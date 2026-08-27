@@ -1,0 +1,72 @@
+import { Command } from "commander";
+import { pathToFileURL } from "node:url";
+
+import { runInit, type InitOptions } from "./commands/init.ts";
+import { runPurge, type PurgeOptions } from "./commands/purge.ts";
+import { runRetry, type RetryOptions } from "./commands/retry.ts";
+import { runServe, type ServeOptions } from "./commands/serve.ts";
+import { runUpload, type UploadOptions } from "./commands/upload.ts";
+import { printError } from "./output.ts";
+
+function handleError(error: unknown): void {
+  printError(error instanceof Error ? error.message : String(error));
+  process.exitCode = 1;
+}
+
+function run<TArgs>(fn: (args: TArgs) => Promise<void>): (args: TArgs) => Promise<void> {
+  return async (args: TArgs) => {
+    await fn(args).catch(handleError);
+  };
+}
+
+export function createProgram(): Command {
+  const program = new Command();
+  program.name("storyshelf").description("Self-hosted visual testing for Storybook.").version("0.1.0");
+
+  program
+    .command("serve")
+    .description("Start the StoryShelf server")
+    .option("-p, --port <port>", "port to listen on", "3000")
+    .option("--data-dir <dir>", "data directory", "./data")
+    .option("--secret <secret>", "session secret")
+    .option("--capture-concurrency <n>", "concurrent capture jobs", "2")
+    .option("--purge-ttl-days <n>", "purge builds older than N days", "30")
+    .action(run<ServeOptions>(runServe));
+
+  program
+    .command("init")
+    .description("Create a project and CI token on a StoryShelf server")
+    .requiredOption("--url <url>", "server base URL")
+    .requiredOption("--name <name>", "project name")
+    .action(run<InitOptions>(runInit));
+
+  program
+    .command("purge")
+    .description("Purge expired builds on a StoryShelf server")
+    .requiredOption("--url <url>", "server base URL")
+    .action(run<PurgeOptions>(runPurge));
+
+  program
+    .command("upload")
+    .description("Create a build record for a StoryShelf project")
+    .requiredOption("--url <url>", "server base URL")
+    .requiredOption("--slug <slug>", "project slug")
+    .requiredOption("--token <token>", "CI token")
+    .requiredOption("--sha <sha>", "git sha")
+    .requiredOption("--branch <branch>", "git branch")
+    .action(run<UploadOptions>(runUpload));
+
+  program
+    .command("retry")
+    .description("Retry a failed StoryShelf build")
+    .requiredOption("--url <url>", "server base URL")
+    .requiredOption("--slug <slug>", "project slug")
+    .requiredOption("--build-id <id>", "build id")
+    .action(run<RetryOptions>(runRetry));
+
+  return program;
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  createProgram().parse(process.argv);
+}

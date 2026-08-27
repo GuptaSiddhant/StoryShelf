@@ -1,0 +1,34 @@
+{
+  "name": "@storyshelf/auth-password",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Shared-password auth adapter for StoryShelf.",
+  "license": "MIT",
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown -w",
+    "fmt": "oxfmt -c ../../.oxfmtrc.json ./src",
+    "lint": "oxlint --type-aware --type-check ./src",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@storyshelf/core": "workspace:*",
+    "hono": "^4.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:",
+    "oxlint-tsgolint": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./package.json": "./package.json"
+  }
+}
