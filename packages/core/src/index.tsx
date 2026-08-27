@@ -2,6 +2,7 @@ import type { FC } from "hono/jsx";
 import { Hono } from "hono";
 
 import type { AuthUser } from "./adapters/auth.ts";
+import { Queue } from "./capture/queue.ts";
 import type { ShelfOptions } from "./config.ts";
 import { BuildModel } from "./models/build.ts";
 import { ProjectModel } from "./models/project.ts";
@@ -42,10 +43,13 @@ export function createShelfRouter(options: ShelfOptions): Hono {
   const logger = options.logger ?? console;
   const authEnabled = options.auth !== undefined;
 
+  const queue = options.capture ? new Queue(config.captureConcurrency ?? 2) : null;
+  const enqueueCapture = queue && options.capture ? (buildId: string) => queue.run(() => options.capture!.run(buildId)) : undefined;
+
   app.use("*", async (c, next) => {
     const user = await resolveUser(c, options);
     return runWithStore(
-      { db: options.database, storage: options.storage, config, ui, logger, user, authEnabled },
+      { db: options.database, storage: options.storage, config, ui, logger, user, authEnabled, enqueueCapture },
       () => next(),
     );
   });
@@ -136,15 +140,8 @@ export { StorybookAdapter } from "./capture/storybook.ts";
 export { runCapture, type CaptureContext, type RenderStory } from "./capture/pipeline.ts";
 export { Queue } from "./capture/queue.ts";
 export { Retention } from "./retention/purge.ts";
-export { ProjectModel } from "./models/project.ts";
-export { BuildModel } from "./models/build.ts";
-export { SnapshotModel } from "./models/snapshot.ts";
-export { BaselineModel } from "./models/baseline.ts";
-export { MemberModel } from "./models/member.ts";
-export { CommentModel } from "./models/comment.ts";
-export { LabelModel } from "./models/label.ts";
-export { TokenModel } from "./models/token.ts";
 export { createUrlBuilder, type UrlBuilder } from "./urls.ts";
 export { ulid, slugify } from "./utils/ulid.ts";
+export { baselinePath, diffPath, screenshotPath, storybookDir, storybookZipPath } from "./utils/paths.ts";
 export * from "./schema.ts";
 export * from "./types.ts";

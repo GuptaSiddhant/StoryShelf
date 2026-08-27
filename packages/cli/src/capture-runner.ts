@@ -1,7 +1,5 @@
 import { join } from "node:path";
 import {
-  BuildModel,
-  ProjectModel,
   StorybookAdapter,
   runCapture,
   type Build,
@@ -13,6 +11,8 @@ import {
   type StorySourceAdapter,
   type Viewport,
 } from "@storyshelf/core";
+import { BuildModel } from "@storyshelf/core/models/build";
+import { ProjectModel } from "@storyshelf/core/models/project";
 import { chromium, type Browser } from "playwright";
 
 import { createStaticServer } from "./static-server.ts";

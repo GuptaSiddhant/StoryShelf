@@ -48,7 +48,16 @@
     "./adapter/status": "./dist/adapter/status.mjs",
     "./adapter/logger": "./dist/adapter/logger.mjs",
     "./schema": "./dist/schema.mjs",
+    "./ddl": "./dist/ddl.mjs",
     "./types": "./dist/types.mjs",
+    "./models/project": "./dist/models/project.mjs",
+    "./models/build": "./dist/models/build.mjs",
+    "./models/snapshot": "./dist/models/snapshot.mjs",
+    "./models/baseline": "./dist/models/baseline.mjs",
+    "./models/member": "./dist/models/member.mjs",
+    "./models/comment": "./dist/models/comment.mjs",
+    "./models/label": "./dist/models/label.mjs",
+    "./models/token": "./dist/models/token.mjs",
     "./package.json": "./package.json"
   }
 }

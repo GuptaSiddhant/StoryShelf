@@ -4,7 +4,7 @@ Decisions made during implementation (for review). Architectural decisions are i
 
 ## 2026-08-27 — Scaffold
 
-1. **Drizzle schema lives in `@storyshelf/core`**, not duplicated per adapter. Both `@storyshelf/sqlite` and `@storyshelf/turso` import the same schema from core (per ADR 0002 "shared schema"). This makes `sqlite`/`turso` depend on `core`.
+1. **Drizzle schema lives in `@storyshelf/core`**, not duplicated per adapter. Both `@storyshelf/db-sqlite` and `@storyshelf/db-turso` import the same schema from core (per ADR 0002 "shared schema"). This makes `db-sqlite`/`db-turso` depend on `core`.
    - *Trade-off:* `core` gains a dependency on `drizzle-orm`. Accepted — the schema is core domain logic.
 
 2. **Models are pure functions/classes over a minimal `DatabaseAdapter`**, not Drizzle-specific. Drizzle is used only inside the `sqlite`/`turso` adapters to translate the adapter's typed operations into SQL. The adapter interface is a small set of typed CRUD + query primitives (per-table generics), not raw SQL passthrough — keeps `turso` (remote HTTP driver) and `sqlite` (sync better-sqlite3) behind one async interface.
@@ -34,4 +34,6 @@ Decisions made during implementation (for review). Architectural decisions are i
 14. **ULID is implemented in-core** (`utils/ulid.ts`, `node:crypto`) rather than pulling an external `ulid`/`cuid` dependency.
 15. **`comments.parent_id` self-FK is stored as a plain text column** (no `.references()`), sidestepping Drizzle's circular-type-inference issue with self-referencing tables.
 16. **Diff overlay + baseline copy are the two storage writes on approve**; baselines are copied (not referenced) so they survive build purge, per ADR 0009.
+17. **Core's barrel entry exports only the router + adapter/option types — not models.** Consumers get `createShelfRouter` and the adapter/capture types from `@storyshelf/core`; the Drizzle models are reachable via deep imports (e.g. `@storyshelf/core/models/build`). This keeps the public surface small and lets models evolve without changing the barrel.
+    - *v2/future:* refactor `runCapture` so the capture-runner (CLI) doesn't need the models directly — have it take preloaded `build`/`project` (or query via `DatabaseAdapter`) instead of constructing `BuildModel`/`ProjectModel` itself.
 

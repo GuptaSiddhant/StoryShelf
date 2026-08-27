@@ -11,7 +11,16 @@ const entry: UserConfig["entry"] = {
   "adapter/status": "./src/adapters/status.ts",
   "adapter/logger": "./src/adapters/logger.ts",
   schema: "./src/schema.ts",
+  ddl: "./src/ddl.ts",
   types: "./src/types.ts",
+  "models/project": "./src/models/project.ts",
+  "models/build": "./src/models/build.ts",
+  "models/snapshot": "./src/models/snapshot.ts",
+  "models/baseline": "./src/models/baseline.ts",
+  "models/member": "./src/models/member.ts",
+  "models/comment": "./src/models/comment.ts",
+  "models/label": "./src/models/label.ts",
+  "models/token": "./src/models/token.ts",
 };
 
 export default defineConfig({
