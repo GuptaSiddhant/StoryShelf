@@ -14,11 +14,12 @@ export function registerAdmin(app: Hono): void {
     const ttlDays = body.ttlDays ?? getStore().config.purgeTtlDays ?? 30;
     const projects = await new ProjectModel(getStore().db).list();
     const retention = new Retention(getStore().db, getStore().storage);
-    let removedBuilds = 0;
-    for (const project of projects) {
-      const result = await retention.purge(project, { ttlDays, keepLatestPerBranch: true });
-      removedBuilds += result.removedBuilds;
-    }
+    const results = await Promise.all(
+      projects.map(async (project) => {
+        return await retention.purge(project, { ttlDays, keepLatestPerBranch: true });
+      }),
+    );
+    const removedBuilds = results.reduce((sum, result) => sum + result.removedBuilds, 0);
     return json(c, { removedBuilds });
   });
 }

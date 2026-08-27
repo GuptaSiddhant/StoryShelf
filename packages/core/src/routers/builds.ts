@@ -1,4 +1,5 @@
 import type { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
 import { BaselineModel } from "../models/baseline.ts";
@@ -8,21 +9,18 @@ import { ProjectModel } from "../models/project.ts";
 import { SnapshotModel } from "../models/snapshot.ts";
 import { getStore } from "../store.ts";
 import { BUILD_STATUSES, type BuildStatus } from "../types.ts";
-import { findProjectBySlug, json, notFound, validJson } from "./helpers.ts";
-
-const createSchema = z.object({
-  gitSha: z.string().min(1),
-  gitBranch: z.string().min(1),
-  authorEmail: z.string().optional(),
-  authorName: z.string().optional(),
-  message: z.string().optional(),
-});
+import { storybookZipPath } from "../utils/paths.ts";
+import { findProjectBySlug, json, notFound, resolveProject, validJson } from "./helpers.ts";
 
 const commentSchema = z.object({
   body: z.string().min(1),
   snapshotId: z.string().optional(),
   parentId: z.string().optional(),
 });
+
+function asString(value: FormDataEntryValue | null): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
 
 async function refreshBuild(buildId: string): Promise<void> {
   const db = getStore().db;
@@ -69,15 +67,34 @@ export function registerBuilds(app: Hono): void {
   });
 
   app.post("/api/v1/projects/:slug/builds", async (c) => {
-    const project = await findProjectBySlug(c.req.param("slug"));
-    if (!project) {
-      notFound("Project not found");
+    const project = await resolveProject(c, c.req.param("slug"));
+    const form = await c.req.formData();
+
+    const gitSha = asString(form.get("gitSha")) ?? "";
+    const gitBranch = asString(form.get("gitBranch")) ?? "";
+    if (!gitSha || !gitBranch) {
+      throw new HTTPException(400, { message: "gitSha and gitBranch are required" });
     }
-    const body = await validJson(c, createSchema);
+    const authorEmail = asString(form.get("authorEmail"));
+    const authorName = asString(form.get("authorName"));
+    const message = asString(form.get("message"));
+
     const build = await new BuildModel(getStore().db).create(project.id, {
-      ...body,
-      isDefault: body.gitBranch === project.gitDefaultBranch,
+      gitSha,
+      gitBranch,
+      isDefault: gitBranch === project.gitDefaultBranch,
+      authorEmail,
+      authorName,
+      message,
     });
+
+    const zip = form.get("zip");
+    if (zip && typeof zip !== "string") {
+      const buffer = Buffer.from(await zip.arrayBuffer());
+      await getStore().storage.write(storybookZipPath(project.id, build.id), buffer);
+    }
+
+    await getStore().enqueueCapture?.(build.id);
     return json(c, build, 202);
   });
 
@@ -132,22 +149,26 @@ export function registerBuilds(app: Hono): void {
   app.post("/api/v1/projects/:slug/builds/:buildId/approve-all", async (c) => {
     const snapshots = await new SnapshotModel(getStore().db).listByBuild(c.req.param("buildId"));
     const userId = getStore().user?.id ?? "anonymous";
-    for (const snapshot of snapshots) {
-      if (snapshot.status === "new" || snapshot.status === "changed") {
-        await approveSnapshot(snapshot.id, userId);
-      }
-    }
+    await Promise.all(
+      snapshots
+        .filter((snapshot) => snapshot.status === "new" || snapshot.status === "changed")
+        .map(async (snapshot) => {
+          await approveSnapshot(snapshot.id, userId);
+        }),
+    );
     return json(c, { ok: true });
   });
 
   app.post("/api/v1/projects/:slug/builds/:buildId/reject-all", async (c) => {
     const snapshots = await new SnapshotModel(getStore().db).listByBuild(c.req.param("buildId"));
     const userId = getStore().user?.id ?? "anonymous";
-    for (const snapshot of snapshots) {
-      if (snapshot.status === "new" || snapshot.status === "changed") {
-        await new SnapshotModel(getStore().db).review(snapshot.id, "rejected", userId);
-      }
-    }
+    await Promise.all(
+      snapshots
+        .filter((snapshot) => snapshot.status === "new" || snapshot.status === "changed")
+        .map(async (snapshot) => {
+          await new SnapshotModel(getStore().db).review(snapshot.id, "rejected", userId);
+        }),
+    );
     await refreshBuild(c.req.param("buildId"));
     return json(c, { ok: true });
   });

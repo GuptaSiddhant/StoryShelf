@@ -14,12 +14,12 @@ export class CommentModel {
   constructor(private readonly db: DatabaseAdapter) {}
 
   async listByBuild(buildId: string): Promise<Comment[]> {
-    return this.db.list(comments, { where: eq(comments.buildId, buildId) });
+    return await this.db.list(comments, { where: eq(comments.buildId, buildId) });
   }
 
   async create(projectId: string, buildId: string, userId: string, input: CommentCreateInput): Promise<Comment> {
     const now = new Date().toISOString();
-    return this.db.insert(comments, {
+    return await this.db.insert(comments, {
       id: ulid(),
       projectId,
       buildId,
@@ -33,7 +33,7 @@ export class CommentModel {
   }
 
   async resolve(id: string): Promise<Comment> {
-    return this.db.update(comments, id, { resolved: true, updatedAt: new Date().toISOString() });
+    return await this.db.update(comments, id, { resolved: true, updatedAt: new Date().toISOString() });
   }
 }
 

@@ -21,23 +21,24 @@ export class LabelModel {
 
   async seedFor(projectId: string): Promise<void> {
     const now = new Date().toISOString();
-    for (const key of SEEDED_LABEL_KEYS) {
-      const exists = await this.getType(projectId, key);
-      if (exists) {
-        continue;
-      }
-      await this.db.insert(labelTypes, {
-        id: ulid(),
-        projectId,
-        key,
-        name: SEEDED_NAMES[key] ?? key,
-        createdAt: now,
-      });
-    }
+    const existing = await this.listTypes(projectId);
+    const existingKeys = new Set(existing.map((t) => t.key));
+    const missing = SEEDED_LABEL_KEYS.filter((key) => !existingKeys.has(key));
+    await Promise.all(
+      missing.map(async (key) => {
+        await this.db.insert(labelTypes, {
+          id: ulid(),
+          projectId,
+          key,
+          name: SEEDED_NAMES[key] ?? key,
+          createdAt: now,
+        });
+      }),
+    );
   }
 
   async listTypes(projectId: string): Promise<LabelType[]> {
-    return this.db.list(labelTypes, { where: eq(labelTypes.projectId, projectId) });
+    return await this.db.list(labelTypes, { where: eq(labelTypes.projectId, projectId) });
   }
 
   async getType(projectId: string, key: string): Promise<LabelType | null> {
@@ -49,7 +50,7 @@ export class LabelModel {
   }
 
   async createType(projectId: string, input: { key: string; name: string; linkTemplate?: string; color?: string }): Promise<LabelType> {
-    return this.db.insert(labelTypes, {
+    return await this.db.insert(labelTypes, {
       id: ulid(),
       projectId,
       key: input.key,
@@ -71,7 +72,7 @@ export class LabelModel {
   }
 
   async attach(projectId: string, buildId: string, typeKey: string, value: string): Promise<BuildLabel> {
-    return this.db.insert(buildLabels, {
+    return await this.db.insert(buildLabels, {
       id: ulid(),
       projectId,
       buildId,
@@ -82,7 +83,7 @@ export class LabelModel {
   }
 
   async listForBuild(buildId: string): Promise<BuildLabel[]> {
-    return this.db.list(buildLabels, { where: eq(buildLabels.buildId, buildId) });
+    return await this.db.list(buildLabels, { where: eq(buildLabels.buildId, buildId) });
   }
 
   async latestBuildId(projectId: string, typeKey: string, value: string): Promise<string | null> {
@@ -92,9 +93,9 @@ export class LabelModel {
     if (labels.length === 0) {
       return null;
     }
-    const ids = labels.map((l) => l.buildId);
+    const idSet = new Set(labels.map((l) => l.buildId));
     const rows = await this.db.list(builds, { orderBy: desc(builds.createdAt) });
-    return rows.find((b) => ids.includes(b.id))?.id ?? null;
+    return rows.find((b) => idSet.has(b.id))?.id ?? null;
   }
 
   async hasPersistent(projectId: string, buildId: string): Promise<boolean> {

@@ -5,7 +5,7 @@ import { DEFAULT_DIFF_OPTIONS } from "../diff/options.ts";
 import { BaselineModel } from "../models/baseline.ts";
 import { BuildModel } from "../models/build.ts";
 import { SnapshotModel } from "../models/snapshot.ts";
-import type { Build, Project } from "../schema.ts";
+import type { Baseline, Build, Project } from "../schema.ts";
 import { diffPath, screenshotPath } from "../utils/paths.ts";
 import type { StoryEntry, StorySourceAdapter, Viewport } from "./adapter.ts";
 
@@ -26,11 +26,13 @@ export interface CaptureContext {
 
 export async function runCapture(ctx: CaptureContext): Promise<void> {
   const stories = await ctx.adapter.discover(ctx.storybookDir);
-  for (const viewport of ctx.viewports) {
-    for (const story of stories) {
-      await captureStory(ctx, story, viewport);
-    }
-  }
+  await Promise.all(
+    ctx.viewports.flatMap((viewport) =>
+      stories.map(async (story) => {
+        await captureStory(ctx, story, viewport);
+      }),
+    ),
+  );
   await finalize(ctx, stories.map((s) => s.id));
 }
 
@@ -47,9 +49,9 @@ async function captureStory(ctx: CaptureContext, story: StoryEntry, viewport: Vi
   await createWithBaseline(ctx, story, viewport, screenshot, baseline.screenshotPath);
 }
 
-async function resolveBaseline(ctx: CaptureContext, storyId: string, viewport: string) {
+async function resolveBaseline(ctx: CaptureContext, storyId: string, viewport: string): Promise<Baseline | null> {
   const baselines = new BaselineModel(ctx.db, ctx.storage);
-  return baselines.resolve(ctx.project.id, storyId, viewport, ctx.build.gitBranch, ctx.project.gitDefaultBranch);
+  return await baselines.resolve(ctx.project.id, storyId, viewport, ctx.build.gitBranch, ctx.project.gitDefaultBranch);
 }
 
 async function createWithoutBaseline(ctx: CaptureContext, story: StoryEntry, viewport: Viewport, screenshot: string): Promise<void> {

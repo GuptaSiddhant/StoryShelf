@@ -21,7 +21,7 @@ export class SnapshotModel {
 
   async create(projectId: string, buildId: string, input: SnapshotCreateInput): Promise<Snapshot> {
     const now = new Date().toISOString();
-    return this.db.insert(snapshots, {
+    return await this.db.insert(snapshots, {
       id: ulid(),
       projectId,
       buildId,
@@ -40,23 +40,23 @@ export class SnapshotModel {
   }
 
   async listByBuild(buildId: string): Promise<Snapshot[]> {
-    return this.db.list(snapshots, { where: eq(snapshots.buildId, buildId) });
+    return await this.db.list(snapshots, { where: eq(snapshots.buildId, buildId) });
   }
 
   async get(id: string): Promise<Snapshot | null> {
-    return this.db.get(snapshots, id);
+    return await this.db.get(snapshots, id);
   }
 
   async update(id: string, patch: Partial<Snapshot>): Promise<Snapshot> {
-    return this.db.update(snapshots, id, { ...patch, updatedAt: new Date().toISOString() });
+    return await this.db.update(snapshots, id, { ...patch, updatedAt: new Date().toISOString() });
   }
 
   async setStatus(id: string, status: SnapshotStatus): Promise<Snapshot> {
-    return this.update(id, { status });
+    return await this.update(id, { status });
   }
 
   async review(id: string, status: SnapshotStatus, userId: string): Promise<Snapshot> {
-    return this.update(id, { status, reviewedBy: userId, reviewedAt: new Date().toISOString() });
+    return await this.update(id, { status, reviewedBy: userId, reviewedAt: new Date().toISOString() });
   }
 }
 

@@ -31,7 +31,7 @@ export class BaselineModel {
   }
 
   async read(baseline: Baseline): Promise<Buffer> {
-    return this.storage.read(baseline.screenshotPath);
+    return await this.storage.read(baseline.screenshotPath);
   }
 
   async upsert(
@@ -69,19 +69,18 @@ export class BaselineModel {
   }
 
   async list(projectId: string): Promise<Baseline[]> {
-    return this.db.list(baselines, { where: eq(baselines.projectId, projectId) });
+    return await this.db.list(baselines, { where: eq(baselines.projectId, projectId) });
   }
 
   async removeOrphans(projectId: string, validStoryIds: Set<string>): Promise<number> {
     const all = await this.list(projectId);
-    let removed = 0;
-    for (const baseline of all) {
-      if (!validStoryIds.has(baseline.storyId)) {
+    const toRemove = all.filter((baseline) => !validStoryIds.has(baseline.storyId));
+    await Promise.all(
+      toRemove.map(async (baseline) => {
         await this.db.remove(baselines, baseline.id);
-        removed += 1;
-      }
-    }
-    return removed;
+      }),
+    );
+    return toRemove.length;
   }
 }
 

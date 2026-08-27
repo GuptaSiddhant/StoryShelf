@@ -16,9 +16,9 @@ export interface DatabaseAdapter {
     values: Partial<T["$inferInsert"]>,
   ): Promise<T["$inferSelect"]>;
   get<T extends AnySQLiteTable>(table: T, id: string): Promise<T["$inferSelect"] | null>;
-  remove<T extends AnySQLiteTable>(table: T, id: string): Promise<void>;
+  remove(table: AnySQLiteTable, id: string): Promise<void>;
   list<T extends AnySQLiteTable>(table: T, opts?: ListOptions): Promise<T["$inferSelect"][]>;
-  count<T extends AnySQLiteTable>(table: T, where?: SQL): Promise<number>;
+  count(table: AnySQLiteTable, where?: SQL): Promise<number>;
   all<T>(query: SQL): Promise<T[]>;
   migrate(): Promise<void>;
   close(): Promise<void>;

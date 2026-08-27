@@ -28,7 +28,7 @@ export class ProjectModel {
   }
 
   async get(id: string): Promise<Project | null> {
-    return this.db.get(projects, id);
+    return await this.db.get(projects, id);
   }
 
   async getBySlug(slug: string): Promise<Project | null> {
@@ -37,11 +37,11 @@ export class ProjectModel {
   }
 
   async list(): Promise<Project[]> {
-    return this.db.list(projects);
+    return await this.db.list(projects);
   }
 
   async update(id: string, patch: Partial<Pick<Project, "name" | "gitRepository" | "gitDefaultBranch" | "pixelThreshold" | "maxDiffRatio" | "publicBranchRegex">>): Promise<Project> {
-    return this.db.update(projects, id, { ...patch, updatedAt: new Date().toISOString() });
+    return await this.db.update(projects, id, { ...patch, updatedAt: new Date().toISOString() });
   }
 
   async remove(id: string): Promise<void> {
@@ -50,13 +50,16 @@ export class ProjectModel {
 
   private async uniqueSlug(name: string): Promise<string> {
     const base = slugify(name) || "project";
-    let candidate = base;
+    const existing = await this.db.list(projects, { where: eq(projects.slug, base) });
+    if (existing.length === 0) {
+      return base;
+    }
+    const taken = new Set(existing.map((p) => p.slug));
     let suffix = 2;
-    while ((await this.getBySlug(candidate)) !== null) {
-      candidate = `${base}-${suffix}`;
+    while (taken.has(`${base}-${suffix}`)) {
       suffix += 1;
     }
-    return candidate;
+    return `${base}-${suffix}`;
   }
 }
 

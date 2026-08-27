@@ -3,6 +3,9 @@ import type { FC } from "hono/jsx";
 import { getStore } from "../store.ts";
 import type { BrandTheme } from "./theme.ts";
 
+// Hono's JSX.Element is typed as `HtmlEscapedString | Promise<...>`, so JSX-returning
+// functions can legitimately return a promise; the rule is a false positive here.
+// eslint-disable-next-line promise-function-async -- JSX component return type
 export const DocumentLayout: FC<{ title: string; children?: unknown }> = ({ title, children }) => {
   const { ui } = getStore();
   const name = ui.name ?? "StoryShelf";

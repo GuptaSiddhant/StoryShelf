@@ -4,14 +4,17 @@ const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
 function encodeTime(time: number): string {
   let out = "";
+  let remaining = time;
   for (let i = 9; i >= 0; i -= 1) {
-    const mod = time % 32;
+    const mod = remaining % 32;
+    // eslint-disable-next-line no-non-null-assertion -- index is within CROCKFORD length
     out = CROCKFORD[mod]! + out;
-    time = (time - mod) / 32;
+    remaining = (remaining - mod) / 32;
   }
   return out;
 }
 
+/* eslint-disable no-bitwise, no-non-null-assertion -- ULID encoding is inherently bitwise. */
 function encodeRandom(bytes: Buffer): string {
   let out = "";
   let buffer = 0;
@@ -29,6 +32,7 @@ function encodeRandom(bytes: Buffer): string {
   }
   return out;
 }
+/* eslint-enable no-bitwise, no-non-null-assertion */
 
 export function ulid(): string {
   return encodeTime(Date.now()) + encodeRandom(randomBytes(10));
@@ -37,7 +41,7 @@ export function ulid(): string {
 export function slugify(value: string): string {
   return value
     .toLowerCase()
-    .replace(/[^a-z0-9]+/gu, "-")
-    .replace(/^-+|-+$/gu, "")
+    .replaceAll(/[^a-z0-9]+/gu, "-")
+    .replaceAll(/^-+|-+$/gu, "")
     .slice(0, 63);
 }

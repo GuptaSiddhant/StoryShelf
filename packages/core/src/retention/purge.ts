@@ -30,18 +30,32 @@ export class Retention {
     });
 
     const keep = options.keepLatestPerBranch ? await this.latestPerBranch(project.id) : new Set<string>();
+    const labelModel = new LabelModel(this.db);
+    const target = await Promise.all(
+      candidates.map(async (build) => {
+        if (keep.has(build.id) || (await labelModel.hasPersistent(project.id, build.id))) {
+          return null;
+        }
+        return build.id;
+      }),
+    );
 
-    let removedBuilds = 0;
-    let removedFiles = 0;
-    for (const build of candidates) {
-      if (keep.has(build.id) || (await new LabelModel(this.db).hasPersistent(project.id, build.id))) {
-        continue;
-      }
-      removedFiles += await this.deleteBuildFiles(project.id, build.id);
-      await new BuildModel(this.db).remove(build.id);
-      removedBuilds += 1;
-    }
-    return { removedBuilds, removedFiles };
+    const buildIds = target.filter((id): id is string => id !== null);
+    const results = await Promise.all(
+      buildIds.map(async (buildId) => ({
+        files: await this.deleteBuildFiles(project.id, buildId),
+        removed: await this.removeBuild(buildId),
+      })),
+    );
+    return {
+      removedBuilds: results.filter((r) => r.removed).length,
+      removedFiles: results.reduce((sum, r) => sum + r.files, 0),
+    };
+  }
+
+  private async removeBuild(buildId: string): Promise<boolean> {
+    await new BuildModel(this.db).remove(buildId);
+    return true;
   }
 
   private async latestPerBranch(projectId: string): Promise<Set<string>> {
@@ -59,9 +73,11 @@ export class Retention {
   private async deleteBuildFiles(projectId: string, buildId: string): Promise<number> {
     const prefix = `${projectId}/builds/${buildId}/`;
     const files = await this.storage.list(prefix);
-    for (const file of files) {
-      await this.storage.delete(file);
-    }
+    await Promise.all(
+      files.map(async (file) => {
+        await this.storage.delete(file);
+      }),
+    );
     return files.length;
   }
 }

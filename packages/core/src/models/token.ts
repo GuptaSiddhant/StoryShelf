@@ -8,7 +8,7 @@ export class TokenModel {
   constructor(private readonly db: DatabaseAdapter) {}
 
   async create(projectId: string, name: string, hash: string): Promise<Token> {
-    return this.db.insert(tokens, {
+    return await this.db.insert(tokens, {
       id: ulid(),
       projectId,
       name,
@@ -18,7 +18,7 @@ export class TokenModel {
   }
 
   async list(projectId: string): Promise<Token[]> {
-    return this.db.list(tokens, { where: eq(tokens.projectId, projectId) });
+    return await this.db.list(tokens, { where: eq(tokens.projectId, projectId) });
   }
 
   async findByHash(hash: string): Promise<Token | null> {

@@ -9,7 +9,7 @@ export class MemberModel {
   constructor(private readonly db: DatabaseAdapter) {}
 
   async list(projectId: string): Promise<ProjectMember[]> {
-    return this.db.list(projectMembers, { where: eq(projectMembers.projectId, projectId) });
+    return await this.db.list(projectMembers, { where: eq(projectMembers.projectId, projectId) });
   }
 
   async get(projectId: string, userId: string): Promise<ProjectMember | null> {

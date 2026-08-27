@@ -26,18 +26,29 @@ export class StorybookAdapter implements StorySourceAdapter {
       }));
   }
 
+  // buildUrl is a pure helper bound by the StorySourceAdapter interface.
+  // eslint-disable-next-line class-methods-use-this
   buildUrl(baseUrl: string, storyId: string): string {
     return `${baseUrl}/iframe.html?id=${encodeURIComponent(storyId)}&viewMode=story`;
   }
 
+  // Private helper; invoked via `this` from discover.
+  // eslint-disable-next-line class-methods-use-this
   private async readIndex(source: string): Promise<StorybookIndex> {
-    for (const name of ["index.json", "stories.json"]) {
-      try {
-        const raw = await readFile(join(source, name), "utf8");
-        return JSON.parse(raw) as StorybookIndex;
-      } catch {
-        continue;
-      }
+    const candidates = ["index.json", "stories.json"];
+    const results = await Promise.all(
+      candidates.map(async (name) => {
+        try {
+          const raw = await readFile(join(source, name), "utf8");
+          return JSON.parse(raw) as StorybookIndex;
+        } catch {
+          return null;
+        }
+      }),
+    );
+    const found = results.find((index) => index !== null);
+    if (found) {
+      return found;
     }
     throw new Error(`No Storybook index found in ${source}`);
   }

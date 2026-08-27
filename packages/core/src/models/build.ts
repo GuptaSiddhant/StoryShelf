@@ -27,7 +27,7 @@ export class BuildModel {
 
   async create(projectId: string, input: BuildCreateInput): Promise<Build> {
     const now = new Date().toISOString();
-    return this.db.insert(builds, {
+    return await this.db.insert(builds, {
       id: ulid(),
       projectId,
       gitSha: input.gitSha,
@@ -44,7 +44,7 @@ export class BuildModel {
   }
 
   async get(id: string): Promise<Build | null> {
-    return this.db.get(builds, id);
+    return await this.db.get(builds, id);
   }
 
   async list(projectId: string, filter: BuildListFilter = {}): Promise<Build[]> {
@@ -69,11 +69,11 @@ export class BuildModel {
   }
 
   async update(id: string, patch: Partial<Pick<Build, "status" | "public" | "message" | "authorEmail" | "authorName">>): Promise<Build> {
-    return this.db.update(builds, id, { ...patch, updatedAt: new Date().toISOString() });
+    return await this.db.update(builds, id, { ...patch, updatedAt: new Date().toISOString() });
   }
 
   async setStatus(id: string, status: BuildStatus): Promise<Build> {
-    return this.update(id, { status });
+    return await this.update(id, { status });
   }
 
   async updateCounts(id: string): Promise<Build> {

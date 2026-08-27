@@ -54,6 +54,10 @@ export function createProgram(): Command {
     .requiredOption("--token <token>", "CI token")
     .requiredOption("--sha <sha>", "git sha")
     .requiredOption("--branch <branch>", "git branch")
+    .option("--storybook-dir <dir>", "built Storybook directory", "storybook-static")
+    .option("--message <message>", "commit message")
+    .option("--author-email <email>", "author email")
+    .option("--author-name <name>", "author name")
     .action(run<UploadOptions>(runUpload));
 
   program

@@ -25,9 +25,11 @@
       "outputLogs": "new-only"
     },
     "test": {
+      "dependsOn": ["^build"],
       "outputs": ["./node_modules/.vite/vitest"]
     },
     "test:integration": {
+      "dependsOn": ["^build"],
       "cache": false,
       "outputs": ["./node_modules/.vite/vitest"]
     },

@@ -5,17 +5,19 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { ZodType } from "zod";
 
 import { MemberModel } from "../models/member.ts";
-import { projects } from "../schema.ts";
+import { ProjectModel } from "../models/project.ts";
+import { TokenModel } from "../models/token.ts";
+import { projects, type Project } from "../schema.ts";
 import { getStore } from "../store.ts";
 import type { ProjectRole } from "../types.ts";
+import { sha256 } from "../utils/hash.ts";
 
-export function json<T>(c: Context, data: T, status: ContentfulStatusCode = 200): Response {
+export function json(c: Context, data: unknown, status: ContentfulStatusCode = 200): Response {
   return c.json(data, status);
 }
 
 export async function validJson<T>(c: Context, schema: ZodType<T>): Promise<T> {
-  const raw = await c.req.json();
-  const result = schema.safeParse(raw);
+  const result = schema.safeParse(await c.req.json());
   if (!result.success) {
     throw new HTTPException(400, { message: result.error.message });
   }
@@ -39,7 +41,7 @@ export async function currentProjectRole(projectId: string): Promise<ProjectRole
   if (!user) {
     return null;
   }
-  return new MemberModel(db).effectiveRole(user.role, projectId, user.id);
+  return await new MemberModel(db).effectiveRole(user.role, projectId, user.id);
 }
 
 export function requireRole(...roles: ProjectRole[]) {
@@ -56,8 +58,29 @@ export function requireRole(...roles: ProjectRole[]) {
   };
 }
 
-export async function findProjectBySlug(slug: string) {
+export async function findProjectBySlug(slug: string): Promise<Project | null> {
   const { db } = getStore();
   const rows = await db.list(projects, { where: eq(projects.slug, slug), limit: 1 });
   return rows[0] ?? null;
+}
+
+export async function resolveProject(c: Context, slug: string): Promise<Project> {
+  const authHeader = c.req.header("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.slice("Bearer ".length);
+    const found = await new TokenModel(getStore().db).findByHash(sha256(token));
+    if (!found) {
+      unauthorized();
+    }
+    const project = await new ProjectModel(getStore().db).get(found.projectId);
+    if (!project || project.slug !== slug) {
+      forbidden();
+    }
+    return project;
+  }
+  const project = await findProjectBySlug(slug);
+  if (!project) {
+    notFound("Project not found");
+  }
+  return project;
 }

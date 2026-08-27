@@ -23,13 +23,18 @@ async function resolveUser(c: { req: { raw: Request; header: (name: string) => s
   if (c.req.header("authorization")) {
     return null;
   }
-  return options.auth.check(c.req.raw);
+  return await options.auth.check(c.req.raw);
 }
 
+// Hono's JSX.Element is typed as `HtmlEscapedString | Promise<...>`, so JSX-returning
+// functions can legitimately return a promise; the rule is a false positive here.
+// eslint-disable-next-line promise-function-async -- JSX component return type
 const ProjectsPage: FC = () => {
   return <DocumentLayout title="Projects">
     <h1>Projects</h1>
-    <ul>{/* populated via htmx on client */}</ul>
+    <ul>
+      {/* populated via htmx on client */}
+    </ul>
     <p>
       <a href="/projects">Manage projects</a>
     </p>
@@ -44,13 +49,24 @@ export function createShelfRouter(options: ShelfOptions): Hono {
   const authEnabled = options.auth !== undefined;
 
   const queue = options.capture ? new Queue(config.captureConcurrency ?? 2) : null;
-  const enqueueCapture = queue && options.capture ? (buildId: string) => queue.run(() => options.capture!.run(buildId)) : undefined;
+
+  let enqueueCapture: ((buildId: string) => Promise<void>) | undefined;
+  if (queue && options.capture) {
+    const capture = options.capture;
+    enqueueCapture = async (buildId: string): Promise<void> => {
+      await queue.run(async () => {
+        await capture.run(buildId);
+      });
+    };
+  }
 
   app.use("*", async (c, next) => {
     const user = await resolveUser(c, options);
     return runWithStore(
       { db: options.database, storage: options.storage, config, ui, logger, user, authEnabled, enqueueCapture },
-      () => next(),
+      async () => {
+        await next();
+      },
     );
   });
 
@@ -61,7 +77,7 @@ export function createShelfRouter(options: ShelfOptions): Hono {
   registerTokens(app);
   registerAdmin(app);
 
-  app.get("/", (c) => c.html(<ProjectsPage />));
+  app.get("/", async (c) => await c.html(<ProjectsPage />));
 
   app.get("/projects", async (c) => {
     const projects = await new ProjectModel(getStore().db).list();
@@ -69,11 +85,14 @@ export function createShelfRouter(options: ShelfOptions): Hono {
       <DocumentLayout title="Projects">
         <h1>Projects</h1>
         <ul>
-          {projects.map((p) => (
-            <li key={p.id}>
-              <a href={`/projects/${p.slug}/builds`}>{p.name}</a>
-            </li>
-          ))}
+          {projects.map(
+            // eslint-disable-next-line promise-function-async -- JSX.Element includes Promise<HtmlEscapedString>
+            (p) => (
+              <li key={p.id}>
+                <a href={`/projects/${p.slug}/builds`}>{p.name}</a>
+              </li>
+            ),
+          )}
         </ul>
       </DocumentLayout>,
     );
@@ -91,11 +110,14 @@ export function createShelfRouter(options: ShelfOptions): Hono {
       <DocumentLayout title={project.name}>
         <h1>{project.name}</h1>
         <ul>
-          {builds.map((b) => (
-            <li key={b.id}>
-              <a href={`/projects/${project.slug}/builds/${b.id}`}>{b.gitBranch}</a> · {b.status} · {b.message ?? ""}
-            </li>
-          ))}
+          {builds.map(
+            // eslint-disable-next-line promise-function-async -- JSX.Element includes Promise<HtmlEscapedString>
+            (b) => (
+              <li key={b.id}>
+                <a href={`/projects/${project.slug}/builds/${b.id}`}>{b.gitBranch}</a> · {b.status} · {b.message ?? ""}
+              </li>
+            ),
+          )}
         </ul>
       </DocumentLayout>,
     );
@@ -113,11 +135,14 @@ export function createShelfRouter(options: ShelfOptions): Hono {
           {build.gitBranch} — {build.status}
         </h1>
         <ul>
-          {snapshots.map((s) => (
-            <li key={s.id}>
-              {s.storyTitle} / {s.storyName} · {s.viewportName} · {s.status}
-            </li>
-          ))}
+          {snapshots.map(
+            // eslint-disable-next-line promise-function-async -- JSX.Element includes Promise<HtmlEscapedString>
+            (s) => (
+              <li key={s.id}>
+                {s.storyTitle} / {s.storyName} · {s.viewportName} · {s.status}
+              </li>
+            ),
+          )}
         </ul>
       </DocumentLayout>,
     );

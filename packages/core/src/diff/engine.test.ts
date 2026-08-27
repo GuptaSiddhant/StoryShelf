@@ -8,7 +8,7 @@ function png(width: number, height: number, fill: (x: number, y: number) => [num
   const image = new PNG({ width, height });
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
-      const idx = (width * y + x) << 2;
+      const idx = (width * y + x) * 4;
       const [r, g, b] = fill(x, y);
       image.data[idx] = r;
       image.data[idx + 1] = g;
@@ -19,7 +19,7 @@ function png(width: number, height: number, fill: (x: number, y: number) => [num
   return PNG.sync.write(image);
 }
 
-const solid = (rgb: [number, number, number]) => (_x: number, _y: number) => rgb;
+const solid = (rgb: [number, number, number]) => (_x: number, _y: number): [number, number, number] => rgb;
 
 describe("diffImages", () => {
   it("reports zero diff for identical images", () => {
