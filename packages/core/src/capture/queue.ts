@@ -9,13 +9,26 @@ export interface QueueEntry {
   error?: string;
 }
 
+/**
+ * A concurrency-limited capture queue that tracks per-build job status.
+ */
 export class Queue {
   private readonly entries = new Map<string, QueueEntry>();
   private running = 0;
   private readonly waiting: (() => void)[] = [];
 
+  /**
+   * @param concurrency - Maximum number of tasks that may run simultaneously.
+   */
   constructor(private readonly concurrency: number) {}
 
+  /**
+   * Run a task for a build, bounded by the queue's concurrency limit.
+   *
+   * @param buildId - Build being processed.
+   * @param task - Async task to run once a slot is available.
+   * @returns The task's result.
+   */
   async run<T>(buildId: string, task: () => Promise<T>): Promise<T> {
     const entry = this.track(buildId);
     await this.acquire();
@@ -38,6 +51,12 @@ export class Queue {
     }
   }
 
+  /**
+   * Return the current status entry for a build.
+   *
+   * @param buildId - Build to look up.
+   * @returns The queue entry, or null if the build is untracked.
+   */
   status(buildId: string): QueueEntry | null {
     return this.entries.get(buildId) ?? null;
   }

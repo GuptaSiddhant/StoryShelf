@@ -9,21 +9,37 @@ import type { Baseline, Build, Project } from "../schema.ts";
 import { diffPath, screenshotPath } from "../utils/paths.ts";
 import type { StoryEntry, StorySourceAdapter, Viewport } from "./adapter.ts";
 
+/** Renders a single story at a viewport and returns the screenshot bytes. */
 export interface RenderStory {
   (story: StoryEntry, viewport: Viewport): Promise<Buffer>;
 }
 
+/** Everything the capture pipeline needs to run against a build. */
 export interface CaptureContext {
+  /** Database adapter. */
   db: DatabaseAdapter;
+  /** Storage adapter. */
   storage: StorageAdapter;
+  /** The project being captured. */
   project: Project;
+  /** The build being captured. */
   build: Build;
+  /** Directory containing the built Storybook. */
   storybookDir: string;
+  /** Viewports at which stories are captured. */
   viewports: Viewport[];
+  /** Adapter used to discover and render stories. */
   adapter: StorySourceAdapter;
+  /** Function that renders a story into a screenshot buffer. */
   renderStory: RenderStory;
 }
 
+/**
+ * Run the capture pipeline for a build: discover stories, capture and diff
+ * snapshots across viewports, then finalize the build.
+ *
+ * @param ctx - Capture context.
+ */
 export async function runCapture(ctx: CaptureContext): Promise<void> {
   const stories = await ctx.adapter.discover(ctx.storybookDir);
   await Promise.all(

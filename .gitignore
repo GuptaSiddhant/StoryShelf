@@ -35,5 +35,6 @@ openapi.json
 
 # StoryShelf local data
 .data/
+.dev-data/
 data
 nub.lock.bak

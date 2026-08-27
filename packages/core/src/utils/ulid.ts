@@ -34,10 +34,21 @@ function encodeRandom(bytes: Buffer): string {
 }
 /* eslint-enable no-bitwise, no-non-null-assertion */
 
+/**
+ * Generate a new sortable, collision-resistant ULID.
+ *
+ * @returns A 26-character ULID string.
+ */
 export function ulid(): string {
   return encodeTime(Date.now()) + encodeRandom(randomBytes(10));
 }
 
+/**
+ * Convert a string into a URL-safe slug, capped at 63 characters.
+ *
+ * @param value - Raw string to slugify.
+ * @returns The lowercased, hyphen-separated slug.
+ */
 export function slugify(value: string): string {
   return value
     .toLowerCase()

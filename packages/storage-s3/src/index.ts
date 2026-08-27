@@ -10,10 +10,15 @@ import {
 
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 
+/** Options for configuring an S3-compatible storage adapter. */
 export interface S3StorageOptions {
+  /** S3 bucket name. */
   bucket: string;
+  /** Optional key prefix applied to all stored objects. */
   prefix?: string;
+  /** Custom endpoint for S3-compatible services (e.g. MinIO, R2). */
   endpoint?: string;
+  /** AWS region. Defaults to `us-east-1`. */
   region?: string;
 }
 
@@ -29,6 +34,12 @@ function isNotFound(error: unknown): boolean {
   return error instanceof S3ServiceException && error.$metadata.httpStatusCode === 404;
 }
 
+/**
+ * Create an S3-compatible StorageAdapter (AWS S3, R2, MinIO, etc.).
+ *
+ * @param options - S3 configuration options.
+ * @returns A StorageAdapter backed by the configured S3 bucket.
+ */
 export function createS3Storage(options: S3StorageOptions): StorageAdapter {
   const { bucket, prefix = "", endpoint, region = "us-east-1" } = options;
   const client = new S3Client({ endpoint, region, forcePathStyle: true });

@@ -19,6 +19,11 @@ function run<TArgs>(fn: (args: TArgs) => Promise<void>): (args: TArgs) => Promis
   };
 }
 
+/**
+ * Build the StoryShelf CLI program with all subcommands registered.
+ *
+ * @returns The configured commander Command instance.
+ */
 export function createProgram(): Command {
   const program = new Command();
   program.name("storyshelf").description("Self-hosted visual testing for Storybook.").version("0.1.0");

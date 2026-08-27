@@ -12,6 +12,12 @@ async function pathExists(target: string): Promise<boolean> {
   }
 }
 
+/**
+ * Create a local filesystem-backed StorageAdapter rooted at the given directory.
+ *
+ * @param dataDir - Root directory in which all stored files live.
+ * @returns A StorageAdapter that reads and writes files under `dataDir`.
+ */
 export function createLocalStorage(dataDir: string): StorageAdapter {
   const root = resolve(dataDir);
 

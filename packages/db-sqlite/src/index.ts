@@ -12,6 +12,12 @@ function idOf(table: AnySQLiteTable): SQLiteColumn {
   return getTableColumns(table)["id"]!;
 }
 
+/**
+ * Create a SQLite-backed DatabaseAdapter using better-sqlite3 and Drizzle ORM.
+ *
+ * @param path - Filesystem path to the SQLite database file.
+ * @returns A DatabaseAdapter backed by the given SQLite file (WAL mode).
+ */
 export function createSqliteDatabase(path: string): DatabaseAdapter {
   const sqlite = new Database(path);
   sqlite.pragma("journal_mode = WAL");

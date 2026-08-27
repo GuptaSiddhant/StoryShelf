@@ -5,12 +5,21 @@ interface BuildResponse {
   id: string;
 }
 
+/** Options for the `retry` command. */
 export interface RetryOptions {
+  /** Server base URL. */
   url: string;
+  /** Project slug. */
   slug: string;
+  /** Build ID to retry. */
   buildId: string;
 }
 
+/**
+ * Retry a failed StoryShelf build.
+ *
+ * @param options - Retry command options.
+ */
 export async function runRetry(options: RetryOptions): Promise<void> {
   const base = normalizeBaseUrl(options.url);
   const build = await postJson<BuildResponse>(

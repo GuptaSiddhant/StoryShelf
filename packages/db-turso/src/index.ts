@@ -12,6 +12,12 @@ function idOf(table: AnySQLiteTable): SQLiteColumn {
   return getTableColumns(table)["id"]!;
 }
 
+/**
+ * Create a Turso/libSQL-backed DatabaseAdapter using Drizzle ORM.
+ *
+ * @param options - Connection options: the database `url` and an optional `authToken`.
+ * @returns A DatabaseAdapter backed by the Turso database.
+ */
 export function createTursoDatabase(options: { url: string; authToken?: string }): DatabaseAdapter {
   const client = createClient({ url: options.url, authToken: options.authToken });
   const db = drizzle(client, { schema });

@@ -27,10 +27,10 @@ docs/                                       — architecture, ADRs, testing, web
 
 ```sh
 nub install                      # install workspace deps
+nub run serve                    # dev server from TS source, hot-restarts on any change
 nub run build                    # turbo build all packages
 nub run test                     # turbo test
 nub run verify                   # build + lint + test
-nub run --filter @storyshelf/cli start   # run the server
 ```
 
-See `docs/architecture.md` for the full architecture and `docs/implementation-plan.md` for the build order.
+`nub run serve` runs the CLI from source (`nub watch ./packages/cli/src/index.ts serve --data-dir .dev-data`). It needs no build step: the `development` exports condition (via `nub.jsonc` + tsconfig `customConditions`) resolves workspace packages to their TypeScript source, and `nub watch` restarts the server whenever any file in the import graph changes.

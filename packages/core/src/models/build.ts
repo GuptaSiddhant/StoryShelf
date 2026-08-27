@@ -22,9 +22,20 @@ export interface BuildListFilter {
   labelValue?: string;
 }
 
+/** Data operations for build records. */
 export class BuildModel {
+  /**
+   * @param db - Database adapter.
+   */
   constructor(private readonly db: DatabaseAdapter) {}
 
+  /**
+   * Create a new build for a project.
+   *
+   * @param projectId - Project ID.
+   * @param input - Build creation input.
+   * @returns The created build.
+   */
   async create(projectId: string, input: BuildCreateInput): Promise<Build> {
     const now = new Date().toISOString();
     return await this.db.insert(builds, {
@@ -43,10 +54,18 @@ export class BuildModel {
     });
   }
 
+  /** Fetch a build by id, or null if not found. */
   async get(id: string): Promise<Build | null> {
     return await this.db.get(builds, id);
   }
 
+  /**
+   * List builds for a project, optionally filtered.
+   *
+   * @param projectId - Project ID.
+   * @param filter - Optional status, branch, or label filter.
+   * @returns The matching builds, newest first.
+   */
   async list(projectId: string, filter: BuildListFilter = {}): Promise<Build[]> {
     const conditions = [eq(builds.projectId, projectId)];
     if (filter.status) {
@@ -68,14 +87,17 @@ export class BuildModel {
     return this.db.list(builds, { where: and(...conditions), orderBy: desc(builds.createdAt) });
   }
 
+  /** Update mutable fields of a build. */
   async update(id: string, patch: Partial<Pick<Build, "status" | "public" | "message" | "authorEmail" | "authorName">>): Promise<Build> {
     return await this.db.update(builds, id, { ...patch, updatedAt: new Date().toISOString() });
   }
 
+  /** Set the status of a build. */
   async setStatus(id: string, status: BuildStatus): Promise<Build> {
     return await this.update(id, { status });
   }
 
+  /** Recompute and persist snapshot count aggregates for a build. */
   async updateCounts(id: string): Promise<Build> {
     const rows = await this.db.list(snapshots, { where: eq(snapshots.buildId, id) });
     const snapshotCount = rows.length;
@@ -91,6 +113,7 @@ export class BuildModel {
     });
   }
 
+  /** Delete a build by id. */
   async remove(id: string): Promise<void> {
     await this.db.remove(builds, id);
   }

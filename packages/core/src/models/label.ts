@@ -16,9 +16,18 @@ const SEEDED_NAMES: Record<string, string> = {
   custom: "Custom",
 };
 
+/** Data operations for label types and build labels. */
 export class LabelModel {
+  /**
+   * @param db - Database adapter.
+   */
   constructor(private readonly db: DatabaseAdapter) {}
 
+  /**
+   * Seed the default label types for a project if missing.
+   *
+   * @param projectId - Project ID.
+   */
   async seedFor(projectId: string): Promise<void> {
     const now = new Date().toISOString();
     const existing = await this.listTypes(projectId);
@@ -37,10 +46,12 @@ export class LabelModel {
     );
   }
 
+  /** List all label types for a project. */
   async listTypes(projectId: string): Promise<LabelType[]> {
     return await this.db.list(labelTypes, { where: eq(labelTypes.projectId, projectId) });
   }
 
+  /** Fetch a label type by key, or null if not found. */
   async getType(projectId: string, key: string): Promise<LabelType | null> {
     const rows = await this.db.list(labelTypes, {
       where: and(eq(labelTypes.projectId, projectId), eq(labelTypes.key, key)),
@@ -49,6 +60,7 @@ export class LabelModel {
     return rows[0] ?? null;
   }
 
+  /** Create a custom label type for a project. */
   async createType(projectId: string, input: { key: string; name: string; linkTemplate?: string; color?: string }): Promise<LabelType> {
     return await this.db.insert(labelTypes, {
       id: ulid(),
@@ -61,6 +73,7 @@ export class LabelModel {
     });
   }
 
+  /** Remove a custom label type, rejecting reserved or persistent types. */
   async removeType(projectId: string, key: string): Promise<void> {
     if (key === PERSISTENT_LABEL_KEY || RESERVED_LABEL_KEYS.includes(key as never)) {
       throw new Error(`Label type '${key}' cannot be removed.`);
@@ -71,6 +84,7 @@ export class LabelModel {
     }
   }
 
+  /** Attach a label value to a build. */
   async attach(projectId: string, buildId: string, typeKey: string, value: string): Promise<BuildLabel> {
     return await this.db.insert(buildLabels, {
       id: ulid(),
@@ -82,10 +96,12 @@ export class LabelModel {
     });
   }
 
+  /** List all labels attached to a build. */
   async listForBuild(buildId: string): Promise<BuildLabel[]> {
     return await this.db.list(buildLabels, { where: eq(buildLabels.buildId, buildId) });
   }
 
+  /** Return the id of the latest build carrying a given label value, if any. */
   async latestBuildId(projectId: string, typeKey: string, value: string): Promise<string | null> {
     const labels = await this.db.list(buildLabels, {
       where: and(eq(buildLabels.projectId, projectId), eq(buildLabels.typeKey, typeKey), eq(buildLabels.value, value)),
@@ -98,6 +114,7 @@ export class LabelModel {
     return rows.find((b) => idSet.has(b.id))?.id ?? null;
   }
 
+  /** Return whether a build is marked as persistent. */
   async hasPersistent(projectId: string, buildId: string): Promise<boolean> {
     const labels = await this.db.list(buildLabels, {
       where: and(eq(buildLabels.projectId, projectId), eq(buildLabels.buildId, buildId), eq(buildLabels.typeKey, PERSISTENT_LABEL_KEY)),

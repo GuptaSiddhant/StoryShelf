@@ -4,18 +4,33 @@ import { printLine, createSpinner } from "../output.ts";
 
 const spinnerFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
+/** Options for the `upload` command. */
 export interface UploadOptions {
+  /** Server base URL. */
   url: string;
+  /** Project slug. */
   slug: string;
+  /** CI token. */
   token: string;
+  /** Git commit SHA. */
   sha: string;
+  /** Git branch. */
   branch: string;
+  /** Built Storybook directory. Defaults to `storybook-static`. */
   storybookDir?: string;
+  /** Commit message. */
   message?: string;
+  /** Author email. */
   authorEmail?: string;
+  /** Author name. */
   authorName?: string;
 }
 
+/**
+ * Upload a built Storybook and create a build record.
+ *
+ * @param options - Upload command options.
+ */
 export async function runUpload(options: UploadOptions): Promise<void> {
   const base = normalizeBaseUrl(options.url);
   const storybookDir = options.storybookDir ?? "storybook-static";

@@ -21,6 +21,7 @@ A self-hosted visual testing platform for Storybook. Self-hosted Chromatic alter
 ```sh
 export PATH="$HOME/.nub/bin:$PATH"   # once per shell
 
+nub run serve          # dev server from TS source, hot-restarts on any repo change (watch)
 nubx turbo verify --force                          # full verify (build + lint + test)
 nubx turbo verify --filter='@storyshelf/core' --force   # one package + deps
 

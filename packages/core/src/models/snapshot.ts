@@ -16,9 +16,21 @@ export interface SnapshotCreateInput {
   screenshotPath: string;
 }
 
+/** Data operations for snapshot records. */
 export class SnapshotModel {
+  /**
+   * @param db - Database adapter.
+   */
   constructor(private readonly db: DatabaseAdapter) {}
 
+  /**
+   * Create a snapshot for a story within a build.
+   *
+   * @param projectId - Project ID.
+   * @param buildId - Build ID.
+   * @param input - Snapshot creation input.
+   * @returns The created snapshot.
+   */
   async create(projectId: string, buildId: string, input: SnapshotCreateInput): Promise<Snapshot> {
     const now = new Date().toISOString();
     return await this.db.insert(snapshots, {
@@ -39,22 +51,27 @@ export class SnapshotModel {
     });
   }
 
+  /** List all snapshots belonging to a build. */
   async listByBuild(buildId: string): Promise<Snapshot[]> {
     return await this.db.list(snapshots, { where: eq(snapshots.buildId, buildId) });
   }
 
+  /** Fetch a snapshot by id, or null if not found. */
   async get(id: string): Promise<Snapshot | null> {
     return await this.db.get(snapshots, id);
   }
 
+  /** Update mutable fields of a snapshot. */
   async update(id: string, patch: Partial<Snapshot>): Promise<Snapshot> {
     return await this.db.update(snapshots, id, { ...patch, updatedAt: new Date().toISOString() });
   }
 
+  /** Set the status of a snapshot. */
   async setStatus(id: string, status: SnapshotStatus): Promise<Snapshot> {
     return await this.update(id, { status });
   }
 
+  /** Record a reviewer's decision on a snapshot. */
   async review(id: string, status: SnapshotStatus, userId: string): Promise<Snapshot> {
     return await this.update(id, { status, reviewedBy: userId, reviewedAt: new Date().toISOString() });
   }

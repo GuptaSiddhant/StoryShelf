@@ -10,9 +10,19 @@ export interface ProjectCreateInput {
   gitDefaultBranch?: string;
 }
 
+/** Data operations for project records. */
 export class ProjectModel {
+  /**
+   * @param db - Database adapter.
+   */
   constructor(private readonly db: DatabaseAdapter) {}
 
+  /**
+   * Create a project with a unique slug.
+   *
+   * @param input - Project creation input.
+   * @returns The created project.
+   */
   async create(input: ProjectCreateInput): Promise<Project> {
     const now = new Date().toISOString();
     const slug = await this.uniqueSlug(input.name);
@@ -27,23 +37,28 @@ export class ProjectModel {
     });
   }
 
+  /** Fetch a project by id, or null if not found. */
   async get(id: string): Promise<Project | null> {
     return await this.db.get(projects, id);
   }
 
+  /** Fetch a project by its slug, or null if not found. */
   async getBySlug(slug: string): Promise<Project | null> {
     const rows = await this.db.list(projects, { where: eq(projects.slug, slug), limit: 1 });
     return rows[0] ?? null;
   }
 
+  /** List all projects. */
   async list(): Promise<Project[]> {
     return await this.db.list(projects);
   }
 
+  /** Update mutable fields of a project. */
   async update(id: string, patch: Partial<Pick<Project, "name" | "gitRepository" | "gitDefaultBranch" | "pixelThreshold" | "maxDiffRatio" | "publicBranchRegex">>): Promise<Project> {
     return await this.db.update(projects, id, { ...patch, updatedAt: new Date().toISOString() });
   }
 
+  /** Delete a project by id. */
   async remove(id: string): Promise<void> {
     await this.db.remove(projects, id);
   }

@@ -12,12 +12,17 @@ interface SessionPayload {
   expiresAt: number;
 }
 
+/** Options for configuring a shared-password auth adapter. */
 export interface PasswordAuthOptions {
+  /** The shared password users must present to log in. */
   password: string;
+  /** Secret used to sign and verify session cookies. */
   secret: string;
 }
 
+/** Auth adapter that authenticates with a single shared password. */
 export interface PasswordAuth extends AuthAdapter {
+  /** Verify `password` and, if correct, create a session for `user`, returning a session token. */
   login(password: string, user: AuthUser): Promise<string>;
 }
 
@@ -88,6 +93,12 @@ function toUser(payload: SessionPayload): AuthUser {
   };
 }
 
+/**
+ * Create a shared-password auth adapter.
+ *
+ * @param options - Password and session signing configuration.
+ * @returns A PasswordAuth instance.
+ */
 export function createPasswordAuth(options: PasswordAuthOptions): PasswordAuth {
   const { password, secret } = options;
 

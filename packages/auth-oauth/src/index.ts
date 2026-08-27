@@ -23,16 +23,25 @@ interface UserInfoResponse {
   picture?: string;
 }
 
+/** Options for configuring an OAuth/OIDC auth adapter. */
 export interface OAuthAuthOptions {
+  /** OIDC issuer base URL. */
   issuer: string;
+  /** OAuth client ID. */
   clientId: string;
+  /** OAuth client secret. */
   clientSecret: string;
+  /** Secret used to sign and verify session cookies. */
   secret: string;
+  /** Redirect URL registered with the OIDC provider. */
   redirectUrl: string;
+  /** Optional OAuth scopes. Defaults to `openid`, `email`, `profile`. */
   scopes?: string[];
 }
 
+/** Auth adapter that authenticates against an OAuth/OIDC provider. */
 export interface OAuthAuth extends AuthAdapter {
+  /** Build the provider authorization URL for a login flow with the given anti-CSRF `state`. */
   loginUrl(state: string): string;
 }
 
@@ -157,6 +166,12 @@ async function fetchUserInfo(
   };
 }
 
+/**
+ * Create an OAuth/OIDC auth adapter.
+ *
+ * @param options - OIDC provider and session configuration.
+ * @returns An OAuthAuth instance.
+ */
 export function createOAuthAuth(options: OAuthAuthOptions): OAuthAuth {
   const { secret } = options;
   const scopes = options.scopes ?? ["openid", "email", "profile"];
