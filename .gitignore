@@ -38,3 +38,4 @@ openapi.json
 .dev-data/
 data
 nub.lock.bak
+.astro

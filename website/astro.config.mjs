@@ -1,5 +1,5 @@
-import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
+import { defineConfig } from "astro/config";
 
 export default defineConfig({
   site: "https://storyshelf.dev",
@@ -7,9 +7,13 @@ export default defineConfig({
     starlight({
       title: "StoryShelf",
       description: "Self-hosted visual testing for Storybook.",
-      social: {
-        github: "https://github.com/GuptaSiddhant/storyshelf",
-      },
+      social: [
+        {
+          label: "GitHub",
+          href: "https://github.com/GuptaSiddhant/storyshelf",
+          icon: "github",
+        },
+      ],
       sidebar: [
         {
           label: "Guides",

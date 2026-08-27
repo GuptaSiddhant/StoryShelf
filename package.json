@@ -8,7 +8,7 @@
   "license": "MIT",
   "workspaces": {
     "packages": [
-      "./packages/*"
+      "./packages/*", "website"
     ],
     "catalog": {
       "@types/node": "^26.0.0",
@@ -32,7 +32,9 @@
     "lint": "turbo lint",
     "serve": "nub run --filter @storyshelf/cli start serve",
     "test": "turbo test",
-    "verify": "turbo verify --filter='./packages/*'"
+    "verify": "turbo verify --filter='./packages/*'",
+    "web:build": "nub run --filter website build",
+    "web:dev": "nub run --filter website dev"
   },
   "devDependencies": {
     "turbo": "^2.10.11"

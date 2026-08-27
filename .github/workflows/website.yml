@@ -43,11 +43,11 @@ jobs:
       - name: Install dependencies
         run: nub ci
       - name: Build with Astro
+        working-directory: ${{ env.BUILD_PATH }}
         run: |
           nub run build \
             --site "${{ steps.pages.outputs.origin }}" \
             --base "${{ steps.pages.outputs.base_path }}"
-        working-directory: ${{ env.BUILD_PATH }}
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
