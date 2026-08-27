@@ -34,3 +34,9 @@ nub run verify                   # build + lint + test
 ```
 
 `nub run serve` runs the CLI from source (`nub watch ./packages/cli/src/index.ts serve --data-dir .dev-data`). It needs no build step: the `development` exports condition (via `nub.jsonc` + tsconfig `customConditions`) resolves workspace packages to their TypeScript source, and `nub watch` restarts the server whenever any file in the import graph changes.
+
+## Documentation
+
+- Each package ships a `README.md` covering its use case, install, API, and an example.
+- `website/` hosts the public docs site (Astro Starlight): getting-started, CI, deployment, auth, and concept guides.
+- `docs/architecture.md` is the full architecture spec; `docs/adr/` records design decisions; `docs/implementation-plan.md` is the build order.

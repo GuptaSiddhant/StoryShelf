@@ -36,8 +36,6 @@ export class StorybookAdapter implements StorySourceAdapter {
       }));
   }
 
-  // buildUrl is a pure helper bound by the StorySourceAdapter interface.
-  // eslint-disable-next-line class-methods-use-this
   /**
    * Build the iframe URL used to render a given story.
    *
@@ -45,6 +43,8 @@ export class StorybookAdapter implements StorySourceAdapter {
    * @param storyId - Story ID to render.
    * @returns The story's iframe URL.
    */
+  // Function buildUrl is a pure helper bound by the StorySourceAdapter interface.
+  // eslint-disable-next-line class-methods-use-this
   buildUrl(baseUrl: string, storyId: string): string {
     return `${baseUrl}/iframe.html?id=${encodeURIComponent(storyId)}&viewMode=story`;
   }
