@@ -1,14 +1,14 @@
 import { createClient } from "@libsql/client";
 import { eq, getTableColumns } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/libsql";
-import type { AnySQLiteTable } from "drizzle-orm/sqlite-core";
+import type { AnySQLiteTable, SQLiteColumn } from "drizzle-orm/sqlite-core";
 
 import type { DatabaseAdapter, ListOptions } from "@storyshelf/core/adapter/database";
 import { schema } from "@storyshelf/core/schema";
+import { DDL } from "@storyshelf/core/ddl";
 
-import { DDL } from "./ddl.ts";
-
-function idOf(table: AnySQLiteTable) {
+function idOf(table: AnySQLiteTable): SQLiteColumn {
+  // eslint-disable-next-line no-non-null-assertion -- every table has an `id` column
   return getTableColumns(table)["id"]!;
 }
 
@@ -18,10 +18,10 @@ export function createTursoDatabase(options: { url: string; authToken?: string }
 
   return {
     async insert(table, values) {
-      return (await db.insert(table).values(values).returning().get())!;
+      return await db.insert(table).values(values).returning().get();
     },
     async update(table, id, values) {
-      return (await db.update(table).set(values).where(eq(idOf(table), id)).returning().get())!;
+      return await db.update(table).set(values).where(eq(idOf(table), id)).returning().get();
     },
     async get(table, id) {
       return (await db.select().from(table).where(eq(idOf(table), id)).limit(1).get()) ?? null;
@@ -43,17 +43,18 @@ export function createTursoDatabase(options: { url: string; authToken?: string }
       if (opts.offset !== undefined) {
         query.offset(opts.offset);
       }
-      return query.all();
+      return await query.all();
     },
     async count(table, where) {
-      return db.$count(table, where);
+      return await db.$count(table, where);
     },
     async all(query) {
-      return db.all(query);
+      return await db.all(query);
     },
     async migrate() {
       await client.executeMultiple(DDL);
     },
+    // eslint-disable-next-line require-await -- client.close() is synchronous
     async close() {
       client.close();
     },

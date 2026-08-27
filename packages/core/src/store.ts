@@ -14,6 +14,7 @@ export interface Store {
   logger: LoggerAdapter;
   user: AuthUser | null;
   authEnabled: boolean;
+  enqueueCapture?: (buildId: string) => Promise<void>;
 }
 
 const storage = new AsyncLocalStorage<Store>();

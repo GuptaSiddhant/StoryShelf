@@ -162,6 +162,8 @@ export function createOAuthAuth(options: OAuthAuthOptions): OAuthAuth {
   const { secret } = options;
   const scopes = options.scopes ?? ["openid", "email", "profile"];
 
+  // Async is required by the AuthAdapter interface, though the logic is synchronous.
+  // eslint-disable-next-line require-await
   const check = async (request: Request): Promise<AuthUser | null> => {
     const token = readCookie(request, SESSION_COOKIE);
     if (!token) {
@@ -174,6 +176,7 @@ export function createOAuthAuth(options: OAuthAuthOptions): OAuthAuth {
     return toUser(payload);
   };
 
+  // eslint-disable-next-line require-await
   const createSession = async (user: AuthUser): Promise<string> => {
     const payload: SessionPayload = {
       userId: user.id,

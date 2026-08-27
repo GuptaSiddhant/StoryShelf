@@ -13,3 +13,7 @@ export function baselinePath(projectId: string, branch: string, storyId: string,
 export function storybookDir(projectId: string, buildId: string): string {
   return `${projectId}/builds/${buildId}/storybook`;
 }
+
+export function storybookZipPath(projectId: string, buildId: string): string {
+  return `${projectId}/builds/${buildId}/storybook.zip`;
+}

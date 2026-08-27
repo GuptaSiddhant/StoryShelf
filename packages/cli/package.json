@@ -18,8 +18,9 @@
   "dependencies": {
     "@hono/node-server": "^1.17.0",
     "@storyshelf/core": "workspace:*",
-    "@storyshelf/sqlite": "workspace:*",
+    "@storyshelf/db-sqlite": "workspace:*",
     "@storyshelf/storage-local": "workspace:*",
+    "adm-zip": "^0.6.0",
     "commander": "^13.0.0",
     "hono": "^4.11.0",
     "playwright": "^1.52.0"

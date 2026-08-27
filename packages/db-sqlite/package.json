@@ -1,5 +1,5 @@
 {
-  "name": "@storyshelf/sqlite",
+  "name": "@storyshelf/db-sqlite",
   "version": "0.1.0",
   "type": "module",
   "description": "SQLite database adapter for StoryShelf (better-sqlite3 + Drizzle).",
