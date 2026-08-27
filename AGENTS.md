@@ -42,8 +42,8 @@ nub run build       # build the docs site
 StoryShelf/
   packages/
     core/           @storyshelf/core           -- Hono router, adapter interfaces, models, capture pipeline, diff, retention
-    sqlite/         @storyshelf/sqlite         -- SQLite database adapter (better-sqlite3 + Drizzle)
-    turso/          @storyshelf/turso          -- Turso/libSQL database adapter (@libsql/client + Drizzle)
+    db-sqlite/      @storyshelf/db-sqlite      -- SQLite database adapter (better-sqlite3 + Drizzle)
+    db-turso/       @storyshelf/db-turso       -- Turso/libSQL database adapter (@libsql/client + Drizzle)
     storage-local/  @storyshelf/storage-local  -- Local filesystem storage adapter
     storage-s3/     @storyshelf/storage-s3     -- S3-compatible storage adapter (S3, R2, MinIO)
     auth-oauth/     @storyshelf/auth-oauth     -- OAuth/OIDC auth adapter
@@ -82,8 +82,8 @@ StoryShelf/
 
 ## Database options
 
-- **SQLite** (default, self-hosted): `@storyshelf/sqlite` — better-sqlite3 + Drizzle ORM. Zero config. WAL mode.
-- **Turso** (serverless/cloud): `@storyshelf/turso` — @libsql/client + Drizzle ORM. Same schema, same queries, different driver. Works on Vercel, Cloudflare Workers, Lambda.
+- **SQLite** (default, self-hosted): `@storyshelf/db-sqlite` — better-sqlite3 + Drizzle ORM. Zero config. WAL mode.
+- **Turso** (serverless/cloud): `@storyshelf/db-turso` — @libsql/client + Drizzle ORM. Same schema, same queries, different driver. Works on Vercel, Cloudflare Workers, Lambda.
 
 ## Storage options
 

@@ -10,7 +10,7 @@ A self-hosted visual testing platform for Storybook. Run visual regression tests
 
 ```
 Developer pushes code
-  → CI runs: npx storyshelf upload --project-token=xxx
+  → CI runs: npx @storyshelf/cli upload --token=xxx
   → CLI builds Storybook (if needed), zips the static build
   → CLI uploads the zip + metadata (sha, branch, message, author) to StoryShelf server
   → Server creates a build, stores the zip, and enqueues capture (async, returns 202)
@@ -621,13 +621,13 @@ StoryShelf/
         index.ts          # createShelfRouter entry point
       package.json
 
-    sqlite/
+    db-sqlite/
       src/
         database.ts       # DatabaseAdapter for SQLite (via better-sqlite3 + Drizzle)
         migrate.ts        # Migration runner
       package.json
 
-    turso/
+    db-turso/
       src/
         database.ts       # DatabaseAdapter for Turso/libSQL (via @libsql/client + Drizzle)
         migrate.ts        # Migration runner

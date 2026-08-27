@@ -1,7 +1,7 @@
 import { serve } from "@hono/node-server";
 import { join, resolve } from "node:path";
 import { createShelfRouter, type ShelfConfig } from "@storyshelf/core";
-import { createSqliteDatabase } from "@storyshelf/sqlite";
+import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { createLocalStorage } from "@storyshelf/storage-local";
 
 import { createPlaywrightCaptureRunner } from "../capture-runner.ts";

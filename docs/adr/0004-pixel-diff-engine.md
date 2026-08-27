@@ -55,7 +55,7 @@ max_diff_ratio        -- max allowed diff ratio
 The CLI can also override thresholds per-run:
 
 ```bash
-npx storyshelf upload --max-diff-ratio 0.02 --pixel-threshold 0.15
+npx @storyshelf/cli upload --max-diff-ratio 0.02 --pixel-threshold 0.15
 ```
 
 ## Consequences
