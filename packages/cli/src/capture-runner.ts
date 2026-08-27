@@ -1,7 +1,11 @@
-import { join } from "node:path";
+import { mkdir, rm } from "node:fs/promises";
+import { join, resolve, sep } from "node:path";
+
+import AdmZip from "adm-zip";
 import {
   StorybookAdapter,
   runCapture,
+  storybookZipPath,
   type Build,
   type CaptureRunner,
   type DatabaseAdapter,
@@ -53,9 +57,33 @@ async function loadTarget(deps: CaptureRunnerDeps, buildId: string): Promise<{ b
   return { build, project };
 }
 
+function blockedTarget(root: string, entryName: string): boolean {
+  const candidate = resolve(join(root, entryName));
+  return candidate !== root && !candidate.startsWith(root + sep);
+}
+
+function assertNoTraversal(zip: AdmZip, root: string): void {
+  for (const entry of zip.getEntries()) {
+    if (blockedTarget(root, entry.entryName)) {
+      throw new Error(`Blocked path traversal in uploaded Storybook: ${entry.entryName}`);
+    }
+  }
+}
+
+async function extractStorybook(deps: CaptureRunnerDeps, projectId: string, buildId: string): Promise<string> {
+  const targetDir = join(deps.dataDir, projectId, "builds", buildId, "storybook");
+  const root = resolve(targetDir);
+  const zip = new AdmZip(await deps.storage.read(storybookZipPath(projectId, buildId)));
+  assertNoTraversal(zip, root);
+  await rm(targetDir, { recursive: true, force: true });
+  await mkdir(targetDir, { recursive: true });
+  zip.extractAllTo(targetDir, true);
+  return targetDir;
+}
+
 async function runBuild(deps: CaptureRunnerDeps, buildId: string): Promise<void> {
   const { build, project } = await loadTarget(deps, buildId);
-  const storybookDir = join(deps.dataDir, project.id, "builds", build.id, "storybook");
+  const storybookDir = await extractStorybook(deps, project.id, build.id);
   const server = await createStaticServer(storybookDir);
   const browser = await chromium.launch();
   const adapter = new StorybookAdapter();

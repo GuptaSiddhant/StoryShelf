@@ -3,6 +3,8 @@ import type { FC } from "hono/jsx";
 import { getStore } from "../store.ts";
 import type { BrandTheme } from "./theme.ts";
 
+export type RenderedContent = string | Promise<string>;
+
 // Hono's JSX.Element is typed as `HtmlEscapedString | Promise<...>`, so JSX-returning
 // functions can legitimately return a promise; the rule is a false positive here.
 // eslint-disable-next-line promise-function-async -- JSX component return type

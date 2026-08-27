@@ -1,20 +1,19 @@
-import type { FC } from "hono/jsx";
 import { Hono } from "hono";
 
 import type { AuthUser } from "./adapters/auth.ts";
 import { Queue } from "./capture/queue.ts";
 import type { ShelfOptions } from "./config.ts";
-import { BuildModel } from "./models/build.ts";
-import { ProjectModel } from "./models/project.ts";
-import { SnapshotModel } from "./models/snapshot.ts";
+import { renderBuildDetailPage } from "./pages/build-detail.tsx";
+import { renderProjectBuildsPage } from "./pages/project-builds.tsx";
+import { renderProjectsPage } from "./pages/projects.tsx";
+import { renderRootPage } from "./pages/root.tsx";
 import { registerAdmin } from "./routers/admin.ts";
 import { registerBuilds } from "./routers/builds.ts";
 import { registerLabels } from "./routers/labels.ts";
 import { registerMembers } from "./routers/members.ts";
 import { registerProjects } from "./routers/projects.ts";
 import { registerTokens } from "./routers/tokens.ts";
-import { getStore, runWithStore } from "./store.ts";
-import { DocumentLayout } from "./ui/document.tsx";
+import { runWithStore } from "./store.ts";
 
 async function resolveUser(c: { req: { raw: Request; header: (name: string) => string | undefined } }, options: ShelfOptions): Promise<AuthUser | null> {
   if (!options.auth) {
@@ -25,21 +24,6 @@ async function resolveUser(c: { req: { raw: Request; header: (name: string) => s
   }
   return await options.auth.check(c.req.raw);
 }
-
-// Hono's JSX.Element is typed as `HtmlEscapedString | Promise<...>`, so JSX-returning
-// functions can legitimately return a promise; the rule is a false positive here.
-// eslint-disable-next-line promise-function-async -- JSX component return type
-const ProjectsPage: FC = () => {
-  return <DocumentLayout title="Projects">
-    <h1>Projects</h1>
-    <ul>
-      {/* populated via htmx on client */}
-    </ul>
-    <p>
-      <a href="/projects">Manage projects</a>
-    </p>
-  </DocumentLayout>;
-};
 
 export function createShelfRouter(options: ShelfOptions): Hono {
   const app = new Hono();
@@ -77,75 +61,24 @@ export function createShelfRouter(options: ShelfOptions): Hono {
   registerTokens(app);
   registerAdmin(app);
 
-  app.get("/", async (c) => await c.html(<ProjectsPage />));
-
-  app.get("/projects", async (c) => {
-    const projects = await new ProjectModel(getStore().db).list();
-    return c.html(
-      <DocumentLayout title="Projects">
-        <h1>Projects</h1>
-        <ul>
-          {projects.map(
-            // eslint-disable-next-line promise-function-async -- JSX.Element includes Promise<HtmlEscapedString>
-            (p) => (
-              <li key={p.id}>
-                <a href={`/projects/${p.slug}/builds`}>{p.name}</a>
-              </li>
-            ),
-          )}
-        </ul>
-      </DocumentLayout>,
-    );
-  });
+  // eslint-disable-next-line promise-function-async -- renderRootPage returns RenderedContent (string | Promise<string>)
+  app.get("/", (c) => c.html(renderRootPage()));
+  app.get("/projects", async (c) => c.html(await renderProjectsPage()));
 
   app.get("/projects/:slug/builds", async (c) => {
-    const slug = c.req.param("slug");
-    const projects = await new ProjectModel(getStore().db).list();
-    const project = projects.find((p) => p.slug === slug);
-    if (!project) {
+    const html = await renderProjectBuildsPage(c.req.param("slug"));
+    if (!html) {
       return c.notFound();
     }
-    const builds = await new BuildModel(getStore().db).list(project.id);
-    return c.html(
-      <DocumentLayout title={project.name}>
-        <h1>{project.name}</h1>
-        <ul>
-          {builds.map(
-            // eslint-disable-next-line promise-function-async -- JSX.Element includes Promise<HtmlEscapedString>
-            (b) => (
-              <li key={b.id}>
-                <a href={`/projects/${project.slug}/builds/${b.id}`}>{b.gitBranch}</a> · {b.status} · {b.message ?? ""}
-              </li>
-            ),
-          )}
-        </ul>
-      </DocumentLayout>,
-    );
+    return c.html(html);
   });
 
   app.get("/projects/:slug/builds/:buildId", async (c) => {
-    const build = await new BuildModel(getStore().db).get(c.req.param("buildId"));
-    if (!build) {
+    const html = await renderBuildDetailPage(c.req.param("buildId"));
+    if (!html) {
       return c.notFound();
     }
-    const snapshots = await new SnapshotModel(getStore().db).listByBuild(build.id);
-    return c.html(
-      <DocumentLayout title={`Build ${build.gitBranch}`}>
-        <h1>
-          {build.gitBranch} — {build.status}
-        </h1>
-        <ul>
-          {snapshots.map(
-            // eslint-disable-next-line promise-function-async -- JSX.Element includes Promise<HtmlEscapedString>
-            (s) => (
-              <li key={s.id}>
-                {s.storyTitle} / {s.storyName} · {s.viewportName} · {s.status}
-              </li>
-            ),
-          )}
-        </ul>
-      </DocumentLayout>,
-    );
+    return c.html(html);
   });
 
   return app;
@@ -161,6 +94,7 @@ export type { LoggerAdapter } from "./adapters/logger.ts";
 export type { DiffOptions, DiffResult } from "./diff/options.ts";
 export type { Viewport, StoryEntry, StorySourceAdapter } from "./capture/adapter.ts";
 export { diffImages } from "./diff/engine.ts";
+export type { RenderedContent } from "./ui/document.tsx";
 export { StorybookAdapter } from "./capture/storybook.ts";
 export { runCapture, type CaptureContext, type RenderStory } from "./capture/pipeline.ts";
 export { Queue } from "./capture/queue.ts";
