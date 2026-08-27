@@ -1,5 +1,6 @@
 import { serve } from "@hono/node-server";
 import { join, resolve } from "node:path";
+import { mkdir } from "node:fs/promises";
 import { createShelfRouter, type ShelfConfig } from "@storyshelf/core";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { createLocalStorage } from "@storyshelf/storage-local";
@@ -16,6 +17,11 @@ export interface ServeOptions {
 
 export async function runServe(options: ServeOptions): Promise<void> {
   const dataDir = resolve(options.dataDir);
+  await mkdir(dataDir, { recursive: true }).catch((error) => {
+    if (error.code !== "EEXIST") {
+      throw error;
+    }
+  });
   const database = createSqliteDatabase(join(dataDir, "shelf.db"));
   await database.migrate();
   const storage = createLocalStorage(dataDir);

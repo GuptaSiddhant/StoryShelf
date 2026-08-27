@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import { tokens, type Token } from "../schema.ts";
@@ -19,6 +19,14 @@ export class TokenModel {
 
   async list(projectId: string): Promise<Token[]> {
     return await this.db.list(tokens, { where: eq(tokens.projectId, projectId) });
+  }
+
+  async get(projectId: string, id: string): Promise<Token | null> {
+    const rows = await this.db.list(tokens, {
+      where: and(eq(tokens.projectId, projectId), eq(tokens.id, id)),
+      limit: 1,
+    });
+    return rows[0] ?? null;
   }
 
   async findByHash(hash: string): Promise<Token | null> {

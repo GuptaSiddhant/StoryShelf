@@ -8,9 +8,18 @@ import { CommentModel } from "../models/comment.ts";
 import { ProjectModel } from "../models/project.ts";
 import { SnapshotModel } from "../models/snapshot.ts";
 import { getStore } from "../store.ts";
-import { BUILD_STATUSES, type BuildStatus } from "../types.ts";
+import { BUILD_STATUSES, type BuildStatus, type ProjectRole } from "../types.ts";
 import { storybookZipPath } from "../utils/paths.ts";
-import { findProjectBySlug, json, notFound, resolveProject, validJson } from "./helpers.ts";
+import {
+  json,
+  notFound,
+  resolveAuthorizedProject,
+  validJson,
+} from "./helpers.ts";
+
+const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];
+const DEVELOPER_ROLES: readonly ProjectRole[] = ["developer", "approver", "admin"];
+const APPROVER_ROLES: readonly ProjectRole[] = ["approver", "admin"];
 
 const commentSchema = z.object({
   body: z.string().min(1),
@@ -20,6 +29,22 @@ const commentSchema = z.object({
 
 function asString(value: FormDataEntryValue | null): string | undefined {
   return typeof value === "string" ? value : undefined;
+}
+
+async function buildForProject(projectId: string, buildId: string): Promise<import("../models/build.ts").Build> {
+  const build = await new BuildModel(getStore().db).get(buildId);
+  if (!build || build.projectId !== projectId) {
+    notFound("Build not found");
+  }
+  return build;
+}
+
+async function snapshotForBuild(build: { id: string }, snapshotId: string): Promise<import("../models/snapshot.ts").Snapshot> {
+  const snapshot = await new SnapshotModel(getStore().db).get(snapshotId);
+  if (!snapshot || snapshot.buildId !== build.id) {
+    notFound("Snapshot not found");
+  }
+  return snapshot;
 }
 
 async function refreshBuild(buildId: string): Promise<void> {
@@ -55,10 +80,7 @@ async function approveSnapshot(snapshotId: string, userId: string): Promise<void
 
 export function registerBuilds(app: Hono): void {
   app.get("/api/v1/projects/:slug/builds", async (c) => {
-    const project = await findProjectBySlug(c.req.param("slug"));
-    if (!project) {
-      notFound("Project not found");
-    }
+    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...VIEW_ROLES);
     const statusParam = c.req.query("status");
     const status = BUILD_STATUSES.includes(statusParam as BuildStatus) ? (statusParam as BuildStatus) : undefined;
     const branch = c.req.query("branch");
@@ -67,7 +89,7 @@ export function registerBuilds(app: Hono): void {
   });
 
   app.post("/api/v1/projects/:slug/builds", async (c) => {
-    const project = await resolveProject(c, c.req.param("slug"));
+    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...DEVELOPER_ROLES);
     const form = await c.req.formData();
 
     const gitSha = asString(form.get("gitSha")) ?? "";
@@ -99,55 +121,55 @@ export function registerBuilds(app: Hono): void {
   });
 
   app.get("/api/v1/projects/:slug/builds/:buildId", async (c) => {
-    const build = await new BuildModel(getStore().db).get(c.req.param("buildId"));
-    if (!build) {
-      notFound("Build not found");
-    }
+    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...VIEW_ROLES);
+    const build = await buildForProject(project.id, c.req.param("buildId"));
     return json(c, build);
   });
 
   app.post("/api/v1/projects/:slug/builds/:buildId/retry", async (c) => {
-    const build = await new BuildModel(getStore().db).get(c.req.param("buildId"));
-    if (!build) {
-      notFound("Build not found");
-    }
+    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...DEVELOPER_ROLES);
+    const build = await buildForProject(project.id, c.req.param("buildId"));
     const updated = await new BuildModel(getStore().db).setStatus(build.id, "pending");
     return json(c, updated, 202);
   });
 
   app.delete("/api/v1/projects/:slug/builds/:buildId", async (c) => {
-    const build = await new BuildModel(getStore().db).get(c.req.param("buildId"));
-    if (!build) {
-      notFound("Build not found");
-    }
+    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...APPROVER_ROLES);
+    const build = await buildForProject(project.id, c.req.param("buildId"));
     await new BuildModel(getStore().db).remove(build.id);
     return c.body(null, 204);
   });
 
   app.get("/api/v1/projects/:slug/builds/:buildId/snapshots", async (c) => {
-    const snapshots = new SnapshotModel(getStore().db).listByBuild(c.req.param("buildId"));
+    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...VIEW_ROLES);
+    const build = await buildForProject(project.id, c.req.param("buildId"));
+    const snapshots = new SnapshotModel(getStore().db).listByBuild(build.id);
     return json(c, await snapshots);
   });
 
   app.post("/api/v1/projects/:slug/builds/:buildId/snapshots/:snapshotId/approve", async (c) => {
+    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...APPROVER_ROLES);
+    const build = await buildForProject(project.id, c.req.param("buildId"));
+    await snapshotForBuild(build, c.req.param("snapshotId"));
     const userId = getStore().user?.id ?? "anonymous";
     await approveSnapshot(c.req.param("snapshotId"), userId);
     return json(c, { ok: true });
   });
 
   app.post("/api/v1/projects/:slug/builds/:buildId/snapshots/:snapshotId/reject", async (c) => {
-    const snapshot = await new SnapshotModel(getStore().db).get(c.req.param("snapshotId"));
-    if (!snapshot) {
-      notFound("Snapshot not found");
-    }
+    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...APPROVER_ROLES);
+    const build = await buildForProject(project.id, c.req.param("buildId"));
+    const snapshot = await snapshotForBuild(build, c.req.param("snapshotId"));
     const userId = getStore().user?.id ?? "anonymous";
     await new SnapshotModel(getStore().db).review(snapshot.id, "rejected", userId);
-    await refreshBuild(snapshot.buildId);
+    await refreshBuild(build.id);
     return json(c, { ok: true });
   });
 
   app.post("/api/v1/projects/:slug/builds/:buildId/approve-all", async (c) => {
-    const snapshots = await new SnapshotModel(getStore().db).listByBuild(c.req.param("buildId"));
+    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...APPROVER_ROLES);
+    const build = await buildForProject(project.id, c.req.param("buildId"));
+    const snapshots = await new SnapshotModel(getStore().db).listByBuild(build.id);
     const userId = getStore().user?.id ?? "anonymous";
     await Promise.all(
       snapshots
@@ -160,7 +182,9 @@ export function registerBuilds(app: Hono): void {
   });
 
   app.post("/api/v1/projects/:slug/builds/:buildId/reject-all", async (c) => {
-    const snapshots = await new SnapshotModel(getStore().db).listByBuild(c.req.param("buildId"));
+    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...APPROVER_ROLES);
+    const build = await buildForProject(project.id, c.req.param("buildId"));
+    const snapshots = await new SnapshotModel(getStore().db).listByBuild(build.id);
     const userId = getStore().user?.id ?? "anonymous";
     await Promise.all(
       snapshots
@@ -169,27 +193,32 @@ export function registerBuilds(app: Hono): void {
           await new SnapshotModel(getStore().db).review(snapshot.id, "rejected", userId);
         }),
     );
-    await refreshBuild(c.req.param("buildId"));
+    await refreshBuild(build.id);
     return json(c, { ok: true });
   });
 
   app.get("/api/v1/projects/:slug/builds/:buildId/comments", async (c) => {
-    return json(c, await new CommentModel(getStore().db).listByBuild(c.req.param("buildId")));
+    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...VIEW_ROLES);
+    const build = await buildForProject(project.id, c.req.param("buildId"));
+    return json(c, await new CommentModel(getStore().db).listByBuild(build.id));
   });
 
   app.post("/api/v1/projects/:slug/builds/:buildId/comments", async (c) => {
-    const project = await findProjectBySlug(c.req.param("slug"));
-    if (!project) {
-      notFound("Project not found");
-    }
+    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...DEVELOPER_ROLES);
+    const build = await buildForProject(project.id, c.req.param("buildId"));
     const body = await validJson(c, commentSchema);
     const userId = getStore().user?.id ?? "anonymous";
-    const comment = await new CommentModel(getStore().db).create(project.id, c.req.param("buildId"), userId, body);
+    const comment = await new CommentModel(getStore().db).create(project.id, build.id, userId, body);
     return json(c, comment, 201);
   });
 
   app.post("/api/v1/projects/:slug/builds/:buildId/comments/:commentId/resolve", async (c) => {
+    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...DEVELOPER_ROLES);
+    const build = await buildForProject(project.id, c.req.param("buildId"));
     const comment = await new CommentModel(getStore().db).resolve(c.req.param("commentId"));
+    if (comment.buildId !== build.id) {
+      notFound("Comment not found");
+    }
     return json(c, comment);
   });
 }

@@ -84,3 +84,61 @@ export async function resolveProject(c: Context, slug: string): Promise<Project>
   }
   return project;
 }
+
+/**
+ * Resolve the project for a request and enforce the caller's project role.
+ *
+ * Authorization model (ADR 0008):
+ * - No auth adapter configured -> all operations permitted (development mode).
+ * - Bearer token (CLI) -> grants access to its own project regardless of role.
+ * - Session user -> must have an effective role in `minRoles`.
+ */
+export async function resolveAuthorizedProject(c: Context, slug: string, ...minRoles: ProjectRole[]): Promise<Project> {
+  const authHeader = c.req.header("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.slice("Bearer ".length);
+    const found = await new TokenModel(getStore().db).findByHash(sha256(token));
+    if (!found) {
+      unauthorized();
+    }
+    const project = await new ProjectModel(getStore().db).get(found.projectId);
+    if (!project || project.slug !== slug) {
+      forbidden();
+    }
+    return project;
+  }
+  const project = await findProjectBySlug(slug);
+  if (!project) {
+    notFound("Project not found");
+  }
+  if (!getStore().authEnabled) {
+    return project;
+  }
+  const role = await currentProjectRole(project.id);
+  if (!role || !minRoles.includes(role)) {
+    forbidden();
+  }
+  return project;
+}
+
+/** Require a site-level admin (or permit when auth is disabled). */
+export function requireSiteAdmin(): void {
+  if (!getStore().authEnabled) {
+    return;
+  }
+const { user } = getStore();
+  if (user?.role !== "admin") {
+    forbidden();
+  }
+}
+
+/** Require the current session user to hold one of the given project roles. */
+export async function requireProjectRole(projectId: string, ...minRoles: ProjectRole[]): Promise<void> {
+  if (!getStore().authEnabled) {
+    return;
+  }
+  const role = await currentProjectRole(projectId);
+  if (!role || !minRoles.includes(role)) {
+    forbidden();
+  }
+}

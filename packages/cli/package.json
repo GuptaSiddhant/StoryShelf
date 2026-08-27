@@ -13,6 +13,8 @@
     "dev": "tsdown -w",
     "fmt": "oxfmt -c ../../.oxfmtrc.json ./src",
     "lint": "oxlint --type-aware --type-check ./src",
+    "serve": "nub --watch ./dist/index.js serve",
+    "start": "nub --watch ./dist/index.js",
     "test": "vitest run"
   },
   "dependencies": {

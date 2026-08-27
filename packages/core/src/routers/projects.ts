@@ -4,7 +4,14 @@ import { z } from "zod";
 import { LabelModel } from "../models/label.ts";
 import { ProjectModel } from "../models/project.ts";
 import { getStore } from "../store.ts";
-import { findProjectBySlug, json, notFound, validJson } from "./helpers.ts";
+import type { ProjectRole } from "../types.ts";
+import {
+  forbidden,
+  json,
+  requireSiteAdmin,
+  resolveAuthorizedProject,
+  validJson,
+} from "./helpers.ts";
 
 const createSchema = z.object({
   name: z.string().min(1),
@@ -21,13 +28,27 @@ const updateSchema = z.object({
   publicBranchRegex: z.string().nullable().optional(),
 });
 
+const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];
+const ADMIN_ROLES: readonly ProjectRole[] = ["admin"];
+
+function requireSessionUser(): void {
+  if (!getStore().authEnabled) {
+    return;
+  }
+  if (!getStore().user) {
+    forbidden();
+  }
+}
+
 export function registerProjects(app: Hono): void {
   app.get("/api/v1/projects", async (c) => {
+    requireSessionUser();
     const projects = new ProjectModel(getStore().db);
     return json(c, await projects.list());
   });
 
   app.post("/api/v1/projects", async (c) => {
+    requireSiteAdmin();
     const body = await validJson(c, createSchema);
     const projects = new ProjectModel(getStore().db);
     const project = await projects.create(body);
@@ -36,27 +57,19 @@ export function registerProjects(app: Hono): void {
   });
 
   app.get("/api/v1/projects/:slug", async (c) => {
-    const project = await findProjectBySlug(c.req.param("slug"));
-    if (!project) {
-      notFound("Project not found");
-    }
+    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...VIEW_ROLES);
     return json(c, project);
   });
 
   app.patch("/api/v1/projects/:slug", async (c) => {
-    const project = await findProjectBySlug(c.req.param("slug"));
-    if (!project) {
-      notFound("Project not found");
-    }
+    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...ADMIN_ROLES);
     const updated = await new ProjectModel(getStore().db).update(project.id, await validJson(c, updateSchema));
     return json(c, updated);
   });
 
   app.delete("/api/v1/projects/:slug", async (c) => {
-    const project = await findProjectBySlug(c.req.param("slug"));
-    if (!project) {
-      notFound("Project not found");
-    }
+    requireSiteAdmin();
+    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...VIEW_ROLES);
     await new ProjectModel(getStore().db).remove(project.id);
     return c.body(null, 204);
   });

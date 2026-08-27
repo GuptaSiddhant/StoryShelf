@@ -4,12 +4,13 @@ import { z } from "zod";
 import { ProjectModel } from "../models/project.ts";
 import { Retention } from "../retention/purge.ts";
 import { getStore } from "../store.ts";
-import { json, validJson } from "./helpers.ts";
+import { json, requireSiteAdmin, validJson } from "./helpers.ts";
 
 const purgeSchema = z.object({ ttlDays: z.number().optional() });
 
 export function registerAdmin(app: Hono): void {
   app.post("/api/v1/admin/purge", async (c) => {
+    requireSiteAdmin();
     const body = await validJson(c, purgeSchema);
     const ttlDays = body.ttlDays ?? getStore().config.purgeTtlDays ?? 30;
     const projects = await new ProjectModel(getStore().db).list();
