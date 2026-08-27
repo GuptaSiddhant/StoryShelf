@@ -37,12 +37,10 @@
     "web:dev": "nub run --filter website dev"
   },
   "devDependencies": {
-    "turbo": "^2.10.11"
-  },
-  "dependencies": {
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
-    "oxlint-tsgolint": "catalog:"
+    "oxlint-tsgolint": "catalog:",
+    "turbo": "^2.10.11"
   },
   "devEngines": {
     "packageManager": {

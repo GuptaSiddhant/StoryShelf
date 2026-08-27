@@ -7,6 +7,7 @@ export default defineConfig({
   integrations: [
     starlight({
       title: "StoryShelf",
+      plugins: [],
       description: "Self-hosted visual testing for Storybook.",
       social: [
         {
@@ -24,7 +25,6 @@ export default defineConfig({
             { label: "Deployment", slug: "guides/deployment" },
             { label: "CLI", slug: "guides/cli" },
             { label: "Auth", slug: "guides/auth" },
-          
           ],
         },
         {
