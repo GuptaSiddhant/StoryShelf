@@ -9,10 +9,15 @@ export interface BuildDiffData {
   comments: Comment[];
   selectedId?: string;
   canReview: boolean;
+  hasBaseline: Record<string, boolean>;
+}
+
+function imageUrl(project: Project, build: Build, snapshot: Snapshot, kind: "image" | "diff" | "baseline"): string {
+  return `/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${snapshot.id}/${kind}`;
 }
 
 export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
-  const { project, build, snapshots, comments, selectedId, canReview } = data;
+  const { project, build, snapshots, comments, selectedId, canReview, hasBaseline } = data;
   const selected = snapshots.find((s) => s.id === selectedId) ?? snapshots.find((s) => s.status === "changed" || s.status === "new") ?? snapshots[0];
   const pending = snapshots.filter((s) => s.status === "new" || s.status === "changed");
 
@@ -163,27 +168,24 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
                     <div class="diff-grid" style="margin-top:1rem;">
                       <div class="diff-pane">
                         <div class="diff-pane__label">Baseline</div>
-                        <div style="aspect-ratio: 16/9; display:grid; place-items:center; background:var(--surface-muted); color:var(--text-secondary); font-size:.85rem;">
-                          Baseline image
-                          <br />
-                          <span class="field__hint">/api snapshot baseline</span>
-                        </div>
+                        {hasBaseline[selected.id] ? (
+                          <img class="diff-pane__img" src={imageUrl(project, build, selected, "baseline")} alt={`Baseline for ${selected.storyTitle} / ${selected.storyName}`} loading="lazy" />
+                        ) : (
+                          <div style="aspect-ratio: 16/9; display:grid; place-items:center; background:var(--surface-muted); color:var(--text-secondary); font-size:.85rem;">
+                            No baseline
+                            <br />
+                            <span class="field__hint">first capture for this story</span>
+                          </div>
+                        )}
                       </div>
                       <div class="diff-pane">
                         <div class="diff-pane__label">Current</div>
-                        <div style="aspect-ratio: 16/9; display:grid; place-items:center; background:var(--surface-muted); color:var(--text-secondary); font-size:.85rem;">
-                          Current screenshot
-                          <br />
-                          <span class="field__hint">{selected.screenshotPath}</span>
-                        </div>
+                        <img class="diff-pane__img" src={imageUrl(project, build, selected, "image")} alt={`Current for ${selected.storyTitle} / ${selected.storyName}`} loading="lazy" />
                       </div>
                       <div class="diff-pane">
                         <div class="diff-pane__label">Diff {selected.diffRatio === null ? "" : `· ${(selected.diffRatio * 100).toFixed(2)}%`}</div>
                         {selected.diffPath ? (
-                          <div style="aspect-ratio: 16/9; display:grid; place-items:center; background:var(--surface-muted);">
-                            Diff overlay
-                            <span class="field__hint">{selected.diffPath}</span>
-                          </div>
+                          <img class="diff-pane__img" src={imageUrl(project, build, selected, "diff")} alt={`Diff for ${selected.storyTitle} / ${selected.storyName}`} loading="lazy" />
                         ) : (
                           <div style="aspect-ratio: 16/9; display:grid; place-items:center; color:var(--text-secondary);">
                             {selected.status === "unchanged" || selected.status === "approved" ? "No diff — within threshold" : "No diff yet"}

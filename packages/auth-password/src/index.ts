@@ -1,7 +1,6 @@
-import type { AuthAdapter, AuthUser } from "@storyshelf/core/adapter/auth";
+import { SESSION_COOKIE, type AuthAdapter, type AuthUser } from "@storyshelf/core/adapter/auth";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-const SESSION_COOKIE = "storyshelf_session";
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 interface SessionPayload {

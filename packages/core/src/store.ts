@@ -4,6 +4,7 @@ import type { AuthUser } from "./adapters/auth.ts";
 import type { DatabaseAdapter } from "./adapters/database.ts";
 import type { LoggerAdapter } from "./adapters/logger.ts";
 import type { StorageAdapter } from "./adapters/storage.ts";
+import type { Queue } from "./capture/queue.ts";
 import type { ShelfConfig, UIConfig } from "./config.ts";
 
 export interface Store {
@@ -15,6 +16,7 @@ export interface Store {
   user: AuthUser | null;
   authEnabled: boolean;
   enqueueCapture?: (buildId: string) => Promise<void>;
+  captureQueue?: Queue | null;
 }
 
 const storage = new AsyncLocalStorage<Store>();

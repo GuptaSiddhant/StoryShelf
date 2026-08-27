@@ -58,6 +58,7 @@
     "./models/comment": "./dist/models/comment.mjs",
     "./models/label": "./dist/models/label.mjs",
     "./models/token": "./dist/models/token.mjs",
+    "./models/webhook": "./dist/models/webhook.mjs",
     "./package.json": "./package.json"
   }
 }

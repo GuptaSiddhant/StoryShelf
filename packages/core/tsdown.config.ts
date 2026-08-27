@@ -21,6 +21,7 @@ const entry: UserConfig["entry"] = {
   "models/comment": "./src/models/comment.ts",
   "models/label": "./src/models/label.ts",
   "models/token": "./src/models/token.ts",
+  "models/webhook": "./src/models/webhook.ts",
 };
 
 export default defineConfig({

@@ -4,8 +4,9 @@ import { renderSettingsGeneral } from "./settings-general.tsx";
 import { renderSettingsLabels } from "./settings-labels.tsx";
 import { renderSettingsMembers, type SettingsMember } from "./settings-members.tsx";
 import { renderSettingsTokens } from "./settings-tokens.tsx";
+import { renderSettingsWebhooks, type SettingsWebhook } from "./settings-webhooks.tsx";
 
-export type SettingsTab = "general" | "labels" | "tokens" | "members";
+export type SettingsTab = "general" | "labels" | "tokens" | "webhooks" | "members";
 
 export interface ProjectSettingsData {
   project: Project;
@@ -13,12 +14,14 @@ export interface ProjectSettingsData {
   labelTypes: LabelType[];
   tokens: Array<Omit<Token, "hash">>;
   members: SettingsMember[];
+  webhooks: SettingsWebhook[];
   isAdmin: boolean;
 }
 
 export interface SettingsFormState {
   errors?: Record<string, string>;
   globalError?: string;
+  secret?: string;
 }
 
 export function renderProjectSettingsPage(data: ProjectSettingsData, formState?: SettingsFormState): RenderedContent {
@@ -42,7 +45,7 @@ export function renderProjectSettingsPage(data: ProjectSettingsData, formState?:
         <div class="page-header__row">
           <div>
             <h1 class="page-header__title">Project settings</h1>
-            <p class="page-header__desc">Manage general settings, labels, tokens and members for {project.name}.</p>
+            <p class="page-header__desc">Manage general settings, labels, tokens, webhooks and members for {project.name}.</p>
           </div>
         </div>
       </div>
@@ -57,6 +60,9 @@ export function renderProjectSettingsPage(data: ProjectSettingsData, formState?:
         <a class={`tabs__link ${activeTab === "tokens" ? "tabs__link--active" : ""}`} href={`/projects/${project.slug}/settings/tokens`} aria-current={activeTab === "tokens" ? "page" : undefined}>
           Tokens
         </a>
+        <a class={`tabs__link ${activeTab === "webhooks" ? "tabs__link--active" : ""}`} href={`/projects/${project.slug}/settings/webhooks`} aria-current={activeTab === "webhooks" ? "page" : undefined}>
+          Webhooks
+        </a>
         <a class={`tabs__link ${activeTab === "members" ? "tabs__link--active" : ""}`} href={`/projects/${project.slug}/settings/members`} aria-current={activeTab === "members" ? "page" : undefined}>
           Members
         </a>
@@ -65,6 +71,7 @@ export function renderProjectSettingsPage(data: ProjectSettingsData, formState?:
       {activeTab === "general" ? renderSettingsGeneral(project, formState, data.isAdmin) : null}
       {activeTab === "labels" ? renderSettingsLabels(project, data.labelTypes, data.isAdmin) : null}
       {activeTab === "tokens" ? renderSettingsTokens(project, data.tokens, data.isAdmin) : null}
+      {activeTab === "webhooks" ? renderSettingsWebhooks(project, data.webhooks, data.isAdmin, formState) : null}
       {activeTab === "members" ? renderSettingsMembers(project, data.members, data.isAdmin) : null}
     </DocumentLayout>
   );
