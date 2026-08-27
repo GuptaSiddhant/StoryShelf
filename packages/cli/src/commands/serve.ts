@@ -32,5 +32,9 @@ export async function runServe(options: ServeOptions): Promise<void> {
     purgeTtlDays: Number(options.purgeTtlDays),
   };
   const app = createShelfRouter({ database, storage, capture, config });
-  serve({ fetch: app.fetch, port: Number(options.port) });
+  const server =serve({ fetch: app.fetch, port: Number(options.port) });
+  server.on("listening", () => {
+    // eslint-disable-next-line no-console
+    console.log(`Server is running on http://localhost:${options.port}`);
+  });
 }
