@@ -1,0 +1,83 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "error",
+    "nursery": "error",
+    "pedantic": "error",
+    "perf": "error",
+    "restriction": "error",
+    "style": "warn",
+    "suspicious": "error"
+  },
+  "env": {
+    "builtin": true,
+    "node": true
+  },
+  "rules": {
+    "arrow-body-style": "allow",
+    "eslint/no-use-before-define": "allow",
+    "eslint/one-var": "allow",
+    "id-length": [
+      "warn",
+      {
+        "exceptions": ["z"]
+      }
+    ],
+    "func-style": ["allow"],
+    "max-lines-per-function": [
+      "warn",
+      {
+        "max": 50,
+        "skipBlankLines": true,
+        "skipComments": true
+      }
+    ],
+    "import/consistent-type-specifier-style": "allow",
+    "import/extensions": "allow",
+    "import/exports-last": "allow",
+    "import/group-exports": "allow",
+    "import/max-dependencies": "allow",
+    "import/no-cycle": "warn",
+    "import/no-relative-parent-imports": "allow",
+    "import/no-namespace": "allow",
+    "import/prefer-default-export": "allow",
+    "import/no-named-export": "allow",
+    "new-cap": "allow",
+    "no-async-await": "allow",
+    "no-continue": "allow",
+    "no-magic-numbers": "allow",
+    "no-null": "allow",
+    "no-optional-chaining": "allow",
+    "no-rest-spread-properties": "allow",
+    "no-script-url": "allow",
+    "no-ternary": "allow",
+    "no-undefined": "allow",
+    "no-unsafe-type-assertion": "allow",
+    "only-throw-error": "allow",
+    "return-await": "allow",
+    "sort-imports": "allow",
+    "sort-keys": "allow",
+    "switch-exhaustiveness-check": "warn",
+    "strict-boolean-expressions": "allow",
+    "eslint/no-underscore-dangle": [
+      "error",
+      {
+        "allow": ["_InPath", "_zod"]
+      }
+    ],
+    "typescript/explicit-member-accessibility": "allow",
+    "typescript/method-signature-style": "allow",
+    "typescript/no-unnecessary-condition": "allow",
+    "typescript/prefer-readonly-parameter-types": "allow",
+    "unicorn/import-style": "allow",
+    "typescript/strict-boolean-expressions": "allow"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.ts", "**/*.spec.ts", "**/mocks/**"],
+      "rules": {
+        "typescript/no-confusing-void-expression": "allow"
+      }
+    }
+  ]
+}

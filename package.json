@@ -1,0 +1,54 @@
+{
+  "name": "storyshelf-monorepo",
+  "private": true,
+  "type": "module",
+  "description": "Self-hosted visual testing platform for Storybook.",
+  "repository": "git@github.com:GuptaSiddhant/storyshelf.git",
+  "author": "Siddhant Gupta <guptasiddhant@icloud.com>",
+  "license": "MIT",
+  "workspaces": {
+    "packages": [
+      "./examples/*",
+      "./packages/*",
+      "website"
+    ],
+    "catalog": {
+      "@types/node": "^22.0.0",
+      "@vitest/coverage-v8": "^4.0.0",
+      "oxfmt": "^0.65.0",
+      "oxlint": "^1.80.0",
+      "oxlint-tsgolint": "^7.0.2001",
+      "typescript": "^7.0.2",
+      "tsdown": "^0.22.14",
+      "vitest": "^4.0.0"
+    }
+  },
+  "scripts": {
+    "build": "turbo build",
+    "build:pkg": "turbo build --filter='./packages/*'",
+    "core:build": "nub run --filter @storyshelf/core build",
+    "core:dev": "nub run --filter @storyshelf/core dev",
+    "cli": "nub run --filter @storyshelf/cli start",
+    "docs": "nub run --filter website start",
+    "fmt": "turbo fmt",
+    "lint": "turbo lint",
+    "serve": "nub run --filter @storyshelf/cli start",
+    "test": "turbo test",
+    "verify": "turbo verify --filter='./packages/*'"
+  },
+  "devDependencies": {
+    "turbo": "^2.10.11"
+  },
+  "dependencies": {
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:",
+    "oxlint-tsgolint": "catalog:"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "nub",
+      "version": "^0.7.5",
+      "onFail": "ignore"
+    }
+  }
+}

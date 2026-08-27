@@ -1,0 +1,38 @@
+{
+  "$schema": "./node_modules/turbo/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist", "storybook-static", "build"],
+      "env": [
+        "PUBLISHED_BASE_DOMAIN",
+        "STORAGE_S3_BUCKET",
+        "STORAGE_S3_ENDPOINT",
+        "STORAGE_S3_REGION",
+        "TURSO_DATABASE_URL",
+        "TURSO_AUTH_TOKEN"
+      ]
+    },
+    "dev": {
+      "persistent": true,
+      "cache": false
+    },
+    "fmt": {
+      "outputLogs": "new-only"
+    },
+    "lint": {
+      "dependsOn": ["^build"],
+      "outputLogs": "new-only"
+    },
+    "test": {
+      "outputs": ["./node_modules/.vite/vitest"]
+    },
+    "test:integration": {
+      "cache": false,
+      "outputs": ["./node_modules/.vite/vitest"]
+    },
+    "verify": {
+      "dependsOn": ["build", "lint", "test"]
+    }
+  }
+}

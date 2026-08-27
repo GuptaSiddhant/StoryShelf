@@ -1,0 +1,54 @@
+{
+  "name": "@storyshelf/core",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "StoryShelf core: Hono router, adapter interfaces, models, capture pipeline, diff, retention.",
+  "author": {
+    "name": "Siddhant Gupta",
+    "url": "https://guptasiddhant.com"
+  },
+  "license": "MIT",
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown -w",
+    "fmt": "oxfmt -c ../../.oxfmtrc.json ./src",
+    "lint": "oxlint --type-aware --type-check ./src",
+    "lint:fix": "nub run lint -- --fix",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@hono/zod-openapi": "^1.1.5",
+    "drizzle-orm": "^0.44.0",
+    "hono": "^4.11.0",
+    "pixelmatch": "^7.1.0",
+    "pngjs": "^7.0.0",
+    "zod": "^4.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/pngjs": "^6.0.5",
+    "@vitest/coverage-v8": "catalog:",
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:",
+    "oxlint-tsgolint": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./adapter/database": "./dist/adapter/database.mjs",
+    "./adapter/storage": "./dist/adapter/storage.mjs",
+    "./adapter/capture-runner": "./dist/adapter/capture-runner.mjs",
+    "./adapter/auth": "./dist/adapter/auth.mjs",
+    "./adapter/status": "./dist/adapter/status.mjs",
+    "./adapter/logger": "./dist/adapter/logger.mjs",
+    "./schema": "./dist/schema.mjs",
+    "./types": "./dist/types.mjs",
+    "./package.json": "./package.json"
+  }
+}
