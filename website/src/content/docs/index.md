@@ -6,7 +6,7 @@ hero:
   tagline: Self-hosted Chromatic alternative. Storybook-native. Unlimited snapshots.
   actions:
     - text: Get started
-      link: /guides/getting-started/
+      link: ./guides/getting-started/
       icon: right-arrow
     - text: GitHub
       link: https://github.com/GuptaSiddhant/storyshelf

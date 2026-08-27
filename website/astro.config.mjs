@@ -3,6 +3,7 @@ import { defineConfig } from "astro/config";
 
 export default defineConfig({
   site: "https://storyshelf.dev",
+  base: process.env.BASE_PATH || "/",
   integrations: [
     starlight({
       title: "StoryShelf",
@@ -21,6 +22,9 @@ export default defineConfig({
             { label: "Getting started", slug: "guides/getting-started" },
             { label: "CI setup", slug: "guides/ci" },
             { label: "Deployment", slug: "guides/deployment" },
+            { label: "CLI", slug: "guides/cli" },
+            { label: "Auth", slug: "guides/auth" },
+          
           ],
         },
         {
@@ -33,14 +37,14 @@ export default defineConfig({
         {
           label: "Packages",
           items: [
-            { label: "@storyshelf/core", href: "https://github.com/GuptaSiddhant/StoryShelf/packages/core/README.md" },
-            { label: "@storyshelf/cli", href: "https://github.com/GuptaSiddhant/StoryShelf/packages/cli/README.md" },
-            { label: "@storyshelf/db-sqlite", href: "https://github.com/GuptaSiddhant/StoryShelf/packages/db-sqlite/README.md" },
-            { label: "@storyshelf/db-turso", href: "https://github.com/GuptaSiddhant/StoryShelf/packages/db-turso/README.md" },
-            { label: "@storyshelf/storage-local", href: "https://github.com/GuptaSiddhant/StoryShelf/packages/storage-local/README.md" },
-            { label: "@storyshelf/storage-s3", href: "https://github.com/GuptaSiddhant/StoryShelf/packages/storage-s3/README.md" },
-            { label: "@storyshelf/auth-oauth", href: "https://github.com/GuptaSiddhant/StoryShelf/packages/auth-oauth/README.md" },
-            { label: "@storyshelf/auth-password", href: "https://github.com/GuptaSiddhant/StoryShelf/packages/auth-password/README.md" },
+            { label: "@storyshelf/core", slug: "packages/core" },
+            { label: "@storyshelf/cli", slug: "packages/cli" },
+            { label: "@storyshelf/db-sqlite", slug: "packages/db-sqlite" },
+            { label: "@storyshelf/db-turso", slug: "packages/db-turso" },
+            { label: "@storyshelf/storage-local", slug: "packages/storage-local" },
+            { label: "@storyshelf/storage-s3", slug: "packages/storage-s3" },
+            { label: "@storyshelf/auth-oauth", slug: "packages/auth-oauth" },
+            { label: "@storyshelf/auth-password", slug: "packages/auth-password" },
           ],
         },
       ],
