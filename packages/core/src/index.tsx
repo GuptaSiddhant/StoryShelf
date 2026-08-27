@@ -3,19 +3,19 @@ import { Hono } from "hono";
 import type { AuthUser } from "./adapters/auth.ts";
 import { Queue } from "./capture/queue.ts";
 import type { ShelfOptions } from "./config.ts";
-import { renderBuildDetailPage } from "./pages/build-detail.tsx";
-import { renderProjectBuildsPage } from "./pages/project-builds.tsx";
-import { renderProjectsPage } from "./pages/projects.tsx";
-import { renderRootPage } from "./pages/root.tsx";
 import { registerAdmin } from "./routers/admin.ts";
 import { registerBuilds } from "./routers/builds.ts";
 import { registerLabels } from "./routers/labels.ts";
 import { registerMembers } from "./routers/members.ts";
 import { registerProjects } from "./routers/projects.ts";
 import { registerTokens } from "./routers/tokens.ts";
+import { registerUiPages } from "./routers/ui.ts";
 import { runWithStore } from "./store.ts";
 
-async function resolveUser(c: { req: { raw: Request; header: (name: string) => string | undefined } }, options: ShelfOptions): Promise<AuthUser | null> {
+async function resolveUser(
+  c: { req: { raw: Request; header: (name: string) => string | undefined } },
+  options: ShelfOptions,
+): Promise<AuthUser | null> {
   if (!options.auth) {
     return null;
   }
@@ -60,26 +60,7 @@ export function createShelfRouter(options: ShelfOptions): Hono {
   registerMembers(app);
   registerTokens(app);
   registerAdmin(app);
-
-  // eslint-disable-next-line promise-function-async -- renderRootPage returns RenderedContent (string | Promise<string>)
-  app.get("/", (c) => c.html(renderRootPage()));
-  app.get("/projects", async (c) => c.html(await renderProjectsPage()));
-
-  app.get("/projects/:slug/builds", async (c) => {
-    const html = await renderProjectBuildsPage(c.req.param("slug"));
-    if (!html) {
-      return c.notFound();
-    }
-    return c.html(html);
-  });
-
-  app.get("/projects/:slug/builds/:buildId", async (c) => {
-    const html = await renderBuildDetailPage(c.req.param("buildId"));
-    if (!html) {
-      return c.notFound();
-    }
-    return c.html(html);
-  });
+  registerUiPages(app);
 
   return app;
 }

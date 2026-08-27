@@ -1,0 +1,71 @@
+import type { LabelType, Project, Token } from "../schema.ts";
+import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
+import { renderSettingsGeneral } from "./settings-general.tsx";
+import { renderSettingsLabels } from "./settings-labels.tsx";
+import { renderSettingsMembers, type SettingsMember } from "./settings-members.tsx";
+import { renderSettingsTokens } from "./settings-tokens.tsx";
+
+export type SettingsTab = "general" | "labels" | "tokens" | "members";
+
+export interface ProjectSettingsData {
+  project: Project;
+  activeTab: SettingsTab;
+  labelTypes: LabelType[];
+  tokens: Array<Omit<Token, "hash">>;
+  members: SettingsMember[];
+  isAdmin: boolean;
+}
+
+export interface SettingsFormState {
+  errors?: Record<string, string>;
+  globalError?: string;
+}
+
+export function renderProjectSettingsPage(data: ProjectSettingsData, formState?: SettingsFormState): RenderedContent {
+  const { project, activeTab } = data;
+  return (
+    <DocumentLayout title={`${project.name} · Settings`} nav={{ active: "settings", projectSlug: project.slug, projectName: project.name }}>
+      <div class="page-header">
+        <nav class="breadcrumbs" aria-label="Breadcrumb">
+          <ol>
+            <li>
+              <a href="/projects">Projects</a>
+            </li>
+            <li>
+              <a href={`/projects/${project.slug}/builds`}>{project.name}</a>
+            </li>
+            <li>
+              <span aria-current="page">Settings</span>
+            </li>
+          </ol>
+        </nav>
+        <div class="page-header__row">
+          <div>
+            <h1 class="page-header__title">Project settings</h1>
+            <p class="page-header__desc">Manage general settings, labels, tokens and members for {project.name}.</p>
+          </div>
+        </div>
+      </div>
+
+      <nav class="tabs" aria-label="Settings sections">
+        <a class={`tabs__link ${activeTab === "general" ? "tabs__link--active" : ""}`} href={`/projects/${project.slug}/settings`} aria-current={activeTab === "general" ? "page" : undefined}>
+          General
+        </a>
+        <a class={`tabs__link ${activeTab === "labels" ? "tabs__link--active" : ""}`} href={`/projects/${project.slug}/settings/labels`} aria-current={activeTab === "labels" ? "page" : undefined}>
+          Labels
+        </a>
+        <a class={`tabs__link ${activeTab === "tokens" ? "tabs__link--active" : ""}`} href={`/projects/${project.slug}/settings/tokens`} aria-current={activeTab === "tokens" ? "page" : undefined}>
+          Tokens
+        </a>
+        <a class={`tabs__link ${activeTab === "members" ? "tabs__link--active" : ""}`} href={`/projects/${project.slug}/settings/members`} aria-current={activeTab === "members" ? "page" : undefined}>
+          Members
+        </a>
+      </nav>
+
+      {activeTab === "general" ? renderSettingsGeneral(project, formState, data.isAdmin) : null}
+      {activeTab === "labels" ? renderSettingsLabels(project, data.labelTypes, data.isAdmin) : null}
+      {activeTab === "tokens" ? renderSettingsTokens(project, data.tokens, data.isAdmin) : null}
+      {activeTab === "members" ? renderSettingsMembers(project, data.members, data.isAdmin) : null}
+    </DocumentLayout>
+  );
+}
