@@ -17,11 +17,7 @@ export interface ServeOptions {
 
 export async function runServe(options: ServeOptions): Promise<void> {
   const dataDir = resolve(options.dataDir);
-  await mkdir(dataDir, { recursive: true }).catch((error) => {
-    if (error.code !== "EEXIST") {
-      throw error;
-    }
-  });
+  await mkdir(dataDir, { recursive: true });
   const database = createSqliteDatabase(join(dataDir, "shelf.db"));
   await database.migrate();
   const storage = createLocalStorage(dataDir);
@@ -32,7 +28,7 @@ export async function runServe(options: ServeOptions): Promise<void> {
     purgeTtlDays: Number(options.purgeTtlDays),
   };
   const app = createShelfRouter({ database, storage, capture, config });
-  const server =serve({ fetch: app.fetch, port: Number(options.port) });
+  const server = serve({ fetch: app.fetch, port: Number(options.port) });
   server.on("listening", () => {
     // eslint-disable-next-line no-console
     console.log(`Server is running on http://localhost:${options.port}`);
