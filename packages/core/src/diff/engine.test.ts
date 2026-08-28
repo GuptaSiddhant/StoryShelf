@@ -47,4 +47,40 @@ describe("diffImages", () => {
     expect(result.sizeChanged).toBe(true);
     expect(result.diffImage).toBeNull();
   });
+
+  it("diffs the overlapping region when failOnSizeChange is disabled", () => {
+    const options = { ...DEFAULT_DIFF_OPTIONS, failOnSizeChange: false };
+    const a = png(4, 4, solid([0, 0, 0]));
+    const b = png(8, 8, solid([0, 0, 0]));
+    const result = diffImages(a, b, options);
+    expect(result.sizeChanged).toBe(true);
+    expect(result.passed).toBe(true);
+    expect(result.diffPixels).toBe(0);
+    expect(result.diffRatio).toBe(0);
+    expect(result.diffImage).not.toBeNull();
+  });
+
+  it("counts changed pixels in the overlap when failOnSizeChange is disabled", () => {
+    const options = { ...DEFAULT_DIFF_OPTIONS, failOnSizeChange: false };
+    const a = png(4, 4, solid([255, 0, 0]));
+    const b = png(8, 4, (x, y) => (x === 0 && y === 0 ? [0, 0, 255] : [255, 0, 0]));
+    const result = diffImages(a, b, options);
+    expect(result.sizeChanged).toBe(true);
+    expect(result.passed).toBe(false);
+    expect(result.diffPixels).toBe(1);
+    expect(result.diffRatio).toBe(1 / 16);
+    expect(result.diffImage).not.toBeNull();
+  });
+
+  it("keeps failing on size change when failOnSizeChange is enabled", () => {
+    const options = { ...DEFAULT_DIFF_OPTIONS, failOnSizeChange: true };
+    const a = png(4, 4, solid([0, 0, 0]));
+    const b = png(8, 8, solid([0, 0, 0]));
+    const result = diffImages(a, b, options);
+    expect(result.passed).toBe(false);
+    expect(result.diffPixels).toBe(0);
+    expect(result.diffRatio).toBe(1);
+    expect(result.sizeChanged).toBe(true);
+    expect(result.diffImage).toBeNull();
+  });
 });

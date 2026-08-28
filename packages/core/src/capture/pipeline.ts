@@ -1,4 +1,5 @@
 import type { DatabaseAdapter } from "../adapters/database.ts";
+import type { LoggerAdapter } from "../adapters/logger.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { diffImages } from "../diff/engine.ts";
 import { DEFAULT_DIFF_OPTIONS } from "../diff/options.ts";
@@ -6,6 +7,7 @@ import { BaselineModel } from "../models/baseline.ts";
 import { BuildModel } from "../models/build.ts";
 import { SnapshotModel } from "../models/snapshot.ts";
 import type { Baseline, Build, Project } from "../schema.ts";
+import type { BuildStatus } from "../types.ts";
 import { diffPath, screenshotPath } from "../utils/paths.ts";
 import type { StoryEntry, StorySourceAdapter, Viewport } from "./adapter.ts";
 
@@ -32,6 +34,8 @@ export interface CaptureContext {
   adapter: StorySourceAdapter;
   /** Function that renders a story into a screenshot buffer. */
   renderStory: RenderStory;
+  /** Optional logger invoked when a story fails to capture. */
+  logger?: LoggerAdapter;
 }
 
 /**
@@ -42,14 +46,27 @@ export interface CaptureContext {
  */
 export async function runCapture(ctx: CaptureContext): Promise<void> {
   const stories = await ctx.adapter.discover(ctx.storybookDir);
+  const failedStoryIds = new Set<string>();
   await Promise.all(
     ctx.viewports.flatMap((viewport) =>
       stories.map(async (story) => {
-        await captureStory(ctx, story, viewport);
+        try {
+          await captureStory(ctx, story, viewport);
+        } catch (error) {
+          // A failure in one story/viewport must not abort the other captures.
+          failedStoryIds.add(story.id);
+          ctx.logger?.error(
+            `capture failed for story "${story.id}" at viewport "${viewport.name}": ${errorMessage(error)}`,
+          );
+        }
       }),
     ),
   );
-  await finalize(ctx, stories.map((s) => s.id));
+  await finalize(ctx, stories.map((s) => s.id), failedStoryIds);
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 async function captureStory(ctx: CaptureContext, story: StoryEntry, viewport: Viewport): Promise<void> {
@@ -116,17 +133,22 @@ async function createWithBaseline(ctx: CaptureContext, story: StoryEntry, viewpo
   }
   await snapshots.update(snapshot.id, {
     status,
-    diffPath: result.passed ? null : diff,
+    diffPath: !result.passed && result.diffImage ? diff : null,
     diffPixels: result.diffPixels,
     diffRatio: result.diffRatio,
     diffPassed: result.passed,
   });
 }
 
-async function finalize(ctx: CaptureContext, storyIds: string[]): Promise<void> {
+async function finalize(ctx: CaptureContext, storyIds: string[], failedStoryIds: ReadonlySet<string>): Promise<void> {
   const builds = new BuildModel(ctx.db);
   const build = await builds.updateCounts(ctx.build.id);
-  const status = build.changedCount === 0 ? "approved" : "reviewing";
+  let status: BuildStatus = "reviewing";
+  if (failedStoryIds.size > 0) {
+    status = "failed";
+  } else if (build.changedCount === 0) {
+    status = "approved";
+  }
   await builds.setStatus(ctx.build.id, status);
 
   if (ctx.build.isDefault) {
