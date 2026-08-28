@@ -118,30 +118,12 @@ importers:
 
   packages/cli:
     dependencies:
-      '@hono/node-server':
-        specifier: ^1.17.0
-        version: 1.19.17(hono@4.13.5)
-      '@storyshelf/core':
-        specifier: workspace:*
-        version: link:../core
-      '@storyshelf/db-sqlite':
-        specifier: workspace:*
-        version: link:../db-sqlite
-      '@storyshelf/storage-local':
-        specifier: workspace:*
-        version: link:../storage-local
       adm-zip:
         specifier: ^0.6.0
         version: 0.6.0
       commander:
         specifier: ^13.0.0
         version: 13.1.0
-      hono:
-        specifier: ^4.11.0
-        version: 4.13.5
-      playwright:
-        specifier: ^1.52.0
-        version: 1.62.1
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -268,6 +250,95 @@ importers:
       drizzle-orm:
         specifier: ^0.44.0
         version: 0.44.7(@libsql/client@0.15.15)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.3.0
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.1.11(@types/node@26.3.0)(vite@8.2.2(@types/node@26.3.0))(vitest@4.1.11)
+      oxfmt:
+        specifier: 'catalog:'
+        version: 0.65.0
+      oxlint:
+        specifier: 'catalog:'
+        version: 1.80.0(oxlint-tsgolint@7.0.2001)
+      oxlint-tsgolint:
+        specifier: 'catalog:'
+        version: 7.0.2001
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.22.14(typescript@7.0.2)
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@types/node@26.3.0)(@vitest/coverage-v8@4.1.11)(vite@8.2.2(@types/node@26.3.0))
+
+  packages/runner-playwright:
+    dependencies:
+      '@storyshelf/core':
+        specifier: workspace:*
+        version: link:../core
+      adm-zip:
+        specifier: ^0.6.0
+        version: 0.6.0
+      playwright:
+        specifier: ^1.52.0
+        version: 1.62.1
+    devDependencies:
+      '@storyshelf/db-sqlite':
+        specifier: workspace:*
+        version: link:../db-sqlite
+      '@storyshelf/storage-local':
+        specifier: workspace:*
+        version: link:../storage-local
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.3.0
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.1.11(@types/node@26.3.0)(vite@8.2.2(@types/node@26.3.0))(vitest@4.1.11)
+      oxfmt:
+        specifier: 'catalog:'
+        version: 0.65.0
+      oxlint:
+        specifier: 'catalog:'
+        version: 1.80.0(oxlint-tsgolint@7.0.2001)
+      oxlint-tsgolint:
+        specifier: 'catalog:'
+        version: 7.0.2001
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.22.14(typescript@7.0.2)
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@types/node@26.3.0)(@vitest/coverage-v8@4.1.11)(vite@8.2.2(@types/node@26.3.0))
+
+  packages/server:
+    dependencies:
+      '@hono/node-server':
+        specifier: ^1.17.0
+        version: 1.19.17(hono@4.13.5)
+      '@storyshelf/core':
+        specifier: workspace:*
+        version: link:../core
+      '@storyshelf/db-sqlite':
+        specifier: workspace:*
+        version: link:../db-sqlite
+      '@storyshelf/runner-playwright':
+        specifier: workspace:*
+        version: link:../runner-playwright
+      '@storyshelf/storage-local':
+        specifier: workspace:*
+        version: link:../storage-local
+      commander:
+        specifier: ^13.0.0
+        version: 13.1.0
     devDependencies:
       '@types/node':
         specifier: 'catalog:'

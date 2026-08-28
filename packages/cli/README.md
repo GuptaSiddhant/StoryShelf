@@ -1,6 +1,6 @@
 # @storyshelf/cli
 
-The StoryShelf command-line interface (binary `storyshelf`): start the server, create projects and CI tokens, upload built Storybooks as builds, purge expired builds, and retry failed builds.
+The StoryShelf command-line interface (binary `storyshelf`): create projects and CI tokens, upload built Storybooks as builds, purge expired builds, and retry failed builds. It talks to a running StoryShelf server over `/api/v1` and has **no Playwright or server dependencies**, so it installs cleanly in CI.
 
 ## Install
 
@@ -16,13 +16,6 @@ npm install @storyshelf/cli
 
 ## Quick start
 
-Start the server:
-
-```sh
-storyshelf serve -p 3000 --data-dir ./data --secret <s> \
-  --capture-concurrency 2 --purge-ttl-days 30
-```
-
 Create a project and a CI token:
 
 ```sh
@@ -32,15 +25,6 @@ storyshelf init --url https://shelf.example.com --name my-app
 ## API
 
 ### Commands
-
-`storyshelf serve` — start the StoryShelf server.
-
-```sh
-storyshelf serve [-p <port>] [--data-dir <dir>] [--secret <secret>] \
-  [--capture-concurrency <n>] [--purge-ttl-days <n>]
-```
-
-Defaults: `--port 3000`, `--data-dir ./data`, `--capture-concurrency 2`, `--purge-ttl-days 30`.
 
 `storyshelf init` — create a project and CI token on a server.
 
@@ -99,6 +83,6 @@ jobs:
 
 ## How it fits in
 
-`cli` is the entry point operators and CI pipelines use to talk to a running StoryShelf server. `serve` assembles the full stack from `@storyshelf/core`, `@storyshelf/db-sqlite`, and `@storyshelf/storage-local`; `init`, `upload`, `purge`, and `retry` drive the JSON API under `/api/v1`.
+The server itself lives in `@storyshelf/server` (binary `storyshelf-server`), which assembles `@storyshelf/core`, `@storyshelf/db-sqlite`, and `@storyshelf/storage-local` and runs Playwright captures. The CLI never imports that stack — client-only by design.
 
 See `docs/architecture.md` for the capture workflow and `docs/testing.md` for the gated browser integration suite.

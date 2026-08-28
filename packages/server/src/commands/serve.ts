@@ -4,8 +4,7 @@ import { mkdir } from "node:fs/promises";
 import { createShelfRouter, type ShelfConfig } from "@storyshelf/core";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { createLocalStorage } from "@storyshelf/storage-local";
-
-import { createPlaywrightCaptureRunner } from "../capture-runner.ts";
+import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
 
 /** Options for the `serve` command. */
 export interface ServeOptions {

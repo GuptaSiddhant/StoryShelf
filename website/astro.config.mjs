@@ -39,6 +39,8 @@ export default defineConfig({
           items: [
             { label: "@storyshelf/core", slug: "packages/core" },
             { label: "@storyshelf/cli", slug: "packages/cli" },
+            { label: "@storyshelf/server", slug: "packages/server" },
+            { label: "@storyshelf/runner-playwright", slug: "packages/runner-playwright" },
             { label: "@storyshelf/db-sqlite", slug: "packages/db-sqlite" },
             { label: "@storyshelf/db-turso", slug: "packages/db-turso" },
             { label: "@storyshelf/storage-local", slug: "packages/storage-local" },

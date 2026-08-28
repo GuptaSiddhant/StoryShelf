@@ -1,8 +1,6 @@
 import AdmZip from "adm-zip";
 import { normalizeBaseUrl, postFormWithProgress } from "../client.ts";
-import { printLine, createSpinner } from "../output.ts";
-
-const spinnerFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+import { createSpinner, printLine, spinnerFrames } from "../output.ts";
 
 /** Options for the `upload` command. */
 export interface UploadOptions {
@@ -47,16 +45,12 @@ export async function runUpload(options: UploadOptions): Promise<void> {
   if (options.authorName) form.set("authorName", options.authorName);
   form.set("zip", new Blob([new Uint8Array(zipBuffer)], { type: "application/zip" }), "storybook.zip");
 
-  const spinner = createSpinner("Uploading...");
+  const spinner = createSpinner("Uploading...", spinnerFrames);
   try {
     const build = await postFormWithProgress<{ id: string }>(
       `${base}/api/v1/projects/${options.slug}/builds`,
       form,
       { authorization: `Bearer ${options.token}` },
-      (loaded, total) => {
-        const pct = ((loaded / total) * 100).toFixed(1);
-        process.stdout.write(`\r${spinnerFrames[Date.now() % spinnerFrames.length]} Uploading ${pct}%`);
-      },
     );
     spinner.stop("Upload complete");
     printLine(`Build created: ${build.id}`);

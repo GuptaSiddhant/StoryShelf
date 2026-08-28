@@ -4,7 +4,6 @@ import { pathToFileURL } from "node:url";
 import { runInit, type InitOptions } from "./commands/init.ts";
 import { runPurge, type PurgeOptions } from "./commands/purge.ts";
 import { runRetry, type RetryOptions } from "./commands/retry.ts";
-import { runServe, type ServeOptions } from "./commands/serve.ts";
 import { runUpload, type UploadOptions } from "./commands/upload.ts";
 import { printError } from "./output.ts";
 
@@ -27,16 +26,6 @@ function run<TArgs>(fn: (args: TArgs) => Promise<void>): (args: TArgs) => Promis
 export function createProgram(): Command {
   const program = new Command();
   program.name("storyshelf").description("Self-hosted visual testing for Storybook.").version("0.1.0");
-
-  program
-    .command("serve")
-    .description("Start the StoryShelf server")
-    .option("-p, --port <port>", "port to listen on", "3000")
-    .option("--data-dir <dir>", "data directory", "./data")
-    .option("--secret <secret>", "session secret")
-    .option("--capture-concurrency <n>", "concurrent capture jobs", "2")
-    .option("--purge-ttl-days <n>", "purge builds older than N days", "30")
-    .action(run<ServeOptions>(runServe));
 
   program
     .command("init")

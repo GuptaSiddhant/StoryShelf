@@ -5,12 +5,12 @@ description: Install StoryShelf and capture your first build.
 
 StoryShelf is a self-hosted visual testing platform for Storybook. You run one server, point your CI at it, and review pixel diffs in the browser.
 
-The CLI is published as `@storyshelf/cli`. Install it globally to get a `storyshelf` command, or prefix every invocation with `npx @storyshelf/cli`:
+The server is published as `@storyshelf/server` (binary `storyshelf-server`), and the CI client as `@storyshelf/cli` (binary `storyshelf`, no Playwright or server deps). Install them globally, or prefix with `npx`:
 
 ```bash
-npm install -g @storyshelf/cli   # then: storyshelf serve ...
+npm install -g @storyshelf/server @storyshelf/cli   # then: storyshelf-server serve ...
 # or, without installing:
-npx @storyshelf/cli serve --port 3000
+npx @storyshelf/server serve --port 3000
 ```
 
 ## 1. Run the server
@@ -18,14 +18,16 @@ npx @storyshelf/cli serve --port 3000
 The easiest way is Docker:
 
 ```bash
-docker run -p 3000:3000 -v storyshelf-data:/app/data storyshelf serve
+docker run -p 3000:3000 -v storyshelf-data:/app/data storyshelf-server serve
 ```
 
-Or run the CLI directly:
+Or run the server directly:
 
 ```bash
-npx @storyshelf/cli serve --port 3000 --data-dir ./data
+npx @storyshelf/server serve --port 3000 --data-dir ./data
 ```
+
+(`serve` is the default command, so `npx @storyshelf/server` alone also works.)
 
 ## 2. Create a project and token
 

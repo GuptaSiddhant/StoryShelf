@@ -34,15 +34,45 @@ interface ScreenshotContext {
   baseUrl: string;
 }
 
+/** A capture that may currently be in flight, so that `cancel` can abort it. */
+interface ActiveRun {
+  cancelled: boolean;
+  browser: Browser | null;
+}
+
+const activeRuns = new Map<string, ActiveRun>();
+
 export function createPlaywrightCaptureRunner(deps: CaptureRunnerDeps): CaptureRunner {
   return {
     async run(buildId) {
-      await runBuild(deps, buildId);
+      const active: ActiveRun = { cancelled: false, browser: null };
+      activeRuns.set(buildId, active);
+      try {
+        await runBuild(deps, buildId, active);
+      } finally {
+        activeRuns.delete(buildId);
+      }
     },
-    async cancel(_buildId) {
-      await Promise.resolve();
+    async cancel(buildId) {
+      const active = activeRuns.get(buildId);
+      if (!active) {
+        return;
+      }
+      active.cancelled = true;
+      await closeBrowser(active.browser);
     },
   };
+}
+
+async function closeBrowser(browser: Browser | null): Promise<void> {
+  if (!browser) {
+    return;
+  }
+  try {
+    await browser.close();
+  } catch {
+    // The run's own `finally` performs final cleanup; cancel must never throw.
+  }
 }
 
 async function loadTarget(deps: CaptureRunnerDeps, buildId: string): Promise<{ build: Build; project: Project }> {
@@ -81,16 +111,18 @@ async function extractStorybook(deps: CaptureRunnerDeps, projectId: string, buil
   return targetDir;
 }
 
-async function runBuild(deps: CaptureRunnerDeps, buildId: string): Promise<void> {
+async function runBuild(deps: CaptureRunnerDeps, buildId: string, active: ActiveRun): Promise<void> {
   const { build, project } = await loadTarget(deps, buildId);
   const storybookDir = await extractStorybook(deps, project.id, build.id);
   const server = await createStaticServer(storybookDir);
   const browser = await chromium.launch();
+  active.browser = browser;
   const adapter = new StorybookAdapter();
   const ctx: ScreenshotContext = { browser, adapter, baseUrl: server.url };
+  const builds = new BuildModel(deps.db);
 
   try {
-    await new BuildModel(deps.db).setStatus(build.id, "capturing");
+    await builds.setStatus(build.id, "capturing");
     await runCapture({
       db: deps.db,
       storage: deps.storage,
@@ -101,7 +133,14 @@ async function runBuild(deps: CaptureRunnerDeps, buildId: string): Promise<void>
       adapter,
       renderStory: async (story, viewport) => await captureScreenshot(ctx, story, viewport),
     });
+    if (active.cancelled) {
+      await builds.setStatus(build.id, "failed");
+    }
+  } catch (error) {
+    await builds.setStatus(build.id, "failed");
+    throw error;
   } finally {
+    active.browser = null;
     await Promise.all([browser.close(), server.close()]);
   }
 }

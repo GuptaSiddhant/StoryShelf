@@ -9,7 +9,7 @@ Auth is a pluggable adapter. StoryShelf ships three modes: **none** (default, fo
 
 With no auth configured, the web UI is open and project roles are not enforced. This is fine for:
 
-- Local development (`storyshelf serve`).
+- Local development (`storyshelf-server serve`).
 - A demo or internal deployment behind a VPN.
 
 :::caution

@@ -1,26 +1,26 @@
 {
-  "name": "@storyshelf/cli",
+  "name": "@storyshelf/runner-playwright",
   "version": "0.1.0",
   "type": "module",
-  "description": "StoryShelf CLI: create projects, upload builds, purge, and retry from CI.",
+  "description": "Playwright CaptureRunner implementation for StoryShelf: renders uploaded Storybook builds in-process.",
   "license": "MIT",
-  "bin": {
-    "storyshelf": "./dist/index.js"
-  },
   "sideEffects": false,
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown -w",
     "fmt": "oxfmt -c ../../.oxfmtrc.json ./src",
     "lint": "oxlint --type-aware --type-check ./src",
-    "start": "nub --watch ./dist/index.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:integration": "RUN_INTEGRATION=1 vitest run integration.test.ts"
   },
   "dependencies": {
+    "@storyshelf/core": "workspace:*",
     "adm-zip": "^0.6.0",
-    "commander": "^13.0.0"
+    "playwright": "^1.52.0"
   },
   "devDependencies": {
+    "@storyshelf/db-sqlite": "workspace:*",
+    "@storyshelf/storage-local": "workspace:*",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "oxfmt": "catalog:",
@@ -29,5 +29,10 @@
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./package.json": "./package.json"
   }
 }

@@ -1,36 +1,17 @@
 ---
 title: CLI reference
-description: The storyshelf command-line interface — serve, init, upload, retry, and purge.
+description: The storyshelf command-line interface — init, upload, retry, and purge.
 ---
 
-The StoryShelf CLI (`@storyshelf/cli`) exposes a `storyshelf` binary. Install it globally, or prefix with `npx @storyshelf/cli`:
+The StoryShelf CLI (`@storyshelf/cli`) exposes a `storyshelf` binary for CI pipelines. Install it globally, or prefix with `npx @storyshelf/cli`:
 
 ```bash
 npm install -g @storyshelf/cli
 ```
 
-## `storyshelf serve`
-
-Run the server (dev mode, or a lightweight self-hosted deployment).
-
-```bash
-storyshelf serve \
-  -p 3000 \
-  --data-dir ./data \
-  --secret "a-long-random-secret" \
-  --capture-concurrency 2 \
-  --purge-ttl-days 30
-```
-
-| Flag | Description |
-|------|-------------|
-| `-p, --port` | HTTP port (default `3000`) |
-| `--data-dir` | Where SQLite + screenshots live (default `./data`) |
-| `--secret` | Session-cookie signing secret (required for auth) |
-| `--capture-concurrency` | Parallel captures (default `2`) |
-| `--purge-ttl-days` | Retention TTL for terminal builds (default `30`) |
-
-The server renders stories with Playwright in-process, so the machine needs Playwright's browsers installed. The official Docker image includes them.
+:::note
+This package is **client-only** — it talks to a running server over `/api/v1` and carries no Playwright or server dependencies. To run the server itself, install `@storyshelf/server` and use `storyshelf-server serve` (see [@storyshelf/server](/packages/server/)).
+:::
 
 ## `storyshelf init`
 

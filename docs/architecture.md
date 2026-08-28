@@ -252,7 +252,7 @@ interface CaptureRunner {
 }
 ```
 
-One local implementation in v1 (the server already has Playwright via the base image). The interface is kept thin so v2 can add a **remote** runner (offload capture to a worker fleet via a queue) without changing the pipeline.
+One local implementation in v1 — `@storyshelf/runner-playwright` (the server already has Playwright via the base image). The interface is kept thin so v2 can add a **remote** runner (offload capture to a worker fleet via a queue) without changing the pipeline — a future `@storyshelf/runner-remote` plugs in at the `serve` assembly point the same way.
 
 ### Capture Queue
 
@@ -655,13 +655,27 @@ StoryShelf/
 
     cli/
       src/
-        index.ts          # CLI entry (commander)
+        index.ts          # CLI client entry (commander: upload/init/retry/purge, no Playwright)
         commands/
           upload.ts       # storyshelf upload (build Storybook -> zip -> upload; git tags -> persistent label)
           retry.ts        # storyshelf retry (re-run capture for a build)
           init.ts         # storyshelf init (create project, generate token)
           purge.ts        # storyshelf purge (manual retention purge)
-          serve.ts        # storyshelf serve (dev mode)
+      package.json
+
+    server/
+      src/
+        index.ts          # server entry (commander: `serve`, the default command)
+        commands/
+          serve.ts        # storyshelf-server serve (assemble router + adapters + runner, listen)
+      package.json
+
+    runner-playwright/
+      src/
+        index.ts          # CaptureRunner entry
+        capture-runner.ts # Playwright CaptureRunner (unzip -> static server -> render -> store)
+        static-server.ts  # local HTTP server for the extracted Storybook during capture
+        viewport.ts       # default viewports
       package.json
 ```
 
@@ -737,7 +751,7 @@ RUN nubx nub run build
 EXPOSE 3000
 VOLUME /app/data
 
-CMD ["node", "packages/cli/dist/index.js", "serve", "--port", "3000", "--data-dir", "/app/data"]
+CMD ["node", "packages/server/dist/index.js", "serve", "--port", "3000", "--data-dir", "/app/data"]
 ```
 
 ```yaml

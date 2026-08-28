@@ -1,24 +1,15 @@
 ---
 title: "@storyshelf/cli"
-description: Run StoryShelf, create projects, upload Storybooks, and manage builds from CI.
+description: Create projects, upload Storybooks, and manage builds from CI — no Playwright, no server deps.
 ---
 
-`@storyshelf/cli` provides the `storyshelf` binary for operators and CI pipelines. It starts a server, creates projects and tokens, uploads built Storybooks, retries captures, and purges expired builds.
+`@storyshelf/cli` provides the `storyshelf` binary for CI pipelines. It creates projects and tokens, uploads built Storybooks, retries captures, and purges expired builds — all over the server's `/api/v1` endpoints. It has **no Playwright or server dependencies**, so it installs cleanly in CI. The server itself lives in `@storyshelf/server`.
 
 ## Install
 
 ```sh
 nub add @storyshelf/cli
 ```
-
-## Start a server
-
-```sh
-storyshelf serve -p 3000 --data-dir ./data --secret <secret> \
-  --capture-concurrency 2 --purge-ttl-days 30
-```
-
-Defaults are port `3000`, data directory `./data`, capture concurrency `2`, and a 30-day purge TTL. The server uses SQLite and local storage by default.
 
 ## Use from CI
 
@@ -40,4 +31,4 @@ Use `storyshelf retry` for a failed capture and `storyshelf purge` for manual re
 
 ## How it fits
 
-The CLI talks to the server's `/api/v1` endpoints. `serve` composes `@storyshelf/core`, `@storyshelf/db-sqlite`, and `@storyshelf/storage-local`; the other commands operate against an already-running server.
+The CLI talks to the server's `/api/v1` endpoints. To start the server, install `@storyshelf/server` and run `storyshelf-server serve` (its default command).

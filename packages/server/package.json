@@ -1,11 +1,11 @@
 {
-  "name": "@storyshelf/cli",
+  "name": "@storyshelf/server",
   "version": "0.1.0",
   "type": "module",
-  "description": "StoryShelf CLI: create projects, upload builds, purge, and retry from CI.",
+  "description": "StoryShelf server: review UI, SQLite, storage, and Playwright capture, all in one self-hosted process.",
   "license": "MIT",
   "bin": {
-    "storyshelf": "./dist/index.js"
+    "storyshelf-server": "./dist/index.js"
   },
   "sideEffects": false,
   "scripts": {
@@ -17,7 +17,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "adm-zip": "^0.6.0",
+    "@hono/node-server": "^1.17.0",
+    "@storyshelf/core": "workspace:*",
+    "@storyshelf/db-sqlite": "workspace:*",
+    "@storyshelf/runner-playwright": "workspace:*",
+    "@storyshelf/storage-local": "workspace:*",
     "commander": "^13.0.0"
   },
   "devDependencies": {
@@ -29,5 +33,10 @@
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./package.json": "./package.json"
   }
 }

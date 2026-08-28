@@ -49,7 +49,9 @@ StoryShelf/
     storage-s3/     @storyshelf/storage-s3     -- S3-compatible storage adapter (S3, R2, MinIO)
     auth-oauth/     @storyshelf/auth-oauth     -- OAuth/OIDC auth adapter
     auth-password/  @storyshelf/auth-password  -- Shared-password auth adapter
-    cli/            @storyshelf/cli            -- CLI entry point (commander)
+    cli/            @storyshelf/cli            -- CLI client (commander; upload/init/retry/purge, no Playwright)
+    runner-playwright/ @storyshelf/runner-playwright -- Playwright CaptureRunner (server-side capture)
+    server/         @storyshelf/server         -- self-hosted server (serve command, wires runner + adapters)
   website/                    -- Public docs & marketing site (Astro Starlight)
   examples/
     storybook/                -- Minimal deterministic Storybook (capture fixture + demo)
