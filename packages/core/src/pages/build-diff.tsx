@@ -55,12 +55,12 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
             </a>
             {canReview && pending.length > 0 ? (
               <>
-                <form method="post" action={`/projects/${project.slug}/builds/${build.id}/approve-all`} hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/approve-all`} hx-target="body">
+                <form method="post" action={`/api/v1/projects/${project.slug}/builds/${build.id}/approve-all`} hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/approve-all`} hx-target="body">
                   <button class="btn btn--primary" type="submit">
                     Approve all ({pending.length})
                   </button>
                 </form>
-                <form method="post" action={`/projects/${project.slug}/builds/${build.id}/reject-all`} hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/reject-all`} hx-target="body">
+                <form method="post" action={`/api/v1/projects/${project.slug}/builds/${build.id}/reject-all`} hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/reject-all`} hx-target="body">
                   <button class="btn btn--danger" type="submit">
                     Reject all
                   </button>

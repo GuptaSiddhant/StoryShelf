@@ -18,7 +18,7 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
   }
   const snapshots = await new SnapshotModel(db).listByBuild(build.id);
   const comments = await new CommentModel(db).listByBuild(build.id);
-  const canReview = true;
+  const canReview = !getStore().authEnabled || Boolean(getStore().user);
 
   const grouped = new Map<string, typeof snapshots>();
   for (const snap of snapshots) {

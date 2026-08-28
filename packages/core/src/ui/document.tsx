@@ -45,7 +45,7 @@ export const DocumentLayout: FC<{ title: string; nav?: NavConfig; children?: unk
             {children}
           </main>
         </div>
-        <script src="https://unpkg.com/htmx.org@1.9.12/dist/htmx.min.js" />
+        <script src="/assets/htmx.js" />
         <script dangerouslySetInnerHTML={{ __html: clientScript() }} />
       </body>
     </html>
@@ -124,9 +124,11 @@ const AuthMenu: FC = () => {
       )}
       <span class="user-menu__name">{user.name}</span>
       <span class={`user-menu__role user-menu__role--${user.role}`}>{user.role}</span>
-      <a class="user-menu__logout" href="/auth/logout" data-method="post">
-        Sign out
-      </a>
+      <form method="post" action="/auth/logout">
+        <button class="user-menu__logout" type="submit">
+          Sign out
+        </button>
+      </form>
     </div>
   );
 };

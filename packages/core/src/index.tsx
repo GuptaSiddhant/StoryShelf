@@ -4,6 +4,7 @@ import type { AuthUser } from "./adapters/auth.ts";
 import { Queue } from "./capture/queue.ts";
 import type { ShelfOptions } from "./config.ts";
 import { registerAdmin } from "./routers/admin.ts";
+import { registerAssets } from "./routers/assets.ts";
 import { registerAuth } from "./routers/auth.ts";
 import { registerBuilds } from "./routers/builds.ts";
 import { registerLabels } from "./routers/labels.ts";
@@ -64,7 +65,7 @@ export function createShelfRouter(options: ShelfOptions): Hono {
   app.use("*", async (c, next) => {
     const { user, authEnabled: isAuthEnabled } = getStore();
     const path = c.req.path;
-    if (!isAuthEnabled || user || path.startsWith("/api/") || path.startsWith("/auth/")) {
+    if (!isAuthEnabled || user || path.startsWith("/api/") || path.startsWith("/auth/") || path.startsWith("/assets/")) {
       return next();
     }
     if (c.req.header("HX-Request") === "true") {
@@ -85,6 +86,7 @@ export function createShelfRouter(options: ShelfOptions): Hono {
   if (options.auth) {
     registerAuth(app, options.auth);
   }
+  registerAssets(app);
   registerUiPages(app);
 
   return app;
