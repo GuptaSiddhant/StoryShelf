@@ -1,10 +1,11 @@
+// oxlint-disable max-statements
 import { serve } from "@hono/node-server";
-import { join, resolve } from "node:path";
-import { mkdir } from "node:fs/promises";
 import { createShelfLogger, createShelfRouter, type ShelfConfig } from "@storyshelf/core";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
-import { createLocalStorage } from "@storyshelf/storage-local";
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
+import { createLocalStorage } from "@storyshelf/storage-local";
+import { mkdir } from "node:fs/promises";
+import { join, resolve } from "node:path";
 
 /** Options for the `serve` command. */
 export interface ServeOptions {
@@ -34,7 +35,7 @@ export async function runServe(options: ServeOptions): Promise<void> {
   await database.migrate();
   const storage = createLocalStorage(dataDir);
   const logger = createShelfLogger({ level: options.logLevel, env: process.env["NODE_ENV"] });
-  const capture = createPlaywrightCaptureRunner({ logger });
+  const capture = createPlaywrightCaptureRunner();
   const config: ShelfConfig = {
     secret: options.secret,
     captureConcurrency: Number(options.captureConcurrency),

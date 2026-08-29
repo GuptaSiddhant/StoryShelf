@@ -13,12 +13,6 @@ import {
 
 import { createStaticServer } from "./static-server.ts";
 
-/** Dependencies for the Playwright renderer. Purely rendering concerns only. */
-export interface CaptureRunnerDeps {
-  /** Optional logger for render-time diagnostics. */
-  logger?: Logger;
-}
-
 interface ScreenshotContext {
   browser: Browser;
   adapter: StorySourceAdapter;
@@ -41,13 +35,13 @@ export interface PlaywrightRenderInput {
   logger?: Logger;
 }
 
-export function createPlaywrightCaptureRunner(deps: CaptureRunnerDeps = {}): CaptureRunner {
+export function createPlaywrightCaptureRunner(): CaptureRunner {
   return {
     async render(input: PlaywrightRenderInput) {
       const active: ActiveRun = { cancelled: false, browser: null };
       activeRuns.set(input.buildId, active);
       try {
-        return await renderAll(input, active, deps.logger);
+        return await renderAll(input, active);
       } finally {
         activeRuns.delete(input.buildId);
       }
@@ -74,7 +68,7 @@ async function closeBrowser(browser: Browser | null): Promise<void> {
   }
 }
 
-async function renderAll(input: PlaywrightRenderInput, active: ActiveRun, parentLogger?: Logger): Promise<RenderResult> {
+async function renderAll(input: PlaywrightRenderInput, active: ActiveRun): Promise<RenderResult> {
   const server = await createStaticServer(input.storybookDir);
   const browser = await chromium.launch();
   active.browser = browser;
@@ -93,7 +87,7 @@ async function renderAll(input: PlaywrightRenderInput, active: ActiveRun, parent
           captures.push({ story, viewportName: viewport.name, screenshot });
         } catch (error) {
           failures.push({ storyId: story.id, viewportName: viewport.name, error: messageOf(error) });
-          parentLogger?.error({ storyId: story.id, viewport: viewport.name, err: error }, "render failed for story");
+          input.logger?.error({ storyId: story.id, viewport: viewport.name, err: error }, "render failed for story");
         }
       }),
     );

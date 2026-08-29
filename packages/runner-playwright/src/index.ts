@@ -1,1 +1,1 @@
-export { createPlaywrightCaptureRunner, type CaptureRunnerDeps } from "./capture-runner.ts";
+export { createPlaywrightCaptureRunner } from "./capture-runner.ts";

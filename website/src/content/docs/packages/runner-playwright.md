@@ -18,10 +18,10 @@ You normally never install this directly — `@storyshelf/server` injects it whe
 ```ts
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
 
-const capture = createPlaywrightCaptureRunner({ logger });
+const capture = createPlaywrightCaptureRunner();
 ```
 
-Hand the pure renderer to `createShelfRouter({ capture, config: { scratchDir } })`; the router builds the orchestrator that loads the build, extracts the uploaded archive into `scratchDir`, discovers stories, calls `capture.render(...)`, and persists. `logger` is an optional pino `Logger`; the orchestrator derives a `logger.child({ buildId, reqId })` and passes it into the renderer so per-build work is traced and correlated with the HTTP request that triggered it.
+Hand the pure renderer to `createShelfRouter({ capture, config: { scratchDir } })`; the router builds the orchestrator that loads the build, extracts the uploaded archive into `scratchDir`, discovers stories, calls `capture.render(...)`, and persists. The factory takes no dependencies. A pino `Logger` is an optional per-render input: the orchestrator derives a `logger.child({ buildId, reqId })` and passes it into each `render` call so per-build work is traced and correlated with the HTTP request that triggered it.
 
 ## How it fits
 

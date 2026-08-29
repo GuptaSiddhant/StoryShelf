@@ -73,9 +73,7 @@ describe("runServe", () => {
     expect(createSqliteDatabase).toHaveBeenCalledWith(join(dataDir, "shelf.db"));
     expect(dbObject.migrate).toHaveBeenCalled();
     expect(createLocalStorage).toHaveBeenCalledWith(dataDir);
-    expect(createPlaywrightCaptureRunner).toHaveBeenCalledWith({
-      logger: loggerObject,
-    });
+    expect(createPlaywrightCaptureRunner).toHaveBeenCalledWith();
     expect(createShelfRouter).toHaveBeenCalledWith({
       database: dbObject,
       storage: storageObject,

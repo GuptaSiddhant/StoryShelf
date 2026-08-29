@@ -49,10 +49,10 @@ The renderer owns only rendering concerns: launching the browser, serving the ex
 
 ### 3. Wiring
 
-`createShelfRouter` builds the orchestrator internally when `capture` is supplied and requires `ShelfConfig.scratchDir` (it throws at construction if missing). The queue runs `executeCaptureJob` instead of `capture.run`. The server (`serve.ts`) constructs the pure runner `createPlaywrightCaptureRunner({ logger })` and passes `dataDir` as `scratchDir`.
+`createShelfRouter` builds the orchestrator internally when `capture` is supplied and requires `ShelfConfig.scratchDir` (it throws at construction if missing). The queue runs `executeCaptureJob` instead of `capture.run`. The server (`serve.ts`) constructs the pure runner `createPlaywrightCaptureRunner()` and passes `dataDir` as `scratchDir`.
 
 ## Consequences
 
 - The capture-runner adapter family now follows the same purity standard as the DB/storage/auth adapters (ADR 0001). A remote runner is a dependency swap, not a copy of orchestration.
 - `core` gains one small dependency (`adm-zip`) for archive extraction and owns the extraction security boundary.
-- `CaptureRunnerDeps`/`runCapture`/`RenderStory` are gone; `runCapture` is split into pure `render` (adapter) + `persistCapture` (core).
+- The renderer factory takes no dependencies (`createPlaywrightCaptureRunner()`); a pino `Logger` is only ever a per-render input. `runCapture`/`RenderStory` are gone; `runCapture` is split into pure `render` (adapter) + `persistCapture` (core).
