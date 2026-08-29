@@ -36,6 +36,7 @@ export function createProgram(): Command {
     .option("--secret <secret>", "session secret")
     .option("--capture-concurrency <n>", "concurrent capture jobs", "2")
     .option("--purge-ttl-days <n>", "purge builds older than N days", "30")
+    .option("--log-level <level>", "minimum log level (trace|debug|info|warn|error|fatal)", "info")
     .action(run<ServeOptions>(runServe));
 
   return program;

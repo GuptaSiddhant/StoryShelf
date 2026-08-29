@@ -116,7 +116,8 @@ export function registerBuilds(app: Hono): void {
       await getStore().storage.write(storybookZipPath(project.id, build.id), buffer);
     }
 
-    await getStore().enqueueCapture?.(build.id);
+    const reqId = c.get("requestId") as string | undefined;
+    await getStore().enqueueCapture?.(build.id, reqId);
     return json(c, build, 202);
   });
 

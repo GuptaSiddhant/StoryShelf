@@ -4,7 +4,7 @@ export type JobStatus = "queued" | "running" | "completed" | "failed" | "cancell
 /** Runs and cancels asynchronous capture jobs for builds. */
 export interface CaptureRunner {
   /** Start (or enqueue) capture for a build. */
-  run(buildId: string): Promise<void>;
+  run(buildId: string, reqId?: string): Promise<void>;
   /** Cancel a pending or in-flight capture for a build. */
   cancel(buildId: string): Promise<void>;
 }

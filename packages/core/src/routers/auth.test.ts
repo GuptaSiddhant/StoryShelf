@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { pino } from "pino";
 
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { createShelfRouter } from "../index.tsx";
+
+const silentLogger = pino({ level: "silent" });
 
 const dbFail = async (): Promise<never> => {
   return await Promise.reject(new Error("database not used in this test"));
@@ -65,6 +68,7 @@ function app(): ReturnType<typeof createShelfRouter> {
     database: stubDatabase(),
     storage: stubStorage(),
     auth: passwordAuth,
+    logger: silentLogger,
   });
 }
 

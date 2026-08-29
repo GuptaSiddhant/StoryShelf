@@ -1,7 +1,7 @@
 import { serve } from "@hono/node-server";
 import { join, resolve } from "node:path";
 import { mkdir } from "node:fs/promises";
-import { createShelfRouter, type ShelfConfig } from "@storyshelf/core";
+import { createShelfLogger, createShelfRouter, type ShelfConfig } from "@storyshelf/core";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { createLocalStorage } from "@storyshelf/storage-local";
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
@@ -18,6 +18,8 @@ export interface ServeOptions {
   captureConcurrency: string;
   /** Purge builds older than this many days. */
   purgeTtlDays: string;
+  /** Minimum log level to emit. */
+  logLevel?: string;
 }
 
 /**
@@ -31,16 +33,16 @@ export async function runServe(options: ServeOptions): Promise<void> {
   const database = createSqliteDatabase(join(dataDir, "shelf.db"));
   await database.migrate();
   const storage = createLocalStorage(dataDir);
-  const capture = createPlaywrightCaptureRunner({ db: database, storage, dataDir });
+  const logger = createShelfLogger({ level: options.logLevel, env: process.env["NODE_ENV"] });
+  const capture = createPlaywrightCaptureRunner({ db: database, storage, dataDir, logger });
   const config: ShelfConfig = {
     secret: options.secret,
     captureConcurrency: Number(options.captureConcurrency),
     purgeTtlDays: Number(options.purgeTtlDays),
   };
-  const app = createShelfRouter({ database, storage, capture, config });
+  const app = createShelfRouter({ database, storage, capture, config, logger });
   const server = serve({ fetch: app.fetch, port: Number(options.port) });
   server.on("listening", () => {
-    // eslint-disable-next-line no-console
-    console.log(`Server is running on http://localhost:${options.port}`);
+    logger.info({ url: `http://localhost:${options.port}` }, "server listening");
   });
 }

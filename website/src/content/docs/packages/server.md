@@ -17,14 +17,18 @@ nub add @storyshelf/server
 
 ```sh
 storyshelf-server serve -p 3000 --data-dir ./data --secret <secret> \
-  --capture-concurrency 2 --purge-ttl-days 30
+  --capture-concurrency 2 --purge-ttl-days 30 --log-level info
 ```
 
 ```sh
 storyshelf-server -p 3000 --data-dir ./data
 ```
 
-Defaults are port `3000`, data directory `./data`, capture concurrency `2`, and a 30-day purge TTL. The server uses SQLite and local storage by default, and captures in-process via `@storyshelf/runner-playwright`.
+Defaults are port `3000`, data directory `./data`, capture concurrency `2`, a 30-day purge TTL, and `info` log level. The server uses SQLite and local storage by default, and captures in-process via `@storyshelf/runner-playwright`.
+
+## Logging
+
+The server constructs a single pino `Logger` (`createShelfLogger`) at startup and shares it across the router, capture runner, and retention job, so request and background logs flow to one structured JSON stream on stdout. `--log-level` sets the minimum level (`trace|debug|info|warn|error|fatal`). To add hosted observability (Sentry, PostHog, Datadog, GCP, OTEL, etc.), attach extra pino worker `transports` when building the logger — see [@storyshelf/core](../packages/core/).
 
 ## How it fits
 

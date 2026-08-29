@@ -26,11 +26,15 @@ const appObject = vi.hoisted(() => ({
 const serverObject = vi.hoisted(() => ({
   on: vi.fn(),
 }));
+const loggerObject = vi.hoisted(() => ({
+  info: vi.fn(),
+}));
 
 vi.mock("@hono/node-server", () => ({
   serve: vi.fn(() => serverObject),
 }));
 vi.mock("@storyshelf/core", () => ({
+  createShelfLogger: vi.fn(() => loggerObject),
   createShelfRouter: vi.fn(() => appObject),
 }));
 vi.mock("@storyshelf/db-sqlite", () => ({
@@ -73,6 +77,7 @@ describe("runServe", () => {
       db: dbObject,
       storage: storageObject,
       dataDir,
+      logger: loggerObject,
     });
     expect(createShelfRouter).toHaveBeenCalledWith({
       database: dbObject,
@@ -83,6 +88,7 @@ describe("runServe", () => {
         captureConcurrency: 3,
         purgeTtlDays: 14,
       },
+      logger: loggerObject,
     });
     expect(serve).toHaveBeenCalledWith({ fetch: appObject.fetch, port: 3200 });
     expect(serverObject.on).toHaveBeenCalled();
@@ -101,6 +107,7 @@ describe("runServe", () => {
       storage: storageObject,
       capture: captureObject,
       config: { secret: undefined, captureConcurrency: 2, purgeTtlDays: 30 },
+      logger: loggerObject,
     });
   });
 });

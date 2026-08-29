@@ -1,7 +1,8 @@
+import type { Logger } from "pino";
+
 import type { AuthAdapter } from "./adapters/auth.ts";
 import type { CaptureRunner } from "./adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "./adapters/database.ts";
-import type { LoggerAdapter } from "./adapters/logger.ts";
 import type { StatusAdapter } from "./adapters/status.ts";
 import type { StorageAdapter } from "./adapters/storage.ts";
 import type { Viewport } from "./capture/adapter.ts";
@@ -60,8 +61,8 @@ export interface ShelfOptions {
   auth?: AuthAdapter;
   /** Git provider status adapter. */
   status?: StatusAdapter;
-  /** Logger adapter. */
-  logger?: LoggerAdapter;
+  /** Logger override. If omitted, a pino logger is constructed internally. */
+  logger?: Logger;
   /** UI branding configuration. */
   ui?: UIConfig;
   /** Runtime configuration. */

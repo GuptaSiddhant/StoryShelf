@@ -1,3 +1,5 @@
+import type { Logger } from "pino";
+
 import type { JobStatus } from "../adapters/capture-runner.ts";
 
 export interface QueueEntry {
@@ -19,27 +21,36 @@ export class Queue {
 
   /**
    * @param concurrency - Maximum number of tasks that may run simultaneously.
+   * @param logger - Optional logger for queue state transitions.
    */
-  constructor(private readonly concurrency: number) {}
+  constructor(
+    private readonly concurrency: number,
+    private readonly logger?: Logger,
+  ) {}
 
   /**
    * Run a task for a build, bounded by the queue's concurrency limit.
    *
    * @param buildId - Build being processed.
+   * @param reqId - Optional request id used to correlate background work with the HTTP request that enqueued it.
    * @param task - Async task to run once a slot is available.
    * @returns The task's result.
    */
-  async run<T>(buildId: string, task: () => Promise<T>): Promise<T> {
+  async run<T>(buildId: string, reqId: string | undefined, task: () => Promise<T>): Promise<T> {
     const entry = this.track(buildId);
+    const log = this.logger?.child({ buildId, reqId });
+    log?.info("capture queued");
     await this.acquire();
     entry.status = "running";
     entry.startedAt = new Date().toISOString();
+    log?.info("capture started");
     try {
       return await task();
     } catch (error) {
       entry.status = "failed";
       entry.finishedAt = new Date().toISOString();
       entry.error = error instanceof Error ? error.message : "Capture failed";
+      log?.error({ err: error }, "capture failed");
       throw error;
     } finally {
       this.running -= 1;
@@ -47,6 +58,7 @@ export class Queue {
       if (entry.status !== "failed") {
         entry.status = "completed";
         entry.finishedAt = new Date().toISOString();
+        log?.info("capture completed");
       }
     }
   }

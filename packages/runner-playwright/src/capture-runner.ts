@@ -18,6 +18,7 @@ import {
 import { BuildModel } from "@storyshelf/core/models/build";
 import { ProjectModel } from "@storyshelf/core/models/project";
 import { chromium, type Browser } from "playwright";
+import type { Logger } from "pino";
 
 import { createStaticServer } from "./static-server.ts";
 import { DEFAULT_VIEWPORTS } from "./viewport.ts";
@@ -26,6 +27,7 @@ export interface CaptureRunnerDeps {
   db: DatabaseAdapter;
   storage: StorageAdapter;
   dataDir: string;
+  logger?: Logger;
 }
 
 interface ScreenshotContext {
@@ -44,11 +46,11 @@ const activeRuns = new Map<string, ActiveRun>();
 
 export function createPlaywrightCaptureRunner(deps: CaptureRunnerDeps): CaptureRunner {
   return {
-    async run(buildId) {
+    async run(buildId, reqId) {
       const active: ActiveRun = { cancelled: false, browser: null };
       activeRuns.set(buildId, active);
       try {
-        await runBuild(deps, buildId, active);
+        await runBuild(deps, buildId, reqId, active);
       } finally {
         activeRuns.delete(buildId);
       }
@@ -111,7 +113,7 @@ async function extractStorybook(deps: CaptureRunnerDeps, projectId: string, buil
   return targetDir;
 }
 
-async function runBuild(deps: CaptureRunnerDeps, buildId: string, active: ActiveRun): Promise<void> {
+async function runBuild(deps: CaptureRunnerDeps, buildId: string, reqId: string | undefined, active: ActiveRun): Promise<void> {
   const { build, project } = await loadTarget(deps, buildId);
   const storybookDir = await extractStorybook(deps, project.id, build.id);
   const server = await createStaticServer(storybookDir);
@@ -120,6 +122,7 @@ async function runBuild(deps: CaptureRunnerDeps, buildId: string, active: Active
   const adapter = new StorybookAdapter();
   const ctx: ScreenshotContext = { browser, adapter, baseUrl: server.url };
   const builds = new BuildModel(deps.db);
+  const logger = deps.logger?.child({ buildId, reqId });
 
   try {
     await builds.setStatus(build.id, "capturing");
@@ -132,6 +135,7 @@ async function runBuild(deps: CaptureRunnerDeps, buildId: string, active: Active
       viewports: DEFAULT_VIEWPORTS,
       adapter,
       renderStory: async (story, viewport) => await captureScreenshot(ctx, story, viewport),
+      logger,
     });
     if (active.cancelled) {
       await builds.setStatus(build.id, "failed");

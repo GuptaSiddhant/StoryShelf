@@ -1,5 +1,6 @@
+import type { Logger } from "pino";
+
 import type { DatabaseAdapter } from "../adapters/database.ts";
-import type { LoggerAdapter } from "../adapters/logger.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { diffImages } from "../diff/engine.ts";
 import { DEFAULT_DIFF_OPTIONS } from "../diff/options.ts";
@@ -35,7 +36,7 @@ export interface CaptureContext {
   /** Function that renders a story into a screenshot buffer. */
   renderStory: RenderStory;
   /** Optional logger invoked when a story fails to capture. */
-  logger?: LoggerAdapter;
+  logger?: Logger;
 }
 
 /**
@@ -55,9 +56,7 @@ export async function runCapture(ctx: CaptureContext): Promise<void> {
         } catch (error) {
           // A failure in one story/viewport must not abort the other captures.
           failedStoryIds.add(story.id);
-          ctx.logger?.error(
-            `capture failed for story "${story.id}" at viewport "${viewport.name}": ${errorMessage(error)}`,
-          );
+          ctx.logger?.error({ storyId: story.id, viewport: viewport.name }, "capture failed: " + errorMessage(error));
         }
       }),
     ),

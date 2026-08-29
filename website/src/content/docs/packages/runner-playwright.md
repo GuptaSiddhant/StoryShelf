@@ -18,8 +18,10 @@ You normally never install this directly — `@storyshelf/server` injects it whe
 ```ts
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
 
-const capture = createPlaywrightCaptureRunner({ db, storage, dataDir });
+const capture = createPlaywrightCaptureRunner({ db, storage, dataDir, logger });
 ```
+
+`logger` is an optional pino `Logger`; when provided, the runner derives a `logger.child({ buildId, reqId })` and passes it into the capture pipeline so per-build work is traced and correlated with the HTTP request that triggered it.
 
 ## How it fits
 

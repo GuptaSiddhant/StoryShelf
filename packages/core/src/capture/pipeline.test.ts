@@ -1,7 +1,7 @@
 import { PNG } from "pngjs";
+import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 
-import type { LoggerAdapter } from "../adapters/logger.ts";
 import { baselines, builds, snapshots, type Build, type Project } from "../schema.ts";
 import { diffPath } from "../utils/paths.ts";
 import type { StoryEntry, StorySourceAdapter, Viewport } from "./adapter.ts";
@@ -74,18 +74,18 @@ function mockAdapter(stories: StoryEntry[]): StorySourceAdapter {
 async function makeContext(options: {
   stories: StoryEntry[];
   renderStory: RenderStory;
-}): Promise<{ ctx: CaptureContext; objects: Map<string, Buffer>; messages: string[] }> {
+}): Promise<{ ctx: CaptureContext; objects: Map<string, Buffer>; lines: string[] }> {
   const { db } = makeDatabase();
   const { storage, objects } = makeStorage();
-  const messages: string[] = [];
-  const logger: LoggerAdapter = {
-    log: (message: string) => {
-      messages.push(message);
+  const lines: string[] = [];
+  const logger = pino(
+    { level: "trace" },
+    {
+      write(chunk: string) {
+        lines.push(chunk.trim());
+      },
     },
-    error: (message: string) => {
-      messages.push(message);
-    },
-  };
+  );
   await db.insert(builds, mockBuild);
   const ctx: CaptureContext = {
     db,
@@ -98,7 +98,7 @@ async function makeContext(options: {
     renderStory: options.renderStory,
     logger,
   };
-  return { ctx, objects, messages };
+  return { ctx, objects, lines };
 }
 
 async function seedBaseline(ctx: CaptureContext): Promise<void> {
@@ -119,7 +119,7 @@ async function seedBaseline(ctx: CaptureContext): Promise<void> {
 
 describe("runCapture", () => {
   it("captures the other stories and fails the build when one story fails", async () => {
-    const { ctx, messages } = await makeContext({
+    const { ctx, lines } = await makeContext({
       stories: [storyOf("a"), storyOf("b")],
       renderStory: async (story): Promise<Buffer> => {
         if (story.id === "a") {
@@ -136,8 +136,9 @@ describe("runCapture", () => {
     expect(rows.map((row) => row.status)).toEqual(["approved"]);
     const build = await ctx.db.get(builds, "b1");
     expect(build?.status).toBe("failed");
-    expect(messages).toHaveLength(1);
-    expect(messages.join(" | ")).toContain('story "a"');
+    expect(lines).toHaveLength(1);
+    const parsed = JSON.parse(lines[0] ?? "{}") as { storyId?: string };
+    expect(parsed.storyId).toBe("a");
   });
 
   it("fails the build when every story fails to capture", async () => {

@@ -40,7 +40,7 @@ serve({ fetch: app.fetch, port: 3000 });
 
 ## Adapter contracts
 
-The router requires a `DatabaseAdapter` and `StorageAdapter`. `AuthAdapter`, `CaptureRunner`, `StatusAdapter`, and `LoggerAdapter` are optional. All adapters are constructor-injected, so each deployment can choose its own database, storage, and authentication implementation.
+The router requires a `DatabaseAdapter` and `StorageAdapter`. `AuthAdapter`, `CaptureRunner`, `StatusAdapter`, and a pino `Logger` are optional. All adapters are constructor-injected, so each deployment can choose its own database, storage, and authentication implementation. Logging uses pino (`createShelfLogger`), with optional transports for hosted observability platforms.
 
 `ShelfConfig` supports a session secret, published Storybook base domain, capture concurrency, purge TTL, and capture viewports. `UIConfig` controls the name, logo, favicon, and light/dark brand themes.
 

@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { pino } from "pino";
 
 import type { AuthAdapter } from "../adapters/auth.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { createShelfRouter } from "../index.tsx";
+
+const silentLogger = pino({ level: "silent" });
 
 const dbFail = async (): Promise<never> => {
   return await Promise.reject(new Error("database not used in this test"));
@@ -53,7 +56,7 @@ const noSessionAuth: AuthAdapter = {
 
 describe("static assets", () => {
   it("serves htmx.js with a JavaScript content type and immutable cache header", async () => {
-    const app = createShelfRouter({ database: stubDatabase(), storage: stubStorage() });
+    const app = createShelfRouter({ database: stubDatabase(), storage: stubStorage(), logger: silentLogger });
     const response = await app.request("/assets/htmx.js");
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("application/javascript");
@@ -61,14 +64,14 @@ describe("static assets", () => {
   });
 
   it("serves the vendored htmx payload", async () => {
-    const app = createShelfRouter({ database: stubDatabase(), storage: stubStorage() });
+    const app = createShelfRouter({ database: stubDatabase(), storage: stubStorage(), logger: silentLogger });
     const body = await (await app.request("/assets/htmx.js")).text();
     expect(body.length).toBeGreaterThan(1000);
     expect(body).toContain("htmx");
   });
 
   it("does not gate assets behind the UI auth redirect", async () => {
-    const app = createShelfRouter({ database: stubDatabase(), storage: stubStorage(), auth: noSessionAuth });
+    const app = createShelfRouter({ database: stubDatabase(), storage: stubStorage(), auth: noSessionAuth, logger: silentLogger });
     const response = await app.request("/assets/htmx.js");
     expect(response.status).toBe(200);
   });

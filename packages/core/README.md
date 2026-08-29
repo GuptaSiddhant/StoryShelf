@@ -25,7 +25,7 @@ const app = createShelfRouter({
   capture,                  // CaptureRunner (optional)
   auth,                     // AuthAdapter (optional)
   status,                   // StatusAdapter (optional)
-  logger,                   // LoggerAdapter (optional)
+  logger,                   // pino Logger (optional; built internally if omitted)
   ui: { name: "My Shelf" }, // UIConfig (optional)
   config: { captureConcurrency: 2, purgeTtlDays: 30 }, // ShelfConfig (optional)
 });
@@ -47,7 +47,7 @@ Assembles the router from the provided adapters. `ShelfOptions`:
 | `capture` | `CaptureRunner` | Optional. Enables the async capture queue. |
 | `auth` | `AuthAdapter` | Optional. Enables auth and the login UI. |
 | `status` | `StatusAdapter` | Optional. Reports CI status checks. |
-| `logger` | `LoggerAdapter` | Optional. Defaults to `console`. |
+| `logger` | `Logger` (pino) | Optional. Shared logger. Construct a fallback via `createShelfLogger()`. |
 | `ui` | `UIConfig` | Optional. UI branding. |
 | `config` | `ShelfConfig` | Optional. Server behavior. |
 
@@ -82,17 +82,20 @@ All adapters are constructor-injected (no AsyncLocalStorage). See `docs/architec
 - `DatabaseAdapter` — `insert`, `update`, `get`, `remove`, `list`, `count`, `all`, `migrate`, `close`. Also exports `ListOptions`.
 - `StorageAdapter` — `read`, `write`, `delete`, `exists`, `list(prefix)`.
 - `AuthAdapter` — `check(request)`, `createSession(user)`, `destroySession(sessionId)`, optional `handleCallback(callback)`. Also exports `AuthUser`, `AuthCallback`, and the shared `SESSION_COOKIE`.
-- `CaptureRunner` — `run(buildId)`, `cancel(buildId)`. Also exports `JobStatus`.
+- `CaptureRunner` — `run(buildId, reqId?)`, `cancel(buildId)`. Also exports `JobStatus`.
 - `StatusAdapter` — `setStatus(context, gitSha, status, url)`. Also exports `CheckStatus`.
-- `LoggerAdapter` — `log`, `error`, optional `debug`.
+
+### Logging
+
+`core` uses **pino** for structured JSON logging. `createShelfLogger({ level, transports, env })` builds a logger writing to stdout by default, with optional extra pino worker transports (Sentry, PostHog, Datadog, GCP, OTEL collector, etc.). Pass the resulting `Logger` to `createShelfRouter({ logger })` (or construct it at your composition root) so request and background logs share one stream. `CaptureRunner.run` accepts an optional `reqId` for tracing background capture work back to the triggering HTTP request. See ADR 0014.
 
 ### Capture, diff, and retention
 
 - `runCapture(ctx: CaptureContext)` — server-side capture pipeline (discover stories, render, diff against baseline, finalize). Also exports `CaptureContext`, `RenderStory`, and the `StorySourceAdapter`/`StoryEntry`/`Viewport` types.
 - `StorybookAdapter` — reads a built Storybook's `index.json`/`stories.json`.
 - `diffImages(baseline: Buffer, current: Buffer, options: DiffOptions): DiffResult` — pixelmatch-based diff. Also exports `DiffOptions`, `DiffResult`.
-- `Queue` — `new Queue(concurrency)`, with `run`, `status`, `active`, `recent`.
-- `Retention` — `new Retention(db, storage)`, with `purge(project, { ttlDays, keepLatestPerBranch })`.
+- `Queue` — `new Queue(concurrency, logger?)`, with `run`, `status`, `active`, `recent`.
+- `Retention` — `new Retention(db, storage, logger?)`, with `purge(project, { ttlDays, keepLatestPerBranch })`.
 
 ### Helpers
 

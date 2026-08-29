@@ -81,6 +81,7 @@ StoryShelf/
 - **API prefix:** all JSON endpoints under `/api/v1`. HTML pages at `/`.
 - **Tests:** every model, every router, every adapter must have tests (target 100% coverage). `nub run test` is hermetic (no browser); the capture pipeline is covered by a gated `test:integration` suite — see `docs/testing.md`.
 - **No AsyncLocalStorage for models.** Use constructor injection. The store is for router handlers only.
+- **Logging:** pino baked into core via `createShelfLogger()`. Always structured objects, never interpolate into the message (`logger.info({ buildId }, "msg")`); attach errors as an `err` child (`logger.error({ err }, "msg")`); derive scoped children for background work (`logger.child({ buildId })`). Hosted observability (Sentry/PostHog/Datadog/GCP/OTEL) are optional pino `transports`, not separate loggers. See ADR 0014.
 - **UI:** server-rendered `hono/jsx` + HTMX + `hono/css`. Fixed UI with a `ui` brand config (logo/theme); header + sidebar layout; system theme with manual override; no client framework and no UI adapter — custom UIs consume `/api/v1`. HTMX is vendored locally; the review page uses a small vanilla-JS layer (theme toggle, keyboard review).
 
 ## Database options
@@ -122,3 +123,4 @@ StoryShelf/
 | 0011 | Project Identity & Published Storybook (project = Storybook, public access) |
 | 0012 | Fixed Server-Rendered UI (header + sidebar, system theme, three-up diff) |
 | 0013 | Build Labels (project-defined types, search + link templates + stable URLs) |
+| 0014 | Pino as Core Logger (structured logs, transports via factory, request tracing) |

@@ -1,4 +1,5 @@
 import { and, eq, inArray, lt } from "drizzle-orm";
+import type { Logger } from "pino";
 
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
@@ -30,6 +31,7 @@ export class Retention {
   constructor(
     private readonly db: DatabaseAdapter,
     private readonly storage: StorageAdapter,
+    private readonly logger?: Logger,
   ) {}
 
   /**
@@ -63,10 +65,10 @@ export class Retention {
         removed: await this.removeBuild(buildId),
       })),
     );
-    return {
-      removedBuilds: results.filter((r) => r.removed).length,
-      removedFiles: results.reduce((sum, r) => sum + r.files, 0),
-    };
+    const removedBuilds = results.filter((r) => r.removed).length;
+    const removedFiles = results.reduce((sum, r) => sum + r.files, 0);
+    this.logger?.info({ projectId: project.id, removedBuilds, removedFiles }, "build retention purge complete");
+    return { removedBuilds, removedFiles };
   }
 
   private async removeBuild(buildId: string): Promise<boolean> {
