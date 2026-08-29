@@ -4,6 +4,32 @@ The self-hosted StoryShelf server for **long-lived Node hosts** (binary `storysh
 
 This package is specific to **Node / `@hono/node-server`**. `@storyshelf/core`'s `createShelfRouter` itself is runtime-agnostic — for Azure Functions, Cloudflare Workers, Vercel, Deno, or Bun, wrap the Hono app with the platform's adapter instead (see `docs/architecture.md` and the website deployment guide).
 
+### Cross-runtime assembly
+
+For serverless / non-Node targets, compose `@storyshelf/core` with platform-specific adapters:
+
+```ts
+// Vercel example (edge runtime)
+import { createShelfRouter } from "@storyshelf/core";
+import { createTursoDatabase } from "@storyshelf/db-turso";
+import { createS3Storage } from "@storyshelf/storage-s3";
+import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
+import { InMemoryCaptureQueue } from "@storyshelf/core";
+
+const app = createShelfRouter({
+  database: createTursoDatabase({ url: process.env.TURSO_URL!, authToken: process.env.TURSO_AUTH_TOKEN! }),
+  storage: createS3Storage({ bucket: process.env.S3_BUCKET!, ... }),
+  capture: createPlaywrightCaptureRunner(),
+  queue: new InMemoryCaptureQueue({ concurrency: 2 }), // or remote queue + worker
+  config: { scratchDir: "/tmp/scratch" },
+  auth: ...,
+});
+
+export default app;
+```
+
+All clouds are equal — see the **Deployment** guide for the full matrix and a minimal Turso + S3 recipe.
+
 ## Install
 
 ```sh

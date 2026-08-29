@@ -59,7 +59,7 @@ export function createShelfRouter(options: ShelfOptions): Hono {
       new InMemoryCaptureQueue({
         concurrency: config.captureConcurrency ?? 2,
         logger,
-        runJob: async (job) => {
+        runJob: async (job): Promise<void> => {
           await executeCaptureJob({ buildId: job.buildId, reqId: job.reqId }, jobOptions);
         },
       });

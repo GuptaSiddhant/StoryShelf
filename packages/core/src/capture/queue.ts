@@ -35,7 +35,7 @@ export class InMemoryCaptureQueue implements CaptureQueue {
     const entry = this.track(job.buildId);
     this.log(job)?.info("capture queued");
     this.inFlight.set(job.buildId, this.process(job, entry));
-    return Promise.resolve();
+    await Promise.resolve();
   }
 
   status(buildId: string): QueueEntry | null {
