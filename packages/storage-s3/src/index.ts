@@ -20,6 +20,8 @@ export interface S3StorageOptions {
   endpoint?: string;
   /** AWS region. Defaults to `us-east-1`. */
   region?: string;
+  /** Pre-configured S3 client. Defaults to a client built from the other options. */
+  client?: S3Client;
 }
 
 export function s3Key(prefix: string, path: string): string {
@@ -41,8 +43,8 @@ function isNotFound(error: unknown): boolean {
  * @returns A StorageAdapter backed by the configured S3 bucket.
  */
 export function createS3Storage(options: S3StorageOptions): StorageAdapter {
-  const { bucket, prefix = "", endpoint, region = "us-east-1" } = options;
-  const client = new S3Client({ endpoint, region, forcePathStyle: true });
+  const { bucket, prefix = "", endpoint, region = "us-east-1", client: injectedClient } = options;
+  const client = injectedClient ?? new S3Client({ endpoint, region, forcePathStyle: true });
 
   return {
     async read(path) {
