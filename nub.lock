@@ -282,27 +282,27 @@ importers:
         specifier: 'catalog:'
         version: 4.1.11(@types/node@26.3.0)(@vitest/coverage-v8@4.1.11)(vite@8.2.2(@types/node@26.3.0))
 
-  packages/runner-playwright:
+  packages/node-server:
     dependencies:
+      '@hono/node-server':
+        specifier: ^1.17.0
+        version: 1.19.17(hono@4.13.5)
       '@storyshelf/core':
         specifier: workspace:*
         version: link:../core
-      adm-zip:
-        specifier: ^0.6.0
-        version: 0.6.0
-      pino:
-        specifier: ^10.3.1
-        version: 10.3.1
-      playwright:
-        specifier: ^1.52.0
-        version: 1.62.1
-    devDependencies:
       '@storyshelf/db-sqlite':
         specifier: workspace:*
         version: link:../db-sqlite
+      '@storyshelf/runner-playwright':
+        specifier: workspace:*
+        version: link:../runner-playwright
       '@storyshelf/storage-local':
         specifier: workspace:*
         version: link:../storage-local
+      commander:
+        specifier: ^13.0.0
+        version: 13.1.0
+    devDependencies:
       '@types/node':
         specifier: 'catalog:'
         version: 26.3.0
@@ -328,27 +328,27 @@ importers:
         specifier: 'catalog:'
         version: 4.1.11(@types/node@26.3.0)(@vitest/coverage-v8@4.1.11)(vite@8.2.2(@types/node@26.3.0))
 
-  packages/node-server:
+  packages/runner-playwright:
     dependencies:
-      '@hono/node-server':
-        specifier: ^1.17.0
-        version: 1.19.17(hono@4.13.5)
       '@storyshelf/core':
         specifier: workspace:*
         version: link:../core
+      adm-zip:
+        specifier: ^0.6.0
+        version: 0.6.0
+      pino:
+        specifier: ^10.3.1
+        version: 10.3.1
+      playwright:
+        specifier: ^1.52.0
+        version: 1.62.1
+    devDependencies:
       '@storyshelf/db-sqlite':
         specifier: workspace:*
         version: link:../db-sqlite
-      '@storyshelf/runner-playwright':
-        specifier: workspace:*
-        version: link:../runner-playwright
       '@storyshelf/storage-local':
         specifier: workspace:*
         version: link:../storage-local
-      commander:
-        specifier: ^13.0.0
-        version: 13.1.0
-    devDependencies:
       '@types/node':
         specifier: 'catalog:'
         version: 26.3.0
