@@ -13,4 +13,4 @@ EXPOSE 3000
 ENV PORT=3000
 ENV DATA_DIR=/data
 
-CMD ["node", "packages/server/dist/index.js", "serve", "--port", "3000", "--data-dir", "/data"]
+CMD ["node", "packages/node-server/dist/index.js", "serve", "--port", "3000", "--data-dir", "/data"]

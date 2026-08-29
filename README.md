@@ -17,7 +17,7 @@ packages/
   auth-password/  @storyshelf/auth-password — shared-password auth
   cli/            @storyshelf/cli           — CLI client (upload, init, purge, retry)
   runner-playwright/ @storyshelf/runner-playwright — Playwright capture runner
-  server/         @storyshelf/server        — self-hosted server (serve + capture)
+  node-server/    @storyshelf/node-server   — Node self-hosted server (storyshelf-server serve + capture)
 website/                                    — public docs (Astro Starlight)
 examples/
   storybook/                                — deterministic capture fixture
@@ -35,7 +35,7 @@ nub run test                     # turbo test
 nub run verify                   # build + lint + test
 ```
 
-`nub run serve` runs the server from source (`nub watch ./packages/server/src/index.ts serve --data-dir .dev-data`). It needs no build step: the `development` exports condition (via `nub.jsonc` + tsconfig `customConditions`) resolves workspace packages to their TypeScript source, and `nub watch` restarts the server whenever any file in the import graph changes.
+`nub run serve` runs the server from source (`nub watch ./packages/node-server/src/index.ts serve --data-dir .dev-data`). It needs no build step: the `development` exports condition (via `nub.jsonc` + tsconfig `customConditions`) resolves workspace packages to their TypeScript source, and `nub watch` restarts the server whenever any file in the import graph changes.
 
 ## Documentation
 

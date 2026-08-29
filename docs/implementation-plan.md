@@ -33,7 +33,7 @@ Step-by-step build order. Each step is independently reviewable. Decisions made 
 ## Phase 4 — CLI
 
 - `@storyshelf/cli` — client: `upload`, `retry`, `init`, `purge` (no Playwright).
-- `@storyshelf/server` — server: `serve` (assembles router + adapters + runner).
+- `@storyshelf/node-server` — server: `serve` (assembles router + adapters + runner).
 - `@storyshelf/runner-playwright` — Playwright `CaptureRunner` (server-side capture).
 
 ## Phase 5 — Examples & website

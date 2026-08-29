@@ -1,8 +1,8 @@
 {
-  "name": "@storyshelf/server",
+  "name": "@storyshelf/node-server",
   "version": "0.1.0",
   "type": "module",
-  "description": "StoryShelf server: review UI, SQLite, storage, and Playwright capture, all in one self-hosted process.",
+  "description": "StoryShelf Node server: review UI, SQLite, storage, and Playwright capture, in one long-lived self-hosted process.",
   "license": "MIT",
   "bin": {
     "storyshelf-server": "./dist/index.js"

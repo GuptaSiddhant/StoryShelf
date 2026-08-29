@@ -10,7 +10,7 @@ npm install -g @storyshelf/cli
 ```
 
 :::note
-This package is **client-only** — it talks to a running server over `/api/v1` and carries no Playwright or server dependencies. To run the server itself, install `@storyshelf/server` and use `storyshelf-server serve` (see [@storyshelf/server](/packages/server/)).
+This package is **client-only** — it talks to a running server over `/api/v1` and carries no Playwright or server dependencies. To run the Node server, install `@storyshelf/node-server` and use `storyshelf-server serve` (see [@storyshelf/node-server](/packages/node-server/)).
 :::
 
 ## `storyshelf init`

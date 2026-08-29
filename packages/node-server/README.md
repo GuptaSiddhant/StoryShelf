@@ -1,17 +1,19 @@
-# @storyshelf/server
+# @storyshelf/node-server
 
-The self-hosted StoryShelf server (binary `storyshelf-server`): the review UI, SQLite, storage, and the capture pipeline, all in one process. It is the **assembly point** — it wires `@storyshelf/core`, `@storyshelf/db-sqlite`, and `@storyshelf/storage-local`, and injects a `CaptureRunner` implementation supplied by a separate runner package (`@storyshelf/runner-playwright` today).
+The self-hosted StoryShelf server for **long-lived Node hosts** (binary `storyshelf-server`): the review UI, SQLite, storage, and the capture pipeline, all in one process. It is the **assembly point** — it wires `@storyshelf/core`, `@storyshelf/db-sqlite`, and `@storyshelf/storage-local`, and injects a `CaptureRunner` implementation supplied by a separate runner package (`@storyshelf/runner-playwright` today).
+
+This package is specific to **Node / `@hono/node-server`**. `@storyshelf/core`'s `createShelfRouter` itself is runtime-agnostic — for Azure Functions, Cloudflare Workers, Vercel, Deno, or Bun, wrap the Hono app with the platform's adapter instead (see `docs/architecture.md` and the website deployment guide).
 
 ## Install
 
 ```sh
-nub add @storyshelf/server
+nub add @storyshelf/node-server
 ```
 
 or
 
 ```sh
-npm install @storyshelf/server
+npm install @storyshelf/node-server
 ```
 
 ## Quick start

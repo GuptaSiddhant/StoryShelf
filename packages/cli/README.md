@@ -83,6 +83,6 @@ jobs:
 
 ## How it fits in
 
-The server itself lives in `@storyshelf/server` (binary `storyshelf-server`), which assembles `@storyshelf/core`, `@storyshelf/db-sqlite`, and `@storyshelf/storage-local` and runs Playwright captures. The CLI never imports that stack — client-only by design.
+The server itself lives in `@storyshelf/node-server` (binary `storyshelf-server`), which assembles `@storyshelf/core`, `@storyshelf/db-sqlite`, and `@storyshelf/storage-local` and runs Playwright captures. The CLI never imports that stack — client-only by design.
 
 See `docs/architecture.md` for the capture workflow and `docs/testing.md` for the gated browser integration suite.

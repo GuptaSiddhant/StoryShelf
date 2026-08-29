@@ -51,7 +51,7 @@ StoryShelf/
     auth-password/  @storyshelf/auth-password  -- Shared-password auth adapter
     cli/            @storyshelf/cli            -- CLI client (commander; upload/init/retry/purge, no Playwright)
     runner-playwright/ @storyshelf/runner-playwright -- pure Playwright CaptureRenderer (server-side render; core orchestrator owns capture)
-    server/         @storyshelf/server         -- self-hosted server (serve command, wires runner + adapters)
+    node-server/    @storyshelf/node-server   -- Node self-hosted server (storyshelf-server serve, wires runner + adapters)
   website/                    -- Public docs & marketing site (Astro Starlight)
   examples/
     storybook/                -- Minimal deterministic Storybook (capture fixture + demo)

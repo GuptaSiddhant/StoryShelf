@@ -699,7 +699,7 @@ StoryShelf/
           purge.ts        # storyshelf purge (manual retention purge)
       package.json
 
-    server/
+    node-server/
       src/
         index.ts          # server entry (commander: `serve`, the default command)
         commands/
@@ -787,7 +787,7 @@ RUN nubx nub run build
 EXPOSE 3000
 VOLUME /app/data
 
-CMD ["node", "packages/server/dist/index.js", "serve", "--port", "3000", "--data-dir", "/app/data"]
+CMD ["node", "packages/node-server/dist/index.js", "serve", "--port", "3000", "--data-dir", "/app/data"]
 ```
 
 ```yaml
