@@ -2,6 +2,9 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const distDir = "dist";
+// Base path can be set via BASE_PATH env var (used by Astro --base option)
+// In CI, this would be like "/storyshelf/" for GitHub Pages project sites
+const basePath = process.env.BASE_PATH || "/";
 
 function getHtmlFiles(dir) {
   const files = [];
@@ -30,10 +33,15 @@ function extractLinks(html, basePath) {
 }
 
 function resolveLink(href, basePath) {
-  if (href.startsWith("/")) {
-    return join(distDir, href.slice(1));
+  // Strip the BASE_PATH prefix from href since dist/ doesn't have it
+  let normalizedHref = href;
+  if (basePath !== "/" && href.startsWith(basePath)) {
+    normalizedHref = href.slice(basePath.length - 1); // keep leading /
   }
-  return join(basePath, href);
+  if (normalizedHref.startsWith("/")) {
+    return join(distDir, normalizedHref.slice(1));
+  }
+  return join(basePath, normalizedHref);
 }
 
 const htmlFiles = getHtmlFiles(distDir);
@@ -49,7 +57,7 @@ for (const file of htmlFiles) {
   const basePath = join(process.cwd(), file).replace(/[^/]+$/, "");
   const links = extractLinks(html, basePath);
 
-  for (const { href, basePath } of links) {
+  for (const { href, basePath: _bp } of links) {
     const resolved = resolveLink(href, basePath);
     if (!statSync(resolved, { throwIfNoEntry: false })) {
       console.error(`BROKEN: ${file} -> ${href} (resolved: ${resolved})`);
