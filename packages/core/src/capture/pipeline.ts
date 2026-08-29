@@ -1,6 +1,7 @@
 import type { Logger } from "pino";
 
 import type { DatabaseAdapter } from "../adapters/database.ts";
+import type { RenderedSnapshot } from "../adapters/capture-runner.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { diffImages } from "../diff/engine.ts";
 import { DEFAULT_DIFF_OPTIONS } from "../diff/options.ts";
@@ -10,14 +11,9 @@ import { SnapshotModel } from "../models/snapshot.ts";
 import type { Baseline, Build, Project } from "../schema.ts";
 import type { BuildStatus } from "../types.ts";
 import { diffPath, screenshotPath } from "../utils/paths.ts";
-import type { StoryEntry, StorySourceAdapter, Viewport } from "./adapter.ts";
+import type { Viewport } from "./adapter.ts";
 
-/** Renders a single story at a viewport and returns the screenshot bytes. */
-export interface RenderStory {
-  (story: StoryEntry, viewport: Viewport): Promise<Buffer>;
-}
-
-/** Everything the capture pipeline needs to run against a build. */
+/** Persistence inputs for a completed capture run. */
 export interface CaptureContext {
   /** Database adapter. */
   db: DatabaseAdapter;
@@ -27,58 +23,59 @@ export interface CaptureContext {
   project: Project;
   /** The build being captured. */
   build: Build;
-  /** Directory containing the built Storybook. */
-  storybookDir: string;
-  /** Viewports at which stories are captured. */
+  /** Viewports at which stories were captured. */
   viewports: Viewport[];
-  /** Adapter used to discover and render stories. */
-  adapter: StorySourceAdapter;
-  /** Function that renders a story into a screenshot buffer. */
-  renderStory: RenderStory;
-  /** Optional logger invoked when a story fails to capture. */
+  /** Screenshot buffers produced by the capture renderer. */
+  captures: RenderedSnapshot[];
+  /** Optional logger for capture diagnostics. */
   logger?: Logger;
 }
 
 /**
- * Run the capture pipeline for a build: discover stories, capture and diff
- * snapshots across viewports, then finalize the build.
+ * Persist a completed capture run: write screenshots, diff against the branch
+ * baseline, create snapshots, and finalize the build.
+ *
+ * Rendering is performed by a pure `CaptureRunner`; this function owns only
+ * storage writes and record keeping, so it can run against any renderer.
  *
  * @param ctx - Capture context.
+ * @param renderFailedStoryIds - Story ids that the renderer could not capture.
+ * They are excluded from the persisted set and force the build to `failed`.
  */
-export async function runCapture(ctx: CaptureContext): Promise<void> {
-  const stories = await ctx.adapter.discover(ctx.storybookDir);
-  const failedStoryIds = new Set<string>();
+export async function persistCapture(ctx: CaptureContext, renderFailedStoryIds: ReadonlySet<string> = new Set()): Promise<void> {
+  const failedStoryIds = new Set(renderFailedStoryIds);
   await Promise.all(
-    ctx.viewports.flatMap((viewport) =>
-      stories.map(async (story) => {
-        try {
-          await captureStory(ctx, story, viewport);
-        } catch (error) {
-          // A failure in one story/viewport must not abort the other captures.
-          failedStoryIds.add(story.id);
-          ctx.logger?.error({ storyId: story.id, viewport: viewport.name }, "capture failed: " + errorMessage(error));
-        }
-      }),
-    ),
+    ctx.captures.map(async (capture) => {
+      try {
+        await persistSnapshot(ctx, capture);
+      } catch (error) {
+        // A failure in one story/viewport must not abort the other persists.
+        failedStoryIds.add(capture.story.id);
+        ctx.logger?.error(
+          { storyId: capture.story.id, viewport: capture.viewportName, err: error },
+          "capture failed for story",
+        );
+      }
+    }),
   );
-  await finalize(ctx, stories.map((s) => s.id), failedStoryIds);
+  await finalize(ctx, new Set(ctx.captures.map((c) => c.story.id)), failedStoryIds);
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+function viewportByName(ctx: CaptureContext, name: string): Viewport {
+  return ctx.viewports.find((v) => v.name === name) ?? { name, width: 0, height: 0 };
 }
 
-async function captureStory(ctx: CaptureContext, story: StoryEntry, viewport: Viewport): Promise<void> {
-  const buffer = await ctx.renderStory(story, viewport);
-  const screenshot = screenshotPath(ctx.project.id, ctx.build.id, story.id, viewport.name);
-  await ctx.storage.write(screenshot, buffer);
+async function persistSnapshot(ctx: CaptureContext, capture: RenderedSnapshot): Promise<void> {
+  const viewport = viewportByName(ctx, capture.viewportName);
+  const screenshot = screenshotPath(ctx.project.id, ctx.build.id, capture.story.id, capture.viewportName);
+  await ctx.storage.write(screenshot, capture.screenshot);
 
-  const baseline = await resolveBaseline(ctx, story.id, viewport.name);
+  const baseline = await resolveBaseline(ctx, capture.story.id, capture.viewportName);
   if (!baseline) {
-    await createWithoutBaseline(ctx, story, viewport, screenshot);
+    await createWithoutBaseline(ctx, capture, viewport, screenshot);
     return;
   }
-  await createWithBaseline(ctx, story, viewport, screenshot, baseline.screenshotPath);
+  await createWithBaseline(ctx, capture, viewport, screenshot, baseline.screenshotPath);
 }
 
 async function resolveBaseline(ctx: CaptureContext, storyId: string, viewport: string): Promise<Baseline | null> {
@@ -86,15 +83,15 @@ async function resolveBaseline(ctx: CaptureContext, storyId: string, viewport: s
   return await baselines.resolve(ctx.project.id, storyId, viewport, ctx.build.gitBranch, ctx.project.gitDefaultBranch);
 }
 
-async function createWithoutBaseline(ctx: CaptureContext, story: StoryEntry, viewport: Viewport, screenshot: string): Promise<void> {
+async function createWithoutBaseline(ctx: CaptureContext, capture: RenderedSnapshot, viewport: Viewport, screenshot: string): Promise<void> {
   const snapshots = new SnapshotModel(ctx.db);
   const status = ctx.build.isDefault ? "approved" : "new";
   const snapshot = await snapshots.create(ctx.project.id, ctx.build.id, {
-    storyId: story.id,
-    storyName: story.name,
-    storyTitle: story.title,
-    storyImportPath: story.importPath,
-    viewportName: viewport.name,
+    storyId: capture.story.id,
+    storyName: capture.story.name,
+    storyTitle: capture.story.title,
+    storyImportPath: capture.story.importPath ?? "",
+    viewportName: capture.viewportName,
     viewportWidth: viewport.width,
     viewportHeight: viewport.height,
     screenshotPath: screenshot,
@@ -103,11 +100,11 @@ async function createWithoutBaseline(ctx: CaptureContext, story: StoryEntry, vie
 
   if (ctx.build.isDefault) {
     const baselines = new BaselineModel(ctx.db, ctx.storage);
-    await baselines.upsert(ctx.project.id, story.id, viewport.name, ctx.build.gitBranch, snapshot.id, screenshot);
+    await baselines.upsert(ctx.project.id, capture.story.id, capture.viewportName, ctx.build.gitBranch, snapshot.id, screenshot);
   }
 }
 
-async function createWithBaseline(ctx: CaptureContext, story: StoryEntry, viewport: Viewport, screenshot: string, baselinePath: string): Promise<void> {
+async function createWithBaseline(ctx: CaptureContext, capture: RenderedSnapshot, viewport: Viewport, screenshot: string, baselinePath: string): Promise<void> {
   const current = await ctx.storage.read(screenshot);
   const previous = await ctx.storage.read(baselinePath);
   const options = { ...DEFAULT_DIFF_OPTIONS, pixelThreshold: ctx.project.pixelThreshold, maxDiffRatio: ctx.project.maxDiffRatio };
@@ -115,18 +112,18 @@ async function createWithBaseline(ctx: CaptureContext, story: StoryEntry, viewpo
 
   const snapshots = new SnapshotModel(ctx.db);
   const snapshot = await snapshots.create(ctx.project.id, ctx.build.id, {
-    storyId: story.id,
-    storyName: story.name,
-    storyTitle: story.title,
-    storyImportPath: story.importPath,
-    viewportName: viewport.name,
+    storyId: capture.story.id,
+    storyName: capture.story.name,
+    storyTitle: capture.story.title,
+    storyImportPath: capture.story.importPath ?? "",
+    viewportName: capture.viewportName,
     viewportWidth: viewport.width,
     viewportHeight: viewport.height,
     screenshotPath: screenshot,
   });
 
   const status = result.passed ? "unchanged" : "changed";
-  const diff = diffPath(ctx.project.id, ctx.build.id, story.id, viewport.name);
+  const diff = diffPath(ctx.project.id, ctx.build.id, capture.story.id, capture.viewportName);
   if (!result.passed && result.diffImage) {
     await ctx.storage.write(diff, result.diffImage);
   }
@@ -139,7 +136,7 @@ async function createWithBaseline(ctx: CaptureContext, story: StoryEntry, viewpo
   });
 }
 
-async function finalize(ctx: CaptureContext, storyIds: string[], failedStoryIds: ReadonlySet<string>): Promise<void> {
+async function finalize(ctx: CaptureContext, storyIds: ReadonlySet<string>, failedStoryIds: ReadonlySet<string>): Promise<void> {
   const builds = new BuildModel(ctx.db);
   const build = await builds.updateCounts(ctx.build.id);
   let status: BuildStatus = "reviewing";

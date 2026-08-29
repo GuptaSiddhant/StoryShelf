@@ -35,7 +35,7 @@ Decisions made during implementation (for review). Architectural decisions are i
 15. **`comments.parent_id` self-FK is stored as a plain text column** (no `.references()`), sidestepping Drizzle's circular-type-inference issue with self-referencing tables.
 16. **Diff overlay + baseline copy are the two storage writes on approve**; baselines are copied (not referenced) so they survive build purge, per ADR 0009.
 17. **Core's barrel entry exports only the router + adapter/option types — not models.** Consumers get `createShelfRouter` and the adapter/capture types from `@storyshelf/core`; the Drizzle models are reachable via deep imports (e.g. `@storyshelf/core/models/build`). This keeps the public surface small and lets models evolve without changing the barrel.
-    - *v2/future:* refactor `runCapture` so the capture-runner (`@storyshelf/runner-playwright`) doesn't need the models directly — have it take preloaded `build`/`project` (or query via `DatabaseAdapter`) instead of constructing `BuildModel`/`ProjectModel` itself.
+    - *Done:* `CaptureRunner` is now a **pure renderer** (ADR 0015) — it no longer constructs models or touches db/storage. The `@storyshelf/runner-playwright` runner's `renderStory`-style logic moved into a pure `render(input)` that returns buffers; loading/status/extraction/persistence moved into core's capture orchestrator (`executeCaptureJob`).
 
 ## 2026-08-27 — Dev workflow (source-linked, hot restart)
 

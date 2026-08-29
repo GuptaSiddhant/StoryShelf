@@ -2,7 +2,7 @@
   "name": "@storyshelf/runner-playwright",
   "version": "0.1.0",
   "type": "module",
-  "description": "Playwright CaptureRunner implementation for StoryShelf: renders uploaded Storybook builds in-process.",
+  "description": "Pure Playwright CaptureRunner implementation for StoryShelf: renders Storybook screenshots in-process (no db/storage coupling).",
   "license": "MIT",
   "sideEffects": false,
   "scripts": {

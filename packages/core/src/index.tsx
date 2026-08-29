@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { requestId } from "hono/request-id";
 
 import type { AuthUser } from "./adapters/auth.ts";
+import { executeCaptureJob, type CaptureJobOptions } from "./capture/orchestrator.ts";
 import { Queue } from "./capture/queue.ts";
 import type { ShelfOptions } from "./config.ts";
 import { createShelfLogger } from "./logger.ts";
@@ -42,10 +43,20 @@ export function createShelfRouter(options: ShelfOptions): Hono {
 
   let enqueueCapture: ((buildId: string, reqId?: string) => Promise<void>) | undefined;
   if (queue && options.capture) {
-    const capture = options.capture;
+    if (!config.scratchDir) {
+      throw new Error("capture is enabled but ShelfConfig.scratchDir is not set");
+    }
+    const jobOptions: CaptureJobOptions = {
+      db: options.database,
+      storage: options.storage,
+      runner: options.capture,
+      scratchDir: config.scratchDir,
+      viewports: config.viewports,
+      logger,
+    };
     enqueueCapture = async (buildId: string, reqId?: string): Promise<void> => {
       await queue.run(buildId, reqId, async () => {
-        await capture.run(buildId, reqId);
+        await executeCaptureJob({ buildId, reqId }, jobOptions);
       });
     };
   }
@@ -119,7 +130,7 @@ export function createShelfRouter(options: ShelfOptions): Hono {
 export type { ShelfOptions, ShelfConfig, UIConfig, BrandTheme } from "./config.ts";
 export type { DatabaseAdapter, ListOptions } from "./adapters/database.ts";
 export type { StorageAdapter } from "./adapters/storage.ts";
-export type { CaptureRunner, JobStatus } from "./adapters/capture-runner.ts";
+export type { CaptureRunner, JobStatus, RenderedSnapshot, RenderResult, RenderFailure } from "./adapters/capture-runner.ts";
 export type { AuthAdapter, AuthUser, AuthCallback } from "./adapters/auth.ts";
 export type { StatusAdapter, CheckStatus } from "./adapters/status.ts";
 export type { DiffOptions, DiffResult } from "./diff/options.ts";
@@ -128,7 +139,9 @@ export { createShelfLogger, type LoggerOptions, type PinoTransport } from "./log
 export { diffImages } from "./diff/engine.ts";
 export type { RenderedContent } from "./ui/document.tsx";
 export { StorybookAdapter } from "./capture/storybook.ts";
-export { runCapture, type CaptureContext, type RenderStory } from "./capture/pipeline.ts";
+export { persistCapture, type CaptureContext } from "./capture/pipeline.ts";
+export { executeCaptureJob, type CaptureJobOptions } from "./capture/orchestrator.ts";
+export { DEFAULT_VIEWPORTS } from "./capture/viewports.ts";
 export { Queue } from "./capture/queue.ts";
 export { Retention } from "./retention/purge.ts";
 export { createUrlBuilder, type UrlBuilder } from "./urls.ts";

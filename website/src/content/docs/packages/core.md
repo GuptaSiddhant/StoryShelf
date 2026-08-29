@@ -32,7 +32,8 @@ serve({ fetch: app.fetch, port: 3000 });
 ## Main APIs
 
 - `createShelfRouter(options)` returns a Hono application.
-- `runCapture(context)` discovers stories, renders them, diffs them against baselines, and finalizes a build.
+- `executeCaptureJob({ buildId, reqId }, deps)` — the capture **orchestrator**: loads the build, marks it `capturing`, extracts the uploaded archive, discovers stories, delegates rendering to a pure `CaptureRunner`, and persists. Wired into the `Queue` when `capture` is supplied.
+- `persistCapture(context)` writes screenshots, diffs them against baselines, and finalizes a build from a renderer's captures.
 - `diffImages(baseline, current, options)` performs the pixel-level comparison.
 - `Queue` manages capture concurrency and job status.
 - `Retention` purges expired builds and their stored files.
@@ -42,6 +43,6 @@ serve({ fetch: app.fetch, port: 3000 });
 
 The router requires a `DatabaseAdapter` and `StorageAdapter`. `AuthAdapter`, `CaptureRunner`, `StatusAdapter`, and a pino `Logger` are optional. All adapters are constructor-injected, so each deployment can choose its own database, storage, and authentication implementation. Logging uses pino (`createShelfLogger`), with optional transports for hosted observability platforms.
 
-`ShelfConfig` supports a session secret, published Storybook base domain, capture concurrency, purge TTL, and capture viewports. `UIConfig` controls the name, logo, favicon, and light/dark brand themes.
+`ShelfConfig` supports a session secret, published Storybook base domain, capture concurrency, capture viewports, a capture scratch directory (`scratchDir`, required when `capture` is enabled), and purge TTL. `UIConfig` controls the name, logo, favicon, and light/dark brand themes.
 
 Choose the default adapters in [deployment](../../guides/deployment/) or see the [CLI guide](../../guides/cli/) for the packaged server entry point.

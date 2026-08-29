@@ -43,6 +43,8 @@ export interface ShelfConfig {
   publishedBaseDomain?: string;
   /** Number of concurrent capture jobs. */
   captureConcurrency?: number;
+  /** Base directory for extracting uploaded Storybook archives during capture. */
+  scratchDir?: string;
   /** Days after which builds are purged. */
   purgeTtlDays?: number;
   /** Viewports at which stories are captured. */

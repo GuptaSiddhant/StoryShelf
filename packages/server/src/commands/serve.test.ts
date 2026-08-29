@@ -17,7 +17,7 @@ const dbObject = vi.hoisted(() => ({
 }));
 const storageObject = vi.hoisted(() => ({}));
 const captureObject = vi.hoisted(() => ({
-  run: vi.fn(),
+  render: vi.fn(),
   cancel: vi.fn(),
 }));
 const appObject = vi.hoisted(() => ({
@@ -74,9 +74,6 @@ describe("runServe", () => {
     expect(dbObject.migrate).toHaveBeenCalled();
     expect(createLocalStorage).toHaveBeenCalledWith(dataDir);
     expect(createPlaywrightCaptureRunner).toHaveBeenCalledWith({
-      db: dbObject,
-      storage: storageObject,
-      dataDir,
       logger: loggerObject,
     });
     expect(createShelfRouter).toHaveBeenCalledWith({
@@ -86,6 +83,7 @@ describe("runServe", () => {
       config: {
         secret: "s3cret",
         captureConcurrency: 3,
+        scratchDir: dataDir,
         purgeTtlDays: 14,
       },
       logger: loggerObject,
@@ -106,7 +104,7 @@ describe("runServe", () => {
       database: dbObject,
       storage: storageObject,
       capture: captureObject,
-      config: { secret: undefined, captureConcurrency: 2, purgeTtlDays: 30 },
+      config: { secret: undefined, captureConcurrency: 2, scratchDir: dataDir, purgeTtlDays: 30 },
       logger: loggerObject,
     });
   });

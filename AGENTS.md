@@ -50,7 +50,7 @@ StoryShelf/
     auth-oauth/     @storyshelf/auth-oauth     -- OAuth/OIDC auth adapter
     auth-password/  @storyshelf/auth-password  -- Shared-password auth adapter
     cli/            @storyshelf/cli            -- CLI client (commander; upload/init/retry/purge, no Playwright)
-    runner-playwright/ @storyshelf/runner-playwright -- Playwright CaptureRunner (server-side capture)
+    runner-playwright/ @storyshelf/runner-playwright -- pure Playwright CaptureRenderer (server-side render; core orchestrator owns capture)
     server/         @storyshelf/server         -- self-hosted server (serve command, wires runner + adapters)
   website/                    -- Public docs & marketing site (Astro Starlight)
   examples/
@@ -124,3 +124,4 @@ StoryShelf/
 | 0012 | Fixed Server-Rendered UI (header + sidebar, system theme, three-up diff) |
 | 0013 | Build Labels (project-defined types, search + link templates + stable URLs) |
 | 0014 | Pino as Core Logger (structured logs, transports via factory, request tracing) |
+| 0015 | Pure Capture Renderer Adapter (capture adapters render only; server orchestrator owns loading/extraction/persistence) |

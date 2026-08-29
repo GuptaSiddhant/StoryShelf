@@ -1,32 +1,21 @@
-import { mkdir, rm } from "node:fs/promises";
-import { join, resolve, sep } from "node:path";
+import { chromium, type Browser } from "playwright";
+import type { Logger } from "pino";
 
-import AdmZip from "adm-zip";
 import {
   StorybookAdapter,
-  runCapture,
-  storybookZipPath,
-  type Build,
   type CaptureRunner,
-  type DatabaseAdapter,
-  type Project,
-  type StorageAdapter,
+  type RenderResult,
+  type RenderedSnapshot,
   type StoryEntry,
   type StorySourceAdapter,
   type Viewport,
 } from "@storyshelf/core";
-import { BuildModel } from "@storyshelf/core/models/build";
-import { ProjectModel } from "@storyshelf/core/models/project";
-import { chromium, type Browser } from "playwright";
-import type { Logger } from "pino";
 
 import { createStaticServer } from "./static-server.ts";
-import { DEFAULT_VIEWPORTS } from "./viewport.ts";
 
+/** Dependencies for the Playwright renderer. Purely rendering concerns only. */
 export interface CaptureRunnerDeps {
-  db: DatabaseAdapter;
-  storage: StorageAdapter;
-  dataDir: string;
+  /** Optional logger for render-time diagnostics. */
   logger?: Logger;
 }
 
@@ -36,7 +25,7 @@ interface ScreenshotContext {
   baseUrl: string;
 }
 
-/** A capture that may currently be in flight, so that `cancel` can abort it. */
+/** A render that may currently be in flight, so that `cancel` can abort it. */
 interface ActiveRun {
   cancelled: boolean;
   browser: Browser | null;
@@ -44,15 +33,23 @@ interface ActiveRun {
 
 const activeRuns = new Map<string, ActiveRun>();
 
-export function createPlaywrightCaptureRunner(deps: CaptureRunnerDeps): CaptureRunner {
+export interface PlaywrightRenderInput {
+  buildId: string;
+  storybookDir: string;
+  stories: StoryEntry[];
+  viewports: Viewport[];
+  logger?: Logger;
+}
+
+export function createPlaywrightCaptureRunner(deps: CaptureRunnerDeps = {}): CaptureRunner {
   return {
-    async run(buildId, reqId) {
+    async render(input: PlaywrightRenderInput) {
       const active: ActiveRun = { cancelled: false, browser: null };
-      activeRuns.set(buildId, active);
+      activeRuns.set(input.buildId, active);
       try {
-        await runBuild(deps, buildId, reqId, active);
+        return await renderAll(input, active, deps.logger);
       } finally {
-        activeRuns.delete(buildId);
+        activeRuns.delete(input.buildId);
       }
     },
     async cancel(buildId) {
@@ -77,75 +74,54 @@ async function closeBrowser(browser: Browser | null): Promise<void> {
   }
 }
 
-async function loadTarget(deps: CaptureRunnerDeps, buildId: string): Promise<{ build: Build; project: Project }> {
-  const build = await new BuildModel(deps.db).get(buildId);
-  if (!build) {
-    throw new Error(`Build not found: ${buildId}`);
-  }
-  const project = await new ProjectModel(deps.db).get(build.projectId);
-  if (!project) {
-    throw new Error(`Project not found: ${build.projectId}`);
-  }
-  return { build, project };
-}
-
-function blockedTarget(root: string, entryName: string): boolean {
-  const candidate = resolve(join(root, entryName));
-  return candidate !== root && !candidate.startsWith(root + sep);
-}
-
-function assertNoTraversal(zip: AdmZip, root: string): void {
-  for (const entry of zip.getEntries()) {
-    if (blockedTarget(root, entry.entryName)) {
-      throw new Error(`Blocked path traversal in uploaded Storybook: ${entry.entryName}`);
-    }
-  }
-}
-
-async function extractStorybook(deps: CaptureRunnerDeps, projectId: string, buildId: string): Promise<string> {
-  const targetDir = join(deps.dataDir, projectId, "builds", buildId, "storybook");
-  const root = resolve(targetDir);
-  const zip = new AdmZip(await deps.storage.read(storybookZipPath(projectId, buildId)));
-  assertNoTraversal(zip, root);
-  await rm(targetDir, { recursive: true, force: true });
-  await mkdir(targetDir, { recursive: true });
-  zip.extractAllTo(targetDir, true);
-  return targetDir;
-}
-
-async function runBuild(deps: CaptureRunnerDeps, buildId: string, reqId: string | undefined, active: ActiveRun): Promise<void> {
-  const { build, project } = await loadTarget(deps, buildId);
-  const storybookDir = await extractStorybook(deps, project.id, build.id);
-  const server = await createStaticServer(storybookDir);
+async function renderAll(input: PlaywrightRenderInput, active: ActiveRun, parentLogger?: Logger): Promise<RenderResult> {
+  const server = await createStaticServer(input.storybookDir);
   const browser = await chromium.launch();
   active.browser = browser;
   const adapter = new StorybookAdapter();
   const ctx: ScreenshotContext = { browser, adapter, baseUrl: server.url };
-  const builds = new BuildModel(deps.db);
-  const logger = deps.logger?.child({ buildId, reqId });
-
+  const captures: RenderedSnapshot[] = [];
+  const failures: RenderResult["failures"] = [];
   try {
-    await builds.setStatus(build.id, "capturing");
-    await runCapture({
-      db: deps.db,
-      storage: deps.storage,
-      project,
-      build,
-      storybookDir,
-      viewports: DEFAULT_VIEWPORTS,
-      adapter,
-      renderStory: async (story, viewport) => await captureScreenshot(ctx, story, viewport),
-      logger,
-    });
-    if (active.cancelled) {
-      await builds.setStatus(build.id, "failed");
-    }
-  } catch (error) {
-    await builds.setStatus(build.id, "failed");
-    throw error;
+    const tasks = input.viewports.flatMap((viewport) =>
+      input.stories.map(async (story) => {
+        if (active.cancelled) {
+          throw new Error("Capture cancelled");
+        }
+        try {
+          const screenshot = await captureScreenshot(ctx, story, viewport);
+          captures.push({ story, viewportName: viewport.name, screenshot });
+        } catch (error) {
+          failures.push({ storyId: story.id, viewportName: viewport.name, error: messageOf(error) });
+          parentLogger?.error({ storyId: story.id, viewport: viewport.name, err: error }, "render failed for story");
+        }
+      }),
+    );
+    await Promise.all(tasks);
+    return { captures, failures };
   } finally {
     active.browser = null;
-    await Promise.all([browser.close(), server.close()]);
+    await Promise.all([safeCloseBrowser(browser), safeCloseServer(server)]);
+  }
+}
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+async function safeCloseBrowser(browser: Browser): Promise<void> {
+  try {
+    await browser.close();
+  } catch {
+    // Already closed by `cancel`; the run must complete without throwing.
+  }
+}
+
+async function safeCloseServer(server: { close(): Promise<void> }): Promise<void> {
+  try {
+    await server.close();
+  } catch {
+    // Best-effort; teardown must never mask a render result.
   }
 }
 

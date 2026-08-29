@@ -82,16 +82,17 @@ All adapters are constructor-injected (no AsyncLocalStorage). See `docs/architec
 - `DatabaseAdapter` — `insert`, `update`, `get`, `remove`, `list`, `count`, `all`, `migrate`, `close`. Also exports `ListOptions`.
 - `StorageAdapter` — `read`, `write`, `delete`, `exists`, `list(prefix)`.
 - `AuthAdapter` — `check(request)`, `createSession(user)`, `destroySession(sessionId)`, optional `handleCallback(callback)`. Also exports `AuthUser`, `AuthCallback`, and the shared `SESSION_COOKIE`.
-- `CaptureRunner` — `run(buildId, reqId?)`, `cancel(buildId)`. Also exports `JobStatus`.
+- `CaptureRunner` — a **pure capture renderer**: `render(input) => RenderResult`, `cancel(buildId)`. Also exports `JobStatus`, `RenderedSnapshot`, `RenderResult`.
 - `StatusAdapter` — `setStatus(context, gitSha, status, url)`. Also exports `CheckStatus`.
 
 ### Logging
 
-`core` uses **pino** for structured JSON logging. `createShelfLogger({ level, transports, env })` builds a logger writing to stdout by default, with optional extra pino worker transports (Sentry, PostHog, Datadog, GCP, OTEL collector, etc.). Pass the resulting `Logger` to `createShelfRouter({ logger })` (or construct it at your composition root) so request and background logs share one stream. `CaptureRunner.run` accepts an optional `reqId` for tracing background capture work back to the triggering HTTP request. See ADR 0014.
+`core` uses **pino** for structured JSON logging. `createShelfLogger({ level, transports, env })` builds a logger writing to stdout by default, with optional extra pino worker transports (Sentry, PostHog, Datadog, GCP, OTEL collector, etc.). Pass the resulting `Logger` to `createShelfRouter({ logger })` (or construct it at your composition root) so request and background logs share one stream. The capture orchestrator derives a `reqId`-scoped child for background capture work, correlating each capture back to the triggering HTTP request. See ADR 0014.
 
 ### Capture, diff, and retention
 
-- `runCapture(ctx: CaptureContext)` — server-side capture pipeline (discover stories, render, diff against baseline, finalize). Also exports `CaptureContext`, `RenderStory`, and the `StorySourceAdapter`/`StoryEntry`/`Viewport` types.
+- `executeCaptureJob({ buildId, reqId }, deps)` — the capture **orchestrator**: loads the build, marks it `capturing`, extracts the uploaded archive into `scratchDir`, discovers stories, delegates rendering to a pure `CaptureRunner`, and persists. `createShelfRouter` wires it into the `Queue` when `capture` is supplied (and requires `ShelfConfig.scratchDir`). Also exports `CaptureJobOptions`.
+- `persistCapture(ctx: CaptureContext)` — writes screenshots, diffs against the branch baseline, creates snapshots, and finalizes a build from a pure renderer's `captures`. Also exports `CaptureContext` and the `StorySourceAdapter`/`StoryEntry`/`Viewport` types.
 - `StorybookAdapter` — reads a built Storybook's `index.json`/`stories.json`.
 - `diffImages(baseline: Buffer, current: Buffer, options: DiffOptions): DiffResult` — pixelmatch-based diff. Also exports `DiffOptions`, `DiffResult`.
 - `Queue` — `new Queue(concurrency, logger?)`, with `run`, `status`, `active`, `recent`.

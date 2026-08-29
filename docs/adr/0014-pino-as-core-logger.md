@@ -39,7 +39,7 @@ Additional pino worker transports (Sentry, PostHog, Datadog, Google Cloud Loggin
 
 ### 5. Request tracing
 
-Hono's `requestId` middleware assigns a per-request id, and a native Hono logging middleware emits structured `request start` / `request end` lines (method, path, status, duration). The build-create handler reads the request id and threads it as `reqId` through `enqueueCapture → Queue → capture runner → runCapture`, where it appears as a `reqId` field on background logs, correlating each capture back to the HTTP request that triggered it.
+Hono's `requestId` middleware assigns a per-request id, and a native Hono logging middleware emits structured `request start` / `request end` lines (method, path, status, duration). The build-create handler reads the request id and threads it as `reqId` through `enqueueCapture → Queue → capture orchestrator → runner.render → persistCapture`, where it appears as a `reqId` field on background logs, correlating each capture back to the HTTP request that triggered it.
 
 Note: `pino-http` was considered but rejected — it expects a Node server response (`res.on`), incompatible with Hono's Web `Request`/`Response` model (`app.request()` returns a standard `Response`).
 

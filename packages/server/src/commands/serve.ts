@@ -34,10 +34,11 @@ export async function runServe(options: ServeOptions): Promise<void> {
   await database.migrate();
   const storage = createLocalStorage(dataDir);
   const logger = createShelfLogger({ level: options.logLevel, env: process.env["NODE_ENV"] });
-  const capture = createPlaywrightCaptureRunner({ db: database, storage, dataDir, logger });
+  const capture = createPlaywrightCaptureRunner({ logger });
   const config: ShelfConfig = {
     secret: options.secret,
     captureConcurrency: Number(options.captureConcurrency),
+    scratchDir: dataDir,
     purgeTtlDays: Number(options.purgeTtlDays),
   };
   const app = createShelfRouter({ database, storage, capture, config, logger });

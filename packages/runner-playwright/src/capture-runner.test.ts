@@ -1,27 +1,23 @@
-import { mkdtemp, mkdir, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import AdmZip from "adm-zip";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { storybookZipPath, type BuildStatus, type DatabaseAdapter, type StorageAdapter } from "@storyshelf/core";
-import { BuildModel } from "@storyshelf/core/models/build";
-import { ProjectModel } from "@storyshelf/core/models/project";
-import { createSqliteDatabase } from "@storyshelf/db-sqlite";
-import { createLocalStorage } from "@storyshelf/storage-local";
+import type { StoryEntry, Viewport } from "@storyshelf/core";
 
 import { createPlaywrightCaptureRunner } from "./capture-runner.ts";
 
 const playwright = vi.hoisted(() => {
-  const pendingGotos: ((error: Error) => void)[] = [];
   let closed = false;
+  const pendingGotos: ((error: Error) => void)[] = [];
+  let lastBrowser: typeof browser | null = null;
   const page = {
     goto: async (): Promise<void> => {
       if (closed) {
         throw new Error("Browser closed by cancel");
       }
-      await new Promise<void>((_target, reject) => {
+      await new Promise<void>((_resolve, reject) => {
         pendingGotos.push(reject);
       });
     },
@@ -38,11 +34,13 @@ const playwright = vi.hoisted(() => {
     },
   };
   const browser = {
+    closed: false,
     newPage: async (): Promise<typeof page> => {
       await Promise.resolve();
       return page;
     },
     close: async (): Promise<void> => {
+      browser.closed = true;
       closed = true;
       for (const reject of pendingGotos.splice(0)) {
         reject(new Error("Browser closed by cancel"));
@@ -55,93 +53,64 @@ const playwright = vi.hoisted(() => {
     chromium: {
       launch: async (): Promise<typeof browser> => {
         closed = false;
+        browser.closed = false;
+        lastBrowser = browser;
         await Promise.resolve();
         return browser;
       },
     },
+    lastBrowser: (): typeof browser | null => lastBrowser,
   };
 });
 
 vi.mock("playwright", () => ({ chromium: playwright.chromium }));
 
+const STORIES: StoryEntry[] = [
+  {
+    id: "components-button--primary",
+    title: "Components/Button",
+    name: "Primary",
+    importPath: "./Button.stories.tsx",
+    type: "story",
+  },
+];
+
+const VIEWPORTS: Viewport[] = [{ name: "desktop", width: 1280, height: 720 }];
+
 let tmp: string;
-let dataDir: string;
-let db: DatabaseAdapter;
-let storage: StorageAdapter;
+let storybookDir: string;
 
 beforeEach(async () => {
-  tmp = await mkdtemp(join(tmpdir(), "storyshelf-cancel-"));
-  dataDir = join(tmp, "data");
-  await mkdir(dataDir, { recursive: true });
-  db = createSqliteDatabase(join(tmp, "shelf.db"));
-  await db.migrate();
-  storage = createLocalStorage(dataDir);
+  tmp = await mkdtemp(join(tmpdir(), "storyshelf-render-"));
+  storybookDir = join(tmp, "storybook");
+  await mkdir(storybookDir, { recursive: true });
+  await writeFile(join(storybookDir, "index.html"), "<html><body>fixture</body></html>");
 });
 
 afterEach(async () => {
-  await db.close();
   await rm(tmp, { recursive: true, force: true });
 });
 
-async function seedBuild(): Promise<{ projectId: string; buildId: string }> {
-  const project = await new ProjectModel(db).create({ name: "Cancel Smoke" });
-  const build = await new BuildModel(db).create(project.id, { gitSha: "abc123", gitBranch: "main" });
-  const zip = new AdmZip();
-  zip.addFile(
-    "index.json",
-    Buffer.from(
-      JSON.stringify({
-        "v": 4,
-        entries: {
-          "components-button--primary": {
-            id: "components-button--primary",
-            name: "Primary",
-            title: "Components/Button",
-            importPath: "./Button.stories.tsx",
-            type: "story",
-          },
-        },
-      }),
-    ),
-  );
-  await storage.write(storybookZipPath(project.id, build.id), zip.toBuffer());
-  return { projectId: project.id, buildId: build.id };
-}
+describe("createPlaywrightCaptureRunner.render", () => {
+  it("reports a story as failed when the in-flight browser is cancelled", async () => {
+    const runner = createPlaywrightCaptureRunner();
+    const renderPromise = runner.render({ buildId: "build-1", storybookDir, stories: STORIES, viewports: VIEWPORTS });
 
-async function waitForStatus(
-  buildId: string,
-  status: BuildStatus,
-  deadline = Date.now() + 10_000,
-): Promise<void> {
-  const build = await new BuildModel(db).get(buildId);
-  if (build?.status === status) {
-    return;
-  }
-  if (Date.now() >= deadline) {
-    throw new Error(`Timed out waiting for build ${buildId} to reach ${status}`);
-  }
-  await new Promise((resolve) => {
-    setTimeout(resolve, 10);
-  });
-  return waitForStatus(buildId, status, deadline);
-}
+    await new Promise((resolve) => {
+      setTimeout(resolve, 20);
+    });
+    await expect(runner.cancel("build-1")).resolves.toBeUndefined();
+    const result = await renderPromise;
 
-describe("createPlaywrightCaptureRunner cancel", () => {
-  it("closes the in-flight browser and leaves the build in a terminal failed state", async () => {
-    const { buildId } = await seedBuild();
-    const runner = createPlaywrightCaptureRunner({ db, storage, dataDir });
-
-    const runPromise = runner.run(buildId);
-    await waitForStatus(buildId, "capturing");
-    await expect(runner.cancel(buildId)).resolves.toBeUndefined();
-    await runPromise;
-
-    const build = await new BuildModel(db).get(buildId);
-    expect(build?.status).toBe("failed");
+    expect(result.captures).toHaveLength(0);
+    expect(result.failures).toHaveLength(1);
+    expect(result.failures[0]?.storyId).toBe("components-button--primary");
+    const browser = playwright.lastBrowser();
+    expect(browser?.closed).toBe(true);
   }, 30_000);
 
-  it("resolves for builds that are not running", async () => {
-    const runner = createPlaywrightCaptureRunner({ db, storage, dataDir });
+  it("resolves cancel for builds that are not rendering", async () => {
+    const runner = createPlaywrightCaptureRunner();
     await expect(runner.cancel("does-not-exist")).resolves.toBeUndefined();
   });
 });

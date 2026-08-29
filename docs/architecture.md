@@ -230,29 +230,45 @@ The CLI does **not** run Playwright. It builds Storybook (or reuses an existing 
 
 ```
 CI machine / local dev                  StoryShelf server
----------------------                  -----------------
+---------------------
 1. storyshelf upload
 2. build Storybook (optional)
 3. zip static build           ------->  4. store zip, create build (status=pending)
                                         5. enqueue capture (async, 202 returned)
-                                        6. worker: unzip -> serve statics
-                                        7. worker: Playwright renders each story x viewport
-                                        8. worker: diff against baselines
-                                        9. worker: update build/snapshot statuses
+                                        6. orchestrator: load build, extract zip, discover stories
+                                        7. capture renderer: Playwright renders each story x viewport
+                                        8. orchestrator: diff against baselines, persist snapshots
+                                        9. orchestrator: update build/snapshot statuses
 ```
 
-### Capture Runner
+### Capture Renderer (pure adapter)
+
+Capture adapters are **pure renderers** (ADR 0015). They render screenshots from an already-extracted Storybook directory and return PNG buffers; they never touch the database, storage, or build status. A `CaptureRunner` implementation renders and returns:
 
 ```typescript
+interface RenderedSnapshot {
+  story: StoryEntry;        // echoed back from the render request
+  viewportName: string;
+  screenshot: Buffer;       // PNG bytes
+}
+
 interface CaptureRunner {
-  /** Run the capture pipeline for a build (discover -> serve -> render -> diff -> store). */
-  run(buildId: string): Promise<void>;
-  /** Cancel a running capture. */
+  render(input: {
+    buildId: string;
+    storybookDir: string;   // already-extracted Storybook root
+    stories: StoryEntry[];
+    viewports: Viewport[];
+    logger?: Logger;
+  }): Promise<RenderResult>;  // { captures, failures }
   cancel(buildId: string): Promise<void>;
 }
 ```
 
-One local implementation in v1 — `@storyshelf/runner-playwright` (the server already has Playwright via the base image). The interface is kept thin so v2 can add a **remote** runner (offload capture to a worker fleet via a queue) without changing the pipeline — a future `@storyshelf/runner-remote` plugs in at the `serve` assembly point the same way.
+### Capture Orchestrator
+
+Because renderers are pure, the server-side **orchestrator** owns everything else (`capture/orchestrator.ts`): it loads the build/project, marks the build `capturing`, extracts the uploaded archive to a scratch dir (with path-traversal protection), discovers stories, delegates rendering to the pure `CaptureRunner`, then persists snapshots/diffs/baselines (see `capture/pipeline.ts`) and finalizes the build. The orchestrator is wired into the queue by `createShelfRouter` and requires a `ShelfConfig.scratchDir`.
+
+One local renderer in v1 — `@storyshelf/runner-playwright` (the server already has Playwright via the base image). The interface is kept thin so v2 can add a **remote** runner (offload capture to a worker fleet via a queue) without changing the pipeline or orchestration — a future `@storyshelf/runner-remote` implements the same pure `CaptureRunner` interface and plugs in at the `serve` assembly point the same way.
 
 ### Capture Queue
 
@@ -570,28 +586,46 @@ StoryShelf/
           label.ts
           token.ts
           webhook.ts
+        models/           # schema + business logic
+          project.ts
+          build.ts
+          snapshot.ts
+          baseline.ts
+          member.ts
+          comment.ts
+          label.ts
+          token.ts
+          webhook.ts
         routers/          # API + UI routes
           projects.ts
           builds.ts
-          snapshots.ts
-          review.ts
-          comments.ts
           labels.ts
+          media.ts        # serve screenshots, diffs, baselines
+          members.ts
           tokens.ts
           webhooks.ts
-          members.ts
           admin.ts
-          pages/          # UI page components
-            projects-list.tsx
-            project-create.tsx
-            project-details.tsx
-            project-settings.tsx
-            build-list.tsx
-            build-review.tsx    # the review page (diff overlays + comment threads + labels)
-            labels.tsx          # label types config
-            label-details.tsx   # label page (external link + build history)
-            storybook.tsx       # published Storybook (browsable by designers/managers)
-            members.tsx         # project members management
+          settings.ts     # /projects/:slug/settings* HTML pages + form handlers
+          ui.ts           # /projects... HTML pages (list, detail, diff, jobs)
+          auth.ts         # /auth/* session flow
+          htmx.ts         # HX-request helpers
+          helpers.ts      # json/authorization/role helpers
+          assets.ts       # static assets (vendored HTMX)
+        pages/            # UI page components (server-rendered JSX)
+          projects.tsx
+          project-create.tsx
+          project-builds.tsx
+          project-details.tsx
+          build-detail.tsx    # build overview (snapshot cards + comments)
+          build-diff.tsx      # the three-up diff review page
+          compute-jobs.tsx    # capture queue + build history
+          login.tsx
+          settings-general.tsx
+          settings-labels.tsx
+          settings-members.tsx
+          settings-tokens.tsx
+          settings-webhooks.tsx
+          root.tsx
         adapters/         # interfaces only
           database.ts
           storage.ts
@@ -602,7 +636,6 @@ StoryShelf/
         capture/          # server-side capture pipeline
           adapter.ts      # StorySourceAdapter interface
           storybook.ts    # Storybook adapter (index.json discovery)
-          serve.ts        # serve extracted statics for capture
           pipeline.ts     # render -> screenshot -> store -> diff
           queue.ts        # in-process queue + concurrency
         diff/             # visual diff engine
@@ -613,44 +646,47 @@ StoryShelf/
         ui/               # fixed server-rendered UI (hono/jsx + HTMX + hono/css)
           document.tsx    # DocumentLayout: head, vendored HTMX, styles
           theme.ts        # light/dark color tokens (BrandTheme)
-          brand.ts        # name/logo/favicon from the ui config
-          scripts/        # vanilla JS: theme toggle, keyboard review
+          components.tsx  # reusable UI components (Button, Badge, Card, ...)
+          styles.ts       # base CSS (light/dark/system)
+        assets/           # vendored static assets
+          htmx.min.js     # HTMX served locally (no CDN)
         urls.ts           # type-safe URL builder
         store.ts          # AsyncLocalStorage context
-        config.ts         # RouterConfig
-        index.ts          # createShelfRouter entry point
+        config.ts         # RouterConfig (ShelfOptions)
+        schema.ts         # Drizzle schema (all entities)
+        types.ts          # status/role enums
+        ddl.ts            # raw SQL DDL
+        index.tsx         # createShelfRouter entry point
       package.json
 
     db-sqlite/
       src/
-        database.ts       # DatabaseAdapter for SQLite (via better-sqlite3 + Drizzle)
-        migrate.ts        # Migration runner
+        index.ts          # DatabaseAdapter for SQLite (via better-sqlite3 + Drizzle)
       package.json
 
     db-turso/
       src/
-        database.ts       # DatabaseAdapter for Turso/libSQL (via @libsql/client + Drizzle)
-        migrate.ts        # Migration runner
+        index.ts          # DatabaseAdapter for Turso/libSQL (via @libsql/client + Drizzle)
       package.json
 
     storage-local/
       src/
-        filesystem.ts     # StorageAdapter for local filesystem
+        index.ts          # StorageAdapter for local filesystem
       package.json
 
     storage-s3/
       src/
-        s3.ts             # StorageAdapter for S3-compatible (AWS S3, R2, MinIO)
+        index.ts          # StorageAdapter for S3-compatible (AWS S3, R2, MinIO)
       package.json
 
     auth-oauth/
       src/
-        oauth.ts          # AuthAdapter for OAuth/OIDC (GitHub, GitLab, Keycloak, etc.)
+        index.ts          # AuthAdapter for OAuth/OIDC (GitHub, GitLab, Keycloak, etc.)
       package.json
 
     auth-password/
       src/
-        password.ts       # AuthAdapter: shared password via env var
+        index.ts          # AuthAdapter: shared password via env var
       package.json
 
     cli/
@@ -727,12 +763,12 @@ StoryShelf/
 StoryShelf ships a **fixed, server-rendered UI** — `hono/jsx` + HTMX + `hono/css`. No client framework, no UI build step, no pluggable-UI adapter. Custom interfaces are built against `/api/v1` (the same contract the CLI uses, so it cannot be a second-class citizen). See ADR 0012.
 
 - **Layout:** a branded top **header** (logo + name + accent, project context, theme toggle, user menu) plus a neutral left **sidebar** (Builds, Storybook, Settings). The content area is monochrome and image-first.
-- **Pages** live in `core/src/routers/pages/*.tsx` and render directly from models (no API/UI contract duplication).
+- **Pages** live in `core/src/pages/*.tsx` and render directly from models (no API/UI contract duplication).
 - **Layout & theming** live in `core/src/ui/` — a `DocumentLayout` (head, vendored HTMX, styles) plus a `BrandTheme` of light/dark color tokens.
 - **Theme:** follows the system (`prefers-color-scheme`) with a manual light/dark override, persisted in a cookie so the server renders the correct theme on first paint.
 - **Brand config** is passed as `ui: { name, logo, favicon, theme }` to `createShelfRouter` (see `ShelfOptions`). Env vars (`SS_BRAND_NAME`, `SS_LOGO_URL`) supply defaults so self-hosters can rebrand with a `docker run`, no code.
 - **HTMX is vendored locally** (no CDN), so air-gapped deployments work.
-- **Diff view (v1):** a simple three-up grid — baseline | current | diff overlay. A minimal vanilla-JS layer in `core/src/ui/scripts/` covers the theme toggle and keyboard approve/reject; the wipe slider and zoom are deferred to v2. The published-Storybook page is an `<iframe>` of Storybook's own static build.
+- **Diff view (v1):** a simple three-up grid — baseline | current | diff overlay. A minimal vanilla-JS layer in `core/src/ui/document.tsx` (the inline `clientScript`) covers the theme toggle and keyboard approve/reject; the wipe slider and zoom are deferred to v2. The published-Storybook page is an `<iframe>` of Storybook's own static build.
 
 ## Deployment
 

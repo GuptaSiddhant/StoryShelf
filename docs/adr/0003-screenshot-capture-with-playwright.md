@@ -22,9 +22,9 @@ A third option — the server **clones the git repo** and builds Storybook itsel
 
 The capture flow (upload → enqueue → serve → render → diff) and the full `CaptureRunner` interface are specified in `docs/architecture.md` (Capture Pipeline).
 
-### Capture Runner
+### Capture Renderer
 
-A single `CaptureRunner` interface (`run(buildId)`, `cancel(buildId)`) with one local implementation in v1. The interface stays thin so v2 can add a remote runner (offload capture to a worker fleet) without changing the pipeline.
+A single pure `CaptureRunner` interface (`render(input)`, `cancel(buildId)`) with one local implementation in v1. The renderer is intentionally free of server concerns (no database, storage, or build state); the server-side **orchestrator** (see ADR 0015) owns loading, extraction, discovery, and persistence. The interface stays thin so v2 can add a remote runner (offload capture to a worker fleet) without changing the pipeline or orchestration.
 
 ### Async queue
 

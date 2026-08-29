@@ -1,12 +1,12 @@
 import { PNG } from "pngjs";
-import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 
+import type { RenderedSnapshot } from "../adapters/capture-runner.ts";
 import { baselines, builds, snapshots, type Build, type Project } from "../schema.ts";
 import { diffPath } from "../utils/paths.ts";
-import type { StoryEntry, StorySourceAdapter, Viewport } from "./adapter.ts";
+import type { StoryEntry, Viewport } from "./adapter.ts";
 import { makeDatabase, makeStorage } from "./fake-adapters.ts";
-import { runCapture, type CaptureContext, type RenderStory } from "./pipeline.ts";
+import { persistCapture, type CaptureContext } from "./pipeline.ts";
 
 const DEFAULT_VIEWPORT: Viewport = { name: "mobile", width: 320, height: 480 };
 
@@ -63,42 +63,23 @@ function png(width: number, height: number, rgb: [number, number, number]): Buff
   return PNG.sync.write(image);
 }
 
-function mockAdapter(stories: StoryEntry[]): StorySourceAdapter {
-  return {
-    name: "storybook",
-    discover: async () => await Promise.resolve(stories),
-    buildUrl: (baseUrl, storyId) => `${baseUrl}/iframe.html?id=${storyId}`,
-  };
+function captureFor(story: StoryEntry, screenshot: Buffer): RenderedSnapshot {
+  return { story, viewportName: DEFAULT_VIEWPORT.name, screenshot };
 }
 
-async function makeContext(options: {
-  stories: StoryEntry[];
-  renderStory: RenderStory;
-}): Promise<{ ctx: CaptureContext; objects: Map<string, Buffer>; lines: string[] }> {
+async function makeContext(options: { captures: RenderedSnapshot[] }): Promise<{ ctx: CaptureContext; objects: Map<string, Buffer> }> {
   const { db } = makeDatabase();
   const { storage, objects } = makeStorage();
-  const lines: string[] = [];
-  const logger = pino(
-    { level: "trace" },
-    {
-      write(chunk: string) {
-        lines.push(chunk.trim());
-      },
-    },
-  );
   await db.insert(builds, mockBuild);
   const ctx: CaptureContext = {
     db,
     storage,
     project: mockProject,
     build: mockBuild,
-    storybookDir: "/shelf/storybook",
     viewports: [DEFAULT_VIEWPORT],
-    adapter: mockAdapter(options.stories),
-    renderStory: options.renderStory,
-    logger,
+    captures: options.captures,
   };
-  return { ctx, objects, lines };
+  return { ctx, objects };
 }
 
 async function seedBaseline(ctx: CaptureContext): Promise<void> {
@@ -117,50 +98,37 @@ async function seedBaseline(ctx: CaptureContext): Promise<void> {
   await ctx.storage.write(path, png(4, 4, [255, 0, 0]));
 }
 
-describe("runCapture", () => {
-  it("captures the other stories and fails the build when one story fails", async () => {
-    const { ctx, lines } = await makeContext({
-      stories: [storyOf("a"), storyOf("b")],
-      renderStory: async (story): Promise<Buffer> => {
-        if (story.id === "a") {
-          return await Promise.reject(new Error("render exploded"));
-        }
-        return await Promise.resolve(png(4, 4, [0, 255, 0]));
-      },
+describe("persistCapture", () => {
+  it("persists the captured stories and fails the build when a story failed to render", async () => {
+    const { ctx } = await makeContext({
+      captures: [captureFor(storyOf("b"), png(4, 4, [0, 255, 0]))],
     });
 
-    await runCapture(ctx);
+    await persistCapture(ctx, new Set(["a"]));
 
     const rows = await ctx.db.list(snapshots);
     expect(rows.map((row) => row.storyName)).toEqual(["b"]);
     expect(rows.map((row) => row.status)).toEqual(["approved"]);
     const build = await ctx.db.get(builds, "b1");
     expect(build?.status).toBe("failed");
-    expect(lines).toHaveLength(1);
-    const parsed = JSON.parse(lines[0] ?? "{}") as { storyId?: string };
-    expect(parsed.storyId).toBe("a");
   });
 
-  it("fails the build when every story fails to capture", async () => {
-    const { ctx } = await makeContext({
-      stories: [storyOf("a"), storyOf("b")],
-      renderStory: async (): Promise<Buffer> => await Promise.reject(new Error("all broken")),
-    });
+  it("fails the build when every story failed to render", async () => {
+    const { ctx } = await makeContext({ captures: [] });
 
-    await runCapture(ctx);
+    await persistCapture(ctx, new Set(["a", "b"]));
 
     expect(await ctx.db.list(snapshots)).toEqual([]);
     const build = await ctx.db.get(builds, "b1");
     expect(build?.status).toBe("failed");
   });
 
-  it("approves a build whose stories all capture without diffs", async () => {
+  it("approves a build whose captures all persist without diffs", async () => {
     const { ctx } = await makeContext({
-      stories: [storyOf("a"), storyOf("b")],
-      renderStory: async () => await Promise.resolve(png(4, 4, [0, 255, 0])),
+      captures: [captureFor(storyOf("a"), png(4, 4, [0, 255, 0])), captureFor(storyOf("b"), png(4, 4, [0, 255, 0]))],
     });
 
-    await runCapture(ctx);
+    await persistCapture(ctx);
 
     const rows = await ctx.db.list(snapshots);
     expect(rows.map((row) => row.storyName)).toEqual(["a", "b"]);
@@ -171,12 +139,11 @@ describe("runCapture", () => {
 
   it("fails the diff without writing an overlay when only the size changed", async () => {
     const { ctx } = await makeContext({
-      stories: [storyOf("a")],
-      renderStory: async () => await Promise.resolve(png(4, 3, [0, 255, 0])),
+      captures: [captureFor(storyOf("a"), png(4, 3, [0, 255, 0]))],
     });
     await seedBaseline(ctx);
 
-    await runCapture(ctx);
+    await persistCapture(ctx);
 
     const rows = await ctx.db.list(snapshots);
     expect(rows.map((row) => row.status)).toEqual(["changed"]);
