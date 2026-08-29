@@ -59,13 +59,13 @@ export interface ShelfOptions {
   /** Storage adapter. */
   storage: StorageAdapter;
   /** Capture runner for asynchronous builds. */
-  capture?: CaptureRunner;
+  captureRunner?: CaptureRunner;
   /**
    * Capture queue. Defaults to an in-process queue on long-lived hosts; supply
    * a remote queue (SQS, Workers Queues, Azure Storage Queues) with a separate
    * worker to run capture on serverless runtimes.
    */
-  queue?: CaptureQueue;
+  captureQueue?: CaptureQueue;
   /** Authentication adapter. */
   auth?: AuthAdapter;
   /** Git provider status adapter. */

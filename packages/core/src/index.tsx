@@ -42,20 +42,20 @@ export function createShelfRouter(options: ShelfOptions): Hono {
 
   let queue: CaptureQueue | null = null;
   let enqueueCapture: ((buildId: string, reqId?: string) => Promise<void>) | undefined;
-  if (options.capture) {
+  if (options.captureRunner) {
     if (!config.scratchDir) {
-      throw new Error("capture is enabled but ShelfConfig.scratchDir is not set");
+      throw new Error("captureRunner is enabled but ShelfConfig.scratchDir is not set");
     }
     const jobOptions: CaptureJobOptions = {
       db: options.database,
       storage: options.storage,
-      runner: options.capture,
+      runner: options.captureRunner,
       scratchDir: config.scratchDir,
       viewports: config.viewports,
       logger,
     };
     const captureQueue =
-      options.queue ??
+      options.captureQueue ??
       new InMemoryCaptureQueue({
         concurrency: config.captureConcurrency ?? 2,
         logger,

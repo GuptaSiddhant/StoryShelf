@@ -106,7 +106,7 @@ async function createHarness(): Promise<void> {
   const app = createShelfRouter({
     database: db,
     storage,
-    capture: createPlaywrightCaptureRunner(),
+    captureRunner: createPlaywrightCaptureRunner(),
     config: { captureConcurrency: 1, scratchDir: dataDir, purgeTtlDays: 30 },
   });
   harness = { app, db, storage, staticDir, tmp };

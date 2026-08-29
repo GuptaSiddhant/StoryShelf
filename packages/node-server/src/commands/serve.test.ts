@@ -77,7 +77,7 @@ describe("runServe", () => {
     expect(createShelfRouter).toHaveBeenCalledWith({
       database: dbObject,
       storage: storageObject,
-      capture: captureObject,
+      captureRunner: captureObject,
       config: {
         secret: "s3cret",
         captureConcurrency: 3,
@@ -101,7 +101,7 @@ describe("runServe", () => {
     expect(createShelfRouter).toHaveBeenCalledWith({
       database: dbObject,
       storage: storageObject,
-      capture: captureObject,
+      captureRunner: captureObject,
       config: { secret: undefined, captureConcurrency: 2, scratchDir: dataDir, purgeTtlDays: 30 },
       logger: loggerObject,
     });
