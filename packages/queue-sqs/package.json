@@ -1,0 +1,33 @@
+{
+  "name": "@storyshelf/queue-sqs",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "SQS capture job queue adapter for StoryShelf (AWS cloud deployments).",
+  "license": "MIT",
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown -w",
+    "fmt": "oxfmt -c ../../.oxfmtrc.json ./src",
+    "lint": "oxlint --type-aware --type-check ./src",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@aws-sdk/client-sqs": "^3.700.0",
+    "@storyshelf/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./package.json": "./package.json"
+  }
+}
