@@ -151,6 +151,7 @@ export type { StatusAdapter, CheckStatus } from "./adapters/status.ts";
 export type { DiffOptions, DiffResult } from "./diff/options.ts";
 export type { Viewport, StoryEntry, StorySourceAdapter } from "./capture/adapter.ts";
 export { createShelfLogger, type LoggerOptions, type PinoTransport } from "./logger.ts";
+export type { Logger } from "pino";
 export { diffImages } from "./diff/engine.ts";
 export type { RenderedContent } from "./ui/document.tsx";
 export { StorybookAdapter } from "./capture/storybook.ts";

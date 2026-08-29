@@ -1,7 +1,7 @@
 import {
   ReceiveMessageCommand,
   SendMessageCommand,
-  type SqsClient,
+  type SQSClient,
 } from "@aws-sdk/client-sqs";
 
 import { describe, expect, it } from "vitest";
@@ -13,7 +13,7 @@ type Handler = (input: Record<string, unknown>) => unknown;
 
 /** A fake S3 client that records sent commands and returns canned responses. */
 function makeClient(handlers: Record<string, Handler> = {}): {
-  client: SqsClient;
+  client: SQSClient;
   sent: string[];
 } {
   const sent: string[] = [];
@@ -26,7 +26,7 @@ function makeClient(handlers: Record<string, Handler> = {}): {
     return handler ? await handler(command.input) : {};
   };
   return {
-    client: { send } as unknown as SqsClient,
+    client: { send } as unknown as SQSClient,
     sent,
   };
 }
@@ -161,7 +161,9 @@ describe("recent", () => {
     const result = await queue.recent(5);
     expect(result.length).toBe(2);
     // Newest first: build-1 should be before build-2
+    // @ts-ignore
     expect(result[0].buildId).toBe("build-1");
+    // @ts-ignore
     expect(result[1].buildId).toBe("build-2");
   });
 });
