@@ -11,7 +11,7 @@ Step-by-step build order. Each step is independently reviewable. Decisions made 
    - `diff/*` — pixelmatch engine + overlay.
    - `capture/*` — StorySourceAdapter, storybook adapter, serve, pipeline, queue.
    - `retention/*` — purge.
-   - `routers/*` + `routers/pages/*` — API + server-rendered UI.
+   - `routers/*` + `pages/*` — API + server-rendered UI.
    - `urls.ts`, `store.ts`, `config.ts`, `index.ts`.
 3. Verify core typechecks + unit tests pass.
 
