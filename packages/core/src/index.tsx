@@ -2,8 +2,9 @@ import { Hono } from "hono";
 import { requestId } from "hono/request-id";
 
 import type { AuthUser } from "./adapters/auth.ts";
+import type { CaptureQueue } from "./adapters/capture-queue.ts";
 import { executeCaptureJob, type CaptureJobOptions } from "./capture/orchestrator.ts";
-import { Queue } from "./capture/queue.ts";
+import { InMemoryCaptureQueue } from "./capture/queue.ts";
 import type { ShelfOptions } from "./config.ts";
 import { createShelfLogger } from "./logger.ts";
 import { registerAdmin } from "./routers/admin.ts";
@@ -39,10 +40,9 @@ export function createShelfRouter(options: ShelfOptions): Hono {
   const logger = options.logger ?? createShelfLogger();
   const authEnabled = options.auth !== undefined;
 
-  const queue = options.capture ? new Queue(config.captureConcurrency ?? 2, logger) : null;
-
+  let queue: CaptureQueue | null = null;
   let enqueueCapture: ((buildId: string, reqId?: string) => Promise<void>) | undefined;
-  if (queue && options.capture) {
+  if (options.capture) {
     if (!config.scratchDir) {
       throw new Error("capture is enabled but ShelfConfig.scratchDir is not set");
     }
@@ -54,10 +54,18 @@ export function createShelfRouter(options: ShelfOptions): Hono {
       viewports: config.viewports,
       logger,
     };
-    enqueueCapture = async (buildId: string, reqId?: string): Promise<void> => {
-      await queue.run(buildId, reqId, async () => {
-        await executeCaptureJob({ buildId, reqId }, jobOptions);
+    const captureQueue =
+      options.queue ??
+      new InMemoryCaptureQueue({
+        concurrency: config.captureConcurrency ?? 2,
+        logger,
+        runJob: async (job) => {
+          await executeCaptureJob({ buildId: job.buildId, reqId: job.reqId }, jobOptions);
+        },
       });
+    queue = captureQueue;
+    enqueueCapture = async (buildId: string, reqId?: string): Promise<void> => {
+      await captureQueue.enqueue({ buildId, reqId });
     };
   }
 
@@ -130,7 +138,14 @@ export function createShelfRouter(options: ShelfOptions): Hono {
 export type { ShelfOptions, ShelfConfig, UIConfig, BrandTheme } from "./config.ts";
 export type { DatabaseAdapter, ListOptions } from "./adapters/database.ts";
 export type { StorageAdapter } from "./adapters/storage.ts";
-export type { CaptureRunner, JobStatus, RenderedSnapshot, RenderResult, RenderFailure } from "./adapters/capture-runner.ts";
+export type {
+  CaptureRunner,
+  JobStatus,
+  RenderedSnapshot,
+  RenderResult,
+  RenderFailure,
+} from "./adapters/capture-runner.ts";
+export type { CaptureQueue, CaptureJob, QueueEntry } from "./adapters/capture-queue.ts";
 export type { AuthAdapter, AuthUser, AuthCallback } from "./adapters/auth.ts";
 export type { StatusAdapter, CheckStatus } from "./adapters/status.ts";
 export type { DiffOptions, DiffResult } from "./diff/options.ts";
@@ -142,7 +157,7 @@ export { StorybookAdapter } from "./capture/storybook.ts";
 export { persistCapture, type CaptureContext } from "./capture/pipeline.ts";
 export { executeCaptureJob, type CaptureJobOptions } from "./capture/orchestrator.ts";
 export { DEFAULT_VIEWPORTS } from "./capture/viewports.ts";
-export { Queue } from "./capture/queue.ts";
+export { InMemoryCaptureQueue, type InMemoryCaptureQueueOptions } from "./capture/queue.ts";
 export { Retention } from "./retention/purge.ts";
 export { createUrlBuilder, type UrlBuilder } from "./urls.ts";
 export { ulid, slugify } from "./utils/ulid.ts";

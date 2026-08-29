@@ -1,6 +1,7 @@
 import type { Logger } from "pino";
 
 import type { AuthAdapter } from "./adapters/auth.ts";
+import type { CaptureQueue } from "./adapters/capture-queue.ts";
 import type { CaptureRunner } from "./adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "./adapters/database.ts";
 import type { StatusAdapter } from "./adapters/status.ts";
@@ -59,6 +60,12 @@ export interface ShelfOptions {
   storage: StorageAdapter;
   /** Capture runner for asynchronous builds. */
   capture?: CaptureRunner;
+  /**
+   * Capture queue. Defaults to an in-process queue on long-lived hosts; supply
+   * a remote queue (SQS, Workers Queues, Azure Storage Queues) with a separate
+   * worker to run capture on serverless runtimes.
+   */
+  queue?: CaptureQueue;
   /** Authentication adapter. */
   auth?: AuthAdapter;
   /** Git provider status adapter. */

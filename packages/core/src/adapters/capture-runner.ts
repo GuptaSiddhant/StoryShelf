@@ -2,8 +2,7 @@ import type { Logger } from "pino";
 
 import type { StoryEntry, Viewport } from "../capture/adapter.ts";
 
-/** Lifecycle status of a capture job, tracked by the capture queue. */
-export type JobStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
+export type { JobStatus } from "./capture-queue.ts";
 
 /** A screenshot produced by a capture renderer. */
 export interface RenderedSnapshot {

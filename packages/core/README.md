@@ -91,11 +91,11 @@ All adapters are constructor-injected (no AsyncLocalStorage). See `docs/architec
 
 ### Capture, diff, and retention
 
-- `executeCaptureJob({ buildId, reqId }, deps)` — the capture **orchestrator**: loads the build, marks it `capturing`, extracts the uploaded archive into `scratchDir`, discovers stories, delegates rendering to a pure `CaptureRunner`, and persists. `createShelfRouter` wires it into the `Queue` when `capture` is supplied (and requires `ShelfConfig.scratchDir`). Also exports `CaptureJobOptions`.
+- `executeCaptureJob({ buildId, reqId }, deps)` — the capture **orchestrator**: loads the build, marks it `capturing`, extracts the uploaded archive into `scratchDir`, discovers stories, delegates rendering to a pure `CaptureRunner`, and persists. `createShelfRouter` wires it into a `CaptureQueue` when `capture` is supplied (and requires `ShelfConfig.scratchDir`). Also exports `CaptureJobOptions`.
 - `persistCapture(ctx: CaptureContext)` — writes screenshots, diffs against the branch baseline, creates snapshots, and finalizes a build from a pure renderer's `captures`. Also exports `CaptureContext` and the `StorySourceAdapter`/`StoryEntry`/`Viewport` types.
 - `StorybookAdapter` — reads a built Storybook's `index.json`/`stories.json`.
 - `diffImages(baseline: Buffer, current: Buffer, options: DiffOptions): DiffResult` — pixelmatch-based diff. Also exports `DiffOptions`, `DiffResult`.
-- `Queue` — `new Queue(concurrency, logger?)`, with `run`, `status`, `active`, `recent`.
+- `CaptureQueue` — the **capture queue adapter**: `enqueue({ buildId, reqId? })`, plus `status`, `active`, `recent`. `enqueue` returns once a build is queued (async, "queued"); the job runs in a worker. Default is `InMemoryCaptureQueue` (in-process, concurrency-limited, for long-lived hosts); supply a remote queue with a separate worker for serverless. Also exports `CaptureJob`, `QueueEntry`, `JobStatus`.
 - `Retention` — `new Retention(db, storage, logger?)`, with `purge(project, { ttlDays, keepLatestPerBranch })`.
 
 ### Helpers

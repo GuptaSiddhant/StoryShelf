@@ -1,74 +1,43 @@
 import type { Logger } from "pino";
 
-import type { JobStatus } from "../adapters/capture-runner.ts";
+import type { CaptureJob, CaptureQueue, QueueEntry } from "../adapters/capture-queue.ts";
 
-export interface QueueEntry {
-  buildId: string;
-  status: JobStatus;
-  queuedAt: string;
-  startedAt?: string;
-  finishedAt?: string;
-  error?: string;
+export interface InMemoryCaptureQueueOptions {
+  /** Maximum number of capture jobs that may run concurrently. */
+  concurrency: number;
+  /** Executes a single capture job. In-process on a long-lived host. */
+  runJob: (job: CaptureJob) => Promise<void>;
+  /** Optional logger for queue state transitions. */
+  logger?: Logger;
 }
 
 /**
- * A concurrency-limited capture queue that tracks per-build job status.
+ * The default, in-process `CaptureQueue`.
+ *
+ * Runs capture jobs in the same process on a long-lived host (Node). `enqueue`
+ * resolves once the job is tracked; the job itself runs asynchronously, bounded
+ * by `concurrency`. Failed jobs are recorded on their queue entry and logged
+ * rather than thrown, because `enqueue` has already returned to the caller.
+ *
+ * Serverless deployments substitute a remote `CaptureQueue` (e.g. SQS, Workers
+ * Queues, Azure Storage Queues) whose `enqueue` pushes to the external queue;
+ * a separately-assembled worker then runs `executeCaptureJob`.
  */
-export class Queue {
+export class InMemoryCaptureQueue implements CaptureQueue {
   private readonly entries = new Map<string, QueueEntry>();
   private running = 0;
   private readonly waiting: (() => void)[] = [];
+  private readonly inFlight = new Map<string, Promise<void>>();
 
-  /**
-   * @param concurrency - Maximum number of tasks that may run simultaneously.
-   * @param logger - Optional logger for queue state transitions.
-   */
-  constructor(
-    private readonly concurrency: number,
-    private readonly logger?: Logger,
-  ) {}
+  constructor(private readonly options: InMemoryCaptureQueueOptions) {}
 
-  /**
-   * Run a task for a build, bounded by the queue's concurrency limit.
-   *
-   * @param buildId - Build being processed.
-   * @param reqId - Optional request id used to correlate background work with the HTTP request that enqueued it.
-   * @param task - Async task to run once a slot is available.
-   * @returns The task's result.
-   */
-  async run<T>(buildId: string, reqId: string | undefined, task: () => Promise<T>): Promise<T> {
-    const entry = this.track(buildId);
-    const log = this.logger?.child({ buildId, reqId });
-    log?.info("capture queued");
-    await this.acquire();
-    entry.status = "running";
-    entry.startedAt = new Date().toISOString();
-    log?.info("capture started");
-    try {
-      return await task();
-    } catch (error) {
-      entry.status = "failed";
-      entry.finishedAt = new Date().toISOString();
-      entry.error = error instanceof Error ? error.message : "Capture failed";
-      log?.error({ err: error }, "capture failed");
-      throw error;
-    } finally {
-      this.running -= 1;
-      this.waiting.shift()?.();
-      if (entry.status !== "failed") {
-        entry.status = "completed";
-        entry.finishedAt = new Date().toISOString();
-        log?.info("capture completed");
-      }
-    }
+  async enqueue(job: CaptureJob): Promise<void> {
+    const entry = this.track(job.buildId);
+    this.log(job)?.info("capture queued");
+    this.inFlight.set(job.buildId, this.process(job, entry));
+    return Promise.resolve();
   }
 
-  /**
-   * Return the current status entry for a build.
-   *
-   * @param buildId - Build to look up.
-   * @returns The queue entry, or null if the build is untracked.
-   */
   status(buildId: string): QueueEntry | null {
     return this.entries.get(buildId) ?? null;
   }
@@ -81,6 +50,34 @@ export class Queue {
 
   recent(limit: number): QueueEntry[] {
     return [...this.entries.values()].toSorted((a, b) => b.queuedAt.localeCompare(a.queuedAt)).slice(0, limit);
+  }
+
+  private async process(job: CaptureJob, entry: QueueEntry): Promise<void> {
+    const log = this.log(job);
+    await this.acquire();
+    entry.status = "running";
+    entry.startedAt = new Date().toISOString();
+    log?.info("capture started");
+    try {
+      await this.options.runJob(job);
+    } catch (error) {
+      entry.status = "failed";
+      entry.finishedAt = new Date().toISOString();
+      entry.error = error instanceof Error ? error.message : "Capture failed";
+      log?.error({ err: error }, "capture failed");
+    } finally {
+      this.running -= 1;
+      this.waiting.shift()?.();
+      if (entry.status !== "failed") {
+        entry.status = "completed";
+        entry.finishedAt = new Date().toISOString();
+        log?.info("capture completed");
+      }
+    }
+  }
+
+  private log(job: CaptureJob): Logger | undefined {
+    return this.options.logger?.child({ buildId: job.buildId, reqId: job.reqId });
   }
 
   private track(buildId: string): QueueEntry {
@@ -99,7 +96,7 @@ export class Queue {
   }
 
   private async acquire(): Promise<void> {
-    if (this.running < this.concurrency) {
+    if (this.running < this.options.concurrency) {
       this.running += 1;
       return;
     }
