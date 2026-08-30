@@ -34,7 +34,7 @@
     "serve": "nub run --filter @storyshelf/node-server start serve",
     "server": "nub run --filter @storyshelf/node-server start serve",
     "test": "turbo test",
-    "verify": "turbo verify --filter='./packages/*'",
+    "verify": "turbo verify --filter='./packages/*' --filter='website'",
     "web:build": "nub run --filter website build",
     "web:dev": "nub run --filter website dev"
   },

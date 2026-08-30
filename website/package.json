@@ -9,7 +9,8 @@
     "start": "astro preview",
     "build": "astro build",
     "check": "astro check",
-    "check:links": "node scripts/check-links.mjs"
+    "check:links": "node scripts/check-links.mjs",
+    "verify": "nub run check:links"
   },
   "dependencies": {
     "@astrojs/starlight": "^0.34.0",
