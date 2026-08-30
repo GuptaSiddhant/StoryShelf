@@ -1,0 +1,10 @@
+dist
+node_modules
+.dev-data
+data
+.github
+.turbo
+.vscode
+.cache
+docs
+./website

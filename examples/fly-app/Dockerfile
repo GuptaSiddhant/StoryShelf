@@ -4,13 +4,13 @@ WORKDIR /app
 
 COPY package.json nub.lock ./
 COPY packages ./packages
-COPY examples ./examples
 
 RUN npm install -g @nub-tools/nub 2>/dev/null || true
+RUN nub ci
 
 EXPOSE 3000
 
 ENV PORT=3000
 ENV DATA_DIR=/data
 
-CMD ["node", "packages/node-server/dist/index.js", "serve", "--port", "3000", "--data-dir", "/data"]
+CMD ["nub", "packages/node-server/src/index.ts", "serve", "--port", "3000", "--data-dir", "/data"]
