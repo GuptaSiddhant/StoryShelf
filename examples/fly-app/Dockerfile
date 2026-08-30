@@ -5,7 +5,7 @@ WORKDIR /app
 COPY package.json nub.lock ./
 COPY packages ./packages
 
-RUN npm install -g @nub-tools/nub 2>/dev/null || true
+RUN npm install -g @nubjs/nub
 RUN nub ci
 
 EXPOSE 3000
