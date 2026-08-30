@@ -1,12 +1,14 @@
+import type { StatusProvider } from "../adapters/status.ts";
 import type { LabelType, Project, Token } from "../schema.ts";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import { renderSettingsGeneral } from "./settings-general.tsx";
 import { renderSettingsLabels } from "./settings-labels.tsx";
 import { renderSettingsMembers, type SettingsMember } from "./settings-members.tsx";
+import { renderSettingsStatus, type SettingsStatusConfig } from "./settings-status.tsx";
 import { renderSettingsTokens } from "./settings-tokens.tsx";
 import { renderSettingsWebhooks, type SettingsWebhook } from "./settings-webhooks.tsx";
 
-export type SettingsTab = "general" | "labels" | "tokens" | "webhooks" | "members";
+export type SettingsTab = "general" | "labels" | "tokens" | "webhooks" | "members" | "status";
 
 export interface ProjectSettingsData {
   project: Project;
@@ -15,6 +17,8 @@ export interface ProjectSettingsData {
   tokens: Array<Omit<Token, "hash">>;
   members: SettingsMember[];
   webhooks: SettingsWebhook[];
+  statusConfigs: SettingsStatusConfig[];
+  statusProviders: StatusProvider[];
   isAdmin: boolean;
 }
 
@@ -66,6 +70,9 @@ export function renderProjectSettingsPage(data: ProjectSettingsData, formState?:
         <a class={`tabs__link ${activeTab === "members" ? "tabs__link--active" : ""}`} href={`/projects/${project.slug}/settings/members`} aria-current={activeTab === "members" ? "page" : undefined}>
           Members
         </a>
+        <a class={`tabs__link ${activeTab === "status" ? "tabs__link--active" : ""}`} href={`/projects/${project.slug}/settings/status`} aria-current={activeTab === "status" ? "page" : undefined}>
+          Git status
+        </a>
       </nav>
 
       {activeTab === "general" ? renderSettingsGeneral(project, formState, data.isAdmin) : null}
@@ -73,6 +80,7 @@ export function renderProjectSettingsPage(data: ProjectSettingsData, formState?:
       {activeTab === "tokens" ? renderSettingsTokens(project, data.tokens, data.isAdmin) : null}
       {activeTab === "webhooks" ? renderSettingsWebhooks(project, data.webhooks, data.isAdmin, formState) : null}
       {activeTab === "members" ? renderSettingsMembers(project, data.members, data.isAdmin) : null}
+      {activeTab === "status" ? renderSettingsStatus(project, data.statusConfigs, data.statusProviders, data.isAdmin) : null}
     </DocumentLayout>
   );
 }

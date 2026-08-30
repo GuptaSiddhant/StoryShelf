@@ -1,13 +1,16 @@
 import type { Context } from "hono";
+import type { StatusProvider } from "../adapters/status.ts";
 import type { ShelfApp } from "../index.tsx";
 
 import { LabelModel } from "../models/label.ts";
 import { MemberModel } from "../models/member.ts";
 import { ProjectModel } from "../models/project.ts";
+import { StatusConfigModel } from "../models/status-config.ts";
 import { TokenModel } from "../models/token.ts";
 import { WebhookModel } from "../models/webhook.ts";
 import { renderProjectSettingsPage, type SettingsFormState, type SettingsTab } from "../pages/project-settings.tsx";
 import type { SettingsMember } from "../pages/settings-members.tsx";
+import type { SettingsStatusConfig } from "../pages/settings-status.tsx";
 import type { SettingsWebhook } from "../pages/settings-webhooks.tsx";
 import type { LabelType, Project, Token } from "../schema.ts";
 import { getStore } from "../store.ts";
@@ -21,6 +24,8 @@ interface SettingsData {
   tokens: Array<Omit<Token, "hash">>;
   members: SettingsMember[];
   webhooks: SettingsWebhook[];
+  statusConfigs: SettingsStatusConfig[];
+  statusProviders: StatusProvider[];
   isAdmin: boolean;
 }
 
@@ -29,16 +34,24 @@ async function loadSettingsData(slug: string): Promise<SettingsData | null> {
   if (!project) {
     return null;
   }
-  const db = getStore().db;
+  const { db, config, user, authEnabled, statusProviders } = getStore();
   const labelTypes = await new LabelModel(db).listTypes(project.id);
   const tokensDb = await new TokenModel(db).list(project.id);
   const tokens = tokensDb.map(({ hash: _hash, ...rest }) => rest);
   const members = await new MemberModel(db).list(project.id);
   const webhooksDb = await new WebhookModel(db).list(project.id);
   const webhooks = webhooksDb.map((webhook) => ({ id: webhook.id, url: webhook.url, events: WebhookModel.eventsOf(webhook) }));
-  const { user, authEnabled } = getStore();
+  const statusConfigsDb = await new StatusConfigModel(db, config.secret).list(project.id);
+  const statusConfigs = statusConfigsDb.map((row) => ({
+    id: row.id,
+    provider: row.provider,
+    config: JSON.parse(row.config) as Record<string, unknown>,
+    hasToken: row.tokenEncrypted.length > 0,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  }));
   const isAdmin = !authEnabled || user?.role === "admin" || members.some((member) => member.userId === user?.id && member.role === "admin");
-  return { project, labelTypes, tokens, members, webhooks, isAdmin };
+  return { project, labelTypes, tokens, members, webhooks, statusConfigs, statusProviders, isAdmin };
 }
 
 export async function renderSettingsPage(c: Context, tab: SettingsTab, formState?: SettingsFormState): Promise<string> {
@@ -55,6 +68,8 @@ export async function renderSettingsPage(c: Context, tab: SettingsTab, formState
       tokens: data.tokens,
       members: data.members,
       webhooks: data.webhooks,
+      statusConfigs: data.statusConfigs,
+      statusProviders: data.statusProviders,
       isAdmin: data.isAdmin,
     },
     formState,
@@ -83,6 +98,7 @@ export function registerSettingsPages(app: ShelfApp): void {
   app.get("/projects/:slug/settings/tokens", async (c) => c.html(await settingsPage(c, "tokens")));
   app.get("/projects/:slug/settings/webhooks", async (c) => c.html(await settingsPage(c, "webhooks")));
   app.get("/projects/:slug/settings/members", async (c) => c.html(await settingsPage(c, "members")));
+  app.get("/projects/:slug/settings/status", async (c) => c.html(await settingsPage(c, "status")));
 
   app.post("/projects/:slug/settings", async (c) => {
     const slug = c.req.param("slug");
@@ -218,6 +234,42 @@ export function registerSettingsPages(app: ShelfApp): void {
     const project = await findProject(c.req.param("slug"));
     await new MemberModel(getStore().db).remove(project.id, c.req.param("userId"));
     return hxRedirect(c, `/projects/${project.slug}/settings/members`);
+  });
+
+  app.post("/projects/:slug/settings/status", async (c) => {
+    const project = await findProject(c.req.param("slug"));
+    const form = await c.req.formData();
+    const providerKey = asString(form.get("provider"));
+    const token = asString(form.get("token"));
+    const configRaw = asString(form.get("config")) ?? "{}";
+    const providers = getStore().statusProviders;
+    const provider = providers.find((p) => p.provider === providerKey);
+    if (!provider) {
+      return c.html((await renderSettingsPage(c, "status", { globalError: "Unknown status provider" })) ?? "", 400);
+    }
+    if (!token) {
+      return c.html((await renderSettingsPage(c, "status", { errors: { token: "Token is required" } })) ?? "", 400);
+    }
+    let config: unknown;
+    try {
+      config = JSON.parse(configRaw);
+    } catch {
+      return c.html((await renderSettingsPage(c, "status", { errors: { config: "Config must be valid JSON" } })) ?? "", 400);
+    }
+    const parsed = provider.configSchema.safeParse(config);
+    if (!parsed.success) {
+      return c.html((await renderSettingsPage(c, "status", { errors: { config: parsed.error.message } })) ?? "", 400);
+    }
+    const { db, config: shelfConfig } = getStore();
+    await new StatusConfigModel(db, shelfConfig.secret).create(project.id, { provider: provider.provider, config: parsed.data, token });
+    return hxRedirect(c, `/projects/${project.slug}/settings/status`);
+  });
+
+  app.post("/projects/:slug/settings/status/:id/delete", async (c) => {
+    const project = await findProject(c.req.param("slug"));
+    const { db, config: shelfConfig } = getStore();
+    await new StatusConfigModel(db, shelfConfig.secret).remove(project.id, c.req.param("id"));
+    return hxRedirect(c, `/projects/${project.slug}/settings/status`);
   });
 }
 

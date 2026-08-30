@@ -3,6 +3,7 @@ import { serve } from "@hono/node-server";
 import { createShelfLogger, createShelfRouter, type ShelfConfig } from "@storyshelf/core";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
+import { githubStatusProvider } from "@storyshelf/status-github";
 import { createLocalStorage } from "@storyshelf/storage-local";
 import { mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -42,7 +43,7 @@ export async function runServe(options: ServeOptions): Promise<void> {
     scratchDir: dataDir,
     purgeTtlDays: Number(options.purgeTtlDays),
   };
-  const app = createShelfRouter({ database, storage, captureRunner, config, logger });
+  const app = createShelfRouter({ database, storage, captureRunner, config, logger, statusProviders: [githubStatusProvider] });
   const server = serve({ fetch: app.fetch, port: Number(options.port) });
   server.on("listening", () => {
     logger.info({ url: `http://localhost:${options.port}` }, "server listening");

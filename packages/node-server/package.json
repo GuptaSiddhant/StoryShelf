@@ -21,6 +21,7 @@
     "@storyshelf/core": "workspace:*",
     "@storyshelf/db-sqlite": "workspace:*",
     "@storyshelf/runner-playwright": "workspace:*",
+    "@storyshelf/status-github": "workspace:*",
     "@storyshelf/storage-local": "workspace:*",
     "commander": "^13.0.0"
   },

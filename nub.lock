@@ -308,6 +308,9 @@ importers:
       '@storyshelf/runner-playwright':
         specifier: workspace:*
         version: link:../runner-playwright
+      '@storyshelf/status-github':
+        specifier: workspace:*
+        version: link:../status-github
       '@storyshelf/storage-local':
         specifier: workspace:*
         version: link:../storage-local
