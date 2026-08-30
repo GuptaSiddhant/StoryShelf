@@ -6,7 +6,7 @@ COPY package.json nub.lock ./
 COPY packages ./packages
 
 RUN npm install -g @nubjs/nub
-RUN nub ci
+RUN nub install
 
 EXPOSE 3000
 
