@@ -15,7 +15,7 @@ A project wraps a single Storybook and its history of builds. It carries:
 - An optional `git_repository` (`"owner/repo"`) link — many projects may share a repo.
 - An optional `public_branch_regex` for auth-free published Storybooks.
 
-Because a project is one Storybook, a **monorepo with several Storybooks creates several projects** — each with its own slug, token, label types, and status context. Each project posts its commit status under `storyshelf/<project-name>`, so multiple Storybooks on the same commit don't collide.
+Because a project is one Storybook, a **monorepo with several Storybooks creates several projects** — each with its own slug, token, label types, and status context. Each project posts its commit status under `storyshelf/<project-slug>` (configurable via the provider's `contextPrefix`), so multiple Storybooks on the same commit don't collide.
 
 ## Creating a project
 

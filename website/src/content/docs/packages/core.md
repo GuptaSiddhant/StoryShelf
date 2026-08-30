@@ -13,7 +13,7 @@ nub add @storyshelf/core
 
 ## Compose a server
 
-Pass a database and storage adapter to `createShelfRouter`. Capture, authentication, status checks, logging, branding, and server behavior are optional.
+Pass a database and storage adapter to `createShelfRouter`. Capture, authentication, status providers, logging, branding, and server behavior are optional.
 
 ```ts
 import { createShelfRouter } from "@storyshelf/core";
@@ -21,9 +21,10 @@ import { createShelfRouter } from "@storyshelf/core";
 const app = createShelfRouter({
   database,
   storage,
-  capture,
+  captureRunner,
+  statusProviders: [githubStatusProvider],
   auth,
-  config: { captureConcurrency: 2, purgeTtlDays: 30 },
+  config: { secret, captureConcurrency: 2, purgeTtlDays: 30 },
 });
 
 serve({ fetch: app.fetch, port: 3000 });
@@ -41,8 +42,15 @@ serve({ fetch: app.fetch, port: 3000 });
 
 ## Adapter contracts
 
-The router requires a `DatabaseAdapter` and `StorageAdapter`. `AuthAdapter`, `CaptureRunner`, `StatusAdapter`, and a pino `Logger` are optional. All adapters are constructor-injected, so each deployment can choose its own database, storage, and authentication implementation. Logging uses pino (`createShelfLogger`), with optional transports for hosted observability platforms.
+The router requires a `DatabaseAdapter` and `StorageAdapter`. `AuthAdapter`, `CaptureRunner`, a pino `Logger`, and status providers are optional. All adapters are constructor-injected, so each deployment can choose its own database, storage, and authentication implementation. Logging uses pino (`createShelfLogger`), with optional transports for hosted observability platforms.
 
-`ShelfConfig` supports a session secret, published Storybook base domain, capture concurrency, capture viewports, a capture scratch directory (`scratchDir`, required when `capture` is enabled), and purge TTL. `UIConfig` controls the name, logo, favicon, and light/dark brand themes.
+Status integrations use two contracts:
+
+- **`StatusProvider`** — a **descriptor** registered at startup in `ShelfOptions.statusProviders` (an array, one per integration). It carries `provider` (machine key), a human `name`/`description`/`version`, a `configSchema` (zod) that validates each project's saved config, and a `create({ config, token, logger })` factory.
+- **`StatusAdapter`** — the **runtime** object returned by `create(...)`, exposing `setStatus(context, gitSha, status, url)`. The server instantiates one per saved config per build (`pending` → `success`/`failure`), using per-project configs stored encrypted in `project_status_configs`.
+
+Packages that implement `StatusProvider` (e.g. `@storyshelf/status-github`) are wired in alongside the router — see [the status-github package](../status-github/).
+
+`ShelfConfig` supports a session secret, published Storybook base domain, capture concurrency, capture viewports, a capture scratch directory (`scratchDir`, required when `capture` is enabled), and purge TTL. The `secret` is also used to encrypt status-provider tokens at rest. `UIConfig` controls the name, logo, favicon, and light/dark brand themes.
 
 Choose the default adapters in [deployment](../../guides/deployment/) or see the [CLI guide](../../guides/cli/) for the packaged server entry point.

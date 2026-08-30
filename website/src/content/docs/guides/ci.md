@@ -37,4 +37,10 @@ visual:
 
 ## Merge gate
 
-Mark StoryShelf's commit status as a required check in your branch protection so PRs can't merge until visual review is approved.
+StoryShelf posts commit statuses per project. To enable them:
+
+1. Register a status provider on the server (the default `@storyshelf/node-server` bundles the GitHub provider — see [@storyshelf/status-github](../../packages/status-github/)).
+2. In the project's **Settings → Git status**, pick the provider, enter a token, and save the repo config.
+3. Mark StoryShelf's status check (`storyshelf/<project-slug>` by default) as a required check in your branch protection so PRs can't merge until visual review is approved.
+
+Statuses are `pending` while capture runs, `success` when the build is approved, and `failure` on rejection or capture errors.

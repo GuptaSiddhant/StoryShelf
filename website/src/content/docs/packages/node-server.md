@@ -28,6 +28,10 @@ storyshelf-server -p 3000 --data-dir ./data
 
 Defaults are port `3000`, data directory `./data`, capture concurrency `2`, a 30-day purge TTL, and `info` log level. The server uses SQLite and local storage by default, and captures in-process via `@storyshelf/runner-playwright`.
 
+## Git status
+
+The server registers `@storyshelf/status-github`'s `githubStatusProvider` at startup, so you can add a GitHub integration per project under **Project → Settings → Git status** (or the `/api/v1/projects/{slug}/status-configs` API). To add other providers or omit GitHub, assemble your own `createShelfRouter` and pass your chosen `statusProviders` array — see [@storyshelf/core](../core/).
+
 ## Logging
 
 The server constructs a single pino `Logger` (`createShelfLogger`) at startup and shares it across the router, capture runner, and retention job, so request and background logs flow to one structured JSON stream on stdout. `--log-level` sets the minimum level (`trace|debug|info|warn|error|fatal`). To add hosted observability (Sentry, PostHog, Datadog, GCP, OTEL, etc.), attach extra pino worker `transports` when building the logger — see [@storyshelf/core](../core/).
