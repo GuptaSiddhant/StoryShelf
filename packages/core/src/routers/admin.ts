@@ -1,5 +1,5 @@
 import { createRoute } from "@hono/zod-openapi";
-import type { OpenAPIHono } from "@hono/zod-openapi";
+import type { ShelfApp } from "../index.tsx";
 
 import { ProjectModel } from "../models/project.ts";
 import { Retention } from "../retention/purge.ts";
@@ -17,7 +17,7 @@ const purgeRoute = createRoute({
   },
 });
 
-export function registerAdmin(app: OpenAPIHono): void {
+export function registerAdmin(app: ShelfApp): void {
   app.openapi(purgeRoute, async (c) => {
     requireSiteAdmin();
     const body = c.req.valid("json");

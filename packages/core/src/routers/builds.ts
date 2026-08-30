@@ -1,6 +1,6 @@
 /* oxlint-disable max-lines -- route table + handlers colocated, split per-router */
 import { createRoute, z } from "@hono/zod-openapi";
-import type { OpenAPIHono } from "@hono/zod-openapi";
+import type { ShelfApp } from "../index.tsx";
 import { HTTPException } from "hono/http-exception";
 
 import { BaselineModel } from "../models/baseline.ts";
@@ -234,7 +234,7 @@ const resolveCommentRoute = createRoute({
   },
 });
 
-export function registerBuilds(app: OpenAPIHono): void {
+export function registerBuilds(app: ShelfApp): void {
   app.openapi(listBuildsRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...VIEW_ROLES);
     const { status, branch } = c.req.valid("query");
@@ -270,7 +270,7 @@ export function registerBuilds(app: OpenAPIHono): void {
       await getStore().storage.write(storybookZipPath(project.id, build.id), buffer);
     }
 
-    const reqId = c.get("requestId") as string | undefined;
+    const reqId = c.get("requestId");
     await getStore().enqueueCapture?.(build.id, reqId);
     return c.json(build, 202);
   });

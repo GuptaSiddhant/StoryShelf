@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
-import type { OpenAPIHono } from "@hono/zod-openapi";
+import type { ShelfApp } from "../index.tsx";
 
 let htmxSource: string | null = null;
 
@@ -10,7 +10,7 @@ async function htmxScript(): Promise<string> {
   return htmxSource;
 }
 
-export function registerAssets(app: OpenAPIHono): void {
+export function registerAssets(app: ShelfApp): void {
   app.get("/assets/htmx.js", async (c) => {
     const body = await htmxScript();
     return c.body(body, 200, {

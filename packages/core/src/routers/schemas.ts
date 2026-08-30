@@ -156,6 +156,22 @@ export const webhookCreatedSchema = z.object({
   secret: z.string(),
 }).openapi("WebhookCreated");
 
+export const statusConfigSchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  provider: z.string(),
+  config: z.record(z.string(), z.unknown()),
+  hasToken: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+}).openapi("StatusConfig");
+
+export const statusConfigCreateSchema = z.object({
+  provider: z.string().min(1),
+  config: z.record(z.string(), z.unknown()),
+  token: z.string().min(1),
+}).openapi("StatusConfigCreateInput");
+
 export const okSchema = z.object({ ok: z.boolean() }).openapi("Ok");
 
 export const errorSchema = z.object({ message: z.string() }).openapi("Error");

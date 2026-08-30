@@ -1,5 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import type { OpenAPIHono } from "@hono/zod-openapi";
+import type { ShelfApp } from "../index.tsx";
 
 import { MemberModel } from "../models/member.ts";
 import { getStore } from "../store.ts";
@@ -57,7 +57,7 @@ const deleteMemberRoute = createRoute({
   },
 });
 
-export function registerMembers(app: OpenAPIHono): void {
+export function registerMembers(app: ShelfApp): void {
   app.openapi(listMembersRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...VIEW_ROLES);
     return c.json(await new MemberModel(getStore().db).list(project.id));

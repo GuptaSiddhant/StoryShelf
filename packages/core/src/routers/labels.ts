@@ -1,5 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import type { OpenAPIHono } from "@hono/zod-openapi";
+import type { ShelfApp } from "../index.tsx";
 
 import { LabelModel } from "../models/label.ts";
 import { getStore } from "../store.ts";
@@ -44,7 +44,7 @@ const deleteLabelRoute = createRoute({
   },
 });
 
-export function registerLabels(app: OpenAPIHono): void {
+export function registerLabels(app: ShelfApp): void {
   app.openapi(listLabelsRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...VIEW_ROLES);
     return c.json(await new LabelModel(getStore().db).listTypes(project.id));

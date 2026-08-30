@@ -5,6 +5,7 @@ import type { Logger } from "pino";
 import type { AuthUser } from "./adapters/auth.ts";
 import type { CaptureQueue } from "./adapters/capture-queue.ts";
 import type { DatabaseAdapter } from "./adapters/database.ts";
+import type { StatusProvider } from "./adapters/status.ts";
 import type { StorageAdapter } from "./adapters/storage.ts";
 import type { ShelfConfig, UIConfig } from "./config.ts";
 
@@ -18,6 +19,7 @@ export interface Store {
   authEnabled: boolean;
   enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
   captureQueue?: CaptureQueue | null;
+  statusProviders: StatusProvider[];
 }
 
 const storage = new AsyncLocalStorage<Store>();

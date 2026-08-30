@@ -4,7 +4,7 @@ import type { AuthAdapter } from "./adapters/auth.ts";
 import type { CaptureQueue } from "./adapters/capture-queue.ts";
 import type { CaptureRunner } from "./adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "./adapters/database.ts";
-import type { StatusAdapter } from "./adapters/status.ts";
+import type { StatusProvider } from "./adapters/status.ts";
 import type { StorageAdapter } from "./adapters/storage.ts";
 import type { Viewport } from "./capture/adapter.ts";
 
@@ -68,8 +68,8 @@ export interface ShelfOptions {
   captureQueue?: CaptureQueue;
   /** Authentication adapter. */
   auth?: AuthAdapter;
-  /** Git provider status adapter. */
-  status?: StatusAdapter;
+  /** Git provider status providers (array — one per integration, fanout per build). */
+  statusProviders?: StatusProvider[];
   /** Logger override. If omitted, a pino logger is constructed internally. */
   logger?: Logger;
   /** UI branding configuration. */

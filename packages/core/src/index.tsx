@@ -1,3 +1,4 @@
+/* oxlint-disable max-lines */
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { swaggerUI } from "@hono/swagger-ui";
 import { requestId } from "hono/request-id";
@@ -8,6 +9,9 @@ import { executeCaptureJob, type CaptureJobOptions } from "./capture/orchestrato
 import { InMemoryCaptureQueue } from "./capture/queue.ts";
 import type { ShelfOptions } from "./config.ts";
 import { createShelfLogger } from "./logger.ts";
+import { BuildModel } from "./models/build.ts";
+import { ProjectModel } from "./models/project.ts";
+import { StatusConfigModel } from "./models/status-config.ts";
 import { registerAdmin } from "./routers/admin.ts";
 import { registerAssets } from "./routers/assets.ts";
 import { registerAuth } from "./routers/auth.ts";
@@ -16,6 +20,7 @@ import { registerLabels } from "./routers/labels.ts";
 import { registerMedia } from "./routers/media.ts";
 import { registerMembers } from "./routers/members.ts";
 import { registerProjects } from "./routers/projects.ts";
+import { registerStatusConfigs } from "./routers/status-configs.ts";
 import { registerTokens } from "./routers/tokens.ts";
 import { registerUiPages } from "./routers/ui.ts";
 import { registerWebhooks } from "./routers/webhooks.ts";
@@ -33,6 +38,7 @@ export type ShelfApp = OpenAPIHono<{
     authEnabled: boolean;
     enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
     captureQueue: import("./adapters/capture-queue.ts").CaptureQueue | null;
+    statusProviders: import("./adapters/status.ts").StatusProvider[];
   };
 }>;
 
@@ -49,6 +55,50 @@ async function resolveUser(
   return await options.auth.check(c.req.raw);
 }
 
+async function postStatusesForBuild(opts: {
+  db: import("./adapters/database.ts").DatabaseAdapter;
+  project: import("./schema.ts").Project;
+  sha: string;
+  status: import("./adapters/status.ts").CheckStatus;
+  url: string;
+  providers: import("./adapters/status.ts").StatusProvider[];
+  secret: string | undefined;
+  logger?: import("pino").Logger;
+}): Promise<void> {
+  if (opts.providers.length === 0) {
+    return;
+  }
+  const model = new StatusConfigModel(opts.db, opts.secret);
+  const rows = await model.list(opts.project.id);
+  const ctx = `storyshelf/${opts.project.slug}`;
+  await Promise.allSettled(
+    rows.map(async (row) => {
+      const provider = opts.providers.find((p) => p.provider === row.provider);
+      if (!provider) {
+        opts.logger?.warn({ provider: row.provider }, "no provider registered for status config");
+        return;
+      }
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(row.config);
+        provider.configSchema.parse(parsed);
+      } catch (error: unknown) {
+        opts.logger?.warn({ err: error, provider: row.provider }, "invalid status config");
+        return;
+      }
+      let token: string;
+      try {
+        token = model.decryptToken(row);
+      } catch (error: unknown) {
+        opts.logger?.warn({ err: error }, "failed to decrypt status token");
+        return;
+      }
+      const adapter = provider.create({ config: parsed, token, logger: opts.logger });
+      await adapter.setStatus(ctx, opts.sha, opts.status, opts.url);
+    }),
+  );
+}
+
 export function createShelfRouter(options: ShelfOptions): ShelfApp {
   const app = new OpenAPIHono<{
     Variables: {
@@ -62,12 +112,15 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
       authEnabled: boolean;
       enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
       captureQueue: import("./adapters/capture-queue.ts").CaptureQueue | null;
+      statusProviders: import("./adapters/status.ts").StatusProvider[];
     };
   }>();
   const config = options.config ?? {};
   const ui = options.ui ?? {};
   const logger = options.logger ?? createShelfLogger();
   const authEnabled = options.auth !== undefined;
+
+  const statusProviders = options.statusProviders ?? [];
 
   let queue: CaptureQueue | null = null;
   let enqueueCapture: ((buildId: string, reqId?: string) => Promise<void>) | undefined;
@@ -89,7 +142,65 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
         concurrency: config.captureConcurrency ?? 2,
         logger,
         runJob: async (job): Promise<void> => {
-          await executeCaptureJob({ buildId: job.buildId, reqId: job.reqId }, jobOptions);
+          const builds = new BuildModel(options.database);
+          const build = await builds.get(job.buildId);
+          if (!build) {
+            await executeCaptureJob({ buildId: job.buildId, reqId: job.reqId }, jobOptions);
+            return;
+          }
+          const project = await new ProjectModel(options.database).get(build.projectId);
+          if (!project) {
+            await executeCaptureJob({ buildId: job.buildId, reqId: job.reqId }, jobOptions);
+            return;
+          }
+          const pendingUrl = `/projects/${project.slug}/builds/${job.buildId}`;
+          await postStatusesForBuild({
+            db: options.database,
+            project,
+            sha: build.gitSha,
+            status: "pending",
+            url: pendingUrl,
+            providers: statusProviders,
+            secret: config.secret,
+            logger,
+          }).catch((error: unknown) => {
+            logger.error({ err: error }, "failed to post pending status");
+          });
+          try {
+            await executeCaptureJob({ buildId: job.buildId, reqId: job.reqId }, jobOptions);
+            const updated = await builds.get(job.buildId);
+            if (updated) {
+              const terminal = updated.status === "approved" ? "success" : updated.status === "rejected" || updated.status === "failed" ? "failure" : null;
+              if (terminal) {
+                await postStatusesForBuild({
+                  db: options.database,
+                  project,
+                  sha: updated.gitSha,
+                  status: terminal,
+                  url: pendingUrl,
+                  providers: statusProviders,
+                  secret: config.secret,
+                  logger,
+                }).catch((error: unknown) => {
+                  logger.error({ err: error }, "failed to post terminal status");
+                });
+              }
+            }
+          } catch (error: unknown) {
+            await postStatusesForBuild({
+              db: options.database,
+              project,
+              sha: build.gitSha,
+              status: "failure",
+              url: pendingUrl,
+              providers: statusProviders,
+              secret: config.secret,
+              logger,
+            }).catch(() => {
+              // ignore: status post failure already logged
+            });
+            throw error;
+          }
         },
       });
     queue = captureQueue;
@@ -105,7 +216,7 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
   // with Hono's Web `Request`/`Response` model.
   app.use("*", async (c, next) => {
     const started = performance.now();
-    const id = c.get("requestId") as string | undefined;
+    const id = c.get("requestId");
     logger.info({ reqId: id, method: c.req.method, url: c.req.path }, "request start");
     await next();
     logger.info(
@@ -123,7 +234,7 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
   app.use("*", async (c, next) => {
     const user = await resolveUser(c, options);
     return runWithStore(
-      { db: options.database, storage: options.storage, config, ui, logger, user, authEnabled, enqueueCapture, captureQueue: queue },
+      { db: options.database, storage: options.storage, config, ui, logger, user, authEnabled, enqueueCapture, captureQueue: queue, statusProviders },
       async () => {
         await next();
       },
@@ -154,6 +265,7 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
   registerMembers(app);
   registerTokens(app);
   registerWebhooks(app);
+  registerStatusConfigs(app);
   registerAdmin(app);
   if (options.auth) {
     registerAuth(app, options.auth);
@@ -186,7 +298,7 @@ export type {
 } from "./adapters/capture-runner.ts";
 export type { CaptureQueue, CaptureJob, QueueEntry } from "./adapters/capture-queue.ts";
 export type { AuthAdapter, AuthUser, AuthCallback } from "./adapters/auth.ts";
-export type { StatusAdapter, CheckStatus } from "./adapters/status.ts";
+export type { StatusAdapter, StatusProvider, CheckStatus } from "./adapters/status.ts";
 export type { DiffOptions, DiffResult } from "./diff/options.ts";
 export type { Viewport, StoryEntry, StorySourceAdapter } from "./capture/adapter.ts";
 export { createShelfLogger, type LoggerOptions, type PinoTransport } from "./logger.ts";

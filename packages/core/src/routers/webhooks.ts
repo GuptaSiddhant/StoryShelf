@@ -1,5 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import type { OpenAPIHono } from "@hono/zod-openapi";
+import type { ShelfApp } from "../index.tsx";
 
 import { WebhookModel } from "../models/webhook.ts";
 import { getStore } from "../store.ts";
@@ -50,7 +50,7 @@ const deleteWebhookRoute = createRoute({
   },
 });
 
-export function registerWebhooks(app: OpenAPIHono): void {
+export function registerWebhooks(app: ShelfApp): void {
   app.openapi(listWebhooksRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
     const webhooks = await new WebhookModel(getStore().db).list(project.id);

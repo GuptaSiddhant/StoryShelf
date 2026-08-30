@@ -1,4 +1,4 @@
-import type { OpenAPIHono } from "@hono/zod-openapi";
+import type { ShelfApp } from "../index.tsx";
 
 import { BaselineModel } from "../models/baseline.ts";
 import { BuildModel } from "../models/build.ts";
@@ -57,7 +57,7 @@ async function canManageJobs(projectId: string): Promise<boolean> {
   return Boolean(role && roles.includes(role));
 }
 
-export function registerUiPages(app: OpenAPIHono): void {
+export function registerUiPages(app: ShelfApp): void {
   // eslint-disable-next-line promise-function-async -- renderRootPage returns RenderedContent (string | Promise<string>)
   app.get("/", (c) => c.html(renderRootPage()));
   app.get("/projects", async (c) => c.html(await renderProjectsPage()));

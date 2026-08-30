@@ -61,6 +61,7 @@
     "./models/label": "./dist/models/label.mjs",
     "./models/token": "./dist/models/token.mjs",
     "./models/webhook": "./dist/models/webhook.mjs",
+    "./models/status-config": "./dist/models/status-config.mjs",
     "./package.json": "./package.json"
   }
 }

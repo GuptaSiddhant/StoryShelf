@@ -1,5 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import type { OpenAPIHono } from "@hono/zod-openapi";
+import type { ShelfApp } from "../index.tsx";
 
 import { TokenModel } from "../models/token.ts";
 import { getStore } from "../store.ts";
@@ -50,7 +50,7 @@ const deleteTokenRoute = createRoute({
   },
 });
 
-export function registerTokens(app: OpenAPIHono): void {
+export function registerTokens(app: ShelfApp): void {
   app.openapi(listTokensRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
     const tokens = await new TokenModel(getStore().db).list(project.id);

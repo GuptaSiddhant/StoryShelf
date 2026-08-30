@@ -15,6 +15,18 @@ export const projects = sqliteTable("projects", {
   updatedAt: text("updated_at").notNull(),
 });
 
+export const projectStatusConfigs = sqliteTable("project_status_configs", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  provider: text("provider").notNull(),
+  config: text("config").notNull(),
+  tokenEncrypted: text("token_encrypted").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
 export const builds = sqliteTable(
   "builds",
   {
@@ -192,6 +204,7 @@ export const projectMembers = sqliteTable(
 
 export const schema = {
   projects,
+  projectStatusConfigs,
   builds,
   snapshots,
   baselines,
@@ -207,6 +220,7 @@ export const schema = {
 export type Schema = typeof schema;
 
 export type Project = typeof projects.$inferSelect;
+export type ProjectStatusConfig = typeof projectStatusConfigs.$inferSelect;
 export type Build = typeof builds.$inferSelect;
 export type Snapshot = typeof snapshots.$inferSelect;
 export type Baseline = typeof baselines.$inferSelect;

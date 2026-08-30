@@ -1,5 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import type { OpenAPIHono } from "@hono/zod-openapi";
+import type { ShelfApp } from "../index.tsx";
 
 import { LabelModel } from "../models/label.ts";
 import { ProjectModel } from "../models/project.ts";
@@ -85,7 +85,7 @@ const deleteProjectRoute = createRoute({
   },
 });
 
-export function registerProjects(app: OpenAPIHono): void {
+export function registerProjects(app: ShelfApp): void {
   app.openapi(listProjectsRoute, async (c) => {
     requireSessionUser();
     const projects = new ProjectModel(getStore().db);

@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
-import type { OpenAPIHono } from "@hono/zod-openapi";
+import type { ShelfApp } from "../index.tsx";
 
 import { SESSION_COOKIE, type AuthAdapter, type AuthUser } from "../adapters/auth.ts";
 import { renderLoginPage } from "../pages/login.tsx";
@@ -37,7 +37,7 @@ function buildSsoUrl(c: Context, auth: SsoAuth): string {
   return auth.loginUrl(state);
 }
 
-export function registerAuth(app: OpenAPIHono, auth: AuthAdapter): void {
+export function registerAuth(app: ShelfApp, auth: AuthAdapter): void {
   app.get("/auth/login", async (c) => {
     if (hasSso(auth) && !hasPasswordLogin(auth)) {
       return c.redirect(buildSsoUrl(c, auth));
