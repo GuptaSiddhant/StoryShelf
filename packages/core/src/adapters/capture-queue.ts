@@ -37,9 +37,9 @@ export interface CaptureQueue {
   /** Submit a build for capture. Resolves once the build is queued. */
   enqueue(job: CaptureJob): Promise<void>;
   /** Return the current status entry for a build, or null if untracked. */
-  status(buildId: string): QueueEntry | null;
+  status(buildId: string): Promise<QueueEntry | null>;
   /** Queue entries that are queued or running. */
-  active(): QueueEntry[];
+  active(): Promise<QueueEntry[]>;
   /** The most recent queue entries, newest first. */
-  recent(limit: number): QueueEntry[];
+  recent(limit: number): Promise<QueueEntry[]>;
 }

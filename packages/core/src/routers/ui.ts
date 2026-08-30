@@ -32,12 +32,13 @@ interface QueueView {
   error?: string;
 }
 
-function getQueueView(): QueueView[] {
+async function getQueueView(): Promise<QueueView[]> {
   const queue = getStore().captureQueue;
   if (!queue) {
     return [];
   }
-  return queue.active().map((entry) => ({
+  const active = await queue.active();
+  return active.map((entry) => ({
     buildId: entry.buildId,
     status: entry.status,
     queuedAt: entry.queuedAt,
@@ -107,7 +108,7 @@ export function registerUiPages(app: ShelfApp): void {
     if (!project) {
       return c.notFound();
     }
-    const queueView = getQueueView();
+    const queueView = await getQueueView();
     const canRetry = await canManageJobs(project.id);
     if (c.req.query("partial") === "queue") {
       return c.html(renderActiveQueue(slug, queueView));

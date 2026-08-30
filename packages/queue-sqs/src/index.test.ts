@@ -161,9 +161,7 @@ describe("recent", () => {
     const result = await queue.recent(5);
     expect(result.length).toBe(2);
     // Newest first: build-1 should be before build-2
-    // @ts-ignore
-    expect(result[0].buildId).toBe("build-1");
-    // @ts-ignore
-    expect(result[1].buildId).toBe("build-2");
+    expect(result.at(0)?.buildId).toBe("build-1");
+    expect(result.at(1)?.buildId).toBe("build-2");
   });
 });

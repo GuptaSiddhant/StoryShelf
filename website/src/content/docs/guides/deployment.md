@@ -92,9 +92,9 @@ export class HttpCaptureQueue implements CaptureQueue {
       body: JSON.stringify(job),
     });
   }
-  status() { return null; }
-  active() { return []; }
-  recent() { return []; }
+  async status() { return null; }
+  async active() { return []; }
+  async recent() { return []; }
 }
 
 // In your serverless entry:

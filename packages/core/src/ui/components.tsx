@@ -65,6 +65,35 @@ export const Alert: FC<{ tone?: BadgeTone; title?: string; children?: unknown }>
   );
 };
 
+// eslint-disable-next-line promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString>
+const FieldAssistant: FC<{ name: string; error: string | undefined; hint: string | undefined }> = ({ name, error, hint }) => {
+  if (error) {
+    return (
+      <p class="field__error" id={`${name}-error`} role="alert">
+        {error}
+      </p>
+    );
+  }
+  if (hint) {
+    return (
+      <p class="field__hint" id={`${name}-hint`}>
+        {hint}
+      </p>
+    );
+  }
+  return null;
+};
+
+function fieldDescribedBy(name: string, error: string | undefined, hint: string | undefined): string | undefined {
+  if (error) {
+    return `${name}-error`;
+  }
+  if (hint) {
+    return `${name}-hint`;
+  }
+  return undefined;
+}
+
 // eslint-disable-next-line promise-function-async -- JSX component return type
 export const Field: FC<{
   label: string;
@@ -77,7 +106,6 @@ export const Field: FC<{
   hint?: string;
   autocomplete?: string;
 }> = ({ label, name, type = "text", value, placeholder, required, error, hint, autocomplete }) => {
-  const describedBy = error ? `${name}-error` : hint ? `${name}-hint` : undefined;
   return (
     <div class="field">
       <label class="field__label" for={name}>
@@ -93,18 +121,10 @@ export const Field: FC<{
         placeholder={placeholder}
         required={required}
         aria-invalid={error ? "true" : undefined}
-        aria-describedby={describedBy}
+        aria-describedby={fieldDescribedBy(name, error, hint)}
         autocomplete={autocomplete}
       />
-      {error ? (
-        <p class="field__error" id={`${name}-error`} role="alert">
-          {error}
-        </p>
-      ) : hint ? (
-        <p class="field__hint" id={`${name}-hint`}>
-          {hint}
-        </p>
-      ) : null}
+      <FieldAssistant name={name} error={error} hint={hint} />
     </div>
   );
 };
@@ -119,7 +139,6 @@ export const TextareaField: FC<{
   hint?: string;
   error?: string;
 }> = ({ label, name, value, placeholder, rows = 3, hint, error }) => {
-  const describedBy = error ? `${name}-error` : hint ? `${name}-hint` : undefined;
   return (
     <div class="field">
       <label class="field__label" for={name}>
@@ -132,19 +151,11 @@ export const TextareaField: FC<{
         placeholder={placeholder}
         rows={rows}
         aria-invalid={error ? "true" : undefined}
-        aria-describedby={describedBy}
+        aria-describedby={fieldDescribedBy(name, error, hint)}
       >
         {value}
       </textarea>
-      {error ? (
-        <p class="field__error" id={`${name}-error`} role="alert">
-          {error}
-        </p>
-      ) : hint ? (
-        <p class="field__hint" id={`${name}-hint`}>
-          {hint}
-        </p>
-      ) : null}
+      <FieldAssistant name={name} error={error} hint={hint} />
     </div>
   );
 };
@@ -154,7 +165,7 @@ export const SelectField: FC<{
   label: string;
   name: string;
   value?: string;
-  options: Array<{ value: string; label: string }>;
+  options: { value: string; label: string }[];
   hint?: string;
 }> = ({ label, name, value, options, hint }) => {
   return (
@@ -183,7 +194,7 @@ export const PageHeader: FC<{
   title: string;
   description?: string;
   actions?: unknown;
-  breadcrumbs?: Array<{ label: string; href?: string }>;
+  breadcrumbs?: { label: string; href?: string }[];
 }> = ({ title, description, actions, breadcrumbs }) => {
   return (
     <div class="page-header">
@@ -222,7 +233,7 @@ export const EmptyState: FC<{ title: string; description?: string; action?: unkn
 
 // eslint-disable-next-line promise-function-async -- JSX component return type
 export const Tabs: FC<{
-  tabs: Array<{ label: string; href: string; active?: boolean }>;
+  tabs: { label: string; href: string; active?: boolean }[];
 }> = ({ tabs }) => {
   return (
     <nav class="tabs" aria-label="Sections">

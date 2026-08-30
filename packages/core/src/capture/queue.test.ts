@@ -35,13 +35,13 @@ describe("InMemoryCaptureQueue", () => {
     await flush();
 
     expect(runJob).toHaveBeenCalledWith({ buildId: "b1" });
-    expect(queue.status("b1")?.status).toBe("running");
+    expect((await queue.status("b1"))?.status).toBe("running");
 
     gate.resolve();
     await gate.promise;
     await flush();
 
-    const entry = queue.status("b1");
+    const entry = await queue.status("b1");
     expect(enqueued).toEqual([true]);
     expect(entry?.status).toBe("completed");
     expect(entry?.startedAt).toBeTruthy();
@@ -58,7 +58,7 @@ describe("InMemoryCaptureQueue", () => {
     await expect(queue.enqueue({ buildId: "b1" })).resolves.toBeUndefined();
 
     await flush();
-    const entry = queue.status("b1");
+    const entry = await queue.status("b1");
     expect(entry?.status).toBe("failed");
     expect(entry?.error).toBe("boom");
     expect(entry?.finishedAt).toBeTruthy();
@@ -82,20 +82,20 @@ describe("InMemoryCaptureQueue", () => {
     await queue.enqueue({ buildId: "b2" });
 
     await flush();
-    expect(queue.active()).toHaveLength(2);
-    expect(queue.status("b1")?.status).toBe("running");
-    expect(queue.status("b2")?.status).toBe("queued");
+    expect(await queue.active()).toHaveLength(2);
+    expect((await queue.status("b1"))?.status).toBe("running");
+    expect((await queue.status("b2"))?.status).toBe("queued");
 
     gates[0]?.resolve();
     await gates[0]?.promise;
     await flush();
-    expect(queue.status("b2")?.status).toBe("running");
+    expect((await queue.status("b2"))?.status).toBe("running");
 
     gates[1]?.resolve();
     await gates[1]?.promise;
     await flush();
     expect(maxActive).toBe(1);
-    expect(queue.active()).toHaveLength(0);
+    expect(await queue.active()).toHaveLength(0);
   });
 
   it("exposes active and recent views", async () => {
@@ -109,15 +109,15 @@ describe("InMemoryCaptureQueue", () => {
     await queue.enqueue({ buildId: "b2" });
     await flush();
 
-    const active = queue.active();
+    const active = await queue.active();
     expect(active.map((e) => e.buildId)).toContain("b1");
     expect(active.map((e) => e.buildId)).toContain("b2");
-    expect(queue.recent(1)).toHaveLength(1);
+    expect(await queue.recent(1)).toHaveLength(1);
 
     gate.resolve();
     await gate.promise;
     await flush();
-    expect(queue.active()).toHaveLength(0);
+    expect(await queue.active()).toHaveLength(0);
   });
 
   it("re-enqueuing an existing build resets its status to queued", async () => {
@@ -131,13 +131,13 @@ describe("InMemoryCaptureQueue", () => {
     await queue.enqueue({ buildId: "b1" });
     await flush();
 
-    const entries = [...new Set([...queue.recent(10)].map((e) => e.buildId))];
+    const entries = [...new Set([...(await queue.recent(10))].map((e) => e.buildId))];
     expect(entries).toEqual(["b1"]);
-    expect(queue.status("b1")?.status).toBe("queued");
+    expect((await queue.status("b1"))?.status).toBe("queued");
 
     gate.resolve();
     await gate.promise;
     await flush();
-    expect(queue.status("b1")?.status).toBe("completed");
+    expect((await queue.status("b1"))?.status).toBe("completed");
   });
 });

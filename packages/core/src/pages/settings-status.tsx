@@ -19,6 +19,10 @@ export interface StatusFormState {
 
 /* eslint-disable promise-function-async -- JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
+function providerOptions(providers: StatusProvider[]): { value: string; label: string }[] {
+  return providers.map((provider) => ({ value: provider.provider, label: provider.name }));
+}
+
 const StatusConfigRow: FC<{
   config: SettingsStatusConfig;
   provider: StatusProvider | undefined;
@@ -45,8 +49,43 @@ const StatusConfigRow: FC<{
       </td>
     </tr>
   );
+};
+
+const StatusCreateCard: FC<{
+  project: Project;
+  providers: StatusProvider[];
+  formState?: StatusFormState;
+}> = ({ project, providers, formState }) => {
+  return (
+    <div class="card card--padded">
+      <h3 style="margin:0 0 .5rem;">Add status provider</h3>
+      <form method="post" action={`/projects/${project.slug}/settings/status`} hx-post={`/projects/${project.slug}/settings/status`} hx-target="body">
+        <SelectField label="Provider" name="provider" options={providerOptions(providers)} hint="Integration that posts commit statuses for this project." />
+        <Field label="Token" name="token" type="password" required placeholder="ghp_…" error={formState?.errors?.["token"]} hint="Scoped token for the provider (e.g. a GitHub PAT with repo:status)." />
+        <TextareaField
+          label="Config"
+          name="config"
+          rows={6}
+          placeholder='{"owner":"my-org","repo":"my-repo"}'
+          error={formState?.errors?.["config"]}
+          hint="JSON configuration for the provider. See the provider documentation for its fields."
+        />
+        <button class="btn btn--primary" type="submit">
+          Add status provider
+        </button>
+      </form>
+    </div>
+  );
+};
+
+function renderCreateSection(project: Project, providers: StatusProvider[], formState?: StatusFormState): unknown {
+  if (providers.length === 0) {
+    return <p class="field__hint">No status providers registered on this server.</p>;
+  }
+  return <StatusCreateCard project={project} providers={providers} formState={formState} />;
 }
 
+// eslint-disable-next-line max-params -- matches sibling settings render functions
 export function renderSettingsStatus(
   project: Project,
   statusConfigs: SettingsStatusConfig[],
@@ -54,7 +93,7 @@ export function renderSettingsStatus(
   isAdmin: boolean,
   formState?: StatusFormState,
 ): unknown {
-  const byProvider = new Map(providers.map((p) => [p.provider, p]));
+  const byProvider = new Map(providers.map((provider) => [provider.provider, provider]));
   return (
     <div class="grid" style="max-width: 880px;">
       {formState?.globalError ? (
@@ -90,28 +129,7 @@ export function renderSettingsStatus(
         {statusConfigs.length === 0 ? <p class="field__hint" style="margin-top:.5rem;">No git providers configured for this project.</p> : null}
       </div>
 
-      {isAdmin && providers.length > 0 ? (
-        <div class="card card--padded">
-          <h3 style="margin:0 0 .5rem;">Add status provider</h3>
-          <form method="post" action={`/projects/${project.slug}/settings/status`} hx-post={`/projects/${project.slug}/settings/status`} hx-target="body">
-            <SelectField label="Provider" name="provider" options={providers.map((p) => ({ value: p.provider, label: p.name }))} hint="Integration that posts commit statuses for this project." />
-            <Field label="Token" name="token" type="password" required placeholder="ghp_…" error={formState?.errors?.["token"]} hint="Scoped token for the provider (e.g. a GitHub PAT with repo:status)." />
-            <TextareaField
-              label="Config"
-              name="config"
-              rows={6}
-              placeholder='{"owner":"my-org","repo":"my-repo"}'
-              error={formState?.errors?.["config"]}
-              hint="JSON configuration for the provider. See the provider documentation for its fields."
-            />
-            <button class="btn btn--primary" type="submit">
-              Add status provider
-            </button>
-          </form>
-        </div>
-      ) : isAdmin ? (
-        <p class="field__hint">No status providers registered on this server.</p>
-      ) : null}
+      {isAdmin ? renderCreateSection(project, providers, formState) : null}
     </div>
   );
 }

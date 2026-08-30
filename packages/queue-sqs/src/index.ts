@@ -104,67 +104,62 @@ export function createSqsCaptureQueue(
      * Polls the SQS queue for a message matching the buildId. If found,
      * the message is deleted so it is not re-processed.
      */
-    // @ts-expect-error: Interface is synchronous, but SQS is inherently asynchronous.
-    status(buildId: string): Promise<QueueEntry | null> {
-      return (async () => {
-        const resp = await client.send(
-          new ReceiveMessageCommand({
-            QueueUrl: options.queueUrl,
-            MaxNumberOfMessages: 1,
-            MessageAttributeNames: ["All"],
-          }),
-        );
+    async status(buildId: string): Promise<QueueEntry | null> {
+      const resp = await client.send(
+        new ReceiveMessageCommand({
+          QueueUrl: options.queueUrl,
+          MaxNumberOfMessages: 1,
+          MessageAttributeNames: ["All"],
+        }),
+      );
 
-        const messages = resp.Messages ?? [];
-        if (messages.length === 0) {
-          return null;
-        }
+      const messages = resp.Messages ?? [];
+      if (messages.length === 0) {
+        return null;
+      }
 
-        const [msg] = messages;
-        if (!msg || !msg.Body) {
-          return null;
-        }
+      const [msg] = messages;
+      if (!msg?.Body) {
+        return null;
+      }
 
-        const body = parseBody(msg.Body);
+      const body = parseBody(msg.Body);
 
-        await client.send(
-          new DeleteMessageCommand({
-            QueueUrl: options.queueUrl,
-            ReceiptHandle: msg.ReceiptHandle,
-          }),
-        );
+      await client.send(
+        new DeleteMessageCommand({
+          QueueUrl: options.queueUrl,
+          ReceiptHandle: msg.ReceiptHandle,
+        }),
+      );
 
-        return {
-          buildId: body.buildId ?? buildId,
-          status: body.status ?? "queued",
-          queuedAt: body.queuedAt ?? new Date().toISOString(),
-          startedAt: body.startedAt,
-          finishedAt: body.finishedAt,
-          error: body.error,
-        };
-      })();
+      return {
+        buildId: body.buildId ?? buildId,
+        status: body.status ?? "queued",
+        queuedAt: body.queuedAt ?? new Date().toISOString(),
+        startedAt: body.startedAt,
+        finishedAt: body.finishedAt,
+        error: body.error,
+      };
     },
 
     /**
-     * Return queue entries that are queued or running.
+     * Return queue entries that are queued or running, newest first.
      *
      * Short poll for up to 10 messages. Filters by status.
      */
-    // @ts-expect-error: Interface is synchronous, but SQS is inherently asynchronous.
-    active(): Promise<QueueEntry[]> {
-      return (async () => {
-        const resp = await client.send(
-          new ReceiveMessageCommand({
-            QueueUrl: options.queueUrl,
-            MaxNumberOfMessages: 10,
-            MessageAttributeNames: ["All"],
-          }),
-        );
+    async active(): Promise<QueueEntry[]> {
+      const resp = await client.send(
+        new ReceiveMessageCommand({
+          QueueUrl: options.queueUrl,
+          MaxNumberOfMessages: 10,
+          MessageAttributeNames: ["All"],
+        }),
+      );
 
-        return (resp.Messages ?? [])
-          .filter((message) => message.Body?.length && hasQueuedOrRunningStatus(parseBody(message.Body)))
-          .map((msg) => mapQueueEntry(msg));
-      })();
+      return (resp.Messages ?? [])
+        .filter((message) => message.Body?.length && hasQueuedOrRunningStatus(parseBody(message.Body)))
+        .map((msg) => mapQueueEntry(msg))
+        .toSorted((left, right) => right.queuedAt.localeCompare(left.queuedAt));
     },
 
     /**
@@ -172,20 +167,18 @@ export function createSqsCaptureQueue(
      *
      * Short poll for up to `limit` messages, sorted by queuedAt descending.
      */
-    // @ts-expect-error: Interface is synchronous, but SQS is inherently asynchronous.
-    recent(limit: number): Promise<QueueEntry[]> {
-      return (async () => {
-        const resp = await client.send(
-          new ReceiveMessageCommand({
-            QueueUrl: options.queueUrl,
-            MaxNumberOfMessages: limit,
-            MessageAttributeNames: ["All"],
-          }),
-        );
+    async recent(limit: number): Promise<QueueEntry[]> {
+      const resp = await client.send(
+        new ReceiveMessageCommand({
+          QueueUrl: options.queueUrl,
+          MaxNumberOfMessages: limit,
+          MessageAttributeNames: ["All"],
+        }),
+      );
 
-        return (resp.Messages ?? [])
-          .map((msg) => mapQueueEntry(msg));
-      })();
+      return (resp.Messages ?? [])
+        .map((msg) => mapQueueEntry(msg))
+        .toSorted((left, right) => right.queuedAt.localeCompare(left.queuedAt));
     },
   };
 }

@@ -2,6 +2,8 @@ import type { Logger } from "pino";
 
 import type { CaptureJob, CaptureQueue, QueueEntry } from "../adapters/capture-queue.ts";
 
+/* oxlint-disable typescript/require-await -- queue view reads are synchronous, but the CaptureQueue contract is async */
+
 export interface InMemoryCaptureQueueOptions {
   /** Maximum number of capture jobs that may run concurrently. */
   concurrency: number;
@@ -38,17 +40,17 @@ export class InMemoryCaptureQueue implements CaptureQueue {
     await Promise.resolve();
   }
 
-  status(buildId: string): QueueEntry | null {
+  async status(buildId: string): Promise<QueueEntry | null> {
     return this.entries.get(buildId) ?? null;
   }
 
-  active(): QueueEntry[] {
+  async active(): Promise<QueueEntry[]> {
     return [...this.entries.values()]
       .filter((entry) => entry.status === "queued" || entry.status === "running")
       .toSorted((a, b) => a.queuedAt.localeCompare(b.queuedAt));
   }
 
-  recent(limit: number): QueueEntry[] {
+  async recent(limit: number): Promise<QueueEntry[]> {
     return [...this.entries.values()].toSorted((a, b) => b.queuedAt.localeCompare(a.queuedAt)).slice(0, limit);
   }
 

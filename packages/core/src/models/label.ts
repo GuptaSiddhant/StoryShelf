@@ -123,4 +123,4 @@ export class LabelModel {
   }
 }
 
-export type { BuildLabel, LabelType };
+export type { BuildLabel, LabelType } from "../schema.ts";
