@@ -1,36 +1,36 @@
 ---
-title: "@storyshelf/status-github"
+title: "@storyshelf/git-github"
 description: GitHub commit-status provider for StoryShelf's visual-testing merge gate.
 ---
 
-`@storyshelf/status-github` posts commit statuses to GitHub so visual tests show up as PR checks. It implements the `StatusProvider` / `StatusAdapter` contracts from `@storyshelf/core`: the server reads each project's saved status config, decrypts its token, and posts `pending` while capturing, `success` when approved, and `failure` on rejection or capture errors.
+`@storyshelf/git-github` posts commit statuses to GitHub so visual tests show up as PR checks. It implements the `GitProvider` / `GitStatusAdapter` contracts from `@storyshelf/core`: the server reads each project's saved status config, decrypts its token, and posts `pending` while capturing, `success` when approved, and `failure` on rejection or capture errors.
 
 ## Install
 
 ```sh
-nub add @storyshelf/status-github
+nub add @storyshelf/git-github
 ```
 
 ## Register the provider
 
-Pass `githubStatusProvider` in the `statusProviders` array of `createShelfRouter`:
+Pass `githubProvider` in the `gitProviders` array of `createShelfRouter`:
 
 ```ts
 import { createShelfRouter } from "@storyshelf/core";
-import { githubStatusProvider } from "@storyshelf/status-github";
+import { githubProvider } from "@storyshelf/git-github";
 
 const app = createShelfRouter({
   database,
   storage,
   captureRunner,
-  statusProviders: [githubStatusProvider],
+  gitProviders: [githubProvider],
   config: {
     secret: process.env.SHELF_SECRET, // also encrypts status tokens
   },
 });
 ```
 
-Multiple providers can be registered (e.g. `githubStatusProvider` plus a GitLab provider once available). `statusProviders` is an array — every registered provider that has a saved config for the build's project receives each status update (fanout per build).
+Multiple providers can be registered (e.g. `githubProvider` plus a GitLab provider once available). `gitProviders` is an array — every registered provider that has a saved config for the build's project receives each status update (fanout per build).
 
 ## Configure a project
 
@@ -58,4 +58,4 @@ Mark StoryShelf's status check as required in GitHub branch protection so PRs ca
 
 ## Direct use
 
-For custom wiring, `createGitHubStatusAdapter({ token, owner, repo, contextPrefix?, logger? })` returns a bare `StatusAdapter` that posts a single `setStatus(context, gitSha, status, url)` without the config-descriptor machinery.
+For custom wiring, `createGitHubStatusAdapter({ token, owner, repo, contextPrefix?, logger? })` returns a bare `GitStatusAdapter` that posts a single `setStatus(context, gitSha, status, url)` without the config-descriptor machinery.

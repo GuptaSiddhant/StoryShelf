@@ -1,5 +1,5 @@
 import type { Context } from "hono";
-import type { StatusProvider } from "../adapters/status.ts";
+import type { GitProvider } from "../adapters/status.ts";
 import type { ShelfApp } from "../index.tsx";
 
 import { LabelModel } from "../models/label.ts";
@@ -25,7 +25,7 @@ interface SettingsData {
   members: SettingsMember[];
   webhooks: SettingsWebhook[];
   statusConfigs: SettingsStatusConfig[];
-  statusProviders: StatusProvider[];
+  gitProviders: GitProvider[];
   isAdmin: boolean;
 }
 
@@ -34,7 +34,7 @@ async function loadSettingsData(slug: string): Promise<SettingsData | null> {
   if (!project) {
     return null;
   }
-  const { db, config, user, authEnabled, statusProviders } = getStore();
+  const { db, config, user, authEnabled, gitProviders } = getStore();
   const labelTypes = await new LabelModel(db).listTypes(project.id);
   const tokensDb = await new TokenModel(db).list(project.id);
   const tokens = tokensDb.map(({ hash: _hash, ...rest }) => rest);
@@ -51,7 +51,7 @@ async function loadSettingsData(slug: string): Promise<SettingsData | null> {
     updatedAt: row.updatedAt,
   }));
   const isAdmin = !authEnabled || user?.role === "admin" || members.some((member) => member.userId === user?.id && member.role === "admin");
-  return { project, labelTypes, tokens, members, webhooks, statusConfigs, statusProviders, isAdmin };
+  return { project, labelTypes, tokens, members, webhooks, statusConfigs, gitProviders, isAdmin };
 }
 
 export async function renderSettingsPage(c: Context, tab: SettingsTab, formState?: SettingsFormState): Promise<string> {
@@ -69,7 +69,7 @@ export async function renderSettingsPage(c: Context, tab: SettingsTab, formState
       members: data.members,
       webhooks: data.webhooks,
       statusConfigs: data.statusConfigs,
-      statusProviders: data.statusProviders,
+      gitProviders: data.gitProviders,
       isAdmin: data.isAdmin,
     },
     formState,
@@ -242,10 +242,10 @@ export function registerSettingsPages(app: ShelfApp): void {
     const providerKey = asString(form.get("provider"));
     const token = asString(form.get("token"));
     const configRaw = asString(form.get("config")) ?? "{}";
-    const providers = getStore().statusProviders;
+    const providers = getStore().gitProviders;
     const provider = providers.find((p) => p.provider === providerKey);
     if (!provider) {
-      return c.html((await renderSettingsPage(c, "status", { globalError: "Unknown status provider" })) ?? "", 400);
+      return c.html((await renderSettingsPage(c, "status", { globalError: "Unknown git provider" })) ?? "", 400);
     }
     if (!token) {
       return c.html((await renderSettingsPage(c, "status", { errors: { token: "Token is required" } })) ?? "", 400);

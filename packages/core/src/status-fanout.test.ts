@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import type { CaptureRunner, RenderResult } from "./adapters/capture-runner.ts";
-import type { CheckStatus, StatusAdapter, StatusProvider } from "./adapters/status.ts";
+import type { CheckStatus, GitStatusAdapter, GitProvider } from "./adapters/status.ts";
 import { makeDatabase, makeStorage } from "./capture/fake-adapters.ts";
 import { createShelfRouter } from "./index.tsx";
 import type { Build } from "./schema.ts";
@@ -45,14 +45,14 @@ function fakeRunner(overrides: Partial<CaptureRunner> = {}): { runner: CaptureRu
   return { runner: { render, cancel }, render: render as ReturnType<typeof vi.fn> };
 }
 
-function fakeStatusProvider(key: string, calls: StatusCall[], tokens: string[]): StatusProvider {
+function fakeGitProvider(key: string, calls: StatusCall[], tokens: string[]): GitProvider {
   const configSchema = z.object({ owner: z.string().min(1), repo: z.string().min(1) });
   return {
     provider: key,
     name: `Fake ${key}`,
     version: "0.0.0",
     configSchema,
-    create(opts: { config: unknown; token: string; logger?: Logger }): StatusAdapter {
+    create(opts: { config: unknown; token: string; logger?: Logger }): GitStatusAdapter {
       return {
         setStatus: async (context, gitSha, status, url): Promise<void> => {
           calls.push({ context, gitSha, status, url });
@@ -191,7 +191,7 @@ describe("status provider fanout", () => {
       storage,
       captureRunner: runner,
       config: { captureConcurrency: 1, scratchDir, secret: "test-secret", purgeTtlDays: 30 },
-      statusProviders: [fakeStatusProvider("github-a", callsA, tokensA), fakeStatusProvider("github-b", callsB, tokensB)],
+      gitProviders: [fakeGitProvider("github-a", callsA, tokensA), fakeGitProvider("github-b", callsB, tokensB)],
       logger: pino({ level: "silent" }),
     });
 

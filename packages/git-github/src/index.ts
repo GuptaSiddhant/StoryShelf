@@ -2,7 +2,7 @@ import { Octokit } from "@octokit/rest";
 import { z } from "zod";
 
 import type { Logger } from "pino";
-import type { CheckStatus, StatusAdapter, StatusProvider } from "@storyshelf/core";
+import type { CheckStatus, GitStatusAdapter, GitProvider } from "@storyshelf/core";
 
 export const githubConfigSchema = z.object({
   owner: z.string().min(1),
@@ -27,18 +27,18 @@ export interface GitHubStatusOptions {
 }
 
 /**
- * Create a GitHub-backed `StatusAdapter`.
+ * Create a GitHub-backed `GitStatusAdapter`.
  *
  * Posts commit statuses to GitHub using the REST API.
  * Context format: `${contextPrefix}/{project-slug}` (e.g., "storyshelf/my-app").
  *
  * @param options - Configuration including token, owner, repo.
- * @returns A `StatusAdapter` implementation.
+ * @returns A `GitStatusAdapter` implementation.
  */
-export function createGitHubStatusAdapter(options: GitHubStatusOptions): StatusAdapter {
+export function createGitHubStatusAdapter(options: GitHubStatusOptions): GitStatusAdapter {
   const octokit = new Octokit({ auth: options.token });
   const contextPrefix = options.contextPrefix ?? "storyshelf";
-  const logger = options.logger?.child({ component: "status-github" });
+  const logger = options.logger?.child({ component: "git-github" });
 
   return {
     async setStatus(context: string, gitSha: string, status: CheckStatus, url: string): Promise<void> {
@@ -66,14 +66,14 @@ export function createGitHubStatusAdapter(options: GitHubStatusOptions): StatusA
   };
 }
 
-export const githubStatusProvider: StatusProvider = {
+export const githubProvider: GitProvider = {
   provider: "github",
   name: "GitHub",
   description: "Commit statuses via GitHub REST API",
   version: "1.0.0",
   logo: "github",
   configSchema: githubConfigSchema,
-  create(opts: { config: unknown; token: string; logger?: Logger }): StatusAdapter {
+  create(opts: { config: unknown; token: string; logger?: Logger }): GitStatusAdapter {
     const cfg = githubConfigSchema.parse(opts.config);
     return createGitHubStatusAdapter({
       token: opts.token,

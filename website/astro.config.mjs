@@ -48,7 +48,7 @@ export default defineConfig({
             { label: "@storyshelf/storage-s3", slug: "packages/storage-s3" },
             { label: "@storyshelf/auth-oauth", slug: "packages/auth-oauth" },
             { label: "@storyshelf/auth-password", slug: "packages/auth-password" },
-            { label: "@storyshelf/status-github", slug: "packages/status-github" },
+            { label: "@storyshelf/git-github", slug: "packages/git-github" },
           ],
         },
       ],

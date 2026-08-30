@@ -9,7 +9,7 @@ import { createShelfRouter } from "@storyshelf/core";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { createLocalStorage } from "@storyshelf/storage-local";
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
-import { githubStatusProvider } from "@storyshelf/status-github";
+import { githubProvider } from "@storyshelf/git-github";
 
 import { runServe } from "./serve.ts";
 
@@ -86,7 +86,7 @@ describe("runServe", () => {
         purgeTtlDays: 14,
       },
       logger: loggerObject,
-      statusProviders: [githubStatusProvider],
+      gitProviders: [githubProvider],
     });
     expect(serve).toHaveBeenCalledWith({ fetch: appObject.fetch, port: 3200 });
     expect(serverObject.on).toHaveBeenCalled();
@@ -106,7 +106,7 @@ describe("runServe", () => {
       captureRunner: captureObject,
       config: { secret: undefined, captureConcurrency: 2, scratchDir: dataDir, purgeTtlDays: 30 },
       logger: loggerObject,
-      statusProviders: [githubStatusProvider],
+      gitProviders: [githubProvider],
     });
   });
 });

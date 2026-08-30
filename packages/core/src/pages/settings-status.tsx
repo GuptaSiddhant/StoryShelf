@@ -1,5 +1,5 @@
 import type { FC } from "hono/jsx";
-import type { StatusProvider } from "../adapters/status.ts";
+import type { GitProvider } from "../adapters/status.ts";
 import type { Project } from "../schema.ts";
 import { Badge, Field, SelectField, TextareaField } from "../ui/components.tsx";
 
@@ -19,13 +19,13 @@ export interface StatusFormState {
 
 /* eslint-disable promise-function-async -- JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
-function providerOptions(providers: StatusProvider[]): { value: string; label: string }[] {
+function providerOptions(providers: GitProvider[]): { value: string; label: string }[] {
   return providers.map((provider) => ({ value: provider.provider, label: provider.name }));
 }
 
 const StatusConfigRow: FC<{
   config: SettingsStatusConfig;
-  provider: StatusProvider | undefined;
+  provider: GitProvider | undefined;
   project: Project;
   isAdmin: boolean;
 }> = ({ config, provider, project, isAdmin }) => {
@@ -53,12 +53,12 @@ const StatusConfigRow: FC<{
 
 const StatusCreateCard: FC<{
   project: Project;
-  providers: StatusProvider[];
+  providers: GitProvider[];
   formState?: StatusFormState;
 }> = ({ project, providers, formState }) => {
   return (
     <div class="card card--padded">
-      <h3 style="margin:0 0 .5rem;">Add status provider</h3>
+      <h3 style="margin:0 0 .5rem;">Add git provider</h3>
       <form method="post" action={`/projects/${project.slug}/settings/status`} hx-post={`/projects/${project.slug}/settings/status`} hx-target="body">
         <SelectField label="Provider" name="provider" options={providerOptions(providers)} hint="Integration that posts commit statuses for this project." />
         <Field label="Token" name="token" type="password" required placeholder="ghp_…" error={formState?.errors?.["token"]} hint="Scoped token for the provider (e.g. a GitHub PAT with repo:status)." />
@@ -71,16 +71,16 @@ const StatusCreateCard: FC<{
           hint="JSON configuration for the provider. See the provider documentation for its fields."
         />
         <button class="btn btn--primary" type="submit">
-          Add status provider
+          Add git provider
         </button>
       </form>
     </div>
   );
 };
 
-function renderCreateSection(project: Project, providers: StatusProvider[], formState?: StatusFormState): unknown {
+function renderCreateSection(project: Project, providers: GitProvider[], formState?: StatusFormState): unknown {
   if (providers.length === 0) {
-    return <p class="field__hint">No status providers registered on this server.</p>;
+    return <p class="field__hint">No git providers registered on this server.</p>;
   }
   return <StatusCreateCard project={project} providers={providers} formState={formState} />;
 }
@@ -89,7 +89,7 @@ function renderCreateSection(project: Project, providers: StatusProvider[], form
 export function renderSettingsStatus(
   project: Project,
   statusConfigs: SettingsStatusConfig[],
-  providers: StatusProvider[],
+  providers: GitProvider[],
   isAdmin: boolean,
   formState?: StatusFormState,
 ): unknown {

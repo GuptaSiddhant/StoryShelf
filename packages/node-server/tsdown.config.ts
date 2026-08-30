@@ -9,6 +9,5 @@ export default defineConfig({
   treeshake: true,
   cjsDefault: false,
   fixedExtension: false,
-  deps: { neverBundle: true },
   clean: true,
 });

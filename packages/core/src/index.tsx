@@ -1,8 +1,7 @@
+import { swaggerUI } from "@hono/swagger-ui";
 /* oxlint-disable max-lines */
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { swaggerUI } from "@hono/swagger-ui";
 import { requestId } from "hono/request-id";
-
 import type { AuthUser } from "./adapters/auth.ts";
 import type { CaptureQueue } from "./adapters/capture-queue.ts";
 import { executeCaptureJob, type CaptureJobOptions } from "./capture/orchestrator.ts";
@@ -38,7 +37,7 @@ export type ShelfApp = OpenAPIHono<{
     authEnabled: boolean;
     enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
     captureQueue: import("./adapters/capture-queue.ts").CaptureQueue | null;
-    statusProviders: import("./adapters/status.ts").StatusProvider[];
+    gitProviders: import("./adapters/status.ts").GitProvider[];
   };
 }>;
 
@@ -61,7 +60,7 @@ async function postStatusesForBuild(opts: {
   sha: string;
   status: import("./adapters/status.ts").CheckStatus;
   url: string;
-  providers: import("./adapters/status.ts").StatusProvider[];
+  providers: import("./adapters/status.ts").GitProvider[];
   secret: string | undefined;
   logger?: import("pino").Logger;
 }): Promise<void> {
@@ -112,7 +111,7 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
       authEnabled: boolean;
       enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
       captureQueue: import("./adapters/capture-queue.ts").CaptureQueue | null;
-      statusProviders: import("./adapters/status.ts").StatusProvider[];
+      gitProviders: import("./adapters/status.ts").GitProvider[];
     };
   }>();
   const config = options.config ?? {};
@@ -120,7 +119,7 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
   const logger = options.logger ?? createShelfLogger();
   const authEnabled = options.auth !== undefined;
 
-  const statusProviders = options.statusProviders ?? [];
+  const gitProviders = options.gitProviders ?? [];
 
   let queue: CaptureQueue | null = null;
   let enqueueCapture: ((buildId: string, reqId?: string) => Promise<void>) | undefined;
@@ -160,7 +159,7 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
             sha: build.gitSha,
             status: "pending",
             url: pendingUrl,
-            providers: statusProviders,
+            providers: gitProviders,
             secret: config.secret,
             logger,
           }).catch((error: unknown) => {
@@ -170,7 +169,12 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
             await executeCaptureJob({ buildId: job.buildId, reqId: job.reqId }, jobOptions);
             const updated = await builds.get(job.buildId);
             if (updated) {
-              const terminal = updated.status === "approved" ? "success" : updated.status === "rejected" || updated.status === "failed" ? "failure" : null;
+              const terminal =
+                updated.status === "approved"
+                  ? "success"
+                  : updated.status === "rejected" || updated.status === "failed"
+                    ? "failure"
+                    : null;
               if (terminal) {
                 await postStatusesForBuild({
                   db: options.database,
@@ -178,7 +182,7 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
                   sha: updated.gitSha,
                   status: terminal,
                   url: pendingUrl,
-                  providers: statusProviders,
+                  providers: gitProviders,
                   secret: config.secret,
                   logger,
                 }).catch((error: unknown) => {
@@ -193,7 +197,7 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
               sha: build.gitSha,
               status: "failure",
               url: pendingUrl,
-              providers: statusProviders,
+              providers: gitProviders,
               secret: config.secret,
               logger,
             }).catch(() => {
@@ -234,21 +238,38 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
   app.use("*", async (c, next) => {
     const user = await resolveUser(c, options);
     return runWithStore(
-      { db: options.database, storage: options.storage, config, ui, logger, user, authEnabled, enqueueCapture, captureQueue: queue, statusProviders },
+      {
+        db: options.database,
+        storage: options.storage,
+        config,
+        ui,
+        logger,
+        user,
+        authEnabled,
+        enqueueCapture,
+        captureQueue: queue,
+        gitProviders,
+      },
       async () => {
         await next();
       },
     );
   });
 
-// Gate the server-rendered UI behind auth (ADR 0008): unauthenticated HTML
+  // Gate the server-rendered UI behind auth (ADR 0008): unauthenticated HTML
   // requests are redirected to the login page. API and auth routes are handled
   // by their own routers (401/403 vs the login flow).
   // eslint-disable-next-line require-await -- async is required to match Hono's middleware signature
   app.use("*", async (c, next) => {
     const { user, authEnabled: isAuthEnabled } = getStore();
     const path = c.req.path;
-    if (!isAuthEnabled || user || path.startsWith("/api/") || path.startsWith("/auth/") || path.startsWith("/assets/")) {
+    if (
+      !isAuthEnabled ||
+      user ||
+      path.startsWith("/api/") ||
+      path.startsWith("/auth/") ||
+      path.startsWith("/assets/")
+    ) {
       return next();
     }
     if (c.req.header("HX-Request") === "true") {
@@ -277,7 +298,8 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
     openapi: "3.0.0",
     info: {
       title: "StoryShelf API",
-      description: "REST API for the StoryShelf visual testing platform. JSON endpoints live under /api/v1; HTML pages are served at /.",
+      description:
+        "REST API for the StoryShelf visual testing platform. JSON endpoints live under /api/v1; HTML pages are served at /.",
       version: "1.0.0",
     },
   });
@@ -298,7 +320,8 @@ export type {
 } from "./adapters/capture-runner.ts";
 export type { CaptureQueue, CaptureJob, QueueEntry } from "./adapters/capture-queue.ts";
 export type { AuthAdapter, AuthUser, AuthCallback } from "./adapters/auth.ts";
-export type { StatusAdapter, StatusProvider, CheckStatus } from "./adapters/status.ts";
+export type { AuthAdapter, AuthUser, AuthCallback } from "./adapters/auth.ts";
+export type { GitStatusAdapter, GitProvider, CheckStatus } from "./adapters/status.ts";
 export type { DiffOptions, DiffResult } from "./diff/options.ts";
 export type { Viewport, StoryEntry, StorySourceAdapter } from "./capture/adapter.ts";
 export { createShelfLogger, type LoggerOptions, type PinoTransport } from "./logger.ts";
@@ -312,6 +335,12 @@ export { InMemoryCaptureQueue, type InMemoryCaptureQueueOptions } from "./captur
 export { Retention } from "./retention/purge.ts";
 export { createUrlBuilder, type UrlBuilder } from "./urls.ts";
 export { ulid, slugify } from "./utils/ulid.ts";
-export { baselinePath, diffPath, screenshotPath, storybookDir, storybookZipPath } from "./utils/paths.ts";
+export {
+  baselinePath,
+  diffPath,
+  screenshotPath,
+  storybookDir,
+  storybookZipPath,
+} from "./utils/paths.ts";
 export * from "./schema.ts";
 export * from "./types.ts";

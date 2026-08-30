@@ -30,7 +30,7 @@ Defaults are port `3000`, data directory `./data`, capture concurrency `2`, a 30
 
 ## Git status
 
-The server registers `@storyshelf/status-github`'s `githubStatusProvider` at startup, so you can add a GitHub integration per project under **Project → Settings → Git status** (or the `/api/v1/projects/{slug}/status-configs` API). To add other providers or omit GitHub, assemble your own `createShelfRouter` and pass your chosen `statusProviders` array — see [@storyshelf/core](../core/).
+The server registers `@storyshelf/git-github`'s `githubProvider` at startup, so you can add a GitHub integration per project under **Project → Settings → Git status** (or the `/api/v1/projects/{slug}/status-configs` API). To add other providers or omit GitHub, assemble your own `createShelfRouter` and pass your chosen `gitProviders` array — see [@storyshelf/core](../core/).
 
 ## Logging
 

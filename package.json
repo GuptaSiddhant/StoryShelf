@@ -1,14 +1,14 @@
 {
   "name": "storyshelf-monorepo",
   "private": true,
-  "type": "module",
   "description": "Self-hosted visual testing platform for Storybook.",
-  "repository": "git@github.com:GuptaSiddhant/storyshelf.git",
-  "author": "Siddhant Gupta <guptasiddhant@icloud.com>",
   "license": "MIT",
+  "author": "Siddhant Gupta <guptasiddhant@icloud.com>",
+  "repository": "git@github.com:GuptaSiddhant/storyshelf.git",
   "workspaces": {
     "packages": [
-      "./packages/*", "website"
+      "./packages/*",
+      "website"
     ],
     "catalog": {
       "@types/node": "^26.0.0",
@@ -22,6 +22,7 @@
       "pino": "^10.3.1"
     }
   },
+  "type": "module",
   "scripts": {
     "build": "turbo build",
     "build:pkg": "turbo build --filter='./packages/*'",
@@ -42,6 +43,7 @@
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
+    "rolldown": "*",
     "turbo": "^2.10.11"
   },
   "devEngines": {

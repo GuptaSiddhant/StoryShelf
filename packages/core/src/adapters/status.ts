@@ -5,13 +5,13 @@ import type { z } from "zod";
 export type CheckStatus = "pending" | "success" | "failure";
 
 /** Runtime contract — reports build status to a git provider. */
-export interface StatusAdapter {
+export interface GitStatusAdapter {
   /** Set the status of a git provider check for a commit. */
   setStatus(context: string, gitSha: string, status: CheckStatus, url: string): Promise<void>;
 }
 
 /** Factory descriptor — how a provider is discovered, validated, and instantiated. */
-export interface StatusProvider {
+export interface GitProvider {
   /** Unique key, stored as `project_status_configs.provider`. */
   readonly provider: string;
   /** Human label for UI picker. */
@@ -25,5 +25,5 @@ export interface StatusProvider {
   /** Zod schema that validates `config` JSON for this provider. */
   readonly configSchema: z.ZodType;
   /** Create a runtime adapter from decrypted config + token. */
-  create(opts: { config: unknown; token: string; logger?: Logger }): StatusAdapter;
+  create(opts: { config: unknown; token: string; logger?: Logger }): GitStatusAdapter;
 }
