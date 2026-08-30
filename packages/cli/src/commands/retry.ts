@@ -1,9 +1,7 @@
-import { normalizeBaseUrl, postJson } from "../client.ts";
+import { createClient } from "../client.ts";
 import { printLine } from "../output.ts";
 
-interface BuildResponse {
-  id: string;
-}
+interface BuildResponse { id: string; }
 
 /** Options for the `retry` command. */
 export interface RetryOptions {
@@ -21,10 +19,8 @@ export interface RetryOptions {
  * @param options - Retry command options.
  */
 export async function runRetry(options: RetryOptions): Promise<void> {
-  const base = normalizeBaseUrl(options.url);
-  const build = await postJson<BuildResponse>(
-    `${base}/api/v1/projects/${options.slug}/builds/${options.buildId}/retry`,
-    {},
-  );
-  printLine(`Build ${build.id} queued for retry`);
+  const client = createClient(options.url);
+  const build = await client.projects.builds.retry(options.slug, options.buildId);
+  const buildData = build as BuildResponse;
+  printLine(`Build ${buildData.id} queued for retry`);
 }

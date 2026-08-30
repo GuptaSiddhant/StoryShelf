@@ -33,8 +33,9 @@ nub run test:integration   # gated browser suite (Playwright + examples/storyboo
 nubx tsc --noEmit -p tsconfig.json   # typecheck
 
 # Website (from website/):
-nub run start       # starlight dev server
-nub run build       # build the docs site
+nub run start       # serve the built docs site (astro preview; requires a prior build)
+nub run dev         # astro dev server (hot reload)
+nub run build       # generate openapi.json (prebuild) + build the docs site
 ```
 
 ## Layout

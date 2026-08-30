@@ -1,17 +1,26 @@
-import type { Hono } from "hono";
-import { z } from "zod";
+import { createRoute } from "@hono/zod-openapi";
+import type { OpenAPIHono } from "@hono/zod-openapi";
 
 import { ProjectModel } from "../models/project.ts";
 import { Retention } from "../retention/purge.ts";
 import { getStore } from "../store.ts";
-import { json, requireSiteAdmin, validJson } from "./helpers.ts";
+import { requireSiteAdmin } from "./helpers.ts";
+import { forbidden as forbiddenResponse, purgeInputSchema, purgeSchema } from "./schemas.ts";
 
-const purgeSchema = z.object({ ttlDays: z.number().optional() });
+const purgeRoute = createRoute({
+  method: "post",
+  path: "/api/v1/admin/purge",
+  request: { body: { content: { "application/json": { schema: purgeInputSchema } } } },
+  responses: {
+    200: { content: { "application/json": { schema: purgeSchema } }, description: "Retention purge run" },
+    ...forbiddenResponse,
+  },
+});
 
-export function registerAdmin(app: Hono): void {
-  app.post("/api/v1/admin/purge", async (c) => {
+export function registerAdmin(app: OpenAPIHono): void {
+  app.openapi(purgeRoute, async (c) => {
     requireSiteAdmin();
-    const body = await validJson(c, purgeSchema);
+    const body = c.req.valid("json");
     const ttlDays = body.ttlDays ?? getStore().config.purgeTtlDays ?? 30;
     const projects = await new ProjectModel(getStore().db).list();
     const retention = new Retention(getStore().db, getStore().storage);
@@ -21,6 +30,6 @@ export function registerAdmin(app: Hono): void {
       }),
     );
     const removedBuilds = results.reduce((sum, result) => sum + result.removedBuilds, 0);
-    return json(c, { removedBuilds });
+    return c.json({ removedBuilds });
   });
 }

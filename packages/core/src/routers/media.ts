@@ -1,4 +1,4 @@
-import type { Hono } from "hono";
+import type { OpenAPIHono } from "@hono/zod-openapi";
 
 import { BaselineModel } from "../models/baseline.ts";
 import { BuildModel } from "../models/build.ts";
@@ -16,7 +16,7 @@ function imageResponse(buffer: Buffer): Response {
   return new Response(new Uint8Array(buffer), { headers: { "content-type": PNG, "cache-control": "private, max-age=3600" } });
 }
 
-export function registerMedia(app: Hono): void {
+export function registerMedia(app: OpenAPIHono): void {
   app.get("/api/v1/projects/:slug/builds/:buildId/snapshots/:snapshotId/image", async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...VIEW_ROLES);
     const snapshot = await findSnapshot(c.req.param("buildId"), c.req.param("snapshotId"), project.id);

@@ -1,38 +1,85 @@
-import type { Hono } from "hono";
-import { z } from "zod";
+import { createRoute, z } from "@hono/zod-openapi";
+import type { OpenAPIHono } from "@hono/zod-openapi";
 
 import { MemberModel } from "../models/member.ts";
 import { getStore } from "../store.ts";
-import { PROJECT_ROLES, type ProjectRole } from "../types.ts";
-import { json, resolveAuthorizedProject, validJson } from "./helpers.ts";
-
-const roleSchema = z.object({ role: z.enum(PROJECT_ROLES) });
-const setSchema = z.object({ userId: z.string().min(1), role: z.enum(PROJECT_ROLES) });
+import type { ProjectRole } from "../types.ts";
+import { resolveAuthorizedProject } from "./helpers.ts";
+import { memberRoleSchema, memberSchema, memberSetSchema, notFound, unauthorized } from "./schemas.ts";
 
 const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];
 const ADMIN_ROLES: readonly ProjectRole[] = ["admin"];
 
-export function registerMembers(app: Hono): void {
-  app.get("/api/v1/projects/:slug/members", async (c) => {
-    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...VIEW_ROLES);
-    return json(c, await new MemberModel(getStore().db).list(project.id));
+const listMembersRoute = createRoute({
+  method: "get",
+  path: "/api/v1/projects/{slug}/members",
+  request: { params: z.object({ slug: z.string() }) },
+  responses: {
+    200: { content: { "application/json": { schema: memberSchema.array() } }, description: "List project members" },
+    ...notFound,
+    ...unauthorized,
+  },
+});
+
+const setMemberRoute = createRoute({
+  method: "post",
+  path: "/api/v1/projects/{slug}/members",
+  request: {
+    params: z.object({ slug: z.string() }),
+    body: { content: { "application/json": { schema: memberSetSchema } } },
+  },
+  responses: {
+    201: { content: { "application/json": { schema: memberSchema } }, description: "Added or updated member" },
+    ...notFound,
+  },
+});
+
+const updateMemberRoute = createRoute({
+  method: "patch",
+  path: "/api/v1/projects/{slug}/members/{userId}",
+  request: {
+    params: z.object({ slug: z.string(), userId: z.string() }),
+    body: { content: { "application/json": { schema: memberRoleSchema } } },
+  },
+  responses: {
+    200: { content: { "application/json": { schema: memberSchema } }, description: "Updated member role" },
+    ...notFound,
+  },
+});
+
+const deleteMemberRoute = createRoute({
+  method: "delete",
+  path: "/api/v1/projects/{slug}/members/{userId}",
+  request: { params: z.object({ slug: z.string(), userId: z.string() }) },
+  responses: {
+    204: { description: "Removed member" },
+    ...notFound,
+  },
+});
+
+export function registerMembers(app: OpenAPIHono): void {
+  app.openapi(listMembersRoute, async (c) => {
+    const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...VIEW_ROLES);
+    return c.json(await new MemberModel(getStore().db).list(project.id));
   });
 
-  app.post("/api/v1/projects/:slug/members", async (c) => {
-    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...ADMIN_ROLES);
-    const body = await validJson(c, setSchema);
-    return json(c, await new MemberModel(getStore().db).set(project.id, body.userId, body.role), 201);
+  app.openapi(setMemberRoute, async (c) => {
+    const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
+    const body = c.req.valid("json");
+    return c.json(await new MemberModel(getStore().db).set(project.id, body.userId, body.role), 201);
   });
 
-  app.patch("/api/v1/projects/:slug/members/:userId", async (c) => {
-    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...ADMIN_ROLES);
-    const body = await validJson(c, roleSchema);
-    return json(c, await new MemberModel(getStore().db).set(project.id, c.req.param("userId"), body.role));
+  app.openapi(updateMemberRoute, async (c) => {
+    const { slug, userId } = c.req.valid("param");
+    const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
+    const body = c.req.valid("json");
+    return c.json(await new MemberModel(getStore().db).set(project.id, userId, body.role));
   });
 
-  app.delete("/api/v1/projects/:slug/members/:userId", async (c) => {
-    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...ADMIN_ROLES);
-    await new MemberModel(getStore().db).remove(project.id, c.req.param("userId"));
+  app.openapi(deleteMemberRoute, async (c) => {
+    const { slug, userId } = c.req.valid("param");
+    const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
+    await new MemberModel(getStore().db).remove(project.id, userId);
     return c.body(null, 204);
   });
 }

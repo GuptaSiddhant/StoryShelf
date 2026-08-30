@@ -1,4 +1,5 @@
-import { Hono } from "hono";
+import { OpenAPIHono } from "@hono/zod-openapi";
+import { swaggerUI } from "@hono/swagger-ui";
 import { requestId } from "hono/request-id";
 
 import type { AuthUser } from "./adapters/auth.ts";
@@ -20,6 +21,21 @@ import { registerUiPages } from "./routers/ui.ts";
 import { registerWebhooks } from "./routers/webhooks.ts";
 import { getStore, runWithStore } from "./store.ts";
 
+export type ShelfApp = OpenAPIHono<{
+  Variables: {
+    requestId?: string;
+    db: import("./adapters/database.ts").DatabaseAdapter;
+    storage: import("./adapters/storage.ts").StorageAdapter;
+    config: import("./config.ts").ShelfConfig;
+    ui: import("./config.ts").UIConfig;
+    logger: ReturnType<typeof createShelfLogger>;
+    user: import("./adapters/auth.ts").AuthUser | null;
+    authEnabled: boolean;
+    enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
+    captureQueue: import("./adapters/capture-queue.ts").CaptureQueue | null;
+  };
+}>;
+
 async function resolveUser(
   c: { req: { raw: Request; header: (name: string) => string | undefined } },
   options: ShelfOptions,
@@ -33,8 +49,21 @@ async function resolveUser(
   return await options.auth.check(c.req.raw);
 }
 
-export function createShelfRouter(options: ShelfOptions): Hono {
-  const app = new Hono();
+export function createShelfRouter(options: ShelfOptions): ShelfApp {
+  const app = new OpenAPIHono<{
+    Variables: {
+      requestId?: string;
+      db: import("./adapters/database.ts").DatabaseAdapter;
+      storage: import("./adapters/storage.ts").StorageAdapter;
+      config: import("./config.ts").ShelfConfig;
+      ui: import("./config.ts").UIConfig;
+      logger: ReturnType<typeof createShelfLogger>;
+      user: import("./adapters/auth.ts").AuthUser | null;
+      authEnabled: boolean;
+      enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
+      captureQueue: import("./adapters/capture-queue.ts").CaptureQueue | null;
+    };
+  }>();
   const config = options.config ?? {};
   const ui = options.ui ?? {};
   const logger = options.logger ?? createShelfLogger();
@@ -132,6 +161,16 @@ export function createShelfRouter(options: ShelfOptions): Hono {
   registerAssets(app);
   registerUiPages(app);
 
+  app.doc("/api/v1/openapi.json", {
+    openapi: "3.0.0",
+    info: {
+      title: "StoryShelf API",
+      description: "REST API for the StoryShelf visual testing platform. JSON endpoints live under /api/v1; HTML pages are served at /.",
+      version: "1.0.0",
+    },
+  });
+  app.get("/api/v1/docs", swaggerUI({ url: "/api/v1/openapi.json" }));
+
   return app;
 }
 
@@ -151,7 +190,6 @@ export type { StatusAdapter, CheckStatus } from "./adapters/status.ts";
 export type { DiffOptions, DiffResult } from "./diff/options.ts";
 export type { Viewport, StoryEntry, StorySourceAdapter } from "./capture/adapter.ts";
 export { createShelfLogger, type LoggerOptions, type PinoTransport } from "./logger.ts";
-export type { Logger } from "pino";
 export { diffImages } from "./diff/engine.ts";
 export type { RenderedContent } from "./ui/document.tsx";
 export { StorybookAdapter } from "./capture/storybook.ts";

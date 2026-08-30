@@ -18,7 +18,8 @@
   },
   "dependencies": {
     "adm-zip": "^0.6.0",
-    "commander": "^13.0.0"
+    "commander": "^13.0.0",
+    "hono": "^4.11.0"
   },
   "devDependencies": {
     "@types/node": "catalog:",
@@ -28,6 +29,7 @@
     "oxlint-tsgolint": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "@storyshelf/core": "workspace:*"
   }
 }

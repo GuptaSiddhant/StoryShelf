@@ -22,6 +22,7 @@ export default defineConfig({
           items: [
             { label: "Getting started", slug: "guides/getting-started" },
             { label: "CI setup", slug: "guides/ci" },
+            { label: "REST API", slug: "guides/api" },
             { label: "Deployment", slug: "guides/deployment" },
             { label: "CLI", slug: "guides/cli" },
             { label: "Auth", slug: "guides/auth" },

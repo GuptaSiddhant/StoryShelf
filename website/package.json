@@ -3,10 +3,11 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "openapi": "nub ../packages/core/scripts/generate-openapi.ts --out ./public/openapi.json",
+    "prebuild": "nub run openapi",
     "dev": "astro dev",
-    "start": "astro dev",
+    "start": "astro preview",
     "build": "astro build",
-    "preview": "astro preview",
     "check": "astro check",
     "check:links": "node scripts/check-links.mjs"
   },

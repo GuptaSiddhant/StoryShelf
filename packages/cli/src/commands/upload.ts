@@ -1,6 +1,8 @@
 import AdmZip from "adm-zip";
-import { normalizeBaseUrl, postFormWithProgress } from "../client.ts";
+import { createClient } from "../client.ts";
 import { createSpinner, printLine, spinnerFrames } from "../output.ts";
+
+interface BuildResponse { id: string; }
 
 /** Options for the `upload` command. */
 export interface UploadOptions {
@@ -30,7 +32,6 @@ export interface UploadOptions {
  * @param options - Upload command options.
  */
 export async function runUpload(options: UploadOptions): Promise<void> {
-  const base = normalizeBaseUrl(options.url);
   const storybookDir = options.storybookDir ?? "storybook-static";
 
   const zip = new AdmZip();
@@ -45,15 +46,13 @@ export async function runUpload(options: UploadOptions): Promise<void> {
   if (options.authorName) form.set("authorName", options.authorName);
   form.set("zip", new Blob([new Uint8Array(zipBuffer)], { type: "application/zip" }), "storybook.zip");
 
+  const client = createClient(options.url, options.token);
   const spinner = createSpinner("Uploading...", spinnerFrames);
   try {
-    const build = await postFormWithProgress<{ id: string }>(
-      `${base}/api/v1/projects/${options.slug}/builds`,
-      form,
-      { authorization: `Bearer ${options.token}` },
-    );
+    const build = await client.projects.builds.create(options.slug, form);
+    const buildData = build as BuildResponse;
     spinner.stop("Upload complete");
-    printLine(`Build created: ${build.id}`);
+    printLine(`Build created: ${buildData.id}`);
   } catch (error) {
     spinner.stop("Upload failed");
     throw error;

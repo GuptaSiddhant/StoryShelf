@@ -21,6 +21,9 @@ catalogs:
     oxlint-tsgolint:
       specifier: ^7.0.2001
       version: 7.0.2001
+    pino:
+      specifier: ^10.3.1
+      version: 10.3.1
     tsdown:
       specifier: ^0.22.14
       version: 0.22.14
@@ -124,7 +127,13 @@ importers:
       commander:
         specifier: ^13.0.0
         version: 13.1.0
+      hono:
+        specifier: ^4.11.0
+        version: 4.13.5
     devDependencies:
+      '@storyshelf/core':
+        specifier: workspace:*
+        version: link:../core
       '@types/node':
         specifier: 'catalog:'
         version: 26.3.0
@@ -152,6 +161,9 @@ importers:
 
   packages/core:
     dependencies:
+      '@hono/swagger-ui':
+        specifier: ^0.6.1
+        version: 0.6.1(hono@4.13.5)
       '@hono/zod-openapi':
         specifier: ^1.1.5
         version: 1.6.1(hono@4.13.5)(zod@4.4.3)
@@ -349,6 +361,9 @@ importers:
       oxlint:
         specifier: 'catalog:'
         version: 1.80.0(oxlint-tsgolint@7.0.2001)
+      pino:
+        specifier: 'catalog:'
+        version: 10.3.1
       tsdown:
         specifier: 'catalog:'
         version: 0.22.14(typescript@7.0.2)
@@ -962,6 +977,11 @@ packages:
     engines: {node: '>=18.14.1'}
     peerDependencies:
       hono: ^4
+
+  '@hono/swagger-ui@0.6.1':
+    resolution: {integrity: sha512-sJTvldu1GPeEPfyeLG7gRj+W4vEuD+JDi+JjJ3TJs/DvMUtBLs0KJO5yokGegWWdy5qrbdnQGekbhgNRmPmYKQ==}
+    peerDependencies:
+      hono: '>=4.0.0'
 
   '@hono/zod-openapi@1.6.1':
     resolution: {integrity: sha512-z1xS3FZxl4bBkU3kMIsQsLtsqxPTha5XZCsDEPMSZ6+3RRBQI7KED1GeoDpq2WueXCacsNIjcB0MtCnEHY7ahQ==}
@@ -4669,6 +4689,10 @@ snapshots:
       '@expressive-code/core': 0.41.7
 
   '@hono/node-server@1.19.17(hono@4.13.5)':
+    dependencies:
+      hono: 4.13.5
+
+  '@hono/swagger-ui@0.6.1(hono@4.13.5)':
     dependencies:
       hono: 4.13.5
 

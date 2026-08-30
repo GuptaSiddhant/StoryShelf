@@ -1,6 +1,7 @@
-import type { Hono } from "hono";
+/* oxlint-disable max-lines -- route table + handlers colocated, split per-router */
+import { createRoute, z } from "@hono/zod-openapi";
+import type { OpenAPIHono } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import { z } from "zod";
 
 import { BaselineModel } from "../models/baseline.ts";
 import { BuildModel } from "../models/build.ts";
@@ -8,28 +9,38 @@ import { CommentModel } from "../models/comment.ts";
 import { ProjectModel } from "../models/project.ts";
 import { SnapshotModel } from "../models/snapshot.ts";
 import { getStore } from "../store.ts";
-import { BUILD_STATUSES, type BuildStatus, type ProjectRole } from "../types.ts";
+import { BUILD_STATUSES, type ProjectRole } from "../types.ts";
 import { storybookZipPath } from "../utils/paths.ts";
+import { notFound, resolveAuthorizedProject } from "./helpers.ts";
 import {
-  json,
-  notFound,
-  resolveAuthorizedProject,
-  validJson,
-} from "./helpers.ts";
+  badRequest,
+  buildSchema,
+  commentCreateSchema,
+  commentSchema,
+  forbidden as forbiddenResponse,
+  notFound as notFoundResponse,
+  okSchema,
+  snapshotSchema,
+  unauthorized,
+} from "./schemas.ts";
 
 const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];
 const DEVELOPER_ROLES: readonly ProjectRole[] = ["developer", "approver", "admin"];
 const APPROVER_ROLES: readonly ProjectRole[] = ["approver", "admin"];
 
-const commentSchema = z.object({
-  body: z.string().min(1),
-  snapshotId: z.string().optional(),
-  parentId: z.string().optional(),
-});
+const buildUploadSchema = z.object({
+  gitSha: z.string(),
+  gitBranch: z.string(),
+  authorEmail: z.string().optional(),
+  authorName: z.string().optional(),
+  message: z.string().optional(),
+  zip: z.instanceof(File).openapi({ type: "string", format: "binary" }).optional(),
+}).openapi("BuildUpload");
 
-function asString(value: FormDataEntryValue | null): string | undefined {
-  return typeof value === "string" ? value : undefined;
-}
+const buildListQuery = z.object({
+  status: z.enum(BUILD_STATUSES).optional(),
+  branch: z.string().optional(),
+});
 
 async function buildForProject(projectId: string, buildId: string): Promise<import("../models/build.ts").Build> {
   const build = await new BuildModel(getStore().db).get(buildId);
@@ -78,18 +89,161 @@ async function approveSnapshot(snapshotId: string, userId: string): Promise<void
   await refreshBuild(build.id);
 }
 
-export function registerBuilds(app: Hono): void {
-  app.get("/api/v1/projects/:slug/builds", async (c) => {
-    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...VIEW_ROLES);
-    const statusParam = c.req.query("status");
-    const status = BUILD_STATUSES.includes(statusParam as BuildStatus) ? (statusParam as BuildStatus) : undefined;
-    const branch = c.req.query("branch");
+const listBuildsRoute = createRoute({
+  method: "get",
+  path: "/api/v1/projects/{slug}/builds",
+  request: {
+    params: z.object({ slug: z.string() }),
+    query: buildListQuery,
+  },
+  responses: {
+    200: { content: { "application/json": { schema: buildSchema.array() } }, description: "List builds for a project" },
+    ...notFoundResponse,
+    ...unauthorized,
+  },
+});
+
+const createBuildRoute = createRoute({
+  method: "post",
+  path: "/api/v1/projects/{slug}/builds",
+  request: {
+    params: z.object({ slug: z.string() }),
+    body: { content: { "multipart/form-data": { schema: buildUploadSchema } } },
+  },
+  responses: {
+    202: { content: { "application/json": { schema: buildSchema } }, description: "Build created and capture queued" },
+    ...badRequest,
+    ...forbiddenResponse,
+    ...notFoundResponse,
+  },
+});
+
+const getBuildRoute = createRoute({
+  method: "get",
+  path: "/api/v1/projects/{slug}/builds/{buildId}",
+  request: { params: z.object({ slug: z.string(), buildId: z.string() }) },
+  responses: {
+    200: { content: { "application/json": { schema: buildSchema } }, description: "Fetch a build" },
+    ...notFoundResponse,
+    ...unauthorized,
+  },
+});
+
+const retryBuildRoute = createRoute({
+  method: "post",
+  path: "/api/v1/projects/{slug}/builds/{buildId}/retry",
+  request: { params: z.object({ slug: z.string(), buildId: z.string() }) },
+  responses: {
+    202: { content: { "application/json": { schema: buildSchema } }, description: "Build reset to pending" },
+    ...notFoundResponse,
+  },
+});
+
+const deleteBuildRoute = createRoute({
+  method: "delete",
+  path: "/api/v1/projects/{slug}/builds/{buildId}",
+  request: { params: z.object({ slug: z.string(), buildId: z.string() }) },
+  responses: {
+    204: { description: "Build deleted" },
+    ...notFoundResponse,
+  },
+});
+
+const listSnapshotsRoute = createRoute({
+  method: "get",
+  path: "/api/v1/projects/{slug}/builds/{buildId}/snapshots",
+  request: { params: z.object({ slug: z.string(), buildId: z.string() }) },
+  responses: {
+    200: { content: { "application/json": { schema: snapshotSchema.array() } }, description: "List snapshots for a build" },
+    ...notFoundResponse,
+    ...unauthorized,
+  },
+});
+
+const approveSnapshotRoute = createRoute({
+  method: "post",
+  path: "/api/v1/projects/{slug}/builds/{buildId}/snapshots/{snapshotId}/approve",
+  request: { params: z.object({ slug: z.string(), buildId: z.string(), snapshotId: z.string() }) },
+  responses: {
+    200: { content: { "application/json": { schema: okSchema } }, description: "Snapshot approved" },
+    ...notFoundResponse,
+  },
+});
+
+const rejectSnapshotRoute = createRoute({
+  method: "post",
+  path: "/api/v1/projects/{slug}/builds/{buildId}/snapshots/{snapshotId}/reject",
+  request: { params: z.object({ slug: z.string(), buildId: z.string(), snapshotId: z.string() }) },
+  responses: {
+    200: { content: { "application/json": { schema: okSchema } }, description: "Snapshot rejected" },
+    ...notFoundResponse,
+  },
+});
+
+const approveAllRoute = createRoute({
+  method: "post",
+  path: "/api/v1/projects/{slug}/builds/{buildId}/approve-all",
+  request: { params: z.object({ slug: z.string(), buildId: z.string() }) },
+  responses: {
+    200: { content: { "application/json": { schema: okSchema } }, description: "All snapshots approved" },
+    ...notFoundResponse,
+  },
+});
+
+const rejectAllRoute = createRoute({
+  method: "post",
+  path: "/api/v1/projects/{slug}/builds/{buildId}/reject-all",
+  request: { params: z.object({ slug: z.string(), buildId: z.string() }) },
+  responses: {
+    200: { content: { "application/json": { schema: okSchema } }, description: "All snapshots rejected" },
+    ...notFoundResponse,
+  },
+});
+
+const listCommentsRoute = createRoute({
+  method: "get",
+  path: "/api/v1/projects/{slug}/builds/{buildId}/comments",
+  request: { params: z.object({ slug: z.string(), buildId: z.string() }) },
+  responses: {
+    200: { content: { "application/json": { schema: commentSchema.array() } }, description: "List comments on a build" },
+    ...notFoundResponse,
+    ...unauthorized,
+  },
+});
+
+const createCommentRoute = createRoute({
+  method: "post",
+  path: "/api/v1/projects/{slug}/builds/{buildId}/comments",
+  request: {
+    params: z.object({ slug: z.string(), buildId: z.string() }),
+    body: { content: { "application/json": { schema: commentCreateSchema } } },
+  },
+  responses: {
+    201: { content: { "application/json": { schema: commentSchema } }, description: "Comment created" },
+    ...notFoundResponse,
+  },
+});
+
+const resolveCommentRoute = createRoute({
+  method: "post",
+  path: "/api/v1/projects/{slug}/builds/{buildId}/comments/{commentId}/resolve",
+  request: { params: z.object({ slug: z.string(), buildId: z.string(), commentId: z.string() }) },
+  responses: {
+    200: { content: { "application/json": { schema: commentSchema } }, description: "Comment resolved" },
+    ...notFoundResponse,
+  },
+});
+
+export function registerBuilds(app: OpenAPIHono): void {
+  app.openapi(listBuildsRoute, async (c) => {
+    const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...VIEW_ROLES);
+    const { status, branch } = c.req.valid("query");
     const builds = new BuildModel(getStore().db).list(project.id, { status, branch: branch ?? undefined });
-    return json(c, await builds);
+    return c.json(await builds);
   });
 
-  app.post("/api/v1/projects/:slug/builds", async (c) => {
-    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...DEVELOPER_ROLES);
+  app.openapi(createBuildRoute, async (c) => {
+    const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...DEVELOPER_ROLES);
     const form = await c.req.formData();
 
     const gitSha = asString(form.get("gitSha")) ?? "";
@@ -118,58 +272,65 @@ export function registerBuilds(app: Hono): void {
 
     const reqId = c.get("requestId") as string | undefined;
     await getStore().enqueueCapture?.(build.id, reqId);
-    return json(c, build, 202);
+    return c.json(build, 202);
   });
 
-  app.get("/api/v1/projects/:slug/builds/:buildId", async (c) => {
-    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...VIEW_ROLES);
-    const build = await buildForProject(project.id, c.req.param("buildId"));
-    return json(c, build);
+  app.openapi(getBuildRoute, async (c) => {
+    const { slug, buildId } = c.req.valid("param");
+    const project = await resolveAuthorizedProject(c, slug, ...VIEW_ROLES);
+    const build = await buildForProject(project.id, buildId);
+    return c.json(build);
   });
 
-  app.post("/api/v1/projects/:slug/builds/:buildId/retry", async (c) => {
-    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...DEVELOPER_ROLES);
-    const build = await buildForProject(project.id, c.req.param("buildId"));
+  app.openapi(retryBuildRoute, async (c) => {
+    const { slug, buildId } = c.req.valid("param");
+    const project = await resolveAuthorizedProject(c, slug, ...DEVELOPER_ROLES);
+    const build = await buildForProject(project.id, buildId);
     const updated = await new BuildModel(getStore().db).setStatus(build.id, "pending");
-    return json(c, updated, 202);
+    return c.json(updated, 202);
   });
 
-  app.delete("/api/v1/projects/:slug/builds/:buildId", async (c) => {
-    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...APPROVER_ROLES);
-    const build = await buildForProject(project.id, c.req.param("buildId"));
+  app.openapi(deleteBuildRoute, async (c) => {
+    const { slug, buildId } = c.req.valid("param");
+    const project = await resolveAuthorizedProject(c, slug, ...APPROVER_ROLES);
+    const build = await buildForProject(project.id, buildId);
     await new BuildModel(getStore().db).remove(build.id);
     return c.body(null, 204);
   });
 
-  app.get("/api/v1/projects/:slug/builds/:buildId/snapshots", async (c) => {
-    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...VIEW_ROLES);
-    const build = await buildForProject(project.id, c.req.param("buildId"));
+  app.openapi(listSnapshotsRoute, async (c) => {
+    const { slug, buildId } = c.req.valid("param");
+    const project = await resolveAuthorizedProject(c, slug, ...VIEW_ROLES);
+    const build = await buildForProject(project.id, buildId);
     const snapshots = new SnapshotModel(getStore().db).listByBuild(build.id);
-    return json(c, await snapshots);
+    return c.json(await snapshots);
   });
 
-  app.post("/api/v1/projects/:slug/builds/:buildId/snapshots/:snapshotId/approve", async (c) => {
-    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...APPROVER_ROLES);
-    const build = await buildForProject(project.id, c.req.param("buildId"));
-    await snapshotForBuild(build, c.req.param("snapshotId"));
+  app.openapi(approveSnapshotRoute, async (c) => {
+    const { slug, buildId, snapshotId } = c.req.valid("param");
+    const project = await resolveAuthorizedProject(c, slug, ...APPROVER_ROLES);
+    const build = await buildForProject(project.id, buildId);
+    await snapshotForBuild(build, snapshotId);
     const userId = getStore().user?.id ?? "anonymous";
-    await approveSnapshot(c.req.param("snapshotId"), userId);
-    return json(c, { ok: true });
+    await approveSnapshot(snapshotId, userId);
+    return c.json({ ok: true });
   });
 
-  app.post("/api/v1/projects/:slug/builds/:buildId/snapshots/:snapshotId/reject", async (c) => {
-    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...APPROVER_ROLES);
-    const build = await buildForProject(project.id, c.req.param("buildId"));
-    const snapshot = await snapshotForBuild(build, c.req.param("snapshotId"));
+  app.openapi(rejectSnapshotRoute, async (c) => {
+    const { slug, buildId, snapshotId } = c.req.valid("param");
+    const project = await resolveAuthorizedProject(c, slug, ...APPROVER_ROLES);
+    const build = await buildForProject(project.id, buildId);
+    const snapshot = await snapshotForBuild(build, snapshotId);
     const userId = getStore().user?.id ?? "anonymous";
     await new SnapshotModel(getStore().db).review(snapshot.id, "rejected", userId);
     await refreshBuild(build.id);
-    return json(c, { ok: true });
+    return c.json({ ok: true });
   });
 
-  app.post("/api/v1/projects/:slug/builds/:buildId/approve-all", async (c) => {
-    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...APPROVER_ROLES);
-    const build = await buildForProject(project.id, c.req.param("buildId"));
+  app.openapi(approveAllRoute, async (c) => {
+    const { slug, buildId } = c.req.valid("param");
+    const project = await resolveAuthorizedProject(c, slug, ...APPROVER_ROLES);
+    const build = await buildForProject(project.id, buildId);
     const snapshots = await new SnapshotModel(getStore().db).listByBuild(build.id);
     const userId = getStore().user?.id ?? "anonymous";
     await Promise.all(
@@ -179,12 +340,13 @@ export function registerBuilds(app: Hono): void {
           await approveSnapshot(snapshot.id, userId);
         }),
     );
-    return json(c, { ok: true });
+    return c.json({ ok: true });
   });
 
-  app.post("/api/v1/projects/:slug/builds/:buildId/reject-all", async (c) => {
-    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...APPROVER_ROLES);
-    const build = await buildForProject(project.id, c.req.param("buildId"));
+  app.openapi(rejectAllRoute, async (c) => {
+    const { slug, buildId } = c.req.valid("param");
+    const project = await resolveAuthorizedProject(c, slug, ...APPROVER_ROLES);
+    const build = await buildForProject(project.id, buildId);
     const snapshots = await new SnapshotModel(getStore().db).listByBuild(build.id);
     const userId = getStore().user?.id ?? "anonymous";
     await Promise.all(
@@ -195,31 +357,38 @@ export function registerBuilds(app: Hono): void {
         }),
     );
     await refreshBuild(build.id);
-    return json(c, { ok: true });
+    return c.json({ ok: true });
   });
 
-  app.get("/api/v1/projects/:slug/builds/:buildId/comments", async (c) => {
-    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...VIEW_ROLES);
-    const build = await buildForProject(project.id, c.req.param("buildId"));
-    return json(c, await new CommentModel(getStore().db).listByBuild(build.id));
+  app.openapi(listCommentsRoute, async (c) => {
+    const { slug, buildId } = c.req.valid("param");
+    const project = await resolveAuthorizedProject(c, slug, ...VIEW_ROLES);
+    const build = await buildForProject(project.id, buildId);
+    return c.json(await new CommentModel(getStore().db).listByBuild(build.id));
   });
 
-  app.post("/api/v1/projects/:slug/builds/:buildId/comments", async (c) => {
-    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...DEVELOPER_ROLES);
-    const build = await buildForProject(project.id, c.req.param("buildId"));
-    const body = await validJson(c, commentSchema);
+  app.openapi(createCommentRoute, async (c) => {
+    const { slug, buildId } = c.req.valid("param");
+    const project = await resolveAuthorizedProject(c, slug, ...DEVELOPER_ROLES);
+    const build = await buildForProject(project.id, buildId);
+    const body = c.req.valid("json");
     const userId = getStore().user?.id ?? "anonymous";
     const comment = await new CommentModel(getStore().db).create(project.id, build.id, userId, body);
-    return json(c, comment, 201);
+    return c.json(comment, 201);
   });
 
-  app.post("/api/v1/projects/:slug/builds/:buildId/comments/:commentId/resolve", async (c) => {
-    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...DEVELOPER_ROLES);
-    const build = await buildForProject(project.id, c.req.param("buildId"));
-    const comment = await new CommentModel(getStore().db).resolve(c.req.param("commentId"));
+  app.openapi(resolveCommentRoute, async (c) => {
+    const { slug, buildId, commentId } = c.req.valid("param");
+    const project = await resolveAuthorizedProject(c, slug, ...DEVELOPER_ROLES);
+    const build = await buildForProject(project.id, buildId);
+    const comment = await new CommentModel(getStore().db).resolve(commentId);
     if (comment.buildId !== build.id) {
       notFound("Comment not found");
     }
-    return json(c, comment);
+    return c.json(comment);
   });
+}
+
+function asString(value: FormDataEntryValue | null): string | undefined {
+  return typeof value === "string" ? value : undefined;
 }

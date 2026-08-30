@@ -1,4 +1,5 @@
-import type { Context, Hono } from "hono";
+import type { Context } from "hono";
+import type { OpenAPIHono } from "@hono/zod-openapi";
 
 import { LabelModel } from "../models/label.ts";
 import { MemberModel } from "../models/member.ts";
@@ -76,7 +77,7 @@ async function findProject(slug: string): Promise<Project> {
   return project;
 }
 
-export function registerSettingsPages(app: Hono): void {
+export function registerSettingsPages(app: OpenAPIHono): void {
   app.get("/projects/:slug/settings", async (c) => c.html(await settingsPage(c, "general")));
   app.get("/projects/:slug/settings/labels", async (c) => c.html(await settingsPage(c, "labels")));
   app.get("/projects/:slug/settings/tokens", async (c) => c.html(await settingsPage(c, "tokens")));

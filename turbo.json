@@ -35,6 +35,9 @@
     },
     "verify": {
       "dependsOn": ["build", "lint", "test"]
+    },
+    "website#build": {
+      "cache": false
     }
   }
 }
