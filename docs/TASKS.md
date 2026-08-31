@@ -216,6 +216,128 @@
 
 ---
 
+## De-Slop — Codebase Simplification (Agreed 2026-08-31)
+
+> Based on architecture.md purist renderer, fixed pipeline, per-branch baselines. Keep JSDoc for `adapters/*` public contracts, delete for `utils`/`models`. Use real `better-sqlite3` in-memory for tests to eliminate hand-rolled SQL parser. Queue interface fully async.
+
+### Wave 1 — Mechanical & Safe (2 parallel worktrees, 0 overlap)
+
+#### P-S1: Strip Verbose JSDoc — Not Started
+
+**Slop:** 6-line `@param/@returns` repeats signature in `utils/paths.ts:1-60`, `utils/hash.ts:3-45`, `utils/ulid.ts:37-57`, `models/baseline.ts:21-56`, `capture/orchestrator.ts:19-52`, `retention/purge.ts:11-43`.
+
+**Action:** Delete blocks that duplicate signature; keep only 1-line `//` for non-obvious invariants (e.g., baselines never TTL'd). Keep JSDoc for `adapters/*`.
+
+**Files to Modify:**
+- `packages/core/src/utils/paths.ts`, `utils/hash.ts`, `utils/ulid.ts`, `diff/engine.ts`, `capture/storybook.ts`, `models/baseline.ts`, `models/build.ts`, `models/comment.ts`, `capture/orchestrator.ts`, `capture/queue.ts`, `retention/purge.ts`, `adapters/*` (trim only)
+
+**Acceptance Criteria:**
+- [ ] No `@param` that duplicates param name/type
+- [ ] `turbo lint` 0 errors
+- [ ] Est. -400 lines
+
+**Estimated Effort:** 1 day
+
+#### P-S2: Collapse Re-Export Shims — Not Started
+
+**Slop:** `models/fake-adapters.ts:1-2` + `retention/fake-adapters.ts:1-2` pure re-exports.
+
+**Action:** Delete both shims; update imports to `../capture/fake-adapters.ts` or move to `test-helpers/db.ts`. Add `no-restricted-imports` to prevent regression.
+
+**Files to Modify:**
+- Delete `packages/core/src/models/fake-adapters.ts`, `packages/core/src/retention/fake-adapters.ts`
+- Update 4 import sites (label/member/token/webhook/build tests)
+- `packages/core/src/capture/fake-adapters.ts` → `packages/core/src/test-helpers/db.ts` (optional rename)
+
+**Acceptance Criteria:**
+- [ ] No re-export shims
+- [ ] Tests 100/100
+
+---
+
+### Wave 2 — Structural (Serialized on `routers/`)
+
+#### P-S3: Deduplicate `routers/helpers.ts` — Not Started
+
+**Slop:** `resolveProject` vs `resolveAuthorizedProject` 80% duplicated bearer-token lookup; 3 role-check variants.
+
+**Action:** `resolveProject(slug)` → base; `resolveAuthorizedProject(slug, ...roles)` calls base + `assertRole(projectId, userId, minRole)` with hierarchy `viewer < developer < approver < admin`.
+
+**Files to Modify:**
+- `packages/core/src/routers/helpers.ts` (single `hasRole`, single `resolve`)
+
+**Acceptance Criteria:**
+- [ ] One `resolveProject` + one `assertRole`
+- [ ] No duplicated token lookup
+
+#### P-S4: Split God Files — Not Started
+
+**Slop:** `routers/builds.ts:1` 413 LOC, `index.tsx:2` 354 LOC, `capture/fake-adapters.ts:193` 48-line `inArrayMatches`, `routers/settings.ts:278` 10 handlers.
+
+**Action:**
+- `routers/builds.ts` → `builds.routes.ts` (route defs) + `builds.handlers.ts` (`refreshBuild`/`approveSnapshot`) + `snapshots.ts` + `comments.ts`
+- `index.tsx` → extract `createQueue()` and `postStatusesForBuild` to `capture/status-fanout.ts`; dedupe `Variables` → `type ShelfContext = ShelfOptions & { requestId?: string; user: AuthUser | null }`
+- `capture/fake-adapters.ts` → split `whereMatches` to `test-helpers/fake-sql.ts` with `filterByWhere` using Drizzle operators; replace hand-rolled SQL string parsing; ideally switch to real `better-sqlite3` in-memory for `pipeline.test.ts`/`purge.test.ts`
+
+**Files to Modify:**
+- `packages/core/src/routers/builds.ts`, `packages/core/src/index.tsx`, `packages/core/src/capture/fake-adapters.ts`, `packages/core/src/routers/settings.ts`
+
+**Acceptance Criteria:**
+- [ ] No file `max-lines` disable
+- [ ] Each file ≤50 LOC per function, ≤10 statements
+
+#### P-S5: Consolidate `urls.ts` + `types.ts` — Not Started
+
+**Slop:** `urls.ts:2-48` 9 one-liners, `types.ts:1-33` grab-bag, `capture/viewports.ts:1-4` 4-line file.
+
+**Action:** Inline `UrlBuilder` as `linkRoute()` templates; move `BuildStatus`/`SnapshotStatus` next to `schema.ts`; delete `viewports.ts` → `DEFAULT_VIEWPORTS` in `capture/adapter.ts`.
+
+**Files to Modify:**
+- `packages/core/src/urls.ts`, `packages/core/src/types.ts`, `packages/core/src/capture/viewports.ts`, `packages/core/src/capture/adapter.ts`
+
+---
+
+### Wave 3 — Debt & Polish (Parallel Safe)
+
+#### P-S6: Resolve Queue Sync/Async Debt — Not Started
+
+**Slop:** `CaptureQueue` sync `status/active/recent` vs in-process queue sync (`queue.ts:5` `require-await` disable). `architecture.md:281` documented debt.
+
+**Action (agreed):** Make `CaptureQueue` fully async (breaking, clean). Update `InMemoryCaptureQueue` to `async` without `await Promise.resolve()`; `RemoteCaptureQueue` already async.
+
+**Files to Modify:**
+- `packages/core/src/adapters/capture-queue.ts`, `packages/core/src/capture/queue.ts`
+
+**Acceptance Criteria:**
+- [ ] No `require-await` disable
+- [ ] `RemoteCaptureQueue` + `InMemoryCaptureQueue` share same async contract
+
+#### P-S7: Test Helper Factory — Not Started
+
+**Slop:** `makeDatabase+makeStorage+insert project/build` duplicated in `pipeline.test.ts:167`, `orchestrator.test.ts:121`, `retention/integration.test.ts:190`.
+
+**Action:** Create `test-helpers/createProject.ts` (`createTestProject(db, overrides)`, `createTestBuild(db, projectId, overrides)`).
+
+**Files to Create:**
+- `packages/core/src/test-helpers/createProject.ts`
+
+**Acceptance Criteria:**
+- [ ] No duplicated setup in 3+ test files
+
+#### P-S8: Tighten Lint — Not Started
+
+**Slop:** `.oxlintrc.json:27` `max-lines-per-function` is `warn`; `max-statements` only in `AGENTS.md` text.
+
+**Action:** Promote `max-lines-per-function` to `error`, add `max-statements: [error, {max:10}]` as `error`.
+
+**Files to Modify:**
+- `.oxlintrc.json`
+
+**Acceptance Criteria:**
+- [ ] `turbo lint` fails on >10 statements or >50 lines
+
+---
+
 ## How to Pick Up a Task
 
 1. **Read this file** to find an uncompleted task
@@ -242,4 +364,4 @@
 
 ---
 
-*Last updated: 2026-08-31 — wave P1-P4 complete (482e8f27 + 35992cc7), 100/100 tests passing, worktree workflow documented in AGENTS.md.*
+*Last updated: 2026-08-31 — wave P1-P4 complete (482e8f27 + 35992cc7 + 3dc09aae), 100/100 tests passing, 0 lint errors. De-slop wave P-S1–P-S8 agreed, 7-9 days, 2 worktrees max. Worktree workflow documented in AGENTS.md.*
