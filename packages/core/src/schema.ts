@@ -1,4 +1,4 @@
-import { integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 import type { BuildStatus, ProjectRole, SiteRole, SnapshotStatus } from "./types.ts";
 
@@ -49,7 +49,10 @@ export const builds = sqliteTable(
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
-  (t) => [uniqueIndex("builds_project_gitsha_idx").on(t.projectId, t.gitSha)],
+  (t) => [
+    uniqueIndex("builds_project_gitsha_idx").on(t.projectId, t.gitSha),
+    index("builds_git_branch_idx").on(t.gitBranch),
+  ],
 );
 
 export const snapshots = sqliteTable(
@@ -80,7 +83,10 @@ export const snapshots = sqliteTable(
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
-  (t) => [uniqueIndex("snapshots_build_story_viewport_idx").on(t.buildId, t.storyId, t.viewportName)],
+  (t) => [
+    uniqueIndex("snapshots_build_story_viewport_idx").on(t.buildId, t.storyId, t.viewportName),
+    index("snapshots_build_id_idx").on(t.buildId),
+  ],
 );
 
 export const baselines = sqliteTable(
@@ -98,27 +104,34 @@ export const baselines = sqliteTable(
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
-  (t) => [uniqueIndex("baselines_project_story_viewport_branch_idx").on(t.projectId, t.storyId, t.viewportName, t.branch)],
+  (t) => [
+    uniqueIndex("baselines_project_story_viewport_branch_idx").on(t.projectId, t.storyId, t.viewportName, t.branch),
+    index("baselines_project_story_idx").on(t.projectId, t.storyId),
+  ],
 );
 
-export const comments = sqliteTable("comments", {
-  id: text("id").primaryKey(),
-  projectId: text("project_id")
-    .notNull()
-    .references(() => projects.id, { onDelete: "cascade" }),
-  buildId: text("build_id")
-    .notNull()
-    .references(() => builds.id, { onDelete: "cascade" }),
-  snapshotId: text("snapshot_id").references(() => snapshots.id, { onDelete: "cascade" }),
-  userId: text("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  body: text("body").notNull(),
-  parentId: text("parent_id"),
-  resolved: integer("resolved", { mode: "boolean" }).notNull().default(false),
-  createdAt: text("created_at").notNull(),
-  updatedAt: text("updated_at").notNull(),
-});
+export const comments = sqliteTable(
+  "comments",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    buildId: text("build_id")
+      .notNull()
+      .references(() => builds.id, { onDelete: "cascade" }),
+    snapshotId: text("snapshot_id").references(() => snapshots.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    parentId: text("parent_id"),
+    resolved: integer("resolved", { mode: "boolean" }).notNull().default(false),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [index("comments_build_id_idx").on(t.buildId)],
+);
 
 export const labelTypes = sqliteTable(
   "label_types",

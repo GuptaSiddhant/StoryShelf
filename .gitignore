@@ -39,3 +39,6 @@ openapi.json
 data
 nub.lock.bak
 .astro
+
+# opencode worktree plugin state
+.ocx/

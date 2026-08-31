@@ -1,0 +1,13 @@
+{
+  "$schema": "https://registry.kdco.dev/schemas/worktree.json",
+
+  "sync": {
+    "copyFiles": [".env", ".env.local", "nub.lock"],
+    "exclude": [".turbo", ".astro", "dist", "build", ".data", "coverage", "storybook-static", ".test-results", "test-report", "openapi.json"]
+  },
+
+  "hooks": {
+    "postCreate": ["export PATH=\"$HOME/.nub/bin:$PATH\" && nub ci"],
+    "preDelete": []
+  }
+}

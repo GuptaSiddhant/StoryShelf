@@ -7,7 +7,9 @@ import type { CaptureQueue } from "./adapters/capture-queue.ts";
 import { executeCaptureJob, type CaptureJobOptions } from "./capture/orchestrator.ts";
 import { InMemoryCaptureQueue } from "./capture/queue.ts";
 import type { ShelfOptions } from "./config.ts";
+import { validateConfig, validateUiConfig } from "./config.ts";
 import { createShelfLogger } from "./logger.ts";
+import { csrf, rateLimit } from "./middleware/index.ts";
 import { BuildModel } from "./models/build.ts";
 import { ProjectModel } from "./models/project.ts";
 import { StatusConfigModel } from "./models/status-config.ts";
@@ -114,8 +116,8 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
       gitProviders: import("./adapters/status.ts").GitProvider[];
     };
   }>();
-  const config = options.config ?? {};
-  const ui = options.ui ?? {};
+  const config = options.config ? validateConfig(options.config as Record<string, unknown>) : {};
+  const ui = options.ui ? validateUiConfig(options.ui as Record<string, unknown>) : {};
   const logger = options.logger ?? createShelfLogger();
   const authEnabled = options.auth !== undefined;
 
@@ -234,6 +236,11 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
       "request end",
     );
   });
+
+  app.use("/api/v1/*", rateLimit({ windowMs: 60_000, max: 100 }));
+  app.use("/api/v1/tokens/*", rateLimit({ windowMs: 60_000, max: 10 }));
+  app.use("/api/v1/webhooks/*", rateLimit({ windowMs: 60_000, max: 20 }));
+  app.use("/projects/:slug/settings/*", csrf());
 
   app.use("*", async (c, next) => {
     const user = await resolveUser(c, options);

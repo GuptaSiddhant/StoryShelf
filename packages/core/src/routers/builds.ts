@@ -8,6 +8,7 @@ import { BuildModel } from "../models/build.ts";
 import { CommentModel } from "../models/comment.ts";
 import { ProjectModel } from "../models/project.ts";
 import { SnapshotModel } from "../models/snapshot.ts";
+import { emitWebhookEvent } from "../adapters/webhook-events.ts";
 import { getStore } from "../store.ts";
 import { BUILD_STATUSES, type ProjectRole } from "../types.ts";
 import { storybookZipPath } from "../utils/paths.ts";
@@ -63,11 +64,21 @@ async function refreshBuild(buildId: string): Promise<void> {
   await new BuildModel(db).updateCounts(buildId);
   const snapshots = await new SnapshotModel(db).listByBuild(buildId);
   const unresolved = snapshots.some((s) => s.status === "new" || s.status === "changed");
+  let status: "reviewing" | "rejected" | "approved";
   if (unresolved) {
-    await new BuildModel(db).setStatus(buildId, "reviewing");
+    status = "reviewing";
   } else {
     const rejected = snapshots.some((s) => s.status === "rejected");
-    await new BuildModel(db).setStatus(buildId, rejected ? "rejected" : "approved");
+    status = rejected ? "rejected" : "approved";
+  }
+  const build = await new BuildModel(db).get(buildId);
+  if (build) {
+    await new BuildModel(db).setStatus(buildId, status);
+    await emitWebhookEvent(db, build.projectId, `build:${status}`, {
+      buildId,
+      status,
+      snapshotCount: snapshots.length,
+    });
   }
 }
 
@@ -259,6 +270,15 @@ export function registerBuilds(app: ShelfApp): void {
       gitSha,
       gitBranch,
       isDefault: gitBranch === project.gitDefaultBranch,
+      authorEmail,
+      authorName,
+      message,
+    });
+
+    await emitWebhookEvent(getStore().db, project.id, "build:created", {
+      buildId: build.id,
+      gitSha,
+      gitBranch,
       authorEmail,
       authorName,
       message,

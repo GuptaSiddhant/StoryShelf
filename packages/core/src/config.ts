@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { Logger } from "pino";
 
 import type { AuthAdapter } from "./adapters/auth.ts";
@@ -6,7 +7,6 @@ import type { CaptureRunner } from "./adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "./adapters/database.ts";
 import type { GitProvider } from "./adapters/status.ts";
 import type { StorageAdapter } from "./adapters/storage.ts";
-import type { Viewport } from "./capture/adapter.ts";
 
 /** Branding colors used to theme the web UI. */
 export interface BrandTheme {
@@ -36,20 +36,60 @@ export interface UIConfig {
   darkTheme?: BrandTheme;
 }
 
+const viewportSchema = z.object({
+  name: z.string().min(1),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+});
+
+const brandThemeSchema = z.object({
+  accent: z.string(),
+  surface: z.object({ base: z.string(), card: z.string() }),
+  text: z.object({ primary: z.string(), secondary: z.string() }),
+  border: z.string(),
+  status: z.object({ approved: z.string(), new: z.string(), rejected: z.string() }),
+});
+
+export const shelfConfigSchema = z
+  .object({
+    secret: z.string().min(16, "secret must be at least 16 characters").optional(),
+    publishedBaseDomain: z.string().optional(),
+    captureConcurrency: z.number().int().positive().optional(),
+    scratchDir: z.string().optional(),
+    purgeTtlDays: z.number().int().positive().optional(),
+    viewports: z.array(viewportSchema).min(1, "at least one viewport required").optional(),
+  })
+  .strict();
+
+export const uiConfigSchema = z
+  .object({
+    name: z.string().optional(),
+    logo: z.url().optional(),
+    favicon: z.url().optional(),
+    lightTheme: brandThemeSchema.optional(),
+    darkTheme: brandThemeSchema.optional(),
+  })
+  .strict();
+
 /** Runtime configuration passed to the shelf router. */
-export interface ShelfConfig {
-  /** Session signing secret. */
-  secret?: string;
-  /** Domain used for published Storybook URLs. */
-  publishedBaseDomain?: string;
-  /** Number of concurrent capture jobs. */
-  captureConcurrency?: number;
-  /** Base directory for extracting uploaded Storybook archives during capture. */
-  scratchDir?: string;
-  /** Days after which builds are purged. */
-  purgeTtlDays?: number;
-  /** Viewports at which stories are captured. */
-  viewports?: Viewport[];
+export type ShelfConfig = z.infer<typeof shelfConfigSchema>;
+
+export function validateConfig(config: Record<string, unknown>): ShelfConfig {
+  const result = shelfConfigSchema.safeParse(config);
+  if (!result.success) {
+    const issues = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+    throw new Error(`Invalid ShelfConfig: ${issues}`);
+  }
+  return result.data;
+}
+
+export function validateUiConfig(config: Record<string, unknown>): UIConfig {
+  const result = uiConfigSchema.safeParse(config);
+  if (!result.success) {
+    const issues = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+    throw new Error(`Invalid UIConfig: ${issues}`);
+  }
+  return result.data;
 }
 
 /** Options used to construct a shelf router. */

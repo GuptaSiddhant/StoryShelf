@@ -36,6 +36,9 @@
     "verify": {
       "dependsOn": ["build", "lint", "test"]
     },
+    "audit": {
+      "cache": false
+    },
     "website#build": {
       "cache": false
     }

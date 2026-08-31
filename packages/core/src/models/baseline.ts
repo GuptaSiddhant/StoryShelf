@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
+import { emitWebhookEvent } from "../adapters/webhook-events.ts";
 import { baselines, type Baseline } from "../schema.ts";
 import { baselinePath } from "../utils/paths.ts";
 import { ulid } from "../utils/ulid.ts";
@@ -83,25 +84,42 @@ export class BaselineModel {
     await this.storage.write(screenshotPath, source);
 
     const existing = await this.getFor(projectId, storyId, viewport, branch);
+    let baseline: Baseline;
     if (existing) {
-      return this.db.update(baselines, existing.id, {
+      baseline = await this.db.update(baselines, existing.id, {
         snapshotId,
         screenshotPath,
         updatedAt: new Date().toISOString(),
       });
+      await emitWebhookEvent(this.db, projectId, "baseline:updated", {
+        baselineId: baseline.id,
+        storyId,
+        viewport,
+        branch,
+        snapshotId,
+      });
+    } else {
+      const now = new Date().toISOString();
+      baseline = await this.db.insert(baselines, {
+        id: ulid(),
+        projectId,
+        storyId,
+        viewportName: viewport,
+        branch,
+        snapshotId,
+        screenshotPath,
+        createdAt: now,
+        updatedAt: now,
+      });
+      await emitWebhookEvent(this.db, projectId, "baseline:created", {
+        baselineId: baseline.id,
+        storyId,
+        viewport,
+        branch,
+        snapshotId,
+      });
     }
-    const now = new Date().toISOString();
-    return this.db.insert(baselines, {
-      id: ulid(),
-      projectId,
-      storyId,
-      viewportName: viewport,
-      branch,
-      snapshotId,
-      screenshotPath,
-      createdAt: now,
-      updatedAt: now,
-    });
+    return baseline;
   }
 
   /** List all baselines for a project. */

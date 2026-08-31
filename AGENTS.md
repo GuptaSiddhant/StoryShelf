@@ -126,3 +126,87 @@ StoryShelf/
 | 0013 | Build Labels (project-defined types, search + link templates + stable URLs) |
 | 0014 | Pino as Core Logger (structured logs, transports via factory, request tracing) |
 | 0015 | Pure Capture Renderer Adapter (capture adapters render only; server orchestrator owns loading/extraction/persistence) |
+
+## Parallel Development with Worktrees
+
+For parallel agent development on multiple tasks, use the **`opencode-worktree` plugin** (`ocx add kdco/worktree --from https://registry.kdco.dev`). Config at `.opencode/worktree.jsonc`.
+
+### Creating a Worktree
+
+```sh
+# From main worktree (manager session):
+worktree_create:
+  branch: "task/P1-1-indexes"
+  baseBranch: "main"
+```
+
+This auto-creates the worktree at `~/.local/share/opencode/worktree/<project-id>/task/P1-1-indexes/`, runs `nub ci` via `postCreate` hook, and opens a new terminal with `opencode` running.
+
+### Per-Worktree Bootstrap
+
+```sh
+export PATH="$HOME/.nub/bin:$PATH"
+nub ci                    # install deps (runs automatically via hook)
+nubx turbo verify --filter='@storyshelf/core' --force  # verify baseline
+```
+
+### Worktree Rules
+
+1. **`docs/TASKS.md` is manager-only** — only the main worktree edits status table (`Not Started → In Progress → Done`). Task worktrees only touch their `Files to Modify`.
+2. **`nub.lock` is per-worktree** — never run `nub` installs concurrently in same tree.
+3. **File ownership** — each task branch only modifies files listed in its `Files to Modify` in `docs/TASKS.md`. Check before editing.
+
+### Wave Assignment (file-disjoint = safe to parallel)
+
+| Wave | Tasks | Concurrent | Notes |
+|------|-------|------------|-------|
+| 1 | P1-1 + P1-2 | 2 | Schema/migrations + middleware/token — 0 file overlap |
+| 2 | P2-3 + P2-4 + P3-2 | 3 | New test files + turbo.json — 0 overlap |
+| 3 | P2-1 + P2-2 + P3-1 | 3 | Config + webhook + queue — serialized on `adapters/` |
+| 4 | P3-3 + P4-* | as needed | Comment validation + future tasks |
+
+### Finishing a Task
+
+1. **In worktree:** verify, commit, push branch
+2. **Call `worktree_delete("P1-1 complete")`** — auto-commits + removes worktree
+3. **In main worktree:** squash-merge into `main`:
+
+```sh
+# From main worktree:
+git merge --squash task/P1-1-indexes
+git commit -m "feat(p1-1): add query performance indexes
+
+- Add Drizzle index definitions for snapshots, comments, builds, baselines
+- Add migrations for db-sqlite and db-turso adapters
+- All tests pass"
+git branch -d task/P1-1-indexes
+```
+
+4. **Update `docs/TASKS.md`** — flip status to `Done`, add commit hash
+
+### Squash Merge Convention
+
+All task branches must be **squash-merged** into `main` — never fast-forward or regular merge. This keeps `git log --oneline` clean and each task = one commit.
+
+Format:
+```
+feat(<task-id>): <short description>
+
+- Bullet point summary of changes
+- Second bullet point
+```
+
+Example: `feat(p1-1): add query performance indexes`
+
+### Manual Worktree (without plugin)
+
+```sh
+git worktree add ../StoryShelf-<task-id> -b task/<task-id> main
+cd ../StoryShelf-<task-id>
+export PATH="$HOME/.nub/bin:$PATH"
+nub ci
+nubx turbo verify --filter='@storyshelf/core' --force
+# ... work ...
+# cleanup:
+git worktree remove ../StoryShelf-<task-id>
+```

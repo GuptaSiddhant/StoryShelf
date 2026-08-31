@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS builds (
   updated_at TEXT NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS builds_project_gitsha_idx ON builds (project_id, git_sha);
+CREATE INDEX IF NOT EXISTS builds_git_branch_idx ON builds (git_branch);
 CREATE TABLE IF NOT EXISTS snapshots (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -62,6 +63,7 @@ CREATE TABLE IF NOT EXISTS snapshots (
   updated_at TEXT NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS snapshots_build_story_viewport_idx ON snapshots (build_id, story_id, viewport_name);
+CREATE INDEX IF NOT EXISTS snapshots_build_id_idx ON snapshots (build_id);
 CREATE TABLE IF NOT EXISTS baselines (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -74,6 +76,7 @@ CREATE TABLE IF NOT EXISTS baselines (
   updated_at TEXT NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS baselines_project_story_viewport_branch_idx ON baselines (project_id, story_id, viewport_name, branch);
+CREATE INDEX IF NOT EXISTS baselines_project_story_idx ON baselines (project_id, story_id);
 CREATE TABLE IF NOT EXISTS comments (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -86,6 +89,7 @@ CREATE TABLE IF NOT EXISTS comments (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
+CREATE INDEX IF NOT EXISTS comments_build_id_idx ON comments (build_id);
 CREATE TABLE IF NOT EXISTS label_types (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
