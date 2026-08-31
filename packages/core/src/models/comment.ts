@@ -34,6 +34,10 @@ export class CommentModel {
   async create(projectId: string, buildId: string, userId: string, input: CommentCreateInput): Promise<Comment> {
     const now = new Date().toISOString();
     await this.db.get(projects, projectId); // validate project exists
+    const project = await this.db.get(projects, projectId);
+    if (!project) {
+      throw new Error(`Project not found: ${projectId}`);
+    }
     return await this.db.insert(comments, {
       id: ulid(),
       projectId,

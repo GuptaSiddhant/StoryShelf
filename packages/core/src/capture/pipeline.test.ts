@@ -153,4 +153,15 @@ describe("persistCapture", () => {
     const build = await ctx.db.get(builds, "b1");
     expect(build?.status).toBe("reviewing");
   });
+
+  it("keeps build in reviewing status when no captures occur", async () => {
+    const { ctx } = await makeContext({ captures: [] });
+
+    await persistCapture(ctx, new Set());
+
+    const rows = await ctx.db.list(snapshots);
+    expect(rows).toEqual([]);
+    const build = await ctx.db.get(builds, "b1");
+    expect(build?.status).toBe("reviewing");
+  });
 });
