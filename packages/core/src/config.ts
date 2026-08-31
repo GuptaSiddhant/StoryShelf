@@ -52,7 +52,7 @@ const brandThemeSchema = z.object({
 
 export const shelfConfigSchema = z
   .object({
-    secret: z.string().min(16, "secret must be at least 16 characters").optional(),
+    secret: z.string().min(1).optional(),
     publishedBaseDomain: z.string().optional(),
     captureConcurrency: z.number().int().positive().optional(),
     scratchDir: z.string().optional(),

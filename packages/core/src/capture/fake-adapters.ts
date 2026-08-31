@@ -158,9 +158,20 @@ function whereMatches(where: SQL, row: Record<string, unknown>, table: AnySQLite
   if (current.some((chunk) => textOf(chunk)?.trim() === "and")) {
     return current
       .filter((chunk) => textOf(chunk) === undefined)
-      .every((chunk) => eqMatches(chunk.queryChunks ?? [], row, table));
+      .every((chunk) => matchChunk(chunk.queryChunks ?? [], row, table));
   }
-  return eqMatches(current, row, table);
+  return matchChunk(current, row, table);
+}
+
+function matchChunk(chunks: SqlChunk[], row: Record<string, unknown>, table: AnySQLiteTable): boolean {
+  const text = chunks.map((c) => textOf(c) ?? "").join("");
+  if (text.includes(" in ")) {
+    return inArrayMatches(chunks, row, table);
+  }
+  if (text.includes(" < ")) {
+    return ltMatches(chunks, row, table);
+  }
+  return eqMatches(chunks, row, table);
 }
 
 function eqMatches(chunks: SqlChunk[], row: Record<string, unknown>, table: AnySQLiteTable): boolean {
@@ -177,6 +188,80 @@ function eqMatches(chunks: SqlChunk[], row: Record<string, unknown>, table: AnyS
     return false;
   }
   return row[columnKey(table, columnName)] === argument;
+}
+
+/* eslint-disable complexity, max-depth -- handles drizzle's varied chunk shapes */
+function inArrayMatches(chunks: SqlChunk[], row: Record<string, unknown>, table: AnySQLiteTable): boolean {
+  let columnName: string | undefined;
+  const values: unknown[] = [];
+  const collect = (nodes: unknown[]): void => {
+    for (const raw of nodes as SqlChunk[]) {
+      const chunk = raw as SqlChunk & Record<string, unknown>;
+      // handle array-like chunk (inArray values stored as array of chunks)
+      if (Array.isArray(chunk) || (chunk && typeof chunk === "object" && Object.keys(chunk).every((k) => /^\d+$/u.test(k)))) {
+        collect(Object.values(chunk as unknown as Record<string, unknown>) as unknown[]);
+        continue;
+      }
+      if (typeof chunk.name === "string" && chunk.table !== undefined) {
+        columnName = chunk.name as string;
+      }
+      if ("brand" in chunk && (chunk as Record<string, unknown>)["value"] !== undefined) {
+        const val = (chunk as Record<string, unknown>)["value"];
+        if (Array.isArray(val)) {
+          values.push(...(val as unknown[]));
+        } else {
+          values.push(val);
+        }
+      }
+      if (chunk.queryChunks) {
+        collect(chunk.queryChunks as unknown[]);
+      }
+      const val = (chunk as Record<string, unknown>)["value"];
+      if (Array.isArray(val)) {
+        for (const item of val as unknown[]) {
+          if (item && typeof item === "object" && "queryChunks" in (item as Record<string, unknown>)) {
+            collect(((item as Record<string, unknown>)["queryChunks"] as unknown[]) ?? []);
+          }
+          if (item && typeof item === "object" && "value" in (item as Record<string, unknown>)) {
+            const iv = (item as Record<string, unknown>)["value"];
+            if (iv !== undefined) values.push(iv);
+          }
+          if (typeof item === "string") values.push(item);
+        }
+      }
+    }
+  };
+  collect(chunks as unknown[]);
+  if (columnName === undefined) {
+    return false;
+  }
+  const key = columnKey(table, columnName);
+  return values.includes(row[key]);
+}
+/* eslint-enable complexity, max-depth */
+
+function ltMatches(chunks: SqlChunk[], row: Record<string, unknown>, table: AnySQLiteTable): boolean {
+  let columnName: string | undefined;
+  let argument: unknown;
+  for (const chunk of chunks) {
+    if (typeof chunk.name === "string" && chunk.table !== undefined) {
+      columnName = chunk.name;
+    } else if ("brand" in chunk) {
+      argument = chunk.value;
+    }
+  }
+  if (columnName === undefined) {
+    return false;
+  }
+  const key = columnKey(table, columnName);
+  const cell = row[key];
+  if (typeof cell === "string" && typeof argument === "string") {
+    return cell < argument;
+  }
+  if (typeof cell === "number" && typeof argument === "number") {
+    return cell < argument;
+  }
+  return String(cell) < String(argument);
 }
 
 function columnKey(table: AnySQLiteTable, dbName: string): string {
