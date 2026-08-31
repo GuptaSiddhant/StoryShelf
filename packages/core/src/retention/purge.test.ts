@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { builds } from "../schema.ts";
+import { builds, projects } from "../schema.ts";
 import { makeStorage } from "../capture/fake-adapters.ts";
 import { makeDatabase } from "./fake-adapters.ts";
 import { Retention } from "./purge.ts";
@@ -16,11 +16,13 @@ describe("Retention", () => {
       gitDefaultBranch: "main", pixelThreshold: 0.1, maxDiffRatio: 0.01,
       publicBranchRegex: null, createdAt: now.toISOString(), updatedAt: now.toISOString(),
     };
-    await (db as any).insert(/* projects */ {} as any, project);
+    await db.insert(projects, project);
 
     // Insert builds: one old approved, one recent approved
-    const oldDate = new Date(now.getTime() - 60 * 86_400_000).toISOString(); // 60 days ago
-    const recentDate = new Date(now.getTime() - 1 * 86_400_000).toISOString(); // 1 day ago
+    // Old build created 60 days ago
+    const oldDate = new Date(now.getTime() - 60 * 86_400_000).toISOString();
+    // Recent build created 1 day ago
+    const recentDate = new Date(now.getTime() - 1 * 86_400_000).toISOString();
 
     await db.insert(builds, {
       id: "b-old", projectId: "p1", gitSha: "sha-old", gitBranch: "main",
@@ -36,10 +38,10 @@ describe("Retention", () => {
     const retention = new Retention(db, storage);
     const result = await retention.purge(project, { ttlDays: 30, keepLatestPerBranch: false });
 
-    // b-old should be purged, b-recent should remain
+    // B-old should be purged, b-recent should remain
     expect(result.removedBuilds).toBe(1);
     const remaining = await db.list(builds);
     expect(remaining.length).toBe(1);
-    expect(remaining[0].id).toBe("b-recent");
+    expect(remaining[0]?.id).toBe("b-recent");
   });
 });

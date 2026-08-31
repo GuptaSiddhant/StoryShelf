@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
+
 import type { DatabaseAdapter } from "../adapters/database.ts";
-import { CommentModel } from "./comment.ts";
 import { projects } from "../schema.ts";
 import { makeDatabase } from "./fake-adapters.ts";
+import { CommentModel } from "./comment.ts";
 
 const mockProject = {
   id: "p1",
@@ -17,7 +18,7 @@ const mockProject = {
   updatedAt: "2026-01-01T00:00:00.000Z",
 };
 
-async function makeDbWithProject() {
+async function makeDbWithProject(): Promise<DatabaseAdapter> {
   const { db } = makeDatabase();
   await db.insert(projects, {
     id: mockProject.id,
@@ -38,12 +39,7 @@ describe("CommentModel", () => {
   it("creates a comment on a build when project exists", async () => {
     const db = await makeDbWithProject();
     const model = new CommentModel(db);
-    const comment = await model.create(
-      mockProject.id,
-      "b1",
-      "user-123",
-      { body: "Great component!" }
-    );
+    const comment = await model.create(mockProject.id, "b1", "user-123", { body: "Great component!" });
     expect(comment.id).toBeDefined();
     expect(comment.body).toBe("Great component!");
     expect(comment.projectId).toBe(mockProject.id);
@@ -55,9 +51,9 @@ describe("CommentModel", () => {
   it("throws when project does not exist", async () => {
     const { db } = makeDatabase();
     const model = new CommentModel(db);
-    await expect(
-      model.create("nonexistent-id", "b1", "user-123", { body: "comment" })
-    ).rejects.toThrow("Project not found: nonexistent-id");
+    await expect(model.create("nonexistent-id", "b1", "user-123", { body: "comment" })).rejects.toThrow(
+      "Project not found: nonexistent-id",
+    );
   });
 
   it("lists comments by build", async () => {

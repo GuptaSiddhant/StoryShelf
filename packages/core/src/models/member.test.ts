@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { DatabaseAdapter } from "../adapters/database.ts";
+
 import { MemberModel } from "./member.ts";
 import { makeDatabase } from "./fake-adapters.ts";
 

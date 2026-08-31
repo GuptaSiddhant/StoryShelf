@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { DatabaseAdapter } from "../adapters/database.ts";
+
 import { SnapshotModel } from "./snapshot.ts";
 import { makeDatabase } from "./fake-adapters.ts";
 
@@ -7,20 +7,16 @@ describe("SnapshotModel", () => {
   it("creates a snapshot for a build", async () => {
     const { db } = makeDatabase();
     const model = new SnapshotModel(db);
-    const snapshot = await model.create(
-      "p1",
-      "b1",
-      {
-        storyId: "a",
-        storyName: "A",
-        storyTitle: "Component A",
-        storyImportPath: "./A.stories.tsx",
-        viewportName: "desktop",
-        viewportWidth: 1280,
-        viewportHeight: 720,
-        screenshotPath: "/path/to/screenshot.png",
-      }
-    );
+    const snapshot = await model.create("p1", "b1", {
+      storyId: "a",
+      storyName: "A",
+      storyTitle: "Component A",
+      storyImportPath: "./A.stories.tsx",
+      viewportName: "desktop",
+      viewportWidth: 1280,
+      viewportHeight: 720,
+      screenshotPath: "/path/to/screenshot.png",
+    });
     expect(snapshot.id).toBeDefined();
     expect(snapshot.storyId).toBe("a");
     expect(snapshot.storyName).toBe("A");
@@ -32,15 +28,23 @@ describe("SnapshotModel", () => {
     const { db } = makeDatabase();
     const model = new SnapshotModel(db);
     await model.create("p1", "b1", {
-      storyId: "a", storyName: "A", storyTitle: "A",
-      storyImportPath: "", viewportName: "desktop",
-      viewportWidth: 1280, viewportHeight: 720,
+      storyId: "a",
+      storyName: "A",
+      storyTitle: "A",
+      storyImportPath: "",
+      viewportName: "desktop",
+      viewportWidth: 1280,
+      viewportHeight: 720,
       screenshotPath: "/path/a.png",
     });
     await model.create("p1", "b1", {
-      storyId: "b", storyName: "B", storyTitle: "B",
-      storyImportPath: "", viewportName: "mobile",
-      viewportWidth: 320, viewportHeight: 480,
+      storyId: "b",
+      storyName: "B",
+      storyTitle: "B",
+      storyImportPath: "",
+      viewportName: "mobile",
+      viewportWidth: 320,
+      viewportHeight: 480,
       screenshotPath: "/path/b.png",
     });
 
@@ -54,9 +58,13 @@ describe("SnapshotModel", () => {
     const { db } = makeDatabase();
     const model = new SnapshotModel(db);
     const snapshot = await model.create("p1", "b1", {
-      storyId: "a", storyName: "A", storyTitle: "A",
-      storyImportPath: "", viewportName: "desktop",
-      viewportWidth: 1280, viewportHeight: 720,
+      storyId: "a",
+      storyName: "A",
+      storyTitle: "A",
+      storyImportPath: "",
+      viewportName: "desktop",
+      viewportWidth: 1280,
+      viewportHeight: 720,
       screenshotPath: "/path/a.png",
     });
     const fetched = await model.get(snapshot.id);
@@ -68,9 +76,13 @@ describe("SnapshotModel", () => {
     const { db } = makeDatabase();
     const model = new SnapshotModel(db);
     const snapshot = await model.create("p1", "b1", {
-      storyId: "a", storyName: "A", storyTitle: "A",
-      storyImportPath: "", viewportName: "desktop",
-      viewportWidth: 1280, viewportHeight: 720,
+      storyId: "a",
+      storyName: "A",
+      storyTitle: "A",
+      storyImportPath: "",
+      viewportName: "desktop",
+      viewportWidth: 1280,
+      viewportHeight: 720,
       screenshotPath: "/path/a.png",
     });
     const updated = await model.setStatus(snapshot.id, "approved" as const);
@@ -81,9 +93,13 @@ describe("SnapshotModel", () => {
     const { db } = makeDatabase();
     const model = new SnapshotModel(db);
     const snapshot = await model.create("p1", "b1", {
-      storyId: "a", storyName: "A", storyTitle: "A",
-      storyImportPath: "", viewportName: "desktop",
-      viewportWidth: 1280, viewportHeight: 720,
+      storyId: "a",
+      storyName: "A",
+      storyTitle: "A",
+      storyImportPath: "",
+      viewportName: "desktop",
+      viewportWidth: 1280,
+      viewportHeight: 720,
       screenshotPath: "/path/a.png",
     });
     const updated = await model.review(snapshot.id, "approved" as const, "user-1");
@@ -95,9 +111,13 @@ describe("SnapshotModel", () => {
     const { db } = makeDatabase();
     const model = new SnapshotModel(db);
     const snap = await model.create("p1", "b1", {
-      storyId: "a", storyName: "A", storyTitle: "A",
-      storyImportPath: "", viewportName: "desktop",
-      viewportWidth: 1280, viewportHeight: 720,
+      storyId: "a",
+      storyName: "A",
+      storyTitle: "A",
+      storyImportPath: "",
+      viewportName: "desktop",
+      viewportWidth: 1280,
+      viewportHeight: 720,
       screenshotPath: "/path/a.png",
     });
     expect(snap.id).toBeDefined();

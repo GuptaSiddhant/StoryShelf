@@ -116,8 +116,10 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
       gitProviders: import("./adapters/status.ts").GitProvider[];
     };
   }>();
-  const config = options.config ? validateConfig(options.config as Record<string, unknown>) : {};
-  const ui = options.ui ? validateUiConfig(options.ui as Record<string, unknown>) : {};
+  // eslint-disable-next-line typescript/no-unnecessary-type-assertion -- ShelfConfig lacks index signature
+  const config = options.config ? validateConfig(options.config as unknown as Record<string, unknown>) : {};
+  // eslint-disable-next-line typescript/no-unnecessary-type-assertion -- UIConfig lacks index signature
+  const ui = options.ui ? validateUiConfig(options.ui as unknown as Record<string, unknown>) : {};
   const logger = options.logger ?? createShelfLogger();
   const authEnabled = options.auth !== undefined;
 
@@ -326,7 +328,6 @@ export type {
   RenderFailure,
 } from "./adapters/capture-runner.ts";
 export type { CaptureQueue, CaptureJob, QueueEntry } from "./adapters/capture-queue.ts";
-export type { AuthAdapter, AuthUser, AuthCallback } from "./adapters/auth.ts";
 export type { AuthAdapter, AuthUser, AuthCallback } from "./adapters/auth.ts";
 export type { GitStatusAdapter, GitProvider, CheckStatus } from "./adapters/status.ts";
 export type { DiffOptions, DiffResult } from "./diff/options.ts";

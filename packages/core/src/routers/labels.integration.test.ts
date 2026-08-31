@@ -54,7 +54,7 @@ describe("Label-driven build resolution", () => {
 
     const types = await labelModel.listTypes("p1");
     expect(types).toHaveLength(1);
-    expect(types[0].key).toBe("custom");
+    expect(types[0]?.key).toBe("custom");
   });
 
   it("attaches labels to builds", async () => {
@@ -70,7 +70,7 @@ describe("Label-driven build resolution", () => {
 
     const labels = await labelModel.listForBuild("b1");
     expect(labels).toHaveLength(1);
-    expect(labels[0].typeKey).toBe("branch");
+    expect(labels[0]?.typeKey).toBe("branch");
   });
 
   it("finds latest build by label", async () => {

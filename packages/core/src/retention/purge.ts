@@ -1,4 +1,4 @@
-import { and, eq, inArray, lt } from "drizzle-orm";
+import { and, eq, inArray, lt, sql } from "drizzle-orm";
 import type { Logger } from "pino";
 
 import type { DatabaseAdapter } from "../adapters/database.ts";
@@ -77,8 +77,8 @@ export class Retention {
   }
 
   private async latestPerBranch(projectId: string): Promise<Set<string>> {
-    const rows = await this.db.all(
-      `SELECT id, gitBranch, createdAt FROM builds WHERE projectId = ${projectId} ORDER BY createdAt DESC`
+    const rows = await this.db.all<{ id: string; gitBranch: string }>(
+      sql`SELECT id, gitBranch, createdAt FROM builds WHERE projectId = ${projectId} ORDER BY createdAt DESC`,
     );
     const latest = new Map<string, string>();
     for (const row of rows) {

@@ -1,13 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { DatabaseAdapter } from "../adapters/database.ts";
+
 import { ProjectModel } from "./project.ts";
 import { makeDatabase } from "./fake-adapters.ts";
-
-const mockProjectData = {
-  name: "Test Project",
-  gitRepository: "owner/repo",
-  gitDefaultBranch: "main",
-};
 
 describe("ProjectModel", () => {
   it("creates a project with unique slug", async () => {
@@ -83,9 +77,10 @@ describe("ProjectModel", () => {
     const { db } = makeDatabase();
     const model = new ProjectModel(db);
     await model.create({ name: "To Be Deleted", gitRepository: "owner/repo" });
-    await model.remove("p1"); // id is ulid, but let's test
+    // id is ulid, but let's test
+    await model.remove("p1");
     // Note: fake db remove by id
     const deleted = await model.get("p1");
-    // In real usage this would work with actual ids
+    expect(deleted).toBeNull();
   });
 });
