@@ -139,15 +139,16 @@ async function createWithBaseline(ctx: CaptureContext, capture: RenderedSnapshot
 async function finalize(ctx: CaptureContext, storyIds: ReadonlySet<string>, failedStoryIds: ReadonlySet<string>): Promise<void> {
   const builds = new BuildModel(ctx.db);
   const build = await builds.updateCounts(ctx.build.id);
+  const hasCaptures = storyIds.size > 0;
   let status: BuildStatus = "reviewing";
   if (failedStoryIds.size > 0) {
     status = "failed";
-  } else if (build.changedCount === 0) {
+  } else if (hasCaptures && build.changedCount === 0) {
     status = "approved";
   }
   await builds.setStatus(ctx.build.id, status);
 
-  if (ctx.build.isDefault) {
+  if (ctx.build.isDefault && hasCaptures) {
     const baselines = new BaselineModel(ctx.db, ctx.storage);
     await baselines.removeOrphans(ctx.project.id, new Set(storyIds));
   }

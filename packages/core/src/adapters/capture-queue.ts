@@ -1,7 +1,5 @@
-/** Lifecycle status of a capture job, tracked by the capture queue. */
 export type JobStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
 
-/** A snapshot of a capture job's status, for the queue/status UI. */
 export interface QueueEntry {
   buildId: string;
   status: JobStatus;

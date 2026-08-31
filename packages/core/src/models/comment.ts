@@ -33,6 +33,7 @@ export class CommentModel {
    */
   async create(projectId: string, buildId: string, userId: string, input: CommentCreateInput): Promise<Comment> {
     const now = new Date().toISOString();
+    await this.db.get(projects, projectId); // validate project exists
     return await this.db.insert(comments, {
       id: ulid(),
       projectId,

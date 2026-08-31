@@ -77,15 +77,17 @@ export class Retention {
   }
 
   private async latestPerBranch(projectId: string): Promise<Set<string>> {
-    const all = await this.db.list(builds, { where: eq(builds.projectId, projectId) });
-    const latest = new Map<string, { id: string; createdAt: string }>();
-    for (const build of all) {
-      const current = latest.get(build.gitBranch);
-      if (!current || build.createdAt > current.createdAt) {
-        latest.set(build.gitBranch, { id: build.id, createdAt: build.createdAt });
+    const rows = await this.db.all(
+      `SELECT id, gitBranch, createdAt FROM builds WHERE projectId = ${projectId} ORDER BY createdAt DESC`
+    );
+    const latest = new Map<string, string>();
+    for (const row of rows) {
+      const current = latest.get(row.gitBranch);
+      if (!current) {
+        latest.set(row.gitBranch, row.id);
       }
     }
-    return new Set([...latest.values()].map((v) => v.id));
+    return new Set(latest.values());
   }
 
   private async deleteBuildFiles(projectId: string, buildId: string): Promise<number> {
