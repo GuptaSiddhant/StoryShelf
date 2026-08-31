@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { builds, projects } from "../schema.ts";
 import { makeStorage } from "../capture/fake-adapters.ts";
-import { makeDatabase } from "./fake-adapters.ts";
+import { makeDatabase } from "../capture/fake-adapters.ts";
 import { Retention } from "./purge.ts";
 
 describe("Retention", () => {

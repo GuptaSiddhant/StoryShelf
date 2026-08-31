@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BuildModel } from "./build.ts";
 import { ProjectModel } from "./project.ts";
 import { snapshots } from "../schema.ts";
-import { makeDatabase } from "./fake-adapters.ts";
+import { makeDatabase } from "../capture/fake-adapters.ts";
 
 describe("BuildModel", () => {
   it("creates a build with default status pending", async () => {

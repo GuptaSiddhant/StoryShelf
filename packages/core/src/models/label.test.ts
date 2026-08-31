@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LabelModel } from "./label.ts";
-import { makeDatabase } from "./fake-adapters.ts";
+import { makeDatabase } from "../capture/fake-adapters.ts";
 
 describe("LabelModel", () => {
   it("creates a label type", async () => {

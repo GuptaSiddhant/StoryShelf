@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { MemberModel } from "./member.ts";
-import { makeDatabase } from "./fake-adapters.ts";
+import { makeDatabase } from "../capture/fake-adapters.ts";
 
 describe("MemberModel", () => {
   it("sets a member role on a project", async () => {

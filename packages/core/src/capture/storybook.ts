@@ -8,20 +8,10 @@ interface StorybookIndex {
   entries: Record<string, { id: string; name: string; title: string; importPath?: string; tags?: string[]; type: string }>;
 }
 
-/**
- * StorySourceAdapter that discovers stories from a built Storybook's
- * `index.json`/`stories.json` and renders them via its iframe URL.
- */
 export class StorybookAdapter implements StorySourceAdapter {
   readonly name = "storybook";
   readonly screenshotSelector = "#storybook-root";
 
-  /**
-   * Discover all story entries from a built Storybook directory.
-   *
-   * @param source - Directory containing the built Storybook.
-   * @returns The discovered story entries (docs pages are excluded).
-   */
   async discover(source: string): Promise<StoryEntry[]> {
     const index = await this.readIndex(source);
     return Object.values(index.entries)
@@ -36,14 +26,6 @@ export class StorybookAdapter implements StorySourceAdapter {
       }));
   }
 
-  /**
-   * Build the iframe URL used to render a given story.
-   *
-   * @param baseUrl - Base URL of the built Storybook.
-   * @param storyId - Story ID to render.
-   * @returns The story's iframe URL.
-   */
-  // Function buildUrl is a pure helper bound by the StorySourceAdapter interface.
   // eslint-disable-next-line class-methods-use-this
   buildUrl(baseUrl: string, storyId: string): string {
     return `${baseUrl}/iframe.html?id=${encodeURIComponent(storyId)}&viewMode=story`;

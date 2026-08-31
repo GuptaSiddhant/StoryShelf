@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { WebhookModel } from "./webhook.ts";
-import { makeDatabase } from "./fake-adapters.ts";
+import { makeDatabase } from "../capture/fake-adapters.ts";
 
 describe("WebhookModel", () => {
   it("creates a webhook for a project", async () => {

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import { projects } from "../schema.ts";
-import { makeDatabase } from "./fake-adapters.ts";
+import { makeDatabase } from "../capture/fake-adapters.ts";
 import { CommentModel } from "./comment.ts";
 
 const mockProject = {

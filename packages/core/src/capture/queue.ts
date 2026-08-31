@@ -5,26 +5,10 @@ import type { CaptureJob, CaptureQueue, QueueEntry } from "../adapters/capture-q
 /* oxlint-disable typescript/require-await -- queue view reads are synchronous, but the CaptureQueue contract is async */
 
 export interface InMemoryCaptureQueueOptions {
-  /** Maximum number of capture jobs that may run concurrently. */
   concurrency: number;
-  /** Executes a single capture job. In-process on a long-lived host. */
   runJob: (job: CaptureJob) => Promise<void>;
-  /** Optional logger for queue state transitions. */
   logger?: Logger;
 }
-
-/**
- * The default, in-process `CaptureQueue`.
- *
- * Runs capture jobs in the same process on a long-lived host (Node). `enqueue`
- * resolves once the job is tracked; the job itself runs asynchronously, bounded
- * by `concurrency`. Failed jobs are recorded on their queue entry and logged
- * rather than thrown, because `enqueue` has already returned to the caller.
- *
- * Serverless deployments substitute a remote `CaptureQueue` (e.g. SQS, Workers
- * Queues, Azure Storage Queues) whose `enqueue` pushes to the external queue;
- * a separately-assembled worker then runs `executeCaptureJob`.
- */
 export class InMemoryCaptureQueue implements CaptureQueue {
   private readonly entries = new Map<string, QueueEntry>();
   private running = 0;

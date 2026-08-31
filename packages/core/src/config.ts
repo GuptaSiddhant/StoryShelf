@@ -8,31 +8,19 @@ import type { DatabaseAdapter } from "./adapters/database.ts";
 import type { GitProvider } from "./adapters/status.ts";
 import type { StorageAdapter } from "./adapters/storage.ts";
 
-/** Branding colors used to theme the web UI. */
 export interface BrandTheme {
-  /** Accent color. */
   accent: string;
-  /** Surface colors. */
   surface: { base: string; card: string };
-  /** Text colors. */
   text: { primary: string; secondary: string };
-  /** Border color. */
   border: string;
-  /** Status-specific colors. */
   status: { approved: string; new: string; rejected: string };
 }
 
-/** Branding and theme configuration for the web UI. */
 export interface UIConfig {
-  /** Brand name shown in the UI. */
   name?: string;
-  /** URL to a logo image. */
   logo?: string;
-  /** URL to a favicon. */
   favicon?: string;
-  /** Theme used in light mode. */
   lightTheme?: BrandTheme;
-  /** Theme used in dark mode. */
   darkTheme?: BrandTheme;
 }
 
@@ -71,7 +59,6 @@ export const uiConfigSchema = z
   })
   .strict();
 
-/** Runtime configuration passed to the shelf router. */
 export type ShelfConfig = z.infer<typeof shelfConfigSchema>;
 
 export function validateConfig(config: Record<string, unknown>): ShelfConfig {
@@ -92,28 +79,14 @@ export function validateUiConfig(config: Record<string, unknown>): UIConfig {
   return result.data;
 }
 
-/** Options used to construct a shelf router. */
 export interface ShelfOptions {
-  /** Database adapter. */
   database: DatabaseAdapter;
-  /** Storage adapter. */
   storage: StorageAdapter;
-  /** Capture runner for asynchronous builds. */
   captureRunner?: CaptureRunner;
-  /**
-   * Capture queue. Defaults to an in-process queue on long-lived hosts; supply
-   * a remote queue (SQS, Workers Queues, Azure Storage Queues) with a separate
-   * worker to run capture on serverless runtimes.
-   */
   captureQueue?: CaptureQueue;
-  /** Authentication adapter. */
   auth?: AuthAdapter;
-  /** Git provider integrations (array — one per integration, fanout per build). */
   gitProviders?: GitProvider[];
-  /** Logger override. If omitted, a pino logger is constructed internally. */
   logger?: Logger;
-  /** UI branding configuration. */
   ui?: UIConfig;
-  /** Runtime configuration. */
   config?: ShelfConfig;
 }

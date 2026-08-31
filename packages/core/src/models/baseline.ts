@@ -7,26 +7,12 @@ import { baselines, type Baseline } from "../schema.ts";
 import { baselinePath } from "../utils/paths.ts";
 import { ulid } from "../utils/ulid.ts";
 
-/** Data and storage operations for per-branch baselines. */
 export class BaselineModel {
-  /**
-   * @param db - Database adapter.
-   * @param storage - Storage adapter used to read and write baseline images.
-   */
   constructor(
     private readonly db: DatabaseAdapter,
     private readonly storage: StorageAdapter,
   ) {}
 
-  /**
-   * Fetch the baseline for a specific story, viewport, and branch.
-   *
-   * @param projectId - Project ID.
-   * @param storyId - Story ID.
-   * @param viewport - Viewport name.
-   * @param branch - Git branch.
-   * @returns The matching baseline, or null.
-   */
   async getFor(projectId: string, storyId: string, viewport: string, branch: string): Promise<Baseline | null> {
     const rows = await this.db.list(baselines, {
       where: and(eq(baselines.projectId, projectId), eq(baselines.storyId, storyId), eq(baselines.viewportName, viewport), eq(baselines.branch, branch)),
@@ -35,16 +21,6 @@ export class BaselineModel {
     return rows[0] ?? null;
   }
 
-  /**
-   * Resolve the effective baseline, falling back to the default branch.
-   *
-   * @param projectId - Project ID.
-   * @param storyId - Story ID.
-   * @param viewport - Viewport name.
-   * @param branch - Current git branch.
-   * @param defaultBranch - Default branch used as fallback.
-   * @returns The resolved baseline, or null.
-   */
   async resolve(projectId: string, storyId: string, viewport: string, branch: string, defaultBranch: string): Promise<Baseline | null> {
     if (branch !== defaultBranch) {
       const own = await this.getFor(projectId, storyId, viewport, branch);
@@ -55,22 +31,10 @@ export class BaselineModel {
     return this.getFor(projectId, storyId, viewport, defaultBranch);
   }
 
-  /** Read the screenshot bytes of a baseline. */
   async read(baseline: Baseline): Promise<Buffer> {
     return await this.storage.read(baseline.screenshotPath);
   }
 
-  /**
-   * Upsert a baseline for a story, copying the source screenshot into place.
-   *
-   * @param projectId - Project ID.
-   * @param storyId - Story ID.
-   * @param viewport - Viewport name.
-   * @param branch - Git branch.
-   * @param snapshotId - ID of the approving snapshot.
-   * @param sourcePath - Storage path of the source screenshot.
-   * @returns The created or updated baseline.
-   */
   async upsert(
     projectId: string,
     storyId: string,
@@ -122,18 +86,10 @@ export class BaselineModel {
     return baseline;
   }
 
-  /** List all baselines for a project. */
   async list(projectId: string): Promise<Baseline[]> {
     return await this.db.list(baselines, { where: eq(baselines.projectId, projectId) });
   }
 
-  /**
-   * Remove baselines whose stories are no longer valid.
-   *
-   * @param projectId - Project ID.
-   * @param validStoryIds - Set of currently valid story IDs.
-   * @returns The number of baselines removed.
-   */
   async removeOrphans(projectId: string, validStoryIds: Set<string>): Promise<number> {
     const all = await this.list(projectId);
     const toRemove = all.filter((baseline) => !validStoryIds.has(baseline.storyId));

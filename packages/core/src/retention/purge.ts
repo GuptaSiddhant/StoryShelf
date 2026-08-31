@@ -8,25 +8,15 @@ import { LabelModel } from "../models/label.ts";
 import { builds, type Project } from "../schema.ts";
 import { TERMINAL_BUILD_STATUSES } from "../types.ts";
 
-/** Options controlling which builds are purged. */
 export interface PurgeOptions {
-  /** Builds older than this many days are considered for removal. */
   ttlDays: number;
-  /** Whether to keep the latest build of each branch regardless of age. */
   keepLatestPerBranch: boolean;
 }
 
-/** The result of a purge run. */
 export interface PurgeResult {
-  /** Number of builds removed. */
   removedBuilds: number;
-  /** Number of storage files deleted. */
   removedFiles: number;
 }
-
-/**
- * Enforces build retention policy by purging expired build records and files.
- */
 export class Retention {
   constructor(
     private readonly db: DatabaseAdapter,
@@ -34,13 +24,7 @@ export class Retention {
     private readonly logger?: Logger,
   ) {}
 
-  /**
-   * Purge expired builds for a project, respecting the given options.
-   *
-   * @param project - The project whose builds should be purged.
-   * @param options - Purge policy options.
-   * @returns A summary of removed builds and files.
-   */
+
   async purge(project: Project, options: PurgeOptions): Promise<PurgeResult> {
     const cutoff = new Date(Date.now() - options.ttlDays * 86_400_000).toISOString();
     const candidates = await this.db.list(builds, {

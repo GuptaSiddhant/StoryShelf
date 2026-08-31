@@ -16,40 +16,14 @@ import { StorybookAdapter } from "./storybook.ts";
 import { DEFAULT_VIEWPORTS } from "./viewports.ts";
 import type { Viewport } from "./adapter.ts";
 
-/**
- * The capture orchestrator's dependencies.
- *
- * The orchestrator owns everything a capture renderer must not: loading the
- * build, extracting the uploaded archive, discovering stories, orchestrating
- * the pure renderer, and persisting snapshots/baselines/diffs.
- */
 export interface CaptureJobOptions {
-  /** Database adapter. */
   db: DatabaseAdapter;
-  /** Storage adapter holding the uploaded Storybook archive. */
   storage: StorageAdapter;
-  /** Pure renderer that turns an extracted Storybook directory into screenshots. */
   runner: CaptureRunner;
-  /** Base directory for extracting uploaded Storybook archives. */
   scratchDir: string;
-  /** Viewports to render at (defaults to `DEFAULT_VIEWPORTS`). */
   viewports?: Viewport[];
-  /** Optional logger; a scoped child is derived for the job. */
   logger?: Logger;
 }
-
-/**
- * Run a capture job for a build end to end.
- *
- * This is the server-side orchestration the `CaptureRunner` used to own
- * internally. It loads the target, sets the build capturing, extracts the
- * uploaded Storybook archive, discovers stories, delegates rendering to the
- * pure `runner`, and finally persists snapshots/diffs/baselines and finalizes
- * the build.
- *
- * @param input - The build to capture.
- * @param options - Orchestration dependencies.
- */
 export async function executeCaptureJob(input: { buildId: string; reqId?: string }, options: CaptureJobOptions): Promise<void> {
   const builds = new BuildModel(options.db);
   const { build, project } = await loadTarget(options, input.buildId);
