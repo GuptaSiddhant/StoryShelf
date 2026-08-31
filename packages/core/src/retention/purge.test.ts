@@ -1,44 +1,45 @@
 import { describe, expect, it } from "vitest";
-import { Retention } from "./purge.ts";
+import { builds } from "../schema.ts";
+import { makeStorage } from "../capture/fake-adapters.ts";
 import { makeDatabase } from "./fake-adapters.ts";
+import { Retention } from "./purge.ts";
 
-describe("Retention.latestPerBranch", () => {
-  it("finds the latest build per branch", async () => {
-    const db = makeDatabase();
+describe("Retention", () => {
+  it("purges expired terminal builds", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const now = new Date();
 
-    // Insert builds for different branches with different creation times
-    await db.remove(/* builds */ {} as any, "b1"); // no-op with fake
-    // Use the fake database's insert mechanism
-    (db as any).rows.set("b1", {
-      id: "b1", projectId: "p1", gitSha: "sha-1", gitBranch: "main",
-      isDefault: true, createdAt: "2026-01-15T00:00:00.000Z", updatedAt: "2026-01-15T00:00:00.000Z",
+    // Insert a project row so purge can reference it
+    const project = {
+      id: "p1", name: "Test", slug: "test", gitRepository: null,
+      gitDefaultBranch: "main", pixelThreshold: 0.1, maxDiffRatio: 0.01,
+      publicBranchRegex: null, createdAt: now.toISOString(), updatedAt: now.toISOString(),
+    };
+    await (db as any).insert(/* projects */ {} as any, project);
+
+    // Insert builds: one old approved, one recent approved
+    const oldDate = new Date(now.getTime() - 60 * 86_400_000).toISOString(); // 60 days ago
+    const recentDate = new Date(now.getTime() - 1 * 86_400_000).toISOString(); // 1 day ago
+
+    await db.insert(builds, {
+      id: "b-old", projectId: "p1", gitSha: "sha-old", gitBranch: "main",
+      isDefault: true, status: "approved", snapshotCount: 0, changedCount: 0,
+      approvedCount: 0, rejectedCount: 0, createdAt: oldDate, updatedAt: oldDate,
     });
-    (db as any).rows.set("b2", {
-      id: "b2", projectId: "p1", gitSha: "sha-2", gitBranch: "main",
-      isDefault: true, createdAt: "2026-01-10T00:00:00.000Z", updatedAt: "2026-01-10T00:00:00.000Z",
-    });
-    (db as any).rows.set("b3", {
-      id: "b3", projectId: "p1", gitSha: "sha-3", gitBranch: "feature/xyz",
-      isDefault: false, createdAt: "2026-01-20T00:00:00.000Z", updatedAt: "2026-01-20T00:00:00.000Z",
-    });
-    (db as any).rows.set("b4", {
-      id: "b4", projectId: "p1", gitSha: "sha-4", gitBranch: "feature/xyz",
-      isDefault: false, createdAt: "2026-01-05T00:00:00.000Z", updatedAt: "2026-01-05T00:00:00.000Z",
-    });
-    (db as any).rows.set("b5", {
-      id: "b5", projectId: "p1", gitSha: "sha-5", gitBranch: "develop",
-      isDefault: false, createdAt: "2026-01-25T00:00:00.000Z", updatedAt: "2026-01-25T00:00:00.000Z",
+    await db.insert(builds, {
+      id: "b-recent", projectId: "p1", gitSha: "sha-recent", gitBranch: "main",
+      isDefault: true, status: "approved", snapshotCount: 0, changedCount: 0,
+      approvedCount: 0, rejectedCount: 0, createdAt: recentDate, updatedAt: recentDate,
     });
 
-    const retention = new Retention(db as any, {} as any);
+    const retention = new Retention(db, storage);
+    const result = await retention.purge(project, { ttlDays: 30, keepLatestPerBranch: false });
 
-    const latest = await retention.latestPerBranch("p1");
-
-    // main branch should have b1 (latest, Jan 15 > Jan 10)
-    expect(latest.has("main")).toBe(true);
-    // feature/xyz should have b3 (latest, Jan 20 > Jan 5)
-    expect(latest.has("feature/xyz")).toBe(true);
-    // develop should have b5 (only one)
-    expect(latest.has("develop")).toBe(true);
+    // b-old should be purged, b-recent should remain
+    expect(result.removedBuilds).toBe(1);
+    const remaining = await db.list(builds);
+    expect(remaining.length).toBe(1);
+    expect(remaining[0].id).toBe("b-recent");
   });
 });

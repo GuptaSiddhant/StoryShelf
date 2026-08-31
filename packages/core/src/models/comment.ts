@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 
 import type { DatabaseAdapter } from "../adapters/database.ts";
-import { comments, type Comment } from "../schema.ts";
+import { comments, projects, type Comment } from "../schema.ts";
 import { ulid } from "../utils/ulid.ts";
 
 export interface CommentCreateInput {
@@ -33,7 +33,6 @@ export class CommentModel {
    */
   async create(projectId: string, buildId: string, userId: string, input: CommentCreateInput): Promise<Comment> {
     const now = new Date().toISOString();
-    await this.db.get(projects, projectId); // validate project exists
     const project = await this.db.get(projects, projectId);
     if (!project) {
       throw new Error(`Project not found: ${projectId}`);
@@ -46,6 +45,7 @@ export class CommentModel {
       userId,
       body: input.body,
       parentId: input.parentId,
+      resolved: false,
       createdAt: now,
       updatedAt: now,
     });

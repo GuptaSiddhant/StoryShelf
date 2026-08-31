@@ -11,7 +11,7 @@ const mockProjectData = {
 
 describe("ProjectModel", () => {
   it("creates a project with unique slug", async () => {
-    const db = makeDatabase();
+    const { db } = makeDatabase();
     const model = new ProjectModel(db);
     const project = await model.create({
       name: "Test Project",
@@ -25,7 +25,7 @@ describe("ProjectModel", () => {
   });
 
   it("creates project with custom default branch", async () => {
-    const db = makeDatabase();
+    const { db } = makeDatabase();
     const model = new ProjectModel(db);
     const project = await model.create({
       name: "Test Project",
@@ -36,7 +36,7 @@ describe("ProjectModel", () => {
   });
 
   it("gets a project by id", async () => {
-    const db = makeDatabase();
+    const { db } = makeDatabase();
     const model = new ProjectModel(db);
     const project = await model.create({
       name: "Test Project",
@@ -48,7 +48,7 @@ describe("ProjectModel", () => {
   });
 
   it("gets a project by slug", async () => {
-    const db = makeDatabase();
+    const { db } = makeDatabase();
     const model = new ProjectModel(db);
     const project = await model.create({
       name: "Test Project",
@@ -60,7 +60,7 @@ describe("ProjectModel", () => {
   });
 
   it("lists all projects", async () => {
-    const db = makeDatabase();
+    const { db } = makeDatabase();
     const model = new ProjectModel(db);
     await model.create({ name: "Project 1", gitRepository: "owner/repo" });
     await model.create({ name: "Project 2", gitRepository: "owner/repo" });
@@ -69,7 +69,7 @@ describe("ProjectModel", () => {
   });
 
   it("updates project fields", async () => {
-    const db = makeDatabase();
+    const { db } = makeDatabase();
     const model = new ProjectModel(db);
     const project = await model.create({
       name: "Test Project",
@@ -80,7 +80,7 @@ describe("ProjectModel", () => {
   });
 
   it("removes a project", async () => {
-    const db = makeDatabase();
+    const { db } = makeDatabase();
     const model = new ProjectModel(db);
     await model.create({ name: "To Be Deleted", gitRepository: "owner/repo" });
     await model.remove("p1"); // id is ulid, but let's test

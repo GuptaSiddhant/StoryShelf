@@ -131,7 +131,7 @@ describe("status provider fanout", () => {
       storage,
       captureRunner: runner,
       config: { captureConcurrency: 1, scratchDir, secret: "test-secret", purgeTtlDays: 30 },
-      statusProviders: [fakeStatusProvider("github-a", callsA, tokensA), fakeStatusProvider("github-b", callsB, tokensB)],
+      gitProviders: [fakeGitProvider("github-a", callsA, tokensA), fakeGitProvider("github-b", callsB, tokensB)],
       logger: pino({ level: "silent" }),
     });
 

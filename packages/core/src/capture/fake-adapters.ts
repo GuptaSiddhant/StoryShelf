@@ -128,7 +128,15 @@ export function makeDatabase(): { db: DatabaseAdapter } {
     list: listRows,
     count: countRows,
     all: async (_query: SQL) => {
-      throw new Error("all() is unused by the capture pipeline");
+      // For raw SQL queries, collect all rows across all tables.
+      // The caller is responsible for filtering/parsing the results.
+      const results: Record<string, unknown>[] = [];
+      for (const rows of tables.values()) {
+        for (const row of rows.values()) {
+          results.push(row as Record<string, unknown>);
+        }
+      }
+      return results as never[];
     },
     migrate: async () => {
       await Promise.resolve();

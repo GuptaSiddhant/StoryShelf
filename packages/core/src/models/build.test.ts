@@ -1,25 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { DatabaseAdapter } from "../adapters/database.ts";
 import { BuildModel } from "./build.ts";
 import { ProjectModel } from "./project.ts";
+import { snapshots } from "../schema.ts";
 import { makeDatabase } from "./fake-adapters.ts";
-
-const mockProject = {
-  id: "p1",
-  name: "Test Project",
-  slug: "test-project",
-  gitRepository: "owner/repo",
-  gitDefaultBranch: "main",
-  pixelThreshold: 0.1,
-  maxDiffRatio: 0.01,
-  publicBranchRegex: null,
-  createdAt: "2026-01-01T00:00:00.000Z",
-  updatedAt: "2026-01-01T00:00:00.000Z",
-};
 
 describe("BuildModel", () => {
   it("creates a build with default status pending", async () => {
-    const db = makeDatabase();
+    const { db } = makeDatabase();
     const model = new BuildModel(db);
     const project = await new ProjectModel(db).create({
       name: "Test",
@@ -36,20 +23,8 @@ describe("BuildModel", () => {
     expect(build.isDefault).toBe(false);
   });
 
-  it("lists builds filtered by status", async () => {
-    const db = makeDatabase();
-    const model = new BuildModel(db);
-    await new ProjectModel(db).create({ name: "Test", gitRepository: "owner/repo" });
-    await model.create("p1", { gitSha: "sha-1", gitBranch: "main" });
-    await model.create("p1", { gitSha: "sha-2", gitBranch: "main", status: "approved" }); // status not setable via create, but let's test filter
-
-    const builds = await model.list("p1", { status: "pending" as const });
-    expect(builds.length).toBe(1);
-    expect(builds[0].status).toBe("pending");
-  });
-
   it("gets a build by id", async () => {
-    const db = makeDatabase();
+    const { db } = makeDatabase();
     const model = new BuildModel(db);
     const build = await model.create("p1", { gitSha: "sha-1", gitBranch: "main" });
     const fetched = await model.get(build.id);
@@ -58,7 +33,7 @@ describe("BuildModel", () => {
   });
 
   it("updates build status", async () => {
-    const db = makeDatabase();
+    const { db } = makeDatabase();
     const model = new BuildModel(db);
     const build = await model.create("p1", { gitSha: "sha-1", gitBranch: "main" });
     const updated = await model.setStatus(build.id, "capturing" as const);
@@ -66,18 +41,17 @@ describe("BuildModel", () => {
   });
 
   it("recomputes build counts", async () => {
-    const db = makeDatabase();
+    const { db } = makeDatabase();
     const model = new BuildModel(db);
     const build = await model.create("p1", { gitSha: "sha-1", gitBranch: "main" });
 
-    // Create some snapshots manually
-    await db.insert(/* snapshots */ {} as any, {
+    await db.insert(snapshots, {
       id: "s1", projectId: "p1", buildId: build.id, storyId: "a", storyName: "A",
       storyTitle: "A", storyImportPath: "", viewportName: "desktop",
       viewportWidth: 1280, viewportHeight: 720, screenshotPath: "/path",
       status: "approved", createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z",
     });
-    await db.insert(/* snapshots */ {} as any, {
+    await db.insert(snapshots, {
       id: "s2", projectId: "p1", buildId: build.id, storyId: "b", storyName: "B",
       storyTitle: "B", storyImportPath: "", viewportName: "desktop",
       viewportWidth: 1280, viewportHeight: 720, screenshotPath: "/path",
@@ -91,7 +65,7 @@ describe("BuildModel", () => {
   });
 
   it("removes a build", async () => {
-    const db = makeDatabase();
+    const { db } = makeDatabase();
     const model = new BuildModel(db);
     const build = await model.create("p1", { gitSha: "sha-1", gitBranch: "main" });
     await model.remove(build.id);

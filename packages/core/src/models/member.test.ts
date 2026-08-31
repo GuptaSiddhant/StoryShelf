@@ -5,7 +5,7 @@ import { makeDatabase } from "./fake-adapters.ts";
 
 describe("MemberModel", () => {
   it("sets a member role on a project", async () => {
-    const db = makeDatabase();
+    const { db } = makeDatabase();
     const model = new MemberModel(db);
     const member = await model.set("p1", "user-1", "admin");
     expect(member.id).toBeDefined();
@@ -13,7 +13,7 @@ describe("MemberModel", () => {
   });
 
   it("gets members of a project", async () => {
-    const db = makeDatabase();
+    const { db } = makeDatabase();
     const model = new MemberModel(db);
     await model.set("p1", "user-1", "admin");
     await model.set("p1", "user-2", "viewer");
@@ -24,7 +24,7 @@ describe("MemberModel", () => {
   });
 
   it("removes a member from a project", async () => {
-    const db = makeDatabase();
+    const { db } = makeDatabase();
     const model = new MemberModel(db);
     await model.set("p1", "user-1", "admin");
     await model.remove("p1", "user-1");
@@ -32,8 +32,8 @@ describe("MemberModel", () => {
     expect(members.length).toBe(0);
   });
 
-  it "updates a member role", async () => {
-    const db = makeDatabase();
+  it("updates a member role", async () => {
+    const { db } = makeDatabase();
     const model = new MemberModel(db);
     await model.set("p1", "user-1", "viewer");
     // In a full impl there'd be an update method; test the set/reset cycle
