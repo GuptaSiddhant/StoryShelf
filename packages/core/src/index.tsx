@@ -1,18 +1,14 @@
 import { swaggerUI } from "@hono/swagger-ui";
-/* oxlint-disable max-lines */
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { requestId } from "hono/request-id";
 import type { AuthUser } from "./adapters/auth.ts";
 import type { CaptureQueue } from "./adapters/capture-queue.ts";
-import { executeCaptureJob, type CaptureJobOptions } from "./capture/orchestrator.ts";
-import { InMemoryCaptureQueue } from "./capture/queue.ts";
 import type { ShelfOptions } from "./config.ts";
 import { validateConfig, validateUiConfig } from "./config.ts";
 import { createShelfLogger } from "./logger.ts";
 import { csrf, rateLimit } from "./middleware/index.ts";
 import { BuildModel } from "./models/build.ts";
 import { ProjectModel } from "./models/project.ts";
-import { StatusConfigModel } from "./models/status-config.ts";
 import { registerAdmin } from "./routers/admin.ts";
 import { registerAssets } from "./routers/assets.ts";
 import { registerAuth } from "./routers/auth.ts";
@@ -26,22 +22,25 @@ import { registerTokens } from "./routers/tokens.ts";
 import { registerUiPages } from "./routers/ui.ts";
 import { registerWebhooks } from "./routers/webhooks.ts";
 import { getStore, runWithStore } from "./store.ts";
+import { executeCaptureJob, type CaptureJobOptions } from "./capture/orchestrator.ts";
+import { InMemoryCaptureQueue } from "./capture/queue.ts";
+import { postStatusesForBuild } from "./capture/status-fanout.ts";
 
-export type ShelfApp = OpenAPIHono<{
-  Variables: {
-    requestId?: string;
-    db: import("./adapters/database.ts").DatabaseAdapter;
-    storage: import("./adapters/storage.ts").StorageAdapter;
-    config: import("./config.ts").ShelfConfig;
-    ui: import("./config.ts").UIConfig;
-    logger: ReturnType<typeof createShelfLogger>;
-    user: import("./adapters/auth.ts").AuthUser | null;
-    authEnabled: boolean;
-    enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
-    captureQueue: import("./adapters/capture-queue.ts").CaptureQueue | null;
-    gitProviders: import("./adapters/status.ts").GitProvider[];
-  };
-}>;
+export type ShelfContext = {
+  requestId?: string;
+  db: import("./adapters/database.ts").DatabaseAdapter;
+  storage: import("./adapters/storage.ts").StorageAdapter;
+  config: import("./config.ts").ShelfConfig;
+  ui: import("./config.ts").UIConfig;
+  logger: ReturnType<typeof createShelfLogger>;
+  user: import("./adapters/auth.ts").AuthUser | null;
+  authEnabled: boolean;
+  enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
+  captureQueue: import("./adapters/capture-queue.ts").CaptureQueue | null;
+  gitProviders: import("./adapters/status.ts").GitProvider[];
+};
+
+export type ShelfApp = OpenAPIHono<{ Variables: ShelfContext }>;
 
 async function resolveUser(
   c: { req: { raw: Request; header: (name: string) => string | undefined } },
@@ -56,66 +55,9 @@ async function resolveUser(
   return await options.auth.check(c.req.raw);
 }
 
-async function postStatusesForBuild(opts: {
-  db: import("./adapters/database.ts").DatabaseAdapter;
-  project: import("./schema.ts").Project;
-  sha: string;
-  status: import("./adapters/status.ts").CheckStatus;
-  url: string;
-  providers: import("./adapters/status.ts").GitProvider[];
-  secret: string | undefined;
-  logger?: import("pino").Logger;
-}): Promise<void> {
-  if (opts.providers.length === 0) {
-    return;
-  }
-  const model = new StatusConfigModel(opts.db, opts.secret);
-  const rows = await model.list(opts.project.id);
-  const ctx = `storyshelf/${opts.project.slug}`;
-  await Promise.allSettled(
-    rows.map(async (row) => {
-      const provider = opts.providers.find((p) => p.provider === row.provider);
-      if (!provider) {
-        opts.logger?.warn({ provider: row.provider }, "no provider registered for status config");
-        return;
-      }
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(row.config);
-        provider.configSchema.parse(parsed);
-      } catch (error: unknown) {
-        opts.logger?.warn({ err: error, provider: row.provider }, "invalid status config");
-        return;
-      }
-      let token: string;
-      try {
-        token = model.decryptToken(row);
-      } catch (error: unknown) {
-        opts.logger?.warn({ err: error }, "failed to decrypt status token");
-        return;
-      }
-      const adapter = provider.create({ config: parsed, token, logger: opts.logger });
-      await adapter.setStatus(ctx, opts.sha, opts.status, opts.url);
-    }),
-  );
-}
 
 export function createShelfRouter(options: ShelfOptions): ShelfApp {
-  const app = new OpenAPIHono<{
-    Variables: {
-      requestId?: string;
-      db: import("./adapters/database.ts").DatabaseAdapter;
-      storage: import("./adapters/storage.ts").StorageAdapter;
-      config: import("./config.ts").ShelfConfig;
-      ui: import("./config.ts").UIConfig;
-      logger: ReturnType<typeof createShelfLogger>;
-      user: import("./adapters/auth.ts").AuthUser | null;
-      authEnabled: boolean;
-      enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
-      captureQueue: import("./adapters/capture-queue.ts").CaptureQueue | null;
-      gitProviders: import("./adapters/status.ts").GitProvider[];
-    };
-  }>();
+  const app = new OpenAPIHono<{ Variables: ShelfContext }>();
   // eslint-disable-next-line typescript/no-unnecessary-type-assertion -- ShelfConfig lacks index signature
   const config = options.config ? validateConfig(options.config as unknown as Record<string, unknown>) : {};
   // eslint-disable-next-line typescript/no-unnecessary-type-assertion -- UIConfig lacks index signature
