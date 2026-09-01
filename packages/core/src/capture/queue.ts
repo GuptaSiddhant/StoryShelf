@@ -2,8 +2,6 @@ import type { Logger } from "pino";
 
 import type { CaptureJob, CaptureQueue, QueueEntry } from "../adapters/capture-queue.ts";
 
-/* oxlint-disable typescript/require-await -- queue view reads are synchronous, but the CaptureQueue contract is async */
-
 export interface InMemoryCaptureQueueOptions {
   concurrency: number;
   runJob: (job: CaptureJob) => Promise<void>;
@@ -17,25 +15,25 @@ export class InMemoryCaptureQueue implements CaptureQueue {
 
   constructor(private readonly options: InMemoryCaptureQueueOptions) {}
 
-  async enqueue(job: CaptureJob): Promise<void> {
+  enqueue(job: CaptureJob): Promise<void> {
     const entry = this.track(job.buildId);
     this.log(job)?.info("capture queued");
     this.inFlight.set(job.buildId, this.process(job, entry));
-    await Promise.resolve();
+    return Promise.resolve();
   }
 
-  async status(buildId: string): Promise<QueueEntry | null> {
-    return this.entries.get(buildId) ?? null;
+  status(buildId: string): Promise<QueueEntry | null> {
+    return Promise.resolve(this.entries.get(buildId) ?? null);
   }
 
-  async active(): Promise<QueueEntry[]> {
-    return [...this.entries.values()]
+  active(): Promise<QueueEntry[]> {
+    return Promise.resolve([...this.entries.values()]
       .filter((entry) => entry.status === "queued" || entry.status === "running")
-      .toSorted((a, b) => a.queuedAt.localeCompare(b.queuedAt));
+      .toSorted((a, b) => a.queuedAt.localeCompare(b.queuedAt)));
   }
 
-  async recent(limit: number): Promise<QueueEntry[]> {
-    return [...this.entries.values()].toSorted((a, b) => b.queuedAt.localeCompare(a.queuedAt)).slice(0, limit);
+  recent(limit: number): Promise<QueueEntry[]> {
+    return Promise.resolve([...this.entries.values()].toSorted((a, b) => b.queuedAt.localeCompare(a.queuedAt)).slice(0, limit));
   }
 
   private async process(job: CaptureJob, entry: QueueEntry): Promise<void> {
