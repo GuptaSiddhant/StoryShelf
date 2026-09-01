@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { pathToFileURL } from "node:url";
 
-import { runCreate, type CreateOptions } from "./commands/create.ts";
+import { runCreate, type CreateOptions } from "./commands/create/index.ts";
 import { runInit, type InitOptions } from "./commands/init.ts";
 import { runPurge, type PurgeOptions } from "./commands/purge.ts";
 import { runRetry, type RetryOptions } from "./commands/retry.ts";

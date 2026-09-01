@@ -62,7 +62,7 @@
     "eslint/no-underscore-dangle": [
       "error",
       {
-        "allow": ["_InPath", "_zod"]
+        "allow": ["_InPath", "_zod", "__CLI_VERSION__"]
       }
     ],
     "typescript/explicit-member-accessibility": "allow",
