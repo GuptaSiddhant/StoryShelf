@@ -283,14 +283,18 @@
 - [x] No file `max-lines` disable
 - [x] Each function ≤50 LOC, ≤10 statements
 
-#### P-S5: Consolidate `urls.ts` + `types.ts` — Not Started
+#### P-S5: Consolidate `urls.ts` + `types.ts` — Done (f0c2bec1)
 
 **Slop:** `urls.ts:2-48` 9 one-liners, `types.ts:1-33` grab-bag, `capture/viewports.ts:1-4` 4-line file.
 
-**Action:** Inline `UrlBuilder` as `linkRoute()` templates; move `BuildStatus`/`SnapshotStatus` next to `schema.ts`; delete `viewports.ts` → `DEFAULT_VIEWPORTS` in `capture/adapter.ts`.
+**Action:** Moved `DEFAULT_VIEWPORTS` from `capture/viewports.ts` to `capture/adapter.ts`; deleted `viewports.ts`; stripped verbose JSDoc from `urls.ts`. `UrlBuilder` inlining and `BuildStatus`/`SnapshotStatus` move deferred (risky API change).
 
-**Files to Modify:**
-- `packages/core/src/urls.ts`, `packages/core/src/types.ts`, `packages/core/src/capture/viewports.ts`, `packages/core/src/capture/adapter.ts`
+**Files Modified:**
+- `packages/core/src/urls.ts`, `types.ts`, `capture/adapter.ts`, `capture/viewports.ts` (deleted), `capture/viewports.test.ts`, `index.tsx`
+
+**Acceptance Criteria:**
+- [x] `viewports.ts` deleted, `DEFAULT_VIEWPORTS` in `capture/adapter.ts`
+- [x] Tests 100/100
 
 ---
 
@@ -361,4 +365,4 @@
 
 ---
 
-*Last updated: 2026-08-31 — wave P1-P4 complete (482e8f27 + 35992cc7 + 3dc09aae), 100/100 tests passing, 0 lint errors. De-slop P-S1–P-S4 done (0e3c03d6, 87f15149, d469134c), P-S5–P-S8 pending.*
+*Last updated: 2026-08-31 — wave P1-P4 complete (482e8f27 + 35992cc7 + 3dc09aae), 100/100 tests passing, 0 lint errors. De-slop P-S1–P-S5 done (0e3c03d6, 87f15149, d469134c, f0c2bec1), P-S6–P-S8 pending.*
