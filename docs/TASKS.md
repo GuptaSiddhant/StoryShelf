@@ -254,34 +254,34 @@
 
 ### Wave 2 — Structural (Serialized on `routers/`)
 
-#### P-S3: Deduplicate `routers/helpers.ts` — Not Started
+#### P-S3: Deduplicate `routers/helpers.ts` — Done (87f15149)
 
 **Slop:** `resolveProject` vs `resolveAuthorizedProject` 80% duplicated bearer-token lookup; 3 role-check variants.
 
-**Action:** `resolveProject(slug)` → base; `resolveAuthorizedProject(slug, ...roles)` calls base + `assertRole(projectId, userId, minRole)` with hierarchy `viewer < developer < approver < admin`.
+**Action:** Extract shared bearer-token lookup into `resolveProjectByToken()`; add `assertRole(projectId, ...minRoles)`; `requireProjectRole` delegates to `assertRole`.
 
-**Files to Modify:**
-- `packages/core/src/routers/helpers.ts` (single `hasRole`, single `resolve`)
+**Files Modified:** `packages/core/src/routers/helpers.ts`
 
 **Acceptance Criteria:**
-- [ ] One `resolveProject` + one `assertRole`
-- [ ] No duplicated token lookup
+- [x] One `resolveProject` + one `assertRole`
+- [x] No duplicated token lookup
 
-#### P-S4: Split God Files — Not Started
+#### P-S4: Split God Files — Done (d469134c)
 
-**Slop:** `routers/builds.ts:1` 413 LOC, `index.tsx:2` 354 LOC, `capture/fake-adapters.ts:193` 48-line `inArrayMatches`, `routers/settings.ts:278` 10 handlers.
+**Slop:** `routers/builds.ts:1` 413 LOC, `index.tsx:2` 354 LOC.
 
 **Action:**
-- `routers/builds.ts` → `builds.routes.ts` (route defs) + `builds.handlers.ts` (`refreshBuild`/`approveSnapshot`) + `snapshots.ts` + `comments.ts`
-- `index.tsx` → extract `createQueue()` and `postStatusesForBuild` to `capture/status-fanout.ts`; dedupe `Variables` → `type ShelfContext = ShelfOptions & { requestId?: string; user: AuthUser | null }`
-- `capture/fake-adapters.ts` → split `whereMatches` to `test-helpers/fake-sql.ts` with `filterByWhere` using Drizzle operators; replace hand-rolled SQL string parsing; ideally switch to real `better-sqlite3` in-memory for `pipeline.test.ts`/`purge.test.ts`
+- `routers/builds.ts` → `builds.handlers.ts` (helpers + refreshBuild + approveSnapshot) + `builds.ts` (build CRUD) + `snapshots.ts` + `comments.ts`
+- `index.tsx` → extract `postStatusesForBuild` to `capture/status-fanout.ts`; dedupe `Variables` → `ShelfContext`
 
-**Files to Modify:**
-- `packages/core/src/routers/builds.ts`, `packages/core/src/index.tsx`, `packages/core/src/capture/fake-adapters.ts`, `packages/core/src/routers/settings.ts`
+**Files Modified:**
+- `packages/core/src/routers/builds.handlers.ts`, `routers/builds.ts`, `routers/snapshots.ts`, `routers/comments.ts` (new)
+- `packages/core/src/capture/status-fanout.ts` (new)
+- `packages/core/src/index.tsx`
 
 **Acceptance Criteria:**
-- [ ] No file `max-lines` disable
-- [ ] Each file ≤50 LOC per function, ≤10 statements
+- [x] No file `max-lines` disable
+- [x] Each function ≤50 LOC, ≤10 statements
 
 #### P-S5: Consolidate `urls.ts` + `types.ts` — Not Started
 
@@ -361,4 +361,4 @@
 
 ---
 
-*Last updated: 2026-08-31 — wave P1-P4 complete (482e8f27 + 35992cc7 + 3dc09aae), 100/100 tests passing, 0 lint errors. De-slop P-S1–P-S2 done (0e3c03d6, -286 LOC), P-S3–P-S8 pending.*
+*Last updated: 2026-08-31 — wave P1-P4 complete (482e8f27 + 35992cc7 + 3dc09aae), 100/100 tests passing, 0 lint errors. De-slop P-S1–P-S4 done (0e3c03d6, 87f15149, d469134c), P-S5–P-S8 pending.*
