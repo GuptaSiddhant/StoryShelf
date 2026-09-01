@@ -78,11 +78,11 @@ export function registerStatusConfigs(app: ShelfApp): void {
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
     const body = c.req.valid("json");
     const providers = getStore().gitProviders;
-    const provider = providers.find((p) => p.provider === body.provider);
+    const provider = providers.find((p) => p.metadata.kind === body.provider);
     if (!provider) {
       return c.json({ message: `Unknown provider: ${body.provider}` }, 400);
     }
-    const parsed = provider.configSchema.safeParse(body.config);
+    const parsed = provider.metadata.schema.safeParse(body.config);
     if (!parsed.success) {
       return c.json({ message: parsed.error.message }, 400);
     }

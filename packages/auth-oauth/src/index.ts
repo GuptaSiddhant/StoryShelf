@@ -1,6 +1,8 @@
 import { SESSION_COOKIE, type AuthAdapter, type AuthCallback, type AuthUser } from "@storyshelf/core/adapter/auth";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+declare const __PKG_VERSION__: string;
+
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 interface SessionPayload {
@@ -212,6 +214,12 @@ export function createOAuthAuth(options: OAuthAuthOptions): OAuthAuth {
   };
 
   return {
+    metadata: {
+      name: "OAuth",
+      version: typeof __PKG_VERSION__ === "undefined" ? "0.0.0" : __PKG_VERSION__, // oxlint-disable-line unicorn/no-typeof-undefined
+      description: "OAuth/OIDC auth adapter",
+      kind: "oauth",
+    },
     check,
     createSession,
     async destroySession() {

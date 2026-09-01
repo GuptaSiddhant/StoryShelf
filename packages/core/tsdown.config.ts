@@ -1,5 +1,7 @@
+import { readFileSync } from "node:fs";
 import { defineConfig, type UserConfig } from "tsdown";
 
+const pkg = JSON.parse(readFileSync("./package.json", "utf-8")) as { version: string };
 const isWatchMode = process.argv.includes("--watch") || process.argv.includes("-w");
 
 const entry: UserConfig["entry"] = {
@@ -35,4 +37,5 @@ export default defineConfig({
   deps: { neverBundle: true },
   shims: true,
   clean: !isWatchMode,
+  define: { __PKG_VERSION__: JSON.stringify(pkg.version) },
 });

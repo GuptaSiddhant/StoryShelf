@@ -1,5 +1,5 @@
 import type { FC } from "hono/jsx";
-import type { GitProvider } from "../adapters/status.ts";
+import type { GitAdapter } from "../adapters/status.ts";
 import type { Project } from "../schema.ts";
 import { Badge, Field, SelectField, TextareaField } from "../ui/components.tsx";
 
@@ -19,20 +19,20 @@ export interface StatusFormState {
 
 /* eslint-disable promise-function-async -- JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
-function providerOptions(providers: GitProvider[]): { value: string; label: string }[] {
-  return providers.map((provider) => ({ value: provider.provider, label: provider.name }));
+function providerOptions(providers: GitAdapter[]): { value: string; label: string }[] {
+  return providers.map((provider) => ({ value: provider.metadata.kind, label: provider.metadata.name }));
 }
 
 const StatusConfigRow: FC<{
   config: SettingsStatusConfig;
-  provider: GitProvider | undefined;
+  provider: GitAdapter | undefined;
   project: Project;
   isAdmin: boolean;
 }> = ({ config, provider, project, isAdmin }) => {
   const rendered = JSON.stringify(config.config);
   return (
     <tr key={config.id}>
-      <td>{provider?.name ?? config.provider}</td>
+      <td>{provider?.metadata.name ?? config.provider}</td>
       <td style="max-width:32ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title={rendered}>
         <code>{rendered}</code>
       </td>
@@ -53,7 +53,7 @@ const StatusConfigRow: FC<{
 
 const StatusCreateCard: FC<{
   project: Project;
-  providers: GitProvider[];
+  providers: GitAdapter[];
   formState?: StatusFormState;
 }> = ({ project, providers, formState }) => {
   return (
@@ -78,7 +78,7 @@ const StatusCreateCard: FC<{
   );
 };
 
-function renderCreateSection(project: Project, providers: GitProvider[], formState?: StatusFormState): unknown {
+function renderCreateSection(project: Project, providers: GitAdapter[], formState?: StatusFormState): unknown {
   if (providers.length === 0) {
     return <p class="field__hint">No git providers registered on this server.</p>;
   }
@@ -89,11 +89,11 @@ function renderCreateSection(project: Project, providers: GitProvider[], formSta
 export function renderSettingsStatus(
   project: Project,
   statusConfigs: SettingsStatusConfig[],
-  providers: GitProvider[],
+  providers: GitAdapter[],
   isAdmin: boolean,
   formState?: StatusFormState,
 ): unknown {
-  const byProvider = new Map(providers.map((provider) => [provider.provider, provider]));
+  const byProvider = new Map(providers.map((provider) => [provider.metadata.kind, provider]));
   return (
     <div class="grid" style="max-width: 880px;">
       {formState?.globalError ? (

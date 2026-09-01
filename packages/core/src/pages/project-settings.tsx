@@ -1,4 +1,4 @@
-import type { GitProvider } from "../adapters/status.ts";
+import type { GitAdapter } from "../adapters/status.ts";
 import type { LabelType, Project, Token } from "../schema.ts";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import { renderSettingsGeneral } from "./settings-general.tsx";
@@ -18,7 +18,7 @@ export interface ProjectSettingsData {
   members: SettingsMember[];
   webhooks: SettingsWebhook[];
   statusConfigs: SettingsStatusConfig[];
-  gitProviders: GitProvider[];
+  gitProviders: GitAdapter[];
   isAdmin: boolean;
 }
 

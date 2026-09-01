@@ -10,6 +10,8 @@ import {
 
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 
+declare const __PKG_VERSION__: string;
+
 /** Options for configuring an S3-compatible storage adapter. */
 export interface S3StorageOptions {
   /** S3 bucket name. */
@@ -47,6 +49,12 @@ export function createS3Storage(options: S3StorageOptions): StorageAdapter {
   const client = injectedClient ?? new S3Client({ endpoint, region, forcePathStyle: true });
 
   return {
+    metadata: {
+      name: "S3 Storage",
+      version: typeof __PKG_VERSION__ === "undefined" ? "0.0.0" : __PKG_VERSION__, // oxlint-disable-line unicorn/no-typeof-undefined
+      description: "S3-compatible storage adapter",
+      kind: "s3",
+    },
     async read(path) {
       const response = await client.send(
         new GetObjectCommand({ Bucket: bucket, Key: s3Key(prefix, path) }),

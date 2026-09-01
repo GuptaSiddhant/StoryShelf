@@ -7,6 +7,8 @@ import type { DatabaseAdapter, ListOptions } from "@storyshelf/core/adapter/data
 import { schema } from "@storyshelf/core/schema";
 import { DDL } from "@storyshelf/core/ddl";
 
+declare const __PKG_VERSION__: string;
+
 function idOf(table: AnySQLiteTable): SQLiteColumn {
   // eslint-disable-next-line no-non-null-assertion -- every table has an `id` column
   return getTableColumns(table)["id"]!;
@@ -23,6 +25,12 @@ export function createTursoDatabase(options: { url: string; authToken?: string }
   const db = drizzle(client, { schema });
 
   return {
+    metadata: {
+      name: "Turso",
+      version: typeof __PKG_VERSION__ === "undefined" ? "0.0.0" : __PKG_VERSION__, // oxlint-disable-line unicorn/no-typeof-undefined
+      description: "Turso/libSQL database adapter",
+      kind: "turso",
+    },
     async insert(table, values) {
       return await db.insert(table).values(values).returning().get();
     },

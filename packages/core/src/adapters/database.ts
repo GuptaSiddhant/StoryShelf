@@ -1,6 +1,8 @@
 import type { SQL } from "drizzle-orm";
 import type { AnySQLiteTable } from "drizzle-orm/sqlite-core";
 
+import type { AdapterMetadata } from "./metadata.ts";
+
 /** Options that narrow and page a list query. */
 export interface ListOptions {
   /** SQL WHERE condition. */
@@ -15,6 +17,8 @@ export interface ListOptions {
 
 /** Database abstraction over Drizzle tables, agnostic of the underlying driver. */
 export interface DatabaseAdapter {
+  /** Adapter identity. */
+  readonly metadata?: AdapterMetadata;
   /** Insert a row and return the inserted record. */
   insert<T extends AnySQLiteTable>(table: T, values: T["$inferInsert"]): Promise<T["$inferSelect"]>;
   /** Update a row by id and return the updated record. */

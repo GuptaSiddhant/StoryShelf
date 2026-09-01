@@ -2,12 +2,21 @@ import type { Logger } from "pino";
 
 import type { CaptureJob, CaptureQueue, QueueEntry } from "../adapters/capture-queue.ts";
 
+declare const __PKG_VERSION__: string;
+
 export interface InMemoryCaptureQueueOptions {
   concurrency: number;
   runJob: (job: CaptureJob) => Promise<void>;
   logger?: Logger;
 }
 export class InMemoryCaptureQueue implements CaptureQueue {
+  readonly metadata = {
+    name: "In-Memory Queue",
+    version: typeof __PKG_VERSION__ === "undefined" ? "0.0.0" : __PKG_VERSION__, // oxlint-disable-line unicorn/no-typeof-undefined
+    description: "In-process capture queue",
+    kind: "memory",
+  } as const;
+
   private readonly entries = new Map<string, QueueEntry>();
   private running = 0;
   private readonly waiting: (() => void)[] = [];
@@ -15,25 +24,25 @@ export class InMemoryCaptureQueue implements CaptureQueue {
 
   constructor(private readonly options: InMemoryCaptureQueueOptions) {}
 
-  enqueue(job: CaptureJob): Promise<void> {
+  async enqueue(job: CaptureJob): Promise<void> {
     const entry = this.track(job.buildId);
     this.log(job)?.info("capture queued");
     this.inFlight.set(job.buildId, this.process(job, entry));
-    return Promise.resolve();
+    await Promise.resolve();
   }
 
-  status(buildId: string): Promise<QueueEntry | null> {
-    return Promise.resolve(this.entries.get(buildId) ?? null);
+  async status(buildId: string): Promise<QueueEntry | null> {
+    return await Promise.resolve(this.entries.get(buildId) ?? null);
   }
 
-  active(): Promise<QueueEntry[]> {
-    return Promise.resolve([...this.entries.values()]
+  async active(): Promise<QueueEntry[]> {
+    return await Promise.resolve([...this.entries.values()]
       .filter((entry) => entry.status === "queued" || entry.status === "running")
       .toSorted((a, b) => a.queuedAt.localeCompare(b.queuedAt)));
   }
 
-  recent(limit: number): Promise<QueueEntry[]> {
-    return Promise.resolve([...this.entries.values()].toSorted((a, b) => b.queuedAt.localeCompare(a.queuedAt)).slice(0, limit));
+  async recent(limit: number): Promise<QueueEntry[]> {
+    return await Promise.resolve([...this.entries.values()].toSorted((a, b) => b.queuedAt.localeCompare(a.queuedAt)).slice(0, limit));
   }
 
   private async process(job: CaptureJob, entry: QueueEntry): Promise<void> {

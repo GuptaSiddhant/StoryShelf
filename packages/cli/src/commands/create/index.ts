@@ -1,4 +1,4 @@
-declare const __CLI_VERSION__: string;
+declare const __PKG_VERSION__: string;
 
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -81,7 +81,7 @@ function buildImports(answers: Answers): string[] {
     imports.push(`import { createPasswordAuth } from "${AUTH_PACKAGE[answers.auth]}";`);
   }
   if (answers.git !== "none") {
-    imports.push(`import { githubProvider } from "${GIT_PACKAGE[answers.git]}";`);
+    imports.push(`import { githubAdapter } from "${GIT_PACKAGE[answers.git]}";`);
   }
   imports.push(`import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";`);
   return imports;
@@ -110,7 +110,7 @@ function buildRouterLines(answers: Answers): string[] {
     lines.push(`  auth: createPasswordAuth({ password: process.env.AUTH_PASSWORD! }),`);
   }
   if (answers.git !== "none") {
-    lines.push(`  gitProviders: [githubProvider],`);
+    lines.push(`  gitProviders: [githubAdapter],`);
   }
 
   lines.push(
@@ -145,19 +145,19 @@ function generateServer(answers: Answers): string {
 function buildDeps(answers: Answers): Record<string, string> {
   const deps: Record<string, string> = {
     "@hono/node-server": "^1.17.0",
-    "@storyshelf/core": `^${__CLI_VERSION__}`,
-    [DB_PACKAGE[answers.database]]: `^${__CLI_VERSION__}`,
-    "@storyshelf/runner-playwright": `^${__CLI_VERSION__}`,
+    "@storyshelf/core": `^${__PKG_VERSION__}`,
+    [DB_PACKAGE[answers.database]]: `^${__PKG_VERSION__}`,
+    "@storyshelf/runner-playwright": `^${__PKG_VERSION__}`,
   };
 
   if (answers.storage !== "local") {
-    deps[STORAGE_PACKAGE[answers.storage]] = `^${__CLI_VERSION__}`;
+    deps[STORAGE_PACKAGE[answers.storage]] = `^${__PKG_VERSION__}`;
   }
   if (answers.auth !== "none") {
-    deps[AUTH_PACKAGE[answers.auth] ?? ""] = `^${__CLI_VERSION__}`;
+    deps[AUTH_PACKAGE[answers.auth] ?? ""] = `^${__PKG_VERSION__}`;
   }
   if (answers.git !== "none") {
-    deps[GIT_PACKAGE[answers.git] ?? ""] = `^${__CLI_VERSION__}`;
+    deps[GIT_PACKAGE[answers.git] ?? ""] = `^${__PKG_VERSION__}`;
   }
 
   return deps;

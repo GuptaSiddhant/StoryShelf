@@ -7,6 +7,8 @@ import type { DatabaseAdapter, ListOptions } from "@storyshelf/core/adapter/data
 import { schema } from "@storyshelf/core/schema";
 import { DDL } from "@storyshelf/core/ddl";
 
+declare const __PKG_VERSION__: string;
+
 function idOf(table: AnySQLiteTable): SQLiteColumn {
   // eslint-disable-next-line no-non-null-assertion -- every table has an `id` column
   return getTableColumns(table)["id"]!;
@@ -30,6 +32,12 @@ export function createSqliteDatabase(path: string): DatabaseAdapter {
   // false positives here.
   /* eslint-disable require-await, no-non-null-assertion, no-unnecessary-type-assertion */
   return {
+    metadata: {
+      name: "SQLite",
+      version: typeof __PKG_VERSION__ === "undefined" ? "0.0.0" : __PKG_VERSION__, // oxlint-disable-line unicorn/no-typeof-undefined
+      description: "SQLite database adapter (better-sqlite3 + Drizzle)",
+      kind: "sqlite",
+    },
     async insert(table, values) {
       const row = db.insert(table).values(values).returning().get();
       return row!;

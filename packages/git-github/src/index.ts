@@ -2,12 +2,13 @@ import { Octokit } from "@octokit/rest";
 import { z } from "zod";
 
 import type { Logger } from "pino";
-import type { CheckStatus, GitStatusAdapter, GitProvider } from "@storyshelf/core";
+import type { CheckStatus, GitAdapter } from "@storyshelf/core";
+
+declare const __PKG_VERSION__: string;
 
 export const githubConfigSchema = z.object({
   owner: z.string().min(1),
   repo: z.string().min(1),
-  contextPrefix: z.string().optional(),
 });
 
 export type GitHubConfig = z.infer<typeof githubConfigSchema>;
@@ -20,29 +21,43 @@ export interface GitHubStatusOptions {
   owner: string;
   /** Repository name. */
   repo: string;
-  /** Context prefix for statuses. Defaults to "storyshelf". */
-  contextPrefix?: string;
   /** Optional logger for diagnostics. */
   logger?: Logger;
 }
 
 /**
- * Create a GitHub-backed `GitStatusAdapter`.
+ * Create a GitHub-backed `GitAdapter` (configured instance).
  *
  * Posts commit statuses to GitHub using the REST API.
- * Context format: `${contextPrefix}/{project-slug}` (e.g., "storyshelf/my-app").
+ * Context format: `storyshelf/{project-slug}` (e.g., "storyshelf/my-app").
  *
  * @param options - Configuration including token, owner, repo.
- * @returns A `GitStatusAdapter` implementation.
+ * @returns A `GitAdapter` implementation.
  */
-export function createGitHubStatusAdapter(options: GitHubStatusOptions): GitStatusAdapter {
+export function createGitHubStatusAdapter(options: GitHubStatusOptions): GitAdapter {
   const octokit = new Octokit({ auth: options.token });
-  const contextPrefix = options.contextPrefix ?? "storyshelf";
   const logger = options.logger?.child({ component: "git-github" });
 
   return {
+    metadata: {
+      name: "GitHub",
+      version: typeof __PKG_VERSION__ === "undefined" ? "0.0.0" : __PKG_VERSION__, // oxlint-disable-line unicorn/no-typeof-undefined
+      description: "Commit statuses via GitHub REST API",
+      kind: "github",
+      logo: "github",
+      schema: githubConfigSchema,
+    },
+    withConfig(opts: { config: unknown; token: string; logger?: Logger }): GitAdapter {
+      const cfg = githubConfigSchema.parse(opts.config);
+      return createGitHubStatusAdapter({
+        token: opts.token,
+        owner: cfg.owner,
+        repo: cfg.repo,
+        logger: opts.logger,
+      });
+    },
     async setStatus(context: string, gitSha: string, status: CheckStatus, url: string): Promise<void> {
-      const ghContext = `${contextPrefix}/${context}`;
+      const ghContext = `storyshelf/${context}`;
       const state = mapStatus(status);
 
       logger?.debug({ context: ghContext, sha: gitSha, state, url }, "posting commit status");
@@ -66,22 +81,27 @@ export function createGitHubStatusAdapter(options: GitHubStatusOptions): GitStat
   };
 }
 
-export const githubProvider: GitProvider = {
-  provider: "github",
-  name: "GitHub",
-  description: "Commit statuses via GitHub REST API",
-  version: "1.0.0",
-  logo: "github",
-  configSchema: githubConfigSchema,
-  create(opts: { config: unknown; token: string; logger?: Logger }): GitStatusAdapter {
+export const githubAdapter: GitAdapter = {
+  metadata: {
+    name: "GitHub",
+    version: typeof __PKG_VERSION__ === "undefined" ? "0.0.0" : __PKG_VERSION__, // oxlint-disable-line unicorn/no-typeof-undefined
+    description: "Commit statuses via GitHub REST API",
+    kind: "github",
+    logo: "github",
+    schema: githubConfigSchema,
+  },
+  withConfig(opts: { config: unknown; token: string; logger?: Logger }): GitAdapter {
     const cfg = githubConfigSchema.parse(opts.config);
     return createGitHubStatusAdapter({
       token: opts.token,
       owner: cfg.owner,
       repo: cfg.repo,
-      contextPrefix: cfg.contextPrefix,
       logger: opts.logger,
     });
+  },
+  // eslint-disable-next-line require-await
+  async setStatus(): Promise<void> {
+    throw new Error("withConfig required — call githubAdapter.withConfig({config, token}) first");
   },
 };
 

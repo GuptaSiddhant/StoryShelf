@@ -5,7 +5,7 @@ import type { AuthAdapter } from "./adapters/auth.ts";
 import type { CaptureQueue } from "./adapters/capture-queue.ts";
 import type { CaptureRunner } from "./adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "./adapters/database.ts";
-import type { GitProvider } from "./adapters/status.ts";
+import type { GitAdapter } from "./adapters/status.ts";
 import type { StorageAdapter } from "./adapters/storage.ts";
 
 export interface BrandTheme {
@@ -38,6 +38,13 @@ const brandThemeSchema = z.object({
   status: z.object({ approved: z.string(), new: z.string(), rejected: z.string() }),
 });
 
+const adapterSnapshotSchema = z.object({
+  name: z.string(),
+  version: z.string(),
+  description: z.string().optional(),
+  kind: z.string(),
+});
+
 export const shelfConfigSchema = z
   .object({
     secret: z.string().min(1).optional(),
@@ -46,6 +53,7 @@ export const shelfConfigSchema = z
     scratchDir: z.string().optional(),
     purgeTtlDays: z.number().int().positive().optional(),
     viewports: z.array(viewportSchema).min(1, "at least one viewport required").optional(),
+    adapters: z.record(z.string(), adapterSnapshotSchema).optional(),
   })
   .strict();
 
@@ -85,7 +93,7 @@ export interface ShelfOptions {
   captureRunner?: CaptureRunner;
   captureQueue?: CaptureQueue;
   auth?: AuthAdapter;
-  gitProviders?: GitProvider[];
+  gitProviders?: GitAdapter[];
   logger?: Logger;
   ui?: UIConfig;
   config?: ShelfConfig;

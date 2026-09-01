@@ -4,6 +4,7 @@ import { requestId } from "hono/request-id";
 import type { AuthUser } from "./adapters/auth.ts";
 import type { CaptureQueue } from "./adapters/capture-queue.ts";
 import type { ShelfOptions } from "./config.ts";
+import type { AdapterMetadata, GitAdapterMetadata } from "./adapters/metadata.ts";
 import { validateConfig, validateUiConfig } from "./config.ts";
 import { createShelfLogger } from "./logger.ts";
 import { csrf, rateLimit } from "./middleware/index.ts";
@@ -37,10 +38,23 @@ export type ShelfContext = {
   authEnabled: boolean;
   enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
   captureQueue: import("./adapters/capture-queue.ts").CaptureQueue | null;
-  gitProviders: import("./adapters/status.ts").GitProvider[];
+  gitProviders: import("./adapters/status.ts").GitAdapter[];
 };
 
 export type ShelfApp = OpenAPIHono<{ Variables: ShelfContext }>;
+
+function buildAdapterSnapshot(options: ShelfOptions): Record<string, AdapterMetadata | GitAdapterMetadata> {
+  const snap: Record<string, AdapterMetadata | GitAdapterMetadata> = {};
+  if (options.database.metadata) snap["database"] = options.database.metadata;
+  if (options.storage.metadata) snap["storage"] = options.storage.metadata;
+  if (options.captureRunner?.metadata) snap["captureRunner"] = options.captureRunner.metadata;
+  if (options.captureQueue?.metadata) snap["captureQueue"] = options.captureQueue.metadata;
+  if (options.auth?.metadata) snap["auth"] = options.auth.metadata;
+  for (const p of options.gitProviders ?? []) {
+    snap[`git:${p.metadata.kind}`] = p.metadata;
+  }
+  return snap;
+}
 
 async function resolveUser(
   c: { req: { raw: Request; header: (name: string) => string | undefined } },
@@ -59,13 +73,21 @@ async function resolveUser(
 export function createShelfRouter(options: ShelfOptions): ShelfApp {
   const app = new OpenAPIHono<{ Variables: ShelfContext }>();
   // eslint-disable-next-line typescript/no-unnecessary-type-assertion -- ShelfConfig lacks index signature
-  const config = options.config ? validateConfig(options.config as unknown as Record<string, unknown>) : {};
+  const rawConfig = options.config ? validateConfig(options.config as unknown as Record<string, unknown>) : {};
   // eslint-disable-next-line typescript/no-unnecessary-type-assertion -- UIConfig lacks index signature
   const ui = options.ui ? validateUiConfig(options.ui as unknown as Record<string, unknown>) : {};
   const logger = options.logger ?? createShelfLogger();
   const authEnabled = options.auth !== undefined;
 
   const gitProviders = options.gitProviders ?? [];
+
+  // Adapter introspection — auto-populate config.adapters if not supplied
+  const config: import("./config.ts").ShelfConfig = rawConfig.adapters
+    ? rawConfig
+    : {
+        ...rawConfig,
+        adapters: buildAdapterSnapshot(options),
+      };
 
   let queue: CaptureQueue | null = null;
   let enqueueCapture: ((buildId: string, reqId?: string) => Promise<void>) | undefined;
@@ -271,7 +293,8 @@ export type {
 } from "./adapters/capture-runner.ts";
 export type { CaptureQueue, CaptureJob, QueueEntry } from "./adapters/capture-queue.ts";
 export type { AuthAdapter, AuthUser, AuthCallback } from "./adapters/auth.ts";
-export type { GitStatusAdapter, GitProvider, CheckStatus } from "./adapters/status.ts";
+export type { GitAdapter, CheckStatus } from "./adapters/status.ts";
+export type { AdapterMetadata, GitAdapterMetadata } from "./adapters/metadata.ts";
 export type { DiffOptions, DiffResult } from "./diff/options.ts";
 export type { Viewport, StoryEntry, StorySourceAdapter } from "./capture/adapter.ts";
 export { createShelfLogger, type LoggerOptions, type PinoTransport } from "./logger.ts";

@@ -1,3 +1,4 @@
+/* oxlint-disable max-lines-per-function, eslint/max-params */
 import { describe, expect, it, vi } from "vitest";
 
 import type { Logger } from "pino";

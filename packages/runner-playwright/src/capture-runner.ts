@@ -11,6 +11,8 @@ import {
   type Viewport,
 } from "@storyshelf/core";
 
+declare const __PKG_VERSION__: string;
+
 import { createStaticServer } from "./static-server.ts";
 
 interface ScreenshotContext {
@@ -37,6 +39,12 @@ export interface PlaywrightRenderInput {
 
 export function createPlaywrightCaptureRunner(): CaptureRunner {
   return {
+    metadata: {
+      name: "Playwright",
+      version: typeof __PKG_VERSION__ === "undefined" ? "0.0.0" : __PKG_VERSION__, // oxlint-disable-line unicorn/no-typeof-undefined
+      description: "Playwright capture runner",
+      kind: "playwright",
+    },
     async render(input: PlaywrightRenderInput) {
       const active: ActiveRun = { cancelled: false, browser: null };
       activeRuns.set(input.buildId, active);

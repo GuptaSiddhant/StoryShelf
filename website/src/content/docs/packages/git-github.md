@@ -3,7 +3,7 @@ title: "@storyshelf/git-github"
 description: GitHub commit-status provider for StoryShelf's visual-testing merge gate.
 ---
 
-`@storyshelf/git-github` posts commit statuses to GitHub so visual tests show up as PR checks. It implements the `GitProvider` / `GitStatusAdapter` contracts from `@storyshelf/core`: the server reads each project's saved status config, decrypts its token, and posts `pending` while capturing, `success` when approved, and `failure` on rejection or capture errors.
+`@storyshelf/git-github` posts commit statuses to GitHub so visual tests show up as PR checks. It implements the `GitAdapter` contract from `@storyshelf/core`: the server reads each project's saved status config, decrypts its token, and posts `pending` while capturing, `success` when approved, and `failure` on rejection or capture errors. The adapter exposes `metadata` (`name`, `version`, `description`, `kind:"github"`, `logo`, `schema`) with `version` injected from `package.json` via `__PKG_VERSION__`.
 
 ## Install
 
@@ -13,24 +13,24 @@ nub add @storyshelf/git-github
 
 ## Register the provider
 
-Pass `githubProvider` in the `gitProviders` array of `createShelfRouter`:
+Pass `githubAdapter` in the `gitProviders` array of `createShelfRouter`:
 
 ```ts
 import { createShelfRouter } from "@storyshelf/core";
-import { githubProvider } from "@storyshelf/git-github";
+import { githubAdapter } from "@storyshelf/git-github";
 
 const app = createShelfRouter({
   database,
   storage,
   captureRunner,
-  gitProviders: [githubProvider],
+  gitProviders: [githubAdapter],
   config: {
     secret: process.env.SHELF_SECRET, // also encrypts status tokens
   },
 });
 ```
 
-Multiple providers can be registered (e.g. `githubProvider` plus a GitLab provider once available). `gitProviders` is an array — every registered provider that has a saved config for the build's project receives each status update (fanout per build).
+Multiple providers can be registered (e.g. `githubAdapter` plus a GitLab provider once available). `gitProviders` is an array — every registered provider that has a saved config for the build's project receives each status update (fanout per build).
 
 ## Configure a project
 
@@ -42,15 +42,15 @@ Content-Type: application/json
 
 {
   "provider": "github",
-  "config": { "owner": "acme", "repo": "widgets", "contextPrefix": "ci" },
+  "config": { "owner": "acme", "repo": "widgets" },
   "token": "github_pat_..."
 }
 ```
 
-- **`config`** — `{ owner, repo, contextPrefix? }`. `contextPrefix` defaults to `storyshelf`.
+- **`config`** — `{ owner, repo }`. Validated by `githubAdapter.metadata.schema`.
 - **`token`** — a GitHub token with `repo:status` scope. It is stored encrypt-at-rest with AES-256-GCM keyed by the `secret` in `ShelfConfig`; only the `provider`, `config`, and `hasToken` flag are readable from the API.
 
-Statuses are posted under the context `{contextPrefix}/{project-slug}` (e.g. `storyshelf/my-app`), pointing at the build review page.
+Statuses are posted under the context `storyshelf/{project-slug}` (e.g. `storyshelf/my-app`), pointing at the build review page.
 
 ## Merge gate
 
@@ -58,4 +58,4 @@ Mark StoryShelf's status check as required in GitHub branch protection so PRs ca
 
 ## Direct use
 
-For custom wiring, `createGitHubStatusAdapter({ token, owner, repo, contextPrefix?, logger? })` returns a bare `GitStatusAdapter` that posts a single `setStatus(context, gitSha, status, url)` without the config-descriptor machinery.
+For custom wiring, `createGitHubStatusAdapter({ token, owner, repo, logger? })` returns a bound `GitAdapter` that posts via `setStatus(context, gitSha, status, url)`. The template adapter `githubAdapter` exposes `withConfig({config, token, logger})` to create a configured instance per project.

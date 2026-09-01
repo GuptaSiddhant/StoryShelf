@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { defineConfig } from "tsdown";
 
-const pkg = JSON.parse(readFileSync("./package.json", "utf-8"));
+const pkg = JSON.parse(readFileSync("./package.json", "utf-8")) as { version: string };
 
 export default defineConfig({
   banner: { js: "#!/usr/bin/env node" },
@@ -15,6 +15,6 @@ export default defineConfig({
   deps: { neverBundle: true },
   clean: true,
   define: {
-    __CLI_VERSION__: JSON.stringify(pkg.version),
+    __PKG_VERSION__: JSON.stringify(pkg.version),
   },
 });

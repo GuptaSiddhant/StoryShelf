@@ -1,5 +1,5 @@
 import type { Context } from "hono";
-import type { GitProvider } from "../adapters/status.ts";
+import type { GitAdapter } from "../adapters/status.ts";
 import type { ShelfApp } from "../index.tsx";
 
 import { LabelModel } from "../models/label.ts";
@@ -25,7 +25,7 @@ interface SettingsData {
   members: SettingsMember[];
   webhooks: SettingsWebhook[];
   statusConfigs: SettingsStatusConfig[];
-  gitProviders: GitProvider[];
+  gitProviders: GitAdapter[];
   isAdmin: boolean;
 }
 
@@ -243,7 +243,7 @@ export function registerSettingsPages(app: ShelfApp): void {
     const token = asString(form.get("token"));
     const configRaw = asString(form.get("config")) ?? "{}";
     const providers = getStore().gitProviders;
-    const provider = providers.find((p) => p.provider === providerKey);
+    const provider = providers.find((p) => p.metadata.kind === providerKey);
     if (!provider) {
       return c.html((await renderSettingsPage(c, "status", { globalError: "Unknown git provider" })) ?? "", 400);
     }
@@ -256,12 +256,12 @@ export function registerSettingsPages(app: ShelfApp): void {
     } catch {
       return c.html((await renderSettingsPage(c, "status", { errors: { config: "Config must be valid JSON" } })) ?? "", 400);
     }
-    const parsed = provider.configSchema.safeParse(config);
+    const parsed = provider.metadata.schema.safeParse(config);
     if (!parsed.success) {
       return c.html((await renderSettingsPage(c, "status", { errors: { config: parsed.error.message } })) ?? "", 400);
     }
     const { db, config: shelfConfig } = getStore();
-    await new StatusConfigModel(db, shelfConfig.secret).create(project.id, { provider: provider.provider, config: parsed.data, token });
+    await new StatusConfigModel(db, shelfConfig.secret).create(project.id, { provider: provider.metadata.kind, config: parsed.data, token });
     return hxRedirect(c, `/projects/${project.slug}/settings/status`);
   });
 

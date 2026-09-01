@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import type { CaptureRunner, RenderResult } from "./adapters/capture-runner.ts";
-import type { CheckStatus, GitStatusAdapter, GitProvider } from "./adapters/status.ts";
+import type { CheckStatus, GitAdapter } from "./adapters/status.ts";
 import { makeDatabase, makeStorage } from "./capture/fake-adapters.ts";
 import { createShelfRouter } from "./index.tsx";
 import type { Build } from "./schema.ts";
@@ -25,6 +25,7 @@ interface StatusCall {
 }
 
 function fakeRunner(overrides: Partial<CaptureRunner> = {}): { runner: CaptureRunner; render: ReturnType<typeof vi.fn> } {
+  const metadata = { name: "Fake Runner", version: "0.0.0", kind: "fake" } as const;
   const result: RenderResult = {
     captures: [
       {
@@ -42,18 +43,22 @@ function fakeRunner(overrides: Partial<CaptureRunner> = {}): { runner: CaptureRu
   const cancel = overrides.cancel ?? vi.fn(async () => {
     await Promise.resolve();
   });
-  return { runner: { render, cancel }, render: render as ReturnType<typeof vi.fn> };
+  return { runner: { metadata, render, cancel }, render: render as ReturnType<typeof vi.fn> };
 }
 
-function fakeGitProvider(key: string, calls: StatusCall[], tokens: string[]): GitProvider {
+function fakeGitProvider(key: string, calls: StatusCall[], tokens: string[]): GitAdapter {
   const configSchema = z.object({ owner: z.string().min(1), repo: z.string().min(1) });
-  return {
-    provider: key,
-    name: `Fake ${key}`,
-    version: "0.0.0",
-    configSchema,
-    create(opts: { config: unknown; token: string; logger?: Logger }): GitStatusAdapter {
+  const base: GitAdapter = {
+    metadata: {
+      name: `Fake ${key}`,
+      version: "0.0.0",
+      kind: key,
+      schema: configSchema,
+    },
+    withConfig(opts: { config: unknown; token: string; logger?: Logger }): GitAdapter {
       return {
+        metadata: base.metadata,
+        withConfig: (nextOpts: { config: unknown; token: string; logger?: Logger }): GitAdapter => base.withConfig(nextOpts),
         setStatus: async (context, gitSha, status, url): Promise<void> => {
           calls.push({ context, gitSha, status, url });
           tokens.push(opts.token);
@@ -61,7 +66,11 @@ function fakeGitProvider(key: string, calls: StatusCall[], tokens: string[]): Gi
         },
       };
     },
+    setStatus: async (): Promise<void> => {
+      await Promise.resolve();
+    },
   };
+  return base;
 }
 
 function zipWithIndex(): Buffer {

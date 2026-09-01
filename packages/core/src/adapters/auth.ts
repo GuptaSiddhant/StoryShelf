@@ -1,3 +1,4 @@
+import type { AdapterMetadata } from "./metadata.ts";
 import type { ProjectRole, SiteRole } from "../types.ts";
 
 /** Shared session cookie name used by all auth adapters (ADR 0008). */
@@ -35,6 +36,8 @@ export interface ProjectAccess {
 
 /** Pluggable authentication abstraction (ADR 0008). */
 export interface AuthAdapter {
+  /** Adapter identity. */
+  readonly metadata?: AdapterMetadata;
   /** Resolve the current user from a request, or null if unauthenticated. */
   check(request: Request): Promise<AuthUser | null>;
   /** Create a session for a user and return a session token. */

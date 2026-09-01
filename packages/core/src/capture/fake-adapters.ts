@@ -13,6 +13,7 @@ export interface FakeStorage {
 export function makeStorage(): FakeStorage {
   const objects = new Map<string, Buffer>();
   const storage: StorageAdapter = {
+    metadata: { name: "Fake Storage", version: "0.0.0", kind: "memory" },
     read: async (path) => {
       const found = objects.get(path);
       if (found === undefined) {
@@ -119,6 +120,7 @@ export function makeDatabase(): { db: DatabaseAdapter } {
   };
 
   const db: DatabaseAdapter = {
+    metadata: { name: "Fake Database", version: "0.0.0", kind: "memory" },
     insert: insertRow,
     update: updateRow,
     get: getRow,

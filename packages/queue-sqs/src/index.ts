@@ -14,6 +14,8 @@ import type {
 
 import type { Logger } from "pino";
 
+declare const __PKG_VERSION__: string;
+
 /** Options for configuring an SQS-backed CaptureQueue. */
 export interface SqsCaptureQueueOptions {
   /** SQS queue URL. */
@@ -70,6 +72,12 @@ export function createSqsCaptureQueue(
   const client = options.client ?? new SQSClient({});
 
   return {
+    metadata: {
+      name: "SQS Queue",
+      version: typeof __PKG_VERSION__ === "undefined" ? "0.0.0" : __PKG_VERSION__, // oxlint-disable-line unicorn/no-typeof-undefined
+      description: "SQS-backed capture queue",
+      kind: "sqs",
+    },
     /**
      * Submit a build for capture. Resolves once the message is sent to SQS.
      *
