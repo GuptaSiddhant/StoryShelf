@@ -25,11 +25,17 @@
     ],
     "func-style": ["allow"],
     "max-lines-per-function": [
-      "warn",
+      "error",
       {
         "max": 50,
         "skipBlankLines": true,
         "skipComments": true
+      }
+    ],
+    "max-statements": [
+      "error",
+      {
+        "max": 10
       }
     ],
     "import/consistent-type-specifier-style": "allow",
@@ -77,6 +83,13 @@
       "files": ["**/*.test.ts", "**/*.spec.ts", "**/mocks/**"],
       "rules": {
         "typescript/no-confusing-void-expression": "allow"
+      }
+    },
+    {
+      "files": ["packages/cli/src/commands/upload.ts", "packages/cli/src/client.ts", "packages/db-turso/src/index.test.ts"],
+      "rules": {
+        "max-lines-per-function": "warn",
+        "max-statements": "warn"
       }
     }
   ]
