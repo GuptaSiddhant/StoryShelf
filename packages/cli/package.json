@@ -19,10 +19,12 @@
   "dependencies": {
     "adm-zip": "^0.6.0",
     "commander": "^13.0.0",
-    "hono": "^4.11.0"
+    "hono": "^4.11.0",
+    "prompts": "^2.4.2"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@types/prompts": "^2.4.9",
     "@vitest/coverage-v8": "catalog:",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
@@ -31,5 +33,10 @@
     "typescript": "catalog:",
     "vitest": "catalog:",
     "@storyshelf/core": "workspace:*"
+  },
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./package.json": "./package.json"
   }
 }

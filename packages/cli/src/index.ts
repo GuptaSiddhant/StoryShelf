@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { pathToFileURL } from "node:url";
 
+import { runCreate, type CreateOptions } from "./commands/create.ts";
 import { runInit, type InitOptions } from "./commands/init.ts";
 import { runPurge, type PurgeOptions } from "./commands/purge.ts";
 import { runRetry, type RetryOptions } from "./commands/retry.ts";
@@ -26,6 +27,12 @@ function run<TArgs>(fn: (args: TArgs) => Promise<void>): (args: TArgs) => Promis
 export function createProgram(): Command {
   const program = new Command();
   program.name("storyshelf").description("Self-hosted visual testing for Storybook.").version("0.1.0");
+
+  program
+    .command("create")
+    .description("Scaffold a new StoryShelf server project")
+    .option("--dir <dir>", "output directory")
+    .action(run<CreateOptions>(runCreate));
 
   program
     .command("init")
