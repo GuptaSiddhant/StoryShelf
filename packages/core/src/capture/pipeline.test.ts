@@ -6,6 +6,7 @@ import { baselines, builds, snapshots, type Build, type Project } from "../schem
 import { diffPath } from "../utils/paths.ts";
 import type { StoryEntry, Viewport } from "./adapter.ts";
 import { makeDatabase, makeStorage } from "./fake-adapters.ts";
+import { createTestProject, createTestBuild } from "../test-helpers/createProject.ts";
 import { persistCapture, type CaptureContext } from "./pipeline.ts";
 
 const DEFAULT_VIEWPORT: Viewport = { name: "mobile", width: 320, height: 480 };

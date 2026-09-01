@@ -693,19 +693,13 @@ StoryShelf/
 
     cli/
       src/
-        index.ts          # CLI client entry (commander: upload/init/retry/purge, no Playwright)
+        index.ts          # CLI client entry (commander: upload/init/retry/purge/create, no Playwright)
         commands/
           upload.ts       # storyshelf upload (build Storybook -> zip -> upload; git tags -> persistent label)
           retry.ts        # storyshelf retry (re-run capture for a build)
           init.ts         # storyshelf init (create project, generate token)
           purge.ts        # storyshelf purge (manual retention purge)
-      package.json
-
-    node-server/
-      src/
-        index.ts          # server entry (commander: `serve`, the default command)
-        commands/
-          serve.ts        # storyshelf-server serve (assemble router + adapters + runner, listen)
+          create.ts       # storyshelf create (scaffold server project)
       package.json
 
     runner-playwright/
@@ -789,7 +783,7 @@ RUN nubx nub run build
 EXPOSE 3000
 VOLUME /app/data
 
-CMD ["node", "packages/node-server/dist/index.js", "serve", "--port", "3000", "--data-dir", "/app/data"]
+CMD ["node", "--experimental-transform-types", "server.ts"]
 ```
 
 ```yaml

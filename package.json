@@ -32,8 +32,6 @@
     "docs": "nub run --filter website start",
     "fmt": "turbo fmt",
     "lint": "turbo lint",
-    "serve": "nub run --filter @storyshelf/node-server start serve",
-    "server": "nub run --filter @storyshelf/node-server start serve",
     "test": "turbo test",
     "audit": "turbo audit",
     "verify": "turbo verify --filter='./packages/*' --filter='website'",

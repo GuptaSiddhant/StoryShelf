@@ -13,7 +13,7 @@ import type { Build, Project } from "../schema.ts";
 import { storybookZipPath } from "../utils/paths.ts";
 import { persistCapture } from "./pipeline.ts";
 import { StorybookAdapter } from "./storybook.ts";
-import { DEFAULT_VIEWPORTS } from "./viewports.ts";
+import { DEFAULT_VIEWPORTS } from "./adapter.ts";
 import type { Viewport } from "./adapter.ts";
 
 export interface CaptureJobOptions {

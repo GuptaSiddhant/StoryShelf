@@ -15,9 +15,8 @@ packages/
   storage-s3/     @storyshelf/storage-s3    — S3-compatible storage
   auth-oauth/     @storyshelf/auth-oauth    — OIDC auth
   auth-password/  @storyshelf/auth-password — shared-password auth
-  cli/            @storyshelf/cli           — CLI client (upload, init, purge, retry)
+  cli/            @storyshelf/cli           — CLI client (create, upload, init, purge, retry)
   runner-playwright/ @storyshelf/runner-playwright — Playwright capture runner
-  node-server/    @storyshelf/node-server   — Node self-hosted server (storyshelf-server serve + capture)
 website/                                    — public docs (Astro Starlight)
 examples/
   storybook/                                — deterministic capture fixture
@@ -29,13 +28,19 @@ docs/                                       — architecture, ADRs, testing, web
 
 ```sh
 nub install                      # install workspace deps
-nub run serve                    # dev server from TS source, hot-restarts on any change
 nub run build                    # turbo build all packages
 nub run test                     # turbo test
 nub run verify                   # build + lint + test
 ```
 
-`nub run serve` runs the server from source (`nub watch ./packages/node-server/src/index.ts serve --data-dir .dev-data`). It needs no build step: the `development` exports condition (via `nub.jsonc` + tsconfig `customConditions`) resolves workspace packages to their TypeScript source, and `nub watch` restarts the server whenever any file in the import graph changes.
+## Getting started
+
+```sh
+npx @storyshelf/cli create       # scaffold a server project
+cd my-storyshelf
+npm install
+npm start                        # start the server
+```
 
 ## Documentation
 

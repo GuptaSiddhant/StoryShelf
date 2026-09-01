@@ -43,9 +43,21 @@ Then `https://<slug>.stories.example.com` serves the latest published Storybook,
 
 ## Deployment targets — bring your own assembly
 
-StoryShelf is **cross-runtime**: the core router (`createShelfRouter`) uses only Web-standard APIs (`Request`, `Response`, `fetch`, `ReadableStream`, `crypto`, `URL`). There is no Node coupling in the core. The only Node-specific code in the entire stack is `@hono/node-server` in `@storyshelf/node-server` (the `serve.ts` entry). This means you can assemble and deploy on any platform that runs JavaScript.
+StoryShelf is **cross-runtime**: the core router (`createShelfRouter`) uses only Web-standard APIs (`Request`, `Response`, `fetch`, `ReadableStream`, `crypto`, `URL`). There is no Node coupling in the core. This means you can assemble and deploy on any platform that runs JavaScript.
 
 ### Recommended assembly (self-hosted default)
+
+Use `storyshelf create` to scaffold a server with your chosen adapters:
+
+```sh
+storyshelf create
+# ? Which database? SQLite
+# ? Which storage? Local filesystem
+# ? Which auth? None
+# ? Which git provider? None
+```
+
+This generates `server.ts` + `package.json` with the correct imports and dependencies.
 
 | Layer | Package | Notes |
 |-------|---------|-------|
@@ -53,9 +65,8 @@ StoryShelf is **cross-runtime**: the core router (`createShelfRouter`) uses only
 | Storage | `@storyshelf/storage-local` | Local filesystem, `--data-dir` |
 | Capture queue | `InMemoryCaptureQueue` (built-in) | Async, concurrency-limited, in-process |
 | Auth | `@storyshelf/auth-oauth` or `@storyshelf/auth-password` | OIDC or shared password |
-| Server | `@storyshelf/node-server` | `storyshelf-server serve` binary |
 
-One `docker run` (or `fly deploy`, `railway up`, `render.com`, etc.) and you're running.
+One `npm start` (or `fly deploy`, `railway up`, `render.com`, etc.) and you're running.
 
 ### Cloud assembly (all clouds equal)
 

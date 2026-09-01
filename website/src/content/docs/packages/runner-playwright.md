@@ -13,7 +13,7 @@ nub add @storyshelf/runner-playwright
 
 ## Usage
 
-You normally never install this directly — `@storyshelf/node-server` injects it when you run `storyshelf-server serve`. Programmatically:
+You normally never install this directly — your server scaffold uses it via `storyshelf create`. Programmatically:
 
 ```ts
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";

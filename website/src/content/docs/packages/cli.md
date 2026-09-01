@@ -3,7 +3,7 @@ title: "@storyshelf/cli"
 description: Create projects, upload Storybooks, and manage builds from CI — no Playwright, no server deps.
 ---
 
-`@storyshelf/cli` provides the `storyshelf` binary for CI pipelines. It creates projects and tokens, uploads built Storybooks, retries captures, and purges expired builds — all over the server's `/api/v1` endpoints. It has **no Playwright or server dependencies**, so it installs cleanly in CI. The Node server itself lives in `@storyshelf/node-server`.
+`@storyshelf/cli` provides the `storyshelf` binary for CI pipelines. It creates projects and tokens, uploads built Storybooks, retries captures, and purges expired builds — all over the server's `/api/v1` endpoints. It has **no Playwright or server dependencies**, so it installs cleanly in CI.
 
 ## Install
 
@@ -31,4 +31,4 @@ Use `storyshelf retry` for a failed capture and `storyshelf purge` for manual re
 
 ## How it fits
 
-The CLI talks to the server's `/api/v1` endpoints. To start the server, install `@storyshelf/node-server` and run `storyshelf-server serve` (its default command).
+The CLI talks to the server's `/api/v1` endpoints. To start the server, use `storyshelf create` to scaffold a new project, or see the [Deployment guide](../../guides/deployment/).

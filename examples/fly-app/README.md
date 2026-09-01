@@ -5,11 +5,15 @@ Deploy StoryShelf as a public demo on Fly.io, seeded with the `examples/storyboo
 ## Prerequisites
 
 - `flyctl` installed and authenticated.
-- A built `packages/cli/dist` and `packages/node-server/dist` (run `nub run build` at the repo root first).
+- A scaffolded server project (run `storyshelf create` first).
 
 ## Deploy
 
 ```sh
+# Scaffold a server project
+storyshelf create
+
+# Deploy to Fly.io
 fly apps create storyshelf-demo
 fly volumes create storyshelf_data --region iad --size 1
 fly deploy --config fly.toml
