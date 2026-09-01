@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_VIEWPORTS } from "./viewports.ts";
+import { DEFAULT_VIEWPORTS } from "./adapter.ts";
 
 describe("DEFAULT_VIEWPORTS", () => {
   it("captures a single desktop viewport", () => {

@@ -280,7 +280,7 @@ export type { RenderedContent } from "./ui/document.tsx";
 export { StorybookAdapter } from "./capture/storybook.ts";
 export { persistCapture, type CaptureContext } from "./capture/pipeline.ts";
 export { executeCaptureJob, type CaptureJobOptions } from "./capture/orchestrator.ts";
-export { DEFAULT_VIEWPORTS } from "./capture/viewports.ts";
+export { DEFAULT_VIEWPORTS } from "./capture/adapter.ts";
 export { InMemoryCaptureQueue, type InMemoryCaptureQueueOptions } from "./capture/queue.ts";
 export { Retention } from "./retention/purge.ts";
 export { createUrlBuilder, type UrlBuilder } from "./urls.ts";
