@@ -2,6 +2,8 @@ import { z } from "@hono/zod-openapi";
 
 import { BUILD_STATUSES, PROJECT_ROLES, SNAPSHOT_STATUSES } from "../types.ts";
 
+const storybookMetaSchema = z.record(z.string(), z.unknown()).nullable().optional();
+
 export const projectSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -11,6 +13,7 @@ export const projectSchema = z.object({
   pixelThreshold: z.number(),
   maxDiffRatio: z.number(),
   publicBranchRegex: z.string().nullable(),
+  storybookMeta: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 }).openapi("Project");
@@ -19,6 +22,7 @@ export const projectCreateSchema = z.object({
   name: z.string().min(1),
   gitRepository: z.string().optional(),
   gitDefaultBranch: z.string().optional(),
+  storybookMeta: storybookMetaSchema,
 }).openapi("ProjectCreateInput");
 
 export const projectUpdateSchema = z.object({
@@ -28,6 +32,7 @@ export const projectUpdateSchema = z.object({
   pixelThreshold: z.number().optional(),
   maxDiffRatio: z.number().optional(),
   publicBranchRegex: z.string().nullable().optional(),
+  storybookMeta: storybookMetaSchema,
 }).openapi("ProjectUpdateInput");
 
 export const buildSchema = z.object({

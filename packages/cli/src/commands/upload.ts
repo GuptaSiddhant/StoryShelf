@@ -1,4 +1,4 @@
-/* oxlint-disable typescript/no-unsafe-assignment, typescript/no-unsafe-member-access, typescript/no-unsafe-call, max-statements, max-lines-per-function, complexity */
+/* oxlint-disable max-statements, max-lines-per-function, complexity, eslint/max-statements, eslint/max-lines-per-function, eslint/complexity, typescript/no-unsafe-assignment, typescript/no-unsafe-member-access, typescript/no-unsafe-call, typescript/prefer-nullish-coalescing, typescript/prefer-regexp-exec, eslint/no-await-in-loop, no-await-in-loop, max-depth, eslint/max-depth */
 import AdmZip from "adm-zip";
 import { createClient } from "../client.ts";
 import { loadStorybookConfig } from "../config.ts";

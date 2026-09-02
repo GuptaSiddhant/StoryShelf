@@ -1,6 +1,7 @@
 interface Client {
   projects: {
-    create: (json: { name: string; gitRepository?: string; gitDefaultBranch?: string }) => Promise<unknown>;
+    create: (json: { name: string; gitRepository?: string; gitDefaultBranch?: string; storybookMeta?: unknown }) => Promise<unknown>;
+    update: (slug: string, json: { storybookMeta?: unknown }) => Promise<unknown>;
     get: (slug: string) => Promise<unknown>;
     list: () => Promise<unknown>;
     tokens: {
@@ -27,9 +28,18 @@ export function createClient(baseUrl: string, token?: string): Client {
   
   return {
     projects: {
-      create: async (json: { name: string; gitRepository?: string; gitDefaultBranch?: string }) => {
+      create: async (json: { name: string; gitRepository?: string; gitDefaultBranch?: string; storybookMeta?: unknown }) => {
         const res = await fetch(`${baseUrl}/api/v1/projects`, {
           method: "POST",
+          headers: requestHeaders("application/json"),
+          body: JSON.stringify(json),
+        });
+        if (!res.ok) throw new Error(`Request failed (${res.status}): ${await res.text()}`);
+        return res.json() as unknown;
+      },
+      update: async (slug: string, json: { storybookMeta?: unknown }) => {
+        const res = await fetch(`${baseUrl}/api/v1/projects/${slug}`, {
+          method: "PATCH",
           headers: requestHeaders("application/json"),
           body: JSON.stringify(json),
         });

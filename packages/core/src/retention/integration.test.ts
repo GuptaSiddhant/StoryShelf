@@ -14,6 +14,7 @@ function makeProject(overrides: Partial<Project> = {}): Project {
     pixelThreshold: 0.1,
     maxDiffRatio: 0.01,
     publicBranchRegex: null,
+      storybookMeta: null,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
     ...overrides,

@@ -69,6 +69,11 @@ export function createSqliteDatabase(path: string): DatabaseAdapter {
     },
     async migrate() {
       sqlite.exec(DDL);
+      try {
+        sqlite.exec("ALTER TABLE projects ADD COLUMN storybook_meta TEXT");
+      } catch {
+        // column already exists or other error — ignore for idempotency
+      }
     },
     async close() {
       sqlite.close();

@@ -37,6 +37,7 @@ export function createProgram(): Command {
     .option("--url <url>", "server base URL")
     .option("--slug <slug>", "project slug")
     .option("--storybook-dir <dir>", "built Storybook directory")
+    .option("--token <token>", "auth token for sync (or STORYSHELF_TOKEN/STORYSHELF_ADMIN_TOKEN env)")
     .action(run<InitOptions>(runInit));
 
   program

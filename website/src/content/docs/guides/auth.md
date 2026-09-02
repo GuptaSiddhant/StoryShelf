@@ -53,7 +53,7 @@ Site-wide `admin` users (from the auth provider) bypass project roles entirely. 
 
 ## API tokens vs. user auth
 
-Auth gates the **web UI**. The **CLI does not use user login** — it authenticates with **per-project API tokens** sent as `Authorization: Bearer <token>`. This keeps CI simple and lets a token be scoped to a single project. Tokens are minted by [`storyshelf init`](/guides/cli/) or in project settings.
+Auth gates the **web UI**. The **CLI does not use user login** — it authenticates with **per-project API tokens** sent as `Authorization: Bearer <token>` (CI, `STORYSHELF_TOKEN`) and **site-admin tokens** (`STORYSHELF_ADMIN_TOKEN`) for project creation. Tokens are minted by [`storyshelf create`](/guides/cli/) (requires admin token, writes `.storybook/storyshelf.json`) or in project settings; client config alone can be initialized via [`storyshelf init`](/guides/cli/).
 
 ## Public Storybooks
 

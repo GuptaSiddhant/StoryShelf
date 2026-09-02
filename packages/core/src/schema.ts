@@ -2,6 +2,15 @@ import { index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-or
 
 import type { BuildStatus, ProjectRole, SiteRole, SnapshotStatus } from "./types.ts";
 
+export interface StorybookMeta {
+  framework?: { name?: string; options?: unknown };
+  addons?: string[];
+  storiesGlobs?: string[];
+  staticDirs?: string[];
+  packagePath?: string;
+  previewParameters?: Record<string, unknown>;
+}
+
 export const projects = sqliteTable("projects", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -11,6 +20,7 @@ export const projects = sqliteTable("projects", {
   pixelThreshold: real("pixel_threshold").notNull().default(0.1),
   maxDiffRatio: real("max_diff_ratio").notNull().default(0.01),
   publicBranchRegex: text("public_branch_regex"),
+  storybookMeta: text("storybook_meta").$type<string | null | undefined>().default(null),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });

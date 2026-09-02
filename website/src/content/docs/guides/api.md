@@ -30,10 +30,12 @@ Two auth mechanisms are supported:
 | Bearer token | CI (`@storyshelf/cli`), scripts | `Authorization: Bearer <token>` header |
 | Session cookie | The web UI | `Cookie: storyshelf_session=...` (set by the auth adapter) |
 
-Create a token from the project settings page (**Tokens** tab) or with the CLI:
+Create a token from the project settings page (**Tokens** tab) or with the CLI (requires site-admin token):
 
 ```sh
-npx @storyshelf/cli init --url $STORYSHELF_URL --name MyProject
+npx @storyshelf/cli create --url $STORYSHELF_URL --name MyProject --token $STORYSHELF_ADMIN_TOKEN
+# or initialize client config for an existing project:
+npx @storyshelf/cli init --url $STORYSHELF_URL --slug my-project
 ```
 
 Unconfigured servers (no auth adapter) accept all requests.

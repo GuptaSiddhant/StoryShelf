@@ -1,6 +1,7 @@
-/* oxlint-disable typescript/no-unsafe-assignment, typescript/no-unsafe-call, typescript/no-unsafe-member-access, eslint/no-await-in-loop */
+/* oxlint-disable typescript/no-unsafe-assignment, typescript/no-unsafe-call, typescript/no-unsafe-member-access, eslint/no-await-in-loop, no-await-in-loop, max-depth, eslint/max-depth, max-statements, max-lines-per-function, complexity, eslint/max-statements, eslint/max-lines-per-function, eslint/complexity, typescript/prefer-regexp-exec, eslint/no-useless-escape, no-useless-escape, typescript/prefer-nullish-coalescing */
+import { execSync } from "node:child_process";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 
 import { z } from "zod";
 
@@ -75,4 +76,101 @@ export async function writeStorybookConfig(
   }
   await writeFile(full, JSON.stringify(result.data, null, 2) + "\n", "utf-8");
   return full;
+}
+
+export interface StorybookMeta {
+  framework?: { name?: string; options?: unknown };
+  addons?: string[];
+  storiesGlobs?: string[];
+  staticDirs?: string[];
+  packagePath?: string;
+}
+
+export async function detectPackagePath(cwd: string = process.cwd()): Promise<string> {
+  const main = await findStorybookMain(cwd);
+  if (!main) return ".";
+  const rel = relative(cwd, dirname(main));
+  return rel === "" ? "." : rel;
+}
+
+export async function detectStorybookMeta(cwd: string = process.cwd()): Promise<StorybookMeta> {
+  const meta: StorybookMeta = {};
+  const mainPath = await findStorybookMain(cwd);
+  if (mainPath) {
+    try {
+      const raw = await readFile(mainPath, "utf-8");
+      const frameworkMatch = raw.match(/framework\s*:\s*\{\s*name\s*:\s*["']([^"']+)["']/u);
+      if (frameworkMatch?.[1]) {
+        meta.framework = { name: frameworkMatch[1] };
+      }
+      const addonsMatch = raw.match(/addons\s*:\s*\[([\s\S]*?)\]/u);
+      if (addonsMatch?.[1]) {
+        const addons = [...addonsMatch[1].matchAll(/["']([^"']+)["']/gu)].map((m) => m[1]).filter(Boolean) as string[];
+        if (addons.length > 0) meta.addons = addons;
+      }
+      const storiesMatch = raw.match(/stories\s*:\s*\[([\s\S]*?)\]/u);
+      if (storiesMatch?.[1]) {
+        const globs = [...storiesMatch[1].matchAll(/["']([^"']+)["']/gu)].map((m) => m[1]).filter(Boolean) as string[];
+        if (globs.length > 0) meta.storiesGlobs = globs;
+      }
+      const staticDirsMatch = raw.match(/staticDirs\s*:\s*\[([\s\S]*?)\]/u);
+      if (staticDirsMatch?.[1]) {
+        const dirs = [...staticDirsMatch[1].matchAll(/["']([^"']+)["']/gu)].map((m) => m[1]).filter(Boolean) as string[];
+        if (dirs.length > 0) meta.staticDirs = dirs;
+      }
+      const rel = relative(cwd, dirname(mainPath));
+      meta.packagePath = rel === "" ? "." : rel;
+    } catch {
+      // ignore parse errors
+    }
+  } else {
+    meta.packagePath = ".";
+  }
+  return meta;
+}
+
+export async function detectPackageName(cwd: string = process.cwd()): Promise<string | null> {
+  try {
+    const raw = await readFile(resolve(cwd, "package.json"), "utf-8");
+    const parsed = JSON.parse(raw) as { name?: unknown };
+    if (typeof parsed.name === "string" && parsed.name.length > 0) {
+      return parsed.name;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function detectGitRepository(cwd: string = process.cwd()): string | null {
+  try {
+    const url = execSync("git config --get remote.origin.url", { cwd, encoding: "utf-8" }).trim();
+    if (!url) return null;
+    // Normalize git@github.com:owner/repo.git and https://github.com/owner/repo.git -> owner/repo
+    const normalized = url
+      .replace(/\.git$/u, "")
+      .replace(/^git@[^:]+:/u, "")
+      .replace(/^https?:\/\/[^/]+\//u, "")
+      .replace(/^ssh:\/\/[^/]+\//u, "");
+    return normalized || null;
+  } catch {
+    return null;
+  }
+}
+
+export function detectGitDefaultBranch(cwd: string = process.cwd()): string | null {
+  try {
+    const ref = execSync("git symbolic-ref refs/remotes/origin/HEAD", { cwd, encoding: "utf-8" }).trim();
+    const match = ref.match(/refs\/remotes\/origin\/(.+)/u);
+    if (match?.[1]) return match[1];
+  } catch {
+    // fallback
+  }
+  try {
+    const branch = execSync("git rev-parse --abbrev-ref HEAD", { cwd, encoding: "utf-8" }).trim();
+    if (branch && branch !== "HEAD") return branch;
+  } catch {
+    // ignore
+  }
+  return null;
 }

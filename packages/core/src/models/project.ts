@@ -8,6 +8,7 @@ export interface ProjectCreateInput {
   name: string;
   gitRepository?: string;
   gitDefaultBranch?: string;
+  storybookMeta?: unknown;
 }
 
 /** Data operations for project records. */
@@ -32,6 +33,7 @@ export class ProjectModel {
       slug,
       gitRepository: input.gitRepository,
       gitDefaultBranch: input.gitDefaultBranch ?? "main",
+      storybookMeta: input.storybookMeta ? JSON.stringify(input.storybookMeta) : null,
       createdAt: now,
       updatedAt: now,
     });
@@ -54,8 +56,21 @@ export class ProjectModel {
   }
 
   /** Update mutable fields of a project. */
-  async update(id: string, patch: Partial<Pick<Project, "name" | "gitRepository" | "gitDefaultBranch" | "pixelThreshold" | "maxDiffRatio" | "publicBranchRegex">>): Promise<Project> {
-    return await this.db.update(projects, id, { ...patch, updatedAt: new Date().toISOString() });
+  async update(
+    id: string,
+    patch: Partial<Omit<Project, "storybookMeta">> & {
+      storybookMeta?: unknown;
+    },
+  ): Promise<Project> {
+    const normalized: Record<string, unknown> = { ...patch };
+    if (patch.storybookMeta !== undefined && patch.storybookMeta !== null && typeof patch.storybookMeta !== "string") {
+      normalized["storybookMeta"] = JSON.stringify(patch.storybookMeta);
+    }
+    // oxlint-disable-next-line typescript/no-unnecessary-type-assertion
+    return await this.db.update(projects, id, {
+      ...normalized,
+      updatedAt: new Date().toISOString(),
+    } as unknown as Partial<Project>);
   }
 
   /** Delete a project by id. */

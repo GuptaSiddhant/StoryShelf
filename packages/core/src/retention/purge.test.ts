@@ -14,7 +14,8 @@ describe("Retention", () => {
     const project = {
       id: "p1", name: "Test", slug: "test", gitRepository: null,
       gitDefaultBranch: "main", pixelThreshold: 0.1, maxDiffRatio: 0.01,
-      publicBranchRegex: null, createdAt: now.toISOString(), updatedAt: now.toISOString(),
+      publicBranchRegex: null,
+      storybookMeta: null, createdAt: now.toISOString(), updatedAt: now.toISOString(),
     };
     await db.insert(projects, project);
 

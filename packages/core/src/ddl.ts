@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS projects (
   pixel_threshold REAL NOT NULL DEFAULT 0.1,
   max_diff_ratio REAL NOT NULL DEFAULT 0.01,
   public_branch_regex TEXT,
+  storybook_meta TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );

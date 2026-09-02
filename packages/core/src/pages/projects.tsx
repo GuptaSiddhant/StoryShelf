@@ -92,13 +92,13 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
         <h3 style="margin:0 0 .4rem;">Next steps</h3>
         <ol style="margin:.4rem 0 0; padding-left:1.2rem; color:var(--text-secondary);">
           <li>
-            Create a project (or run <code>npx @storyshelf/cli init --url http://localhost:3000 --name "My Storybook"</code>)
+            Create a project (or run <code>npx @storyshelf/cli create --url http://localhost:3000 --name "My Storybook" --token $STORYSHELF_ADMIN_TOKEN</code>, or <code>init --url --slug</code> to write <code>.storybook/storyshelf.json</code>)
           </li>
           <li>
             Generate a token in <strong>Settings → Tokens</strong> and set <code>STORYSHELF_TOKEN</code> in CI.
           </li>
           <li>
-            Upload: <code>npx @storyshelf/cli upload --token $STORYSHELF_TOKEN</code>
+            Upload: <code>npx @storyshelf/cli upload</code> (or <code>npx @storyshelf/cli</code> defaults to upload when config exists)
           </li>
         </ol>
       </div>

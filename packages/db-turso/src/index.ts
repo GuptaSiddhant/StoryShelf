@@ -67,6 +67,11 @@ export function createTursoDatabase(options: { url: string; authToken?: string }
     },
     async migrate() {
       await client.executeMultiple(DDL);
+      try {
+        await client.execute("ALTER TABLE projects ADD COLUMN storybook_meta TEXT");
+      } catch {
+        // column already exists — ignore
+      }
     },
     // eslint-disable-next-line require-await -- client.close() is synchronous
     async close() {
