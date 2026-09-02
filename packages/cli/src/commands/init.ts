@@ -11,8 +11,18 @@ export interface InitOptions {
   url?: string;
   /** Project slug. */
   slug?: string;
-  /** Built Storybook directory for config. */
+  /** Built Storybook directory. */
+  buildDir?: string;
+  /** Deprecated alias for buildDir. */
   storybookDir?: string;
+  /** Build command. */
+  buildCommand?: string;
+  /** Build script name. */
+  buildScriptName?: string;
+  /** Skip pattern (glob). */
+  skip?: string;
+  /** Custom config file path. */
+  config?: string;
   /** Token for sync (fallback to env). */
   token?: string;
 }
@@ -28,13 +38,20 @@ export async function runInit(options: InitOptions): Promise<void> {
 
   let url = options.url ?? process.env["STORYSHELF_URL"];
   let slug = options.slug ?? process.env["STORYSHELF_SLUG"];
-  let storybookDir = options.storybookDir;
+  let buildDir = options.buildDir ?? options.storybookDir;
+  let buildCommand = options.buildCommand;
+  let buildScriptName = options.buildScriptName;
+  let skip = options.skip;
+  const configPath = options.config;
 
-  const existing = await loadStorybookConfig();
+  const existing = await loadStorybookConfig(process.cwd(), configPath);
   if (existing) {
     url ??= existing.url;
     slug ??= existing.slug;
-    storybookDir ??= existing.storybookDir;
+    buildDir ??= existing.buildDir;
+    buildCommand ??= existing.buildCommand;
+    buildScriptName ??= existing.buildScriptName;
+    skip ??= existing.skip;
   }
 
   const meta = await detectStorybookMeta();
@@ -68,12 +85,15 @@ export async function runInit(options: InitOptions): Promise<void> {
     return;
   }
 
-  const config: { slug: string; url?: string; storybookDir?: string } = { slug };
+  const config: { slug: string; url?: string; buildDir?: string; buildCommand?: string; buildScriptName?: string; skip?: string } = { slug };
   if (url) config.url = url;
-  if (storybookDir) config.storybookDir = storybookDir;
+  if (buildDir) config.buildDir = buildDir;
+  if (buildCommand) config.buildCommand = buildCommand;
+  if (buildScriptName) config.buildScriptName = buildScriptName;
+  if (skip) config.skip = skip;
 
   try {
-    const written = await writeStorybookConfig(config);
+    const written = await writeStorybookConfig(config, process.cwd(), options.config);
     printLine(`Wrote ${written}`);
     if (hintParts.length > 0) {
       printLine(`Detected ${hintParts.join(" • ")}`);

@@ -36,7 +36,11 @@ export function createProgram(): Command {
     .description("Initialize Storybook project with .storybook/storyshelf.json (client config)")
     .option("--url <url>", "server base URL")
     .option("--slug <slug>", "project slug")
-    .option("--storybook-dir <dir>", "built Storybook directory")
+    .option("--build-dir <dir>", "built Storybook directory (default storybook-static)")
+    .option("--build-command <cmd>", "build command (e.g. \"npm run build-storybook\")")
+    .option("--build-script-name <name>", "npm script to build Storybook (default build-storybook)")
+    .option("--skip <glob>", "skip upload for matching branch (glob)")
+    .option("-c, --config <path>", "config file path (default .storybook/storyshelf.json)")
     .option("--token <token>", "auth token for sync (or STORYSHELF_TOKEN/STORYSHELF_ADMIN_TOKEN env)")
     .action(run<InitOptions>(runInit));
 
@@ -70,7 +74,13 @@ export function createProgram(): Command {
     .option("--token <token>", "CI token (or STORYSHELF_TOKEN env)")
     .option("--sha <sha>", "git sha (or GITHUB_SHA env)")
     .option("--branch <branch>", "git branch (or GITHUB_REF_NAME env)")
-    .option("--storybook-dir <dir>", "built Storybook directory", "storybook-static")
+    .option("--build-dir <dir>", "built Storybook directory (default storybook-static)")
+    .option("--storybook-dir <dir>", "deprecated alias for --build-dir")
+    .option("-c, --config <path>", "config file path (default .storybook/storyshelf.json)")
+    .option("--build-command <cmd>", "build command to run if buildDir missing/empty")
+    .option("--build-script-name <name>", "npm script to build Storybook (default build-storybook)")
+    .option("--force-build", "force rebuild even if buildDir exists")
+    .option("--skip <glob>", "skip upload for matching branch (glob)")
     .option("--message <message>", "commit message")
     .option("--author-email <email>", "author email")
     .option("--author-name <name>", "author name")
@@ -100,14 +110,17 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         const token = process.env["STORYSHELF_TOKEN"] ?? process.env["SHELF_TOKEN"];
         const sha = process.env["GITHUB_SHA"] ?? process.env["VERCEL_GIT_COMMIT_SHA"] ?? process.env["CI_COMMIT_SHA"];
         const branch = process.env["GITHUB_REF_NAME"] ?? process.env["VERCEL_GIT_COMMIT_REF"] ?? process.env["CI_COMMIT_REF_NAME"];
-        const storybookDir = cfg.storybookDir ?? "storybook-static";
+        const buildDir = cfg.buildDir ?? "storybook-static";
+        const buildCommand = cfg.buildCommand;
+        const buildScriptName = cfg.buildScriptName;
+        const skip = cfg.skip;
         if (!url || !slug || !token || !sha || !branch) {
           printError("Missing required upload options — ensure STORYSHELF_URL/SLUG/TOKEN and GITHUB_SHA/BRANCH are set or run `storyshelf upload --help`");
           program.outputHelp();
           process.exitCode = 1;
           return;
         }
-        await runUpload({ url, slug, token, sha, branch, storybookDir }).catch(handleError);
+        await runUpload({ url, slug, token, sha, branch, buildDir, buildCommand, buildScriptName, skip }).catch(handleError);
       } else {
         program.outputHelp();
         printError("No .storybook/storyshelf.json found — run `storyshelf init --url <url> --slug <slug>` first");

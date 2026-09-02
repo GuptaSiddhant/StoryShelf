@@ -5,11 +5,19 @@ import { dirname, join, relative, resolve } from "node:path";
 
 import { z } from "zod";
 
-export const storybookConfigSchema = z.object({
-  slug: z.string().min(1, "slug is required"),
-  url: z.url().optional(),
-  storybookDir: z.string().min(1).optional(),
-});
+export const storybookConfigSchema = z
+  .object({
+    slug: z.string().min(1, "slug is required"),
+    url: z.url().optional(),
+    buildDir: z.string().min(1).optional(),
+    buildCommand: z.string().min(1).optional(),
+    buildScriptName: z.string().min(1).optional(),
+    skip: z.string().min(1).optional(),
+  })
+  .refine((data) => !(data.buildCommand && data.buildScriptName), {
+    message: "buildCommand and buildScriptName are mutually exclusive",
+    path: ["buildCommand"],
+  });
 
 export type StorybookConfig = z.infer<typeof storybookConfigSchema>;
 
@@ -46,11 +54,22 @@ export async function assertStorybookMain(cwd: string = process.cwd()): Promise<
   }
 }
 
-export async function loadStorybookConfig(cwd: string = process.cwd()): Promise<StorybookConfig | null> {
-  const full = resolve(cwd, CONFIG_RELATIVE);
+export async function loadStorybookConfig(
+  cwd: string = process.cwd(),
+  customPath?: string,
+): Promise<StorybookConfig | null> {
+  const full = customPath ? resolve(cwd, customPath) : resolve(cwd, CONFIG_RELATIVE);
   try {
     const raw = await readFile(full, "utf-8");
     const parsed = JSON.parse(raw) as unknown;
+    // Backward compat: storybookDir -> buildDir
+    if (parsed && typeof parsed === "object" && parsed !== null && "storybookDir" in (parsed as Record<string, unknown>)) {
+      const p = parsed as Record<string, unknown>;
+      if (typeof p["storybookDir"] === "string" && !p["buildDir"]) {
+        p["buildDir"] = p["storybookDir"];
+      }
+      delete p["storybookDir"];
+    }
     const result = storybookConfigSchema.safeParse(parsed);
     if (!result.success) {
       return null;
@@ -64,13 +83,20 @@ export async function loadStorybookConfig(cwd: string = process.cwd()): Promise<
 export async function writeStorybookConfig(
   config: StorybookConfig,
   cwd: string = process.cwd(),
+  customPath?: string,
 ): Promise<string> {
-  const dir = resolve(cwd, ".storybook");
-  const full = resolve(cwd, CONFIG_RELATIVE);
+  const full = customPath ? resolve(cwd, customPath) : resolve(cwd, CONFIG_RELATIVE);
+  const dir = dirname(full);
   await mkdir(dir, { recursive: true });
-  const existing = await loadStorybookConfig(cwd);
+  const existing = await loadStorybookConfig(cwd, customPath);
   const merged = existing ? { ...existing, ...config } : config;
-  const result = storybookConfigSchema.safeParse(merged);
+  // Backward compat: map deprecated storybookDir -> buildDir if present in file
+  const withCompat = { ...merged } as Record<string, unknown> & StorybookConfig;
+  if ((withCompat as Record<string, unknown>)["storybookDir"] && !withCompat.buildDir) {
+    withCompat.buildDir = (withCompat as Record<string, unknown>)["storybookDir"] as string;
+    delete (withCompat as Record<string, unknown>)["storybookDir"];
+  }
+  const result = storybookConfigSchema.safeParse(withCompat);
   if (!result.success) {
     throw new Error(`Invalid storybook config: ${result.error.message}`);
   }
