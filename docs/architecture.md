@@ -693,13 +693,15 @@ StoryShelf/
 
     cli/
       src/
-        index.ts          # CLI client entry (commander: upload/init/retry/purge/create, no Playwright)
+        index.ts          # CLI client entry (commander: upload/init/create/server/purge/retry, no Playwright)
+        config.ts         # .storybook/storyshelf.json load/write + .storybook/main.* guard
         commands/
-          upload.ts       # storyshelf upload (build Storybook -> zip -> upload; git tags -> persistent label)
+          upload.ts       # storyshelf upload (build Storybook -> zip -> upload; git tags -> persistent label; defaults to upload)
           retry.ts        # storyshelf retry (re-run capture for a build)
-          init.ts         # storyshelf init (create project, generate token)
+          init.ts         # storyshelf init (write .storybook/storyshelf.json, prompts, fails if no main.*)
+          create/         # storyshelf create (create project + token with admin token, writes config, fails if no main.*)
           purge.ts        # storyshelf purge (manual retention purge)
-          create.ts       # storyshelf create (scaffold server project)
+          server/init.ts  # storyshelf server init (scaffold server project; prompts infra)
       package.json
 
     runner-playwright/

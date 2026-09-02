@@ -28,7 +28,7 @@ Decisions made during implementation (for review). Architectural decisions are i
 
 ## 2026-08-27 — Core scaffold (post-foundation)
 
-11. **Playwright lives in `@storyshelf/runner-playwright`, not core.** Core's capture pipeline (`capture/pipeline.ts`) is browser-agnostic — it takes an injected `renderStory(story, viewport) => Buffer`. The real Playwright renderer + `CaptureRunner` implementation is constructed in `@storyshelf/runner-playwright` (wired in by your server scaffold via `storyshelf create`). This keeps `@storyshelf/core` free of the heavy Playwright dependency and unit-testable (gated browser suite in the runner package).
+11. **Playwright lives in `@storyshelf/runner-playwright`, not core.** Core's capture pipeline (`capture/pipeline.ts`) is browser-agnostic — it takes an injected `renderStory(story, viewport) => Buffer`. The real Playwright renderer + `CaptureRunner` implementation is constructed in `@storyshelf/runner-playwright` (wired in by your server scaffold via `storyshelf server init`). This keeps `@storyshelf/core` free of the heavy Playwright dependency and unit-testable (gated browser suite in the runner package).
 12. **Removed `erasableSyntaxOnly` from `tsconfig.base.json`** (StoryBooker had it `true`). It disallows constructor parameter properties, which the models use heavily; dropped for velocity. (One-line revert if we want to match StoryBooker exactly.)
 13. **Routers use plain Hono + zod (`validJson`)**, not `@hono/zod-openapi`, for the scaffold. OpenAPI spec generation is deferred (the `@hono/zod-openapi` dep is already in place for it).
 14. **ULID is implemented in-core** (`utils/ulid.ts`, `node:crypto`) rather than pulling an external `ulid`/`cuid` dependency.
@@ -46,7 +46,7 @@ Decisions made during implementation (for review). Architectural decisions are i
 
 ## 2026-08-29 — CLI/server package split
 
-22. **`@storyshelf/cli` is client-only.** The CLI keeps only the `/api/v1` client verbs — `create`, `init`, `upload`, `retry`, `purge` — and its dependencies include `commander`, `adm-zip`, and `prompts` (for interactive scaffolding). The `storyshelf create` command generates a server project with the correct adapter imports and dependencies, replacing the need for a separate server package.
+22. **`@storyshelf/cli` is client-only.** The CLI keeps only the `/api/v1` client verbs — `server init`, `init`, `create`, `upload`, `retry`, `purge` — and its dependencies include `commander`, `adm-zip`, `prompts` and `zod` (for `.storybook/storyshelf.json`). The `storyshelf server init` command generates a server project with the correct adapter imports and dependencies, replacing the need for a separate server package.
    - *Trade-off:* users must run `npm install` after scaffolding, but they own the server file and can modify it freely.
 
 23. **The Playwright runner is its own package: `@storyshelf/runner-playwright`.** The `CaptureRunner` implementation (browser lifecycle, zip extraction, ephemeral static server, default viewports) is a separate package, mirroring the `db-*`/`storage-*`/`auth-*` adapter-package convention (ADR 0001). The server scaffold injects whichever runner it wants, so a v2 remote runner (offload capture to a worker fleet) becomes a dependency swap, not a router or pipeline change.
@@ -54,7 +54,7 @@ Decisions made during implementation (for review). Architectural decisions are i
 
 ## 2026-08-29 — Server scaffolding
 
-24. **`@storyshelf/node-server` replaced by `storyshelf create`.** The old package implied *the* universal server, but it hardcoded a specific stack (SQLite + local storage + Playwright + GitHub). The new approach uses `storyshelf create` to generate a server project with the user's chosen adapters. This eliminates the combinatorial explosion of adapter combinations and lets users own their server file.
+24. **`@storyshelf/node-server` replaced by `storyshelf server init`.** The old package implied *the* universal server, but it hardcoded a specific stack (SQLite + local storage + Playwright + GitHub). The new approach uses `storyshelf server init` to generate a server project with the user's chosen adapters. This eliminates the combinatorial explosion of adapter combinations and lets users own their server file.
 25. **Cross-runtime serving is core's job, not a server package's.** `@storyshelf/core`'s `createShelfRouter` returns a plain Hono app (Web `Request`/`Response` `FetchHandler`), so it already runs on Azure Functions, Cloudflare Workers, Vercel, Deno, or Bun. Only capture's in-process queue constrains the runtime; a new `CaptureQueue` adapter makes it swappable (in-memory for Node; a remote/durable queue + separate worker for serverless).
 
 ## 2026-08-30 — OpenAPI API surface

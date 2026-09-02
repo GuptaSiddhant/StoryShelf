@@ -15,7 +15,7 @@ packages/
   storage-s3/     @storyshelf/storage-s3    — S3-compatible storage
   auth-oauth/     @storyshelf/auth-oauth    — OIDC auth
   auth-password/  @storyshelf/auth-password — shared-password auth
-  cli/            @storyshelf/cli           — CLI client (create, upload, init, purge, retry)
+  cli/            @storyshelf/cli           — CLI client (server init, init, create, upload, purge, retry)
   runner-playwright/ @storyshelf/runner-playwright — Playwright capture runner
 website/                                    — public docs (Astro Starlight)
 examples/
@@ -36,7 +36,7 @@ nub run verify                   # build + lint + test
 ## Getting started
 
 ```sh
-npx @storyshelf/cli create       # scaffold a server project
+npx @storyshelf/cli server init  # scaffold a server project
 cd my-storyshelf
 npm install
 npm start                        # start the server

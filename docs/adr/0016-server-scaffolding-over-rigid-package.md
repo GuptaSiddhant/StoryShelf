@@ -16,11 +16,11 @@ The adapter composition pattern (ADR 0001) already supports this: `createShelfRo
 
 ## Decision
 
-1. **Add `storyshelf create` to `@storyshelf/cli`** — Interactive prompts select adapters, generate `server.ts` + `package.json`.
+1. **Add `storyshelf server init` to `@storyshelf/cli`** (originally `storyshelf create`, later namespaced under `server`) — Interactive prompts select adapters, generate `server.ts` + `package.json`.
 
 2. **Deprecate `@storyshelf/node-server` as a published package** — Replace with templates in the CLI. The existing package remains for backward compatibility but is no longer the recommended approach.
 
-3. **Keep commander, add `prompts`** — Commander handles command parsing (existing commands stay unchanged). `prompts` handles interactive selection in the new `create` command only.
+3. **Keep commander, add `prompts`** — Commander handles command parsing (existing commands stay unchanged). `prompts` handles interactive selection in the new `server init` command only.
 
 ### Generated output example
 
@@ -43,14 +43,14 @@ serve({ fetch: app.fetch, port: 3000 });
 ### Command interface
 
 ```
-$ storyshelf create
+$ storyshelf server init
 
 ? Project name: my-app
 ? Directory: ./my-app
 ? Database: SQLite / Turso
 ? Storage: Local / S3
 ? Auth: OAuth / Password / None
-? Git provider: GitHub / None
+? Git provider: GitHub / GitLab / None
 
 ✓ Created package.json
 ✓ Created server.ts

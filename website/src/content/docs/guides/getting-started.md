@@ -7,10 +7,10 @@ StoryShelf is a self-hosted visual testing platform for Storybook. You run one s
 
 ## 1. Scaffold a server
 
-Use the CLI to create a new server project:
+Use the CLI to scaffold a new server project:
 
 ```bash
-npx @storyshelf/cli create
+npx @storyshelf/cli server init
 # ? Project name: my-storyshelf
 # ? Directory: ./my-storyshelf
 # ? Which database? SQLite
@@ -29,15 +29,35 @@ npm install
 npm start
 ```
 
-## 3. Create a project and token
+## 3. Initialize Storybook and create a project
+
+Ensure `.storybook/main.*` exists, then initialize client config and create a project (requires site-admin token when auth is enabled):
 
 ```bash
-npx @storyshelf/cli init --url http://localhost:3000 --name "My Design System"
+# writes .storybook/storyshelf.json (prompts if flags missing)
+npx @storyshelf/cli init --url http://localhost:3000 --slug my-design-system
+
+# or create remotely and write config in one step (requires STORYSHELF_ADMIN_TOKEN)
+npx @storyshelf/cli create --url http://localhost:3000 --name "My Design System" --token $STORYSHELF_ADMIN_TOKEN
+# → prints slug + CI token and writes .storybook/storyshelf.json
 ```
 
-This prints a project `slug` and a CI token. Keep the token secret.
+Keep the CI token secret (`STORYSHELF_TOKEN` env in CI). `create` and `init` fail if `.storybook/main.*` is not found.
 
 ## 4. Upload a build from CI
+
+With `.storybook/storyshelf.json` present, `upload` flags can be omitted and `npx @storyshelf/cli` defaults to `upload`:
+
+```bash
+npx @storyshelf/cli upload \
+  --token shelf_xxx \
+  --sha "$GITHUB_SHA" \
+  --branch "$GITHUB_REF_NAME"
+# or simply (when config + env present):
+npx @storyshelf/cli
+```
+
+Explicit flags still work:
 
 ```bash
 npx @storyshelf/cli upload \
@@ -48,7 +68,7 @@ npx @storyshelf/cli upload \
   --branch "$GITHUB_REF_NAME"
 ```
 
-StoryShelf renders every story server-side and diffs it against the branch baseline.
+StoryShelf renders every story server-side and diffs it against the branch baseline. Without `.storybook/storyshelf.json`, running `storyshelf` shows help to run `init`.
 
 ## 5. Review
 

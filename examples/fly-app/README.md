@@ -5,13 +5,13 @@ Deploy StoryShelf as a public demo on Fly.io, seeded with the `examples/storyboo
 ## Prerequisites
 
 - `flyctl` installed and authenticated.
-- A scaffolded server project (run `storyshelf create` first).
+- A scaffolded server project (run `storyshelf server init` first).
 
 ## Deploy
 
 ```sh
 # Scaffold a server project
-storyshelf create
+storyshelf server init
 
 # Deploy to Fly.io
 fly apps create storyshelf-demo

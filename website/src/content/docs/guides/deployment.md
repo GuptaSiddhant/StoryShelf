@@ -47,10 +47,10 @@ StoryShelf is **cross-runtime**: the core router (`createShelfRouter`) uses only
 
 ### Recommended assembly (self-hosted default)
 
-Use `storyshelf create` to scaffold a server with your chosen adapters:
+Use `storyshelf server init` to scaffold a server with your chosen adapters:
 
 ```sh
-storyshelf create
+storyshelf server init
 # ? Which database? SQLite
 # ? Which storage? Local filesystem
 # ? Which auth? None
