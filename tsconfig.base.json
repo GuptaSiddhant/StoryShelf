@@ -1,11 +1,7 @@
 {
   "compilerOptions": {
     "target": "esnext",
-    "lib": [
-      "es2024",
-      "DOM",
-      "DOM.Iterable"
-    ],
+    "lib": ["es2024", "DOM", "DOM.Iterable"],
     "moduleResolution": "Bundler",
     "module": "Preserve",
     "declaration": true,
@@ -36,7 +32,10 @@
     "noEmitOnError": true,
     "isolatedDeclarations": false,
     "verbatimModuleSyntax": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "hono/jsx",
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "src",
+    "customConditions": ["source"]
   }
 }

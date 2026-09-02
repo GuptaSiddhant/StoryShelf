@@ -36,7 +36,9 @@
     "audit": "turbo audit",
     "verify": "turbo verify --filter='./packages/*' --filter='website'",
     "web:build": "nub run --filter website build",
-    "web:dev": "nub run --filter website dev"
+    "web:dev": "nub run --filter website dev",
+    "release": "nub ./scripts/release.mjs",
+    "release:dry": "nub ./scripts/release.mjs --dry-run"
   },
   "devDependencies": {
     "oxfmt": "catalog:",

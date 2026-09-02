@@ -3,15 +3,39 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Pure Playwright CaptureRunner implementation for StoryShelf: renders Storybook screenshots in-process (no db/storage coupling).",
+  "author": {
+    "name": "Siddhant Gupta",
+    "url": "https://guptasiddhant.com"
+  },
   "license": "MIT",
   "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GuptaSiddhant/storyshelf.git",
+    "directory": "packages/runner-playwright"
+  },
+  "homepage": "https://github.com/GuptaSiddhant/storyshelf#readme",
+  "bugs": {
+    "url": "https://github.com/GuptaSiddhant/storyshelf/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": "./dist/index.mjs",
+      "./package.json": "./package.json"
+    }
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown -w",
     "fmt": "oxfmt -c ../../.oxfmtrc.json ./src",
     "lint": "oxlint --type-aware --type-check ./src",
     "test": "vitest run",
-    "test:integration": "RUN_INTEGRATION=1 vitest run integration.test.ts"
+    "test:integration": "RUN_INTEGRATION=1 vitest run integration.test.ts",
+    "prepublishOnly": "nub run build"
   },
   "dependencies": {
     "@storyshelf/core": "workspace:*",
@@ -33,7 +57,10 @@
   },
   "types": "./dist/index.d.mts",
   "exports": {
-    ".": "./dist/index.mjs",
+    ".": {
+      "source": "./src/index.ts",
+      "default": "./dist/index.mjs"
+    },
     "./package.json": "./package.json"
   }
 }

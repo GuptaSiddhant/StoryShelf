@@ -19,7 +19,29 @@
     "url": "https://github.com/GuptaSiddhant/storyshelf/issues"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "exports": {
+      ".": "./dist/index.mjs",
+      "./adapter/auth": "./dist/adapter/auth.mjs",
+      "./adapter/capture-runner": "./dist/adapter/capture-runner.mjs",
+      "./adapter/database": "./dist/adapter/database.mjs",
+      "./adapter/git-host": "./dist/adapter/git-host.mjs",
+      "./adapter/git-host/helpers": "./dist/adapter/git-host/helpers.mjs",
+      "./adapter/storage": "./dist/adapter/storage.mjs",
+      "./ddl": "./dist/ddl.mjs",
+      "./models/baseline": "./dist/models/baseline.mjs",
+      "./models/build": "./dist/models/build.mjs",
+      "./models/comment": "./dist/models/comment.mjs",
+      "./models/label": "./dist/models/label.mjs",
+      "./models/member": "./dist/models/member.mjs",
+      "./models/project": "./dist/models/project.mjs",
+      "./models/snapshot": "./dist/models/snapshot.mjs",
+      "./models/token": "./dist/models/token.mjs",
+      "./models/webhook": "./dist/models/webhook.mjs",
+      "./schema": "./dist/schema.mjs",
+      "./types": "./dist/types.mjs",
+      "./package.json": "./package.json"
+    }
   },
   "files": [
     "dist"
@@ -59,26 +81,82 @@
   },
   "types": "./dist/index.d.mts",
   "exports": {
-    ".": "./dist/index.mjs",
-    "./adapter/database": "./dist/adapter/database.mjs",
-    "./adapter/storage": "./dist/adapter/storage.mjs",
-    "./adapter/capture-runner": "./dist/adapter/capture-runner.mjs",
-    "./adapter/auth": "./dist/adapter/auth.mjs",
-    "./adapter/git-host": "./dist/adapter/git-host.mjs",
-    "./adapter/git-host/helpers": "./dist/adapter/git-host/helpers.mjs",
-    "./schema": "./dist/schema.mjs",
-    "./ddl": "./dist/ddl.mjs",
-    "./types": "./dist/types.mjs",
-    "./models/project": "./dist/models/project.mjs",
-    "./models/build": "./dist/models/build.mjs",
-    "./models/snapshot": "./dist/models/snapshot.mjs",
-    "./models/baseline": "./dist/models/baseline.mjs",
-    "./models/member": "./dist/models/member.mjs",
-    "./models/comment": "./dist/models/comment.mjs",
-    "./models/label": "./dist/models/label.mjs",
-    "./models/token": "./dist/models/token.mjs",
-    "./models/webhook": "./dist/models/webhook.mjs",
-    "./models/status-config": "./dist/models/status-config.mjs",
+    ".": {
+      "source": "./src/index.tsx",
+      "default": "./dist/index.mjs"
+    },
+    "./adapter/auth": {
+      "source": "./src/adapters/auth.ts",
+      "default": "./dist/adapter/auth.mjs"
+    },
+    "./adapter/capture-runner": {
+      "source": "./src/adapters/capture-runner.ts",
+      "default": "./dist/adapter/capture-runner.mjs"
+    },
+    "./adapter/database": {
+      "source": "./src/adapters/database.ts",
+      "default": "./dist/adapter/database.mjs"
+    },
+    "./adapter/git-host": {
+      "source": "./src/adapters/git-host/index.ts",
+      "default": "./dist/adapter/git-host.mjs"
+    },
+    "./adapter/git-host/helpers": {
+      "source": "./src/adapters/git-host/helpers.ts",
+      "default": "./dist/adapter/git-host/helpers.mjs"
+    },
+    "./adapter/storage": {
+      "source": "./src/adapters/storage.ts",
+      "default": "./dist/adapter/storage.mjs"
+    },
+    "./ddl": {
+      "source": "./src/ddl.ts",
+      "default": "./dist/ddl.mjs"
+    },
+    "./models/baseline": {
+      "source": "./src/models/baseline.ts",
+      "default": "./dist/models/baseline.mjs"
+    },
+    "./models/build": {
+      "source": "./src/models/build.ts",
+      "default": "./dist/models/build.mjs"
+    },
+    "./models/comment": {
+      "source": "./src/models/comment.ts",
+      "default": "./dist/models/comment.mjs"
+    },
+    "./models/label": {
+      "source": "./src/models/label.ts",
+      "default": "./dist/models/label.mjs"
+    },
+    "./models/member": {
+      "source": "./src/models/member.ts",
+      "default": "./dist/models/member.mjs"
+    },
+    "./models/project": {
+      "source": "./src/models/project.ts",
+      "default": "./dist/models/project.mjs"
+    },
+    "./models/snapshot": {
+      "source": "./src/models/snapshot.ts",
+      "default": "./dist/models/snapshot.mjs"
+    },
+    "./models/token": {
+      "source": "./src/models/token.ts",
+      "default": "./dist/models/token.mjs"
+    },
+    "./models/webhook": {
+      "source": "./src/models/webhook.ts",
+      "default": "./dist/models/webhook.mjs"
+    },
+    "./schema": {
+      "source": "./src/schema.ts",
+      "default": "./dist/schema.mjs"
+    },
+    "./types": {
+      "source": "./src/types.ts",
+      "default": "./dist/types.mjs"
+    },
     "./package.json": "./package.json"
   }
 }

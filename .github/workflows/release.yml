@@ -1,0 +1,92 @@
+name: Release
+
+# Tag-push only: `nub ./scripts/release.mjs <bump>` commits and tags v<version>,
+# `git push --follow-tags` triggers this workflow for trusted (OIDC) publish.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+      - "v*.*.*-*"
+
+permissions:
+  contents: write # for GitHub Release creation
+  id-token: write # for Sigstore provenance + npm trusted publishing
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Nub
+        uses: nubjs/setup-nub@v0
+
+      - name: Install dependencies
+        run: nub ci
+
+      - name: Build packages
+        # Not strictly required — prepublishOnly runs build — but fail-fast before provenance.
+        run: nub run build --filter='./packages/*'
+
+      - name: Guard tag matches fixed version
+        run: |
+          set -e
+          TAG="${GITHUB_REF_NAME}"
+          PKG_VERSION="$(node -e "console.log(require('./packages/core/package.json').version)")"
+          echo "tag=$TAG pkg=v$PKG_VERSION"
+          if [ "$TAG" != "v$PKG_VERSION" ]; then
+            echo "::error::Tag $TAG != packages/core version v$PKG_VERSION"
+            exit 1
+          fi
+          # All non-private packages must share same version
+          VERS=$(node -e "const fs=require('fs');const path=require('path');const dir='packages';console.log([...new Set(require('fs').readdirSync(dir).filter(d=>fs.statSync(path.join(dir,d)).isDirectory()).map(d=>{try{const p=JSON.parse(fs.readFileSync(path.join(dir,d,'package.json'),'utf8'));return p.private?null:p.version}catch{return null}}).filter(Boolean))].join(','))")
+          COUNT=$(echo "$VERS" | tr ',' '\n' | sort -u | wc -l | tr -d ' ')
+          echo "distinct versions: $VERS (count=$COUNT)"
+          if [ "$COUNT" != "1" ]; then
+            echo "::error::Packages not fixed-version: $VERS"
+            exit 1
+          fi
+
+      - name: Publish to npm (trusted / provenance)
+        run: |
+          set -e
+          VERSION="$(node -e "console.log(require('./packages/core/package.json').version)")"
+          if echo "$VERSION" | grep -q "-"; then
+            TAG="next"
+          else
+            TAG="latest"
+          fi
+          echo "publishing $VERSION with dist-tag $TAG"
+          nub publish -r --provenance --tag "$TAG" --no-git-checks
+
+      - name: Generate release notes from git log
+        id: log
+        run: |
+          set -e
+          TAG="${GITHUB_REF_NAME}"
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+          echo "prev=$PREV_TAG current=$TAG"
+          if [ -z "$PREV_TAG" ]; then
+            LOG=$(git log --pretty='- %s (%h)' --no-merges)
+          else
+            LOG=$(git log "$PREV_TAG..HEAD" --pretty='- %s (%h)' --no-merges)
+          fi
+          {
+            echo "## $TAG"
+            echo ""
+            echo "$LOG"
+          } > /tmp/release-body.md
+          cat /tmp/release-body.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: /tmp/release-body.md
+          generate_release_notes: false

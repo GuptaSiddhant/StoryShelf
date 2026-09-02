@@ -3,18 +3,38 @@
   "version": "0.1.0",
   "type": "module",
   "description": "StoryShelf CLI: create projects, upload builds, purge, and retry from CI.",
+  "author": {
+    "name": "Siddhant Gupta",
+    "url": "https://guptasiddhant.com"
+  },
   "license": "MIT",
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GuptaSiddhant/storyshelf.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/GuptaSiddhant/storyshelf#readme",
+  "bugs": {
+    "url": "https://github.com/GuptaSiddhant/storyshelf/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist"
+  ],
   "bin": {
     "storyshelf": "./dist/index.js"
   },
-  "sideEffects": false,
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown -w",
     "fmt": "oxfmt -c ../../.oxfmtrc.json ./src",
     "lint": "oxlint --type-aware --type-check ./src",
     "start": "nub --watch ./dist/index.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepublishOnly": "nub run build"
   },
   "dependencies": {
     "adm-zip": "^0.6.0",
@@ -39,7 +59,7 @@
   },
   "types": "./dist/index.d.mts",
   "exports": {
-    ".": "./dist/index.mjs",
+    ".": "./dist/index.js",
     "./package.json": "./package.json"
   }
 }
