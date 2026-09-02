@@ -16,7 +16,7 @@ export interface CreateOptions {
 type DatabaseChoice = "sqlite" | "turso";
 type StorageChoice = "local" | "s3";
 type AuthChoice = "none" | "password" | "oauth";
-type GitChoice = "none" | "github";
+type GitChoice = "none" | "github" | "gitlab";
 
 interface Answers {
   name: string;
@@ -47,6 +47,7 @@ const AUTH_PACKAGE: Record<AuthChoice, string | null> = {
 const GIT_PACKAGE: Record<GitChoice, string | null> = {
   none: null,
   github: "@storyshelf/git-github",
+  gitlab: "@storyshelf/git-gitlab",
 };
 
 const DB_IMPORT: Record<DatabaseChoice, string> = {
@@ -81,7 +82,8 @@ function buildImports(answers: Answers): string[] {
     imports.push(`import { createPasswordAuth } from "${AUTH_PACKAGE[answers.auth]}";`);
   }
   if (answers.git !== "none") {
-    imports.push(`import { gitHubHost } from "${GIT_PACKAGE[answers.git]}";`);
+    const host = answers.git === "github" ? "gitHubHost" : "gitLabHost";
+    imports.push(`import { ${host} } from "${GIT_PACKAGE[answers.git]}";`);
   }
   imports.push(`import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";`);
   return imports;
@@ -110,7 +112,8 @@ function buildRouterLines(answers: Answers): string[] {
     lines.push(`  auth: createPasswordAuth({ password: process.env.AUTH_PASSWORD! }),`);
   }
   if (answers.git !== "none") {
-    lines.push(`  gitHosts: [gitHubHost],`);
+    const host = answers.git === "github" ? "gitHubHost" : "gitLabHost";
+    lines.push(`  gitHosts: [${host}],`);
   }
 
   lines.push(

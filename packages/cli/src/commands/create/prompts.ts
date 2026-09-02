@@ -77,6 +77,7 @@ export const INFRA_PROMPTS: Prompt[] = [
     choices: [
       { title: "None", value: "none" },
       { title: "GitHub", value: "github" },
+      { title: "GitLab", value: "gitlab" },
     ],
   },
   {
