@@ -25,6 +25,7 @@ export default defineConfig({
             { label: "REST API", slug: "guides/api" },
             { label: "Deployment", slug: "guides/deployment" },
             { label: "CLI", slug: "guides/cli" },
+            { label: "Configuration", slug: "guides/config" },
             { label: "Auth", slug: "guides/auth" },
           ],
         },

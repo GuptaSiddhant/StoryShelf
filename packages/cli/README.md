@@ -43,7 +43,7 @@ storyshelf server init --dir ./my-shelf
 `storyshelf init` — initialize `.storybook/storyshelf.json` (client config). Fails if `.storybook/main.*` not found. Prompts if flags missing.
 
 ```sh
-storyshelf init --url <url> --slug <slug> [--storybook-dir <dir>]
+storyshelf init --url <url> --slug <slug> [--build-dir <dir> --build-command <cmd> --skip <glob> -c <config>]
 ```
 
 `storyshelf create` — create a project and CI token on a server (requires admin token). Fails if `.storybook/main.*` not found and writes `.storybook/storyshelf.json`.
@@ -64,11 +64,11 @@ storyshelf server init --dir <dir>
 ```sh
 storyshelf upload --url <url> --slug <slug> --token <token> \
   --sha <sha> --branch <branch> \
-  [--storybook-dir storybook-static] [--message <msg>] \
+  [--build-dir <dir> --build-command <cmd> --force-build --skip <glob> -c <config>] [--message <msg>] \
   [--author-email <email>] [--author-name <name>]
 ```
 
-The default `--storybook-dir` is `storybook-static` or `storybookDir` from `.storybook/storyshelf.json`.
+The default `--build-dir` is `storybook-static` or `buildDir` from `.storybook/storyshelf.json` (see [Configuration](../../website/src/content/docs/guides/config.md)). If `buildDir` is missing/empty, `upload` runs `buildCommand` or `npm run <buildScriptName>`.
 
 `storyshelf purge` — purge expired builds (requires admin token when auth enabled).
 

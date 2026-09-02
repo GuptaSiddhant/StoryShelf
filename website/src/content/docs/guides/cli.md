@@ -18,14 +18,15 @@ This package is **client-only** — it talks to a running server over `/api/v1` 
 Initialize the current Storybook with `.storybook/storyshelf.json` (client config). Fails if `.storybook/main.*` is not found.
 
 ```bash
-storyshelf init --url http://localhost:3000 --slug my-design-system
+storyshelf init --url http://localhost:3000 --slug my-design-system --build-dir storybook-static
 # or with prompts:
 storyshelf init
-# ? Server URL? http://localhost:3000
+# ? Server URL? http://localhost:3000 (detected React-Vite • 1 addons)
 # ? Project slug? my-design-system
+# also: --build-dir, --build-command, --build-script-name, --skip, -c/--config
 ```
 
-Writes `.storybook/storyshelf.json: { "slug": "...", "url": "..." }` (no token). Token stays in `STORYSHELF_TOKEN` env / `--token`. If flags are missing, prompts are shown.
+Writes `.storybook/storyshelf.json: { "slug": "...", "url": "...", "buildDir": "...", "skip": "..." }` (no token, see [Configuration](/guides/config/)). Token stays in `STORYSHELF_TOKEN` env / `--token`. If flags are missing, prompts are shown with detected framework hints.
 
 ## `storyshelf create`
 
@@ -56,7 +57,7 @@ Generates `server.ts` + `package.json` (and `Dockerfile`/`compose.yaml` if selec
 
 ## `storyshelf upload`
 
-Build (optionally), zip, and upload a Storybook build for capture. When `.storybook/storyshelf.json` exists, `--url`/`--slug`/`--storybook-dir` can be omitted and are resolved as `flags > env > file`. `STORYSHELF_TOKEN`/`GITHUB_SHA`/`GITHUB_REF_NAME` are fallback envs.
+Build (optionally), zip, and upload a Storybook build for capture. When `.storybook/storyshelf.json` exists (`slug`, `url`, `buildDir`, `skip` — see [Configuration](/guides/config/)), `--url`/`--slug` can be omitted and are resolved as `flags > env > file` (`STORYSHELF_TOKEN`/`GITHUB_SHA`/`GITHUB_REF_NAME` are fallback envs). If `buildDir` is missing or empty or `--force-build` is given, `upload` runs `buildCommand` or `npm run <buildScriptName>` before zipping.
 
 ```bash
 # explicit flags
@@ -71,6 +72,8 @@ storyshelf upload \
 storyshelf
 # or
 storyshelf upload --token shelf_xxx --sha $GITHUB_SHA --branch main
+# with custom config path
+storyshelf upload --config ./config/storyshelf.json --force-build
 ```
 
 | Flag | Description |
@@ -80,7 +83,12 @@ storyshelf upload --token shelf_xxx --sha $GITHUB_SHA --branch main
 | `--token` | Project API token (sent as `Authorization: Bearer`, or `STORYSHELF_TOKEN`) |
 | `--sha` | Git commit SHA (or `GITHUB_SHA`) |
 | `--branch` | Git branch (or `GITHUB_REF_NAME`) |
-| `--storybook-dir` | Path to the static Storybook build (default `storybook-static` or file) |
+| `--build-dir` / `-d` | Built Storybook directory (default `storybook-static`, or file `buildDir`; `--storybook-dir` deprecated alias) |
+| `--config` / `-c` | Config file path (default `.storybook/storyshelf.json`) |
+| `--build-command` | Custom build command (e.g. `nx run app:build-storybook`, mutually exclusive with `--build-script-name`) |
+| `--build-script-name` / `-b` | npm script to build Storybook (default `build-storybook`) |
+| `--force-build` | Force rebuild even if `buildDir` exists |
+| `--skip` | Glob to skip upload (e.g. `"main"`, `"release/*"` — file `skip` also supported) |
 | `--message` | Build message (commit message) |
 | `--author-name`, `--author-email` | Author attribution |
 | `--label key=value` | Attach a build label (repeatable) |
