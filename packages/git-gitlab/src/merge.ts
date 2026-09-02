@@ -27,7 +27,9 @@ export async function checkIsMerged(opts: {
       const res = await fetch(`${base}/api/v4/projects/${pid}/merge_requests/${iid}`, {
         headers: gitlabHeaders(opts.token),
       });
-      if (!res.ok) return false;
+      if (!res.ok) {
+        return false;
+      }
       const mr = (await res.json()) as { state?: string; merged_at?: string | null };
       return mr.state === "merged" || mr.merged_at !== null && mr.merged_at !== undefined; // oxlint-disable-line eslint/no-eq-null, eslint/eqeqeq
     }
@@ -37,8 +39,10 @@ export async function checkIsMerged(opts: {
       `${base}/api/v4/projects/${pid}/merge_requests?state=merged&source_branch=${encodeURIComponent(opts.branch)}&per_page=5`,
       { headers: gitlabHeaders(opts.token) },
     );
-    if (!res.ok) return false;
-    const mrs = (await res.json()) as Array<{ sha?: string; merge_commit_sha?: string | null }>;
+    if (!res.ok) {
+      return false;
+    }
+    const mrs = (await res.json()) as { sha?: string; merge_commit_sha?: string | null }[];
     return mrs.some((mr) => mr.sha === opts.sha || mr.merge_commit_sha === opts.sha);
   } catch (error) {
     opts.logger?.debug({ err: error, sha: opts.sha, branch: opts.branch }, "isMerged check failed, not skipping");

@@ -20,31 +20,31 @@ async function pathExists(target: string): Promise<boolean> {
  * @param dataDir - Root directory in which all stored files live.
  * @returns A StorageAdapter that reads and writes files under `dataDir`.
  */
+function toAbsolute(root: string, path: string): string {
+  const target = resolve(root, path);
+  const rel = relative(root, target);
+  if (rel === ".." || rel.startsWith(`..${sep}`)) {
+    throw new Error(`Path escapes storage directory: ${path}`);
+  }
+  return target;
+}
+
+async function walk(root: string, dir: string): Promise<string[]> {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const nested = await Promise.all(
+    entries.map(async (entry) => {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        return await walk(root, full);
+      }
+      return [relative(root, full)];
+    }),
+  );
+  return nested.flat();
+}
+
 export function createLocalStorage(dataDir: string): StorageAdapter {
   const root = resolve(dataDir);
-
-  function toAbsolute(path: string): string {
-    const target = resolve(root, path);
-    const rel = relative(root, target);
-    if (rel === ".." || rel.startsWith(`..${sep}`)) {
-      throw new Error(`Path escapes storage directory: ${path}`);
-    }
-    return target;
-  }
-
-  async function walk(dir: string): Promise<string[]> {
-    const entries = await readdir(dir, { withFileTypes: true });
-    const nested = await Promise.all(
-      entries.map(async (entry) => {
-        const full = join(dir, entry.name);
-        if (entry.isDirectory()) {
-          return await walk(full);
-        }
-        return [relative(root, full)];
-      }),
-    );
-    return nested.flat();
-  }
 
   return {
     metadata: {
@@ -54,25 +54,25 @@ export function createLocalStorage(dataDir: string): StorageAdapter {
       kind: "local",
     },
     async read(path) {
-      return await readFile(toAbsolute(path));
+      return await readFile(toAbsolute(root, path));
     },
     async write(path, data) {
-      const target = toAbsolute(path);
+      const target = toAbsolute(root, path);
       await mkdir(dirname(target), { recursive: true });
       await writeFile(target, data);
     },
     async delete(path) {
-      await rm(toAbsolute(path), { force: true });
+      await rm(toAbsolute(root, path), { force: true });
     },
     async exists(path) {
-      return await pathExists(toAbsolute(path));
+      return await pathExists(toAbsolute(root, path));
     },
     async list(prefix) {
-      const dir = toAbsolute(prefix);
+      const dir = toAbsolute(root, prefix);
       if (!(await pathExists(dir))) {
         return [];
       }
-      return walk(dir);
+      return walk(root, dir);
     },
   };
 }

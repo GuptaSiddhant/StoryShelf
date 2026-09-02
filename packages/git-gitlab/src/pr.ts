@@ -12,8 +12,10 @@ export async function findMrIid(opts: {
     const pid = projectId(opts.owner, opts.repo);
     const url = `${base}/api/v4/projects/${pid}/repository/commits/${encodeURIComponent(opts.sha)}/merge_requests`;
     const res = await fetch(url, { headers: gitlabHeaders(opts.token) });
-    if (!res.ok) return undefined;
-    const data = (await res.json()) as Array<{ iid: number }>;
+    if (!res.ok) {
+      return undefined;
+    }
+    const data = (await res.json()) as { iid: number }[];
     return data[0]?.iid;
   } catch {
     return undefined;

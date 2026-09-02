@@ -14,6 +14,26 @@ function idOf(table: AnySQLiteTable): SQLiteColumn {
   return getTableColumns(table)["id"]!;
 }
 
+/* eslint-disable typescript/no-explicit-any, typescript/no-unsafe-call, typescript/no-unsafe-member-access -- drizzle query builder is intentionally loosely typed */
+function applyListOptions(
+  query: any,
+  opts: ListOptions,
+): void {
+  if (opts.where) {
+    query.where(opts.where);
+  }
+  if (opts.orderBy) {
+    query.orderBy(opts.orderBy);
+  }
+  if (opts.limit !== undefined) {
+    query.limit(opts.limit);
+  }
+  if (opts.offset !== undefined) {
+    query.offset(opts.offset);
+  }
+}
+/* eslint-enable typescript/no-explicit-any, typescript/no-unsafe-call, typescript/no-unsafe-member-access */
+
 /**
  * Create a SQLite-backed DatabaseAdapter using better-sqlite3 and Drizzle ORM.
  *
@@ -26,10 +46,10 @@ export function createSqliteDatabase(path: string): DatabaseAdapter {
   sqlite.pragma("busy_timeout = 5000");
   const db = drizzle(sqlite, { schema });
 
-  // better-sqlite3 is synchronous, so `async` is required only by the
+  // Better-sqlite3 is synchronous, so `async` is required only by the
   // DatabaseAdapter interface (no `await`), and drizzle's `.get()`/`["id"]`
-  // are guaranteed present despite the undefined-able types. Both rules are
-  // false positives here.
+  // Are guaranteed present despite the undefined-able types. Both rules are
+  // False positives here.
   /* eslint-disable require-await, no-non-null-assertion, no-unnecessary-type-assertion */
   return {
     metadata: {
@@ -39,26 +59,20 @@ export function createSqliteDatabase(path: string): DatabaseAdapter {
       kind: "sqlite",
     },
     async insert(table, values) {
-      const row = db.insert(table).values(values).returning().get();
-      return row!;
+      return db.insert(table).values(values).returning().get()!;
     },
     async update(table, id, values) {
-      const row = db.update(table).set(values).where(eq(idOf(table), id)).returning().get();
-      return row!;
+      return db.update(table).set(values).where(eq(idOf(table), id)).returning().get()!;
     },
     async get(table, id) {
-      const row = db.select().from(table).where(eq(idOf(table), id)).limit(1).get();
-      return row ?? null;
+      return db.select().from(table).where(eq(idOf(table), id)).limit(1).get() ?? null;
     },
     async remove(table, id) {
       db.delete(table).where(eq(idOf(table), id)).run();
     },
     async list(table, opts: ListOptions = {}) {
       const query = db.select().from(table);
-      if (opts.where) query.where(opts.where);
-      if (opts.orderBy) query.orderBy(opts.orderBy);
-      if (opts.limit !== undefined) query.limit(opts.limit);
-      if (opts.offset !== undefined) query.offset(opts.offset);
+      applyListOptions(query, opts);
       return query.all();
     },
     async count(table, where) {
@@ -72,7 +86,7 @@ export function createSqliteDatabase(path: string): DatabaseAdapter {
       try {
         sqlite.exec("ALTER TABLE projects ADD COLUMN storybook_meta TEXT");
       } catch {
-        // column already exists or other error — ignore for idempotency
+        // Column already exists or other error — ignore for idempotency
       }
     },
     async close() {

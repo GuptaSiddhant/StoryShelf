@@ -35,7 +35,7 @@ export async function upsertPrComment(opts: {
       issue_number: resolved,
       per_page: 100,
     });
-    const existing = comments.data.find((c) => c.body?.includes(marker));
+    const existing = comments.data.find((comment) => comment.body?.includes(marker));
     if (existing) {
       const updated = await opts.octokit.issues.updateComment({
         owner: opts.owner,

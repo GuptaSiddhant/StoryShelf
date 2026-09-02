@@ -38,6 +38,41 @@ function isNotFound(error: unknown): boolean {
   return error instanceof S3ServiceException && error.$metadata.httpStatusCode === 404;
 }
 
+type S3Context = { client: S3Client; bucket: string; prefix: string };
+
+async function s3Read(ctx: S3Context, path: string): Promise<Buffer> {
+  const response = await ctx.client.send(
+    new GetObjectCommand({ Bucket: ctx.bucket, Key: s3Key(ctx.prefix, path) }),
+  );
+  const body = response.Body;
+  if (body === undefined) {
+    return Buffer.alloc(0);
+  }
+  return Buffer.from(await body.transformToByteArray());
+}
+
+async function s3Exists(ctx: S3Context, path: string): Promise<boolean> {
+  try {
+    await ctx.client.send(new HeadObjectCommand({ Bucket: ctx.bucket, Key: s3Key(ctx.prefix, path) }));
+    return true;
+  } catch (error) {
+    if (isNotFound(error)) {
+      return false;
+    }
+    throw error;
+  }
+}
+
+async function s3List(ctx: S3Context, listPrefix: string): Promise<string[]> {
+  const response = await ctx.client.send(
+    new ListObjectsV2Command({ Bucket: ctx.bucket, Prefix: s3Key(ctx.prefix, listPrefix) }),
+  );
+  return (response.Contents ?? [])
+    .map((item) => item.Key)
+    .filter((key): key is string => key !== undefined)
+    .map((key) => s3Rel(ctx.prefix, key));
+}
+
 /**
  * Create an S3-compatible StorageAdapter (AWS S3, R2, MinIO, etc.).
  *
@@ -47,6 +82,7 @@ function isNotFound(error: unknown): boolean {
 export function createS3Storage(options: S3StorageOptions): StorageAdapter {
   const { bucket, prefix = "", endpoint, region = "us-east-1", client: injectedClient } = options;
   const client = injectedClient ?? new S3Client({ endpoint, region, forcePathStyle: true });
+  const ctx: S3Context = { client, bucket, prefix };
 
   return {
     metadata: {
@@ -56,14 +92,7 @@ export function createS3Storage(options: S3StorageOptions): StorageAdapter {
       kind: "s3",
     },
     async read(path) {
-      const response = await client.send(
-        new GetObjectCommand({ Bucket: bucket, Key: s3Key(prefix, path) }),
-      );
-      const body = response.Body;
-      if (body === undefined) {
-        return Buffer.alloc(0);
-      }
-      return Buffer.from(await body.transformToByteArray());
+      return await s3Read(ctx, path);
     },
     async write(path, data) {
       await client.send(
@@ -76,24 +105,10 @@ export function createS3Storage(options: S3StorageOptions): StorageAdapter {
       );
     },
     async exists(path) {
-      try {
-        await client.send(new HeadObjectCommand({ Bucket: bucket, Key: s3Key(prefix, path) }));
-        return true;
-      } catch (error) {
-        if (isNotFound(error)) {
-          return false;
-        }
-        throw error;
-      }
+      return await s3Exists(ctx, path);
     },
     async list(listPrefix) {
-      const response = await client.send(
-        new ListObjectsV2Command({ Bucket: bucket, Prefix: s3Key(prefix, listPrefix) }),
-      );
-      return (response.Contents ?? [])
-        .map((item) => item.Key)
-        .filter((key): key is string => key !== undefined)
-        .map((key) => s3Rel(prefix, key));
+      return await s3List(ctx, listPrefix);
     },
   };
 }

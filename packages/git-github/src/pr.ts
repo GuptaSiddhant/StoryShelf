@@ -12,7 +12,7 @@ export async function findPrNumber(opts: {
       repo: opts.repo,
       commit_sha: opts.sha,
     });
-    const pr = pulls.data[0];
+    const [pr] = pulls.data;
     if (pr && typeof pr.number === "number") {
       return pr.number;
     }

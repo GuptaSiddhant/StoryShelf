@@ -5,7 +5,7 @@ import { projects } from "@storyshelf/core/schema";
 import { createSqliteDatabase } from "./index.ts";
 
 describe("createSqliteDatabase", () => {
-  it("migrates and performs CRUD", async () => {
+  it("migrates and inserts a project", async () => {
     const db = createSqliteDatabase(":memory:");
     await db.migrate();
 
@@ -19,11 +19,28 @@ describe("createSqliteDatabase", () => {
     const listed = await db.list(projects);
     expect(listed).toHaveLength(1);
 
+    await db.close();
+  });
+
+  it("updates and removes a project", async () => {
+    const db = createSqliteDatabase(":memory:");
+    await db.migrate();
+
+    await db.insert(projects, {
+      id: "p1",
+      name: "Demo",
+      slug: "demo",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
     await db.update(projects, "p1", { name: "Renamed" });
-    expect((await db.get(projects, "p1"))?.name).toBe("Renamed");
+    const renamed = await db.get(projects, "p1");
+    expect(renamed?.name).toBe("Renamed");
 
     await db.remove(projects, "p1");
-    expect(await db.get(projects, "p1")).toBeNull();
+    const afterRemove = await db.get(projects, "p1");
+    expect(afterRemove).toBeNull();
 
     await db.close();
   });

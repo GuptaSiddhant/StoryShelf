@@ -9,7 +9,7 @@ import { projects } from "@storyshelf/core/schema";
 import { createTursoDatabase } from "./index.ts";
 
 describe("createTursoDatabase", () => {
-  it("migrates and performs CRUD", async () => {
+  it("migrates and inserts a project", async () => {
     const dir = mkdtempSync(join(tmpdir(), "storyshelf-turso-"));
     const db = createTursoDatabase({ url: `file:${join(dir, "test.db")}` });
     await db.migrate();
@@ -24,11 +24,30 @@ describe("createTursoDatabase", () => {
     const listed = await db.list(projects);
     expect(listed).toHaveLength(1);
 
+    await db.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("updates and removes a project", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "storyshelf-turso-"));
+    const db = createTursoDatabase({ url: `file:${join(dir, "test.db")}` });
+    await db.migrate();
+
+    await db.insert(projects, {
+      id: "p1",
+      name: "Demo",
+      slug: "demo",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
     await db.update(projects, "p1", { name: "Renamed" });
-    expect((await db.get(projects, "p1"))?.name).toBe("Renamed");
+    const renamed = await db.get(projects, "p1");
+    expect(renamed?.name).toBe("Renamed");
 
     await db.remove(projects, "p1");
-    expect(await db.get(projects, "p1")).toBeNull();
+    const afterRemove = await db.get(projects, "p1");
+    expect(afterRemove).toBeNull();
 
     await db.close();
     rmSync(dir, { recursive: true, force: true });

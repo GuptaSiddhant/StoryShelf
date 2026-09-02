@@ -35,8 +35,8 @@ export async function upsertMrNote(opts: {
     const listUrl = `${base}/api/v4/projects/${pid}/merge_requests/${iid}/notes?per_page=100`;
     const res = await fetch(listUrl, { headers: gitlabHeaders(opts.token) });
     if (res.ok) {
-      const notes = (await res.json()) as Array<{ id: number; body: string }>;
-      const existing = notes.find((n) => n.body.includes(marker));
+      const notes = (await res.json()) as { id: number; body: string }[];
+      const existing = notes.find((note) => note.body.includes(marker));
       if (existing) {
         const upd = await fetch(`${base}/api/v4/projects/${pid}/merge_requests/${iid}/notes/${existing.id}`, {
           method: "PUT",

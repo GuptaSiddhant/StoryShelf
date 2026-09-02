@@ -14,6 +14,26 @@ function idOf(table: AnySQLiteTable): SQLiteColumn {
   return getTableColumns(table)["id"]!;
 }
 
+/* eslint-disable typescript/no-explicit-any, typescript/no-unsafe-call, typescript/no-unsafe-member-access -- drizzle query builder is intentionally loosely typed */
+function applyListOptions(
+  query: any,
+  opts: ListOptions,
+): void {
+  if (opts.where) {
+    query.where(opts.where);
+  }
+  if (opts.orderBy) {
+    query.orderBy(opts.orderBy);
+  }
+  if (opts.limit !== undefined) {
+    query.limit(opts.limit);
+  }
+  if (opts.offset !== undefined) {
+    query.offset(opts.offset);
+  }
+}
+/* eslint-enable typescript/no-explicit-any, typescript/no-unsafe-call, typescript/no-unsafe-member-access */
+
 /**
  * Create a Turso/libSQL-backed DatabaseAdapter using Drizzle ORM.
  *
@@ -43,22 +63,11 @@ export function createTursoDatabase(options: { url: string; authToken?: string }
     async remove(table, id) {
       await db.delete(table).where(eq(idOf(table), id)).run();
     },
-    async list(table, opts: ListOptions = {}) {
-      const query = db.select().from(table);
-      if (opts.where) {
-        query.where(opts.where);
-      }
-      if (opts.orderBy) {
-        query.orderBy(opts.orderBy);
-      }
-      if (opts.limit !== undefined) {
-        query.limit(opts.limit);
-      }
-      if (opts.offset !== undefined) {
-        query.offset(opts.offset);
-      }
-      return await query.all();
-    },
+      async list(table, opts: ListOptions = {}) {
+        const query = db.select().from(table);
+        applyListOptions(query, opts);
+        return await query.all();
+      },
     async count(table, where) {
       return await db.$count(table, where);
     },
@@ -70,8 +79,8 @@ export function createTursoDatabase(options: { url: string; authToken?: string }
       try {
         await client.execute("ALTER TABLE projects ADD COLUMN storybook_meta TEXT");
       } catch {
-        // column already exists — ignore
-      }
+          // Column already exists — ignore
+        }
     },
     // eslint-disable-next-line require-await -- client.close() is synchronous
     async close() {

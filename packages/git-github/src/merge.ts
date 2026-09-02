@@ -27,7 +27,7 @@ export async function checkIsMerged(opts: {
         state: "closed",
         per_page: 5,
       });
-      const pr = pulls.data.find((p) => p.merge_commit_sha === opts.sha || p.head.sha === opts.sha);
+      const pr = pulls.data.find((pull) => pull.merge_commit_sha === opts.sha || pull.head.sha === opts.sha);
       return pr?.merged_at != null; // oxlint-disable-line eslint/eqeqeq, eslint/no-eq-null
     }
     const pr = await opts.octokit.pulls.get({
