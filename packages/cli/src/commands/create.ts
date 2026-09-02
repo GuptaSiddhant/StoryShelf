@@ -1,7 +1,7 @@
 /* oxlint-disable typescript/no-unsafe-assignment, typescript/no-unsafe-member-access, typescript/no-unsafe-call, max-statements, max-lines-per-function, complexity */
-import { createClient } from "../../client.ts";
-import { assertStorybookMain, writeStorybookConfig } from "../../config.ts";
-import { printError, printLine } from "../../output.ts";
+import { createClient } from "../client.ts";
+import { assertStorybookMain, writeStorybookConfig } from "../config.ts";
+import { printError, printLine } from "../output.ts";
 
 /** Options for the `create` command (project creation). */
 export interface CreateOptions {
