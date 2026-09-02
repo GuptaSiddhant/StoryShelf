@@ -38,7 +38,11 @@ function isNotFound(error: unknown): boolean {
   return error instanceof S3ServiceException && error.$metadata.httpStatusCode === 404;
 }
 
-type S3Context = { client: S3Client; bucket: string; prefix: string };
+interface S3Context {
+  client: S3Client;
+  bucket: string;
+  prefix: string;
+}
 
 async function s3Read(ctx: S3Context, path: string): Promise<Buffer> {
   const response = await ctx.client.send(

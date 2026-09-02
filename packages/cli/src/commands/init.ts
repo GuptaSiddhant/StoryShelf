@@ -39,9 +39,9 @@ export async function runInit(options: InitOptions): Promise<void> {
   let url = options.url ?? process.env["STORYSHELF_URL"];
   let slug = options.slug ?? process.env["STORYSHELF_SLUG"];
   let buildDir = options.buildDir ?? options.storybookDir;
-  let buildCommand = options.buildCommand;
-  let buildScriptName = options.buildScriptName;
-  let skip = options.skip;
+  let {buildCommand} = options;
+  let {buildScriptName} = options;
+  let {skip} = options;
   const configPath = options.config;
 
   const existing = await loadStorybookConfig(process.cwd(), configPath);
@@ -56,12 +56,12 @@ export async function runInit(options: InitOptions): Promise<void> {
 
   const meta = await detectStorybookMeta();
   const hintParts: string[] = [];
-  if (meta.framework?.name) hintParts.push(meta.framework.name);
-  if (meta.addons?.length) hintParts.push(`${meta.addons.length} addons`);
-  if (meta.packagePath && meta.packagePath !== ".") hintParts.push(meta.packagePath);
+  if (meta.framework?.name) {hintParts.push(meta.framework.name);}
+  if (meta.addons?.length) {hintParts.push(`${meta.addons.length} addons`);}
+  if (meta.packagePath && meta.packagePath !== ".") {hintParts.push(meta.packagePath);}
   const hintSuffix = hintParts.length > 0 ? ` (detected ${hintParts.join(" • ")})` : "";
 
-  const questions: Array<{ type: "text"; name: string; message: string; initial?: string }> = [];
+  const questions: { type: "text"; name: string; message: string; initial?: string }[] = [];
   if (!url) {
     questions.push({ type: "text", name: "url", message: `Server URL?${hintSuffix}` });
   }
@@ -86,11 +86,11 @@ export async function runInit(options: InitOptions): Promise<void> {
   }
 
   const config: { slug: string; url?: string; buildDir?: string; buildCommand?: string; buildScriptName?: string; skip?: string } = { slug };
-  if (url) config.url = url;
-  if (buildDir) config.buildDir = buildDir;
-  if (buildCommand) config.buildCommand = buildCommand;
-  if (buildScriptName) config.buildScriptName = buildScriptName;
-  if (skip) config.skip = skip;
+  if (url) {config.url = url;}
+  if (buildDir) {config.buildDir = buildDir;}
+  if (buildCommand) {config.buildCommand = buildCommand;}
+  if (buildScriptName) {config.buildScriptName = buildScriptName;}
+  if (skip) {config.skip = skip;}
 
   try {
     const written = await writeStorybookConfig(config, process.cwd(), options.config);
@@ -107,27 +107,27 @@ export async function runInit(options: InitOptions): Promise<void> {
   // Sync storybook_meta to server if project already exists
   if (url && slug) {
     const metaToSync = await detectStorybookMeta();
-    if (Object.keys(metaToSync).length === 0) return;
+    if (Object.keys(metaToSync).length === 0) {return;}
     const tokens = [
       options.token ?? process.env["STORYSHELF_TOKEN"] ?? process.env["SHELF_TOKEN"],
       process.env["STORYSHELF_ADMIN_TOKEN"] ?? process.env["ADMIN_TOKEN"],
     ].filter(Boolean) as string[];
-    if (tokens.length === 0) return;
+    if (tokens.length === 0) {return;}
     let synced = false;
     let notFound = false;
     for (const token of tokens) {
       const client = createClient(url, token);
       try {
         await client.projects.get(slug);
-        // project exists, try patch
+        // Project exists, try patch
         try {
           await client.projects.update(slug, { storybookMeta: metaToSync });
           printLine(`Synced storybook_meta for ${slug}`);
           synced = true;
           break;
         } catch (error) {
-          // patch may fail due to auth (project token not admin), try next token
-          if (error instanceof Error && error.message.includes("403")) continue;
+          // Patch may fail due to auth (project token not admin), try next token
+          if (error instanceof Error && error.message.includes("403")) {continue;}
           throw error;
         }
       } catch (error) {
@@ -138,7 +138,7 @@ export async function runInit(options: InitOptions): Promise<void> {
         if (error instanceof Error && error.message.includes("403")) {
           continue;
         }
-        // network or other error, try next token
+        // Network or other error, try next token
         continue;
       }
     }

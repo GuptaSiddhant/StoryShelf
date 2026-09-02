@@ -105,7 +105,7 @@ export function makeDatabase(): { db: DatabaseAdapter } {
   const listRows = async <T extends AnySQLiteTable>(table: T, opts: ListOptions = {}): Promise<T["$inferSelect"][]> => {
     let current = [...rowsOf(table).values()];
     if (opts.where) {
-      const where = opts.where;
+      const {where} = opts;
       current = current.filter((row) => whereMatches(where, row as Record<string, unknown>, table));
     }
     if (opts.limit !== undefined) {
@@ -199,7 +199,7 @@ function inArrayMatches(chunks: SqlChunk[], row: Record<string, unknown>, table:
   const collect = (nodes: unknown[]): void => {
     for (const raw of nodes as SqlChunk[]) {
       const chunk = raw as SqlChunk & Record<string, unknown>;
-      // handle array-like chunk (inArray values stored as array of chunks)
+      // Handle array-like chunk (inArray values stored as array of chunks)
       if (Array.isArray(chunk) || (chunk && typeof chunk === "object" && Object.keys(chunk).every((k) => /^\d+$/u.test(k)))) {
         collect(Object.values(chunk as unknown as Record<string, unknown>) as unknown[]);
         continue;
@@ -226,9 +226,9 @@ function inArrayMatches(chunks: SqlChunk[], row: Record<string, unknown>, table:
           }
           if (item && typeof item === "object" && "value" in (item as Record<string, unknown>)) {
             const iv = (item as Record<string, unknown>)["value"];
-            if (iv !== undefined) values.push(iv);
+            if (iv !== undefined) {values.push(iv);}
           }
-          if (typeof item === "string") values.push(item);
+          if (typeof item === "string") {values.push(item);}
         }
       }
     }

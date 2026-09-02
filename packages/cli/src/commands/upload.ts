@@ -68,11 +68,11 @@ export async function runUpload(options: UploadOptions): Promise<void> {
     return;
   }
 
-  if (!url) throw new Error("--url is required (or .storybook/storyshelf.json / STORYSHELF_URL)");
-  if (!slug) throw new Error("--slug is required (or .storybook/storyshelf.json / STORYSHELF_SLUG)");
-  if (!token) throw new Error("--token is required (or STORYSHELF_TOKEN env)");
-  if (!sha) throw new Error("--sha is required (or GITHUB_SHA env)");
-  if (!branch) throw new Error("--branch is required (or GITHUB_REF_NAME env)");
+  if (!url) {throw new Error("--url is required (or .storybook/storyshelf.json / STORYSHELF_URL)");}
+  if (!slug) {throw new Error("--slug is required (or .storybook/storyshelf.json / STORYSHELF_SLUG)");}
+  if (!token) {throw new Error("--token is required (or STORYSHELF_TOKEN env)");}
+  if (!sha) {throw new Error("--sha is required (or GITHUB_SHA env)");}
+  if (!branch) {throw new Error("--branch is required (or GITHUB_REF_NAME env)");}
 
   await ensureBuildDir({ buildDir, buildCommand, buildScriptName, force: options.forceBuild });
 
@@ -83,9 +83,9 @@ export async function runUpload(options: UploadOptions): Promise<void> {
   const form = new FormData();
   form.set("gitSha", sha);
   form.set("gitBranch", branch);
-  if (options.message) form.set("message", options.message);
-  if (options.authorEmail) form.set("authorEmail", options.authorEmail);
-  if (options.authorName) form.set("authorName", options.authorName);
+  if (options.message) {form.set("message", options.message);}
+  if (options.authorEmail) {form.set("authorEmail", options.authorEmail);}
+  if (options.authorName) {form.set("authorName", options.authorName);}
   form.set("zip", new Blob([new Uint8Array(zipBuffer)], { type: "application/zip" }), "storybook.zip");
 
   const client = createClient(url, token);
@@ -123,7 +123,7 @@ async function ensureBuildDir(opts: {
       shouldBuild = true;
     }
   }
-  if (!shouldBuild) return;
+  if (!shouldBuild) {return;}
   const command = opts.buildCommand ?? `npm run ${opts.buildScriptName ?? "build-storybook"} -- --output-dir ${opts.buildDir}`;
   printLine(`Building Storybook: ${command}`);
   execSync(command, { stdio: "inherit" });

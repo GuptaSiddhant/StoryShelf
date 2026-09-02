@@ -14,7 +14,7 @@ export interface ProjectSettingsData {
   project: Project;
   activeTab: SettingsTab;
   labelTypes: LabelType[];
-  tokens: Array<Omit<Token, "hash">>;
+  tokens: Omit<Token, "hash">[];
   members: SettingsMember[];
   webhooks: SettingsWebhook[];
   statusConfigs: SettingsStatusConfig[];

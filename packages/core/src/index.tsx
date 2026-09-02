@@ -27,7 +27,7 @@ import { executeCaptureJob, type CaptureJobOptions } from "./capture/orchestrato
 import { InMemoryCaptureQueue } from "./capture/queue.ts";
 import { postStatusesForBuild } from "./capture/status-fanout.ts";
 
-export type ShelfContext = {
+export interface ShelfContext {
   requestId?: string;
   db: import("./adapters/database.ts").DatabaseAdapter;
   storage: import("./adapters/storage.ts").StorageAdapter;
@@ -39,17 +39,17 @@ export type ShelfContext = {
   enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
   captureQueue: import("./adapters/capture-queue.ts").CaptureQueue | null;
   gitHosts: import("./adapters/git-host/index.ts").GitHostProvider[];
-};
+}
 
 export type ShelfApp = OpenAPIHono<{ Variables: ShelfContext }>;
 
 function buildAdapterSnapshot(options: ShelfOptions): Record<string, AdapterMetadata | GitAdapterMetadata> {
   const snap: Record<string, AdapterMetadata | GitAdapterMetadata> = {};
-  if (options.database.metadata) snap["database"] = options.database.metadata;
-  if (options.storage.metadata) snap["storage"] = options.storage.metadata;
-  if (options.captureRunner?.metadata) snap["captureRunner"] = options.captureRunner.metadata;
-  if (options.captureQueue?.metadata) snap["captureQueue"] = options.captureQueue.metadata;
-  if (options.auth?.metadata) snap["auth"] = options.auth.metadata;
+  if (options.database.metadata) {snap["database"] = options.database.metadata;}
+  if (options.storage.metadata) {snap["storage"] = options.storage.metadata;}
+  if (options.captureRunner?.metadata) {snap["captureRunner"] = options.captureRunner.metadata;}
+  if (options.captureQueue?.metadata) {snap["captureQueue"] = options.captureQueue.metadata;}
+  if (options.auth?.metadata) {snap["auth"] = options.auth.metadata;}
   for (const p of options.gitHosts ?? []) {
     snap[`git:${p.metadata.kind}`] = p.metadata;
   }
@@ -76,13 +76,13 @@ async function isAlreadyMerged(opts: {
   projectId: string;
   logger?: import("pino").Logger;
 }): Promise<boolean> {
-  if (opts.providers.length === 0) return false;
+  if (opts.providers.length === 0) {return false;}
   const { StatusConfigModel } = await import("./models/status-config.ts");
   const model = new StatusConfigModel(opts.db, opts.secret);
   const rows = await model.list(opts.projectId);
   for (const row of rows) {
     const provider = opts.providers.find((p) => p.metadata.kind === row.provider);
-    if (!provider) continue;
+    if (!provider) {continue;}
     let parsed: unknown;
     try {
       parsed = JSON.parse(row.config);
@@ -97,13 +97,13 @@ async function isAlreadyMerged(opts: {
       continue;
     }
     const adapter = provider.create({ config: parsed, token, logger: opts.logger });
-    if (!adapter.isMerged) continue;
+    if (!adapter.isMerged) {continue;}
     try {
       // eslint-disable-next-line no-await-in-loop -- short-circuit on first merged status
       const merged = await adapter.isMerged({ sha: opts.sha, branch: opts.branch });
-      if (merged) return true;
+      if (merged) {return true;}
     } catch {
-      // ignore provider errors — do not skip on failure
+      // Ignore provider errors — do not skip on failure
     }
   }
   return false;
@@ -199,7 +199,7 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
             }).catch(() => false);
             if (merged) {
               logger.info({ buildId: build.id, sha: build.gitSha, branch: build.gitBranch }, "skipping capture — already merged");
-              await builds.setStatus(build.id, "approved").catch(() => {}); // intentionally empty — fire-and-forget
+              await builds.setStatus(build.id, "approved").catch(() => {}); // Intentionally empty — fire-and-forget
               await postStatusesForBuild({
                 db: options.database,
                 project,
@@ -209,7 +209,7 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
                 providers: gitHosts,
                 secret: config.secret,
                 logger,
-              }).catch(() => {}); // intentionally empty — fire-and-forget
+              }).catch(() => {}); // Intentionally empty — fire-and-forget
               return;
             }
           }
@@ -217,7 +217,7 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
           const dup = await hasApprovedBuildForSha(options.database, project.id, build.gitSha, build.id);
           if (dup) {
             logger.info({ buildId: build.id, sha: build.gitSha }, "skipping capture — duplicate sha already approved");
-            await builds.setStatus(build.id, "approved").catch(() => {}); // intentionally empty — fire-and-forget
+            await builds.setStatus(build.id, "approved").catch(() => {}); // Intentionally empty — fire-and-forget
             await postStatusesForBuild({
               db: options.database,
               project,
@@ -227,7 +227,7 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
               providers: gitHosts,
               secret: config.secret,
               logger,
-            }).catch(() => {}); // intentionally empty — fire-and-forget
+            }).catch(() => {}); // Intentionally empty — fire-and-forget
             return;
           }
           try {
@@ -237,9 +237,9 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
               const terminal =
                 updated.status === "approved"
                   ? "success"
-                  : updated.status === "rejected" || updated.status === "failed"
+                  : (updated.status === "rejected" || updated.status === "failed"
                     ? "failure"
-                    : null;
+                    : null);
               if (terminal) {
                 await postStatusesForBuild({
                   db: options.database,
@@ -266,7 +266,7 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
               secret: config.secret,
               logger,
             }).catch(() => {
-              // ignore: status post failure already logged
+              // Ignore: status post failure already logged
             });
             throw error;
           }
@@ -281,8 +281,8 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
   app.use("*", requestId());
 
   // Structured request logging. Uses a Hono-native middleware rather than
-  // pino-http, which expects a Node server response (`res.on`) incompatible
-  // with Hono's Web `Request`/`Response` model.
+  // Pino-http, which expects a Node server response (`res.on`) incompatible
+  // With Hono's Web `Request`/`Response` model.
   app.use("*", async (c, next) => {
     const started = performance.now();
     const id = c.get("requestId");
@@ -327,12 +327,12 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
   });
 
   // Gate the server-rendered UI behind auth (ADR 0008): unauthenticated HTML
-  // requests are redirected to the login page. API and auth routes are handled
-  // by their own routers (401/403 vs the login flow).
+  // Requests are redirected to the login page. API and auth routes are handled
+  // By their own routers (401/403 vs the login flow).
   // eslint-disable-next-line require-await -- async is required to match Hono's middleware signature
   app.use("*", async (c, next) => {
     const { user, authEnabled: isAuthEnabled } = getStore();
-    const path = c.req.path;
+    const {path} = c.req;
     if (
       !isAuthEnabled ||
       user ||

@@ -44,7 +44,7 @@ export async function snapshotForBuild(build: { id: string }, snapshotId: string
 }
 
 export async function refreshBuild(buildId: string): Promise<void> {
-  const db = getStore().db;
+  const {db} = getStore();
   await new BuildModel(db).updateCounts(buildId);
   const snapshots = await new SnapshotModel(db).listByBuild(buildId);
   const unresolved = snapshots.some((s) => s.status === "new" || s.status === "changed");
@@ -67,7 +67,7 @@ export async function refreshBuild(buildId: string): Promise<void> {
 }
 
 export async function approveSnapshot(snapshotId: string, userId: string): Promise<void> {
-  const db = getStore().db;
+  const {db} = getStore();
   const snapshots = new SnapshotModel(db);
   const snapshot = await snapshots.get(snapshotId);
   if (!snapshot) {

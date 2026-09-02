@@ -47,7 +47,7 @@ export async function emitWebhookEvent(
       try {
         await sendWebhook(webhook.url, webhook.secret, eventPayload);
       } catch {
-        // webhook delivery failures are non-fatal
+        // Webhook delivery failures are non-fatal
       }
     }),
   );

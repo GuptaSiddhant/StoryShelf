@@ -41,7 +41,7 @@ export async function findStorybookMain(cwd: string = process.cwd()): Promise<st
       await access(full);
       return full;
     } catch {
-      // not found, continue
+      // Not found, continue
     }
   }
   return null;
@@ -60,7 +60,7 @@ export async function loadStorybookConfig(
 ): Promise<StorybookConfig | null> {
   const full = customPath ? resolve(cwd, customPath) : resolve(cwd, CONFIG_RELATIVE);
   try {
-    const raw = await readFile(full, "utf-8");
+    const raw = await readFile(full, "utf8");
     const parsed = JSON.parse(raw) as unknown;
     // Backward compat: storybookDir -> buildDir
     if (parsed && typeof parsed === "object" && parsed !== null && "storybookDir" in (parsed as Record<string, unknown>)) {
@@ -100,7 +100,7 @@ export async function writeStorybookConfig(
   if (!result.success) {
     throw new Error(`Invalid storybook config: ${result.error.message}`);
   }
-  await writeFile(full, JSON.stringify(result.data, null, 2) + "\n", "utf-8");
+  await writeFile(full, `${JSON.stringify(result.data, null, 2)  }\n`, "utf8");
   return full;
 }
 
@@ -114,7 +114,7 @@ export interface StorybookMeta {
 
 export async function detectPackagePath(cwd: string = process.cwd()): Promise<string> {
   const main = await findStorybookMain(cwd);
-  if (!main) return ".";
+  if (!main) {return ".";}
   const rel = relative(cwd, dirname(main));
   return rel === "" ? "." : rel;
 }
@@ -124,7 +124,7 @@ export async function detectStorybookMeta(cwd: string = process.cwd()): Promise<
   const mainPath = await findStorybookMain(cwd);
   if (mainPath) {
     try {
-      const raw = await readFile(mainPath, "utf-8");
+      const raw = await readFile(mainPath, "utf8");
       const frameworkMatch = raw.match(/framework\s*:\s*\{\s*name\s*:\s*["']([^"']+)["']/u);
       if (frameworkMatch?.[1]) {
         meta.framework = { name: frameworkMatch[1] };
@@ -132,22 +132,22 @@ export async function detectStorybookMeta(cwd: string = process.cwd()): Promise<
       const addonsMatch = raw.match(/addons\s*:\s*\[([\s\S]*?)\]/u);
       if (addonsMatch?.[1]) {
         const addons = [...addonsMatch[1].matchAll(/["']([^"']+)["']/gu)].map((m) => m[1]).filter(Boolean) as string[];
-        if (addons.length > 0) meta.addons = addons;
+        if (addons.length > 0) {meta.addons = addons;}
       }
       const storiesMatch = raw.match(/stories\s*:\s*\[([\s\S]*?)\]/u);
       if (storiesMatch?.[1]) {
         const globs = [...storiesMatch[1].matchAll(/["']([^"']+)["']/gu)].map((m) => m[1]).filter(Boolean) as string[];
-        if (globs.length > 0) meta.storiesGlobs = globs;
+        if (globs.length > 0) {meta.storiesGlobs = globs;}
       }
       const staticDirsMatch = raw.match(/staticDirs\s*:\s*\[([\s\S]*?)\]/u);
       if (staticDirsMatch?.[1]) {
         const dirs = [...staticDirsMatch[1].matchAll(/["']([^"']+)["']/gu)].map((m) => m[1]).filter(Boolean) as string[];
-        if (dirs.length > 0) meta.staticDirs = dirs;
+        if (dirs.length > 0) {meta.staticDirs = dirs;}
       }
       const rel = relative(cwd, dirname(mainPath));
       meta.packagePath = rel === "" ? "." : rel;
     } catch {
-      // ignore parse errors
+      // Ignore parse errors
     }
   } else {
     meta.packagePath = ".";
@@ -157,7 +157,7 @@ export async function detectStorybookMeta(cwd: string = process.cwd()): Promise<
 
 export async function detectPackageName(cwd: string = process.cwd()): Promise<string | null> {
   try {
-    const raw = await readFile(resolve(cwd, "package.json"), "utf-8");
+    const raw = await readFile(resolve(cwd, "package.json"), "utf8");
     const parsed = JSON.parse(raw) as { name?: unknown };
     if (typeof parsed.name === "string" && parsed.name.length > 0) {
       return parsed.name;
@@ -170,8 +170,8 @@ export async function detectPackageName(cwd: string = process.cwd()): Promise<st
 
 export function detectGitRepository(cwd: string = process.cwd()): string | null {
   try {
-    const url = execSync("git config --get remote.origin.url", { cwd, encoding: "utf-8" }).trim();
-    if (!url) return null;
+    const url = execSync("git config --get remote.origin.url", { cwd, encoding: "utf8" }).trim();
+    if (!url) {return null;}
     // Normalize git@github.com:owner/repo.git and https://github.com/owner/repo.git -> owner/repo
     const normalized = url
       .replace(/\.git$/u, "")
@@ -186,17 +186,17 @@ export function detectGitRepository(cwd: string = process.cwd()): string | null 
 
 export function detectGitDefaultBranch(cwd: string = process.cwd()): string | null {
   try {
-    const ref = execSync("git symbolic-ref refs/remotes/origin/HEAD", { cwd, encoding: "utf-8" }).trim();
+    const ref = execSync("git symbolic-ref refs/remotes/origin/HEAD", { cwd, encoding: "utf8" }).trim();
     const match = ref.match(/refs\/remotes\/origin\/(.+)/u);
-    if (match?.[1]) return match[1];
+    if (match?.[1]) {return match[1];}
   } catch {
-    // fallback
+    // Fallback
   }
   try {
-    const branch = execSync("git rev-parse --abbrev-ref HEAD", { cwd, encoding: "utf-8" }).trim();
-    if (branch && branch !== "HEAD") return branch;
+    const branch = execSync("git rev-parse --abbrev-ref HEAD", { cwd, encoding: "utf8" }).trim();
+    if (branch && branch !== "HEAD") {return branch;}
   } catch {
-    // ignore
+    // Ignore
   }
   return null;
 }

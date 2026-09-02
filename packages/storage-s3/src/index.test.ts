@@ -17,7 +17,11 @@ interface FakeBody {
 }
 
 /** A fake S3 response handler keyed by the command constructor name. */
-type Handler = (input: Record<string, unknown>) => unknown;
+/* eslint-disable typescript/prefer-function-type -- allow interface for Handler to satisfy consistent-type-definitions */
+interface Handler {
+  (input: Record<string, unknown>): unknown;
+}
+/* eslint-enable typescript/prefer-function-type */
 
 /** A fake S3 client that records commands and returns canned responses. */
 function makeClient(handlers: Record<string, Handler> = {}): { client: S3Client; sent: string[] } {
@@ -56,7 +60,7 @@ describe("s3Key", () => {
   });
 });
 
-describe("createS3Storage", () => {
+describe("createS3Storage - construct and write", () => {
   it("constructs a StorageAdapter without throwing", () => {
     const storage = createS3Storage({
       bucket: "test-bucket",
@@ -99,7 +103,9 @@ describe("createS3Storage", () => {
 
     await expect(storage.read("a.txt")).resolves.toHaveLength(0);
   });
+});
 
+describe("createS3Storage - delete and exists", () => {
   it("delete sends DeleteObjectCommand with the prefixed key", async () => {
     const { client, sent } = makeClient();
     const storage = createS3Storage({ bucket: "bkt", prefix: "app", client });
@@ -137,7 +143,9 @@ describe("createS3Storage", () => {
 
     await expect(storage.exists("a.txt")).rejects.toThrow("boom");
   });
+});
 
+describe("createS3Storage - list", () => {
   it("list sends ListObjectsV2Command and strips the prefix from keys", async () => {
     const { client } = makeClient({
       [ListObjectsV2Command.name]: () => ({

@@ -49,8 +49,8 @@ export function diffImages(baseline: Buffer, current: Buffer, options: DiffOptio
     };
   }
 
-  const width = baselineDimensions.width;
-  const height = baselineDimensions.height;
+  const {width} = baselineDimensions;
+  const {height} = baselineDimensions;
   const overlap = compareRegions(baselinePng.data, currentPng.data, width, height, options);
   const diffRatio = overlap.diffPixels / (width * height);
   return {

@@ -8,10 +8,20 @@ import { projects } from "@storyshelf/core/schema";
 
 import { createTursoDatabase } from "./index.ts";
 
+function createTempTurso(): { dir: string; db: ReturnType<typeof createTursoDatabase> } {
+  const dir = mkdtempSync(join(tmpdir(), "storyshelf-turso-"));
+  const db = createTursoDatabase({ url: `file:${join(dir, "test.db")}` });
+  return { dir, db };
+}
+
+async function cleanupTurso(dir: string, db: ReturnType<typeof createTursoDatabase>): Promise<void> {
+  await db.close();
+  rmSync(dir, { recursive: true, force: true });
+}
+
 describe("createTursoDatabase", () => {
   it("migrates and inserts a project", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "storyshelf-turso-"));
-    const db = createTursoDatabase({ url: `file:${join(dir, "test.db")}` });
+    const { dir, db } = createTempTurso();
     await db.migrate();
 
     const now = new Date().toISOString();
@@ -24,13 +34,11 @@ describe("createTursoDatabase", () => {
     const listed = await db.list(projects);
     expect(listed).toHaveLength(1);
 
-    await db.close();
-    rmSync(dir, { recursive: true, force: true });
+    await cleanupTurso(dir, db);
   });
 
   it("updates and removes a project", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "storyshelf-turso-"));
-    const db = createTursoDatabase({ url: `file:${join(dir, "test.db")}` });
+    const { dir, db } = createTempTurso();
     await db.migrate();
 
     await db.insert(projects, {
@@ -49,7 +57,6 @@ describe("createTursoDatabase", () => {
     const afterRemove = await db.get(projects, "p1");
     expect(afterRemove).toBeNull();
 
-    await db.close();
-    rmSync(dir, { recursive: true, force: true });
+    await cleanupTurso(dir, db);
   });
 });

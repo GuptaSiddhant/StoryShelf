@@ -106,14 +106,14 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       const cfg = await loadStorybookConfig();
       if (cfg) {
         const url = cfg.url ?? process.env["STORYSHELF_URL"];
-        const slug = cfg.slug;
+        const {slug} = cfg;
         const token = process.env["STORYSHELF_TOKEN"] ?? process.env["SHELF_TOKEN"];
         const sha = process.env["GITHUB_SHA"] ?? process.env["VERCEL_GIT_COMMIT_SHA"] ?? process.env["CI_COMMIT_SHA"];
         const branch = process.env["GITHUB_REF_NAME"] ?? process.env["VERCEL_GIT_COMMIT_REF"] ?? process.env["CI_COMMIT_REF_NAME"];
         const buildDir = cfg.buildDir ?? "storybook-static";
-        const buildCommand = cfg.buildCommand;
-        const buildScriptName = cfg.buildScriptName;
-        const skip = cfg.skip;
+        const {buildCommand} = cfg;
+        const {buildScriptName} = cfg;
+        const {skip} = cfg;
         if (!url || !slug || !token || !sha || !branch) {
           printError("Missing required upload options — ensure STORYSHELF_URL/SLUG/TOKEN and GITHUB_SHA/BRANCH are set or run `storyshelf upload --help`");
           program.outputHelp();

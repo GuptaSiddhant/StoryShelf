@@ -38,7 +38,7 @@ export async function runCreate(options: CreateOptions): Promise<void> {
   await assertStorybookMain();
 
   const url = options.url ?? process.env["STORYSHELF_URL"] ?? process.env["STORYSHELF_HOST"];
-  let name = options.name;
+  let {name} = options;
   const token = options.token ?? process.env["STORYSHELF_ADMIN_TOKEN"] ?? process.env["ADMIN_TOKEN"];
 
   if (!url) {
@@ -67,8 +67,8 @@ export async function runCreate(options: CreateOptions): Promise<void> {
   const payload: { name: string; gitRepository?: string; gitDefaultBranch?: string; storybookMeta?: unknown } = {
     name,
   };
-  if (gitRepository) payload.gitRepository = gitRepository;
-  if (gitDefaultBranch) payload.gitDefaultBranch = gitDefaultBranch;
+  if (gitRepository) {payload.gitRepository = gitRepository;}
+  if (gitDefaultBranch) {payload.gitDefaultBranch = gitDefaultBranch;}
   if (Object.keys(storybookMeta).length > 0) {
     payload.storybookMeta = storybookMeta;
   }

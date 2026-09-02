@@ -21,7 +21,7 @@ import { hxRedirect } from "./htmx.ts";
 interface SettingsData {
   project: Project;
   labelTypes: LabelType[];
-  tokens: Array<Omit<Token, "hash">>;
+  tokens: Omit<Token, "hash">[];
   members: SettingsMember[];
   webhooks: SettingsWebhook[];
   statusConfigs: SettingsStatusConfig[];

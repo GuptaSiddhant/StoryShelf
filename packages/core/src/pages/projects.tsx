@@ -65,7 +65,7 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
                     </p>
                     {info?.latest ? (
                       <p class="field__hint" style="margin:.3rem 0 0;">
-                        Latest: {info.latest.gitBranch} · {info.latest.gitSha.slice(0, 7)} · <Badge tone={info.latest.status === "approved" ? "success" : info.latest.status === "reviewing" ? "warning" : "neutral"}>{info.latest.status}</Badge>
+                        Latest: {info.latest.gitBranch} · {info.latest.gitSha.slice(0, 7)} · <Badge tone={info.latest.status === "approved" ? "success" : (info.latest.status === "reviewing" ? "warning" : "neutral")}>{info.latest.status}</Badge>
                       </p>
                     ) : (
                       <p class="field__hint" style="margin:.3rem 0 0;">

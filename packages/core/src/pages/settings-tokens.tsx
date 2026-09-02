@@ -1,6 +1,6 @@
 import type { Project, Token } from "../schema.ts";
 
-export function renderSettingsTokens(project: Project, tokens: Array<Omit<Token, "hash">>, isAdmin: boolean): unknown {
+export function renderSettingsTokens(project: Project, tokens: Omit<Token, "hash">[], isAdmin: boolean): unknown {
   return (
     <div class="grid" style="max-width: 880px;">
       <div class="card card--padded">

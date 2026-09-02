@@ -83,7 +83,7 @@ async function resolveProjectByToken(c: Context, slug: string): Promise<Project 
 
 export async function resolveProject(c: Context, slug: string): Promise<Project> {
   const project = await resolveProjectByToken(c, slug);
-  if (project) return project;
+  if (project) {return project;}
   const found = await findProjectBySlug(slug);
   if (!found) {
     notFound("Project not found");
@@ -111,7 +111,7 @@ export async function assertRole(projectId: string, ...minRoles: ProjectRole[]):
 
 export async function resolveAuthorizedProject(c: Context, slug: string, ...minRoles: ProjectRole[]): Promise<Project> {
   const project = await resolveProjectByToken(c, slug);
-  if (project) return project;
+  if (project) {return project;}
   const found = await findProjectBySlug(slug);
   if (!found) {
     notFound("Project not found");

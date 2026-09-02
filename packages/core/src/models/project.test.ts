@@ -77,7 +77,7 @@ describe("ProjectModel", () => {
     const { db } = makeDatabase();
     const model = new ProjectModel(db);
     await model.create({ name: "To Be Deleted", gitRepository: "owner/repo" });
-    // id is ulid, but let's test
+    // Id is ulid, but let's test
     await model.remove("p1");
     // Note: fake db remove by id
     const deleted = await model.get("p1");

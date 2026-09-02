@@ -34,7 +34,7 @@ export function renderSettingsMembers(project: Project, members: SettingsMember[
                       <code>{member.userId}</code>
                     </td>
                     <td>
-                      <Badge tone={member.role === "admin" ? "danger" : member.role === "viewer" ? "neutral" : "info"}>{member.role}</Badge>
+                      <Badge tone={member.role === "admin" ? "danger" : (member.role === "viewer" ? "neutral" : "info")}>{member.role}</Badge>
                     </td>
                     <td>{new Date(member.createdAt).toLocaleDateString()}</td>
                     <td>

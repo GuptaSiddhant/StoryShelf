@@ -22,7 +22,7 @@ export function createClient(baseUrl: string, token?: string): Client {
   
   function requestHeaders(contentType?: string): Record<string, string> {
     const h: Record<string, string> = { ...authHeaders };
-    if (contentType) h["content-type"] = contentType;
+    if (contentType) {h["content-type"] = contentType;}
     return h;
   }
   
@@ -34,7 +34,7 @@ export function createClient(baseUrl: string, token?: string): Client {
           headers: requestHeaders("application/json"),
           body: JSON.stringify(json),
         });
-        if (!res.ok) throw new Error(`Request failed (${res.status}): ${await res.text()}`);
+        if (!res.ok) {throw new Error(`Request failed (${res.status}): ${await res.text()}`);}
         return res.json() as unknown;
       },
       update: async (slug: string, json: { storybookMeta?: unknown }) => {
@@ -43,17 +43,17 @@ export function createClient(baseUrl: string, token?: string): Client {
           headers: requestHeaders("application/json"),
           body: JSON.stringify(json),
         });
-        if (!res.ok) throw new Error(`Request failed (${res.status}): ${await res.text()}`);
+        if (!res.ok) {throw new Error(`Request failed (${res.status}): ${await res.text()}`);}
         return res.json() as unknown;
       },
       get: async (slug: string) => {
         const res = await fetch(`${baseUrl}/api/v1/projects/${slug}`, { headers: requestHeaders() });
-        if (!res.ok) throw new Error(`Request failed (${res.status}): ${await res.text()}`);
+        if (!res.ok) {throw new Error(`Request failed (${res.status}): ${await res.text()}`);}
         return res.json() as unknown;
       },
       list: async () => {
         const res = await fetch(`${baseUrl}/api/v1/projects`, { headers: requestHeaders() });
-        if (!res.ok) throw new Error(`Request failed (${res.status}): ${await res.text()}`);
+        if (!res.ok) {throw new Error(`Request failed (${res.status}): ${await res.text()}`);}
         return res.json() as unknown;
       },
       tokens: {
@@ -63,7 +63,7 @@ export function createClient(baseUrl: string, token?: string): Client {
             headers: requestHeaders("application/json"),
             body: JSON.stringify(json),
           });
-          if (!res.ok) throw new Error(`Request failed (${res.status}): ${await res.text()}`);
+          if (!res.ok) {throw new Error(`Request failed (${res.status}): ${await res.text()}`);}
           return res.json() as unknown;
         },
       },
@@ -74,7 +74,7 @@ export function createClient(baseUrl: string, token?: string): Client {
             headers: authHeaders,
             body: form,
           });
-          if (!res.ok) throw new Error(`Request failed (${res.status}): ${await res.text()}`);
+          if (!res.ok) {throw new Error(`Request failed (${res.status}): ${await res.text()}`);}
           return res.json() as unknown;
         },
         retry: async (slug: string, buildId: string) => {
@@ -83,7 +83,7 @@ export function createClient(baseUrl: string, token?: string): Client {
             headers: requestHeaders("application/json"),
             body: JSON.stringify({}),
           });
-          if (!res.ok) throw new Error(`Request failed (${res.status}): ${await res.text()}`);
+          if (!res.ok) {throw new Error(`Request failed (${res.status}): ${await res.text()}`);}
           return res.json() as unknown;
         },
       },
@@ -94,7 +94,7 @@ export function createClient(baseUrl: string, token?: string): Client {
             headers: requestHeaders("application/json"),
             body: JSON.stringify(json),
           });
-          if (!res.ok) throw new Error(`Request failed (${res.status}): ${await res.text()}`);
+          if (!res.ok) {throw new Error(`Request failed (${res.status}): ${await res.text()}`);}
           return res.json() as unknown;
         },
       },

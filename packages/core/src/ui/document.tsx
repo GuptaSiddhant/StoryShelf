@@ -13,7 +13,7 @@ interface NavConfig {
 }
 
 // Hono's JSX.Element is typed as `HtmlEscapedString | Promise<...>`, so JSX-returning
-// functions can legitimately return a promise; the rule is a false positive here.
+// Functions can legitimately return a promise; the rule is a false positive here.
 // eslint-disable-next-line promise-function-async -- JSX component return type
 export const DocumentLayout: FC<{ title: string; nav?: NavConfig; children?: unknown }> = ({ title, nav, children }) => {
   const { ui } = getStore();
