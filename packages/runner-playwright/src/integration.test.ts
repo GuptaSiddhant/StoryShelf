@@ -145,7 +145,9 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
       form.set("gitSha", "a".repeat(40));
       form.set("gitBranch", "feature/smoke");
       form.set("message", message);
-      form.set("zip", new Blob([new Uint8Array(zip.toBuffer())], { type: "application/zip" }), "storybook.zip");
+      const zipBuffer = zip.toBuffer();
+      const zipBlob = new Blob([new Uint8Array(zipBuffer)], { type: "application/zip" });
+      form.set("zip", zipBlob, "storybook.zip");
       const response = await app.request(`/api/v1/projects/${project.slug}/builds`, { method: "POST", body: form });
       expect(response.status).toBe(202);
       const created = await readJson<Build>(response);

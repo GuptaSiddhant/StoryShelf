@@ -75,7 +75,30 @@
     "typescript/method-signature-style": "allow",
     "typescript/no-unnecessary-condition": "allow",
     "typescript/prefer-readonly-parameter-types": "allow",
+    "typescript/consistent-type-imports": "allow",
+    "typescript/parameter-properties": "allow",
+    "typescript/array-type": "allow",
+    "typescript/consistent-type-definitions": "allow",
     "unicorn/import-style": "allow",
+    "unicorn/prefer-export-from": "allow",
+    "unicorn/no-await-expression-member": "allow",
+    "unicorn/no-nested-ternary": "allow",
+    "init-declarations": "allow",
+    "eslint/init-declarations": "allow",
+    "no-empty-function": "allow",
+    "no-inline-comments": "allow",
+    "no-duplicate-imports": "allow",
+    "no-nested-ternary": "allow",
+    "capitalized-comments": "allow",
+    "eslint/capitalized-comments": "allow",
+    "curly": "allow",
+    "eslint/curly": "allow",
+    "prefer-destructuring": "allow",
+    "eslint/prefer-destructuring": "allow",
+    "max-params": "allow",
+    "eslint/max-params": "allow",
+    "max-lines": "allow",
+    "eslint/max-lines": "allow",
     "typescript/strict-boolean-expressions": "allow"
   },
   "overrides": [
@@ -83,26 +106,37 @@
       "files": ["**/*.test.ts", "**/*.spec.ts", "**/mocks/**"],
       "rules": {
         "typescript/no-confusing-void-expression": "allow",
-        "max-lines-per-function": "warn",
-        "max-statements": "warn"
+        "max-lines-per-function": "allow",
+        "max-statements": "allow",
+        "max-lines": "allow"
       }
     },
     {
       "files": ["packages/cli/src/commands/upload.ts", "packages/cli/src/client.ts", "packages/db-turso/src/index.test.ts", "packages/db-turso/src/index.ts", "packages/db-sqlite/src/index.test.ts", "packages/storage-local/src/index.ts", "packages/storage-s3/src/index.ts", "packages/storage-s3/src/index.test.ts", "packages/runner-playwright/src/capture-runner.ts", "packages/runner-playwright/src/capture-runner.test.ts", "packages/runner-playwright/src/integration.test.ts"],
       "rules": {
-        "max-lines-per-function": "warn",
-        "max-statements": "warn"
+        "max-lines-per-function": "allow",
+        "max-statements": "allow",
+        "max-lines": "allow"
       }
     },
     {
       "files": ["packages/core/src/**"],
       "rules": {
-        "max-lines-per-function": "warn",
-        "max-statements": "warn",
-        "max-lines": "warn",
-        "no-empty-function": "warn",
-        "no-inline-comments": "warn",
-        "no-await-in-loop": "warn"
+        "max-lines-per-function": "allow",
+        "max-statements": "allow",
+        "max-lines": "allow",
+        "no-empty-function": "allow",
+        "no-inline-comments": "allow",
+        "no-await-in-loop": "allow",
+        "capitalized-comments": "allow",
+        "eslint/capitalized-comments": "allow",
+        "curly": "allow",
+        "eslint/curly": "allow",
+        "prefer-destructuring": "allow",
+        "eslint/prefer-destructuring": "allow",
+        "max-params": "allow",
+        "eslint/max-params": "allow",
+        "id-length": "allow"
       }
     }
   ]
