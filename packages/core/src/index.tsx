@@ -99,6 +99,7 @@ async function isAlreadyMerged(opts: {
     const adapter = provider.create({ config: parsed, token, logger: opts.logger });
     if (!adapter.isMerged) continue;
     try {
+      // eslint-disable-next-line no-await-in-loop -- short-circuit on first merged status
       const merged = await adapter.isMerged({ sha: opts.sha, branch: opts.branch });
       if (merged) return true;
     } catch {
@@ -198,7 +199,7 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
             }).catch(() => false);
             if (merged) {
               logger.info({ buildId: build.id, sha: build.gitSha, branch: build.gitBranch }, "skipping capture — already merged");
-              await builds.setStatus(build.id, "approved").catch(() => {});
+              await builds.setStatus(build.id, "approved").catch(() => {}); // intentionally empty — fire-and-forget
               await postStatusesForBuild({
                 db: options.database,
                 project,
@@ -208,7 +209,7 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
                 providers: gitHosts,
                 secret: config.secret,
                 logger,
-              }).catch(() => {});
+              }).catch(() => {}); // intentionally empty — fire-and-forget
               return;
             }
           }
@@ -216,7 +217,7 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
           const dup = await hasApprovedBuildForSha(options.database, project.id, build.gitSha, build.id);
           if (dup) {
             logger.info({ buildId: build.id, sha: build.gitSha }, "skipping capture — duplicate sha already approved");
-            await builds.setStatus(build.id, "approved").catch(() => {});
+            await builds.setStatus(build.id, "approved").catch(() => {}); // intentionally empty — fire-and-forget
             await postStatusesForBuild({
               db: options.database,
               project,
@@ -226,7 +227,7 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
               providers: gitHosts,
               secret: config.secret,
               logger,
-            }).catch(() => {});
+            }).catch(() => {}); // intentionally empty — fire-and-forget
             return;
           }
           try {

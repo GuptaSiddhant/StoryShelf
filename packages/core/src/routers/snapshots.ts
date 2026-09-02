@@ -2,7 +2,6 @@ import { createRoute, z } from "@hono/zod-openapi";
 import type { ShelfApp } from "../index.tsx";
 
 import { SnapshotModel } from "../models/snapshot.ts";
-import { BuildModel } from "../models/build.ts";
 import { getStore } from "../store.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
 import { snapshotSchema, okSchema, notFound, unauthorized } from "./schemas.ts";

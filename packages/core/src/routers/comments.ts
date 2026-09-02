@@ -2,10 +2,9 @@ import { createRoute, z } from "@hono/zod-openapi";
 import type { ShelfApp } from "../index.tsx";
 
 import { CommentModel } from "../models/comment.ts";
-import { BuildModel } from "../models/build.ts";
 import { getStore } from "../store.ts";
-import { resolveAuthorizedProject } from "./helpers.ts";
-import { commentSchema, commentCreateSchema, okSchema, notFound, unauthorized } from "./schemas.ts";
+import { resolveAuthorizedProject, notFound as throwNotFound } from "./helpers.ts";
+import { commentSchema, commentCreateSchema, notFound, unauthorized } from "./schemas.ts";
 import { VIEW_ROLES, DEVELOPER_ROLES, buildForProject } from "./builds.handlers.ts";
 
 const listCommentsRoute = createRoute({
@@ -66,7 +65,7 @@ export function registerComments(app: ShelfApp): void {
     const build = await buildForProject(project.id, buildId);
     const comment = await new CommentModel(getStore().db).resolve(commentId);
     if (comment.buildId !== build.id) {
-      notFound("Comment not found");
+      throwNotFound("Comment not found");
     }
     return c.json(comment);
   });

@@ -5,11 +5,10 @@ import { HTTPException } from "hono/http-exception";
 import { BuildModel } from "../models/build.ts";
 import { emitWebhookEvent } from "../adapters/webhook-events.ts";
 import { getStore } from "../store.ts";
-import { BUILD_STATUSES, type ProjectRole } from "../types.ts";
 import { storybookZipPath } from "../utils/paths.ts";
-import { notFound, resolveAuthorizedProject } from "./helpers.ts";
+import { resolveAuthorizedProject } from "./helpers.ts";
 import { badRequest, buildSchema, forbidden as forbiddenResponse, notFound as notFoundResponse, unauthorized } from "./schemas.ts";
-import { VIEW_ROLES, DEVELOPER_ROLES, APPROVER_ROLES, buildUploadSchema, buildListQuery, buildForProject, asString, refreshBuild, approveSnapshot } from "./builds.handlers.ts";
+import { VIEW_ROLES, DEVELOPER_ROLES, APPROVER_ROLES, buildUploadSchema, buildListQuery, buildForProject, asString } from "./builds.handlers.ts";
 import { registerSnapshots } from "./snapshots.ts";
 import { registerComments } from "./comments.ts";
 

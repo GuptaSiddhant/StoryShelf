@@ -35,6 +35,7 @@ export function buildCommentMarkdown(status: CheckStatus, url: string, context: 
       return `Visual changes detected for \`${context}\` — [View build](${url})`;
     }
     default: {
+      // eslint-disable-next-line restrict-template-expressions -- status is never in default case
       return `Visual tests \`${status}\` for \`${context}\` — [View build](${url})`;
     }
   }

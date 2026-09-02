@@ -24,13 +24,3 @@ export interface Viewport {
 }
 
 export const DEFAULT_VIEWPORTS: Viewport[] = [{ name: "desktop", width: 1280, height: 720 }];
-
-/** A viewport size at which stories are captured. */
-export interface Viewport {
-  /** Viewport name. */
-  name: string;
-  /** Viewport width in pixels. */
-  width: number;
-  /** Viewport height in pixels. */
-  height: number;
-}

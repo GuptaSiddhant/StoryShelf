@@ -1,19 +1,13 @@
 import { z } from "@hono/zod-openapi";
-import { eq } from "drizzle-orm";
-import type { Context } from "hono";
-import { HTTPException } from "hono/http-exception";
 
 import { BaselineModel } from "../models/baseline.ts";
 import { BuildModel } from "../models/build.ts";
-import { CommentModel } from "../models/comment.ts";
 import { ProjectModel } from "../models/project.ts";
 import { SnapshotModel } from "../models/snapshot.ts";
 import { emitWebhookEvent } from "../adapters/webhook-events.ts";
 import { getStore } from "../store.ts";
 import { type ProjectRole, BUILD_STATUSES } from "../types.ts";
-import { storybookZipPath } from "../utils/paths.ts";
 import { notFound } from "./helpers.ts";
-import { buildSchema, commentSchema, snapshotSchema } from "./schemas.ts";
 
 export const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];
 export const DEVELOPER_ROLES: readonly ProjectRole[] = ["developer", "approver", "admin"];
