@@ -38,7 +38,7 @@ export type ShelfContext = {
   authEnabled: boolean;
   enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
   captureQueue: import("./adapters/capture-queue.ts").CaptureQueue | null;
-  gitHosts: import("./adapters/git-host.ts").GitHostProvider[];
+  gitHosts: import("./adapters/git-host/index.ts").GitHostProvider[];
 };
 
 export type ShelfApp = OpenAPIHono<{ Variables: ShelfContext }>;
@@ -68,7 +68,7 @@ async function hasApprovedBuildForSha(
 
 // eslint-disable-next-line max-statements, complexity
 async function isAlreadyMerged(opts: {
-  providers: import("./adapters/git-host.ts").GitHostProvider[];
+  providers: import("./adapters/git-host/index.ts").GitHostProvider[];
   sha: string;
   branch: string;
   secret: string | undefined;
@@ -389,8 +389,9 @@ export type {
 } from "./adapters/capture-runner.ts";
 export type { CaptureQueue, CaptureJob, QueueEntry } from "./adapters/capture-queue.ts";
 export type { AuthAdapter, AuthUser, AuthCallback } from "./adapters/auth.ts";
-export type { GitHostProvider, GitHostAdapter, CheckStatus } from "./adapters/git-host.ts";
+export type { GitHostProvider, GitHostAdapter, CheckStatus } from "./adapters/git-host/index.ts";
 export type { AdapterMetadata, GitAdapterMetadata } from "./adapters/metadata.ts";
+export { describeStatus, buildCommentMarkdown, commentMarker } from "./adapters/git-host/helpers.ts";
 export type { DiffOptions, DiffResult } from "./diff/options.ts";
 export type { Viewport, StoryEntry, StorySourceAdapter } from "./capture/adapter.ts";
 export { createShelfLogger, type LoggerOptions, type PinoTransport } from "./logger.ts";

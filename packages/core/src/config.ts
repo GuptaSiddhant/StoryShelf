@@ -5,7 +5,7 @@ import type { AuthAdapter } from "./adapters/auth.ts";
 import type { CaptureQueue } from "./adapters/capture-queue.ts";
 import type { CaptureRunner } from "./adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "./adapters/database.ts";
-import type { GitHostProvider } from "./adapters/git-host.ts";
+import type { GitHostProvider } from "./adapters/git-host/index.ts";
 import type { StorageAdapter } from "./adapters/storage.ts";
 
 export interface BrandTheme {

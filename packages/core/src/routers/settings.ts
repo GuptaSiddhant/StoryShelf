@@ -1,5 +1,5 @@
 import type { Context } from "hono";
-import type { GitHostProvider } from "../adapters/git-host.ts";
+import type { GitHostProvider } from "../adapters/git-host/index.ts";
 import type { ShelfApp } from "../index.tsx";
 
 import { LabelModel } from "../models/label.ts";

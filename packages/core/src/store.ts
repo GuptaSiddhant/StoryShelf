@@ -5,7 +5,7 @@ import type { Logger } from "pino";
 import type { AuthUser } from "./adapters/auth.ts";
 import type { CaptureQueue } from "./adapters/capture-queue.ts";
 import type { DatabaseAdapter } from "./adapters/database.ts";
-import type { GitHostProvider } from "./adapters/git-host.ts";
+import type { GitHostProvider } from "./adapters/git-host/index.ts";
 import type { StorageAdapter } from "./adapters/storage.ts";
 import type { ShelfConfig, UIConfig } from "./config.ts";
 

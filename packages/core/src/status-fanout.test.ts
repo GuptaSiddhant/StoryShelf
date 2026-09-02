@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import type { CaptureRunner, RenderResult } from "./adapters/capture-runner.ts";
-import type { CheckStatus, GitHostAdapter, GitHostProvider } from "./adapters/git-host.ts";
+import type { CheckStatus, GitHostAdapter, GitHostProvider } from "./adapters/git-host/index.ts";
 import { makeDatabase, makeStorage } from "./capture/fake-adapters.ts";
 import { createShelfRouter } from "./index.tsx";
 import type { Build } from "./schema.ts";
@@ -58,8 +58,8 @@ function fakeGitProvider(key: string, calls: StatusCall[], tokens: string[]): Gi
     create(opts: { config: unknown; token: string; logger?: Logger }): GitHostAdapter {
       return {
         metadata: base.metadata,
-        setStatus: async (context, gitSha, status, url): Promise<void> => {
-          calls.push({ context, gitSha, status, url });
+        setStatus: async (statusOpts: { context: string; gitSha: string; status: CheckStatus; url: string }): Promise<void> => {
+          calls.push({ context: statusOpts.context, gitSha: statusOpts.gitSha, status: statusOpts.status, url: statusOpts.url });
           tokens.push(opts.token);
           await Promise.resolve();
         },

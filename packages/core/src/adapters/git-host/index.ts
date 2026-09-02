@@ -1,6 +1,6 @@
 import type { Logger } from "pino";
 
-import type { GitAdapterMetadata } from "./metadata.ts";
+import type { GitAdapterMetadata } from "../metadata.ts";
 
 /** Status of a git-host provider check. */
 export type CheckStatus = "pending" | "success" | "failure";
@@ -20,7 +20,7 @@ export interface GitHostAdapter {
   readonly metadata: GitAdapterMetadata;
 
   /** Set the status of a commit. */
-  setStatus(context: string, gitSha: string, status: CheckStatus, url: string): Promise<void>;
+  setStatus(opts: { context: string; gitSha: string; status: CheckStatus; url: string }): Promise<void>;
 
   /** Whether the branch/sha is already merged — gate to skip capture. */
   isMerged?(opts: { sha: string; branch: string }): Promise<boolean>;

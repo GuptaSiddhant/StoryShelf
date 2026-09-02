@@ -14,7 +14,7 @@ export interface AdapterMetadata {
 
 /** Git-specific metadata extension (adds logo + validation schema). */
 export interface GitAdapterMetadata extends AdapterMetadata {
-  readonly kind: "github";
+  readonly kind: string;
   readonly logo?: string;
   readonly schema: z.ZodType;
 }

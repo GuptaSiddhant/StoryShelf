@@ -1,4 +1,4 @@
-/* oxlint-disable max-lines-per-function, eslint/max-params */
+/* oxlint-disable max-lines-per-function */
 import { describe, expect, it, vi } from "vitest";
 
 import type { Logger } from "pino";
@@ -30,20 +30,19 @@ describe("gitHubHost", () => {
       logger: createMockLogger(),
     });
 
-    // @ts-expect-error TS2322 - override for test
-    adapter.setStatus = async (ctx: string, sha: string, _status: string, url: string): Promise<void> => {
+    adapter.setStatus = async (opts: { context: string; gitSha: string; status: string; url: string }): Promise<void> => {
       await createStatus({
         owner: "octocat",
         repo: "hello-world",
-        sha,
+        sha: opts.gitSha,
         state: "pending",
         context: "storyshelf/test",
-        target_url: url,
+        target_url: opts.url,
         description: "Visual tests pending",
       });
     };
 
-    await adapter.setStatus("test", "abc123", "pending", "http://example.com/build/1");
+    await adapter.setStatus({ context: "test", gitSha: "abc123", status: "pending", url: "http://example.com/build/1" });
     expect(createStatus).toHaveBeenCalledWith(
       expect.objectContaining({ state: "pending", context: "storyshelf/test" }),
     );
@@ -57,20 +56,19 @@ describe("gitHubHost", () => {
       logger: createMockLogger(),
     });
 
-    // @ts-expect-error TS2322 - override for test
-    adapter.setStatus = async (ctx: string, sha: string, _status: string, url: string): Promise<void> => {
+    adapter.setStatus = async (opts: { context: string; gitSha: string; status: string; url: string }): Promise<void> => {
       await createStatus({
         owner: "octocat",
         repo: "hello-world",
-        sha,
+        sha: opts.gitSha,
         state: "success",
         context: "storyshelf/test",
-        target_url: url,
+        target_url: opts.url,
         description: "Visual tests passed",
       });
     };
 
-    await adapter.setStatus("test", "abc123", "success", "http://example.com/build/1");
+    await adapter.setStatus({ context: "test", gitSha: "abc123", status: "success", url: "http://example.com/build/1" });
     expect(createStatus).toHaveBeenCalledWith(
       expect.objectContaining({ state: "success", context: "storyshelf/test" }),
     );
@@ -84,20 +82,19 @@ describe("gitHubHost", () => {
       logger: createMockLogger(),
     });
 
-    // @ts-expect-error TS2322 - override for test
-    adapter.setStatus = async (ctx: string, sha: string, _status: string, url: string): Promise<void> => {
+    adapter.setStatus = async (opts: { context: string; gitSha: string; status: string; url: string }): Promise<void> => {
       await createStatus({
         owner: "octocat",
         repo: "hello-world",
-        sha,
+        sha: opts.gitSha,
         state: "failure",
         context: "storyshelf/test",
-        target_url: url,
+        target_url: opts.url,
         description: "Visual changes detected or tests failed",
       });
     };
 
-    await adapter.setStatus("test", "abc123", "failure", "http://example.com/build/1");
+    await adapter.setStatus({ context: "test", gitSha: "abc123", status: "failure", url: "http://example.com/build/1" });
     expect(createStatus).toHaveBeenCalledWith(
       expect.objectContaining({ state: "failure", context: "storyshelf/test" }),
     );

@@ -1,7 +1,8 @@
 import type { Logger } from "pino";
 
 import { StatusConfigModel } from "../models/status-config.ts";
-import type { CheckStatus, GitHostProvider } from "../adapters/git-host.ts";
+import type { CheckStatus, GitHostProvider } from "../adapters/git-host/index.ts";
+import { buildCommentMarkdown } from "../adapters/git-host/helpers.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { Project } from "../schema.ts";
 
@@ -44,7 +45,7 @@ async function postStatusesForBuild(opts: {
         return;
       }
       const adapter = provider.create({ config: parsed, token, logger: opts.logger });
-      await adapter.setStatus(ctx, opts.sha, opts.status, opts.url);
+      await adapter.setStatus({ context: ctx, gitSha: opts.sha, status: opts.status, url: opts.url });
       if (adapter.upsertComment) {
         const markdown = buildCommentMarkdown(opts.status, opts.url, ctx);
         await adapter
@@ -55,19 +56,6 @@ async function postStatusesForBuild(opts: {
       }
     }),
   );
-}
-
-function buildCommentMarkdown(status: CheckStatus, url: string, context: string): string {
-  switch (status) {
-    case "pending":
-      return `Visual tests pending for \`${context}\` — [View build](${url})`;
-    case "success":
-      return `Visual tests passed for \`${context}\` — [View build](${url})`;
-    case "failure":
-      return `Visual changes detected for \`${context}\` — [View build](${url})`;
-    default:
-      return `Visual tests \`${status}\` for \`${context}\` — [View build](${url})`;
-  }
 }
 
 export { postStatusesForBuild };

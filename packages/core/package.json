@@ -65,6 +65,7 @@
     "./adapter/capture-runner": "./dist/adapter/capture-runner.mjs",
     "./adapter/auth": "./dist/adapter/auth.mjs",
     "./adapter/git-host": "./dist/adapter/git-host.mjs",
+    "./adapter/git-host/helpers": "./dist/adapter/git-host/helpers.mjs",
     "./schema": "./dist/schema.mjs",
     "./ddl": "./dist/ddl.mjs",
     "./types": "./dist/types.mjs",

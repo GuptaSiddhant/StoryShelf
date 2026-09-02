@@ -1,5 +1,5 @@
 import type { FC } from "hono/jsx";
-import type { GitHostProvider } from "../adapters/git-host.ts";
+import type { GitHostProvider } from "../adapters/git-host/index.ts";
 import type { Project } from "../schema.ts";
 import { Badge, Field, SelectField, TextareaField } from "../ui/components.tsx";
 

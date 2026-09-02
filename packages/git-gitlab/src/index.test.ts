@@ -1,4 +1,4 @@
-/* oxlint-disable max-lines-per-function, eslint/max-params */
+/* oxlint-disable max-lines-per-function, eslint/require-await, typescript/require-await, typescript/no-unnecessary-type-assertion, eslint/no-void, eslint/no-unused-vars */
 import { describe, expect, it, vi } from "vitest";
 
 import type { Logger } from "pino";
@@ -37,18 +37,15 @@ describe("gitLabHost", () => {
       logger: createMockLogger(),
     });
 
-    // @ts-expect-error TS2322 - override for test
-    adapter.setStatus = async (ctx: string, sha: string, _status: string, url: string): Promise<void> => {
+    adapter.setStatus = async (opts: { context: string; gitSha: string; status: string; url: string }): Promise<void> => {
       await fetchMock({
         state: "pending",
         context: "storyshelf/test",
-        target_url: url,
+        target_url: opts.url,
       });
-      void ctx;
-      void sha;
     };
 
-    await adapter.setStatus("test", "abc123", "pending", "http://example.com/build/1");
+    await adapter.setStatus({ context: "test", gitSha: "abc123", status: "pending", url: "http://example.com/build/1" });
     expect(fetchMock).toHaveBeenCalled();
     globalThis.fetch = orig;
   });

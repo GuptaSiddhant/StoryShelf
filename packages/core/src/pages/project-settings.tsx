@@ -1,4 +1,4 @@
-import type { GitHostProvider } from "../adapters/git-host.ts";
+import type { GitHostProvider } from "../adapters/git-host/index.ts";
 import type { LabelType, Project, Token } from "../schema.ts";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import { renderSettingsGeneral } from "./settings-general.tsx";
