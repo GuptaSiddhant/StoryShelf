@@ -2,7 +2,7 @@ import { Octokit } from "@octokit/rest";
 import { z } from "zod";
 
 import type { Logger } from "pino";
-import type { CheckStatus, GitAdapter } from "@storyshelf/core";
+import type { CheckStatus, GitHostAdapter, GitHostProvider } from "@storyshelf/core";
 
 declare const __PKG_VERSION__: string;
 
@@ -25,43 +25,53 @@ export interface GitHubStatusOptions {
   logger?: Logger;
 }
 
+function getMetadata(): GitHostProvider["metadata"] {
+  return {
+    name: "GitHub",
+    version: typeof __PKG_VERSION__ === "undefined" ? "0.0.0" : __PKG_VERSION__, // oxlint-disable-line unicorn/no-typeof-undefined
+    description: "Commit statuses via GitHub REST API",
+    kind: "github",
+    logo: "github",
+    schema: githubConfigSchema,
+  };
+}
+
 /**
- * Create a GitHub-backed `GitAdapter` (configured instance).
+ * Create a GitHub-backed `GitHostAdapter` (configured instance).
  *
  * Posts commit statuses to GitHub using the REST API.
  * Context format: `storyshelf/{project-slug}` (e.g., "storyshelf/my-app").
  *
  * @param options - Configuration including token, owner, repo.
- * @returns A `GitAdapter` implementation.
+ * @returns A `GitHostAdapter` implementation.
  */
-export function createGitHubStatusAdapter(options: GitHubStatusOptions): GitAdapter {
+export function createGitHubStatusAdapter(options: GitHubStatusOptions): GitHostAdapter {
   const octokit = new Octokit({ auth: options.token });
   const logger = options.logger?.child({ component: "git-github" });
 
-  return {
-    metadata: {
-      name: "GitHub",
-      version: typeof __PKG_VERSION__ === "undefined" ? "0.0.0" : __PKG_VERSION__, // oxlint-disable-line unicorn/no-typeof-undefined
-      description: "Commit statuses via GitHub REST API",
-      kind: "github",
-      logo: "github",
-      schema: githubConfigSchema,
-    },
-    withConfig(opts: { config: unknown; token: string; logger?: Logger }): GitAdapter {
-      const cfg = githubConfigSchema.parse(opts.config);
-      return createGitHubStatusAdapter({
-        token: opts.token,
-        owner: cfg.owner,
-        repo: cfg.repo,
-        logger: opts.logger,
+  async function findPrNumber(sha: string): Promise<number | undefined> {
+    try {
+      const pulls = await octokit.repos.listPullRequestsAssociatedWithCommit({
+        owner: options.owner,
+        repo: options.repo,
+        commit_sha: sha,
       });
-    },
+      const pr = pulls.data[0];
+      if (pr && typeof pr.number === "number") {
+        return pr.number;
+      }
+      return undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  return {
+    metadata: getMetadata(),
     async setStatus(context: string, gitSha: string, status: CheckStatus, url: string): Promise<void> {
       const ghContext = `storyshelf/${context}`;
       const state = mapStatus(status);
-
       logger?.debug({ context: ghContext, sha: gitSha, state, url }, "posting commit status");
-
       try {
         await octokit.repos.createCommitStatus({
           owner: options.owner,
@@ -78,19 +88,85 @@ export function createGitHubStatusAdapter(options: GitHubStatusOptions): GitAdap
         throw error;
       }
     },
+    async isMerged(opts: { sha: string; branch: string }): Promise<boolean> {
+      try {
+        const prNumber = await findPrNumber(opts.sha);
+        if (prNumber === undefined) {
+          const pulls = await octokit.pulls.list({
+            owner: options.owner,
+            repo: options.repo,
+            head: `${options.owner}:${opts.branch}`,
+            state: "closed",
+            per_page: 5,
+          });
+          const pr = pulls.data.find((p) => p.merge_commit_sha === opts.sha || p.head.sha === opts.sha);
+          return pr?.merged_at != null;
+        }
+        const pr = await octokit.pulls.get({
+          owner: options.owner,
+          repo: options.repo,
+          pull_number: prNumber,
+        });
+        return pr.data.merged === true;
+      } catch (error) {
+        logger?.debug({ err: error, sha: opts.sha, branch: opts.branch }, "isMerged check failed, not skipping");
+        return false;
+      }
+    },
+    async upsertComment(opts: {
+      prNumber?: number;
+      sha: string;
+      url: string;
+      status: CheckStatus;
+      markdown: string;
+    }): Promise<string> {
+      const marker = `<!-- storyshelf:${opts.url} -->`;
+      const body = `${marker}\n${opts.markdown}`;
+      let prNumber = opts.prNumber;
+      if (prNumber === undefined) {
+        prNumber = await findPrNumber(opts.sha);
+      }
+      if (prNumber === undefined) {
+        logger?.debug({ sha: opts.sha }, "no PR found for comment, skipping");
+        return "";
+      }
+      try {
+        const comments = await octokit.issues.listComments({
+          owner: options.owner,
+          repo: options.repo,
+          issue_number: prNumber,
+          per_page: 100,
+        });
+        const existing = comments.data.find((c) => c.body?.includes(marker));
+        if (existing) {
+          const updated = await octokit.issues.updateComment({
+            owner: options.owner,
+            repo: options.repo,
+            comment_id: existing.id,
+            body,
+          });
+          logger?.info({ prNumber, commentId: updated.data.id }, "git comment updated");
+          return String(updated.data.id);
+        }
+        const created = await octokit.issues.createComment({
+          owner: options.owner,
+          repo: options.repo,
+          issue_number: prNumber,
+          body,
+        });
+        logger?.info({ prNumber, commentId: created.data.id }, "git comment created");
+        return String(created.data.id);
+      } catch (error) {
+        logger?.error({ err: error, prNumber }, "failed to upsert git comment");
+        throw error;
+      }
+    },
   };
 }
 
-export const githubAdapter: GitAdapter = {
-  metadata: {
-    name: "GitHub",
-    version: typeof __PKG_VERSION__ === "undefined" ? "0.0.0" : __PKG_VERSION__, // oxlint-disable-line unicorn/no-typeof-undefined
-    description: "Commit statuses via GitHub REST API",
-    kind: "github",
-    logo: "github",
-    schema: githubConfigSchema,
-  },
-  withConfig(opts: { config: unknown; token: string; logger?: Logger }): GitAdapter {
+export const githubAdapter: GitHostProvider = {
+  metadata: getMetadata(),
+  create(opts: { config: unknown; token: string; logger?: Logger }): GitHostAdapter {
     const cfg = githubConfigSchema.parse(opts.config);
     return createGitHubStatusAdapter({
       token: opts.token,
@@ -98,10 +174,6 @@ export const githubAdapter: GitAdapter = {
       repo: cfg.repo,
       logger: opts.logger,
     });
-  },
-  // eslint-disable-next-line require-await
-  async setStatus(): Promise<void> {
-    throw new Error("withConfig required — call githubAdapter.withConfig({config, token}) first");
   },
 };
 

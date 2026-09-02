@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import type { CaptureRunner, RenderResult } from "./adapters/capture-runner.ts";
-import type { CheckStatus, GitAdapter } from "./adapters/status.ts";
+import type { CheckStatus, GitHostAdapter, GitHostProvider } from "./adapters/git-host.ts";
 import { makeDatabase, makeStorage } from "./capture/fake-adapters.ts";
 import { createShelfRouter } from "./index.tsx";
 import type { Build } from "./schema.ts";
@@ -46,28 +46,24 @@ function fakeRunner(overrides: Partial<CaptureRunner> = {}): { runner: CaptureRu
   return { runner: { metadata, render, cancel }, render: render as ReturnType<typeof vi.fn> };
 }
 
-function fakeGitProvider(key: string, calls: StatusCall[], tokens: string[]): GitAdapter {
+function fakeGitProvider(key: string, calls: StatusCall[], tokens: string[]): GitHostProvider {
   const configSchema = z.object({ owner: z.string().min(1), repo: z.string().min(1) });
-  const base: GitAdapter = {
+  const base: GitHostProvider = {
     metadata: {
       name: `Fake ${key}`,
       version: "0.0.0",
       kind: key,
       schema: configSchema,
     },
-    withConfig(opts: { config: unknown; token: string; logger?: Logger }): GitAdapter {
+    create(opts: { config: unknown; token: string; logger?: Logger }): GitHostAdapter {
       return {
         metadata: base.metadata,
-        withConfig: (nextOpts: { config: unknown; token: string; logger?: Logger }): GitAdapter => base.withConfig(nextOpts),
         setStatus: async (context, gitSha, status, url): Promise<void> => {
           calls.push({ context, gitSha, status, url });
           tokens.push(opts.token);
           await Promise.resolve();
         },
       };
-    },
-    setStatus: async (): Promise<void> => {
-      await Promise.resolve();
     },
   };
   return base;
@@ -140,7 +136,7 @@ describe("status provider fanout", () => {
       storage,
       captureRunner: runner,
       config: { captureConcurrency: 1, scratchDir, secret: "test-secret", purgeTtlDays: 30 },
-      gitProviders: [fakeGitProvider("github-a", callsA, tokensA), fakeGitProvider("github-b", callsB, tokensB)],
+      gitHosts: [fakeGitProvider("github-a", callsA, tokensA), fakeGitProvider("github-b", callsB, tokensB)],
       logger: pino({ level: "silent" }),
     });
 
@@ -200,7 +196,7 @@ describe("status provider fanout", () => {
       storage,
       captureRunner: runner,
       config: { captureConcurrency: 1, scratchDir, secret: "test-secret", purgeTtlDays: 30 },
-      gitProviders: [fakeGitProvider("github-a", callsA, tokensA), fakeGitProvider("github-b", callsB, tokensB)],
+      gitHosts: [fakeGitProvider("github-a", callsA, tokensA), fakeGitProvider("github-b", callsB, tokensB)],
       logger: pino({ level: "silent" }),
     });
 

@@ -5,7 +5,7 @@ import type { AuthAdapter } from "./adapters/auth.ts";
 import type { CaptureQueue } from "./adapters/capture-queue.ts";
 import type { CaptureRunner } from "./adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "./adapters/database.ts";
-import type { GitAdapter } from "./adapters/status.ts";
+import type { GitHostProvider } from "./adapters/git-host.ts";
 import type { StorageAdapter } from "./adapters/storage.ts";
 
 export interface BrandTheme {
@@ -93,7 +93,7 @@ export interface ShelfOptions {
   captureRunner?: CaptureRunner;
   captureQueue?: CaptureQueue;
   auth?: AuthAdapter;
-  gitProviders?: GitAdapter[];
+  gitHosts?: GitHostProvider[];
   logger?: Logger;
   ui?: UIConfig;
   config?: ShelfConfig;

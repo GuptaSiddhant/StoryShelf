@@ -77,7 +77,7 @@ export function registerStatusConfigs(app: ShelfApp): void {
     const { slug } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
     const body = c.req.valid("json");
-    const providers = getStore().gitProviders;
+    const providers = getStore().gitHosts;
     const provider = providers.find((p) => p.metadata.kind === body.provider);
     if (!provider) {
       return c.json({ message: `Unknown provider: ${body.provider}` }, 400);

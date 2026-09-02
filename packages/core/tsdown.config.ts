@@ -10,7 +10,7 @@ const entry: UserConfig["entry"] = {
   "adapter/storage": "./src/adapters/storage.ts",
   "adapter/capture-runner": "./src/adapters/capture-runner.ts",
   "adapter/auth": "./src/adapters/auth.ts",
-  "adapter/status": "./src/adapters/status.ts",
+  "adapter/git-host": "./src/adapters/git-host.ts",
   schema: "./src/schema.ts",
   ddl: "./src/ddl.ts",
   types: "./src/types.ts",

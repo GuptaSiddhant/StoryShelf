@@ -38,7 +38,7 @@ export type ShelfContext = {
   authEnabled: boolean;
   enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
   captureQueue: import("./adapters/capture-queue.ts").CaptureQueue | null;
-  gitProviders: import("./adapters/status.ts").GitAdapter[];
+  gitHosts: import("./adapters/git-host.ts").GitHostProvider[];
 };
 
 export type ShelfApp = OpenAPIHono<{ Variables: ShelfContext }>;
@@ -50,10 +50,62 @@ function buildAdapterSnapshot(options: ShelfOptions): Record<string, AdapterMeta
   if (options.captureRunner?.metadata) snap["captureRunner"] = options.captureRunner.metadata;
   if (options.captureQueue?.metadata) snap["captureQueue"] = options.captureQueue.metadata;
   if (options.auth?.metadata) snap["auth"] = options.auth.metadata;
-  for (const p of options.gitProviders ?? []) {
+  for (const p of options.gitHosts ?? []) {
     snap[`git:${p.metadata.kind}`] = p.metadata;
   }
   return snap;
+}
+
+async function hasApprovedBuildForSha(
+  db: import("./adapters/database.ts").DatabaseAdapter,
+  projectId: string,
+  sha: string,
+  excludeBuildId: string,
+): Promise<boolean> {
+  const builds = await new BuildModel(db).list(projectId);
+  return builds.some((b) => b.gitSha === sha && b.id !== excludeBuildId && b.status === "approved");
+}
+
+// eslint-disable-next-line max-statements, complexity
+async function isAlreadyMerged(opts: {
+  providers: import("./adapters/git-host.ts").GitHostProvider[];
+  sha: string;
+  branch: string;
+  secret: string | undefined;
+  db: import("./adapters/database.ts").DatabaseAdapter;
+  projectId: string;
+  logger?: import("pino").Logger;
+}): Promise<boolean> {
+  if (opts.providers.length === 0) return false;
+  const { StatusConfigModel } = await import("./models/status-config.ts");
+  const model = new StatusConfigModel(opts.db, opts.secret);
+  const rows = await model.list(opts.projectId);
+  for (const row of rows) {
+    const provider = opts.providers.find((p) => p.metadata.kind === row.provider);
+    if (!provider) continue;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(row.config);
+      provider.metadata.schema.parse(parsed);
+    } catch {
+      continue;
+    }
+    let token: string;
+    try {
+      token = model.decryptToken(row);
+    } catch {
+      continue;
+    }
+    const adapter = provider.create({ config: parsed, token, logger: opts.logger });
+    if (!adapter.isMerged) continue;
+    try {
+      const merged = await adapter.isMerged({ sha: opts.sha, branch: opts.branch });
+      if (merged) return true;
+    } catch {
+      // ignore provider errors — do not skip on failure
+    }
+  }
+  return false;
 }
 
 async function resolveUser(
@@ -79,7 +131,7 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
   const logger = options.logger ?? createShelfLogger();
   const authEnabled = options.auth !== undefined;
 
-  const gitProviders = options.gitProviders ?? [];
+  const gitHosts = options.gitHosts ?? [];
 
   // Adapter introspection — auto-populate config.adapters if not supplied
   const config: import("./config.ts").ShelfConfig = rawConfig.adapters
@@ -127,12 +179,56 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
             sha: build.gitSha,
             status: "pending",
             url: pendingUrl,
-            providers: gitProviders,
+            providers: gitHosts,
             secret: config.secret,
             logger,
           }).catch((error: unknown) => {
             logger.error({ err: error }, "failed to post pending status");
           });
+          // Skip capture if already merged (PR closed) or locally deduped
+          if (!build.isDefault) {
+            const merged = await isAlreadyMerged({
+              providers: gitHosts,
+              sha: build.gitSha,
+              branch: build.gitBranch,
+              secret: config.secret,
+              db: options.database,
+              projectId: project.id,
+              logger,
+            }).catch(() => false);
+            if (merged) {
+              logger.info({ buildId: build.id, sha: build.gitSha, branch: build.gitBranch }, "skipping capture — already merged");
+              await builds.setStatus(build.id, "approved").catch(() => {});
+              await postStatusesForBuild({
+                db: options.database,
+                project,
+                sha: build.gitSha,
+                status: "success",
+                url: pendingUrl,
+                providers: gitHosts,
+                secret: config.secret,
+                logger,
+              }).catch(() => {});
+              return;
+            }
+          }
+          // Local dedupe: if another approved build for same sha exists, skip render
+          const dup = await hasApprovedBuildForSha(options.database, project.id, build.gitSha, build.id);
+          if (dup) {
+            logger.info({ buildId: build.id, sha: build.gitSha }, "skipping capture — duplicate sha already approved");
+            await builds.setStatus(build.id, "approved").catch(() => {});
+            await postStatusesForBuild({
+              db: options.database,
+              project,
+              sha: build.gitSha,
+              status: "success",
+              url: pendingUrl,
+              providers: gitHosts,
+              secret: config.secret,
+              logger,
+            }).catch(() => {});
+            return;
+          }
           try {
             await executeCaptureJob({ buildId: job.buildId, reqId: job.reqId }, jobOptions);
             const updated = await builds.get(job.buildId);
@@ -150,7 +246,7 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
                   sha: updated.gitSha,
                   status: terminal,
                   url: pendingUrl,
-                  providers: gitProviders,
+                  providers: gitHosts,
                   secret: config.secret,
                   logger,
                 }).catch((error: unknown) => {
@@ -165,7 +261,7 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
               sha: build.gitSha,
               status: "failure",
               url: pendingUrl,
-              providers: gitProviders,
+              providers: gitHosts,
               secret: config.secret,
               logger,
             }).catch(() => {
@@ -221,7 +317,7 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
         authEnabled,
         enqueueCapture,
         captureQueue: queue,
-        gitProviders,
+        gitHosts,
       },
       async () => {
         await next();
@@ -293,7 +389,7 @@ export type {
 } from "./adapters/capture-runner.ts";
 export type { CaptureQueue, CaptureJob, QueueEntry } from "./adapters/capture-queue.ts";
 export type { AuthAdapter, AuthUser, AuthCallback } from "./adapters/auth.ts";
-export type { GitAdapter, CheckStatus } from "./adapters/status.ts";
+export type { GitHostProvider, GitHostAdapter, CheckStatus } from "./adapters/git-host.ts";
 export type { AdapterMetadata, GitAdapterMetadata } from "./adapters/metadata.ts";
 export type { DiffOptions, DiffResult } from "./diff/options.ts";
 export type { Viewport, StoryEntry, StorySourceAdapter } from "./capture/adapter.ts";

@@ -1,4 +1,4 @@
-import type { GitAdapter } from "../adapters/status.ts";
+import type { GitHostProvider } from "../adapters/git-host.ts";
 import type { LabelType, Project, Token } from "../schema.ts";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import { renderSettingsGeneral } from "./settings-general.tsx";
@@ -18,7 +18,7 @@ export interface ProjectSettingsData {
   members: SettingsMember[];
   webhooks: SettingsWebhook[];
   statusConfigs: SettingsStatusConfig[];
-  gitProviders: GitAdapter[];
+  gitHosts: GitHostProvider[];
   isAdmin: boolean;
 }
 
@@ -80,7 +80,7 @@ export function renderProjectSettingsPage(data: ProjectSettingsData, formState?:
       {activeTab === "tokens" ? renderSettingsTokens(project, data.tokens, data.isAdmin) : null}
       {activeTab === "webhooks" ? renderSettingsWebhooks(project, data.webhooks, data.isAdmin, formState) : null}
       {activeTab === "members" ? renderSettingsMembers(project, data.members, data.isAdmin) : null}
-      {activeTab === "status" ? renderSettingsStatus(project, data.statusConfigs, data.gitProviders, data.isAdmin) : null}
+      {activeTab === "status" ? renderSettingsStatus(project, data.statusConfigs, data.gitHosts, data.isAdmin) : null}
     </DocumentLayout>
   );
 }

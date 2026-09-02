@@ -3,7 +3,7 @@ title: "@storyshelf/git-github"
 description: GitHub commit-status provider for StoryShelf's visual-testing merge gate.
 ---
 
-`@storyshelf/git-github` posts commit statuses to GitHub so visual tests show up as PR checks. It implements the `GitAdapter` contract from `@storyshelf/core`: the server reads each project's saved status config, decrypts its token, and posts `pending` while capturing, `success` when approved, and `failure` on rejection or capture errors. The adapter exposes `metadata` (`name`, `version`, `description`, `kind:"github"`, `logo`, `schema`) with `version` injected from `package.json` via `__PKG_VERSION__`.
+`@storyshelf/git-github` posts commit statuses to GitHub so visual tests show up as PR checks. It implements the `GitHostProvider`/`GitHostAdapter` contracts from `@storyshelf/core`: the server reads each project's saved status config, decrypts its token, and posts `pending` while capturing, `success` when approved, and `failure` on rejection or capture errors, plus a single updatable PR comment (`<!-- storyshelf:<url> -->`). The adapter exposes `metadata` (`name`, `version`, `description`, `kind:"github"`, `logo`, `schema`) with `version` injected from `package.json` via `__PKG_VERSION__`.
 
 ## Install
 
@@ -13,7 +13,7 @@ nub add @storyshelf/git-github
 
 ## Register the provider
 
-Pass `githubAdapter` in the `gitProviders` array of `createShelfRouter`:
+Pass `githubAdapter` in the `gitHosts` array of `createShelfRouter`:
 
 ```ts
 import { createShelfRouter } from "@storyshelf/core";
@@ -23,14 +23,14 @@ const app = createShelfRouter({
   database,
   storage,
   captureRunner,
-  gitProviders: [githubAdapter],
+  gitHosts: [githubAdapter],
   config: {
     secret: process.env.SHELF_SECRET, // also encrypts status tokens
   },
 });
 ```
 
-Multiple providers can be registered (e.g. `githubAdapter` plus a GitLab provider once available). `gitProviders` is an array — every registered provider that has a saved config for the build's project receives each status update (fanout per build).
+Multiple providers can be registered (e.g. `githubAdapter` plus a GitLab provider once available). `gitHosts` is an array — every registered provider that has a saved config for the build's project receives each status update (fanout per build) and hosts also expose `isMerged` (skip capture if PR already merged) and `upsertComment` (one comment per build).
 
 ## Configure a project
 
@@ -58,4 +58,4 @@ Mark StoryShelf's status check as required in GitHub branch protection so PRs ca
 
 ## Direct use
 
-For custom wiring, `createGitHubStatusAdapter({ token, owner, repo, logger? })` returns a bound `GitAdapter` that posts via `setStatus(context, gitSha, status, url)`. The template adapter `githubAdapter` exposes `withConfig({config, token, logger})` to create a configured instance per project.
+For custom wiring, `createGitHubStatusAdapter({ token, owner, repo, logger? })` returns a bound `GitHostAdapter` that posts via `setStatus(context, gitSha, status, url)` and can `isMerged`/`upsertComment`. The template `githubAdapter: GitHostProvider` exposes `create({config, token, logger})` to create a configured instance per project.

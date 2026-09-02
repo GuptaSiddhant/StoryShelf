@@ -1,5 +1,5 @@
 import type { FC } from "hono/jsx";
-import type { GitAdapter } from "../adapters/status.ts";
+import type { GitHostProvider } from "../adapters/git-host.ts";
 import type { Project } from "../schema.ts";
 import { Badge, Field, SelectField, TextareaField } from "../ui/components.tsx";
 
@@ -19,13 +19,13 @@ export interface StatusFormState {
 
 /* eslint-disable promise-function-async -- JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
-function providerOptions(providers: GitAdapter[]): { value: string; label: string }[] {
+function providerOptions(providers: GitHostProvider[]): { value: string; label: string }[] {
   return providers.map((provider) => ({ value: provider.metadata.kind, label: provider.metadata.name }));
 }
 
 const StatusConfigRow: FC<{
   config: SettingsStatusConfig;
-  provider: GitAdapter | undefined;
+  provider: GitHostProvider | undefined;
   project: Project;
   isAdmin: boolean;
 }> = ({ config, provider, project, isAdmin }) => {
@@ -53,7 +53,7 @@ const StatusConfigRow: FC<{
 
 const StatusCreateCard: FC<{
   project: Project;
-  providers: GitAdapter[];
+  providers: GitHostProvider[];
   formState?: StatusFormState;
 }> = ({ project, providers, formState }) => {
   return (
@@ -78,7 +78,7 @@ const StatusCreateCard: FC<{
   );
 };
 
-function renderCreateSection(project: Project, providers: GitAdapter[], formState?: StatusFormState): unknown {
+function renderCreateSection(project: Project, providers: GitHostProvider[], formState?: StatusFormState): unknown {
   if (providers.length === 0) {
     return <p class="field__hint">No git providers registered on this server.</p>;
   }
@@ -89,7 +89,7 @@ function renderCreateSection(project: Project, providers: GitAdapter[], formStat
 export function renderSettingsStatus(
   project: Project,
   statusConfigs: SettingsStatusConfig[],
-  providers: GitAdapter[],
+  providers: GitHostProvider[],
   isAdmin: boolean,
   formState?: StatusFormState,
 ): unknown {

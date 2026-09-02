@@ -110,7 +110,7 @@ function buildRouterLines(answers: Answers): string[] {
     lines.push(`  auth: createPasswordAuth({ password: process.env.AUTH_PASSWORD! }),`);
   }
   if (answers.git !== "none") {
-    lines.push(`  gitProviders: [githubAdapter],`);
+    lines.push(`  gitHosts: [githubAdapter],`);
   }
 
   lines.push(
