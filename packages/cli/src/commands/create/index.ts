@@ -81,7 +81,7 @@ function buildImports(answers: Answers): string[] {
     imports.push(`import { createPasswordAuth } from "${AUTH_PACKAGE[answers.auth]}";`);
   }
   if (answers.git !== "none") {
-    imports.push(`import { githubAdapter } from "${GIT_PACKAGE[answers.git]}";`);
+    imports.push(`import { gitHubHost } from "${GIT_PACKAGE[answers.git]}";`);
   }
   imports.push(`import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";`);
   return imports;
@@ -110,7 +110,7 @@ function buildRouterLines(answers: Answers): string[] {
     lines.push(`  auth: createPasswordAuth({ password: process.env.AUTH_PASSWORD! }),`);
   }
   if (answers.git !== "none") {
-    lines.push(`  gitHosts: [githubAdapter],`);
+    lines.push(`  gitHosts: [gitHubHost],`);
   }
 
   lines.push(

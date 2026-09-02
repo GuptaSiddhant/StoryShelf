@@ -6,22 +6,17 @@ import type { CheckStatus, GitHostAdapter, GitHostProvider } from "@storyshelf/c
 
 declare const __PKG_VERSION__: string;
 
-export const githubConfigSchema = z.object({
+const githubConfigSchema = z.object({
   owner: z.string().min(1),
   repo: z.string().min(1),
 });
 
-export type GitHubConfig = z.infer<typeof githubConfigSchema>;
+type GitHubConfig = z.infer<typeof githubConfigSchema>;
 
-/** Options for configuring the GitHub status adapter. */
-export interface GitHubStatusOptions {
-  /** GitHub Personal Access Token or App installation token. */
+interface GitHubStatusOptions {
   token: string;
-  /** Repository owner (user or org). */
   owner: string;
-  /** Repository name. */
   repo: string;
-  /** Optional logger for diagnostics. */
   logger?: Logger;
 }
 
@@ -36,16 +31,7 @@ function getMetadata(): GitHostProvider["metadata"] {
   };
 }
 
-/**
- * Create a GitHub-backed `GitHostAdapter` (configured instance).
- *
- * Posts commit statuses to GitHub using the REST API.
- * Context format: `storyshelf/{project-slug}` (e.g., "storyshelf/my-app").
- *
- * @param options - Configuration including token, owner, repo.
- * @returns A `GitHostAdapter` implementation.
- */
-export function createGitHubStatusAdapter(options: GitHubStatusOptions): GitHostAdapter {
+function createGitHubStatusAdapter(options: GitHubStatusOptions): GitHostAdapter {
   const octokit = new Octokit({ auth: options.token });
   const logger = options.logger?.child({ component: "git-github" });
 
@@ -164,7 +150,7 @@ export function createGitHubStatusAdapter(options: GitHubStatusOptions): GitHost
   };
 }
 
-export const githubAdapter: GitHostProvider = {
+export const gitHubHost: GitHostProvider = {
   metadata: getMetadata(),
   create(opts: { config: unknown; token: string; logger?: Logger }): GitHostAdapter {
     const cfg = githubConfigSchema.parse(opts.config);

@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { Logger } from "pino";
-import { createGitHubStatusAdapter } from "./index.ts";
+import { gitHubHost } from "./index.ts";
 
 function createMockLogger(): Logger {
   return {
@@ -20,14 +20,13 @@ function createMockLogger(): Logger {
   } as unknown as Logger;
 }
 
-describe("createGitHubStatusAdapter", () => {
+describe("gitHubHost", () => {
   it("maps pending -> pending", async (): Promise<void> => {
     const createStatus = vi.fn().mockResolvedValue({});
 
-    const adapter = createGitHubStatusAdapter({
+    const adapter = gitHubHost.create({
+      config: { owner: "octocat", repo: "hello-world" },
       token: "ghp_test",
-      owner: "octocat",
-      repo: "hello-world",
       logger: createMockLogger(),
     });
 
@@ -52,10 +51,9 @@ describe("createGitHubStatusAdapter", () => {
 
   it("maps success -> success", async (): Promise<void> => {
     const createStatus = vi.fn().mockResolvedValue({});
-    const adapter = createGitHubStatusAdapter({
+    const adapter = gitHubHost.create({
+      config: { owner: "octocat", repo: "hello-world" },
       token: "ghp_test",
-      owner: "octocat",
-      repo: "hello-world",
       logger: createMockLogger(),
     });
 
@@ -80,10 +78,9 @@ describe("createGitHubStatusAdapter", () => {
 
   it("maps failure -> failure", async (): Promise<void> => {
     const createStatus = vi.fn().mockResolvedValue({});
-    const adapter = createGitHubStatusAdapter({
+    const adapter = gitHubHost.create({
+      config: { owner: "octocat", repo: "hello-world" },
       token: "ghp_test",
-      owner: "octocat",
-      repo: "hello-world",
       logger: createMockLogger(),
     });
 

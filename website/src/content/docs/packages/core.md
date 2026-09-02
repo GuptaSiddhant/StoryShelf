@@ -17,13 +17,13 @@ Pass a database and storage adapter to `createShelfRouter`. Capture, authenticat
 
 ```ts
 import { createShelfRouter } from "@storyshelf/core";
-import { githubAdapter } from "@storyshelf/git-github";
+import { gitHubHost } from "@storyshelf/git-github";
 
 const app = createShelfRouter({
   database,
   storage,
   captureRunner,
-  gitHosts: [githubAdapter],
+  gitHosts: [gitHubHost],
   auth,
   config: { secret, captureConcurrency: 2, purgeTtlDays: 30 },
 });
@@ -50,7 +50,7 @@ Git integration is a `GitHost` pair:
 - **`GitHostProvider`** — descriptor registered at startup in `ShelfOptions.gitHosts` (array, keep `[]` for heterogeneous hosts). Carries `metadata: { kind:"github", name, version, description, logo, schema }` (zod) and `create({config, token, logger})→GitHostAdapter`.
 - **`GitHostAdapter`** — runtime per-project instance exposing `setStatus(context, gitSha, status, url)` plus optional `isMerged({sha, branch})` (skip capture if PR already merged) and `upsertComment({sha, url, markdown})` (one comment per build, updated via `<!-- storyshelf:<url> -->` marker).
 
-Packages that implement `GitHostProvider` (e.g. `@storyshelf/git-github` `githubAdapter`) are wired in alongside the router — see [the git-github package](../git-github/).
+Packages that implement `GitHostProvider` (e.g. `@storyshelf/git-github` `gitHubHost`) are wired in alongside the router — see [the git-github package](../git-github/).
 
 `ShelfConfig` supports a session secret, published Storybook base domain, capture concurrency, capture viewports, a capture scratch directory (`scratchDir`, required when `capture` is enabled), purge TTL, and an optional `adapters` snapshot (`{ [key]: AdapterMetadata }`) auto-populated from each adapter's `metadata` for introspection. The `secret` is also used to encrypt git-provider tokens at rest. `UIConfig` controls the name, logo, favicon, and light/dark brand themes.
 
