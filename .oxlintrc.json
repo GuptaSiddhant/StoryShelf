@@ -20,7 +20,7 @@
     "id-length": [
       "warn",
       {
-        "exceptions": ["z"]
+        "exceptions": ["a", "b", "c", "e", "h", "i", "j", "k", "l", "m", "n", "p", "q", "r", "s", "v", "x", "y", "z", "T", "K", "V", "id", "db", "fn", "pr", "mr", "err"]
       }
     ],
     "func-style": ["allow"],

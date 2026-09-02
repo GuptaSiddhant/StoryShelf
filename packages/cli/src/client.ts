@@ -17,88 +17,113 @@ interface Client {
   };
 }
 
-export function createClient(baseUrl: string, token?: string): Client {
-  const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
-  
-  function requestHeaders(contentType?: string): Record<string, string> {
-    const h: Record<string, string> = { ...authHeaders };
-    if (contentType) {h["content-type"] = contentType;}
-    return h;
+function buildAuthHeaders(token?: string): Record<string, string> {
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function buildRequestHeaders(authHeaders: Record<string, string>, contentType?: string): Record<string, string> {
+  const headers: Record<string, string> = { ...authHeaders };
+  if (contentType) {
+    headers["content-type"] = contentType;
   }
-  
+  return headers;
+}
+
+async function fetchJson(url: string, options: RequestInit): Promise<unknown> {
+  const res = await fetch(url, options);
+  if (!res.ok) {
+    throw new Error(`Request failed (${res.status}): ${await res.text()}`);
+  }
+  return res.json() as unknown;
+}
+
+function createTokensApi(
+  baseUrl: string,
+  requestHeaders: (contentType?: string) => Record<string, string>,
+): Client["projects"]["tokens"] {
   return {
-    projects: {
-      create: async (json: { name: string; gitRepository?: string; gitDefaultBranch?: string; storybookMeta?: unknown }) => {
-        const res = await fetch(`${baseUrl}/api/v1/projects`, {
-          method: "POST",
-          headers: requestHeaders("application/json"),
-          body: JSON.stringify(json),
-        });
-        if (!res.ok) {throw new Error(`Request failed (${res.status}): ${await res.text()}`);}
-        return res.json() as unknown;
-      },
-      update: async (slug: string, json: { storybookMeta?: unknown }) => {
-        const res = await fetch(`${baseUrl}/api/v1/projects/${slug}`, {
-          method: "PATCH",
-          headers: requestHeaders("application/json"),
-          body: JSON.stringify(json),
-        });
-        if (!res.ok) {throw new Error(`Request failed (${res.status}): ${await res.text()}`);}
-        return res.json() as unknown;
-      },
-      get: async (slug: string) => {
-        const res = await fetch(`${baseUrl}/api/v1/projects/${slug}`, { headers: requestHeaders() });
-        if (!res.ok) {throw new Error(`Request failed (${res.status}): ${await res.text()}`);}
-        return res.json() as unknown;
-      },
-      list: async () => {
-        const res = await fetch(`${baseUrl}/api/v1/projects`, { headers: requestHeaders() });
-        if (!res.ok) {throw new Error(`Request failed (${res.status}): ${await res.text()}`);}
-        return res.json() as unknown;
-      },
-      tokens: {
-        create: async (slug: string, json: { name: string }) => {
-          const res = await fetch(`${baseUrl}/api/v1/projects/${slug}/tokens`, {
-            method: "POST",
-            headers: requestHeaders("application/json"),
-            body: JSON.stringify(json),
-          });
-          if (!res.ok) {throw new Error(`Request failed (${res.status}): ${await res.text()}`);}
-          return res.json() as unknown;
-        },
-      },
-      builds: {
-        create: async (slug: string, form: FormData) => {
-          const res = await fetch(`${baseUrl}/api/v1/projects/${slug}/builds`, {
-            method: "POST",
-            headers: authHeaders,
-            body: form,
-          });
-          if (!res.ok) {throw new Error(`Request failed (${res.status}): ${await res.text()}`);}
-          return res.json() as unknown;
-        },
-        retry: async (slug: string, buildId: string) => {
-          const res = await fetch(`${baseUrl}/api/v1/projects/${slug}/builds/${buildId}/retry`, {
-            method: "POST",
-            headers: requestHeaders("application/json"),
-            body: JSON.stringify({}),
-          });
-          if (!res.ok) {throw new Error(`Request failed (${res.status}): ${await res.text()}`);}
-          return res.json() as unknown;
-        },
-      },
-      admin: {
-        purge: async (json: { ttlDays?: number }) => {
-          const res = await fetch(`${baseUrl}/api/v1/admin/purge`, {
-            method: "POST",
-            headers: requestHeaders("application/json"),
-            body: JSON.stringify(json),
-          });
-          if (!res.ok) {throw new Error(`Request failed (${res.status}): ${await res.text()}`);}
-          return res.json() as unknown;
-        },
-      },
-    },
+    create: async (slug: string, json: { name: string }) =>
+      await fetchJson(`${baseUrl}/api/v1/projects/${slug}/tokens`, {
+        method: "POST",
+        headers: requestHeaders("application/json"),
+        body: JSON.stringify(json),
+      }),
+  };
+}
+
+function createBuildsApi(
+  baseUrl: string,
+  authHeaders: Record<string, string>,
+  requestHeaders: (contentType?: string) => Record<string, string>,
+): Client["projects"]["builds"] {
+  return {
+    create: async (slug: string, form: FormData) =>
+      await fetchJson(`${baseUrl}/api/v1/projects/${slug}/builds`, {
+        method: "POST",
+        headers: authHeaders,
+        body: form,
+      }),
+    retry: async (slug: string, buildId: string) =>
+      await fetchJson(`${baseUrl}/api/v1/projects/${slug}/builds/${buildId}/retry`, {
+        method: "POST",
+        headers: requestHeaders("application/json"),
+        body: JSON.stringify({}),
+      }),
+  };
+}
+
+function createAdminApi(
+  baseUrl: string,
+  requestHeaders: (contentType?: string) => Record<string, string>,
+): Client["projects"]["admin"] {
+  return {
+    purge: async (json: { ttlDays?: number }) =>
+      await fetchJson(`${baseUrl}/api/v1/admin/purge`, {
+        method: "POST",
+        headers: requestHeaders("application/json"),
+        body: JSON.stringify(json),
+      }),
+  };
+}
+
+function createProjectsApi(
+  baseUrl: string,
+  authHeaders: Record<string, string>,
+  requestHeaders: (contentType?: string) => Record<string, string>,
+): Client["projects"] {
+  return {
+    create: async (json: { name: string; gitRepository?: string; gitDefaultBranch?: string; storybookMeta?: unknown }) =>
+      await fetchJson(`${baseUrl}/api/v1/projects`, {
+        method: "POST",
+        headers: requestHeaders("application/json"),
+        body: JSON.stringify(json),
+      }),
+    update: async (slug: string, json: { storybookMeta?: unknown }) =>
+      await fetchJson(`${baseUrl}/api/v1/projects/${slug}`, {
+        method: "PATCH",
+        headers: requestHeaders("application/json"),
+        body: JSON.stringify(json),
+      }),
+    get: async (slug: string) =>
+      await fetchJson(`${baseUrl}/api/v1/projects/${slug}`, {
+        headers: requestHeaders(),
+      }),
+    list: async () =>
+      await fetchJson(`${baseUrl}/api/v1/projects`, {
+        headers: requestHeaders(),
+      }),
+    tokens: createTokensApi(baseUrl, requestHeaders),
+    builds: createBuildsApi(baseUrl, authHeaders, requestHeaders),
+    admin: createAdminApi(baseUrl, requestHeaders),
+  };
+}
+
+export function createClient(baseUrl: string, token?: string): Client {
+  const authHeaders = buildAuthHeaders(token);
+  const requestHeaders = (contentType?: string): Record<string, string> => buildRequestHeaders(authHeaders, contentType);
+
+  return {
+    projects: createProjectsApi(baseUrl, authHeaders, requestHeaders),
   };
 }
 

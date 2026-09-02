@@ -71,7 +71,7 @@ export async function runInit(options: InitOptions): Promise<void> {
 
   if (questions.length > 0) {
     const answers = await prompts(questions);
-    if (questions.some((q) => !answers[q.name])) {
+    if (questions.some((question) => !answers[question.name])) {
       printError("Cancelled.");
       return;
     }

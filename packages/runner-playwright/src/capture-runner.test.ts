@@ -77,8 +77,8 @@ const STORIES: StoryEntry[] = [
 
 const VIEWPORTS: Viewport[] = [{ name: "desktop", width: 1280, height: 720 }];
 
-let tmp: string;
-let storybookDir: string;
+let tmp = "";
+let storybookDir = "";
 
 beforeEach(async () => {
   tmp = await mkdtemp(join(tmpdir(), "storyshelf-render-"));

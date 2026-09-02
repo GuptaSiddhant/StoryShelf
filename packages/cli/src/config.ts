@@ -64,11 +64,11 @@ export async function loadStorybookConfig(
     const parsed = JSON.parse(raw) as unknown;
     // Backward compat: storybookDir -> buildDir
     if (parsed && typeof parsed === "object" && parsed !== null && "storybookDir" in (parsed as Record<string, unknown>)) {
-      const p = parsed as Record<string, unknown>;
-      if (typeof p["storybookDir"] === "string" && !p["buildDir"]) {
-        p["buildDir"] = p["storybookDir"];
+      const parsedRecord = parsed as Record<string, unknown>;
+      if (typeof parsedRecord["storybookDir"] === "string" && !parsedRecord["buildDir"]) {
+        parsedRecord["buildDir"] = parsedRecord["storybookDir"];
       }
-      delete p["storybookDir"];
+      delete parsedRecord["storybookDir"];
     }
     const result = storybookConfigSchema.safeParse(parsed);
     if (!result.success) {
@@ -125,23 +125,23 @@ export async function detectStorybookMeta(cwd: string = process.cwd()): Promise<
   if (mainPath) {
     try {
       const raw = await readFile(mainPath, "utf8");
-      const frameworkMatch = raw.match(/framework\s*:\s*\{\s*name\s*:\s*["']([^"']+)["']/u);
+      const frameworkMatch = raw.match(/framework\s*:\s*\{\s*name\s*:\s*["'](?<frameworkName>[^"']+)["']/u);
       if (frameworkMatch?.[1]) {
         meta.framework = { name: frameworkMatch[1] };
       }
-      const addonsMatch = raw.match(/addons\s*:\s*\[([\s\S]*?)\]/u);
+      const addonsMatch = raw.match(/addons\s*:\s*\[(?<addonsContent>[\s\S]*?)\]/u);
       if (addonsMatch?.[1]) {
-        const addons = [...addonsMatch[1].matchAll(/["']([^"']+)["']/gu)].map((m) => m[1]).filter(Boolean) as string[];
+        const addons = [...addonsMatch[1].matchAll(/["'](?<addonName>[^"']+)["']/gu)].map((match) => match[1]).filter(Boolean) as string[];
         if (addons.length > 0) {meta.addons = addons;}
       }
-      const storiesMatch = raw.match(/stories\s*:\s*\[([\s\S]*?)\]/u);
+      const storiesMatch = raw.match(/stories\s*:\s*\[(?<storiesContent>[\s\S]*?)\]/u);
       if (storiesMatch?.[1]) {
-        const globs = [...storiesMatch[1].matchAll(/["']([^"']+)["']/gu)].map((m) => m[1]).filter(Boolean) as string[];
+        const globs = [...storiesMatch[1].matchAll(/["'](?<storyGlob>[^"']+)["']/gu)].map((match) => match[1]).filter(Boolean) as string[];
         if (globs.length > 0) {meta.storiesGlobs = globs;}
       }
-      const staticDirsMatch = raw.match(/staticDirs\s*:\s*\[([\s\S]*?)\]/u);
+      const staticDirsMatch = raw.match(/staticDirs\s*:\s*\[(?<staticDirsContent>[\s\S]*?)\]/u);
       if (staticDirsMatch?.[1]) {
-        const dirs = [...staticDirsMatch[1].matchAll(/["']([^"']+)["']/gu)].map((m) => m[1]).filter(Boolean) as string[];
+        const dirs = [...staticDirsMatch[1].matchAll(/["'](?<staticDir>[^"']+)["']/gu)].map((match) => match[1]).filter(Boolean) as string[];
         if (dirs.length > 0) {meta.staticDirs = dirs;}
       }
       const rel = relative(cwd, dirname(mainPath));
@@ -187,7 +187,7 @@ export function detectGitRepository(cwd: string = process.cwd()): string | null 
 export function detectGitDefaultBranch(cwd: string = process.cwd()): string | null {
   try {
     const ref = execSync("git symbolic-ref refs/remotes/origin/HEAD", { cwd, encoding: "utf8" }).trim();
-    const match = ref.match(/refs\/remotes\/origin\/(.+)/u);
+    const match = ref.match(/refs\/remotes\/origin\/(?<branch>.+)/u);
     if (match?.[1]) {return match[1];}
   } catch {
     // Fallback
