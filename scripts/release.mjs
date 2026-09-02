@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// oxlint-disable max-statements no-console
 /**
  * Release helper — guarantees fixed-version bump + checks.
  * Wraps `nub version` which commits and tags `v<version>`.
@@ -30,7 +31,9 @@ function error(msg) {
 }
 function run(cmd, opts = {}) {
   const result = spawnSync(cmd, { shell: true, stdio: "inherit", ...opts });
-  if (result.status !== 0) process.exit(result.status ?? 1);
+  if (result.status !== 0) {
+    process.exit(result.status ?? 1);
+  }
   return result;
 }
 function capture(cmd) {
@@ -80,22 +83,22 @@ if (argsWithoutDry.length === 0) {
 let bump = null;
 let preid = null;
 const nubVersionArgs = [];
-for (let i = 0; i < argsWithoutDry.length; i++) {
-  const arg = argsWithoutDry[i];
+for (let index = 0; index < argsWithoutDry.length; index += 1) {
+  const arg = argsWithoutDry[index];
   if (arg === "--preid") {
-    preid = argsWithoutDry[i + 1];
+    preid = argsWithoutDry[index + 1];
     if (!preid) {
       error("--preid requires a value");
       process.exit(1);
     }
     nubVersionArgs.push("--preid", preid);
-    i++;
+    index += 1;
   } else if (arg.startsWith("--")) {
     nubVersionArgs.push(arg);
-  } else if (!bump) {
-    bump = arg;
+  } else if (bump) {
     nubVersionArgs.push(arg);
   } else {
+    bump = arg;
     nubVersionArgs.push(arg);
   }
 }
@@ -124,13 +127,19 @@ function getPackageVersions() {
   const entries = readdirSync(packagesDir, { withFileTypes: true });
   const versions = [];
   for (const e of entries) {
-    if (!e.isDirectory()) continue;
+    if (!e.isDirectory()) {
+      continue;
+    }
     const pkgPath = join(packagesDir, e.name, "package.json");
     try {
       const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
-      if (pkg.private) continue;
+      if (pkg.private) {
+        continue;
+      }
       versions.push({ name: pkg.name ?? e.name, version: pkg.version, dir: e.name });
-    } catch {}
+    } catch {
+      // Ignore missing or invalid package.json
+    }
   }
   return versions;
 }
@@ -155,7 +164,9 @@ try {
 
 // 4. Run nub version
 const versionCmd = ["nub", "version", ...nubVersionArgs];
-if (dryRun) versionCmd.push("--no-git-tag-version");
+if (dryRun) {
+  versionCmd.push("--no-git-tag-version");
+}
 log(`running: ${versionCmd.join(" ")}${dryRun ? " (dry-run, no commit/tag)" : ""}`);
 run(versionCmd.join(" "));
 
@@ -167,7 +178,7 @@ if (uniqAfter.length !== 1) {
   console.error(after.map((v) => `  ${v.name}: ${v.version}`).join("\n"));
   process.exit(1);
 }
-const newVersion = uniqAfter[0];
+const newVersion = uniqAfter.at(0);
 log(`new fixed version: ${newVersion}`);
 
 // 6. Dry-run publish check
@@ -189,13 +200,15 @@ if (dryRun) {
 } else {
   const tag = `v${newVersion}`;
   log(`bump complete: ${uniqBefore[0]} → ${newVersion} (commit + tag ${tag})`);
-  // verify tag exists
+  // Verify tag exists
   try {
     const tags = capture("git tag --points-at HEAD");
     if (!tags.split("\n").includes(tag)) {
       error(`expected tag ${tag} not found at HEAD — nub version may not have tagged`);
     }
-  } catch {}
+  } catch {
+    error("failed to verify git tag");
+  }
   console.log("");
   console.log(`Next: git push --follow-tags`);
   console.log(`  → triggers .github/workflows/release.yml for trusted publish + GitHub Release`);
