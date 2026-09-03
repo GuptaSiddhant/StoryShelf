@@ -21,6 +21,8 @@ export const projects = sqliteTable("projects", {
   maxDiffRatio: real("max_diff_ratio").notNull().default(0.01),
   publicBranchRegex: text("public_branch_regex"),
   storybookMeta: text("storybook_meta").$type<string | null | undefined>().default(null),
+  executePlay: integer("execute_play", { mode: "boolean" }).notNull().default(false),
+  playTimeoutMs: integer("play_timeout_ms").notNull().default(10_000),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });

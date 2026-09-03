@@ -1,11 +1,32 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import type { StoryEntry, StorySourceAdapter } from "./adapter.ts";
+import type { StoryEntry, StoryParameters, StorySourceAdapter } from "./adapter.ts";
 
 interface StorybookIndex {
   v: number;
-  entries: Record<string, { id: string; name: string; title: string; importPath?: string; tags?: string[]; type: string }>;
+  entries: Record<
+    string,
+    {
+      id: string;
+      name: string;
+      title: string;
+      importPath?: string;
+      tags?: string[];
+      type: string;
+      parameters?: { chromatic?: StoryParameters; storyshelf?: StoryParameters };
+    }
+  >;
+}
+
+function mergeParameters(entry: {
+  parameters?: { chromatic?: StoryParameters; storyshelf?: StoryParameters };
+}): StoryParameters | undefined {
+  const merged: StoryParameters = {
+    ...entry.parameters?.chromatic,
+    ...entry.parameters?.storyshelf,
+  };
+  return Object.keys(merged).length > 0 ? merged : undefined;
 }
 
 export class StorybookAdapter implements StorySourceAdapter {
@@ -23,6 +44,7 @@ export class StorybookAdapter implements StorySourceAdapter {
         importPath: entry.importPath,
         tags: entry.tags,
         type: entry.type === "docs" ? "docs" : "story",
+        parameters: mergeParameters(entry),
       }));
   }
 
@@ -33,7 +55,7 @@ export class StorybookAdapter implements StorySourceAdapter {
 
   // eslint-disable-next-line class-methods-use-this
   private async readIndex(source: string): Promise<StorybookIndex> {
-    const candidates = ["index.json", "stories.json"];
+    const candidates: string[] = ["stories.json", "index.json"];
     const results = await Promise.all(
       candidates.map(async (name) => {
         try {

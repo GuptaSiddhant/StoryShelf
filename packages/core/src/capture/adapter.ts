@@ -1,3 +1,30 @@
+export interface StoryParameters {
+  disableSnapshot?: boolean;
+  delay?: number;
+  diffThreshold?: number;
+  pauseAnimationAtEnd?: boolean;
+  flakyTest?: boolean;
+}
+
+export function isFlakyStory(entry: Pick<StoryEntry, "tags" | "parameters">): boolean {
+  if (entry.parameters?.flakyTest) return true;
+  const tags = entry.tags ?? [];
+  for (const t of tags) {
+    if (t.toLowerCase() === "flaky-test") return true;
+  }
+  return false;
+}
+
+export function isDisabledStory(entry: Pick<StoryEntry, "tags" | "parameters">): boolean {
+  if (entry.parameters?.disableSnapshot) return true;
+  const tags = entry.tags ?? [];
+  for (const t of tags) {
+    const lower = t.toLowerCase();
+    if (lower === "skip" || lower === "disable" || lower === "disable-snapshot") return true;
+  }
+  return false;
+}
+
 /** A single discoverable story or docs entry within a Storybook. */
 export interface StoryEntry {
   id: string;
@@ -6,6 +33,7 @@ export interface StoryEntry {
   importPath?: string;
   tags?: string[];
   type: "story" | "docs";
+  parameters?: StoryParameters;
 }
 
 /** Adapter that discovers and renders stories from a Storybook build. */

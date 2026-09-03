@@ -13,7 +13,7 @@ import type { Build, Project } from "../schema.ts";
 import { storybookDir, storybookZipPath } from "../utils/paths.ts";
 import { persistCapture } from "./pipeline.ts";
 import { StorybookAdapter } from "./storybook.ts";
-import { DEFAULT_VIEWPORTS } from "./adapter.ts";
+import { DEFAULT_VIEWPORTS, isDisabledStory, isFlakyStory } from "./adapter.ts";
 import type { Viewport } from "./adapter.ts";
 
 export interface CaptureJobOptions {
@@ -45,13 +45,30 @@ export async function executeCaptureJob(input: { buildId: string; reqId?: string
     logger?.info({ durationMs: Math.round(performance.now() - staticsStart) }, "storybook statics persisted");
 
     const adapter = new StorybookAdapter();
-    const stories = await adapter.discover(extractedDir);
+    const discovered = await adapter.discover(extractedDir);
+    const stories = discovered.filter((s) => !isDisabledStory(s));
     const viewports = options.viewports ?? DEFAULT_VIEWPORTS;
 
     const renderStart = performance.now();
-    const result = await options.runner.render({ buildId: build.id, storybookDir: extractedDir, stories, viewports, logger });
+    const result = await options.runner.render({
+      buildId: build.id,
+      storybookDir: extractedDir,
+      stories,
+      viewports,
+      logger,
+      executePlay: project.executePlay ?? false,
+      playTimeoutMs: project.playTimeoutMs ?? 10_000,
+    });
     const renderDuration = performance.now() - renderStart;
     logger?.info({ durationMs: Math.round(renderDuration), storyCount: stories.length }, "stories rendered");
+
+    const flakyStoryIds = new Set(stories.filter((s) => isFlakyStory(s)).map((s) => s.id));
+    const blockingFailed = new Set<string>();
+    const flakyFailed = new Set<string>();
+    for (const f of result.failures) {
+      if (flakyStoryIds.has(f.storyId)) flakyFailed.add(f.storyId);
+      else blockingFailed.add(f.storyId);
+    }
 
     const persistStart = performance.now();
     await persistCapture(
@@ -64,7 +81,8 @@ export async function executeCaptureJob(input: { buildId: string; reqId?: string
         captures: result.captures,
         logger,
       },
-      new Set(result.failures.map((failure) => failure.storyId)),
+      blockingFailed,
+      flakyFailed,
     );
     const persistDuration = performance.now() - persistStart;
     logger?.info({ durationMs: Math.round(persistDuration) }, "capture persisted");

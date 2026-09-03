@@ -35,6 +35,8 @@ export interface PlaywrightRenderInput {
   stories: StoryEntry[];
   viewports: Viewport[];
   logger?: Logger;
+  executePlay?: boolean;
+  playTimeoutMs?: number;
 }
 
 export function createPlaywrightCaptureRunner(): CaptureRunner {
@@ -81,7 +83,13 @@ async function renderAll(input: PlaywrightRenderInput, active: ActiveRun): Promi
   const browser = await chromium.launch();
   active.browser = browser;
   const adapter = new StorybookAdapter();
-  const ctx: ScreenshotContext = { browser, adapter, baseUrl: server.url };
+  const ctx: ScreenshotContext & { executePlay?: boolean; playTimeoutMs?: number } = {
+    browser,
+    adapter,
+    baseUrl: server.url,
+    executePlay: input.executePlay,
+    playTimeoutMs: input.playTimeoutMs,
+  };
   const captures: RenderedSnapshot[] = [];
   const failures: RenderResult["failures"] = [];
   try {
@@ -127,16 +135,73 @@ async function safeCloseServer(server: { close(): Promise<void> }): Promise<void
   }
 }
 
-async function captureScreenshot(ctx: ScreenshotContext, story: StoryEntry, viewport: Viewport): Promise<Buffer> {
+async function captureScreenshot(
+  ctx: ScreenshotContext & { executePlay?: boolean; playTimeoutMs?: number },
+  story: StoryEntry,
+  viewport: Viewport,
+): Promise<Buffer> {
   const page = await ctx.browser.newPage({ viewport: { width: viewport.width, height: viewport.height } });
   try {
     await page.goto(ctx.adapter.buildUrl(ctx.baseUrl, story.id), { waitUntil: "networkidle" });
     if (ctx.adapter.screenshotSelector) {
       await page.waitForSelector(ctx.adapter.screenshotSelector, { state: "attached" });
-      // Storybook may initially render the root as hidden; wait briefly for the story to paint.
-      await page.waitForTimeout(500);
+      const delay = story.parameters?.delay ?? 500;
+      await page.waitForTimeout(delay);
+      if (story.parameters?.pauseAnimationAtEnd) {
+        await page.evaluate(() => {
+          const doc = globalThis.document as unknown as { getAnimations: () => { pause: () => void }[] };
+          for (const anim of doc.getAnimations()) anim.pause();
+        });
+      }
     }
-    return await page.screenshot();
+    if (ctx.executePlay) {
+      const timeout = ctx.playTimeoutMs ?? 10_000;
+      try {
+        await page.evaluate(
+          async ({ storyId, timeoutMs }: { storyId: string; timeoutMs: number }) => {
+            const win = globalThis as unknown as {
+              __STORYBOOK_PREVIEW__?: {
+                executePlay?: (id: string) => Promise<void>;
+                storyStore?: { fromId?: (id: string) => { play?: () => Promise<void> } };
+                channel?: { on: (e: string, cb: (err: unknown) => void) => void };
+              };
+            };
+            const preview = win.__STORYBOOK_PREVIEW__;
+            if (!preview) return;
+            // Try channel-based error capture for play failures
+            let playError: unknown = null;
+            const handler = (err: unknown): void => {
+              playError = err;
+            };
+            // Storybook channel emits playFunctionThrewException on failure
+            try {
+              preview.channel?.on("playFunctionThrewException", handler);
+            } catch {}
+            // Try direct executePlay if available (custom StoryShelf preview addition)
+            if (preview.executePlay) {
+              await Promise.race([
+                preview.executePlay(storyId),
+                new Promise((_, reject) => setTimeout(() => reject(new Error(`play timeout after ${timeoutMs}ms`)), timeoutMs)),
+              ]);
+            } else if (preview.storyStore?.fromId) {
+              const story = preview.storyStore.fromId(storyId) as unknown as { play?: (ctx: unknown) => Promise<void> };
+              if (story?.play) {
+                await Promise.race([
+                  story.play({ canvasElement: globalThis.document.getElementById("storybook-root") }),
+                  new Promise((_, reject) => setTimeout(() => reject(new Error(`play timeout after ${timeoutMs}ms`)), timeoutMs)),
+                ]);
+              }
+            }
+            if (playError) throw playError;
+          },
+          { storyId: story.id, timeoutMs: timeout },
+        );
+      } catch (error) {
+        throw new Error(`play failed: ${messageOf(error)}`);
+      }
+    }
+    // Playwright page.screenshot supports animations: disabled to freeze CSS animations
+    return await page.screenshot({ animations: story.parameters?.pauseAnimationAtEnd ? "allow" : "disabled" });
   } finally {
     await page.close();
   }

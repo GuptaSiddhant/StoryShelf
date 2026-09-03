@@ -126,5 +126,8 @@ async function ensureBuildDir(opts: {
   if (!shouldBuild) {return;}
   const command = opts.buildCommand ?? `npm run ${opts.buildScriptName ?? "build-storybook"} -- --output-dir ${opts.buildDir}`;
   printLine(`Building Storybook: ${command}`);
-  execSync(command, { stdio: "inherit" });
+  execSync(command, {
+    stdio: "inherit",
+    env: { ...process.env, STORYBOOK_BUILD_STORIES_JSON: "true" },
+  });
 }

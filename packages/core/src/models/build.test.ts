@@ -101,7 +101,10 @@ describe("BuildModel latestPublished", () => {
     const { db } = makeDatabase();
     const model = new BuildModel(db);
     const project = await new ProjectModel(db).create({ name: "Test", gitRepository: "owner/repo" });
-    const pr = { publicBranchRegex: null };
+    const pr = { publicBranchRegex: null,
+      executePlay: false,
+      playTimeoutMs: 10_000,
+    };
     await model.create(project.id, { gitSha: "abc", gitBranch: "main" });
     const publicBuild = await model.create(project.id, { gitSha: "def", gitBranch: "main", public: true });
     const published = await model.latestPublished(project);

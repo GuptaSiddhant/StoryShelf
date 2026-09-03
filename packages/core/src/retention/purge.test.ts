@@ -15,6 +15,8 @@ describe("Retention", () => {
       id: "p1", name: "Test", slug: "test", gitRepository: null,
       gitDefaultBranch: "main", pixelThreshold: 0.1, maxDiffRatio: 0.01,
       publicBranchRegex: null,
+    executePlay: false,
+    playTimeoutMs: 10_000,
       storybookMeta: null, createdAt: now.toISOString(), updatedAt: now.toISOString(),
     };
     await db.insert(projects, project);

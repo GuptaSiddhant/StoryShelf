@@ -64,6 +64,10 @@ export interface CaptureRunner {
     viewports: Viewport[];
     /** Optional logger for render-time diagnostics. */
     logger?: Logger;
+    /** Whether to execute Storybook play functions before screenshot. */
+    executePlay?: boolean;
+    /** Timeout for play function execution in ms. */
+    playTimeoutMs?: number;
   }): Promise<RenderResult>;
 
   /** Cancel a pending or in-flight render for a build. */

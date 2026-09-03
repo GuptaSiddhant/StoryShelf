@@ -8,6 +8,9 @@ const config: StorybookConfig = {
     options: {},
   },
   staticDirs: [],
+  features: {
+    buildStoriesJson: true,
+  },
 };
 
 export default config;

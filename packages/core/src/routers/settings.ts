@@ -94,6 +94,7 @@ async function findProject(slug: string): Promise<Project> {
 
 export function registerSettingsPages(app: ShelfApp): void {
   app.get("/projects/:slug/settings", async (c) => c.html(await settingsPage(c, "general")));
+  app.get("/projects/:slug/settings/tests", async (c) => c.html(await settingsPage(c, "tests")));
   app.get("/projects/:slug/settings/labels", async (c) => c.html(await settingsPage(c, "labels")));
   app.get("/projects/:slug/settings/tokens", async (c) => c.html(await settingsPage(c, "tokens")));
   app.get("/projects/:slug/settings/webhooks", async (c) => c.html(await settingsPage(c, "webhooks")));
@@ -126,6 +127,28 @@ export function registerSettingsPages(app: ShelfApp): void {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to update";
       return c.html((await renderSettingsPage(c, "general", { globalError: message })) ?? "", 400);
+    }
+  });
+
+  app.post("/projects/:slug/settings/tests", async (c) => {
+    const slug = c.req.param("slug");
+    const project = await findProject(slug);
+    const form = await c.req.formData();
+    const executePlay = form.get("executePlay") === "true";
+    const playTimeoutMsRaw = asString(form.get("playTimeoutMs"));
+    const playTimeoutMs = playTimeoutMsRaw ? Number(playTimeoutMsRaw) : undefined;
+    if (playTimeoutMs !== undefined && (Number.isNaN(playTimeoutMs) || playTimeoutMs < 1000 || playTimeoutMs > 30_000)) {
+      return c.html((await renderSettingsPage(c, "tests", { globalError: "Play timeout must be between 1000 and 30000" })) ?? "", 400);
+    }
+    try {
+      await new ProjectModel(getStore().db).update(project.id, {
+        executePlay,
+        playTimeoutMs: playTimeoutMs ?? undefined,
+      });
+      return hxRedirect(c, `/projects/${slug}/settings/tests`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to update";
+      return c.html((await renderSettingsPage(c, "tests", { globalError: message })) ?? "", 400);
     }
   });
 

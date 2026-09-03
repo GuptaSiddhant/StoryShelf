@@ -5,10 +5,11 @@ import { renderSettingsGeneral } from "./settings-general.tsx";
 import { renderSettingsLabels } from "./settings-labels.tsx";
 import { renderSettingsMembers, type SettingsMember } from "./settings-members.tsx";
 import { renderSettingsStatus, type SettingsStatusConfig } from "./settings-status.tsx";
+import { renderSettingsTests } from "./settings-tests.tsx";
 import { renderSettingsTokens } from "./settings-tokens.tsx";
 import { renderSettingsWebhooks, type SettingsWebhook } from "./settings-webhooks.tsx";
 
-export type SettingsTab = "general" | "labels" | "tokens" | "webhooks" | "members" | "status";
+export type SettingsTab = "general" | "tests" | "labels" | "tokens" | "webhooks" | "members" | "status";
 
 export interface ProjectSettingsData {
   project: Project;
@@ -58,6 +59,9 @@ export function renderProjectSettingsPage(data: ProjectSettingsData, formState?:
         <a class={`tabs__link ${activeTab === "general" ? "tabs__link--active" : ""}`} href={`/projects/${project.slug}/settings`} aria-current={activeTab === "general" ? "page" : undefined}>
           General
         </a>
+        <a class={`tabs__link ${activeTab === "tests" ? "tabs__link--active" : ""}`} href={`/projects/${project.slug}/settings/tests`} aria-current={activeTab === "tests" ? "page" : undefined}>
+          Tests
+        </a>
         <a class={`tabs__link ${activeTab === "labels" ? "tabs__link--active" : ""}`} href={`/projects/${project.slug}/settings/labels`} aria-current={activeTab === "labels" ? "page" : undefined}>
           Labels
         </a>
@@ -76,6 +80,7 @@ export function renderProjectSettingsPage(data: ProjectSettingsData, formState?:
       </nav>
 
       {activeTab === "general" ? renderSettingsGeneral(project, formState, data.isAdmin) : null}
+      {activeTab === "tests" ? renderSettingsTests(project, data.isAdmin, formState) : null}
       {activeTab === "labels" ? renderSettingsLabels(project, data.labelTypes, data.isAdmin) : null}
       {activeTab === "tokens" ? renderSettingsTokens(project, data.tokens, data.isAdmin) : null}
       {activeTab === "webhooks" ? renderSettingsWebhooks(project, data.webhooks, data.isAdmin, formState) : null}

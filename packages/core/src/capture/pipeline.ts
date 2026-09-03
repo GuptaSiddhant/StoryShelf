@@ -39,18 +39,34 @@ export interface CaptureContext {
  * storage writes and record keeping, so it can run against any renderer.
  *
  * @param ctx - Capture context.
- * @param renderFailedStoryIds - Story ids that the renderer could not capture.
- * They are excluded from the persisted set and force the build to `failed`.
+ * @param renderFailedStoryIds - Story ids that the renderer could not capture
+ * (blocking failures). They force the build to `failed`.
+ * @param flakyFailedStoryIds - Story ids that failed but are marked flaky
+ * (non-blocking). They are logged as warnings and do not block the build.
  */
-export async function persistCapture(ctx: CaptureContext, renderFailedStoryIds: ReadonlySet<string> = new Set()): Promise<void> {
+export async function persistCapture(
+  ctx: CaptureContext,
+  renderFailedStoryIds: ReadonlySet<string> = new Set(),
+  flakyFailedStoryIds: ReadonlySet<string> = new Set(),
+): Promise<void> {
   const failedStoryIds = new Set(renderFailedStoryIds);
+  const flakyIds = new Set(flakyFailedStoryIds);
   await Promise.all(
     ctx.captures.map(async (capture) => {
       try {
         await persistSnapshot(ctx, capture);
       } catch (error) {
         // A failure in one story/viewport must not abort the other persists.
-        failedStoryIds.add(capture.story.id);
+        // Flaky stories remain non-blocking even on persist failure.
+        if (flakyIds.has(capture.story.id)) {
+          flakyIds.add(capture.story.id);
+          ctx.logger?.warn(
+            { storyId: capture.story.id, viewport: capture.viewportName, err: error },
+            "capture failed for flaky story (non-blocking)",
+          );
+        } else {
+          failedStoryIds.add(capture.story.id);
+        }
         ctx.logger?.error(
           { storyId: capture.story.id, viewport: capture.viewportName, err: error },
           "capture failed for story",
@@ -58,7 +74,13 @@ export async function persistCapture(ctx: CaptureContext, renderFailedStoryIds: 
       }
     }),
   );
-  await finalize(ctx, new Set(ctx.captures.map((c) => c.story.id)), failedStoryIds);
+  // Also log flaky render failures as warnings
+  for (const id of flakyIds) {
+    if (!failedStoryIds.has(id)) {
+      ctx.logger?.warn({ storyId: id }, "flaky story failed (non-blocking)");
+    }
+  }
+  await finalize(ctx, new Set(ctx.captures.map((c) => c.story.id)), failedStoryIds, flakyIds);
 }
 
 function viewportByName(ctx: CaptureContext, name: string): Viewport {
@@ -136,7 +158,12 @@ async function createWithBaseline(ctx: CaptureContext, capture: RenderedSnapshot
   });
 }
 
-async function finalize(ctx: CaptureContext, storyIds: ReadonlySet<string>, failedStoryIds: ReadonlySet<string>): Promise<void> {
+async function finalize(
+  ctx: CaptureContext,
+  storyIds: ReadonlySet<string>,
+  failedStoryIds: ReadonlySet<string>,
+  flakyFailedStoryIds: ReadonlySet<string> = new Set(),
+): Promise<void> {
   const builds = new BuildModel(ctx.db);
   const build = await builds.updateCounts(ctx.build.id);
   const hasCaptures = storyIds.size > 0;
@@ -145,6 +172,10 @@ async function finalize(ctx: CaptureContext, storyIds: ReadonlySet<string>, fail
     status = "failed";
   } else if (hasCaptures && build.changedCount === 0) {
     status = "approved";
+  }
+  // Flaky failures do not block: log warning if any flaky stories failed
+  if (flakyFailedStoryIds.size > 0 && failedStoryIds.size === 0) {
+    ctx.logger?.warn({ flakyStoryIds: [...flakyFailedStoryIds] }, "flaky stories failed (non-blocking)");
   }
   await builds.setStatus(ctx.build.id, status);
 

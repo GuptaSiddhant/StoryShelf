@@ -14,6 +14,8 @@ export const projectSchema = z.object({
   maxDiffRatio: z.number(),
   publicBranchRegex: z.string().nullable(),
   storybookMeta: z.string().nullable().optional(),
+  executePlay: z.boolean(),
+  playTimeoutMs: z.number(),
   createdAt: z.string(),
   updatedAt: z.string(),
 }).openapi("Project");
@@ -23,6 +25,8 @@ export const projectCreateSchema = z.object({
   gitRepository: z.string().optional(),
   gitDefaultBranch: z.string().optional(),
   storybookMeta: storybookMetaSchema,
+  executePlay: z.boolean().optional(),
+  playTimeoutMs: z.number().int().min(1000).max(30_000).optional(),
 }).openapi("ProjectCreateInput");
 
 export const projectUpdateSchema = z.object({
@@ -33,6 +37,8 @@ export const projectUpdateSchema = z.object({
   maxDiffRatio: z.number().optional(),
   publicBranchRegex: z.string().nullable().optional(),
   storybookMeta: storybookMetaSchema,
+  executePlay: z.boolean().optional(),
+  playTimeoutMs: z.number().int().min(1000).max(30_000).optional(),
 }).openapi("ProjectUpdateInput");
 
 export const buildSchema = z.object({

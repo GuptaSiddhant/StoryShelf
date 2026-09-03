@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS projects (
   max_diff_ratio REAL NOT NULL DEFAULT 0.01,
   public_branch_regex TEXT,
   storybook_meta TEXT,
+  execute_play INTEGER NOT NULL DEFAULT 0,
+  play_timeout_ms INTEGER NOT NULL DEFAULT 10000,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
