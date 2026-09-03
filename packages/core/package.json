@@ -63,7 +63,7 @@
     "adm-zip": "^0.6.0",
     "drizzle-orm": "^0.44.0",
     "hono": "^4.11.0",
-    "pino": "^10.3.1",
+    "pino": "catalog:",
     "pixelmatch": "^7.1.0",
     "pngjs": "^7.0.0",
     "zod": "^4.2.0"

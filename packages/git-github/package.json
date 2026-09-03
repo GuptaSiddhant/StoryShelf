@@ -38,7 +38,6 @@
   },
   "dependencies": {
     "@octokit/rest": "^21.0.0",
-    "pino": "catalog:",
     "zod": "^4.2.0"
   },
   "devDependencies": {

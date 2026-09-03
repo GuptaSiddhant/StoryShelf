@@ -5,7 +5,7 @@ import { apiBase, gitlabHeaders, projectId } from "./helpers.ts";
 import { mapStatus } from "./mapper.ts";
 
 import type { CheckStatus } from "@storyshelf/core";
-import type { Logger } from "pino";
+import type { Logger } from "@storyshelf/core/types";
 
 export async function postCommitStatus(opts: {
   owner: string;

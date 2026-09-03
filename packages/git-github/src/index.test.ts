@@ -1,7 +1,7 @@
 /* oxlint-disable max-lines-per-function */
 import { describe, expect, it, vi } from "vitest";
 
-import type { Logger } from "pino";
+import type { Logger } from "@storyshelf/core/types";
 import { gitHubHost } from "./index.ts";
 
 function createMockLogger(): Logger {

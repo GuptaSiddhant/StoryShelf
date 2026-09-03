@@ -29,3 +29,5 @@ export const SEEDED_LABEL_KEYS = ["branch", "persistent", "pr", "mr", "jira", "l
 export const RESERVED_LABEL_KEYS = ["build"] as const;
 
 export const PERSISTENT_LABEL_KEY = "persistent";
+
+export type { Logger } from "./logger.ts";

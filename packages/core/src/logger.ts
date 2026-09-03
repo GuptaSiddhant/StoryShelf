@@ -1,4 +1,7 @@
-import pino, { type Logger } from "pino";
+import pino from "pino";
+import type { Logger } from "pino";
+
+export type { Logger };
 
 /** A pino worker transport to attach to the logger output. */
 export interface PinoTransport {
@@ -34,7 +37,10 @@ export interface LoggerOptions {
  * they are sinks for this logger, not standalone loggers.
  */
 export function createShelfLogger(options: LoggerOptions = {}): Logger {
-  const targets = [{ target: "pino/file", options: { destination: 1 } }, ...(options.transports ?? [])];
+  const targets = [
+    { target: "pino/file", options: { destination: 1 } },
+    ...(options.transports ?? []),
+  ];
   const transport = pino.transport({ targets });
   return pino(
     {

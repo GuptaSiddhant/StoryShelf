@@ -2,7 +2,7 @@
 import { apiBase, gitlabHeaders, projectId } from "./helpers.ts";
 import { findMrIid } from "./pr.ts";
 
-import type { Logger } from "pino";
+import type { Logger } from "@storyshelf/core/types";
 
 export async function checkIsMerged(opts: {
   owner: string;

@@ -1,6 +1,6 @@
 /* oxlint-disable max-statements */
 import type { Octokit } from "@octokit/rest";
-import type { Logger } from "pino";
+import type { Logger } from "@storyshelf/core/types";
 
 import { findPrNumber } from "./pr.ts";
 

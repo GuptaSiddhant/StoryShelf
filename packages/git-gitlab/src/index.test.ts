@@ -1,7 +1,7 @@
 /* oxlint-disable max-lines-per-function, eslint/require-await, typescript/require-await, typescript/no-unnecessary-type-assertion, eslint/no-void, eslint/no-unused-vars */
 import { describe, expect, it, vi } from "vitest";
 
-import type { Logger } from "pino";
+import type { Logger } from "@storyshelf/core/types";
 import { gitLabHost } from "./index.ts";
 
 function createMockLogger(): Logger {

@@ -37,7 +37,6 @@
     "prepublishOnly": "nub run build"
   },
   "dependencies": {
-    "pino": "catalog:",
     "zod": "^4.2.0"
   },
   "devDependencies": {

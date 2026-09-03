@@ -74,7 +74,7 @@ async function isAlreadyMerged(opts: {
   secret: string | undefined;
   db: import("./adapters/database.ts").DatabaseAdapter;
   projectId: string;
-  logger?: import("pino").Logger;
+  logger?: import("./logger.ts").Logger;
 }): Promise<boolean> {
   if (opts.providers.length === 0) {return false;}
   const { StatusConfigModel } = await import("./models/status-config.ts");
@@ -395,7 +395,7 @@ export type { AdapterMetadata, GitAdapterMetadata } from "./adapters/metadata.ts
 export { describeStatus, buildCommentMarkdown, commentMarker } from "./adapters/git-host/helpers.ts";
 export type { DiffOptions, DiffResult } from "./diff/options.ts";
 export type { Viewport, StoryEntry, StorySourceAdapter } from "./capture/adapter.ts";
-export { createShelfLogger, type LoggerOptions, type PinoTransport } from "./logger.ts";
+export { createShelfLogger, type LoggerOptions, type Logger, type PinoTransport } from "./logger.ts";
 export { diffImages } from "./diff/engine.ts";
 export type { RenderedContent } from "./ui/document.tsx";
 export { StorybookAdapter } from "./capture/storybook.ts";

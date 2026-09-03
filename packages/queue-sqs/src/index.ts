@@ -12,7 +12,7 @@ import type {
   QueueEntry,
 } from "@storyshelf/core";
 
-import type { Logger } from "pino";
+import type { Logger } from "@storyshelf/core/types";
 
 declare const __PKG_VERSION__: string;
 

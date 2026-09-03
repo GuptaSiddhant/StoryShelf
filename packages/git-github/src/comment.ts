@@ -3,7 +3,7 @@ import type { Octokit } from "@octokit/rest";
 
 import { findPrNumber } from "./pr.ts";
 
-import type { Logger } from "pino";
+import type { Logger } from "@storyshelf/core/types";
 
 export async function upsertPrComment(opts: {
   octokit: Octokit;

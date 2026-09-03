@@ -1,4 +1,4 @@
-import type { Logger } from "pino";
+import type { Logger } from "@storyshelf/core/types";
 import type { GitHostAdapter, GitHostProvider } from "@storyshelf/core";
 
 import { upsertMrNote } from "./comment.ts";

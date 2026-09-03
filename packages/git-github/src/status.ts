@@ -5,7 +5,7 @@ import { describeStatus } from "@storyshelf/core/adapter/git-host/helpers";
 
 import { mapStatus } from "./mapper.ts";
 
-import type { Logger } from "pino";
+import type { Logger } from "@storyshelf/core/types";
 
 export async function postCommitStatus(opts: {
   octokit: Octokit;

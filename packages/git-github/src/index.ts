@@ -1,7 +1,7 @@
 import { Octokit } from "@octokit/rest";
 
-import type { Logger } from "pino";
 import type { GitHostAdapter, GitHostProvider } from "@storyshelf/core";
+import type { Logger } from "@storyshelf/core/types";
 
 import { upsertPrComment } from "./comment.ts";
 import { githubConfigSchema } from "./config.ts";

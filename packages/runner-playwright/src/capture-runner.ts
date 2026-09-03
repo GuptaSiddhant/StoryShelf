@@ -1,5 +1,4 @@
 import { chromium, type Browser } from "playwright";
-import type { Logger } from "pino";
 
 import {
   StorybookAdapter,
@@ -10,6 +9,7 @@ import {
   type StorySourceAdapter,
   type Viewport,
 } from "@storyshelf/core";
+import type { Logger } from "@storyshelf/core/types";
 
 declare const __PKG_VERSION__: string;
 

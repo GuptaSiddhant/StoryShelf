@@ -45,7 +45,7 @@
     "@vitest/coverage-v8": "catalog:",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
-    "pino": "catalog:",
+    "oxlint-tsgolint": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
