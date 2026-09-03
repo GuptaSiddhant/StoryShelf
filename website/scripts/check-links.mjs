@@ -79,7 +79,7 @@ function isInternalLink(href, filePath) {
     const normalizedBase = basePath.endsWith('/') ? basePath : `${basePath}/`;
     if (basePath !== '/' && path.startsWith(normalizedBase)) {
       path = path.slice(normalizedBase.length);
-    } else if (basePath !== '/' && path === basePath.slice(0, -1)) {
+    } else if (basePath !== '/' && (path === basePath || path === basePath.slice(0, -1))) {
       path = '';
     }
     
