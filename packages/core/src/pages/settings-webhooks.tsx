@@ -1,3 +1,4 @@
+import type { HtmlEscapedString } from "hono/utils/html";
 import type { Project } from "../schema.ts";
 
 export interface SettingsWebhook {
@@ -39,8 +40,7 @@ export function renderSettingsWebhooks(project: Project, webhooks: SettingsWebho
             </thead>
             <tbody>
               {webhooks.map(
-                // eslint-disable-next-line promise-function-async -- JSX.Element includes Promise<HtmlEscapedString>
-                (webhook) => (
+                (webhook): HtmlEscapedString => (
                   <tr key={webhook.id}>
                     <td style="max-width:36ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title={webhook.url}>
                       {webhook.url}
@@ -51,8 +51,7 @@ export function renderSettingsWebhooks(project: Project, webhooks: SettingsWebho
                       ) : (
                         <div style="display:flex; gap:.25rem; flex-wrap:wrap;">
                           {webhook.events.map(
-                            // eslint-disable-next-line promise-function-async -- JSX.Element includes Promise<HtmlEscapedString>
-                            (event) => (
+                            (event): HtmlEscapedString => (
                               <span key={event} class="badge badge--neutral">
                                 {event}
                               </span>

@@ -1,3 +1,5 @@
+import type { HtmlEscapedString } from "hono/utils/html";
+
 import { BuildModel } from "../models/build.ts";
 import { ProjectModel } from "../models/project.ts";
 import { getStore } from "../store.ts";
@@ -112,8 +114,7 @@ export async function renderProjectBuildsPage(slug: string, query: { status?: st
             </thead>
             <tbody>
               {builds.map(
-                // eslint-disable-next-line promise-function-async -- JSX.Element includes Promise<HtmlEscapedString>
-                (build) => (
+                (build): HtmlEscapedString => (
                 <tr key={build.id}>
                   <td>
                     <div style="font-weight:600;">{build.gitBranch}</div>

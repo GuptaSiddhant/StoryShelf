@@ -1,3 +1,5 @@
+import type { HtmlEscapedString } from "hono/utils/html";
+
 import { BuildModel } from "../models/build.ts";
 import { ProjectModel } from "../models/project.ts";
 import { getStore } from "../store.ts";
@@ -32,8 +34,7 @@ export function renderActiveQueue(slug: string, queueView: QueueView[]): Rendere
             </thead>
             <tbody>
               {queueView.map(
-                // eslint-disable-next-line promise-function-async -- JSX.Element includes Promise<HtmlEscapedString>
-                (job) => (
+                (job): HtmlEscapedString => (
                   <tr key={job.buildId}>
                     <td>
                       <a href={`/projects/${slug}/builds/${job.buildId}`}>{job.buildId.slice(0, 8)}</a>
@@ -111,8 +112,7 @@ export async function renderComputeJobsPage(slug: string, queueView: QueueView[]
             </thead>
             <tbody>
               {recentBuilds.map(
-                // eslint-disable-next-line promise-function-async -- JSX.Element includes Promise<HtmlEscapedString>
-                (build) => (
+                (build): HtmlEscapedString => (
                   <tr key={build.id}>
                     <td>
                       <div style="font-weight:600;">{build.gitBranch}</div>

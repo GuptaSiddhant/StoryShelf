@@ -1,3 +1,5 @@
+import type { HtmlEscapedString } from "hono/utils/html";
+
 import { BuildModel } from "../models/build.ts";
 import { CommentModel } from "../models/comment.ts";
 import { ProjectModel } from "../models/project.ts";
@@ -112,8 +114,7 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
       ) : (
         <div class="snapshot-grid">
           {snapshots.map(
-            // eslint-disable-next-line promise-function-async -- JSX.Element includes Promise<HtmlEscapedString>
-            (snap) => (
+            (snap): HtmlEscapedString => (
             <div key={snap.id} class="snapshot-card">
               <div class="snapshot-card__head">
                 <Badge tone={statusTone(snap.status)}>{snap.status}</Badge>
@@ -161,8 +162,7 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
         {comments.length === 0 ? <p class="field__hint">No comments. Add one in the diff review page for a specific snapshot.</p> : null}
         <div style="display:grid; gap:.6rem;">
           {comments.map(
-            // eslint-disable-next-line promise-function-async -- JSX.Element includes Promise<HtmlEscapedString>
-            (comment) => (
+            (comment): HtmlEscapedString => (
             <div key={comment.id} class="comment">
               <div class="comment__head">
                 <strong>{comment.userId}</strong>

@@ -1,3 +1,4 @@
+import type { HtmlEscapedString } from "hono/utils/html";
 import type { LabelType, Project } from "../schema.ts";
 import { Badge } from "../ui/components.tsx";
 
@@ -19,8 +20,7 @@ export function renderSettingsLabels(project: Project, labelTypes: LabelType[], 
             </thead>
             <tbody>
               {labelTypes.map(
-                // eslint-disable-next-line promise-function-async -- JSX.Element includes Promise<HtmlEscapedString>
-                (labelType) => (
+                (labelType): HtmlEscapedString => (
                   <tr key={labelType.id}>
                     <td>
                       <Badge tone="neutral">{labelType.key}</Badge>

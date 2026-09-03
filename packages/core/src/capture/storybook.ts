@@ -12,6 +12,7 @@ export class StorybookAdapter implements StorySourceAdapter {
   readonly name = "storybook";
   readonly screenshotSelector = "#storybook-root";
 
+  // eslint-disable-next-line class-methods-use-this
   async discover(source: string): Promise<StoryEntry[]> {
     const index = await StorybookAdapter.readIndex(source);
     return Object.values(index.entries)

@@ -1,3 +1,4 @@
+import type { HtmlEscapedString } from "hono/utils/html";
 import { ProjectModel } from "../models/project.ts";
 import { BuildModel } from "../models/build.ts";
 import { getStore } from "../store.ts";
@@ -50,8 +51,7 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
       ) : (
         <div class="grid" style="gap:.75rem;">
           {projects.map(
-            // eslint-disable-next-line promise-function-async -- JSX.Element includes Promise<HtmlEscapedString>
-            (project) => {
+            (project): HtmlEscapedString => {
             const info = countsBySlug.get(project.slug);
             return (
               <div key={project.id} class="card card--padded">

@@ -1,3 +1,4 @@
+import type { HtmlEscapedString } from "hono/utils/html";
 import type { Project, Token } from "../schema.ts";
 
 export function renderSettingsTokens(project: Project, tokens: Omit<Token, "hash">[], isAdmin: boolean): unknown {
@@ -18,8 +19,7 @@ export function renderSettingsTokens(project: Project, tokens: Omit<Token, "hash
             </thead>
             <tbody>
               {tokens.map(
-                // eslint-disable-next-line promise-function-async -- JSX.Element includes Promise<HtmlEscapedString>
-                (token) => (
+                (token): HtmlEscapedString => (
                   <tr key={token.id}>
                     <td>{token.name}</td>
                     <td>{new Date(token.createdAt).toLocaleDateString()}</td>

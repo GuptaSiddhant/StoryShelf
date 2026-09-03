@@ -1,3 +1,4 @@
+import type { HtmlEscapedString } from "hono/utils/html";
 import type { Project } from "../schema.ts";
 import { Badge } from "../ui/components.tsx";
 
@@ -27,8 +28,7 @@ export function renderSettingsMembers(project: Project, members: SettingsMember[
             </thead>
             <tbody>
               {members.map(
-                // eslint-disable-next-line promise-function-async -- JSX.Element includes Promise<HtmlEscapedString>
-                (member) => (
+                (member): HtmlEscapedString => (
                   <tr key={member.id}>
                     <td>
                       <code>{member.userId}</code>

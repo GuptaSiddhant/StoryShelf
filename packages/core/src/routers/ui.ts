@@ -60,10 +60,10 @@ async function canManageJobs(projectId: string): Promise<boolean> {
 
 export function registerUiPages(app: ShelfApp): void {
   // eslint-disable-next-line promise-function-async -- renderRootPage returns RenderedContent (string | Promise<string>)
-  app.get("/", (c) => c.html(renderRootPage()));
+  app.get("/", async (c) => c.html(await renderRootPage()));
   app.get("/projects", async (c) => c.html(await renderProjectsPage()));
   // eslint-disable-next-line promise-function-async -- renderProjectCreatePage returns RenderedContent (string | Promise<string>)
-  app.get("/projects/new", (c) => c.html(renderProjectCreatePage()));
+  app.get("/projects/new", async (c) => c.html(await renderProjectCreatePage()));
 
   app.post("/projects/new", async (c) => {
     const form = await c.req.formData();

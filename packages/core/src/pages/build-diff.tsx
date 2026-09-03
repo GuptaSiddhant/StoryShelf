@@ -1,3 +1,4 @@
+import type { HtmlEscapedString } from "hono/utils/html";
 import type { Build, Comment, Project, Snapshot } from "../schema.ts";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import { Badge, statusTone } from "../ui/components.tsx";
@@ -108,8 +109,7 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
                 </div>
                 <div data-diff-nav data-current={selected?.id} style="max-height: 70vh; overflow:auto;">
                   {snapshots.map(
-                    // eslint-disable-next-line promise-function-async -- JSX.Element includes Promise<HtmlEscapedString>
-                    (snap) => (
+                    (snap): HtmlEscapedString => (
                     <a
                       key={snap.id}
                       href={`/projects/${project.slug}/builds/${build.id}/diff?snapshot=${snap.id}`}
@@ -204,8 +204,7 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
                       {comments
                         .filter((comment) => !comment.snapshotId || comment.snapshotId === selected.id)
                         .map(
-                          // eslint-disable-next-line promise-function-async -- JSX.Element includes Promise<HtmlEscapedString>
-                          (comment) => (
+                          (comment): HtmlEscapedString => (
                           <div key={comment.id} class="comment">
                             <div class="comment__head">
                               <strong>{comment.userId}</strong>
