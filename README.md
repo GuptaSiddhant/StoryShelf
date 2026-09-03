@@ -19,12 +19,14 @@ packages/
   git-gitlab/     @storyshelf/git-gitlab    — GitLab commit status / merge gate / MR comments
   queue-sqs/      @storyshelf/queue-sqs     — AWS SQS capture job queue
   cli/            @storyshelf/cli           — CLI client (server init, init, create, upload, purge, retry)
-  runner-playwright/ @storyshelf/runner-playwright — Playwright capture runner
-website/                                    — public docs (Astro Starlight)
-examples/
-  storybook/                                — deterministic capture fixture
-  fly-app/                                  — fly.io demo
-docs/                                       — architecture, ADRs, testing, website plan
+   runner-playwright/ @storyshelf/runner-playwright — Playwright capture runner
+  apps/
+    dev-server/     dev-server      — local dev server (from TS source via nub watch)
+    storybook-fixture/ storybook-fixture — deterministic capture fixture (committed storybook-static/)
+    website/        website         — public docs (Astro Starlight)
+  examples/
+    fly-app/                                  — fly.io demo
+  docs/                                       — architecture, ADRs, testing, website plan
 ```
 
 ## Commands
@@ -48,5 +50,5 @@ npm start                        # start the server
 ## Documentation
 
 - Each package ships a `README.md` covering its use case, install, API, and an example.
-- `website/` hosts the public docs site (Astro Starlight): getting-started, CI, deployment, auth, and concept guides.
+- `apps/website/` hosts the public docs site (Astro Starlight): getting-started, CI, deployment, auth, and concept guides.
 - `docs/architecture.md` is the full architecture spec; `docs/adr/` records design decisions; `docs/implementation-plan.md` is the build order.

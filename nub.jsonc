@@ -1,8 +1,8 @@
 {
   "$schema": "https://nubjs.com/schema/latest.json",
-  "conditions": ["development"],
+  "conditions": ["source"],
   "install": {
-    "linker": {"strategy" :"isolated", },
-    "publicHoist": ["@types/*"]
+    "linker": { "strategy": "isolated" },
+    "publicHoist": ["@types/*"],
   },
 }

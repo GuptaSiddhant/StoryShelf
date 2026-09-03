@@ -32,7 +32,7 @@ nub run test        # vitest (hermetic; no browser)
 nub run test:integration   # gated browser suite (Playwright + apps/storybook-fixture)
 nubx tsc --noEmit -p tsconfig.json   # typecheck
 
-# Website (from website/):
+# Website (from apps/website/):
 nub run start       # serve the built docs site (astro preview; requires a prior build)
 nub run dev         # astro dev server (hot reload)
 nub run build       # generate openapi.json (prebuild) + build the docs site
@@ -55,7 +55,7 @@ StoryShelf/
   apps/
     dev-server/     dev-server      -- Local dev server, runs from TS source via `nub run serve` (no build; Playwright capture + optional shared-password auth)
     storybook-fixture/ storybook-fixture      -- Minimal deterministic Storybook (capture fixture + demo; committed storybook-static/)
-  website/                    -- Public docs & marketing site (Astro Starlight)
+    website/        website         -- Public docs & marketing site (Astro Starlight)
   examples/
     fly-app/                  -- fly.io deployment demo
   docs/

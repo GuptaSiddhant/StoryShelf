@@ -39,7 +39,7 @@ Step-by-step build order. Each step is independently reviewable. Decisions made 
 
 - `apps/storybook-fixture` — deterministic component library + committed `storybook-static/`.
 - `examples/fly-app` — fly.io deploy.
-- `website/` — Astro Starlight docs + marketing.
+- `apps/website/` — Astro Starlight docs + marketing.
 
 ## Phase 6 — Verification & commit
 

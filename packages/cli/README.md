@@ -68,7 +68,7 @@ storyshelf upload --url <url> --slug <slug> --token <token> \
   [--author-email <email>] [--author-name <name>]
 ```
 
-The default `--build-dir` is `storybook-static` or `buildDir` from `.storybook/storyshelf.json` (see [Configuration](../../website/src/content/docs/guides/config.md)). If `buildDir` is missing/empty, `upload` runs `buildCommand` or `npm run <buildScriptName>`.
+The default `--build-dir` is `storybook-static` or `buildDir` from `.storybook/storyshelf.json` (see [Configuration](../../apps/website/src/content/docs/guides/config.md)). If `buildDir` is missing/empty, `upload` runs `buildCommand` or `npm run <buildScriptName>`.
 
 `storyshelf purge` — purge expired builds (requires admin token when auth enabled).
 

@@ -50,9 +50,15 @@ importers:
       rolldown:
         specifier: '*'
         version: 1.2.6
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.22.14(typescript@7.0.2)
       turbo:
         specifier: ^2.10.11
         version: 2.10.12
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
 
   apps/dev-server:
     dependencies:
@@ -130,6 +136,15 @@ importers:
       vite:
         specifier: ^6.0.0
         version: 6.4.3(@types/node@26.4.1)(lightningcss@1.33.0)(yaml@2.9.0)
+
+  apps/website:
+    dependencies:
+      '@astrojs/starlight':
+        specifier: ^0.34.0
+        version: 0.34.8(astro@5.18.2)(typescript@5.9.3)
+      astro:
+        specifier: ^5.7.0
+        version: 5.18.2(typescript@5.9.3)
 
   packages/auth-oauth:
     dependencies:
@@ -601,15 +616,6 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@types/node@26.4.1)(@vitest/coverage-v8@4.1.11)(vite@8.2.2(@types/node@26.4.1))
-
-  website:
-    dependencies:
-      '@astrojs/starlight':
-        specifier: ^0.34.0
-        version: 0.34.8(astro@5.18.2)(typescript@5.9.3)
-      astro:
-        specifier: ^5.7.0
-        version: 5.18.2(typescript@5.9.3)
 
 packages:
 
