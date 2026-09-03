@@ -1,0 +1,31 @@
+{
+  "name": "@storyshelf/dev-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local StoryShelf dev server, run from TypeScript source (no build step) via nub + customCondition.",
+  "scripts": {
+    "serve": "nub watch ./src/server.ts",
+    "lint": "oxlint --type-aware --type-check ./src",
+    "fmt": "oxfmt ./src",
+    "build": "nubx tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.17.0",
+    "@storyshelf/auth-password": "workspace:*",
+    "@storyshelf/core": "workspace:*",
+    "@storyshelf/db-sqlite": "workspace:*",
+    "@storyshelf/runner-playwright": "workspace:*",
+    "@storyshelf/storage-local": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:",
+    "oxlint-tsgolint": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -8,6 +8,7 @@
   "workspaces": {
     "packages": [
       "./packages/*",
+      "apps/*",
       "website"
     ],
     "catalog": {
@@ -30,6 +31,7 @@
     "core:dev": "nub run --filter @storyshelf/core dev",
     "cli": "nub run --filter @storyshelf/cli start",
     "docs": "nub run --filter website start",
+    "serve": "nub run --filter @storyshelf/dev-server serve",
     "fmt": "turbo fmt",
     "lint": "turbo lint",
     "test": "turbo test",
@@ -59,5 +61,8 @@
       "version": "26.x",
       "onFail": "error"
     }
+  },
+  "allowBuilds": {
+    "better-sqlite3": true
   }
 }

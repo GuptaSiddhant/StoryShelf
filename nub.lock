@@ -54,6 +54,49 @@ importers:
         specifier: ^2.10.11
         version: 2.10.12
 
+  apps/dev-server:
+    dependencies:
+      '@hono/node-server':
+        specifier: ^1.17.0
+        version: 1.19.17(hono@4.13.5)
+      '@storyshelf/auth-password':
+        specifier: workspace:*
+        version: link:../../packages/auth-password
+      '@storyshelf/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@storyshelf/db-sqlite':
+        specifier: workspace:*
+        version: link:../../packages/db-sqlite
+      '@storyshelf/runner-playwright':
+        specifier: workspace:*
+        version: link:../../packages/runner-playwright
+      '@storyshelf/storage-local':
+        specifier: workspace:*
+        version: link:../../packages/storage-local
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.4.1
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.1.11(@types/node@26.4.1)(vite@8.2.2(@types/node@26.4.1))(vitest@4.1.11)
+      oxfmt:
+        specifier: 'catalog:'
+        version: 0.65.0
+      oxlint:
+        specifier: 'catalog:'
+        version: 1.81.0(oxlint-tsgolint@7.0.2001)
+      oxlint-tsgolint:
+        specifier: 'catalog:'
+        version: 7.0.2001
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@types/node@26.4.1)(@vitest/coverage-v8@4.1.11)(vite@8.2.2(@types/node@26.4.1))
+
   packages/auth-oauth:
     dependencies:
       '@storyshelf/core':
@@ -1011,6 +1054,12 @@ packages:
 
   '@expressive-code/plugin-text-markers@0.41.7':
     resolution: {integrity: sha512-Ewpwuc5t6eFdZmWlFyeuy3e1PTQC0jFvw2Q+2bpcWXbOZhPLsT7+h8lsSIJxb5mS7wZko7cKyQ2RLYDyK6Fpmw==}
+
+  '@hono/node-server@1.19.17':
+    resolution: {integrity: sha512-dSneS5qhiauZWGDCeK4o695Xd9nUNjviSZCMQrj10eetr8Uln1ucn6bbphOM6UynAMMtNIzZNSpL9vnASJwrPQ==}
+    engines: {node: '>=18.14.1'}
+    peerDependencies:
+      hono: ^4
 
   '@hono/swagger-ui@0.6.1':
     resolution: {integrity: sha512-sJTvldu1GPeEPfyeLG7gRj+W4vEuD+JDi+JjJ3TJs/DvMUtBLs0KJO5yokGegWWdy5qrbdnQGekbhgNRmPmYKQ==}
@@ -4790,6 +4839,10 @@ snapshots:
   '@expressive-code/plugin-text-markers@0.41.7':
     dependencies:
       '@expressive-code/core': 0.41.7
+
+  '@hono/node-server@1.19.17(hono@4.13.5)':
+    dependencies:
+      hono: 4.13.5
 
   '@hono/swagger-ui@0.6.1(hono@4.13.5)':
     dependencies:

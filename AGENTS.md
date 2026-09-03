@@ -52,6 +52,8 @@ StoryShelf/
     auth-password/  @storyshelf/auth-password  -- Shared-password auth adapter
     cli/            @storyshelf/cli            -- CLI client (commander; upload/init/create/server/retry/purge, no Playwright)
     runner-playwright/ @storyshelf/runner-playwright -- pure Playwright CaptureRenderer (server-side render; core orchestrator owns capture)
+  apps/
+    dev-server/     @storyshelf/dev-server      -- Local dev server, runs from TS source via `nub run serve` (no build; Playwright capture + optional shared-password auth)
   website/                    -- Public docs & marketing site (Astro Starlight)
   examples/
     storybook/                -- Minimal deterministic Storybook (capture fixture + demo)
