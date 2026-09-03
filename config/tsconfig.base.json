@@ -34,8 +34,7 @@
     "verbatimModuleSyntax": true,
     "jsx": "react-jsx",
     "jsxImportSource": "hono/jsx",
-    "outDir": "dist",
-    "rootDir": "src",
+    "types": ["node"],
     "customConditions": ["source"]
   }
 }

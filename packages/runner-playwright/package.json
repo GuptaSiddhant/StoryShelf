@@ -31,7 +31,7 @@
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown -w",
-    "fmt": "oxfmt -c ../../.oxfmtrc.json ./src",
+    "fmt": "oxfmt ./src",
     "lint": "oxlint --type-aware --type-check ./src",
     "test": "vitest run",
     "test:integration": "RUN_INTEGRATION=1 vitest run integration.test.ts",
