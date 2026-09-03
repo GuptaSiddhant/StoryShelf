@@ -157,6 +157,11 @@ function whereMatches(where: SQL, row: Record<string, unknown>, table: AnySQLite
     current = wrapped;
     wrapped = current[1]?.queryChunks;
   }
+  // Drizzle's `and(singleCondition)` emits the condition directly, without
+  // the enclosing parens produced for two or more clauses, so unwrap it.
+  if (current.length === 1 && current[0]?.queryChunks !== undefined) {
+    current = current[0].queryChunks as unknown as SqlChunk[];
+  }
   if (current.some((chunk) => textOf(chunk)?.trim() === "and")) {
     return current
       .filter((chunk) => textOf(chunk) === undefined)
