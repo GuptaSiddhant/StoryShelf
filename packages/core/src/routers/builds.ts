@@ -72,8 +72,8 @@ const deleteBuildRoute = createRoute({
 export function registerBuilds(app: ShelfApp): void {
   app.openapi(listBuildsRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...VIEW_ROLES);
-    const { status, branch } = c.req.valid("query");
-    const builds = new BuildModel(getStore().db).list(project.id, { status, branch: branch ?? undefined });
+    const { status, branch, labelKey, labelValue } = c.req.valid("query");
+    const builds = new BuildModel(getStore().db).list(project.id, { status, branch: branch ?? undefined, labelKey: labelKey ?? undefined, labelValue: labelValue ?? undefined });
     return c.json(await builds);
   });
 

@@ -25,6 +25,8 @@ export const buildUploadSchema = z.object({
 export const buildListQuery = z.object({
   status: z.enum(BUILD_STATUSES).optional(),
   branch: z.string().optional(),
+  labelKey: z.string().optional(),
+  labelValue: z.string().optional(),
 });
 
 export async function buildForProject(projectId: string, buildId: string): Promise<import("../models/build.ts").Build> {
