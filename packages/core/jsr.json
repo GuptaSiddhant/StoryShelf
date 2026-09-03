@@ -1,0 +1,39 @@
+{
+  "name": "@storyshelf/core",
+  "version": "0.1.0",
+  "exports": {
+    ".": "./src/index.tsx",
+    "./adapter/database": "./src/adapters/database.ts",
+    "./adapter/storage": "./src/adapters/storage.ts",
+    "./adapter/capture-runner": "./src/adapters/capture-runner.ts",
+    "./adapter/auth": "./src/adapters/auth.ts",
+    "./adapter/git-host": "./src/adapters/git-host/index.ts",
+    "./adapter/git-host/helpers": "./src/adapters/git-host/helpers.ts",
+    "./schema": "./src/schema.ts",
+    "./ddl": "./src/ddl.ts",
+    "./types": "./src/types.ts",
+    "./models/project": "./src/models/project.ts",
+    "./models/build": "./src/models/build.ts",
+    "./models/snapshot": "./src/models/snapshot.ts",
+    "./models/baseline": "./src/models/baseline.ts",
+    "./models/member": "./src/models/member.ts",
+    "./models/comment": "./src/models/comment.ts",
+    "./models/label": "./src/models/label.ts",
+    "./models/token": "./src/models/token.ts",
+    "./models/webhook": "./src/models/webhook.ts"
+  },
+  "publish": {
+    "include": [
+      "src",
+      "README.md",
+      "LICENSE"
+    ],
+    "exclude": [
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "**/test-helpers"
+    ]
+  },
+  "description": "StoryShelf core: Hono router, adapter interfaces, models, capture pipeline, diff, retention.",
+  "license": "MIT"
+}

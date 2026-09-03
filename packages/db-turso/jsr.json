@@ -1,0 +1,21 @@
+{
+  "name": "@storyshelf/db-turso",
+  "version": "0.1.0",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "publish": {
+    "include": [
+      "src",
+      "README.md",
+      "LICENSE"
+    ],
+    "exclude": [
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "**/test-helpers"
+    ]
+  },
+  "description": "Turso/libSQL database adapter for StoryShelf (@libsql/client + Drizzle).",
+  "license": "MIT"
+}

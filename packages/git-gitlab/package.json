@@ -37,10 +37,10 @@
     "prepublishOnly": "nub run build"
   },
   "dependencies": {
+    "@storyshelf/core": "workspace:*",
     "zod": "^4.2.0"
   },
   "devDependencies": {
-    "@storyshelf/core": "workspace:*",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "oxfmt": "catalog:",

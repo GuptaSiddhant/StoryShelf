@@ -1,0 +1,21 @@
+{
+  "name": "@storyshelf/auth-oauth",
+  "version": "0.1.0",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "publish": {
+    "include": [
+      "src",
+      "README.md",
+      "LICENSE"
+    ],
+    "exclude": [
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "**/test-helpers"
+    ]
+  },
+  "description": "OIDC authorization-code auth adapter for StoryShelf.",
+  "license": "MIT"
+}

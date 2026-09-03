@@ -1,0 +1,21 @@
+{
+  "name": "@storyshelf/runner-playwright",
+  "version": "0.1.0",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "publish": {
+    "include": [
+      "src",
+      "README.md",
+      "LICENSE"
+    ],
+    "exclude": [
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "**/test-helpers"
+    ]
+  },
+  "description": "Pure Playwright CaptureRunner implementation for StoryShelf: renders Storybook screenshots in-process (no db/storage coupling).",
+  "license": "MIT"
+}

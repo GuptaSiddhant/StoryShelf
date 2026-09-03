@@ -10,14 +10,16 @@ on:
 
 permissions:
   contents: write # for GitHub Release creation
-  id-token: write # for Sigstore provenance + npm trusted publishing
+  id-token: write # for Sigstore provenance + npm trusted publishing + JSR OIDC publishing
 
 concurrency:
   group: release
   cancel-in-progress: false
 
 jobs:
-  publish:
+  # npm publish + GitHub Release. Independent of JSR: a failure here never blocks
+  # publish-jsr, and is never blocked by it.
+  publish-npm:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -90,3 +92,74 @@ jobs:
         with:
           body_path: /tmp/release-body.md
           generate_release_notes: false
+
+  # JSR publish. Independent of npm: no `needs`, and `continue-on-error` means a
+  # failure here never fails the workflow or blocks publish-npm.
+  publish-jsr:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+      id-token: write # OIDC — JSR authenticates publish + attaches provenance, no token
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Nub
+        uses: nubjs/setup-nub@v0
+
+      - name: Install dependencies
+        run: nub ci
+
+      - name: Build packages (regenerates jsr.json with current version)
+        run: nub run build --filter='./packages/*'
+
+      - name: Guard jsr.json versions match package.json
+        run: |
+          set -e
+          VERS=$(node -e "
+            const fs=require('fs');
+            const path=require('path');
+            const dir='packages';
+            const bad=[];
+            for (const d of fs.readdirSync(dir)) {
+              if (!fs.statSync(path.join(dir,d)).isDirectory()) continue;
+              try {
+                const p=JSON.parse(fs.readFileSync(path.join(dir,d,'package.json'),'utf8'));
+                if (p.private) continue;
+                const j=JSON.parse(fs.readFileSync(path.join(dir,d,'jsr.json'),'utf8'));
+                if (j.version !== p.version) bad.push(d+': jsr='+j.version+' pkg='+p.version);
+              } catch {}
+            }
+            if (bad.length) { console.error('jsr.json/package.json version mismatch:'); console.error(bad.join('\n')); process.exit(1); }
+            console.log('all jsr.json versions match package.json');
+          ")
+
+      - name: "Publish to JSR (dependency order: core first)"
+        run: |
+          set -e
+          # Ordered: @storyshelf/core must publish before the packages that depend on it.
+          ORDER=(
+            "@storyshelf/core"
+            "@storyshelf/auth-oauth"
+            "@storyshelf/auth-password"
+            "@storyshelf/db-sqlite"
+            "@storyshelf/db-turso"
+            "@storyshelf/queue-sqs"
+            "@storyshelf/runner-playwright"
+            "@storyshelf/storage-local"
+            "@storyshelf/storage-s3"
+            "@storyshelf/cli"
+            "@storyshelf/git-github"
+            "@storyshelf/git-gitlab"
+          )
+          for name in "${ORDER[@]}"; do
+            PACKAGE="${name#@storyshelf/}"
+            echo "Publishing $name"
+            # --allow-dirty: build regenerates jsr.json, leaving the tree dirty.
+            # --allow-slow-types: core's zod/drizzle inferred types trip JSR's
+            #   explicit-type check; documented escape hatch, no-op elsewhere.
+            (cd "packages/$PACKAGE" && npx jsr publish --allow-dirty --allow-slow-types)
+          done

@@ -38,10 +38,10 @@
   },
   "dependencies": {
     "@octokit/rest": "^21.0.0",
+    "@storyshelf/core": "workspace:*",
     "zod": "^4.2.0"
   },
   "devDependencies": {
-    "@storyshelf/core": "workspace:*",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "oxfmt": "catalog:",

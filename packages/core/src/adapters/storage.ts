@@ -1,3 +1,4 @@
+import type { Buffer } from "node:buffer";
 import type { AdapterMetadata } from "./metadata.ts";
 
 /** Blob storage abstraction for screenshots, diffs and Storybook archives. */

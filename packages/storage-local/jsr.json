@@ -1,0 +1,21 @@
+{
+  "name": "@storyshelf/storage-local",
+  "version": "0.1.0",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "publish": {
+    "include": [
+      "src",
+      "README.md",
+      "LICENSE"
+    ],
+    "exclude": [
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "**/test-helpers"
+    ]
+  },
+  "description": "Local filesystem storage adapter for StoryShelf.",
+  "license": "MIT"
+}

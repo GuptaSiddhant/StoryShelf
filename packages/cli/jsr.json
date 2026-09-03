@@ -1,0 +1,21 @@
+{
+  "name": "@storyshelf/cli",
+  "version": "0.1.0",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "publish": {
+    "include": [
+      "src",
+      "README.md",
+      "LICENSE"
+    ],
+    "exclude": [
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "**/test-helpers"
+    ]
+  },
+  "description": "StoryShelf CLI: create projects, upload builds, purge, and retry from CI.",
+  "license": "MIT"
+}

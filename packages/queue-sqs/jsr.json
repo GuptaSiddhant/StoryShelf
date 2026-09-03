@@ -1,0 +1,21 @@
+{
+  "name": "@storyshelf/queue-sqs",
+  "version": "0.1.0",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "publish": {
+    "include": [
+      "src",
+      "README.md",
+      "LICENSE"
+    ],
+    "exclude": [
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "**/test-helpers"
+    ]
+  },
+  "description": "SQS capture job queue adapter for StoryShelf (AWS cloud deployments).",
+  "license": "MIT"
+}

@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import type { UserConfig } from "tsdown";
+import { generateJsrConfig } from "./jsr.ts";
 
 const isWatchMode = process.argv.includes("--watch") || process.argv.includes("-w");
 
@@ -25,6 +26,7 @@ function getBaseOptions(): Partial<UserConfig> {
     deps: { neverBundle: true as const },
     shims: true,
     clean: !isWatchMode,
+    onSuccess: generateJsrConfig,
     define: { __PKG_VERSION__: JSON.stringify(readVersion()) },
   };
 }
