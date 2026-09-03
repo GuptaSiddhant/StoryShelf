@@ -113,6 +113,12 @@ export const labelTypeCreateSchema = z.object({
   color: z.string().optional(),
 }).openapi("LabelTypeCreateInput");
 
+export const labelTypeUpdateSchema = z.object({
+  name: z.string().min(1).optional(),
+  linkTemplate: z.string().nullable().optional(),
+  color: z.string().nullable().optional(),
+}).openapi("LabelTypeUpdateInput");
+
 export const tokenPublicSchema = z.object({
   id: z.string(),
   projectId: z.string(),

@@ -30,12 +30,27 @@ describe("LabelModel", () => {
     expect(types.length).toBe(1);
   });
 
-  it("updates a label type", async () => {
+  it("updates a label type name, template and color", async () => {
     const { db } = makeDatabase();
     const model = new LabelModel(db);
-    await model.createType("p1", { key: "pr", name: "Pull request", color: "blue" });
-    await model.removeType("p1", "pr");
-    const types = await model.listTypes("p1");
-    expect(types.length).toBe(0);
+    await model.createType("p1", { key: "pr", name: "Pull request", color: "blue", linkTemplate: "https://github.com/{repo}/pull/{value}" });
+    const updated = await model.updateType("p1", "pr", { name: "PR", linkTemplate: null, color: null });
+    expect(updated?.name).toBe("PR");
+    expect(updated?.linkTemplate).toBeNull();
+    expect(updated?.color).toBeNull();
+  });
+
+  it("updateType returns null for a non-existent label type", async () => {
+    const { db } = makeDatabase();
+    const model = new LabelModel(db);
+    const updated = await model.updateType("p1", "missing", { name: "X" });
+    expect(updated).toBeNull();
+  });
+
+  it("updateType rejects reserved label types", async () => {
+    const { db } = makeDatabase();
+    const model = new LabelModel(db);
+    await expect(model.updateType("p1", "persistent", { name: "X" })).rejects.toThrow("Label type 'persistent' cannot be updated.");
+    await expect(model.updateType("p1", "build", { name: "X" })).rejects.toThrow("Label type 'build' cannot be updated.");
   });
 });

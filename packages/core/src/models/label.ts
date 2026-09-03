@@ -73,6 +73,22 @@ export class LabelModel {
     });
   }
 
+  /** Update a custom label type's name, template or color. */
+  async updateType(projectId: string, key: string, input: { name?: string; linkTemplate?: string | null; color?: string | null }): Promise<LabelType | null> {
+    if (key === PERSISTENT_LABEL_KEY || RESERVED_LABEL_KEYS.includes(key as never)) {
+      throw new Error(`Label type '${key}' cannot be updated.`);
+    }
+    const existing = await this.getType(projectId, key);
+    if (!existing) {
+      return null;
+    }
+    return await this.db.update(labelTypes, existing.id, {
+      name: input.name ?? existing.name,
+      linkTemplate: input.linkTemplate === undefined ? existing.linkTemplate : input.linkTemplate,
+      color: input.color === undefined ? existing.color : input.color,
+    });
+  }
+
   /** Remove a custom label type, rejecting reserved or persistent types. */
   async removeType(projectId: string, key: string): Promise<void> {
     if (key === PERSISTENT_LABEL_KEY || RESERVED_LABEL_KEYS.includes(key as never)) {

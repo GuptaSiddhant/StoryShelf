@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { pino } from "pino";
 
-import { makeDatabase } from "../capture/fake-adapters.ts";
+import { makeDatabase, makeStorage } from "../capture/fake-adapters.ts";
+import { createShelfRouter } from "../index.tsx";
 import { LabelModel } from "../models/label.ts";
 import { builds, projects, type Build, type Project } from "../schema.ts";
+
+const silentLogger = pino({ level: "silent" });
 
 describe("Label-driven build resolution", () => {
   const mockProject: Project = {
@@ -126,5 +130,67 @@ describe("Label-driven build resolution", () => {
     const labelModel = new LabelModel(db);
 
     await expect(labelModel.removeType("p1", "persistent")).rejects.toThrow("Label type 'persistent' cannot be removed.");
+  });
+});
+
+describe("PATCH label-type endpoint", () => {
+  const localProject: Project = {
+    id: "p1",
+    name: "Test Project",
+    slug: "test-project",
+    gitRepository: null,
+    gitDefaultBranch: "main",
+    pixelThreshold: 0.1,
+    maxDiffRatio: 0.01,
+    publicBranchRegex: null,
+    storybookMeta: null,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  };
+
+  it("updates a custom label type", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    await db.insert(projects, localProject);
+    const labelModel = new LabelModel(db);
+    await labelModel.createType("p1", { key: "custom", name: "Custom", linkTemplate: "https://x/{value}", color: "#fff" });
+    const app = createShelfRouter({ database: db, storage, logger: silentLogger });
+
+    const response = await app.request("/api/v1/projects/test-project/label-types/custom", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Renamed", color: null }),
+    });
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { name: string; color: string | null; linkTemplate: string };
+    expect(body.name).toBe("Renamed");
+    expect(body.color).toBeNull();
+    expect(body.linkTemplate).toBe("https://x/{value}");
+  });
+
+  it("returns 404 when patching a non-existent label type", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    await db.insert(projects, localProject);
+    const app = createShelfRouter({ database: db, storage, logger: silentLogger });
+    const response = await app.request("/api/v1/projects/test-project/label-types/missing", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "X" }),
+    });
+    expect(response.status).toBe(404);
+  });
+
+  it("rejects patching a reserved label type", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    await db.insert(projects, localProject);
+    const app = createShelfRouter({ database: db, storage, logger: silentLogger });
+    const response = await app.request("/api/v1/projects/test-project/label-types/persistent", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "X" }),
+    });
+    expect(response.status).toBe(400);
   });
 });
