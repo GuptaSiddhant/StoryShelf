@@ -156,6 +156,7 @@ export const webhookPublicSchema = z.object({
 }).openapi("Webhook");
 
 export const webhookCreateSchema = z.object({
+  // oxlint-disable-next-line typescript/no-deprecated -- z.string().url() kept for zod v3 API compat
   url: z.string().url(),
   events: z.array(z.string().min(1)).optional(),
 }).openapi("WebhookCreateInput");

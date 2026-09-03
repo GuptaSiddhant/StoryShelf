@@ -60,7 +60,9 @@ export const shelfConfigSchema = z
 export const uiConfigSchema = z
   .object({
     name: z.string().optional(),
+    // oxlint-disable-next-line typescript/no-deprecated -- z.string().url() kept for zod v3 API compat
     logo: z.string().url().optional(),
+    // oxlint-disable-next-line typescript/no-deprecated -- z.string().url() kept for zod v3 API compat
     favicon: z.string().url().optional(),
     lightTheme: brandThemeSchema.optional(),
     darkTheme: brandThemeSchema.optional(),
