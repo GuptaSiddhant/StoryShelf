@@ -47,7 +47,7 @@ export function createTursoDatabase(options: { url: string; authToken?: string }
   return {
     metadata: {
       name: "Turso",
-      version: __PKG_VERSION__ ?? "0.0.0",
+      version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
       description: "Turso/libSQL database adapter",
       kind: "turso",
     },

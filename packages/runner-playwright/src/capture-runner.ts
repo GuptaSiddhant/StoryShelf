@@ -41,7 +41,7 @@ export function createPlaywrightCaptureRunner(): CaptureRunner {
   return {
     metadata: {
       name: "Playwright",
-      version: __PKG_VERSION__ ?? "0.0.0",
+      version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
       description: "Playwright capture runner",
       kind: "playwright",
     },

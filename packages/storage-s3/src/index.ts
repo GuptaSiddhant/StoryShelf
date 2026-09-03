@@ -91,7 +91,7 @@ export function createS3Storage(options: S3StorageOptions): StorageAdapter {
   return {
     metadata: {
       name: "S3 Storage",
-      version: __PKG_VERSION__ ?? "0.0.0",
+      version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
       description: "S3-compatible storage adapter",
       kind: "s3",
     },

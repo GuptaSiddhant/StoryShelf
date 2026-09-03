@@ -12,7 +12,7 @@ export interface InMemoryCaptureQueueOptions {
 export class InMemoryCaptureQueue implements CaptureQueue {
   readonly metadata = {
     name: "In-Memory Queue",
-    version: __PKG_VERSION__ ?? "0.0.0",
+    version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
     description: "In-process capture queue",
     kind: "memory",
   } as const;

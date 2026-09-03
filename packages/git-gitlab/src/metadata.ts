@@ -7,7 +7,7 @@ declare const __PKG_VERSION__: string | undefined;
 export function getMetadata(): GitHostProvider["metadata"] {
   return {
     name: "GitLab",
-    version: __PKG_VERSION__ ?? "0.0.0",
+    version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
     description: "Commit statuses via GitLab API",
     kind: "gitlab",
     logo: "gitlab",

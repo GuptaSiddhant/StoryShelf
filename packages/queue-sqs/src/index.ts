@@ -74,7 +74,7 @@ export function createSqsCaptureQueue(
   return {
     metadata: {
       name: "SQS Queue",
-      version: __PKG_VERSION__ ?? "0.0.0",
+      version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
       description: "SQS-backed capture queue",
       kind: "sqs",
     },

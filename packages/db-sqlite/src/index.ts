@@ -54,7 +54,7 @@ export function createSqliteDatabase(path: string): DatabaseAdapter {
   return {
     metadata: {
       name: "SQLite",
-      version: __PKG_VERSION__ ?? "0.0.0",
+      version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
       description: "SQLite database adapter (better-sqlite3 + Drizzle)",
       kind: "sqlite",
     },
