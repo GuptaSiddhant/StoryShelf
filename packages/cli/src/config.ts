@@ -8,7 +8,7 @@ import { z } from "zod";
 export const storybookConfigSchema = z
   .object({
     slug: z.string().min(1, "slug is required"),
-    url: z.url().optional(),
+    url: z.string().url().optional(),
     buildDir: z.string().min(1).optional(),
     buildCommand: z.string().min(1).optional(),
     buildScriptName: z.string().min(1).optional(),

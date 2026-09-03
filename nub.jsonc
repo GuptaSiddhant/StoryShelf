@@ -3,6 +3,6 @@
   "conditions": ["source"],
   "install": {
     "linker": { "strategy": "isolated" },
-    "publicHoist": ["@types/*"],
+    "publicHoist": ["@types/*", "@hono/*", "hono", "pino", "drizzle-orm", "zod", "pixelmatch", "pngjs", "adm-zip", "better-sqlite3", "playwright", "yaml"],
   },
 }

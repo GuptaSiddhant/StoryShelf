@@ -35,6 +35,9 @@ test-report
 coverage
 openapi.json
 
+# pnpm trick for turbo prune (nub.lock is source of truth)
+pnpm-lock.yaml
+
 # StoryShelf local data
 .data/
 .dev-data/
@@ -42,5 +45,6 @@ data
 nub.lock.bak
 .astro
 
-# opencode worktree plugin state
+# opencode state
+.opencode/
 .ocx/

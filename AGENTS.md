@@ -56,8 +56,7 @@ StoryShelf/
     dev-server/     dev-server      -- Local dev server, runs from TS source via `nub run serve` (no build; Playwright capture + optional shared-password auth)
     storybook-fixture/ storybook-fixture      -- Minimal deterministic Storybook (capture fixture + demo; committed storybook-static/)
     website/        website         -- Public docs & marketing site (Astro Starlight)
-  examples/
-    fly-app/                  -- fly.io deployment demo
+    fly-app/        fly-app         -- Fly demo (local adapters, workspace deps, multi-stage cached Dockerfile; deploys on tag via fly.yml)
   docs/
     architecture.md       -- Full architecture document
     testing.md            -- Testing strategy (unit/adapter/integration/gated-browser)

@@ -60,8 +60,8 @@ export const shelfConfigSchema = z
 export const uiConfigSchema = z
   .object({
     name: z.string().optional(),
-    logo: z.url().optional(),
-    favicon: z.url().optional(),
+    logo: z.string().url().optional(),
+    favicon: z.string().url().optional(),
     lightTheme: brandThemeSchema.optional(),
     darkTheme: brandThemeSchema.optional(),
   })

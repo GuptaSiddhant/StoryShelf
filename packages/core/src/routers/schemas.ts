@@ -156,7 +156,7 @@ export const webhookPublicSchema = z.object({
 }).openapi("Webhook");
 
 export const webhookCreateSchema = z.object({
-  url: z.url(),
+  url: z.string().url(),
   events: z.array(z.string().min(1)).optional(),
 }).openapi("WebhookCreateInput");
 
