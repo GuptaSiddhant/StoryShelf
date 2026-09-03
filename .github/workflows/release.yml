@@ -138,6 +138,38 @@ jobs:
             console.log('all jsr.json versions match package.json');
           ")
 
+      - name: "Rewrite workspace protocol for JSR manifest"
+        run: |
+          set -e
+          # JSR cannot record workspace:* requirements in the published manifest,
+          # so rewrite them to caret ranges of the current fixed version.
+          # Repo files keep workspace:*; only this CI working tree is rewritten
+          # (already --allow-dirty). Local node_modules symlinks still resolve.
+          node -e "
+            const fs=require('fs');
+            const path=require('path');
+            for (const d of fs.readdirSync('packages')) {
+              const dir=path.join('packages',d);
+              if (!fs.statSync(dir).isDirectory()) continue;
+              const f=path.join(dir,'package.json');
+              let pkg;
+              try { pkg=JSON.parse(fs.readFileSync(f,'utf8')); } catch { continue; }
+              if (pkg.private || !pkg.dependencies) continue;
+              let changed=false;
+              for (const dep of Object.keys(pkg.dependencies)) {
+                if (dep.startsWith('@storyshelf/') && pkg.dependencies[dep]==='workspace:*') {
+                  pkg.dependencies[dep]='^'+pkg.version;
+                  changed=true;
+                }
+              }
+              if (changed) {
+                fs.writeFileSync(f,JSON.stringify(pkg,null,2)+'\n');
+                console.log('rewrote '+d);
+              }
+            }
+            console.log('workspace protocol rewrite complete');
+          "
+
       - name: "Publish to JSR (dependency order: core first)"
         run: |
           set -e
