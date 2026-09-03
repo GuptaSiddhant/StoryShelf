@@ -11,8 +11,8 @@ The public site lives in `website/` (top-level, not a `packages/` member) and is
 
 ## Examples
 
-Top-level `examples/` (not turbo packages):
+Top-level `examples/` (not turbo packages) plus the `apps/storybook-fixture` app:
 
-- **`examples/storybook`** — a minimal deterministic component library; its committed `storybook-static/` doubles as the capture test fixture and the "try it" sample.
-- **`examples/fly-app`** — deploys StoryShelf to fly.io as a public demo: a `fly.toml` + Dockerfile running the server, a persistent Fly volume for `--data-dir` (SQLite + screenshots), seeded with the `examples/storybook` project. Fly's `*.fly.dev` wildcard certs mean `publishedBaseDomain` subdomains work on the demo.
+- **`apps/storybook-fixture`** — a minimal deterministic component library; its committed `storybook-static/` doubles as the capture test fixture and the "try it" sample.
+- **`examples/fly-app`** — deploys StoryShelf to fly.io as a public demo: a `fly.toml` + Dockerfile running the server, a persistent Fly volume for `--data-dir` (SQLite + screenshots), seeded with the `apps/storybook-fixture` project. Fly's `*.fly.dev` wildcard certs mean `publishedBaseDomain` subdomains work on the demo.
 - CI workflow examples (`github-actions.yml`, `.gitlab-ci.yml`) are shown inline in the guides rather than shipped as runnable repos.

@@ -31,7 +31,7 @@
     "core:dev": "nub run --filter @storyshelf/core dev",
     "cli": "nub run --filter @storyshelf/cli start",
     "docs": "nub run --filter website start",
-    "serve": "nub run --filter @storyshelf/dev-server serve",
+    "serve": "nub run --filter dev-server serve",
     "fmt": "turbo fmt",
     "lint": "turbo lint",
     "test": "turbo test",

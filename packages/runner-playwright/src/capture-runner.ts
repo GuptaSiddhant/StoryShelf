@@ -132,7 +132,9 @@ async function captureScreenshot(ctx: ScreenshotContext, story: StoryEntry, view
   try {
     await page.goto(ctx.adapter.buildUrl(ctx.baseUrl, story.id), { waitUntil: "networkidle" });
     if (ctx.adapter.screenshotSelector) {
-      await page.waitForSelector(ctx.adapter.screenshotSelector);
+      await page.waitForSelector(ctx.adapter.screenshotSelector, { state: "attached" });
+      // Storybook may initially render the root as hidden; wait briefly for the story to paint.
+      await page.waitForTimeout(500);
     }
     return await page.screenshot();
   } finally {

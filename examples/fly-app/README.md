@@ -1,6 +1,6 @@
 # StoryShelf on Fly.io
 
-Deploy StoryShelf as a public demo on Fly.io, seeded with the `examples/storybook` project.
+Deploy StoryShelf as a public demo on Fly.io, seeded with the `apps/storybook-fixture` project.
 
 ## Prerequisites
 

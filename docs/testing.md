@@ -26,10 +26,10 @@ Each adapter against its interface: SQLite via `:memory:` (Turso via a local lib
 
 ### 4. Browser integration (gated: `nub run test:integration`)
 
-Runs the **real** capture pipeline (`@storyshelf/runner-playwright`) against the committed Storybook fixture in `examples/storybook` (pre-built `storybook-static/`), asserting it produces the expected snapshots and diffs. Requires Playwright browsers (present in the base Docker image / CI). Gated behind a separate turbo task so `turbo test` stays browser-free.
+Runs the **real** capture pipeline (`@storyshelf/runner-playwright`) against the committed Storybook fixture in `apps/storybook-fixture` (pre-built `storybook-static/`), asserting it produces the expected snapshots and diffs. Requires Playwright browsers (present in the base Docker image / CI). Gated behind a separate turbo task so `turbo test` stays browser-free.
 
 ## Fixtures
 
-- `examples/storybook` — a minimal, deterministic Storybook (system fonts, no network, no external assets) whose `storybook-static/` is committed. Used by the browser-integration suite and as the "try it" sample.
+- `apps/storybook-fixture` — a minimal, deterministic Storybook (system fonts, no network, no external assets) whose `storybook-static/` is committed. Used by the browser-integration suite and as the "try it" sample.
 - PNG fixtures for the diff engine.
 - `index.json` fixtures for `discover()`.

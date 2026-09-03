@@ -12,7 +12,7 @@ import { createLocalStorage } from "@storyshelf/storage-local";
 
 import { createPlaywrightCaptureRunner } from "./capture-runner.ts";
 
-const FIXTURE_DIR = resolve(import.meta.dirname, "..", "..", "..", "examples", "storybook");
+const FIXTURE_DIR = resolve(import.meta.dirname, "..", "..", "..", "apps", "storybook-fixture");
 const FIXTURE_STATIC_DIR = join(FIXTURE_DIR, "storybook-static");
 
 let harness: {
@@ -79,7 +79,7 @@ async function buildFixture(): Promise<void> {
   const built = await runBuilders(runners);
   if (!built) {
     throw new Error(
-      `Storybook fixture not built at ${FIXTURE_STATIC_DIR}. Install the fixture deps and run \`nub run build-storybook\` from examples/storybook first.`,
+      `Storybook fixture not built at ${FIXTURE_STATIC_DIR}. Install the fixture deps and run \`nub run build-storybook\` from apps/storybook-fixture first.`,
     );
   }
 }

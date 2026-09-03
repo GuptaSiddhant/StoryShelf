@@ -29,7 +29,7 @@ nubx turbo verify --filter='@storyshelf/core' --force   # one package + deps
 nub run lint        # oxlint --type-aware
 nub run build       # tsdown -> dist/
 nub run test        # vitest (hermetic; no browser)
-nub run test:integration   # gated browser suite (Playwright + examples/storybook fixture)
+nub run test:integration   # gated browser suite (Playwright + apps/storybook-fixture)
 nubx tsc --noEmit -p tsconfig.json   # typecheck
 
 # Website (from website/):
@@ -53,10 +53,10 @@ StoryShelf/
     cli/            @storyshelf/cli            -- CLI client (commander; upload/init/create/server/retry/purge, no Playwright)
     runner-playwright/ @storyshelf/runner-playwright -- pure Playwright CaptureRenderer (server-side render; core orchestrator owns capture)
   apps/
-    dev-server/     @storyshelf/dev-server      -- Local dev server, runs from TS source via `nub run serve` (no build; Playwright capture + optional shared-password auth)
+    dev-server/     dev-server      -- Local dev server, runs from TS source via `nub run serve` (no build; Playwright capture + optional shared-password auth)
+    storybook-fixture/ storybook-fixture      -- Minimal deterministic Storybook (capture fixture + demo; committed storybook-static/)
   website/                    -- Public docs & marketing site (Astro Starlight)
   examples/
-    storybook/                -- Minimal deterministic Storybook (capture fixture + demo)
     fly-app/                  -- fly.io deployment demo
   docs/
     architecture.md       -- Full architecture document
