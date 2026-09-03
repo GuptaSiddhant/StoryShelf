@@ -22,10 +22,10 @@ import { createShelfRouter } from "@storyshelf/core";
 const app = createShelfRouter({
   database,                 // DatabaseAdapter
   storage,                  // StorageAdapter
-  capture,                  // CaptureRunner (optional)
-  auth,                     // AuthAdapter (optional)
-  status,                   // StatusAdapter (optional)
-  logger,                   // pino Logger (optional; built internally if omitted)
+  captureRunner,            // CaptureRunner (optional)
+  auth,                    // AuthAdapter (optional)
+  gitHosts,                // GitHostProvider[] (optional)
+  logger,                  // pino Logger (optional; built internally if omitted)
   ui: { name: "My Shelf" }, // UIConfig (optional)
   config: { captureConcurrency: 2, purgeTtlDays: 30 }, // ShelfConfig (optional)
 });
@@ -44,9 +44,10 @@ Assembles the router from the provided adapters. `ShelfOptions`:
 | ------ | ---- | ----------- |
 | `database` | `DatabaseAdapter` | **Required.** Data access. |
 | `storage` | `StorageAdapter` | **Required.** Blob storage for screenshots, diffs, storybook archives. |
-| `capture` | `CaptureRunner` | Optional. Enables the async capture queue. |
+| `captureRunner` | `CaptureRunner` | Optional. Enables the async capture pipeline (pure renderer). |
+| `captureQueue` | `CaptureQueue` | Optional. Queue adapter; defaults to `InMemoryCaptureQueue`. |
 | `auth` | `AuthAdapter` | Optional. Enables auth and the login UI. |
-| `status` | `StatusAdapter` | Optional. Reports CI status checks. |
+| `gitHosts` | `GitHostProvider[]` | Optional. Git-host adapters (GitHub/GitLab) for status checks, merge gates, PR comments. |
 | `logger` | `Logger` (pino) | Optional. Shared logger. Construct a fallback via `createShelfLogger()`. |
 | `ui` | `UIConfig` | Optional. UI branding. |
 | `config` | `ShelfConfig` | Optional. Server behavior. |
@@ -83,7 +84,7 @@ All adapters are constructor-injected (no AsyncLocalStorage). See `docs/architec
 - `StorageAdapter` — `read`, `write`, `delete`, `exists`, `list(prefix)`.
 - `AuthAdapter` — `check(request)`, `createSession(user)`, `destroySession(sessionId)`, optional `handleCallback(callback)`. Also exports `AuthUser`, `AuthCallback`, and the shared `SESSION_COOKIE`.
 - `CaptureRunner` — a **pure capture renderer**: `render(input) => RenderResult`, `cancel(buildId)`. Also exports `JobStatus`, `RenderedSnapshot`, `RenderResult`.
-- `StatusAdapter` — `setStatus(context, gitSha, status, url)`. Also exports `CheckStatus`.
+- `GitHostProvider` / `GitHostAdapter` — set commit status checks, detect merges, and upsert PR comments. Real providers ship in `@storyshelf/git-github` and `@storyshelf/git-gitlab`. Also exports `CheckStatus`.
 
 ### Logging
 
@@ -113,7 +114,7 @@ See `docs/architecture.md` and the ADRs in `docs/adr/`.
 
 ## Deployment targets
 
-The core router is runtime-agnostic (Web `Request`/`Response`, `fetch`, `crypto`, `URL`). The only Node-specific code in the stack is `@hono/node-server` in `@storyshelf/node-server`. You can assemble on any platform:
+The core router is runtime-agnostic (Web `Request`/`Response`, `fetch`, `crypto`, `URL`). The only Node-specific piece is the in-process `InMemoryCaptureQueue`, which suits long-lived Node servers; serverless runtimes swap in a remote `CaptureQueue` (e.g. `@storyshelf/queue-sqs`) plus a separate worker. You assemble a server for any platform — `storyshelf server init` generates a scaffold with the adapters you choose:
 
 | Platform | Database | Storage | Capture queue | Server entry |
 |----------|----------|---------|---------------|--------------|

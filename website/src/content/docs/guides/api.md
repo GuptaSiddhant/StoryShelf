@@ -83,11 +83,14 @@ The core CI flow in three calls:
    curl -sS $STORYSHELF_URL/api/v1/projects/my-app/builds/<buildId>
    ```
 
-   Query builds by `?status=` and `?branch=`:
+   Query builds by `?status=` and `?branch=`, and filter by a label value with `?labelKey=` + `?labelValue=`:
 
    ```sh
    curl -sS "$STORYSHELF_URL/api/v1/projects/my-app/builds?branch=main"
+   curl -sS "$STORYSHELF_URL/api/v1/projects/my-app/builds?labelKey=environment&labelValue=staging"
    ```
+
+   The label filter returns only builds carrying that label value (AND with any `status`/`branch` filters).
 
 ## Review flow
 
@@ -108,6 +111,33 @@ Raw PNGs are served per snapshot — image, pixel-diff overlay, and baseline:
 ```sh
 curl -sS $STORYSHELF_URL/api/v1/projects/my-app/builds/<buildId>/snapshots/<snapshotId>/image
 ```
+
+## Label types
+
+Project-defined build label schemas live under `/api/v1/projects/{slug}/label-types` (see the **Labels** concept page for what labels are for). List and create them, then update a type's presentation with `PATCH`:
+
+```sh
+# List label types
+curl -sS $STORYSHELF_URL/api/v1/projects/my-app/label-types
+
+# Create a label type
+curl -sS -X POST $STORYSHELF_URL/api/v1/projects/my-app/label-types \
+  -H "Authorization: Bearer $STORYSHELF_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{ "key": "environment", "name": "Environment", "color": "#0f766e" }'
+
+# Update a label type (any of name / linkTemplate / color)
+curl -sS -X PATCH $STORYSHELF_URL/api/v1/projects/my-app/label-types/environment \
+  -H "Authorization: Bearer $STORYSHELF_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{ "color": "#0f766e", "linkTemplate": "https://console.example.com/env/{value}" }'
+
+# Delete a label type
+curl -sS -X DELETE $STORYSHELF_URL/api/v1/projects/my-app/label-types/environment \
+  -H "Authorization: Bearer $STORYSHELF_TOKEN"
+```
+
+The built-in `persistent` and `branch` label types are seeded and read-only — `PATCH`/`DELETE` on them returns `400`. `PATCH` returns the updated `LabelType`; `DELETE` returns `204`.
 
 ## Errors and status codes
 

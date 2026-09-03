@@ -162,7 +162,7 @@ CREATE INDEX IF NOT EXISTS idx_baselines_project_story ON baselines(project_id, 
 
 ---
 
-### 7. Capture Queue Interface Finalization (Low Priority)
+### 7. Capture Queue Interface Finalization (Low Priority) — DONE
 
 **Problem**: `CaptureQueue` interface has sync/async ambiguity documented as architectural debt.
 
@@ -170,14 +170,7 @@ CREATE INDEX IF NOT EXISTS idx_baselines_project_story ON baselines(project_id, 
 - `InMemoryCaptureQueue` — synchronous in-process (current implementation)
 - `RemoteCaptureQueue` — asynchronous with `Promise<T>` for status/active/recent
 
-**Files to Modify**:
-- `packages/core/src/adapters/capture-queue.ts` — split interface
-- Update `InMemoryCaptureQueue` to match new sync contract
-- Create skeleton `RemoteCaptureQueue` adapter
-
-**Impact**: Cleaner architecture, easier remote queue implementations.
-
-**Estimated Effort**: 2 days
+**Status**: **Resolved.** The `CaptureQueue` interface (in `packages/core/src/adapters/capture-queue.ts`) now uses a single fully-async contract (`enqueue`/`status`/`active`/`recent` all return `Promise<T>`), shared by both `InMemoryCaptureQueue` and the `RemoteCaptureQueue` skeleton. See `docs/adr/` and `docs/TASKS.md`.
 
 ---
 

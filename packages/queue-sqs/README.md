@@ -49,7 +49,7 @@ Creates an SQS-backed `CaptureQueue`. The returned adapter implements every meth
 
 ## How it fits in
 
-`queue-sqs` is the `queue` option for `createShelfRouter` in AWS/cloud deployments. It implements the same `CaptureQueue` interface as `@storyshelf/capture/queue` (InMemoryCaptureQueue), so switching between in-process and remote queues requires no changes to router or build logic.
+`queue-sqs` is the `captureQueue` option for `createShelfRouter` in AWS/cloud deployments. It implements the same `CaptureQueue` interface as `InMemoryCaptureQueue` (exported from `@storyshelf/core`), so switching between in-process and remote queues requires no changes to router or build logic.
 
 See `docs/architecture.md` and ADR 0009.
 

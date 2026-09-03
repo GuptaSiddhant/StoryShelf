@@ -115,8 +115,8 @@ import { HttpCaptureQueue } from "./my-queue";
 const router = createShelfRouter({
   database: ...,
   storage: ...,
-  capture: ...,
-  queue: new HttpCaptureQueue("https://my-worker.example.com/capture"),
+  captureRunner: ...,
+  captureQueue: new HttpCaptureQueue("https://my-worker.example.com/capture"),
   // ...
 });
 ```
@@ -149,8 +149,8 @@ const queue = new InMemoryCaptureQueue({ concurrency: 2 });
 export const app = createShelfRouter({
   database,
   storage,
-  capture,
-  queue,
+  captureRunner: capture,
+  captureQueue: queue,
   config: { scratchDir: "/tmp/scratch" },
   auth: ...,
 });

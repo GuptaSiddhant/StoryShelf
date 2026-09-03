@@ -15,6 +15,9 @@ packages/
   storage-s3/     @storyshelf/storage-s3    — S3-compatible storage
   auth-oauth/     @storyshelf/auth-oauth    — OIDC auth
   auth-password/  @storyshelf/auth-password — shared-password auth
+  git-github/     @storyshelf/git-github    — GitHub commit status / merge gate / PR comments
+  git-gitlab/     @storyshelf/git-gitlab    — GitLab commit status / merge gate / MR comments
+  queue-sqs/      @storyshelf/queue-sqs     — AWS SQS capture job queue
   cli/            @storyshelf/cli           — CLI client (server init, init, create, upload, purge, retry)
   runner-playwright/ @storyshelf/runner-playwright — Playwright capture runner
 website/                                    — public docs (Astro Starlight)

@@ -55,6 +55,8 @@ export default defineConfig({
             { label: "@storyshelf/auth-oauth", slug: "packages/auth-oauth" },
             { label: "@storyshelf/auth-password", slug: "packages/auth-password" },
             { label: "@storyshelf/git-github", slug: "packages/git-github" },
+            { label: "@storyshelf/git-gitlab", slug: "packages/git-gitlab" },
+            { label: "@storyshelf/queue-sqs", slug: "packages/queue-sqs" },
           ],
         },
       ],
