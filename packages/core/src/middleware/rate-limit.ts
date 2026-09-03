@@ -26,8 +26,7 @@ setInterval(cleanup, 60_000).unref();
 
 export function rateLimit(options: RateLimitOptions) {
   const { windowMs, max, keyGenerator } = options;
-  // oxlint-disable-next-line typescript/no-invalid-void-type -- Hono middleware may not return Response
-  return async (c: Context, next: Next): Promise<Response | void> => {
+  return async (c: Context, next: Next): Promise<Response | undefined> => {
     const key = keyGenerator ? keyGenerator(c) : (c.req.header("x-forwarded-for") ?? "anonymous");
     const now = Date.now();
     let entry = stores.get(key);

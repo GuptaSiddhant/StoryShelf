@@ -7,8 +7,7 @@ function encodeTime(time: number): string {
   let remaining = time;
   for (let i = 9; i >= 0; i -= 1) {
     const mod = remaining % 32;
-    // eslint-disable-next-line no-non-null-assertion -- index is within CROCKFORD length
-    out = CROCKFORD[mod]! + out;
+    out = CROCKFORD.charAt(mod) + out;
     remaining = (remaining - mod) / 32;
   }
   return out;
@@ -23,12 +22,12 @@ function encodeRandom(bytes: Buffer): string {
     buffer = (buffer << 8) | byte;
     bits += 8;
     while (bits >= 5) {
-      out += CROCKFORD[(buffer >>> (bits - 5)) & 31]!;
+      out += CROCKFORD.charAt((buffer >>> (bits - 5)) & 31);
       bits -= 5;
     }
   }
   if (bits > 0) {
-    out += CROCKFORD[(buffer << (5 - bits)) & 31]!;
+    out += CROCKFORD.charAt((buffer << (5 - bits)) & 31);
   }
   return out;
 }

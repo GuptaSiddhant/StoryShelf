@@ -62,15 +62,14 @@ export class ProjectModel {
       storybookMeta?: unknown;
     },
   ): Promise<Project> {
-    const normalized: Record<string, unknown> = { ...patch };
+    const normalized: Partial<Project> & Record<string, unknown> = { ...patch } as unknown as Partial<Project> & Record<string, unknown>;
     if (patch.storybookMeta !== undefined && patch.storybookMeta !== null && typeof patch.storybookMeta !== "string") {
-      normalized["storybookMeta"] = JSON.stringify(patch.storybookMeta);
+      normalized.storybookMeta = JSON.stringify(patch.storybookMeta);
     }
-    // oxlint-disable-next-line typescript/no-unnecessary-type-assertion
     return await this.db.update(projects, id, {
       ...normalized,
       updatedAt: new Date().toISOString(),
-    } as unknown as Partial<Project>);
+    });
   }
 
   /** Delete a project by id. */
