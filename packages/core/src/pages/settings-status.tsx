@@ -1,3 +1,7 @@
+// Explicit JSX runtime edge so JSR unfurls it to an absolute specifier in
+// published tarballs. The synthesized import would otherwise stay bare and
+// unresolvable server-side (see honojs/hono#3219).
+import "hono/jsx/jsx-runtime";
 import type { FC } from "hono/jsx";
 import type { GitHostProvider } from "../adapters/git-host/index.ts";
 import type { Project } from "../schema.ts";
