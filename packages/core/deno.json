@@ -1,4 +1,5 @@
 {
+  "$schema": "https://deno.land/x/deno/cli/schemas/config-file.v1.json",
   "name": "@storyshelf/core",
   "version": "0.1.0",
   "exports": {
@@ -22,6 +23,11 @@
     "./models/token": "./src/models/token.ts",
     "./models/webhook": "./src/models/webhook.ts"
   },
+  "imports": {
+    "hono/jsx": "npm:hono@4.13.5/jsx",
+    "hono/jsx/jsx-runtime": "npm:hono@4.13.5/jsx/jsx-runtime",
+    "hono/jsx/jsx-dev-runtime": "npm:hono@4.13.5/jsx/jsx-dev-runtime"
+  },
   "publish": {
     "include": [
       "src",
@@ -33,7 +39,5 @@
       "**/*.test.tsx",
       "**/test-helpers"
     ]
-  },
-  "description": "StoryShelf core: Hono router, adapter interfaces, models, capture pipeline, diff, retention.",
-  "license": "MIT"
+  }
 }

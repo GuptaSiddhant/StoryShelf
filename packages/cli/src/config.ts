@@ -8,6 +8,7 @@ import { z } from "zod";
 export const storybookConfigSchema = z
   .object({
     slug: z.string().min(1, "slug is required"),
+    // oxlint-disable-next-line typescript/no-deprecated -- z.string().url() kept for zod v3 API compat
     url: z.string().url().optional(),
     buildDir: z.string().min(1).optional(),
     buildCommand: z.string().min(1).optional(),
