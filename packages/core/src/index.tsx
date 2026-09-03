@@ -19,6 +19,7 @@ import { registerMedia } from "./routers/media.ts";
 import { registerMembers } from "./routers/members.ts";
 import { registerProjects } from "./routers/projects.ts";
 import { registerStatusConfigs } from "./routers/status-configs.ts";
+import { registerStorybook } from "./routers/storybook.ts";
 import { registerTokens } from "./routers/tokens.ts";
 import { registerUiPages } from "./routers/ui.ts";
 import { registerWebhooks } from "./routers/webhooks.ts";
@@ -338,7 +339,10 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
       user ||
       path.startsWith("/api/") ||
       path.startsWith("/auth/") ||
-      path.startsWith("/assets/")
+      path.startsWith("/assets/") ||
+      // Published Storybook routes enforce their own auth inside the handler
+      // (public builds are viewable without a session, ADR 0011).
+      path.startsWith("/projects/") && path.includes("/storybook")
     ) {
       return next();
     }
@@ -362,6 +366,7 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
     registerAuth(app, options.auth);
   }
   registerAssets(app);
+  registerStorybook(app);
   registerUiPages(app);
 
   app.doc("/api/v1/openapi.json", {
