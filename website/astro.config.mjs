@@ -11,6 +11,11 @@ export default defineConfig({
       description: "Self-hosted visual testing for Storybook.",
       social: [
         {
+          label: "OpenAPI",
+          href: `${(process.env.BASE_PATH || "/").replace(/\/?$/, "/")}openapi/`,
+          icon: "document",
+        },
+        {
           label: "GitHub",
           href: "https://github.com/GuptaSiddhant/storyshelf",
           icon: "github",
