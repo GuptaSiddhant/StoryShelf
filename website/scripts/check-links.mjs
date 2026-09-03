@@ -74,10 +74,13 @@ function isInternalLink(href, filePath) {
   // 4. Absolute hrefs: strip BASE_PATH prefix, check dist/ + remaining path
   if (href.startsWith('/')) {
     let path = href;
-    
-    // Strip /StoryShelf/ prefix if present (GitHub Pages project site base path)
-    if (path.startsWith('/StoryShelf/')) {
-      path = path.slice('/StoryShelf/'.length);
+
+    // Strip BASE_PATH prefix if present (e.g. /StoryShelf/ for project site)
+    const normalizedBase = basePath.endsWith('/') ? basePath : `${basePath}/`;
+    if (basePath !== '/' && path.startsWith(normalizedBase)) {
+      path = path.slice(normalizedBase.length);
+    } else if (basePath !== '/' && path === basePath.slice(0, -1)) {
+      path = '';
     }
     
     // Strip any remaining leading /

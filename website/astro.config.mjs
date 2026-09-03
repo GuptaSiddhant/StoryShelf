@@ -23,6 +23,7 @@ export default defineConfig({
             { label: "Getting started", slug: "guides/getting-started" },
             { label: "CI setup", slug: "guides/ci" },
             { label: "REST API", slug: "guides/api" },
+            { label: "API Reference", link: "/openapi/" },
             { label: "Deployment", slug: "guides/deployment" },
             { label: "CLI", slug: "guides/cli" },
             { label: "Configuration", slug: "guides/config" },

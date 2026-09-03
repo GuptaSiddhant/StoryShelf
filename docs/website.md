@@ -6,7 +6,7 @@ The public site lives in `website/` (top-level, not a `packages/` member) and is
 
 - **Homepage:** the "self-hosted Chromatic alternative" pitch.
 - **Guides:** Getting started; CI (GitHub Actions, GitLab CI); Deployment (Docker/docker-compose, reverse proxy, subdomains + wildcard TLS); Auth (OIDC, shared password, none); Monorepo (one project per Storybook); Retention & labels; Migrating from Chromatic.
-- **API reference:** generated from the Hono `OpenAPIHono` spec — the `openapi` script copies `packages/core/dist/openapi.json` into the site and renders it with the `starlight-openapi` plugin (same trick StoryBooker used with Docusaurus).
+- **API reference:** generated from the Hono `OpenAPIHono` spec — the `openapi` script runs `packages/core/scripts/generate-openapi.ts` → `website/public/openapi.json` (prebuild). The site serves the static spec at `/openapi.json` and a client-side Swagger UI at `/openapi/` (CDN, read-only, no try-it) loading that spec.
 - The internal `docs/` (architecture + ADRs) remains engineering-facing; the site is curated user guides.
 
 ## Examples
