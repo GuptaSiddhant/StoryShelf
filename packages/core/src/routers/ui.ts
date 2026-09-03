@@ -9,6 +9,7 @@ import { SnapshotModel } from "../models/snapshot.ts";
 import { renderBuildDetailPage } from "../pages/build-detail.tsx";
 import { renderBuildDiffPage } from "../pages/build-diff.tsx";
 import { renderComputeJobsPage, renderActiveQueue } from "../pages/compute-jobs.tsx";
+import { renderLabelDetailPage, renderLabelsPage } from "../pages/label-detail.tsx";
 import { renderProjectCreatePage } from "../pages/project-create.tsx";
 import { renderProjectBuildsPage } from "../pages/project-builds.tsx";
 import { renderProjectsPage } from "../pages/projects.tsx";
@@ -21,6 +22,14 @@ import { registerSettingsPages } from "./settings.ts";
 
 function asString(value: FormDataEntryValue | null): string | undefined {
   return typeof value === "string" ? value.trim() : undefined;
+}
+
+function decodeRest(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return "";
+  }
 }
 
 interface QueueView {
@@ -155,6 +164,28 @@ export function registerUiPages(app: ShelfApp): void {
         hasBaseline,
       }),
     );
+  });
+
+  app.get("/projects/:slug/labels", async (c) => {
+    const html = await renderLabelsPage(c.req.param("slug"));
+    if (!html) {
+      return c.notFound();
+    }
+    return c.html(html);
+  });
+
+  app.get("/projects/:slug/labels/:key/*", async (c) => {
+    const slug = c.req.param("slug");
+    const key = c.req.param("key");
+    // Hono's bare `/*` wildcard is not exposed through `param()`, so derive the
+    // label value from the raw request path and decode it ourselves.
+    const base = `/projects/${slug}/labels/${key}/`;
+    const value = c.req.path.startsWith(base) ? decodeRest(c.req.path.slice(base.length)) : "";
+    const html = await renderLabelDetailPage(slug, key, value);
+    if (!html) {
+      return c.notFound();
+    }
+    return c.html(html);
   });
 
   registerSettingsPages(app);

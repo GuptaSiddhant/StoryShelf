@@ -150,6 +150,9 @@ const Sidebar: FC<{ nav?: NavConfig }> = ({ nav }) => {
             <a class={`sidebar__link ${nav.active === "jobs" ? "sidebar__link--active" : ""}`} href={`/projects/${nav.projectSlug}/jobs`} aria-current={nav.active === "jobs" ? "page" : undefined}>
               <span aria-hidden="true">◫</span> Jobs
             </a>
+            <a class={`sidebar__link ${nav.active === "labels" ? "sidebar__link--active" : ""}`} href={`/projects/${nav.projectSlug}/labels`} aria-current={nav.active === "labels" ? "page" : undefined}>
+              <span aria-hidden="true">⌗</span> Labels
+            </a>
             <a class={`sidebar__link ${nav.active === "settings" ? "sidebar__link--active" : ""}`} href={`/projects/${nav.projectSlug}/settings`} aria-current={nav.active === "settings" ? "page" : undefined}>
               <span aria-hidden="true">⚙</span> Settings
             </a>

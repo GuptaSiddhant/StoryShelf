@@ -21,24 +21,24 @@ export function renderSettingsLabels(project: Project, labelTypes: LabelType[], 
             <tbody>
               {labelTypes.map(
                 (labelType): HtmlEscapedString | Promise<HtmlEscapedString> => (
-                  <tr key={labelType.id}>
-                    <td>
-                      <Badge tone="neutral">{labelType.key}</Badge>
-                    </td>
-                    <td>{labelType.name}</td>
-                    <td style="max-width:32ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{labelType.linkTemplate ?? "—"}</td>
-                    <td>
-                      {isAdmin && labelType.key !== "persistent" && labelType.key !== "branch" ? (
-                        <form method="post" action={`/projects/${project.slug}/settings/labels/${labelType.key}/delete`} hx-post={`/projects/${project.slug}/settings/labels/${labelType.key}/delete`} hx-target="body">
-                          <button class="btn btn--ghost" type="submit" aria-label={`Delete ${labelType.key}`}>
-                            Delete
-                          </button>
-                        </form>
-                      ) : (
-                        <span class="field__hint">built-in</span>
-                      )}
-                    </td>
-                  </tr>
+                <tr key={labelType.id}>
+                  <td>
+                    <Badge tone="neutral">{labelType.key}</Badge>
+                  </td>
+                  <td>{labelType.name}</td>
+                  <td style="max-width:32ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{labelType.linkTemplate ?? "—"}</td>
+                  <td>
+                    {isAdmin && labelType.key !== "persistent" && labelType.key !== "branch" ? (
+                      <form method="post" action={`/projects/${project.slug}/settings/labels/${labelType.key}/delete`} hx-post={`/projects/${project.slug}/settings/labels/${labelType.key}/delete`} hx-target="body">
+                        <button class="btn btn--ghost" type="submit" aria-label={`Delete ${labelType.key}`}>
+                          Delete
+                        </button>
+                      </form>
+                    ) : (
+                      <span class="field__hint">built-in</span>
+                    )}
+                  </td>
+                </tr>
                 ),
               )}
             </tbody>
