@@ -1,5 +1,5 @@
-import { mkdir, rm } from "node:fs/promises";
-import { join, resolve, sep } from "node:path";
+import { mkdir, readdir, readFile, rm } from "node:fs/promises";
+import { join, relative, resolve, sep } from "node:path";
 
 import AdmZip from "adm-zip";
 import type { Logger } from "pino";
@@ -10,7 +10,7 @@ import type { StorageAdapter } from "../adapters/storage.ts";
 import { BuildModel } from "../models/build.ts";
 import { ProjectModel } from "../models/project.ts";
 import type { Build, Project } from "../schema.ts";
-import { storybookZipPath } from "../utils/paths.ts";
+import { storybookDir, storybookZipPath } from "../utils/paths.ts";
 import { persistCapture } from "./pipeline.ts";
 import { StorybookAdapter } from "./storybook.ts";
 import { DEFAULT_VIEWPORTS } from "./adapter.ts";
@@ -31,19 +31,25 @@ export async function executeCaptureJob(input: { buildId: string; reqId?: string
   await builds.setStatus(build.id, "capturing");
 
   const startTime = performance.now();
-  let storybookDir: string | undefined;
+  let extractedDir: string | undefined;
   try {
     const extractStart = performance.now();
-    storybookDir = await extractStorybook(options, project.id, build.id);
+    extractedDir = await extractStorybook(options, project.id, build.id);
     const extractDuration = performance.now() - extractStart;
     logger?.info({ durationMs: Math.round(extractDuration) }, "storybook extracted");
 
+    // Persist the extracted statics to storage so the published Storybook
+    // (`storybookDir`) can be served after the scratch dir is cleaned up.
+    const staticsStart = performance.now();
+    await persistStorybookStatics(options.storage, extractedDir, project.id, build.id);
+    logger?.info({ durationMs: Math.round(performance.now() - staticsStart) }, "storybook statics persisted");
+
     const adapter = new StorybookAdapter();
-    const stories = await adapter.discover(storybookDir);
+    const stories = await adapter.discover(extractedDir);
     const viewports = options.viewports ?? DEFAULT_VIEWPORTS;
 
     const renderStart = performance.now();
-    const result = await options.runner.render({ buildId: build.id, storybookDir, stories, viewports, logger });
+    const result = await options.runner.render({ buildId: build.id, storybookDir: extractedDir, stories, viewports, logger });
     const renderDuration = performance.now() - renderStart;
     logger?.info({ durationMs: Math.round(renderDuration), storyCount: stories.length }, "stories rendered");
 
@@ -109,4 +115,30 @@ async function extractStorybook(options: CaptureJobOptions, projectId: string, b
   await mkdir(targetDir, { recursive: true });
   zip.extractAllTo(targetDir, true);
   return targetDir;
+}
+
+async function walkFiles(dir: string): Promise<string[]> {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const nested = await Promise.all(
+    entries.map(async (entry) => {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        return await walkFiles(full);
+      }
+      return [full];
+    }),
+  );
+  return nested.flat();
+}
+
+async function persistStorybookStatics(storage: StorageAdapter, sourceDir: string, projectId: string, buildId: string): Promise<void> {
+  const root = resolve(sourceDir);
+  const destinationPrefix = storybookDir(projectId, buildId);
+  const files = await walkFiles(root);
+  await Promise.all(
+    files.map(async (file) => {
+      const rel = relative(root, file);
+      await storage.write(`${destinationPrefix}/${rel}`, await readFile(file));
+    }),
+  );
 }
