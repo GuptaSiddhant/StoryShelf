@@ -5,6 +5,23 @@ import { buildLabels, builds, snapshots, type Build } from "../schema.ts";
 import type { BuildStatus } from "../types.ts";
 import { ulid } from "../utils/ulid.ts";
 
+/**
+ * Return whether a build is publicly viewable without a session.
+ *
+ * A build is public iff `builds.public` is set or its branch matches the
+ * project's `public_branch_regex` (ADR 0011). Supplying an empty/nonexistent
+ * regex makes every build require auth.
+ */
+export function isPublicBuild(project: { publicBranchRegex: string | null }, build: Pick<Build, "public" | "gitBranch">): boolean {
+  if (build.public) {
+    return true;
+  }
+  if (!project.publicBranchRegex) {
+    return false;
+  }
+  return new RegExp(project.publicBranchRegex, "u").test(build.gitBranch);
+}
+
 export interface BuildCreateInput {
   gitSha: string;
   gitBranch: string;
@@ -66,6 +83,17 @@ export class BuildModel {
       conditions.push(inArray(builds.id, ids));
     }
     return this.db.list(builds, { where: and(...conditions), orderBy: desc(builds.createdAt) });
+  }
+
+  /** Return the most recent build intended for publishing, if any. */
+  async latestPublished(project: { id: string; publicBranchRegex: string | null }): Promise<Build | null> {
+    const rows = await this.list(project.id);
+    for (const build of rows) {
+      if (isPublicBuild(project, build)) {
+        return build;
+      }
+    }
+    return null;
   }
 
   async update(id: string, patch: Partial<Pick<Build, "status" | "public" | "message" | "authorEmail" | "authorName">>): Promise<Build> {
