@@ -28,7 +28,7 @@ export function renderSettingsMembers(project: Project, members: SettingsMember[
             </thead>
             <tbody>
               {members.map(
-                (member): HtmlEscapedString => (
+                (member): HtmlEscapedString | Promise<HtmlEscapedString> => (
                   <tr key={member.id}>
                     <td>
                       <code>{member.userId}</code>

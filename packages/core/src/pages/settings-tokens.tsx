@@ -19,7 +19,7 @@ export function renderSettingsTokens(project: Project, tokens: Omit<Token, "hash
             </thead>
             <tbody>
               {tokens.map(
-                (token): HtmlEscapedString => (
+                (token): HtmlEscapedString | Promise<HtmlEscapedString> => (
                   <tr key={token.id}>
                     <td>{token.name}</td>
                     <td>{new Date(token.createdAt).toLocaleDateString()}</td>

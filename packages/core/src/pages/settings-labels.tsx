@@ -20,7 +20,7 @@ export function renderSettingsLabels(project: Project, labelTypes: LabelType[], 
             </thead>
             <tbody>
               {labelTypes.map(
-                (labelType): HtmlEscapedString => (
+                (labelType): HtmlEscapedString | Promise<HtmlEscapedString> => (
                   <tr key={labelType.id}>
                     <td>
                       <Badge tone="neutral">{labelType.key}</Badge>

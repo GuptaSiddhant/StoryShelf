@@ -29,7 +29,8 @@ function verifyToken(token: string, sessionId: string): boolean {
 }
 
 export function csrf() {
-  return async (c: Context, next: Next): Promise<Response | undefined> => {
+  // oxlint-disable-next-line typescript/no-invalid-void-type -- Hono middleware may not return Response
+  return async (c: Context, next: Next): Promise<Response | void> => {
     const {method} = c.req;
     if (method === "GET" || method === "HEAD" || method === "OPTIONS") {
       const sessionId = c.req.header("session-id") ?? "default";

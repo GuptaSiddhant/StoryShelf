@@ -34,7 +34,7 @@ export function renderActiveQueue(slug: string, queueView: QueueView[]): Rendere
             </thead>
             <tbody>
               {queueView.map(
-                (job): HtmlEscapedString => (
+                (job): HtmlEscapedString | Promise<HtmlEscapedString> => (
                   <tr key={job.buildId}>
                     <td>
                       <a href={`/projects/${slug}/builds/${job.buildId}`}>{job.buildId.slice(0, 8)}</a>
@@ -112,7 +112,7 @@ export async function renderComputeJobsPage(slug: string, queueView: QueueView[]
             </thead>
             <tbody>
               {recentBuilds.map(
-                (build): HtmlEscapedString => (
+                (build): HtmlEscapedString | Promise<HtmlEscapedString> => (
                   <tr key={build.id}>
                     <td>
                       <div style="font-weight:600;">{build.gitBranch}</div>

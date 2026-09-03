@@ -51,7 +51,7 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
       ) : (
         <div class="grid" style="gap:.75rem;">
           {projects.map(
-            (project): HtmlEscapedString => {
+            (project): HtmlEscapedString | Promise<HtmlEscapedString> => {
             const info = countsBySlug.get(project.slug);
             return (
               <div key={project.id} class="card card--padded">

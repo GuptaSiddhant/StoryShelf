@@ -114,7 +114,7 @@ export async function renderProjectBuildsPage(slug: string, query: { status?: st
             </thead>
             <tbody>
               {builds.map(
-                (build): HtmlEscapedString => (
+                (build): HtmlEscapedString | Promise<HtmlEscapedString> => (
                 <tr key={build.id}>
                   <td>
                     <div style="font-weight:600;">{build.gitBranch}</div>

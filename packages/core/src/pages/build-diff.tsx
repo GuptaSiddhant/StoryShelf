@@ -109,7 +109,7 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
                 </div>
                 <div data-diff-nav data-current={selected?.id} style="max-height: 70vh; overflow:auto;">
                   {snapshots.map(
-                    (snap): HtmlEscapedString => (
+                    (snap): HtmlEscapedString | Promise<HtmlEscapedString> => (
                     <a
                       key={snap.id}
                       href={`/projects/${project.slug}/builds/${build.id}/diff?snapshot=${snap.id}`}
@@ -204,7 +204,7 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
                       {comments
                         .filter((comment) => !comment.snapshotId || comment.snapshotId === selected.id)
                         .map(
-                          (comment): HtmlEscapedString => (
+                          (comment): HtmlEscapedString | Promise<HtmlEscapedString> => (
                           <div key={comment.id} class="comment">
                             <div class="comment__head">
                               <strong>{comment.userId}</strong>
