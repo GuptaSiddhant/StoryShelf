@@ -13,7 +13,7 @@ export class StorybookAdapter implements StorySourceAdapter {
   readonly screenshotSelector = "#storybook-root";
 
   async discover(source: string): Promise<StoryEntry[]> {
-    const index = await this.readIndex(source);
+    const index = await StorybookAdapter.readIndex(source);
     return Object.values(index.entries)
       .filter((entry) => entry.type !== "docs")
       .map((entry) => ({
@@ -26,14 +26,11 @@ export class StorybookAdapter implements StorySourceAdapter {
       }));
   }
 
-  // eslint-disable-next-line class-methods-use-this
-  buildUrl(baseUrl: string, storyId: string): string {
+  static buildUrl(baseUrl: string, storyId: string): string {
     return `${baseUrl}/iframe.html?id=${encodeURIComponent(storyId)}&viewMode=story`;
   }
 
-  // Private helper; invoked via `this` from discover.
-  // eslint-disable-next-line class-methods-use-this
-  private async readIndex(source: string): Promise<StorybookIndex> {
+  private static async readIndex(source: string): Promise<StorybookIndex> {
     const candidates = ["index.json", "stories.json"];
     const results = await Promise.all(
       candidates.map(async (name) => {

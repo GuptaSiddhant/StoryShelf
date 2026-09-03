@@ -11,8 +11,7 @@ export const Button: FC<{
   href?: string;
   disabled?: boolean;
   children?: unknown;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [key: string]: any;
+  [key: string]: unknown;
 }> = ({ variant = "primary", type = "button", href, disabled, children, ...rest }) => {
   const className = `btn btn--${variant}`;
   if (href) {
