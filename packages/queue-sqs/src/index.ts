@@ -14,7 +14,7 @@ import type {
 
 import type { Logger } from "@storyshelf/core/types";
 
-declare const __PKG_VERSION__: string;
+declare const __PKG_VERSION__: string | undefined;
 
 /** Options for configuring an SQS-backed CaptureQueue. */
 export interface SqsCaptureQueueOptions {
@@ -74,7 +74,7 @@ export function createSqsCaptureQueue(
   return {
     metadata: {
       name: "SQS Queue",
-      version: typeof __PKG_VERSION__ === "undefined" ? "0.0.0" : __PKG_VERSION__, // oxlint-disable-line unicorn/no-typeof-undefined
+      version: __PKG_VERSION__ ?? "0.0.0",
       description: "SQS-backed capture queue",
       kind: "sqs",
     },

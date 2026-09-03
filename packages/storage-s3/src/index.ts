@@ -10,7 +10,7 @@ import {
 
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 
-declare const __PKG_VERSION__: string;
+declare const __PKG_VERSION__: string | undefined;
 
 /** Options for configuring an S3-compatible storage adapter. */
 export interface S3StorageOptions {
@@ -91,7 +91,7 @@ export function createS3Storage(options: S3StorageOptions): StorageAdapter {
   return {
     metadata: {
       name: "S3 Storage",
-      version: typeof __PKG_VERSION__ === "undefined" ? "0.0.0" : __PKG_VERSION__, // oxlint-disable-line unicorn/no-typeof-undefined
+      version: __PKG_VERSION__ ?? "0.0.0",
       description: "S3-compatible storage adapter",
       kind: "s3",
     },

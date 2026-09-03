@@ -2,7 +2,7 @@ import type { Logger } from "pino";
 
 import type { CaptureJob, CaptureQueue, QueueEntry } from "../adapters/capture-queue.ts";
 
-declare const __PKG_VERSION__: string;
+declare const __PKG_VERSION__: string | undefined;
 
 export interface InMemoryCaptureQueueOptions {
   concurrency: number;
@@ -12,7 +12,7 @@ export interface InMemoryCaptureQueueOptions {
 export class InMemoryCaptureQueue implements CaptureQueue {
   readonly metadata = {
     name: "In-Memory Queue",
-    version: typeof __PKG_VERSION__ === "undefined" ? "0.0.0" : __PKG_VERSION__, // oxlint-disable-line unicorn/no-typeof-undefined
+    version: __PKG_VERSION__ ?? "0.0.0",
     description: "In-process capture queue",
     kind: "memory",
   } as const;

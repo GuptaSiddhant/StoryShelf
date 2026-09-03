@@ -11,7 +11,7 @@ import {
 } from "@storyshelf/core";
 import type { Logger } from "@storyshelf/core/types";
 
-declare const __PKG_VERSION__: string;
+declare const __PKG_VERSION__: string | undefined;
 
 import { createStaticServer } from "./static-server.ts";
 
@@ -41,7 +41,7 @@ export function createPlaywrightCaptureRunner(): CaptureRunner {
   return {
     metadata: {
       name: "Playwright",
-      version: typeof __PKG_VERSION__ === "undefined" ? "0.0.0" : __PKG_VERSION__, // oxlint-disable-line unicorn/no-typeof-undefined
+      version: __PKG_VERSION__ ?? "0.0.0",
       description: "Playwright capture runner",
       kind: "playwright",
     },

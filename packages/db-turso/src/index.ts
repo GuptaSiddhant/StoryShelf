@@ -7,7 +7,7 @@ import type { DatabaseAdapter, ListOptions } from "@storyshelf/core/adapter/data
 import { schema } from "@storyshelf/core/schema";
 import { DDL } from "@storyshelf/core/ddl";
 
-declare const __PKG_VERSION__: string;
+declare const __PKG_VERSION__: string | undefined;
 
 function idOf(table: AnySQLiteTable): SQLiteColumn {
   // eslint-disable-next-line no-non-null-assertion -- every table has an `id` column
@@ -47,7 +47,7 @@ export function createTursoDatabase(options: { url: string; authToken?: string }
   return {
     metadata: {
       name: "Turso",
-      version: typeof __PKG_VERSION__ === "undefined" ? "0.0.0" : __PKG_VERSION__, // oxlint-disable-line unicorn/no-typeof-undefined
+      version: __PKG_VERSION__ ?? "0.0.0",
       description: "Turso/libSQL database adapter",
       kind: "turso",
     },
