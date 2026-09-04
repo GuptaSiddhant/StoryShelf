@@ -9,6 +9,20 @@ const SCHEMA_URL =
 const NPM_SCHEME = "npm:";
 const PUBLISH_INCLUDE = ["src", "README.md", "LICENSE"];
 const PUBLISH_EXCLUDE = ["**/*.test.ts", "**/*.test.tsx", "**/test-helpers"];
+const SHORT_STRING_ARRAY_RE = /\[(\s*"[^"\n]*",?)+\s*\]/gu;
+const MAX_SINGLE_LINE_ARRAY = 80;
+
+function compactShortArrays(json: string): string {
+  return json.replace(SHORT_STRING_ARRAY_RE, (match) => {
+    const items = match.match(/"[^"\n]*"/gu) ?? [];
+    const single = `[${items.join(", ")}]`;
+    return single.length <= MAX_SINGLE_LINE_ARRAY ? single : match;
+  });
+}
+
+function writeJsonFile(filePath: string, value: Record<string, unknown>): void {
+  writeFileSync(filePath, `${compactShortArrays(JSON.stringify(value, null, 2))}\n`);
+}
 
 function mapEntries(entry: Record<string, string>): Record<string, string> {
   const exports: Record<string, string> = {};
@@ -106,5 +120,5 @@ export function generateDenoConfig(config: ResolvedConfig): void {
   deno["version"] = String(pkg["version"] ?? "0.0.0");
   deno["exports"] = mapEntries(config.entry);
   refreshImports(pkgRoot, deno);
-  writeFileSync(denoPath, `${JSON.stringify(deno, null, 2)}\n`);
+  writeJsonFile(denoPath, deno);
 }
