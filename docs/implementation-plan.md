@@ -37,7 +37,7 @@ Step-by-step build order. Each step is independently reviewable. Decisions made 
 
 ## Phase 5 — Examples, fixtures & website
 
-- `fixtures/storybook-8` — SB 8.6 Vite React (default, 7 stories; own npm install, built on demand)
+- `fixtures/storybook-8` — SB 8.6 Vite React (default, 7 stories; own pnpm install, built on demand)
 - `fixtures/storybook-9` — SB 9 Vite React
 - `fixtures/storybook-10` — SB 10 ESM + CSF-Next
 - `fixtures/storybook-11` — SB 11 alpha

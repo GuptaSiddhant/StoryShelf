@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// oxlint-disable max-statements max-lines-per-function no-console complexity
 /**
  * Prune nub.lock to match the (already pruned) working directory.
  *
@@ -15,7 +16,7 @@
  * importers and BFS on reachable packages.
  */
 
-import { cpSync, existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, relative, resolve } from "node:path";
 
@@ -57,7 +58,14 @@ function walkPackageJson(dir, outDir, keys) {
     return;
   }
   for (const e of entries) {
-    if (e.name === "node_modules" || e.name === "dist" || e.name === ".turbo" || e.name === ".cache" || e.name === ".git") continue;
+    if (
+      e.name === "node_modules" ||
+      e.name === "dist" ||
+      e.name === ".turbo" ||
+      e.name === ".cache" ||
+      e.name === ".git"
+    )
+      continue;
     const full = join(dir, e.name);
     if (e.isDirectory()) {
       walkPackageJson(full, outDir, keys);
@@ -142,15 +150,24 @@ function processSingleDir(dir, verbose, dryRun) {
     const nubRaw = readFileSync(nubLock, "utf8");
     if (pnpmRaw !== nubRaw) {
       if (!dryRun) writeFileSync(nubLock, pnpmRaw);
-      if (verbose) console.log(`[prune] trick: copied pruned pnpm-lock.yaml → nub.lock in ${relative(process.cwd(), dir)} (${pnpmRaw.length} bytes)`);
+      if (verbose)
+        console.log(
+          `[prune] trick: copied pruned pnpm-lock.yaml → nub.lock in ${relative(process.cwd(), dir)} (${pnpmRaw.length} bytes)`,
+        );
       return true;
     }
-    if (verbose) console.log(`[prune] trick: pnpm-lock.yaml already equals nub.lock in ${relative(process.cwd(), dir)} — no-op`);
+    if (verbose)
+      console.log(
+        `[prune] trick: pnpm-lock.yaml already equals nub.lock in ${relative(process.cwd(), dir)} — no-op`,
+      );
     return false;
   }
   if (existsSync(pnpmLock) && !existsSync(nubLock)) {
     if (!dryRun) cpSync(pnpmLock, nubLock);
-    if (verbose) console.log(`[prune] trick: created nub.lock from pnpm-lock.yaml in ${relative(process.cwd(), dir)}`);
+    if (verbose)
+      console.log(
+        `[prune] trick: created nub.lock from pnpm-lock.yaml in ${relative(process.cwd(), dir)}`,
+      );
     return true;
   }
 
@@ -214,11 +231,16 @@ function processSingleDir(dir, verbose, dryRun) {
     }
     const out = yaml.stringify(pruned);
     if (dryRun) {
-      console.log(`[prune] dry-run ${relative(process.cwd(), dir)}: importers ${originalImporterCount}→${Object.keys(newImporters).length}, packages ${originalPackageCount}→${Object.keys(newPackages ?? {}).length}`);
+      console.log(
+        `[prune] dry-run ${relative(process.cwd(), dir)}: importers ${originalImporterCount}→${Object.keys(newImporters).length}, packages ${originalPackageCount}→${Object.keys(newPackages ?? {}).length}`,
+      );
       return true;
     }
     writeFileSync(nubLock, out);
-    if (verbose) console.log(`[prune] fallback: trimmed ${relative(process.cwd(), nubLock)} importers ${originalImporterCount}→${Object.keys(newImporters).length}, packages ${originalPackageCount}→${Object.keys(newPackages).length}`);
+    if (verbose)
+      console.log(
+        `[prune] fallback: trimmed ${relative(process.cwd(), nubLock)} importers ${originalImporterCount}→${Object.keys(newImporters).length}, packages ${originalPackageCount}→${Object.keys(newPackages).length}`,
+      );
     return true;
   }
 
@@ -228,7 +250,10 @@ function processSingleDir(dir, verbose, dryRun) {
 
 function pruneDir(targetDir, verbose, dryRun) {
   const abs = resolve(targetDir);
-  const hasJson = existsSync(join(abs, "json", "package.json")) || existsSync(join(abs, "json", "pnpm-lock.yaml")) || existsSync(join(abs, "json", "nub.lock"));
+  const hasJson =
+    existsSync(join(abs, "json", "package.json")) ||
+    existsSync(join(abs, "json", "pnpm-lock.yaml")) ||
+    existsSync(join(abs, "json", "nub.lock"));
   const hasFull = existsSync(join(abs, "full", "package.json"));
   if (hasJson || hasFull) {
     let did = false;
@@ -238,7 +263,10 @@ function pruneDir(targetDir, verbose, dryRun) {
       const p = readFileSync(join(abs, "pnpm-lock.yaml"), "utf8");
       const n = readFileSync(join(abs, "nub.lock"), "utf8");
       if (p !== n && !dryRun) writeFileSync(join(abs, "nub.lock"), p);
-      if (verbose && p !== n) console.log(`[prune] synced ${relative(process.cwd(), join(abs, "pnpm-lock.yaml"))} → nub.lock`);
+      if (verbose && p !== n)
+        console.log(
+          `[prune] synced ${relative(process.cwd(), join(abs, "pnpm-lock.yaml"))} → nub.lock`,
+        );
       did = did || p !== n;
     }
     return did;

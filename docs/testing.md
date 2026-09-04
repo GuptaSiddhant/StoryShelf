@@ -26,11 +26,11 @@ Each adapter against its interface: SQLite via `:memory:` (Turso via a local lib
 
 ### 4. Browser integration (gated: `nub run test:integration`)
 
-Runs the **real** capture pipeline (`@storyshelf/runner-playwright`) against a built Storybook fixture in `fixtures/storybook-8` (default, 7 stories). Fixtures for 8/9/10/11 each have independent `npm` installs and are built on demand (`npm ci && npm run build-storybook`; `storybook-static/` is `.gitignored`). Override with `FIXTURE_DIR=fixtures/storybook-9`. Requires Playwright browsers. Gated so `turbo test` stays browser-free.
+Runs the **real** capture pipeline (`@storyshelf/runner-playwright`) against a built Storybook fixture in `fixtures/storybook-8` (default, 7 stories). Fixtures for 8/9/10/11 each have independent `pnpm` installs and are built on demand (`pnpm install && pnpm run build-storybook`; `storybook-static/` is `.gitignored`). Override with `FIXTURE_DIR=fixtures/storybook-9`. Requires Playwright browsers. Gated so `turbo test` stays browser-free.
 
 ## Fixtures
 
-- `fixtures/storybook-8` — SB 8.6 Vite React (default, 7 stories; own npm install)
+- `fixtures/storybook-8` — SB 8.6 Vite React (default, 7 stories; own pnpm install)
 - `fixtures/storybook-9` — SB 9 Vite React
 - `fixtures/storybook-10` — SB 10 ESM + CSF-Next (filters `subtype:'test'`)
 - `fixtures/storybook-11` — SB 11 alpha (upcoming)

@@ -3,19 +3,12 @@ import { execSync } from "node:child_process";
 import { setTimeout } from "node:timers/promises";
 import { getPublicPackageNames } from "./public-packages.mjs";
 
-let npm = "npm";
-try {
-  execSync("npm --version", { stdio: "ignore" });
-} catch {
-  npm = `~/.local/share/node-v26.8.1-linux-arm64/bin/npm`;
-}
-
 const packages = getPublicPackageNames();
 
 for (let index = 0; index < packages.length; index += 1) {
   const name = packages[index];
   const cmd = [
-    `${npm} trust github`,
+    "npm trust github",
     name,
     '--repo="GuptaSiddhant/storyshelf"',
     '--file="release.yml"',

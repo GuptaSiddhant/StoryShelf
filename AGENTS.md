@@ -38,8 +38,8 @@ nub run dev         # astro dev server (hot reload)
 nub run build       # generate openapi.json (prebuild) + build the docs site
 
 # Fixtures (independent npm installs, not nub workspaces):
-# cd fixtures/storybook-8 && npm ci && npm run build-storybook  # SB 8.6 (default)
-# cd fixtures/storybook-9 && npm ci && npm run build-storybook  # SB 9
+# cd fixtures/storybook-8 && pnpm install && pnpm run build-storybook  # SB 8.6 (default)
+# cd fixtures/storybook-9 && pnpm install && pnpm run build-storybook  # SB 9
 # All fixtures ignored for storybook-static (built on demand, not committed)
 ```
 
@@ -62,7 +62,7 @@ StoryShelf/
     website/        website         -- Public docs & marketing site (Astro Starlight)
     fly-app/        fly-app         -- Fly demo (local adapters, workspace deps, multi-stage cached Dockerfile; deploys on tag via fly.yml)
   fixtures/
-    storybook-8/    storybook-fixture -- SB 8.6 Vite React (default, 7 stories; own npm install)
+    storybook-8/    storybook-fixture -- SB 8.6 Vite React (default, 7 stories; own pnpm install)
     storybook-9/    storybook-fixture -- SB 9 Vite React
     storybook-10/   storybook-fixture -- SB 10 ESM + CSF-Next (filters subtype:'test')
     storybook-11/   storybook-fixture -- SB 11 alpha (upcoming)
