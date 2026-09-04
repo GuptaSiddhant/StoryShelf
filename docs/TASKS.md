@@ -1,4 +1,11 @@
-# StoryShelf — Task Board
+# StoryShelf — Task Board (ARCHIVED 2026-09-04)
+
+> **Source of truth is now [GitHub Issues](https://github.com/GuptaSiddhant/StoryShelf/issues).**
+> This file is frozen as a historical record. All 25 tasks were imported as
+> issues #1–#25 (24 closed as Done, #15 `[P4-1] E2E test suite` remains open).
+> Milestones `P0-Critical`…`P4-Future` + `De-slop` replace the sections below.
+> Do not update statuses here — open, assign, and close issues instead.
+> See `AGENTS.md` ("Parallel Development with Worktrees") for the issue-based workflow.
 
 > Structured task list for remaining P0–P4 improvements. Each task is self-contained with context, files, and acceptance criteria so any agent can pick it up.
 
@@ -337,11 +344,11 @@
 
 ---
 
-## How to Pick Up a Task
+## How to Pick Up a Task (archived — use GitHub Issues)
 
-1. **Read this file** to find an uncompleted task
-2. **Read `docs/architectural-improvement-plan.md`** for full context
-3. **Read `docs/adr/`** for architectural decisions
+1. **Find an open issue**: `gh issue list --state open` (or filter by milestone/label, e.g. `gh issue list --milestone "P4-Future" --label "type-task"`).
+2. Read `docs/architectural-improvement-plan.md` for full context (historical).
+3. Read `docs/adr/` for architectural decisions.
 4. **Run `nubx turbo test --filter='@storyshelf/core'`** to verify current state
 5. **Create a task branch** from `main`
 6. **Implement the task** following project conventions

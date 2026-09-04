@@ -161,9 +161,9 @@ nubx turbo verify --filter='@storyshelf/core' --force  # verify baseline
 
 ### Worktree Rules
 
-1. **`docs/TASKS.md` is manager-only** — only the main worktree edits status table (`Not Started → In Progress → Done`). Task worktrees only touch their `Files to Modify`.
+1. **GitHub Issues is the source of truth** — `docs/TASKS.md` is archived (frozen 2026-09-04, issues #1–#25). Manager creates/labels/milestones/assigns issues; agents pick up open issues via `gh issue list --state open`. Task worktrees only touch their issue's `Files to Modify`.
 2. **`nub.lock` is per-worktree** — never run `nub` installs concurrently in same tree.
-3. **File ownership** — each task branch only modifies files listed in its `Files to Modify` in `docs/TASKS.md`. Check before editing.
+3. **File ownership** — each task branch only modifies files listed in its issue's `Files to Modify`. Check before editing.
 
 ### Wave Assignment (file-disjoint = safe to parallel)
 
@@ -191,7 +191,7 @@ git commit -m "feat(p1-1): add query performance indexes
 git branch -d task/P1-1-indexes
 ```
 
-4. **Update `docs/TASKS.md`** — flip status to `Done`, add commit hash
+4. **Close the issue** — comment with commit hash and close (`gh issue close <n> --reason completed`), or `Closes #<n>` in the squash commit. Never edit `docs/TASKS.md` (archived).
 
 ### Squash Merge Convention
 

@@ -1,0 +1,55 @@
+name: Tracked task
+description: Agent-ready task with ownership scope and acceptance criteria.
+title: "[P?-?] "
+labels: ["type-task"]
+body:
+  - type: input
+    id: task-id
+    attributes:
+      label: Task ID
+      description: Stable ID like P1-1, P4-1, P-S3.
+      placeholder: "P4-1"
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is wrong or missing? Link relevant code (file:line).
+    validations:
+      required: true
+  - type: textarea
+    id: approach
+    attributes:
+      label: Solution / Approach
+      description: Proposed fix. Keep it scoped; split follow-ups into new issues.
+    validations:
+      required: false
+  - type: textarea
+    id: files
+    attributes:
+      label: Files to Modify
+      description: Ownership scope. The worktree/branch must not touch other files without a new issue.
+      placeholder: |
+        - `packages/core/src/...`
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: Checkboxes that must all pass before merge.
+      value: |
+        - [ ] Tests added/updated (`*.test.ts` colocated)
+        - [ ] `turbo lint` 0 errors
+        - [ ] `turbo test` passes
+    validations:
+      required: true
+  - type: input
+    id: branch
+    attributes:
+      label: Branch
+      description: Task branch name.
+      placeholder: "task/P4-1-short-slug"
+    validations:
+      required: false

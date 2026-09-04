@@ -283,7 +283,7 @@ if (dryRun) {
 } else {
   run(`git add ${bumpedFiles.join(" ")}`);
   run(`git commit -m "v${targetVersion}"`);
-  run(`git tag v${targetVersion}`);
+  run(`git tag -a v${targetVersion} -m "v${targetVersion}"`);
 }
 
 // 5. Guarantee: all packages now fixed at new version
