@@ -10,7 +10,7 @@ for (let index = 0; index < packages.length; index += 1) {
   const cmd = [
     "npm trust github",
     name,
-    '--repo="GuptaSiddhant/storyshelf"',
+    '--repo="GuptaSiddhant/StoryShelf"',
     '--file="release.yml"',
     "--allow-publish",
     "--yes",
