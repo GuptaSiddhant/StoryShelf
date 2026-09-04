@@ -1,4 +1,4 @@
-# StoryShelf Storybook Fixture
+# StoryShelf Storybook v10 Fixture
 
 A minimal, deterministic Storybook used as the capture test fixture and as the "try it" sample.
 

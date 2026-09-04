@@ -37,9 +37,10 @@ nub run start       # serve the built docs site (astro preview; requires a prior
 nub run dev         # astro dev server (hot reload)
 nub run build       # generate openapi.json (prebuild) + build the docs site
 
-# Fixtures (independent npm installs, not nub workspaces):
-# cd fixtures/storybook-8 && pnpm install && pnpm run build-storybook  # SB 8.6 (default)
-# cd fixtures/storybook-9 && pnpm install && pnpm run build-storybook  # SB 9
+# Fixtures (independent pnpm installs, not nub workspaces):
+# cd fixtures/storybook-8 && pnpm install && pnpm run build-storybook  # SB 8.6 (default, :6008)
+# cd fixtures/storybook-9 && pnpm install && pnpm run build-storybook  # SB 9 (:6009)
+# cd fixtures/storybook-10 && pnpm install && pnpm run build-storybook # SB 10 ESM + CSF-Next (:6010)
 # All fixtures ignored for storybook-static (built on demand, not committed)
 ```
 
@@ -65,7 +66,6 @@ StoryShelf/
     storybook-8/    storybook-fixture -- SB 8.6 Vite React (default, 7 stories; own pnpm install)
     storybook-9/    storybook-fixture -- SB 9 Vite React
     storybook-10/   storybook-fixture -- SB 10 ESM + CSF-Next (filters subtype:'test')
-    storybook-11/   storybook-fixture -- SB 11 alpha (upcoming)
   docs/
     architecture.md       -- Full architecture document
     testing.md            -- Testing strategy (unit/adapter/integration/gated-browser)

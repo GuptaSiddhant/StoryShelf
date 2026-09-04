@@ -12,6 +12,7 @@ const config: StorybookConfig = {
     backgrounds: true,
     controls: true,
     viewport: true,
+    experimentalTestSyntax: true,
   },
 };
 

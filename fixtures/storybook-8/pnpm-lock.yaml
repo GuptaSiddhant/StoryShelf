@@ -9,10 +9,10 @@ importers:
   .:
     dependencies:
       react:
-        specifier: ^18.3.1
+        specifier: ^18.3.0
         version: 18.3.1
       react-dom:
-        specifier: ^18.3.1
+        specifier: ^18.3.0
         version: 18.3.1(react@18.3.1)
     devDependencies:
       '@storybook/addon-essentials':
@@ -20,10 +20,10 @@ importers:
         version: 8.6.14(@types/react@18.3.31)(storybook@8.6.18)
       '@storybook/react':
         specifier: ^8.6.0
-        version: 8.6.18(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(storybook@8.6.18)(typescript@5.9.3)
+        version: 8.6.18(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(storybook@8.6.18)(typescript@6.0.3)
       '@storybook/react-vite':
         specifier: ^8.6.0
-        version: 8.6.18(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(rollup@4.63.1)(storybook@8.6.18)(typescript@5.9.3)(vite@6.4.3)
+        version: 8.6.18(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(rollup@4.63.1)(storybook@8.6.18)(typescript@6.0.3)(vite@6.4.3)
       '@types/react':
         specifier: ^18.3.0
         version: 18.3.31
@@ -34,8 +34,8 @@ importers:
         specifier: ^8.6.0
         version: 8.6.18
       typescript:
-        specifier: ^5.7.0
-        version: 5.9.3
+        specifier: ^6.0.0
+        version: 6.0.3
       vite:
         specifier: ^6.0.0
         version: 6.4.3
@@ -1187,8 +1187,8 @@ packages:
   tslib@2.8.1:
     resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
 
-  typescript@5.9.3:
-    resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
+  typescript@6.0.3:
+    resolution: {integrity: sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==}
     engines: {node: '>=14.17'}
     hasBin: true
 
@@ -1480,14 +1480,14 @@ snapshots:
       wrap-ansi: 8.1.0
       wrap-ansi-cjs: wrap-ansi@7.0.0
 
-  '@joshwooding/vite-plugin-react-docgen-typescript@0.5.0(typescript@5.9.3)(vite@6.4.3)':
+  '@joshwooding/vite-plugin-react-docgen-typescript@0.5.0(typescript@6.0.3)(vite@6.4.3)':
     dependencies:
       glob: 10.5.0
       magic-string: 0.27.0
-      react-docgen-typescript: 2.4.0(typescript@5.9.3)
+      react-docgen-typescript: 2.4.0(typescript@6.0.3)
       vite: 6.4.3
     optionalDependencies:
-      typescript: 5.9.3
+      typescript: 6.0.3
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
@@ -1758,12 +1758,12 @@ snapshots:
       react-dom: 18.3.1(react@18.3.1)
       storybook: 8.6.18
 
-  '@storybook/react-vite@8.6.18(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(rollup@4.63.1)(storybook@8.6.18)(typescript@5.9.3)(vite@6.4.3)':
+  '@storybook/react-vite@8.6.18(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(rollup@4.63.1)(storybook@8.6.18)(typescript@6.0.3)(vite@6.4.3)':
     dependencies:
-      '@joshwooding/vite-plugin-react-docgen-typescript': 0.5.0(typescript@5.9.3)(vite@6.4.3)
+      '@joshwooding/vite-plugin-react-docgen-typescript': 0.5.0(typescript@6.0.3)(vite@6.4.3)
       '@rollup/pluginutils': 5.4.0(rollup@4.63.1)
       '@storybook/builder-vite': 8.6.18(storybook@8.6.18)(vite@6.4.3)
-      '@storybook/react': 8.6.18(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(storybook@8.6.18)(typescript@5.9.3)
+      '@storybook/react': 8.6.18(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(storybook@8.6.18)(typescript@6.0.3)
       find-up: 5.0.0
       magic-string: 0.30.21
       react: 18.3.1
@@ -1778,7 +1778,7 @@ snapshots:
       - supports-color
       - typescript
 
-  '@storybook/react@8.6.18(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(storybook@8.6.18)(typescript@5.9.3)':
+  '@storybook/react@8.6.18(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(storybook@8.6.18)(typescript@6.0.3)':
     dependencies:
       '@storybook/components': 8.6.18(storybook@8.6.18)
       '@storybook/global': 5.0.0
@@ -1790,7 +1790,7 @@ snapshots:
       react-dom: 18.3.1(react@18.3.1)
       storybook: 8.6.18
     optionalDependencies:
-      typescript: 5.9.3
+      typescript: 6.0.3
 
   '@storybook/theming@8.6.18(storybook@8.6.18)':
     dependencies:
@@ -2214,9 +2214,9 @@ snapshots:
 
   process@0.11.10: {}
 
-  react-docgen-typescript@2.4.0(typescript@5.9.3):
+  react-docgen-typescript@2.4.0(typescript@6.0.3):
     dependencies:
-      typescript: 5.9.3
+      typescript: 6.0.3
 
   react-docgen@7.1.1:
     dependencies:
@@ -2376,7 +2376,7 @@ snapshots:
 
   tslib@2.8.1: {}
 
-  typescript@5.9.3: {}
+  typescript@6.0.3: {}
 
   unplugin@1.16.1:
     dependencies:

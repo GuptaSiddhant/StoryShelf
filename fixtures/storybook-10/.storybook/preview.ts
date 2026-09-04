@@ -1,10 +1,8 @@
-import type { Preview } from "@storybook/react";
+import { definePreview } from "@storybook/react-vite";
 
-const preview: Preview = {
+export default definePreview({
   parameters: {
     controls: { expanded: true },
     layout: "centered",
   },
-};
-
-export default preview;
+});
