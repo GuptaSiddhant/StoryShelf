@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/git-github",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "GitHub commit status adapter for StoryShelf.",
   "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
   "bugs": {
