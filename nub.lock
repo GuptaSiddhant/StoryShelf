@@ -126,6 +126,13 @@ importers:
       '@storyshelf/storage-local':
         specifier: workspace:*
         version: link:../../packages/storage-local
+    devDependencies:
+      rolldown:
+        specifier: '*'
+        version: 1.2.7
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
 
   apps/website:
     dependencies:

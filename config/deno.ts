@@ -4,7 +4,8 @@ import type { ResolvedConfig } from "tsdown";
 
 const INDEX_KEY = "index";
 const DENO_JSON = "deno.json";
-const SCHEMA_URL = "https://deno.land/x/deno/cli/schemas/config-file.v1.json";
+const SCHEMA_URL =
+  "https://raw.githubusercontent.com/denoland/deno/refs/heads/main/cli/schemas/config-file.v1.json";
 const NPM_SCHEME = "npm:";
 const PUBLISH_INCLUDE = ["src", "README.md", "LICENSE"];
 const PUBLISH_EXCLUDE = ["**/*.test.ts", "**/*.test.tsx", "**/test-helpers"];
@@ -68,7 +69,8 @@ function refreshImports(pkgRoot: string, deno: Record<string, unknown>): void {
     }
     const version = installedVersion(pkgRoot, parsed.name);
     if (version) {
-      (imports as Record<string, unknown>)[key] = `${NPM_SCHEME}${parsed.name}@${version}${parsed.subpath}`;
+      (imports as Record<string, unknown>)[key] =
+        `${NPM_SCHEME}${parsed.name}@${version}${parsed.subpath}`;
     }
   }
 }
