@@ -115,10 +115,15 @@ jobs:
       - name: Setup Nub
         uses: nubjs/setup-nub@v0
 
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.6.7
+
       - name: Install dependencies
         run: nub ci
 
-      - name: Build packages (regenerates jsr.json with current version)
+      - name: Build packages (regenerates deno.json with current version)
         run: nub run build --filter='./packages/*'
 
       - name: Guard JSR config versions match package.json
@@ -201,8 +206,13 @@ jobs:
           for name in "${ORDER[@]}"; do
             PACKAGE="${name#@storyshelf/}"
             echo "Publishing $name"
-            # --allow-dirty: build regenerates jsr.json, leaving the tree dirty.
+            # deno publish directly (no npx jsr wrapper): the wrapper re-downloads
+            # itself and its deno binary per package (~5 min each). Pinned deno
+            # via Setup Deno above makes every package publish in seconds.
+            # --allow-dirty: build regenerates deno.json, leaving the tree dirty.
             # --allow-slow-types: core's zod/drizzle inferred types trip JSR's
             #   explicit-type check; documented escape hatch, no-op elsewhere.
-            (cd "packages/$PACKAGE" && npx jsr publish --allow-dirty --allow-slow-types)
+            # --unstable-*: BYONM/sloppy-imports for package.json projects (same
+            #   set the jsr CLI injects); --no-check skips redundant typecheck.
+            (cd "packages/$PACKAGE" && deno publish --unstable-bare-node-builtins --unstable-sloppy-imports --unstable-byonm --no-check --allow-dirty --allow-slow-types)
           done
