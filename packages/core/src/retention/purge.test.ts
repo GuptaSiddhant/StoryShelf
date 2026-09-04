@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { builds, projects } from "../schema.ts";
+import { builds, projects } from "../schema-tables.ts";
 import { makeStorage } from "../capture/fake-adapters.ts";
 import { makeDatabase } from "../capture/fake-adapters.ts";
 import { Retention } from "./purge.ts";

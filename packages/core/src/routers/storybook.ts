@@ -61,6 +61,7 @@ async function canViewBuild(build: Pick<Build, "public" | "gitBranch">, project:
   return Boolean(role && VIEW_ROLES.has(role));
 }
 
+/** Register the published Storybook resolver and static-asset routes. */
 export function registerStorybook(app: ShelfApp): void {
   // Resolver: latest published build on the default branch.
   app.get("/projects/:slug/storybook", async (c) => {

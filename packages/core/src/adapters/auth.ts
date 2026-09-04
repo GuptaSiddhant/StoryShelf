@@ -1,3 +1,6 @@
+/**
+ * Auth adapter interface: authenticate users and resolve project access.
+ */
 import type { AdapterMetadata } from "./metadata.ts";
 import type { ProjectRole, SiteRole } from "../types.ts";
 

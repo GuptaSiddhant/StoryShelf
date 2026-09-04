@@ -23,6 +23,7 @@ export function commentMarker(url: string): string {
   return `<!-- storyshelf:${url} -->`;
 }
 
+/** Build the Markdown body for a StoryShelf status comment. */
 export function buildCommentMarkdown(status: CheckStatus, url: string, context: string): string {
   switch (status) {
     case "pending": {

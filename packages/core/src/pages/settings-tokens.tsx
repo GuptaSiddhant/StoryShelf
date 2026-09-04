@@ -1,6 +1,7 @@
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { Project, Token } from "../schema.ts";
 
+/** Tokens settings tab: project CLI tokens plus the create-token form. */
 export function renderSettingsTokens(project: Project, tokens: Omit<Token, "hash">[], isAdmin: boolean): unknown {
   return (
     <div class="grid" style="max-width: 880px;">

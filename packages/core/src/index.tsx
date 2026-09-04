@@ -1,3 +1,7 @@
+/**
+ * StoryShelf core: compose database, storage, capture, auth, and git-host
+ * adapters into a complete self-hosted visual-testing Hono server.
+ */
 import { swaggerUI } from "@hono/swagger-ui";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { requestId } from "hono/request-id";
@@ -28,6 +32,7 @@ import { executeCaptureJob, type CaptureJobOptions } from "./capture/orchestrato
 import { InMemoryCaptureQueue } from "./capture/queue.ts";
 import { postStatusesForBuild } from "./capture/status-fanout.ts";
 
+/** Per-request shelf context (adapters, config, user, capture queue). */
 export interface ShelfContext {
   requestId?: string;
   db: import("./adapters/database.ts").DatabaseAdapter;
@@ -42,6 +47,7 @@ export interface ShelfContext {
   gitHosts: import("./adapters/git-host/index.ts").GitHostProvider[];
 }
 
+/** Hono application type carrying the shelf context variables. */
 export type ShelfApp = OpenAPIHono<{ Variables: ShelfContext }>;
 
 function buildAdapterSnapshot(options: ShelfOptions): Record<string, AdapterMetadata | GitAdapterMetadata> {
@@ -124,6 +130,7 @@ async function resolveUser(
 }
 
 
+/** Create the StoryShelf Hono router with all API routes and HTML pages. */
 export function createShelfRouter(options: ShelfOptions): ShelfApp {
   const app = new OpenAPIHono<{ Variables: ShelfContext }>();
   // eslint-disable-next-line typescript/no-unnecessary-type-assertion -- ShelfConfig lacks index signature

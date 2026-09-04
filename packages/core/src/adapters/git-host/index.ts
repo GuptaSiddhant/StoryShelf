@@ -1,3 +1,6 @@
+/**
+ * Git-host adapter interface: commit statuses and review comments for merge gates.
+ */
 import type { Logger } from "pino";
 
 import type { GitAdapterMetadata } from "../metadata.ts";

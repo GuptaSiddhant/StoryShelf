@@ -1,3 +1,4 @@
+/** Per-story capture parameters from the Storybook index. */
 export interface StoryParameters {
   disableSnapshot?: boolean;
   delay?: number;
@@ -6,6 +7,7 @@ export interface StoryParameters {
   flakyTest?: boolean;
 }
 
+/** Return whether a story is marked flaky (failures stay non-blocking). */
 export function isFlakyStory(entry: Pick<StoryEntry, "tags" | "parameters">): boolean {
   if (entry.parameters?.flakyTest) return true;
   const tags = entry.tags ?? [];
@@ -15,6 +17,7 @@ export function isFlakyStory(entry: Pick<StoryEntry, "tags" | "parameters">): bo
   return false;
 }
 
+/** Return whether a story is excluded from snapshot capture. */
 export function isDisabledStory(entry: Pick<StoryEntry, "tags" | "parameters">): boolean {
   if (entry.parameters?.disableSnapshot) return true;
   const tags = entry.tags ?? [];
@@ -51,4 +54,5 @@ export interface Viewport {
   height: number;
 }
 
+/** Default viewport used when none is configured. */
 export const DEFAULT_VIEWPORTS: Viewport[] = [{ name: "desktop", width: 1280, height: 720 }];

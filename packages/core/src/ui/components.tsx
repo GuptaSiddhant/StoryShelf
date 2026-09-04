@@ -5,6 +5,7 @@ import type { FC } from "hono/jsx";
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 type BadgeTone = "neutral" | "success" | "warning" | "danger" | "info";
 
+/** Button or link styled as a button (renders an anchor when `href` is set). */
 export const Button: FC<{
   variant?: ButtonVariant;
   type?: "button" | "submit" | "reset";
@@ -28,11 +29,13 @@ export const Button: FC<{
   );
 };
 
+/** Small status pill with a color tone. */
 // eslint-disable-next-line promise-function-async -- JSX component return type
 export const Badge: FC<{ tone?: BadgeTone; children?: unknown }> = ({ tone = "neutral", children }) => {
   return <span class={`badge badge--${tone}`}>{children}</span>;
 };
 
+/** Map a build or snapshot status string to its badge tone. */
 export function statusTone(status: string): BadgeTone {
   if (status === "approved" || status === "unchanged") {
     return "success";
@@ -49,11 +52,13 @@ export function statusTone(status: string): BadgeTone {
   return "neutral";
 }
 
+/** Card container, padded by default. */
 // eslint-disable-next-line promise-function-async -- JSX component return type
 export const Card: FC<{ children?: unknown; padded?: boolean }> = ({ children, padded = true }) => {
   return <div class={padded ? "card card--padded" : "card"}>{children}</div>;
 };
 
+/** Alert banner with an optional title. */
 // eslint-disable-next-line promise-function-async -- JSX component return type
 export const Alert: FC<{ tone?: BadgeTone; title?: string; children?: unknown }> = ({ tone = "info", title, children }) => {
   return (
@@ -93,6 +98,7 @@ function fieldDescribedBy(name: string, error: string | undefined, hint: string 
   return undefined;
 }
 
+/** Labeled text input with error and hint states. */
 // eslint-disable-next-line promise-function-async -- JSX component return type
 export const Field: FC<{
   label: string;
@@ -128,6 +134,7 @@ export const Field: FC<{
   );
 };
 
+/** Labeled textarea with error and hint states. */
 // eslint-disable-next-line promise-function-async -- JSX component return type
 export const TextareaField: FC<{
   label: string;
@@ -159,6 +166,7 @@ export const TextareaField: FC<{
   );
 };
 
+/** Labeled select dropdown with an optional hint. */
 // eslint-disable-next-line promise-function-async -- JSX component return type
 export const SelectField: FC<{
   label: string;
@@ -188,6 +196,7 @@ export const SelectField: FC<{
   );
 };
 
+/** Page header with breadcrumbs, title, description, and actions. */
 // eslint-disable-next-line promise-function-async -- JSX component return type
 export const PageHeader: FC<{
   title: string;
@@ -219,6 +228,7 @@ export const PageHeader: FC<{
   );
 };
 
+/** Centered empty state with an optional call-to-action. */
 // eslint-disable-next-line promise-function-async -- JSX component return type
 export const EmptyState: FC<{ title: string; description?: string; action?: unknown }> = ({ title, description, action }) => {
   return (
@@ -230,6 +240,7 @@ export const EmptyState: FC<{ title: string; description?: string; action?: unkn
   );
 };
 
+/** Tab navigation bar for section switching. */
 // eslint-disable-next-line promise-function-async -- JSX component return type
 export const Tabs: FC<{
   tabs: { label: string; href: string; active?: boolean }[];
@@ -245,6 +256,7 @@ export const Tabs: FC<{
   );
 };
 
+/** Centered statistic value with a label. */
 // eslint-disable-next-line promise-function-async -- JSX component return type
 export const Stat: FC<{ label: string; value: string | number }> = ({ label, value }) => {
   return (

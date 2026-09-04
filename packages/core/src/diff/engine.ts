@@ -3,6 +3,14 @@ import { PNG } from "pngjs";
 
 import type { DiffOptions, DiffResult } from "./options.ts";
 
+/**
+ * Compare baseline and current screenshots, returning pass/fail and a diff image.
+ *
+ * @param baseline - Baseline PNG buffer.
+ * @param current - Current capture PNG buffer.
+ * @param options - Pixel threshold and ratio limits.
+ * @returns The diff result with pixel counts and an optional overlay image.
+ */
 export function diffImages(baseline: Buffer, current: Buffer, options: DiffOptions): DiffResult {
   const baselinePng = PNG.sync.read(baseline);
   const currentPng = PNG.sync.read(current);

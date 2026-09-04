@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { DatabaseAdapter } from "../adapters/database.ts";
-import { projects } from "../schema.ts";
+import { projects } from "../schema-tables.ts";
 import { makeDatabase } from "../capture/fake-adapters.ts";
 import { CommentModel } from "./comment.ts";
 

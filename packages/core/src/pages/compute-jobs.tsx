@@ -15,6 +15,7 @@ interface QueueView {
   error?: string;
 }
 
+/** Live-refreshing partial showing the currently queued and running captures. */
 export function renderActiveQueue(slug: string, queueView: QueueView[]): RenderedContent {
   return (
     <div class="card card--padded" id="active-queue" hx-get={`/projects/${slug}/jobs?partial=queue`} hx-trigger="every 5s" hx-swap="outerHTML" hx-target="#active-queue">
@@ -55,6 +56,7 @@ export function renderActiveQueue(slug: string, queueView: QueueView[]): Rendere
   );
 }
 
+/** Compute jobs page: live capture queue plus recent build history with retry. */
 export async function renderComputeJobsPage(slug: string, queueView: QueueView[], canRetry: boolean): Promise<RenderedContent | null> {
   const projects = await new ProjectModel(getStore().db).list();
   const project = projects.find((item) => item.slug === slug);

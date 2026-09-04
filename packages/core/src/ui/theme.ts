@@ -1,3 +1,4 @@
+/** Brand theme tokens (accent, surfaces, text, borders, statuses). */
 export interface BrandTheme {
   accent: string;
   surface: { base: string; card: string };
@@ -6,6 +7,7 @@ export interface BrandTheme {
   status: { approved: string; new: string; rejected: string };
 }
 
+/** Default light brand theme. */
 export const LIGHT_THEME: BrandTheme = {
   accent: "#2b7fff",
   surface: { base: "#f6f6f7", card: "#ffffff" },
@@ -14,6 +16,7 @@ export const LIGHT_THEME: BrandTheme = {
   status: { approved: "#16a34a", new: "#d97706", rejected: "#dc2626" },
 };
 
+/** Default dark brand theme. */
 export const DARK_THEME: BrandTheme = {
   accent: "#4f8fff",
   surface: { base: "#09090b", card: "#18181b" },

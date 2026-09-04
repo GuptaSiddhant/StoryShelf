@@ -1,10 +1,12 @@
 import type { Project } from "../schema.ts";
 
+/** Form state for the settings tabs (field errors and global error). */
 export interface SettingsFormState {
   errors?: Record<string, string>;
   globalError?: string;
 }
 
+/** General settings tab: project metadata, diff thresholds, and danger zone. */
 export function renderSettingsGeneral(project: Project, formState: SettingsFormState | undefined, isAdmin: boolean): unknown {
   const errors = formState?.errors ?? {};
   return (

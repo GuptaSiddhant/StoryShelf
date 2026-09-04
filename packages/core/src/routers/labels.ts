@@ -58,6 +58,7 @@ const updateLabelRoute = createRoute({
   },
 });
 
+/** Register the project label-type list, create, update, and delete endpoints. */
 export function registerLabels(app: ShelfApp): void {
   app.openapi(listLabelsRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...VIEW_ROLES);

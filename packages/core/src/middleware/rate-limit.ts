@@ -24,6 +24,7 @@ function cleanup(): void {
 
 setInterval(cleanup, 60_000).unref();
 
+/** Hono middleware limiting requests per key within a sliding window. */
 export function rateLimit(options: RateLimitOptions) {
   const { windowMs, max, keyGenerator } = options;
   // oxlint-disable-next-line typescript/no-invalid-void-type -- Hono middleware may not return Response

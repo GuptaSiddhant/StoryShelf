@@ -1,5 +1,6 @@
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
+/** Landing page introducing capture, diff, and review. */
 export function renderRootPage(): RenderedContent {
   return (
     <DocumentLayout title="Welcome" nav={{ active: "projects" }}>

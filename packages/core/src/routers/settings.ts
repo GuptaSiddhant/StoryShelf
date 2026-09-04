@@ -54,6 +54,7 @@ async function loadSettingsData(slug: string): Promise<SettingsData | null> {
   return { project, labelTypes, tokens, members, webhooks, statusConfigs, gitHosts, isAdmin };
 }
 
+/** Render the project settings page for the given tab, optionally with form state. */
 export async function renderSettingsPage(c: Context, tab: SettingsTab, formState?: SettingsFormState): Promise<string> {
   const slug = c.req.param("slug") ?? "";
   const data = await loadSettingsData(slug);
@@ -92,6 +93,7 @@ async function findProject(slug: string): Promise<Project> {
   return project;
 }
 
+/** Register the server-rendered project settings pages and their form handlers. */
 export function registerSettingsPages(app: ShelfApp): void {
   app.get("/projects/:slug/settings", async (c) => c.html(await settingsPage(c, "general")));
   app.get("/projects/:slug/settings/tests", async (c) => c.html(await settingsPage(c, "tests")));

@@ -2,6 +2,7 @@ import type { HtmlEscapedString } from "hono/utils/html";
 import type { LabelType, Project } from "../schema.ts";
 import { Badge } from "../ui/components.tsx";
 
+/** Labels settings tab: label-type table plus the create-type form. */
 export function renderSettingsLabels(project: Project, labelTypes: LabelType[], isAdmin: boolean): unknown {
   return (
     <div class="grid" style="max-width: 880px;">

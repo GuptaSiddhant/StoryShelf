@@ -3,6 +3,7 @@ import type { GitHostProvider } from "../adapters/git-host/index.ts";
 import type { Project } from "../schema.ts";
 import { Badge, Field, SelectField, TextareaField } from "../ui/components.tsx";
 
+/** Git status configuration row as rendered in the status settings tab. */
 export interface SettingsStatusConfig {
   id: string;
   provider: string;
@@ -12,6 +13,7 @@ export interface SettingsStatusConfig {
   updatedAt: string;
 }
 
+/** Form state for the git status settings tab. */
 export interface StatusFormState {
   errors?: Record<string, string>;
   globalError?: string;
@@ -85,6 +87,7 @@ function renderCreateSection(project: Project, providers: GitHostProvider[], for
   return <StatusCreateCard project={project} providers={providers} formState={formState} />;
 }
 
+/** Git status settings tab: configured providers plus the add-provider form. */
 // eslint-disable-next-line max-params -- matches sibling settings render functions
 export function renderSettingsStatus(
   project: Project,

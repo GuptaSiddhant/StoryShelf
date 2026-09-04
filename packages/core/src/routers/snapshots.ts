@@ -58,6 +58,7 @@ const rejectAllRoute = createRoute({
   },
 });
 
+/** Register the snapshot list, approve, reject, and bulk-review endpoints. */
 export function registerSnapshots(app: ShelfApp): void {
   app.openapi(listSnapshotsRoute, async (c) => {
     const { slug, buildId } = c.req.valid("param");

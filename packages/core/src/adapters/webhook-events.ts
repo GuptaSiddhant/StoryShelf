@@ -2,6 +2,7 @@ import type { DatabaseAdapter } from "./database.ts";
 import { WebhookModel } from "../models/webhook.ts";
 import { hmacSha256 } from "../utils/hash.ts";
 
+/** Outbound webhook payload delivered to subscribers. */
 export interface WebhookEvent {
   event: string;
   projectId: string;
@@ -23,6 +24,14 @@ async function sendWebhook(url: string, secret: string, event: WebhookEvent): Pr
   });
 }
 
+/**
+ * Deliver an event to every subscribed webhook of a project.
+ *
+ * @param db - Database adapter for loading subscriptions.
+ * @param projectId - Project whose webhooks receive the event.
+ * @param event - Event name (e.g. "baseline:created").
+ * @param data - Event payload.
+ */
 export async function emitWebhookEvent(
   db: DatabaseAdapter,
   projectId: string,

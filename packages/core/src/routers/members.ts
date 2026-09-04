@@ -57,6 +57,7 @@ const deleteMemberRoute = createRoute({
   },
 });
 
+/** Register the project member list, upsert, and removal endpoints. */
 export function registerMembers(app: ShelfApp): void {
   app.openapi(listMembersRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...VIEW_ROLES);

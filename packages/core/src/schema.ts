@@ -1,7 +1,27 @@
-import { index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import type { AnySQLiteTable } from "drizzle-orm/sqlite-core";
 
+import {
+  baselines as baselinesTable,
+  buildLabels as buildLabelsTable,
+  builds as buildsTable,
+  comments as commentsTable,
+  labelTypes as labelTypesTable,
+  projectMembers as projectMembersTable,
+  projects as projectsTable,
+  projectStatusConfigs as projectStatusConfigsTable,
+  snapshots as snapshotsTable,
+  tokens as tokensTable,
+  users as usersTable,
+  webhooks as webhooksTable,
+} from "./schema-tables.ts";
 import type { BuildStatus, ProjectRole, SiteRole, SnapshotStatus } from "./types.ts";
 
+/**
+ * Database schema: table handles, row types, and the schema object passed to
+ * the Drizzle client.
+ */
+
+/** Storybook metadata synced from a project's published Storybook. */
 export interface StorybookMeta {
   framework?: { name?: string; options?: unknown };
   addons?: string[];
@@ -11,222 +31,32 @@ export interface StorybookMeta {
   previewParameters?: Record<string, unknown>;
 }
 
-export const projects = sqliteTable("projects", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  slug: text("slug").notNull(),
-  gitRepository: text("git_repository"),
-  gitDefaultBranch: text("git_default_branch").notNull().default("main"),
-  pixelThreshold: real("pixel_threshold").notNull().default(0.1),
-  maxDiffRatio: real("max_diff_ratio").notNull().default(0.01),
-  publicBranchRegex: text("public_branch_regex"),
-  storybookMeta: text("storybook_meta").$type<string | null | undefined>().default(null),
-  executePlay: integer("execute_play", { mode: "boolean" }).notNull().default(false),
-  playTimeoutMs: integer("play_timeout_ms").notNull().default(10_000),
-  createdAt: text("created_at").notNull(),
-  updatedAt: text("updated_at").notNull(),
-});
+/** Projects table (one row per Storybook project). */
+export const projects: AnySQLiteTable = projectsTable;
+/** Project status-configs table (merge-gate configurations). */
+export const projectStatusConfigs: AnySQLiteTable = projectStatusConfigsTable;
+/** Builds table (one row per uploaded Storybook build). */
+export const builds: AnySQLiteTable = buildsTable;
+/** Snapshots table (one row per captured story screenshot). */
+export const snapshots: AnySQLiteTable = snapshotsTable;
+/** Baselines table (accepted reference snapshots per branch). */
+export const baselines: AnySQLiteTable = baselinesTable;
+/** Comments table (review comments on snapshots). */
+export const comments: AnySQLiteTable = commentsTable;
+/** Label-types table (project-defined build label vocabularies). */
+export const labelTypes: AnySQLiteTable = labelTypesTable;
+/** Build-labels table (labels attached to builds). */
+export const buildLabels: AnySQLiteTable = buildLabelsTable;
+/** Tokens table (CI token hashes per project). */
+export const tokens: AnySQLiteTable = tokensTable;
+/** Webhooks table (outgoing build-event subscriptions). */
+export const webhooks: AnySQLiteTable = webhooksTable;
+/** Users table (dashboard members). */
+export const users: AnySQLiteTable = usersTable;
+/** Project-members table (per-project memberships and roles). */
+export const projectMembers: AnySQLiteTable = projectMembersTable;
 
-export const projectStatusConfigs = sqliteTable("project_status_configs", {
-  id: text("id").primaryKey(),
-  projectId: text("project_id")
-    .notNull()
-    .references(() => projects.id, { onDelete: "cascade" }),
-  provider: text("provider").notNull(),
-  config: text("config").notNull(),
-  tokenEncrypted: text("token_encrypted").notNull(),
-  createdAt: text("created_at").notNull(),
-  updatedAt: text("updated_at").notNull(),
-});
-
-export const builds = sqliteTable(
-  "builds",
-  {
-    id: text("id").primaryKey(),
-    projectId: text("project_id")
-      .notNull()
-      .references(() => projects.id, { onDelete: "cascade" }),
-    gitSha: text("git_sha").notNull(),
-    gitBranch: text("git_branch").notNull(),
-    isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false),
-    authorEmail: text("author_email"),
-    authorName: text("author_name"),
-    message: text("message"),
-    public: integer("public", { mode: "boolean" }).notNull().default(false),
-    status: text("status").$type<BuildStatus>().notNull().default("pending"),
-    snapshotCount: integer("snapshot_count").notNull().default(0),
-    changedCount: integer("changed_count").notNull().default(0),
-    approvedCount: integer("approved_count").notNull().default(0),
-    rejectedCount: integer("rejected_count").notNull().default(0),
-    createdAt: text("created_at").notNull(),
-    updatedAt: text("updated_at").notNull(),
-  },
-  (t) => [
-    uniqueIndex("builds_project_gitsha_idx").on(t.projectId, t.gitSha),
-    index("builds_git_branch_idx").on(t.gitBranch),
-  ],
-);
-
-export const snapshots = sqliteTable(
-  "snapshots",
-  {
-    id: text("id").primaryKey(),
-    projectId: text("project_id")
-      .notNull()
-      .references(() => projects.id, { onDelete: "cascade" }),
-    buildId: text("build_id")
-      .notNull()
-      .references(() => builds.id, { onDelete: "cascade" }),
-    storyId: text("story_id").notNull(),
-    storyName: text("story_name").notNull(),
-    storyTitle: text("story_title").notNull(),
-    storyImportPath: text("story_import_path"),
-    viewportName: text("viewport_name").notNull().default("desktop"),
-    viewportWidth: integer("viewport_width").notNull().default(1280),
-    viewportHeight: integer("viewport_height").notNull().default(720),
-    screenshotPath: text("screenshot_path").notNull(),
-    diffPath: text("diff_path"),
-    diffPixels: integer("diff_pixels"),
-    diffRatio: real("diff_ratio"),
-    diffPassed: integer("diff_passed", { mode: "boolean" }),
-    status: text("status").$type<SnapshotStatus>().notNull().default("pending"),
-    reviewedBy: text("reviewed_by"),
-    reviewedAt: text("reviewed_at"),
-    createdAt: text("created_at").notNull(),
-    updatedAt: text("updated_at").notNull(),
-  },
-  (t) => [
-    uniqueIndex("snapshots_build_story_viewport_idx").on(t.buildId, t.storyId, t.viewportName),
-    index("snapshots_build_id_idx").on(t.buildId),
-  ],
-);
-
-export const baselines = sqliteTable(
-  "baselines",
-  {
-    id: text("id").primaryKey(),
-    projectId: text("project_id")
-      .notNull()
-      .references(() => projects.id, { onDelete: "cascade" }),
-    storyId: text("story_id").notNull(),
-    viewportName: text("viewport_name").notNull().default("desktop"),
-    branch: text("branch").notNull(),
-    snapshotId: text("snapshot_id"),
-    screenshotPath: text("screenshot_path").notNull(),
-    createdAt: text("created_at").notNull(),
-    updatedAt: text("updated_at").notNull(),
-  },
-  (t) => [
-    uniqueIndex("baselines_project_story_viewport_branch_idx").on(t.projectId, t.storyId, t.viewportName, t.branch),
-    index("baselines_project_story_idx").on(t.projectId, t.storyId),
-  ],
-);
-
-export const comments = sqliteTable(
-  "comments",
-  {
-    id: text("id").primaryKey(),
-    projectId: text("project_id")
-      .notNull()
-      .references(() => projects.id, { onDelete: "cascade" }),
-    buildId: text("build_id")
-      .notNull()
-      .references(() => builds.id, { onDelete: "cascade" }),
-    snapshotId: text("snapshot_id").references(() => snapshots.id, { onDelete: "cascade" }),
-    userId: text("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    body: text("body").notNull(),
-    parentId: text("parent_id"),
-    resolved: integer("resolved", { mode: "boolean" }).notNull().default(false),
-    createdAt: text("created_at").notNull(),
-    updatedAt: text("updated_at").notNull(),
-  },
-  (t) => [index("comments_build_id_idx").on(t.buildId)],
-);
-
-export const labelTypes = sqliteTable(
-  "label_types",
-  {
-    id: text("id").primaryKey(),
-    projectId: text("project_id")
-      .notNull()
-      .references(() => projects.id, { onDelete: "cascade" }),
-    key: text("key").notNull(),
-    name: text("name").notNull(),
-    linkTemplate: text("link_template"),
-    color: text("color"),
-    createdAt: text("created_at").notNull(),
-  },
-  (t) => [uniqueIndex("label_types_project_key_idx").on(t.projectId, t.key)],
-);
-
-export const buildLabels = sqliteTable(
-  "build_labels",
-  {
-    id: text("id").primaryKey(),
-    projectId: text("project_id")
-      .notNull()
-      .references(() => projects.id, { onDelete: "cascade" }),
-    buildId: text("build_id")
-      .notNull()
-      .references(() => builds.id, { onDelete: "cascade" }),
-    typeKey: text("type_key").notNull(),
-    value: text("value").notNull(),
-    createdAt: text("created_at").notNull(),
-  },
-  (t) => [uniqueIndex("build_labels_build_type_value_idx").on(t.buildId, t.typeKey, t.value)],
-);
-
-export const tokens = sqliteTable("tokens", {
-  id: text("id").primaryKey(),
-  projectId: text("project_id")
-    .notNull()
-    .references(() => projects.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  hash: text("hash").notNull(),
-  lastUsedAt: text("last_used_at"),
-  createdAt: text("created_at").notNull(),
-});
-
-export const webhooks = sqliteTable("webhooks", {
-  id: text("id").primaryKey(),
-  projectId: text("project_id")
-    .notNull()
-    .references(() => projects.id, { onDelete: "cascade" }),
-  url: text("url").notNull(),
-  secret: text("secret").notNull(),
-  events: text("events"),
-  createdAt: text("created_at").notNull(),
-  updatedAt: text("updated_at").notNull(),
-});
-
-export const users = sqliteTable("users", {
-  id: text("id").primaryKey(),
-  email: text("email").notNull(),
-  name: text("name").notNull(),
-  avatarUrl: text("avatar_url"),
-  role: text("role").$type<SiteRole>().notNull().default("member"),
-  lastLoginAt: text("last_login_at"),
-  createdAt: text("created_at").notNull(),
-});
-
-export const projectMembers = sqliteTable(
-  "project_members",
-  {
-    id: text("id").primaryKey(),
-    projectId: text("project_id")
-      .notNull()
-      .references(() => projects.id, { onDelete: "cascade" }),
-    userId: text("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    role: text("role").$type<ProjectRole>().notNull().default("viewer"),
-    createdAt: text("created_at").notNull(),
-  },
-  (t) => [uniqueIndex("project_members_project_user_idx").on(t.projectId, t.userId)],
-);
-
+/** Full Drizzle schema object passed to the database client. */
 export const schema = {
   projects,
   projectStatusConfigs,
@@ -242,17 +72,166 @@ export const schema = {
   projectMembers,
 };
 
+/** The full database schema type. */
 export type Schema = typeof schema;
 
-export type Project = typeof projects.$inferSelect;
-export type ProjectStatusConfig = typeof projectStatusConfigs.$inferSelect;
-export type Build = typeof builds.$inferSelect;
-export type Snapshot = typeof snapshots.$inferSelect;
-export type Baseline = typeof baselines.$inferSelect;
-export type Comment = typeof comments.$inferSelect;
-export type LabelType = typeof labelTypes.$inferSelect;
-export type BuildLabel = typeof buildLabels.$inferSelect;
-export type Token = typeof tokens.$inferSelect;
-export type Webhook = typeof webhooks.$inferSelect;
-export type User = typeof users.$inferSelect;
-export type ProjectMember = typeof projectMembers.$inferSelect;
+/** A project row. */
+export interface Project {
+  id: string;
+  name: string;
+  slug: string;
+  gitRepository: string | null;
+  gitDefaultBranch: string;
+  pixelThreshold: number;
+  maxDiffRatio: number;
+  publicBranchRegex: string | null;
+  storybookMeta: string | null | undefined;
+  executePlay: boolean;
+  playTimeoutMs: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A project status-config row. */
+export interface ProjectStatusConfig {
+  id: string;
+  projectId: string;
+  provider: string;
+  config: string;
+  tokenEncrypted: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A build row. */
+export interface Build {
+  id: string;
+  projectId: string;
+  gitSha: string;
+  gitBranch: string;
+  isDefault: boolean;
+  authorEmail: string | null;
+  authorName: string | null;
+  message: string | null;
+  public: boolean;
+  status: BuildStatus;
+  snapshotCount: number;
+  changedCount: number;
+  approvedCount: number;
+  rejectedCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A snapshot row. */
+export interface Snapshot {
+  id: string;
+  projectId: string;
+  buildId: string;
+  storyId: string;
+  storyName: string;
+  storyTitle: string;
+  storyImportPath: string | null;
+  viewportName: string;
+  viewportWidth: number;
+  viewportHeight: number;
+  screenshotPath: string;
+  diffPath: string | null;
+  diffPixels: number | null;
+  diffRatio: number | null;
+  diffPassed: boolean | null;
+  status: SnapshotStatus;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A baseline row. */
+export interface Baseline {
+  id: string;
+  projectId: string;
+  storyId: string;
+  viewportName: string;
+  branch: string;
+  snapshotId: string | null;
+  screenshotPath: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A comment row. */
+export interface Comment {
+  id: string;
+  projectId: string;
+  buildId: string;
+  snapshotId: string | null;
+  userId: string;
+  body: string;
+  parentId: string | null;
+  resolved: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A label-type row. */
+export interface LabelType {
+  id: string;
+  projectId: string;
+  key: string;
+  name: string;
+  linkTemplate: string | null;
+  color: string | null;
+  createdAt: string;
+}
+
+/** A build-label row. */
+export interface BuildLabel {
+  id: string;
+  projectId: string;
+  buildId: string;
+  typeKey: string;
+  value: string;
+  createdAt: string;
+}
+
+/** A CI token row (hash only; the secret itself is never stored). */
+export interface Token {
+  id: string;
+  projectId: string;
+  name: string;
+  hash: string;
+  lastUsedAt: string | null;
+  createdAt: string;
+}
+
+/** A webhook subscription row. */
+export interface Webhook {
+  id: string;
+  projectId: string;
+  url: string;
+  secret: string;
+  events: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A user row. */
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  avatarUrl: string | null;
+  role: SiteRole;
+  lastLoginAt: string | null;
+  createdAt: string;
+}
+
+/** A project-membership row. */
+export interface ProjectMember {
+  id: string;
+  projectId: string;
+  userId: string;
+  role: ProjectRole;
+  createdAt: string;
+}

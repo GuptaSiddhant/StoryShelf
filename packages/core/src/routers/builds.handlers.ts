@@ -9,10 +9,14 @@ import { getStore } from "../store.ts";
 import { type ProjectRole, BUILD_STATUSES } from "../types.ts";
 import { notFound } from "./helpers.ts";
 
+/** Roles permitted to view builds, snapshots, and comments. */
 export const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];
+/** Roles permitted to upload builds and write comments. */
 export const DEVELOPER_ROLES: readonly ProjectRole[] = ["developer", "approver", "admin"];
+/** Roles permitted to approve or reject snapshots and delete builds. */
 export const APPROVER_ROLES: readonly ProjectRole[] = ["approver", "admin"];
 
+/** Multipart input schema for uploading a build with its Storybook bundle. */
 export const buildUploadSchema = z.object({
   gitSha: z.string(),
   gitBranch: z.string(),
@@ -22,6 +26,7 @@ export const buildUploadSchema = z.object({
   zip: z.instanceof(File).openapi({ type: "string", format: "binary" }).optional(),
 }).openapi("BuildUpload");
 
+/** Query filters accepted by the build list endpoint. */
 export const buildListQuery = z.object({
   status: z.enum(BUILD_STATUSES).optional(),
   branch: z.string().optional(),
@@ -29,6 +34,7 @@ export const buildListQuery = z.object({
   labelValue: z.string().optional(),
 });
 
+/** Fetch a build scoped to its project, throwing 404 when it does not belong. */
 export async function buildForProject(projectId: string, buildId: string): Promise<import("../models/build.ts").Build> {
   const build = await new BuildModel(getStore().db).get(buildId);
   if (!build || build.projectId !== projectId) {
@@ -37,6 +43,7 @@ export async function buildForProject(projectId: string, buildId: string): Promi
   return build;
 }
 
+/** Fetch a snapshot scoped to its build, throwing 404 when it does not belong. */
 export async function snapshotForBuild(build: { id: string }, snapshotId: string): Promise<import("../models/snapshot.ts").Snapshot> {
   const snapshot = await new SnapshotModel(getStore().db).get(snapshotId);
   if (!snapshot || snapshot.buildId !== build.id) {
@@ -45,6 +52,7 @@ export async function snapshotForBuild(build: { id: string }, snapshotId: string
   return snapshot;
 }
 
+/** Recompute a build's counts and roll its status up from its snapshots. */
 export async function refreshBuild(buildId: string): Promise<void> {
   const {db} = getStore();
   await new BuildModel(db).updateCounts(buildId);
@@ -68,6 +76,7 @@ export async function refreshBuild(buildId: string): Promise<void> {
   }
 }
 
+/** Approve a snapshot, promote its screenshot to baseline, and refresh the build. */
 export async function approveSnapshot(snapshotId: string, userId: string): Promise<void> {
   const {db} = getStore();
   const snapshots = new SnapshotModel(db);
@@ -86,6 +95,7 @@ export async function approveSnapshot(snapshotId: string, userId: string): Promi
   await refreshBuild(build.id);
 }
 
+/** Extract a string from a multipart form field, ignoring file entries. */
 function asString(value: FormDataEntryValue | null): string | undefined {
   return typeof value === "string" ? value : undefined;
 }

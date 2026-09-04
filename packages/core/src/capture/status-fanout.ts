@@ -6,6 +6,7 @@ import { buildCommentMarkdown } from "../adapters/git-host/helpers.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { Project } from "../schema.ts";
 
+/** Post build check statuses (and review comments) to every configured git provider. */
 async function postStatusesForBuild(opts: {
   db: DatabaseAdapter;
   project: Project;

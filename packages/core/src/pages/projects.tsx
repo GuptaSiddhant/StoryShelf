@@ -5,6 +5,7 @@ import { getStore } from "../store.ts";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import { Badge } from "../ui/components.tsx";
 
+/** Projects overview page: project cards with latest build plus next steps. */
 export async function renderProjectsPage(): Promise<RenderedContent> {
   const { db, user } = getStore();
   const projects = await new ProjectModel(db).list();

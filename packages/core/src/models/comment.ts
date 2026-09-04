@@ -1,15 +1,19 @@
+/** Build and snapshot review comments. */
 import { eq } from "drizzle-orm";
 
 import type { DatabaseAdapter } from "../adapters/database.ts";
-import { comments, projects, type Comment } from "../schema.ts";
+import { comments, projects } from "../schema-tables.ts";
+import type { Comment } from "../schema.ts";
 import { ulid } from "../utils/ulid.ts";
 
+/** Input for creating a review comment. */
 export interface CommentCreateInput {
   body: string;
   snapshotId?: string;
   parentId?: string;
 }
 
+/** Data operations for review comments. */
 export class CommentModel {
   constructor(private readonly db: DatabaseAdapter) {}
 

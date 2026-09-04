@@ -9,6 +9,7 @@ import type { GitHostProvider } from "./adapters/git-host/index.ts";
 import type { StorageAdapter } from "./adapters/storage.ts";
 import type { ShelfConfig, UIConfig } from "./config.ts";
 
+/** Request-scoped dependencies and session state. */
 export interface Store {
   db: DatabaseAdapter;
   storage: StorageAdapter;
@@ -24,10 +25,12 @@ export interface Store {
 
 const storage = new AsyncLocalStorage<Store>();
 
+/** Run a function with the given request store in scope. */
 export function runWithStore<T>(store: Store, fn: () => T): T {
   return storage.run(store, fn);
 }
 
+/** Return the current request store, throwing outside a request scope. */
 export function getStore(): Store {
   const store = storage.getStore();
   if (!store) {

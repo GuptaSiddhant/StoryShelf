@@ -1,9 +1,12 @@
+/** Project records and slug management. */
 import { eq } from "drizzle-orm";
 
 import type { DatabaseAdapter } from "../adapters/database.ts";
-import { projects, type Project } from "../schema.ts";
+import { projects } from "../schema-tables.ts";
+import type { Project } from "../schema.ts";
 import { slugify, ulid } from "../utils/ulid.ts";
 
+/** Input for creating a project. */
 export interface ProjectCreateInput {
   name: string;
   gitRepository?: string;

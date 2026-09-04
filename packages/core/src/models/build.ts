@@ -1,7 +1,9 @@
+/** Build records, status transitions, and publication helpers. */
 import { and, desc, eq, inArray } from "drizzle-orm";
 
 import type { DatabaseAdapter } from "../adapters/database.ts";
-import { buildLabels, builds, snapshots, type Build } from "../schema.ts";
+import { buildLabels, builds, snapshots } from "../schema-tables.ts";
+import type { Build } from "../schema.ts";
 import type { BuildStatus } from "../types.ts";
 import { ulid } from "../utils/ulid.ts";
 
@@ -22,6 +24,7 @@ export function isPublicBuild(project: { publicBranchRegex: string | null }, bui
   return new RegExp(project.publicBranchRegex, "u").test(build.gitBranch);
 }
 
+/** Input for creating a build. */
 export interface BuildCreateInput {
   gitSha: string;
   gitBranch: string;
@@ -32,6 +35,7 @@ export interface BuildCreateInput {
   public?: boolean;
 }
 
+/** Filter options for listing builds. */
 export interface BuildListFilter {
   status?: BuildStatus;
   branch?: string;
@@ -39,6 +43,7 @@ export interface BuildListFilter {
   labelValue?: string;
 }
 
+/** Data operations for build records. */
 export class BuildModel {
   constructor(private readonly db: DatabaseAdapter) {}
 

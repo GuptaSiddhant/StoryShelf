@@ -6,6 +6,7 @@ import { getStore } from "../store.ts";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import { Badge, statusTone } from "../ui/components.tsx";
 
+/** Project builds page: filterable build history for one project. */
 export async function renderProjectBuildsPage(slug: string, query: { status?: string; branch?: string } = {}): Promise<RenderedContent | null> {
   const projects = await new ProjectModel(getStore().db).list();
   const project = projects.find((item) => item.slug === slug);

@@ -7,15 +7,18 @@ import type { ZodType } from "zod";
 import { MemberModel } from "../models/member.ts";
 import { ProjectModel } from "../models/project.ts";
 import { TokenModel } from "../models/token.ts";
-import { projects, type Project } from "../schema.ts";
+import { projects } from "../schema-tables.ts";
+import type { Project } from "../schema.ts";
 import { getStore } from "../store.ts";
 import type { ProjectRole } from "../types.ts";
 import { sha256 } from "../utils/hash.ts";
 
+/** Send a JSON response with the given status code. */
 export function json(c: Context, data: unknown, status: ContentfulStatusCode = 200): Response {
   return c.json(data, status);
 }
 
+/** Parse the request body as JSON and validate it against a Zod schema. */
 export async function validJson<T>(c: Context, schema: ZodType<T>): Promise<T> {
   const result = schema.safeParse(await c.req.json());
   if (!result.success) {
@@ -24,18 +27,22 @@ export async function validJson<T>(c: Context, schema: ZodType<T>): Promise<T> {
   return result.data;
 }
 
+/** Throw a 401 Unauthorized error for unauthenticated requests. */
 export function unauthorized(): never {
   throw new HTTPException(401, { message: "Unauthorized" });
 }
 
+/** Throw a 403 Forbidden error for requests lacking the required role. */
 export function forbidden(): never {
   throw new HTTPException(403, { message: "Forbidden" });
 }
 
+/** Throw a 404 Not Found error with a custom message. */
 export function notFound(message = "Not found"): never {
   throw new HTTPException(404, { message });
 }
 
+/** Resolve the current session user's effective role on a project. */
 export async function currentProjectRole(projectId: string): Promise<ProjectRole | null> {
   const { db, user } = getStore();
   if (!user) {
@@ -44,6 +51,7 @@ export async function currentProjectRole(projectId: string): Promise<ProjectRole
   return await new MemberModel(db).effectiveRole(user.role, projectId, user.id);
 }
 
+/** Build middleware that requires one of the given project roles. */
 export function requireRole(...roles: ProjectRole[]) {
   return async (c: Context, next: Next): Promise<void> => {
     const projectId = c.req.param("projectId") ?? c.req.param("slug");
@@ -58,6 +66,7 @@ export function requireRole(...roles: ProjectRole[]) {
   };
 }
 
+/** Look up a project by its URL slug, returning null when absent. */
 export async function findProjectBySlug(slug: string): Promise<Project | null> {
   const { db } = getStore();
   const rows = await db.list(projects, { where: eq(projects.slug, slug), limit: 1 });
@@ -81,6 +90,7 @@ async function resolveProjectByToken(c: Context, slug: string): Promise<Project 
   return null;
 }
 
+/** Resolve a project by slug, honoring CLI bearer-token access. */
 export async function resolveProject(c: Context, slug: string): Promise<Project> {
   const project = await resolveProjectByToken(c, slug);
   if (project) {return project;}
@@ -109,6 +119,7 @@ export async function assertRole(projectId: string, ...minRoles: ProjectRole[]):
   }
 }
 
+/** Resolve a project by slug and enforce the caller's minimum role. */
 export async function resolveAuthorizedProject(c: Context, slug: string, ...minRoles: ProjectRole[]): Promise<Project> {
   const project = await resolveProjectByToken(c, slug);
   if (project) {return project;}

@@ -17,6 +17,7 @@ const purgeRoute = createRoute({
   },
 });
 
+/** Register the site-admin retention purge endpoint. */
 export function registerAdmin(app: ShelfApp): void {
   app.openapi(purgeRoute, async (c) => {
     requireSiteAdmin();

@@ -10,6 +10,7 @@ export interface FakeStorage {
   objects: Map<string, Buffer>;
 }
 
+/** Create an in-memory storage adapter for capture pipeline tests. */
 export function makeStorage(): FakeStorage {
   const objects = new Map<string, Buffer>();
   const storage: StorageAdapter = {
@@ -59,6 +60,7 @@ function withoutUndefined(values: unknown): Record<string, unknown> {
 // The in-memory fake back-fills Drizzle's inferred row types from raw maps
 // Without a driver, so the casts and await-free `async` methods are unavoidable.
 /* eslint-disable require-await, no-unnecessary-type-assertion, no-unnecessary-type-parameters, non-nullable-type-assertion-style */
+/** Create an in-memory database adapter for capture pipeline tests. */
 export function makeDatabase(): { db: DatabaseAdapter } {
   const tables = new Map<AnySQLiteTable, Map<string, unknown>>();
 

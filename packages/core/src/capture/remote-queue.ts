@@ -1,5 +1,6 @@
 import type { CaptureJob, CaptureQueue, QueueEntry } from "../adapters/capture-queue.ts";
 
+/** Options for delegating capture jobs to a remote queue service. */
 export interface RemoteCaptureQueueOptions {
   /** URL of the remote queue service. */
   url: string;

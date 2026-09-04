@@ -1,5 +1,6 @@
 import type { BrandTheme } from "./theme.ts";
 
+/** Build the global CSS stylesheet from the light and dark brand themes. */
 export function baseStyle(light: BrandTheme, dark: BrandTheme): string {
   return `
     :root {

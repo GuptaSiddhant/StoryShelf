@@ -1,11 +1,14 @@
 /* oxlint-disable eslint/no-await-in-loop, typescript/promise-function-async, eslint/require-await */
+/** Per-project git-provider status check configurations. */
 import { eq } from "drizzle-orm";
 
 import type { DatabaseAdapter } from "../adapters/database.ts";
-import { projectStatusConfigs, type ProjectStatusConfig } from "../schema.ts";
+import { projectStatusConfigs } from "../schema-tables.ts";
+import type { ProjectStatusConfig } from "../schema.ts";
 import { decrypt, encrypt } from "../utils/encrypt.ts";
 import { ulid } from "../utils/ulid.ts";
 
+/** Input for creating a git-provider status config. */
 export interface StatusConfigCreateInput {
   provider: string;
   config: unknown;

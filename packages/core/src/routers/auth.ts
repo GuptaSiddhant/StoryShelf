@@ -37,6 +37,7 @@ function buildSsoUrl(c: Context, auth: SsoAuth): string {
   return auth.loginUrl(state);
 }
 
+/** Register the password and SSO login, callback, and logout routes. */
 export function registerAuth(app: ShelfApp, auth: AuthAdapter): void {
   app.get("/auth/login", async (c) => {
     if (hasSso(auth) && !hasPasswordLogin(auth)) {

@@ -85,6 +85,7 @@ const deleteProjectRoute = createRoute({
   },
 });
 
+/** Register the project list, create, fetch, update, and delete endpoints. */
 export function registerProjects(app: ShelfApp): void {
   app.openapi(listProjectsRoute, async (c) => {
     requireSessionUser();

@@ -28,6 +28,7 @@ function verifyToken(token: string, sessionId: string): boolean {
   return age > 0 && age < 24 * 60 * 60 * 1000;
 }
 
+/** Hono middleware issuing CSRF tokens on safe methods and verifying them on writes. */
 export function csrf() {
   // oxlint-disable-next-line typescript/no-invalid-void-type -- Hono middleware may not return Response
   return async (c: Context, next: Next): Promise<Response | void> => {
@@ -48,6 +49,7 @@ export function csrf() {
   };
 }
 
+/** Generate a CSRF token for the given session. */
 export function getCsrfToken(sessionId: string): string {
   return generateToken(sessionId);
 }

@@ -4,7 +4,8 @@ import { pino } from "pino";
 import { makeDatabase, makeStorage } from "../capture/fake-adapters.ts";
 import { createShelfRouter } from "../index.tsx";
 import { LabelModel } from "../models/label.ts";
-import { builds, projects, type Build, type Project } from "../schema.ts";
+import { builds, projects } from "../schema-tables.ts";
+import type { Build, Project } from "../schema.ts";
 
 const silentLogger = pino({ level: "silent" });
 

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { projects } from "@storyshelf/core/schema";
+import type { Project } from "@storyshelf/core/schema";
 
 import { createTursoDatabase } from "./index.ts";
 
@@ -25,10 +26,10 @@ describe("createTursoDatabase", () => {
     await db.migrate();
 
     const now = new Date().toISOString();
-    const project = await db.insert(projects, { id: "p1", name: "Demo", slug: "demo", createdAt: now, updatedAt: now });
+    const project = (await db.insert(projects, { id: "p1", name: "Demo", slug: "demo", createdAt: now, updatedAt: now })) as Project;
     expect(project.name).toBe("Demo");
 
-    const found = await db.get(projects, "p1");
+    const found = (await db.get(projects, "p1")) as Project | null;
     expect(found?.slug).toBe("demo");
 
     const listed = await db.list(projects);
@@ -50,7 +51,7 @@ describe("createTursoDatabase", () => {
     });
 
     await db.update(projects, "p1", { name: "Renamed" });
-    const renamed = await db.get(projects, "p1");
+    const renamed = (await db.get(projects, "p1")) as Project | null;
     expect(renamed?.name).toBe("Renamed");
 
     await db.remove(projects, "p1");

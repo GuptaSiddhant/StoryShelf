@@ -5,18 +5,22 @@ import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { BuildModel } from "../models/build.ts";
 import { LabelModel } from "../models/label.ts";
-import { builds, type Project } from "../schema.ts";
+import { builds } from "../schema-tables.ts";
+import type { Project } from "../schema.ts";
 import { TERMINAL_BUILD_STATUSES } from "../types.ts";
 
+/** Options controlling which builds a retention purge removes. */
 export interface PurgeOptions {
   ttlDays: number;
   keepLatestPerBranch: boolean;
 }
 
+/** Counts of builds and files removed by a retention purge. */
 export interface PurgeResult {
   removedBuilds: number;
   removedFiles: number;
 }
+/** Removes expired transient builds while keeping baselines and persistent builds. */
 export class Retention {
   constructor(
     private readonly db: DatabaseAdapter,

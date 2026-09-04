@@ -1,3 +1,4 @@
+/** Canonical SQLite DDL for all StoryShelf tables and indexes. */
 export const DDL = `
 CREATE TABLE IF NOT EXISTS projects (
   id TEXT PRIMARY KEY,

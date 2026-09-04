@@ -1,6 +1,7 @@
 import pino from "pino";
 import type { Logger } from "pino";
 
+/** Pino logger type shared across StoryShelf. */
 export type { Logger };
 
 /** A pino worker transport to attach to the logger output. */

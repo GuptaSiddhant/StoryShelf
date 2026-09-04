@@ -9,8 +9,10 @@ import { renderSettingsTests } from "./settings-tests.tsx";
 import { renderSettingsTokens } from "./settings-tokens.tsx";
 import { renderSettingsWebhooks, type SettingsWebhook } from "./settings-webhooks.tsx";
 
+/** Tabs available in the project settings section. */
 export type SettingsTab = "general" | "tests" | "labels" | "tokens" | "webhooks" | "members" | "status";
 
+/** Data required to render the project settings page with its active tab. */
 export interface ProjectSettingsData {
   project: Project;
   activeTab: SettingsTab;
@@ -23,6 +25,7 @@ export interface ProjectSettingsData {
   isAdmin: boolean;
 }
 
+/** Form state shared by the settings tabs (field errors, global error, one-time secret). */
 export interface SettingsFormState {
   errors?: Record<string, string>;
   globalError?: string;
@@ -54,6 +57,7 @@ function renderActiveTab(data: ProjectSettingsData, formState?: SettingsFormStat
   return null;
 }
 
+/** Project settings shell: tab navigation plus the active settings tab. */
 export function renderProjectSettingsPage(data: ProjectSettingsData, formState?: SettingsFormState): RenderedContent {
   const { project, activeTab } = data;
   return (

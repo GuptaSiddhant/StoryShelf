@@ -1,3 +1,4 @@
+/** Type-safe URL builder for project pages and published Storybooks. */
 export interface UrlBuilder {
   projectsList(): string;
   project(slug: string): string;
@@ -11,6 +12,13 @@ export interface UrlBuilder {
   settings(slug: string): string;
 }
 
+/**
+ * Create a URL builder rooted at the given base URL.
+ *
+ * @param baseUrl - Public root URL of the shelf server.
+ * @param publishedBaseDomain - Optional wildcard domain for published Storybooks.
+ * @returns The URL builder.
+ */
 export function createUrlBuilder(baseUrl: string, publishedBaseDomain?: string): UrlBuilder {
   const root = baseUrl.replace(/\/+$/u, "");
 

@@ -41,6 +41,7 @@ const resolveCommentRoute = createRoute({
   },
 });
 
+/** Register the build comment list, create, and resolve endpoints. */
 export function registerComments(app: ShelfApp): void {
   app.openapi(listCommentsRoute, async (c) => {
     const { slug, buildId } = c.req.valid("param");

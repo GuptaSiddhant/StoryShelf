@@ -2,7 +2,8 @@ import { PNG } from "pngjs";
 import { describe, expect, it } from "vitest";
 
 import type { RenderedSnapshot } from "../adapters/capture-runner.ts";
-import { baselines, builds, snapshots, type Build, type Project } from "../schema.ts";
+import { baselines, builds, snapshots } from "../schema-tables.ts";
+import type { Build, Project } from "../schema.ts";
 import { diffPath } from "../utils/paths.ts";
 import type { StoryEntry, Viewport } from "./adapter.ts";
 import { makeDatabase, makeStorage } from "./fake-adapters.ts";

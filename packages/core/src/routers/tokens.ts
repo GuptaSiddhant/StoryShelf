@@ -50,6 +50,7 @@ const deleteTokenRoute = createRoute({
   },
 });
 
+/** Register the project API token list, create, and revoke endpoints. */
 export function registerTokens(app: ShelfApp): void {
   app.openapi(listTokensRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);

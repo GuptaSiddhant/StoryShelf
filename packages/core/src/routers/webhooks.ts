@@ -50,6 +50,7 @@ const deleteWebhookRoute = createRoute({
   },
 });
 
+/** Register the project webhook list, create, and delete endpoints. */
 export function registerWebhooks(app: ShelfApp): void {
   app.openapi(listWebhooksRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);

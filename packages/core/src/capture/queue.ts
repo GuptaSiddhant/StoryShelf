@@ -4,11 +4,13 @@ import type { CaptureJob, CaptureQueue, QueueEntry } from "../adapters/capture-q
 
 declare const __PKG_VERSION__: string | undefined;
 
+/** Options for the in-process capture queue. */
 export interface InMemoryCaptureQueueOptions {
   concurrency: number;
   runJob: (job: CaptureJob) => Promise<void>;
   logger?: Logger;
 }
+/** In-process capture queue with bounded concurrency. */
 export class InMemoryCaptureQueue implements CaptureQueue {
   readonly metadata = {
     name: "In-Memory Queue",

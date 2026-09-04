@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { makeDatabase, makeStorage } from "./fake-adapters.ts";
 import { BaselineModel } from "../models/baseline.ts";
-import { baselines, projects, type Project } from "../schema.ts";
+import { baselines, projects } from "../schema-tables.ts";
+import type { Project } from "../schema.ts";
 
 describe("Branch baseline fallback", () => {
   const mockProject: Project = {

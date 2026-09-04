@@ -64,6 +64,7 @@ function toPublic(row: ProjectStatusConfig): {
   };
 }
 
+/** Register the git status-config list, create, and delete endpoints. */
 export function registerStatusConfigs(app: ShelfApp): void {
   app.openapi(listRoute, async (c) => {
     const { slug } = c.req.valid("param");

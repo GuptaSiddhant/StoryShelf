@@ -10,6 +10,7 @@ async function htmxScript(): Promise<string> {
   return htmxSource;
 }
 
+/** Register the vendored static-asset routes (HTMX bundle). */
 export function registerAssets(app: ShelfApp): void {
   app.get("/assets/htmx.js", async (c) => {
     const body = await htmxScript();

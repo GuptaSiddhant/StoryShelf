@@ -1,12 +1,14 @@
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { Project } from "../schema.ts";
 
+/** Webhook row as rendered in the webhooks settings tab. */
 export interface SettingsWebhook {
   id: string;
   url: string;
   events: string[];
 }
 
+/** Webhooks settings tab: webhook list plus the create-webhook form. */
 export function renderSettingsWebhooks(project: Project, webhooks: SettingsWebhook[], isAdmin: boolean, formState?: { errors?: Record<string, string>; globalError?: string; secret?: string }): unknown {
   return (
     <div class="grid" style="max-width: 880px;">

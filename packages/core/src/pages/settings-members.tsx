@@ -2,6 +2,7 @@ import type { HtmlEscapedString } from "hono/utils/html";
 import type { Project } from "../schema.ts";
 import { Badge } from "../ui/components.tsx";
 
+/** Project member row as rendered in the members settings tab. */
 export interface SettingsMember {
   id: string;
   projectId: string;
@@ -10,6 +11,7 @@ export interface SettingsMember {
   createdAt: string;
 }
 
+/** Members settings tab: member roster plus the add-member form. */
 export function renderSettingsMembers(project: Project, members: SettingsMember[], isAdmin: boolean): unknown {
   return (
     <div class="grid" style="max-width: 880px;">

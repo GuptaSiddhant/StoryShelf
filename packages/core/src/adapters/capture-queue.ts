@@ -1,7 +1,9 @@
 import type { AdapterMetadata } from "./metadata.ts";
 
+/** Lifecycle status of a queued capture job. */
 export type JobStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
 
+/** Observable state of a single capture queue entry. */
 export interface QueueEntry {
   buildId: string;
   status: JobStatus;

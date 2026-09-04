@@ -1,11 +1,13 @@
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
+/** Form state for the project creation page (values and validation errors). */
 export interface ProjectCreateFormState {
   values?: { name?: string; gitRepository?: string; gitDefaultBranch?: string };
   errors?: Record<string, string>;
   globalError?: string;
 }
 
+/** New-project form page (one project corresponds to one Storybook). */
 export function renderProjectCreatePage(state: ProjectCreateFormState = {}): RenderedContent {
   const values = state.values ?? {};
   const errors = state.errors ?? {};

@@ -1,5 +1,6 @@
 import type { Project } from "../schema.ts";
 
+/** Interaction-tests settings tab: play execution toggle and timeout. */
 export function renderSettingsTests(project: Project, isAdmin: boolean, formState?: { globalError?: string }): unknown {
   return (
     <div class="grid" style="max-width: 720px;">

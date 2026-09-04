@@ -1,10 +1,12 @@
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
+/** Form state for the sign-in page (SSO link and error message). */
 export interface LoginPageState {
   ssoUrl?: string;
   error?: string;
 }
 
+/** Sign-in page with password form and optional SSO button. */
 export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
   return (
     <DocumentLayout title="Sign in">

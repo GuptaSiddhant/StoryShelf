@@ -67,6 +67,7 @@ async function canManageJobs(projectId: string): Promise<boolean> {
   return Boolean(role && roles.includes(role));
 }
 
+/** Register the server-rendered HTML pages (projects, builds, diffs, labels, settings). */
 export function registerUiPages(app: ShelfApp): void {
   // eslint-disable-next-line promise-function-async -- renderRootPage returns RenderedContent (string | Promise<string>)
   app.get("/", async (c) => c.html(await renderRootPage()));

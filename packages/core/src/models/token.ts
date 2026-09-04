@@ -1,7 +1,9 @@
+/** CI tokens for project-scoped API access. */
 import { and, eq } from "drizzle-orm";
 
 import type { DatabaseAdapter } from "../adapters/database.ts";
-import { tokens, type Token } from "../schema.ts";
+import { tokens } from "../schema-tables.ts";
+import type { Token } from "../schema.ts";
 import { ulid } from "../utils/ulid.ts";
 
 /** Data operations for CI tokens. */

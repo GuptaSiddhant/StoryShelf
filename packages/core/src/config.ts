@@ -8,6 +8,7 @@ import type { DatabaseAdapter } from "./adapters/database.ts";
 import type { GitHostProvider } from "./adapters/git-host/index.ts";
 import type { StorageAdapter } from "./adapters/storage.ts";
 
+/** Brand color theme for the server-rendered UI. */
 export interface BrandTheme {
   accent: string;
   surface: { base: string; card: string };
@@ -16,6 +17,7 @@ export interface BrandTheme {
   status: { approved: string; new: string; rejected: string };
 }
 
+/** Branding overrides for the server-rendered UI. */
 export interface UIConfig {
   name?: string;
   logo?: string;
@@ -24,7 +26,33 @@ export interface UIConfig {
   darkTheme?: BrandTheme;
 }
 
-const viewportSchema = z.object({
+/** A viewport in which stories are captured. */
+export interface ShelfViewport {
+  name: string;
+  width: number;
+  height: number;
+}
+
+/** Metadata snapshot of a configured adapter. */
+export interface AdapterSnapshot {
+  name: string;
+  version: string;
+  description?: string;
+  kind: string;
+}
+
+/** Shelf-level configuration (validated by {@link shelfConfigSchema}). */
+export interface ShelfConfig {
+  secret?: string;
+  publishedBaseDomain?: string;
+  captureConcurrency?: number;
+  scratchDir?: string;
+  purgeTtlDays?: number;
+  viewports?: ShelfViewport[];
+  adapters?: Record<string, AdapterSnapshot>;
+}
+
+const viewportSchema: z.ZodType<ShelfViewport> = z.object({
   name: z.string().min(1),
   width: z.number().int().positive(),
   height: z.number().int().positive(),
@@ -38,14 +66,15 @@ const brandThemeSchema = z.object({
   status: z.object({ approved: z.string(), new: z.string(), rejected: z.string() }),
 });
 
-const adapterSnapshotSchema = z.object({
+const adapterSnapshotSchema: z.ZodType<AdapterSnapshot> = z.object({
   name: z.string(),
   version: z.string(),
   description: z.string().optional(),
   kind: z.string(),
 });
 
-export const shelfConfigSchema = z
+/** Zod schema validating the shelf-level configuration. */
+export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
   .object({
     secret: z.string().min(1).optional(),
     publishedBaseDomain: z.string().optional(),
@@ -57,6 +86,7 @@ export const shelfConfigSchema = z
   })
   .strict();
 
+/** Zod schema validating the UI branding configuration. */
 export const uiConfigSchema = z
   .object({
     name: z.string().optional(),
@@ -69,8 +99,12 @@ export const uiConfigSchema = z
   })
   .strict();
 
-export type ShelfConfig = z.infer<typeof shelfConfigSchema>;
-
+/**
+ * Parse and validate a raw shelf-level configuration object.
+ *
+ * @param config - Unvalidated configuration record.
+ * @returns The validated shelf configuration.
+ */
 export function validateConfig(config: Record<string, unknown>): ShelfConfig {
   const result = shelfConfigSchema.safeParse(config);
   if (!result.success) {
@@ -80,6 +114,12 @@ export function validateConfig(config: Record<string, unknown>): ShelfConfig {
   return result.data;
 }
 
+/**
+ * Parse and validate a raw UI branding configuration object.
+ *
+ * @param config - Unvalidated UI configuration record.
+ * @returns The validated UI configuration.
+ */
 export function validateUiConfig(config: Record<string, unknown>): UIConfig {
   const result = uiConfigSchema.safeParse(config);
   if (!result.success) {
@@ -89,6 +129,7 @@ export function validateUiConfig(config: Record<string, unknown>): UIConfig {
   return result.data;
 }
 
+/** Adapter and configuration options for creating the shelf router. */
 export interface ShelfOptions {
   database: DatabaseAdapter;
   storage: StorageAdapter;

@@ -8,6 +8,7 @@ import { getStore } from "../store.ts";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import { Badge, statusTone } from "../ui/components.tsx";
 
+/** Build overview page: snapshot grid, bulk actions, and build comments. */
 export async function renderBuildDetailPage(buildId: string): Promise<RenderedContent | null> {
   const {db} = getStore();
   const build = await new BuildModel(db).get(buildId);

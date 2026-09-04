@@ -4,6 +4,7 @@ import { BUILD_STATUSES, PROJECT_ROLES, SNAPSHOT_STATUSES } from "../types.ts";
 
 const storybookMetaSchema = z.record(z.string(), z.unknown()).nullable().optional();
 
+/** OpenAPI schema for a project record. */
 export const projectSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -20,6 +21,7 @@ export const projectSchema = z.object({
   updatedAt: z.string(),
 }).openapi("Project");
 
+/** OpenAPI schema for creating a project. */
 export const projectCreateSchema = z.object({
   name: z.string().min(1),
   gitRepository: z.string().optional(),
@@ -29,6 +31,7 @@ export const projectCreateSchema = z.object({
   playTimeoutMs: z.number().int().min(1000).max(30_000).optional(),
 }).openapi("ProjectCreateInput");
 
+/** OpenAPI schema for patching a project. */
 export const projectUpdateSchema = z.object({
   name: z.string().optional(),
   gitRepository: z.string().optional(),
@@ -41,6 +44,7 @@ export const projectUpdateSchema = z.object({
   playTimeoutMs: z.number().int().min(1000).max(30_000).optional(),
 }).openapi("ProjectUpdateInput");
 
+/** OpenAPI schema for a build record. */
 export const buildSchema = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -60,6 +64,7 @@ export const buildSchema = z.object({
   updatedAt: z.string(),
 }).openapi("Build");
 
+/** OpenAPI schema for a snapshot record. */
 export const snapshotSchema = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -83,6 +88,7 @@ export const snapshotSchema = z.object({
   updatedAt: z.string(),
 }).openapi("Snapshot");
 
+/** OpenAPI schema for a build comment. */
 export const commentSchema = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -96,12 +102,14 @@ export const commentSchema = z.object({
   updatedAt: z.string(),
 }).openapi("Comment");
 
+/** OpenAPI schema for creating a build comment. */
 export const commentCreateSchema = z.object({
   body: z.string().min(1),
   snapshotId: z.string().optional(),
   parentId: z.string().optional(),
 }).openapi("CommentCreateInput");
 
+/** OpenAPI schema for a project label type. */
 export const labelTypeSchema = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -112,6 +120,7 @@ export const labelTypeSchema = z.object({
   createdAt: z.string(),
 }).openapi("LabelType");
 
+/** OpenAPI schema for creating a label type. */
 export const labelTypeCreateSchema = z.object({
   key: z.string().min(1),
   name: z.string().min(1),
@@ -119,12 +128,14 @@ export const labelTypeCreateSchema = z.object({
   color: z.string().optional(),
 }).openapi("LabelTypeCreateInput");
 
+/** OpenAPI schema for patching a label type. */
 export const labelTypeUpdateSchema = z.object({
   name: z.string().min(1).optional(),
   linkTemplate: z.string().nullable().optional(),
   color: z.string().nullable().optional(),
 }).openapi("LabelTypeUpdateInput");
 
+/** OpenAPI schema for a public API token (hash omitted). */
 export const tokenPublicSchema = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -133,13 +144,16 @@ export const tokenPublicSchema = z.object({
   createdAt: z.string(),
 }).openapi("Token");
 
+/** OpenAPI schema for creating an API token. */
 export const tokenCreateSchema = z.object({ name: z.string().min(1) }).openapi("TokenCreateInput");
 
+/** OpenAPI schema for a newly created token including its secret value. */
 export const tokenCreatedSchema = z.object({
   name: z.string(),
   token: z.string(),
 }).openapi("TokenCreated");
 
+/** OpenAPI schema for a project member record. */
 export const memberSchema = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -148,25 +162,30 @@ export const memberSchema = z.object({
   createdAt: z.string(),
 }).openapi("ProjectMember");
 
+/** OpenAPI schema for updating a member's role. */
 export const memberRoleSchema = z.object({ role: z.enum(PROJECT_ROLES) }).openapi("MemberRoleInput");
 
+/** OpenAPI schema for adding a member to a project. */
 export const memberSetSchema = z.object({
   userId: z.string().min(1),
   role: z.enum(PROJECT_ROLES),
 }).openapi("MemberSetInput");
 
+/** OpenAPI schema for a public webhook (secret omitted). */
 export const webhookPublicSchema = z.object({
   id: z.string(),
   url: z.string(),
   events: z.array(z.string()),
 }).openapi("Webhook");
 
+/** OpenAPI schema for creating a webhook. */
 export const webhookCreateSchema = z.object({
   // oxlint-disable-next-line typescript/no-deprecated -- z.string().url() kept for zod v3 API compat
   url: z.string().url(),
   events: z.array(z.string().min(1)).optional(),
 }).openapi("WebhookCreateInput");
 
+/** OpenAPI schema for a newly created webhook including its signing secret. */
 export const webhookCreatedSchema = z.object({
   id: z.string(),
   url: z.string(),
@@ -174,6 +193,7 @@ export const webhookCreatedSchema = z.object({
   secret: z.string(),
 }).openapi("WebhookCreated");
 
+/** OpenAPI schema for a git status-check configuration. */
 export const statusConfigSchema = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -184,18 +204,23 @@ export const statusConfigSchema = z.object({
   updatedAt: z.string(),
 }).openapi("StatusConfig");
 
+/** OpenAPI schema for creating a git status-check configuration. */
 export const statusConfigCreateSchema = z.object({
   provider: z.string().min(1),
   config: z.record(z.string(), z.unknown()),
   token: z.string().min(1),
 }).openapi("StatusConfigCreateInput");
 
+/** OpenAPI schema for a generic `{ ok: true }` acknowledgement. */
 export const okSchema = z.object({ ok: z.boolean() }).openapi("Ok");
 
+/** OpenAPI schema for an error response message. */
 export const errorSchema = z.object({ message: z.string() }).openapi("Error");
 
+/** OpenAPI schema for the retention purge result. */
 export const purgeSchema = z.object({ removedBuilds: z.number() }).openapi("PurgeResult");
 
+/** OpenAPI schema for the retention purge input. */
 export const purgeInputSchema = z.object({ ttlDays: z.number().optional() }).openapi("PurgeInput");
 
 /** Shared response spec for a 400 Bad Request. */

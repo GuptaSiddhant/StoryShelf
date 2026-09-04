@@ -16,6 +16,7 @@ function imageResponse(buffer: Buffer): Response {
   return new Response(new Uint8Array(buffer), { headers: { "content-type": PNG, "cache-control": "private, max-age=3600" } });
 }
 
+/** Register the PNG image, diff, and baseline media endpoints for snapshots. */
 export function registerMedia(app: ShelfApp): void {
   app.get("/api/v1/projects/:slug/builds/:buildId/snapshots/:snapshotId/image", async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...VIEW_ROLES);

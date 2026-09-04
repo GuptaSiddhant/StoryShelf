@@ -3,6 +3,7 @@ import type { Build, Comment, Project, Snapshot } from "../schema.ts";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import { Badge, statusTone } from "../ui/components.tsx";
 
+/** Data required to render the three-up build diff review page. */
 export interface BuildDiffData {
   project: Project;
   build: Build;
@@ -17,6 +18,7 @@ function imageUrl(project: Project, build: Build, snapshot: Snapshot, kind: "ima
   return `/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${snapshot.id}/${kind}`;
 }
 
+/** Three-up diff review page: baseline, current, and diff with keyboard review. */
 export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
   const { project, build, snapshots, comments, selectedId, canReview, hasBaseline } = data;
   const selected = snapshots.find((s) => s.id === selectedId) ?? snapshots.find((s) => s.status === "changed" || s.status === "new") ?? snapshots[0];

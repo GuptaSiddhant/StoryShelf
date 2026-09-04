@@ -30,6 +30,7 @@ function mergeParameters(entry: {
   return Object.keys(merged).length > 0 ? merged : undefined;
 }
 
+/** Discovers stories from a built Storybook via its index file. */
 export class StorybookAdapter implements StorySourceAdapter {
   readonly name = "storybook";
   readonly screenshotSelector = "#storybook-root";

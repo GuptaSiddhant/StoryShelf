@@ -1,3 +1,6 @@
+/**
+ * Storage adapter interface: binary objects for screenshots, diffs, and archives.
+ */
 import type { Buffer } from "node:buffer";
 import type { AdapterMetadata } from "./metadata.ts";
 

@@ -16,6 +16,7 @@ import { StorybookAdapter } from "./storybook.ts";
 import { DEFAULT_VIEWPORTS, isDisabledStory, isFlakyStory } from "./adapter.ts";
 import type { Viewport } from "./adapter.ts";
 
+/** Inputs for running a capture job against a Storybook build. */
 export interface CaptureJobOptions {
   db: DatabaseAdapter;
   storage: StorageAdapter;
@@ -24,6 +25,12 @@ export interface CaptureJobOptions {
   viewports?: Viewport[];
   logger?: Logger;
 }
+/**
+ * Run the full capture for a build: extract, render, persist, and finalize.
+ *
+ * @param input - Build id plus the originating request id.
+ * @param options - Adapters, scratch dir, viewports, and logger.
+ */
 export async function executeCaptureJob(input: { buildId: string; reqId?: string }, options: CaptureJobOptions): Promise<void> {
   const builds = new BuildModel(options.db);
   const { build, project } = await loadTarget(options, input.buildId);

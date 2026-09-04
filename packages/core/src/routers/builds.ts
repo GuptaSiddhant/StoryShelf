@@ -69,6 +69,7 @@ const deleteBuildRoute = createRoute({
   },
 });
 
+/** Register the build list, upload, fetch, retry, and delete endpoints. */
 export function registerBuilds(app: ShelfApp): void {
   app.openapi(listBuildsRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...VIEW_ROLES);

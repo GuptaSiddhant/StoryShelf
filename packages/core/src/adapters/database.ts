@@ -1,3 +1,6 @@
+/**
+ * Database adapter interface: query builders over explicitly typed tables.
+ */
 import type { SQL } from "drizzle-orm";
 import type { AnySQLiteTable } from "drizzle-orm/sqlite-core";
 

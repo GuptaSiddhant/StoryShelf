@@ -33,10 +33,12 @@ function encodeRandom(bytes: Buffer): string {
 }
 /* eslint-enable no-bitwise, no-non-null-assertion */
 
+/** Generate a sortable, collision-resistant ULID. */
 export function ulid(): string {
   return encodeTime(Date.now()) + encodeRandom(randomBytes(10));
 }
 
+/** Convert a name to a URL-safe slug of at most 63 characters. */
 export function slugify(value: string): string {
   return value
     .toLowerCase()

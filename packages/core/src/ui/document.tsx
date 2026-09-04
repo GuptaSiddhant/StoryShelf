@@ -4,6 +4,7 @@ import { getStore } from "../store.ts";
 import { baseStyle } from "./styles.ts";
 import { DARK_THEME, LIGHT_THEME } from "./theme.ts";
 
+/** Rendered HTML content returned by page components. */
 export type RenderedContent = string | Promise<string>;
 
 interface NavConfig {
@@ -14,6 +15,7 @@ interface NavConfig {
 
 // Hono's JSX.Element is typed as `HtmlEscapedString | Promise<...>`, so JSX-returning
 // Functions can legitimately return a promise; the rule is a false positive here.
+/** Full HTML document shell with top bar, sidebar, theme, and HTMX. */
 // eslint-disable-next-line promise-function-async -- JSX component return type
 export const DocumentLayout: FC<{ title: string; nav?: NavConfig; children?: unknown }> = ({ title, nav, children }) => {
   const { ui } = getStore();

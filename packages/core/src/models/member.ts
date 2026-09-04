@@ -1,7 +1,9 @@
+/** Project membership and role resolution. */
 import { and, eq } from "drizzle-orm";
 
 import type { DatabaseAdapter } from "../adapters/database.ts";
-import { projectMembers, type ProjectMember } from "../schema.ts";
+import { projectMembers } from "../schema-tables.ts";
+import type { ProjectMember } from "../schema.ts";
 import type { ProjectRole, SiteRole } from "../types.ts";
 import { ulid } from "../utils/ulid.ts";
 
