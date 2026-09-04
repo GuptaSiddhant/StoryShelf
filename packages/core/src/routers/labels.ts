@@ -1,12 +1,17 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfApp } from "../index.tsx";
-
 import { LabelModel } from "../models/label.ts";
 import { getStore } from "../store.ts";
 import type { ProjectRole } from "../types.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
-import { labelTypeCreateSchema, labelTypeSchema, labelTypeUpdateSchema, notFound, unauthorized } from "./schemas.ts";
+import {
+  labelTypeCreateSchema,
+  labelTypeSchema,
+  labelTypeUpdateSchema,
+  notFound,
+  unauthorized,
+} from "./schemas.ts";
 
 const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];
 const ADMIN_ROLES: readonly ProjectRole[] = ["admin"];
@@ -16,7 +21,10 @@ const listLabelsRoute = createRoute({
   path: "/api/v1/projects/{slug}/label-types",
   request: { params: z.object({ slug: z.string() }) },
   responses: {
-    200: { content: { "application/json": { schema: labelTypeSchema.array() } }, description: "List label types" },
+    200: {
+      content: { "application/json": { schema: labelTypeSchema.array() } },
+      description: "List label types",
+    },
     ...notFound,
     ...unauthorized,
   },
@@ -30,7 +38,10 @@ const createLabelRoute = createRoute({
     body: { content: { "application/json": { schema: labelTypeCreateSchema } } },
   },
   responses: {
-    201: { content: { "application/json": { schema: labelTypeSchema } }, description: "Created label type" },
+    201: {
+      content: { "application/json": { schema: labelTypeSchema } },
+      description: "Created label type",
+    },
     ...notFound,
   },
 });
@@ -53,7 +64,10 @@ const updateLabelRoute = createRoute({
     body: { content: { "application/json": { schema: labelTypeUpdateSchema } } },
   },
   responses: {
-    200: { content: { "application/json": { schema: labelTypeSchema } }, description: "Updated label type" },
+    200: {
+      content: { "application/json": { schema: labelTypeSchema } },
+      description: "Updated label type",
+    },
     ...notFound,
   },
 });
@@ -92,7 +106,9 @@ export function registerLabels(app: ShelfApp): void {
       if (error instanceof HTTPException) {
         throw error;
       }
-      throw new HTTPException(400, { message: error instanceof Error ? error.message : "Cannot update label type" });
+      throw new HTTPException(400, {
+        message: error instanceof Error ? error.message : "Cannot update label type",
+      });
     }
   });
 }

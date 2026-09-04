@@ -1,18 +1,27 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import type { ShelfApp } from "../index.tsx";
-
 import { SnapshotModel } from "../models/snapshot.ts";
 import { getStore } from "../store.ts";
+import {
+  VIEW_ROLES,
+  APPROVER_ROLES,
+  snapshotForBuild,
+  refreshBuild,
+  approveSnapshot,
+  buildForProject,
+} from "./builds.handlers.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
 import { snapshotSchema, okSchema, notFound, unauthorized } from "./schemas.ts";
-import { VIEW_ROLES, APPROVER_ROLES, snapshotForBuild, refreshBuild, approveSnapshot, buildForProject } from "./builds.handlers.ts";
 
 const listSnapshotsRoute = createRoute({
   method: "get",
   path: "/api/v1/projects/{slug}/builds/{buildId}/snapshots",
   request: { params: z.object({ slug: z.string(), buildId: z.string() }) },
   responses: {
-    200: { content: { "application/json": { schema: snapshotSchema.array() } }, description: "List snapshots for a build" },
+    200: {
+      content: { "application/json": { schema: snapshotSchema.array() } },
+      description: "List snapshots for a build",
+    },
     ...notFound,
     ...unauthorized,
   },
@@ -23,7 +32,10 @@ const approveSnapshotRoute = createRoute({
   path: "/api/v1/projects/{slug}/builds/{buildId}/snapshots/{snapshotId}/approve",
   request: { params: z.object({ slug: z.string(), buildId: z.string(), snapshotId: z.string() }) },
   responses: {
-    200: { content: { "application/json": { schema: okSchema } }, description: "Snapshot approved" },
+    200: {
+      content: { "application/json": { schema: okSchema } },
+      description: "Snapshot approved",
+    },
     ...notFound,
   },
 });
@@ -33,7 +45,10 @@ const rejectSnapshotRoute = createRoute({
   path: "/api/v1/projects/{slug}/builds/{buildId}/snapshots/{snapshotId}/reject",
   request: { params: z.object({ slug: z.string(), buildId: z.string(), snapshotId: z.string() }) },
   responses: {
-    200: { content: { "application/json": { schema: okSchema } }, description: "Snapshot rejected" },
+    200: {
+      content: { "application/json": { schema: okSchema } },
+      description: "Snapshot rejected",
+    },
     ...notFound,
   },
 });
@@ -43,7 +58,10 @@ const approveAllRoute = createRoute({
   path: "/api/v1/projects/{slug}/builds/{buildId}/approve-all",
   request: { params: z.object({ slug: z.string(), buildId: z.string() }) },
   responses: {
-    200: { content: { "application/json": { schema: okSchema } }, description: "All snapshots approved" },
+    200: {
+      content: { "application/json": { schema: okSchema } },
+      description: "All snapshots approved",
+    },
     ...notFound,
   },
 });
@@ -53,7 +71,10 @@ const rejectAllRoute = createRoute({
   path: "/api/v1/projects/{slug}/builds/{buildId}/reject-all",
   request: { params: z.object({ slug: z.string(), buildId: z.string() }) },
   responses: {
-    200: { content: { "application/json": { schema: okSchema } }, description: "All snapshots rejected" },
+    200: {
+      content: { "application/json": { schema: okSchema } },
+      description: "All snapshots rejected",
+    },
     ...notFound,
   },
 });

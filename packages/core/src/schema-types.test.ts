@@ -1,19 +1,4 @@
 import { expectTypeOf, it } from "vitest";
-
-import type {
-  Baseline,
-  Build,
-  BuildLabel,
-  Comment,
-  LabelType,
-  Project,
-  ProjectMember,
-  ProjectStatusConfig,
-  Snapshot,
-  Token,
-  User,
-  Webhook,
-} from "./schema.ts";
 import {
   baselines,
   buildLabels,
@@ -28,6 +13,20 @@ import {
   users,
   webhooks,
 } from "./schema-tables.ts";
+import type {
+  Baseline,
+  Build,
+  BuildLabel,
+  Comment,
+  LabelType,
+  Project,
+  ProjectMember,
+  ProjectStatusConfig,
+  Snapshot,
+  Token,
+  User,
+  Webhook,
+} from "./schema.ts";
 
 /**
  * Pin the hand-written row interfaces in `schema.ts` to Drizzle's inferred

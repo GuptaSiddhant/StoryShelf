@@ -1,6 +1,5 @@
-import { describe, expect, it } from "vitest";
 import { pino } from "pino";
-
+import { describe, expect, it } from "vitest";
 import { makeDatabase, makeStorage } from "../capture/fake-adapters.ts";
 import { createShelfRouter } from "../index.tsx";
 import { builds, projects } from "../schema-tables.ts";
@@ -59,7 +58,7 @@ async function seededApp(): Promise<{ app: ReturnType<typeof createShelfRouter> 
   objects.set(`${storybookDir("p1", "b1")}/index.html`, Buffer.from("<html>storybook</html>"));
   objects.set(`${storybookDir("p1", "b1")}/iframe.js`, Buffer.from("console.log('hi')"));
   objects.set(`${storybookDir("p1", "b1")}/styles.css`, Buffer.from("body{}"));
-  objects.set(`${storybookDir("p1", "b1")}/icon.png`, Buffer.from([0x89, 0x50, 0x4E, 0x47]));
+  objects.set(`${storybookDir("p1", "b1")}/icon.png`, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
 
   const app = createShelfRouter({ database: db, storage, logger: silentLogger });
   return { app };
@@ -132,7 +131,9 @@ describe("storybook routes", () => {
 
   it("rejects backslash traversal segments", async () => {
     const { app } = await seededApp();
-    const response = await app.request("/projects/test-project/storybook/build/b1/%5C%5C..%5Csecrets.txt");
+    const response = await app.request(
+      "/projects/test-project/storybook/build/b1/%5C%5C..%5Csecrets.txt",
+    );
     expect(response.status).toBe(404);
   });
 

@@ -1,10 +1,8 @@
+import AdmZip from "adm-zip";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-
-import AdmZip from "adm-zip";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
 import type { CaptureRunner, RenderResult } from "../adapters/capture-runner.ts";
 import { BuildModel } from "../models/build.ts";
 import { ProjectModel } from "../models/project.ts";
@@ -37,24 +35,37 @@ function zipWithIndex(): Buffer {
   return zip.toBuffer();
 }
 
-function fakeRunner(overrides: Partial<CaptureRunner> = {}): { runner: CaptureRunner; render: ReturnType<typeof vi.fn> } {
+function fakeRunner(overrides: Partial<CaptureRunner> = {}): {
+  runner: CaptureRunner;
+  render: ReturnType<typeof vi.fn>;
+} {
   const result: RenderResult = {
     captures: [
       {
-        story: { id: STORY_ID, title: "Components/Button", name: "Primary", importPath: "./Button.stories.tsx", type: "story" },
+        story: {
+          id: STORY_ID,
+          title: "Components/Button",
+          name: "Primary",
+          importPath: "./Button.stories.tsx",
+          type: "story",
+        },
         viewportName: "desktop",
         screenshot: Buffer.from([0, 1, 2]),
       },
     ],
     failures: [],
   };
-  const render = overrides.render ?? vi.fn(async () => {
-    await Promise.resolve();
-    return result;
-  });
-  const cancel = overrides.cancel ?? vi.fn(async () => {
-    await Promise.resolve();
-  });
+  const render =
+    overrides.render ??
+    vi.fn(async () => {
+      await Promise.resolve();
+      return result;
+    });
+  const cancel =
+    overrides.cancel ??
+    vi.fn(async () => {
+      await Promise.resolve();
+    });
   const runner: CaptureRunner = { render, cancel };
   return { runner, render: render as ReturnType<typeof vi.fn> };
 }
@@ -74,14 +85,15 @@ describe("executeCaptureJob", () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
     const project = await new ProjectModel(db).create({ name: "Orchestrator" });
-    const build = await new BuildModel(db).create(project.id, { gitSha: "sha-abc", gitBranch: "main", isDefault: true });
+    const build = await new BuildModel(db).create(project.id, {
+      gitSha: "sha-abc",
+      gitBranch: "main",
+      isDefault: true,
+    });
     await storage.write(storybookZipPath(project.id, build.id), zipWithIndex());
     const { runner, render } = fakeRunner();
 
-    await executeCaptureJob(
-      { buildId: build.id },
-      { db, storage, runner, scratchDir },
-    );
+    await executeCaptureJob({ buildId: build.id }, { db, storage, runner, scratchDir });
 
     const updatedBuild = await db.get(builds, build.id);
     expect(updatedBuild?.status).toBe("approved");
@@ -94,7 +106,10 @@ describe("executeCaptureJob", () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
     const project = await new ProjectModel(db).create({ name: "Orchestrator" });
-    const build = await new BuildModel(db).create(project.id, { gitSha: "sha-abc", gitBranch: "main" });
+    const build = await new BuildModel(db).create(project.id, {
+      gitSha: "sha-abc",
+      gitBranch: "main",
+    });
     await storage.write(storybookZipPath(project.id, build.id), zipWithIndex());
     const { runner } = fakeRunner({
       render: vi.fn(async () => {
@@ -103,9 +118,9 @@ describe("executeCaptureJob", () => {
       }),
     });
 
-    await expect(executeCaptureJob({ buildId: build.id }, { db, storage, runner, scratchDir })).rejects.toThrow(
-      "browser exploded",
-    );
+    await expect(
+      executeCaptureJob({ buildId: build.id }, { db, storage, runner, scratchDir }),
+    ).rejects.toThrow("browser exploded");
 
     const updatedBuild = await db.get(builds, build.id);
     expect(updatedBuild?.status).toBe("failed");
@@ -114,8 +129,11 @@ describe("executeCaptureJob", () => {
   it("throws when the build does not exist", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    await expect(executeCaptureJob({ buildId: "missing" }, { db, storage, runner: fakeRunner().runner, scratchDir })).rejects.toThrow(
-      "Build not found",
-    );
+    await expect(
+      executeCaptureJob(
+        { buildId: "missing" },
+        { db, storage, runner: fakeRunner().runner, scratchDir },
+      ),
+    ).rejects.toThrow("Build not found");
   });
 });

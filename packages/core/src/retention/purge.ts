@@ -1,6 +1,5 @@
 import { and, eq, inArray, lt, sql } from "drizzle-orm";
 import type { Logger } from "pino";
-
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { BuildModel } from "../models/build.ts";
@@ -28,14 +27,19 @@ export class Retention {
     private readonly logger?: Logger,
   ) {}
 
-
   async purge(project: Project, options: PurgeOptions): Promise<PurgeResult> {
     const cutoff = new Date(Date.now() - options.ttlDays * 86_400_000).toISOString();
     const candidates = await this.db.list(builds, {
-      where: and(eq(builds.projectId, project.id), inArray(builds.status, [...TERMINAL_BUILD_STATUSES]), lt(builds.updatedAt, cutoff)),
+      where: and(
+        eq(builds.projectId, project.id),
+        inArray(builds.status, [...TERMINAL_BUILD_STATUSES]),
+        lt(builds.updatedAt, cutoff),
+      ),
     });
 
-    const keep = options.keepLatestPerBranch ? await this.latestPerBranch(project.id) : new Set<string>();
+    const keep = options.keepLatestPerBranch
+      ? await this.latestPerBranch(project.id)
+      : new Set<string>();
     const labelModel = new LabelModel(this.db);
     const target = await Promise.all(
       candidates.map(async (build) => {
@@ -55,7 +59,10 @@ export class Retention {
     );
     const removedBuilds = results.filter((r) => r.removed).length;
     const removedFiles = results.reduce((sum, r) => sum + r.files, 0);
-    this.logger?.info({ projectId: project.id, removedBuilds, removedFiles }, "build retention purge complete");
+    this.logger?.info(
+      { projectId: project.id, removedBuilds, removedFiles },
+      "build retention purge complete",
+    );
     return { removedBuilds, removedFiles };
   }
 

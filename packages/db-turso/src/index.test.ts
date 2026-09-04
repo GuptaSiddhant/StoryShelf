@@ -1,12 +1,9 @@
+import { projects } from "@storyshelf/core/schema";
+import type { Project } from "@storyshelf/core/schema";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-
 import { describe, expect, it } from "vitest";
-
-import { projects } from "@storyshelf/core/schema";
-import type { Project } from "@storyshelf/core/schema";
-
 import { createTursoDatabase } from "./index.ts";
 
 function createTempTurso(): { dir: string; db: ReturnType<typeof createTursoDatabase> } {
@@ -15,7 +12,10 @@ function createTempTurso(): { dir: string; db: ReturnType<typeof createTursoData
   return { dir, db };
 }
 
-async function cleanupTurso(dir: string, db: ReturnType<typeof createTursoDatabase>): Promise<void> {
+async function cleanupTurso(
+  dir: string,
+  db: ReturnType<typeof createTursoDatabase>,
+): Promise<void> {
   await db.close();
   rmSync(dir, { recursive: true, force: true });
 }
@@ -26,7 +26,13 @@ describe("createTursoDatabase", () => {
     await db.migrate();
 
     const now = new Date().toISOString();
-    const project = (await db.insert(projects, { id: "p1", name: "Demo", slug: "demo", createdAt: now, updatedAt: now })) as Project;
+    const project = (await db.insert(projects, {
+      id: "p1",
+      name: "Demo",
+      slug: "demo",
+      createdAt: now,
+      updatedAt: now,
+    })) as Project;
     expect(project.name).toBe("Demo");
 
     const found = (await db.get(projects, "p1")) as Project | null;

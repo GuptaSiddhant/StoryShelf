@@ -1,3 +1,9 @@
+import { serve } from "@hono/node-server";
+import { createPasswordAuth } from "@storyshelf/auth-password";
+import { createShelfLogger, createShelfRouter } from "@storyshelf/core";
+import { createSqliteDatabase } from "@storyshelf/db-sqlite";
+import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
+import { createLocalStorage } from "@storyshelf/storage-local";
 /**
  * Local StoryShelf dev server.
  *
@@ -10,12 +16,6 @@
  * Start it with `nub run serve` from the repo root (auto-restarts on change).
  */
 import { mkdirSync } from "node:fs";
-import { serve } from "@hono/node-server";
-import { createPasswordAuth } from "@storyshelf/auth-password";
-import { createShelfLogger, createShelfRouter } from "@storyshelf/core";
-import { createSqliteDatabase } from "@storyshelf/db-sqlite";
-import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
-import { createLocalStorage } from "@storyshelf/storage-local";
 
 const env = process.env;
 const dataDir = env["DATA_DIR"] ?? ".dev-data";
@@ -38,9 +38,7 @@ const app = createShelfRouter({
   captureRunner,
   logger,
   // Enable a shared-password login by setting AUTH_PASSWORD (and SECRET).
-  auth: authPassword && secret
-    ? createPasswordAuth({ password: authPassword, secret })
-    : undefined,
+  auth: authPassword && secret ? createPasswordAuth({ password: authPassword, secret }) : undefined,
   config: {
     // `SECRET` signs auth sessions; `scratchDir` is where an uploaded
     // Storybook archive is extracted before Playwright renders it.

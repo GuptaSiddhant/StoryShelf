@@ -1,6 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import type { ShelfApp } from "../index.tsx";
-
 import { WebhookModel } from "../models/webhook.ts";
 import { getStore } from "../store.ts";
 import type { ProjectRole } from "../types.ts";
@@ -21,7 +20,10 @@ const listWebhooksRoute = createRoute({
   path: "/api/v1/projects/{slug}/webhooks",
   request: { params: z.object({ slug: z.string() }) },
   responses: {
-    200: { content: { "application/json": { schema: webhookPublicSchema.array() } }, description: "List webhooks" },
+    200: {
+      content: { "application/json": { schema: webhookPublicSchema.array() } },
+      description: "List webhooks",
+    },
     ...notFoundResponse,
     ...unauthorized,
   },
@@ -35,7 +37,10 @@ const createWebhookRoute = createRoute({
     body: { content: { "application/json": { schema: webhookCreateSchema } } },
   },
   responses: {
-    201: { content: { "application/json": { schema: webhookCreatedSchema } }, description: "Created webhook" },
+    201: {
+      content: { "application/json": { schema: webhookCreatedSchema } },
+      description: "Created webhook",
+    },
     ...notFoundResponse,
   },
 });
@@ -55,7 +60,13 @@ export function registerWebhooks(app: ShelfApp): void {
   app.openapi(listWebhooksRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
     const webhooks = await new WebhookModel(getStore().db).list(project.id);
-    return c.json(webhooks.map((webhook) => ({ id: webhook.id, url: webhook.url, events: WebhookModel.eventsOf(webhook) })));
+    return c.json(
+      webhooks.map((webhook) => ({
+        id: webhook.id,
+        url: webhook.url,
+        events: WebhookModel.eventsOf(webhook),
+      })),
+    );
   });
 
   app.openapi(createWebhookRoute, async (c) => {

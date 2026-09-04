@@ -1,9 +1,8 @@
 import type { Logger } from "pino";
-
-import { StatusConfigModel } from "../models/status-config.ts";
-import type { CheckStatus, GitHostProvider } from "../adapters/git-host/index.ts";
-import { buildCommentMarkdown } from "../adapters/git-host/helpers.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
+import { buildCommentMarkdown } from "../adapters/git-host/helpers.ts";
+import type { CheckStatus, GitHostProvider } from "../adapters/git-host/index.ts";
+import { StatusConfigModel } from "../models/status-config.ts";
 import type { Project } from "../schema.ts";
 
 /** Post build check statuses (and review comments) to every configured git provider. */
@@ -46,7 +45,12 @@ async function postStatusesForBuild(opts: {
         return;
       }
       const adapter = provider.create({ config: parsed, token, logger: opts.logger });
-      await adapter.setStatus({ context: ctx, gitSha: opts.sha, status: opts.status, url: opts.url });
+      await adapter.setStatus({
+        context: ctx,
+        gitSha: opts.sha,
+        status: opts.status,
+        url: opts.url,
+      });
       if (adapter.upsertComment) {
         const markdown = buildCommentMarkdown(opts.status, opts.url, ctx);
         await adapter

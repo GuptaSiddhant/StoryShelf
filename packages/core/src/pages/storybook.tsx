@@ -1,5 +1,5 @@
-import { getStore } from "../store.ts";
 import type { Build, Project } from "../schema.ts";
+import { getStore } from "../store.ts";
 
 /**
  * Landing page for a published Storybook build. Presents the live Storybook

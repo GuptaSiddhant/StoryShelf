@@ -1,6 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import type { ShelfApp } from "../index.tsx";
-
 import { LabelModel } from "../models/label.ts";
 import { ProjectModel } from "../models/project.ts";
 import { getStore } from "../store.ts";
@@ -32,7 +31,10 @@ const listProjectsRoute = createRoute({
   method: "get",
   path: "/api/v1/projects",
   responses: {
-    200: { content: { "application/json": { schema: projectSchema.array() } }, description: "List projects" },
+    200: {
+      content: { "application/json": { schema: projectSchema.array() } },
+      description: "List projects",
+    },
     ...unauthorized,
   },
 });
@@ -42,7 +44,10 @@ const createProjectRoute = createRoute({
   path: "/api/v1/projects",
   request: { body: { content: { "application/json": { schema: projectCreateSchema } } } },
   responses: {
-    201: { content: { "application/json": { schema: projectSchema } }, description: "Created project" },
+    201: {
+      content: { "application/json": { schema: projectSchema } },
+      description: "Created project",
+    },
     ...badRequest,
     ...forbiddenResponse,
     ...unauthorized,
@@ -54,7 +59,10 @@ const getProjectRoute = createRoute({
   path: "/api/v1/projects/{slug}",
   request: { params: z.object({ slug: z.string() }) },
   responses: {
-    200: { content: { "application/json": { schema: projectSchema } }, description: "Fetch a project" },
+    200: {
+      content: { "application/json": { schema: projectSchema } },
+      description: "Fetch a project",
+    },
     ...notFound,
     ...unauthorized,
   },
@@ -68,7 +76,10 @@ const updateProjectRoute = createRoute({
     body: { content: { "application/json": { schema: projectUpdateSchema } } },
   },
   responses: {
-    200: { content: { "application/json": { schema: projectSchema } }, description: "Updated project" },
+    200: {
+      content: { "application/json": { schema: projectSchema } },
+      description: "Updated project",
+    },
     ...forbiddenResponse,
     ...notFound,
   },

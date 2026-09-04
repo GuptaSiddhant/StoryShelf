@@ -44,7 +44,11 @@ export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
           {state.ssoUrl ? (
             <div style="margin-top:1rem; text-align:center;">
               <span style="color: var(--color-text-secondary); font-size:.875rem;">or</span>
-              <a class="btn btn--secondary" href={state.ssoUrl} style="display:block; margin-top:.5rem;">
+              <a
+                class="btn btn--secondary"
+                href={state.ssoUrl}
+                style="display:block; margin-top:.5rem;"
+              >
                 Sign in with SSO
               </a>
             </div>

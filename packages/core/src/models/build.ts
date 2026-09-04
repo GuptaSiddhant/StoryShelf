@@ -1,6 +1,5 @@
 /** Build records, status transitions, and publication helpers. */
 import { and, desc, eq, inArray } from "drizzle-orm";
-
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import { buildLabels, builds, snapshots } from "../schema-tables.ts";
 import type { Build } from "../schema.ts";
@@ -14,7 +13,10 @@ import { ulid } from "../utils/ulid.ts";
  * project's `public_branch_regex` (ADR 0011). Supplying an empty/nonexistent
  * regex makes every build require auth.
  */
-export function isPublicBuild(project: { publicBranchRegex: string | null }, build: Pick<Build, "public" | "gitBranch">): boolean {
+export function isPublicBuild(
+  project: { publicBranchRegex: string | null },
+  build: Pick<Build, "public" | "gitBranch">,
+): boolean {
   if (build.public) {
     return true;
   }
@@ -79,7 +81,11 @@ export class BuildModel {
     }
     if (filter.labelKey && filter.labelValue) {
       const labels = await this.db.list(buildLabels, {
-        where: and(eq(buildLabels.projectId, projectId), eq(buildLabels.typeKey, filter.labelKey), eq(buildLabels.value, filter.labelValue)),
+        where: and(
+          eq(buildLabels.projectId, projectId),
+          eq(buildLabels.typeKey, filter.labelKey),
+          eq(buildLabels.value, filter.labelValue),
+        ),
       });
       const ids = labels.map((l) => l.buildId);
       if (ids.length === 0) {
@@ -91,7 +97,10 @@ export class BuildModel {
   }
 
   /** Return the most recent build intended for publishing, if any. */
-  async latestPublished(project: { id: string; publicBranchRegex: string | null }): Promise<Build | null> {
+  async latestPublished(project: {
+    id: string;
+    publicBranchRegex: string | null;
+  }): Promise<Build | null> {
     const rows = await this.list(project.id);
     for (const build of rows) {
       if (isPublicBuild(project, build)) {
@@ -101,7 +110,10 @@ export class BuildModel {
     return null;
   }
 
-  async update(id: string, patch: Partial<Pick<Build, "status" | "public" | "message" | "authorEmail" | "authorName">>): Promise<Build> {
+  async update(
+    id: string,
+    patch: Partial<Pick<Build, "status" | "public" | "message" | "authorEmail" | "authorName">>,
+  ): Promise<Build> {
     return await this.db.update(builds, id, { ...patch, updatedAt: new Date().toISOString() });
   }
 
@@ -113,7 +125,9 @@ export class BuildModel {
     const rows = await this.db.list(snapshots, { where: eq(snapshots.buildId, id) });
     const snapshotCount = rows.length;
     const changedCount = rows.filter((s) => s.status === "changed" || s.status === "new").length;
-    const approvedCount = rows.filter((s) => s.status === "approved" || s.status === "unchanged").length;
+    const approvedCount = rows.filter(
+      (s) => s.status === "approved" || s.status === "unchanged",
+    ).length;
     const rejectedCount = rows.filter((s) => s.status === "rejected").length;
     return this.db.update(builds, id, {
       snapshotCount,

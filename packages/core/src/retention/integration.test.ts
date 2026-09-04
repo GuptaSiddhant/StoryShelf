@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-
 import { makeDatabase, makeStorage } from "../capture/fake-adapters.ts";
 import { builds } from "../schema-tables.ts";
 import type { Project } from "../schema.ts";
@@ -17,14 +16,16 @@ function makeProject(overrides: Partial<Project> = {}): Project {
     publicBranchRegex: null,
     executePlay: false,
     playTimeoutMs: 10_000,
-      storybookMeta: null,
+    storybookMeta: null,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
     ...overrides,
   };
 }
 
-async function createTestDb(rows: Record<string, unknown>[]): Promise<ReturnType<typeof makeDatabase>["db"]> {
+async function createTestDb(
+  rows: Record<string, unknown>[],
+): Promise<ReturnType<typeof makeDatabase>["db"]> {
   const { db } = makeDatabase();
 
   await Promise.all(

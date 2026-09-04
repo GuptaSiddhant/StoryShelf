@@ -1,7 +1,6 @@
+import type { Logger } from "@storyshelf/core/types";
 /* oxlint-disable max-lines-per-function, eslint/require-await, typescript/require-await, typescript/no-unnecessary-type-assertion, eslint/no-void, eslint/no-unused-vars */
 import { describe, expect, it, vi } from "vitest";
-
-import type { Logger } from "@storyshelf/core/types";
 import { gitLabHost } from "./index.ts";
 
 function createMockLogger(): Logger {
@@ -27,7 +26,9 @@ describe("gitLabHost", () => {
   });
 
   it("maps pending -> pending via schema", async (): Promise<void> => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}), text: async () => "" });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => ({}), text: async () => "" });
     const orig = globalThis.fetch;
     globalThis.fetch = fetchMock as unknown as typeof fetch;
 
@@ -37,7 +38,12 @@ describe("gitLabHost", () => {
       logger: createMockLogger(),
     });
 
-    adapter.setStatus = async (opts: { context: string; gitSha: string; status: string; url: string }): Promise<void> => {
+    adapter.setStatus = async (opts: {
+      context: string;
+      gitSha: string;
+      status: string;
+      url: string;
+    }): Promise<void> => {
       await fetchMock({
         state: "pending",
         context: "storyshelf/test",
@@ -45,7 +51,12 @@ describe("gitLabHost", () => {
       });
     };
 
-    await adapter.setStatus({ context: "test", gitSha: "abc123", status: "pending", url: "http://example.com/build/1" });
+    await adapter.setStatus({
+      context: "test",
+      gitSha: "abc123",
+      status: "pending",
+      url: "http://example.com/build/1",
+    });
     expect(fetchMock).toHaveBeenCalled();
     globalThis.fetch = orig;
   });

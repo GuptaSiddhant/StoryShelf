@@ -1,11 +1,10 @@
+import type { DatabaseAdapter, ListOptions } from "@storyshelf/core/adapter/database";
+import { DDL } from "@storyshelf/core/ddl";
+import { schema } from "@storyshelf/core/schema";
+import Database from "better-sqlite3";
 import { eq, getTableColumns } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import type { AnySQLiteTable, SQLiteColumn } from "drizzle-orm/sqlite-core";
-import Database from "better-sqlite3";
-
-import type { DatabaseAdapter, ListOptions } from "@storyshelf/core/adapter/database";
-import { schema } from "@storyshelf/core/schema";
-import { DDL } from "@storyshelf/core/ddl";
 
 declare const __PKG_VERSION__: string | undefined;
 
@@ -15,10 +14,7 @@ function idOf(table: AnySQLiteTable): SQLiteColumn {
 }
 
 /* eslint-disable typescript/no-explicit-any, typescript/no-unsafe-call, typescript/no-unsafe-member-access -- drizzle query builder is intentionally loosely typed */
-function applyListOptions(
-  query: any,
-  opts: ListOptions,
-): void {
+function applyListOptions(query: any, opts: ListOptions): void {
   if (opts.where) {
     query.where(opts.where);
   }
@@ -62,13 +58,27 @@ export function createSqliteDatabase(path: string): DatabaseAdapter {
       return db.insert(table).values(values).returning().get()!;
     },
     async update(table, id, values) {
-      return db.update(table).set(values).where(eq(idOf(table), id)).returning().get()!;
+      return db
+        .update(table)
+        .set(values)
+        .where(eq(idOf(table), id))
+        .returning()
+        .get()!;
     },
     async get(table, id) {
-      return db.select().from(table).where(eq(idOf(table), id)).limit(1).get() ?? null;
+      return (
+        db
+          .select()
+          .from(table)
+          .where(eq(idOf(table), id))
+          .limit(1)
+          .get() ?? null
+      );
     },
     async remove(table, id) {
-      db.delete(table).where(eq(idOf(table), id)).run();
+      db.delete(table)
+        .where(eq(idOf(table), id))
+        .run();
     },
     async list(table, opts: ListOptions = {}) {
       const query = db.select().from(table);

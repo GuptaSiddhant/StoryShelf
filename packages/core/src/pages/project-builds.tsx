@@ -1,13 +1,15 @@
 import type { HtmlEscapedString } from "hono/utils/html";
-
 import { BuildModel } from "../models/build.ts";
 import { ProjectModel } from "../models/project.ts";
 import { getStore } from "../store.ts";
-import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import { Badge, statusTone } from "../ui/components.tsx";
+import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
 /** Project builds page: filterable build history for one project. */
-export async function renderProjectBuildsPage(slug: string, query: { status?: string; branch?: string } = {}): Promise<RenderedContent | null> {
+export async function renderProjectBuildsPage(
+  slug: string,
+  query: { status?: string; branch?: string } = {},
+): Promise<RenderedContent | null> {
   const projects = await new ProjectModel(getStore().db).list();
   const project = projects.find((item) => item.slug === slug);
   if (!project) {
@@ -19,7 +21,10 @@ export async function renderProjectBuildsPage(slug: string, query: { status?: st
   });
 
   return (
-    <DocumentLayout title={project.name} nav={{ active: "builds", projectSlug: project.slug, projectName: project.name }}>
+    <DocumentLayout
+      title={project.name}
+      nav={{ active: "builds", projectSlug: project.slug, projectName: project.name }}
+    >
       <div class="page-header">
         <nav class="breadcrumbs" aria-label="Breadcrumb">
           <ol>
@@ -35,7 +40,9 @@ export async function renderProjectBuildsPage(slug: string, query: { status?: st
           <div>
             <h1 class="page-header__title">{project.name}</h1>
             <p class="page-header__desc">
-              <code>{project.slug}</code> {project.gitRepository ? `· ${project.gitRepository}` : ""} · <Badge tone="neutral">{project.gitDefaultBranch}</Badge>
+              <code>{project.slug}</code>{" "}
+              {project.gitRepository ? `· ${project.gitRepository}` : ""} ·{" "}
+              <Badge tone="neutral">{project.gitDefaultBranch}</Badge>
             </p>
           </div>
           <div class="page-header__actions">
@@ -50,7 +57,11 @@ export async function renderProjectBuildsPage(slug: string, query: { status?: st
       </div>
 
       <div class="card card--padded" style="margin-bottom:1rem;">
-        <form method="get" action={`/projects/${project.slug}/builds`} style="display:flex; gap:.5rem; flex-wrap:wrap; align-items:end;">
+        <form
+          method="get"
+          action={`/projects/${project.slug}/builds`}
+          style="display:flex; gap:.5rem; flex-wrap:wrap; align-items:end;"
+        >
           <div class="field" style="margin:0; min-width:160px;">
             <label class="field__label" for="status">
               Status
@@ -80,7 +91,13 @@ export async function renderProjectBuildsPage(slug: string, query: { status?: st
             <label class="field__label" for="branch">
               Branch
             </label>
-            <input class="field__input" id="branch" name="branch" value={query.branch ?? ""} placeholder="main" />
+            <input
+              class="field__input"
+              id="branch"
+              name="branch"
+              value={query.branch ?? ""}
+              placeholder="main"
+            />
           </div>
           <button class="btn btn--secondary" type="submit">
             Filter
@@ -97,7 +114,9 @@ export async function renderProjectBuildsPage(slug: string, query: { status?: st
         <div class="empty">
           <h2 class="empty__title">No builds</h2>
           <p class="empty__desc">
-            {query.status || query.branch ? "No builds match the current filter." : "Upload your first build with the CLI. Builds appear here once uploaded."}
+            {query.status || query.branch
+              ? "No builds match the current filter."
+              : "Upload your first build with the CLI. Builds appear here once uploaded."}
           </p>
         </div>
       ) : (
@@ -114,13 +133,13 @@ export async function renderProjectBuildsPage(slug: string, query: { status?: st
               </tr>
             </thead>
             <tbody>
-              {builds.map(
-                (build): HtmlEscapedString | Promise<HtmlEscapedString> => (
+              {builds.map((build): HtmlEscapedString | Promise<HtmlEscapedString> => (
                 <tr key={build.id}>
                   <td>
                     <div style="font-weight:600;">{build.gitBranch}</div>
                     <div class="field__hint" style="font-family: ui-monospace, monospace;">
-                      {build.gitSha.slice(0, 7)} {build.message ? `· ${build.message.slice(0, 60)}` : ""}
+                      {build.gitSha.slice(0, 7)}{" "}
+                      {build.message ? `· ${build.message.slice(0, 60)}` : ""}
                     </div>
                   </td>
                   <td>
@@ -128,7 +147,8 @@ export async function renderProjectBuildsPage(slug: string, query: { status?: st
                   </td>
                   <td>
                     <span class="field__hint">
-                      {build.changedCount} changed · {build.approvedCount} approved · {build.snapshotCount} total
+                      {build.changedCount} changed · {build.approvedCount} approved ·{" "}
+                      {build.snapshotCount} total
                     </span>
                   </td>
                   <td>
@@ -137,11 +157,17 @@ export async function renderProjectBuildsPage(slug: string, query: { status?: st
                   </td>
                   <td class="field__hint">{new Date(build.createdAt).toLocaleString()}</td>
                   <td style="white-space:nowrap;">
-                    <a class="btn btn--secondary" href={`/projects/${project.slug}/builds/${build.id}`}>
+                    <a
+                      class="btn btn--secondary"
+                      href={`/projects/${project.slug}/builds/${build.id}`}
+                    >
                       View
                     </a>
                     <span style="margin-left:.35rem;" />
-                    <a class="btn btn--ghost" href={`/projects/${project.slug}/builds/${build.id}/diff`}>
+                    <a
+                      class="btn btn--ghost"
+                      href={`/projects/${project.slug}/builds/${build.id}/diff`}
+                    >
                       Review
                     </a>
                   </td>

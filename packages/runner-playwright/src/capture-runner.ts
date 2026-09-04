@@ -1,5 +1,3 @@
-import { chromium, type Browser } from "playwright";
-
 import {
   StorybookAdapter,
   type CaptureRunner,
@@ -10,6 +8,7 @@ import {
   type Viewport,
 } from "@storyshelf/core";
 import type { Logger } from "@storyshelf/core/types";
+import { chromium, type Browser } from "playwright";
 
 declare const __PKG_VERSION__: string | undefined;
 
@@ -104,8 +103,15 @@ async function renderAll(input: PlaywrightRenderInput, active: ActiveRun): Promi
           const screenshot = await captureScreenshot(ctx, story, viewport);
           captures.push({ story, viewportName: viewport.name, screenshot });
         } catch (error) {
-          failures.push({ storyId: story.id, viewportName: viewport.name, error: messageOf(error) });
-          input.logger?.error({ storyId: story.id, viewport: viewport.name, err: error }, "render failed for story");
+          failures.push({
+            storyId: story.id,
+            viewportName: viewport.name,
+            error: messageOf(error),
+          });
+          input.logger?.error(
+            { storyId: story.id, viewport: viewport.name, err: error },
+            "render failed for story",
+          );
         }
       }),
     );
@@ -142,7 +148,9 @@ async function captureScreenshot(
   story: StoryEntry,
   viewport: Viewport,
 ): Promise<Buffer> {
-  const page = await ctx.browser.newPage({ viewport: { width: viewport.width, height: viewport.height } });
+  const page = await ctx.browser.newPage({
+    viewport: { width: viewport.width, height: viewport.height },
+  });
   try {
     await page.goto(ctx.adapter.buildUrl(ctx.baseUrl, story.id), { waitUntil: "networkidle" });
     if (ctx.adapter.screenshotSelector) {
@@ -151,7 +159,9 @@ async function captureScreenshot(
       await page.waitForTimeout(delay);
       if (story.parameters?.pauseAnimationAtEnd) {
         await page.evaluate(() => {
-          const doc = globalThis.document as unknown as { getAnimations: () => { pause: () => void }[] };
+          const doc = globalThis.document as unknown as {
+            getAnimations: () => { pause: () => void }[];
+          };
           for (const anim of doc.getAnimations()) anim.pause();
         });
       }
@@ -192,10 +202,14 @@ async function captureScreenshot(
                 }),
               ]);
             } else if (preview.storyStore?.fromId) {
-              const loaded = preview.storyStore.fromId(storyId) as unknown as { play?: (ctx: unknown) => Promise<void> };
+              const loaded = preview.storyStore.fromId(storyId) as unknown as {
+                play?: (ctx: unknown) => Promise<void>;
+              };
               if (loaded?.play) {
                 await Promise.race([
-                  loaded.play({ canvasElement: globalThis.document.querySelector("#storybook-root") }),
+                  loaded.play({
+                    canvasElement: globalThis.document.querySelector("#storybook-root"),
+                  }),
                   new Promise((_, reject) => {
                     setTimeout(() => {
                       reject(new Error(`play timeout after ${timeoutMs}ms`));
@@ -213,7 +227,9 @@ async function captureScreenshot(
       }
     }
     // Playwright page.screenshot supports animations: disabled to freeze CSS animations
-    return await page.screenshot({ animations: story.parameters?.pauseAnimationAtEnd ? "allow" : "disabled" });
+    return await page.screenshot({
+      animations: story.parameters?.pauseAnimationAtEnd ? "allow" : "disabled",
+    });
   } finally {
     await page.close();
   }

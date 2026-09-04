@@ -1,6 +1,5 @@
 import { PNG } from "pngjs";
 import { describe, expect, it } from "vitest";
-
 import type { RenderedSnapshot } from "../adapters/capture-runner.ts";
 import { baselines, builds, snapshots } from "../schema-tables.ts";
 import type { Build, Project } from "../schema.ts";
@@ -20,9 +19,9 @@ const mockProject: Project = {
   pixelThreshold: 0.1,
   maxDiffRatio: 0.01,
   publicBranchRegex: null,
-    executePlay: false,
-    playTimeoutMs: 10_000,
-      storybookMeta: null,
+  executePlay: false,
+  playTimeoutMs: 10_000,
+  storybookMeta: null,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
 };
@@ -71,7 +70,9 @@ function captureFor(story: StoryEntry, screenshot: Buffer): RenderedSnapshot {
   return { story, viewportName: DEFAULT_VIEWPORT.name, screenshot };
 }
 
-async function makeContext(options: { captures: RenderedSnapshot[] }): Promise<{ ctx: CaptureContext; objects: Map<string, Buffer> }> {
+async function makeContext(options: {
+  captures: RenderedSnapshot[];
+}): Promise<{ ctx: CaptureContext; objects: Map<string, Buffer> }> {
   const { db } = makeDatabase();
   const { storage, objects } = makeStorage();
   await db.insert(builds, mockBuild);
@@ -129,7 +130,10 @@ describe("persistCapture", () => {
 
   it("approves a build whose captures all persist without diffs", async () => {
     const { ctx } = await makeContext({
-      captures: [captureFor(storyOf("a"), png(4, 4, [0, 255, 0])), captureFor(storyOf("b"), png(4, 4, [0, 255, 0]))],
+      captures: [
+        captureFor(storyOf("a"), png(4, 4, [0, 255, 0])),
+        captureFor(storyOf("b"), png(4, 4, [0, 255, 0])),
+      ],
     });
 
     await persistCapture(ctx);

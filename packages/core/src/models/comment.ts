@@ -1,6 +1,5 @@
 /** Build and snapshot review comments. */
 import { eq } from "drizzle-orm";
-
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import { comments, projects } from "../schema-tables.ts";
 import type { Comment } from "../schema.ts";
@@ -21,7 +20,12 @@ export class CommentModel {
     return await this.db.list(comments, { where: eq(comments.buildId, buildId) });
   }
 
-  async create(projectId: string, buildId: string, userId: string, input: CommentCreateInput): Promise<Comment> {
+  async create(
+    projectId: string,
+    buildId: string,
+    userId: string,
+    input: CommentCreateInput,
+  ): Promise<Comment> {
     const now = new Date().toISOString();
     const project = await this.db.get(projects, projectId);
     if (!project) {
@@ -42,7 +46,10 @@ export class CommentModel {
   }
 
   async resolve(id: string): Promise<Comment> {
-    return await this.db.update(comments, id, { resolved: true, updatedAt: new Date().toISOString() });
+    return await this.db.update(comments, id, {
+      resolved: true,
+      updatedAt: new Date().toISOString(),
+    });
   }
 }
 

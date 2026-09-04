@@ -1,15 +1,19 @@
+import {
+  createShelfRouter,
+  screenshotPath,
+  type Build,
+  type DatabaseAdapter,
+  type Snapshot,
+  type StorageAdapter,
+} from "@storyshelf/core";
+import { createSqliteDatabase } from "@storyshelf/db-sqlite";
+import { createLocalStorage } from "@storyshelf/storage-local";
+import AdmZip from "adm-zip";
 import { execFile, type ExecException } from "node:child_process";
 import { access, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-
-import AdmZip from "adm-zip";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { createShelfRouter, screenshotPath, type Build, type DatabaseAdapter, type Snapshot, type StorageAdapter } from "@storyshelf/core";
-import { createSqliteDatabase } from "@storyshelf/db-sqlite";
-import { createLocalStorage } from "@storyshelf/storage-local";
-
 import { createPlaywrightCaptureRunner } from "./capture-runner.ts";
 
 const FIXTURE_DIR = process.env["FIXTURE_DIR"]
@@ -58,7 +62,9 @@ async function fixtureBuilt(): Promise<boolean> {
   }
 }
 
-async function runBuilders(runners: readonly (readonly [string, readonly string[]])[]): Promise<boolean> {
+async function runBuilders(
+  runners: readonly (readonly [string, readonly string[]])[],
+): Promise<boolean> {
   const [runner, ...rest] = runners;
   if (!runner) {
     return false;
@@ -150,14 +156,19 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
       const zipBuffer = zip.toBuffer();
       const zipBlob = new Blob([new Uint8Array(zipBuffer)], { type: "application/zip" });
       form.set("zip", zipBlob, "storybook.zip");
-      const response = await app.request(`/api/v1/projects/${project.slug}/builds`, { method: "POST", body: form });
+      const response = await app.request(`/api/v1/projects/${project.slug}/builds`, {
+        method: "POST",
+        body: form,
+      });
       expect(response.status).toBe(202);
       const created = await readJson<Build>(response);
       return created;
     };
 
     const snapshotsFor = async (buildId: string): Promise<Snapshot[]> => {
-      const response = await app.request(`/api/v1/projects/${project.slug}/builds/${buildId}/snapshots`);
+      const response = await app.request(
+        `/api/v1/projects/${project.slug}/builds/${buildId}/snapshots`,
+      );
       return readJson<Snapshot[]>(response);
     };
 
@@ -181,9 +192,12 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
     );
     expect(screenshot.length).toBeGreaterThan(0);
 
-    const approveResponse = await app.request(`/api/v1/projects/${project.slug}/builds/${first.id}/approve-all`, {
-      method: "POST",
-    });
+    const approveResponse = await app.request(
+      `/api/v1/projects/${project.slug}/builds/${first.id}/approve-all`,
+      {
+        method: "POST",
+      },
+    );
     expect(approveResponse.status).toBe(200);
     const reviewed = await readJson<Build>(
       await app.request(`/api/v1/projects/${project.slug}/builds/${first.id}`),

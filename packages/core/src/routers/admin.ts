@@ -1,6 +1,5 @@
 import { createRoute } from "@hono/zod-openapi";
 import type { ShelfApp } from "../index.tsx";
-
 import { ProjectModel } from "../models/project.ts";
 import { Retention } from "../retention/purge.ts";
 import { getStore } from "../store.ts";
@@ -12,7 +11,10 @@ const purgeRoute = createRoute({
   path: "/api/v1/admin/purge",
   request: { body: { content: { "application/json": { schema: purgeInputSchema } } } },
   responses: {
-    200: { content: { "application/json": { schema: purgeSchema } }, description: "Retention purge run" },
+    200: {
+      content: { "application/json": { schema: purgeSchema } },
+      description: "Retention purge run",
+    },
     ...forbiddenResponse,
   },
 });

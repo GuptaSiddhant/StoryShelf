@@ -21,13 +21,7 @@ const DOCKERFILE_LINES = [
   'CMD ["node", "dist/server.mjs"]',
 ];
 
-const DOCKERIGNORE_LINES = [
-  "node_modules/",
-  ".git/",
-  "*.md",
-  ".env*",
-  "data/",
-];
+const DOCKERIGNORE_LINES = ["node_modules/", ".git/", "*.md", ".env*", "data/"];
 
 const COMPOSE_LINES = [
   "services:",

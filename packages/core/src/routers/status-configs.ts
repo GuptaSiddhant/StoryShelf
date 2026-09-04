@@ -1,5 +1,4 @@
 import { createRoute, z } from "@hono/zod-openapi";
-
 import type { ShelfApp } from "../index.tsx";
 import { StatusConfigModel } from "../models/status-config.ts";
 import type { ProjectStatusConfig } from "../schema.ts";
@@ -14,7 +13,10 @@ const listRoute = createRoute({
   path: "/api/v1/projects/{slug}/status-configs",
   request: { params: z.object({ slug: z.string() }) },
   responses: {
-    200: { content: { "application/json": { schema: statusConfigSchema.array() } }, description: "List status configs" },
+    200: {
+      content: { "application/json": { schema: statusConfigSchema.array() } },
+      description: "List status configs",
+    },
     ...notFound,
     ...unauthorized,
   },
@@ -28,8 +30,14 @@ const createRouteDef = createRoute({
     body: { content: { "application/json": { schema: statusConfigCreateSchema } } },
   },
   responses: {
-    201: { content: { "application/json": { schema: statusConfigSchema } }, description: "Created status config" },
-    400: { content: { "application/json": { schema: z.object({ message: z.string() }) } }, description: "Bad request" },
+    201: {
+      content: { "application/json": { schema: statusConfigSchema } },
+      description: "Created status config",
+    },
+    400: {
+      content: { "application/json": { schema: z.object({ message: z.string() }) } },
+      description: "Bad request",
+    },
     ...notFound,
   },
 });

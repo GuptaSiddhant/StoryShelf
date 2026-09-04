@@ -1,5 +1,4 @@
 import type { FC } from "hono/jsx";
-
 import { getStore } from "../store.ts";
 import { baseStyle } from "./styles.ts";
 import { DARK_THEME, LIGHT_THEME } from "./theme.ts";
@@ -17,7 +16,11 @@ interface NavConfig {
 // Functions can legitimately return a promise; the rule is a false positive here.
 /** Full HTML document shell with top bar, sidebar, theme, and HTMX. */
 // eslint-disable-next-line promise-function-async -- JSX component return type
-export const DocumentLayout: FC<{ title: string; nav?: NavConfig; children?: unknown }> = ({ title, nav, children }) => {
+export const DocumentLayout: FC<{ title: string; nav?: NavConfig; children?: unknown }> = ({
+  title,
+  nav,
+  children,
+}) => {
   const { ui } = getStore();
   const name = ui.name ?? "StoryShelf";
   const light = ui.lightTheme ?? LIGHT_THEME;
@@ -60,11 +63,24 @@ const TopBar: FC<{ name: string; logo?: string; nav?: NavConfig }> = ({ name, lo
     <header class="topbar" role="banner">
       <div class="topbar__inner">
         <div class="topbar__left">
-          <button class="topbar__menu" type="button" aria-label="Toggle navigation" aria-expanded="false" aria-controls="sidebar" data-sidebar-toggle>
+          <button
+            class="topbar__menu"
+            type="button"
+            aria-label="Toggle navigation"
+            aria-expanded="false"
+            aria-controls="sidebar"
+            data-sidebar-toggle
+          >
             <span aria-hidden="true">☰</span>
           </button>
           <a class="brand" href="/">
-            {logo ? <img class="logo" src={logo} alt={name} width="28" height="28" /> : <span class="brand__mark" aria-hidden="true">◆</span>}
+            {logo ? (
+              <img class="logo" src={logo} alt={name} width="28" height="28" />
+            ) : (
+              <span class="brand__mark" aria-hidden="true">
+                ◆
+              </span>
+            )}
             <span class="brand__name">{name}</span>
           </a>
           {nav?.projectSlug ? (
@@ -72,7 +88,9 @@ const TopBar: FC<{ name: string; logo?: string; nav?: NavConfig }> = ({ name, lo
               <span class="project-crumb__sep" aria-hidden="true">
                 /
               </span>
-              <a href={`/projects/${nav.projectSlug}/builds`}>{nav.projectName ?? nav.projectSlug}</a>
+              <a href={`/projects/${nav.projectSlug}/builds`}>
+                {nav.projectName ?? nav.projectSlug}
+              </a>
             </nav>
           ) : null}
         </div>
@@ -140,22 +158,42 @@ const Sidebar: FC<{ nav?: NavConfig }> = ({ nav }) => {
   return (
     <aside id="sidebar" class="sidebar" aria-label="Primary">
       <nav class="sidebar__nav">
-        <a class={`sidebar__link ${nav?.active === "projects" ? "sidebar__link--active" : ""}`} href="/projects" aria-current={nav?.active === "projects" ? "page" : undefined}>
+        <a
+          class={`sidebar__link ${nav?.active === "projects" ? "sidebar__link--active" : ""}`}
+          href="/projects"
+          aria-current={nav?.active === "projects" ? "page" : undefined}
+        >
           <span aria-hidden="true">▦</span> Projects
         </a>
         {nav?.projectSlug ? (
           <>
             <div class="sidebar__section">Project</div>
-            <a class={`sidebar__link ${nav.active === "builds" ? "sidebar__link--active" : ""}`} href={`/projects/${nav.projectSlug}/builds`} aria-current={nav.active === "builds" ? "page" : undefined}>
+            <a
+              class={`sidebar__link ${nav.active === "builds" ? "sidebar__link--active" : ""}`}
+              href={`/projects/${nav.projectSlug}/builds`}
+              aria-current={nav.active === "builds" ? "page" : undefined}
+            >
               <span aria-hidden="true">◧</span> Builds
             </a>
-            <a class={`sidebar__link ${nav.active === "jobs" ? "sidebar__link--active" : ""}`} href={`/projects/${nav.projectSlug}/jobs`} aria-current={nav.active === "jobs" ? "page" : undefined}>
+            <a
+              class={`sidebar__link ${nav.active === "jobs" ? "sidebar__link--active" : ""}`}
+              href={`/projects/${nav.projectSlug}/jobs`}
+              aria-current={nav.active === "jobs" ? "page" : undefined}
+            >
               <span aria-hidden="true">◫</span> Jobs
             </a>
-            <a class={`sidebar__link ${nav.active === "labels" ? "sidebar__link--active" : ""}`} href={`/projects/${nav.projectSlug}/labels`} aria-current={nav.active === "labels" ? "page" : undefined}>
+            <a
+              class={`sidebar__link ${nav.active === "labels" ? "sidebar__link--active" : ""}`}
+              href={`/projects/${nav.projectSlug}/labels`}
+              aria-current={nav.active === "labels" ? "page" : undefined}
+            >
               <span aria-hidden="true">⌗</span> Labels
             </a>
-            <a class={`sidebar__link ${nav.active === "settings" ? "sidebar__link--active" : ""}`} href={`/projects/${nav.projectSlug}/settings`} aria-current={nav.active === "settings" ? "page" : undefined}>
+            <a
+              class={`sidebar__link ${nav.active === "settings" ? "sidebar__link--active" : ""}`}
+              href={`/projects/${nav.projectSlug}/settings`}
+              aria-current={nav.active === "settings" ? "page" : undefined}
+            >
               <span aria-hidden="true">⚙</span> Settings
             </a>
           </>

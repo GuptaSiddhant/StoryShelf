@@ -1,7 +1,7 @@
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { Build, Comment, Project, Snapshot } from "../schema.ts";
-import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import { Badge, statusTone } from "../ui/components.tsx";
+import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
 /** Data required to render the three-up build diff review page. */
 export interface BuildDiffData {
@@ -14,18 +14,29 @@ export interface BuildDiffData {
   hasBaseline: Record<string, boolean>;
 }
 
-function imageUrl(project: Project, build: Build, snapshot: Snapshot, kind: "image" | "diff" | "baseline"): string {
+function imageUrl(
+  project: Project,
+  build: Build,
+  snapshot: Snapshot,
+  kind: "image" | "diff" | "baseline",
+): string {
   return `/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${snapshot.id}/${kind}`;
 }
 
 /** Three-up diff review page: baseline, current, and diff with keyboard review. */
 export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
   const { project, build, snapshots, comments, selectedId, canReview, hasBaseline } = data;
-  const selected = snapshots.find((s) => s.id === selectedId) ?? snapshots.find((s) => s.status === "changed" || s.status === "new") ?? snapshots[0];
+  const selected =
+    snapshots.find((s) => s.id === selectedId) ??
+    snapshots.find((s) => s.status === "changed" || s.status === "new") ??
+    snapshots[0];
   const pending = snapshots.filter((s) => s.status === "new" || s.status === "changed");
 
   return (
-    <DocumentLayout title={`Review · ${build.gitBranch}`} nav={{ active: "builds", projectSlug: project.slug, projectName: project.name }}>
+    <DocumentLayout
+      title={`Review · ${build.gitBranch}`}
+      nav={{ active: "builds", projectSlug: project.slug, projectName: project.name }}
+    >
       <div class="page-header">
         <nav class="breadcrumbs" aria-label="Breadcrumb">
           <ol>
@@ -46,10 +57,14 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
         <div class="page-header__row">
           <div>
             <h1 class="page-header__title">
-              {build.gitBranch} <span style="color:var(--text-secondary); font-weight:400;">· {build.gitSha.slice(0, 7)}</span>
+              {build.gitBranch}{" "}
+              <span style="color:var(--text-secondary); font-weight:400;">
+                · {build.gitSha.slice(0, 7)}
+              </span>
             </h1>
             <p class="page-header__desc">
-              {build.message ?? "No message"} {build.authorName ? `· ${build.authorName}` : ""} · <Badge tone={statusTone(build.status)}>{build.status}</Badge>
+              {build.message ?? "No message"} {build.authorName ? `· ${build.authorName}` : ""} ·{" "}
+              <Badge tone={statusTone(build.status)}>{build.status}</Badge>
             </p>
           </div>
           <div class="page-header__actions">
@@ -58,12 +73,22 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
             </a>
             {canReview && pending.length > 0 ? (
               <>
-                <form method="post" action={`/api/v1/projects/${project.slug}/builds/${build.id}/approve-all`} hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/approve-all`} hx-target="body">
+                <form
+                  method="post"
+                  action={`/api/v1/projects/${project.slug}/builds/${build.id}/approve-all`}
+                  hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/approve-all`}
+                  hx-target="body"
+                >
                   <button class="btn btn--primary" type="submit">
                     Approve all ({pending.length})
                   </button>
                 </form>
-                <form method="post" action={`/api/v1/projects/${project.slug}/builds/${build.id}/reject-all`} hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/reject-all`} hx-target="body">
+                <form
+                  method="post"
+                  action={`/api/v1/projects/${project.slug}/builds/${build.id}/reject-all`}
+                  hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/reject-all`}
+                  hx-target="body"
+                >
                   <button class="btn btn--danger" type="submit">
                     Reject all
                   </button>
@@ -109,9 +134,12 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
                   <strong>Snapshots</strong>
                   <span class="field__hint">{snapshots.length} total</span>
                 </div>
-                <div data-diff-nav data-current={selected?.id} style="max-height: 70vh; overflow:auto;">
-                  {snapshots.map(
-                    (snap): HtmlEscapedString | Promise<HtmlEscapedString> => (
+                <div
+                  data-diff-nav
+                  data-current={selected?.id}
+                  style="max-height: 70vh; overflow:auto;"
+                >
+                  {snapshots.map((snap): HtmlEscapedString | Promise<HtmlEscapedString> => (
                     <a
                       key={snap.id}
                       href={`/projects/${project.slug}/builds/${build.id}/diff?snapshot=${snap.id}`}
@@ -125,11 +153,15 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
                     >
                       <span style="display:flex; gap:.4rem; align-items:center; flex-wrap:wrap;">
                         <Badge tone={statusTone(snap.status)}>{snap.status}</Badge>
-                        <span style="font-weight:600; font-size:.9rem;">{snap.storyTitle} / {snap.storyName}</span>
+                        <span style="font-weight:600; font-size:.9rem;">
+                          {snap.storyTitle} / {snap.storyName}
+                        </span>
                       </span>
                       <span class="field__hint" style="font-size:.8rem;">
                         {snap.viewportName} · {snap.viewportWidth}×{snap.viewportHeight}
-                        {snap.diffRatio !== null && snap.diffRatio !== undefined ? ` · ${(snap.diffRatio * 100).toFixed(2)}%` : ""}
+                        {snap.diffRatio !== null && snap.diffRatio !== undefined
+                          ? ` · ${(snap.diffRatio * 100).toFixed(2)}%`
+                          : ""}
                       </span>
                     </a>
                   ))}
@@ -147,19 +179,41 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
                           {selected.storyTitle} — {selected.storyName}
                         </h2>
                         <p class="field__hint" style="margin:.2rem 0 0;">
-                          {selected.viewportName} · {selected.viewportWidth}×{selected.viewportHeight} · <Badge tone={statusTone(selected.status)}>{selected.status}</Badge>
+                          {selected.viewportName} · {selected.viewportWidth}×
+                          {selected.viewportHeight} ·{" "}
+                          <Badge tone={statusTone(selected.status)}>{selected.status}</Badge>
                           {selected.diffPixels === null ? "" : ` · ${selected.diffPixels} px`}
                         </p>
                       </div>
                       {canReview && (selected.status === "new" || selected.status === "changed") ? (
                         <div style="display:flex; gap:.5rem;">
-                          <form method="post" action={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${selected.id}/approve`} hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${selected.id}/approve`} hx-target="body">
-                            <button class="btn btn--primary" type="submit" accesskey="a" title="Approve (a)">
+                          <form
+                            method="post"
+                            action={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${selected.id}/approve`}
+                            hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${selected.id}/approve`}
+                            hx-target="body"
+                          >
+                            <button
+                              class="btn btn--primary"
+                              type="submit"
+                              accesskey="a"
+                              title="Approve (a)"
+                            >
                               Approve
                             </button>
                           </form>
-                          <form method="post" action={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${selected.id}/reject`} hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${selected.id}/reject`} hx-target="body">
-                            <button class="btn btn--danger" type="submit" accesskey="r" title="Reject (r)">
+                          <form
+                            method="post"
+                            action={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${selected.id}/reject`}
+                            hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${selected.id}/reject`}
+                            hx-target="body"
+                          >
+                            <button
+                              class="btn btn--danger"
+                              type="submit"
+                              accesskey="r"
+                              title="Reject (r)"
+                            >
                               Reject
                             </button>
                           </form>
@@ -171,7 +225,12 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
                       <div class="diff-pane">
                         <div class="diff-pane__label">Baseline</div>
                         {hasBaseline[selected.id] ? (
-                          <img class="diff-pane__img" src={imageUrl(project, build, selected, "baseline")} alt={`Baseline for ${selected.storyTitle} / ${selected.storyName}`} loading="lazy" />
+                          <img
+                            class="diff-pane__img"
+                            src={imageUrl(project, build, selected, "baseline")}
+                            alt={`Baseline for ${selected.storyTitle} / ${selected.storyName}`}
+                            loading="lazy"
+                          />
                         ) : (
                           <div style="aspect-ratio: 16/9; display:grid; place-items:center; background:var(--surface-muted); color:var(--text-secondary); font-size:.85rem;">
                             No baseline
@@ -182,21 +241,39 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
                       </div>
                       <div class="diff-pane">
                         <div class="diff-pane__label">Current</div>
-                        <img class="diff-pane__img" src={imageUrl(project, build, selected, "image")} alt={`Current for ${selected.storyTitle} / ${selected.storyName}`} loading="lazy" />
+                        <img
+                          class="diff-pane__img"
+                          src={imageUrl(project, build, selected, "image")}
+                          alt={`Current for ${selected.storyTitle} / ${selected.storyName}`}
+                          loading="lazy"
+                        />
                       </div>
                       <div class="diff-pane">
-                        <div class="diff-pane__label">Diff {selected.diffRatio === null ? "" : `· ${(selected.diffRatio * 100).toFixed(2)}%`}</div>
+                        <div class="diff-pane__label">
+                          Diff{" "}
+                          {selected.diffRatio === null
+                            ? ""
+                            : `· ${(selected.diffRatio * 100).toFixed(2)}%`}
+                        </div>
                         {selected.diffPath ? (
-                          <img class="diff-pane__img" src={imageUrl(project, build, selected, "diff")} alt={`Diff for ${selected.storyTitle} / ${selected.storyName}`} loading="lazy" />
+                          <img
+                            class="diff-pane__img"
+                            src={imageUrl(project, build, selected, "diff")}
+                            alt={`Diff for ${selected.storyTitle} / ${selected.storyName}`}
+                            loading="lazy"
+                          />
                         ) : (
                           <div style="aspect-ratio: 16/9; display:grid; place-items:center; color:var(--text-secondary);">
-                            {selected.status === "unchanged" || selected.status === "approved" ? "No diff — within threshold" : "No diff yet"}
+                            {selected.status === "unchanged" || selected.status === "approved"
+                              ? "No diff — within threshold"
+                              : "No diff yet"}
                           </div>
                         )}
                       </div>
                     </div>
                     <p class="field__hint" style="margin-top:.6rem;">
-                      Keyboard: <kbd>←</kbd> <kbd>→</kbd> navigate · <kbd>a</kbd> approve · <kbd>r</kbd> reject · <kbd>?</kbd> help
+                      Keyboard: <kbd>←</kbd> <kbd>→</kbd> navigate · <kbd>a</kbd> approve ·{" "}
+                      <kbd>r</kbd> reject · <kbd>?</kbd> help
                     </p>
                   </div>
 
@@ -204,9 +281,10 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
                     <h3 style="margin:0 0 .5rem;">Comments</h3>
                     <div style="display:grid; gap:.75rem;">
                       {comments
-                        .filter((comment) => !comment.snapshotId || comment.snapshotId === selected.id)
-                        .map(
-                          (comment): HtmlEscapedString | Promise<HtmlEscapedString> => (
+                        .filter(
+                          (comment) => !comment.snapshotId || comment.snapshotId === selected.id,
+                        )
+                        .map((comment): HtmlEscapedString | Promise<HtmlEscapedString> => (
                           <div key={comment.id} class="comment">
                             <div class="comment__head">
                               <strong>{comment.userId}</strong>
@@ -215,7 +293,13 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
                             </div>
                             <p class="comment__body">{comment.body}</p>
                             {!comment.resolved && canReview ? (
-                              <form method="post" action={`/api/v1/projects/${project.slug}/builds/${build.id}/comments/${comment.id}/resolve`} hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/comments/${comment.id}/resolve`} hx-target="body" style="margin-top:.5rem;">
+                              <form
+                                method="post"
+                                action={`/api/v1/projects/${project.slug}/builds/${build.id}/comments/${comment.id}/resolve`}
+                                hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/comments/${comment.id}/resolve`}
+                                hx-target="body"
+                                style="margin-top:.5rem;"
+                              >
                                 <button class="btn btn--ghost" type="submit">
                                   Mark resolved
                                 </button>
@@ -223,15 +307,31 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
                             ) : null}
                           </div>
                         ))}
-                      {comments.filter((c) => !c.snapshotId || c.snapshotId === selected.id).length === 0 ? <p class="field__hint">No comments on this snapshot.</p> : null}
+                      {comments.filter((c) => !c.snapshotId || c.snapshotId === selected.id)
+                        .length === 0 ? (
+                        <p class="field__hint">No comments on this snapshot.</p>
+                      ) : null}
                     </div>
 
-                    <form method="post" action={`/api/v1/projects/${project.slug}/builds/${build.id}/comments`} hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/comments`} hx-target="body" style="margin-top:1rem; display:grid; gap:.5rem;">
+                    <form
+                      method="post"
+                      action={`/api/v1/projects/${project.slug}/builds/${build.id}/comments`}
+                      hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/comments`}
+                      hx-target="body"
+                      style="margin-top:1rem; display:grid; gap:.5rem;"
+                    >
                       <input type="hidden" name="snapshotId" value={selected.id} />
                       <label class="field__label" for="comment-body">
                         Add comment
                       </label>
-                      <textarea class="field__input field__input--textarea" id="comment-body" name="body" rows={3} required placeholder="Leave feedback on this snapshot…" />
+                      <textarea
+                        class="field__input field__input--textarea"
+                        id="comment-body"
+                        name="body"
+                        rows={3}
+                        required
+                        placeholder="Leave feedback on this snapshot…"
+                      />
                       <div>
                         <button class="btn btn--primary" type="submit">
                           Comment

@@ -1,8 +1,7 @@
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
-import type { ShelfApp } from "../index.tsx";
-
 import { SESSION_COOKIE, type AuthAdapter, type AuthUser } from "../adapters/auth.ts";
+import type { ShelfApp } from "../index.tsx";
 import { renderLoginPage } from "../pages/login.tsx";
 import { randomToken } from "../utils/hash.ts";
 import { hxRedirect } from "./htmx.ts";
@@ -33,7 +32,10 @@ function hasSso(auth: AuthAdapter): auth is SsoAuth {
 
 function buildSsoUrl(c: Context, auth: SsoAuth): string {
   const state = randomToken("shelf_").value;
-  c.header("set-cookie", `${OAUTH_STATE_COOKIE}=${state}; Path=/; HttpOnly; SameSite=Lax; Max-Age=600`);
+  c.header(
+    "set-cookie",
+    `${OAUTH_STATE_COOKIE}=${state}; Path=/; HttpOnly; SameSite=Lax; Max-Age=600`,
+  );
   return auth.loginUrl(state);
 }
 

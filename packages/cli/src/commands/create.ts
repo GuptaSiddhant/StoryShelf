@@ -38,8 +38,9 @@ export async function runCreate(options: CreateOptions): Promise<void> {
   await assertStorybookMain();
 
   const url = options.url ?? process.env["STORYSHELF_URL"] ?? process.env["STORYSHELF_HOST"];
-  let {name} = options;
-  const token = options.token ?? process.env["STORYSHELF_ADMIN_TOKEN"] ?? process.env["ADMIN_TOKEN"];
+  let { name } = options;
+  const token =
+    options.token ?? process.env["STORYSHELF_ADMIN_TOKEN"] ?? process.env["ADMIN_TOKEN"];
 
   if (!url) {
     printError("--url is required (or STORYSHELF_URL env)");
@@ -47,7 +48,7 @@ export async function runCreate(options: CreateOptions): Promise<void> {
     return;
   }
   if (!name) {
-    name = await detectPackageName() ?? undefined;
+    name = (await detectPackageName()) ?? undefined;
   }
   if (!name) {
     printError("--name is required (or ensure package.json has a name)");
@@ -64,11 +65,20 @@ export async function runCreate(options: CreateOptions): Promise<void> {
   const gitDefaultBranch = detectGitDefaultBranch() ?? undefined;
   const storybookMeta = await detectStorybookMeta();
 
-  const payload: { name: string; gitRepository?: string; gitDefaultBranch?: string; storybookMeta?: unknown } = {
+  const payload: {
+    name: string;
+    gitRepository?: string;
+    gitDefaultBranch?: string;
+    storybookMeta?: unknown;
+  } = {
     name,
   };
-  if (gitRepository) {payload.gitRepository = gitRepository;}
-  if (gitDefaultBranch) {payload.gitDefaultBranch = gitDefaultBranch;}
+  if (gitRepository) {
+    payload.gitRepository = gitRepository;
+  }
+  if (gitDefaultBranch) {
+    payload.gitDefaultBranch = gitDefaultBranch;
+  }
   if (Object.keys(storybookMeta).length > 0) {
     payload.storybookMeta = storybookMeta;
   }

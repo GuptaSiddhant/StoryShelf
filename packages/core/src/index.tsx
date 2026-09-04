@@ -7,8 +7,11 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { requestId } from "hono/request-id";
 import type { AuthUser } from "./adapters/auth.ts";
 import type { CaptureQueue } from "./adapters/capture-queue.ts";
-import type { ShelfOptions } from "./config.ts";
 import type { AdapterMetadata, GitAdapterMetadata } from "./adapters/metadata.ts";
+import { executeCaptureJob, type CaptureJobOptions } from "./capture/orchestrator.ts";
+import { InMemoryCaptureQueue } from "./capture/queue.ts";
+import { postStatusesForBuild } from "./capture/status-fanout.ts";
+import type { ShelfOptions } from "./config.ts";
 import { validateConfig, validateUiConfig } from "./config.ts";
 import { createShelfLogger } from "./logger.ts";
 import { csrf, rateLimit } from "./middleware/index.ts";
@@ -28,9 +31,6 @@ import { registerTokens } from "./routers/tokens.ts";
 import { registerUiPages } from "./routers/ui.ts";
 import { registerWebhooks } from "./routers/webhooks.ts";
 import { getStore, runWithStore } from "./store.ts";
-import { executeCaptureJob, type CaptureJobOptions } from "./capture/orchestrator.ts";
-import { InMemoryCaptureQueue } from "./capture/queue.ts";
-import { postStatusesForBuild } from "./capture/status-fanout.ts";
 
 /** Per-request shelf context (adapters, config, user, capture queue). */
 export interface ShelfContext {
@@ -50,13 +50,25 @@ export interface ShelfContext {
 /** Hono application type carrying the shelf context variables. */
 export type ShelfApp = OpenAPIHono<{ Variables: ShelfContext }>;
 
-function buildAdapterSnapshot(options: ShelfOptions): Record<string, AdapterMetadata | GitAdapterMetadata> {
+function buildAdapterSnapshot(
+  options: ShelfOptions,
+): Record<string, AdapterMetadata | GitAdapterMetadata> {
   const snap: Record<string, AdapterMetadata | GitAdapterMetadata> = {};
-  if (options.database.metadata) {snap["database"] = options.database.metadata;}
-  if (options.storage.metadata) {snap["storage"] = options.storage.metadata;}
-  if (options.captureRunner?.metadata) {snap["captureRunner"] = options.captureRunner.metadata;}
-  if (options.captureQueue?.metadata) {snap["captureQueue"] = options.captureQueue.metadata;}
-  if (options.auth?.metadata) {snap["auth"] = options.auth.metadata;}
+  if (options.database.metadata) {
+    snap["database"] = options.database.metadata;
+  }
+  if (options.storage.metadata) {
+    snap["storage"] = options.storage.metadata;
+  }
+  if (options.captureRunner?.metadata) {
+    snap["captureRunner"] = options.captureRunner.metadata;
+  }
+  if (options.captureQueue?.metadata) {
+    snap["captureQueue"] = options.captureQueue.metadata;
+  }
+  if (options.auth?.metadata) {
+    snap["auth"] = options.auth.metadata;
+  }
   for (const p of options.gitHosts ?? []) {
     snap[`git:${p.metadata.kind}`] = p.metadata;
   }
@@ -83,13 +95,17 @@ async function isAlreadyMerged(opts: {
   projectId: string;
   logger?: import("./logger.ts").Logger;
 }): Promise<boolean> {
-  if (opts.providers.length === 0) {return false;}
+  if (opts.providers.length === 0) {
+    return false;
+  }
   const { StatusConfigModel } = await import("./models/status-config.ts");
   const model = new StatusConfigModel(opts.db, opts.secret);
   const rows = await model.list(opts.projectId);
   for (const row of rows) {
     const provider = opts.providers.find((p) => p.metadata.kind === row.provider);
-    if (!provider) {continue;}
+    if (!provider) {
+      continue;
+    }
     let parsed: unknown;
     try {
       parsed = JSON.parse(row.config);
@@ -104,11 +120,15 @@ async function isAlreadyMerged(opts: {
       continue;
     }
     const adapter = provider.create({ config: parsed, token, logger: opts.logger });
-    if (!adapter.isMerged) {continue;}
+    if (!adapter.isMerged) {
+      continue;
+    }
     try {
       // eslint-disable-next-line no-await-in-loop -- short-circuit on first merged status
       const merged = await adapter.isMerged({ sha: opts.sha, branch: opts.branch });
-      if (merged) {return true;}
+      if (merged) {
+        return true;
+      }
     } catch {
       // Ignore provider errors — do not skip on failure
     }
@@ -129,12 +149,13 @@ async function resolveUser(
   return await options.auth.check(c.req.raw);
 }
 
-
 /** Create the StoryShelf Hono router with all API routes and HTML pages. */
 export function createShelfRouter(options: ShelfOptions): ShelfApp {
   const app = new OpenAPIHono<{ Variables: ShelfContext }>();
   // eslint-disable-next-line typescript/no-unnecessary-type-assertion -- ShelfConfig lacks index signature
-  const rawConfig = options.config ? validateConfig(options.config as unknown as Record<string, unknown>) : {};
+  const rawConfig = options.config
+    ? validateConfig(options.config as unknown as Record<string, unknown>)
+    : {};
   // eslint-disable-next-line typescript/no-unnecessary-type-assertion -- UIConfig lacks index signature
   const ui = options.ui ? validateUiConfig(options.ui as unknown as Record<string, unknown>) : {};
   const logger = options.logger ?? createShelfLogger();
@@ -206,7 +227,10 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
               logger,
             }).catch(() => false);
             if (merged) {
-              logger.info({ buildId: build.id, sha: build.gitSha, branch: build.gitBranch }, "skipping capture — already merged");
+              logger.info(
+                { buildId: build.id, sha: build.gitSha, branch: build.gitBranch },
+                "skipping capture — already merged",
+              );
               await builds.setStatus(build.id, "approved").catch(() => {}); // Intentionally empty — fire-and-forget
               await postStatusesForBuild({
                 db: options.database,
@@ -222,9 +246,17 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
             }
           }
           // Local dedupe: if another approved build for same sha exists, skip render
-          const dup = await hasApprovedBuildForSha(options.database, project.id, build.gitSha, build.id);
+          const dup = await hasApprovedBuildForSha(
+            options.database,
+            project.id,
+            build.gitSha,
+            build.id,
+          );
           if (dup) {
-            logger.info({ buildId: build.id, sha: build.gitSha }, "skipping capture — duplicate sha already approved");
+            logger.info(
+              { buildId: build.id, sha: build.gitSha },
+              "skipping capture — duplicate sha already approved",
+            );
             await builds.setStatus(build.id, "approved").catch(() => {}); // Intentionally empty — fire-and-forget
             await postStatusesForBuild({
               db: options.database,
@@ -245,9 +277,9 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
               const terminal =
                 updated.status === "approved"
                   ? "success"
-                  : (updated.status === "rejected" || updated.status === "failed"
+                  : updated.status === "rejected" || updated.status === "failed"
                     ? "failure"
-                    : null);
+                    : null;
               if (terminal) {
                 await postStatusesForBuild({
                   db: options.database,
@@ -340,7 +372,7 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
   // eslint-disable-next-line require-await -- async is required to match Hono's middleware signature
   app.use("*", async (c, next) => {
     const { user, authEnabled: isAuthEnabled } = getStore();
-    const {path} = c.req;
+    const { path } = c.req;
     if (
       !isAuthEnabled ||
       user ||
@@ -349,7 +381,7 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
       path.startsWith("/assets/") ||
       // Published Storybook routes enforce their own auth inside the handler
       // (public builds are viewable without a session, ADR 0011).
-      path.startsWith("/projects/") && path.includes("/storybook")
+      (path.startsWith("/projects/") && path.includes("/storybook"))
     ) {
       return next();
     }
@@ -404,10 +436,19 @@ export type { CaptureQueue, CaptureJob, QueueEntry } from "./adapters/capture-qu
 export type { AuthAdapter, AuthUser, AuthCallback } from "./adapters/auth.ts";
 export type { GitHostProvider, GitHostAdapter, CheckStatus } from "./adapters/git-host/index.ts";
 export type { AdapterMetadata, GitAdapterMetadata } from "./adapters/metadata.ts";
-export { describeStatus, buildCommentMarkdown, commentMarker } from "./adapters/git-host/helpers.ts";
+export {
+  describeStatus,
+  buildCommentMarkdown,
+  commentMarker,
+} from "./adapters/git-host/helpers.ts";
 export type { DiffOptions, DiffResult } from "./diff/options.ts";
 export type { Viewport, StoryEntry, StorySourceAdapter } from "./capture/adapter.ts";
-export { createShelfLogger, type LoggerOptions, type Logger, type PinoTransport } from "./logger.ts";
+export {
+  createShelfLogger,
+  type LoggerOptions,
+  type Logger,
+  type PinoTransport,
+} from "./logger.ts";
 export { diffImages } from "./diff/engine.ts";
 export type { RenderedContent } from "./ui/document.tsx";
 export { StorybookAdapter } from "./capture/storybook.ts";

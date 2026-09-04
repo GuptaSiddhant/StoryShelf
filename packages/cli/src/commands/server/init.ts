@@ -186,10 +186,7 @@ function generatePackageJson(answers: Answers): string {
   return JSON.stringify(pkg, null, 2);
 }
 
-async function writeFiles(
-  outDir: string,
-  answers: Answers,
-): Promise<void> {
+async function writeFiles(outDir: string, answers: Answers): Promise<void> {
   const serverCode = generateServer(answers);
   await writeFile(join(outDir, "server.ts"), serverCode);
   printLine(`Created server.ts`);
@@ -201,10 +198,7 @@ async function writeFiles(
   await writeDockerFiles(outDir, answers.docker);
 }
 
-async function writeDockerFiles(
-  outDir: string,
-  docker: boolean,
-): Promise<void> {
+async function writeDockerFiles(outDir: string, docker: boolean): Promise<void> {
   if (!docker) {
     return;
   }

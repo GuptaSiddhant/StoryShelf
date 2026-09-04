@@ -1,6 +1,5 @@
 /** Project membership and role resolution. */
 import { and, eq } from "drizzle-orm";
-
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import { projectMembers } from "../schema-tables.ts";
 import type { ProjectMember } from "../schema.ts";
@@ -52,7 +51,11 @@ export class MemberModel {
   }
 
   /** Resolve a user's effective project role, honoring site-wide admins. */
-  async effectiveRole(siteRole: SiteRole, projectId: string, userId: string): Promise<ProjectRole | null> {
+  async effectiveRole(
+    siteRole: SiteRole,
+    projectId: string,
+    userId: string,
+  ): Promise<ProjectRole | null> {
     if (siteRole === "admin") {
       return "admin";
     }

@@ -1,6 +1,11 @@
 interface Client {
   projects: {
-    create: (json: { name: string; gitRepository?: string; gitDefaultBranch?: string; storybookMeta?: unknown }) => Promise<unknown>;
+    create: (json: {
+      name: string;
+      gitRepository?: string;
+      gitDefaultBranch?: string;
+      storybookMeta?: unknown;
+    }) => Promise<unknown>;
     update: (slug: string, json: { storybookMeta?: unknown }) => Promise<unknown>;
     get: (slug: string) => Promise<unknown>;
     list: () => Promise<unknown>;
@@ -21,7 +26,10 @@ function buildAuthHeaders(token?: string): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-function buildRequestHeaders(authHeaders: Record<string, string>, contentType?: string): Record<string, string> {
+function buildRequestHeaders(
+  authHeaders: Record<string, string>,
+  contentType?: string,
+): Record<string, string> {
   const headers: Record<string, string> = { ...authHeaders };
   if (contentType) {
     headers["content-type"] = contentType;
@@ -92,7 +100,12 @@ function createProjectsApi(
   requestHeaders: (contentType?: string) => Record<string, string>,
 ): Client["projects"] {
   return {
-    create: async (json: { name: string; gitRepository?: string; gitDefaultBranch?: string; storybookMeta?: unknown }) =>
+    create: async (json: {
+      name: string;
+      gitRepository?: string;
+      gitDefaultBranch?: string;
+      storybookMeta?: unknown;
+    }) =>
       await fetchJson(`${baseUrl}/api/v1/projects`, {
         method: "POST",
         headers: requestHeaders("application/json"),
@@ -120,7 +133,8 @@ function createProjectsApi(
 
 export function createClient(baseUrl: string, token?: string): Client {
   const authHeaders = buildAuthHeaders(token);
-  const requestHeaders = (contentType?: string): Record<string, string> => buildRequestHeaders(authHeaders, contentType);
+  const requestHeaders = (contentType?: string): Record<string, string> =>
+    buildRequestHeaders(authHeaders, contentType);
 
   return {
     projects: createProjectsApi(baseUrl, authHeaders, requestHeaders),
@@ -132,7 +146,11 @@ export function normalizeBaseUrl(value: string): string {
   return value.replace(/\/+$/u, "");
 }
 
-export async function postJson<TData>(url: string, body: unknown, headers: Record<string, string> = {}): Promise<TData> {
+export async function postJson<TData>(
+  url: string,
+  body: unknown,
+  headers: Record<string, string> = {},
+): Promise<TData> {
   const response = await fetch(url, {
     method: "POST",
     headers: { "content-type": "application/json", ...headers },
@@ -144,7 +162,11 @@ export async function postJson<TData>(url: string, body: unknown, headers: Recor
   return (await response.json()) as TData;
 }
 
-export async function postForm<TData>(url: string, form: FormData, headers: Record<string, string> = {}): Promise<TData> {
+export async function postForm<TData>(
+  url: string,
+  form: FormData,
+  headers: Record<string, string> = {},
+): Promise<TData> {
   const response = await fetch(url, { method: "POST", headers, body: form });
   if (!response.ok) {
     throw new Error(`Request failed (${response.status}): ${await response.text()}`);

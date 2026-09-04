@@ -1,6 +1,5 @@
-import { describe, expect, it } from "vitest";
 import { pino } from "pino";
-
+import { describe, expect, it } from "vitest";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { createShelfRouter } from "../index.tsx";
@@ -66,7 +65,10 @@ describe("OpenAPI spec", () => {
   it("documents project paths with typed responses", async () => {
     const response = await app().request("/api/v1/openapi.json");
     const doc = (await response.json()) as OpenApiDocument;
-    const paths = doc.paths as Record<string, { get?: { responses: Record<string, unknown> }; post?: unknown }>;
+    const paths = doc.paths as Record<
+      string,
+      { get?: { responses: Record<string, unknown> }; post?: unknown }
+    >;
     expect(paths["/api/v1/projects"]?.get?.responses["200"]).toBeDefined();
     expect(paths["/api/v1/projects/{slug}"]?.get?.responses["200"]).toBeDefined();
   });

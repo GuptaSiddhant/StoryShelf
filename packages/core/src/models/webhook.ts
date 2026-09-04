@@ -1,6 +1,5 @@
 /** Webhook subscriptions for project events. */
 import { eq } from "drizzle-orm";
-
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import { webhooks } from "../schema-tables.ts";
 import type { Webhook } from "../schema.ts";
@@ -67,7 +66,9 @@ export class WebhookModel {
     }
     try {
       const parsed: unknown = JSON.parse(webhook.events);
-      return Array.isArray(parsed) ? parsed.filter((event): event is string => typeof event === "string") : [];
+      return Array.isArray(parsed)
+        ? parsed.filter((event): event is string => typeof event === "string")
+        : [];
     } catch {
       return [];
     }

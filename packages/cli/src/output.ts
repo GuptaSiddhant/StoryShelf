@@ -8,7 +8,10 @@ export function printError(message: string): void {
 
 export const spinnerFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
-export function createSpinner(message: string, frames: readonly string[] = spinnerFrames): { stop(finalMessage?: string): void } {
+export function createSpinner(
+  message: string,
+  frames: readonly string[] = spinnerFrames,
+): { stop(finalMessage?: string): void } {
   let frame = 0;
   const interval = setInterval(() => {
     process.stdout.write(`\r${frames[frame % frames.length]} ${message}`);

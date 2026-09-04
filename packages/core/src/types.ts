@@ -13,7 +13,14 @@ export const BUILD_STATUSES = [
 export type BuildStatus = (typeof BUILD_STATUSES)[number];
 
 /** All review statuses a snapshot can carry. */
-export const SNAPSHOT_STATUSES = ["pending", "new", "unchanged", "changed", "approved", "rejected"] as const;
+export const SNAPSHOT_STATUSES = [
+  "pending",
+  "new",
+  "unchanged",
+  "changed",
+  "approved",
+  "rejected",
+] as const;
 
 /** Review status of a snapshot. */
 export type SnapshotStatus = (typeof SNAPSHOT_STATUSES)[number];
@@ -34,7 +41,16 @@ export const PROJECT_ROLES = ["admin", "approver", "developer", "viewer"] as con
 export type ProjectRole = (typeof PROJECT_ROLES)[number];
 
 /** Label type keys seeded for every new project. */
-export const SEEDED_LABEL_KEYS = ["branch", "persistent", "pr", "mr", "jira", "linear", "figma", "custom"] as const;
+export const SEEDED_LABEL_KEYS = [
+  "branch",
+  "persistent",
+  "pr",
+  "mr",
+  "jira",
+  "linear",
+  "figma",
+  "custom",
+] as const;
 
 /** Label type keys reserved for internal use. */
 export const RESERVED_LABEL_KEYS = ["build"] as const;

@@ -1,7 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-
 import type { Logger } from "pino";
-
 import type { AuthUser } from "./adapters/auth.ts";
 import type { CaptureQueue } from "./adapters/capture-queue.ts";
 import type { DatabaseAdapter } from "./adapters/database.ts";

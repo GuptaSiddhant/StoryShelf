@@ -217,7 +217,9 @@ function resolveBumpVersion(current, bumpKind, preid) {
       }
       return formatVersion({ ...v, pre: bumpPreid(v.pre, preid) });
     default:
-      error(`unknown bump: ${bumpKind} (want patch|minor|major|premajor|preminor|prepatch|prerelease|from-git|0.2.0)`);
+      error(
+        `unknown bump: ${bumpKind} (want patch|minor|major|premajor|preminor|prepatch|prerelease|from-git|0.2.0)`,
+      );
       process.exit(1);
   }
 }

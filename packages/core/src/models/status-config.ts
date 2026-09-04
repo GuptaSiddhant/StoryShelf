@@ -1,7 +1,6 @@
 /* oxlint-disable eslint/no-await-in-loop, typescript/promise-function-async, eslint/require-await */
 /** Per-project git-provider status check configurations. */
 import { eq } from "drizzle-orm";
-
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import { projectStatusConfigs } from "../schema-tables.ts";
 import type { ProjectStatusConfig } from "../schema.ts";
@@ -24,12 +23,17 @@ export class StatusConfigModel {
 
   /** List all status configs for a project. */
   async list(projectId: string): Promise<ProjectStatusConfig[]> {
-    return await this.db.list(projectStatusConfigs, { where: eq(projectStatusConfigs.projectId, projectId) });
+    return await this.db.list(projectStatusConfigs, {
+      where: eq(projectStatusConfigs.projectId, projectId),
+    });
   }
 
   /** Fetch a config by id scoped to a project, or null. */
   async get(projectId: string, id: string): Promise<ProjectStatusConfig | null> {
-    const rows = await this.db.list(projectStatusConfigs, { where: eq(projectStatusConfigs.id, id), limit: 1 });
+    const rows = await this.db.list(projectStatusConfigs, {
+      where: eq(projectStatusConfigs.id, id),
+      limit: 1,
+    });
     const found = rows[0] ?? null;
     return found?.projectId === projectId ? found : null;
   }

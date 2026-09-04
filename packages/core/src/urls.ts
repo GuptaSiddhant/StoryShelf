@@ -28,11 +28,18 @@ export function createUrlBuilder(baseUrl: string, publishedBaseDomain?: string):
     buildsList: (slug) => `${root}/projects/${slug}/builds`,
     build: (slug, buildId) => `${root}/projects/${slug}/builds/${buildId}`,
     labels: (slug) => `${root}/projects/${slug}/labels`,
-    label: (slug, key, value) => `${root}/projects/${slug}/labels/${encodeURIComponent(key)}/${encodeURI(value)}`,
-    storybook: (slug) => (publishedBaseDomain ? `https://${slug}.${publishedBaseDomain}` : `${root}/projects/${slug}/storybook`),
-    storybookLabel: (slug, key, value) => `${root}/projects/${slug}/storybook/${encodeURIComponent(key)}/${encodeURI(value)}`,
+    label: (slug, key, value) =>
+      `${root}/projects/${slug}/labels/${encodeURIComponent(key)}/${encodeURI(value)}`,
+    storybook: (slug) =>
+      publishedBaseDomain
+        ? `https://${slug}.${publishedBaseDomain}`
+        : `${root}/projects/${slug}/storybook`,
+    storybookLabel: (slug, key, value) =>
+      `${root}/projects/${slug}/storybook/${encodeURIComponent(key)}/${encodeURI(value)}`,
     storybookBuild: (slug, buildId) =>
-      publishedBaseDomain ? `https://${buildId}.${slug}.${publishedBaseDomain}` : `${root}/projects/${slug}/storybook/build/${buildId}`,
+      publishedBaseDomain
+        ? `https://${buildId}.${slug}.${publishedBaseDomain}`
+        : `${root}/projects/${slug}/storybook/build/${buildId}`,
     settings: (slug) => `${root}/projects/${slug}/settings`,
   };
 }

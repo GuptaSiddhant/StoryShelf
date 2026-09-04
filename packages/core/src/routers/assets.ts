@@ -1,12 +1,14 @@
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-
 import type { ShelfApp } from "../index.tsx";
 
 let htmxSource: string | null = null;
 
 async function htmxScript(): Promise<string> {
-  htmxSource ??= await readFile(fileURLToPath(new URL("../assets/htmx.min.js", import.meta.url)), "utf8");
+  htmxSource ??= await readFile(
+    fileURLToPath(new URL("../assets/htmx.min.js", import.meta.url)),
+    "utf8",
+  );
   return htmxSource;
 }
 

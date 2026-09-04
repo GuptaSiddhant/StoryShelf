@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
-
-import { makeDatabase, makeStorage } from "./fake-adapters.ts";
 import { BaselineModel } from "../models/baseline.ts";
 import { baselines, projects } from "../schema-tables.ts";
 import type { Project } from "../schema.ts";
+import { makeDatabase, makeStorage } from "./fake-adapters.ts";
 
 describe("Branch baseline fallback", () => {
   const mockProject: Project = {
@@ -17,7 +16,7 @@ describe("Branch baseline fallback", () => {
     publicBranchRegex: null,
     executePlay: false,
     playTimeoutMs: 10_000,
-      storybookMeta: null,
+    storybookMeta: null,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
   };
@@ -63,7 +62,13 @@ describe("Branch baseline fallback", () => {
       updatedAt: "2026-01-01T00:00:00.000Z",
     });
 
-    const resolved = await baselineModel.resolve("p1", "story-1", "desktop", "feature-branch", "main");
+    const resolved = await baselineModel.resolve(
+      "p1",
+      "story-1",
+      "desktop",
+      "feature-branch",
+      "main",
+    );
     expect(resolved).not.toBeNull();
     expect(resolved?.branch).toBe("main");
   });
@@ -108,7 +113,13 @@ describe("Branch baseline fallback", () => {
       updatedAt: "2026-01-02T00:00:00.000Z",
     });
 
-    const resolved = await baselineModel.resolve("p1", "story-1", "desktop", "feature-branch", "main");
+    const resolved = await baselineModel.resolve(
+      "p1",
+      "story-1",
+      "desktop",
+      "feature-branch",
+      "main",
+    );
     expect(resolved).not.toBeNull();
     expect(resolved?.branch).toBe("feature-branch");
   });

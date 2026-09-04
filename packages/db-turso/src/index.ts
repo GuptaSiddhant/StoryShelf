@@ -1,11 +1,10 @@
 import { createClient } from "@libsql/client";
+import type { DatabaseAdapter, ListOptions } from "@storyshelf/core/adapter/database";
+import { DDL } from "@storyshelf/core/ddl";
+import { schema } from "@storyshelf/core/schema";
 import { eq, getTableColumns } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/libsql";
 import type { AnySQLiteTable, SQLiteColumn } from "drizzle-orm/sqlite-core";
-
-import type { DatabaseAdapter, ListOptions } from "@storyshelf/core/adapter/database";
-import { schema } from "@storyshelf/core/schema";
-import { DDL } from "@storyshelf/core/ddl";
 
 declare const __PKG_VERSION__: string | undefined;
 
@@ -15,10 +14,7 @@ function idOf(table: AnySQLiteTable): SQLiteColumn {
 }
 
 /* eslint-disable typescript/no-explicit-any, typescript/no-unsafe-call, typescript/no-unsafe-member-access -- drizzle query builder is intentionally loosely typed */
-function applyListOptions(
-  query: any,
-  opts: ListOptions,
-): void {
+function applyListOptions(query: any, opts: ListOptions): void {
   if (opts.where) {
     query.where(opts.where);
   }
@@ -55,19 +51,34 @@ export function createTursoDatabase(options: { url: string; authToken?: string }
       return await db.insert(table).values(values).returning().get();
     },
     async update(table, id, values) {
-      return await db.update(table).set(values).where(eq(idOf(table), id)).returning().get();
+      return await db
+        .update(table)
+        .set(values)
+        .where(eq(idOf(table), id))
+        .returning()
+        .get();
     },
     async get(table, id) {
-      return (await db.select().from(table).where(eq(idOf(table), id)).limit(1).get()) ?? null;
+      return (
+        (await db
+          .select()
+          .from(table)
+          .where(eq(idOf(table), id))
+          .limit(1)
+          .get()) ?? null
+      );
     },
     async remove(table, id) {
-      await db.delete(table).where(eq(idOf(table), id)).run();
+      await db
+        .delete(table)
+        .where(eq(idOf(table), id))
+        .run();
     },
-      async list(table, opts: ListOptions = {}) {
-        const query = db.select().from(table);
-        applyListOptions(query, opts);
-        return await query.all();
-      },
+    async list(table, opts: ListOptions = {}) {
+      const query = db.select().from(table);
+      applyListOptions(query, opts);
+      return await query.all();
+    },
     async count(table, where) {
       return await db.$count(table, where);
     },
@@ -79,8 +90,8 @@ export function createTursoDatabase(options: { url: string; authToken?: string }
       try {
         await client.execute("ALTER TABLE projects ADD COLUMN storybook_meta TEXT");
       } catch {
-          // Column already exists — ignore
-        }
+        // Column already exists — ignore
+      }
     },
     // eslint-disable-next-line require-await -- client.close() is synchronous
     async close() {

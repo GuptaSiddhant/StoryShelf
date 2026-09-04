@@ -1,6 +1,5 @@
 /** Per-branch baseline screenshots with default-branch fallback. */
 import { and, eq } from "drizzle-orm";
-
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { emitWebhookEvent } from "../adapters/webhook-events.ts";
@@ -16,15 +15,31 @@ export class BaselineModel {
     private readonly storage: StorageAdapter,
   ) {}
 
-  async getFor(projectId: string, storyId: string, viewport: string, branch: string): Promise<Baseline | null> {
+  async getFor(
+    projectId: string,
+    storyId: string,
+    viewport: string,
+    branch: string,
+  ): Promise<Baseline | null> {
     const rows = await this.db.list(baselines, {
-      where: and(eq(baselines.projectId, projectId), eq(baselines.storyId, storyId), eq(baselines.viewportName, viewport), eq(baselines.branch, branch)),
+      where: and(
+        eq(baselines.projectId, projectId),
+        eq(baselines.storyId, storyId),
+        eq(baselines.viewportName, viewport),
+        eq(baselines.branch, branch),
+      ),
       limit: 1,
     });
     return rows[0] ?? null;
   }
 
-  async resolve(projectId: string, storyId: string, viewport: string, branch: string, defaultBranch: string): Promise<Baseline | null> {
+  async resolve(
+    projectId: string,
+    storyId: string,
+    viewport: string,
+    branch: string,
+    defaultBranch: string,
+  ): Promise<Baseline | null> {
     if (branch !== defaultBranch) {
       const own = await this.getFor(projectId, storyId, viewport, branch);
       if (own) {

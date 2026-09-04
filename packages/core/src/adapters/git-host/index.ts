@@ -2,7 +2,6 @@
  * Git-host adapter interface: commit statuses and review comments for merge gates.
  */
 import type { Logger } from "pino";
-
 import type { GitAdapterMetadata } from "../metadata.ts";
 
 /** Status of a git-host provider check. */
@@ -23,11 +22,22 @@ export interface GitHostAdapter {
   readonly metadata: GitAdapterMetadata;
 
   /** Set the status of a commit. */
-  setStatus(opts: { context: string; gitSha: string; status: CheckStatus; url: string }): Promise<void>;
+  setStatus(opts: {
+    context: string;
+    gitSha: string;
+    status: CheckStatus;
+    url: string;
+  }): Promise<void>;
 
   /** Whether the branch/sha is already merged — gate to skip capture. */
   isMerged?(opts: { sha: string; branch: string }): Promise<boolean>;
 
   /** Create or update a single PR comment per build (idempotent via url marker). */
-  upsertComment?(opts: { prNumber?: number; sha: string; url: string; status: CheckStatus; markdown: string }): Promise<string>;
+  upsertComment?(opts: {
+    prNumber?: number;
+    sha: string;
+    url: string;
+    status: CheckStatus;
+    markdown: string;
+  }): Promise<string>;
 }

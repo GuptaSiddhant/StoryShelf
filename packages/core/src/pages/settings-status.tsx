@@ -22,7 +22,10 @@ export interface StatusFormState {
 /* eslint-disable promise-function-async -- JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
 function providerOptions(providers: GitHostProvider[]): { value: string; label: string }[] {
-  return providers.map((provider) => ({ value: provider.metadata.kind, label: provider.metadata.name }));
+  return providers.map((provider) => ({
+    value: provider.metadata.kind,
+    label: provider.metadata.name,
+  }));
 }
 
 const StatusConfigRow: FC<{
@@ -35,14 +38,28 @@ const StatusConfigRow: FC<{
   return (
     <tr key={config.id}>
       <td>{provider?.metadata.name ?? config.provider}</td>
-      <td style="max-width:32ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title={rendered}>
+      <td
+        style="max-width:32ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
+        title={rendered}
+      >
         <code>{rendered}</code>
       </td>
-      <td>{config.hasToken ? <Badge tone="success">configured</Badge> : <Badge tone="danger">missing</Badge>}</td>
+      <td>
+        {config.hasToken ? (
+          <Badge tone="success">configured</Badge>
+        ) : (
+          <Badge tone="danger">missing</Badge>
+        )}
+      </td>
       <td>{new Date(config.createdAt).toLocaleDateString()}</td>
       <td>
         {isAdmin ? (
-          <form method="post" action={`/projects/${project.slug}/settings/status/${config.id}/delete`} hx-post={`/projects/${project.slug}/settings/status/${config.id}/delete`} hx-target="body">
+          <form
+            method="post"
+            action={`/projects/${project.slug}/settings/status/${config.id}/delete`}
+            hx-post={`/projects/${project.slug}/settings/status/${config.id}/delete`}
+            hx-target="body"
+          >
             <button class="btn btn--ghost" type="submit">
               Delete
             </button>
@@ -61,9 +78,27 @@ const StatusCreateCard: FC<{
   return (
     <div class="card card--padded">
       <h3 style="margin:0 0 .5rem;">Add git provider</h3>
-      <form method="post" action={`/projects/${project.slug}/settings/status`} hx-post={`/projects/${project.slug}/settings/status`} hx-target="body">
-        <SelectField label="Provider" name="provider" options={providerOptions(providers)} hint="Integration that posts commit statuses for this project." />
-        <Field label="Token" name="token" type="password" required placeholder="ghp_…" error={formState?.errors?.["token"]} hint="Scoped token for the provider (e.g. a GitHub PAT with repo:status)." />
+      <form
+        method="post"
+        action={`/projects/${project.slug}/settings/status`}
+        hx-post={`/projects/${project.slug}/settings/status`}
+        hx-target="body"
+      >
+        <SelectField
+          label="Provider"
+          name="provider"
+          options={providerOptions(providers)}
+          hint="Integration that posts commit statuses for this project."
+        />
+        <Field
+          label="Token"
+          name="token"
+          type="password"
+          required
+          placeholder="ghp_…"
+          error={formState?.errors?.["token"]}
+          hint="Scoped token for the provider (e.g. a GitHub PAT with repo:status)."
+        />
         <TextareaField
           label="Config"
           name="config"
@@ -80,7 +115,11 @@ const StatusCreateCard: FC<{
   );
 };
 
-function renderCreateSection(project: Project, providers: GitHostProvider[], formState?: StatusFormState): unknown {
+function renderCreateSection(
+  project: Project,
+  providers: GitHostProvider[],
+  formState?: StatusFormState,
+): unknown {
   if (providers.length === 0) {
     return <p class="field__hint">No git providers registered on this server.</p>;
   }
@@ -108,8 +147,9 @@ export function renderSettingsStatus(
       <div class="card card--padded">
         <h2 style="margin:0 0 .3rem;">Git status</h2>
         <p class="field__hint">
-          Post commit statuses to a git provider so visual tests show up in your PR checks. Status is reported for each configured provider: pending while
-          capturing, success on approval, failure on rejection or capture errors.
+          Post commit statuses to a git provider so visual tests show up in your PR checks. Status
+          is reported for each configured provider: pending while capturing, success on approval,
+          failure on rejection or capture errors.
         </p>
         <div class="table-wrap" style="margin-top:.75rem;">
           <table>
@@ -124,12 +164,22 @@ export function renderSettingsStatus(
             </thead>
             <tbody>
               {statusConfigs.map((config) => (
-                <StatusConfigRow key={config.id} config={config} provider={byProvider.get(config.provider)} project={project} isAdmin={isAdmin} />
+                <StatusConfigRow
+                  key={config.id}
+                  config={config}
+                  provider={byProvider.get(config.provider)}
+                  project={project}
+                  isAdmin={isAdmin}
+                />
               ))}
             </tbody>
           </table>
         </div>
-        {statusConfigs.length === 0 ? <p class="field__hint" style="margin-top:.5rem;">No git providers configured for this project.</p> : null}
+        {statusConfigs.length === 0 ? (
+          <p class="field__hint" style="margin-top:.5rem;">
+            No git providers configured for this project.
+          </p>
+        ) : null}
       </div>
 
       {isAdmin ? renderCreateSection(project, providers, formState) : null}

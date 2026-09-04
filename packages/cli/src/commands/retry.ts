@@ -1,7 +1,9 @@
 import { createClient } from "../client.ts";
 import { printLine } from "../output.ts";
 
-interface BuildResponse { id: string; }
+interface BuildResponse {
+  id: string;
+}
 
 /** Options for the `retry` command. */
 export interface RetryOptions {

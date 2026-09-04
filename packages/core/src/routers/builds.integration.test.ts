@@ -1,6 +1,5 @@
-import { describe, expect, it } from "vitest";
 import { pino } from "pino";
-
+import { describe, expect, it } from "vitest";
 import { makeDatabase, makeStorage } from "../capture/fake-adapters.ts";
 import { createShelfRouter } from "../index.tsx";
 import { LabelModel } from "../models/label.ts";

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { TokenModel } from "./token.ts";
 import { makeDatabase } from "../capture/fake-adapters.ts";
+import { TokenModel } from "./token.ts";
 
 describe("TokenModel", () => {
   it("creates a token for a project", async () => {

@@ -1,5 +1,4 @@
 import type { AnySQLiteTable } from "drizzle-orm/sqlite-core";
-
 import {
   baselines as baselinesTable,
   buildLabels as buildLabelsTable,

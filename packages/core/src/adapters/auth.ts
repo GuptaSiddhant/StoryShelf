@@ -1,8 +1,8 @@
+import type { ProjectRole, SiteRole } from "../types.ts";
 /**
  * Auth adapter interface: authenticate users and resolve project access.
  */
 import type { AdapterMetadata } from "./metadata.ts";
-import type { ProjectRole, SiteRole } from "../types.ts";
 
 /** Shared session cookie name used by all auth adapters (ADR 0008). */
 export const SESSION_COOKIE = "storyshelf_session";

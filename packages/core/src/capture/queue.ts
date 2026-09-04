@@ -1,5 +1,4 @@
 import type { Logger } from "pino";
-
 import type { CaptureJob, CaptureQueue, QueueEntry } from "../adapters/capture-queue.ts";
 
 declare const __PKG_VERSION__: string | undefined;
@@ -38,13 +37,19 @@ export class InMemoryCaptureQueue implements CaptureQueue {
   }
 
   async active(): Promise<QueueEntry[]> {
-    return await Promise.resolve([...this.entries.values()]
-      .filter((entry) => entry.status === "queued" || entry.status === "running")
-      .toSorted((a, b) => a.queuedAt.localeCompare(b.queuedAt)));
+    return await Promise.resolve(
+      [...this.entries.values()]
+        .filter((entry) => entry.status === "queued" || entry.status === "running")
+        .toSorted((a, b) => a.queuedAt.localeCompare(b.queuedAt)),
+    );
   }
 
   async recent(limit: number): Promise<QueueEntry[]> {
-    return await Promise.resolve([...this.entries.values()].toSorted((a, b) => b.queuedAt.localeCompare(a.queuedAt)).slice(0, limit));
+    return await Promise.resolve(
+      [...this.entries.values()]
+        .toSorted((a, b) => b.queuedAt.localeCompare(a.queuedAt))
+        .slice(0, limit),
+    );
   }
 
   private async process(job: CaptureJob, entry: QueueEntry): Promise<void> {

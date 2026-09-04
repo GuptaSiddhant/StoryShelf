@@ -1,23 +1,39 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import type { ShelfApp } from "../index.tsx";
 import { HTTPException } from "hono/http-exception";
-
-import { BuildModel } from "../models/build.ts";
 import { emitWebhookEvent } from "../adapters/webhook-events.ts";
+import type { ShelfApp } from "../index.tsx";
+import { BuildModel } from "../models/build.ts";
 import { getStore } from "../store.ts";
 import { storybookZipPath } from "../utils/paths.ts";
-import { resolveAuthorizedProject } from "./helpers.ts";
-import { badRequest, buildSchema, forbidden as forbiddenResponse, notFound as notFoundResponse, unauthorized } from "./schemas.ts";
-import { VIEW_ROLES, DEVELOPER_ROLES, APPROVER_ROLES, buildUploadSchema, buildListQuery, buildForProject, asString } from "./builds.handlers.ts";
-import { registerSnapshots } from "./snapshots.ts";
+import {
+  VIEW_ROLES,
+  DEVELOPER_ROLES,
+  APPROVER_ROLES,
+  buildUploadSchema,
+  buildListQuery,
+  buildForProject,
+  asString,
+} from "./builds.handlers.ts";
 import { registerComments } from "./comments.ts";
+import { resolveAuthorizedProject } from "./helpers.ts";
+import {
+  badRequest,
+  buildSchema,
+  forbidden as forbiddenResponse,
+  notFound as notFoundResponse,
+  unauthorized,
+} from "./schemas.ts";
+import { registerSnapshots } from "./snapshots.ts";
 
 const listBuildsRoute = createRoute({
   method: "get",
   path: "/api/v1/projects/{slug}/builds",
   request: { params: z.object({ slug: z.string() }), query: buildListQuery },
   responses: {
-    200: { content: { "application/json": { schema: buildSchema.array() } }, description: "List builds for a project" },
+    200: {
+      content: { "application/json": { schema: buildSchema.array() } },
+      description: "List builds for a project",
+    },
     ...notFoundResponse,
     ...unauthorized,
   },
@@ -31,7 +47,10 @@ const createBuildRoute = createRoute({
     body: { content: { "multipart/form-data": { schema: buildUploadSchema } } },
   },
   responses: {
-    202: { content: { "application/json": { schema: buildSchema } }, description: "Build created and capture queued" },
+    202: {
+      content: { "application/json": { schema: buildSchema } },
+      description: "Build created and capture queued",
+    },
     ...badRequest,
     ...forbiddenResponse,
     ...notFoundResponse,
@@ -54,7 +73,10 @@ const retryBuildRoute = createRoute({
   path: "/api/v1/projects/{slug}/builds/{buildId}/retry",
   request: { params: z.object({ slug: z.string(), buildId: z.string() }) },
   responses: {
-    202: { content: { "application/json": { schema: buildSchema } }, description: "Build reset to pending" },
+    202: {
+      content: { "application/json": { schema: buildSchema } },
+      description: "Build reset to pending",
+    },
     ...notFoundResponse,
   },
 });
@@ -74,12 +96,21 @@ export function registerBuilds(app: ShelfApp): void {
   app.openapi(listBuildsRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...VIEW_ROLES);
     const { status, branch, labelKey, labelValue } = c.req.valid("query");
-    const builds = new BuildModel(getStore().db).list(project.id, { status, branch: branch ?? undefined, labelKey: labelKey ?? undefined, labelValue: labelValue ?? undefined });
+    const builds = new BuildModel(getStore().db).list(project.id, {
+      status,
+      branch: branch ?? undefined,
+      labelKey: labelKey ?? undefined,
+      labelValue: labelValue ?? undefined,
+    });
     return c.json(await builds);
   });
 
   app.openapi(createBuildRoute, async (c) => {
-    const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...DEVELOPER_ROLES);
+    const project = await resolveAuthorizedProject(
+      c,
+      c.req.valid("param").slug,
+      ...DEVELOPER_ROLES,
+    );
     const form = await c.req.formData();
 
     const gitSha = asString(form.get("gitSha")) ?? "";

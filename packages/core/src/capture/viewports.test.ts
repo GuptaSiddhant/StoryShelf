@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-
 import { DEFAULT_VIEWPORTS } from "./adapter.ts";
 
 describe("DEFAULT_VIEWPORTS", () => {

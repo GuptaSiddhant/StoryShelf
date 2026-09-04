@@ -2,7 +2,6 @@
 import { execSync } from "node:child_process";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
-
 import { z } from "zod";
 
 export const storybookConfigSchema = z
@@ -64,7 +63,12 @@ export async function loadStorybookConfig(
     const raw = await readFile(full, "utf8");
     const parsed = JSON.parse(raw) as unknown;
     // Backward compat: storybookDir -> buildDir
-    if (parsed && typeof parsed === "object" && parsed !== null && "storybookDir" in (parsed as Record<string, unknown>)) {
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      parsed !== null &&
+      "storybookDir" in (parsed as Record<string, unknown>)
+    ) {
       const parsedRecord = parsed as Record<string, unknown>;
       if (typeof parsedRecord["storybookDir"] === "string" && !parsedRecord["buildDir"]) {
         parsedRecord["buildDir"] = parsedRecord["storybookDir"];
@@ -101,7 +105,7 @@ export async function writeStorybookConfig(
   if (!result.success) {
     throw new Error(`Invalid storybook config: ${result.error.message}`);
   }
-  await writeFile(full, `${JSON.stringify(result.data, null, 2)  }\n`, "utf8");
+  await writeFile(full, `${JSON.stringify(result.data, null, 2)}\n`, "utf8");
   return full;
 }
 
@@ -115,7 +119,9 @@ export interface StorybookMeta {
 
 export async function detectPackagePath(cwd: string = process.cwd()): Promise<string> {
   const main = await findStorybookMain(cwd);
-  if (!main) {return ".";}
+  if (!main) {
+    return ".";
+  }
   const rel = relative(cwd, dirname(main));
   return rel === "" ? "." : rel;
 }
@@ -126,24 +132,38 @@ export async function detectStorybookMeta(cwd: string = process.cwd()): Promise<
   if (mainPath) {
     try {
       const raw = await readFile(mainPath, "utf8");
-      const frameworkMatch = raw.match(/framework\s*:\s*\{\s*name\s*:\s*["'](?<frameworkName>[^"']+)["']/u);
+      const frameworkMatch = raw.match(
+        /framework\s*:\s*\{\s*name\s*:\s*["'](?<frameworkName>[^"']+)["']/u,
+      );
       if (frameworkMatch?.[1]) {
         meta.framework = { name: frameworkMatch[1] };
       }
       const addonsMatch = raw.match(/addons\s*:\s*\[(?<addonsContent>[\s\S]*?)\]/u);
       if (addonsMatch?.[1]) {
-        const addons = [...addonsMatch[1].matchAll(/["'](?<addonName>[^"']+)["']/gu)].map((match) => match[1]).filter(Boolean) as string[];
-        if (addons.length > 0) {meta.addons = addons;}
+        const addons = [...addonsMatch[1].matchAll(/["'](?<addonName>[^"']+)["']/gu)]
+          .map((match) => match[1])
+          .filter(Boolean) as string[];
+        if (addons.length > 0) {
+          meta.addons = addons;
+        }
       }
       const storiesMatch = raw.match(/stories\s*:\s*\[(?<storiesContent>[\s\S]*?)\]/u);
       if (storiesMatch?.[1]) {
-        const globs = [...storiesMatch[1].matchAll(/["'](?<storyGlob>[^"']+)["']/gu)].map((match) => match[1]).filter(Boolean) as string[];
-        if (globs.length > 0) {meta.storiesGlobs = globs;}
+        const globs = [...storiesMatch[1].matchAll(/["'](?<storyGlob>[^"']+)["']/gu)]
+          .map((match) => match[1])
+          .filter(Boolean) as string[];
+        if (globs.length > 0) {
+          meta.storiesGlobs = globs;
+        }
       }
       const staticDirsMatch = raw.match(/staticDirs\s*:\s*\[(?<staticDirsContent>[\s\S]*?)\]/u);
       if (staticDirsMatch?.[1]) {
-        const dirs = [...staticDirsMatch[1].matchAll(/["'](?<staticDir>[^"']+)["']/gu)].map((match) => match[1]).filter(Boolean) as string[];
-        if (dirs.length > 0) {meta.staticDirs = dirs;}
+        const dirs = [...staticDirsMatch[1].matchAll(/["'](?<staticDir>[^"']+)["']/gu)]
+          .map((match) => match[1])
+          .filter(Boolean) as string[];
+        if (dirs.length > 0) {
+          meta.staticDirs = dirs;
+        }
       }
       const rel = relative(cwd, dirname(mainPath));
       meta.packagePath = rel === "" ? "." : rel;
@@ -172,7 +192,9 @@ export async function detectPackageName(cwd: string = process.cwd()): Promise<st
 export function detectGitRepository(cwd: string = process.cwd()): string | null {
   try {
     const url = execSync("git config --get remote.origin.url", { cwd, encoding: "utf8" }).trim();
-    if (!url) {return null;}
+    if (!url) {
+      return null;
+    }
     // Normalize git@github.com:owner/repo.git and https://github.com/owner/repo.git -> owner/repo
     const normalized = url
       .replace(/\.git$/u, "")
@@ -187,15 +209,22 @@ export function detectGitRepository(cwd: string = process.cwd()): string | null 
 
 export function detectGitDefaultBranch(cwd: string = process.cwd()): string | null {
   try {
-    const ref = execSync("git symbolic-ref refs/remotes/origin/HEAD", { cwd, encoding: "utf8" }).trim();
+    const ref = execSync("git symbolic-ref refs/remotes/origin/HEAD", {
+      cwd,
+      encoding: "utf8",
+    }).trim();
     const match = ref.match(/refs\/remotes\/origin\/(?<branch>.+)/u);
-    if (match?.[1]) {return match[1];}
+    if (match?.[1]) {
+      return match[1];
+    }
   } catch {
     // Fallback
   }
   try {
     const branch = execSync("git rev-parse --abbrev-ref HEAD", { cwd, encoding: "utf8" }).trim();
-    if (branch && branch !== "HEAD") {return branch;}
+    if (branch && branch !== "HEAD") {
+      return branch;
+    }
   } catch {
     // Ignore
   }

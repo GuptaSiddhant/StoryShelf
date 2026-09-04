@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
-
-import { SnapshotModel } from "./snapshot.ts";
 import { makeDatabase } from "../capture/fake-adapters.ts";
+import { SnapshotModel } from "./snapshot.ts";
 
 describe("SnapshotModel", () => {
   it("creates a snapshot for a build", async () => {

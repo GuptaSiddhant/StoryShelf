@@ -1,14 +1,17 @@
 import type { Context } from "hono";
 import type { GitHostProvider } from "../adapters/git-host/index.ts";
 import type { ShelfApp } from "../index.tsx";
-
 import { LabelModel } from "../models/label.ts";
 import { MemberModel } from "../models/member.ts";
 import { ProjectModel } from "../models/project.ts";
 import { StatusConfigModel } from "../models/status-config.ts";
 import { TokenModel } from "../models/token.ts";
 import { WebhookModel } from "../models/webhook.ts";
-import { renderProjectSettingsPage, type SettingsFormState, type SettingsTab } from "../pages/project-settings.tsx";
+import {
+  renderProjectSettingsPage,
+  type SettingsFormState,
+  type SettingsTab,
+} from "../pages/project-settings.tsx";
 import type { SettingsMember } from "../pages/settings-members.tsx";
 import type { SettingsStatusConfig } from "../pages/settings-status.tsx";
 import type { SettingsWebhook } from "../pages/settings-webhooks.tsx";
@@ -40,7 +43,11 @@ async function loadSettingsData(slug: string): Promise<SettingsData | null> {
   const tokens = tokensDb.map(({ hash: _hash, ...rest }) => rest);
   const members = await new MemberModel(db).list(project.id);
   const webhooksDb = await new WebhookModel(db).list(project.id);
-  const webhooks = webhooksDb.map((webhook) => ({ id: webhook.id, url: webhook.url, events: WebhookModel.eventsOf(webhook) }));
+  const webhooks = webhooksDb.map((webhook) => ({
+    id: webhook.id,
+    url: webhook.url,
+    events: WebhookModel.eventsOf(webhook),
+  }));
   const statusConfigsDb = await new StatusConfigModel(db, config.secret).list(project.id);
   const statusConfigs = statusConfigsDb.map((row) => ({
     id: row.id,
@@ -50,12 +57,19 @@ async function loadSettingsData(slug: string): Promise<SettingsData | null> {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   }));
-  const isAdmin = !authEnabled || user?.role === "admin" || members.some((member) => member.userId === user?.id && member.role === "admin");
+  const isAdmin =
+    !authEnabled ||
+    user?.role === "admin" ||
+    members.some((member) => member.userId === user?.id && member.role === "admin");
   return { project, labelTypes, tokens, members, webhooks, statusConfigs, gitHosts, isAdmin };
 }
 
 /** Render the project settings page for the given tab, optionally with form state. */
-export async function renderSettingsPage(c: Context, tab: SettingsTab, formState?: SettingsFormState): Promise<string> {
+export async function renderSettingsPage(
+  c: Context,
+  tab: SettingsTab,
+  formState?: SettingsFormState,
+): Promise<string> {
   const slug = c.req.param("slug") ?? "";
   const data = await loadSettingsData(slug);
   if (!data) {
@@ -99,8 +113,12 @@ export function registerSettingsPages(app: ShelfApp): void {
   app.get("/projects/:slug/settings/tests", async (c) => c.html(await settingsPage(c, "tests")));
   app.get("/projects/:slug/settings/labels", async (c) => c.html(await settingsPage(c, "labels")));
   app.get("/projects/:slug/settings/tokens", async (c) => c.html(await settingsPage(c, "tokens")));
-  app.get("/projects/:slug/settings/webhooks", async (c) => c.html(await settingsPage(c, "webhooks")));
-  app.get("/projects/:slug/settings/members", async (c) => c.html(await settingsPage(c, "members")));
+  app.get("/projects/:slug/settings/webhooks", async (c) =>
+    c.html(await settingsPage(c, "webhooks")),
+  );
+  app.get("/projects/:slug/settings/members", async (c) =>
+    c.html(await settingsPage(c, "members")),
+  );
   app.get("/projects/:slug/settings/status", async (c) => c.html(await settingsPage(c, "status")));
 
   app.post("/projects/:slug/settings", async (c) => {
@@ -109,7 +127,10 @@ export function registerSettingsPages(app: ShelfApp): void {
     const form = await c.req.formData();
     const name = form.get("name");
     if (typeof name !== "string" || name.trim() === "") {
-      return c.html((await renderSettingsPage(c, "general", { errors: { name: "Name is required" } })) ?? "", 400);
+      return c.html(
+        (await renderSettingsPage(c, "general", { errors: { name: "Name is required" } })) ?? "",
+        400,
+      );
     }
     const gitRepository = asString(form.get("gitRepository"));
     const gitDefaultBranch = asString(form.get("gitDefaultBranch"));
@@ -139,8 +160,16 @@ export function registerSettingsPages(app: ShelfApp): void {
     const executePlay = form.get("executePlay") === "true";
     const playTimeoutMsRaw = asString(form.get("playTimeoutMs"));
     const playTimeoutMs = playTimeoutMsRaw ? Number(playTimeoutMsRaw) : undefined;
-    if (playTimeoutMs !== undefined && (Number.isNaN(playTimeoutMs) || playTimeoutMs < 1000 || playTimeoutMs > 30_000)) {
-      return c.html((await renderSettingsPage(c, "tests", { globalError: "Play timeout must be between 1000 and 30000" })) ?? "", 400);
+    if (
+      playTimeoutMs !== undefined &&
+      (Number.isNaN(playTimeoutMs) || playTimeoutMs < 1000 || playTimeoutMs > 30_000)
+    ) {
+      return c.html(
+        (await renderSettingsPage(c, "tests", {
+          globalError: "Play timeout must be between 1000 and 30000",
+        })) ?? "",
+        400,
+      );
     }
     try {
       await new ProjectModel(getStore().db).update(project.id, {
@@ -167,10 +196,17 @@ export function registerSettingsPages(app: ShelfApp): void {
     const labelName = asString(form.get("labelName")) ?? asString(form.get("name"));
     const linkTemplate = asString(form.get("linkTemplate"));
     if (!key || !labelName) {
-      return c.html((await renderSettingsPage(c, "labels", { globalError: "Key and name are required" })) ?? "", 400);
+      return c.html(
+        (await renderSettingsPage(c, "labels", { globalError: "Key and name are required" })) ?? "",
+        400,
+      );
     }
     try {
-      await new LabelModel(getStore().db).createType(project.id, { key, name: labelName, linkTemplate });
+      await new LabelModel(getStore().db).createType(project.id, {
+        key,
+        name: labelName,
+        linkTemplate,
+      });
       return hxRedirect(c, `/projects/${project.slug}/settings/labels`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to create label";
@@ -183,7 +219,11 @@ export function registerSettingsPages(app: ShelfApp): void {
     try {
       await new LabelModel(getStore().db).removeType(project.id, c.req.param("key"));
     } catch {
-      return c.html((await renderSettingsPage(c, "labels", { globalError: "Cannot delete built-in label" })) ?? "", 400);
+      return c.html(
+        (await renderSettingsPage(c, "labels", { globalError: "Cannot delete built-in label" })) ??
+          "",
+        400,
+      );
     }
     return hxRedirect(c, `/projects/${project.slug}/settings/labels`);
   });
@@ -193,7 +233,10 @@ export function registerSettingsPages(app: ShelfApp): void {
     const form = await c.req.formData();
     const tokenName = asString(form.get("tokenName")) ?? asString(form.get("name"));
     if (!tokenName) {
-      return c.html((await renderSettingsPage(c, "tokens", { globalError: "Name is required" })) ?? "", 400);
+      return c.html(
+        (await renderSettingsPage(c, "tokens", { globalError: "Name is required" })) ?? "",
+        400,
+      );
     }
     const token = randomToken("shelf_");
     await new TokenModel(getStore().db).create(project.id, tokenName, token.hash);
@@ -214,19 +257,36 @@ export function registerSettingsPages(app: ShelfApp): void {
     const form = await c.req.formData();
     const url = asString(form.get("url"));
     if (!url) {
-      return c.html((await renderSettingsPage(c, "webhooks", { errors: { url: "A valid URL is required" } })) ?? "", 400);
+      return c.html(
+        (await renderSettingsPage(c, "webhooks", { errors: { url: "A valid URL is required" } })) ??
+          "",
+        400,
+      );
     }
     let parsedUrl: URL;
     try {
       parsedUrl = new URL(url);
     } catch {
-      return c.html((await renderSettingsPage(c, "webhooks", { errors: { url: "Enter a valid URL" } })) ?? "", 400);
+      return c.html(
+        (await renderSettingsPage(c, "webhooks", { errors: { url: "Enter a valid URL" } })) ?? "",
+        400,
+      );
     }
     if (parsedUrl.protocol !== "https:" && parsedUrl.protocol !== "http:") {
-      return c.html((await renderSettingsPage(c, "webhooks", { errors: { url: "URL must use http or https" } })) ?? "", 400);
+      return c.html(
+        (await renderSettingsPage(c, "webhooks", {
+          errors: { url: "URL must use http or https" },
+        })) ?? "",
+        400,
+      );
     }
     const eventsRaw = asString(form.get("events"));
-    const events = eventsRaw ? eventsRaw.split(",").map((event) => event.trim()).filter((event) => event.length > 0) : undefined;
+    const events = eventsRaw
+      ? eventsRaw
+          .split(",")
+          .map((event) => event.trim())
+          .filter((event) => event.length > 0)
+      : undefined;
     const webhookModel = new WebhookModel(getStore().db);
     const secret = randomToken("whsec_").value;
     await webhookModel.create(project.id, { url, events, secret });
@@ -249,7 +309,11 @@ export function registerSettingsPages(app: ShelfApp): void {
     const userId = asString(form.get("userId"));
     const role = asString(form.get("role"));
     if (!userId || !role) {
-      return c.html((await renderSettingsPage(c, "members", { globalError: "User and role are required" })) ?? "", 400);
+      return c.html(
+        (await renderSettingsPage(c, "members", { globalError: "User and role are required" })) ??
+          "",
+        400,
+      );
     }
     await new MemberModel(getStore().db).set(project.id, userId, role as never);
     return hxRedirect(c, `/projects/${project.slug}/settings/members`);
@@ -270,23 +334,41 @@ export function registerSettingsPages(app: ShelfApp): void {
     const providers = getStore().gitHosts;
     const provider = providers.find((p) => p.metadata.kind === providerKey);
     if (!provider) {
-      return c.html((await renderSettingsPage(c, "status", { globalError: "Unknown git provider" })) ?? "", 400);
+      return c.html(
+        (await renderSettingsPage(c, "status", { globalError: "Unknown git provider" })) ?? "",
+        400,
+      );
     }
     if (!token) {
-      return c.html((await renderSettingsPage(c, "status", { errors: { token: "Token is required" } })) ?? "", 400);
+      return c.html(
+        (await renderSettingsPage(c, "status", { errors: { token: "Token is required" } })) ?? "",
+        400,
+      );
     }
     let config: unknown;
     try {
       config = JSON.parse(configRaw);
     } catch {
-      return c.html((await renderSettingsPage(c, "status", { errors: { config: "Config must be valid JSON" } })) ?? "", 400);
+      return c.html(
+        (await renderSettingsPage(c, "status", {
+          errors: { config: "Config must be valid JSON" },
+        })) ?? "",
+        400,
+      );
     }
     const parsed = provider.metadata.schema.safeParse(config);
     if (!parsed.success) {
-      return c.html((await renderSettingsPage(c, "status", { errors: { config: parsed.error.message } })) ?? "", 400);
+      return c.html(
+        (await renderSettingsPage(c, "status", { errors: { config: parsed.error.message } })) ?? "",
+        400,
+      );
     }
     const { db, config: shelfConfig } = getStore();
-    await new StatusConfigModel(db, shelfConfig.secret).create(project.id, { provider: provider.metadata.kind, config: parsed.data, token });
+    await new StatusConfigModel(db, shelfConfig.secret).create(project.id, {
+      provider: provider.metadata.kind,
+      config: parsed.data,
+      token,
+    });
     return hxRedirect(c, `/projects/${project.slug}/settings/status`);
   });
 

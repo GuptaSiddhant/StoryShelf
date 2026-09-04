@@ -1,6 +1,5 @@
 import { getTableColumns, type SQL } from "drizzle-orm";
 import type { AnySQLiteTable } from "drizzle-orm/sqlite-core";
-
 import type { DatabaseAdapter, ListOptions } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 
@@ -47,14 +46,20 @@ interface SqlChunk {
 
 /** Flatten the string parts of a drizzle SQL chunk into a single string. */
 function textOf(chunk: SqlChunk | undefined): string | undefined {
-  if (chunk === undefined || !Array.isArray(chunk.value) || !chunk.value.every((part) => typeof part === "string")) {
+  if (
+    chunk === undefined ||
+    !Array.isArray(chunk.value) ||
+    !chunk.value.every((part) => typeof part === "string")
+  ) {
     return undefined;
   }
   return chunk.value.join("");
 }
 
 function withoutUndefined(values: unknown): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(values as Record<string, unknown>).filter((pair) => pair[1] !== undefined));
+  return Object.fromEntries(
+    Object.entries(values as Record<string, unknown>).filter((pair) => pair[1] !== undefined),
+  );
 }
 
 // The in-memory fake back-fills Drizzle's inferred row types from raw maps
@@ -96,7 +101,10 @@ export function makeDatabase(): { db: DatabaseAdapter } {
     return merged as T["$inferSelect"];
   };
 
-  const getRow = async <T extends AnySQLiteTable>(table: T, id: string): Promise<T["$inferSelect"] | null> => {
+  const getRow = async <T extends AnySQLiteTable>(
+    table: T,
+    id: string,
+  ): Promise<T["$inferSelect"] | null> => {
     const found = rowsOf(table).get(id);
     if (found === undefined) {
       return null;
@@ -104,10 +112,13 @@ export function makeDatabase(): { db: DatabaseAdapter } {
     return found as T["$inferSelect"];
   };
 
-  const listRows = async <T extends AnySQLiteTable>(table: T, opts: ListOptions = {}): Promise<T["$inferSelect"][]> => {
+  const listRows = async <T extends AnySQLiteTable>(
+    table: T,
+    opts: ListOptions = {},
+  ): Promise<T["$inferSelect"][]> => {
     let current = [...rowsOf(table).values()];
     if (opts.where) {
-      const {where} = opts;
+      const { where } = opts;
       current = current.filter((row) => whereMatches(where, row as Record<string, unknown>, table));
     }
     if (opts.limit !== undefined) {
@@ -172,7 +183,11 @@ function whereMatches(where: SQL, row: Record<string, unknown>, table: AnySQLite
   return matchChunk(current, row, table);
 }
 
-function matchChunk(chunks: SqlChunk[], row: Record<string, unknown>, table: AnySQLiteTable): boolean {
+function matchChunk(
+  chunks: SqlChunk[],
+  row: Record<string, unknown>,
+  table: AnySQLiteTable,
+): boolean {
   const text = chunks.map((c) => textOf(c) ?? "").join("");
   if (text.includes(" in ")) {
     return inArrayMatches(chunks, row, table);
@@ -183,7 +198,11 @@ function matchChunk(chunks: SqlChunk[], row: Record<string, unknown>, table: Any
   return eqMatches(chunks, row, table);
 }
 
-function eqMatches(chunks: SqlChunk[], row: Record<string, unknown>, table: AnySQLiteTable): boolean {
+function eqMatches(
+  chunks: SqlChunk[],
+  row: Record<string, unknown>,
+  table: AnySQLiteTable,
+): boolean {
   let columnName: string | undefined;
   let argument: unknown;
   for (const chunk of chunks) {
@@ -200,14 +219,21 @@ function eqMatches(chunks: SqlChunk[], row: Record<string, unknown>, table: AnyS
 }
 
 /* eslint-disable complexity, max-depth -- handles drizzle's varied chunk shapes */
-function inArrayMatches(chunks: SqlChunk[], row: Record<string, unknown>, table: AnySQLiteTable): boolean {
+function inArrayMatches(
+  chunks: SqlChunk[],
+  row: Record<string, unknown>,
+  table: AnySQLiteTable,
+): boolean {
   let columnName: string | undefined;
   const values: unknown[] = [];
   const collect = (nodes: unknown[]): void => {
     for (const raw of nodes as SqlChunk[]) {
       const chunk = raw as SqlChunk & Record<string, unknown>;
       // Handle array-like chunk (inArray values stored as array of chunks)
-      if (Array.isArray(chunk) || (chunk && typeof chunk === "object" && Object.keys(chunk).every((k) => /^\d+$/u.test(k)))) {
+      if (
+        Array.isArray(chunk) ||
+        (chunk && typeof chunk === "object" && Object.keys(chunk).every((k) => /^\d+$/u.test(k)))
+      ) {
         collect(Object.values(chunk as unknown as Record<string, unknown>) as unknown[]);
         continue;
       }
@@ -228,14 +254,22 @@ function inArrayMatches(chunks: SqlChunk[], row: Record<string, unknown>, table:
       const val = (chunk as Record<string, unknown>)["value"];
       if (Array.isArray(val)) {
         for (const item of val as unknown[]) {
-          if (item && typeof item === "object" && "queryChunks" in (item as Record<string, unknown>)) {
+          if (
+            item &&
+            typeof item === "object" &&
+            "queryChunks" in (item as Record<string, unknown>)
+          ) {
             collect(((item as Record<string, unknown>)["queryChunks"] as unknown[]) ?? []);
           }
           if (item && typeof item === "object" && "value" in (item as Record<string, unknown>)) {
             const iv = (item as Record<string, unknown>)["value"];
-            if (iv !== undefined) {values.push(iv);}
+            if (iv !== undefined) {
+              values.push(iv);
+            }
           }
-          if (typeof item === "string") {values.push(item);}
+          if (typeof item === "string") {
+            values.push(item);
+          }
         }
       }
     }
@@ -249,7 +283,11 @@ function inArrayMatches(chunks: SqlChunk[], row: Record<string, unknown>, table:
 }
 /* eslint-enable complexity, max-depth */
 
-function ltMatches(chunks: SqlChunk[], row: Record<string, unknown>, table: AnySQLiteTable): boolean {
+function ltMatches(
+  chunks: SqlChunk[],
+  row: Record<string, unknown>,
+  table: AnySQLiteTable,
+): boolean {
   let columnName: string | undefined;
   let argument: unknown;
   for (const chunk of chunks) {

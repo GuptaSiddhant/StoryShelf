@@ -1,12 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { LabelModel } from "./label.ts";
 import { makeDatabase } from "../capture/fake-adapters.ts";
+import { LabelModel } from "./label.ts";
 
 describe("LabelModel", () => {
   it("creates a label type", async () => {
     const { db } = makeDatabase();
     const model = new LabelModel(db);
-    const type = await model.createType("p1", { key: "pr", name: "Pull request", linkTemplate: "https://github.com/{repo}/pull/{value}", color: "green" });
+    const type = await model.createType("p1", {
+      key: "pr",
+      name: "Pull request",
+      linkTemplate: "https://github.com/{repo}/pull/{value}",
+      color: "green",
+    });
     expect(type.key).toBe("pr");
     expect(type.name).toBe("Pull request");
     expect(type.linkTemplate).toBe("https://github.com/{repo}/pull/{value}");
@@ -33,8 +38,17 @@ describe("LabelModel", () => {
   it("updates a label type name, template and color", async () => {
     const { db } = makeDatabase();
     const model = new LabelModel(db);
-    await model.createType("p1", { key: "pr", name: "Pull request", color: "blue", linkTemplate: "https://github.com/{repo}/pull/{value}" });
-    const updated = await model.updateType("p1", "pr", { name: "PR", linkTemplate: null, color: null });
+    await model.createType("p1", {
+      key: "pr",
+      name: "Pull request",
+      color: "blue",
+      linkTemplate: "https://github.com/{repo}/pull/{value}",
+    });
+    const updated = await model.updateType("p1", "pr", {
+      name: "PR",
+      linkTemplate: null,
+      color: null,
+    });
     expect(updated?.name).toBe("PR");
     expect(updated?.linkTemplate).toBeNull();
     expect(updated?.color).toBeNull();
@@ -50,7 +64,11 @@ describe("LabelModel", () => {
   it("updateType rejects reserved label types", async () => {
     const { db } = makeDatabase();
     const model = new LabelModel(db);
-    await expect(model.updateType("p1", "persistent", { name: "X" })).rejects.toThrow("Label type 'persistent' cannot be updated.");
-    await expect(model.updateType("p1", "build", { name: "X" })).rejects.toThrow("Label type 'build' cannot be updated.");
+    await expect(model.updateType("p1", "persistent", { name: "X" })).rejects.toThrow(
+      "Label type 'persistent' cannot be updated.",
+    );
+    await expect(model.updateType("p1", "build", { name: "X" })).rejects.toThrow(
+      "Label type 'build' cannot be updated.",
+    );
   });
 });

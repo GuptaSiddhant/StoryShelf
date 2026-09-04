@@ -2,10 +2,8 @@
 import type { Octokit } from "@octokit/rest";
 import type { CheckStatus } from "@storyshelf/core";
 import { describeStatus } from "@storyshelf/core/adapter/git-host/helpers";
-
-import { mapStatus } from "./mapper.ts";
-
 import type { Logger } from "@storyshelf/core/types";
+import { mapStatus } from "./mapper.ts";
 
 /** Post a StoryShelf build status to a GitHub commit SHA. */
 export async function postCommitStatus(opts: {
@@ -20,7 +18,10 @@ export async function postCommitStatus(opts: {
 }): Promise<void> {
   const ghContext = `storyshelf/${opts.context}`;
   const state = mapStatus(opts.status);
-  opts.logger?.debug({ context: ghContext, sha: opts.gitSha, state, url: opts.url }, "posting commit status");
+  opts.logger?.debug(
+    { context: ghContext, sha: opts.gitSha, state, url: opts.url },
+    "posting commit status",
+  );
   try {
     await opts.octokit.repos.createCommitStatus({
       owner: opts.owner,
@@ -33,7 +34,10 @@ export async function postCommitStatus(opts: {
     });
     opts.logger?.info({ context: ghContext, sha: opts.gitSha, state }, "commit status posted");
   } catch (error) {
-    opts.logger?.error({ err: error, context: ghContext, sha: opts.gitSha }, "failed to post commit status");
+    opts.logger?.error(
+      { err: error, context: ghContext, sha: opts.gitSha },
+      "failed to post commit status",
+    );
     throw error;
   }
 }

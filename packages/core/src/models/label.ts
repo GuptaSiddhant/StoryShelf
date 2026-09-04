@@ -1,6 +1,5 @@
 /** Build labels and project label types. */
 import { and, desc, eq } from "drizzle-orm";
-
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import { buildLabels, builds, labelTypes } from "../schema-tables.ts";
 import type { BuildLabel, LabelType } from "../schema.ts";
@@ -63,7 +62,10 @@ export class LabelModel {
   }
 
   /** Create a custom label type for a project. */
-  async createType(projectId: string, input: { key: string; name: string; linkTemplate?: string; color?: string }): Promise<LabelType> {
+  async createType(
+    projectId: string,
+    input: { key: string; name: string; linkTemplate?: string; color?: string },
+  ): Promise<LabelType> {
     return await this.db.insert(labelTypes, {
       id: ulid(),
       projectId,
@@ -76,7 +78,11 @@ export class LabelModel {
   }
 
   /** Update a custom label type's name, template or color. */
-  async updateType(projectId: string, key: string, input: { name?: string; linkTemplate?: string | null; color?: string | null }): Promise<LabelType | null> {
+  async updateType(
+    projectId: string,
+    key: string,
+    input: { name?: string; linkTemplate?: string | null; color?: string | null },
+  ): Promise<LabelType | null> {
     if (key === PERSISTENT_LABEL_KEY || RESERVED_LABEL_KEYS.includes(key as never)) {
       throw new Error(`Label type '${key}' cannot be updated.`);
     }
@@ -103,7 +109,12 @@ export class LabelModel {
   }
 
   /** Attach a label value to a build. */
-  async attach(projectId: string, buildId: string, typeKey: string, value: string): Promise<BuildLabel> {
+  async attach(
+    projectId: string,
+    buildId: string,
+    typeKey: string,
+    value: string,
+  ): Promise<BuildLabel> {
     return await this.db.insert(buildLabels, {
       id: ulid(),
       projectId,
@@ -122,7 +133,11 @@ export class LabelModel {
   /** Return the id of the latest build carrying a given label value, if any. */
   async latestBuildId(projectId: string, typeKey: string, value: string): Promise<string | null> {
     const labels = await this.db.list(buildLabels, {
-      where: and(eq(buildLabels.projectId, projectId), eq(buildLabels.typeKey, typeKey), eq(buildLabels.value, value)),
+      where: and(
+        eq(buildLabels.projectId, projectId),
+        eq(buildLabels.typeKey, typeKey),
+        eq(buildLabels.value, value),
+      ),
     });
     if (labels.length === 0) {
       return null;
@@ -135,7 +150,11 @@ export class LabelModel {
   /** Return whether a build is marked as persistent. */
   async hasPersistent(projectId: string, buildId: string): Promise<boolean> {
     const labels = await this.db.list(buildLabels, {
-      where: and(eq(buildLabels.projectId, projectId), eq(buildLabels.buildId, buildId), eq(buildLabels.typeKey, PERSISTENT_LABEL_KEY)),
+      where: and(
+        eq(buildLabels.projectId, projectId),
+        eq(buildLabels.buildId, buildId),
+        eq(buildLabels.typeKey, PERSISTENT_LABEL_KEY),
+      ),
     });
     return labels.length > 0;
   }

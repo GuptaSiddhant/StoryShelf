@@ -1,14 +1,13 @@
 /* oxlint-disable typescript/no-unsafe-assignment, typescript/no-unsafe-member-access, typescript/no-unsafe-call, typescript/no-unsafe-argument, max-statements, max-lines-per-function, complexity, eslint/no-await-in-loop, unicorn/prefer-top-level-await, typescript/no-floating-promises, typescript/explicit-function-return-type */
 import { Command } from "commander";
 import { pathToFileURL } from "node:url";
-
-import { loadStorybookConfig } from "./config.ts";
 import { runCreate, type CreateOptions } from "./commands/create.ts";
 import { runInit, type InitOptions } from "./commands/init.ts";
 import { runPurge, type PurgeOptions } from "./commands/purge.ts";
 import { runRetry, type RetryOptions } from "./commands/retry.ts";
-import { runUpload, type UploadOptions } from "./commands/upload.ts";
 import { runServerInit, type ServerInitOptions } from "./commands/server/init.ts";
+import { runUpload, type UploadOptions } from "./commands/upload.ts";
+import { loadStorybookConfig } from "./config.ts";
 import { printError } from "./output.ts";
 
 function handleError(error: unknown): void {
@@ -29,7 +28,10 @@ function run<TArgs>(fn: (args: TArgs) => Promise<void>): (args: TArgs) => Promis
  */
 export function createProgram(): Command {
   const program = new Command();
-  program.name("storyshelf").description("Self-hosted visual testing for Storybook.").version("0.1.0");
+  program
+    .name("storyshelf")
+    .description("Self-hosted visual testing for Storybook.")
+    .version("0.1.0");
 
   program
     .command("init")
@@ -37,11 +39,14 @@ export function createProgram(): Command {
     .option("--url <url>", "server base URL")
     .option("--slug <slug>", "project slug")
     .option("--build-dir <dir>", "built Storybook directory (default storybook-static)")
-    .option("--build-command <cmd>", "build command (e.g. \"npm run build-storybook\")")
+    .option("--build-command <cmd>", 'build command (e.g. "npm run build-storybook")')
     .option("--build-script-name <name>", "npm script to build Storybook (default build-storybook)")
     .option("--skip <glob>", "skip upload for matching branch (glob)")
     .option("-c, --config <path>", "config file path (default .storybook/storyshelf.json)")
-    .option("--token <token>", "auth token for sync (or STORYSHELF_TOKEN/STORYSHELF_ADMIN_TOKEN env)")
+    .option(
+      "--token <token>",
+      "auth token for sync (or STORYSHELF_TOKEN/STORYSHELF_ADMIN_TOKEN env)",
+    )
     .action(run<InitOptions>(runInit));
 
   program
@@ -106,24 +111,44 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       const cfg = await loadStorybookConfig();
       if (cfg) {
         const url = cfg.url ?? process.env["STORYSHELF_URL"];
-        const {slug} = cfg;
+        const { slug } = cfg;
         const token = process.env["STORYSHELF_TOKEN"] ?? process.env["SHELF_TOKEN"];
-        const sha = process.env["GITHUB_SHA"] ?? process.env["VERCEL_GIT_COMMIT_SHA"] ?? process.env["CI_COMMIT_SHA"];
-        const branch = process.env["GITHUB_REF_NAME"] ?? process.env["VERCEL_GIT_COMMIT_REF"] ?? process.env["CI_COMMIT_REF_NAME"];
+        const sha =
+          process.env["GITHUB_SHA"] ??
+          process.env["VERCEL_GIT_COMMIT_SHA"] ??
+          process.env["CI_COMMIT_SHA"];
+        const branch =
+          process.env["GITHUB_REF_NAME"] ??
+          process.env["VERCEL_GIT_COMMIT_REF"] ??
+          process.env["CI_COMMIT_REF_NAME"];
         const buildDir = cfg.buildDir ?? "storybook-static";
-        const {buildCommand} = cfg;
-        const {buildScriptName} = cfg;
-        const {skip} = cfg;
+        const { buildCommand } = cfg;
+        const { buildScriptName } = cfg;
+        const { skip } = cfg;
         if (!url || !slug || !token || !sha || !branch) {
-          printError("Missing required upload options — ensure STORYSHELF_URL/SLUG/TOKEN and GITHUB_SHA/BRANCH are set or run `storyshelf upload --help`");
+          printError(
+            "Missing required upload options — ensure STORYSHELF_URL/SLUG/TOKEN and GITHUB_SHA/BRANCH are set or run `storyshelf upload --help`",
+          );
           program.outputHelp();
           process.exitCode = 1;
           return;
         }
-        await runUpload({ url, slug, token, sha, branch, buildDir, buildCommand, buildScriptName, skip }).catch(handleError);
+        await runUpload({
+          url,
+          slug,
+          token,
+          sha,
+          branch,
+          buildDir,
+          buildCommand,
+          buildScriptName,
+          skip,
+        }).catch(handleError);
       } else {
         program.outputHelp();
-        printError("No .storybook/storyshelf.json found — run `storyshelf init --url <url> --slug <slug>` first");
+        printError(
+          "No .storybook/storyshelf.json found — run `storyshelf init --url <url> --slug <slug>` first",
+        );
         process.exitCode = 1;
       }
     })();

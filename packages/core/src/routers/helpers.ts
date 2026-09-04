@@ -3,7 +3,6 @@ import type { Context, Next } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { ZodType } from "zod";
-
 import { MemberModel } from "../models/member.ts";
 import { ProjectModel } from "../models/project.ts";
 import { TokenModel } from "../models/token.ts";
@@ -93,7 +92,9 @@ async function resolveProjectByToken(c: Context, slug: string): Promise<Project 
 /** Resolve a project by slug, honoring CLI bearer-token access. */
 export async function resolveProject(c: Context, slug: string): Promise<Project> {
   const project = await resolveProjectByToken(c, slug);
-  if (project) {return project;}
+  if (project) {
+    return project;
+  }
   const found = await findProjectBySlug(slug);
   if (!found) {
     notFound("Project not found");
@@ -120,9 +121,15 @@ export async function assertRole(projectId: string, ...minRoles: ProjectRole[]):
 }
 
 /** Resolve a project by slug and enforce the caller's minimum role. */
-export async function resolveAuthorizedProject(c: Context, slug: string, ...minRoles: ProjectRole[]): Promise<Project> {
+export async function resolveAuthorizedProject(
+  c: Context,
+  slug: string,
+  ...minRoles: ProjectRole[]
+): Promise<Project> {
   const project = await resolveProjectByToken(c, slug);
-  if (project) {return project;}
+  if (project) {
+    return project;
+  }
   const found = await findProjectBySlug(slug);
   if (!found) {
     notFound("Project not found");
@@ -143,6 +150,9 @@ export function requireSiteAdmin(): void {
 }
 
 /** Require the current session user to hold one of the given project roles. */
-export async function requireProjectRole(projectId: string, ...minRoles: ProjectRole[]): Promise<void> {
+export async function requireProjectRole(
+  projectId: string,
+  ...minRoles: ProjectRole[]
+): Promise<void> {
   await assertRole(projectId, ...minRoles);
 }

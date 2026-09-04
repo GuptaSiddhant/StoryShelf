@@ -1,11 +1,16 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import type { ShelfApp } from "../index.tsx";
-
 import { MemberModel } from "../models/member.ts";
 import { getStore } from "../store.ts";
 import type { ProjectRole } from "../types.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
-import { memberRoleSchema, memberSchema, memberSetSchema, notFound, unauthorized } from "./schemas.ts";
+import {
+  memberRoleSchema,
+  memberSchema,
+  memberSetSchema,
+  notFound,
+  unauthorized,
+} from "./schemas.ts";
 
 const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];
 const ADMIN_ROLES: readonly ProjectRole[] = ["admin"];
@@ -15,7 +20,10 @@ const listMembersRoute = createRoute({
   path: "/api/v1/projects/{slug}/members",
   request: { params: z.object({ slug: z.string() }) },
   responses: {
-    200: { content: { "application/json": { schema: memberSchema.array() } }, description: "List project members" },
+    200: {
+      content: { "application/json": { schema: memberSchema.array() } },
+      description: "List project members",
+    },
     ...notFound,
     ...unauthorized,
   },
@@ -29,7 +37,10 @@ const setMemberRoute = createRoute({
     body: { content: { "application/json": { schema: memberSetSchema } } },
   },
   responses: {
-    201: { content: { "application/json": { schema: memberSchema } }, description: "Added or updated member" },
+    201: {
+      content: { "application/json": { schema: memberSchema } },
+      description: "Added or updated member",
+    },
     ...notFound,
   },
 });
@@ -42,7 +53,10 @@ const updateMemberRoute = createRoute({
     body: { content: { "application/json": { schema: memberRoleSchema } } },
   },
   responses: {
-    200: { content: { "application/json": { schema: memberSchema } }, description: "Updated member role" },
+    200: {
+      content: { "application/json": { schema: memberSchema } },
+      description: "Updated member role",
+    },
     ...notFound,
   },
 });
@@ -67,7 +81,10 @@ export function registerMembers(app: ShelfApp): void {
   app.openapi(setMemberRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
     const body = c.req.valid("json");
-    return c.json(await new MemberModel(getStore().db).set(project.id, body.userId, body.role), 201);
+    return c.json(
+      await new MemberModel(getStore().db).set(project.id, body.userId, body.role),
+      201,
+    );
   });
 
   app.openapi(updateMemberRoute, async (c) => {

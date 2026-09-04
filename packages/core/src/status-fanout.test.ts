@@ -1,13 +1,11 @@
+import AdmZip from "adm-zip";
 /* oxlint-disable eslint/no-await-in-loop, eslint/no-promise-executor-return */
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-
-import AdmZip from "adm-zip";
 import { pino, type Logger } from "pino";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-
 import type { CaptureRunner, RenderResult } from "./adapters/capture-runner.ts";
 import type { CheckStatus, GitHostAdapter, GitHostProvider } from "./adapters/git-host/index.ts";
 import { makeDatabase, makeStorage } from "./capture/fake-adapters.ts";
@@ -24,25 +22,38 @@ interface StatusCall {
   url: string;
 }
 
-function fakeRunner(overrides: Partial<CaptureRunner> = {}): { runner: CaptureRunner; render: ReturnType<typeof vi.fn> } {
+function fakeRunner(overrides: Partial<CaptureRunner> = {}): {
+  runner: CaptureRunner;
+  render: ReturnType<typeof vi.fn>;
+} {
   const metadata = { name: "Fake Runner", version: "0.0.0", kind: "fake" } as const;
   const result: RenderResult = {
     captures: [
       {
-        story: { id: STORY_ID, title: "Components/Button", name: "Primary", importPath: "./Button.stories.tsx", type: "story" },
+        story: {
+          id: STORY_ID,
+          title: "Components/Button",
+          name: "Primary",
+          importPath: "./Button.stories.tsx",
+          type: "story",
+        },
         viewportName: "desktop",
         screenshot: Buffer.from([0, 1, 2]),
       },
     ],
     failures: [],
   };
-  const render = overrides.render ?? vi.fn(async () => {
-    await Promise.resolve();
-    return result;
-  });
-  const cancel = overrides.cancel ?? vi.fn(async () => {
-    await Promise.resolve();
-  });
+  const render =
+    overrides.render ??
+    vi.fn(async () => {
+      await Promise.resolve();
+      return result;
+    });
+  const cancel =
+    overrides.cancel ??
+    vi.fn(async () => {
+      await Promise.resolve();
+    });
   return { runner: { metadata, render, cancel }, render: render as ReturnType<typeof vi.fn> };
 }
 
@@ -58,8 +69,18 @@ function fakeGitProvider(key: string, calls: StatusCall[], tokens: string[]): Gi
     create(opts: { config: unknown; token: string; logger?: Logger }): GitHostAdapter {
       return {
         metadata: base.metadata,
-        setStatus: async (statusOpts: { context: string; gitSha: string; status: CheckStatus; url: string }): Promise<void> => {
-          calls.push({ context: statusOpts.context, gitSha: statusOpts.gitSha, status: statusOpts.status, url: statusOpts.url });
+        setStatus: async (statusOpts: {
+          context: string;
+          gitSha: string;
+          status: CheckStatus;
+          url: string;
+        }): Promise<void> => {
+          calls.push({
+            context: statusOpts.context,
+            gitSha: statusOpts.gitSha,
+            status: statusOpts.status,
+            url: statusOpts.url,
+          });
           tokens.push(opts.token);
           await Promise.resolve();
         },
@@ -91,7 +112,12 @@ function zipWithIndex(): Buffer {
   return zip.toBuffer();
 }
 
-async function upTo(options: { app: ReturnType<typeof createShelfRouter>; slug: string; buildId: string; wanted: string }): Promise<Build> {
+async function upTo(options: {
+  app: ReturnType<typeof createShelfRouter>;
+  slug: string;
+  buildId: string;
+  wanted: string;
+}): Promise<Build> {
   const { app, slug, buildId, wanted } = options;
   const deadline = Date.now() + 3000;
   for (;;) {
@@ -136,7 +162,10 @@ describe("status provider fanout", () => {
       storage,
       captureRunner: runner,
       config: { captureConcurrency: 1, scratchDir, secret: "test-secret", purgeTtlDays: 30 },
-      gitHosts: [fakeGitProvider("github-a", callsA, tokensA), fakeGitProvider("github-b", callsB, tokensB)],
+      gitHosts: [
+        fakeGitProvider("github-a", callsA, tokensA),
+        fakeGitProvider("github-b", callsB, tokensB),
+      ],
       logger: pino({ level: "silent" }),
     });
 
@@ -148,7 +177,10 @@ describe("status provider fanout", () => {
     expect(projectResponse.status).toBe(201);
     const project = (await projectResponse.json()) as { id: string; slug: string };
 
-    for (const [provider, token] of [["github-a", "token-a"], ["github-b", "token-b"]] as const) {
+    for (const [provider, token] of [
+      ["github-a", "token-a"],
+      ["github-b", "token-b"],
+    ] as const) {
       const created = await app.request(`/api/v1/projects/${project.slug}/status-configs`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -162,14 +194,32 @@ describe("status provider fanout", () => {
     form.set("gitSha", SHA);
     form.set("gitBranch", "main");
     form.set("zip", new Blob([new Uint8Array(zip)], { type: "application/zip" }), "storybook.zip");
-    const upload = await app.request(`/api/v1/projects/${project.slug}/builds`, { method: "POST", body: form });
+    const upload = await app.request(`/api/v1/projects/${project.slug}/builds`, {
+      method: "POST",
+      body: form,
+    });
     expect(upload.status).toBe(202);
     const createdBuild = (await upload.json()) as Build;
-    const updatedBuild = await upTo({ app, slug: project.slug, buildId: createdBuild.id, wanted: "approved" });
+    const updatedBuild = await upTo({
+      app,
+      slug: project.slug,
+      buildId: createdBuild.id,
+      wanted: "approved",
+    });
 
     const expected: StatusCall[] = [
-      { context: `storyshelf/${project.slug}`, gitSha: SHA, status: "pending", url: `/projects/${project.slug}/builds/${createdBuild.id}` },
-      { context: `storyshelf/${project.slug}`, gitSha: SHA, status: "success", url: `/projects/${project.slug}/builds/${createdBuild.id}` },
+      {
+        context: `storyshelf/${project.slug}`,
+        gitSha: SHA,
+        status: "pending",
+        url: `/projects/${project.slug}/builds/${createdBuild.id}`,
+      },
+      {
+        context: `storyshelf/${project.slug}`,
+        gitSha: SHA,
+        status: "success",
+        url: `/projects/${project.slug}/builds/${createdBuild.id}`,
+      },
     ];
     expect(callsA).toEqual(expected);
     expect(callsB).toEqual(expected);
@@ -196,7 +246,10 @@ describe("status provider fanout", () => {
       storage,
       captureRunner: runner,
       config: { captureConcurrency: 1, scratchDir, secret: "test-secret", purgeTtlDays: 30 },
-      gitHosts: [fakeGitProvider("github-a", callsA, tokensA), fakeGitProvider("github-b", callsB, tokensB)],
+      gitHosts: [
+        fakeGitProvider("github-a", callsA, tokensA),
+        fakeGitProvider("github-b", callsB, tokensB),
+      ],
       logger: pino({ level: "silent" }),
     });
 
@@ -210,7 +263,11 @@ describe("status provider fanout", () => {
     const created = await app.request(`/api/v1/projects/${project.slug}/status-configs`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ provider: "github-a", config: { owner: "acme", repo: "widgets" }, token: "token-a" }),
+      body: JSON.stringify({
+        provider: "github-a",
+        config: { owner: "acme", repo: "widgets" },
+        token: "token-a",
+      }),
     });
     expect(created.status).toBe(201);
 
@@ -219,15 +276,26 @@ describe("status provider fanout", () => {
     form.set("gitSha", SHA);
     form.set("gitBranch", "main");
     form.set("zip", new Blob([new Uint8Array(zip)], { type: "application/zip" }), "storybook.zip");
-    const upload = await app.request(`/api/v1/projects/${project.slug}/builds`, { method: "POST", body: form });
+    const upload = await app.request(`/api/v1/projects/${project.slug}/builds`, {
+      method: "POST",
+      body: form,
+    });
     expect(upload.status).toBe(202);
     const createdBuild = (await upload.json()) as Build;
 
     await upTo({ app, slug: project.slug, buildId: createdBuild.id, wanted: "failed" });
 
     expect(callsA).toEqual([
-      expect.objectContaining({ context: `storyshelf/${project.slug}`, gitSha: SHA, status: "pending" as const }),
-      expect.objectContaining({ context: `storyshelf/${project.slug}`, gitSha: SHA, status: "failure" as const }),
+      expect.objectContaining({
+        context: `storyshelf/${project.slug}`,
+        gitSha: SHA,
+        status: "pending" as const,
+      }),
+      expect.objectContaining({
+        context: `storyshelf/${project.slug}`,
+        gitSha: SHA,
+        status: "failure" as const,
+      }),
     ]);
     expect(callsB).toEqual([]);
     expect(tokensA.every((token) => token === "token-a")).toBe(true);

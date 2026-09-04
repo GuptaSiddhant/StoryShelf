@@ -1,8 +1,7 @@
+import type { Logger } from "@storyshelf/core/types";
 /* oxlint-disable max-statements, max-lines-per-function */
 import { apiBase, gitlabHeaders, projectId } from "./helpers.ts";
 import { findMrIid } from "./pr.ts";
-
-import type { Logger } from "@storyshelf/core/types";
 
 /** Create or update the StoryShelf review note on a merge request. */
 export async function upsertMrNote(opts: {
@@ -39,11 +38,14 @@ export async function upsertMrNote(opts: {
       const notes = (await res.json()) as { id: number; body: string }[];
       const existing = notes.find((note) => note.body.includes(marker));
       if (existing) {
-        const upd = await fetch(`${base}/api/v4/projects/${pid}/merge_requests/${iid}/notes/${existing.id}`, {
-          method: "PUT",
-          headers: gitlabHeaders(opts.token),
-          body: JSON.stringify({ body }),
-        });
+        const upd = await fetch(
+          `${base}/api/v4/projects/${pid}/merge_requests/${iid}/notes/${existing.id}`,
+          {
+            method: "PUT",
+            headers: gitlabHeaders(opts.token),
+            body: JSON.stringify({ body }),
+          },
+        );
         if (!upd.ok) {
           const text = await upd.text();
           throw new Error(`update note ${upd.status}: ${text}`);

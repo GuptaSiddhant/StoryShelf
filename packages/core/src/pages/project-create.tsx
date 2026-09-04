@@ -27,7 +27,9 @@ export function renderProjectCreatePage(state: ProjectCreateFormState = {}): Ren
         <div class="page-header__row">
           <div>
             <h1 class="page-header__title">Create project</h1>
-            <p class="page-header__desc">A project corresponds to one Storybook. You can have multiple projects per repository.</p>
+            <p class="page-header__desc">
+              A project corresponds to one Storybook. You can have multiple projects per repository.
+            </p>
           </div>
         </div>
       </div>
@@ -88,7 +90,9 @@ export function renderProjectCreatePage(state: ProjectCreateFormState = {}): Ren
               value={values.gitRepository ?? ""}
               placeholder="acme/design-system"
               aria-invalid={errors["gitRepository"] ? "true" : undefined}
-              aria-describedby={errors["gitRepository"] ? "gitRepository-error" : "gitRepository-hint"}
+              aria-describedby={
+                errors["gitRepository"] ? "gitRepository-error" : "gitRepository-hint"
+              }
             />
             {errors["gitRepository"] ? (
               <p class="field__error" id="gitRepository-error" role="alert">
@@ -113,7 +117,9 @@ export function renderProjectCreatePage(state: ProjectCreateFormState = {}): Ren
               value={values.gitDefaultBranch ?? "main"}
               placeholder="main"
             />
-            <p class="field__hint">Baselines fall back to this branch when no branch-specific baseline exists.</p>
+            <p class="field__hint">
+              Baselines fall back to this branch when no branch-specific baseline exists.
+            </p>
           </div>
 
           <div style="display:flex; gap:.5rem; margin-top:1rem;">

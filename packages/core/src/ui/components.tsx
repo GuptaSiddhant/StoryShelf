@@ -31,7 +31,10 @@ export const Button: FC<{
 
 /** Small status pill with a color tone. */
 // eslint-disable-next-line promise-function-async -- JSX component return type
-export const Badge: FC<{ tone?: BadgeTone; children?: unknown }> = ({ tone = "neutral", children }) => {
+export const Badge: FC<{ tone?: BadgeTone; children?: unknown }> = ({
+  tone = "neutral",
+  children,
+}) => {
   return <span class={`badge badge--${tone}`}>{children}</span>;
 };
 
@@ -60,7 +63,11 @@ export const Card: FC<{ children?: unknown; padded?: boolean }> = ({ children, p
 
 /** Alert banner with an optional title. */
 // eslint-disable-next-line promise-function-async -- JSX component return type
-export const Alert: FC<{ tone?: BadgeTone; title?: string; children?: unknown }> = ({ tone = "info", title, children }) => {
+export const Alert: FC<{ tone?: BadgeTone; title?: string; children?: unknown }> = ({
+  tone = "info",
+  title,
+  children,
+}) => {
   return (
     <div class={`alert alert--${tone}`} role="alert">
       {title ? <strong class="alert__title">{title}</strong> : null}
@@ -70,7 +77,11 @@ export const Alert: FC<{ tone?: BadgeTone; title?: string; children?: unknown }>
 };
 
 // eslint-disable-next-line promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString>
-const FieldAssistant: FC<{ name: string; error: string | undefined; hint: string | undefined }> = ({ name, error, hint }) => {
+const FieldAssistant: FC<{ name: string; error: string | undefined; hint: string | undefined }> = ({
+  name,
+  error,
+  hint,
+}) => {
   if (error) {
     return (
       <p class="field__error" id={`${name}-error`} role="alert">
@@ -88,7 +99,11 @@ const FieldAssistant: FC<{ name: string; error: string | undefined; hint: string
   return null;
 };
 
-function fieldDescribedBy(name: string, error: string | undefined, hint: string | undefined): string | undefined {
+function fieldDescribedBy(
+  name: string,
+  error: string | undefined,
+  hint: string | undefined,
+): string | undefined {
   if (error) {
     return `${name}-error`;
   }
@@ -180,7 +195,12 @@ export const SelectField: FC<{
       <label class="field__label" for={name}>
         {label}
       </label>
-      <select class="field__input" id={name} name={name} aria-describedby={hint ? `${name}-hint` : undefined}>
+      <select
+        class="field__input"
+        id={name}
+        name={name}
+        aria-describedby={hint ? `${name}-hint` : undefined}
+      >
         {options.map((opt) => (
           <option value={opt.value} selected={opt.value === value}>
             {opt.label}
@@ -211,7 +231,11 @@ export const PageHeader: FC<{
           <ol>
             {breadcrumbs.map((crumb, index) => (
               <li key={String(index)}>
-                {crumb.href ? <a href={crumb.href}>{crumb.label}</a> : <span aria-current="page">{crumb.label}</span>}
+                {crumb.href ? (
+                  <a href={crumb.href}>{crumb.label}</a>
+                ) : (
+                  <span aria-current="page">{crumb.label}</span>
+                )}
               </li>
             ))}
           </ol>
@@ -230,7 +254,11 @@ export const PageHeader: FC<{
 
 /** Centered empty state with an optional call-to-action. */
 // eslint-disable-next-line promise-function-async -- JSX component return type
-export const EmptyState: FC<{ title: string; description?: string; action?: unknown }> = ({ title, description, action }) => {
+export const EmptyState: FC<{ title: string; description?: string; action?: unknown }> = ({
+  title,
+  description,
+  action,
+}) => {
   return (
     <div class="empty">
       <h2 class="empty__title">{title}</h2>
@@ -248,7 +276,11 @@ export const Tabs: FC<{
   return (
     <nav class="tabs" aria-label="Sections">
       {tabs.map((tab) => (
-        <a class={`tabs__link ${tab.active ? "tabs__link--active" : ""}`} href={tab.href} aria-current={tab.active ? "page" : undefined}>
+        <a
+          class={`tabs__link ${tab.active ? "tabs__link--active" : ""}`}
+          href={tab.href}
+          aria-current={tab.active ? "page" : undefined}
+        >
           {tab.label}
         </a>
       ))}

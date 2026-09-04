@@ -1,6 +1,5 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-
 import type { StoryEntry, StoryParameters, StorySourceAdapter } from "./adapter.ts";
 
 interface StorybookIndex {

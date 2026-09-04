@@ -1,6 +1,5 @@
-import { z } from "zod";
 import type { Logger } from "pino";
-
+import { z } from "zod";
 import type { AuthAdapter } from "./adapters/auth.ts";
 import type { CaptureQueue } from "./adapters/capture-queue.ts";
 import type { CaptureRunner } from "./adapters/capture-runner.ts";

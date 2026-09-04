@@ -1,6 +1,5 @@
 /** Project records and slug management. */
 import { eq } from "drizzle-orm";
-
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import { projects } from "../schema-tables.ts";
 import type { Project } from "../schema.ts";
@@ -65,8 +64,14 @@ export class ProjectModel {
       storybookMeta?: unknown;
     },
   ): Promise<Project> {
-    const normalized: Partial<Project> & Record<string, unknown> = { ...patch } as unknown as Partial<Project> & Record<string, unknown>;
-    if (patch.storybookMeta !== undefined && patch.storybookMeta !== null && typeof patch.storybookMeta !== "string") {
+    const normalized: Partial<Project> & Record<string, unknown> = {
+      ...patch,
+    } as unknown as Partial<Project> & Record<string, unknown>;
+    if (
+      patch.storybookMeta !== undefined &&
+      patch.storybookMeta !== null &&
+      typeof patch.storybookMeta !== "string"
+    ) {
       normalized.storybookMeta = JSON.stringify(patch.storybookMeta);
     }
     return await this.db.update(projects, id, {

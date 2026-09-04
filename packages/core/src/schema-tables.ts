@@ -1,5 +1,4 @@
 import { index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
-
 import type { BuildStatus, ProjectRole, SiteRole, SnapshotStatus } from "./types.ts";
 
 /**
@@ -122,7 +121,12 @@ export const baselines = sqliteTable(
     updatedAt: text("updated_at").notNull(),
   },
   (t) => [
-    uniqueIndex("baselines_project_story_viewport_branch_idx").on(t.projectId, t.storyId, t.viewportName, t.branch),
+    uniqueIndex("baselines_project_story_viewport_branch_idx").on(
+      t.projectId,
+      t.storyId,
+      t.viewportName,
+      t.branch,
+    ),
     index("baselines_project_story_idx").on(t.projectId, t.storyId),
   ],
 );

@@ -1,7 +1,6 @@
 import type { Logger } from "pino";
-
-import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { RenderedSnapshot } from "../adapters/capture-runner.ts";
+import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { diffImages } from "../diff/engine.ts";
 import { DEFAULT_DIFF_OPTIONS } from "../diff/options.ts";
@@ -89,7 +88,12 @@ function viewportByName(ctx: CaptureContext, name: string): Viewport {
 
 async function persistSnapshot(ctx: CaptureContext, capture: RenderedSnapshot): Promise<void> {
   const viewport = viewportByName(ctx, capture.viewportName);
-  const screenshot = screenshotPath(ctx.project.id, ctx.build.id, capture.story.id, capture.viewportName);
+  const screenshot = screenshotPath(
+    ctx.project.id,
+    ctx.build.id,
+    capture.story.id,
+    capture.viewportName,
+  );
   await ctx.storage.write(screenshot, capture.screenshot);
 
   const baseline = await resolveBaseline(ctx, capture.story.id, capture.viewportName);
@@ -100,12 +104,27 @@ async function persistSnapshot(ctx: CaptureContext, capture: RenderedSnapshot): 
   await createWithBaseline(ctx, capture, viewport, screenshot, baseline.screenshotPath);
 }
 
-async function resolveBaseline(ctx: CaptureContext, storyId: string, viewport: string): Promise<Baseline | null> {
+async function resolveBaseline(
+  ctx: CaptureContext,
+  storyId: string,
+  viewport: string,
+): Promise<Baseline | null> {
   const baselines = new BaselineModel(ctx.db, ctx.storage);
-  return await baselines.resolve(ctx.project.id, storyId, viewport, ctx.build.gitBranch, ctx.project.gitDefaultBranch);
+  return await baselines.resolve(
+    ctx.project.id,
+    storyId,
+    viewport,
+    ctx.build.gitBranch,
+    ctx.project.gitDefaultBranch,
+  );
 }
 
-async function createWithoutBaseline(ctx: CaptureContext, capture: RenderedSnapshot, viewport: Viewport, screenshot: string): Promise<void> {
+async function createWithoutBaseline(
+  ctx: CaptureContext,
+  capture: RenderedSnapshot,
+  viewport: Viewport,
+  screenshot: string,
+): Promise<void> {
   const snapshots = new SnapshotModel(ctx.db);
   const status = ctx.build.isDefault ? "approved" : "new";
   const snapshot = await snapshots.create(ctx.project.id, ctx.build.id, {
@@ -122,14 +141,31 @@ async function createWithoutBaseline(ctx: CaptureContext, capture: RenderedSnaps
 
   if (ctx.build.isDefault) {
     const baselines = new BaselineModel(ctx.db, ctx.storage);
-    await baselines.upsert(ctx.project.id, capture.story.id, capture.viewportName, ctx.build.gitBranch, snapshot.id, screenshot);
+    await baselines.upsert(
+      ctx.project.id,
+      capture.story.id,
+      capture.viewportName,
+      ctx.build.gitBranch,
+      snapshot.id,
+      screenshot,
+    );
   }
 }
 
-async function createWithBaseline(ctx: CaptureContext, capture: RenderedSnapshot, viewport: Viewport, screenshot: string, baselinePath: string): Promise<void> {
+async function createWithBaseline(
+  ctx: CaptureContext,
+  capture: RenderedSnapshot,
+  viewport: Viewport,
+  screenshot: string,
+  baselinePath: string,
+): Promise<void> {
   const current = await ctx.storage.read(screenshot);
   const previous = await ctx.storage.read(baselinePath);
-  const options = { ...DEFAULT_DIFF_OPTIONS, pixelThreshold: ctx.project.pixelThreshold, maxDiffRatio: ctx.project.maxDiffRatio };
+  const options = {
+    ...DEFAULT_DIFF_OPTIONS,
+    pixelThreshold: ctx.project.pixelThreshold,
+    maxDiffRatio: ctx.project.maxDiffRatio,
+  };
   const result = diffImages(previous, current, options);
 
   const snapshots = new SnapshotModel(ctx.db);
@@ -175,7 +211,10 @@ async function finalize(
   }
   // Flaky failures do not block: log warning if any flaky stories failed
   if (flakyFailedStoryIds.size > 0 && failedStoryIds.size === 0) {
-    ctx.logger?.warn({ flakyStoryIds: [...flakyFailedStoryIds] }, "flaky stories failed (non-blocking)");
+    ctx.logger?.warn(
+      { flakyStoryIds: [...flakyFailedStoryIds] },
+      "flaky stories failed (non-blocking)",
+    );
   }
   await builds.setStatus(ctx.build.id, status);
 

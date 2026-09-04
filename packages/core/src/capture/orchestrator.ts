@@ -1,9 +1,7 @@
+import AdmZip from "adm-zip";
 import { mkdir, readdir, readFile, rm } from "node:fs/promises";
 import { join, relative, resolve, sep } from "node:path";
-
-import AdmZip from "adm-zip";
 import type { Logger } from "pino";
-
 import type { CaptureRunner } from "../adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
@@ -11,10 +9,10 @@ import { BuildModel } from "../models/build.ts";
 import { ProjectModel } from "../models/project.ts";
 import type { Build, Project } from "../schema.ts";
 import { storybookDir, storybookZipPath } from "../utils/paths.ts";
-import { persistCapture } from "./pipeline.ts";
-import { StorybookAdapter } from "./storybook.ts";
 import { DEFAULT_VIEWPORTS, isDisabledStory, isFlakyStory } from "./adapter.ts";
 import type { Viewport } from "./adapter.ts";
+import { persistCapture } from "./pipeline.ts";
+import { StorybookAdapter } from "./storybook.ts";
 
 /** Inputs for running a capture job against a Storybook build. */
 export interface CaptureJobOptions {
@@ -31,7 +29,10 @@ export interface CaptureJobOptions {
  * @param input - Build id plus the originating request id.
  * @param options - Adapters, scratch dir, viewports, and logger.
  */
-export async function executeCaptureJob(input: { buildId: string; reqId?: string }, options: CaptureJobOptions): Promise<void> {
+export async function executeCaptureJob(
+  input: { buildId: string; reqId?: string },
+  options: CaptureJobOptions,
+): Promise<void> {
   const builds = new BuildModel(options.db);
   const { build, project } = await loadTarget(options, input.buildId);
   const logger = options.logger?.child({ buildId: input.buildId, reqId: input.reqId });
@@ -49,7 +50,10 @@ export async function executeCaptureJob(input: { buildId: string; reqId?: string
     // (`storybookDir`) can be served after the scratch dir is cleaned up.
     const staticsStart = performance.now();
     await persistStorybookStatics(options.storage, extractedDir, project.id, build.id);
-    logger?.info({ durationMs: Math.round(performance.now() - staticsStart) }, "storybook statics persisted");
+    logger?.info(
+      { durationMs: Math.round(performance.now() - staticsStart) },
+      "storybook statics persisted",
+    );
 
     const adapter = new StorybookAdapter();
     const discovered = await adapter.discover(extractedDir);
@@ -67,7 +71,10 @@ export async function executeCaptureJob(input: { buildId: string; reqId?: string
       playTimeoutMs: project.playTimeoutMs ?? 10_000,
     });
     const renderDuration = performance.now() - renderStart;
-    logger?.info({ durationMs: Math.round(renderDuration), storyCount: stories.length }, "stories rendered");
+    logger?.info(
+      { durationMs: Math.round(renderDuration), storyCount: stories.length },
+      "stories rendered",
+    );
 
     const flakyStoryIds = new Set(stories.filter((s) => isFlakyStory(s)).map((s) => s.id));
     const blockingFailed = new Set<string>();
@@ -106,7 +113,10 @@ export async function executeCaptureJob(input: { buildId: string; reqId?: string
   }
 }
 
-async function loadTarget(options: CaptureJobOptions, buildId: string): Promise<{ build: Build; project: Project }> {
+async function loadTarget(
+  options: CaptureJobOptions,
+  buildId: string,
+): Promise<{ build: Build; project: Project }> {
   const build = await new BuildModel(options.db).get(buildId);
   if (!build) {
     throw new Error(`Build not found: ${buildId}`);
@@ -131,7 +141,11 @@ function assertNoTraversal(zip: AdmZip, root: string): void {
   }
 }
 
-async function extractStorybook(options: CaptureJobOptions, projectId: string, buildId: string): Promise<string> {
+async function extractStorybook(
+  options: CaptureJobOptions,
+  projectId: string,
+  buildId: string,
+): Promise<string> {
   const targetDir = join(options.scratchDir, projectId, "builds", buildId, "storybook");
   const root = resolve(targetDir);
   const zip = new AdmZip(await options.storage.read(storybookZipPath(projectId, buildId)));
@@ -156,7 +170,12 @@ async function walkFiles(dir: string): Promise<string[]> {
   return nested.flat();
 }
 
-async function persistStorybookStatics(storage: StorageAdapter, sourceDir: string, projectId: string, buildId: string): Promise<void> {
+async function persistStorybookStatics(
+  storage: StorageAdapter,
+  sourceDir: string,
+  projectId: string,
+  buildId: string,
+): Promise<void> {
   const root = resolve(sourceDir);
   const destinationPrefix = storybookDir(projectId, buildId);
   const files = await walkFiles(root);

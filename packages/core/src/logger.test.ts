@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-
 import { createShelfLogger, type PinoTransport } from "./logger.ts";
 
 describe("createShelfLogger", () => {
@@ -20,9 +19,7 @@ describe("createShelfLogger", () => {
   });
 
   it("accepts extra transports", () => {
-    const transports: PinoTransport[] = [
-      { target: "pino/file", options: { destination: 1 } },
-    ];
+    const transports: PinoTransport[] = [{ target: "pino/file", options: { destination: 1 } }];
     expect(() => createShelfLogger({ transports })).not.toThrow();
   });
 });

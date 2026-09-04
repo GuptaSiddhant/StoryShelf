@@ -3,7 +3,6 @@
  */
 import type { SQL } from "drizzle-orm";
 import type { AnySQLiteTable } from "drizzle-orm/sqlite-core";
-
 import type { AdapterMetadata } from "./metadata.ts";
 
 /** Options that narrow and page a list query. */

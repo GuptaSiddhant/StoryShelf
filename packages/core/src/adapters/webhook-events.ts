@@ -1,6 +1,6 @@
-import type { DatabaseAdapter } from "./database.ts";
 import { WebhookModel } from "../models/webhook.ts";
 import { hmacSha256 } from "../utils/hash.ts";
+import type { DatabaseAdapter } from "./database.ts";
 
 /** Outbound webhook payload delivered to subscribers. */
 export interface WebhookEvent {

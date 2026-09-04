@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
-
 import type { DatabaseAdapter } from "../adapters/database.ts";
-import { projects } from "../schema-tables.ts";
 import { makeDatabase } from "../capture/fake-adapters.ts";
+import { projects } from "../schema-tables.ts";
 import { CommentModel } from "./comment.ts";
 
 const mockProject = {
@@ -14,9 +13,9 @@ const mockProject = {
   pixelThreshold: 0.1,
   maxDiffRatio: 0.01,
   publicBranchRegex: null,
-    executePlay: false,
-    playTimeoutMs: 10_000,
-      storybookMeta: null,
+  executePlay: false,
+  playTimeoutMs: 10_000,
+  storybookMeta: null,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
 };
@@ -44,7 +43,9 @@ describe("CommentModel", () => {
   it("creates a comment on a build when project exists", async () => {
     const db = await makeDbWithProject();
     const model = new CommentModel(db);
-    const comment = await model.create(mockProject.id, "b1", "user-123", { body: "Great component!" });
+    const comment = await model.create(mockProject.id, "b1", "user-123", {
+      body: "Great component!",
+    });
     expect(comment.id).toBeDefined();
     expect(comment.body).toBe("Great component!");
     expect(comment.projectId).toBe(mockProject.id);
@@ -56,9 +57,9 @@ describe("CommentModel", () => {
   it("throws when project does not exist", async () => {
     const { db } = makeDatabase();
     const model = new CommentModel(db);
-    await expect(model.create("nonexistent-id", "b1", "user-123", { body: "comment" })).rejects.toThrow(
-      "Project not found: nonexistent-id",
-    );
+    await expect(
+      model.create("nonexistent-id", "b1", "user-123", { body: "comment" }),
+    ).rejects.toThrow("Project not found: nonexistent-id");
   });
 
   it("lists comments by build", async () => {
@@ -78,7 +79,9 @@ describe("CommentModel", () => {
     const db = await makeDbWithProject();
     const model = new CommentModel(db);
 
-    const comment = await model.create(mockProject.id, "b1", "user-1", { body: "Comment to resolve" });
+    const comment = await model.create(mockProject.id, "b1", "user-1", {
+      body: "Comment to resolve",
+    });
     const resolvedComment = await model.resolve(comment.id);
     expect(resolvedComment.resolved).toBe(true);
   });

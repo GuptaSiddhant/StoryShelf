@@ -1,11 +1,8 @@
+import type { StoryEntry, Viewport } from "@storyshelf/core";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import type { StoryEntry, Viewport } from "@storyshelf/core";
-
 import { createPlaywrightCaptureRunner } from "./capture-runner.ts";
 
 const playwright = vi.hoisted(() => {
@@ -94,7 +91,12 @@ afterEach(async () => {
 describe("createPlaywrightCaptureRunner.render", () => {
   it("reports a story as failed when the in-flight browser is cancelled", async () => {
     const runner = createPlaywrightCaptureRunner();
-    const renderPromise = runner.render({ buildId: "build-1", storybookDir, stories: STORIES, viewports: VIEWPORTS });
+    const renderPromise = runner.render({
+      buildId: "build-1",
+      storybookDir,
+      stories: STORIES,
+      viewports: VIEWPORTS,
+    });
 
     await new Promise((resolve) => {
       setTimeout(resolve, 20);

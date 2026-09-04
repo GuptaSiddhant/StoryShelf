@@ -1,6 +1,5 @@
 import pixelmatch from "pixelmatch";
 import { PNG } from "pngjs";
-
 import type { DiffOptions, DiffResult } from "./options.ts";
 
 /**
@@ -18,7 +17,8 @@ export function diffImages(baseline: Buffer, current: Buffer, options: DiffOptio
   const baselineDimensions = { width: baselinePng.width, height: baselinePng.height };
   const currentDimensions = { width: currentPng.width, height: currentPng.height };
   const sizeChanged =
-    baselineDimensions.width !== currentDimensions.width || baselineDimensions.height !== currentDimensions.height;
+    baselineDimensions.width !== currentDimensions.width ||
+    baselineDimensions.height !== currentDimensions.height;
 
   if (sizeChanged) {
     if (options.failOnSizeChange) {
@@ -57,8 +57,8 @@ export function diffImages(baseline: Buffer, current: Buffer, options: DiffOptio
     };
   }
 
-  const {width} = baselineDimensions;
-  const {height} = baselineDimensions;
+  const { width } = baselineDimensions;
+  const { height } = baselineDimensions;
   const overlap = compareRegions(baselinePng.data, currentPng.data, width, height, options);
   const diffRatio = overlap.diffPixels / (width * height);
   return {

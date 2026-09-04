@@ -1,7 +1,6 @@
+import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import { access, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
-
-import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 
 declare const __PKG_VERSION__: string | undefined;
 

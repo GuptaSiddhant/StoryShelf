@@ -1,10 +1,9 @@
 import { z } from "@hono/zod-openapi";
-
+import { emitWebhookEvent } from "../adapters/webhook-events.ts";
 import { BaselineModel } from "../models/baseline.ts";
 import { BuildModel } from "../models/build.ts";
 import { ProjectModel } from "../models/project.ts";
 import { SnapshotModel } from "../models/snapshot.ts";
-import { emitWebhookEvent } from "../adapters/webhook-events.ts";
 import { getStore } from "../store.ts";
 import { type ProjectRole, BUILD_STATUSES } from "../types.ts";
 import { notFound } from "./helpers.ts";
@@ -17,14 +16,16 @@ export const DEVELOPER_ROLES: readonly ProjectRole[] = ["developer", "approver",
 export const APPROVER_ROLES: readonly ProjectRole[] = ["approver", "admin"];
 
 /** Multipart input schema for uploading a build with its Storybook bundle. */
-export const buildUploadSchema = z.object({
-  gitSha: z.string(),
-  gitBranch: z.string(),
-  authorEmail: z.string().optional(),
-  authorName: z.string().optional(),
-  message: z.string().optional(),
-  zip: z.instanceof(File).openapi({ type: "string", format: "binary" }).optional(),
-}).openapi("BuildUpload");
+export const buildUploadSchema = z
+  .object({
+    gitSha: z.string(),
+    gitBranch: z.string(),
+    authorEmail: z.string().optional(),
+    authorName: z.string().optional(),
+    message: z.string().optional(),
+    zip: z.instanceof(File).openapi({ type: "string", format: "binary" }).optional(),
+  })
+  .openapi("BuildUpload");
 
 /** Query filters accepted by the build list endpoint. */
 export const buildListQuery = z.object({
@@ -35,7 +36,10 @@ export const buildListQuery = z.object({
 });
 
 /** Fetch a build scoped to its project, throwing 404 when it does not belong. */
-export async function buildForProject(projectId: string, buildId: string): Promise<import("../models/build.ts").Build> {
+export async function buildForProject(
+  projectId: string,
+  buildId: string,
+): Promise<import("../models/build.ts").Build> {
   const build = await new BuildModel(getStore().db).get(buildId);
   if (!build || build.projectId !== projectId) {
     notFound("Build not found");
@@ -44,7 +48,10 @@ export async function buildForProject(projectId: string, buildId: string): Promi
 }
 
 /** Fetch a snapshot scoped to its build, throwing 404 when it does not belong. */
-export async function snapshotForBuild(build: { id: string }, snapshotId: string): Promise<import("../models/snapshot.ts").Snapshot> {
+export async function snapshotForBuild(
+  build: { id: string },
+  snapshotId: string,
+): Promise<import("../models/snapshot.ts").Snapshot> {
   const snapshot = await new SnapshotModel(getStore().db).get(snapshotId);
   if (!snapshot || snapshot.buildId !== build.id) {
     notFound("Snapshot not found");
@@ -54,7 +61,7 @@ export async function snapshotForBuild(build: { id: string }, snapshotId: string
 
 /** Recompute a build's counts and roll its status up from its snapshots. */
 export async function refreshBuild(buildId: string): Promise<void> {
-  const {db} = getStore();
+  const { db } = getStore();
   await new BuildModel(db).updateCounts(buildId);
   const snapshots = await new SnapshotModel(db).listByBuild(buildId);
   const unresolved = snapshots.some((s) => s.status === "new" || s.status === "changed");
@@ -78,7 +85,7 @@ export async function refreshBuild(buildId: string): Promise<void> {
 
 /** Approve a snapshot, promote its screenshot to baseline, and refresh the build. */
 export async function approveSnapshot(snapshotId: string, userId: string): Promise<void> {
-  const {db} = getStore();
+  const { db } = getStore();
   const snapshots = new SnapshotModel(db);
   const snapshot = await snapshots.get(snapshotId);
   if (!snapshot) {
@@ -91,7 +98,14 @@ export async function approveSnapshot(snapshotId: string, userId: string): Promi
   }
   await snapshots.review(snapshotId, "approved", userId);
   const baselines = new BaselineModel(db, getStore().storage);
-  await baselines.upsert(project.id, snapshot.storyId, snapshot.viewportName, build.gitBranch, snapshot.id, snapshot.screenshotPath);
+  await baselines.upsert(
+    project.id,
+    snapshot.storyId,
+    snapshot.viewportName,
+    build.gitBranch,
+    snapshot.id,
+    snapshot.screenshotPath,
+  );
   await refreshBuild(build.id);
 }
 

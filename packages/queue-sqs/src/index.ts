@@ -4,14 +4,7 @@ import {
   SendMessageCommand,
   SQSClient,
 } from "@aws-sdk/client-sqs";
-
-import type {
-  CaptureJob,
-  CaptureQueue,
-  JobStatus,
-  QueueEntry,
-} from "@storyshelf/core";
-
+import type { CaptureJob, CaptureQueue, JobStatus, QueueEntry } from "@storyshelf/core";
 import type { Logger } from "@storyshelf/core/types";
 
 declare const __PKG_VERSION__: string | undefined;
@@ -66,9 +59,7 @@ function mapQueueEntry(raw: { Body?: string }): QueueEntry {
  * @returns A `CaptureQueue` satisfying the core interface.
  */
 /* oxlint-disable max-lines-per-function */
-export function createSqsCaptureQueue(
-  options: SqsCaptureQueueOptions,
-): CaptureQueue {
+export function createSqsCaptureQueue(options: SqsCaptureQueueOptions): CaptureQueue {
   const client = options.client ?? new SQSClient({});
 
   return {
@@ -165,7 +156,9 @@ export function createSqsCaptureQueue(
       );
 
       return (resp.Messages ?? [])
-        .filter((message) => message.Body?.length && hasQueuedOrRunningStatus(parseBody(message.Body)))
+        .filter(
+          (message) => message.Body?.length && hasQueuedOrRunningStatus(parseBody(message.Body)),
+        )
         .map((msg) => mapQueueEntry(msg))
         .toSorted((left, right) => right.queuedAt.localeCompare(left.queuedAt));
     },

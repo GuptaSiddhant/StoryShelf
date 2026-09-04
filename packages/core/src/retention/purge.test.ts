@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { builds, projects } from "../schema-tables.ts";
 import { makeStorage } from "../capture/fake-adapters.ts";
 import { makeDatabase } from "../capture/fake-adapters.ts";
+import { builds, projects } from "../schema-tables.ts";
 import { Retention } from "./purge.ts";
 
 describe("Retention", () => {
@@ -12,12 +12,19 @@ describe("Retention", () => {
 
     // Insert a project row so purge can reference it
     const project = {
-      id: "p1", name: "Test", slug: "test", gitRepository: null,
-      gitDefaultBranch: "main", pixelThreshold: 0.1, maxDiffRatio: 0.01,
+      id: "p1",
+      name: "Test",
+      slug: "test",
+      gitRepository: null,
+      gitDefaultBranch: "main",
+      pixelThreshold: 0.1,
+      maxDiffRatio: 0.01,
       publicBranchRegex: null,
-    executePlay: false,
-    playTimeoutMs: 10_000,
-      storybookMeta: null, createdAt: now.toISOString(), updatedAt: now.toISOString(),
+      executePlay: false,
+      playTimeoutMs: 10_000,
+      storybookMeta: null,
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
     };
     await db.insert(projects, project);
 
@@ -28,14 +35,32 @@ describe("Retention", () => {
     const recentDate = new Date(now.getTime() - 1 * 86_400_000).toISOString();
 
     await db.insert(builds, {
-      id: "b-old", projectId: "p1", gitSha: "sha-old", gitBranch: "main",
-      isDefault: true, status: "approved", snapshotCount: 0, changedCount: 0,
-      approvedCount: 0, rejectedCount: 0, createdAt: oldDate, updatedAt: oldDate,
+      id: "b-old",
+      projectId: "p1",
+      gitSha: "sha-old",
+      gitBranch: "main",
+      isDefault: true,
+      status: "approved",
+      snapshotCount: 0,
+      changedCount: 0,
+      approvedCount: 0,
+      rejectedCount: 0,
+      createdAt: oldDate,
+      updatedAt: oldDate,
     });
     await db.insert(builds, {
-      id: "b-recent", projectId: "p1", gitSha: "sha-recent", gitBranch: "main",
-      isDefault: true, status: "approved", snapshotCount: 0, changedCount: 0,
-      approvedCount: 0, rejectedCount: 0, createdAt: recentDate, updatedAt: recentDate,
+      id: "b-recent",
+      projectId: "p1",
+      gitSha: "sha-recent",
+      gitBranch: "main",
+      isDefault: true,
+      status: "approved",
+      snapshotCount: 0,
+      changedCount: 0,
+      approvedCount: 0,
+      rejectedCount: 0,
+      createdAt: recentDate,
+      updatedAt: recentDate,
     });
 
     const retention = new Retention(db, storage);

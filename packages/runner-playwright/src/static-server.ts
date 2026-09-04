@@ -90,7 +90,9 @@ export async function createStaticServer(rootDir: string): Promise<StaticServer>
   const root = normalize(rootDir);
   const info = await stat(root).catch(() => null);
   if (!info || !info.isDirectory()) {
-    throw new Error(`Storybook directory not found: ${rootDir}. Upload the built Storybook before capturing.`);
+    throw new Error(
+      `Storybook directory not found: ${rootDir}. Upload the built Storybook before capturing.`,
+    );
   }
 
   const server = createServer((req, res) => {

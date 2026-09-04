@@ -8,7 +8,6 @@ import {
   type S3Client,
 } from "@aws-sdk/client-s3";
 import { describe, expect, it } from "vitest";
-
 import { createS3Storage, s3Key } from "./index.ts";
 
 /** Minimal stand-in for the S3 response `Body` with the shape the SDK uses. */
@@ -26,7 +25,10 @@ interface Handler {
 /** A fake S3 client that records commands and returns canned responses. */
 function makeClient(handlers: Record<string, Handler> = {}): { client: S3Client; sent: string[] } {
   const sent: string[] = [];
-  const send = async (command: { constructor: { name: string }; input: Record<string, unknown> }): Promise<unknown> => {
+  const send = async (command: {
+    constructor: { name: string };
+    input: Record<string, unknown>;
+  }): Promise<unknown> => {
     sent.push(command.constructor.name);
     const handler = handlers[command.constructor.name];
     return handler ? await handler(command.input) : {};

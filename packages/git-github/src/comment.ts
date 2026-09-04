@@ -1,9 +1,7 @@
 /* oxlint-disable max-statements, max-lines-per-function */
 import type { Octokit } from "@octokit/rest";
-
-import { findPrNumber } from "./pr.ts";
-
 import type { Logger } from "@storyshelf/core/types";
+import { findPrNumber } from "./pr.ts";
 
 /** Create or update the StoryShelf review comment on a pull request. */
 export async function upsertPrComment(opts: {

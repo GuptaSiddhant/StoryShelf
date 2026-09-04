@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
-
-import { ProjectModel } from "./project.ts";
 import { makeDatabase } from "../capture/fake-adapters.ts";
+import { ProjectModel } from "./project.ts";
 
 describe("ProjectModel", () => {
   it("creates a project with unique slug", async () => {

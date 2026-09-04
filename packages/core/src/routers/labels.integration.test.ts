@@ -1,6 +1,5 @@
-import { describe, expect, it } from "vitest";
 import { pino } from "pino";
-
+import { describe, expect, it } from "vitest";
 import { makeDatabase, makeStorage } from "../capture/fake-adapters.ts";
 import { createShelfRouter } from "../index.tsx";
 import { LabelModel } from "../models/label.ts";
@@ -21,7 +20,7 @@ describe("Label-driven build resolution", () => {
     publicBranchRegex: null,
     executePlay: false,
     playTimeoutMs: 10_000,
-      storybookMeta: null,
+    storybookMeta: null,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
   };
@@ -132,7 +131,9 @@ describe("Label-driven build resolution", () => {
     await db.insert(projects, mockProject);
     const labelModel = new LabelModel(db);
 
-    await expect(labelModel.removeType("p1", "persistent")).rejects.toThrow("Label type 'persistent' cannot be removed.");
+    await expect(labelModel.removeType("p1", "persistent")).rejects.toThrow(
+      "Label type 'persistent' cannot be removed.",
+    );
   });
 });
 
@@ -158,7 +159,12 @@ describe("PATCH label-type endpoint", () => {
     const { storage } = makeStorage();
     await db.insert(projects, localProject);
     const labelModel = new LabelModel(db);
-    await labelModel.createType("p1", { key: "custom", name: "Custom", linkTemplate: "https://x/{value}", color: "#fff" });
+    await labelModel.createType("p1", {
+      key: "custom",
+      name: "Custom",
+      linkTemplate: "https://x/{value}",
+      color: "#fff",
+    });
     const app = createShelfRouter({ database: db, storage, logger: silentLogger });
 
     const response = await app.request("/api/v1/projects/test-project/label-types/custom", {
@@ -167,7 +173,11 @@ describe("PATCH label-type endpoint", () => {
       body: JSON.stringify({ name: "Renamed", color: null }),
     });
     expect(response.status).toBe(200);
-    const body = (await response.json()) as { name: string; color: string | null; linkTemplate: string };
+    const body = (await response.json()) as {
+      name: string;
+      color: string | null;
+      linkTemplate: string;
+    };
     expect(body.name).toBe("Renamed");
     expect(body.color).toBeNull();
     expect(body.linkTemplate).toBe("https://x/{value}");

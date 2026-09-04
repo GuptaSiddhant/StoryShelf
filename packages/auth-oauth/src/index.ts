@@ -1,4 +1,9 @@
-import { SESSION_COOKIE, type AuthAdapter, type AuthCallback, type AuthUser } from "@storyshelf/core/adapter/auth";
+import {
+  SESSION_COOKIE,
+  type AuthAdapter,
+  type AuthCallback,
+  type AuthUser,
+} from "@storyshelf/core/adapter/auth";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 declare const __PKG_VERSION__: string | undefined;

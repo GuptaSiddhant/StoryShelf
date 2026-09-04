@@ -1,5 +1,4 @@
 import type { ShelfApp } from "../index.tsx";
-
 import { BaselineModel } from "../models/baseline.ts";
 import { BuildModel } from "../models/build.ts";
 import { CommentModel } from "../models/comment.ts";
@@ -10,8 +9,8 @@ import { renderBuildDetailPage } from "../pages/build-detail.tsx";
 import { renderBuildDiffPage } from "../pages/build-diff.tsx";
 import { renderComputeJobsPage, renderActiveQueue } from "../pages/compute-jobs.tsx";
 import { renderLabelDetailPage, renderLabelsPage } from "../pages/label-detail.tsx";
-import { renderProjectCreatePage } from "../pages/project-create.tsx";
 import { renderProjectBuildsPage } from "../pages/project-builds.tsx";
+import { renderProjectCreatePage } from "../pages/project-create.tsx";
 import { renderProjectsPage } from "../pages/projects.tsx";
 import { renderRootPage } from "../pages/root.tsx";
 import { getStore } from "../store.ts";
@@ -81,15 +80,31 @@ export function registerUiPages(app: ShelfApp): void {
     const gitRepository = asString(form.get("gitRepository"));
     const gitDefaultBranch = asString(form.get("gitDefaultBranch"));
     if (!name) {
-      return c.html(renderProjectCreatePage({ values: { name, gitRepository, gitDefaultBranch }, errors: { name: "Name is required" } }), 400);
+      return c.html(
+        renderProjectCreatePage({
+          values: { name, gitRepository, gitDefaultBranch },
+          errors: { name: "Name is required" },
+        }),
+        400,
+      );
     }
     try {
-      const project = await new ProjectModel(getStore().db).create({ name, gitRepository, gitDefaultBranch });
+      const project = await new ProjectModel(getStore().db).create({
+        name,
+        gitRepository,
+        gitDefaultBranch,
+      });
       await new LabelModel(getStore().db).seedFor(project.id);
       return hxRedirect(c, `/projects/${project.slug}/builds`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to create project";
-      return c.html(renderProjectCreatePage({ values: { name, gitRepository, gitDefaultBranch }, globalError: message }), 400);
+      return c.html(
+        renderProjectCreatePage({
+          values: { name, gitRepository, gitDefaultBranch },
+          globalError: message,
+        }),
+        400,
+      );
     }
   });
 
@@ -147,7 +162,13 @@ export function registerUiPages(app: ShelfApp): void {
     const baselines = new BaselineModel(getStore().db, getStore().storage);
     const hasBaselineEntries = await Promise.all(
       snapshots.map(async (snapshot) => {
-        const baseline = await baselines.resolve(project.id, snapshot.storyId, snapshot.viewportName, build.gitBranch, project.gitDefaultBranch);
+        const baseline = await baselines.resolve(
+          project.id,
+          snapshot.storyId,
+          snapshot.viewportName,
+          build.gitBranch,
+          project.gitDefaultBranch,
+        );
         return [snapshot.id, Boolean(baseline)] as const;
       }),
     );

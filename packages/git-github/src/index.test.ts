@@ -1,7 +1,6 @@
+import type { Logger } from "@storyshelf/core/types";
 /* oxlint-disable max-lines-per-function */
 import { describe, expect, it, vi } from "vitest";
-
-import type { Logger } from "@storyshelf/core/types";
 import { gitHubHost } from "./index.ts";
 
 function createMockLogger(): Logger {
@@ -30,7 +29,12 @@ describe("gitHubHost", () => {
       logger: createMockLogger(),
     });
 
-    adapter.setStatus = async (opts: { context: string; gitSha: string; status: string; url: string }): Promise<void> => {
+    adapter.setStatus = async (opts: {
+      context: string;
+      gitSha: string;
+      status: string;
+      url: string;
+    }): Promise<void> => {
       await createStatus({
         owner: "octocat",
         repo: "hello-world",
@@ -42,7 +46,12 @@ describe("gitHubHost", () => {
       });
     };
 
-    await adapter.setStatus({ context: "test", gitSha: "abc123", status: "pending", url: "http://example.com/build/1" });
+    await adapter.setStatus({
+      context: "test",
+      gitSha: "abc123",
+      status: "pending",
+      url: "http://example.com/build/1",
+    });
     expect(createStatus).toHaveBeenCalledWith(
       expect.objectContaining({ state: "pending", context: "storyshelf/test" }),
     );
@@ -56,7 +65,12 @@ describe("gitHubHost", () => {
       logger: createMockLogger(),
     });
 
-    adapter.setStatus = async (opts: { context: string; gitSha: string; status: string; url: string }): Promise<void> => {
+    adapter.setStatus = async (opts: {
+      context: string;
+      gitSha: string;
+      status: string;
+      url: string;
+    }): Promise<void> => {
       await createStatus({
         owner: "octocat",
         repo: "hello-world",
@@ -68,7 +82,12 @@ describe("gitHubHost", () => {
       });
     };
 
-    await adapter.setStatus({ context: "test", gitSha: "abc123", status: "success", url: "http://example.com/build/1" });
+    await adapter.setStatus({
+      context: "test",
+      gitSha: "abc123",
+      status: "success",
+      url: "http://example.com/build/1",
+    });
     expect(createStatus).toHaveBeenCalledWith(
       expect.objectContaining({ state: "success", context: "storyshelf/test" }),
     );
@@ -82,7 +101,12 @@ describe("gitHubHost", () => {
       logger: createMockLogger(),
     });
 
-    adapter.setStatus = async (opts: { context: string; gitSha: string; status: string; url: string }): Promise<void> => {
+    adapter.setStatus = async (opts: {
+      context: string;
+      gitSha: string;
+      status: string;
+      url: string;
+    }): Promise<void> => {
       await createStatus({
         owner: "octocat",
         repo: "hello-world",
@@ -94,7 +118,12 @@ describe("gitHubHost", () => {
       });
     };
 
-    await adapter.setStatus({ context: "test", gitSha: "abc123", status: "failure", url: "http://example.com/build/1" });
+    await adapter.setStatus({
+      context: "test",
+      gitSha: "abc123",
+      status: "failure",
+      url: "http://example.com/build/1",
+    });
     expect(createStatus).toHaveBeenCalledWith(
       expect.objectContaining({ state: "failure", context: "storyshelf/test" }),
     );

@@ -1,8 +1,12 @@
 /* oxlint-disable max-statements, max-lines-per-function, complexity, eslint/max-statements, eslint/max-lines-per-function, eslint/complexity, typescript/no-unsafe-assignment, typescript/no-unsafe-member-access, typescript/prefer-nullish-coalescing, eslint/no-await-in-loop, no-await-in-loop, max-depth, eslint/max-depth, eslint/no-useless-escape, no-useless-escape */
 import prompts from "prompts";
-
 import { createClient } from "../client.ts";
-import { assertStorybookMain, detectStorybookMeta, loadStorybookConfig, writeStorybookConfig } from "../config.ts";
+import {
+  assertStorybookMain,
+  detectStorybookMeta,
+  loadStorybookConfig,
+  writeStorybookConfig,
+} from "../config.ts";
 import { printError, printLine } from "../output.ts";
 
 /** Options for the `init` command (client config). */
@@ -39,9 +43,9 @@ export async function runInit(options: InitOptions): Promise<void> {
   let url = options.url ?? process.env["STORYSHELF_URL"];
   let slug = options.slug ?? process.env["STORYSHELF_SLUG"];
   let buildDir = options.buildDir ?? options.storybookDir;
-  let {buildCommand} = options;
-  let {buildScriptName} = options;
-  let {skip} = options;
+  let { buildCommand } = options;
+  let { buildScriptName } = options;
+  let { skip } = options;
   const configPath = options.config;
 
   const existing = await loadStorybookConfig(process.cwd(), configPath);
@@ -56,9 +60,15 @@ export async function runInit(options: InitOptions): Promise<void> {
 
   const meta = await detectStorybookMeta();
   const hintParts: string[] = [];
-  if (meta.framework?.name) {hintParts.push(meta.framework.name);}
-  if (meta.addons?.length) {hintParts.push(`${meta.addons.length} addons`);}
-  if (meta.packagePath && meta.packagePath !== ".") {hintParts.push(meta.packagePath);}
+  if (meta.framework?.name) {
+    hintParts.push(meta.framework.name);
+  }
+  if (meta.addons?.length) {
+    hintParts.push(`${meta.addons.length} addons`);
+  }
+  if (meta.packagePath && meta.packagePath !== ".") {
+    hintParts.push(meta.packagePath);
+  }
   const hintSuffix = hintParts.length > 0 ? ` (detected ${hintParts.join(" • ")})` : "";
 
   const questions: { type: "text"; name: string; message: string; initial?: string }[] = [];
@@ -85,12 +95,29 @@ export async function runInit(options: InitOptions): Promise<void> {
     return;
   }
 
-  const config: { slug: string; url?: string; buildDir?: string; buildCommand?: string; buildScriptName?: string; skip?: string } = { slug };
-  if (url) {config.url = url;}
-  if (buildDir) {config.buildDir = buildDir;}
-  if (buildCommand) {config.buildCommand = buildCommand;}
-  if (buildScriptName) {config.buildScriptName = buildScriptName;}
-  if (skip) {config.skip = skip;}
+  const config: {
+    slug: string;
+    url?: string;
+    buildDir?: string;
+    buildCommand?: string;
+    buildScriptName?: string;
+    skip?: string;
+  } = { slug };
+  if (url) {
+    config.url = url;
+  }
+  if (buildDir) {
+    config.buildDir = buildDir;
+  }
+  if (buildCommand) {
+    config.buildCommand = buildCommand;
+  }
+  if (buildScriptName) {
+    config.buildScriptName = buildScriptName;
+  }
+  if (skip) {
+    config.skip = skip;
+  }
 
   try {
     const written = await writeStorybookConfig(config, process.cwd(), options.config);
@@ -107,12 +134,16 @@ export async function runInit(options: InitOptions): Promise<void> {
   // Sync storybook_meta to server if project already exists
   if (url && slug) {
     const metaToSync = await detectStorybookMeta();
-    if (Object.keys(metaToSync).length === 0) {return;}
+    if (Object.keys(metaToSync).length === 0) {
+      return;
+    }
     const tokens = [
       options.token ?? process.env["STORYSHELF_TOKEN"] ?? process.env["SHELF_TOKEN"],
       process.env["STORYSHELF_ADMIN_TOKEN"] ?? process.env["ADMIN_TOKEN"],
     ].filter(Boolean) as string[];
-    if (tokens.length === 0) {return;}
+    if (tokens.length === 0) {
+      return;
+    }
     let synced = false;
     let notFound = false;
     for (const token of tokens) {
@@ -127,7 +158,9 @@ export async function runInit(options: InitOptions): Promise<void> {
           break;
         } catch (error) {
           // Patch may fail due to auth (project token not admin), try next token
-          if (error instanceof Error && error.message.includes("403")) {continue;}
+          if (error instanceof Error && error.message.includes("403")) {
+            continue;
+          }
           throw error;
         }
       } catch (error) {
@@ -143,7 +176,9 @@ export async function runInit(options: InitOptions): Promise<void> {
       }
     }
     if (!synced && notFound) {
-      printError(`Project "${slug}" does not exist on ${url} — run \`storyshelf create --url ${url} --name <name> --token \$STORYSHELF_ADMIN_TOKEN\` first`);
+      printError(
+        `Project "${slug}" does not exist on ${url} — run \`storyshelf create --url ${url} --name <name> --token \$STORYSHELF_ADMIN_TOKEN\` first`,
+      );
       process.exitCode = 1;
     }
   }

@@ -7,7 +7,6 @@ import {
   S3Client,
   S3ServiceException,
 } from "@aws-sdk/client-s3";
-
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 
 declare const __PKG_VERSION__: string | undefined;
@@ -58,7 +57,9 @@ async function s3Read(ctx: S3Context, path: string): Promise<Buffer> {
 
 async function s3Exists(ctx: S3Context, path: string): Promise<boolean> {
   try {
-    await ctx.client.send(new HeadObjectCommand({ Bucket: ctx.bucket, Key: s3Key(ctx.prefix, path) }));
+    await ctx.client.send(
+      new HeadObjectCommand({ Bucket: ctx.bucket, Key: s3Key(ctx.prefix, path) }),
+    );
     return true;
   } catch (error) {
     if (isNotFound(error)) {
@@ -105,9 +106,7 @@ export function createS3Storage(options: S3StorageOptions): StorageAdapter {
       );
     },
     async delete(path) {
-      await client.send(
-        new DeleteObjectCommand({ Bucket: bucket, Key: s3Key(prefix, path) }),
-      );
+      await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: s3Key(prefix, path) }));
     },
     async exists(path) {
       return await s3Exists(ctx, path);

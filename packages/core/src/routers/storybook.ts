@@ -1,13 +1,11 @@
 import { posix } from "node:path";
-
 import type { ShelfApp } from "../index.tsx";
-
 import { isPublicBuild, BuildModel } from "../models/build.ts";
 import { LabelModel } from "../models/label.ts";
 import { ProjectModel } from "../models/project.ts";
 import { renderStorybookPage } from "../pages/storybook.tsx";
-import { getStore } from "../store.ts";
 import type { Build, Project } from "../schema.ts";
+import { getStore } from "../store.ts";
 import { storybookDir } from "../utils/paths.ts";
 import { currentProjectRole, notFound } from "./helpers.ts";
 
@@ -40,7 +38,12 @@ function contentTypeFor(path: string): string {
 }
 
 function isSafeSegment(segment: string): boolean {
-  return segment !== ".." && !segment.startsWith("/") && !segment.includes("\\") && !segment.includes("..");
+  return (
+    segment !== ".." &&
+    !segment.startsWith("/") &&
+    !segment.includes("\\") &&
+    !segment.includes("..")
+  );
 }
 
 /**
@@ -49,7 +52,10 @@ function isSafeSegment(segment: string): boolean {
  * Public builds (ADR 0011) are viewable without auth; every other build requires
  * a logged-in session with at least `viewer` membership on the project.
  */
-async function canViewBuild(build: Pick<Build, "public" | "gitBranch">, project: Project): Promise<boolean> {
+async function canViewBuild(
+  build: Pick<Build, "public" | "gitBranch">,
+  project: Project,
+): Promise<boolean> {
   if (isPublicBuild(project, build)) {
     return true;
   }

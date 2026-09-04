@@ -1,15 +1,30 @@
 /** Storage path for a captured snapshot screenshot. */
-export function screenshotPath(projectId: string, buildId: string, storyId: string, viewport: string): string {
+export function screenshotPath(
+  projectId: string,
+  buildId: string,
+  storyId: string,
+  viewport: string,
+): string {
   return `${projectId}/builds/${buildId}/screenshots/${storyId}/${viewport}.png`;
 }
 
 /** Storage path for a snapshot diff overlay image. */
-export function diffPath(projectId: string, buildId: string, storyId: string, viewport: string): string {
+export function diffPath(
+  projectId: string,
+  buildId: string,
+  storyId: string,
+  viewport: string,
+): string {
   return `${projectId}/builds/${buildId}/diffs/${storyId}/${viewport}.png`;
 }
 
 /** Storage path for a branch baseline screenshot. */
-export function baselinePath(projectId: string, branch: string, storyId: string, viewport: string): string {
+export function baselinePath(
+  projectId: string,
+  branch: string,
+  storyId: string,
+  viewport: string,
+): string {
   return `${projectId}/baselines/${branch}/${storyId}/${viewport}.png`;
 }
 

@@ -2,7 +2,6 @@
  * Capture-runner adapter interface: render story screenshots for a build.
  */
 import type { Logger } from "pino";
-
 import type { StoryEntry, Viewport } from "../capture/adapter.ts";
 import type { AdapterMetadata } from "./metadata.ts";
 

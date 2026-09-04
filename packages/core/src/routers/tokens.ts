@@ -1,6 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import type { ShelfApp } from "../index.tsx";
-
 import { TokenModel } from "../models/token.ts";
 import { getStore } from "../store.ts";
 import type { ProjectRole } from "../types.ts";
@@ -21,7 +20,10 @@ const listTokensRoute = createRoute({
   path: "/api/v1/projects/{slug}/tokens",
   request: { params: z.object({ slug: z.string() }) },
   responses: {
-    200: { content: { "application/json": { schema: tokenPublicSchema.array() } }, description: "List API tokens" },
+    200: {
+      content: { "application/json": { schema: tokenPublicSchema.array() } },
+      description: "List API tokens",
+    },
     ...notFoundResponse,
     ...unauthorized,
   },
@@ -35,7 +37,10 @@ const createTokenRoute = createRoute({
     body: { content: { "application/json": { schema: tokenCreateSchema } } },
   },
   responses: {
-    201: { content: { "application/json": { schema: tokenCreatedSchema } }, description: "Created token" },
+    201: {
+      content: { "application/json": { schema: tokenCreatedSchema } },
+      description: "Created token",
+    },
     ...notFoundResponse,
   },
 });

@@ -1,16 +1,16 @@
+import AdmZip from "adm-zip";
 /* oxlint-disable max-statements, max-lines-per-function, complexity, eslint/max-statements, eslint/max-lines-per-function, eslint/complexity, typescript/no-unsafe-assignment, typescript/no-unsafe-member-access, typescript/no-unsafe-call, typescript/prefer-nullish-coalescing, typescript/prefer-regexp-exec, eslint/no-await-in-loop, no-await-in-loop, max-depth, eslint/max-depth */
 import { execSync } from "node:child_process";
 import { access, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
-
-import AdmZip from "adm-zip";
 import * as picomatch from "picomatch";
-
 import { createClient } from "../client.ts";
 import { loadStorybookConfig } from "../config.ts";
 import { createSpinner, printLine, spinnerFrames } from "../output.ts";
 
-interface BuildResponse { id: string; }
+interface BuildResponse {
+  id: string;
+}
 
 /** Options for the `upload` command. */
 export interface UploadOptions {
@@ -56,8 +56,16 @@ export async function runUpload(options: UploadOptions): Promise<void> {
   const url = options.url ?? cfg?.url ?? process.env["STORYSHELF_URL"];
   const slug = options.slug ?? cfg?.slug ?? process.env["STORYSHELF_SLUG"];
   const token = options.token ?? process.env["STORYSHELF_TOKEN"] ?? process.env["SHELF_TOKEN"];
-  const sha = options.sha ?? process.env["GITHUB_SHA"] ?? process.env["VERCEL_GIT_COMMIT_SHA"] ?? process.env["CI_COMMIT_SHA"];
-  const branch = options.branch ?? process.env["GITHUB_REF_NAME"] ?? process.env["VERCEL_GIT_COMMIT_REF"] ?? process.env["CI_COMMIT_REF_NAME"];
+  const sha =
+    options.sha ??
+    process.env["GITHUB_SHA"] ??
+    process.env["VERCEL_GIT_COMMIT_SHA"] ??
+    process.env["CI_COMMIT_SHA"];
+  const branch =
+    options.branch ??
+    process.env["GITHUB_REF_NAME"] ??
+    process.env["VERCEL_GIT_COMMIT_REF"] ??
+    process.env["CI_COMMIT_REF_NAME"];
   const buildDir = options.buildDir ?? options.storybookDir ?? cfg?.buildDir ?? "storybook-static";
   const buildCommand = options.buildCommand ?? cfg?.buildCommand;
   const buildScriptName = options.buildScriptName ?? cfg?.buildScriptName;
@@ -68,11 +76,21 @@ export async function runUpload(options: UploadOptions): Promise<void> {
     return;
   }
 
-  if (!url) {throw new Error("--url is required (or .storybook/storyshelf.json / STORYSHELF_URL)");}
-  if (!slug) {throw new Error("--slug is required (or .storybook/storyshelf.json / STORYSHELF_SLUG)");}
-  if (!token) {throw new Error("--token is required (or STORYSHELF_TOKEN env)");}
-  if (!sha) {throw new Error("--sha is required (or GITHUB_SHA env)");}
-  if (!branch) {throw new Error("--branch is required (or GITHUB_REF_NAME env)");}
+  if (!url) {
+    throw new Error("--url is required (or .storybook/storyshelf.json / STORYSHELF_URL)");
+  }
+  if (!slug) {
+    throw new Error("--slug is required (or .storybook/storyshelf.json / STORYSHELF_SLUG)");
+  }
+  if (!token) {
+    throw new Error("--token is required (or STORYSHELF_TOKEN env)");
+  }
+  if (!sha) {
+    throw new Error("--sha is required (or GITHUB_SHA env)");
+  }
+  if (!branch) {
+    throw new Error("--branch is required (or GITHUB_REF_NAME env)");
+  }
 
   await ensureBuildDir({ buildDir, buildCommand, buildScriptName, force: options.forceBuild });
 
@@ -83,10 +101,20 @@ export async function runUpload(options: UploadOptions): Promise<void> {
   const form = new FormData();
   form.set("gitSha", sha);
   form.set("gitBranch", branch);
-  if (options.message) {form.set("message", options.message);}
-  if (options.authorEmail) {form.set("authorEmail", options.authorEmail);}
-  if (options.authorName) {form.set("authorName", options.authorName);}
-  form.set("zip", new Blob([new Uint8Array(zipBuffer)], { type: "application/zip" }), "storybook.zip");
+  if (options.message) {
+    form.set("message", options.message);
+  }
+  if (options.authorEmail) {
+    form.set("authorEmail", options.authorEmail);
+  }
+  if (options.authorName) {
+    form.set("authorName", options.authorName);
+  }
+  form.set(
+    "zip",
+    new Blob([new Uint8Array(zipBuffer)], { type: "application/zip" }),
+    "storybook.zip",
+  );
 
   const client = createClient(url, token);
   const spinner = createSpinner("Uploading...", spinnerFrames);
@@ -123,8 +151,12 @@ async function ensureBuildDir(opts: {
       shouldBuild = true;
     }
   }
-  if (!shouldBuild) {return;}
-  const command = opts.buildCommand ?? `npm run ${opts.buildScriptName ?? "build-storybook"} -- --output-dir ${opts.buildDir}`;
+  if (!shouldBuild) {
+    return;
+  }
+  const command =
+    opts.buildCommand ??
+    `npm run ${opts.buildScriptName ?? "build-storybook"} -- --output-dir ${opts.buildDir}`;
   printLine(`Building Storybook: ${command}`);
   execSync(command, {
     stdio: "inherit",

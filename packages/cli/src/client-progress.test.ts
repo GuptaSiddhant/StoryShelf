@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-
 import { postFormWithProgress } from "./client.ts";
 
 afterEach(() => {
@@ -31,8 +30,8 @@ describe("postFormWithProgress", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("boom", { status: 400 })));
     const form = new FormData();
 
-    await expect(postFormWithProgress("https://shelf.test/projects/demo/builds", form)).rejects.toThrow(
-      /Request failed \(400\): boom/u,
-    );
+    await expect(
+      postFormWithProgress("https://shelf.test/projects/demo/builds", form),
+    ).rejects.toThrow(/Request failed \(400\): boom/u);
   });
 });

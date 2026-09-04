@@ -20,7 +20,36 @@
     "id-length": [
       "warn",
       {
-        "exceptions": ["a", "b", "c", "e", "h", "i", "j", "k", "l", "m", "n", "p", "q", "r", "s", "v", "x", "y", "z", "T", "K", "V", "id", "db", "fn", "pr", "mr", "err"]
+        "exceptions": [
+          "a",
+          "b",
+          "c",
+          "e",
+          "h",
+          "i",
+          "j",
+          "k",
+          "l",
+          "m",
+          "n",
+          "p",
+          "q",
+          "r",
+          "s",
+          "v",
+          "x",
+          "y",
+          "z",
+          "T",
+          "K",
+          "V",
+          "id",
+          "db",
+          "fn",
+          "pr",
+          "mr",
+          "err"
+        ]
       }
     ],
     "func-style": ["allow"],
@@ -112,7 +141,20 @@
       }
     },
     {
-      "files": ["packages/cli/src/commands/upload.ts", "packages/cli/src/client.ts", "packages/db-turso/src/index.test.ts", "packages/db-turso/src/index.ts", "packages/db-sqlite/src/index.test.ts", "packages/storage-local/src/index.ts", "packages/storage-s3/src/index.ts", "packages/storage-s3/src/index.test.ts", "packages/runner-playwright/src/capture-runner.ts", "packages/runner-playwright/src/capture-runner.test.ts", "packages/runner-playwright/src/integration.test.ts"],
+      "files": [
+        "packages/cli/src/commands/upload.ts",
+        "packages/cli/src/client.ts",
+        "packages/db-turso/src/index.test.ts",
+        "packages/db-turso/src/index.ts",
+        "packages/db-sqlite/src/index.test.ts",
+        "packages/db-sqlite/src/index.ts",
+        "packages/storage-local/src/index.ts",
+        "packages/storage-s3/src/index.ts",
+        "packages/storage-s3/src/index.test.ts",
+        "packages/runner-playwright/src/capture-runner.ts",
+        "packages/runner-playwright/src/capture-runner.test.ts",
+        "packages/runner-playwright/src/integration.test.ts"
+      ],
       "rules": {
         "max-lines-per-function": "allow",
         "max-statements": "allow",

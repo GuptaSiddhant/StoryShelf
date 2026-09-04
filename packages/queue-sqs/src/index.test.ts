@@ -1,11 +1,5 @@
-import {
-  ReceiveMessageCommand,
-  SendMessageCommand,
-  type SQSClient,
-} from "@aws-sdk/client-sqs";
-
+import { ReceiveMessageCommand, SendMessageCommand, type SQSClient } from "@aws-sdk/client-sqs";
 import { describe, expect, it } from "vitest";
-
 import { createSqsCaptureQueue } from "./index.ts";
 
 /** A fake S3 response handler keyed by the command constructor name. */

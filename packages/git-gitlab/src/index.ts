@@ -1,6 +1,5 @@
-import type { Logger } from "@storyshelf/core/types";
 import type { GitHostAdapter, GitHostProvider } from "@storyshelf/core";
-
+import type { Logger } from "@storyshelf/core/types";
 import { upsertMrNote } from "./comment.ts";
 import { gitlabConfigSchema } from "./config.ts";
 import { checkIsMerged } from "./merge.ts";
@@ -64,7 +63,10 @@ function createGitLabStatusAdapter(options: GitLabStatusOptions): GitHostAdapter
 export const gitLabHost: GitHostProvider = {
   metadata: getMetadata(),
   create(opts: { config: unknown; token: string; logger?: Logger }): GitHostAdapter {
-    const cfg = gitlabConfigSchema.parse(opts.config) as GitLabStatusOptions & { owner: string; repo: string };
+    const cfg = gitlabConfigSchema.parse(opts.config) as GitLabStatusOptions & {
+      owner: string;
+      repo: string;
+    };
     return createGitLabStatusAdapter({
       token: opts.token,
       owner: cfg.owner,
