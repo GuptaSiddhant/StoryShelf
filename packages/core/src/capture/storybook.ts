@@ -14,6 +14,7 @@ interface StorybookIndex {
       importPath?: string;
       tags?: string[];
       type: string;
+      subtype?: string;
       parameters?: { chromatic?: StoryParameters; storyshelf?: StoryParameters };
     }
   >;
@@ -36,7 +37,7 @@ export class StorybookAdapter implements StorySourceAdapter {
   async discover(source: string): Promise<StoryEntry[]> {
     const index = await this.readIndex(source);
     return Object.values(index.entries)
-      .filter((entry) => entry.type !== "docs")
+      .filter((entry) => entry.type !== "docs" && entry.subtype !== "test")
       .map((entry) => ({
         id: entry.id,
         title: entry.title,

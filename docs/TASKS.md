@@ -181,7 +181,7 @@
 
 ### P4-1: E2E Test Suite — Deferred
 
-**Decision:** Deferred — requires Playwright + `apps/storybook-fixture` + gated `test:integration` suite (see `docs/testing.md`). Not in scope for this wave.
+**Decision:** Deferred — requires Playwright + `fixtures/storybook-8` + gated `test:integration` suite (see `docs/testing.md`). Not in scope for this wave.
 
 **Acceptance Criteria:**
 - [ ] Storybook upload works

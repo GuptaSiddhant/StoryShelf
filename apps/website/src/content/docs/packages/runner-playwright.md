@@ -23,6 +23,16 @@ const capture = createPlaywrightCaptureRunner();
 
 Hand the pure renderer to `createShelfRouter({ capture, config: { scratchDir } })`; the router builds the orchestrator that loads the build, extracts the uploaded archive into `scratchDir`, discovers stories, calls `capture.render(...)`, and persists. The factory takes no dependencies. A pino `Logger` is an optional per-render input: the orchestrator derives a `logger.child({ buildId, reqId })` and passes it into each `render` call so per-build work is traced and correlated with the HTTP request that triggered it.
 
+## Interaction testing
+
+When the project's **Tests** setting has **Enable interaction tests (play)** checked, the runner executes each story's `play` function before the screenshot (with `playTimeoutMs`, default 10000, and per-story `delay` if set). A throwing `play` fails the story:
+
+- **Blocking** (`!flaky`) → whole build `failed`, GitHub status `failure`.
+- **Flaky** (`tags: ['flaky-test']` case-insensitive whole-story, or `parameters.flakyTest` in `chromatic`/`storyshelf` keys with `storyshelf` winning) → build stays `reviewing`/`approved`, UI shows a warning, GitHub posts `success` with a warning comment `⚠️ flaky story failed — not blocking`.
+- **Disabled** (`parameters.disableSnapshot` or `tags: ['skip']`) → skip capture + play entirely.
+
+Per-story `delay`, `diffThreshold`, and `pauseAnimationAtEnd` are also read from the same dual-key `parameters` (merged as `{...chromatic, ...storyshelf}`), with `stories.json` preferred over `index.json` plus a runtime `__STORYBOOK_PREVIEW__` fallback for Storybook 8. See **Interaction testing** guide.
+
 ## How it fits
 
 It is the only package that depends on `playwright`. Core's capture logic is browser-agnostic: the **orchestrator** owns loading, extraction, discovery, and persistence and delegates only the screenshotting to this package's `render(input) => RenderResult`. The server is the assembly point where this renderer (or a future alternative, e.g. a remote runner) is wired in behind the pure `CaptureRunner` interface.

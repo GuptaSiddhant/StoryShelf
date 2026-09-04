@@ -27,6 +27,7 @@ export default defineConfig({
           items: [
             { label: "Getting started", slug: "guides/getting-started" },
             { label: "CI setup", slug: "guides/ci" },
+            { label: "Interaction testing", slug: "guides/interaction-testing" },
             { label: "REST API", slug: "guides/api" },
             { label: "API Reference", link: "/openapi/" },
             { label: "Deployment", slug: "guides/deployment" },

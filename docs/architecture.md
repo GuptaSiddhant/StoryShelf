@@ -827,11 +827,11 @@ nubx nub run dev          # starts Hono dev server
 
 ## Testing
 
-See `docs/testing.md`. Unit, adapter-contract, and integration tests run on every CI (`nub run test`, vitest, hermetic — no browser). The capture pipeline is browser-gated: a separate `nub run test:integration` suite runs real Playwright against the committed Storybook fixture in `apps/storybook-fixture`.
+See `docs/testing.md`. Unit, adapter-contract, and integration tests run on every CI (`nub run test`, vitest, hermetic — no browser). The capture pipeline is browser-gated: a separate `nub run test:integration` suite runs real Playwright against the committed Storybook fixture in `fixtures/storybook-8`.
 
 ## Website, Docs & Examples
 
-See `docs/website.md`. The public site (`apps/website/`, Astro Starlight) hosts guides plus an auto-generated API reference from the Hono OpenAPI spec. `apps/storybook-fixture` is the deterministic capture fixture; `examples/fly-app` deploys StoryShelf to fly.io as a public demo.
+See `docs/website.md`. The public site (`apps/website/`, Astro Starlight) hosts guides plus an auto-generated API reference from the Hono OpenAPI spec. `fixtures/storybook-8` is the deterministic capture fixture; `examples/fly-app` deploys StoryShelf to fly.io as a public demo.
 
 ## Deliberately Deferred (v2)
 

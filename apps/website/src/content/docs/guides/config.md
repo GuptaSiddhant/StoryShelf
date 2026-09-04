@@ -70,7 +70,7 @@ Each upload resolves `packagePath` (`relative(cwd, dirname(.storybook))`) and is
 `storyshelf upload` (and `storyshelf` with no args defaults to `upload` when config exists, else shows help to run `init`):
 
 1. `skip` glob matches `branch` → exit 0, no `POST`.
-2. `buildDir` missing or empty or `--force-build` → run `buildCommand` or `npm run <buildScriptName> -- --output-dir <buildDir>`.
+2. `buildDir` missing or empty or `--force-build` → run `buildCommand` or `npm run <buildScriptName> -- --output-dir <buildDir>` with `STORYBOOK_BUILD_STORIES_JSON=true` (so Storybook emits `stories.json` with `parameters` for per-story controls like `disableSnapshot`/`flakyTest` — see **Interaction testing**).
 3. `zip.addLocalFolder(buildDir)` → `POST /api/v1/projects/{slug}/builds`.
 
 ## Server config vs client config

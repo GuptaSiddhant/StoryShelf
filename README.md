@@ -22,10 +22,13 @@ packages/
    runner-playwright/ @storyshelf/runner-playwright — Playwright capture runner
   apps/
     dev-server/     dev-server      — local dev server (from TS source via nub watch)
-    storybook-fixture/ storybook-fixture — deterministic capture fixture (committed storybook-static/)
     website/        website         — public docs (Astro Starlight)
-  examples/
-    fly-app/                                  — fly.io demo
+    fly-app/        fly-app         — Fly demo (local adapters, workspace deps, multi-stage cached Dockerfile; deploys on tag via fly.yml)
+  fixtures/
+    storybook-8/    storybook-fixture -- SB 8.6 Vite React (default, 7 stories; own npm install)
+    storybook-9/    storybook-fixture -- SB 9 Vite React
+    storybook-10/   storybook-fixture -- SB 10 ESM + CSF-Next (filters subtype:'test')
+    storybook-11/   storybook-fixture -- SB 11 alpha (upcoming)
   docs/                                       — architecture, ADRs, testing, website plan
 ```
 

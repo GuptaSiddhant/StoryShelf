@@ -29,13 +29,18 @@ nubx turbo verify --filter='@storyshelf/core' --force   # one package + deps
 nub run lint        # oxlint --type-aware
 nub run build       # tsdown -> dist/
 nub run test        # vitest (hermetic; no browser)
-nub run test:integration   # gated browser suite (Playwright + apps/storybook-fixture)
+nub run test:integration   # gated browser suite (Playwright + fixtures/storybook-8; override with FIXTURE_DIR=fixtures/storybook-9)
 nubx tsc --noEmit -p tsconfig.json   # typecheck
 
 # Website (from apps/website/):
 nub run start       # serve the built docs site (astro preview; requires a prior build)
 nub run dev         # astro dev server (hot reload)
 nub run build       # generate openapi.json (prebuild) + build the docs site
+
+# Fixtures (independent npm installs, not nub workspaces):
+# cd fixtures/storybook-8 && npm ci && npm run build-storybook  # SB 8.6 (default)
+# cd fixtures/storybook-9 && npm ci && npm run build-storybook  # SB 9
+# All fixtures ignored for storybook-static (built on demand, not committed)
 ```
 
 ## Layout
@@ -54,9 +59,13 @@ StoryShelf/
     runner-playwright/ @storyshelf/runner-playwright -- pure Playwright CaptureRenderer (server-side render; core orchestrator owns capture)
   apps/
     dev-server/     dev-server      -- Local dev server, runs from TS source via `nub run serve` (no build; Playwright capture + optional shared-password auth)
-    storybook-fixture/ storybook-fixture      -- Minimal deterministic Storybook (capture fixture + demo; committed storybook-static/)
     website/        website         -- Public docs & marketing site (Astro Starlight)
     fly-app/        fly-app         -- Fly demo (local adapters, workspace deps, multi-stage cached Dockerfile; deploys on tag via fly.yml)
+  fixtures/
+    storybook-8/    storybook-fixture -- SB 8.6 Vite React (default, 7 stories; own npm install)
+    storybook-9/    storybook-fixture -- SB 9 Vite React
+    storybook-10/   storybook-fixture -- SB 10 ESM + CSF-Next (filters subtype:'test')
+    storybook-11/   storybook-fixture -- SB 11 alpha (upcoming)
   docs/
     architecture.md       -- Full architecture document
     testing.md            -- Testing strategy (unit/adapter/integration/gated-browser)

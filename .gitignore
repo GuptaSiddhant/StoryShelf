@@ -28,8 +28,9 @@ vite.config.ts.timestamp*
 .npmrc
 
 storybook-static
-!apps/storybook-fixture/storybook-static
-!apps/storybook-fixture/storybook-static/**
+fixtures/**/node_modules
+fixtures/**/storybook-static
+fixtures/**/dist
 .test-results
 test-report
 coverage

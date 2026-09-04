@@ -35,10 +35,13 @@ Step-by-step build order. Each step is independently reviewable. Decisions made 
 - `@storyshelf/cli` — client: `upload`, `retry`, `init`, `create`, `purge` + `server init` (no Playwright). `storyshelf server init` generates a server project with the user's chosen adapters (replaces the former `@storyshelf/node-server` package, per DECISIONS 24).
 - `@storyshelf/runner-playwright` — Playwright `CaptureRunner` (server-side capture).
 
-## Phase 5 — Examples & website
+## Phase 5 — Examples, fixtures & website
 
-- `apps/storybook-fixture` — deterministic component library + committed `storybook-static/`.
-- `examples/fly-app` — fly.io deploy.
+- `fixtures/storybook-8` — SB 8.6 Vite React (default, 7 stories; own npm install, built on demand)
+- `fixtures/storybook-9` — SB 9 Vite React
+- `fixtures/storybook-10` — SB 10 ESM + CSF-Next
+- `fixtures/storybook-11` — SB 11 alpha
+- `apps/fly-app` — fly.io deploy (pruned via turbo + nub trick)
 - `apps/website/` — Astro Starlight docs + marketing.
 
 ## Phase 6 — Verification & commit
