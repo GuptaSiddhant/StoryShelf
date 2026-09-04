@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/auth-oauth",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "OIDC authorization-code auth adapter for StoryShelf.",
   "author": {

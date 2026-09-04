@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/storage-s3",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "S3-compatible storage adapter for StoryShelf (AWS SDK v3).",
   "author": {
