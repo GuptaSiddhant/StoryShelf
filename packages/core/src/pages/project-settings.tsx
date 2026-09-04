@@ -29,6 +29,31 @@ export interface SettingsFormState {
   secret?: string;
 }
 
+function tabHref(project: Project, tab: SettingsTab): string {
+  return tab === "general" ? `/projects/${project.slug}/settings` : `/projects/${project.slug}/settings/${tab}`;
+}
+
+function renderTabLink(project: Project, activeTab: SettingsTab, tab: SettingsTab, label: string): unknown {
+  const active = activeTab === tab;
+  return (
+    <a class={`tabs__link ${active ? "tabs__link--active" : ""}`} href={tabHref(project, tab)} aria-current={active ? "page" : undefined}>
+      {label}
+    </a>
+  );
+}
+
+function renderActiveTab(data: ProjectSettingsData, formState?: SettingsFormState): unknown {
+  const { project, activeTab } = data;
+  if (activeTab === "general") return renderSettingsGeneral(project, formState, data.isAdmin);
+  if (activeTab === "tests") return renderSettingsTests(project, data.isAdmin, formState);
+  if (activeTab === "labels") return renderSettingsLabels(project, data.labelTypes, data.isAdmin);
+  if (activeTab === "tokens") return renderSettingsTokens(project, data.tokens, data.isAdmin);
+  if (activeTab === "webhooks") return renderSettingsWebhooks(project, data.webhooks, data.isAdmin, formState);
+  if (activeTab === "members") return renderSettingsMembers(project, data.members, data.isAdmin);
+  if (activeTab === "status") return renderSettingsStatus(project, data.statusConfigs, data.gitHosts, data.isAdmin);
+  return null;
+}
+
 export function renderProjectSettingsPage(data: ProjectSettingsData, formState?: SettingsFormState): RenderedContent {
   const { project, activeTab } = data;
   return (
@@ -56,36 +81,16 @@ export function renderProjectSettingsPage(data: ProjectSettingsData, formState?:
       </div>
 
       <nav class="tabs" aria-label="Settings sections">
-        <a class={`tabs__link ${activeTab === "general" ? "tabs__link--active" : ""}`} href={`/projects/${project.slug}/settings`} aria-current={activeTab === "general" ? "page" : undefined}>
-          General
-        </a>
-        <a class={`tabs__link ${activeTab === "tests" ? "tabs__link--active" : ""}`} href={`/projects/${project.slug}/settings/tests`} aria-current={activeTab === "tests" ? "page" : undefined}>
-          Tests
-        </a>
-        <a class={`tabs__link ${activeTab === "labels" ? "tabs__link--active" : ""}`} href={`/projects/${project.slug}/settings/labels`} aria-current={activeTab === "labels" ? "page" : undefined}>
-          Labels
-        </a>
-        <a class={`tabs__link ${activeTab === "tokens" ? "tabs__link--active" : ""}`} href={`/projects/${project.slug}/settings/tokens`} aria-current={activeTab === "tokens" ? "page" : undefined}>
-          Tokens
-        </a>
-        <a class={`tabs__link ${activeTab === "webhooks" ? "tabs__link--active" : ""}`} href={`/projects/${project.slug}/settings/webhooks`} aria-current={activeTab === "webhooks" ? "page" : undefined}>
-          Webhooks
-        </a>
-        <a class={`tabs__link ${activeTab === "members" ? "tabs__link--active" : ""}`} href={`/projects/${project.slug}/settings/members`} aria-current={activeTab === "members" ? "page" : undefined}>
-          Members
-        </a>
-        <a class={`tabs__link ${activeTab === "status" ? "tabs__link--active" : ""}`} href={`/projects/${project.slug}/settings/status`} aria-current={activeTab === "status" ? "page" : undefined}>
-          Git status
-        </a>
+        {renderTabLink(project, activeTab, "general", "General")}
+        {renderTabLink(project, activeTab, "tests", "Tests")}
+        {renderTabLink(project, activeTab, "labels", "Labels")}
+        {renderTabLink(project, activeTab, "tokens", "Tokens")}
+        {renderTabLink(project, activeTab, "webhooks", "Webhooks")}
+        {renderTabLink(project, activeTab, "members", "Members")}
+        {renderTabLink(project, activeTab, "status", "Git status")}
       </nav>
 
-      {activeTab === "general" ? renderSettingsGeneral(project, formState, data.isAdmin) : null}
-      {activeTab === "tests" ? renderSettingsTests(project, data.isAdmin, formState) : null}
-      {activeTab === "labels" ? renderSettingsLabels(project, data.labelTypes, data.isAdmin) : null}
-      {activeTab === "tokens" ? renderSettingsTokens(project, data.tokens, data.isAdmin) : null}
-      {activeTab === "webhooks" ? renderSettingsWebhooks(project, data.webhooks, data.isAdmin, formState) : null}
-      {activeTab === "members" ? renderSettingsMembers(project, data.members, data.isAdmin) : null}
-      {activeTab === "status" ? renderSettingsStatus(project, data.statusConfigs, data.gitHosts, data.isAdmin) : null}
+      {renderActiveTab(data, formState)}
     </DocumentLayout>
   );
 }
