@@ -1,5 +1,6 @@
 {
-  "name": "@storyshelf/git-github",
+  "$schema": "https://deno.land/x/deno/cli/schemas/config-file.v1.json",
+  "name": "@storyshelf/git-gitlab",
   "version": "0.1.0",
   "exports": {
     ".": "./src/index.ts"
@@ -15,7 +16,5 @@
       "**/*.test.tsx",
       "**/test-helpers"
     ]
-  },
-  "description": "GitHub commit status adapter for StoryShelf.",
-  "license": "MIT"
+  }
 }

@@ -1,5 +1,6 @@
 {
-  "name": "@storyshelf/storage-s3",
+  "$schema": "https://deno.land/x/deno/cli/schemas/config-file.v1.json",
+  "name": "@storyshelf/db-sqlite",
   "version": "0.1.0",
   "exports": {
     ".": "./src/index.ts"
@@ -15,7 +16,5 @@
       "**/*.test.tsx",
       "**/test-helpers"
     ]
-  },
-  "description": "S3-compatible storage adapter for StoryShelf (AWS SDK v3).",
-  "license": "MIT"
+  }
 }

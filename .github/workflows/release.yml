@@ -130,7 +130,7 @@ jobs:
       - name: Build packages (regenerates deno.json with current version)
         run: nub run build --filter='./packages/*'
 
-      - name: Guard JSR config versions match package.json
+      - name: Guard deno.json versions match package.json
         run: |
           set -e
           VERS=$(node -e "
@@ -145,16 +145,14 @@ jobs:
                 const p=JSON.parse(fs.readFileSync(path.join(dir,d,'package.json'),'utf8'));
                 if (p.private) continue;
                 let j=null;
-                for (const f of ['deno.json','jsr.json']) {
-                  try { j=JSON.parse(fs.readFileSync(path.join(dir,d,f),'utf8')); break; } catch {}
-                }
+                try { j=JSON.parse(fs.readFileSync(path.join(dir,d,'deno.json'),'utf8')); } catch {}
                 if (!j) { missing.push(d); continue; }
-                if (j.version !== p.version) bad.push(d+': jsr='+j.version+' pkg='+p.version);
+                if (j.version !== p.version) bad.push(d+': deno='+j.version+' pkg='+p.version);
               } catch {}
             }
-            if (missing.length) { console.error('missing JSR config:'); console.error(missing.join('\n')); process.exit(1); }
-            if (bad.length) { console.error('JSR config/package.json version mismatch:'); console.error(bad.join('\n')); process.exit(1); }
-            console.log('all JSR config versions match package.json');
+            if (missing.length) { console.error('missing deno.json:'); console.error(missing.join('\n')); process.exit(1); }
+            if (bad.length) { console.error('deno.json/package.json version mismatch:'); console.error(bad.join('\n')); process.exit(1); }
+            console.log('all deno.json versions match package.json');
           ")
 
       - name: "Rewrite workspace protocol for JSR manifest"
