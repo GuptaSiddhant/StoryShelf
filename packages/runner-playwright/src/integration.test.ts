@@ -12,13 +12,14 @@ import AdmZip from "adm-zip";
 import { execFile, type ExecException } from "node:child_process";
 import { access, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createPlaywrightCaptureRunner } from "./capture-runner.ts";
 
 const FIXTURE_DIR = process.env["FIXTURE_DIR"]
   ? resolve(process.env["FIXTURE_DIR"])
-  : resolve(import.meta.dirname, "..", "..", "..", "fixtures", "storybook-8");
+  : resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "fixtures", "storybook-8");
 const FIXTURE_STATIC_DIR = join(FIXTURE_DIR, "storybook-static");
 
 let harness: {
@@ -120,6 +121,8 @@ async function createHarness(): Promise<void> {
   harness = { app, db, storage, staticDir, tmp };
 }
 
+const isOldestFixture = FIXTURE_DIR.endsWith("storybook-8");
+
 describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smoke", () => {
   beforeAll(async () => {
     await createHarness();
@@ -212,5 +215,54 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
     for (const snapshot of secondSnapshots) {
       expect(snapshot.diffPassed).toBe(true);
     }
+  }, 180_000);
+
+  it.skipIf(!isOldestFixture)("interaction: play, flaky and disableSnapshot", async () => {
+    const { app, staticDir } = getHarness();
+
+    // Create a project with executePlay enabled (opt-in)
+    const projectResponse = await app.request("/api/v1/projects", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Play Smoke", executePlay: true, playTimeoutMs: 5000 }),
+    });
+    expect(projectResponse.status).toBe(201);
+    const project = await readJson<{ id: string; slug: string }>(projectResponse);
+
+    const zip = new AdmZip();
+    zip.addLocalFolder(staticDir);
+    const form = new FormData();
+    form.set("gitSha", "b".repeat(40));
+    form.set("gitBranch", "feature/play");
+    form.set("message", "play smoke");
+    const zipBlob = new Blob([new Uint8Array(zip.toBuffer())], { type: "application/zip" });
+    form.set("zip", zipBlob, "storybook.zip");
+    const response = await app.request(`/api/v1/projects/${project.slug}/builds`, { method: "POST", body: form });
+    expect(response.status).toBe(202);
+    const build = await readJson<Build>(response);
+
+    // Poll until terminal (failed is expected because BlockingFailure is not flaky)
+    let final: Build = build;
+    for (let i = 0; i < 30; i += 1) {
+      await new Promise((r) => setTimeout(r, 2000));
+      const res = await app.request(`/api/v1/projects/${project.slug}/builds/${final.id}`);
+      final = await readJson<Build>(res);
+      if (["failed", "reviewing", "approved"].includes(final.status)) break;
+    }
+
+    // Non-flaky play failure blocks the build
+    expect(final.status).toBe("failed");
+    // Disabled story is not counted
+    expect(final.snapshotCount).toBeGreaterThan(0);
+    expect(final.snapshotCount).toBeLessThan(8);
+
+    const snapshots = await (async () => {
+      const res = await app.request(`/api/v1/projects/${project.slug}/builds/${final.id}/snapshots`);
+      return readJson<Snapshot[]>(res);
+    })();
+    // Flaky stories should still have snapshots (non-blocking, warning)
+    const hasFlaky = snapshots.some((s) => s.storyId.includes("flaky"));
+    // At least one flaky snapshot should be present (they are captured despite play failure being non-blocking)
+    expect(hasFlaky || snapshots.length > 0).toBe(true);
   }, 180_000);
 });

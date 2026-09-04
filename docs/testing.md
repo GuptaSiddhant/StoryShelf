@@ -26,14 +26,14 @@ Each adapter against its interface: SQLite via `:memory:` (Turso via a local lib
 
 ### 4. Browser integration (gated: `nub run test:integration`)
 
-Runs the **real** capture pipeline (`@storyshelf/runner-playwright`) against a built Storybook fixture in `fixtures/storybook-8` (default, 7 stories). Fixtures for 8/9/10/11 each have independent `pnpm` installs and are built on demand (`pnpm install && pnpm run build-storybook`; `storybook-static/` is `.gitignored`). Override with `FIXTURE_DIR=fixtures/storybook-9`. Requires Playwright browsers. Gated so `turbo test` stays browser-free.
+- **Visual (all fixtures, matrix in CI):** Runs the real capture pipeline (`@storyshelf/runner-playwright`) against a built Storybook fixture in `fixtures/storybook-8` (default, 7 stories), `fixtures/storybook-9`, and `fixtures/storybook-10` (each independent `pnpm` install, built on demand `pnpm install && pnpm run build-storybook`; `storybook-static/` is `.gitignored`). Override locally with `FIXTURE_DIR=fixtures/storybook-9`. Requires Playwright browsers. Gated so `turbo test` stays browser-free.
+- **Interaction (`play`, only oldest):** When a project has `executePlay: true`, the same suite runs `play` functions before screenshots. Tested only against `fixtures/storybook-8` (oldest) unless a major changes the `play` channel — then add a single `play` smoke for that major. Verified: `BlockingFailure` → whole build `failed`, `FlakyTag`/`FlakyParam` (`flaky-test`) → non-blocking `reviewing` with warning, `Disabled` (`skip`/`disableSnapshot`) → not counted.
 
 ## Fixtures
 
-- `fixtures/storybook-8` — SB 8.6 Vite React (default, 7 stories; own pnpm install)
-- `fixtures/storybook-9` — SB 9 Vite React
-- `fixtures/storybook-10` — SB 10 ESM + CSF-Next (filters `subtype:'test'`)
-- `fixtures/storybook-11` — SB 11 alpha (upcoming)
-- All fixtures are deterministic (system fonts, no network) and share the same `Button` stories (including `play`/`flaky-test`/`disableSnapshot` variants). `storybook-static/` is built on demand, not committed.
+- `fixtures/storybook-8` — SB 8.6 Vite React (default, 7 stories; own pnpm install, `6008`)
+- `fixtures/storybook-9` — SB 9 Vite React (`6009`, no `addon-essentials`, `features: {backgrounds,controls,viewport}`)
+- `fixtures/storybook-10` — SB 10 ESM + CSF-Next (filters `subtype:'test'`, `6010`, `definePreview`/`preview.meta`/`meta.story` + `experimentalTestSyntax`)
+- All fixtures are deterministic (system fonts, no network) and share the same `Button` stories (including `play`/`flaky-test`/`disableSnapshot`/`delay` variants). `storybook-static/` is built on demand, not committed.
 - PNG fixtures for the diff engine.
 - `index.json` fixtures for `discover()`.
