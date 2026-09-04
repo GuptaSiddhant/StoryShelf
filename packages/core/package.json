@@ -2,9 +2,9 @@
   "name": "@storyshelf/core",
   "version": "0.1.1",
   "description": "StoryShelf core: Hono router, adapter interfaces, models, capture pipeline, diff, retention.",
-  "homepage": "https://github.com/GuptaSiddhant/storyshelf#readme",
+  "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
   "bugs": {
-    "url": "https://github.com/GuptaSiddhant/storyshelf/issues"
+    "url": "https://github.com/GuptaSiddhant/StoryShelf/issues"
   },
   "license": "MIT",
   "author": {
@@ -13,7 +13,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/GuptaSiddhant/storyshelf.git",
+    "url": "git+https://github.com/GuptaSiddhant/StoryShelf.git",
     "directory": "packages/core"
   },
   "files": [

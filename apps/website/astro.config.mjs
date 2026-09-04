@@ -12,12 +12,12 @@ export default defineConfig({
       social: [
         {
           label: "OpenAPI",
-          href: `${(process.env.BASE_PATH || "/").replace(/\/?$/, "/")}openapi/`,
+          href: `${(process.env.BASE_PATH || "/").replace(/\/?$/u, "/")}openapi/`,
           icon: "document",
         },
         {
           label: "GitHub",
-          href: "https://github.com/GuptaSiddhant/storyshelf",
+          href: "https://github.com/GuptaSiddhant/StoryShelf",
           icon: "github",
         },
       ],

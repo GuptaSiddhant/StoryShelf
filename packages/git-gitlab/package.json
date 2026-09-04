@@ -1,42 +1,41 @@
 {
   "name": "@storyshelf/git-gitlab",
   "version": "0.1.1",
-  "type": "module",
   "description": "GitLab commit status adapter for StoryShelf.",
+  "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
+  "bugs": {
+    "url": "https://github.com/GuptaSiddhant/StoryShelf/issues"
+  },
+  "license": "MIT",
   "author": {
     "name": "Siddhant Gupta",
     "url": "https://guptasiddhant.com"
   },
-  "license": "MIT",
-  "sideEffects": false,
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/GuptaSiddhant/storyshelf.git",
+    "url": "git+https://github.com/GuptaSiddhant/StoryShelf.git",
     "directory": "packages/git-gitlab"
-  },
-  "homepage": "https://github.com/GuptaSiddhant/storyshelf#readme",
-  "bugs": {
-    "url": "https://github.com/GuptaSiddhant/storyshelf/issues"
-  },
-  "publishConfig": {
-    "access": "public",
-    "exports": {
-      ".": "./dist/index.mjs",
-      "./package.json": "./package.json"
-    }
-  },
-  "jsr": {
-    "runtimeCompat": {
-      "node": true,
-      "deno": true,
-      "browser": false,
-      "workerd": false,
-      "bun": true
-    }
   },
   "files": [
     "dist"
   ],
+  "type": "module",
+  "sideEffects": false,
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "default": "./dist/index.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.mjs",
+      "./package.json": "./package.json"
+    },
+    "access": "public"
+  },
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown -w",
@@ -59,12 +58,13 @@
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
-  "types": "./dist/index.d.mts",
-  "exports": {
-    ".": {
-      "source": "./src/index.ts",
-      "default": "./dist/index.mjs"
-    },
-    "./package.json": "./package.json"
+  "jsr": {
+    "runtimeCompat": {
+      "node": true,
+      "deno": true,
+      "browser": false,
+      "workerd": false,
+      "bun": true
+    }
   }
 }

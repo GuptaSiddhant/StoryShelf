@@ -4,9 +4,12 @@
   "description": "Self-hosted visual testing platform for Storybook.",
   "license": "MIT",
   "author": "Siddhant Gupta <guptasiddhant@icloud.com>",
-  "repository": "git@github.com:GuptaSiddhant/storyshelf.git",
+  "repository": "git@github.com:GuptaSiddhant/StoryShelf.git",
   "workspaces": {
-    "packages": ["./packages/*", "apps/*"],
+    "packages": [
+      "./apps/*",
+      "./packages/*"
+    ],
     "catalog": {
       "@types/node": "^26.0.0",
       "@vitest/coverage-v8": "^4.0.0",

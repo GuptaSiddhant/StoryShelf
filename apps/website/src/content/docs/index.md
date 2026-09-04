@@ -9,7 +9,7 @@ hero:
       link: ./guides/getting-started/
       icon: right-arrow
     - text: GitHub
-      link: https://github.com/GuptaSiddhant/storyshelf
+      link: https://github.com/GuptaSiddhant/StoryShelf
       icon: github
       variant: minimal
 ---

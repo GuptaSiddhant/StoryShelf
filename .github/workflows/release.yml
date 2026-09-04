@@ -63,17 +63,69 @@ jobs:
             exit 1
           fi
 
+      - name: Check npm version for OIDC
+        run: |
+          set -e
+          NPM_VERSION="$(npm --version)"
+          echo "npm version: $NPM_VERSION"
+          node -e "
+            const [major, minor] = process.argv[1].split('.').map(Number);
+            if (major < 11 || (major === 11 && minor < 5)) {
+              console.error('::error::npm >= 11.5.1 required for OIDC trusted publishing, found ' + process.argv[1]);
+              process.exit(1);
+            }
+            console.log('npm OIDC supported');
+          " "$NPM_VERSION"
+
+      - name: Rewrite workspace protocol for npm manifest
+        run: |
+          set -e
+          # Plain npm publish ships dependencies verbatim, so workspace:*
+          # must become caret ranges (nub publish did this automatically).
+          # Repo files keep workspace:*; only this CI working tree is rewritten.
+          node -e "
+            const fs=require('fs');
+            const path=require('path');
+            for (const d of fs.readdirSync('packages')) {
+              const dir=path.join('packages',d);
+              if (!fs.statSync(dir).isDirectory()) continue;
+              const f=path.join(dir,'package.json');
+              let pkg;
+              try { pkg=JSON.parse(fs.readFileSync(f,'utf8')); } catch { continue; }
+              if (pkg.private || !pkg.dependencies) continue;
+              let changed=false;
+              for (const dep of Object.keys(pkg.dependencies)) {
+                if (dep.startsWith('@storyshelf/') && pkg.dependencies[dep]==='workspace:*') {
+                  pkg.dependencies[dep]='^'+pkg.version;
+                  changed=true;
+                }
+              }
+              if (changed) {
+                fs.writeFileSync(f,JSON.stringify(pkg,null,2)+'\n');
+                console.log('rewrote '+d);
+              }
+            }
+            console.log('workspace protocol rewrite complete');
+          "
+
       - name: Publish to npm (trusted / provenance)
         run: |
           set -e
           VERSION="$(node -e "console.log(require('./packages/core/package.json').version)")"
           if echo "$VERSION" | grep -q "-"; then
-            TAG="next"
+            DIST_TAG="next"
           else
-            TAG="latest"
+            DIST_TAG="latest"
           fi
-          echo "publishing $VERSION with dist-tag $TAG"
-          nub publish -r --provenance --tag "$TAG" --no-git-checks
+          echo "publishing $VERSION with dist-tag $DIST_TAG"
+          # OIDC trusted publishing: the npm CLI (>= 11.5.1) exchanges the
+          # workflow OIDC token automatically — no NODE_AUTH_TOKEN. Requires a
+          # trusted publisher configured per package on npmjs.com (one-time).
+          ORDER="core auth-oauth auth-password db-sqlite db-turso queue-sqs runner-playwright storage-local storage-s3 cli git-github git-gitlab"
+          for PACKAGE in $ORDER; do
+            echo "Publishing @storyshelf/$PACKAGE"
+            (cd "packages/$PACKAGE" && npm publish --access public --provenance --tag "$DIST_TAG")
+          done
 
       - name: Generate release notes from git log
         id: log

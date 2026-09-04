@@ -1,40 +1,36 @@
 {
   "name": "@storyshelf/cli",
   "version": "0.1.1",
-  "type": "module",
   "description": "StoryShelf CLI: create projects, upload builds, purge, and retry from CI.",
+  "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
+  "bugs": {
+    "url": "https://github.com/GuptaSiddhant/StoryShelf/issues"
+  },
+  "license": "MIT",
   "author": {
     "name": "Siddhant Gupta",
     "url": "https://guptasiddhant.com"
   },
-  "license": "MIT",
-  "sideEffects": false,
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/GuptaSiddhant/storyshelf.git",
+    "url": "git+https://github.com/GuptaSiddhant/StoryShelf.git",
     "directory": "packages/cli"
   },
-  "homepage": "https://github.com/GuptaSiddhant/storyshelf#readme",
-  "bugs": {
-    "url": "https://github.com/GuptaSiddhant/storyshelf/issues"
-  },
-  "publishConfig": {
-    "access": "public"
-  },
-  "jsr": {
-    "runtimeCompat": {
-      "node": true,
-      "deno": true,
-      "browser": false,
-      "workerd": false,
-      "bun": true
-    }
+  "bin": {
+    "storyshelf": "./dist/index.js"
   },
   "files": [
     "dist"
   ],
-  "bin": {
-    "storyshelf": "./dist/index.js"
+  "type": "module",
+  "sideEffects": false,
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "tsdown",
@@ -54,6 +50,7 @@
     "zod": "^4.2.0"
   },
   "devDependencies": {
+    "@storyshelf/core": "workspace:*",
     "@types/node": "catalog:",
     "@types/picomatch": "^4.0.1",
     "@types/prompts": "^2.4.9",
@@ -63,12 +60,15 @@
     "oxlint-tsgolint": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:",
-    "@storyshelf/core": "workspace:*"
+    "vitest": "catalog:"
   },
-  "types": "./dist/index.d.mts",
-  "exports": {
-    ".": "./dist/index.js",
-    "./package.json": "./package.json"
+  "jsr": {
+    "runtimeCompat": {
+      "node": true,
+      "deno": true,
+      "browser": false,
+      "workerd": false,
+      "bun": true
+    }
   }
 }
