@@ -8,6 +8,10 @@ on:
       - "v*.*.*"
       - "v*.*.*-*"
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (must match packages/core version)"
+        default: ""
 
 permissions:
   contents: write # for GitHub Release creation
@@ -41,7 +45,7 @@ jobs:
       - name: Guard tag matches fixed version
         run: |
           set -e
-          TAG="${GITHUB_REF_NAME}"
+          TAG="${ inputs.tag || GITHUB_REF_NAME}"
           PKG_VERSION="$(node -e "console.log(require('./packages/core/package.json').version)")"
           echo "tag=$TAG pkg=v$PKG_VERSION"
           if [ "$TAG" != "v$PKG_VERSION" ]; then
