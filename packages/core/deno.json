@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/denoland/deno/refs/heads/main/cli/schemas/config-file.v1.json",
   "name": "@storyshelf/core",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "exports": {
     ".": "./src/index.tsx",
     "./adapter/database": "./src/adapters/database.ts",
@@ -29,15 +29,7 @@
     "hono/jsx/jsx-dev-runtime": "npm:hono@4.13.5/jsx/jsx-dev-runtime"
   },
   "publish": {
-    "include": [
-      "src",
-      "README.md",
-      "LICENSE"
-    ],
-    "exclude": [
-      "**/*.test.ts",
-      "**/*.test.tsx",
-      "**/test-helpers"
-    ]
+    "include": ["src", "README.md", "LICENSE"],
+    "exclude": ["**/*.test.ts", "**/*.test.tsx", "**/test-helpers"]
   }
 }

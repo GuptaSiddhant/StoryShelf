@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/cli",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "StoryShelf CLI: create projects, upload builds, purge, and retry from CI.",
   "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
   "bugs": {
