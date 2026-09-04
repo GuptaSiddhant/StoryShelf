@@ -26,11 +26,14 @@ jobs:
   # publish-jsr, and is never blocked by it.
   publish-npm:
     runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          ref: ${{ inputs.tag || github.ref_name }}
 
       - name: Setup Nub
         uses: nubjs/setup-nub@v0
@@ -45,7 +48,7 @@ jobs:
       - name: Guard tag matches fixed version
         run: |
           set -e
-          TAG="${ inputs.tag || GITHUB_REF_NAME}"
+          TAG="${RELEASE_TAG}"
           PKG_VERSION="$(node -e "console.log(require('./packages/core/package.json').version)")"
           echo "tag=$TAG pkg=v$PKG_VERSION"
           if [ "$TAG" != "v$PKG_VERSION" ]; then
@@ -77,7 +80,7 @@ jobs:
         id: log
         run: |
           set -e
-          TAG="${GITHUB_REF_NAME}"
+          TAG="${RELEASE_TAG}"
           PREV_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
           echo "prev=$PREV_TAG current=$TAG"
           if [ -z "$PREV_TAG" ]; then
@@ -95,6 +98,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
           body_path: /tmp/release-body.md
           generate_release_notes: false
 
