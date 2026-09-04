@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 const distDir = 'dist';
 
@@ -37,41 +37,23 @@ function extractLinks(html) {
 
 // Determine if a link from a given file is "internal" to the dist tree
 // Rules:
-// 1. Absolute /hrefs: strip BASE_PATH prefix, check dist/ + remaining path
-// 2. Relative ./hrefs: resolve relative to dist/, check existence
-// 3. Relative ../hrefs from dist/packages/: these navigate between packages in multi-package site — treat as internal
-// 4. Relative ../hrefs from other dist/ locations: check normally
+// 1. Relative ./ and ../ hrefs: resolve against the containing file's
+//    directory (exactly as a browser resolves page URL + href), then check
+//    existence. E.g. dist/guides/ci/index.html + ../packages/git-github/
+//    -> dist/packages/git-github/
+// 2. Absolute /hrefs: strip BASE_PATH prefix, check dist/ + remaining path
 function isInternalLink(href, filePath) {
-  // 3. Relative ../hrefs from dist/packages/: navigate between packages — internal
-  if (href.startsWith('../')) {
-    const relativeToDist = join(distDir, '..', href);
-    // If file is in dist/packages/ and href goes ../.. to repo root, it's package navigation — internal
-    const inPackages = filePath.includes(`/packages/`);
-    if (inPackages) {
-      // Check if resolving goes to another package under dist/
-      const potentialPath = join(distDir, '..', href);
-      try {
-        statSync(potentialPath);
-        return true;
-      } catch {
-        // Check if it goes to another package's dist path
-        // e.g., from dist/packages/auth-oauth/../../guides/auth -> dist/packages/core/guides/auth or similar
-        // Since we can't know the exact target, treat package-internal ../ as internal
-        if (inPackages) {
-          return true; // package navigation is intentional
-        }
-      }
-    }
-    // For non-packages, check normally
+  // 1. Relative hrefs: resolve against the containing file's directory
+  if (href.startsWith('./') || href.startsWith('../')) {
     try {
-      statSync(relativeToDist);
+      statSync(join(dirname(filePath), href));
       return true;
     } catch {
       return false;
     }
   }
 
-  // 4. Absolute hrefs: strip BASE_PATH prefix, check dist/ + remaining path
+  // 2. Absolute hrefs: strip BASE_PATH prefix, check dist/ + remaining path
   if (href.startsWith('/')) {
     let path = href;
 
@@ -93,17 +75,6 @@ function isInternalLink(href, filePath) {
     const fullPath = join(distDir, path);
     try {
       statSync(fullPath);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  // 5. ./hrefs: resolve relative to dist/
-  if (href.startsWith('./')) {
-    const relativePath = join(distDir, href.slice(2));
-    try {
-      statSync(relativePath);
       return true;
     } catch {
       return false;
