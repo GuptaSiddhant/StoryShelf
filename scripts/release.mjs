@@ -298,10 +298,11 @@ log(`new fixed version: ${newVersion}`);
 // 5.5 deno.json versions were bumped alongside package.json above (tsdown
 // regenerates them on build too).
 
-// 6. Dry-run publish check
-log("dry-run publish check: nub publish -r --dry-run --provenance");
+// 6. Dry-run publish check (packaging only — no --provenance, which needs an
+// OIDC environment unavailable on dev machines; CI's real publish exercises it).
+log("dry-run publish check: nub publish -r --dry-run");
 try {
-  run("nub publish -r --dry-run --provenance --no-git-checks");
+  run("nub publish -r --dry-run --no-git-checks");
 } catch {
   error("publish dry-run failed");
   if (!dryRun) {
