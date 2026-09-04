@@ -21,6 +21,11 @@
   "publishConfig": {
     "access": "public"
   },
+  "jsr": {
+    "runtimeCompat": {
+      "node": true
+    }
+  },
   "files": [
     "dist"
   ],

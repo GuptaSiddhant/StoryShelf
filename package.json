@@ -28,6 +28,7 @@
     "core:dev": "nub run --filter @storyshelf/core dev",
     "cli": "nub run --filter @storyshelf/cli start",
     "docs": "nub run --filter website start",
+    "jsr": "nub ./scripts/jsr.mjs",
     "serve": "nub run --filter dev-server serve",
     "fmt": "turbo fmt",
     "lint": "turbo lint",

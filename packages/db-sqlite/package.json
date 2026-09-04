@@ -25,6 +25,11 @@
       "./package.json": "./package.json"
     }
   },
+  "jsr": {
+    "runtimeCompat": {
+      "node": true
+    }
+  },
   "files": [
     "dist"
   ],

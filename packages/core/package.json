@@ -1,84 +1,26 @@
 {
   "name": "@storyshelf/core",
   "version": "0.1.0",
-  "type": "module",
   "description": "StoryShelf core: Hono router, adapter interfaces, models, capture pipeline, diff, retention.",
+  "homepage": "https://github.com/GuptaSiddhant/storyshelf#readme",
+  "bugs": {
+    "url": "https://github.com/GuptaSiddhant/storyshelf/issues"
+  },
+  "license": "MIT",
   "author": {
     "name": "Siddhant Gupta",
     "url": "https://guptasiddhant.com"
   },
-  "license": "MIT",
-  "sideEffects": false,
   "repository": {
     "type": "git",
     "url": "git+https://github.com/GuptaSiddhant/storyshelf.git",
     "directory": "packages/core"
   },
-  "homepage": "https://github.com/GuptaSiddhant/storyshelf#readme",
-  "bugs": {
-    "url": "https://github.com/GuptaSiddhant/storyshelf/issues"
-  },
-  "publishConfig": {
-    "access": "public",
-    "exports": {
-      ".": "./dist/index.mjs",
-      "./adapter/auth": "./dist/adapter/auth.mjs",
-      "./adapter/capture-runner": "./dist/adapter/capture-runner.mjs",
-      "./adapter/database": "./dist/adapter/database.mjs",
-      "./adapter/git-host": "./dist/adapter/git-host.mjs",
-      "./adapter/git-host/helpers": "./dist/adapter/git-host/helpers.mjs",
-      "./adapter/storage": "./dist/adapter/storage.mjs",
-      "./ddl": "./dist/ddl.mjs",
-      "./models/baseline": "./dist/models/baseline.mjs",
-      "./models/build": "./dist/models/build.mjs",
-      "./models/comment": "./dist/models/comment.mjs",
-      "./models/label": "./dist/models/label.mjs",
-      "./models/member": "./dist/models/member.mjs",
-      "./models/project": "./dist/models/project.mjs",
-      "./models/snapshot": "./dist/models/snapshot.mjs",
-      "./models/token": "./dist/models/token.mjs",
-      "./models/webhook": "./dist/models/webhook.mjs",
-      "./schema": "./dist/schema.mjs",
-      "./types": "./dist/types.mjs",
-      "./package.json": "./package.json"
-    }
-  },
   "files": [
     "dist"
   ],
-  "scripts": {
-    "build": "tsdown",
-    "dev": "tsdown -w",
-    "fmt": "oxfmt ./src",
-    "lint": "oxlint --type-aware --type-check ./src",
-    "lint:fix": "nub run lint -- --fix",
-    "prepublishOnly": "nub run build",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
-    "test:watch": "vitest"
-  },
-  "dependencies": {
-    "@hono/swagger-ui": "^0.6.1",
-    "@hono/zod-openapi": "^1.1.5",
-    "adm-zip": "^0.6.0",
-    "drizzle-orm": "^0.44.0",
-    "hono": "^4.11.0",
-    "pino": "^10.3.1",
-    "pixelmatch": "^7.1.0",
-    "pngjs": "^7.0.0",
-    "zod": "^4.2.0"
-  },
-  "devDependencies": {
-    "@types/node": "catalog:",
-    "@types/pngjs": "^6.0.5",
-    "@vitest/coverage-v8": "catalog:",
-    "oxfmt": "catalog:",
-    "oxlint": "catalog:",
-    "oxlint-tsgolint": "catalog:",
-    "tsdown": "catalog:",
-    "typescript": "catalog:",
-    "vitest": "catalog:"
-  },
+  "type": "module",
+  "sideEffects": false,
   "types": "./dist/index.d.mts",
   "exports": {
     ".": {
@@ -158,5 +100,72 @@
       "default": "./dist/types.mjs"
     },
     "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.mjs",
+      "./adapter/auth": "./dist/adapter/auth.mjs",
+      "./adapter/capture-runner": "./dist/adapter/capture-runner.mjs",
+      "./adapter/database": "./dist/adapter/database.mjs",
+      "./adapter/git-host": "./dist/adapter/git-host.mjs",
+      "./adapter/git-host/helpers": "./dist/adapter/git-host/helpers.mjs",
+      "./adapter/storage": "./dist/adapter/storage.mjs",
+      "./ddl": "./dist/ddl.mjs",
+      "./models/baseline": "./dist/models/baseline.mjs",
+      "./models/build": "./dist/models/build.mjs",
+      "./models/comment": "./dist/models/comment.mjs",
+      "./models/label": "./dist/models/label.mjs",
+      "./models/member": "./dist/models/member.mjs",
+      "./models/project": "./dist/models/project.mjs",
+      "./models/snapshot": "./dist/models/snapshot.mjs",
+      "./models/token": "./dist/models/token.mjs",
+      "./models/webhook": "./dist/models/webhook.mjs",
+      "./schema": "./dist/schema.mjs",
+      "./types": "./dist/types.mjs",
+      "./package.json": "./package.json"
+    },
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown -w",
+    "fmt": "oxfmt ./src",
+    "lint": "oxlint --type-aware --type-check ./src",
+    "lint:fix": "nub run lint -- --fix",
+    "prepublishOnly": "nub run build",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@hono/swagger-ui": "^0.6.1",
+    "@hono/zod-openapi": "^1.1.5",
+    "adm-zip": "^0.6.0",
+    "drizzle-orm": "^0.44.0",
+    "hono": "^4.11.0",
+    "pino": "^10.3.1",
+    "pixelmatch": "^7.1.0",
+    "pngjs": "^7.0.0",
+    "zod": "^4.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/pngjs": "^6.0.5",
+    "@vitest/coverage-v8": "catalog:",
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:",
+    "oxlint-tsgolint": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "jsr": {
+    "runtimeCompat": {
+      "node": true,
+      "deno": true,
+      "bun": true,
+      "workerd": false,
+      "browser": false
+    }
   }
 }

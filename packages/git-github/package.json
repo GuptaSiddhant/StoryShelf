@@ -25,6 +25,15 @@
       "./package.json": "./package.json"
     }
   },
+  "jsr": {
+    "runtimeCompat": {
+      "node": true,
+      "deno": true,
+      "browser": false,
+      "workerd": false,
+      "bun": true
+    }
+  },
   "files": [
     "dist"
   ],
