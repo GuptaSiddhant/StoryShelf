@@ -5,6 +5,7 @@ import { findPrNumber } from "./pr.ts";
 
 import type { Logger } from "@storyshelf/core/types";
 
+/** Create or update the StoryShelf review comment on a pull request. */
 export async function upsertPrComment(opts: {
   octokit: Octokit;
   owner: string;

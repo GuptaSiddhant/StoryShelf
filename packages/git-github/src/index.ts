@@ -59,6 +59,7 @@ function createGitHubStatusAdapter(options: GitHubStatusOptions): GitHostAdapter
   };
 }
 
+/** GitHub commit-status provider for StoryShelf merge gates. */
 export const gitHubHost: GitHostProvider = {
   metadata: getMetadata(),
   create(opts: { config: unknown; token: string; logger?: Logger }): GitHostAdapter {

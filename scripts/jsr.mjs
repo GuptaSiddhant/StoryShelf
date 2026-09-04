@@ -34,6 +34,10 @@
  * Each PATCH carries a single field, since JSR's UpdatePackageRequest is a
  * oneOf. Run it after adding a new public `packages/<name>/package.json`
  * and it will be registered automatically.
+ *
+ * Runtime-compat convention: `node: true` implies `deno: true` + `bun: true`
+ * (both runtimes target Node compatibility); `browser`/`workerd` are marked
+ * explicitly only when verified.
  */
 
 import { readFileSync } from "node:fs";

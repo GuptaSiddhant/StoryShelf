@@ -4,6 +4,7 @@ import type { GitHostProvider } from "@storyshelf/core";
 
 declare const __PKG_VERSION__: string | undefined;
 
+/** Describe the GitLab provider (name, version, config schema). */
 export function getMetadata(): GitHostProvider["metadata"] {
   return {
     name: "GitLab",

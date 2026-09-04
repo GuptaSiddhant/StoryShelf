@@ -4,6 +4,7 @@ import { findMrIid } from "./pr.ts";
 
 import type { Logger } from "@storyshelf/core/types";
 
+/** Create or update the StoryShelf review note on a merge request. */
 export async function upsertMrNote(opts: {
   owner: string;
   repo: string;

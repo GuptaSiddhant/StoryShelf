@@ -23,7 +23,11 @@
   },
   "jsr": {
     "runtimeCompat": {
-      "node": true
+      "node": true,
+      "deno": true,
+      "browser": false,
+      "workerd": false,
+      "bun": true
     }
   },
   "files": [

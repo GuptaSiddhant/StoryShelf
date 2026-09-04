@@ -26,6 +26,7 @@ export interface S3StorageOptions {
   client?: S3Client;
 }
 
+/** Join an optional key prefix with a storage path. */
 export function s3Key(prefix: string, path: string): string {
   return prefix === "" ? path : `${prefix}/${path}`;
 }

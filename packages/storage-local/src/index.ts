@@ -14,12 +14,6 @@ async function pathExists(target: string): Promise<boolean> {
   }
 }
 
-/**
- * Create a local filesystem-backed StorageAdapter rooted at the given directory.
- *
- * @param dataDir - Root directory in which all stored files live.
- * @returns A StorageAdapter that reads and writes files under `dataDir`.
- */
 function toAbsolute(root: string, path: string): string {
   const target = resolve(root, path);
   const rel = relative(root, target);
@@ -43,6 +37,12 @@ async function walk(root: string, dir: string): Promise<string[]> {
   return nested.flat();
 }
 
+/**
+ * Create a local filesystem-backed StorageAdapter rooted at the given directory.
+ *
+ * @param dataDir - Root directory in which all stored files live.
+ * @returns A StorageAdapter that reads and writes files under `dataDir`.
+ */
 export function createLocalStorage(dataDir: string): StorageAdapter {
   const root = resolve(dataDir);
 

@@ -60,6 +60,7 @@ function createGitLabStatusAdapter(options: GitLabStatusOptions): GitHostAdapter
   };
 }
 
+/** GitLab commit-status provider for StoryShelf merge gates. */
 export const gitLabHost: GitHostProvider = {
   metadata: getMetadata(),
   create(opts: { config: unknown; token: string; logger?: Logger }): GitHostAdapter {

@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+/** Validation schema for the GitLab provider config (`owner` + `repo` + optional `host`). */
 export const gitlabConfigSchema = z.object({
   owner: z.string().min(1),
   repo: z.string().min(1),

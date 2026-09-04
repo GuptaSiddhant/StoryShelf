@@ -29,6 +29,7 @@ interface ActiveRun {
 
 const activeRuns = new Map<string, ActiveRun>();
 
+/** Input for a Playwright capture run over a built Storybook directory. */
 export interface PlaywrightRenderInput {
   buildId: string;
   storybookDir: string;
@@ -39,6 +40,7 @@ export interface PlaywrightRenderInput {
   playTimeoutMs?: number;
 }
 
+/** Create a CaptureRunner that renders Storybook stories with Playwright. */
 export function createPlaywrightCaptureRunner(): CaptureRunner {
   return {
     metadata: {
@@ -166,7 +168,7 @@ async function captureScreenshot(
                 channel?: { on: (e: string, cb: (err: unknown) => void) => void };
               };
             };
-            const preview = win.__STORYBOOK_PREVIEW__;
+            const preview = win["__STORYBOOK_PREVIEW__"];
             if (!preview) return;
             // Try channel-based error capture for play failures
             let playError: unknown = null;
@@ -176,19 +178,29 @@ async function captureScreenshot(
             // Storybook channel emits playFunctionThrewException on failure
             try {
               preview.channel?.on("playFunctionThrewException", handler);
-            } catch {}
+            } catch {
+              // Channel hookup is best-effort; play still runs without it.
+            }
             // Try direct executePlay if available (custom StoryShelf preview addition)
             if (preview.executePlay) {
               await Promise.race([
                 preview.executePlay(storyId),
-                new Promise((_, reject) => setTimeout(() => reject(new Error(`play timeout after ${timeoutMs}ms`)), timeoutMs)),
+                new Promise((_, reject) => {
+                  setTimeout(() => {
+                    reject(new Error(`play timeout after ${timeoutMs}ms`));
+                  }, timeoutMs);
+                }),
               ]);
             } else if (preview.storyStore?.fromId) {
-              const story = preview.storyStore.fromId(storyId) as unknown as { play?: (ctx: unknown) => Promise<void> };
-              if (story?.play) {
+              const loaded = preview.storyStore.fromId(storyId) as unknown as { play?: (ctx: unknown) => Promise<void> };
+              if (loaded?.play) {
                 await Promise.race([
-                  story.play({ canvasElement: globalThis.document.getElementById("storybook-root") }),
-                  new Promise((_, reject) => setTimeout(() => reject(new Error(`play timeout after ${timeoutMs}ms`)), timeoutMs)),
+                  loaded.play({ canvasElement: globalThis.document.querySelector("#storybook-root") }),
+                  new Promise((_, reject) => {
+                    setTimeout(() => {
+                      reject(new Error(`play timeout after ${timeoutMs}ms`));
+                    }, timeoutMs);
+                  }),
                 ]);
               }
             }
@@ -197,7 +209,7 @@ async function captureScreenshot(
           { storyId: story.id, timeoutMs: timeout },
         );
       } catch (error) {
-        throw new Error(`play failed: ${messageOf(error)}`);
+        throw new Error(`play failed: ${messageOf(error)}`, { cause: error });
       }
     }
     // Playwright page.screenshot supports animations: disabled to freeze CSS animations

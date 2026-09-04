@@ -7,6 +7,7 @@ import { mapStatus } from "./mapper.ts";
 import type { CheckStatus } from "@storyshelf/core";
 import type { Logger } from "@storyshelf/core/types";
 
+/** Post a StoryShelf build status to a GitLab commit SHA. */
 export async function postCommitStatus(opts: {
   owner: string;
   repo: string;

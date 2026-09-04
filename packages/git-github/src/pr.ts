@@ -1,5 +1,6 @@
 import type { Octokit } from "@octokit/rest";
 
+/** Find the pull request number associated with a commit SHA, if any. */
 export async function findPrNumber(opts: {
   octokit: Octokit;
   owner: string;

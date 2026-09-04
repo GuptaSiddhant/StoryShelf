@@ -4,6 +4,7 @@ import type { Logger } from "@storyshelf/core/types";
 
 import { findPrNumber } from "./pr.ts";
 
+/** Check whether the pull request for a commit SHA has been merged. */
 export async function checkIsMerged(opts: {
   octokit: Octokit;
   owner: string;

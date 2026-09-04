@@ -7,6 +7,7 @@ import { mapStatus } from "./mapper.ts";
 
 import type { Logger } from "@storyshelf/core/types";
 
+/** Post a StoryShelf build status to a GitHub commit SHA. */
 export async function postCommitStatus(opts: {
   octokit: Octokit;
   owner: string;

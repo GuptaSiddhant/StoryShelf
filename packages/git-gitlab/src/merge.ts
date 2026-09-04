@@ -4,6 +4,7 @@ import { findMrIid } from "./pr.ts";
 
 import type { Logger } from "@storyshelf/core/types";
 
+/** Check whether the merge request for a commit SHA has been merged. */
 export async function checkIsMerged(opts: {
   owner: string;
   repo: string;

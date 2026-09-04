@@ -3,6 +3,7 @@ import { stat } from "node:fs/promises";
 import { createServer, type Server, type ServerResponse } from "node:http";
 import { extname, join, normalize, sep } from "node:path";
 
+/** A local HTTP server serving a built Storybook directory for capture. */
 export interface StaticServer {
   url: string;
   close(): Promise<void>;
@@ -79,6 +80,12 @@ async function closeServer(server: Server): Promise<void> {
   });
 }
 
+/**
+ * Serve a built Storybook directory over HTTP on 127.0.0.1 for capture.
+ *
+ * @param rootDir - Directory containing the built Storybook (`index.html` entry).
+ * @returns The server URL and a `close` function to stop it.
+ */
 export async function createStaticServer(rootDir: string): Promise<StaticServer> {
   const root = normalize(rootDir);
   const info = await stat(root).catch(() => null);
