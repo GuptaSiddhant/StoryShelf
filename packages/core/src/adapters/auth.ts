@@ -2,7 +2,7 @@ import type { ProjectRole, SiteRole } from "../types.ts";
 /**
  * Auth adapter interface: authenticate users and resolve project access.
  */
-import type { AdapterMetadata } from "./metadata.ts";
+import type { Adapter } from "./metadata.ts";
 
 /** Shared session cookie name used by all auth adapters (ADR 0008). */
 export const SESSION_COOKIE = "storyshelf_session";
@@ -38,9 +38,7 @@ export interface ProjectAccess {
 }
 
 /** Pluggable authentication abstraction (ADR 0008). */
-export interface AuthAdapter {
-  /** Adapter identity. */
-  readonly metadata?: AdapterMetadata;
+export interface AuthAdapter extends Adapter<{ readonly category: "auth" }> {
   /** Resolve the current user from a request, or null if unauthenticated. */
   check(request: Request): Promise<AuthUser | null>;
   /** Create a session for a user and return a session token. */

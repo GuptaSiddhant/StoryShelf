@@ -67,7 +67,11 @@ function fakeRunner(overrides: Partial<CaptureRunner> = {}): {
     vi.fn(async () => {
       await Promise.resolve();
     });
-  const runner: CaptureRunner = { render, cancel };
+  const runner: CaptureRunner = {
+    metadata: { name: "Fake Runner", version: "0.0.0", kind: "fake", category: "capture-runner" },
+    render,
+    cancel,
+  };
   return { runner, render: render as ReturnType<typeof vi.fn> };
 }
 

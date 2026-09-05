@@ -96,6 +96,17 @@ export function createS3Storage(options: S3StorageOptions): StorageAdapter {
       version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
       description: "S3-compatible storage adapter",
       kind: "s3",
+      category: "storage",
+    },
+    lifecycle: {
+      init: async () => {
+        await client.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix, MaxKeys: 1 }));
+      },
+      health: async () => {
+        const started = Date.now();
+        await client.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix, MaxKeys: 1 }));
+        return { ok: true, latencyMs: Date.now() - started };
+      },
     },
     async read(path) {
       return await s3Read(ctx, path);

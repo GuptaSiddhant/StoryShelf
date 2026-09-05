@@ -16,6 +16,7 @@ export class InMemoryCaptureQueue implements CaptureQueue {
     version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
     description: "In-process capture queue",
     kind: "memory",
+    category: "capture-queue",
   } as const;
 
   private readonly entries = new Map<string, QueueEntry>();

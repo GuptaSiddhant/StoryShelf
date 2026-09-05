@@ -10,6 +10,7 @@ export function getMetadata(): GitHostProvider["metadata"] {
     version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
     description: "Commit statuses via GitLab API",
     kind: "gitlab",
+    category: "git-host",
     logo: "gitlab",
     schema: gitlabConfigSchema,
   };

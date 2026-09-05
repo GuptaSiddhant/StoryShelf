@@ -15,7 +15,6 @@ afterAll(() => {
 describe("dev server router assembly", () => {
   it("boots and serves the HTML UI and the JSON API", async () => {
     const database = createSqliteDatabase(join(scratch, "shelf.db"));
-    await database.migrate();
     const storage = createLocalStorage(scratch);
 
     const app = createShelfRouter({
@@ -23,6 +22,7 @@ describe("dev server router assembly", () => {
       storage,
       config: { scratchDir: scratch },
     });
+    await app.lifecycle.init();
 
     const html = await app.request("/");
     expect(html.status).toBe(200);
@@ -31,6 +31,6 @@ describe("dev server router assembly", () => {
     expect(api.status).toBe(200);
     await expect(api.json()).resolves.toEqual([]);
 
-    await database.close();
+    await app.lifecycle.close();
   });
 });

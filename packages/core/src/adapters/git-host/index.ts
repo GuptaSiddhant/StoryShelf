@@ -2,25 +2,19 @@
  * Git-host adapter interface: commit statuses and review comments for merge gates.
  */
 import type { Logger } from "pino";
-import type { GitAdapterMetadata } from "../metadata.ts";
+import type { Adapter, GitAdapterMetadata } from "../metadata.ts";
 
 /** Status of a git-host provider check. */
 export type CheckStatus = "pending" | "success" | "failure";
 
 /** Descriptor — registered at startup, validates per-project config. */
-export interface GitHostProvider {
-  /** Adapter identity (name, version, description, kind="github", logo, schema). */
-  readonly metadata: GitAdapterMetadata;
-
+export interface GitHostProvider extends Adapter<GitAdapterMetadata> {
   /** Create a configured instance bound to a project config + decrypted token. */
   create(opts: { config: unknown; token: string; logger?: Logger }): GitHostAdapter;
 }
 
 /** Runtime — bound to a project config + token, posts statuses/comments. */
-export interface GitHostAdapter {
-  /** Adapter identity. */
-  readonly metadata: GitAdapterMetadata;
-
+export interface GitHostAdapter extends Adapter<GitAdapterMetadata> {
   /** Set the status of a commit. */
   setStatus(opts: {
     context: string;

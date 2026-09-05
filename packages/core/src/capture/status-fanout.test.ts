@@ -26,7 +26,12 @@ function fakeRunner(overrides: Partial<CaptureRunner> = {}): {
   runner: CaptureRunner;
   render: ReturnType<typeof vi.fn>;
 } {
-  const metadata = { name: "Fake Runner", version: "0.0.0", kind: "fake" } as const;
+  const metadata = {
+    name: "Fake Runner",
+    version: "0.0.0",
+    kind: "fake",
+    category: "capture-runner",
+  } as const;
   const result: RenderResult = {
     captures: [
       {
@@ -64,6 +69,7 @@ function fakeGitProvider(key: string, calls: StatusCall[], tokens: string[]): Gi
       name: `Fake ${key}`,
       version: "0.0.0",
       kind: key,
+      category: "git-host",
       schema: configSchema,
     },
     create(opts: { config: unknown; token: string; logger?: Logger }): GitHostAdapter {

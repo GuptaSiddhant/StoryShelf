@@ -25,6 +25,7 @@ export function createTursoDatabase(options: { url: string; authToken?: string }
       version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
       description: "Turso/libSQL database adapter",
       kind: "turso",
+      category: "database",
     },
     migrate: async () => {
       await client.executeMultiple(DDL);

@@ -12,6 +12,7 @@ const unreachable = async (): Promise<never> => {
 
 /** Adapters that throw if touched — route registration alone yields the spec. */
 const stubDatabase: DatabaseAdapter = {
+  metadata: { name: "Stub DB", version: "0.0.0", kind: "stub", category: "database" },
   insert: unreachable,
   update: unreachable,
   get: unreachable,
@@ -19,11 +20,10 @@ const stubDatabase: DatabaseAdapter = {
   list: unreachable,
   count: unreachable,
   all: unreachable,
-  migrate: unreachable,
-  close: unreachable,
 };
 
 const stubStorage: StorageAdapter = {
+  metadata: { name: "Stub Storage", version: "0.0.0", kind: "stub", category: "storage" },
   read: unreachable,
   write: unreachable,
   delete: unreachable,

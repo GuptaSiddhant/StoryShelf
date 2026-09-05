@@ -2,12 +2,10 @@
  * Storage adapter interface: binary objects for screenshots, diffs, and archives.
  */
 import type { Buffer } from "node:buffer";
-import type { AdapterMetadata } from "./metadata.ts";
+import type { Adapter } from "./metadata.ts";
 
 /** Blob storage abstraction for screenshots, diffs and Storybook archives. */
-export interface StorageAdapter {
-  /** Adapter identity. */
-  readonly metadata?: AdapterMetadata;
+export interface StorageAdapter extends Adapter<{ readonly category: "storage" }> {
   /** Read the bytes stored at `path`. */
   read(path: string): Promise<Buffer>;
   /** Write `data` to `path`, creating parent directories as needed. */

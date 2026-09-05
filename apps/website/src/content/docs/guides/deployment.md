@@ -154,6 +154,7 @@ export const app = createShelfRouter({
   config: { scratchDir: "/tmp/scratch" },
   auth: ...,
 });
+await app.lifecycle.init(); // migrations + credential checks, fail fast
 ```
 
 This runs on **any** platform that supports Node-compatible `fetch` + `crypto` + `sqlite`/`libsql` — including all clouds above.

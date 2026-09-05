@@ -31,6 +31,17 @@ const app = createShelfRouter({
 serve({ fetch: app.fetch, port: 3000 });
 ```
 
+Adapter `init` hooks kick off in the background when the router is created. Await them before serving for fail-fast startup (or let the first request gate on settlement), and close adapters on shutdown:
+
+```ts
+await app.lifecycle.init();
+
+const server = serve({ fetch: app.fetch, port: 3000 });
+process.on("SIGTERM", () => {
+  app.lifecycle.close().then(() => server.close()).catch(() => {});
+});
+```
+
 ## Main APIs
 
 The barrel (`@storyshelf/core`) exports only the router and its types
@@ -45,7 +56,7 @@ Everything else lives under a subpath:
 
 ## Adapter contracts
 
-The router requires a `DatabaseAdapter` and `StorageAdapter`. `AuthAdapter`, `CaptureRunner`, a pino `Logger`, and git providers are optional. All adapters are constructor-injected, so each deployment can choose its own database, storage, and authentication implementation. Logging uses pino (`createShelfLogger`), with optional transports for hosted observability platforms. Every adapter **instance** exposes `metadata: { name, version, description, kind }` (`version` injected via `__PKG_VERSION__` at build); adapter-specific extensions live in the same object (git adds `schema` + `logo`).
+The router requires a `DatabaseAdapter` and `StorageAdapter`. `AuthAdapter`, `CaptureRunner`, a pino `Logger`, and git providers are optional. All adapters are constructor-injected, so each deployment can choose its own database, storage, and authentication implementation. Logging uses pino (`createShelfLogger`), with optional transports for hosted observability platforms. Every adapter **instance** exposes mandatory `metadata: { name, version, description, kind, category }` (`version` injected via `__PKG_VERSION__` at build; `category` is the family — `database`, `storage`, `auth`, `capture-runner`, `capture-queue`, `git-host` — while `kind` stays an open string so third-party implementations are never blocked) plus an optional `lifecycle: { init?, close?, health? }` for setup, teardown, and probes. Adapter-specific extensions live in the same metadata object (git adds `schema` + `logo`).
 
 Git integration is a `GitHost` pair:
 

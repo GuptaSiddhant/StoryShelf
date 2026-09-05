@@ -2,6 +2,8 @@ import { libConfig } from "../../config/tsdown.ts";
 
 export default libConfig({
   index: "./src/index.tsx",
+  "adapter/metadata": "./src/adapters/metadata.ts",
+  "adapter/init": "./src/adapters/init.ts",
   "adapter/database": "./src/adapters/database.ts",
   "adapter/storage": "./src/adapters/storage.ts",
   "adapter/capture-runner": "./src/adapters/capture-runner.ts",

@@ -24,18 +24,17 @@ const database = createTursoDatabase({
   url: process.env.TURSO_DATABASE_URL!,
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
-await database.migrate();
-
 const app = createShelfRouter({ database, storage });
+await app.lifecycle.init();
 ```
 
 ## API
 
 ### `createTursoDatabase(options: { url: string; authToken?: string }): DatabaseAdapter`
 
-Creates a libSQL client and returns a `DatabaseAdapter`. `url` is the Turso database URL; `authToken` is the optional authentication token. Call `migrate()` before use to apply the schema.
+Creates a libSQL client and returns a `DatabaseAdapter`. `url` is the Turso database URL; `authToken` is the optional authentication token. Schema migrations run inside the adapter's `lifecycle.init` (via `await app.lifecycle.init()`).
 
-The returned adapter implements every method of the `DatabaseAdapter` interface (`insert`, `update`, `get`, `remove`, `list`, `count`, `all`, `migrate`, `close`).
+The returned adapter implements every method of the `DatabaseAdapter` interface (`insert`, `update`, `get`, `remove`, `list`, `count`, `all`) plus `metadata`/`lifecycle` from the shared `Adapter` base.
 
 ## How it fits in
 

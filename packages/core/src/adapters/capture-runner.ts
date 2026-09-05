@@ -3,7 +3,7 @@
  */
 import type { Logger } from "pino";
 import type { StoryEntry, Viewport } from "../capture/adapter.ts";
-import type { AdapterMetadata } from "./metadata.ts";
+import type { Adapter } from "./metadata.ts";
 
 export type { JobStatus } from "./capture-queue.ts";
 export type { StoryEntry, StorySourceAdapter, Viewport } from "../capture/adapter.ts";
@@ -47,9 +47,7 @@ export interface RenderResult {
  * orchestrator's job (see `capture/orchestrator.ts`), keeping every adapter
  * implementation free of server concerns.
  */
-export interface CaptureRunner {
-  /** Adapter identity. */
-  readonly metadata?: AdapterMetadata;
+export interface CaptureRunner extends Adapter<{ readonly category: "capture-runner" }> {
   /**
    * Render configured viewports for the given stories of an extracted
    * Storybook and return the screenshot buffers.

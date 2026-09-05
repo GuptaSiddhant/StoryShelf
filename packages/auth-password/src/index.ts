@@ -144,12 +144,26 @@ export function createPasswordAuth(options: PasswordAuthOptions): PasswordAuth {
       version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
       description: "Shared-password auth adapter",
       kind: "password",
+      category: "auth",
     },
+    lifecycle: buildLifecycle(options),
     check,
     createSession,
     async destroySession() {
       await Promise.resolve();
     },
     login,
+  };
+}
+
+/** Lifecycle: fail fast when password or secret is missing. */
+function buildLifecycle(options: PasswordAuthOptions): PasswordAuth["lifecycle"] {
+  return {
+    init: async () => {
+      if (options.password === "" || options.secret === "") {
+        throw new Error("Password auth requires a non-empty password and secret");
+      }
+      await Promise.resolve();
+    },
   };
 }

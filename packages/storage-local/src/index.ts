@@ -51,6 +51,17 @@ export function createLocalStorage(dataDir: string): StorageAdapter {
       version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
       description: "Local filesystem storage adapter",
       kind: "local",
+      category: "storage",
+    },
+    lifecycle: {
+      init: async () => {
+        await mkdir(root, { recursive: true });
+      },
+      health: async () => {
+        const started = Date.now();
+        const ok = await pathExists(root);
+        return { ok, latencyMs: Date.now() - started };
+      },
     },
     async read(path) {
       return await readFile(toAbsolute(root, path));

@@ -17,10 +17,9 @@ nub add @storyshelf/db-sqlite
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 
 const database = createSqliteDatabase("./data/shelf.db");
-await database.migrate();
 ```
 
-Call `migrate()` before creating or serving the router. Call `close()` during shutdown. The adapter implements `DatabaseAdapter`: `insert`, `update`, `get`, `remove`, `list`, `count`, `all`, `migrate`, and `close`.
+Migrations run inside the adapter's `lifecycle.init` — await them via `app.lifecycle.init()` after creating the router, and close via `app.lifecycle.close()` on shutdown. The adapter implements `DatabaseAdapter`: `insert`, `update`, `get`, `remove`, `list`, `count`, and `all`, plus `metadata`/`lifecycle` from the shared `Adapter` base.
 
 ## When to use it
 

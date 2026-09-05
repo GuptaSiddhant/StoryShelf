@@ -64,6 +64,7 @@ export function createSqliteDatabase(path: string): DatabaseAdapter {
       version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
       description: "SQLite database adapter (node:sqlite + Drizzle)",
       kind: "sqlite",
+      category: "database",
     },
     migrate: () => {
       sqlite.exec(DDL);

@@ -1,9 +1,18 @@
 import { projects } from "@storyshelf/core/schema";
+import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import { createShelfLogger } from "@storyshelf/core/logger";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createTursoDatabase } from "./index.ts";
+
+const silentLogger = createShelfLogger({ level: "silent" });
+
+/** Run the adapter's init hook (migrations live there now). */
+async function initDb(db: DatabaseAdapter): Promise<void> {
+  await db.lifecycle?.init?.({ config: {}, logger: silentLogger });
+}
 
 function createTempTurso(): { dir: string; db: ReturnType<typeof createTursoDatabase> } {
   const dir = mkdtempSync(join(tmpdir(), "storyshelf-turso-"));
@@ -15,14 +24,14 @@ async function cleanupTurso(
   dir: string,
   db: ReturnType<typeof createTursoDatabase>,
 ): Promise<void> {
-  await db.close();
+  await db.lifecycle?.close?.();
   rmSync(dir, { recursive: true, force: true });
 }
 
 describe("createTursoDatabase", () => {
   it("migrates and inserts a project", async () => {
     const { dir, db } = createTempTurso();
-    await db.migrate();
+    await initDb(db);
 
     const now = new Date().toISOString();
     const project = await db.insert(projects, {
@@ -45,7 +54,7 @@ describe("createTursoDatabase", () => {
 
   it("updates and removes a project", async () => {
     const { dir, db } = createTempTurso();
-    await db.migrate();
+    await initDb(db);
 
     await db.insert(projects, {
       id: "p1",

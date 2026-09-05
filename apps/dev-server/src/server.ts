@@ -48,8 +48,19 @@ const app = createShelfRouter({
   },
 });
 
-await database.migrate();
+await app.lifecycle.init();
 
-serve({ fetch: app.fetch, port }, () => {
+const server = serve({ fetch: app.fetch, port }, () => {
   logger.info({ port, dataDir }, "StoryShelf dev server listening");
+});
+
+const shutdown = async (): Promise<void> => {
+  await app.lifecycle.close();
+  server.close();
+};
+process.on("SIGTERM", () => {
+  shutdown().catch(() => {}); // Intentionally empty — shutdown errors are already logged
+});
+process.on("SIGINT", () => {
+  shutdown().catch(() => {}); // Intentionally empty — shutdown errors are already logged
 });

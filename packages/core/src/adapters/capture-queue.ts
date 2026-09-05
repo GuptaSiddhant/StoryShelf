@@ -1,4 +1,4 @@
-import type { AdapterMetadata } from "./metadata.ts";
+import type { Adapter } from "./metadata.ts";
 
 /** Lifecycle status of a queued capture job. */
 export type JobStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
@@ -35,10 +35,7 @@ export interface CaptureJob {
  *
  * `status`/`active`/`recent` back the live queue view regardless of transport.
  */
-export interface CaptureQueue {
-  /** Adapter identity. */
-  readonly metadata?: AdapterMetadata;
-
+export interface CaptureQueue extends Adapter<{ readonly category: "capture-queue" }> {
   /** Submit a build for capture. Resolves once the build is queued. */
   enqueue(job: CaptureJob): Promise<void>;
   /** Return the current status entry for a build, or null if untracked. */

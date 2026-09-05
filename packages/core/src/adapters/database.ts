@@ -4,7 +4,7 @@
 import type { SQL } from "drizzle-orm";
 import { eq, getTableColumns } from "drizzle-orm";
 import type { AnySQLiteTable, SQLiteColumn } from "drizzle-orm/sqlite-core";
-import type { AdapterMetadata } from "./metadata.ts";
+import type { Adapter, AdapterLifecycle, AdapterMetadata } from "./metadata.ts";
 
 /** Options that narrow and page a list query. */
 export interface ListOptions {
@@ -19,9 +19,7 @@ export interface ListOptions {
 }
 
 /** Database abstraction over Drizzle tables, agnostic of the underlying driver. */
-export interface DatabaseAdapter {
-  /** Adapter identity. */
-  readonly metadata?: AdapterMetadata;
+export interface DatabaseAdapter extends Adapter<{ readonly category: "database" }> {
   /** Insert a row and return the inserted record. */
   insert<T extends AnySQLiteTable>(table: T, values: T["$inferInsert"]): Promise<T["$inferSelect"]>;
   /** Update a row by id and return the updated record. */
@@ -40,10 +38,6 @@ export interface DatabaseAdapter {
   count(table: AnySQLiteTable, where?: SQL): Promise<number>;
   /** Run an arbitrary SQL query and return typed rows. */
   all<T>(query: SQL): Promise<T[]>;
-  /** Apply any pending schema migrations. */
-  migrate(): Promise<void>;
-  /** Close the underlying database connection. */
-  close(): Promise<void>;
 }
 
 /** A value or a promise of one (sync node:sqlite vs async libSQL drivers). */
@@ -79,7 +73,7 @@ interface DrizzleLike {
 
 /** Driver-supplied identity plus lifecycle hooks. */
 export interface DrizzleAdapterOptions {
-  metadata: AdapterMetadata;
+  metadata: AdapterMetadata & { readonly category: "database" };
   migrate: () => Promise<void> | void;
   close: () => Promise<void> | void;
 }
@@ -110,6 +104,26 @@ function applyListOptions(query: DrizzleSelectChain, opts: ListOptions): Drizzle
 }
 
 /**
+ * Build the database lifecycle: migrations run in `init`, the connection
+ * closes in `close`. Close tolerates repeated calls (drivers may not).
+ */
+function buildLifecycle(options: DrizzleAdapterOptions): AdapterLifecycle {
+  let closed = false;
+  return {
+    init: async () => {
+      await options.migrate();
+    },
+    close: async () => {
+      if (closed) {
+        return;
+      }
+      closed = true;
+      await options.close();
+    },
+  };
+}
+
+/**
  * Build a {@link DatabaseAdapter} over any SQLite-compatible Drizzle
  * dialect. Sync results (node:sqlite) and promises (libSQL) are both
  * awaited, so drivers only supply connection setup, metadata, and the
@@ -119,6 +133,7 @@ export function createDrizzleAdapter(db: unknown, options: DrizzleAdapterOptions
   const drizzle = db as DrizzleLike;
   return {
     metadata: options.metadata,
+    lifecycle: buildLifecycle(options),
     insert: async <T extends AnySQLiteTable>(
       table: T,
       values: T["$inferInsert"],
@@ -139,11 +154,17 @@ export function createDrizzleAdapter(db: unknown, options: DrizzleAdapterOptions
       table: T,
       id: string,
     ): Promise<T["$inferSelect"] | null> =>
-      ((await drizzle.select().from(table).where(eq(idOf(table), id)).limit(1).get()) as
-        | T["$inferSelect"]
-        | undefined) ?? null,
+      ((await drizzle
+        .select()
+        .from(table)
+        .where(eq(idOf(table), id))
+        .limit(1)
+        .get()) as T["$inferSelect"] | undefined) ?? null,
     remove: async (table: AnySQLiteTable, id: string): Promise<void> => {
-      await drizzle.delete(table).where(eq(idOf(table), id)).run();
+      await drizzle
+        .delete(table)
+        .where(eq(idOf(table), id))
+        .run();
     },
     list: async <T extends AnySQLiteTable>(
       table: T,
@@ -156,11 +177,5 @@ export function createDrizzleAdapter(db: unknown, options: DrizzleAdapterOptions
     count: async (table: AnySQLiteTable, where?: SQL): Promise<number> =>
       await drizzle.$count(table, where),
     all: async <T>(query: SQL): Promise<T[]> => await drizzle.all(query),
-    migrate: async () => {
-      await options.migrate();
-    },
-    close: async () => {
-      await options.close();
-    },
   };
 }

@@ -5,6 +5,7 @@ import type { CaptureQueue } from "./adapters/capture-queue.ts";
 import type { CaptureRunner } from "./adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "./adapters/database.ts";
 import type { GitHostProvider } from "./adapters/git-host/index.ts";
+import type { AdapterCategory } from "./adapters/metadata.ts";
 import type { StorageAdapter } from "./adapters/storage.ts";
 
 /** Brand color theme for the server-rendered UI. */
@@ -38,6 +39,7 @@ export interface AdapterSnapshot {
   version: string;
   description?: string;
   kind: string;
+  category: AdapterCategory;
 }
 
 /** Shelf-level configuration (validated by {@link shelfConfigSchema}). */
@@ -70,6 +72,7 @@ const adapterSnapshotSchema: z.ZodType<AdapterSnapshot> = z.object({
   version: z.string(),
   description: z.string().optional(),
   kind: z.string(),
+  category: z.enum(["database", "storage", "auth", "capture-runner", "capture-queue", "git-host"]),
 });
 
 /** Zod schema validating the shelf-level configuration. */

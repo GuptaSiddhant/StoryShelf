@@ -16,6 +16,7 @@ const storageFail = async (): Promise<never> => {
 
 function stubDatabase(): DatabaseAdapter {
   return {
+    metadata: { name: "Stub DB", version: "0.0.0", kind: "stub", category: "database" },
     insert: dbFail,
     update: dbFail,
     get: dbFail,
@@ -23,13 +24,12 @@ function stubDatabase(): DatabaseAdapter {
     list: dbFail,
     count: dbFail,
     all: dbFail,
-    migrate: dbFail,
-    close: dbFail,
   };
 }
 
 function stubStorage(): StorageAdapter {
   return {
+    metadata: { name: "Stub Storage", version: "0.0.0", kind: "stub", category: "storage" },
     read: storageFail,
     write: storageFail,
     delete: storageFail,
@@ -41,6 +41,7 @@ function stubStorage(): StorageAdapter {
 const admin = { id: "user_1", email: "ada@example.com", name: "Ada", role: "admin" as const };
 
 const passwordAuth = {
+  metadata: { name: "Stub Auth", version: "0.0.0", kind: "stub", category: "auth" as const },
   check: async (request: Request): Promise<typeof admin | null> => {
     await Promise.resolve();
     const cookie = request.headers.get("cookie") ?? "";

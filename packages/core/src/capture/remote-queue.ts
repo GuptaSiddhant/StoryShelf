@@ -16,6 +16,14 @@ export interface RemoteCaptureQueueOptions {
  * Azure Storage Queues, or similar services.
  */
 export class RemoteCaptureQueue implements CaptureQueue {
+  readonly metadata = {
+    name: "Remote Queue",
+    version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
+    description: "Remote capture queue (serverless skeleton)",
+    kind: "remote",
+    category: "capture-queue",
+  } as const;
+
   constructor(private readonly options: RemoteCaptureQueueOptions) {}
 
   async enqueue(job: CaptureJob): Promise<void> {

@@ -47,6 +47,7 @@ export function createPlaywrightCaptureRunner(): CaptureRunner {
       version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
       description: "Playwright capture runner",
       kind: "playwright",
+      category: "capture-runner",
     },
     async render(input: PlaywrightRenderInput) {
       const active: ActiveRun = { cancelled: false, browser: null };

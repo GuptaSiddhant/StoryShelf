@@ -12,7 +12,7 @@ const fail = async (): Promise<never> => {
 
 function stubDatabase(): DatabaseAdapter {
   return {
-    metadata: { name: "Stub DB", version: "0.0.0", kind: "stub" },
+    metadata: { name: "Stub DB", version: "0.0.0", kind: "stub", category: "database" },
     insert: fail,
     update: fail,
     get: fail,
@@ -20,14 +20,12 @@ function stubDatabase(): DatabaseAdapter {
     list: fail,
     count: fail,
     all: fail,
-    migrate: fail,
-    close: fail,
   };
 }
 
 function stubStorage(): StorageAdapter {
   return {
-    metadata: { name: "Stub Storage", version: "0.0.0", kind: "stub" },
+    metadata: { name: "Stub Storage", version: "0.0.0", kind: "stub", category: "storage" },
     read: fail,
     write: fail,
     delete: fail,

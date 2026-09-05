@@ -224,7 +224,9 @@ export function createOAuthAuth(options: OAuthAuthOptions): OAuthAuth {
       version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
       description: "OAuth/OIDC auth adapter",
       kind: "oauth",
+      category: "auth",
     },
+    lifecycle: buildLifecycle(options),
     check,
     createSession,
     async destroySession() {
@@ -232,5 +234,17 @@ export function createOAuthAuth(options: OAuthAuthOptions): OAuthAuth {
     },
     handleCallback,
     loginUrl: (state: string) => buildLoginUrl(options, scopes, state),
+  };
+}
+
+/** Lifecycle: fail fast when OIDC wiring is missing. */
+function buildLifecycle(options: OAuthAuthOptions): OAuthAuth["lifecycle"] {
+  return {
+    init: async () => {
+      if (options.issuer === "" || options.clientId === "" || options.clientSecret === "") {
+        throw new Error("OAuth auth requires a non-empty issuer, clientId, and clientSecret");
+      }
+      await Promise.resolve();
+    },
   };
 }

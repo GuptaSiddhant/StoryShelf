@@ -123,6 +123,8 @@ function buildRouterLines(answers: Answers): string[] {
     `    scratchDir: dataDir,`,
     `  },`,
     `});`,
+    ``,
+    `await app.lifecycle.init();`,
   );
 
   return lines;
@@ -139,8 +141,19 @@ function generateServer(answers: Answers): string {
     ``,
     ...buildRouterLines(answers),
     ``,
-    `serve({ fetch: app.fetch, port }, () => {`,
+    `const server = serve({ fetch: app.fetch, port }, () => {`,
     `  logger.info({ port }, "StoryShelf server listening");`,
+    `});`,
+    ``,
+    `const shutdown = async () => {`,
+    `  await app.lifecycle.close();`,
+    `  server.close();`,
+    `};`,
+    `process.on("SIGTERM", () => {`,
+    `  shutdown().catch(() => {});`,
+    `});`,
+    `process.on("SIGINT", () => {`,
+    `  shutdown().catch(() => {});`,
     `});`,
     ``,
   ].join("\n");

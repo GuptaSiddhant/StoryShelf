@@ -20,10 +20,9 @@ const database = createTursoDatabase({
   url: process.env.TURSO_DATABASE_URL!,
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
-await database.migrate();
 ```
 
-`url` is required and `authToken` is optional for local or unsecured libSQL servers. Run `migrate()` before serving requests.
+`url` is required and `authToken` is optional for local or unsecured libSQL servers. Migrations run inside the adapter's `lifecycle.init` — await them via `app.lifecycle.init()` after creating the router.
 
 ## When to use it
 

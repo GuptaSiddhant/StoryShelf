@@ -106,7 +106,6 @@ async function createHarness(): Promise<void> {
   const dataDir = join(tmp, "data");
   await mkdir(dataDir, { recursive: true });
   const db = createSqliteDatabase(join(tmp, "shelf.db"));
-  await db.migrate();
   const storage = createLocalStorage(dataDir);
   const app = createShelfRouter({
     database: db,
@@ -114,6 +113,7 @@ async function createHarness(): Promise<void> {
     captureRunner: createPlaywrightCaptureRunner(),
     config: { captureConcurrency: 1, scratchDir: dataDir, purgeTtlDays: 30 },
   });
+  await app.lifecycle.init();
   harness = { app, db, storage, staticDir, tmp };
 }
 
@@ -130,7 +130,7 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
     if (!current) {
       return;
     }
-    await current.db.close();
+    await current.app.lifecycle.close();
     await rm(current.tmp, { recursive: true, force: true });
   });
 

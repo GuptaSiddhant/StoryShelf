@@ -1,5 +1,6 @@
 import {
   DeleteMessageCommand,
+  GetQueueAttributesCommand,
   ReceiveMessageCommand,
   SendMessageCommand,
   SQSClient,
@@ -73,6 +74,12 @@ export function createSqsCaptureQueue(options: SqsCaptureQueueOptions): CaptureQ
       version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
       description: "SQS-backed capture queue",
       kind: "sqs",
+      category: "capture-queue",
+    },
+    lifecycle: {
+      init: async () => {
+        await client.send(new GetQueueAttributesCommand({ QueueUrl: options.queueUrl }));
+      },
     },
     /**
      * Submit a build for capture. Resolves once the message is sent to SQS.

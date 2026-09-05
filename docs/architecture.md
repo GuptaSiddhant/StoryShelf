@@ -241,6 +241,16 @@ CI machine / local dev                  StoryShelf server
                                         9. orchestrator: update build/snapshot statuses
 ```
 
+### Adapter Identity & Lifecycle
+
+Every adapter extends the shared `Adapter<Extra>` base (`core/adapter/metadata`): mandatory `metadata: { name, version, description?, kind, category }` plus an optional `lifecycle: { init?, close?, health? }` sub-object. `category` (`database | storage | auth | capture-runner | capture-queue | git-host`) names the concern so metadata reads standalone; `kind` stays an open string (`sqlite`, `local`, `s3`, …) for third-party implementations. All hooks must be idempotent.
+
+`createShelfRouter` kicks every `lifecycle.init` eagerly via `Promise.allSettled` and exposes `app.lifecycle { ready, init(), close() }`: `await app.lifecycle.init()` before serving for fail-fast startup (database migrations run here — there is no top-level `migrate()`), otherwise the first request gates on settlement (503 with per-adapter failures); `await app.lifecycle.close()` on `SIGTERM`/`SIGINT`.
+
+### Health
+
+Two-tier, both ungated by init: `GET /api/v1/health` is open liveness (`{ status: "ok", uptimeSecs, version }`, no adapter I/O — the Fly/Docker probe path); `POST /api/v1/health` is site-admin deep readiness (`{ status, adapters: [{ category, kind, name, state, latencyMs?, detail? }] }`, 200 or 503, error text sanitized).
+
 ### Capture Renderer (pure adapter)
 
 Capture adapters are **pure renderers** (ADR 0015). They render screenshots from an already-extracted Storybook directory and return PNG buffers; they never touch the database, storage, or build status. A `CaptureRunner` implementation renders and returns:

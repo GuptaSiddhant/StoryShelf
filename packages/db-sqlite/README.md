@@ -22,19 +22,19 @@ import { createShelfRouter } from "@storyshelf/core";
 import { createLocalStorage } from "@storyshelf/storage-local";
 
 const database = createSqliteDatabase("./data/shelf.db");
-await database.migrate();
 
 const storage = createLocalStorage("./data");
 const app = createShelfRouter({ database, storage });
+await app.lifecycle.init();
 ```
 
 ## API
 
 ### `createSqliteDatabase(path: string): DatabaseAdapter`
 
-Opens (or creates) a SQLite database at `path` and returns a `DatabaseAdapter`. The connection enables WAL journal mode and a 5s busy timeout. Call `migrate()` before use to apply the schema (shared DDL from `@storyshelf/core`).
+Opens (or creates) a SQLite database at `path` and returns a `DatabaseAdapter`. The connection enables WAL journal mode and a 5s busy timeout. Schema migrations run inside the adapter's `lifecycle.init` (via `await app.lifecycle.init()`); teardown via `lifecycle.close` (idempotent).
 
-The returned adapter implements every method of the `DatabaseAdapter` interface (`insert`, `update`, `get`, `remove`, `list`, `count`, `all`, `migrate`, `close`).
+The returned adapter implements every method of the `DatabaseAdapter` interface (`insert`, `update`, `get`, `remove`, `list`, `count`, `all`) plus `metadata`/`lifecycle` from the shared `Adapter` base.
 
 ## How it fits in
 
