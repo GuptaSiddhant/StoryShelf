@@ -3,7 +3,7 @@ import type { ShelfApp } from "../index.tsx";
 import { isPublicBuild, BuildModel } from "../models/build.ts";
 import { LabelModel } from "../models/label.ts";
 import { ProjectModel } from "../models/project.ts";
-import { renderStorybookPage } from "../pages/storybook.tsx";
+import { renderStorybookPage, renderStorybookPreparingPage } from "../pages/storybook.tsx";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 import { getStore } from "../store.ts";
@@ -66,6 +66,13 @@ async function canViewBuild(
   }
   const role = await currentProjectRole(project.id);
   return Boolean(role && VIEW_ROLES.has(role));
+}
+
+/** Check whether a build's extracted statics are available for serving. */
+async function staticsReady(projectId: string, buildId: string): Promise<boolean> {
+  return await getStore().storage.exists(
+    posix.join(storybookDir(projectId, buildId), "iframe.html"),
+  );
 }
 
 /** Register the published Storybook resolver and static-asset routes. */
@@ -139,6 +146,9 @@ export function registerStorybook(app: ShelfApp): void {
     }
 
     if (rest === "") {
+      if (!(await staticsReady(project.id, build.id))) {
+        return c.html(renderStorybookPreparingPage(project, build, slug), 200);
+      }
       return c.html(renderStorybookPage(project, build, slug), 200);
     }
 

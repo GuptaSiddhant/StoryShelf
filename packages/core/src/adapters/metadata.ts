@@ -1,3 +1,6 @@
+/**
+ * Adapter metadata: identity, family, and health contracts shared by all adapters.
+ */
 import type { z } from "zod";
 import type { ShelfConfig } from "../config.ts";
 import type { Logger } from "../logger.ts";

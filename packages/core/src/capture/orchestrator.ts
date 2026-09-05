@@ -1,9 +1,4 @@
-import { createWriteStream } from "node:fs";
-import { mkdir, readdir, readFile, rm } from "node:fs/promises";
-import { dirname, join, relative, resolve, sep } from "node:path";
-import { pipeline } from "node:stream/promises";
 import type { Logger } from "pino";
-import { Parse, type Entry } from "unzipper";
 import type { CaptureRunner } from "../adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
@@ -11,10 +6,10 @@ import { BuildModel } from "../models/build.ts";
 import { ProjectModel } from "../models/project.ts";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
-import { storybookDir, storybookZipPath } from "../utils/paths.ts";
 import { DEFAULT_VIEWPORTS, isDisabledStory, isFlakyStory } from "./adapter.ts";
 import type { Viewport } from "./adapter.ts";
 import { persistCapture } from "./pipeline.ts";
+import { extractStorybookToScratch, persistStorybookStatics } from "./statics.ts";
 import { StorybookAdapter } from "./storybook.ts";
 
 /** Inputs for running a capture job against a Storybook build. */
@@ -47,7 +42,12 @@ export async function executeCaptureJob(
   let extractedDir: string | undefined;
   try {
     const extractStart = performance.now();
-    extractedDir = await extractStorybook(options, project.id, build.id);
+    extractedDir = await extractStorybookToScratch(
+      options.storage,
+      options.scratchDir,
+      project.id,
+      build.id,
+    );
     const extractDuration = performance.now() - extractStart;
     logger?.info({ durationMs: Math.round(extractDuration) }, "storybook extracted");
 
@@ -132,115 +132,4 @@ async function loadTarget(
     throw new Error(`Project not found: ${build.projectId}`);
   }
   return { build, project };
-}
-
-function blockedTarget(root: string, entryName: string): boolean {
-  const candidate = resolve(join(root, entryName));
-  return candidate !== root && !candidate.startsWith(root + sep);
-}
-
-/** Pipe one zip entry to disk, tracking the write for later aggregation. */
-function handleEntry(
-  root: string,
-  entry: Entry,
-  writes: Promise<void>[],
-  fail: (error: unknown) => void,
-): void {
-  if (blockedTarget(root, entry.path)) {
-    entry.autodrain();
-    fail(new Error(`Blocked path traversal in uploaded Storybook: ${entry.path}`));
-    return;
-  }
-  if (entry.type === "Directory") {
-    entry.autodrain();
-    return;
-  }
-  const target = join(root, entry.path);
-  const done = (async (): Promise<void> => {
-    await mkdir(dirname(target), { recursive: true });
-    await pipeline(entry, createWriteStream(target));
-  })();
-  writes.push(done);
-  done.catch(() => {}); // Intentionally empty — aggregated via allSettled by the caller
-}
-
-/** Run the unzipper parser, resolving with the first parse error (or null). */
-// oxlint-disable-next-line typescript/promise-function-async -- executor-style promise wrapper around events
-function runParser(
-  root: string,
-  source: import("node:stream").Readable,
-  writes: Promise<void>[],
-): Promise<unknown> {
-  return new Promise((settle) => {
-    const parser = Parse();
-    const fail = (error: unknown): void => {
-      source.destroy();
-      settle(error);
-    };
-    parser.on("entry", (entry: Entry) => {
-      handleEntry(root, entry, writes, fail);
-    });
-    parser.on("error", fail);
-    parser.on("close", () => {
-      settle(null);
-    });
-    source.on("error", fail);
-    source.pipe(parser);
-  });
-}
-
-async function extractStorybook(
-  options: CaptureJobOptions,
-  projectId: string,
-  buildId: string,
-): Promise<string> {
-  const targetDir = join(options.scratchDir, projectId, "builds", buildId, "storybook");
-  const root = resolve(targetDir);
-  await rm(targetDir, { recursive: true, force: true });
-  await mkdir(targetDir, { recursive: true });
-  const source = await options.storage.readStream(storybookZipPath(projectId, buildId));
-  const writes: Promise<void>[] = [];
-  const parseError = await runParser(root, source, writes);
-  const outcomes = await Promise.allSettled(writes);
-  if (parseError) {
-    throw parseError;
-  }
-  const writeError = outcomes.find(
-    (outcome): outcome is PromiseRejectedResult => outcome.status === "rejected",
-  );
-  if (writeError) {
-    throw writeError.reason;
-  }
-  return targetDir;
-}
-
-async function walkFiles(dir: string): Promise<string[]> {
-  const entries = await readdir(dir, { withFileTypes: true });
-  const nested = await Promise.all(
-    entries.map(async (entry) => {
-      const full = join(dir, entry.name);
-      if (entry.isDirectory()) {
-        return await walkFiles(full);
-      }
-      return [full];
-    }),
-  );
-  return nested.flat();
-}
-
-async function persistStorybookStatics(
-  storage: StorageAdapter,
-  sourceDir: string,
-  projectId: string,
-  buildId: string,
-): Promise<void> {
-  const root = resolve(sourceDir);
-  const destinationPrefix = storybookDir(projectId, buildId);
-  const files = await walkFiles(root);
-  await Promise.all(
-    files.map(async (file) => {
-      const rel = relative(root, file);
-      await storage.write(`${destinationPrefix}/${rel}`, await readFile(file));
-    }),
-  );
 }

@@ -53,6 +53,11 @@ export interface ShelfConfig {
   scratchDir?: string;
   purgeTtlDays?: number;
   maxUploadBytes?: number;
+  /**
+   * Max zip size (bytes) eligible for inline statics extraction at upload.
+   * Unset (or 0) disables inline extraction — statics land via capture.
+   */
+  maxInlineUnzipSize?: number;
   viewports?: ShelfViewport[];
   adapters?: Record<string, AdapterSnapshot>;
 }
@@ -88,6 +93,7 @@ export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
     scratchDir: z.string().optional(),
     purgeTtlDays: z.number().int().positive().optional(),
     maxUploadBytes: z.number().int().positive().optional(),
+    maxInlineUnzipSize: z.number().int().positive().optional(),
     viewports: z.array(viewportSchema).min(1, "at least one viewport required").optional(),
     adapters: z.record(z.string(), adapterSnapshotSchema).optional(),
   })

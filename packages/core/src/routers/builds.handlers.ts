@@ -2,14 +2,16 @@ import { z } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import { Readable, Transform } from "node:stream";
 import type { ReadableStream as NodeWebStream } from "node:stream/web";
-import { emitWebhookEvent } from "../adapters/webhook-events.ts";
+import type { Logger } from "pino";
 import type { StorageAdapter } from "../adapters/storage.ts";
+import { emitWebhookEvent } from "../adapters/webhook-events.ts";
+import { extractStorybookToScratch, persistStorybookStatics } from "../capture/statics.ts";
 import { BaselineModel } from "../models/baseline.ts";
 import { BuildModel } from "../models/build.ts";
 import { LabelModel } from "../models/label.ts";
 import { ProjectModel } from "../models/project.ts";
-import type { Project } from "../schema/project.ts";
 import { SnapshotModel } from "../models/snapshot.ts";
+import type { Project } from "../schema/project.ts";
 import { getStore } from "../store.ts";
 import { type ProjectRole, BUILD_STATUSES } from "../types.ts";
 import { notFound } from "./helpers.ts";
@@ -84,14 +86,20 @@ export async function createBuildRecord(
   if (meta.labels && meta.labels.length > 0) {
     await attachLabels(db, project.id, build.id, meta.labels);
   }
-  await emitWebhookEvent(db, project.id, "build:created", {
-    buildId: build.id,
-    gitSha: meta.gitSha,
-    gitBranch: meta.gitBranch,
-    authorEmail: meta.authorEmail,
-    authorName: meta.authorName,
-    message: meta.message,
-  }, config.secret);
+  await emitWebhookEvent(
+    db,
+    project.id,
+    "build:created",
+    {
+      buildId: build.id,
+      gitSha: meta.gitSha,
+      gitBranch: meta.gitBranch,
+      authorEmail: meta.authorEmail,
+      authorName: meta.authorName,
+      message: meta.message,
+    },
+    config.secret,
+  );
   return build;
 }
 
@@ -110,7 +118,11 @@ export async function storeUploadStream(
   }
   let seen = 0;
   const limiter = new Transform({
-    transform(chunk: Buffer, _encoding: string, callback: (error?: Error | null, data?: Buffer) => void): void {
+    transform(
+      chunk: Buffer,
+      _encoding: string,
+      callback: (error?: Error | null, data?: Buffer) => void,
+    ): void {
       seen += chunk.length;
       if (seen > maxBytes) {
         callback(new Error(`Upload exceeds ${maxBytes} byte limit`));
@@ -129,6 +141,46 @@ export async function storeUploadStream(
     throw error;
   }
 }
+
+/** Parse a Content-Length header value into bytes, or undefined when unknown. */
+function parseContentLength(value: string | undefined): number | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const parsed = Math.trunc(Number(value));
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+/**
+ * Best-effort inline statics extraction for small uploads (see
+ * `maxInlineUnzipSize`). Never throws: failures are logged and the capture
+ * job backfills the same keys idempotently.
+ */
+export async function persistInlineStatics(
+  storage: StorageAdapter,
+  scratchDir: string | undefined,
+  maxInlineBytes: number | undefined,
+  contentLength: string | undefined,
+  projectId: string,
+  buildId: string,
+  logger: Logger,
+): Promise<void> {
+  if (!scratchDir || !maxInlineBytes) {
+    return;
+  }
+  const size = parseContentLength(contentLength);
+  if (size === undefined || size > maxInlineBytes) {
+    return;
+  }
+  try {
+    const extractedDir = await extractStorybookToScratch(storage, scratchDir, projectId, buildId);
+    await persistStorybookStatics(storage, extractedDir, projectId, buildId);
+    logger.info({ buildId, size }, "upload statics persisted inline");
+  } catch (error) {
+    logger.error({ err: error, buildId }, "inline statics persist failed; capture will backfill");
+  }
+}
+/** Query filters accepted by the build list endpoint. */
 export const buildListQuery = z.object({
   status: z.enum(BUILD_STATUSES).optional(),
   branch: z.string().optional(),
@@ -176,11 +228,17 @@ export async function refreshBuild(buildId: string): Promise<void> {
   const build = await new BuildModel(db).get(buildId);
   if (build) {
     await new BuildModel(db).setStatus(buildId, status);
-    await emitWebhookEvent(db, build.projectId, `build:${status}`, {
-      buildId,
-      status,
-      snapshotCount: snapshots.length,
-    }, config.secret);
+    await emitWebhookEvent(
+      db,
+      build.projectId,
+      `build:${status}`,
+      {
+        buildId,
+        status,
+        snapshotCount: snapshots.length,
+      },
+      config.secret,
+    );
   }
 }
 

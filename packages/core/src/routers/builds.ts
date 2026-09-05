@@ -13,6 +13,7 @@ import {
   buildListQuery,
   buildForProject,
   createBuildRecord,
+  persistInlineStatics,
   storeUploadStream,
 } from "./builds.handlers.ts";
 import { registerComments } from "./comments.ts";
@@ -179,6 +180,16 @@ export function registerBuilds(app: ShelfApp): void {
 
     const reqId = c.get("requestId");
     await getStore().enqueueCapture?.(build.id, reqId);
+    const { storage, config, logger } = getStore();
+    await persistInlineStatics(
+      storage,
+      config.scratchDir,
+      config.maxInlineUnzipSize,
+      c.req.header("content-length"),
+      project.id,
+      build.id,
+      logger,
+    );
     return c.json(build, 202);
   });
 

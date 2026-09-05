@@ -58,6 +58,7 @@ async function seededApp(): Promise<{ app: ReturnType<typeof createShelfRouter> 
   await db.insert(builds, mockBuild({ public: true }));
 
   objects.set(`${storybookDir("p1", "b1")}/index.html`, Buffer.from("<html>storybook</html>"));
+  objects.set(`${storybookDir("p1", "b1")}/iframe.html`, Buffer.from("<html>preview</html>"));
   objects.set(`${storybookDir("p1", "b1")}/iframe.js`, Buffer.from("console.log('hi')"));
   objects.set(`${storybookDir("p1", "b1")}/styles.css`, Buffer.from("body{}"));
   objects.set(`${storybookDir("p1", "b1")}/icon.png`, Buffer.from([137, 80, 78, 71])); // PNG magic
@@ -96,6 +97,19 @@ describe("storybook routes", () => {
     const response = await app.request("/projects/test-project/storybook/build/b1/");
     expect(response.status).toBe(200);
     expect(await response.text()).toContain("iframe");
+  });
+
+  it("serves a preparing state when statics are not yet extracted", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    await db.insert(projects, mockProject());
+    await db.insert(builds, mockBuild({ public: true }));
+    const app = createShelfRouter({ database: db, storage, logger: silentLogger });
+    const response = await app.request("/projects/test-project/storybook/build/b1/");
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toContain("Preparing preview");
+    expect(body).not.toContain("<iframe");
   });
 
   it("serves a static JS asset with the correct content type", async () => {
@@ -147,10 +161,9 @@ describe("storybook routes", () => {
 
   it("serves a non-public build when auth is disabled", async () => {
     const { db } = makeDatabase();
-    const { storage, objects } = makeStorage();
+    const { storage } = makeStorage();
     await db.insert(projects, mockProject());
     await db.insert(builds, mockBuild({ public: false }));
-    objects.set(`${storybookDir("p1", "b1")}/index.html`, Buffer.from("<html>storybook</html>"));
     const app = createShelfRouter({ database: db, storage, logger: silentLogger });
     const response = await app.request("/projects/test-project/storybook/build/b1/");
     expect(response.status).toBe(200);

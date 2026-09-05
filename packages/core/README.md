@@ -20,12 +20,12 @@ npm install @storyshelf/core
 import { createShelfRouter } from "@storyshelf/core";
 
 const app = createShelfRouter({
-  database,                 // DatabaseAdapter
-  storage,                  // StorageAdapter
-  captureRunner,            // CaptureRunner (optional)
-  auth,                    // AuthAdapter (optional)
-  gitHosts,                // GitHostProvider[] (optional)
-  logger,                  // pino Logger (optional; built internally if omitted)
+  database, // DatabaseAdapter
+  storage, // StorageAdapter
+  captureRunner, // CaptureRunner (optional)
+  auth, // AuthAdapter (optional)
+  gitHosts, // GitHostProvider[] (optional)
+  logger, // pino Logger (optional; built internally if omitted)
   ui: { name: "My Shelf" }, // UIConfig (optional)
   config: { captureConcurrency: 2, purgeTtlDays: 30 }, // ShelfConfig (optional)
 });
@@ -40,27 +40,30 @@ serve({ fetch: app.fetch, port: 3000 });
 
 Assembles the router from the provided adapters. `ShelfOptions`:
 
-| Option | Type | Description |
-| ------ | ---- | ----------- |
-| `database` | `DatabaseAdapter` | **Required.** Data access. |
-| `storage` | `StorageAdapter` | **Required.** Blob storage for screenshots, diffs, storybook archives. |
-| `captureRunner` | `CaptureRunner` | Optional. Enables the async capture pipeline (pure renderer). |
-| `captureQueue` | `CaptureQueue` | Optional. Queue adapter; defaults to `InMemoryCaptureQueue`. |
-| `auth` | `AuthAdapter` | Optional. Enables auth and the login UI. |
-| `gitHosts` | `GitHostProvider[]` | Optional. Git-host adapters (GitHub/GitLab) for status checks, merge gates, PR comments. |
-| `logger` | `Logger` (pino) | Optional. Shared logger. Construct a fallback via `createShelfLogger()`. |
-| `ui` | `UIConfig` | Optional. UI branding. |
-| `config` | `ShelfConfig` | Optional. Server behavior. |
+| Option          | Type                | Description                                                                              |
+| --------------- | ------------------- | ---------------------------------------------------------------------------------------- |
+| `database`      | `DatabaseAdapter`   | **Required.** Data access.                                                               |
+| `storage`       | `StorageAdapter`    | **Required.** Blob storage for screenshots, diffs, storybook archives.                   |
+| `captureRunner` | `CaptureRunner`     | Optional. Enables the async capture pipeline (pure renderer).                            |
+| `captureQueue`  | `CaptureQueue`      | Optional. Queue adapter; defaults to `InMemoryCaptureQueue`.                             |
+| `auth`          | `AuthAdapter`       | Optional. Enables auth and the login UI.                                                 |
+| `gitHosts`      | `GitHostProvider[]` | Optional. Git-host adapters (GitHub/GitLab) for status checks, merge gates, PR comments. |
+| `logger`        | `Logger` (pino)     | Optional. Shared logger. Construct a fallback via `createShelfLogger()`.                 |
+| `ui`            | `UIConfig`          | Optional. UI branding.                                                                   |
+| `config`        | `ShelfConfig`       | Optional. Server behavior.                                                               |
 
 ### `ShelfConfig`
 
 ```ts
 interface ShelfConfig {
-  secret?: string;              // session signing secret
+  secret?: string; // session signing secret
   publishedBaseDomain?: string; // for published storybook URLs
-  captureConcurrency?: number;  // concurrent capture jobs (default 2)
-  purgeTtlDays?: number;        // purge builds older than N days
-  viewports?: Viewport[];       // capture viewports
+  captureConcurrency?: number; // concurrent capture jobs (default 2)
+  scratchDir?: string; // capture working directory (required with captureRunner)
+  purgeTtlDays?: number; // purge builds older than N days
+  maxUploadBytes?: number; // single-zip upload cap (default 1 GiB)
+  maxInlineUnzipSize?: number; // inline statics extraction cap; unset = capture-only
+  viewports?: Viewport[]; // capture viewports
 }
 ```
 
@@ -117,13 +120,13 @@ See `docs/architecture.md` and the ADRs in `docs/adr/`.
 
 The core router is runtime-agnostic (Web `Request`/`Response`, `fetch`, `crypto`, `URL`). The only Node-specific piece is the in-process `InMemoryCaptureQueue`, which suits long-lived Node servers; serverless runtimes swap in a remote `CaptureQueue` (e.g. `@storyshelf/queue-sqs`) plus a separate worker. You assemble a server for any platform — `storyshelf server init` generates a scaffold with the adapters you choose:
 
-| Platform | Database | Storage | Capture queue | Server entry |
-|----------|----------|---------|---------------|--------------|
-| **Vercel** | `@storyshelf/db-turso` | `@storyshelf/storage-s3` (R2/S3) | Remote `CaptureQueue` + worker | Hono + `@hono/vercel-edge` |
-| **Cloudflare Workers** | `@storyshelf/db-turso` | `@storyshelf/storage-s3` (R2) | Workers Queues `CaptureQueue` | Hono + Workers entry |
-| **Azure Functions** | `@storyshelf/db-turso` | `@storyshelf/storage-s3` (Blob) | Azure Queues `CaptureQueue` | Hono + Azure handler |
-| **AWS Lambda** | `@storyshelf/db-turso` | `@storyshelf/storage-s3` | SQS `CaptureQueue` | Hono + Lambda handler |
-| **Deno Deploy** | `@storyshelf/db-turso` | `@storyshelf/storage-s3` | Custom `CaptureQueue` (Deno KV) | Hono + Deno entry |
-| **Bun / Node (VPS, Fly, Railway, Render)** | `db-sqlite` / `db-turso` | `storage-local` / `storage-s3` | `InMemoryCaptureQueue` | `storyshelf-server serve` |
+| Platform                                   | Database                 | Storage                          | Capture queue                   | Server entry               |
+| ------------------------------------------ | ------------------------ | -------------------------------- | ------------------------------- | -------------------------- |
+| **Vercel**                                 | `@storyshelf/db-turso`   | `@storyshelf/storage-s3` (R2/S3) | Remote `CaptureQueue` + worker  | Hono + `@hono/vercel-edge` |
+| **Cloudflare Workers**                     | `@storyshelf/db-turso`   | `@storyshelf/storage-s3` (R2)    | Workers Queues `CaptureQueue`   | Hono + Workers entry       |
+| **Azure Functions**                        | `@storyshelf/db-turso`   | `@storyshelf/storage-s3` (Blob)  | Azure Queues `CaptureQueue`     | Hono + Azure handler       |
+| **AWS Lambda**                             | `@storyshelf/db-turso`   | `@storyshelf/storage-s3`         | SQS `CaptureQueue`              | Hono + Lambda handler      |
+| **Deno Deploy**                            | `@storyshelf/db-turso`   | `@storyshelf/storage-s3`         | Custom `CaptureQueue` (Deno KV) | Hono + Deno entry          |
+| **Bun / Node (VPS, Fly, Railway, Render)** | `db-sqlite` / `db-turso` | `storage-local` / `storage-s3`   | `InMemoryCaptureQueue`          | `storyshelf-server serve`  |
 
 All clouds are equal — pick the adapters that match your infrastructure. See the **Deployment** guide for recipes including a minimal Turso + S3 + `InMemoryCaptureQueue` example.

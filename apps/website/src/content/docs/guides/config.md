@@ -20,14 +20,14 @@ Created by `storyshelf init` or `storyshelf create` (both fail if `.storybook/ma
 }
 ```
 
-| Field | CLI flag | Env fallback | Description |
-|---|---|---|---|
-| `slug` | `--slug` | `STORYSHELF_SLUG` | Project slug (required) |
-| `url` | `--url` | `STORYSHELF_URL` | Server URL |
-| `buildDir` | `--build-dir` / `-d` | — | Built Storybook directory (default `storybook-static`). If missing or empty, `upload` will build |
-| `buildCommand` | `--build-command` | — | Custom build command (e.g. `nx run app:build-storybook`). Mutually exclusive with `buildScriptName` |
-| `buildScriptName` | `--build-script-name` / `-b` | — | npm script to run (default `build-storybook`) |
-| `skip` | `--skip` | — | Glob to skip upload (e.g. `"main"`, `"release/*"`). `branch` matched via `picomatch`; when matched `upload` exits 0 without `POST` |
+| Field             | CLI flag                     | Env fallback      | Description                                                                                                                        |
+| ----------------- | ---------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `slug`            | `--slug`                     | `STORYSHELF_SLUG` | Project slug (required)                                                                                                            |
+| `url`             | `--url`                      | `STORYSHELF_URL`  | Server URL                                                                                                                         |
+| `buildDir`        | `--build-dir` / `-d`         | —                 | Built Storybook directory (default `storybook-static`). If missing or empty, `upload` will build                                   |
+| `buildCommand`    | `--build-command`            | —                 | Custom build command (e.g. `nx run app:build-storybook`). Mutually exclusive with `buildScriptName`                                |
+| `buildScriptName` | `--build-script-name` / `-b` | —                 | npm script to run (default `build-storybook`)                                                                                      |
+| `skip`            | `--skip`                     | —                 | Glob to skip upload (e.g. `"main"`, `"release/*"`). `branch` matched via `picomatch`; when matched `upload` exits 0 without `POST` |
 
 **Note:** `buildDir` default is Storybook's default `storybook-static` unless `buildDir` is set in file. `buildCommand` and `buildScriptName` are mutually exclusive (validated by `zod` `refine`).
 
@@ -51,8 +51,8 @@ storyshelf init --config ./config/storyshelf.json --url https://... --slug my-ap
 flags (--url/--slug/--build-dir) > env (STORYSHELF_URL/SLUG/TOKEN, GITHUB_SHA/BRANCH) > file (.storybook/storyshelf.json) > defaults (storybook-static, build-storybook)
 ```
 
-* `token` **never** stored in file — use `STORYSHELF_TOKEN` (project) or `STORYSHELF_ADMIN_TOKEN`/`ADMIN_TOKEN` (site-admin for `create`/`purge`).
-* `sha`/`branch` default to `GITHUB_SHA`/`GITHUB_REF_NAME` (`VERCEL_GIT_COMMIT_*`, `CI_COMMIT_*`).
+- `token` **never** stored in file — use `STORYSHELF_TOKEN` (project) or `STORYSHELF_ADMIN_TOKEN`/`ADMIN_TOKEN` (site-admin for `create`/`purge`).
+- `sha`/`branch` default to `GITHUB_SHA`/`GITHUB_REF_NAME` (`VERCEL_GIT_COMMIT_*`, `CI_COMMIT_*`).
 
 ## Monorepo
 
@@ -75,8 +75,10 @@ Each upload resolves `packagePath` (`relative(cwd, dirname(.storybook))`) and is
 
 ## Server config vs client config
 
-* **Client file** (`.storybook/storyshelf.json`): `slug`, `url`, `buildDir`, `buildCommand`, `buildScriptName`, `skip` — per-Storybook, committed, non-secret.
-* **Server `ShelfConfig` / DB `projects`** (`core/src/config.ts:48`, `core/src/schema.ts:5`): `secret`, `captureConcurrency`, `scratchDir`, `purgeTtlDays`, `viewports`, `pixel_threshold`, `storybook_meta` (`framework/addons/storiesGlobs/packagePath` auto-detected at `create`).
+- **Client file** (`.storybook/storyshelf.json`): `slug`, `url`, `buildDir`, `buildCommand`, `buildScriptName`, `skip` — per-Storybook, committed, non-secret.
+- **Server `ShelfConfig` / DB `projects`** (`core/src/config.ts:48`, `core/src/schema.ts:5`): `secret`, `captureConcurrency`, `scratchDir`, `purgeTtlDays`, `maxUploadBytes`, `maxInlineUnzipSize`, `viewports`, `pixel_threshold`, `storybook_meta` (`framework/addons/storiesGlobs/packagePath` auto-detected at `create`).
+
+Uploads at or under `maxInlineUnzipSize` bytes are extracted inline so the published Storybook preview is live on response; larger uploads wait for capture. Leave it unset (the default) to always wait for capture — required on diskless hosts.
 
 ## Validation
 

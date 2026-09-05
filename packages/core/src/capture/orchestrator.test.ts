@@ -9,7 +9,7 @@ import { ProjectModel } from "../models/project.ts";
 import { builds } from "../schema/build.ts";
 import { snapshots } from "../schema/snapshot.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
-import { storybookZipPath } from "../utils/paths.ts";
+import { storybookDir, storybookZipPath } from "../utils/paths.ts";
 import { executeCaptureJob } from "./orchestrator.ts";
 
 const STORY_ID = "components-button--primary";
@@ -129,6 +129,34 @@ describe("executeCaptureJob", () => {
 
     const updatedBuild = await db.get(builds, build.id);
     expect(updatedBuild?.status).toBe("failed");
+  });
+
+  it("persists statics before render so preview survives render failure", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const project = await new ProjectModel(db).create({ name: "Orchestrator" });
+    const build = await new BuildModel(db).create(project.id, {
+      gitSha: "sha-abc",
+      gitBranch: "main",
+    });
+    const zip = new AdmZip();
+    zip.addFile("iframe.html", Buffer.from("<html>preview</html>"));
+    zip.addFile("index.json", Buffer.from(JSON.stringify({ v: 4, entries: {} })));
+    await storage.write(storybookZipPath(project.id, build.id), zip.toBuffer());
+    const { runner } = fakeRunner({
+      render: vi.fn(async () => {
+        await Promise.resolve();
+        throw new Error("browser exploded");
+      }),
+    });
+
+    await expect(
+      executeCaptureJob({ buildId: build.id }, { db, storage, runner, scratchDir }),
+    ).rejects.toThrow("browser exploded");
+
+    expect(await storage.exists(`${storybookDir(project.id, build.id)}/iframe.html`)).toBe(true);
+    const failedBuild = await db.get(builds, build.id);
+    expect(failedBuild?.status).toBe("failed");
   });
 
   it("throws when the build does not exist", async () => {
