@@ -18,8 +18,6 @@ export interface InitOptions {
   slug?: string;
   /** Built Storybook directory. */
   buildDir?: string;
-  /** Deprecated alias for buildDir. */
-  storybookDir?: string;
   /** Build command. */
   buildCommand?: string;
   /** Build script name. */
@@ -120,7 +118,7 @@ function mergeWithExisting(options: InitOptions, existing: StorybookConfig | nul
     return {
       url,
       slug,
-      buildDir: options.buildDir ?? options.storybookDir,
+      buildDir: options.buildDir,
       buildCommand: options.buildCommand,
       buildScriptName: options.buildScriptName,
       skip: options.skip,
@@ -129,7 +127,7 @@ function mergeWithExisting(options: InitOptions, existing: StorybookConfig | nul
   return {
     url: url ?? existing.url,
     slug: slug ?? existing.slug,
-    buildDir: (options.buildDir ?? options.storybookDir) ?? existing.buildDir,
+    buildDir: options.buildDir ?? existing.buildDir,
     buildCommand: options.buildCommand ?? existing.buildCommand,
     buildScriptName: options.buildScriptName ?? existing.buildScriptName,
     skip: options.skip ?? existing.skip,

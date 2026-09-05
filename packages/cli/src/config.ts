@@ -33,18 +33,6 @@ const MAIN_CANDIDATES = [
   ".storybook/main.tsx",
 ];
 
-/** Map the deprecated `storybookDir` key onto `buildDir` in place. */
-function migrateDeprecatedDir(parsed: unknown): void {
-  if (typeof parsed !== "object" || parsed === null) {
-    return;
-  }
-  const record = parsed as Record<string, unknown>;
-  if (typeof record["storybookDir"] === "string" && !record["buildDir"]) {
-    record["buildDir"] = record["storybookDir"];
-  }
-  delete record["storybookDir"];
-}
-
 export async function findStorybookMain(cwd: string = process.cwd()): Promise<string | null> {
   for (const candidate of MAIN_CANDIDATES) {
     const full = resolve(cwd, candidate);
@@ -74,7 +62,6 @@ export async function loadStorybookConfig(
   try {
     const raw = await readFile(full, "utf8");
     const parsed = JSON.parse(raw) as unknown;
-    migrateDeprecatedDir(parsed);
     const result = storybookConfigSchema.safeParse(parsed);
     if (!result.success) {
       return null;
@@ -85,11 +72,9 @@ export async function loadStorybookConfig(
   }
 }
 
-/** Merge an existing config with new values, applying deprecated-key migration. */
+/** Merge an existing config with new values. */
 function mergeConfigs(existing: StorybookConfig | null, config: StorybookConfig): StorybookConfig {
-  const merged = existing ? { ...existing, ...config } : { ...config };
-  migrateDeprecatedDir(merged);
-  return merged;
+  return existing ? { ...existing, ...config } : { ...config };
 }
 
 export async function writeStorybookConfig(

@@ -42,7 +42,7 @@
     "prepublishOnly": "nub run build"
   },
   "dependencies": {
-    "adm-zip": "^0.6.0",
+    "archiver": "8.0.0",
     "commander": "^13.0.0",
     "hono": "^4.11.0",
     "picomatch": "^4.0.2",
@@ -55,6 +55,7 @@
     "@types/picomatch": "^4.0.1",
     "@types/prompts": "^2.4.9",
     "@vitest/coverage-v8": "catalog:",
+    "adm-zip": "0.6.0",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",

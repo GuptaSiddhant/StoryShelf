@@ -83,7 +83,7 @@ storyshelf upload --config ./config/storyshelf.json --force-build
 | `--token` | Project API token (sent as `Authorization: Bearer`, or `STORYSHELF_TOKEN`) |
 | `--sha` | Git commit SHA (or `GITHUB_SHA`) |
 | `--branch` | Git branch (or `GITHUB_REF_NAME`) |
-| `--build-dir` / `-d` | Built Storybook directory (default `storybook-static`, or file `buildDir`; `--storybook-dir` deprecated alias) |
+| `--build-dir` / `-d` | Built Storybook directory (default `storybook-static`, or file `buildDir`) |
 | `--config` / `-c` | Config file path (default `.storybook/storyshelf.json`) |
 | `--build-command` | Custom build command (e.g. `nx run app:build-storybook`, mutually exclusive with `--build-script-name`) |
 | `--build-script-name` / `-b` | npm script to build Storybook (default `build-storybook`) |
@@ -94,7 +94,7 @@ storyshelf upload --config ./config/storyshelf.json --force-build
 | `--label key=value` | Attach a build label (repeatable) |
 
 :::note
-The CLI does **not** run Playwright. It zips the static build and uploads it; the server renders and diffs asynchronously. The upload request returns `202` immediately.
+The CLI does **not** run Playwright. It streams the zipped static build to the server (JSON metadata, then a `PUT` of the zip); the server renders and diffs asynchronously. The upload request returns `202` immediately.
 :::
 
 When run with no subcommand, `storyshelf` defaults to `upload` if `.storybook/storyshelf.json` exists, otherwise shows help to run `storyshelf init`.

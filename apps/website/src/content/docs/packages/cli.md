@@ -35,7 +35,7 @@ Upload the built Storybook on each commit (when `.storybook/storyshelf.json` exi
 
 ```sh
 storyshelf upload --token "$STORYSHELF_TOKEN" --sha "$GIT_SHA" --branch "$GIT_BRANCH" \
-  --storybook-dir storybook-static
+  --build-dir storybook-static
 # or simply: storyshelf (when config exists)
 ```
 

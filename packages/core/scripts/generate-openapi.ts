@@ -29,6 +29,8 @@ const stubStorage: StorageAdapter = {
   delete: unreachable,
   exists: unreachable,
   list: unreachable,
+  writeStream: unreachable,
+  readStream: unreachable,
 };
 
 /**

@@ -1,5 +1,6 @@
 import { getTableColumns, type SQL } from "drizzle-orm";
 import type { AnySQLiteTable } from "drizzle-orm/sqlite-core";
+import { Readable } from "node:stream";
 import type { DatabaseAdapter, ListOptions } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 
@@ -32,6 +33,20 @@ export function makeStorage(): FakeStorage {
     exists: async (path) => await Promise.resolve(objects.has(path)),
     list: async (prefix) =>
       await Promise.resolve([...objects.keys()].filter((key) => key.startsWith(prefix)).toSorted()),
+    writeStream: async (path, stream) => {
+      const chunks: Buffer[] = [];
+      for await (const chunk of stream) {
+        chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : Buffer.from(chunk as Uint8Array));
+      }
+      objects.set(path, Buffer.concat(chunks));
+    },
+    readStream: async (path) => {
+      const found = objects.get(path);
+      if (found === undefined) {
+        throw new Error(`no object at "${path}"`);
+      }
+      return await Promise.resolve(Readable.from([found]));
+    },
   };
   return { storage, objects };
 }

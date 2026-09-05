@@ -26,6 +26,9 @@ export interface UIConfig {
   darkTheme?: BrandTheme;
 }
 
+/** Default cap for a single Storybook zip upload (1 GiB). */
+export const DEFAULT_MAX_UPLOAD_BYTES = 1024 * 1024 * 1024;
+
 /** A viewport in which stories are captured. */
 export interface ShelfViewport {
   name: string;
@@ -49,6 +52,7 @@ export interface ShelfConfig {
   captureConcurrency?: number;
   scratchDir?: string;
   purgeTtlDays?: number;
+  maxUploadBytes?: number;
   viewports?: ShelfViewport[];
   adapters?: Record<string, AdapterSnapshot>;
 }
@@ -83,6 +87,7 @@ export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
     captureConcurrency: z.number().int().positive().optional(),
     scratchDir: z.string().optional(),
     purgeTtlDays: z.number().int().positive().optional(),
+    maxUploadBytes: z.number().int().positive().optional(),
     viewports: z.array(viewportSchema).min(1, "at least one viewport required").optional(),
     adapters: z.record(z.string(), adapterSnapshotSchema).optional(),
   })

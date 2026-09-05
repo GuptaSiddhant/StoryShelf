@@ -35,6 +35,8 @@ function stubStorage(): StorageAdapter {
     delete: storageFail,
     exists: storageFail,
     list: storageFail,
+    writeStream: storageFail,
+    readStream: storageFail,
   };
 }
 

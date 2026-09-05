@@ -141,4 +141,32 @@ describe("executeCaptureJob", () => {
       ),
     ).rejects.toThrow("Build not found");
   });
+
+  it("blocks path traversal in the streamed extract", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const project = await new ProjectModel(db).create({ name: "Orchestrator" });
+    const build = await new BuildModel(db).create(project.id, {
+      gitSha: "sha-abc",
+      gitBranch: "main",
+    });
+    const evil = new AdmZip();
+    evil.addFile("index.json", Buffer.from(JSON.stringify({ v: 4, entries: {} })));
+    evil.addFile("placeholder.txt", Buffer.from("escape"));
+    const evilEntry = evil.getEntries().find((entry) => entry.entryName === "placeholder.txt");
+    if (!evilEntry) {
+      throw new Error("test setup failed: placeholder entry missing");
+    }
+    // AdmZip sanitizes traversal on write; rename post-hoc to craft the attack.
+    evilEntry.entryName = "../../evil.txt";
+    await storage.write(storybookZipPath(project.id, build.id), evil.toBuffer());
+    const { runner } = fakeRunner();
+
+    await expect(
+      executeCaptureJob({ buildId: build.id }, { db, storage, runner, scratchDir }),
+    ).rejects.toThrow("path traversal");
+
+    const updatedBuild = await db.get(builds, build.id);
+    expect(updatedBuild?.status).toBe("failed");
+  });
 });

@@ -1,3 +1,19 @@
+/** Metadata posted to create a build before streaming its bundle. */
+export interface BuildCreateInput {
+  gitSha: string;
+  gitBranch: string;
+  message?: string;
+  authorEmail?: string;
+  authorName?: string;
+  labels?: { key: string; value: string }[];
+}
+
+/** Build record plus the zip upload URL returned by JSON creation. */
+export interface BuildCreated {
+  build: { id: string };
+  uploadUrl: string;
+}
+
 interface Client {
   projects: {
     create: (json: {
@@ -13,7 +29,8 @@ interface Client {
       create: (slug: string, json: { name: string }) => Promise<unknown>;
     };
     builds: {
-      create: (slug: string, form: FormData) => Promise<unknown>;
+      createJson: (slug: string, json: BuildCreateInput) => Promise<BuildCreated>;
+      uploadZip: (uploadUrl: string, body: NodeJS.ReadableStream) => Promise<unknown>;
       retry: (slug: string, buildId: string) => Promise<unknown>;
     };
     admin: {
@@ -65,12 +82,25 @@ function createBuildsApi(
   requestHeaders: (contentType?: string) => Record<string, string>,
 ): Client["projects"]["builds"] {
   return {
-    create: async (slug: string, form: FormData) =>
-      await fetchJson(`${baseUrl}/api/v1/projects/${slug}/builds`, {
+    createJson: async (slug: string, json: BuildCreateInput) =>
+      (await fetchJson(`${baseUrl}/api/v1/projects/${slug}/builds`, {
         method: "POST",
-        headers: authHeaders,
-        body: form,
-      }),
+        headers: requestHeaders("application/json"),
+        body: JSON.stringify(json),
+      })) as BuildCreated,
+    uploadZip: async (uploadUrl: string, body: NodeJS.ReadableStream) => {
+      const init = {
+        method: "PUT",
+        headers: { ...authHeaders, "content-type": "application/zip" },
+        body: body as unknown as BodyInit,
+        duplex: "half",
+      } as RequestInit;
+      const res = await fetch(`${baseUrl}${uploadUrl}`, init);
+      if (!res.ok) {
+        throw new Error(`Request failed (${res.status}): ${await res.text()}`);
+      }
+      return res.json() as unknown;
+    },
     retry: async (slug: string, buildId: string) =>
       await fetchJson(`${baseUrl}/api/v1/projects/${slug}/builds/${buildId}/retry`, {
         method: "POST",

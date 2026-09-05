@@ -1,7 +1,9 @@
-import AdmZip from "adm-zip";
+import { createWriteStream } from "node:fs";
 import { mkdir, readdir, readFile, rm } from "node:fs/promises";
-import { join, relative, resolve, sep } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
+import { pipeline } from "node:stream/promises";
 import type { Logger } from "pino";
+import { Parse, type Entry } from "unzipper";
 import type { CaptureRunner } from "../adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
@@ -137,12 +139,54 @@ function blockedTarget(root: string, entryName: string): boolean {
   return candidate !== root && !candidate.startsWith(root + sep);
 }
 
-function assertNoTraversal(zip: AdmZip, root: string): void {
-  for (const entry of zip.getEntries()) {
-    if (blockedTarget(root, entry.entryName)) {
-      throw new Error(`Blocked path traversal in uploaded Storybook: ${entry.entryName}`);
-    }
+/** Pipe one zip entry to disk, tracking the write for later aggregation. */
+function handleEntry(
+  root: string,
+  entry: Entry,
+  writes: Promise<void>[],
+  fail: (error: unknown) => void,
+): void {
+  if (blockedTarget(root, entry.path)) {
+    entry.autodrain();
+    fail(new Error(`Blocked path traversal in uploaded Storybook: ${entry.path}`));
+    return;
   }
+  if (entry.type === "Directory") {
+    entry.autodrain();
+    return;
+  }
+  const target = join(root, entry.path);
+  const done = (async (): Promise<void> => {
+    await mkdir(dirname(target), { recursive: true });
+    await pipeline(entry, createWriteStream(target));
+  })();
+  writes.push(done);
+  done.catch(() => {}); // Intentionally empty — aggregated via allSettled by the caller
+}
+
+/** Run the unzipper parser, resolving with the first parse error (or null). */
+// oxlint-disable-next-line typescript/promise-function-async -- executor-style promise wrapper around events
+function runParser(
+  root: string,
+  source: import("node:stream").Readable,
+  writes: Promise<void>[],
+): Promise<unknown> {
+  return new Promise((settle) => {
+    const parser = Parse();
+    const fail = (error: unknown): void => {
+      source.destroy();
+      settle(error);
+    };
+    parser.on("entry", (entry: Entry) => {
+      handleEntry(root, entry, writes, fail);
+    });
+    parser.on("error", fail);
+    parser.on("close", () => {
+      settle(null);
+    });
+    source.on("error", fail);
+    source.pipe(parser);
+  });
 }
 
 async function extractStorybook(
@@ -152,11 +196,21 @@ async function extractStorybook(
 ): Promise<string> {
   const targetDir = join(options.scratchDir, projectId, "builds", buildId, "storybook");
   const root = resolve(targetDir);
-  const zip = new AdmZip(await options.storage.read(storybookZipPath(projectId, buildId)));
-  assertNoTraversal(zip, root);
   await rm(targetDir, { recursive: true, force: true });
   await mkdir(targetDir, { recursive: true });
-  zip.extractAllTo(targetDir, true);
+  const source = await options.storage.readStream(storybookZipPath(projectId, buildId));
+  const writes: Promise<void>[] = [];
+  const parseError = await runParser(root, source, writes);
+  const outcomes = await Promise.allSettled(writes);
+  if (parseError) {
+    throw parseError;
+  }
+  const writeError = outcomes.find(
+    (outcome): outcome is PromiseRejectedResult => outcome.status === "rejected",
+  );
+  if (writeError) {
+    throw writeError.reason;
+  }
   return targetDir;
 }
 

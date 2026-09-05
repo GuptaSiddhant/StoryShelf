@@ -1,8 +1,14 @@
 import { z } from "@hono/zod-openapi";
+import { HTTPException } from "hono/http-exception";
+import { Readable, Transform } from "node:stream";
+import type { ReadableStream as NodeWebStream } from "node:stream/web";
 import { emitWebhookEvent } from "../adapters/webhook-events.ts";
+import type { StorageAdapter } from "../adapters/storage.ts";
 import { BaselineModel } from "../models/baseline.ts";
 import { BuildModel } from "../models/build.ts";
+import { LabelModel } from "../models/label.ts";
 import { ProjectModel } from "../models/project.ts";
+import type { Project } from "../schema/project.ts";
 import { SnapshotModel } from "../models/snapshot.ts";
 import { getStore } from "../store.ts";
 import { type ProjectRole, BUILD_STATUSES } from "../types.ts";
@@ -15,19 +21,114 @@ export const DEVELOPER_ROLES: readonly ProjectRole[] = ["developer", "approver",
 /** Roles permitted to approve or reject snapshots and delete builds. */
 export const APPROVER_ROLES: readonly ProjectRole[] = ["approver", "admin"];
 
-/** Multipart input schema for uploading a build with its Storybook bundle. */
-export const buildUploadSchema = z
+/** JSON input schema for creating a build before streaming its bundle. */
+export const buildCreateJsonSchema = z
   .object({
-    gitSha: z.string(),
-    gitBranch: z.string(),
+    gitSha: z.string().min(1),
+    gitBranch: z.string().min(1),
     authorEmail: z.string().optional(),
     authorName: z.string().optional(),
     message: z.string().optional(),
-    zip: z.instanceof(File).openapi({ type: "string", format: "binary" }).optional(),
+    labels: z.array(z.object({ key: z.string().min(1), value: z.string() })).optional(),
   })
-  .openapi("BuildUpload");
+  .openapi("BuildCreate");
 
-/** Query filters accepted by the build list endpoint. */
+/** Metadata accepted by either build-creation route. */
+export interface BuildCreateMetadata {
+  gitSha: string;
+  gitBranch: string;
+  authorEmail?: string;
+  authorName?: string;
+  message?: string;
+  labels?: { key: string; value: string }[];
+}
+
+/* oxlint-disable eslint/no-await-in-loop -- label attach is intentionally sequential */
+async function attachLabels(
+  db: import("../adapters/database.ts").DatabaseAdapter,
+  projectId: string,
+  buildId: string,
+  labels: { key: string; value: string }[],
+): Promise<void> {
+  const models = new LabelModel(db);
+  for (const { key, value } of labels) {
+    const existing = await models.getType(projectId, key);
+    if (!existing) {
+      await models.createType(projectId, { key, name: key });
+    }
+    await models.attach(projectId, buildId, key, value);
+  }
+}
+/* oxlint-enable eslint/no-await-in-loop */
+
+/**
+ * Create a build record with labels and the `build:created` webhook.
+ * Shared by the build-creation route.
+ */
+export async function createBuildRecord(
+  project: Project,
+  meta: BuildCreateMetadata,
+): Promise<import("../schema/build.ts").Build> {
+  const { db, config } = getStore();
+  if (!meta.gitSha || !meta.gitBranch) {
+    throw new HTTPException(400, { message: "gitSha and gitBranch are required" });
+  }
+  const build = await new BuildModel(db).create(project.id, {
+    gitSha: meta.gitSha,
+    gitBranch: meta.gitBranch,
+    isDefault: meta.gitBranch === project.gitDefaultBranch,
+    authorEmail: meta.authorEmail,
+    authorName: meta.authorName,
+    message: meta.message,
+  });
+  if (meta.labels && meta.labels.length > 0) {
+    await attachLabels(db, project.id, build.id, meta.labels);
+  }
+  await emitWebhookEvent(db, project.id, "build:created", {
+    buildId: build.id,
+    gitSha: meta.gitSha,
+    gitBranch: meta.gitBranch,
+    authorEmail: meta.authorEmail,
+    authorName: meta.authorName,
+    message: meta.message,
+  }, config.secret);
+  return build;
+}
+
+/**
+ * Stream a raw request body into storage with a byte cap.
+ * Throws 400 for a missing body, 413 once `maxBytes` is exceeded.
+ */
+export async function storeUploadStream(
+  storage: StorageAdapter,
+  path: string,
+  body: ReadableStream<Uint8Array> | null,
+  maxBytes: number,
+): Promise<void> {
+  if (!body) {
+    throw new HTTPException(400, { message: "Missing request body" });
+  }
+  let seen = 0;
+  const limiter = new Transform({
+    transform(chunk: Buffer, _encoding: string, callback: (error?: Error | null, data?: Buffer) => void): void {
+      seen += chunk.length;
+      if (seen > maxBytes) {
+        callback(new Error(`Upload exceeds ${maxBytes} byte limit`));
+      } else {
+        callback(null, chunk);
+      }
+    },
+  });
+  try {
+    const nodeBody = Readable.fromWeb(body as unknown as NodeWebStream);
+    await storage.writeStream(path, nodeBody.pipe(limiter));
+  } catch (error) {
+    if (seen > maxBytes) {
+      throw new HTTPException(413, { message: "Upload exceeds size limit" });
+    }
+    throw error;
+  }
+}
 export const buildListQuery = z.object({
   status: z.enum(BUILD_STATUSES).optional(),
   branch: z.string().optional(),
@@ -108,10 +209,3 @@ export async function approveSnapshot(snapshotId: string, userId: string): Promi
   );
   await refreshBuild(build.id);
 }
-
-/** Extract a string from a multipart form field, ignoring file entries. */
-function asString(value: FormDataEntryValue | null): string | undefined {
-  return typeof value === "string" ? value : undefined;
-}
-
-export { asString };

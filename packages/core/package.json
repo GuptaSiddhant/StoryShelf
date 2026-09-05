@@ -140,18 +140,20 @@
   "dependencies": {
     "@hono/swagger-ui": "^0.6.1",
     "@hono/zod-openapi": "^1.1.5",
-    "adm-zip": "^0.6.0",
     "drizzle-orm": "^0.44.0",
     "hono": "^4.11.0",
     "pino": "^10.3.1",
     "pixelmatch": "^7.1.0",
     "pngjs": "^7.0.0",
+    "unzipper": "0.12.5",
     "zod": "^4.2.0"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "@types/pngjs": "^6.0.5",
+    "@types/unzipper": "0.10.11",
     "@vitest/coverage-v8": "catalog:",
+    "adm-zip": "0.6.0",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",

@@ -1,6 +1,8 @@
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
+import { createReadStream, createWriteStream } from "node:fs";
 import { access, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
+import { pipeline } from "node:stream/promises";
 
 declare const __PKG_VERSION__: string | undefined;
 
@@ -83,6 +85,31 @@ export function createLocalStorage(dataDir: string): StorageAdapter {
         return [];
       }
       return walk(root, dir);
+    },
+    ...buildStreamMethods(root),
+  };
+}
+
+/** Streaming reads/writes for a local storage root (split for lint limits). */
+function buildStreamMethods(root: string): Pick<StorageAdapter, "writeStream" | "readStream"> {
+  return {
+    async writeStream(path, stream) {
+      const target = toAbsolute(root, path);
+      await mkdir(dirname(target), { recursive: true });
+      const out = createWriteStream(target);
+      try {
+        await pipeline(stream, out);
+      } catch (error) {
+        await rm(target, { force: true });
+        throw error;
+      }
+    },
+    async readStream(path) {
+      const target = toAbsolute(root, path);
+      if (!(await pathExists(target))) {
+        throw new Error(`No object at "${path}"`);
+      }
+      return createReadStream(target);
     },
   };
 }

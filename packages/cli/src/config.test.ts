@@ -85,15 +85,6 @@ describe("loadStorybookConfig", () => {
     );
     await expect(loadStorybookConfig(dir)).resolves.toBeNull();
   });
-
-  it("maps the deprecated storybookDir to buildDir", async () => {
-    mkdirSync(join(dir, ".storybook"), { recursive: true });
-    writeFileSync(
-      join(dir, ".storybook", "storyshelf.json"),
-      JSON.stringify({ slug: "demo", storybookDir: "old-dir" }),
-    );
-    await expect(loadStorybookConfig(dir)).resolves.toEqual({ slug: "demo", buildDir: "old-dir" });
-  });
 });
 
 describe("writeStorybookConfig", () => {

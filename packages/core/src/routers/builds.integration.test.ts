@@ -7,6 +7,8 @@ import type { Build } from "../schema/build.ts";
 import { projects } from "../schema/project.ts";
 import type { Project } from "../schema/project.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
+import { storybookZipPath } from "../utils/paths.ts";
+import { Readable } from "node:stream";
 
 const silentLogger = pino({ level: "silent" });
 
@@ -119,5 +121,144 @@ describe("build list label filter", () => {
     expect(response.status).toBe(200);
     const body = (await response.json()) as Build[];
     expect(body).toHaveLength(2);
+  });
+});
+
+describe("streaming build upload (JSON + PUT)", () => {
+  const project: Project = {
+    id: "p1",
+    name: "Stream Project",
+    slug: "stream-project",
+    gitRepository: null,
+    gitDefaultBranch: "main",
+    pixelThreshold: 0.1,
+    maxDiffRatio: 0.01,
+    publicBranchRegex: null,
+    executePlay: false,
+    playTimeoutMs: 10_000,
+    storybookMeta: null,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  };
+
+  interface CreatedBody {
+    build: Build;
+    uploadUrl: string;
+  }
+
+  async function setupSeeded(): Promise<{
+    db: ReturnType<typeof makeDatabase>["db"];
+    storage: ReturnType<typeof makeStorage>["storage"];
+    app: ReturnType<typeof createShelfRouter>;
+  }> {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    await db.insert(projects, project);
+    const app = createShelfRouter({ database: db, storage, logger: silentLogger });
+    return { db, storage, app };
+  }
+
+  const defaultPayload: Record<string, unknown> = {
+    gitSha: "sha-1",
+    gitBranch: "main",
+    message: "hello",
+    labels: [{ key: "pr", value: "7" }],
+  };
+
+  async function createViaJson(
+    app: ReturnType<typeof createShelfRouter>,
+    payload: Record<string, unknown>,
+  ): Promise<CreatedBody> {
+    const response = await app.request("/api/v1/projects/stream-project/builds", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    expect(response.status).toBe(202);
+    return (await response.json()) as CreatedBody;
+  }
+
+  it("creates a build via JSON with labels and no stored bytes yet", async () => {
+    const { db, storage, app } = await setupSeeded();
+    const created = await createViaJson(app, defaultPayload);
+
+    expect(created.build.gitSha).toBe("sha-1");
+    expect(created.build.status).toBe("pending");
+    expect(created.uploadUrl).toBe(
+      `/api/v1/projects/stream-project/builds/${created.build.id}/zip`,
+    );
+    expect(await storage.exists(storybookZipPath("p1", created.build.id))).toBe(false);
+    const labels = await new LabelModel(db).listForBuild(created.build.id);
+    expect(labels.map((label) => `${label.typeKey}=${label.value}`)).toEqual(["pr=7"]);
+  });
+
+  it("streams the zip with PUT and stores byte-identical content", async () => {
+    const { storage, app } = await setupSeeded();
+    const created = await createViaJson(app, defaultPayload);
+    const payload = Buffer.from("PK-zip-bytes-".repeat(5000));
+
+    const response = await app.request(created.uploadUrl, {
+      method: "PUT",
+      headers: { "content-type": "application/zip" },
+      body: payload,
+    });
+
+    expect(response.status).toBe(202);
+    expect(await storage.read(storybookZipPath("p1", created.build.id))).toEqual(payload);
+  });
+
+  it("streams a node Readable end to end", async () => {
+    const { storage, app } = await setupSeeded();
+    const created = await createViaJson(app, defaultPayload);
+    const payload = Buffer.from("readable-bytes-".repeat(2000));
+
+    const response = await app.request(created.uploadUrl, {
+      method: "PUT",
+      headers: { "content-type": "application/zip" },
+      body: Readable.from([payload]) as unknown as BodyInit,
+      duplex: "half",
+    } as RequestInit);
+
+    expect(response.status).toBe(202);
+    expect(await storage.read(storybookZipPath("p1", created.build.id))).toEqual(payload);
+  });
+
+  it("rejects JSON without sha with 400", async () => {
+    const { app } = await setupSeeded();
+    const response = await app.request("/api/v1/projects/stream-project/builds", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ gitSha: "", gitBranch: "main" }),
+    });
+    expect(response.status).toBe(400);
+  });
+
+  it("rejects PUT for unknown builds with 404", async () => {
+    const { app } = await setupSeeded();
+    const response = await app.request("/api/v1/projects/stream-project/builds/nope/zip", {
+      method: "PUT",
+      headers: { "content-type": "application/zip" },
+      body: Buffer.from("x"),
+    });
+    expect(response.status).toBe(404);
+  });
+
+  it("rejects oversize uploads with 413", async () => {
+    const { db } = makeDatabase();
+    const { storage: memStorage } = makeStorage();
+    await db.insert(projects, project);
+    const app = createShelfRouter({
+      database: db,
+      storage: memStorage,
+      logger: silentLogger,
+      config: { maxUploadBytes: 4 },
+    });
+    const created = await createViaJson(app, defaultPayload);
+    const response = await app.request(created.uploadUrl, {
+      method: "PUT",
+      headers: { "content-type": "application/zip" },
+      body: Buffer.from("way-too-long-payload"),
+    });
+    expect(response.status).toBe(413);
   });
 });

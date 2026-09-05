@@ -154,6 +154,27 @@ afterEach(async () => {
   await rm(scratchDir, { recursive: true, force: true });
 });
 
+/** Create a build via JSON metadata and stream its zip with PUT. */
+async function uploadBuild(
+  app: ReturnType<typeof createShelfRouter>,
+  slug: string,
+): Promise<{ id: string }> {
+  const created = await app.request(`/api/v1/projects/${slug}/builds`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ gitSha: SHA, gitBranch: "main" }),
+  });
+  expect(created.status).toBe(202);
+  const { build, uploadUrl } = (await created.json()) as { build: { id: string }; uploadUrl: string };
+  const upload = await app.request(uploadUrl, {
+    method: "PUT",
+    headers: { "content-type": "application/zip" },
+    body: new Uint8Array(zipWithIndex()),
+  });
+  expect(upload.status).toBe(202);
+  return build;
+}
+
 describe("status provider fanout", () => {
   it("posts pending and success statuses to every configured provider", async () => {
     const { db } = makeDatabase();
@@ -195,17 +216,7 @@ describe("status provider fanout", () => {
       expect(created.status).toBe(201);
     }
 
-    const zip = zipWithIndex();
-    const form = new FormData();
-    form.set("gitSha", SHA);
-    form.set("gitBranch", "main");
-    form.set("zip", new Blob([new Uint8Array(zip)], { type: "application/zip" }), "storybook.zip");
-    const upload = await app.request(`/api/v1/projects/${project.slug}/builds`, {
-      method: "POST",
-      body: form,
-    });
-    expect(upload.status).toBe(202);
-    const createdBuild = (await upload.json()) as Build;
+    const createdBuild = await uploadBuild(app, project.slug);
     const updatedBuild = await upTo({
       app,
       slug: project.slug,
@@ -277,17 +288,7 @@ describe("status provider fanout", () => {
     });
     expect(created.status).toBe(201);
 
-    const zip = zipWithIndex();
-    const form = new FormData();
-    form.set("gitSha", SHA);
-    form.set("gitBranch", "main");
-    form.set("zip", new Blob([new Uint8Array(zip)], { type: "application/zip" }), "storybook.zip");
-    const upload = await app.request(`/api/v1/projects/${project.slug}/builds`, {
-      method: "POST",
-      body: form,
-    });
-    expect(upload.status).toBe(202);
-    const createdBuild = (await upload.json()) as Build;
+    const createdBuild = await uploadBuild(app, project.slug);
 
     await upTo({ app, slug: project.slug, buildId: createdBuild.id, wanted: "failed" });
 

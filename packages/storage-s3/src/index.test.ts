@@ -7,6 +7,7 @@ import {
   S3ServiceException,
   type S3Client,
 } from "@aws-sdk/client-s3";
+import { Readable } from "node:stream";
 import { describe, expect, it } from "vitest";
 import { createS3Storage, s3Key } from "./index.ts";
 
@@ -33,7 +34,12 @@ function makeClient(handlers: Record<string, Handler> = {}): { client: S3Client;
     const handler = handlers[command.constructor.name];
     return handler ? await handler(command.input) : {};
   };
-  return { client: { send } as unknown as S3Client, sent };
+  // lib-storage Upload resolves `client.config.endpoint()` before sending.
+  const config = {
+    endpoint: async (): Promise<unknown> =>
+      await Promise.resolve({ protocol: "https:", hostname: "bkt", path: "/", query: undefined }),
+  };
+  return { client: { send, config } as unknown as S3Client, sent };
 }
 
 function body(bytes: number[]): FakeBody {
@@ -175,5 +181,54 @@ describe("createS3Storage - list", () => {
     const storage = createS3Storage({ bucket: "bkt", client });
 
     await expect(storage.list("a")).resolves.toEqual(["a/1.png"]);
+  });
+});
+
+describe("createS3Storage - streams", () => {
+  it("writeStream uploads small bodies with a single PUT", async () => {
+    const { client, sent } = makeClient();
+    const storage = createS3Storage({ bucket: "bkt", prefix: "app", client });
+
+    await storage.writeStream("x/y.bin", Readable.from([Buffer.from("streamed")]));
+
+    expect(sent).toEqual([PutObjectCommand.name]);
+  });
+
+  it("readStream returns node stream bodies directly", async () => {
+    const payload = Buffer.from("direct-bytes");
+    const { client } = makeClient({
+      [GetObjectCommand.name]: () => ({ Body: Readable.from([payload]) }),
+    });
+    const storage = createS3Storage({ bucket: "bkt", client });
+
+    const chunks: Buffer[] = [];
+    for await (const chunk of await storage.readStream("a.bin")) {
+      chunks.push(Buffer.from(chunk as Uint8Array));
+    }
+    expect(Buffer.concat(chunks)).toEqual(payload);
+  });
+
+  it("readStream converts web-stream bodies to node streams", async () => {
+    const payload = Buffer.from("web-bytes");
+    const web = Readable.toWeb(Readable.from([payload]));
+    const { client } = makeClient({ [GetObjectCommand.name]: () => ({ Body: web }) });
+    const storage = createS3Storage({ bucket: "bkt", client });
+
+    const chunks: Buffer[] = [];
+    for await (const chunk of await storage.readStream("a.bin")) {
+      chunks.push(Buffer.from(chunk as Uint8Array));
+    }
+    expect(Buffer.concat(chunks)).toEqual(payload);
+  });
+
+  it("readStream rejects when GetObject throws", async () => {
+    const { client } = makeClient({
+      [GetObjectCommand.name]: () => {
+        throw notFoundError();
+      },
+    });
+    const storage = createS3Storage({ bucket: "bkt", client });
+
+    await expect(storage.readStream("missing.bin")).rejects.toThrow();
   });
 });

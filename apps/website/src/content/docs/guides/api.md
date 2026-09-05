@@ -65,17 +65,21 @@ The core CI flow in three calls:
    curl -sS $STORYSHELF_URL/api/v1/projects
    ```
 
-2. **Upload the built Storybook** (multipart form — `gitSha` and `gitBranch` are required)
+2. **Upload the built Storybook** — create the build with JSON metadata, then stream the zip
 
    ```sh
-   curl -sS -X POST $STORYSHELF_URL/api/v1/projects/my-app/builds \
+   CREATE=$(curl -sS -X POST $STORYSHELF_URL/api/v1/projects/my-app/builds \
      -H "Authorization: Bearer $STORYSHELF_TOKEN" \
-     -F "gitSha=$GITHUB_SHA" \
-     -F "gitBranch=$GITHUB_REF_NAME" \
-     -F "zip=@storybook-static.zip;type=application/zip"
+     -H "Content-Type: application/json" \
+     -d "{\"gitSha\":\"$GITHUB_SHA\",\"gitBranch\":\"$GITHUB_REF_NAME\"}")
+   UPLOAD_URL=$(echo "$CREATE" | jq -r .uploadUrl)
+   curl -sS -X PUT "$STORYSHELF_URL$UPLOAD_URL" \
+     -H "Authorization: Bearer $STORYSHELF_TOKEN" \
+     -H "Content-Type: application/zip" \
+     --data-binary @storybook-static.zip
    ```
 
-   The response is the new `Build` with `status: "pending"` and `HTTP 202` — capture runs asynchronously.
+   The PUT responds with the `Build` (`status: "pending"`, `HTTP 202`) — capture runs asynchronously. Uploads larger than the server's `maxUploadBytes` (default 1 GiB) are rejected with `413`.
 
 3. **Follow the build to its terminal state**
 

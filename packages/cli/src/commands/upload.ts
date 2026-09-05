@@ -1,15 +1,11 @@
-import AdmZip from "adm-zip";
+import { ZipArchive } from "archiver";
 import { execSync } from "node:child_process";
 import { access, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import * as picomatch from "picomatch";
-import { createClient } from "../client.ts";
+import { createClient, type BuildCreated } from "../client.ts";
 import { loadStorybookConfig, type StorybookConfig } from "../config.ts";
 import { createSpinner, printLine, spinnerFrames } from "../output.ts";
-
-interface BuildResponse {
-  id: string;
-}
 
 /** Options for the `upload` command. */
 export interface UploadOptions {
@@ -25,8 +21,6 @@ export interface UploadOptions {
   branch?: string;
   /** Built Storybook directory. Defaults to `storybook-static`. */
   buildDir?: string;
-  /** Deprecated alias for buildDir. */
-  storybookDir?: string;
   /** Custom config file path. */
   config?: string;
   /** Build command. */
@@ -43,6 +37,8 @@ export interface UploadOptions {
   authorEmail?: string;
   /** Author name. */
   authorName?: string;
+  /** Build labels as `key=value` strings (repeatable). */
+  label?: string[];
   /** Working directory (defaults to process.cwd()). Test seam for fs access. */
   cwd?: string;
 }
@@ -60,6 +56,7 @@ interface CollectedUploadOptions {
   message?: string;
   authorEmail?: string;
   authorName?: string;
+  label?: string[];
 }
 
 /** First set value among the given env var names. */
@@ -81,13 +78,14 @@ function collectUploadOptions(options: UploadOptions, cfg: StorybookConfig | nul
     token: options.token ?? envOf("STORYSHELF_TOKEN", "SHELF_TOKEN"),
     sha: options.sha ?? envOf("GITHUB_SHA", "VERCEL_GIT_COMMIT_SHA", "CI_COMMIT_SHA"),
     branch: options.branch ?? envOf("GITHUB_REF_NAME", "VERCEL_GIT_COMMIT_REF", "CI_COMMIT_REF_NAME"),
-    buildDir: options.buildDir ?? options.storybookDir ?? cfg?.buildDir ?? "storybook-static",
+    buildDir: options.buildDir ?? cfg?.buildDir ?? "storybook-static",
     buildCommand: options.buildCommand ?? cfg?.buildCommand,
     buildScriptName: options.buildScriptName ?? cfg?.buildScriptName,
     skip: options.skip ?? cfg?.skip,
     message: options.message,
     authorEmail: options.authorEmail,
     authorName: options.authorName,
+    label: options.label,
   };
 }
 
@@ -122,54 +120,31 @@ function shouldSkipUpload(skip: string | undefined, branch: string | undefined):
   return Boolean(skip && branch && picomatch.isMatch(branch, skip));
 }
 
-/** Zip the built Storybook directory into a buffer. */
-function zipBuildDir(cwd: string, buildDir: string): Buffer {
-  const zip = new AdmZip();
-  zip.addLocalFolder(resolve(cwd, buildDir));
-  return zip.toBuffer();
+/** Parse `--label key=value` flags into label pairs. */
+function parseLabels(flags: string[] | undefined): { key: string; value: string }[] {
+  return (flags ?? []).map((flag) => {
+    const eq = flag.indexOf("=");
+    if (eq <= 0) {
+      throw new Error(`--label must be key=value, got "${flag}"`);
+    }
+    return { key: flag.slice(0, eq), value: flag.slice(eq + 1) };
+  });
 }
 
-function setAuthorFields(form: FormData, opts: ResolvedUploadOptions): void {
-  if (opts.message) {
-    form.set("message", opts.message);
-  }
-  if (opts.authorEmail) {
-    form.set("authorEmail", opts.authorEmail);
-  }
-  if (opts.authorName) {
-    form.set("authorName", opts.authorName);
-  }
-}
-
-/** Build the multipart upload form for a zipped Storybook. */
-function buildUploadForm(buffer: Buffer, opts: ResolvedUploadOptions): FormData {
-  const form = new FormData();
-  form.set("gitSha", opts.sha);
-  form.set("gitBranch", opts.branch);
-  setAuthorFields(form, opts);
-  form.set(
-    "zip",
-    new Blob([new Uint8Array(buffer)], { type: "application/zip" }),
-    "storybook.zip",
-  );
-  return form;
-}
-
-/** Post the form and return the created build id, with spinner handling. */
-async function postBuild(
-  client: ReturnType<typeof createClient>,
-  slug: string,
-  form: FormData,
-): Promise<string> {
-  const spinner = createSpinner("Uploading...", spinnerFrames);
-  try {
-    const build = (await client.projects.builds.create(slug, form)) as BuildResponse;
-    spinner.stop("Upload complete");
-    return build.id;
-  } catch (error) {
-    spinner.stop("Upload failed");
-    throw error;
-  }
+/** Zip the built Storybook directory as a stream (bounded memory). */
+function zipBuildDirStream(cwd: string, buildDir: string): ZipArchive {
+  const archive = new ZipArchive({ zlib: { level: 9 } });
+  archive.on("warning", (warning: Error) => {
+    printLine(`Zip warning: ${warning.message}`);
+  });
+  archive.on("error", (error: Error) => {
+    archive.destroy(error);
+  });
+  archive.directory(resolve(cwd, buildDir), false);
+  archive.finalize().catch(() => {
+    // Intentionally empty — finalize failures also emit 'error' above
+  });
+  return archive;
 }
 
 /**
@@ -189,7 +164,7 @@ export async function runUpload(options: UploadOptions): Promise<void> {
   await buildAndPost(cwd, collected, options.forceBuild);
 }
 
-/** Ensure, zip, and post the build directory. */
+/** Ensure, create, and stream the build directory. */
 async function buildAndPost(
   cwd: string,
   collected: ResolvedUploadOptions,
@@ -202,20 +177,34 @@ async function buildAndPost(
     buildScriptName: collected.buildScriptName,
     force,
   });
-  const buffer = zipBuildDir(cwd, collected.buildDir);
-  const form = buildUploadForm(buffer, collected);
   const client = createClient(collected.url, collected.token);
-  await executeUpload(client, collected.slug, form);
+  const created: BuildCreated = await client.projects.builds.createJson(collected.slug, {
+    gitSha: collected.sha,
+    gitBranch: collected.branch,
+    message: collected.message,
+    authorEmail: collected.authorEmail,
+    authorName: collected.authorName,
+    labels: parseLabels(collected.label),
+  });
+  await putZipStream(client, created, cwd, collected.buildDir);
+  printLine(`Build created: ${created.build.id}`);
 }
 
-/** Post the build form and report the created build id. */
-async function executeUpload(
+/** PUT the streamed zip, then report the created build id. */
+async function putZipStream(
   client: ReturnType<typeof createClient>,
-  slug: string,
-  form: FormData,
+  created: BuildCreated,
+  cwd: string,
+  buildDir: string,
 ): Promise<void> {
-  const buildId = await postBuild(client, slug, form);
-  printLine(`Build created: ${buildId}`);
+  const spinner = createSpinner("Uploading...", spinnerFrames);
+  try {
+    await client.projects.builds.uploadZip(created.uploadUrl, zipBuildDirStream(cwd, buildDir));
+    spinner.stop("Upload complete");
+  } catch (error) {
+    spinner.stop("Upload failed");
+    throw error;
+  }
 }
 
 async function ensureBuildDir(opts: {

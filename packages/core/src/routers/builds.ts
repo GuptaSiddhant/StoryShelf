@@ -1,6 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import { emitWebhookEvent } from "../adapters/webhook-events.ts";
+import { DEFAULT_MAX_UPLOAD_BYTES } from "../config.ts";
 import type { ShelfApp } from "../index.tsx";
 import { BuildModel } from "../models/build.ts";
 import { getStore } from "../store.ts";
@@ -9,10 +9,11 @@ import {
   VIEW_ROLES,
   DEVELOPER_ROLES,
   APPROVER_ROLES,
-  buildUploadSchema,
+  buildCreateJsonSchema,
   buildListQuery,
   buildForProject,
-  asString,
+  createBuildRecord,
+  storeUploadStream,
 } from "./builds.handlers.ts";
 import { registerComments } from "./comments.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
@@ -39,17 +40,61 @@ const listBuildsRoute = createRoute({
   },
 });
 
+const buildCreatedSchema = z
+  .object({ build: buildSchema, uploadUrl: z.string() })
+  .openapi("BuildCreated");
+
 const createBuildRoute = createRoute({
   method: "post",
   path: "/api/v1/projects/{slug}/builds",
   request: {
     params: z.object({ slug: z.string() }),
-    body: { content: { "multipart/form-data": { schema: buildUploadSchema } } },
+    body: {
+      content: {
+        "application/json": { schema: buildCreateJsonSchema },
+      },
+    },
+  },
+  responses: {
+    202: {
+      content: {
+        "application/json": {
+          schema: buildCreatedSchema,
+        },
+      },
+      description: "Build created. PUT the Storybook zip to uploadUrl to queue capture.",
+    },
+    ...badRequest,
+    ...forbiddenResponse,
+    ...notFoundResponse,
+  },
+});
+
+const uploadZipRoute = createRoute({
+  method: "put",
+  path: "/api/v1/projects/{slug}/builds/{buildId}/zip",
+  request: {
+    params: z.object({ slug: z.string(), buildId: z.string() }),
+    body: {
+      content: {
+        "application/zip": {
+          schema: z.string().openapi({ type: "string", format: "binary" }),
+        },
+      },
+    },
   },
   responses: {
     202: {
       content: { "application/json": { schema: buildSchema } },
-      description: "Build created and capture queued",
+      description: "Zip stored and capture queued",
+    },
+    413: {
+      content: {
+        "application/json": {
+          schema: z.object({ message: z.string() }).openapi("Error"),
+        },
+      },
+      description: "Upload exceeds the configured size limit",
     },
     ...badRequest,
     ...forbiddenResponse,
@@ -111,40 +156,26 @@ export function registerBuilds(app: ShelfApp): void {
       c.req.valid("param").slug,
       ...DEVELOPER_ROLES,
     );
-    const form = await c.req.formData();
-
-    const gitSha = asString(form.get("gitSha")) ?? "";
-    const gitBranch = asString(form.get("gitBranch")) ?? "";
-    if (!gitSha || !gitBranch) {
-      throw new HTTPException(400, { message: "gitSha and gitBranch are required" });
+    const parsed = buildCreateJsonSchema.safeParse(await c.req.json());
+    if (!parsed.success) {
+      throw new HTTPException(400, { message: parsed.error.message });
     }
-    const authorEmail = asString(form.get("authorEmail"));
-    const authorName = asString(form.get("authorName"));
-    const message = asString(form.get("message"));
+    const build = await createBuildRecord(project, parsed.data);
+    const uploadUrl = `/api/v1/projects/${project.slug}/builds/${build.id}/zip`;
+    return c.json({ build, uploadUrl }, 202);
+  });
 
-    const build = await new BuildModel(getStore().db).create(project.id, {
-      gitSha,
-      gitBranch,
-      isDefault: gitBranch === project.gitDefaultBranch,
-      authorEmail,
-      authorName,
-      message,
-    });
-
-    await emitWebhookEvent(getStore().db, project.id, "build:created", {
-      buildId: build.id,
-      gitSha,
-      gitBranch,
-      authorEmail,
-      authorName,
-      message,
-    }, getStore().config.secret);
-
-    const zip = form.get("zip");
-    if (zip && typeof zip !== "string") {
-      const buffer = Buffer.from(await zip.arrayBuffer());
-      await getStore().storage.write(storybookZipPath(project.id, build.id), buffer);
-    }
+  app.openapi(uploadZipRoute, async (c) => {
+    const { slug, buildId } = c.req.valid("param");
+    const project = await resolveAuthorizedProject(c, slug, ...DEVELOPER_ROLES);
+    const build = await buildForProject(project.id, buildId);
+    const maxBytes = getStore().config.maxUploadBytes ?? DEFAULT_MAX_UPLOAD_BYTES;
+    await storeUploadStream(
+      getStore().storage,
+      storybookZipPath(project.id, build.id),
+      c.req.raw.body,
+      maxBytes,
+    );
 
     const reqId = c.get("requestId");
     await getStore().enqueueCapture?.(build.id, reqId);

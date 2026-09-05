@@ -67,7 +67,6 @@ function buildUploadCommand(): Command {
     .option("--sha <sha>", "git sha (or GITHUB_SHA env)")
     .option("--branch <branch>", "git branch (or GITHUB_REF_NAME env)")
     .option("--build-dir <dir>", "built Storybook directory (default storybook-static)")
-    .option("--storybook-dir <dir>", "deprecated alias for --build-dir")
     .option("-c, --config <path>", "config file path (default .storybook/storyshelf.json)")
     .option("--build-command <cmd>", "build command to run if buildDir missing/empty")
     .option("--build-script-name <name>", "npm script to build Storybook (default build-storybook)")
@@ -76,6 +75,12 @@ function buildUploadCommand(): Command {
     .option("--message <message>", "commit message")
     .option("--author-email <email>", "author email")
     .option("--author-name <name>", "author name")
+    .option(
+      "--label <key=value>",
+      "build label (repeatable: --label pr=123)",
+      (value: string, previous: string[]) => [...previous, value],
+      [] as string[],
+    )
     .action(run<UploadOptions>(runUpload));
 }
 

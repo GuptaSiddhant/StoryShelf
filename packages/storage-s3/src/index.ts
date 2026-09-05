@@ -7,7 +7,10 @@ import {
   S3Client,
   S3ServiceException,
 } from "@aws-sdk/client-s3";
+import { Upload } from "@aws-sdk/lib-storage";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
+import { Readable } from "node:stream";
+import type { ReadableStream as NodeWebStream } from "node:stream/web";
 
 declare const __PKG_VERSION__: string | undefined;
 
@@ -36,6 +39,36 @@ function s3Rel(prefix: string, key: string): string {
 
 function isNotFound(error: unknown): boolean {
   return error instanceof S3ServiceException && error.$metadata.httpStatusCode === 404;
+}
+
+function isWebStream(body: unknown): body is NodeWebStream {
+  return (
+    typeof body === "object" &&
+    body !== null &&
+    typeof (body as { getReader?: unknown }).getReader === "function"
+  );
+}
+
+async function s3WriteStream(ctx: S3Context, path: string, stream: Readable): Promise<void> {
+  const upload = new Upload({
+    client: ctx.client,
+    params: { Bucket: ctx.bucket, Key: s3Key(ctx.prefix, path), Body: stream },
+  });
+  await upload.done();
+}
+
+async function s3ReadStream(ctx: S3Context, path: string): Promise<Readable> {
+  const response = await ctx.client.send(
+    new GetObjectCommand({ Bucket: ctx.bucket, Key: s3Key(ctx.prefix, path) }),
+  );
+  const body: unknown = response.Body;
+  if (body instanceof Readable) {
+    return body;
+  }
+  if (isWebStream(body)) {
+    return Readable.fromWeb(body);
+  }
+  throw new Error(`No object at "${path}"`);
 }
 
 interface S3Context {
@@ -124,6 +157,12 @@ export function createS3Storage(options: S3StorageOptions): StorageAdapter {
     },
     async list(listPrefix) {
       return await s3List(ctx, listPrefix);
+    },
+    async writeStream(path, stream) {
+      await s3WriteStream(ctx, path, stream);
+    },
+    async readStream(path) {
+      return await s3ReadStream(ctx, path);
     },
   };
 }
