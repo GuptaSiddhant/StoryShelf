@@ -18,13 +18,4 @@ export default libConfig({
   schema: "./src/schema/index.ts",
   ddl: "./src/ddl.ts",
   types: "./src/types.ts",
-  "models/project": "./src/models/project.ts",
-  "models/build": "./src/models/build.ts",
-  "models/snapshot": "./src/models/snapshot.ts",
-  "models/baseline": "./src/models/baseline.ts",
-  "models/member": "./src/models/member.ts",
-  "models/comment": "./src/models/comment.ts",
-  "models/label": "./src/models/label.ts",
-  "models/token": "./src/models/token.ts",
-  "models/webhook": "./src/models/webhook.ts",
 });

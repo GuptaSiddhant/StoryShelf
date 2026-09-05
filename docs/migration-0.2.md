@@ -38,18 +38,17 @@ import type { CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
 Adapter interfaces (`DatabaseAdapter`, `StorageAdapter`, `CaptureRunner`,
 `AuthAdapter`, `GitHostProvider`, …) moved to their `core/adapter/*` entries;
 `CheckStatus` / `GitHost*` live under `core/adapter/git-host`. Row types stay
-under `core/schema` (or per-entity `core/schema/*` inside the repo); models
-under `core/models/*`. Internal tooling (`store`, `middleware`, `retention`,
-page components, `ulid`) has no public entry at all.
+under `core/schema`. Models have no public entry at all — they are private
+implementation details. Internal tooling (`store`, `middleware`, `retention`,
+page components, `ulid`) has no public entry either.
 
 ### 2. Row types no longer re-exported from model modules
 
 ```ts
 // Before
 import type { Build } from "@storyshelf/core/models/build";
-// After (pick one)
-import type { Build } from "@storyshelf/core/schema/build";
-import type { Build } from "@storyshelf/core"; // barrel now includes models-adjacent types via schema
+// After
+import type { Build } from "@storyshelf/core/schema";
 ```
 
 Model modules export only their own API (`*Model` classes, `*CreateInput`,

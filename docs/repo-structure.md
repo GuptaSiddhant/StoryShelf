@@ -34,9 +34,10 @@ There is no `tsdown-entry` key. Each `package.json` `exports` map carries `{ sou
 - Everything else lives under a subpath: adapter interfaces under
   `core/adapter/*`, runtime capture under `core/capture`, logging under
   `core/logger`, diff under `core/diff`, URLs under `core/urls`, storage paths
-  under `core/paths`, tables/rows under `core/schema`, models under
-  `core/models/*`. Internal tooling (`store`, `middleware`, `retention`, page
-  components) has no entry and no barrel export — it may change without notice.
+  under `core/paths`, tables/rows under `core/schema`. Models (`models/`),
+  internal tooling (`store`, `middleware`, `retention`, page components) have
+  no entry and no barrel export — they are private implementation details that
+  may change without notice.
 - `Logger` canonical home is `core/logger` (the `core/types` re-export was
   removed in 0.2.0).
 

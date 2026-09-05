@@ -75,42 +75,6 @@
       "source": "./src/logger.ts",
       "default": "./dist/logger.mjs"
     },
-    "./models/baseline": {
-      "source": "./src/models/baseline.ts",
-      "default": "./dist/models/baseline.mjs"
-    },
-    "./models/build": {
-      "source": "./src/models/build.ts",
-      "default": "./dist/models/build.mjs"
-    },
-    "./models/comment": {
-      "source": "./src/models/comment.ts",
-      "default": "./dist/models/comment.mjs"
-    },
-    "./models/label": {
-      "source": "./src/models/label.ts",
-      "default": "./dist/models/label.mjs"
-    },
-    "./models/member": {
-      "source": "./src/models/member.ts",
-      "default": "./dist/models/member.mjs"
-    },
-    "./models/project": {
-      "source": "./src/models/project.ts",
-      "default": "./dist/models/project.mjs"
-    },
-    "./models/snapshot": {
-      "source": "./src/models/snapshot.ts",
-      "default": "./dist/models/snapshot.mjs"
-    },
-    "./models/token": {
-      "source": "./src/models/token.ts",
-      "default": "./dist/models/token.mjs"
-    },
-    "./models/webhook": {
-      "source": "./src/models/webhook.ts",
-      "default": "./dist/models/webhook.mjs"
-    },
     "./paths": {
       "source": "./src/utils/paths.ts",
       "default": "./dist/paths.mjs"
@@ -144,15 +108,6 @@
       "./ddl": "./dist/ddl.mjs",
       "./diff": "./dist/diff.mjs",
       "./logger": "./dist/logger.mjs",
-      "./models/baseline": "./dist/models/baseline.mjs",
-      "./models/build": "./dist/models/build.mjs",
-      "./models/comment": "./dist/models/comment.mjs",
-      "./models/label": "./dist/models/label.mjs",
-      "./models/member": "./dist/models/member.mjs",
-      "./models/project": "./dist/models/project.mjs",
-      "./models/snapshot": "./dist/models/snapshot.mjs",
-      "./models/token": "./dist/models/token.mjs",
-      "./models/webhook": "./dist/models/webhook.mjs",
       "./paths": "./dist/paths.mjs",
       "./schema": "./dist/schema.mjs",
       "./types": "./dist/types.mjs",

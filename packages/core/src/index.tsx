@@ -246,7 +246,8 @@ export function createShelfRouter(options: ShelfOptions): ShelfApp {
  * `createShelfRouter` plus the option/config types needed to call it. Adapter
  * interfaces live under `core/adapter/*`; runtime helpers under `core/logger`,
  * `core/capture`, `core/paths`, `core/urls`, `core/diff`; tables and row types
- * under `core/schema/*`; models under `core/models/*`. Importing the barrel
+ * under `core/schema`. Models and internal tooling (`store`, `middleware`,
+ * `retention`, pages) have no public entry. Importing the barrel
  * must never pull the Hono router into bundles that do not serve it.
  */
 export type { ShelfOptions, ShelfConfig, UIConfig, BrandTheme } from "./config.ts";

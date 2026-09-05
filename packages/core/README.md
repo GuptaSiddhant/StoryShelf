@@ -100,7 +100,7 @@ Import from `core/capture`, `core/diff`, and the model entries — never from th
 - `StorybookAdapter` (`core/capture`) — reads a built Storybook's `index.json`/`stories.json`.
 - `InMemoryCaptureQueue` (`core/capture`) — in-process, concurrency-limited queue for long-lived hosts; supply a remote queue with a separate worker for serverless.
 - `diffImages(baseline: Buffer, current: Buffer, options: DiffOptions): DiffResult` (`core/diff`) — pixelmatch-based diff. Also exports `DiffOptions`, `DiffResult`.
-- Models (`core/models/*`), schema (`core/schema`), and row types back every entity; retention runs inside the router.
+- Models, schema, and row types back every entity; retention runs inside the router. (Models are private implementation details with no public entry — reach row types via `core/schema`.)
 
 ### Helpers
 

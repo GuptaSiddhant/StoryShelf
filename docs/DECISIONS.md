@@ -66,3 +66,9 @@ Decisions made during implementation (for review). Architectural decisions are i
 29. **`pino` joined the root workspace catalog** to resolve `@storyshelf/queue-sqs`'s `catalog:` reference, which was added without a catalog entry.
 
 
+
+## 2026-09-05 — Router-only barrel, private models
+
+30. **The `@storyshelf/core` barrel exports only the router and its types** (`createShelfRouter`, `ShelfOptions`/`ShelfConfig`/`UIConfig`/`BrandTheme`, `ShelfApp`/`ShelfContext`). Everything else moved to subpaths (new `core/logger`, `core/capture`, `core/adapter/capture-queue`, `core/paths`, `core/urls`, `core/diff` entries). Rationale: consumers that do not serve HTTP (runners, workers, CLIs) must not import the Hono router to reach a helper.
+    - *Reverses 17:* the `core/models/*` deep entries are deleted — models are private implementation details with no public entry, since nothing outside core imports them. Row types remain reachable via `core/schema`.
+    - *Trade-off:* more import lines per consumer (router + logger + adapters from separate entries). Accepted — explicit dependency edges beat an implicit barrel.
