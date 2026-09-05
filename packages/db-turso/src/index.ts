@@ -1,34 +1,13 @@
 import { createClient } from "@libsql/client";
-import type { DatabaseAdapter, ListOptions } from "@storyshelf/core/adapter/database";
+import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import { createDrizzleAdapter } from "@storyshelf/core/adapter/database";
 import { DDL } from "@storyshelf/core/ddl";
 import { schema } from "@storyshelf/core/schema";
-import { eq, getTableColumns } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/libsql";
-import type { AnySQLiteTable, SQLiteColumn } from "drizzle-orm/sqlite-core";
 
 declare const __PKG_VERSION__: string | undefined;
 
-function idOf(table: AnySQLiteTable): SQLiteColumn {
-  // eslint-disable-next-line no-non-null-assertion -- every table has an `id` column
-  return getTableColumns(table)["id"]!;
-}
-
-/* eslint-disable typescript/no-explicit-any, typescript/no-unsafe-call, typescript/no-unsafe-member-access -- drizzle query builder is intentionally loosely typed */
-function applyListOptions(query: any, opts: ListOptions): void {
-  if (opts.where) {
-    query.where(opts.where);
-  }
-  if (opts.orderBy) {
-    query.orderBy(opts.orderBy);
-  }
-  if (opts.limit !== undefined) {
-    query.limit(opts.limit);
-  }
-  if (opts.offset !== undefined) {
-    query.offset(opts.offset);
-  }
-}
-/* eslint-enable typescript/no-explicit-any, typescript/no-unsafe-call, typescript/no-unsafe-member-access */
+const STORYBOOK_META_ALTER = "ALTER TABLE projects ADD COLUMN storybook_meta TEXT";
 
 /**
  * Create a Turso/libSQL-backed DatabaseAdapter using Drizzle ORM.
@@ -40,62 +19,23 @@ export function createTursoDatabase(options: { url: string; authToken?: string }
   const client = createClient({ url: options.url, authToken: options.authToken });
   const db = drizzle(client, { schema });
 
-  return {
+  return createDrizzleAdapter(db, {
     metadata: {
       name: "Turso",
       version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
       description: "Turso/libSQL database adapter",
       kind: "turso",
     },
-    async insert(table, values) {
-      return await db.insert(table).values(values).returning().get();
-    },
-    async update(table, id, values) {
-      return await db
-        .update(table)
-        .set(values)
-        .where(eq(idOf(table), id))
-        .returning()
-        .get();
-    },
-    async get(table, id) {
-      return (
-        (await db
-          .select()
-          .from(table)
-          .where(eq(idOf(table), id))
-          .limit(1)
-          .get()) ?? null
-      );
-    },
-    async remove(table, id) {
-      await db
-        .delete(table)
-        .where(eq(idOf(table), id))
-        .run();
-    },
-    async list(table, opts: ListOptions = {}) {
-      const query = db.select().from(table);
-      applyListOptions(query, opts);
-      return await query.all();
-    },
-    async count(table, where) {
-      return await db.$count(table, where);
-    },
-    async all(query) {
-      return await db.all(query);
-    },
-    async migrate() {
+    migrate: async () => {
       await client.executeMultiple(DDL);
       try {
-        await client.execute("ALTER TABLE projects ADD COLUMN storybook_meta TEXT");
+        await client.execute(STORYBOOK_META_ALTER);
       } catch {
         // Column already exists — ignore
       }
     },
-    // eslint-disable-next-line require-await -- client.close() is synchronous
-    async close() {
+    close: () => {
       client.close();
     },
-  };
+  });
 }

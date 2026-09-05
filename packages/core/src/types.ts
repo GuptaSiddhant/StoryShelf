@@ -57,5 +57,3 @@ export const RESERVED_LABEL_KEYS = ["build"] as const;
 
 /** Label key marking a build as exempt from retention purging. */
 export const PERSISTENT_LABEL_KEY = "persistent";
-
-export type { Logger } from "./logger.ts";

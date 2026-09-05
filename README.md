@@ -19,17 +19,16 @@ packages/
   git-gitlab/     @storyshelf/git-gitlab    — GitLab commit status / merge gate / MR comments
   queue-sqs/      @storyshelf/queue-sqs     — AWS SQS capture job queue
   cli/            @storyshelf/cli           — CLI client (server init, init, create, upload, purge, retry)
-   runner-playwright/ @storyshelf/runner-playwright — Playwright capture runner
-  apps/
-    dev-server/     dev-server      — local dev server (from TS source via nub watch)
-    website/        website         — public docs (Astro Starlight)
-    fly-app/        fly-app         — Fly demo (local adapters, workspace deps, multi-stage cached Dockerfile; deploys on tag via fly.yml)
-  fixtures/
-    storybook-8/    storybook-fixture -- SB 8.6 Vite React (default, 7 stories; own pnpm install)
-    storybook-9/    storybook-fixture -- SB 9 Vite React
-    storybook-10/   storybook-fixture -- SB 10 ESM + CSF-Next (filters subtype:'test')
-    storybook-11/   storybook-fixture -- SB 11 alpha (upcoming)
-  docs/                                       — architecture, ADRs, testing, website plan
+  runner-playwright/ @storyshelf/runner-playwright — Playwright capture runner
+apps/
+  dev-server/     dev-server      — local dev server (from TS source via nub watch)
+  website/        website         — public docs (Astro Starlight)
+  fly-app/        fly-app         — Fly demo (local adapters, workspace deps, multi-stage cached Dockerfile; deploys on tag via fly.yml)
+fixtures/
+  storybook-8/    storybook-fixture -- SB 8.6 Vite React (default, 7 stories; own pnpm install)
+  storybook-9/    storybook-fixture -- SB 9 Vite React
+  storybook-10/   storybook-fixture -- SB 10 ESM + CSF-Next (filters subtype:'test')
+docs/                                       — architecture, ADRs, testing, website plan
 ```
 
 ## Commands

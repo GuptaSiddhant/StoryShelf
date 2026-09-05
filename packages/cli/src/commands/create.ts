@@ -1,4 +1,3 @@
-/* oxlint-disable max-statements, max-lines-per-function, complexity, eslint/max-statements, eslint/max-lines-per-function, eslint/complexity, typescript/no-unsafe-assignment, typescript/no-unsafe-member-access, typescript/no-unsafe-call, typescript/prefer-nullish-coalescing, typescript/prefer-regexp-exec, eslint/no-await-in-loop, no-await-in-loop, max-depth, eslint/max-depth, eslint/no-useless-escape, no-useless-escape */
 import { createClient } from "../client.ts";
 import {
   assertStorybookMain,
@@ -6,6 +5,7 @@ import {
   detectGitRepository,
   detectPackageName,
   detectStorybookMeta,
+  type StorybookMeta,
   writeStorybookConfig,
 } from "../config.ts";
 import { printError, printLine } from "../output.ts";
@@ -18,6 +18,8 @@ export interface CreateOptions {
   name?: string;
   /** Admin token (fallback to STORYSHELF_ADMIN_TOKEN / ADMIN_TOKEN env). */
   token?: string;
+  /** Working directory (defaults to process.cwd()). Test seam for fs access. */
+  cwd?: string;
 }
 
 interface ProjectResponse {
@@ -28,6 +30,79 @@ interface TokenResponse {
   token: string;
 }
 
+interface CreateInputs {
+  url?: string;
+  name?: string;
+  token?: string;
+  gitRepository?: string;
+  gitDefaultBranch?: string;
+  storybookMeta: StorybookMeta;
+}
+
+async function readCreateInputs(options: CreateOptions, cwd: string): Promise<CreateInputs> {
+  const rawName = options.name === "" ? undefined : options.name;
+  const name = rawName ?? (await detectPackageName(cwd));
+  return {
+    url: options.url ?? process.env["STORYSHELF_URL"] ?? process.env["STORYSHELF_HOST"],
+    name: name ?? undefined,
+    token: options.token ?? process.env["STORYSHELF_ADMIN_TOKEN"] ?? process.env["ADMIN_TOKEN"],
+    gitRepository: detectGitRepository(cwd) ?? undefined,
+    gitDefaultBranch: detectGitDefaultBranch(cwd) ?? undefined,
+    storybookMeta: await detectStorybookMeta(cwd),
+  };
+}
+
+function createInputError(inputs: CreateInputs): string | null {
+  if (!inputs.url) {
+    return "--url is required (or STORYSHELF_URL env)";
+  }
+  if (!inputs.name) {
+    return "--name is required (or ensure package.json has a name)";
+  }
+  if (!inputs.token) {
+    return "--token is required for site-admin (or STORYSHELF_ADMIN_TOKEN env)";
+  }
+  return null;
+}
+
+interface CreatePayload {
+  name: string;
+  gitRepository?: string;
+  gitDefaultBranch?: string;
+  storybookMeta?: unknown;
+}
+
+function buildCreatePayload(name: string, inputs: CreateInputs): CreatePayload {
+  const payload: CreatePayload = { name };
+  if (inputs.gitRepository) {
+    payload.gitRepository = inputs.gitRepository;
+  }
+  if (inputs.gitDefaultBranch) {
+    payload.gitDefaultBranch = inputs.gitDefaultBranch;
+  }
+  if (Object.keys(inputs.storybookMeta).length > 0) {
+    payload.storybookMeta = inputs.storybookMeta;
+  }
+  return payload;
+}
+
+async function executeCreate(
+  url: string,
+  token: string,
+  payload: CreatePayload,
+  cwd: string,
+): Promise<void> {
+  const client = createClient(url, token);
+  const project = (await client.projects.create(payload)) as ProjectResponse;
+  const tokenRes = (await client.projects.tokens.create(project.slug, { name: "ci" })) as TokenResponse;
+  // Write client config without token
+  const written = await writeStorybookConfig({ slug: project.slug, url }, cwd);
+  printLine(`Project slug: ${project.slug}`);
+  printLine(`CI token: ${tokenRes.token}`);
+  printLine(`Wrote ${written}`);
+  printLine("Store CI token in secrets (STORYSHELF_TOKEN) — not in git");
+}
+
 /**
  * Create a project and CI token on a StoryShelf server.
  * Requires .storybook/main.* to exist and writes .storybook/storyshelf.json.
@@ -35,64 +110,14 @@ interface TokenResponse {
  * @param options - Create command options.
  */
 export async function runCreate(options: CreateOptions): Promise<void> {
-  await assertStorybookMain();
-
-  const url = options.url ?? process.env["STORYSHELF_URL"] ?? process.env["STORYSHELF_HOST"];
-  let { name } = options;
-  const token =
-    options.token ?? process.env["STORYSHELF_ADMIN_TOKEN"] ?? process.env["ADMIN_TOKEN"];
-
-  if (!url) {
-    printError("--url is required (or STORYSHELF_URL env)");
+  const cwd = options.cwd ?? process.cwd();
+  await assertStorybookMain(cwd);
+  const inputs = await readCreateInputs(options, cwd);
+  const error = createInputError(inputs);
+  if (error || !inputs.url || !inputs.name || !inputs.token) {
+    printError(error ?? "Missing required options");
     process.exitCode = 1;
     return;
   }
-  if (!name) {
-    name = (await detectPackageName()) ?? undefined;
-  }
-  if (!name) {
-    printError("--name is required (or ensure package.json has a name)");
-    process.exitCode = 1;
-    return;
-  }
-  if (!token) {
-    printError("--token is required for site-admin (or STORYSHELF_ADMIN_TOKEN env)");
-    process.exitCode = 1;
-    return;
-  }
-
-  const gitRepository = detectGitRepository() ?? undefined;
-  const gitDefaultBranch = detectGitDefaultBranch() ?? undefined;
-  const storybookMeta = await detectStorybookMeta();
-
-  const payload: {
-    name: string;
-    gitRepository?: string;
-    gitDefaultBranch?: string;
-    storybookMeta?: unknown;
-  } = {
-    name,
-  };
-  if (gitRepository) {
-    payload.gitRepository = gitRepository;
-  }
-  if (gitDefaultBranch) {
-    payload.gitDefaultBranch = gitDefaultBranch;
-  }
-  if (Object.keys(storybookMeta).length > 0) {
-    payload.storybookMeta = storybookMeta;
-  }
-
-  const client = createClient(url, token);
-  const project = await client.projects.create(payload);
-  const projectData = project as ProjectResponse;
-  const tokenRes = await client.projects.tokens.create(projectData.slug, { name: "ci" });
-  const tokenData = tokenRes as TokenResponse;
-
-  // Write client config without token
-  const written = await writeStorybookConfig({ slug: projectData.slug, url });
-  printLine(`Project slug: ${projectData.slug}`);
-  printLine(`CI token: ${tokenData.token}`);
-  printLine(`Wrote ${written}`);
-  printLine("Store CI token in secrets (STORYSHELF_TOKEN) — not in git");
+  await executeCreate(inputs.url, inputs.token, buildCreatePayload(inputs.name, inputs), cwd);
 }

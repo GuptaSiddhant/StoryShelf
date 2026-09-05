@@ -1,7 +1,7 @@
-import type { CheckStatus } from "@storyshelf/core";
+import type { CheckStatus } from "@storyshelf/core/adapter/git-host";
 /* oxlint-disable max-statements */
 import { describeStatus } from "@storyshelf/core/adapter/git-host/helpers";
-import type { Logger } from "@storyshelf/core/types";
+import type { Logger } from "@storyshelf/core/logger";
 import { apiBase, gitlabHeaders, projectId } from "./helpers.ts";
 import { mapStatus } from "./mapper.ts";
 

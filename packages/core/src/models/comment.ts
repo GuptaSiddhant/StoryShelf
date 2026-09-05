@@ -1,8 +1,9 @@
 /** Build and snapshot review comments. */
 import { eq } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
-import { comments, projects } from "../schema-tables.ts";
-import type { Comment } from "../schema.ts";
+import { comments } from "../schema/comment.ts";
+import type { Comment } from "../schema/comment.ts";
+import { projects } from "../schema/project.ts";
 import { ulid } from "../utils/ulid.ts";
 
 /** Input for creating a review comment. */
@@ -52,5 +53,3 @@ export class CommentModel {
     });
   }
 }
-
-export type { Comment };

@@ -78,33 +78,34 @@ interface UIConfig {
 
 ### Adapter interfaces
 
-All adapters are constructor-injected (no AsyncLocalStorage). See `docs/architecture.md` for the entity model and workflow.
+All adapters are constructor-injected (no AsyncLocalStorage). See `docs/architecture.md` for the entity model and workflow. Import each from its subpath — the barrel (`@storyshelf/core`) exports only the router and its types.
 
-- `DatabaseAdapter` — `insert`, `update`, `get`, `remove`, `list`, `count`, `all`, `migrate`, `close`. Also exports `ListOptions`.
-- `StorageAdapter` — `read`, `write`, `delete`, `exists`, `list(prefix)`.
-- `AuthAdapter` — `check(request)`, `createSession(user)`, `destroySession(sessionId)`, optional `handleCallback(callback)`. Also exports `AuthUser`, `AuthCallback`, and the shared `SESSION_COOKIE`.
-- `CaptureRunner` — a **pure capture renderer**: `render(input) => RenderResult`, `cancel(buildId)`. Also exports `JobStatus`, `RenderedSnapshot`, `RenderResult`.
-- `GitHostProvider` / `GitHostAdapter` — set commit status checks, detect merges, and upsert PR comments. Real providers ship in `@storyshelf/git-github` and `@storyshelf/git-gitlab`. Also exports `CheckStatus`.
+- `DatabaseAdapter` (`core/adapter/database`) — `insert`, `update`, `get`, `remove`, `list`, `count`, `all`, `migrate`, `close`. Also exports `ListOptions` and the `createDrizzleAdapter` factory.
+- `StorageAdapter` (`core/adapter/storage`) — `read`, `write`, `delete`, `exists`, `list(prefix)`.
+- `AuthAdapter` (`core/adapter/auth`) — `check(request)`, `createSession(user)`, `destroySession(sessionId)`, optional `handleCallback(callback)`. Also exports `AuthUser`, `AuthCallback`, and the shared `SESSION_COOKIE`.
+- `CaptureRunner` (`core/adapter/capture-runner`) — a **pure capture renderer**: `render(input) => RenderResult`, `cancel(buildId)`. Also exports `RenderedSnapshot`, `RenderResult`, `StoryEntry`, `StorySourceAdapter`, `Viewport`.
+- `CaptureQueue` (`core/adapter/capture-queue`) — `enqueue({ buildId, reqId? })`, plus `status`, `active`, `recent`. Also exports `CaptureJob`, `QueueEntry`, `JobStatus`.
+- `GitHostProvider` / `GitHostAdapter` (`core/adapter/git-host`) — set commit status checks, detect merges, and upsert PR comments. Real providers ship in `@storyshelf/git-github` and `@storyshelf/git-gitlab`. Also exports `CheckStatus`.
 
 ### Logging
 
-`core` uses **pino** for structured JSON logging. `createShelfLogger({ level, transports, env })` builds a logger writing to stdout by default, with optional extra pino worker transports (Sentry, PostHog, Datadog, GCP, OTEL collector, etc.). Pass the resulting `Logger` to `createShelfRouter({ logger })` (or construct it at your composition root) so request and background logs share one stream. The capture orchestrator derives a `reqId`-scoped child for background capture work, correlating each capture back to the triggering HTTP request. See ADR 0014.
+`core` uses **pino** for structured JSON logging. `createShelfLogger({ level, transports, env })` (from `core/logger`) builds a logger writing to stdout by default, with optional extra pino worker transports (Sentry, PostHog, Datadog, GCP, OTEL collector, etc.). Pass the resulting `Logger` to `createShelfRouter({ logger })` (or construct it at your composition root) so request and background logs share one stream. The capture orchestrator derives a `reqId`-scoped child for background capture work, correlating each capture back to the triggering HTTP request. See ADR 0014.
 
 ### Capture, diff, and retention
 
-- `executeCaptureJob({ buildId, reqId }, deps)` — the capture **orchestrator**: loads the build, marks it `capturing`, extracts the uploaded archive into `scratchDir`, discovers stories, delegates rendering to a pure `CaptureRunner`, and persists. `createShelfRouter` wires it into a `CaptureQueue` when `capture` is supplied (and requires `ShelfConfig.scratchDir`). Also exports `CaptureJobOptions`.
-- `persistCapture(ctx: CaptureContext)` — writes screenshots, diffs against the branch baseline, creates snapshots, and finalizes a build from a pure renderer's `captures`. Also exports `CaptureContext` and the `StorySourceAdapter`/`StoryEntry`/`Viewport` types.
-- `StorybookAdapter` — reads a built Storybook's `index.json`/`stories.json`.
-- `diffImages(baseline: Buffer, current: Buffer, options: DiffOptions): DiffResult` — pixelmatch-based diff. Also exports `DiffOptions`, `DiffResult`.
-- `CaptureQueue` — the **capture queue adapter**: `enqueue({ buildId, reqId? })`, plus `status`, `active`, `recent`. `enqueue` returns once a build is queued (async, "queued"); the job runs in a worker. Default is `InMemoryCaptureQueue` (in-process, concurrency-limited, for long-lived hosts); supply a remote queue with a separate worker for serverless. Also exports `CaptureJob`, `QueueEntry`, `JobStatus`.
-- `Retention` — `new Retention(db, storage, logger?)`, with `purge(project, { ttlDays, keepLatestPerBranch })`.
+Import from `core/capture`, `core/diff`, and the model entries — never from the barrel:
+
+- `executeCaptureJob({ buildId, reqId }, deps)` (`core/capture`) — the capture **orchestrator**: loads the build, marks it `capturing`, extracts the uploaded archive into `scratchDir`, discovers stories, delegates rendering to a pure `CaptureRunner`, and persists. `createShelfRouter` wires it into a `CaptureQueue` when `capture` is supplied (and requires `ShelfConfig.scratchDir`). Also exports `CaptureJobOptions`.
+- `persistCapture(ctx: CaptureContext)` (`core/capture`) — writes screenshots, diffs against the branch baseline, creates snapshots, and finalizes a build from a pure renderer's `captures`. Also exports `CaptureContext`.
+- `StorybookAdapter` (`core/capture`) — reads a built Storybook's `index.json`/`stories.json`.
+- `InMemoryCaptureQueue` (`core/capture`) — in-process, concurrency-limited queue for long-lived hosts; supply a remote queue with a separate worker for serverless.
+- `diffImages(baseline: Buffer, current: Buffer, options: DiffOptions): DiffResult` (`core/diff`) — pixelmatch-based diff. Also exports `DiffOptions`, `DiffResult`.
+- Models (`core/models/*`), schema (`core/schema`), and row types back every entity; retention runs inside the router.
 
 ### Helpers
 
-- `createUrlBuilder(baseUrl, publishedBaseDomain?)` — type-safe URL builder. Also exports `UrlBuilder`.
-- `ulid`, `slugify`.
-- Path helpers: `screenshotPath`, `diffPath`, `baselinePath`, `storybookDir`, `storybookZipPath`.
-- `RenderedContent` type for the server-rendered UI.
+- `createUrlBuilder(baseUrl, publishedBaseDomain?)` (`core/urls`) — type-safe URL builder. Also exports `UrlBuilder`.
+- Path helpers (`core/paths`): `screenshotPath`, `diffPath`, `baselinePath`, `storybookDir`, `storybookZipPath`.
 
 ## How it fits in
 

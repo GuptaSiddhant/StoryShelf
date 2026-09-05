@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/db-turso",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "description": "Turso/libSQL database adapter for StoryShelf (@libsql/client + Drizzle).",
   "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
   "bugs": {

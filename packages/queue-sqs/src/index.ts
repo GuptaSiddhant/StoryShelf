@@ -4,8 +4,13 @@ import {
   SendMessageCommand,
   SQSClient,
 } from "@aws-sdk/client-sqs";
-import type { CaptureJob, CaptureQueue, JobStatus, QueueEntry } from "@storyshelf/core";
-import type { Logger } from "@storyshelf/core/types";
+import type {
+  CaptureJob,
+  CaptureQueue,
+  JobStatus,
+  QueueEntry,
+} from "@storyshelf/core/adapter/capture-queue";
+import type { Logger } from "@storyshelf/core/logger";
 
 declare const __PKG_VERSION__: string | undefined;
 

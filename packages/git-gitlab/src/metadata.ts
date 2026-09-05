@@ -1,4 +1,4 @@
-import type { GitHostProvider } from "@storyshelf/core";
+import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import { gitlabConfigSchema } from "./config.ts";
 
 declare const __PKG_VERSION__: string | undefined;

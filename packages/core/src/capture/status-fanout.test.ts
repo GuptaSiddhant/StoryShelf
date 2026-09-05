@@ -6,11 +6,11 @@ import { join } from "node:path";
 import { pino, type Logger } from "pino";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import type { CaptureRunner, RenderResult } from "./adapters/capture-runner.ts";
-import type { CheckStatus, GitHostAdapter, GitHostProvider } from "./adapters/git-host/index.ts";
-import { makeDatabase, makeStorage } from "./capture/fake-adapters.ts";
-import { createShelfRouter } from "./index.tsx";
-import type { Build } from "./schema.ts";
+import type { CaptureRunner, RenderResult } from "../adapters/capture-runner.ts";
+import type { CheckStatus, GitHostAdapter, GitHostProvider } from "../adapters/git-host/index.ts";
+import { createShelfRouter } from "../index.tsx";
+import type { Build } from "../schema/build.ts";
+import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 
 const STORY_ID = "components-button--primary";
 const SHA = "a".repeat(40);

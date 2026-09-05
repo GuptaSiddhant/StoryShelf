@@ -3,7 +3,7 @@ import type { DatabaseAdapter } from "../adapters/database.ts";
 import { buildCommentMarkdown } from "../adapters/git-host/helpers.ts";
 import type { CheckStatus, GitHostProvider } from "../adapters/git-host/index.ts";
 import { StatusConfigModel } from "../models/status-config.ts";
-import type { Project } from "../schema.ts";
+import type { Project } from "../schema/project.ts";
 
 /** Post build check statuses (and review comments) to every configured git provider. */
 async function postStatusesForBuild(opts: {

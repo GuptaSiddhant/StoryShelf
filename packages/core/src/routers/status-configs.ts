@@ -1,7 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import type { ShelfApp } from "../index.tsx";
 import { StatusConfigModel } from "../models/status-config.ts";
-import type { ProjectStatusConfig } from "../schema.ts";
+import type { ProjectStatusConfig } from "../schema/status-config.ts";
 import { getStore } from "../store.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
 import { notFound, statusConfigCreateSchema, statusConfigSchema, unauthorized } from "./schemas.ts";

@@ -78,6 +78,7 @@
     "import/prefer-default-export": "allow",
     "import/no-named-export": "allow",
     "new-cap": "allow",
+    "oxc/no-async-endpoint-handlers": "allow",
     "no-async-await": "allow",
     "no-continue": "allow",
     "no-magic-numbers": "allow",
@@ -132,7 +133,7 @@
   },
   "overrides": [
     {
-      "files": ["**/*.test.ts", "**/*.spec.ts", "**/mocks/**"],
+      "files": ["**/*.test.ts", "**/*.spec.ts", "**/mocks/**", "**/test-helpers/**"],
       "rules": {
         "typescript/no-confusing-void-expression": "allow",
         "max-lines-per-function": "allow",
@@ -142,43 +143,48 @@
     },
     {
       "files": [
-        "packages/cli/src/commands/upload.ts",
-        "packages/cli/src/client.ts",
-        "packages/db-turso/src/index.test.ts",
-        "packages/db-turso/src/index.ts",
-        "packages/db-sqlite/src/index.test.ts",
-        "packages/db-sqlite/src/index.ts",
-        "packages/storage-local/src/index.ts",
-        "packages/storage-s3/src/index.ts",
-        "packages/storage-s3/src/index.test.ts",
-        "packages/runner-playwright/src/capture-runner.ts",
-        "packages/runner-playwright/src/capture-runner.test.ts",
-        "packages/runner-playwright/src/integration.test.ts"
+        "packages/core/src/capture/orchestrator.ts",
+        "packages/core/src/capture/pipeline.ts",
+        "packages/core/src/capture/queue.ts",
+        "packages/core/src/capture/status-fanout.ts",
+        "packages/core/src/diff/engine.ts",
+        "packages/core/src/middleware/csrf.ts",
+        "packages/core/src/middleware/rate-limit.ts",
+        "packages/core/src/models/baseline.ts",
+        "packages/core/src/models/build.ts",
+        "packages/core/src/pages/build-detail.tsx",
+        "packages/core/src/pages/compute-jobs.tsx",
+        "packages/core/src/pages/label-detail.tsx",
+        "packages/core/src/pages/project-builds.tsx",
+        "packages/core/src/pages/project-create.tsx",
+        "packages/core/src/pages/projects.tsx",
+        "packages/core/src/pages/root.tsx",
+        "packages/core/src/pages/settings-general.tsx",
+        "packages/core/src/pages/settings-labels.tsx",
+        "packages/core/src/pages/settings-members.tsx",
+        "packages/core/src/pages/settings-status.tsx",
+        "packages/core/src/pages/settings-tests.tsx",
+        "packages/core/src/pages/settings-tokens.tsx",
+        "packages/core/src/pages/settings-webhooks.tsx",
+        "packages/core/src/retention/purge.ts",
+        "packages/core/src/routers/auth.ts",
+        "packages/core/src/routers/builds.handlers.ts",
+        "packages/core/src/routers/builds.ts",
+        "packages/core/src/routers/helpers.ts",
+        "packages/core/src/routers/labels.ts",
+        "packages/core/src/routers/snapshots.ts",
+        "packages/core/src/routers/status-configs.ts",
+        "packages/core/src/routers/storybook.ts",
+        "packages/core/src/routers/ui.ts",
+        "packages/core/src/ui/document.tsx",
+        "packages/core/src/ui/styles.ts",
+        "packages/core/src/utils/encrypt.ts",
+        "packages/core/src/utils/ulid.ts",
+        "packages/runner-playwright/src/capture-runner.ts"
       ],
       "rules": {
         "max-lines-per-function": "allow",
-        "max-statements": "allow",
-        "max-lines": "allow"
-      }
-    },
-    {
-      "files": ["packages/core/src/**"],
-      "rules": {
-        "max-lines-per-function": "allow",
-        "max-statements": "allow",
-        "max-lines": "allow",
-        "no-empty-function": "allow",
-        "no-inline-comments": "allow",
-        "no-await-in-loop": "allow",
-        "capitalized-comments": "allow",
-        "eslint/capitalized-comments": "allow",
-        "curly": "allow",
-        "eslint/curly": "allow",
-        "prefer-destructuring": "allow",
-        "eslint/prefer-destructuring": "allow",
-        "max-params": "allow",
-        "eslint/max-params": "allow",
-        "id-length": "allow"
+        "max-statements": "allow"
       }
     }
   ]

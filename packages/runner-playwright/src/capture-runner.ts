@@ -1,13 +1,13 @@
-import {
-  StorybookAdapter,
-  type CaptureRunner,
-  type RenderResult,
-  type RenderedSnapshot,
-  type StoryEntry,
-  type StorySourceAdapter,
-  type Viewport,
-} from "@storyshelf/core";
-import type { Logger } from "@storyshelf/core/types";
+import type {
+  CaptureRunner,
+  RenderResult,
+  RenderedSnapshot,
+  StoryEntry,
+  StorySourceAdapter,
+  Viewport,
+} from "@storyshelf/core/adapter/capture-runner";
+import { StorybookAdapter } from "@storyshelf/core/capture";
+import type { Logger } from "@storyshelf/core/logger";
 import { chromium, type Browser } from "playwright";
 
 declare const __PKG_VERSION__: string | undefined;

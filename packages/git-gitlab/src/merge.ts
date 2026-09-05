@@ -1,4 +1,4 @@
-import type { Logger } from "@storyshelf/core/types";
+import type { Logger } from "@storyshelf/core/logger";
 /* oxlint-disable max-statements, max-lines-per-function */
 import { apiBase, gitlabHeaders, projectId } from "./helpers.ts";
 import { findMrIid } from "./pr.ts";

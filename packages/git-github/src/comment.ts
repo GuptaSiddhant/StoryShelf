@@ -1,7 +1,45 @@
-/* oxlint-disable max-statements, max-lines-per-function */
 import type { Octokit } from "@octokit/rest";
-import type { Logger } from "@storyshelf/core/types";
+import type { ReviewThread } from "@storyshelf/core/adapter/git-host/comments";
+import { upsertReviewComment } from "@storyshelf/core/adapter/git-host/comments";
+import type { Logger } from "@storyshelf/core/logger";
 import { findPrNumber } from "./pr.ts";
+
+/** Octokit-backed review thread for a pull request. */
+function createThread(octokit: Octokit, owner: string, repo: string, prNumber: number): ReviewThread {
+  return {
+    list: async () =>
+      (
+        await octokit.issues.listComments({
+          owner,
+          repo,
+          issue_number: prNumber,
+          per_page: 100,
+        })
+      ).data.map((comment) => ({ id: comment.id, body: comment.body ?? "" })),
+    update: async (id, body) =>
+      String(
+        (
+          await octokit.issues.updateComment({
+            owner,
+            repo,
+            comment_id: id as number,
+            body,
+          })
+        ).data.id,
+      ),
+    create: async (body) =>
+      String(
+        (
+          await octokit.issues.createComment({
+            owner,
+            repo,
+            issue_number: prNumber,
+            body,
+          })
+        ).data.id,
+      ),
+  };
+}
 
 /** Create or update the StoryShelf review comment on a pull request. */
 export async function upsertPrComment(opts: {
@@ -14,47 +52,14 @@ export async function upsertPrComment(opts: {
   prNumber: number | undefined;
   logger?: Logger;
 }): Promise<string> {
-  const marker = `<!-- storyshelf:${opts.url} -->`;
-  const body = `${marker}\n${opts.markdown}`;
-  let resolved: number | undefined = opts.prNumber;
-  resolved ??= await findPrNumber({
-    octokit: opts.octokit,
-    owner: opts.owner,
-    repo: opts.repo,
+  const { octokit, owner, repo } = opts;
+  return await upsertReviewComment({
+    url: opts.url,
+    markdown: opts.markdown,
+    prNumber: opts.prNumber,
     sha: opts.sha,
+    logger: opts.logger,
+    resolveNumber: async () => await findPrNumber({ octokit, owner, repo, sha: opts.sha }),
+    thread: (prNumber) => createThread(octokit, owner, repo, prNumber),
   });
-  if (resolved === undefined) {
-    opts.logger?.debug({ sha: opts.sha }, "no PR found for comment, skipping");
-    return "";
-  }
-  try {
-    const comments = await opts.octokit.issues.listComments({
-      owner: opts.owner,
-      repo: opts.repo,
-      issue_number: resolved,
-      per_page: 100,
-    });
-    const existing = comments.data.find((comment) => comment.body?.includes(marker));
-    if (existing) {
-      const updated = await opts.octokit.issues.updateComment({
-        owner: opts.owner,
-        repo: opts.repo,
-        comment_id: existing.id,
-        body,
-      });
-      opts.logger?.info({ prNumber: resolved, commentId: updated.data.id }, "git comment updated");
-      return String(updated.data.id);
-    }
-    const created = await opts.octokit.issues.createComment({
-      owner: opts.owner,
-      repo: opts.repo,
-      issue_number: resolved,
-      body,
-    });
-    opts.logger?.info({ prNumber: resolved, commentId: created.data.id }, "git comment created");
-    return String(created.data.id);
-  } catch (error) {
-    opts.logger?.error({ err: error, prNumber: resolved }, "failed to upsert git comment");
-    throw error;
-  }
 }

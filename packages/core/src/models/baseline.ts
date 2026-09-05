@@ -3,8 +3,8 @@ import { and, eq } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { emitWebhookEvent } from "../adapters/webhook-events.ts";
-import { baselines } from "../schema-tables.ts";
-import type { Baseline } from "../schema.ts";
+import { baselines } from "../schema/baseline.ts";
+import type { Baseline } from "../schema/baseline.ts";
 import { baselinePath } from "../utils/paths.ts";
 import { ulid } from "../utils/ulid.ts";
 
@@ -119,5 +119,3 @@ export class BaselineModel {
     return toRemove.length;
   }
 }
-
-export type { Baseline };

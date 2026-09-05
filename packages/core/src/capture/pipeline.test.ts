@@ -1,11 +1,14 @@
 import { PNG } from "pngjs";
 import { describe, expect, it } from "vitest";
 import type { RenderedSnapshot } from "../adapters/capture-runner.ts";
-import { baselines, builds, snapshots } from "../schema-tables.ts";
-import type { Build, Project } from "../schema.ts";
+import { baselines } from "../schema/baseline.ts";
+import { builds } from "../schema/build.ts";
+import type { Build } from "../schema/build.ts";
+import type { Project } from "../schema/project.ts";
+import { snapshots } from "../schema/snapshot.ts";
+import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { diffPath } from "../utils/paths.ts";
 import type { StoryEntry, Viewport } from "./adapter.ts";
-import { makeDatabase, makeStorage } from "./fake-adapters.ts";
 import { persistCapture, type CaptureContext } from "./pipeline.ts";
 
 const DEFAULT_VIEWPORT: Viewport = { name: "mobile", width: 320, height: 480 };

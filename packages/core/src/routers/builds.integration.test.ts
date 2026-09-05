@@ -1,10 +1,12 @@
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
-import { makeDatabase, makeStorage } from "../capture/fake-adapters.ts";
 import { createShelfRouter } from "../index.tsx";
 import { LabelModel } from "../models/label.ts";
-import { builds, projects } from "../schema-tables.ts";
-import type { Build, Project } from "../schema.ts";
+import { builds } from "../schema/build.ts";
+import type { Build } from "../schema/build.ts";
+import { projects } from "../schema/project.ts";
+import type { Project } from "../schema/project.ts";
+import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 
 const silentLogger = pino({ level: "silent" });
 

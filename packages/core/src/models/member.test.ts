@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { makeDatabase } from "../capture/fake-adapters.ts";
+import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { MemberModel } from "./member.ts";
 
 describe("MemberModel", () => {

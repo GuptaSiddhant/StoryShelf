@@ -1,4 +1,4 @@
-import type { StoryEntry, Viewport } from "@storyshelf/core";
+import type { StoryEntry, Viewport } from "@storyshelf/core/adapter/capture-runner";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

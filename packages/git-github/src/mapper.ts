@@ -1,4 +1,4 @@
-import type { CheckStatus } from "@storyshelf/core";
+import type { CheckStatus } from "@storyshelf/core/adapter/git-host";
 
 /** Map a StoryShelf check status to a GitHub commit state. */
 export function mapStatus(status: CheckStatus): "pending" | "success" | "failure" | "error" {

@@ -2,8 +2,8 @@
 /** Per-project git-provider status check configurations. */
 import { eq } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
-import { projectStatusConfigs } from "../schema-tables.ts";
-import type { ProjectStatusConfig } from "../schema.ts";
+import { projectStatusConfigs } from "../schema/status-config.ts";
+import type { ProjectStatusConfig } from "../schema/status-config.ts";
 import { decrypt, encrypt } from "../utils/encrypt.ts";
 import { ulid } from "../utils/ulid.ts";
 
@@ -75,5 +75,3 @@ export class StatusConfigModel {
     }
   }
 }
-
-export type { ProjectStatusConfig };

@@ -1,5 +1,6 @@
 import type { HtmlEscapedString } from "hono/utils/html";
-import type { Project, Token } from "../schema.ts";
+import type { Project } from "../schema/project.ts";
+import type { Token } from "../schema/token.ts";
 
 /** Tokens settings tab: project CLI tokens plus the create-token form. */
 export function renderSettingsTokens(

@@ -4,7 +4,7 @@ import { createShelfLogger } from "../logger.ts";
 import { BuildModel } from "../models/build.ts";
 import { ProjectModel } from "../models/project.ts";
 import { SnapshotModel } from "../models/snapshot.ts";
-import { makeDatabase, makeStorage } from "./fake-adapters.ts";
+import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 
 function makeApp(): ReturnType<typeof createShelfRouter> {
   const { db } = makeDatabase();

@@ -1,4 +1,4 @@
-import type { CheckStatus } from "@storyshelf/core";
+import type { CheckStatus } from "@storyshelf/core/adapter/git-host";
 
 /** Map a StoryShelf check status to a GitLab pipeline status. */
 export function mapStatus(status: CheckStatus): string {

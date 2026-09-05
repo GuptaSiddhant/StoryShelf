@@ -1,6 +1,6 @@
 import type { FC } from "hono/jsx";
 import type { GitHostProvider } from "../adapters/git-host/index.ts";
-import type { Project } from "../schema.ts";
+import type { Project } from "../schema/project.ts";
 import { Badge, Field, SelectField, TextareaField } from "../ui/components.tsx";
 
 /** Git status configuration row as rendered in the status settings tab. */

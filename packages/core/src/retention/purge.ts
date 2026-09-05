@@ -4,8 +4,8 @@ import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { BuildModel } from "../models/build.ts";
 import { LabelModel } from "../models/label.ts";
-import { builds } from "../schema-tables.ts";
-import type { Project } from "../schema.ts";
+import { builds } from "../schema/build.ts";
+import type { Project } from "../schema/project.ts";
 import { TERMINAL_BUILD_STATUSES } from "../types.ts";
 
 /** Options controlling which builds a retention purge removes. */

@@ -1,4 +1,4 @@
-import type { Logger } from "@storyshelf/core/types";
+import type { Logger } from "@storyshelf/core/logger";
 /* oxlint-disable max-lines-per-function, eslint/require-await, typescript/require-await, typescript/no-unnecessary-type-assertion, eslint/no-void, eslint/no-unused-vars */
 import { describe, expect, it, vi } from "vitest";
 import { gitLabHost } from "./index.ts";

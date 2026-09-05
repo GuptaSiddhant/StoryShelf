@@ -58,7 +58,7 @@ See `docs/architecture.md` and ADR 0009.
 A separate worker process (Node, Bun, etc.) polls the SQS queue and calls `executeCaptureJob` from `@storyshelf/core`:
 
 ```ts
-import { executeCaptureJob } from "@storyshelf/core";
+import { executeCaptureJob } from "@storyshelf/core/capture";
 import { SqsClient, ReceiveMessageCommand, DeleteMessageCommand } from "@aws-sdk/client-sqs";
 
 while (true) {

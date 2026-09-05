@@ -46,11 +46,11 @@ describe("createPasswordAuth", () => {
     const auth = createPasswordAuth({ password: "hunter2", secret });
     await expect(auth.check(new Request("http://localhost/"))).resolves.toBeNull();
   });
-
   it("rejects a tampered token", async () => {
     const auth = createPasswordAuth({ password: "hunter2", secret });
     const token = await auth.createSession(user);
-    const tampered = `${token.slice(0, -1)}0`;
+    // Flip the last hex digit (guaranteed to change it, unlike a fixed replacement).
+    const tampered = `${token.slice(0, -1)}${token.endsWith("0") ? "1" : "0"}`;
 
     await expect(auth.check(requestWithCookie(tampered))).resolves.toBeNull();
   });

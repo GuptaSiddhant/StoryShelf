@@ -1,6 +1,6 @@
 import { Octokit } from "@octokit/rest";
-import type { GitHostAdapter, GitHostProvider } from "@storyshelf/core";
-import type { Logger } from "@storyshelf/core/types";
+import type { GitHostAdapter, GitHostProvider } from "@storyshelf/core/adapter/git-host";
+import type { Logger } from "@storyshelf/core/logger";
 import { upsertPrComment } from "./comment.ts";
 import { githubConfigSchema } from "./config.ts";
 import { checkIsMerged } from "./merge.ts";

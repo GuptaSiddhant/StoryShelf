@@ -1,6 +1,5 @@
 {
   "name": "dev-server",
-  "version": "0.1.0",
   "private": true,
   "type": "module",
   "description": "Local StoryShelf dev server, run from TypeScript source (no build step) via nub + customCondition.",

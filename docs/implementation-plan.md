@@ -4,7 +4,7 @@ Step-by-step build order. Each step is independently reviewable. Decisions made 
 
 ## Phase 0 — Foundation (this step)
 
-1. Root workspace: `package.json` (nub workspaces + catalog), `turbo.json`, `tsconfig.base.json`, `.oxlintrc.json`, `.oxfmtrc.json`, `.npmrc`, `.gitignore`, `.nvmrc`.
+1. Root workspace: `package.json` (nub workspaces + catalog), `turbo.json`, `tsconfig.base.json`, `.oxlintrc.json`, `.oxfmtrc.json`, `.gitignore`.
 2. `@storyshelf/core` — the heart. Order within core:
    - `adapters/*` — interface types only (database, storage, capture-runner, auth, status, logger).
    - `models/*` — Drizzle schema + business logic (project, build, snapshot, baseline, member, comment, label, token, webhook).

@@ -12,8 +12,8 @@ A self-hosted visual testing platform for Storybook. Self-hosted Chromatic alter
   `nubx` is the wrapper that puts `~/.nub/bin` on PATH; if bare `node`/`npx` fails
   with "command not found", prefix commands with `export PATH="$HOME/.nub/bin:$PATH"`.
 - **Task orchestration: turbo.** Root scripts (`turbo build|lint|test|fmt`) fan out per package.
-- **Bundler: tsdown**, configured per-package via the `"tsdown-entry"` map in each `package.json`.
-- **Tests: vitest**, colocated as `*.test.ts` next to sources.
+- **Bundler: tsdown for libs, rolldown for apps.** Each package's `exports` map carries `{ source: ./src/..., default: ./dist/... }`; `config/tsdown.ts` (`libConfig`/`cliConfig`) derives `dist/` for publishable packages, `apps/fly-app/rolldown.config.ts` bundles deployables. See `docs/repo-structure.md`.
+- **Tests: vitest**, colocated as `*.test.ts` next to sources (`*.integration.test.ts` for the HTTP-level suite; `RUN_INTEGRATION=1` gates the real-browser suite).
 - **Lint/format: oxlint (+ tsgolint type-aware) and oxfmt**, config at `.oxlintrc.json` / `.oxfmtrc.json`.
 
 ## Commands
@@ -46,6 +46,8 @@ nub run build       # generate openapi.json (prebuild) + build the docs site
 
 ## Layout
 
+See `docs/repo-structure.md` for the annotated map (workspaces vs fixtures, bundler rule, public import surface, schema layout). Summary:
+
 ```
 StoryShelf/
   packages/
@@ -58,6 +60,9 @@ StoryShelf/
     auth-password/  @storyshelf/auth-password  -- Shared-password auth adapter
     cli/            @storyshelf/cli            -- CLI client (commander; upload/init/create/server/retry/purge, no Playwright)
     runner-playwright/ @storyshelf/runner-playwright -- pure Playwright CaptureRenderer (server-side render; core orchestrator owns capture)
+    git-github/     @storyshelf/git-github      -- GitHub status checks, PR comments, merge-gate helpers (@octokit)
+    git-gitlab/     @storyshelf/git-gitlab      -- GitLab commit statuses, MR comments, merge-gate helpers
+    queue-sqs/      @storyshelf/queue-sqs       -- SQS-backed remote CaptureQueue (AWS SDK v3)
   apps/
     dev-server/     dev-server      -- Local dev server, runs from TS source via `nub run serve` (no build; Playwright capture + optional shared-password auth)
     website/        website         -- Public docs & marketing site (Astro Starlight)
@@ -107,7 +112,7 @@ StoryShelf/
 ## Lint rules that bite (oxlint, type-aware)
 
 - `TS4111`: dot access on index signatures forbidden -- use `obj["key"]` on `Record<string, unknown>`.
-- Complexity ≤ 20 per function, max-statements ≤ 10 -- split into small helpers.
+- Complexity ≤ 20 per function, max-statements ≤ 10, max-lines-per-function ≤ 50 -- split into small helpers (no path-based lint exemptions; fix the code, not the config).
 - `require-unicode-regexp`: every regex needs the `u` flag.
 - `unicorn/no-array-sort` → use `toSorted`.
 - `unicorn/no-array-callback-reference` → wrap callbacks as arrows.
@@ -135,6 +140,8 @@ StoryShelf/
 | 0013 | Build Labels (project-defined types, search + link templates + stable URLs) |
 | 0014 | Pino as Core Logger (structured logs, transports via factory, request tracing) |
 | 0015 | Pure Capture Renderer Adapter (capture adapters render only; server orchestrator owns loading/extraction/persistence) |
+| 0016 | Server Scaffolding Over Rigid Package (`storyshelf server init` generates the server; no universal server package) |
+| 0017 | Interaction Testing via Storybook `play` Function (executePlay, flaky/blocked/disabled semantics) |
 
 ## Parallel Development with Worktrees
 

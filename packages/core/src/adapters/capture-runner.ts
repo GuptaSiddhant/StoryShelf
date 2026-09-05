@@ -6,6 +6,7 @@ import type { StoryEntry, Viewport } from "../capture/adapter.ts";
 import type { AdapterMetadata } from "./metadata.ts";
 
 export type { JobStatus } from "./capture-queue.ts";
+export type { StoryEntry, StorySourceAdapter, Viewport } from "../capture/adapter.ts";
 
 /** A screenshot produced by a capture renderer. */
 export interface RenderedSnapshot {

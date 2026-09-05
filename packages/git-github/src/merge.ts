@@ -1,6 +1,6 @@
 /* oxlint-disable max-statements */
 import type { Octokit } from "@octokit/rest";
-import type { Logger } from "@storyshelf/core/types";
+import type { Logger } from "@storyshelf/core/logger";
 import { findPrNumber } from "./pr.ts";
 
 /** Check whether the pull request for a commit SHA has been merged. */

@@ -1,9 +1,11 @@
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
-import { makeDatabase, makeStorage } from "../capture/fake-adapters.ts";
 import { createShelfRouter } from "../index.tsx";
-import { builds, projects } from "../schema-tables.ts";
-import type { Build, Project } from "../schema.ts";
+import { builds } from "../schema/build.ts";
+import type { Build } from "../schema/build.ts";
+import { projects } from "../schema/project.ts";
+import type { Project } from "../schema/project.ts";
+import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { storybookDir } from "../utils/paths.ts";
 
 const silentLogger = pino({ level: "silent" });
@@ -58,7 +60,7 @@ async function seededApp(): Promise<{ app: ReturnType<typeof createShelfRouter> 
   objects.set(`${storybookDir("p1", "b1")}/index.html`, Buffer.from("<html>storybook</html>"));
   objects.set(`${storybookDir("p1", "b1")}/iframe.js`, Buffer.from("console.log('hi')"));
   objects.set(`${storybookDir("p1", "b1")}/styles.css`, Buffer.from("body{}"));
-  objects.set(`${storybookDir("p1", "b1")}/icon.png`, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+  objects.set(`${storybookDir("p1", "b1")}/icon.png`, Buffer.from([137, 80, 78, 71])); // PNG magic
 
   const app = createShelfRouter({ database: db, storage, logger: silentLogger });
   return { app };

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { makeDatabase, makeStorage } from "../capture/fake-adapters.ts";
-import { builds } from "../schema-tables.ts";
-import type { Project } from "../schema.ts";
+import { builds } from "../schema/build.ts";
+import type { Project } from "../schema/project.ts";
+import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { Retention } from "./purge.ts";
 
 function makeProject(overrides: Partial<Project> = {}): Project {

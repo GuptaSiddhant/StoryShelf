@@ -2,7 +2,7 @@ import { apiBase, gitlabHeaders, projectId } from "./helpers.ts";
 
 /** Find the merge request IID associated with a commit SHA, if any. */
 export async function findMrIid(opts: {
-  host: string | undefined;
+  host?: string;
   owner: string;
   repo: string;
   token: string;

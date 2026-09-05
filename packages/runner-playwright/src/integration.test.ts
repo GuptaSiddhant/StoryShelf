@@ -1,25 +1,21 @@
-import {
-  createShelfRouter,
-  screenshotPath,
-  type Build,
-  type DatabaseAdapter,
-  type Snapshot,
-  type StorageAdapter,
-} from "@storyshelf/core";
+import { createShelfRouter } from "@storyshelf/core";
+import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
+import { screenshotPath } from "@storyshelf/core/paths";
+import type { Build, Snapshot } from "@storyshelf/core/schema";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { createLocalStorage } from "@storyshelf/storage-local";
 import AdmZip from "adm-zip";
 import { execFile, type ExecException } from "node:child_process";
 import { access, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createPlaywrightCaptureRunner } from "./capture-runner.ts";
 
 const FIXTURE_DIR = process.env["FIXTURE_DIR"]
   ? resolve(process.env["FIXTURE_DIR"])
-  : resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "fixtures", "storybook-8");
+  : resolve(import.meta.dirname ?? ".", "..", "..", "..", "fixtures", "storybook-8");
 const FIXTURE_STATIC_DIR = join(FIXTURE_DIR, "storybook-static");
 
 let harness: {
@@ -243,12 +239,16 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
 
     // Poll until terminal (failed is expected because BlockingFailure is not flaky)
     let final: Build = build;
+    /* eslint-disable no-await-in-loop -- poll build status sequentially until terminal */
     for (let i = 0; i < 30; i += 1) {
-      await new Promise((r) => setTimeout(r, 2000));
+      await new Promise<void>((done) => {
+        setTimeout(done, 2000);
+      });
       const res = await app.request(`/api/v1/projects/${project.slug}/builds/${final.id}`);
       final = await readJson<Build>(res);
       if (["failed", "reviewing", "approved"].includes(final.status)) break;
     }
+    /* eslint-enable no-await-in-loop */
 
     // Non-flaky play failure blocks the build
     expect(final.status).toBe("failed");
@@ -256,7 +256,7 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
     expect(final.snapshotCount).toBeGreaterThan(0);
     expect(final.snapshotCount).toBeLessThan(8);
 
-    const snapshots = await (async () => {
+    const snapshots = await (async (): Promise<Snapshot[]> => {
       const res = await app.request(`/api/v1/projects/${project.slug}/builds/${final.id}/snapshots`);
       return readJson<Snapshot[]>(res);
     })();

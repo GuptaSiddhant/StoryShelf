@@ -6,9 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CaptureRunner, RenderResult } from "../adapters/capture-runner.ts";
 import { BuildModel } from "../models/build.ts";
 import { ProjectModel } from "../models/project.ts";
-import { builds, snapshots } from "../schema-tables.ts";
+import { builds } from "../schema/build.ts";
+import { snapshots } from "../schema/snapshot.ts";
+import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { storybookZipPath } from "../utils/paths.ts";
-import { makeDatabase, makeStorage } from "./fake-adapters.ts";
 import { executeCaptureJob } from "./orchestrator.ts";
 
 const STORY_ID = "components-button--primary";

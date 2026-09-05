@@ -1,8 +1,8 @@
 /** Webhook subscriptions for project events. */
 import { eq } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
-import { webhooks } from "../schema-tables.ts";
-import type { Webhook } from "../schema.ts";
+import { webhooks } from "../schema/webhook.ts";
+import type { Webhook } from "../schema/webhook.ts";
 import { ulid } from "../utils/ulid.ts";
 
 /** Input for creating a webhook subscription. */
@@ -74,5 +74,3 @@ export class WebhookModel {
     }
   }
 }
-
-export type { Webhook };

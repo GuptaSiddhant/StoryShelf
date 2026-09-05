@@ -2,7 +2,7 @@ import type { ShelfApp } from "../index.tsx";
 import { BaselineModel } from "../models/baseline.ts";
 import { BuildModel } from "../models/build.ts";
 import { SnapshotModel } from "../models/snapshot.ts";
-import type { Snapshot } from "../schema.ts";
+import type { Snapshot } from "../schema/snapshot.ts";
 import { getStore } from "../store.ts";
 import type { ProjectRole } from "../types.ts";
 import { notFound, resolveAuthorizedProject } from "./helpers.ts";

@@ -33,13 +33,15 @@ serve({ fetch: app.fetch, port: 3000 });
 
 ## Main APIs
 
-- `createShelfRouter(options)` returns a Hono application.
-- `executeCaptureJob({ buildId, reqId }, deps)` — the capture **orchestrator**: loads the build, marks it `capturing`, extracts the uploaded archive, discovers stories, delegates rendering to a pure `CaptureRunner`, and persists. Wired into the `Queue` when `capture` is supplied.
-- `persistCapture(context)` writes screenshots, diffs them against baselines, and finalizes a build from a renderer's captures.
-- `diffImages(baseline, current, options)` performs the pixel-level comparison.
-- `Queue` manages capture concurrency and job status.
-- `Retention` purges expired builds and their stored files.
-- `createUrlBuilder(baseUrl, publishedBaseDomain?)` builds application and published Storybook URLs.
+The barrel (`@storyshelf/core`) exports only the router and its types
+(`createShelfRouter`, `ShelfOptions`, `ShelfConfig`, `UIConfig`, `ShelfApp`).
+Everything else lives under a subpath:
+
+- `executeCaptureJob({ buildId, reqId }, deps)` (`core/capture`) — the capture **orchestrator**: loads the build, marks it `capturing`, extracts the uploaded archive, discovers stories, delegates rendering to a pure `CaptureRunner`, and persists. Wired into the `Queue` when `capture` is supplied.
+- `persistCapture(context)` (`core/capture`) writes screenshots, diffs them against baselines, and finalizes a build from a renderer's captures.
+- `diffImages(baseline, current, options)` (`core/diff`) performs the pixel-level comparison.
+- `InMemoryCaptureQueue` (`core/capture`) manages capture concurrency and job status.
+- `createUrlBuilder(baseUrl, publishedBaseDomain?)` (`core/urls`) builds application and published Storybook URLs.
 
 ## Adapter contracts
 

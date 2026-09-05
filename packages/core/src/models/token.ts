@@ -1,8 +1,8 @@
 /** CI tokens for project-scoped API access. */
 import { and, eq } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
-import { tokens } from "../schema-tables.ts";
-import type { Token } from "../schema.ts";
+import { tokens } from "../schema/token.ts";
+import type { Token } from "../schema/token.ts";
 import { ulid } from "../utils/ulid.ts";
 
 /** Data operations for CI tokens. */
@@ -55,5 +55,3 @@ export class TokenModel {
     await this.db.remove(tokens, id);
   }
 }
-
-export type { Token };

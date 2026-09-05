@@ -1,4 +1,4 @@
-import type { Logger } from "@storyshelf/core/types";
+import type { Logger } from "@storyshelf/core/logger";
 /* oxlint-disable max-lines-per-function */
 import { describe, expect, it, vi } from "vitest";
 import { gitHubHost } from "./index.ts";

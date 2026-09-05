@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { makeDatabase } from "../capture/fake-adapters.ts";
-import { projects, snapshots } from "../schema-tables.ts";
+import { projects } from "../schema/project.ts";
+import { snapshots } from "../schema/snapshot.ts";
+import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { BuildModel, isPublicBuild } from "./build.ts";
 import { ProjectModel } from "./project.ts";
 

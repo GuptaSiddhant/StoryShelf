@@ -1,8 +1,10 @@
 /** Build records, status transitions, and publication helpers. */
 import { and, desc, eq, inArray } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
-import { buildLabels, builds, snapshots } from "../schema-tables.ts";
-import type { Build } from "../schema.ts";
+import { builds } from "../schema/build.ts";
+import type { Build } from "../schema/build.ts";
+import { buildLabels } from "../schema/label.ts";
+import { snapshots } from "../schema/snapshot.ts";
 import type { BuildStatus } from "../types.ts";
 import { ulid } from "../utils/ulid.ts";
 
@@ -142,5 +144,3 @@ export class BuildModel {
     await this.db.remove(builds, id);
   }
 }
-
-export type { Build };

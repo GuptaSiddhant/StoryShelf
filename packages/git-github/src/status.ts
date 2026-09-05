@@ -1,8 +1,8 @@
 /* oxlint-disable max-statements */
 import type { Octokit } from "@octokit/rest";
-import type { CheckStatus } from "@storyshelf/core";
+import type { CheckStatus } from "@storyshelf/core/adapter/git-host";
 import { describeStatus } from "@storyshelf/core/adapter/git-host/helpers";
-import type { Logger } from "@storyshelf/core/types";
+import type { Logger } from "@storyshelf/core/logger";
 import { mapStatus } from "./mapper.ts";
 
 /** Post a StoryShelf build status to a GitHub commit SHA. */

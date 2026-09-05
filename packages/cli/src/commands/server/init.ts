@@ -73,7 +73,8 @@ const STORAGE_INIT: Record<StorageChoice, string> = {
 function buildImports(answers: Answers): string[] {
   const imports = [
     `import { serve } from "@hono/node-server";`,
-    `import { createShelfLogger, createShelfRouter } from "@storyshelf/core";`,
+    `import { createShelfRouter } from "@storyshelf/core";`,
+    `import { createShelfLogger } from "@storyshelf/core/logger";`,
     DB_IMPORT[answers.database],
     STORAGE_IMPORT[answers.storage],
   ];

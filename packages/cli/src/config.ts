@@ -1,4 +1,3 @@
-/* oxlint-disable typescript/no-unsafe-assignment, typescript/no-unsafe-call, typescript/no-unsafe-member-access, eslint/no-await-in-loop, no-await-in-loop, max-depth, eslint/max-depth, max-statements, max-lines-per-function, complexity, eslint/max-statements, eslint/max-lines-per-function, eslint/complexity, typescript/prefer-regexp-exec, eslint/no-useless-escape, no-useless-escape, typescript/prefer-nullish-coalescing */
 import { execSync } from "node:child_process";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
@@ -34,10 +33,23 @@ const MAIN_CANDIDATES = [
   ".storybook/main.tsx",
 ];
 
+/** Map the deprecated `storybookDir` key onto `buildDir` in place. */
+function migrateDeprecatedDir(parsed: unknown): void {
+  if (typeof parsed !== "object" || parsed === null) {
+    return;
+  }
+  const record = parsed as Record<string, unknown>;
+  if (typeof record["storybookDir"] === "string" && !record["buildDir"]) {
+    record["buildDir"] = record["storybookDir"];
+  }
+  delete record["storybookDir"];
+}
+
 export async function findStorybookMain(cwd: string = process.cwd()): Promise<string | null> {
   for (const candidate of MAIN_CANDIDATES) {
     const full = resolve(cwd, candidate);
     try {
+      // eslint-disable-next-line no-await-in-loop -- probe candidates in order, return first hit
       await access(full);
       return full;
     } catch {
@@ -62,19 +74,7 @@ export async function loadStorybookConfig(
   try {
     const raw = await readFile(full, "utf8");
     const parsed = JSON.parse(raw) as unknown;
-    // Backward compat: storybookDir -> buildDir
-    if (
-      parsed &&
-      typeof parsed === "object" &&
-      parsed !== null &&
-      "storybookDir" in (parsed as Record<string, unknown>)
-    ) {
-      const parsedRecord = parsed as Record<string, unknown>;
-      if (typeof parsedRecord["storybookDir"] === "string" && !parsedRecord["buildDir"]) {
-        parsedRecord["buildDir"] = parsedRecord["storybookDir"];
-      }
-      delete parsedRecord["storybookDir"];
-    }
+    migrateDeprecatedDir(parsed);
     const result = storybookConfigSchema.safeParse(parsed);
     if (!result.success) {
       return null;
@@ -83,6 +83,13 @@ export async function loadStorybookConfig(
   } catch {
     return null;
   }
+}
+
+/** Merge an existing config with new values, applying deprecated-key migration. */
+function mergeConfigs(existing: StorybookConfig | null, config: StorybookConfig): StorybookConfig {
+  const merged = existing ? { ...existing, ...config } : { ...config };
+  migrateDeprecatedDir(merged);
+  return merged;
 }
 
 export async function writeStorybookConfig(
@@ -94,14 +101,8 @@ export async function writeStorybookConfig(
   const dir = dirname(full);
   await mkdir(dir, { recursive: true });
   const existing = await loadStorybookConfig(cwd, customPath);
-  const merged = existing ? { ...existing, ...config } : config;
-  // Backward compat: map deprecated storybookDir -> buildDir if present in file
-  const withCompat = { ...merged } as Record<string, unknown> & StorybookConfig;
-  if ((withCompat as Record<string, unknown>)["storybookDir"] && !withCompat.buildDir) {
-    withCompat.buildDir = (withCompat as Record<string, unknown>)["storybookDir"] as string;
-    delete (withCompat as Record<string, unknown>)["storybookDir"];
-  }
-  const result = storybookConfigSchema.safeParse(withCompat);
+  const merged = mergeConfigs(existing, config);
+  const result = storybookConfigSchema.safeParse(merged);
   if (!result.success) {
     throw new Error(`Invalid storybook config: ${result.error.message}`);
   }
@@ -127,53 +128,61 @@ export async function detectPackagePath(cwd: string = process.cwd()): Promise<st
 }
 
 export async function detectStorybookMeta(cwd: string = process.cwd()): Promise<StorybookMeta> {
-  const meta: StorybookMeta = {};
   const mainPath = await findStorybookMain(cwd);
-  if (mainPath) {
-    try {
-      const raw = await readFile(mainPath, "utf8");
-      const frameworkMatch = raw.match(
-        /framework\s*:\s*\{\s*name\s*:\s*["'](?<frameworkName>[^"']+)["']/u,
-      );
-      if (frameworkMatch?.[1]) {
-        meta.framework = { name: frameworkMatch[1] };
-      }
-      const addonsMatch = raw.match(/addons\s*:\s*\[(?<addonsContent>[\s\S]*?)\]/u);
-      if (addonsMatch?.[1]) {
-        const addons = [...addonsMatch[1].matchAll(/["'](?<addonName>[^"']+)["']/gu)]
-          .map((match) => match[1])
-          .filter(Boolean) as string[];
-        if (addons.length > 0) {
-          meta.addons = addons;
-        }
-      }
-      const storiesMatch = raw.match(/stories\s*:\s*\[(?<storiesContent>[\s\S]*?)\]/u);
-      if (storiesMatch?.[1]) {
-        const globs = [...storiesMatch[1].matchAll(/["'](?<storyGlob>[^"']+)["']/gu)]
-          .map((match) => match[1])
-          .filter(Boolean) as string[];
-        if (globs.length > 0) {
-          meta.storiesGlobs = globs;
-        }
-      }
-      const staticDirsMatch = raw.match(/staticDirs\s*:\s*\[(?<staticDirsContent>[\s\S]*?)\]/u);
-      if (staticDirsMatch?.[1]) {
-        const dirs = [...staticDirsMatch[1].matchAll(/["'](?<staticDir>[^"']+)["']/gu)]
-          .map((match) => match[1])
-          .filter(Boolean) as string[];
-        if (dirs.length > 0) {
-          meta.staticDirs = dirs;
-        }
-      }
-      const rel = relative(cwd, dirname(mainPath));
-      meta.packagePath = rel === "" ? "." : rel;
-    } catch {
-      // Ignore parse errors
+  if (!mainPath) {
+    return { packagePath: "." };
+  }
+  const meta = await parseMetaSource(mainPath);
+  const rel = relative(cwd, dirname(mainPath));
+  meta.packagePath = rel === "" ? "." : rel;
+  return meta;
+}
+
+function parseFrameworkName(raw: string): string | undefined {
+  const match = /framework\s*:\s*\{\s*name\s*:\s*["'](?<name>[^"']+)["']/u.exec(raw);
+  return match?.groups?.["name"];
+}
+
+function parseQuotedList(raw: string, key: string): string[] {
+  const section = new RegExp(`${key}\\s*:\\s*\\[(?<content>[\\s\\S]*?)\\]`, "u").exec(raw);
+  const content = section?.groups?.["content"];
+  if (!content) {
+    return [];
+  }
+  return [...content.matchAll(/["'](?<item>[^"']+)["']/gu)]
+    .map((match) => match.groups?.["item"])
+    .filter((item): item is string => item !== undefined && item.length > 0);
+}
+
+async function parseMetaSource(mainPath: string): Promise<StorybookMeta> {
+  const meta: StorybookMeta = {};
+  try {
+    const raw = await readFile(mainPath, "utf8");
+    Object.assign(meta, parseMetaLists(raw));
+    const framework = parseFrameworkName(raw);
+    if (framework) {
+      meta.framework = { name: framework };
     }
-  } else {
-    meta.packagePath = ".";
+  } catch {
+    // Ignore parse errors
   }
   return meta;
+}
+
+function parseMetaLists(raw: string): Pick<StorybookMeta, "addons" | "storiesGlobs" | "staticDirs"> {
+  const lists: Pick<StorybookMeta, "addons" | "storiesGlobs" | "staticDirs"> = {};
+  const keys = [
+    ["addons", "addons"],
+    ["stories", "storiesGlobs"],
+    ["staticDirs", "staticDirs"],
+  ] as const;
+  for (const [key, prop] of keys) {
+    const values = parseQuotedList(raw, key);
+    if (values.length > 0) {
+      lists[prop] = values;
+    }
+  }
+  return lists;
 }
 
 export async function detectPackageName(cwd: string = process.cwd()): Promise<string | null> {
@@ -213,7 +222,7 @@ export function detectGitDefaultBranch(cwd: string = process.cwd()): string | nu
       cwd,
       encoding: "utf8",
     }).trim();
-    const match = ref.match(/refs\/remotes\/origin\/(?<branch>.+)/u);
+    const match = /refs\/remotes\/origin\/(?<branch>.+)/u.exec(ref);
     if (match?.[1]) {
       return match[1];
     }

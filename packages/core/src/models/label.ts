@@ -1,8 +1,9 @@
 /** Build labels and project label types. */
 import { and, desc, eq } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
-import { buildLabels, builds, labelTypes } from "../schema-tables.ts";
-import type { BuildLabel, LabelType } from "../schema.ts";
+import { builds } from "../schema/build.ts";
+import { buildLabels, labelTypes } from "../schema/label.ts";
+import type { BuildLabel, LabelType } from "../schema/label.ts";
 import { PERSISTENT_LABEL_KEY, RESERVED_LABEL_KEYS, SEEDED_LABEL_KEYS } from "../types.ts";
 import { ulid } from "../utils/ulid.ts";
 
@@ -159,5 +160,3 @@ export class LabelModel {
     return labels.length > 0;
   }
 }
-
-export type { BuildLabel, LabelType } from "../schema.ts";

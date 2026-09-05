@@ -1,7 +1,8 @@
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import { BuildModel } from "../models/build.ts";
 import { ProjectModel } from "../models/project.ts";
-import type { Build, Project } from "../schema.ts";
+import type { Build } from "../schema/build.ts";
+import type { Project } from "../schema/project.ts";
 
 export async function createTestProject(
   db: DatabaseAdapter,

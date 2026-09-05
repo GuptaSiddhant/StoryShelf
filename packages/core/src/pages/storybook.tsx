@@ -1,4 +1,5 @@
-import type { Build, Project } from "../schema.ts";
+import type { Build } from "../schema/build.ts";
+import type { Project } from "../schema/project.ts";
 import { getStore } from "../store.ts";
 
 /**

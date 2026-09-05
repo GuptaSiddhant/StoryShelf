@@ -1,11 +1,19 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-
 import { describe, expect, it } from "vitest";
-
 import { isDisabledStory, isFlakyStory } from "./adapter.ts";
 import { StorybookAdapter } from "./storybook.ts";
+
+async function withIndex(index: unknown, fn: (dir: string) => Promise<void>): Promise<void> {
+  const dir = await mkdtemp(join(tmpdir(), "storyshelf-storybook-"));
+  try {
+    await writeFile(join(dir, "index.json"), JSON.stringify(index));
+    await fn(dir);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
 
 describe("isFlakyStory", () => {
   it("detects flaky via tags case-insensitive", () => {
@@ -44,16 +52,6 @@ describe("isDisabledStory", () => {
 });
 
 describe("StorybookAdapter.discover", () => {
-  async function withIndex(index: unknown, fn: (dir: string) => Promise<void>): Promise<void> {
-    const dir = await mkdtemp(join(tmpdir(), "storyshelf-storybook-"));
-    try {
-      await writeFile(join(dir, "index.json"), JSON.stringify(index));
-      await fn(dir);
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
-  }
-
   it("filters docs and test subtypes", async () => {
     const adapter = new StorybookAdapter();
     const index = {
@@ -82,13 +80,16 @@ describe("StorybookAdapter.discover", () => {
           type: "story",
           subtype: "story",
           tags: [],
-          parameters: { chromatic: { disableSnapshot: true, delay: 100 }, storyshelf: { delay: 300 } },
+          parameters: {
+            chromatic: { disableSnapshot: true, delay: 100 },
+            storyshelf: { delay: 300 },
+          },
         },
       },
     };
     await withIndex(index, async (dir) => {
       const [s] = await adapter.discover(dir);
-      expect(s.parameters).toEqual({ disableSnapshot: true, delay: 300 });
+      expect(s?.parameters).toEqual({ disableSnapshot: true, delay: 300 });
     });
   });
 
@@ -99,7 +100,14 @@ describe("StorybookAdapter.discover", () => {
       const indexJson = {
         v: 5,
         entries: {
-          s1: { id: "s1", title: "T", name: "N", type: "story", subtype: "story", tags: ["flaky-test"] },
+          s1: {
+            id: "s1",
+            title: "T",
+            name: "N",
+            type: "story",
+            subtype: "story",
+            tags: ["flaky-test"],
+          },
         },
       };
       const storiesJson = {
@@ -119,8 +127,8 @@ describe("StorybookAdapter.discover", () => {
       await writeFile(join(dir, "index.json"), JSON.stringify(indexJson));
       await writeFile(join(dir, "stories.json"), JSON.stringify(storiesJson));
       const [s] = await adapter.discover(dir);
-      expect(s.parameters).toEqual({ flakyTest: true, delay: 123 });
-      expect(s.tags).toEqual(["flaky-test"]);
+      expect(s?.parameters).toEqual({ flakyTest: true, delay: 123 });
+      expect(s?.tags).toEqual(["flaky-test"]);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -131,20 +139,31 @@ describe("StorybookAdapter.discover", () => {
     const index = {
       v: 5,
       entries: {
-        s1: { id: "s1", title: "T", name: "N", type: "story", subtype: "story", tags: ["flaky-test"] },
+        s1: {
+          id: "s1",
+          title: "T",
+          name: "N",
+          type: "story",
+          subtype: "story",
+          tags: ["flaky-test"],
+        },
         s2: { id: "s2", title: "T", name: "N2", type: "story", subtype: "story", tags: ["skip"] },
       },
     };
     await withIndex(index, async (dir) => {
       const stories = await adapter.discover(dir);
-      expect(isFlakyStory(stories[0])).toBe(true);
-      expect(isDisabledStory(stories[1])).toBe(true);
+      expect(isFlakyStory(stories[0] ?? {})).toBe(true);
+      expect(isDisabledStory(stories[1] ?? {})).toBe(true);
     });
   });
 
   it("builds iframe URL correctly", () => {
     const adapter = new StorybookAdapter();
-    expect(adapter.buildUrl("http://127.0.0.1:1234", "a--b")).toBe("http://127.0.0.1:1234/iframe.html?id=a--b&viewMode=story");
-    expect(adapter.buildUrl("http://127.0.0.1:1234", "a b/c")).toBe("http://127.0.0.1:1234/iframe.html?id=a%20b%2Fc&viewMode=story");
+    expect(adapter.buildUrl("http://127.0.0.1:1234", "a--b")).toBe(
+      "http://127.0.0.1:1234/iframe.html?id=a--b&viewMode=story",
+    );
+    expect(adapter.buildUrl("http://127.0.0.1:1234", "a b/c")).toBe(
+      "http://127.0.0.1:1234/iframe.html?id=a%20b%2Fc&viewMode=story",
+    );
   });
 });

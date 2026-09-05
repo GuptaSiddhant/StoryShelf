@@ -92,7 +92,7 @@ The `InMemoryCaptureQueue` (default) runs the worker inline — suitable only fo
 
 ```ts
 // Example: custom CaptureQueue pushing to an HTTP endpoint (worker picks up)
-import type { CaptureQueue, CaptureJob } from "@storyshelf/core";
+import type { CaptureQueue, CaptureJob } from "@storyshelf/core/adapter/capture-queue";
 
 export class HttpCaptureQueue implements CaptureQueue {
   constructor(private readonly endpoint: string) {}
@@ -130,7 +130,7 @@ import { createShelfRouter } from "@storyshelf/core";
 import { createTursoDatabase } from "@storyshelf/db-turso";
 import { createS3Storage } from "@storyshelf/storage-s3";
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
-import { InMemoryCaptureQueue } from "@storyshelf/core";
+import { InMemoryCaptureQueue } from "@storyshelf/core/capture";
 
 const database = createTursoDatabase({
   url: process.env.TURSO_URL!,

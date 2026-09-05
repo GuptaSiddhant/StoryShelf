@@ -39,7 +39,7 @@ export const buildListQuery = z.object({
 export async function buildForProject(
   projectId: string,
   buildId: string,
-): Promise<import("../models/build.ts").Build> {
+): Promise<import("../schema/build.ts").Build> {
   const build = await new BuildModel(getStore().db).get(buildId);
   if (!build || build.projectId !== projectId) {
     notFound("Build not found");
@@ -51,7 +51,7 @@ export async function buildForProject(
 export async function snapshotForBuild(
   build: { id: string },
   snapshotId: string,
-): Promise<import("../models/snapshot.ts").Snapshot> {
+): Promise<import("../schema/snapshot.ts").Snapshot> {
   const snapshot = await new SnapshotModel(getStore().db).get(snapshotId);
   if (!snapshot || snapshot.buildId !== build.id) {
     notFound("Snapshot not found");
