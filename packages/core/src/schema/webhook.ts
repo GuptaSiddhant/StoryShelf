@@ -8,7 +8,7 @@ export const webhooks = sqliteTable("webhooks", {
     .notNull()
     .references(() => projects.id, { onDelete: "cascade" }),
   url: text("url").notNull(),
-  secret: text("secret").notNull(),
+  secretEncrypted: text("secret_encrypted").notNull(),
   events: text("events"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
@@ -19,7 +19,7 @@ export interface Webhook {
   id: string;
   projectId: string;
   url: string;
-  secret: string;
+  secretEncrypted: string;
   events: string | null;
   createdAt: string;
   updatedAt: string;

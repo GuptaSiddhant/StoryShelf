@@ -138,7 +138,7 @@ export function registerBuilds(app: ShelfApp): void {
       authorEmail,
       authorName,
       message,
-    });
+    }, getStore().config.secret);
 
     const zip = form.get("zip");
     if (zip && typeof zip !== "string") {

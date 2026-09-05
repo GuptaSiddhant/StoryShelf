@@ -8,6 +8,8 @@ import { drizzle, type AsyncRemoteCallback } from "drizzle-orm/sqlite-proxy";
 declare const __PKG_VERSION__: string | undefined;
 
 const STORYBOOK_META_ALTER = "ALTER TABLE projects ADD COLUMN storybook_meta TEXT";
+const WEBHOOK_SECRET_ALTER = "ALTER TABLE webhooks ADD COLUMN secret_encrypted TEXT NOT NULL DEFAULT ''";
+const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN secret";
 
 type ProxyMethod = "run" | "all" | "values" | "get";
 
@@ -72,6 +74,12 @@ export function createSqliteDatabase(path: string): DatabaseAdapter {
         sqlite.exec(STORYBOOK_META_ALTER);
       } catch {
         // Column already exists or other error — ignore for idempotency
+      }
+      try {
+        sqlite.exec(WEBHOOK_SECRET_ALTER);
+        sqlite.exec(WEBHOOK_SECRET_DROP);
+      } catch {
+        // Already migrated (or fresh schema) — ignore for idempotency
       }
     },
     close: () => {

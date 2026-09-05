@@ -31,14 +31,16 @@ async function sendWebhook(url: string, secret: string, event: WebhookEvent): Pr
  * @param projectId - Project whose webhooks receive the event.
  * @param event - Event name (e.g. "baseline:created").
  * @param data - Event payload.
+ * @param secret - Server secret for decrypting webhook secrets (in memory only).
  */
 export async function emitWebhookEvent(
   db: DatabaseAdapter,
   projectId: string,
   event: string,
   data: Record<string, unknown>,
+  secret: string | undefined,
 ): Promise<void> {
-  const webhookModel = new WebhookModel(db);
+  const webhookModel = new WebhookModel(db, secret);
   const webhooks = await webhookModel.list(projectId);
   const eventPayload: WebhookEvent = {
     event,
@@ -53,8 +55,15 @@ export async function emitWebhookEvent(
       if (events.length > 0 && !events.includes(event)) {
         return;
       }
+      let plaintext: string;
       try {
-        await sendWebhook(webhook.url, webhook.secret, eventPayload);
+        plaintext = webhookModel.decryptSecret(webhook);
+      } catch {
+        // Undecryptable secret (e.g. rotated server SECRET) — skip, don't leak
+        return;
+      }
+      try {
+        await sendWebhook(webhook.url, plaintext, eventPayload);
       } catch {
         // Webhook delivery failures are non-fatal
       }

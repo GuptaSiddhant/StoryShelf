@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import { webhooks } from "../schema/webhook.ts";
 import type { Webhook } from "../schema/webhook.ts";
+import { decrypt, encrypt } from "../utils/encrypt.ts";
 import { ulid } from "../utils/ulid.ts";
 
 /** Input for creating a webhook subscription. */
@@ -16,8 +17,12 @@ export interface WebhookCreateInput {
 export class WebhookModel {
   /**
    * @param db - Database adapter.
+   * @param secret - Server secret for webhook-secret encryption (throws on write/decrypt when unset).
    */
-  constructor(private readonly db: DatabaseAdapter) {}
+  constructor(
+    private readonly db: DatabaseAdapter,
+    private readonly secret?: string,
+  ) {}
 
   /** List all webhooks for a project. */
   async list(projectId: string): Promise<Webhook[]> {
@@ -37,11 +42,16 @@ export class WebhookModel {
       id: ulid(),
       projectId,
       url: input.url,
-      secret: input.secret,
+      secretEncrypted: encrypt(this.secret, input.secret),
       events: input.events && input.events.length > 0 ? JSON.stringify(input.events) : null,
       createdAt: now,
       updatedAt: now,
     });
+  }
+
+  /** Decrypt the secret for a stored row (in memory only, at send time). */
+  decryptSecret(row: Webhook): string {
+    return decrypt(this.secret, row.secretEncrypted);
   }
 
   /** Fetch a webhook by id scoped to a project, or null if not found. */

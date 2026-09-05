@@ -152,7 +152,7 @@ webhooks (
   id                  text PRIMARY KEY,
   project_id          text NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   url                 text NOT NULL,
-  secret              text NOT NULL,           -- HMAC secret, encrypted at rest
+  secret_encrypted    text NOT NULL,           -- HMAC secret, AES-256-GCM with server SECRET
   events              text,                    -- JSON array or NULL for all
   created_at          text NOT NULL,
   updated_at          text NOT NULL

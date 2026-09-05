@@ -67,7 +67,7 @@ async function createWebhookRecord(
   url: string,
   events: string[] | undefined,
 ): Promise<Response> {
-  const webhookModel = new WebhookModel(getStore().db);
+  const webhookModel = new WebhookModel(getStore().db, getStore().config.secret);
   const secret = randomToken("whsec_").value;
   await webhookModel.create(project.id, { url, events, secret });
   return c.html((await renderSettingsPage(c, "webhooks", { secret })) ?? "", 201);
@@ -75,10 +75,10 @@ async function createWebhookRecord(
 
 async function handleDeleteWebhook(c: Context): Promise<Response> {
   const project = await findProject(c.req.param("slug") ?? "");
-  const webhook = await new WebhookModel(getStore().db).get(project.id, c.req.param("webhookId") ?? "");
+  const webhook = await new WebhookModel(getStore().db, getStore().config.secret).get(project.id, c.req.param("webhookId") ?? "");
   if (!webhook) {
     notFound("Webhook not found");
   }
-  await new WebhookModel(getStore().db).remove(project.id, webhook.id);
+  await new WebhookModel(getStore().db, getStore().config.secret).remove(project.id, webhook.id);
   return hxRedirect(c, `/projects/${project.slug}/settings/webhooks`);
 }

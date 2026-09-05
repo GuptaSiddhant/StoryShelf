@@ -30,6 +30,8 @@ export interface CaptureContext {
   captures: RenderedSnapshot[];
   /** Optional logger for capture diagnostics. */
   logger?: Logger;
+  /** Server secret for decrypting webhook secrets at send time. */
+  secret?: string | undefined;
 }
 
 /**
@@ -111,7 +113,7 @@ async function resolveBaseline(
   storyId: string,
   viewport: string,
 ): Promise<Baseline | null> {
-  const baselines = new BaselineModel(ctx.db, ctx.storage);
+  const baselines = new BaselineModel(ctx.db, ctx.storage, ctx.secret);
   return await baselines.resolve(
     ctx.project.id,
     storyId,
@@ -142,7 +144,7 @@ async function createWithoutBaseline(
   await snapshots.setStatus(snapshot.id, status);
 
   if (ctx.build.isDefault) {
-    const baselines = new BaselineModel(ctx.db, ctx.storage);
+    const baselines = new BaselineModel(ctx.db, ctx.storage, ctx.secret);
     await baselines.upsert(
       ctx.project.id,
       capture.story.id,
@@ -221,7 +223,7 @@ async function finalize(
   await builds.setStatus(ctx.build.id, status);
 
   if (ctx.build.isDefault && hasCaptures) {
-    const baselines = new BaselineModel(ctx.db, ctx.storage);
+    const baselines = new BaselineModel(ctx.db, ctx.storage, ctx.secret);
     await baselines.removeOrphans(ctx.project.id, new Set(storyIds));
   }
 }

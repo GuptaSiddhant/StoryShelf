@@ -23,6 +23,8 @@ export interface CaptureJobOptions {
   scratchDir: string;
   viewports?: Viewport[];
   logger?: Logger;
+  /** Server secret for decrypting webhook secrets at send time. */
+  secret?: string | undefined;
 }
 /**
  * Run the full capture for a build: extract, render, persist, and finalize.
@@ -95,6 +97,7 @@ export async function executeCaptureJob(
         viewports,
         captures: result.captures,
         logger,
+        secret: options.secret,
       },
       blockingFailed,
       flakyFailed,

@@ -13,6 +13,7 @@ export class BaselineModel {
   constructor(
     private readonly db: DatabaseAdapter,
     private readonly storage: StorageAdapter,
+    private readonly secret?: string,
   ) {}
 
   async getFor(
@@ -79,7 +80,7 @@ export class BaselineModel {
         viewport,
         branch,
         snapshotId,
-      });
+      }, this.secret);
     } else {
       const now = new Date().toISOString();
       baseline = await this.db.insert(baselines, {
@@ -99,7 +100,7 @@ export class BaselineModel {
         viewport,
         branch,
         snapshotId,
-      });
+      }, this.secret);
     }
     return baseline;
   }

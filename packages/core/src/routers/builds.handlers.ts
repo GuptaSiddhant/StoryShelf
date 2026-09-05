@@ -61,7 +61,7 @@ export async function snapshotForBuild(
 
 /** Recompute a build's counts and roll its status up from its snapshots. */
 export async function refreshBuild(buildId: string): Promise<void> {
-  const { db } = getStore();
+  const { db, config } = getStore();
   await new BuildModel(db).updateCounts(buildId);
   const snapshots = await new SnapshotModel(db).listByBuild(buildId);
   const unresolved = snapshots.some((s) => s.status === "new" || s.status === "changed");
@@ -79,13 +79,13 @@ export async function refreshBuild(buildId: string): Promise<void> {
       buildId,
       status,
       snapshotCount: snapshots.length,
-    });
+    }, config.secret);
   }
 }
 
 /** Approve a snapshot, promote its screenshot to baseline, and refresh the build. */
 export async function approveSnapshot(snapshotId: string, userId: string): Promise<void> {
-  const { db } = getStore();
+  const { db, config } = getStore();
   const snapshots = new SnapshotModel(db);
   const snapshot = await snapshots.get(snapshotId);
   if (!snapshot) {
@@ -97,7 +97,7 @@ export async function approveSnapshot(snapshotId: string, userId: string): Promi
     notFound("Project or build not found");
   }
   await snapshots.review(snapshotId, "approved", userId);
-  const baselines = new BaselineModel(db, getStore().storage);
+  const baselines = new BaselineModel(db, getStore().storage, config.secret);
   await baselines.upsert(
     project.id,
     snapshot.storyId,

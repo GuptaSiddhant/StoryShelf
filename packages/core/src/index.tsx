@@ -169,6 +169,7 @@ function setupCaptureQueue(
     scratchDir: config.scratchDir,
     viewports: config.viewports,
     logger,
+    secret: config.secret,
   };
   const runJob = createDispatchJob({
     db: options.database,

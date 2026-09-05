@@ -3,6 +3,19 @@
 All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 `scripts/release.mjs` (every workspace package shares one version).
 
+## Unreleased (breaking)
+
+**Webhook secrets encrypted at rest (#45)**
+- `webhooks.secret` (plaintext) is replaced by `secret_encrypted` (AES-256-GCM
+  under `ShelfConfig.secret`). The legacy column is dropped by migration —
+  pre-existing plaintext secrets are **discarded, not migrated**.
+- **Action required after upgrade: re-create webhooks.** Until then, deliveries
+  for old webhooks fail closed (skipped, never crash). Creation fails loudly
+  when `SECRET` is unset.
+- `WebhookModel` now takes the server secret (`new WebhookModel(db, secret)`);
+  `DatabaseAdapter` no longer exposes top-level `migrate()`/`close()` (see
+  #59 lifecycle); `emitWebhookEvent` takes the secret as its final argument.
+
 ## 0.2.0 — Repository restructure (2026-09-05)
 
 Internal reorganization with a small, documented public-surface cleanup. See
