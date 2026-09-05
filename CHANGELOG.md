@@ -16,6 +16,18 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
   `DatabaseAdapter` no longer exposes top-level `migrate()`/`close()` (see
   #59 lifecycle); `emitWebhookEvent` takes the secret as its final argument.
 
+**Streaming uploads replace multipart (#53)**
+- `POST /api/v1/projects/:slug/builds` accepts only `application/json` and
+  returns `{ build, uploadUrl }`; the bundle streams via
+  `PUT …/builds/:buildId/zip` (new `StorageAdapter.writeStream/readStream`;
+  `maxUploadBytes`, default 1 GiB, enforced with `413`). The multipart form
+  route is removed — servers answer old CLI uploads with `4xx`.
+- **Action required after upgrade: upgrade the CLI.** Old servers are not
+  supported by the new CLI (no fallback); old CLIs cannot upload to new
+  servers. The deprecated `--storybook-dir` alias is removed (use
+  `--build-dir`); JSON creation accepts `labels: [{ key, value }]`, and the
+  CLI gained repeatable `--label key=value`.
+
 ## 0.2.0 — Repository restructure (2026-09-05)
 
 Internal reorganization with a small, documented public-surface cleanup. See
