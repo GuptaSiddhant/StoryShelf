@@ -32,6 +32,9 @@ Internal reorganization with a small, documented public-surface cleanup. See
 **Adapters**
 - New `createDrizzleAdapter` factory (`core/adapter/database`); `db-sqlite` and
   `db-turso` are thin driver shims. Adapter tests gained exact type inference.
+- `db-sqlite` runs on the `node:sqlite` builtin via `drizzle-orm/sqlite-proxy`
+  — zero native dependencies (`better-sqlite3` removed). Same signature, same
+  WAL mode, same schema.
 - New shared `upsertReviewComment` flow (`core/adapter/git-host/comments`);
   `git-github` / `git-gitlab` comment modules are thin provider bindings.
 

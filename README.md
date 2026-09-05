@@ -9,7 +9,7 @@ Self-hosted visual testing platform for Storybook. Run visual regression tests i
 ```
 packages/
   core/           @storyshelf/core          — Hono router, models, capture pipeline, diff, retention
-  db-sqlite/      @storyshelf/db-sqlite      — SQLite database adapter (better-sqlite3 + Drizzle)
+  db-sqlite/      @storyshelf/db-sqlite      — SQLite database adapter (node:sqlite + Drizzle)
   db-turso/       @storyshelf/db-turso       — Turso/libSQL database adapter
   storage-local/  @storyshelf/storage-local — local filesystem storage
   storage-s3/     @storyshelf/storage-s3    — S3-compatible storage

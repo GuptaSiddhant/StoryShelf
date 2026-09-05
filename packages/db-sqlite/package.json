@@ -1,7 +1,7 @@
 {
   "name": "@storyshelf/db-sqlite",
   "version": "0.2.0",
-  "description": "SQLite database adapter for StoryShelf (better-sqlite3 + Drizzle).",
+  "description": "SQLite database adapter for StoryShelf (node:sqlite + Drizzle).",
   "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
   "bugs": {
     "url": "https://github.com/GuptaSiddhant/StoryShelf/issues"
@@ -46,11 +46,9 @@
   },
   "dependencies": {
     "@storyshelf/core": "workspace:*",
-    "better-sqlite3": "^12.4.1",
     "drizzle-orm": "^0.44.0"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "oxfmt": "catalog:",

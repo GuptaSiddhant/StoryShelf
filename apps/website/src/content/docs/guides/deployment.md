@@ -61,7 +61,7 @@ This generates `server.ts` + `package.json` with the correct imports and depende
 
 | Layer | Package | Notes |
 |-------|---------|-------|
-| Database | `@storyshelf/db-sqlite` | better-sqlite3 + Drizzle, WAL mode, single file |
+| Database | `@storyshelf/db-sqlite` | node:sqlite + Drizzle, WAL mode, single file |
 | Storage | `@storyshelf/storage-local` | Local filesystem, `--data-dir` |
 | Capture queue | `InMemoryCaptureQueue` (built-in) | Async, concurrency-limited, in-process |
 | Auth | `@storyshelf/auth-oauth` or `@storyshelf/auth-password` | OIDC or shared password |

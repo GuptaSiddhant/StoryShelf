@@ -14,7 +14,7 @@ export default defineConfig({
   },
   external: (id) => {
     if (id.startsWith("node:")) return true;
-    if (["better-sqlite3", "playwright", "playwright-core"].includes(id)) return true;
+    if (["playwright", "playwright-core"].includes(id)) return true;
     if (id.startsWith("@storyshelf/")) return false;
     if (id.startsWith(".") || id.startsWith("/")) return false;
     return true;

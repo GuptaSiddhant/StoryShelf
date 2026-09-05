@@ -1,6 +1,6 @@
 # @storyshelf/db-sqlite
 
-The default database adapter for self-hosted StoryShelf: SQLite backed by better-sqlite3 and Drizzle ORM, in WAL mode. Zero configuration for a single-node deployment.
+The default database adapter for self-hosted StoryShelf: SQLite backed by node:sqlite (zero-dependency builtin) and Drizzle ORM, in WAL mode. Zero configuration for a single-node deployment.
 
 ## Install
 

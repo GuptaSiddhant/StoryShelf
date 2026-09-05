@@ -46,7 +46,7 @@ export interface DatabaseAdapter {
   close(): Promise<void>;
 }
 
-/** A value or a promise of one (sync better-sqlite3 vs async libSQL drivers). */
+/** A value or a promise of one (sync node:sqlite vs async libSQL drivers). */
 type MaybePromise<T> = T | Promise<T>;
 
 /** Chainable select surface shared by the sync and async Drizzle dialects. */
@@ -111,7 +111,7 @@ function applyListOptions(query: DrizzleSelectChain, opts: ListOptions): Drizzle
 
 /**
  * Build a {@link DatabaseAdapter} over any SQLite-compatible Drizzle
- * dialect. Sync results (better-sqlite3) and promises (libSQL) are both
+ * dialect. Sync results (node:sqlite) and promises (libSQL) are both
  * awaited, so drivers only supply connection setup, metadata, and the
  * driver-specific migrate/close.
  */

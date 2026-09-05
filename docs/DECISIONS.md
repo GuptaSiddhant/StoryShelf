@@ -7,10 +7,10 @@ Decisions made during implementation (for review). Architectural decisions are i
 1. **Drizzle schema lives in `@storyshelf/core`**, not duplicated per adapter. Both `@storyshelf/db-sqlite` and `@storyshelf/db-turso` import the same schema from core (per ADR 0002 "shared schema"). This makes `db-sqlite`/`db-turso` depend on `core`.
    - *Trade-off:* `core` gains a dependency on `drizzle-orm`. Accepted — the schema is core domain logic.
 
-2. **Models are pure functions/classes over a minimal `DatabaseAdapter`**, not Drizzle-specific. Drizzle is used only inside the `sqlite`/`turso` adapters to translate the adapter's typed operations into SQL. The adapter interface is a small set of typed CRUD + query primitives (per-table generics), not raw SQL passthrough — keeps `turso` (remote HTTP driver) and `sqlite` (sync better-sqlite3) behind one async interface.
+2. **Models are pure functions/classes over a minimal `DatabaseAdapter`**, not Drizzle-specific. Drizzle is used only inside the `sqlite`/`turso` adapters to translate the adapter's typed operations into SQL. The adapter interface is a small set of typed CRUD + query primitives (per-table generics), not raw SQL passthrough — keeps `turso` (remote HTTP driver) and `sqlite` (sync node:sqlite) behind one async interface.
    - *Trade-off:* more indirection than writing Drizzle queries inline in models. Accepted for testability and the two-driver requirement.
 
-3. **`DatabaseAdapter` is async everywhere**, even for `sqlite` (better-sqlite3 is sync, wrapped in `Promise.resolve`). Uniformity beats micro-optimizing the local driver.
+3. **`DatabaseAdapter` is async everywhere**, even for `sqlite` (node:sqlite is sync, wrapped in `Promise.resolve`). Uniformity beats micro-optimizing the local driver.
 
 4. **Token/secret hashing**: API token values are stored SHA-256 hashed (consistent with `docs/architecture.md` tokens.hash). Webhook `secret` and session cookies use HMAC-SHA256 with the server `SECRET`; no encryption-at-rest in v1 (noted as a gap).
 

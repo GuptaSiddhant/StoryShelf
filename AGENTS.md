@@ -52,7 +52,7 @@ See `docs/repo-structure.md` for the annotated map (workspaces vs fixtures, bund
 StoryShelf/
   packages/
     core/           @storyshelf/core           -- Hono router, adapter interfaces, models, capture pipeline, diff, retention
-    db-sqlite/      @storyshelf/db-sqlite      -- SQLite database adapter (better-sqlite3 + Drizzle)
+    db-sqlite/      @storyshelf/db-sqlite      -- SQLite database adapter (node:sqlite + Drizzle)
     db-turso/       @storyshelf/db-turso       -- Turso/libSQL database adapter (@libsql/client + Drizzle)
     storage-local/  @storyshelf/storage-local  -- Local filesystem storage adapter
     storage-s3/     @storyshelf/storage-s3     -- S3-compatible storage adapter (S3, R2, MinIO)
@@ -101,7 +101,7 @@ StoryShelf/
 
 ## Database options
 
-- **SQLite** (default, self-hosted): `@storyshelf/db-sqlite` — better-sqlite3 + Drizzle ORM. Zero config. WAL mode.
+- **SQLite** (default, self-hosted): `@storyshelf/db-sqlite` — node:sqlite (zero-dependency builtin) + Drizzle ORM. Zero config. WAL mode.
 - **Turso** (serverless/cloud): `@storyshelf/db-turso` — @libsql/client + Drizzle ORM. Same schema, same queries, different driver. Works on Vercel, Cloudflare Workers, Lambda.
 
 ## Storage options

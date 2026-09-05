@@ -65,8 +65,5 @@
       "version": "26.x",
       "onFail": "error"
     }
-  },
-  "allowBuilds": {
-    "better-sqlite3": true
   }
 }

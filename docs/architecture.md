@@ -663,7 +663,7 @@ StoryShelf/
 
     db-sqlite/
       src/
-        index.ts          # DatabaseAdapter for SQLite (via better-sqlite3 + Drizzle)
+        index.ts          # DatabaseAdapter for SQLite (via node:sqlite + Drizzle)
       package.json
 
     db-turso/
@@ -719,7 +719,7 @@ StoryShelf/
 |---------|--------|-----------|
 | **Runtime** | Node.js 22+ | Playwright's best-supported runtime; LTS |
 | **HTTP framework** | Hono (OpenAPIHono) | Type-safe routes, OpenAPI spec generation, edge-compatible |
-| **Database** | SQLite via `better-sqlite3` + Drizzle ORM (local). Turso/libSQL via `@libsql/client` + Drizzle (serverless). | Zero-config on VPS/Docker. Turso for Vercel/Cloudflare Workers. Same schema, same queries, different connection. |
+| **Database** | SQLite via `node:sqlite` + Drizzle ORM (local). Turso/libSQL via `@libsql/client` + Drizzle (serverless). | Zero-config on VPS/Docker. Turso for Vercel/Cloudflare Workers. Same schema, same queries, different connection. |
 | **Storage** | Local filesystem (default). S3-compatible (R2, MinIO, S3) as alternative. | Local for Docker/VPS. S3 for cloud. Same adapter interface, two implementations. |
 | **Screenshot capture** | Playwright (server-side) | Industry standard. Deterministic rendering in a pinned image. `toHaveScreenshot` battle-tested |
 | **Pixel diff** | pixelmatch + pngjs | Same libraries Playwright uses internally. Fast, reliable, widely adopted |

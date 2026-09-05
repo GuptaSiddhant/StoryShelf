@@ -3,7 +3,7 @@ title: "@storyshelf/db-sqlite"
 description: The zero-configuration SQLite database adapter for single-node StoryShelf deployments.
 ---
 
-`@storyshelf/db-sqlite` is the default database adapter for self-hosted StoryShelf. It uses better-sqlite3 and Drizzle ORM, enables WAL mode, and stores the database in one local file.
+`@storyshelf/db-sqlite` is the default database adapter for self-hosted StoryShelf. It uses node:sqlite (zero-dependency builtin) and Drizzle ORM, enables WAL mode, and stores the database in one local file.
 
 ## Install
 

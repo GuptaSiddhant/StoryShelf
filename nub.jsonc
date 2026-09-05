@@ -13,7 +13,6 @@
       "pixelmatch",
       "pngjs",
       "adm-zip",
-      "better-sqlite3",
       "playwright",
       "yaml",
     ],
