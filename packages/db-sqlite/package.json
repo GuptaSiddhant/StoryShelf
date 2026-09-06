@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/db-sqlite",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "SQLite database adapter for StoryShelf (node:sqlite + Drizzle).",
   "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
   "bugs": {
