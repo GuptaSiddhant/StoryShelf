@@ -23,7 +23,7 @@ jobs:
   publish-npm:
     runs-on: ubuntu-latest
     env:
-      RELEASE_TAG: ${ github.ref_name }
+      RELEASE_TAG: ${{ github.ref_name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -145,7 +145,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${ github.ref_name }
+          tag_name: ${{ github.ref_name }}
           body_path: /tmp/release-body.md
           generate_release_notes: false
 
