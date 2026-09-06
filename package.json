@@ -34,6 +34,7 @@
     "jsr": "nub ./scripts/jsr.mjs",
     "serve": "nub run --filter dev-server serve",
     "fmt": "turbo fmt",
+    "hook:install": "git config core.hooksPath .githooks && chmod +x .githooks/pre-commit .githooks/commit-msg",
     "lint": "turbo lint",
     "test": "turbo test",
     "audit": "turbo audit",
