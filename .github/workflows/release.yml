@@ -36,53 +36,7 @@ jobs:
 
       - name: Guard tag and fixed versions
         id: guard
-        run: |
-          set -e
-          TAG="${{ github.ref_name }}"
-          PKG_VERSION="$(node -e "console.log(require('./packages/core/package.json').version)")"
-          echo "tag=$TAG pkg=v$PKG_VERSION"
-          if [ "$TAG" != "v$PKG_VERSION" ]; then
-            echo "::error::Tag $TAG != packages/core version v$PKG_VERSION"
-            exit 1
-          fi
-          # All non-private packages must share same version
-          VERS=$(node -e "const fs=require('fs');const path=require('path');const dir='packages';console.log([...new Set(require('fs').readdirSync(dir).filter(d=>fs.statSync(path.join(dir,d)).isDirectory()).map(d=>{try{const p=JSON.parse(fs.readFileSync(path.join(dir,d,'package.json'),'utf8'));return p.private?null:p.version}catch{return null}}).filter(Boolean))].join(','))")
-          COUNT=$(echo "$VERS" | tr ',' '\n' | sort -u | wc -l | tr -d ' ')
-          echo "distinct versions: $VERS (count=$COUNT)"
-          if [ "$COUNT" != "1" ]; then
-            echo "::error::Packages not fixed-version: $VERS"
-            exit 1
-          fi
-          # deno.json versions must match package.json
-          node -e "
-            const fs=require('fs');
-            const path=require('path');
-            const dir='packages';
-            const bad=[];
-            const missing=[];
-            for (const d of fs.readdirSync(dir)) {
-              if (!fs.statSync(path.join(dir,d)).isDirectory()) continue;
-              try {
-                const p=JSON.parse(fs.readFileSync(path.join(dir,d,'package.json'),'utf8'));
-                if (p.private) continue;
-                let j=null;
-                try { j=JSON.parse(fs.readFileSync(path.join(dir,d,'deno.json'),'utf8')); } catch {}
-                if (!j) { missing.push(d); continue; }
-                if (j.version !== p.version) bad.push(d+': deno='+j.version+' pkg='+p.version);
-              } catch {}
-            }
-            if (missing.length) { console.error('missing deno.json:'); console.error(missing.join('\n')); process.exit(1); }
-            if (bad.length) { console.error('deno.json/package.json version mismatch:'); console.error(bad.join('\n')); process.exit(1); }
-            console.log('all deno.json versions match package.json');
-          "
-          if echo "$PKG_VERSION" | grep -q "-"; then
-            DIST_TAG="next"
-          else
-            DIST_TAG="latest"
-          fi
-          echo "version=$PKG_VERSION" >> "$GITHUB_OUTPUT"
-          echo "dist_tag=$DIST_TAG" >> "$GITHUB_OUTPUT"
-          echo "validated $PKG_VERSION ($DIST_TAG)"
+        run: node scripts/release-validate.mjs "${{ github.ref_name }}"
 
   # npm publish + GitHub Release. Depends on validate, independent of JSR:
   # a failure here never blocks publish-jsr, and is never blocked by it.
@@ -108,64 +62,19 @@ jobs:
         run: nub run build --filter='./packages/*'
 
       - name: Check npm version for OIDC
-        run: |
-          set -e
-          NPM_VERSION="$(npm --version)"
-          echo "npm version: $NPM_VERSION"
-          node -e "
-            const [major, minor] = process.argv[1].split('.').map(Number);
-            if (major < 11 || (major === 11 && minor < 5)) {
-              console.error('::error::npm >= 11.5.1 required for OIDC trusted publishing, found ' + process.argv[1]);
-              process.exit(1);
-            }
-            console.log('npm OIDC supported');
-          " "$NPM_VERSION"
+        run: node scripts/check-npm-oidc.mjs
 
       - name: Rewrite workspace protocol for npm manifest
-        run: |
-          set -e
-          # Plain npm publish ships dependencies verbatim, so workspace:*
-          # must become caret ranges (nub publish did this automatically).
-          # Repo files keep workspace:*; only this CI working tree is rewritten.
-          node -e "
-            const fs=require('fs');
-            const path=require('path');
-            for (const d of fs.readdirSync('packages')) {
-              const dir=path.join('packages',d);
-              if (!fs.statSync(dir).isDirectory()) continue;
-              const f=path.join(dir,'package.json');
-              let pkg;
-              try { pkg=JSON.parse(fs.readFileSync(f,'utf8')); } catch { continue; }
-              if (pkg.private || !pkg.dependencies) continue;
-              let changed=false;
-              for (const dep of Object.keys(pkg.dependencies)) {
-                if (dep.startsWith('@storyshelf/') && pkg.dependencies[dep]==='workspace:*') {
-                  pkg.dependencies[dep]='^'+pkg.version;
-                  changed=true;
-                }
-              }
-              if (changed) {
-                fs.writeFileSync(f,JSON.stringify(pkg,null,2)+'\n');
-                console.log('rewrote '+d);
-              }
-            }
-            console.log('workspace protocol rewrite complete');
-          "
+        # Plain npm publish ships dependencies verbatim, so workspace:*
+        # must become caret ranges. Repo files keep workspace:*; only this
+        # CI working tree is rewritten.
+        run: node scripts/rewrite-workspace-protocol.mjs
 
       - name: Publish to npm (trusted / provenance)
-        run: |
-          set -e
-          VERSION="${{ needs.validate.outputs.version }}"
-          DIST_TAG="${{ needs.validate.outputs.dist_tag }}"
-          echo "publishing $VERSION with dist-tag $DIST_TAG"
-          # OIDC trusted publishing: the npm CLI (>= 11.5.1) exchanges the
-          # workflow OIDC token automatically — no NODE_AUTH_TOKEN. Requires a
-          # trusted publisher configured per package on npmjs.com (one-time).
-          ORDER="core auth-oauth auth-password db-sqlite db-turso queue-sqs runner-playwright storage-local storage-s3 cli git-github git-gitlab"
-          for PACKAGE in $ORDER; do
-            echo "Publishing @storyshelf/$PACKAGE"
-            (cd "packages/$PACKAGE" && npm publish --access public --provenance --tag "$DIST_TAG")
-          done
+        # OIDC trusted publishing: npm exchanges the workflow OIDC token
+        # automatically — no NODE_AUTH_TOKEN. Requires a trusted publisher
+        # configured per package on npmjs.com (one-time).
+        run: node scripts/publish-npm.mjs "${{ needs.validate.outputs.version }}" "${{ needs.validate.outputs.dist_tag }}"
 
       - name: Generate release notes from git log
         id: log
@@ -223,65 +132,11 @@ jobs:
         run: nub run build --filter='./packages/*'
 
       - name: "Rewrite workspace protocol for JSR manifest"
-        run: |
-          set -e
-          # JSR cannot record workspace:* requirements in the published manifest,
-          # so rewrite them to caret ranges of the current fixed version.
-          # Repo files keep workspace:*; only this CI working tree is rewritten
-          # (already --allow-dirty). Local node_modules symlinks still resolve.
-          node -e "
-            const fs=require('fs');
-            const path=require('path');
-            for (const d of fs.readdirSync('packages')) {
-              const dir=path.join('packages',d);
-              if (!fs.statSync(dir).isDirectory()) continue;
-              const f=path.join(dir,'package.json');
-              let pkg;
-              try { pkg=JSON.parse(fs.readFileSync(f,'utf8')); } catch { continue; }
-              if (pkg.private || !pkg.dependencies) continue;
-              let changed=false;
-              for (const dep of Object.keys(pkg.dependencies)) {
-                if (dep.startsWith('@storyshelf/') && pkg.dependencies[dep]==='workspace:*') {
-                  pkg.dependencies[dep]='^'+pkg.version;
-                  changed=true;
-                }
-              }
-              if (changed) {
-                fs.writeFileSync(f,JSON.stringify(pkg,null,2)+'\n');
-                console.log('rewrote '+d);
-              }
-            }
-            console.log('workspace protocol rewrite complete');
-          "
+        # Same rewrite as the npm job; --allow-dirty tolerates it at publish.
+        run: node scripts/rewrite-workspace-protocol.mjs
 
       - name: "Publish to JSR (dependency order: core first)"
-        run: |
-          set -e
-          # Ordered: @storyshelf/core must publish before the packages that depend on it.
-          ORDER=(
-            "@storyshelf/core"
-            "@storyshelf/auth-oauth"
-            "@storyshelf/auth-password"
-            "@storyshelf/db-sqlite"
-            "@storyshelf/db-turso"
-            "@storyshelf/queue-sqs"
-            "@storyshelf/runner-playwright"
-            "@storyshelf/storage-local"
-            "@storyshelf/storage-s3"
-            "@storyshelf/cli"
-            "@storyshelf/git-github"
-            "@storyshelf/git-gitlab"
-          )
-          for name in "${ORDER[@]}"; do
-            PACKAGE="${name#@storyshelf/}"
-            echo "Publishing $name"
-            # deno publish directly (no npx jsr wrapper): the wrapper re-downloads
-            # itself and its deno binary per package (~5 min each). Pinned deno
-            # via Setup Deno above makes every package publish in seconds.
-            # --allow-dirty: build regenerates deno.json, leaving the tree dirty.
-            # --allow-slow-types: core's zod/drizzle inferred types trip JSR's
-            #   explicit-type check; documented escape hatch, no-op elsewhere.
-            # --unstable-*: BYONM/sloppy-imports for package.json projects (same
-            #   set the jsr CLI injects); --no-check skips redundant typecheck.
-            (cd "packages/$PACKAGE" && deno publish --unstable-bare-node-builtins --unstable-sloppy-imports --unstable-byonm --no-check --allow-dirty --allow-slow-types)
-          done
+        # deno publish directly (no npx jsr wrapper): the wrapper re-downloads
+        # itself and its deno binary per package (~5 min each). Pinned deno
+        # via Setup Deno above makes every package publish in seconds.
+        run: node scripts/publish-jsr.mjs
