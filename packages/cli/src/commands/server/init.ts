@@ -162,19 +162,19 @@ function generateServer(answers: Answers): string {
 function buildDeps(answers: Answers): Record<string, string> {
   const deps: Record<string, string> = {
     "@hono/node-server": "^1.17.0",
-    "@storyshelf/core": `^${__PKG_VERSION__}`,
-    [DB_PACKAGE[answers.database]]: `^${__PKG_VERSION__}`,
-    "@storyshelf/runner-playwright": `^${__PKG_VERSION__}`,
+    "@storyshelf/core": `${__PKG_VERSION__}`,
+    [DB_PACKAGE[answers.database]]: `${__PKG_VERSION__}`,
+    "@storyshelf/runner-playwright": `${__PKG_VERSION__}`,
   };
 
   if (answers.storage !== "local") {
-    deps[STORAGE_PACKAGE[answers.storage]] = `^${__PKG_VERSION__}`;
+    deps[STORAGE_PACKAGE[answers.storage]] = `${__PKG_VERSION__}`;
   }
   if (answers.auth !== "none") {
-    deps[AUTH_PACKAGE[answers.auth] ?? ""] = `^${__PKG_VERSION__}`;
+    deps[AUTH_PACKAGE[answers.auth] ?? ""] = `${__PKG_VERSION__}`;
   }
   if (answers.git !== "none") {
-    deps[GIT_PACKAGE[answers.git] ?? ""] = `^${__PKG_VERSION__}`;
+    deps[GIT_PACKAGE[answers.git] ?? ""] = `${__PKG_VERSION__}`;
   }
 
   return deps;

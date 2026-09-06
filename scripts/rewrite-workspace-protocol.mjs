@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // oxlint-disable max-statements curly no-console
 /**
- * Rewrite `workspace:*` requirements to caret ranges of the current fixed
- * version. Shared by the npm and JSR publish paths — neither registry can
- * record the workspace protocol in a published manifest.
+ * Rewrite `workspace:*` requirements to exact versions matching the current
+ * fixed version. Shared by the npm and JSR publish paths — neither registry
+ * can record the workspace protocol in a published manifest.
  *
  * Repo files keep `workspace:*`; run this only on a CI working tree where
  * dirty state is tolerated (publish jobs use --allow-dirty equivalents).
@@ -36,7 +36,7 @@ for (const entry of readdirSync(packagesDir, { withFileTypes: true })) {
   let changed = false;
   for (const dep of Object.keys(pkg.dependencies)) {
     if (dep.startsWith("@storyshelf/") && pkg.dependencies[dep] === "workspace:*") {
-      pkg.dependencies[dep] = `^${pkg.version}`;
+      pkg.dependencies[dep] = `${pkg.version}`;
       changed = true;
     }
   }
