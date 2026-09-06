@@ -34,28 +34,6 @@ async function createTestDb(
     }),
   );
 
-  const projectId = rows[0]?.["projectId"] as string | undefined;
-
-  // Override `all` to return latestPerBranch-compatible rows filtered by projectId.
-  // The fake adapter's `all` returns every table's rows, so we narrow it here.
-  const dbRecord = db as unknown as Record<string, unknown>;
-  dbRecord["all"] = async (): Promise<{ id: string; gitBranch: string; createdAt: string }[]> => {
-    if (projectId === undefined) {
-      return [];
-    }
-    const filtered = rows
-      .filter((row) => row["projectId"] === projectId)
-      .map((row) => ({
-        id: row["id"] as string,
-        gitBranch: row["gitBranch"] as string,
-        createdAt: row["createdAt"] as string,
-      }));
-    // Mirror the real query's ORDER BY createdAt DESC by sorting descending
-    filtered.sort((first, second) => second.createdAt.localeCompare(first.createdAt));
-    await Promise.resolve();
-    return filtered;
-  };
-
   return db;
 }
 
@@ -64,17 +42,9 @@ describe("Retention purge integration", () => {
     const { storage } = makeStorage();
     const project = makeProject();
 
+    // Inserted oldest-first per branch, so insertion order disagrees with
+    // recency: only a real ORDER BY updatedAt DESC keeps the newest builds.
     const rows: Record<string, unknown>[] = [
-      {
-        id: "b1",
-        projectId: "p1",
-        gitSha: "sha-1",
-        gitBranch: "main",
-        isDefault: true,
-        status: "approved",
-        createdAt: "2026-01-15T00:00:00.000Z",
-        updatedAt: "2026-01-15T00:00:00.000Z",
-      },
       {
         id: "b2",
         projectId: "p1",
@@ -86,16 +56,6 @@ describe("Retention purge integration", () => {
         updatedAt: "2026-01-10T00:00:00.000Z",
       },
       {
-        id: "b3",
-        projectId: "p1",
-        gitSha: "sha-3",
-        gitBranch: "feature/xyz",
-        isDefault: false,
-        status: "approved",
-        createdAt: "2026-01-20T00:00:00.000Z",
-        updatedAt: "2026-01-20T00:00:00.000Z",
-      },
-      {
         id: "b4",
         projectId: "p1",
         gitSha: "sha-4",
@@ -104,6 +64,26 @@ describe("Retention purge integration", () => {
         status: "approved",
         createdAt: "2026-01-05T00:00:00.000Z",
         updatedAt: "2026-01-05T00:00:00.000Z",
+      },
+      {
+        id: "b1",
+        projectId: "p1",
+        gitSha: "sha-1",
+        gitBranch: "main",
+        isDefault: true,
+        status: "approved",
+        createdAt: "2026-01-15T00:00:00.000Z",
+        updatedAt: "2026-01-15T00:00:00.000Z",
+      },
+      {
+        id: "b3",
+        projectId: "p1",
+        gitSha: "sha-3",
+        gitBranch: "feature/xyz",
+        isDefault: false,
+        status: "approved",
+        createdAt: "2026-01-20T00:00:00.000Z",
+        updatedAt: "2026-01-20T00:00:00.000Z",
       },
       {
         id: "b5",
@@ -123,6 +103,8 @@ describe("Retention purge integration", () => {
 
     expect(result.removedBuilds).toBe(2);
     expect(result.removedFiles).toBeGreaterThanOrEqual(0);
+    const survivors = await db.list(builds);
+    expect(survivors.map((build) => build.id).toSorted()).toEqual(["b1", "b3", "b5"]);
   });
 
   it("purges all terminal builds when keepLatestPerBranch is false", async () => {

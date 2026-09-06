@@ -136,6 +136,9 @@ export function makeDatabase(): { db: DatabaseAdapter } {
       const { where } = opts;
       current = current.filter((row) => whereMatches(where, row as Record<string, unknown>, table));
     }
+    if (opts.orderBy) {
+      current = orderRows(current, opts.orderBy, table);
+    }
     if (opts.limit !== undefined) {
       current = current.slice(0, opts.limit);
     }
@@ -318,6 +321,69 @@ function ltMatches(
     return cell < argument;
   }
   return String(cell) < String(argument);
+}
+
+function compareCells(left: unknown, right: unknown): number {
+  if (typeof left === "string" && typeof right === "string") {
+    if (left === right) {
+      return 0;
+    }
+    return left < right ? -1 : 1;
+  }
+  if (typeof left === "number" && typeof right === "number") {
+    return left - right;
+  }
+  const leftText = String(left);
+  const rightText = String(right);
+  if (leftText === rightText) {
+    return 0;
+  }
+  return leftText < rightText ? -1 : 1;
+}
+
+/** Collect every raw string part of a drizzle SQL chunk tree. */
+function sqlText(nodes: SqlChunk[]): string {
+  return nodes
+    .map((node) => {
+      const own = textOf(node) ?? "";
+      const nested = node.queryChunks ? sqlText(node.queryChunks as unknown as SqlChunk[]) : "";
+      return own + nested;
+    })
+    .join("");
+}
+
+/** Find the ordered column reference in a drizzle order-by expression. */
+function findOrderColumn(nodes: SqlChunk[]): string | undefined {
+  for (const node of nodes) {
+    if (typeof node.name === "string" && node.table !== undefined) {
+      return node.name;
+    }
+    if (node.queryChunks) {
+      const nested = findOrderColumn(node.queryChunks as unknown as SqlChunk[]);
+      if (nested !== undefined) {
+        return nested;
+      }
+    }
+  }
+  return undefined;
+}
+
+/** Sort rows per a drizzle order-by expression (single-column asc/desc). */
+function orderRows(rows: unknown[], orderBy: SQL, table: AnySQLiteTable): unknown[] {
+  const chunks = orderBy.queryChunks as unknown as SqlChunk[];
+  const columnName = findOrderColumn(chunks);
+  if (columnName === undefined) {
+    return rows;
+  }
+  const key = columnKey(table, columnName);
+  const descending = /desc/iu.test(sqlText(chunks));
+  return rows.toSorted((left, right) => {
+    const order = compareCells(
+      (left as Record<string, unknown>)[key],
+      (right as Record<string, unknown>)[key],
+    );
+    return descending ? -order : order;
+  });
 }
 
 function columnKey(table: AnySQLiteTable, dbName: string): string {
