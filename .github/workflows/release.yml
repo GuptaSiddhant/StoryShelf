@@ -18,10 +18,77 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # npm publish + GitHub Release. Independent of JSR: a failure here never blocks
-  # publish-jsr, and is never blocked by it.
+  # Version gate: single source of truth. Both publishers depend on this job
+  # (not on each other), so a bad tag/tree fails fast before either registry
+  # is touched — while npm and JSR still never block each other.
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.guard.outputs.version }}
+      dist_tag: ${{ steps.guard.outputs.dist_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Guard tag and fixed versions
+        id: guard
+        run: |
+          set -e
+          TAG="${{ github.ref_name }}"
+          PKG_VERSION="$(node -e "console.log(require('./packages/core/package.json').version)")"
+          echo "tag=$TAG pkg=v$PKG_VERSION"
+          if [ "$TAG" != "v$PKG_VERSION" ]; then
+            echo "::error::Tag $TAG != packages/core version v$PKG_VERSION"
+            exit 1
+          fi
+          # All non-private packages must share same version
+          VERS=$(node -e "const fs=require('fs');const path=require('path');const dir='packages';console.log([...new Set(require('fs').readdirSync(dir).filter(d=>fs.statSync(path.join(dir,d)).isDirectory()).map(d=>{try{const p=JSON.parse(fs.readFileSync(path.join(dir,d,'package.json'),'utf8'));return p.private?null:p.version}catch{return null}}).filter(Boolean))].join(','))")
+          COUNT=$(echo "$VERS" | tr ',' '\n' | sort -u | wc -l | tr -d ' ')
+          echo "distinct versions: $VERS (count=$COUNT)"
+          if [ "$COUNT" != "1" ]; then
+            echo "::error::Packages not fixed-version: $VERS"
+            exit 1
+          fi
+          # deno.json versions must match package.json
+          node -e "
+            const fs=require('fs');
+            const path=require('path');
+            const dir='packages';
+            const bad=[];
+            const missing=[];
+            for (const d of fs.readdirSync(dir)) {
+              if (!fs.statSync(path.join(dir,d)).isDirectory()) continue;
+              try {
+                const p=JSON.parse(fs.readFileSync(path.join(dir,d,'package.json'),'utf8'));
+                if (p.private) continue;
+                let j=null;
+                try { j=JSON.parse(fs.readFileSync(path.join(dir,d,'deno.json'),'utf8')); } catch {}
+                if (!j) { missing.push(d); continue; }
+                if (j.version !== p.version) bad.push(d+': deno='+j.version+' pkg='+p.version);
+              } catch {}
+            }
+            if (missing.length) { console.error('missing deno.json:'); console.error(missing.join('\n')); process.exit(1); }
+            if (bad.length) { console.error('deno.json/package.json version mismatch:'); console.error(bad.join('\n')); process.exit(1); }
+            console.log('all deno.json versions match package.json');
+          "
+          if echo "$PKG_VERSION" | grep -q "-"; then
+            DIST_TAG="next"
+          else
+            DIST_TAG="latest"
+          fi
+          echo "version=$PKG_VERSION" >> "$GITHUB_OUTPUT"
+          echo "dist_tag=$DIST_TAG" >> "$GITHUB_OUTPUT"
+          echo "validated $PKG_VERSION ($DIST_TAG)"
+
+  # npm publish + GitHub Release. Depends on validate, independent of JSR:
+  # a failure here never blocks publish-jsr, and is never blocked by it.
   publish-npm:
     runs-on: ubuntu-latest
+    needs: [validate]
     env:
       RELEASE_TAG: ${{ github.ref_name }}
     steps:
@@ -39,25 +106,6 @@ jobs:
       - name: Build packages
         # Not strictly required — prepublishOnly runs build — but fail-fast before provenance.
         run: nub run build --filter='./packages/*'
-
-      - name: Guard tag matches fixed version
-        run: |
-          set -e
-          TAG="${RELEASE_TAG}"
-          PKG_VERSION="$(node -e "console.log(require('./packages/core/package.json').version)")"
-          echo "tag=$TAG pkg=v$PKG_VERSION"
-          if [ "$TAG" != "v$PKG_VERSION" ]; then
-            echo "::error::Tag $TAG != packages/core version v$PKG_VERSION"
-            exit 1
-          fi
-          # All non-private packages must share same version
-          VERS=$(node -e "const fs=require('fs');const path=require('path');const dir='packages';console.log([...new Set(require('fs').readdirSync(dir).filter(d=>fs.statSync(path.join(dir,d)).isDirectory()).map(d=>{try{const p=JSON.parse(fs.readFileSync(path.join(dir,d,'package.json'),'utf8'));return p.private?null:p.version}catch{return null}}).filter(Boolean))].join(','))")
-          COUNT=$(echo "$VERS" | tr ',' '\n' | sort -u | wc -l | tr -d ' ')
-          echo "distinct versions: $VERS (count=$COUNT)"
-          if [ "$COUNT" != "1" ]; then
-            echo "::error::Packages not fixed-version: $VERS"
-            exit 1
-          fi
 
       - name: Check npm version for OIDC
         run: |
@@ -107,12 +155,8 @@ jobs:
       - name: Publish to npm (trusted / provenance)
         run: |
           set -e
-          VERSION="$(node -e "console.log(require('./packages/core/package.json').version)")"
-          if echo "$VERSION" | grep -q "-"; then
-            DIST_TAG="next"
-          else
-            DIST_TAG="latest"
-          fi
+          VERSION="${{ needs.validate.outputs.version }}"
+          DIST_TAG="${{ needs.validate.outputs.dist_tag }}"
           echo "publishing $VERSION with dist-tag $DIST_TAG"
           # OIDC trusted publishing: the npm CLI (>= 11.5.1) exchanges the
           # workflow OIDC token automatically — no NODE_AUTH_TOKEN. Requires a
@@ -149,10 +193,11 @@ jobs:
           body_path: /tmp/release-body.md
           generate_release_notes: false
 
-  # JSR publish. Independent of npm: no `needs`, and `continue-on-error` means a
-  # failure here never fails the workflow or blocks publish-npm.
+  # JSR publish. Depends on validate, independent of npm: `continue-on-error`
+  # means a failure here never fails the workflow or blocks publish-npm.
   publish-jsr:
     runs-on: ubuntu-latest
+    needs: [validate]
     continue-on-error: true
     permissions:
       contents: read
@@ -176,31 +221,6 @@ jobs:
 
       - name: Build packages (regenerates deno.json with current version)
         run: nub run build --filter='./packages/*'
-
-      - name: Guard deno.json versions match package.json
-        run: |
-          set -e
-          VERS=$(node -e "
-            const fs=require('fs');
-            const path=require('path');
-            const dir='packages';
-            const bad=[];
-            const missing=[];
-            for (const d of fs.readdirSync(dir)) {
-              if (!fs.statSync(path.join(dir,d)).isDirectory()) continue;
-              try {
-                const p=JSON.parse(fs.readFileSync(path.join(dir,d,'package.json'),'utf8'));
-                if (p.private) continue;
-                let j=null;
-                try { j=JSON.parse(fs.readFileSync(path.join(dir,d,'deno.json'),'utf8')); } catch {}
-                if (!j) { missing.push(d); continue; }
-                if (j.version !== p.version) bad.push(d+': deno='+j.version+' pkg='+p.version);
-              } catch {}
-            }
-            if (missing.length) { console.error('missing deno.json:'); console.error(missing.join('\n')); process.exit(1); }
-            if (bad.length) { console.error('deno.json/package.json version mismatch:'); console.error(bad.join('\n')); process.exit(1); }
-            console.log('all deno.json versions match package.json');
-          ")
 
       - name: "Rewrite workspace protocol for JSR manifest"
         run: |
