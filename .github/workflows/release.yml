@@ -38,13 +38,11 @@ jobs:
         id: guard
         run: node scripts/release-validate.mjs "${{ github.ref_name }}"
 
-  # npm publish + GitHub Release. Depends on validate, independent of JSR:
-  # a failure here never blocks publish-jsr, and is never blocked by it.
+  # npm publish. Depends on validate, independent of JSR: a failure here
+  # never blocks publish-jsr, and is never blocked by it.
   publish-npm:
     runs-on: ubuntu-latest
     needs: [validate]
-    env:
-      RELEASE_TAG: ${{ github.ref_name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -54,15 +52,17 @@ jobs:
       - name: Setup Nub
         uses: nubjs/setup-nub@v0
 
+      - name: Check npm version for OIDC
+        # Before install: no project-state dependency, fails fast on a bad
+        # toolchain. After Setup Nub so the tested npm is the publishing one.
+        run: node scripts/check-npm-oidc.mjs
+
       - name: Install dependencies
         run: nub ci
 
       - name: Build packages
         # Not strictly required — prepublishOnly runs build — but fail-fast before provenance.
         run: nub run build --filter='./packages/*'
-
-      - name: Check npm version for OIDC
-        run: node scripts/check-npm-oidc.mjs
 
       - name: Rewrite workspace protocol for npm manifest
         # Plain npm publish ships dependencies verbatim, so workspace:*
@@ -75,6 +75,22 @@ jobs:
         # automatically — no NODE_AUTH_TOKEN. Requires a trusted publisher
         # configured per package on npmjs.com (one-time).
         run: node scripts/publish-npm.mjs "${{ needs.validate.outputs.version }}" "${{ needs.validate.outputs.dist_tag }}"
+
+  # GitHub Release. Runs only after a successful npm publish (same semantics
+  # as when these steps lived at the tail of publish-npm); JSR outcome can't
+  # affect it. Needs no toolchain — just git history and the tag.
+  github-release:
+    runs-on: ubuntu-latest
+    needs: [validate, publish-npm]
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Generate release notes from git log
         id: log
