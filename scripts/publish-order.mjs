@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { spawnSync } from "node:child_process";
 // oxlint-disable max-statements curly no-console
 /**
  * Shared publish ordering for the release pipeline. Both registry publishers
@@ -13,7 +14,6 @@
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { spawnSync } from "node:child_process";
 
 const { dirname } = import.meta;
 const packagesDir = join(dirname, "..", "packages");
@@ -92,6 +92,16 @@ export function topoSort(nodes, edges) {
     throw new Error(`dependency cycle detected among: ${stuck.join(", ")}`);
   }
   return order;
+}
+
+/**
+ * Public package directories published to JSR, in publish order.
+ * Skips packages opted out via `"jsr": false` in package.json.
+ *
+ * @returns {string[]} Directory names, deterministic.
+ */
+export function getJsrPublishOrder() {
+  return getPublishOrder().filter((dir) => readManifest(dir)?.jsr !== false);
 }
 
 /**

@@ -23,10 +23,10 @@ export function renderRootPage(): RenderedContent {
         <p class="field__hint" style="margin-top:1rem;">
           Tip: use{" "}
           <code>
-            npx @storyshelf/cli create --url &lt;url&gt; --name &lt;name&gt; --token
+            npx storyshelf create --url &lt;url&gt; --name &lt;name&gt; --token
             $STORYSHELF_ADMIN_TOKEN
           </code>{" "}
-          to create a project and token for CI, or <code>npx @storyshelf/cli init</code> to write{" "}
+          to create a project and token for CI, or <code>npx storyshelf init</code> to write{" "}
           <code>.storybook/storyshelf.json</code>.
         </p>
       </div>

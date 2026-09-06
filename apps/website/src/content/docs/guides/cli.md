@@ -3,10 +3,10 @@ title: CLI reference
 description: The storyshelf command-line interface — init, create, server, upload, retry, and purge.
 ---
 
-The StoryShelf CLI (`@storyshelf/cli`) exposes a `storyshelf` binary for CI pipelines. Install it globally, or prefix with `npx @storyshelf/cli`:
+The StoryShelf CLI (`storyshelf`) exposes a `storyshelf` binary for CI pipelines. Install it globally, or prefix with `npx storyshelf`:
 
 ```bash
-npm install -g @storyshelf/cli
+npm install -g storyshelf
 ```
 
 :::note

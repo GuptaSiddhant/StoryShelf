@@ -12,7 +12,7 @@
  * Usage:
  *   node scripts/publish-jsr.mjs
  */
-import { getPublishOrder, runPublishStep } from "./publish-order.mjs";
+import { getJsrPublishOrder, runPublishStep } from "./publish-order.mjs";
 
 const args = [
   "publish",
@@ -29,7 +29,7 @@ const args = [
   "--allow-slow-types",
 ];
 
-for (const dir of getPublishOrder()) {
+for (const dir of getJsrPublishOrder()) {
   runPublishStep(dir, "deno", args, "deno");
 }
 console.log("JSR publish complete");

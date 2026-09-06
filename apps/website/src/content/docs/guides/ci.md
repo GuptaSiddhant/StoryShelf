@@ -18,7 +18,7 @@ jobs:
         run: npx build-storybook -o storybook-static
       - name: Upload to StoryShelf
         run: |
-          npx @storyshelf/cli upload \
+          npx storyshelf upload \
             --url ${{ secrets.STORYSHELF_URL }} \
             --slug ${{ vars.STORYSHELF_SLUG }} \
             --token ${{ secrets.STORYSHELF_TOKEN }} \
@@ -32,7 +32,7 @@ jobs:
 visual:
   script:
     - npx build-storybook -o storybook-static
-    - npx @storyshelf/cli upload --url "$STORYSHELF_URL" --slug "$STORYSHELF_SLUG" --token "$STORYSHELF_TOKEN" --sha "$CI_COMMIT_SHA" --branch "$CI_COMMIT_REF_NAME"
+    - npx storyshelf upload --url "$STORYSHELF_URL" --slug "$STORYSHELF_SLUG" --token "$STORYSHELF_TOKEN" --sha "$CI_COMMIT_SHA" --branch "$CI_COMMIT_REF_NAME"
 ```
 
 ## Merge gate

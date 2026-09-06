@@ -18,7 +18,7 @@ packages/
   git-github/     @storyshelf/git-github    — GitHub commit status / merge gate / PR comments
   git-gitlab/     @storyshelf/git-gitlab    — GitLab commit status / merge gate / MR comments
   queue-sqs/      @storyshelf/queue-sqs     — AWS SQS capture job queue
-  cli/            @storyshelf/cli           — CLI client (server init, init, create, upload, purge, retry)
+  cli/            storyshelf              — CLI client (server init, init, create, upload, purge, retry)
   runner-playwright/ @storyshelf/runner-playwright — Playwright capture runner
 apps/
   dev-server/     dev-server      — local dev server (from TS source via nub watch)
@@ -43,7 +43,7 @@ nub run verify                   # build + lint + test
 ## Getting started
 
 ```sh
-npx @storyshelf/cli server init  # scaffold a server project
+npx storyshelf server init  # scaffold a server project
 cd my-storyshelf
 npm install
 npm start                        # start the server

@@ -22,9 +22,9 @@ Because a project is one Storybook, a **monorepo with several Storybooks creates
 The quickest way is the CLI (requires site-admin token, writes `.storybook/storyshelf.json`):
 
 ```bash
-npx @storyshelf/cli create --url http://localhost:3000 --name "My Design System" --token $STORYSHELF_ADMIN_TOKEN
+npx storyshelf create --url http://localhost:3000 --name "My Design System" --token $STORYSHELF_ADMIN_TOKEN
 # or initialize client config for an existing project:
-npx @storyshelf/cli init --url http://localhost:3000 --slug my-design-system
+npx storyshelf init --url http://localhost:3000 --slug my-design-system
 ```
 
 This creates the project and returns its `slug` and a **CI token** (or just writes client config). You can also create and manage projects from the web UI's project-create and settings pages.

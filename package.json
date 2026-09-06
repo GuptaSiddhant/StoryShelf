@@ -29,7 +29,7 @@
     "build:pkg": "turbo build --filter='./packages/*'",
     "core:build": "nub run --filter @storyshelf/core build",
     "core:dev": "nub run --filter @storyshelf/core dev",
-    "cli": "nub run --filter @storyshelf/cli start",
+    "cli": "nub run --filter storyshelf start",
     "docs": "nub run --filter website start",
     "jsr": "nub ./scripts/jsr.mjs",
     "serve": "nub run --filter dev-server serve",

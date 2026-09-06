@@ -1,21 +1,23 @@
 ---
-title: "@storyshelf/cli"
+title: "storyshelf"
 description: Create projects, upload Storybooks, and manage builds from CI — no Playwright, no server deps.
 ---
 
-`@storyshelf/cli` provides the `storyshelf` binary for CI pipelines. It scaffolds servers, initializes client config, creates projects and tokens, uploads built Storybooks, retries captures, and purges expired builds — all over the server's `/api/v1` endpoints. It has **no Playwright or server dependencies**, so it installs cleanly in CI.
+`storyshelf` provides the `storyshelf` binary for CI pipelines. It scaffolds servers, initializes client config, creates projects and tokens, uploads built Storybooks, retries captures, and purges expired builds — all over the server's `/api/v1` endpoints. It has **no Playwright or server dependencies**, so it installs cleanly in CI.
 
 ## Install
 
 ```sh
-nub add @storyshelf/cli
+nub add storyshelf
 ```
 
-[![JSR](https://jsr.io/badges/@storyshelf/cli)](https://jsr.io/@storyshelf/cli) [![JSR Score](https://jsr.io/badges/@storyshelf/cli/score)](https://jsr.io/@storyshelf/cli)
+or
 
-- [npm package](https://www.npmjs.com/package/@storyshelf/cli) — install tarballs and version history.
-- [JSR package](https://jsr.io/@storyshelf/cli) — TypeScript-first registry page.
-- [Public API reference](https://jsr.io/@storyshelf/cli/doc) — generated docs for every export; start here to learn the API.
+```sh
+npm install -g storyshelf
+```
+
+- [npm package](https://www.npmjs.com/package/storyshelf) — install tarballs and version history.
 - [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/cli) — package directory on `main`.
 
 ## Use from CI

@@ -60,7 +60,7 @@ StoryShelf/
     storage-s3/     @storyshelf/storage-s3     -- S3-compatible storage adapter (S3, R2, MinIO)
     auth-oauth/     @storyshelf/auth-oauth     -- OAuth/OIDC auth adapter
     auth-password/  @storyshelf/auth-password  -- Shared-password auth adapter
-    cli/            @storyshelf/cli            -- CLI client (commander; upload/init/create/server/retry/purge, no Playwright)
+    cli/            storyshelf              -- CLI client (commander; upload/init/create/server/retry/purge, no Playwright)
     runner-playwright/ @storyshelf/runner-playwright -- pure Playwright CaptureRenderer (server-side render; core orchestrator owns capture)
     git-github/     @storyshelf/git-github      -- GitHub status checks, PR comments, merge-gate helpers (@octokit)
     git-gitlab/     @storyshelf/git-gitlab      -- GitLab commit statuses, MR comments, merge-gate helpers

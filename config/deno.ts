@@ -34,6 +34,49 @@ function mapEntries(entry: Record<string, string>): Record<string, string> {
   return exports;
 }
 
+function readPackageManifest(pkgRoot: string): {
+  pkg: Record<string, unknown>;
+  name: string;
+} | null {
+  const pkg = readJson(join(pkgRoot, "package.json"));
+  const name = pkg?.["name"];
+  if (!pkg || typeof name !== "string" || name.length === 0) {
+    return null;
+  }
+  if (pkg["jsr"] === false) {
+    return null;
+  }
+  return { pkg, name };
+}
+
+function loadDenoManifest(
+  denoPath: string,
+  name: string,
+  version: string,
+): Record<string, unknown> {
+  const deno: Record<string, unknown> = readJson(denoPath) ?? {
+    $schema: SCHEMA_URL,
+    name,
+    version,
+    exports: {},
+    publish: { include: PUBLISH_INCLUDE, exclude: PUBLISH_EXCLUDE },
+  };
+  deno["name"] = name;
+  deno["version"] = version;
+  return deno;
+}
+
+function writeDenoManifest(
+  pkgRoot: string,
+  denoPath: string,
+  deno: Record<string, unknown>,
+  entry: Record<string, string>,
+): void {
+  deno["exports"] = mapEntries(entry);
+  refreshImports(pkgRoot, deno);
+  writeJsonFile(denoPath, deno);
+}
+
 function readJson(filePath: string): Record<string, unknown> | null {
   try {
     return JSON.parse(readFileSync(filePath, "utf8")) as Record<string, unknown>;
@@ -48,23 +91,44 @@ function installedVersion(pkgRoot: string, name: string): string | null {
   return typeof version === "string" ? version : null;
 }
 
-function parseNpmSpecifier(value: string): { name: string; subpath: string } | null {
-  if (!value.startsWith(NPM_SCHEME)) {
-    return null;
-  }
-  const rest = value.slice(NPM_SCHEME.length);
+function splitSpecifierName(rest: string): { name: string; after: string } | null {
   const at = rest.lastIndexOf("@");
   if (at < 1) {
     return null;
   }
   const name = rest.slice(0, at);
-  const after = rest.slice(at + 1);
-  const slash = after.indexOf("/");
-  const subpath = slash < 0 ? "" : after.slice(slash);
   if (name.length === 0) {
     return null;
   }
-  return { name, subpath };
+  return { name, after: rest.slice(at + 1) };
+}
+
+function parseNpmSpecifier(value: string): { name: string; subpath: string } | null {
+  if (!value.startsWith(NPM_SCHEME)) {
+    return null;
+  }
+  const split = splitSpecifierName(value.slice(NPM_SCHEME.length));
+  if (!split) {
+    return null;
+  }
+  const slash = split.after.indexOf("/");
+  const subpath = slash < 0 ? "" : split.after.slice(slash);
+  return { name: split.name, subpath };
+}
+
+function refreshImport(pkgRoot: string, imports: Record<string, unknown>, key: string): void {
+  const value = imports[key];
+  if (typeof value !== "string") {
+    return;
+  }
+  const parsed = parseNpmSpecifier(value);
+  if (!parsed) {
+    return;
+  }
+  const version = installedVersion(pkgRoot, parsed.name);
+  if (version) {
+    imports[key] = `${NPM_SCHEME}${parsed.name}@${version}${parsed.subpath}`;
+  }
 }
 
 function refreshImports(pkgRoot: string, deno: Record<string, unknown>): void {
@@ -73,19 +137,7 @@ function refreshImports(pkgRoot: string, deno: Record<string, unknown>): void {
     return;
   }
   for (const key of Object.keys(imports)) {
-    const value = (imports as Record<string, unknown>)[key];
-    if (typeof value !== "string") {
-      continue;
-    }
-    const parsed = parseNpmSpecifier(value);
-    if (!parsed) {
-      continue;
-    }
-    const version = installedVersion(pkgRoot, parsed.name);
-    if (version) {
-      (imports as Record<string, unknown>)[key] =
-        `${NPM_SCHEME}${parsed.name}@${version}${parsed.subpath}`;
-    }
+    refreshImport(pkgRoot, imports as Record<string, unknown>, key);
   }
 }
 
@@ -96,29 +148,25 @@ function refreshImports(pkgRoot: string, deno: Record<string, unknown>): void {
  * Only `name`/`version`/`exports` are managed; every other key (notably an
  * `imports` map, whose pinned versions are refreshed from the installed
  * tree) is preserved. Creates the file with publish defaults when missing.
+ *
+ * Packages opted out of JSR (`"jsr": false` in package.json) are skipped
+ * entirely — no file is created or updated for them.
  */
 export function generateDenoConfig(config: ResolvedConfig): void {
   const pkgRoot = config.pkg?.packageJsonPath ? dirname(config.pkg.packageJsonPath) : null;
   if (!pkgRoot) {
     return;
   }
-  const pkg = readJson(join(pkgRoot, "package.json"));
-  const name = pkg?.["name"] ?? config.pkg?.name;
-  if (!pkg || typeof name !== "string" || name.length === 0) {
+  const manifest = readPackageManifest(pkgRoot);
+  if (!manifest) {
     return;
   }
 
   const denoPath = join(pkgRoot, DENO_JSON);
-  const deno: Record<string, unknown> = readJson(denoPath) ?? {
-    $schema: SCHEMA_URL,
-    name,
-    version: String(pkg["version"] ?? "0.0.0"),
-    exports: {},
-    publish: { include: PUBLISH_INCLUDE, exclude: PUBLISH_EXCLUDE },
-  };
-  deno["name"] = name;
-  deno["version"] = String(pkg["version"] ?? "0.0.0");
-  deno["exports"] = mapEntries(config.entry);
-  refreshImports(pkgRoot, deno);
-  writeJsonFile(denoPath, deno);
+  const deno = loadDenoManifest(
+    denoPath,
+    manifest.name,
+    String(manifest.pkg["version"] ?? "0.0.0"),
+  );
+  writeDenoManifest(pkgRoot, denoPath, deno, config.entry);
 }

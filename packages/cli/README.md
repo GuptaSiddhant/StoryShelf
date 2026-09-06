@@ -1,17 +1,17 @@
-# @storyshelf/cli
+# storyshelf
 
 The StoryShelf command-line interface (binary `storyshelf`): scaffold servers, initialize client config, create projects and CI tokens, upload built Storybooks as builds, purge expired builds, and retry failed builds. It talks to a running StoryShelf server over `/api/v1` and has **no Playwright or server dependencies**, so it installs cleanly in CI.
 
 ## Install
 
 ```sh
-nub add @storyshelf/cli
+nub add storyshelf
 ```
 
 or
 
 ```sh
-npm install @storyshelf/cli
+npm install -g storyshelf
 ```
 
 ## Quick start

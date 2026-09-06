@@ -3,7 +3,8 @@
 /**
  * Release validation gate — single source of truth for the release workflow.
  * Checks: tag matches the fixed workspace version, all non-private packages
- * share one version, every public package has a matching deno.json version.
+ * share one version, every JSR-published package has a matching deno.json
+ * version (packages with `"jsr": false` are exempt).
  * Emits `version` and `dist_tag` (stdout + GITHUB_OUTPUT when present).
  *
  * Usage:
@@ -81,6 +82,9 @@ for (const entry of readdirSync(packagesDir, { withFileTypes: true })) {
     continue;
   }
   if (pkg.private) {
+    continue;
+  }
+  if (pkg.jsr === false) {
     continue;
   }
   let jsr = null;

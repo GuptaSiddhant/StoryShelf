@@ -38,11 +38,13 @@
  * Runtime-compat convention: `node: true` implies `deno: true` + `bun: true`
  * (both runtimes target Node compatibility); `browser`/`workerd` are marked
  * explicitly only when verified.
+ *
+ * Packages opted out of JSR (`"jsr": false` in package.json, e.g. the npm-only
+ * `storyshelf` CLI) are listed as opted-out by `status` and skipped by `sync`.
  */
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { getPublicPackageNames } from "./public-packages.mjs";
 
 const { dirname } = import.meta;
 const PACKAGES_DIR = join(dirname, "..", "packages");
@@ -260,20 +262,47 @@ function toLocalDetail(name) {
   };
 }
 
+function readPkg(dir) {
+  try {
+    return JSON.parse(readFileSync(join(PACKAGES_DIR, dir, "package.json"), "utf8"));
+  } catch {
+    return null;
+  }
+}
+
 function listLocalDetails() {
-  return getPublicPackageNames()
-    .map((name) => toLocalDetail(name))
-    .toSorted((a, b) => a.jsr.localeCompare(b.jsr));
+  const out = [];
+  for (const entry of readdirSync(PACKAGES_DIR, { withFileTypes: true })) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+    const pkg = readPkg(entry.name);
+    if (!pkg || pkg.private === true || !pkg.name) {
+      continue;
+    }
+    if (pkg.jsr === false) {
+      out.push({
+        dir: entry.name,
+        name: pkg.name,
+        jsr: null,
+        optedOut: true,
+        version: String(pkg.version ?? "0.0.0"),
+      });
+      continue;
+    }
+    out.push(toLocalDetail(pkg.name));
+  }
+  return out.toSorted((a, b) => (a.jsr ?? a.name).localeCompare(b.jsr ?? b.name));
 }
 
 function selectPackages(flags) {
   const all = listLocalDetails();
   if (!flags.package) return all;
   const jsr = normalizePkgRef(String(flags.package));
-  const found = all.find((local) => local.jsr === jsr);
+  const found = all.find((local) => local.jsr === jsr || local.name === String(flags.package));
   if (!found)
     throw new Error(
-      `no local public package '${flags.package}' (dir packages/${jsr} missing or private).`,
+      `no local public package '${flags.package}' (missing, private, or not on JSR).`,
     );
   return [found];
 }
@@ -338,6 +367,10 @@ function noteSynced(summary, local, existed) {
 }
 
 async function syncOne(local, summary, dry) {
+  if (local.optedOut) {
+    summary.skipped.push(local.name);
+    return;
+  }
   const remote = await fetchPackage(local.jsr);
   if (!remote) await createPackage(local, dry);
   const patches = diffMetadata(local, remote);
@@ -355,23 +388,32 @@ function printSummary(summary, flags) {
     return;
   }
   log(
-    `sync ${summary.dryRun ? "(dry-run) " : ""}done: ${summary.created.length} created, ${summary.updated.length} updated, ${summary.inSync.length} in sync`,
+    `sync ${summary.dryRun ? "(dry-run) " : ""}done: ${summary.created.length} created, ${summary.updated.length} updated, ${summary.inSync.length} in sync, ${summary.skipped.length} skipped`,
   );
   for (const name of summary.created) log(`  created @${SCOPE}/${name}`);
   for (const entry of summary.updated)
     log(`  updated @${SCOPE}/${entry.package}: ${entry.fields.join(", ")}`);
+  for (const name of summary.skipped) log(`  skipped ${name} (not on JSR)`);
 }
 
 async function cmdSync(flags) {
   const dry = flagTrue(flags, "dry-run");
   if (!dry) requireYes(flags, "sync package metadata");
   const selected = selectPackages(flags);
-  const summary = { scope: SCOPE, dryRun: dry, created: [], updated: [], inSync: [] };
+  const summary = { scope: SCOPE, dryRun: dry, created: [], updated: [], inSync: [], skipped: [] };
   for (const local of selected) await syncOne(local, summary, dry);
   printSummary(summary, flags);
 }
 
 async function statusRow(local) {
+  if (local.optedOut) {
+    return {
+      package: local.name,
+      local: local.version,
+      published: [],
+      state: "not on JSR (opted out)",
+    };
+  }
   const remote = await fetchPackage(local.jsr);
   const id = `@${SCOPE}/${local.jsr}`;
   if (!remote)

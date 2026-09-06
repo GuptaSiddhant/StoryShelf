@@ -111,7 +111,7 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
           <li>
             Create a project (or run{" "}
             <code>
-              npx @storyshelf/cli create --url http://localhost:3000 --name "My Storybook" --token
+              npx storyshelf create --url http://localhost:3000 --name "My Storybook" --token
               $STORYSHELF_ADMIN_TOKEN
             </code>
             , or <code>init --url --slug</code> to write <code>.storybook/storyshelf.json</code>)
@@ -121,8 +121,8 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
             <code>STORYSHELF_TOKEN</code> in CI.
           </li>
           <li>
-            Upload: <code>npx @storyshelf/cli upload</code> (or <code>npx @storyshelf/cli</code>{" "}
-            defaults to upload when config exists)
+            Upload: <code>npx storyshelf upload</code> (or <code>npx storyshelf</code> defaults to
+            upload when config exists)
           </li>
         </ol>
       </div>

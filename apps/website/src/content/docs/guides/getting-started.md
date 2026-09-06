@@ -10,7 +10,7 @@ StoryShelf is a self-hosted visual testing platform for Storybook. You run one s
 Use the CLI to scaffold a new server project:
 
 ```bash
-npx @storyshelf/cli server init
+npx storyshelf server init
 # ? Project name: my-storyshelf
 # ? Directory: ./my-storyshelf
 # ? Which database? SQLite
@@ -35,10 +35,10 @@ Ensure `.storybook/main.*` exists, then initialize client config and create a pr
 
 ```bash
 # writes .storybook/storyshelf.json (prompts if flags missing)
-npx @storyshelf/cli init --url http://localhost:3000 --slug my-design-system
+npx storyshelf init --url http://localhost:3000 --slug my-design-system
 
 # or create remotely and write config in one step (requires STORYSHELF_ADMIN_TOKEN)
-npx @storyshelf/cli create --url http://localhost:3000 --name "My Design System" --token $STORYSHELF_ADMIN_TOKEN
+npx storyshelf create --url http://localhost:3000 --name "My Design System" --token $STORYSHELF_ADMIN_TOKEN
 # → prints slug + CI token and writes .storybook/storyshelf.json
 ```
 
@@ -46,21 +46,21 @@ Keep the CI token secret (`STORYSHELF_TOKEN` env in CI). `create` and `init` fai
 
 ## 4. Upload a build from CI
 
-With `.storybook/storyshelf.json` present, `upload` flags can be omitted and `npx @storyshelf/cli` defaults to `upload`:
+With `.storybook/storyshelf.json` present, `upload` flags can be omitted and `npx storyshelf` defaults to `upload`:
 
 ```bash
-npx @storyshelf/cli upload \
+npx storyshelf upload \
   --token shelf_xxx \
   --sha "$GITHUB_SHA" \
   --branch "$GITHUB_REF_NAME"
 # or simply (when config + env present):
-npx @storyshelf/cli
+npx storyshelf
 ```
 
 Explicit flags still work:
 
 ```bash
-npx @storyshelf/cli upload \
+npx storyshelf upload \
   --url http://localhost:3000 \
   --slug my-design-system \
   --token shelf_xxx \
