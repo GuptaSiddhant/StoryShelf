@@ -1,5 +1,5 @@
+import type { Logger } from "@storyshelf/core/logger";
 import type { Context, Next } from "hono";
-import type { Logger } from "../logger.ts";
 
 /** Hono middleware logging request start/end with duration. */
 export function requestLogging(logger: Logger) {

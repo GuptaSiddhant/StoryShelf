@@ -1,9 +1,9 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { TokenModel } from "@storyshelf/core/models";
+import type { ProjectRole } from "@storyshelf/core/types";
+import { randomToken } from "@storyshelf/core/utils";
 import type { ShelfApp } from "../index.tsx";
-import { TokenModel } from "../models/token.ts";
 import { getStore } from "../store.ts";
-import type { ProjectRole } from "../types.ts";
-import { randomToken } from "../utils/hash.ts";
 import { resolveAuthorizedProject, notFound } from "./helpers.ts";
 import {
   notFound as notFoundResponse,

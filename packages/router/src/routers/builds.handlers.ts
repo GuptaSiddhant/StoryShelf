@@ -1,19 +1,21 @@
 import { z } from "@hono/zod-openapi";
+import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
+import { emitWebhookEvent } from "@storyshelf/core/adapter/webhook-events";
+import { extractStorybookToScratch, persistStorybookStatics } from "@storyshelf/core/capture";
+import { BaselineModel } from "@storyshelf/core/models";
+import { BuildModel } from "@storyshelf/core/models";
+import { LabelModel } from "@storyshelf/core/models";
+import { ProjectModel } from "@storyshelf/core/models";
+import { SnapshotModel } from "@storyshelf/core/models";
+import type { Project } from "@storyshelf/core/schema";
+import type { Build, Snapshot } from "@storyshelf/core/schema";
+import { type ProjectRole, BUILD_STATUSES } from "@storyshelf/core/types";
 import { HTTPException } from "hono/http-exception";
 import { Readable, Transform } from "node:stream";
 import type { ReadableStream as NodeWebStream } from "node:stream/web";
 import type { Logger } from "pino";
-import type { StorageAdapter } from "../adapters/storage.ts";
-import { emitWebhookEvent } from "../adapters/webhook-events.ts";
-import { extractStorybookToScratch, persistStorybookStatics } from "../capture/statics.ts";
-import { BaselineModel } from "../models/baseline.ts";
-import { BuildModel } from "../models/build.ts";
-import { LabelModel } from "../models/label.ts";
-import { ProjectModel } from "../models/project.ts";
-import { SnapshotModel } from "../models/snapshot.ts";
-import type { Project } from "../schema/project.ts";
 import { getStore } from "../store.ts";
-import { type ProjectRole, BUILD_STATUSES } from "../types.ts";
 import { notFound } from "./helpers.ts";
 
 /** Roles permitted to view builds, snapshots, and comments. */
@@ -47,7 +49,7 @@ export interface BuildCreateMetadata {
 
 /* oxlint-disable eslint/no-await-in-loop -- label attach is intentionally sequential */
 async function attachLabels(
-  db: import("../adapters/database.ts").DatabaseAdapter,
+  db: DatabaseAdapter,
   projectId: string,
   buildId: string,
   labels: { key: string; value: string }[],
@@ -70,7 +72,7 @@ async function attachLabels(
 export async function createBuildRecord(
   project: Project,
   meta: BuildCreateMetadata,
-): Promise<import("../schema/build.ts").Build> {
+): Promise<Build> {
   const { db, config } = getStore();
   if (!meta.gitSha || !meta.gitBranch) {
     throw new HTTPException(400, { message: "gitSha and gitBranch are required" });
@@ -189,10 +191,7 @@ export const buildListQuery = z.object({
 });
 
 /** Fetch a build scoped to its project, throwing 404 when it does not belong. */
-export async function buildForProject(
-  projectId: string,
-  buildId: string,
-): Promise<import("../schema/build.ts").Build> {
+export async function buildForProject(projectId: string, buildId: string): Promise<Build> {
   const build = await new BuildModel(getStore().db).get(buildId);
   if (!build || build.projectId !== projectId) {
     notFound("Build not found");
@@ -204,7 +203,7 @@ export async function buildForProject(
 export async function snapshotForBuild(
   build: { id: string },
   snapshotId: string,
-): Promise<import("../schema/snapshot.ts").Snapshot> {
+): Promise<Snapshot> {
   const snapshot = await new SnapshotModel(getStore().db).get(snapshotId);
   if (!snapshot || snapshot.buildId !== build.id) {
     notFound("Snapshot not found");

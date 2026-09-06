@@ -109,7 +109,7 @@ export class HttpCaptureQueue implements CaptureQueue {
 }
 
 // In your serverless entry:
-import { createShelfRouter } from "@storyshelf/core";
+import { createShelfRouter } from "@storyshelf/router";
 import { HttpCaptureQueue } from "./my-queue";
 
 const router = createShelfRouter({
@@ -126,7 +126,7 @@ const router = createShelfRouter({
 ### Minimal Turso + S3 recipe
 
 ```ts
-import { createShelfRouter } from "@storyshelf/core";
+import { createShelfRouter } from "@storyshelf/router";
 import { createTursoDatabase } from "@storyshelf/db-turso";
 import { createS3Storage } from "@storyshelf/storage-s3";
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";

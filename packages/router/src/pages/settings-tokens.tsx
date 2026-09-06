@@ -1,6 +1,6 @@
+import type { Project } from "@storyshelf/core/schema";
+import type { Token } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import type { Project } from "../schema/project.ts";
-import type { Token } from "../schema/token.ts";
 
 /** Tokens settings tab: project CLI tokens plus the create-token form. */
 export function renderSettingsTokens(

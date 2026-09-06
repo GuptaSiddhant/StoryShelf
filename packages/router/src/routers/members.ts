@@ -1,8 +1,8 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { MemberModel } from "@storyshelf/core/models";
+import type { ProjectRole } from "@storyshelf/core/types";
 import type { ShelfApp } from "../index.tsx";
-import { MemberModel } from "../models/member.ts";
 import { getStore } from "../store.ts";
-import type { ProjectRole } from "../types.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
 import {
   memberRoleSchema,

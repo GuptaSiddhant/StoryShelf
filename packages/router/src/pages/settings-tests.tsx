@@ -1,4 +1,4 @@
-import type { Project } from "../schema/project.ts";
+import type { Project } from "@storyshelf/core/schema";
 
 /** Interaction-tests settings tab: play execution toggle and timeout. */
 export function renderSettingsTests(

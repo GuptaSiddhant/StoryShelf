@@ -1,5 +1,5 @@
 import { z } from "@hono/zod-openapi";
-import { BUILD_STATUSES, PROJECT_ROLES, SNAPSHOT_STATUSES } from "../types.ts";
+import { BUILD_STATUSES, PROJECT_ROLES, SNAPSHOT_STATUSES } from "@storyshelf/core/types";
 
 const storybookMetaSchema = z.record(z.string(), z.unknown()).nullable().optional();
 

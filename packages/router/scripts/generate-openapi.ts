@@ -1,12 +1,11 @@
+import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
+import { createShelfLogger } from "@storyshelf/core/logger";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-
-import { createShelfLogger } from "../src/logger.ts";
 import { createShelfRouter } from "../src/index.tsx";
-import type { DatabaseAdapter } from "../src/adapters/database.ts";
-import type { StorageAdapter } from "../src/adapters/storage.ts";
 
-const unreachable = async (): Promise<never> => {
+const unreachable = (): Promise<never> => {
   throw new Error("unreachable: this adapter is never used during spec generation");
 };
 
@@ -58,18 +57,20 @@ async function generateOpenApi(outPath: string): Promise<void> {
   const target = resolve(outPath);
   await mkdir(dirname(target), { recursive: true });
   await writeFile(target, `${JSON.stringify(spec, null, 2)}\n`, "utf8");
-  console.log(`openapi.json written to ${target}`);
+  process.stdout.write(`openapi.json written to ${target}\n`);
 }
 
 const outFlagIndex = process.argv.indexOf("--out");
 const outPath = outFlagIndex >= 0 ? process.argv[outFlagIndex + 1] : undefined;
 
-if (!outPath) {
-  console.error("usage: nub ./scripts/generate-openapi.ts --out <path>");
-  process.exitCode = 1;
-} else {
-  generateOpenApi(outPath).catch((error: unknown) => {
-    console.error(error);
+if (outPath) {
+  try {
+    await generateOpenApi(outPath);
+  } catch (error: unknown) {
+    process.stderr.write(`${String(error)}\n`);
     process.exitCode = 1;
-  });
+  }
+} else {
+  process.stderr.write("usage: nub ./scripts/generate-openapi.ts --out <path>\n");
+  process.exitCode = 1;
 }

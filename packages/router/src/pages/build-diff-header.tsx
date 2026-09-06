@@ -1,7 +1,7 @@
+import type { Build } from "@storyshelf/core/schema";
+import type { Project } from "@storyshelf/core/schema";
+import type { Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import type { Build } from "../schema/build.ts";
-import type { Project } from "../schema/project.ts";
-import type { Snapshot } from "../schema/snapshot.ts";
 import { Badge, statusTone } from "../ui/components.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */

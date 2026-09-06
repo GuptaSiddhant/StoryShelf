@@ -23,7 +23,7 @@ nub add @storyshelf/git-gitlab
 Pass `gitLabHost` in the `gitHosts` array of `createShelfRouter`:
 
 ```ts
-import { createShelfRouter } from "@storyshelf/core";
+import { createShelfRouter } from "@storyshelf/router";
 import { gitLabHost } from "@storyshelf/git-gitlab";
 
 const app = createShelfRouter({

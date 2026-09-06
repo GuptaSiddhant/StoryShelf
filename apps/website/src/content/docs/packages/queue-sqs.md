@@ -23,7 +23,7 @@ nub add @storyshelf/queue-sqs
 Pass the SQS-backed queue as the `captureQueue` option of `createShelfRouter`:
 
 ```ts
-import { createShelfRouter } from "@storyshelf/core";
+import { createShelfRouter } from "@storyshelf/router";
 import { createSqsCaptureQueue } from "@storyshelf/queue-sqs";
 
 const queue = createSqsCaptureQueue({

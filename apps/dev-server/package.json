@@ -1,8 +1,8 @@
 {
   "name": "dev-server",
   "private": true,
-  "type": "module",
   "description": "Local StoryShelf dev server, run from TypeScript source (no build step) via nub + customCondition.",
+  "type": "module",
   "scripts": {
     "serve": "nub watch ./src/server.ts",
     "lint": "oxlint --type-aware --type-check ./src",
@@ -15,6 +15,7 @@
     "@storyshelf/auth-password": "workspace:*",
     "@storyshelf/core": "workspace:*",
     "@storyshelf/db-sqlite": "workspace:*",
+    "@storyshelf/router": "workspace:*",
     "@storyshelf/runner-playwright": "workspace:*",
     "@storyshelf/storage-local": "workspace:*"
   },

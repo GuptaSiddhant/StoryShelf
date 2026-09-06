@@ -1,7 +1,7 @@
-import type { GitHostProvider } from "../adapters/git-host/index.ts";
-import type { LabelType } from "../schema/label.ts";
-import type { Project } from "../schema/project.ts";
-import type { Token } from "../schema/token.ts";
+import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
+import type { LabelType } from "@storyshelf/core/schema";
+import type { Project } from "@storyshelf/core/schema";
+import type { Token } from "@storyshelf/core/schema";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import { renderSettingsGeneral } from "./settings-general.tsx";
 import { renderSettingsLabels } from "./settings-labels.tsx";

@@ -1,8 +1,8 @@
+import type { AuthAdapter } from "@storyshelf/core/adapter/auth";
+import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
-import type { AuthAdapter } from "../adapters/auth.ts";
-import type { DatabaseAdapter } from "../adapters/database.ts";
-import type { StorageAdapter } from "../adapters/storage.ts";
 import { createShelfRouter } from "../index.tsx";
 
 const silentLogger = pino({ level: "silent" });

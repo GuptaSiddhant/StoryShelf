@@ -1,6 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { SnapshotModel } from "@storyshelf/core/models";
 import type { ShelfApp } from "../index.tsx";
-import { SnapshotModel } from "../models/snapshot.ts";
 import { getStore } from "../store.ts";
 import {
   VIEW_ROLES,

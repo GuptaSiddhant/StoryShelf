@@ -1,8 +1,8 @@
+import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
+import { StatusConfigModel } from "@storyshelf/core/models";
+import type { Project } from "@storyshelf/core/schema";
 import type { Context } from "hono";
 import type { ShelfApp } from "../index.tsx";
-import type { GitHostProvider } from "../adapters/git-host/index.ts";
-import { StatusConfigModel } from "../models/status-config.ts";
-import type { Project } from "../schema/project.ts";
 import { getStore } from "../store.ts";
 import { hxRedirect } from "./htmx.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
@@ -40,7 +40,9 @@ interface StatusFields {
 async function readStatusFields(c: Context): Promise<StatusFields | Response> {
   const project = await findProject(c.req.param("slug") ?? "");
   const form = await c.req.formData();
-  const provider = getStore().gitHosts.find((p) => p.metadata.kind === asString(form.get("provider")));
+  const provider = getStore().gitHosts.find(
+    (p) => p.metadata.kind === asString(form.get("provider")),
+  );
   if (!provider) {
     return await unknownProviderResponse(c);
   }
@@ -56,7 +58,13 @@ async function handleCreateStatus(c: Context): Promise<Response> {
   if (fields instanceof Response) {
     return fields;
   }
-  return await createStatusFromForm(c, fields.project, fields.provider, fields.token, fields.configRaw);
+  return await createStatusFromForm(
+    c,
+    fields.project,
+    fields.provider,
+    fields.token,
+    fields.configRaw,
+  );
 }
 
 async function createStatusFromForm(

@@ -4,8 +4,12 @@
  * answer mid-migration so orchestrators don't kill the machine, and deep
  * reports the init settlement state instead of being masked by the gate.
  */
-import type { AdapterInitResult, AdapterInitSources } from "../adapters/init.ts";
-import type { AdapterHealth, AdapterLifecycle, AdapterMetadata } from "../adapters/metadata.ts";
+import type { AdapterInitResult, AdapterInitSources } from "@storyshelf/core/adapter/init";
+import type {
+  AdapterHealth,
+  AdapterLifecycle,
+  AdapterMetadata,
+} from "@storyshelf/core/adapter/metadata";
 import type { ShelfApp } from "../index.tsx";
 import { requireSiteAdmin } from "./helpers.ts";
 

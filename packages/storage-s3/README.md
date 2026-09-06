@@ -18,7 +18,7 @@ npm install @storyshelf/storage-s3
 
 ```ts
 import { createS3Storage } from "@storyshelf/storage-s3";
-import { createShelfRouter } from "@storyshelf/core";
+import { createShelfRouter } from "@storyshelf/router";
 
 const storage = createS3Storage({
   bucket: "my-shelf",

@@ -1,6 +1,6 @@
+import type { LabelType } from "@storyshelf/core/schema";
+import type { Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import type { LabelType } from "../schema/label.ts";
-import type { Project } from "../schema/project.ts";
 import { Badge } from "../ui/components.tsx";
 
 /** Labels settings tab: label-type table plus the create-type form. */

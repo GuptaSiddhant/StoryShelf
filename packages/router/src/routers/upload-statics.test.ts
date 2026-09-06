@@ -1,14 +1,14 @@
+import type { CaptureJob, CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
+import type { CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
+import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
+import { storybookDir } from "@storyshelf/core/utils";
 import AdmZip from "adm-zip";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pino } from "pino";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { CaptureJob, CaptureQueue } from "../adapters/capture-queue.ts";
-import type { CaptureRunner } from "../adapters/capture-runner.ts";
 import { createShelfRouter } from "../index.tsx";
-import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
-import { storybookDir } from "../utils/paths.ts";
 
 const silentLogger = pino({ level: "silent" });
 

@@ -18,7 +18,7 @@ npm install @storyshelf/auth-password
 
 ```ts
 import { createPasswordAuth } from "@storyshelf/auth-password";
-import { createShelfRouter } from "@storyshelf/core";
+import { createShelfRouter } from "@storyshelf/router";
 
 const auth = createPasswordAuth({
   password: process.env.SHELF_PASSWORD!,

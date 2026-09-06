@@ -18,7 +18,7 @@ npm install @storyshelf/queue-sqs
 
 ```ts
 import { createSqsCaptureQueue } from "@storyshelf/queue-sqs";
-import { createShelfRouter } from "@storyshelf/core";
+import { createShelfRouter } from "@storyshelf/router";
 
 const queue = createSqsCaptureQueue({
   queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs",

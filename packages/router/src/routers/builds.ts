@@ -1,10 +1,10 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { DEFAULT_MAX_UPLOAD_BYTES } from "@storyshelf/core/config";
+import { BuildModel } from "@storyshelf/core/models";
+import { storybookZipPath } from "@storyshelf/core/utils";
 import { HTTPException } from "hono/http-exception";
-import { DEFAULT_MAX_UPLOAD_BYTES } from "../config.ts";
 import type { ShelfApp } from "../index.tsx";
-import { BuildModel } from "../models/build.ts";
 import { getStore } from "../store.ts";
-import { storybookZipPath } from "../utils/paths.ts";
 import {
   VIEW_ROLES,
   DEVELOPER_ROLES,

@@ -1,5 +1,5 @@
-import { createShelfRouter } from "@storyshelf/core";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
+import { createShelfRouter } from "@storyshelf/router";
 import { createLocalStorage } from "@storyshelf/storage-local";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";

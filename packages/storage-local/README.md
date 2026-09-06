@@ -18,7 +18,7 @@ npm install @storyshelf/storage-local
 
 ```ts
 import { createLocalStorage } from "@storyshelf/storage-local";
-import { createShelfRouter } from "@storyshelf/core";
+import { createShelfRouter } from "@storyshelf/router";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 
 const storage = createLocalStorage("./data");

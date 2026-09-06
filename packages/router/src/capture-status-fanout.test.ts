@@ -1,3 +1,11 @@
+import type { CaptureRunner, RenderResult } from "@storyshelf/core/adapter/capture-runner";
+import type {
+  CheckStatus,
+  GitHostAdapter,
+  GitHostProvider,
+} from "@storyshelf/core/adapter/git-host";
+import type { Build } from "@storyshelf/core/schema";
+import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import AdmZip from "adm-zip";
 /* oxlint-disable eslint/no-await-in-loop, eslint/no-promise-executor-return */
 import { mkdtemp, rm } from "node:fs/promises";
@@ -6,11 +14,7 @@ import { join } from "node:path";
 import { pino, type Logger } from "pino";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import type { CaptureRunner, RenderResult } from "../adapters/capture-runner.ts";
-import type { CheckStatus, GitHostAdapter, GitHostProvider } from "../adapters/git-host/index.ts";
-import { createShelfRouter } from "../index.tsx";
-import type { Build } from "../schema/build.ts";
-import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
+import { createShelfRouter } from "./index.tsx";
 
 const STORY_ID = "components-button--primary";
 const SHA = "a".repeat(40);
@@ -165,7 +169,10 @@ async function uploadBuild(
     body: JSON.stringify({ gitSha: SHA, gitBranch: "main" }),
   });
   expect(created.status).toBe(202);
-  const { build, uploadUrl } = (await created.json()) as { build: { id: string }; uploadUrl: string };
+  const { build, uploadUrl } = (await created.json()) as {
+    build: { id: string };
+    uploadUrl: string;
+  };
   const upload = await app.request(uploadUrl, {
     method: "PUT",
     headers: { "content-type": "application/zip" },

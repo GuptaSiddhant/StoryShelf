@@ -1,6 +1,6 @@
+import { LabelModel } from "@storyshelf/core/models";
 import type { Context } from "hono";
 import type { ShelfApp } from "../index.tsx";
-import { LabelModel } from "../models/label.ts";
 import { getStore } from "../store.ts";
 import { hxRedirect } from "./htmx.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";

@@ -1,12 +1,12 @@
+import { LabelModel } from "@storyshelf/core/models";
+import { builds } from "@storyshelf/core/schema";
+import type { Build } from "@storyshelf/core/schema";
+import { projects } from "@storyshelf/core/schema";
+import type { Project } from "@storyshelf/core/schema";
+import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfRouter } from "../index.tsx";
-import { LabelModel } from "../models/label.ts";
-import { builds } from "../schema/build.ts";
-import type { Build } from "../schema/build.ts";
-import { projects } from "../schema/project.ts";
-import type { Project } from "../schema/project.ts";
-import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 
 const silentLogger = pino({ level: "silent" });
 

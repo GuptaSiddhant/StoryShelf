@@ -1,5 +1,5 @@
-import type { Build } from "../schema/build.ts";
-import type { Project } from "../schema/project.ts";
+import type { Build } from "@storyshelf/core/schema";
+import type { Project } from "@storyshelf/core/schema";
 import { getStore } from "../store.ts";
 
 /**

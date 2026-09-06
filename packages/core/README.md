@@ -1,6 +1,6 @@
 # @storyshelf/core
 
-The heart of StoryShelf: the Hono router, adapter interfaces, models, capture pipeline, diff engine, and retention logic. Compose pluggable adapters into a complete self-hosted visual testing server.
+The domain layer of StoryShelf: adapter interfaces, models, capture pipeline, diff engine, and retention logic — with no HTTP dependency, so workers import it without pulling a server. The Hono router lives in `@storyshelf/router`. Compose pluggable adapters into a complete self-hosted visual testing server.
 
 ## Install
 
@@ -17,7 +17,7 @@ npm install @storyshelf/core
 ## Quick start
 
 ```ts
-import { createShelfRouter } from "@storyshelf/core";
+import { createShelfRouter } from "@storyshelf/router";
 
 const app = createShelfRouter({
   database, // DatabaseAdapter

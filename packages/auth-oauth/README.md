@@ -18,7 +18,7 @@ npm install @storyshelf/auth-oauth
 
 ```ts
 import { createOAuthAuth } from "@storyshelf/auth-oauth";
-import { createShelfRouter } from "@storyshelf/core";
+import { createShelfRouter } from "@storyshelf/router";
 
 const auth = createOAuthAuth({
   issuer: process.env.OIDC_ISSUER!,

@@ -1,8 +1,8 @@
+import { TokenModel } from "@storyshelf/core/models";
+import { randomToken } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import type { ShelfApp } from "../index.tsx";
-import { TokenModel } from "../models/token.ts";
 import { getStore } from "../store.ts";
-import { randomToken } from "../utils/hash.ts";
 import { hxRedirect } from "./htmx.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
 

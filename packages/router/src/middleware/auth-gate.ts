@@ -1,5 +1,5 @@
+import type { AuthAdapter, AuthUser } from "@storyshelf/core/adapter/auth";
 import type { Context, Next } from "hono";
-import type { AuthAdapter, AuthUser } from "../adapters/auth.ts";
 import { getStore } from "../store.ts";
 
 /** Resolve the request user from the auth adapter (null when auth is off or a token is used). */

@@ -13,6 +13,7 @@
       "pixelmatch",
       "pngjs",
       "adm-zip",
+      "unzipper",
       "playwright",
       "yaml",
     ],

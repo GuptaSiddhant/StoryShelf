@@ -1,8 +1,8 @@
+import type { Build } from "@storyshelf/core/schema";
+import type { Comment } from "@storyshelf/core/schema";
+import type { Project } from "@storyshelf/core/schema";
+import type { Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import type { Build } from "../schema/build.ts";
-import type { Comment } from "../schema/comment.ts";
-import type { Project } from "../schema/project.ts";
-import type { Snapshot } from "../schema/snapshot.ts";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import { DiffComments } from "./build-diff-comments.tsx";
 import { DiffHeader } from "./build-diff-header.tsx";

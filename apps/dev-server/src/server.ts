@@ -1,8 +1,8 @@
 import { serve } from "@hono/node-server";
 import { createPasswordAuth } from "@storyshelf/auth-password";
-import { createShelfRouter } from "@storyshelf/core";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
+import { createShelfRouter } from "@storyshelf/router";
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
 import { createLocalStorage } from "@storyshelf/storage-local";
 /**

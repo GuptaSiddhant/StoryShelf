@@ -1,10 +1,10 @@
+import { BaselineModel } from "@storyshelf/core/models";
+import { BuildModel } from "@storyshelf/core/models";
+import { SnapshotModel } from "@storyshelf/core/models";
+import type { Snapshot } from "@storyshelf/core/schema";
+import type { ProjectRole } from "@storyshelf/core/types";
 import type { ShelfApp } from "../index.tsx";
-import { BaselineModel } from "../models/baseline.ts";
-import { BuildModel } from "../models/build.ts";
-import { SnapshotModel } from "../models/snapshot.ts";
-import type { Snapshot } from "../schema/snapshot.ts";
 import { getStore } from "../store.ts";
-import type { ProjectRole } from "../types.ts";
 import { notFound, resolveAuthorizedProject } from "./helpers.ts";
 
 const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];

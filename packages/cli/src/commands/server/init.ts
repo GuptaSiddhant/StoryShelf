@@ -73,7 +73,7 @@ const STORAGE_INIT: Record<StorageChoice, string> = {
 function buildImports(answers: Answers): string[] {
   const imports = [
     `import { serve } from "@hono/node-server";`,
-    `import { createShelfRouter } from "@storyshelf/core";`,
+    `import { createShelfRouter } from "@storyshelf/router";`,
     `import { createShelfLogger } from "@storyshelf/core/logger";`,
     DB_IMPORT[answers.database],
     STORAGE_IMPORT[answers.storage],
@@ -162,19 +162,20 @@ function generateServer(answers: Answers): string {
 function buildDeps(answers: Answers): Record<string, string> {
   const deps: Record<string, string> = {
     "@hono/node-server": "^1.17.0",
-    "@storyshelf/core": `${__PKG_VERSION__}`,
-    [DB_PACKAGE[answers.database]]: `${__PKG_VERSION__}`,
-    "@storyshelf/runner-playwright": `${__PKG_VERSION__}`,
+    "@storyshelf/core": __PKG_VERSION__ ?? "0.0.0",
+    "@storyshelf/router": __PKG_VERSION__ ?? "0.0.0",
+    [DB_PACKAGE[answers.database]]: __PKG_VERSION__ ?? "0.0.0",
+    "@storyshelf/runner-playwright": __PKG_VERSION__ ?? "0.0.0",
   };
 
   if (answers.storage !== "local") {
-    deps[STORAGE_PACKAGE[answers.storage]] = `${__PKG_VERSION__}`;
+    deps[STORAGE_PACKAGE[answers.storage]] = __PKG_VERSION__ ?? "0.0.0";
   }
   if (answers.auth !== "none") {
-    deps[AUTH_PACKAGE[answers.auth] ?? ""] = `${__PKG_VERSION__}`;
+    deps[AUTH_PACKAGE[answers.auth] ?? ""] = __PKG_VERSION__ ?? "0.0.0";
   }
   if (answers.git !== "none") {
-    deps[GIT_PACKAGE[answers.git] ?? ""] = `${__PKG_VERSION__}`;
+    deps[GIT_PACKAGE[answers.git] ?? ""] = __PKG_VERSION__ ?? "0.0.0";
   }
 
   return deps;

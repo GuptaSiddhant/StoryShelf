@@ -1,5 +1,5 @@
+import type { Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import type { Project } from "../schema/project.ts";
 
 /** Webhook row as rendered in the webhooks settings tab. */
 export interface SettingsWebhook {

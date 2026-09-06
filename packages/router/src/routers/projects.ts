@@ -1,9 +1,9 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { LabelModel } from "@storyshelf/core/models";
+import { ProjectModel } from "@storyshelf/core/models";
+import type { ProjectRole } from "@storyshelf/core/types";
 import type { ShelfApp } from "../index.tsx";
-import { LabelModel } from "../models/label.ts";
-import { ProjectModel } from "../models/project.ts";
 import { getStore } from "../store.ts";
-import type { ProjectRole } from "../types.ts";
 import { forbidden, requireSiteAdmin, resolveAuthorizedProject } from "./helpers.ts";
 import {
   badRequest,

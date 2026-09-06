@@ -586,90 +586,37 @@ GET    /projects/:slug/settings                           # members, label types
 ```
 StoryShelf/
   packages/
-    core/
+    core/                 # domain only — no HTTP (see ADR 0018)
       src/
-        models/           # schema + business logic
-          project.ts
-          build.ts
-          snapshot.ts
-          baseline.ts
-          member.ts
-          comment.ts
-          label.ts
-          token.ts
-          webhook.ts
-        models/           # schema + business logic
-          project.ts
-          build.ts
-          snapshot.ts
-          baseline.ts
-          member.ts
-          comment.ts
-          label.ts
-          token.ts
-          webhook.ts
-        routers/          # API + UI routes
-          projects.ts
-          builds.ts
-          labels.ts
-          media.ts        # serve screenshots, diffs, baselines
-          members.ts
-          tokens.ts
-          webhooks.ts
-          admin.ts
-          settings.ts     # /projects/:slug/settings* HTML pages + form handlers
-          ui.ts           # /projects... HTML pages (list, detail, diff, jobs)
-          auth.ts         # /auth/* session flow
-          htmx.ts         # HX-request helpers
-          helpers.ts      # json/authorization/role helpers
-          assets.ts       # static assets (vendored HTMX)
-        pages/            # UI page components (server-rendered JSX)
-          projects.tsx
-          project-create.tsx
-          project-builds.tsx
-          project-details.tsx
-          build-detail.tsx    # build overview (snapshot cards + comments)
-          build-diff.tsx      # the three-up diff review page
-          compute-jobs.tsx    # capture queue + build history
-          login.tsx
-          settings-general.tsx
-          settings-labels.tsx
-          settings-members.tsx
-          settings-tokens.tsx
-          settings-webhooks.tsx
-          root.tsx
-        adapters/         # interfaces only
-          database.ts
-          storage.ts
-          auth.ts
-          status.ts       # GitHub/GitLab status checks
-          capture-runner.ts
-          logger.ts
-        capture/          # server-side capture pipeline
-          adapter.ts      # StorySourceAdapter interface
-          storybook.ts    # Storybook adapter (index.json discovery)
-          pipeline.ts     # render -> screenshot -> store -> diff
-          queue.ts        # in-process queue + concurrency
-        diff/             # visual diff engine
-          engine.ts       # pixelmatch + overlay generation
-          options.ts      # DiffOptions, DiffResult types
-        retention/        # purge
-          purge.ts        # TTL + per-branch retention + orphan GC
-        ui/               # fixed server-rendered UI (hono/jsx + HTMX + hono/css)
-          document.tsx    # DocumentLayout: head, vendored HTMX, styles
-          theme.ts        # light/dark color tokens (BrandTheme)
-          components.tsx  # reusable UI components (Button, Badge, Card, ...)
-          styles.ts       # base CSS (light/dark/system)
-        assets/           # vendored static assets
-          htmx.min.js     # HTMX served locally (no CDN)
+        adapters/         # interfaces only (+ lifecycle runner, webhook sender)
+        models/           # business logic (constructor-injected over DatabaseAdapter)
+        schema/           # Drizzle tables + row types (narrow handles via `core/schema`)
+        capture/          # orchestrator, pipeline, queues, storybook discovery
+        retention/        # purge (TTL + per-branch retention + orphan GC)
+        diff/             # visual diff engine (pixelmatch + overlay)
+        config.ts         # ShelfOptions/ShelfConfig/UIConfig + validation
+        logger.ts         # pino factory (`core/logger`)
         urls.ts           # type-safe URL builder
-        store.ts          # AsyncLocalStorage context
-        config.ts         # RouterConfig (ShelfOptions)
-        schema.ts         # Drizzle schema (all entities)
         types.ts          # status/role enums
         ddl.ts            # raw SQL DDL
-        index.tsx         # createShelfRouter entry point
-      package.json
+        utils/            # hash/encrypt/ulid/paths (`core/utils`)
+        test-helpers/     # in-memory fakes (`core/test-helpers`)
+        index.tsx         # domain-only barrel (config/logger/types surface)
+      package.json        # subpaths: adapter/*, capture, config, ddl, diff,
+                          # logger, models, paths, retention, schema, types,
+                          # urls, utils, test-helpers
+    router/               # HTTP server over core (see ADR 0018)
+      src/
+        index.tsx         # createShelfRouter entry point (ShelfApp/ShelfRouter)
+        routers/          # API + UI routes (incl. health, OpenAPI)
+        pages/            # UI page components (server-rendered JSX)
+        ui/               # DocumentLayout, theme, components, styles
+        middleware/       # request id/logging/gate/rate-limit/scope/auth
+        store.ts          # AsyncLocalStorage request context
+        assets/           # vendored HTMX (served locally, no CDN)
+      scripts/
+        generate-openapi.ts  # OpenAPI snapshot for the website prebuild
+      package.json        # single `index` entry
 
     db-sqlite/
       src/
@@ -771,12 +718,12 @@ StoryShelf/
 StoryShelf ships a **fixed, server-rendered UI** — `hono/jsx` + HTMX + `hono/css`. No client framework, no UI build step, no pluggable-UI adapter. Custom interfaces are built against `/api/v1` (the same contract the CLI uses, so it cannot be a second-class citizen). See ADR 0012.
 
 - **Layout:** a branded top **header** (logo + name + accent, project context, theme toggle, user menu) plus a neutral left **sidebar** (Builds, Storybook, Settings). The content area is monochrome and image-first.
-- **Pages** live in `core/src/pages/*.tsx` and render directly from models (no API/UI contract duplication).
-- **Layout & theming** live in `core/src/ui/` — a `DocumentLayout` (head, vendored HTMX, styles) plus a `BrandTheme` of light/dark color tokens.
+- **Pages** live in `router/src/pages/*.tsx` and render directly from models (no API/UI contract duplication).
+- **Layout & theming** live in `router/src/ui/` — a `DocumentLayout` (head, vendored HTMX, styles) plus a `BrandTheme` of light/dark color tokens.
 - **Theme:** follows the system (`prefers-color-scheme`) with a manual light/dark override, persisted in a cookie so the server renders the correct theme on first paint.
 - **Brand config** is passed as `ui: { name, logo, favicon, theme }` to `createShelfRouter` (see `ShelfOptions`). Env vars (`SS_BRAND_NAME`, `SS_LOGO_URL`) supply defaults so self-hosters can rebrand with a `docker run`, no code.
 - **HTMX is vendored locally** (no CDN), so air-gapped deployments work.
-- **Diff view (v1):** a simple three-up grid — baseline | current | diff overlay. A minimal vanilla-JS layer in `core/src/ui/document.tsx` (the inline `clientScript`) covers the theme toggle and keyboard approve/reject; the wipe slider and zoom are deferred to v2. The published-Storybook page is an `<iframe>` of Storybook's own static build.
+- **Diff view (v1):** a simple three-up grid — baseline | current | diff overlay. A minimal vanilla-JS layer in `router/src/ui/document.tsx` (the inline `clientScript`) covers the theme toggle and keyboard approve/reject; the wipe slider and zoom are deferred to v2. The published-Storybook page is an `<iframe>` of Storybook's own static build.
 
 ## Deployment
 

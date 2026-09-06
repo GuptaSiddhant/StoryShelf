@@ -1,9 +1,9 @@
 ---
 title: "@storyshelf/core"
-description: Compose StoryShelf's server, adapters, capture pipeline, and review UI.
+description: StoryShelf's domain layer — adapters, models, capture pipeline, and review engine (no HTTP).
 ---
 
-`@storyshelf/core` is the framework at the center of StoryShelf. It provides the Hono router, adapter contracts, models, server-side capture pipeline, pixel diff engine, retention jobs, and server-rendered UI.
+`@storyshelf/core` is the domain layer at the center of StoryShelf. It provides adapter contracts, models, the server-side capture pipeline, pixel diff engine, and retention jobs — with no HTTP dependency, so queue workers and remote runners import it without pulling a server. The HTTP server lives in [@storyshelf/router](../router/).
 
 ## Install
 
@@ -20,10 +20,10 @@ nub add @storyshelf/core
 
 ## Compose a server
 
-Pass a database and storage adapter to `createShelfRouter`. Capture, authentication, git providers, logging, branding, and server behavior are optional.
+Pass a database and storage adapter to `createShelfRouter` from `@storyshelf/router` (see the [router package](../router/)). Capture, authentication, git providers, logging, branding, and server behavior are optional.
 
 ```ts
-import { createShelfRouter } from "@storyshelf/core";
+import { createShelfRouter } from "@storyshelf/router";
 import { gitHubHost } from "@storyshelf/git-github";
 
 const app = createShelfRouter({

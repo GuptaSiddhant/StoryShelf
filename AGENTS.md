@@ -52,7 +52,8 @@ See `docs/repo-structure.md` for the annotated map (workspaces vs fixtures, bund
 ```
 StoryShelf/
   packages/
-    core/           @storyshelf/core           -- Hono router, adapter interfaces, models, capture pipeline, diff, retention
+    core/           @storyshelf/core           -- Adapter interfaces, models, capture pipeline, diff, retention (no HTTP)
+    router/         @storyshelf/router         -- Hono router, API routes, server-rendered UI over core (see ADR 0018)
     db-sqlite/      @storyshelf/db-sqlite      -- SQLite database adapter (node:sqlite + Drizzle)
     db-turso/       @storyshelf/db-turso       -- Turso/libSQL database adapter (@libsql/client + Drizzle)
     storage-local/  @storyshelf/storage-local  -- Local filesystem storage adapter

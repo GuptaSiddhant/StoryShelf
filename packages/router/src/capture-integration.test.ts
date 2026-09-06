@@ -1,10 +1,10 @@
+import { createShelfLogger } from "@storyshelf/core/logger";
+import { BuildModel } from "@storyshelf/core/models";
+import { ProjectModel } from "@storyshelf/core/models";
+import { SnapshotModel } from "@storyshelf/core/models";
+import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { describe, expect, it } from "vitest";
-import { createShelfRouter } from "../index.tsx";
-import { createShelfLogger } from "../logger.ts";
-import { BuildModel } from "../models/build.ts";
-import { ProjectModel } from "../models/project.ts";
-import { SnapshotModel } from "../models/snapshot.ts";
-import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
+import { createShelfRouter } from "./index.tsx";
 
 function makeApp(): ReturnType<typeof createShelfRouter> {
   const { db } = makeDatabase();

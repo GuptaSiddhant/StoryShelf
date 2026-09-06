@@ -4,29 +4,33 @@
  */
 import { swaggerUI } from "@hono/swagger-ui";
 import { OpenAPIHono } from "@hono/zod-openapi";
-import type { Context, Next } from "hono";
-import { requestId } from "hono/request-id";
-import type { CaptureQueue } from "./adapters/capture-queue.ts";
+import type { AuthUser } from "@storyshelf/core/adapter/auth";
+import type { CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
+import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import {
   AdapterLifecycleError,
   collectCloses,
   collectInits,
   runAdapterCloses,
   runAdapterInits,
-} from "./adapters/init.ts";
-import type { AdapterInitResult } from "./adapters/init.ts";
+} from "@storyshelf/core/adapter/init";
+import type { AdapterInitResult } from "@storyshelf/core/adapter/init";
 import type {
   AdapterInitContext,
   AdapterMetadata,
   GitAdapterMetadata,
-} from "./adapters/metadata.ts";
-import { createDispatchJob } from "./capture/dispatch.ts";
-import type { CaptureJobOptions } from "./capture/orchestrator.ts";
-import { InMemoryCaptureQueue } from "./capture/queue.ts";
-import type { ShelfOptions } from "./config.ts";
-import { validateConfig, validateUiConfig } from "./config.ts";
-import { createShelfLogger } from "./logger.ts";
-import type { Logger } from "./logger.ts";
+} from "@storyshelf/core/adapter/metadata";
+import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
+import { createDispatchJob } from "@storyshelf/core/capture";
+import type { CaptureJobOptions } from "@storyshelf/core/capture";
+import { InMemoryCaptureQueue } from "@storyshelf/core/capture";
+import type { ShelfConfig, ShelfOptions, UIConfig } from "@storyshelf/core/config";
+import { validateConfig, validateUiConfig } from "@storyshelf/core/config";
+import { createShelfLogger } from "@storyshelf/core/logger";
+import type { Logger } from "@storyshelf/core/logger";
+import type { Context, Next } from "hono";
+import { requestId } from "hono/request-id";
 import {
   authGate,
   csrf,
@@ -54,16 +58,16 @@ import { registerWebhooks } from "./routers/webhooks.ts";
 /** Per-request shelf context (adapters, config, user, capture queue). */
 export interface ShelfContext {
   requestId?: string;
-  db: import("./adapters/database.ts").DatabaseAdapter;
-  storage: import("./adapters/storage.ts").StorageAdapter;
-  config: import("./config.ts").ShelfConfig;
-  ui: import("./config.ts").UIConfig;
+  db: DatabaseAdapter;
+  storage: StorageAdapter;
+  config: ShelfConfig;
+  ui: UIConfig;
   logger: ReturnType<typeof createShelfLogger>;
-  user: import("./adapters/auth.ts").AuthUser | null;
+  user: AuthUser | null;
   authEnabled: boolean;
   enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
-  captureQueue: import("./adapters/capture-queue.ts").CaptureQueue | null;
-  gitHosts: import("./adapters/git-host/index.ts").GitHostProvider[];
+  captureQueue: CaptureQueue | null;
+  gitHosts: GitHostProvider[];
 }
 
 /** Hono application type carrying the shelf context variables. */
@@ -116,11 +120,11 @@ function buildAdapterSnapshot(
 }
 
 interface ServerRuntime {
-  config: import("./config.ts").ShelfConfig;
-  ui: import("./config.ts").UIConfig;
-  logger: import("./logger.ts").Logger;
+  config: ShelfConfig;
+  ui: UIConfig;
+  logger: Logger;
   authEnabled: boolean;
-  gitHosts: import("./adapters/git-host/index.ts").GitHostProvider[];
+  gitHosts: GitHostProvider[];
 }
 
 /** Validate config/ui and derive runtime singletons from options. */
@@ -135,7 +139,7 @@ function resolveRuntime(options: ShelfOptions): ServerRuntime {
   const authEnabled = options.auth !== undefined;
   const gitHosts = options.gitHosts ?? [];
   // Adapter introspection — auto-populate config.adapters if not supplied
-  const config: import("./config.ts").ShelfConfig = rawConfig.adapters
+  const config: ShelfConfig = rawConfig.adapters
     ? rawConfig
     : {
         ...rawConfig,
@@ -152,9 +156,9 @@ interface QueueWiring {
 /** Assemble the capture queue and its enqueue hook when a runner is configured. */
 function setupCaptureQueue(
   options: ShelfOptions,
-  config: import("./config.ts").ShelfConfig,
-  gitHosts: import("./adapters/git-host/index.ts").GitHostProvider[],
-  logger: import("./logger.ts").Logger,
+  config: ShelfConfig,
+  gitHosts: GitHostProvider[],
+  logger: Logger,
 ): QueueWiring {
   if (!options.captureRunner) {
     return { queue: null, enqueueCapture: undefined };
@@ -425,4 +429,4 @@ export function createShelfRouter(options: ShelfOptions): ShelfRouter {
  * `retention`, pages) have no public entry. Importing the barrel
  * must never pull the Hono router into bundles that do not serve it.
  */
-export type { ShelfOptions, ShelfConfig, UIConfig, BrandTheme } from "./config.ts";
+export type { ShelfOptions, ShelfConfig, UIConfig, BrandTheme } from "@storyshelf/core/config";

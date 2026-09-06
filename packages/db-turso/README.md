@@ -18,7 +18,7 @@ npm install @storyshelf/db-turso
 
 ```ts
 import { createTursoDatabase } from "@storyshelf/db-turso";
-import { createShelfRouter } from "@storyshelf/core";
+import { createShelfRouter } from "@storyshelf/router";
 
 const database = createTursoDatabase({
   url: process.env.TURSO_DATABASE_URL!,

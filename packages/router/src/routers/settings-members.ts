@@ -1,5 +1,5 @@
+import { MemberModel } from "@storyshelf/core/models";
 import type { ShelfApp } from "../index.tsx";
-import { MemberModel } from "../models/member.ts";
 import { getStore } from "../store.ts";
 import { hxRedirect } from "./htmx.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";

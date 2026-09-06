@@ -1,11 +1,11 @@
+import type { AuthUser } from "@storyshelf/core/adapter/auth";
+import type { CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
+import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
+import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
+import type { ShelfConfig, UIConfig } from "@storyshelf/core/config";
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { Logger } from "pino";
-import type { AuthUser } from "./adapters/auth.ts";
-import type { CaptureQueue } from "./adapters/capture-queue.ts";
-import type { DatabaseAdapter } from "./adapters/database.ts";
-import type { GitHostProvider } from "./adapters/git-host/index.ts";
-import type { StorageAdapter } from "./adapters/storage.ts";
-import type { ShelfConfig, UIConfig } from "./config.ts";
 
 /** Request-scoped dependencies and session state. */
 export interface Store {

@@ -1,13 +1,13 @@
+import { isPublicBuild, BuildModel } from "@storyshelf/core/models";
+import { LabelModel } from "@storyshelf/core/models";
+import { ProjectModel } from "@storyshelf/core/models";
+import type { Build } from "@storyshelf/core/schema";
+import type { Project } from "@storyshelf/core/schema";
+import { storybookDir } from "@storyshelf/core/utils";
 import { posix } from "node:path";
 import type { ShelfApp } from "../index.tsx";
-import { isPublicBuild, BuildModel } from "../models/build.ts";
-import { LabelModel } from "../models/label.ts";
-import { ProjectModel } from "../models/project.ts";
 import { renderStorybookPage, renderStorybookPreparingPage } from "../pages/storybook.tsx";
-import type { Build } from "../schema/build.ts";
-import type { Project } from "../schema/project.ts";
 import { getStore } from "../store.ts";
-import { storybookDir } from "../utils/paths.ts";
 import { currentProjectRole, notFound } from "./helpers.ts";
 
 const VIEW_ROLES: ReadonlySet<string> = new Set(["viewer", "developer", "approver", "admin"]);

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://raw.githubusercontent.com/denoland/deno/refs/heads/main/cli/schemas/config-file.v1.json",
+  "name": "@storyshelf/router",
+  "version": "0.3.2",
+  "exports": {
+    ".": "./src/index.tsx"
+  },
+  "publish": {
+    "include": ["src", "README.md", "LICENSE"],
+    "exclude": ["**/*.test.ts", "**/*.test.tsx", "**/test-helpers"]
+  }
+}

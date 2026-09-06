@@ -1,7 +1,7 @@
+import { ProjectModel } from "@storyshelf/core/models";
+import type { Project } from "@storyshelf/core/schema";
 import type { Context } from "hono";
 import type { ShelfApp } from "../index.tsx";
-import { ProjectModel } from "../models/project.ts";
-import type { Project } from "../schema/project.ts";
 import { getStore } from "../store.ts";
 import { hxRedirect } from "./htmx.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
@@ -82,16 +82,16 @@ async function handleTestsUpdate(c: Context): Promise<Response> {
   const { executePlay, playTimeoutMs } = readTestsFields(form);
   const rangeError = playTimeoutError(playTimeoutMs);
   if (rangeError) {
-    return c.html(
-      (await renderSettingsPage(c, "tests", { globalError: rangeError })) ?? "",
-      400,
-    );
+    return c.html((await renderSettingsPage(c, "tests", { globalError: rangeError })) ?? "", 400);
   }
   return await persistTestsUpdate(c, project, slug, executePlay, playTimeoutMs);
 }
 
 /** Read the tests-tab form fields. */
-function readTestsFields(form: FormData): { executePlay: boolean; playTimeoutMs: number | undefined } {
+function readTestsFields(form: FormData): {
+  executePlay: boolean;
+  playTimeoutMs: number | undefined;
+} {
   const playTimeoutMsRaw = asString(form.get("playTimeoutMs"));
   return {
     executePlay: form.get("executePlay") === "true",

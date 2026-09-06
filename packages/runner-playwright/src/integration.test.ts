@@ -1,9 +1,9 @@
-import { createShelfRouter } from "@storyshelf/core";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import { screenshotPath } from "@storyshelf/core/paths";
 import type { Build, Snapshot } from "@storyshelf/core/schema";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
+import { createShelfRouter } from "@storyshelf/router";
 import { createLocalStorage } from "@storyshelf/storage-local";
 import AdmZip from "adm-zip";
 import { execFile, type ExecException } from "node:child_process";
@@ -213,56 +213,65 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
     }
   }, 180_000);
 
-  it.skipIf(!isOldestFixture)("interaction: play, flaky and disableSnapshot", async () => {
-    const { app, staticDir } = getHarness();
+  it.skipIf(!isOldestFixture)(
+    "interaction: play, flaky and disableSnapshot",
+    async () => {
+      const { app, staticDir } = getHarness();
 
-    // Create a project with executePlay enabled (opt-in)
-    const projectResponse = await app.request("/api/v1/projects", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "Play Smoke", executePlay: true, playTimeoutMs: 5000 }),
-    });
-    expect(projectResponse.status).toBe(201);
-    const project = await readJson<{ id: string; slug: string }>(projectResponse);
-
-    const zip = new AdmZip();
-    zip.addLocalFolder(staticDir);
-    const form = new FormData();
-    form.set("gitSha", "b".repeat(40));
-    form.set("gitBranch", "feature/play");
-    form.set("message", "play smoke");
-    const zipBlob = new Blob([new Uint8Array(zip.toBuffer())], { type: "application/zip" });
-    form.set("zip", zipBlob, "storybook.zip");
-    const response = await app.request(`/api/v1/projects/${project.slug}/builds`, { method: "POST", body: form });
-    expect(response.status).toBe(202);
-    const build = await readJson<Build>(response);
-
-    // Poll until terminal (failed is expected because BlockingFailure is not flaky)
-    let final: Build = build;
-    /* eslint-disable no-await-in-loop -- poll build status sequentially until terminal */
-    for (let i = 0; i < 30; i += 1) {
-      await new Promise<void>((done) => {
-        setTimeout(done, 2000);
+      // Create a project with executePlay enabled (opt-in)
+      const projectResponse = await app.request("/api/v1/projects", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Play Smoke", executePlay: true, playTimeoutMs: 5000 }),
       });
-      const res = await app.request(`/api/v1/projects/${project.slug}/builds/${final.id}`);
-      final = await readJson<Build>(res);
-      if (["failed", "reviewing", "approved"].includes(final.status)) break;
-    }
-    /* eslint-enable no-await-in-loop */
+      expect(projectResponse.status).toBe(201);
+      const project = await readJson<{ id: string; slug: string }>(projectResponse);
 
-    // Non-flaky play failure blocks the build
-    expect(final.status).toBe("failed");
-    // Disabled story is not counted
-    expect(final.snapshotCount).toBeGreaterThan(0);
-    expect(final.snapshotCount).toBeLessThan(8);
+      const zip = new AdmZip();
+      zip.addLocalFolder(staticDir);
+      const form = new FormData();
+      form.set("gitSha", "b".repeat(40));
+      form.set("gitBranch", "feature/play");
+      form.set("message", "play smoke");
+      const zipBlob = new Blob([new Uint8Array(zip.toBuffer())], { type: "application/zip" });
+      form.set("zip", zipBlob, "storybook.zip");
+      const response = await app.request(`/api/v1/projects/${project.slug}/builds`, {
+        method: "POST",
+        body: form,
+      });
+      expect(response.status).toBe(202);
+      const build = await readJson<Build>(response);
 
-    const snapshots = await (async (): Promise<Snapshot[]> => {
-      const res = await app.request(`/api/v1/projects/${project.slug}/builds/${final.id}/snapshots`);
-      return readJson<Snapshot[]>(res);
-    })();
-    // Flaky stories should still have snapshots (non-blocking, warning)
-    const hasFlaky = snapshots.some((s) => s.storyId.includes("flaky"));
-    // At least one flaky snapshot should be present (they are captured despite play failure being non-blocking)
-    expect(hasFlaky || snapshots.length > 0).toBe(true);
-  }, 180_000);
+      // Poll until terminal (failed is expected because BlockingFailure is not flaky)
+      let final: Build = build;
+      /* eslint-disable no-await-in-loop -- poll build status sequentially until terminal */
+      for (let i = 0; i < 30; i += 1) {
+        await new Promise<void>((done) => {
+          setTimeout(done, 2000);
+        });
+        const res = await app.request(`/api/v1/projects/${project.slug}/builds/${final.id}`);
+        final = await readJson<Build>(res);
+        if (["failed", "reviewing", "approved"].includes(final.status)) break;
+      }
+      /* eslint-enable no-await-in-loop */
+
+      // Non-flaky play failure blocks the build
+      expect(final.status).toBe("failed");
+      // Disabled story is not counted
+      expect(final.snapshotCount).toBeGreaterThan(0);
+      expect(final.snapshotCount).toBeLessThan(8);
+
+      const snapshots = await (async (): Promise<Snapshot[]> => {
+        const res = await app.request(
+          `/api/v1/projects/${project.slug}/builds/${final.id}/snapshots`,
+        );
+        return readJson<Snapshot[]>(res);
+      })();
+      // Flaky stories should still have snapshots (non-blocking, warning)
+      const hasFlaky = snapshots.some((s) => s.storyId.includes("flaky"));
+      // At least one flaky snapshot should be present (they are captured despite play failure being non-blocking)
+      expect(hasFlaky || snapshots.length > 0).toBe(true);
+    },
+    180_000,
+  );
 });

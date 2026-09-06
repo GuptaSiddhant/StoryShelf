@@ -1,6 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { CommentModel } from "@storyshelf/core/models";
 import type { ShelfApp } from "../index.tsx";
-import { CommentModel } from "../models/comment.ts";
 import { getStore } from "../store.ts";
 import { VIEW_ROLES, DEVELOPER_ROLES, buildForProject } from "./builds.handlers.ts";
 import { resolveAuthorizedProject, notFound as throwNotFound } from "./helpers.ts";

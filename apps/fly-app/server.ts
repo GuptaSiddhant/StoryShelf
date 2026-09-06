@@ -1,3 +1,10 @@
+import { serve } from "@hono/node-server";
+import { createPasswordAuth } from "@storyshelf/auth-password";
+import { createShelfLogger } from "@storyshelf/core/logger";
+import { createSqliteDatabase } from "@storyshelf/db-sqlite";
+import { createShelfRouter } from "@storyshelf/router";
+import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
+import { createLocalStorage } from "@storyshelf/storage-local";
 /**
  * Fly demo server — local adapters only.
  *
@@ -12,13 +19,6 @@
  *  - @storyshelf/runner-playwright → Chromium via playwright base image
  */
 import { mkdirSync } from "node:fs";
-import { serve } from "@hono/node-server";
-import { createPasswordAuth } from "@storyshelf/auth-password";
-import { createShelfRouter } from "@storyshelf/core";
-import { createShelfLogger } from "@storyshelf/core/logger";
-import { createSqliteDatabase } from "@storyshelf/db-sqlite";
-import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
-import { createLocalStorage } from "@storyshelf/storage-local";
 
 const env = process.env;
 const dataDir = env["DATA_DIR"] ?? "/data";

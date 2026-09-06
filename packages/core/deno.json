@@ -14,14 +14,20 @@
     "./adapter/git-host/helpers": "./src/adapters/git-host/helpers.ts",
     "./adapter/git-host/comments": "./src/adapters/git-host/comments.ts",
     "./adapter/capture-queue": "./src/adapters/capture-queue.ts",
+    "./adapter/webhook-events": "./src/adapters/webhook-events.ts",
     "./logger": "./src/logger.ts",
     "./capture": "./src/capture/index.ts",
+    "./config": "./src/config.ts",
     "./diff": "./src/diff/index.ts",
+    "./models": "./src/models/index.ts",
+    "./retention": "./src/retention/purge.ts",
     "./paths": "./src/utils/paths.ts",
     "./urls": "./src/urls.ts",
     "./schema": "./src/schema/index.ts",
     "./ddl": "./src/ddl.ts",
-    "./types": "./src/types.ts"
+    "./types": "./src/types.ts",
+    "./utils": "./src/utils/index.ts",
+    "./test-helpers": "./src/test-helpers/index.ts"
   },
   "imports": {
     "hono/jsx": "npm:hono@4.13.5/jsx",

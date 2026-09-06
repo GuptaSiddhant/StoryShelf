@@ -1,9 +1,9 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { WebhookModel } from "@storyshelf/core/models";
+import type { ProjectRole } from "@storyshelf/core/types";
+import { randomToken } from "@storyshelf/core/utils";
 import type { ShelfApp } from "../index.tsx";
-import { WebhookModel } from "../models/webhook.ts";
 import { getStore } from "../store.ts";
-import type { ProjectRole } from "../types.ts";
-import { randomToken } from "../utils/hash.ts";
 import { resolveAuthorizedProject, notFound } from "./helpers.ts";
 import {
   notFound as notFoundResponse,
@@ -59,7 +59,9 @@ const deleteWebhookRoute = createRoute({
 export function registerWebhooks(app: ShelfApp): void {
   app.openapi(listWebhooksRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
-    const webhooks = await new WebhookModel(getStore().db, getStore().config.secret).list(project.id);
+    const webhooks = await new WebhookModel(getStore().db, getStore().config.secret).list(
+      project.id,
+    );
     return c.json(
       webhooks.map((webhook) => ({
         id: webhook.id,
@@ -73,14 +75,20 @@ export function registerWebhooks(app: ShelfApp): void {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
     const body = c.req.valid("json");
     const secret = randomToken("whsec_").value;
-    const webhook = await new WebhookModel(getStore().db, getStore().config.secret).create(project.id, { ...body, secret });
+    const webhook = await new WebhookModel(getStore().db, getStore().config.secret).create(
+      project.id,
+      { ...body, secret },
+    );
     return c.json({ id: webhook.id, url: webhook.url, events: body.events ?? [], secret }, 201);
   });
 
   app.openapi(deleteWebhookRoute, async (c) => {
     const { slug, webhookId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
-    const webhook = await new WebhookModel(getStore().db, getStore().config.secret).get(project.id, webhookId);
+    const webhook = await new WebhookModel(getStore().db, getStore().config.secret).get(
+      project.id,
+      webhookId,
+    );
     if (!webhook) {
       notFound("Webhook not found");
     }

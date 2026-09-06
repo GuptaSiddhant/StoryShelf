@@ -1,4 +1,4 @@
-import type { Project } from "../schema/project.ts";
+import type { Project } from "@storyshelf/core/schema";
 
 /** Form state for the settings tabs (field errors and global error). */
 export interface SettingsFormState {

@@ -1,7 +1,7 @@
 import { createRoute } from "@hono/zod-openapi";
+import { ProjectModel } from "@storyshelf/core/models";
+import { Retention } from "@storyshelf/core/retention";
 import type { ShelfApp } from "../index.tsx";
-import { ProjectModel } from "../models/project.ts";
-import { Retention } from "../retention/purge.ts";
 import { getStore } from "../store.ts";
 import { requireSiteAdmin } from "./helpers.ts";
 import { forbidden as forbiddenResponse, purgeInputSchema, purgeSchema } from "./schemas.ts";

@@ -1,7 +1,7 @@
 {
   "name": "@storyshelf/core",
   "version": "0.3.2",
-  "description": "StoryShelf core: Hono router, adapter interfaces, models, capture pipeline, diff, retention.",
+  "description": "StoryShelf core: adapter interfaces, models, capture pipeline, diff, and retention (no HTTP).",
   "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
   "bugs": {
     "url": "https://github.com/GuptaSiddhant/StoryShelf/issues"
@@ -67,9 +67,17 @@
       "source": "./src/adapters/storage.ts",
       "default": "./dist/adapter/storage.mjs"
     },
+    "./adapter/webhook-events": {
+      "source": "./src/adapters/webhook-events.ts",
+      "default": "./dist/adapter/webhook-events.mjs"
+    },
     "./capture": {
       "source": "./src/capture/index.ts",
       "default": "./dist/capture.mjs"
+    },
+    "./config": {
+      "source": "./src/config.ts",
+      "default": "./dist/config.mjs"
     },
     "./ddl": {
       "source": "./src/ddl.ts",
@@ -83,13 +91,25 @@
       "source": "./src/logger.ts",
       "default": "./dist/logger.mjs"
     },
+    "./models": {
+      "source": "./src/models/index.ts",
+      "default": "./dist/models.mjs"
+    },
     "./paths": {
       "source": "./src/utils/paths.ts",
       "default": "./dist/paths.mjs"
     },
+    "./retention": {
+      "source": "./src/retention/purge.ts",
+      "default": "./dist/retention.mjs"
+    },
     "./schema": {
       "source": "./src/schema/index.ts",
       "default": "./dist/schema.mjs"
+    },
+    "./test-helpers": {
+      "source": "./src/test-helpers/index.ts",
+      "default": "./dist/test-helpers.mjs"
     },
     "./types": {
       "source": "./src/types.ts",
@@ -98,6 +118,10 @@
     "./urls": {
       "source": "./src/urls.ts",
       "default": "./dist/urls.mjs"
+    },
+    "./utils": {
+      "source": "./src/utils/index.ts",
+      "default": "./dist/utils.mjs"
     },
     "./package.json": "./package.json"
   },
@@ -114,14 +138,20 @@
       "./adapter/init": "./dist/adapter/init.mjs",
       "./adapter/metadata": "./dist/adapter/metadata.mjs",
       "./adapter/storage": "./dist/adapter/storage.mjs",
+      "./adapter/webhook-events": "./dist/adapter/webhook-events.mjs",
       "./capture": "./dist/capture.mjs",
+      "./config": "./dist/config.mjs",
       "./ddl": "./dist/ddl.mjs",
       "./diff": "./dist/diff.mjs",
       "./logger": "./dist/logger.mjs",
+      "./models": "./dist/models.mjs",
       "./paths": "./dist/paths.mjs",
+      "./retention": "./dist/retention.mjs",
       "./schema": "./dist/schema.mjs",
+      "./test-helpers": "./dist/test-helpers.mjs",
       "./types": "./dist/types.mjs",
       "./urls": "./dist/urls.mjs",
+      "./utils": "./dist/utils.mjs",
       "./package.json": "./package.json"
     },
     "access": "public"
@@ -138,10 +168,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@hono/swagger-ui": "^0.6.1",
-    "@hono/zod-openapi": "^1.1.5",
     "drizzle-orm": "^0.44.0",
-    "hono": "^4.11.0",
     "pino": "^10.3.1",
     "pixelmatch": "^7.1.0",
     "pngjs": "^7.0.0",

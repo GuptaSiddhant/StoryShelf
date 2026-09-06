@@ -1,9 +1,9 @@
+import { WebhookModel } from "@storyshelf/core/models";
+import type { Project } from "@storyshelf/core/schema";
+import { randomToken } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import type { ShelfApp } from "../index.tsx";
-import { WebhookModel } from "../models/webhook.ts";
-import type { Project } from "../schema/project.ts";
 import { getStore } from "../store.ts";
-import { randomToken } from "../utils/hash.ts";
 import { notFound } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
@@ -75,7 +75,10 @@ async function createWebhookRecord(
 
 async function handleDeleteWebhook(c: Context): Promise<Response> {
   const project = await findProject(c.req.param("slug") ?? "");
-  const webhook = await new WebhookModel(getStore().db, getStore().config.secret).get(project.id, c.req.param("webhookId") ?? "");
+  const webhook = await new WebhookModel(getStore().db, getStore().config.secret).get(
+    project.id,
+    c.req.param("webhookId") ?? "",
+  );
   if (!webhook) {
     notFound("Webhook not found");
   }

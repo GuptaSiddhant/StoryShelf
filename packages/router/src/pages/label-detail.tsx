@@ -1,7 +1,7 @@
+import { BuildModel } from "@storyshelf/core/models";
+import { LabelModel } from "@storyshelf/core/models";
+import { ProjectModel } from "@storyshelf/core/models";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { BuildModel } from "../models/build.ts";
-import { LabelModel } from "../models/label.ts";
-import { ProjectModel } from "../models/project.ts";
 import { getStore } from "../store.ts";
 import { Badge, statusTone } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";

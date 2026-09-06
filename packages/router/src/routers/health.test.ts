@@ -1,8 +1,8 @@
+import { AdapterLifecycleError } from "@storyshelf/core/adapter/init";
+import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
-import { AdapterLifecycleError } from "../adapters/init.ts";
 import { createShelfRouter } from "../index.tsx";
-import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 
 const silentLogger = pino({ level: "silent" });
 
