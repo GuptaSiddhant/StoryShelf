@@ -11,6 +11,13 @@ description: Protect a StoryShelf instance with one shared password.
 nub add @storyshelf/auth-password
 ```
 
+[![JSR](https://jsr.io/badges/@storyshelf/auth-password)](https://jsr.io/@storyshelf/auth-password) [![JSR Score](https://jsr.io/badges/@storyshelf/auth-password/score)](https://jsr.io/@storyshelf/auth-password)
+
+- [npm package](https://www.npmjs.com/package/@storyshelf/auth-password) — install tarballs and version history.
+- [JSR package](https://jsr.io/@storyshelf/auth-password) — TypeScript-first registry page.
+- [Public API reference](https://jsr.io/@storyshelf/auth-password/doc) — generated docs for every export; start here to learn the API.
+- [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/auth-password) — package directory on `main`.
+
 ## Configure
 
 ```ts

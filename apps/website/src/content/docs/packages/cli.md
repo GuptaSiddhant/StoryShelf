@@ -11,6 +11,13 @@ description: Create projects, upload Storybooks, and manage builds from CI — n
 nub add @storyshelf/cli
 ```
 
+[![JSR](https://jsr.io/badges/@storyshelf/cli)](https://jsr.io/@storyshelf/cli) [![JSR Score](https://jsr.io/badges/@storyshelf/cli/score)](https://jsr.io/@storyshelf/cli)
+
+- [npm package](https://www.npmjs.com/package/@storyshelf/cli) — install tarballs and version history.
+- [JSR package](https://jsr.io/@storyshelf/cli) — TypeScript-first registry page.
+- [Public API reference](https://jsr.io/@storyshelf/cli/doc) — generated docs for every export; start here to learn the API.
+- [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/cli) — package directory on `main`.
+
 ## Use from CI
 
 Scaffold a server (once):

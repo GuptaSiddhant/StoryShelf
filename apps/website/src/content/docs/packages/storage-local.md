@@ -11,6 +11,13 @@ description: Store StoryShelf screenshots, diffs, and Storybook archives on a lo
 nub add @storyshelf/storage-local
 ```
 
+[![JSR](https://jsr.io/badges/@storyshelf/storage-local)](https://jsr.io/@storyshelf/storage-local) [![JSR Score](https://jsr.io/badges/@storyshelf/storage-local/score)](https://jsr.io/@storyshelf/storage-local)
+
+- [npm package](https://www.npmjs.com/package/@storyshelf/storage-local) — install tarballs and version history.
+- [JSR package](https://jsr.io/@storyshelf/storage-local) — TypeScript-first registry page.
+- [Public API reference](https://jsr.io/@storyshelf/storage-local/doc) — generated docs for every export; start here to learn the API.
+- [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/storage-local) — package directory on `main`.
+
 ## Configure
 
 ```ts

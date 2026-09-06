@@ -11,6 +11,13 @@ description: Store StoryShelf artifacts in AWS S3, Cloudflare R2, MinIO, or anot
 nub add @storyshelf/storage-s3
 ```
 
+[![JSR](https://jsr.io/badges/@storyshelf/storage-s3)](https://jsr.io/@storyshelf/storage-s3) [![JSR Score](https://jsr.io/badges/@storyshelf/storage-s3/score)](https://jsr.io/@storyshelf/storage-s3)
+
+- [npm package](https://www.npmjs.com/package/@storyshelf/storage-s3) — install tarballs and version history.
+- [JSR package](https://jsr.io/@storyshelf/storage-s3) — TypeScript-first registry page.
+- [Public API reference](https://jsr.io/@storyshelf/storage-s3/doc) — generated docs for every export; start here to learn the API.
+- [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/storage-s3) — package directory on `main`.
+
 ## Configure
 
 ```ts

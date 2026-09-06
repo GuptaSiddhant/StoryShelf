@@ -11,6 +11,13 @@ description: Compose StoryShelf's server, adapters, capture pipeline, and review
 nub add @storyshelf/core
 ```
 
+[![JSR](https://jsr.io/badges/@storyshelf/core)](https://jsr.io/@storyshelf/core) [![JSR Score](https://jsr.io/badges/@storyshelf/core/score)](https://jsr.io/@storyshelf/core)
+
+- [npm package](https://www.npmjs.com/package/@storyshelf/core) — install tarballs and version history.
+- [JSR package](https://jsr.io/@storyshelf/core) — TypeScript-first registry page.
+- [Public API reference](https://jsr.io/@storyshelf/core/doc) — generated docs for every export; start here to learn the API.
+- [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/core) — package directory on `main`.
+
 ## Compose a server
 
 Pass a database and storage adapter to `createShelfRouter`. Capture, authentication, git providers, logging, branding, and server behavior are optional.

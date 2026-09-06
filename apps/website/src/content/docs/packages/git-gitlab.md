@@ -11,6 +11,13 @@ description: GitLab commit-status provider for StoryShelf's visual-testing merge
 nub add @storyshelf/git-gitlab
 ```
 
+[![JSR](https://jsr.io/badges/@storyshelf/git-gitlab)](https://jsr.io/@storyshelf/git-gitlab) [![JSR Score](https://jsr.io/badges/@storyshelf/git-gitlab/score)](https://jsr.io/@storyshelf/git-gitlab)
+
+- [npm package](https://www.npmjs.com/package/@storyshelf/git-gitlab) — install tarballs and version history.
+- [JSR package](https://jsr.io/@storyshelf/git-gitlab) — TypeScript-first registry page.
+- [Public API reference](https://jsr.io/@storyshelf/git-gitlab/doc) — generated docs for every export; start here to learn the API.
+- [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/git-gitlab) — package directory on `main`.
+
 ## Register the provider
 
 Pass `gitLabHost` in the `gitHosts` array of `createShelfRouter`:

@@ -11,6 +11,13 @@ description: A serverless Turso/libSQL database adapter for cloud StoryShelf dep
 nub add @storyshelf/db-turso
 ```
 
+[![JSR](https://jsr.io/badges/@storyshelf/db-turso)](https://jsr.io/@storyshelf/db-turso) [![JSR Score](https://jsr.io/badges/@storyshelf/db-turso/score)](https://jsr.io/@storyshelf/db-turso)
+
+- [npm package](https://www.npmjs.com/package/@storyshelf/db-turso) — install tarballs and version history.
+- [JSR package](https://jsr.io/@storyshelf/db-turso) — TypeScript-first registry page.
+- [Public API reference](https://jsr.io/@storyshelf/db-turso/doc) — generated docs for every export; start here to learn the API.
+- [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/db-turso) — package directory on `main`.
+
 ## Configure
 
 ```ts

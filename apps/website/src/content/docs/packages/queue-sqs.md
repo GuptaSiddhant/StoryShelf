@@ -11,6 +11,13 @@ description: AWS SQS capture job queue adapter for StoryShelf cloud deployments.
 nub add @storyshelf/queue-sqs
 ```
 
+[![JSR](https://jsr.io/badges/@storyshelf/queue-sqs)](https://jsr.io/@storyshelf/queue-sqs) [![JSR Score](https://jsr.io/badges/@storyshelf/queue-sqs/score)](https://jsr.io/@storyshelf/queue-sqs)
+
+- [npm package](https://www.npmjs.com/package/@storyshelf/queue-sqs) — install tarballs and version history.
+- [JSR package](https://jsr.io/@storyshelf/queue-sqs) — TypeScript-first registry page.
+- [Public API reference](https://jsr.io/@storyshelf/queue-sqs/doc) — generated docs for every export; start here to learn the API.
+- [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/queue-sqs) — package directory on `main`.
+
 ## Register the queue
 
 Pass the SQS-backed queue as the `captureQueue` option of `createShelfRouter`:

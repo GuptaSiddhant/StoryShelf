@@ -11,6 +11,13 @@ description: Add OAuth and OpenID Connect login to StoryShelf.
 nub add @storyshelf/auth-oauth
 ```
 
+[![JSR](https://jsr.io/badges/@storyshelf/auth-oauth)](https://jsr.io/@storyshelf/auth-oauth) [![JSR Score](https://jsr.io/badges/@storyshelf/auth-oauth/score)](https://jsr.io/@storyshelf/auth-oauth)
+
+- [npm package](https://www.npmjs.com/package/@storyshelf/auth-oauth) — install tarballs and version history.
+- [JSR package](https://jsr.io/@storyshelf/auth-oauth) — TypeScript-first registry page.
+- [Public API reference](https://jsr.io/@storyshelf/auth-oauth/doc) — generated docs for every export; start here to learn the API.
+- [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/auth-oauth) — package directory on `main`.
+
 ## Configure
 
 ```ts

@@ -11,6 +11,13 @@ description: Pure Playwright CaptureRunner — renders Storybook screenshots in-
 nub add @storyshelf/runner-playwright
 ```
 
+[![JSR](https://jsr.io/badges/@storyshelf/runner-playwright)](https://jsr.io/@storyshelf/runner-playwright) [![JSR Score](https://jsr.io/badges/@storyshelf/runner-playwright/score)](https://jsr.io/@storyshelf/runner-playwright)
+
+- [npm package](https://www.npmjs.com/package/@storyshelf/runner-playwright) — install tarballs and version history.
+- [JSR package](https://jsr.io/@storyshelf/runner-playwright) — TypeScript-first registry page.
+- [Public API reference](https://jsr.io/@storyshelf/runner-playwright/doc) — generated docs for every export; start here to learn the API.
+- [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/runner-playwright) — package directory on `main`.
+
 ## Usage
 
 You normally never install this directly — your server scaffold uses it via `storyshelf server init`. Programmatically:

@@ -11,6 +11,13 @@ description: GitHub commit-status provider for StoryShelf's visual-testing merge
 nub add @storyshelf/git-github
 ```
 
+[![JSR](https://jsr.io/badges/@storyshelf/git-github)](https://jsr.io/@storyshelf/git-github) [![JSR Score](https://jsr.io/badges/@storyshelf/git-github/score)](https://jsr.io/@storyshelf/git-github)
+
+- [npm package](https://www.npmjs.com/package/@storyshelf/git-github) — install tarballs and version history.
+- [JSR package](https://jsr.io/@storyshelf/git-github) — TypeScript-first registry page.
+- [Public API reference](https://jsr.io/@storyshelf/git-github/doc) — generated docs for every export; start here to learn the API.
+- [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/git-github) — package directory on `main`.
+
 ## Register the provider
 
 Pass `gitHubHost` in the `gitHosts` array of `createShelfRouter`:

@@ -11,6 +11,13 @@ description: The zero-configuration SQLite database adapter for single-node Stor
 nub add @storyshelf/db-sqlite
 ```
 
+[![JSR](https://jsr.io/badges/@storyshelf/db-sqlite)](https://jsr.io/@storyshelf/db-sqlite) [![JSR Score](https://jsr.io/badges/@storyshelf/db-sqlite/score)](https://jsr.io/@storyshelf/db-sqlite)
+
+- [npm package](https://www.npmjs.com/package/@storyshelf/db-sqlite) — install tarballs and version history.
+- [JSR package](https://jsr.io/@storyshelf/db-sqlite) — TypeScript-first registry page.
+- [Public API reference](https://jsr.io/@storyshelf/db-sqlite/doc) — generated docs for every export; start here to learn the API.
+- [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/db-sqlite) — package directory on `main`.
+
 ## Configure
 
 ```ts
