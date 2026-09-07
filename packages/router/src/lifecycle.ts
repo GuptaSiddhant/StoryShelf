@@ -63,6 +63,7 @@ function createLifecycle(
     get ready() {
       return cell.ready;
     },
+    logger,
     init: async () => {
       const result = await runAdapterInits(collectInits(options), ctx, logger);
       cell.ready = Promise.resolve(result);

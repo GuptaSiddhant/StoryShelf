@@ -4,8 +4,8 @@ import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import type { ShelfConfig, UIConfig } from "@storyshelf/core/config";
+import type { Logger } from "@storyshelf/core/logger";
 import { AsyncLocalStorage } from "node:async_hooks";
-import type { Logger } from "pino";
 
 /** Request-scoped dependencies and session state. */
 export interface Store {

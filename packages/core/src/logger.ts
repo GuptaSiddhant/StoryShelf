@@ -14,7 +14,7 @@ export interface PinoTransport {
 
 /** Configuration for constructing the shelf logger. */
 export interface LoggerOptions {
-  /** Minimum level to emit. Defaults to `"info"`. */
+  /** Minimum level to emit. Defaults to `LOG_LEVEL` env, then `"info"`. */
   level?: string;
   /** Extra pino worker transports appended to the default stdout sink. */
   transports?: PinoTransport[];
@@ -33,9 +33,13 @@ export interface LoggerOptions {
  * - Derive scoped child loggers for background work:
  *   `const captureLogger = logger.child({ buildId })`.
  *
- * The default sink is stdout. Hosted observability platforms (Sentry, PostHog,
- * Datadog, GCP, OTEL collector, etc.) are added as pino worker `transports` —
- * they are sinks for this logger, not standalone loggers.
+ * The default sink is stdout. The level resolves as explicit option, then
+ * the `LOG_LEVEL` environment variable, then `"info"` — so `LOG_LEVEL=debug`
+ * configures a default-constructed logger with no code changes. Unknown
+ * levels throw at construction (fail fast on typos). Hosted observability
+ * platforms (Sentry, PostHog, Datadog, GCP, OTEL collector, etc.) are added
+ * as pino worker `transports` — they are sinks for this logger, not
+ * standalone loggers.
  */
 export function createShelfLogger(options: LoggerOptions = {}): Logger {
   const targets = [
@@ -45,7 +49,7 @@ export function createShelfLogger(options: LoggerOptions = {}): Logger {
   const transport = pino.transport({ targets });
   return pino(
     {
-      level: options.level ?? "info",
+      level: options.level ?? process.env["LOG_LEVEL"] ?? "info",
       base: { env: options.env ?? process.env["NODE_ENV"] },
     },
     transport,

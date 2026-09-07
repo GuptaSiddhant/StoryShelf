@@ -54,6 +54,21 @@ describe("app.lifecycle", () => {
     await expect(app.lifecycle.close()).resolves.toBeUndefined();
   });
 
+  it("exposes the passed logger instance", () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const app = createShelfRouter({ database: db, storage, logger: silentLogger });
+    expect(app.lifecycle.logger).toBe(silentLogger);
+  });
+
+  it("defaults to a working logger when omitted", () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const app = createShelfRouter({ database: db, storage });
+    expect(typeof app.lifecycle.logger.info).toBe("function");
+    expect(typeof app.lifecycle.logger.child).toBe("function");
+  });
+
   it("init throws AdapterInitError naming the failed adapter", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();

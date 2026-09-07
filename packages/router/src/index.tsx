@@ -161,4 +161,10 @@ function packageVersion(): string {
  * into edge bundles beyond what Hono itself needs.
  */
 export type { ShelfOptions, ShelfConfig, UIConfig, BrandTheme } from "@storyshelf/core/config";
+export {
+  createShelfLogger,
+  type Logger,
+  type LoggerOptions,
+  type PinoTransport,
+} from "@storyshelf/core/logger";
 export type { ShelfApp, ShelfContext, ShelfLifecycle, ShelfRouter } from "./app-types.ts";

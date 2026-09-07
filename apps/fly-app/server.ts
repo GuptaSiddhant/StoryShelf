@@ -1,6 +1,5 @@
 import { serve } from "@hono/node-server";
 import { createPasswordAuth } from "@storyshelf/auth-password";
-import { createShelfLogger } from "@storyshelf/core/logger";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { createShelfRouter } from "@storyshelf/router";
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
@@ -31,13 +30,11 @@ mkdirSync(dataDir, { recursive: true });
 const database = createSqliteDatabase(`${dataDir}/shelf.db`);
 const storage = createLocalStorage(dataDir);
 const captureRunner = createPlaywrightCaptureRunner();
-const logger = createShelfLogger({ level: env["LOG_LEVEL"] });
 
 const app = createShelfRouter({
   database,
   storage,
   captureRunner,
-  logger,
   auth: authPassword && secret ? createPasswordAuth({ password: authPassword, secret }) : undefined,
   config: {
     secret,
@@ -46,6 +43,7 @@ const app = createShelfRouter({
 });
 
 await app.lifecycle.init();
+const logger = app.lifecycle.logger;
 
 const server = serve({ fetch: app.fetch, port }, () => {
   logger.info({ port, dataDir }, "StoryShelf fly server listening");

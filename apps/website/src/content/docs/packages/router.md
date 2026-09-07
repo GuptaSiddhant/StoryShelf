@@ -40,9 +40,24 @@ process.on("SIGTERM", () => {
 });
 ```
 
+## Logging
+
+Three tiers, pick the shallowest that fits:
+
+1. **Defaults** — omit `logger` and import nothing. The router creates its own instance; `LOG_LEVEL` env sets the level (`debug`, `info`, …; default `"info"`).
+2. **Configured server** — `createShelfLogger` (re-exported from `@storyshelf/router`, canonical home `@storyshelf/core/logger`), pass it in, and read it back via `app.lifecycle.logger` for your own logs:
+   ```ts
+   import { createShelfLogger, createShelfRouter } from "@storyshelf/router";
+
+   const app = createShelfRouter({ database, storage, logger: createShelfLogger() });
+   await app.lifecycle.init();
+   const logger = app.lifecycle.logger;
+   ```
+3. **Remote worker process** — import `createShelfLogger` from `@storyshelf/core/logger` directly, never the router barrel (workers must not pull Hono).
+
 ## Main APIs
 
-The barrel exports only the router and its types (`createShelfRouter`, `ShelfApp`, `ShelfRouter`, `ShelfContext`, `ShelfLifecycle`, plus the option types re-exported from core). Everything domain-level lives under `@storyshelf/core/*` subpaths.
+The barrel exports only the router and its types (`createShelfRouter`, `ShelfApp`, `ShelfRouter`, `ShelfContext`, `ShelfLifecycle`, the logger factory + types, plus the option types re-exported from core). Everything domain-level lives under `@storyshelf/core/*` subpaths.
 
 ## Health
 

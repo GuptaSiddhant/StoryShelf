@@ -74,7 +74,6 @@ function buildImports(answers: Answers): string[] {
   const imports = [
     `import { serve } from "@hono/node-server";`,
     `import { createShelfRouter } from "@storyshelf/router";`,
-    `import { createShelfLogger } from "@storyshelf/core/logger";`,
     DB_IMPORT[answers.database],
     STORAGE_IMPORT[answers.storage],
   ];
@@ -96,7 +95,6 @@ function buildAdapterLines(answers: Answers): string[] {
     `const database = ${DB_INIT[answers.database]};`,
     `const storage = ${STORAGE_INIT[answers.storage]};`,
     `const captureRunner = createPlaywrightCaptureRunner();`,
-    `const logger = createShelfLogger({ level: process.env.LOG_LEVEL });`,
   ];
 }
 
@@ -106,7 +104,6 @@ function buildRouterLines(answers: Answers): string[] {
     `  database,`,
     `  storage,`,
     `  captureRunner,`,
-    `  logger,`,
   ];
 
   if (answers.auth !== "none") {
@@ -125,6 +122,7 @@ function buildRouterLines(answers: Answers): string[] {
     `});`,
     ``,
     `await app.lifecycle.init();`,
+    `const logger = app.lifecycle.logger;`,
   );
 
   return lines;

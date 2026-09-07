@@ -3,6 +3,7 @@ import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import { emitWebhookEvent } from "@storyshelf/core/adapter/webhook-events";
 import { extractStorybookToScratch, persistStorybookStatics } from "@storyshelf/core/capture";
+import type { Logger } from "@storyshelf/core/logger";
 import { BaselineModel } from "@storyshelf/core/models";
 import { BuildModel } from "@storyshelf/core/models";
 import { LabelModel } from "@storyshelf/core/models";
@@ -14,7 +15,6 @@ import { type ProjectRole, BUILD_STATUSES } from "@storyshelf/core/types";
 import { HTTPException } from "hono/http-exception";
 import { Readable, Transform } from "node:stream";
 import type { ReadableStream as NodeWebStream } from "node:stream/web";
-import type { Logger } from "pino";
 import { getStore } from "../store.ts";
 import { notFound } from "./helpers.ts";
 
