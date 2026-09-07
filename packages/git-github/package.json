@@ -45,7 +45,6 @@
     "prepublishOnly": "nub run build"
   },
   "dependencies": {
-    "@octokit/rest": "^21.0.0",
     "@storyshelf/core": "workspace:*",
     "zod": "catalog:"
   },
