@@ -1,7 +1,8 @@
-import type { CheckStatus } from "@storyshelf/core/adapter/git-host";
 /* oxlint-disable max-statements */
+import type { CheckStatus } from "@storyshelf/core/adapter/git-host";
 import { describeStatus } from "@storyshelf/core/adapter/git-host/helpers";
 import type { Logger } from "@storyshelf/core/logger";
+import { httpJson } from "@storyshelf/core/utils";
 import { apiBase, gitlabHeaders, projectId } from "./helpers.ts";
 import { mapStatus } from "./mapper.ts";
 
@@ -26,24 +27,18 @@ export async function postCommitStatus(opts: {
     "posting commit status",
   );
   try {
-    const res = await fetch(
-      `${base}/api/v4/projects/${pid}/statuses/${encodeURIComponent(opts.gitSha)}`,
-      {
-        method: "POST",
-        headers: gitlabHeaders(opts.token),
-        body: JSON.stringify({
-          state,
-          target_url: opts.url,
-          description: describeStatus(opts.status),
-          name: glContext,
-          context: glContext,
-        }),
+    await httpJson(`${base}/api/v4/projects/${pid}/statuses/${encodeURIComponent(opts.gitSha)}`, {
+      method: "POST",
+      headers: gitlabHeaders(opts.token),
+      json: {
+        state,
+        target_url: opts.url,
+        description: describeStatus(opts.status),
+        name: glContext,
+        context: glContext,
       },
-    );
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`GitLab status ${res.status}: ${text}`);
-    }
+      logger: opts.logger,
+    });
     opts.logger?.info({ context: glContext, sha: opts.gitSha, state }, "commit status posted");
   } catch (error) {
     opts.logger?.error(

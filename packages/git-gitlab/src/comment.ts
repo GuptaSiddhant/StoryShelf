@@ -1,8 +1,14 @@
 import type { ReviewThread } from "@storyshelf/core/adapter/git-host/comments";
 import { upsertReviewComment } from "@storyshelf/core/adapter/git-host/comments";
 import type { Logger } from "@storyshelf/core/logger";
+import { httpJson } from "@storyshelf/core/utils";
 import { apiBase, gitlabHeaders, projectId } from "./helpers.ts";
 import { findMrIid } from "./pr.ts";
+
+interface MergeRequestNote {
+  id: number;
+  body?: string | null;
+}
 
 /** Fetch-backed review thread (notes) for a merge request. */
 function createThread(
@@ -14,33 +20,28 @@ function createThread(
   const threadUrl = `${base}/api/v4/projects/${pid}/merge_requests/${iid}/notes`;
   return {
     list: async () => {
-      const res = await fetch(`${threadUrl}?per_page=100`, { headers });
-      if (!res.ok) {
+      try {
+        const notes = await httpJson<MergeRequestNote[]>(`${threadUrl}?per_page=100`, { headers });
+        return notes.map((note) => ({ id: note.id, body: note.body ?? "" }));
+      } catch {
         return [];
       }
-      return (await res.json()) as { id: number; body: string }[];
     },
     update: async (id, body) => {
-      const res = await fetch(`${threadUrl}/${String(id)}`, {
+      const updated = await httpJson<MergeRequestNote>(`${threadUrl}/${String(id)}`, {
         method: "PUT",
         headers,
-        body: JSON.stringify({ body }),
+        json: { body },
       });
-      if (!res.ok) {
-        throw new Error(`update note ${res.status}: ${await res.text()}`);
-      }
-      return String(((await res.json()) as { id: number }).id);
+      return String(updated.id);
     },
     create: async (body) => {
-      const res = await fetch(threadUrl, {
+      const created = await httpJson<MergeRequestNote>(threadUrl, {
         method: "POST",
         headers,
-        body: JSON.stringify({ body }),
+        json: { body },
       });
-      if (!res.ok) {
-        throw new Error(`create note ${res.status}: ${await res.text()}`);
-      }
-      return String(((await res.json()) as { id: number }).id);
+      return String(created.id);
     },
   };
 }

@@ -1,11 +1,22 @@
 /* oxlint-disable max-statements */
-import type { Octokit } from "@octokit/rest";
 import type { Logger } from "@storyshelf/core/logger";
+import { httpJson } from "@storyshelf/core/utils";
+import { githubHeaders, repoPath } from "./api.ts";
 import { findPrNumber } from "./pr.ts";
+
+interface PullSummary {
+  merge_commit_sha: string | null;
+  head: { sha: string };
+  merged_at: string | null;
+}
+
+interface PullDetail {
+  merged: boolean;
+}
 
 /** Check whether the pull request for a commit SHA has been merged. */
 export async function checkIsMerged(opts: {
-  octokit: Octokit;
+  token: string;
   owner: string;
   repo: string;
   sha: string;
@@ -14,30 +25,31 @@ export async function checkIsMerged(opts: {
 }): Promise<boolean> {
   try {
     const prNumber = await findPrNumber({
-      octokit: opts.octokit,
+      token: opts.token,
       owner: opts.owner,
       repo: opts.repo,
       sha: opts.sha,
     });
     if (prNumber === undefined) {
-      const pulls = await opts.octokit.pulls.list({
-        owner: opts.owner,
-        repo: opts.repo,
+      const query = new URLSearchParams({
         head: `${opts.owner}:${opts.branch}`,
         state: "closed",
-        per_page: 5,
+        per_page: "5",
       });
-      const pr = pulls.data.find(
+      const pulls = await httpJson<PullSummary[]>(
+        `${repoPath(opts.owner, opts.repo, "/pulls")}?${query.toString()}`,
+        { headers: githubHeaders(opts.token), logger: opts.logger },
+      );
+      const pr = pulls.find(
         (pull) => pull.merge_commit_sha === opts.sha || pull.head.sha === opts.sha,
       );
       return pr?.merged_at != null; // oxlint-disable-line eslint/eqeqeq, eslint/no-eq-null
     }
-    const pr = await opts.octokit.pulls.get({
-      owner: opts.owner,
-      repo: opts.repo,
-      pull_number: prNumber,
+    const pr = await httpJson<PullDetail>(repoPath(opts.owner, opts.repo, `/pulls/${prNumber}`), {
+      headers: githubHeaders(opts.token),
+      logger: opts.logger,
     });
-    return pr.data.merged;
+    return pr.merged;
   } catch (error) {
     opts.logger?.debug(
       { err: error, sha: opts.sha, branch: opts.branch },

@@ -1,4 +1,9 @@
+import { httpJson } from "@storyshelf/core/utils";
 import { apiBase, gitlabHeaders, projectId } from "./helpers.ts";
+
+interface CommitMergeRequest {
+  iid: number;
+}
 
 /** Find the merge request IID associated with a commit SHA, if any. */
 export async function findMrIid(opts: {
@@ -12,11 +17,9 @@ export async function findMrIid(opts: {
     const base = apiBase(opts.host);
     const pid = projectId(opts.owner, opts.repo);
     const url = `${base}/api/v4/projects/${pid}/repository/commits/${encodeURIComponent(opts.sha)}/merge_requests`;
-    const res = await fetch(url, { headers: gitlabHeaders(opts.token) });
-    if (!res.ok) {
-      return undefined;
-    }
-    const data = (await res.json()) as { iid: number }[];
+    const data = await httpJson<CommitMergeRequest[]>(url, {
+      headers: gitlabHeaders(opts.token),
+    });
     return data[0]?.iid;
   } catch {
     return undefined;

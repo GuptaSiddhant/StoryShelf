@@ -86,9 +86,17 @@ function readJson(filePath: string): Record<string, unknown> | null {
 }
 
 function installedVersion(pkgRoot: string, name: string): string | null {
-  const manifest = readJson(join(pkgRoot, "node_modules", name, "package.json"));
-  const version = manifest?.["version"];
-  return typeof version === "string" ? version : null;
+  const local = readJson(join(pkgRoot, "node_modules", name, "package.json"));
+  const localVersion = local?.["version"];
+  if (typeof localVersion === "string") {
+    return localVersion;
+  }
+  // Fall back to the workspace root (public-hoisted deps like hono live
+  // there under the isolated linker, so per-package pins would go stale).
+  const rootVersion = readJson(join(pkgRoot, "..", "..", "node_modules", name, "package.json"))?.[
+    "version"
+  ];
+  return typeof rootVersion === "string" ? rootVersion : null;
 }
 
 function splitSpecifierName(rest: string): { name: string; after: string } | null {

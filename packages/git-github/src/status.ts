@@ -1,13 +1,14 @@
 /* oxlint-disable max-statements */
-import type { Octokit } from "@octokit/rest";
 import type { CheckStatus } from "@storyshelf/core/adapter/git-host";
 import { describeStatus } from "@storyshelf/core/adapter/git-host/helpers";
 import type { Logger } from "@storyshelf/core/logger";
+import { httpJson } from "@storyshelf/core/utils";
+import { githubHeaders, repoPath } from "./api.ts";
 import { mapStatus } from "./mapper.ts";
 
 /** Post a StoryShelf build status to a GitHub commit SHA. */
 export async function postCommitStatus(opts: {
-  octokit: Octokit;
+  token: string;
   owner: string;
   repo: string;
   context: string;
@@ -23,15 +24,20 @@ export async function postCommitStatus(opts: {
     "posting commit status",
   );
   try {
-    await opts.octokit.repos.createCommitStatus({
-      owner: opts.owner,
-      repo: opts.repo,
-      sha: opts.gitSha,
-      state,
-      context: ghContext,
-      target_url: opts.url,
-      description: describeStatus(opts.status),
-    });
+    await httpJson(
+      repoPath(opts.owner, opts.repo, `/statuses/${encodeURIComponent(opts.gitSha)}`),
+      {
+        method: "POST",
+        headers: githubHeaders(opts.token),
+        json: {
+          state,
+          target_url: opts.url,
+          description: describeStatus(opts.status),
+          context: ghContext,
+        },
+        logger: opts.logger,
+      },
+    );
     opts.logger?.info({ context: ghContext, sha: opts.gitSha, state }, "commit status posted");
   } catch (error) {
     opts.logger?.error(

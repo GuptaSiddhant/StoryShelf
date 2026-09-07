@@ -1,4 +1,3 @@
-import { Octokit } from "@octokit/rest";
 import type { GitHostAdapter, GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import type { Logger } from "@storyshelf/core/logger";
 import { upsertPrComment } from "./comment.ts";
@@ -15,16 +14,14 @@ interface GitHubStatusOptions {
 }
 
 function createGitHubStatusAdapter(options: GitHubStatusOptions): GitHostAdapter {
-  const octokit = new Octokit({ auth: options.token });
   const logger = options.logger?.child({ component: "git-github" });
+  const api = { token: options.token, owner: options.owner, repo: options.repo };
 
   return {
     metadata: getMetadata(),
     async setStatus(opts) {
       await postCommitStatus({
-        octokit,
-        owner: options.owner,
-        repo: options.repo,
+        ...api,
         context: opts.context,
         gitSha: opts.gitSha,
         status: opts.status,
@@ -34,9 +31,7 @@ function createGitHubStatusAdapter(options: GitHubStatusOptions): GitHostAdapter
     },
     async isMerged(opts) {
       return await checkIsMerged({
-        octokit,
-        owner: options.owner,
-        repo: options.repo,
+        ...api,
         sha: opts.sha,
         branch: opts.branch,
         logger,
@@ -44,9 +39,7 @@ function createGitHubStatusAdapter(options: GitHubStatusOptions): GitHostAdapter
     },
     async upsertComment(opts) {
       return await upsertPrComment({
-        octokit,
-        owner: options.owner,
-        repo: options.repo,
+        ...api,
         sha: opts.sha,
         url: opts.url,
         markdown: opts.markdown,

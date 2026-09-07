@@ -99,6 +99,7 @@ StoryShelf/
 - **Tests:** every model, every router, every adapter must have tests (target 100% coverage). `nub run test` is hermetic (no browser); the capture pipeline is covered by a gated `test:integration` suite — see `docs/testing.md`.
 - **No AsyncLocalStorage for models.** Use constructor injection. The store is for router handlers only.
 - **Logging:** pino baked into core via `createShelfLogger()`. Always structured objects, never interpolate into the message (`logger.info({ buildId }, "msg")`); attach errors as an `err` child (`logger.error({ err }, "msg")`); derive scoped children for background work (`logger.child({ buildId })`). Hosted observability (Sentry/PostHog/Datadog/GCP/OTEL) are optional pino `transports`, not separate loggers. See ADR 0014.
+- **HTTP:** outbound calls go through the shared helper (`@storyshelf/core/utils`: `httpJson`/`HttpError`) — timeout plus retry with `Retry-After` built in. Never hand-roll fetch error handling per package, and never add client libraries (`ky`/`ofetch`) — see ADR 0019.
 - **UI:** server-rendered `hono/jsx` + HTMX + `hono/css`. Fixed UI with a `ui` brand config (logo/theme); header + sidebar layout; system theme with manual override; no client framework and no UI adapter — custom UIs consume `/api/v1`. HTMX is vendored locally; the review page uses a small vanilla-JS layer (theme toggle, keyboard review).
 - **Primary export first:** in every module, the primary exported item (the factory/router/class readers came for — e.g. `createShelfRouter`, `createLocalStorage`, model classes) sits as high as possible: doc header, imports, then the primary export before helpers, secondary types, and internal utilities. Skim-reading rule: the file's purpose must be obvious within the first screen.
 - **Single prod owner per third-party dep:** a runtime dependency lives in exactly one package's `dependencies` (e.g. `pino` in `@storyshelf/core`); other packages use `devDependencies` for tests and import types through the owner (`@storyshelf/core/logger`), never directly.
@@ -146,6 +147,8 @@ StoryShelf/
 | 0015 | Pure Capture Renderer Adapter (capture adapters render only; server orchestrator owns loading/extraction/persistence) |
 | 0016 | Server Scaffolding Over Rigid Package (`storyshelf server init` generates the server; no universal server package) |
 | 0017 | Interaction Testing via Storybook `play` Function (executePlay, flaky/blocked/disabled semantics) |
+| 0018 | Split Core (Domain) from Router (HTTP) |
+| 0019 | Shared HTTP Helper in Core (`httpJson`/`HttpError` with timeout + retry; no client libraries) |
 
 ## Parallel Development with Worktrees
 

@@ -30,9 +30,9 @@
     "./test-helpers": "./src/test-helpers/index.ts"
   },
   "imports": {
-    "hono/jsx": "npm:hono@4.13.5/jsx",
-    "hono/jsx/jsx-runtime": "npm:hono@4.13.5/jsx/jsx-runtime",
-    "hono/jsx/jsx-dev-runtime": "npm:hono@4.13.5/jsx/jsx-dev-runtime"
+    "hono/jsx": "npm:hono@4.13.7/jsx",
+    "hono/jsx/jsx-runtime": "npm:hono@4.13.7/jsx/jsx-runtime",
+    "hono/jsx/jsx-dev-runtime": "npm:hono@4.13.7/jsx/jsx-dev-runtime"
   },
   "publish": {
     "include": ["src", "README.md", "LICENSE"],

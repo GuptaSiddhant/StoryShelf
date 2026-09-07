@@ -1,28 +1,22 @@
-import type { Octokit } from "@octokit/rest";
 import type { CheckStatus } from "@storyshelf/core/adapter/git-host";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { mapStatus } from "./mapper.ts";
 import { findPrNumber } from "./pr.ts";
 
-function stubOctokit(
-  listPulls: (opts: { owner: string; repo: string; commit_sha: string }) => Promise<{ data: { number?: unknown }[] }>,
-): Octokit {
-  return {
-    repos: {
-      listPullRequestsAssociatedWithCommit: listPulls,
-    },
-  } as unknown as Octokit;
+function stubFetch(handler: () => Response | Promise<Response>): void {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => await handler()),
+  );
 }
 
-async function emptyPulls(): Promise<{ data: { number?: unknown }[] }> {
-  await Promise.resolve();
-  return { data: [] };
+function pullsResponse(pulls: unknown): Response {
+  return Response.json(pulls);
 }
 
-async function numberedPulls(...numbers: number[]): Promise<{ data: { number?: unknown }[] }> {
-  await Promise.resolve();
-  return { data: numbers.map((number) => ({ number })) };
-}
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("mapStatus", () => {
   it("maps the three check states to GitHub states", () => {
@@ -37,44 +31,38 @@ describe("mapStatus", () => {
 });
 
 describe("findPrNumber", () => {
+  const opts = { token: "ghp_test", owner: "acme", repo: "widgets", sha: "abc" };
+
   it("returns the first associated PR number", async () => {
-    const octokit = stubOctokit(async () => await numberedPulls(42, 43));
-    await expect(
-      findPrNumber({ octokit, owner: "acme", repo: "widgets", sha: "abc" }),
-    ).resolves.toBe(42);
+    stubFetch(() => pullsResponse([{ number: 42 }, { number: 43 }]));
+    await expect(findPrNumber(opts)).resolves.toBe(42);
   });
 
   it("returns undefined when no PR is associated", async () => {
-    const octokit = stubOctokit(emptyPulls);
-    await expect(
-      findPrNumber({ octokit, owner: "acme", repo: "widgets", sha: "abc" }),
-    ).resolves.toBeUndefined();
+    stubFetch(() => pullsResponse([]));
+    await expect(findPrNumber(opts)).resolves.toBeUndefined();
   });
 
   it("returns undefined when the API throws", async () => {
-    const octokit = stubOctokit(async () => {
-      await Promise.resolve();
-      throw new Error("rate limited");
-    });
-    await expect(
-      findPrNumber({ octokit, owner: "acme", repo: "widgets", sha: "abc" }),
-    ).resolves.toBeUndefined();
+    stubFetch(() => new Response("boom", { status: 400 }));
+    await expect(findPrNumber(opts)).resolves.toBeUndefined();
   });
 
   it("ignores non-numeric PR numbers", async () => {
-    const octokit = stubOctokit(async () => {
-      await Promise.resolve();
-      return { data: [{ number: "42" }] };
-    });
-    await expect(
-      findPrNumber({ octokit, owner: "acme", repo: "widgets", sha: "abc" }),
-    ).resolves.toBeUndefined();
+    stubFetch(() => pullsResponse([{ number: "42" }]));
+    await expect(findPrNumber(opts)).resolves.toBeUndefined();
   });
 
-  it("forwards owner, repo, and sha", async () => {
-    const listPulls = vi.fn(emptyPulls);
-    const octokit = stubOctokit(listPulls);
-    await findPrNumber({ octokit, owner: "acme", repo: "widgets", sha: "abc123" });
-    expect(listPulls).toHaveBeenCalledWith({ owner: "acme", repo: "widgets", commit_sha: "abc123" });
+  it("queries the commits pulls endpoint with auth", async () => {
+    const fetchMock = vi.fn(async () => {
+      await Promise.resolve();
+      return pullsResponse([]);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await findPrNumber({ ...opts, sha: "abc123" });
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("https://api.github.com/repos/acme/widgets/commits/abc123/pulls");
+    expect(init.headers).toMatchObject({ authorization: "Bearer ghp_test" });
   });
 });

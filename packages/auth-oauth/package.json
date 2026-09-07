@@ -45,8 +45,7 @@
     "prepublishOnly": "nub run build"
   },
   "dependencies": {
-    "@storyshelf/core": "workspace:*",
-    "hono": "^4.11.0"
+    "@storyshelf/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",
