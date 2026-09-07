@@ -58,4 +58,4 @@ Each project has settings for:
 
 ## Projects vs. builds
 
-A project contains **builds** (one per upload, identified by ULID rather than git SHA so re-runs are possible) and **baselines** (per branch). Builds are transient and purged by retention; baselines are permanent. See [Baselines & branches](/concepts/baselines/).
+A project contains **builds** (one per upload, identified by ULID rather than git SHA so re-runs are possible) and **baselines** (per branch). Builds are transient and purged by retention; default-branch baselines are permanent, feature-branch baselines are GC'd after `branchTtlDays` (30d daily sweep). See [Baselines & branches](/concepts/baselines/).

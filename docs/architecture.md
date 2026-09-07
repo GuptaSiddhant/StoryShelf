@@ -217,7 +217,7 @@ data/                                    # --data-dir flag (default: ./data)
           static/
     baselines/
       {branch}/
-        {storyId}/{viewport}.png         # canonical approved screenshot (NEVER TTL'd)
+        {storyId}/{viewport}.png         # canonical approved screenshot (default branch NEVER TTL'd; feature branches TTL'd via branchTtlDays 30d daily GC)
 ```
 
 **Design decisions:**
@@ -440,25 +440,25 @@ Screenshots accumulate fast. Everything below the **baseline** is transient; the
 
 ### What is never purged
 
-- `baselines/**` files and `baselines` rows (all branches)
-- Builds bearing a `persistent` label (release/tag builds) and their storage files
+- Default-branch `baselines/**` files/rows (feature branches TTL'd — see below) and builds bearing a `persistent` label (release/tag builds) and their storage files
 
 ### What is purged
 
 - **Builds in a terminal review state** (`approved`/`rejected`) older than `purge_ttl` (default 30 days).
 - **Old builds of a branch**: retain the most recent build per branch (it is the branch's "current" state and powers the PR status link); purge older ones past TTL.
 - Builds stuck in non-terminal states are **not** purged (a `reviewing` build must not vanish before review).
+- **Stale branch baselines:** branches whose latest build is older than `branchTtlDays` (default 30, `null` = disabled) are GC'd — deletes `baselines/{branch}/**` files and `baselines` rows for that branch (default branch never GC'd).
 
-Purge removes **both** storage files (`builds/{buildId}/`) and database rows (`builds`, `snapshots`) in one transaction.
+Purge removes **both** storage files (`builds/{buildId}/` or `baselines/{branch}/**`) and database rows (`builds`, `snapshots`, or `baselines`) in one transaction.
 
 ### Orphaned baselines
 
-When a story is renamed or removed from Storybook, its baseline is never touched by normal builds. On each **default-branch** build, diff `index.json` against the `baselines` table and delete baselines whose `story_id` no longer exists.
+When a story is renamed or removed from Storybook, its baseline is never touched by normal builds. On each **default-branch** build, diff `index.json` against the `baselines` table and delete baselines whose `story_id` no longer exists (now also deletes the storage file).
 
 ### Trigger
 
-- **Scheduled**: an in-server timer driven by `--purge-interval` (default hourly).
-- **Manual**: `storyshelf purge` CLI command or `POST /api/v1/admin/purge` (admin).
+- **Scheduled**: in-server timers — build purge (`--purge-interval`, default hourly) and branch GC (`branchTtlDays` 30 + `branchGcIntervalMs` 24h daily interval clock via `retention-timer.ts`, staggered 1h).
+- **Manual**: `storyshelf purge` CLI command or `POST /api/v1/admin/purge` (admin; now runs both build purge and branch GC and returns `{removedBuilds,removedBranches,removedBaselines}`).
 
 ## Published Storybook
 
@@ -594,7 +594,7 @@ StoryShelf/
         models/           # business logic (constructor-injected over DatabaseAdapter)
         schema/           # Drizzle tables + row types (narrow handles via `core/schema`)
         capture/          # orchestrator, pipeline, queues, storybook discovery
-        retention/        # purge (TTL + per-branch retention + orphan GC)
+        retention/        # purge (build TTL + per-branch keep-latest + orphan GC + branch GC via purgeStaleBranches)
         diff/             # visual diff engine (pixelmatch + overlay)
         config.ts         # ShelfOptions/ShelfConfig/UIConfig + validation
         logger.ts         # pino factory (`core/logger`)
@@ -761,6 +761,8 @@ services:
       # Capture + retention
       - CAPTURE_CONCURRENCY=2
       - PURGE_TTL_DAYS=30
+      - BRANCH_TTL_DAYS=30
+      - BRANCH_GC_INTERVAL_MS=86400000
       - PURGE_INTERVAL_MINUTES=60
       # Published Storybook subdomains (optional — omit for path-based URLs only)
       # - PUBLISHED_BASE_DOMAIN=stories.example.com   # requires wildcard DNS + TLS

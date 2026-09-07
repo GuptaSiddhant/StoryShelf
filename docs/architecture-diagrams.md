@@ -571,18 +571,19 @@ flowchart TB
                 SB2["storybook/<br/>index.json + static/<br/><em>published Storybook — served as browsable site</em>"]
                 Zip["storybook.zip<br/><em>uploaded archive (optional inline-extract)</em>"]
             end
-            subgraph Baselines["baselines/{branch}/{storyId}/{viewport}.png<br/><em>canonical — NEVER purged</em>"]
+            subgraph Baselines["baselines/{branch}/{storyId}/{viewport}.png<br/><em>canonical — default branch NEVER purged; stale feature branches TTL'd (30d daily GC)</em>"]
                 BMain["main/..."]
                 BFeat["feature/xyz/..."]
             end
         end
     end
 
-    Purge[/"Retention Purge<br/>packages/core/src/retention/purge.ts:30<br/>removes builds/* but NOT baselines/*"/]
+    Purge[/"Retention Purge<br/>packages/core/src/retention/purge.ts:30<br/>removes builds/* + stale branch baselines/*"/]
+    BranchGC[/"Branch GC<br/>packages/core/src/retention/purge.ts:107<br/>purgeStaleBranches + retention-timer.ts daily"/]
     Publish[/"Published Storybook<br/>most recent public build<br/>per project (architecture.md:471)"/]
 
     Builds -. TTL + keep-latest-per-branch .-> Purge
-    Baselines -. exempt .-> Purge
+    Baselines -. stale branches TTL'd .-> BranchGC
     SB2 -. served at .-> Publish
 
     classDef transient fill:#fef7e0,stroke:#fbbc04;
@@ -690,9 +691,9 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-    startP(["Trigger<br/>--purge-interval (hourly timer)<br/>or POST /api/v1/admin/purge<br/>or storyshelf purge CLI"])
+    startP(["Trigger<br/>--purge-interval (hourly) + branchGcIntervalMs (daily)<br/>or POST /api/v1/admin/purge<br/>or storyshelf purge CLI"])
     loadProjects["For each project"]
-    cutoff["cutoff = now - purgeTtlDays (default 30)"]
+    cutoff["cutoff = now - purgeTtlDays (30)"]
     candidates["candidates = builds<br/>where status IN (approved,rejected)<br/>AND updated_at < cutoff"]
     keepLatest{"keepLatestPerBranch?<br/>(default true)"}
     latest["latestPerBranch = most recent build<br/>per git_branch<br/>packages/core/src/retention/purge.ts:74"]
@@ -702,14 +703,16 @@ flowchart TB
     delFiles["storage.list(prefix)<br/>storage.delete(each file)<br/>prefix = {projectId}/builds/{buildId}/"]
     delRows["BuildModel.remove(buildId)<br/>cascades snapshots + comments"]
     orphanGC["Orphan baseline GC<br/>(default-branch builds only)<br/>diff index.json vs baselines table<br/>delete story_id no longer in Storybook"]
-    done(["Done<br/>return { removedBuilds, removedFiles }"])
+    branchGC["Branch GC<br/>purgeStaleBranches(project, branchTtlDays=30)<br/>branches with no build since cutoff<br/>default branch exempt"]
+    done(["Done<br/>return { removedBuilds, removedBranches, removedBaselines }"])
 
     startP --> loadProjects --> cutoff --> candidates --> keepLatest
     keepLatest -- yes --> latest --> checkPersistent
     keepLatest -- no --> checkPersistent
     checkPersistent -- yes --> skip
-    checkPersistent -- no --> toPurge --> delFiles --> delRows --> orphanGC --> done
-    skip --> done
+    checkPersistent -- no --> toPurge --> delFiles --> delRows --> orphanGC --> branchGC --> done
+    skip --> orphanGC
+    orphanGC --> branchGC
 
     classDef trigger fill:#e8f0fe,stroke:#4285f4;
     classDef decision fill:#fff4ce,stroke:#e6a800;
@@ -717,7 +720,7 @@ flowchart TB
     classDef done2 fill:#e6f4ea,stroke:#34a853;
     class startP trigger;
     class keepLatest,checkPersistent decision;
-    class loadProjects,cutoff,candidates,latest,toPurge,delFiles,delRows,orphanGC action;
+    class loadProjects,cutoff,candidates,latest,toPurge,delFiles,delRows,orphanGC,branchGC action;
     class done done2;
 ```
 

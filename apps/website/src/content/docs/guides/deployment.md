@@ -17,6 +17,8 @@ services:
       - SECRET=change-me
       - CAPTURE_CONCURRENCY=2
       - PURGE_TTL_DAYS=30
+      - BRANCH_TTL_DAYS=30
+      - BRANCH_GC_INTERVAL_MS=86400000
       - OIDC_ISSUER=https://keycloak.example.com/realms/myteam
       - OIDC_CLIENT_ID=storyshelf
       - OIDC_CLIENT_SECRET=secret

@@ -76,7 +76,7 @@ Each upload resolves `packagePath` (`relative(cwd, dirname(.storybook))`) and is
 ## Server config vs client config
 
 - **Client file** (`.storybook/storyshelf.json`): `slug`, `url`, `buildDir`, `buildCommand`, `buildScriptName`, `skip` — per-Storybook, committed, non-secret.
-- **Server `ShelfConfig` / DB `projects`** (`core/src/config.ts:48`, `core/src/schema.ts:5`): `secret`, `captureConcurrency`, `scratchDir`, `purgeTtlDays`, `maxUploadBytes`, `maxInlineUnzipSize`, `viewports`, `pixel_threshold`, `storybook_meta` (`framework/addons/storiesGlobs/packagePath` auto-detected at `create`).
+- **Server `ShelfConfig` / DB `projects`** (`core/src/config.ts:48`, `core/src/schema.ts:5`): `secret`, `captureConcurrency`, `scratchDir`, `purgeTtlDays`, `branchTtlDays`, `branchGcIntervalMs`, `maxUploadBytes`, `maxInlineUnzipSize`, `viewports`, `pixel_threshold`, `storybook_meta` (`framework/addons/storiesGlobs/packagePath` auto-detected at `create`).
 
 Uploads at or under `maxInlineUnzipSize` bytes are extracted inline so the published Storybook preview is live on response; larger uploads wait for capture. Leave it unset (the default) to always wait for capture — required on diskless hosts.
 

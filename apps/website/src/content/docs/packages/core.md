@@ -32,7 +32,7 @@ const app = createShelfRouter({
   captureRunner,
   gitHosts: [gitHubHost],
   auth,
-  config: { secret, captureConcurrency: 2, purgeTtlDays: 30 },
+  config: { secret, captureConcurrency: 2, purgeTtlDays: 30, branchTtlDays: 30, branchGcIntervalMs: 86_400_000 },
 });
 
 serve({ fetch: app.fetch, port: 3000 });
@@ -72,6 +72,6 @@ Git integration is a `GitHost` pair:
 
 Packages that implement `GitHostProvider` (e.g. `@storyshelf/git-github` `gitHubHost`) are wired in alongside the router — see [the git-github package](../git-github/).
 
-`ShelfConfig` supports a session secret, published Storybook base domain, capture concurrency, capture viewports, a capture scratch directory (`scratchDir`, required when `capture` is enabled), purge TTL, and an optional `adapters` snapshot (`{ [key]: AdapterMetadata }`) auto-populated from each adapter's `metadata` for introspection. The `secret` is also used to encrypt git-provider tokens at rest. `UIConfig` controls the name, logo, favicon, and light/dark brand themes.
+`ShelfConfig` supports a session secret, published Storybook base domain, capture concurrency, capture viewports, a capture scratch directory (`scratchDir`, required when `capture` is enabled), purge TTL (`purgeTtlDays`), branch GC TTL (`branchTtlDays` 30, `null`=disabled) + interval (`branchGcIntervalMs` 86_400_000 daily), and an optional `adapters` snapshot (`{ [key]: AdapterMetadata }`) auto-populated from each adapter's `metadata` for introspection. The `secret` is also used to encrypt git-provider tokens at rest. `UIConfig` controls the name, logo, favicon, and light/dark brand themes.
 
 Choose the default adapters in [deployment](../../guides/deployment/) or see the [CLI guide](../../guides/cli/) for the packaged server entry point.

@@ -52,7 +52,9 @@ export interface ShelfConfig {
   captureConcurrency?: number;
   scratchDir?: string;
   purgeTtlDays?: number;
+  /** Branch baseline TTL, days; null disables branch GC (default 30). */
   branchTtlDays?: number | null;
+  /** Branch GC interval, ms; daily sweep via interval clock (default 86_400_000). */
   branchGcIntervalMs?: number;
   maxUploadBytes?: number;
   /**

@@ -1,3 +1,4 @@
+/* oxlint-disable typescript/promise-function-async -- map callbacks return promises from async helpers */
 /** Per-branch baseline screenshots with default-branch fallback. */
 import { and, eq } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";

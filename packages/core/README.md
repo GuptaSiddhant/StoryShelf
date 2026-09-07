@@ -27,7 +27,7 @@ const app = createShelfRouter({
   gitHosts, // GitHostProvider[] (optional)
   logger, // pino Logger (optional; built internally if omitted)
   ui: { name: "My Shelf" }, // UIConfig (optional)
-  config: { captureConcurrency: 2, purgeTtlDays: 30 }, // ShelfConfig (optional)
+  config: { captureConcurrency: 2, purgeTtlDays: 30, branchTtlDays: 30, branchGcIntervalMs: 86_400_000 }, // ShelfConfig (optional)
 });
 
 // The returned app is a Hono instance; serve it with any Hono adapter.
@@ -61,6 +61,8 @@ interface ShelfConfig {
   captureConcurrency?: number; // concurrent capture jobs (default 2)
   scratchDir?: string; // capture working directory (required with captureRunner)
   purgeTtlDays?: number; // purge builds older than N days
+  branchTtlDays?: number | null; // branch baseline TTL, days; null disables GC (default 30)
+  branchGcIntervalMs?: number; // branch GC interval, ms; daily via interval clock (default 86_400_000)
   maxUploadBytes?: number; // single-zip upload cap (default 1 GiB)
   maxInlineUnzipSize?: number; // inline statics extraction cap; unset = capture-only
   viewports?: Viewport[]; // capture viewports
@@ -103,7 +105,7 @@ Import from `core/capture`, `core/diff`, and the model entries — never from th
 - `StorybookAdapter` (`core/capture`) — reads a built Storybook's `index.json`/`stories.json`.
 - `InMemoryCaptureQueue` (`core/capture`) — in-process, concurrency-limited queue for long-lived hosts; supply a remote queue with a separate worker for serverless.
 - `diffImages(baseline: Buffer, current: Buffer, options: DiffOptions): DiffResult` (`core/diff`) — pixelmatch-based diff. Also exports `DiffOptions`, `DiffResult`.
-- Models, schema, and row types back every entity; retention runs inside the router. (Models are private implementation details with no public entry — reach row types via `core/schema`.)
+- Models, schema, and row types back every entity; retention runs inside the router (`Retention.purge` for builds + `Retention.purgeStaleBranches` for branch GC via `retention-timer.ts` daily sweep). (Models are private implementation details with no public entry — reach row types via `core/schema`.)
 
 ### Helpers
 

@@ -20,3 +20,7 @@ Accepting a change on a feature branch records a baseline **for that branch**, s
 ## Persistent builds
 
 A build carrying the `persistent` label is never purged. The CLI attaches it automatically for commits with git tags, so release builds survive retention.
+
+## Branch GC
+
+Feature-branch baselines are GC'd after `branchTtlDays` (default 30, `null` = disabled) of inactivity via a daily sweep (`branchGcIntervalMs` 24h). Default-branch baselines are never GC'd.

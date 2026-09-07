@@ -64,7 +64,7 @@ const s3 = createS3Storage({
 
 ### Retention
 
-Baselines are the durable truth and are **never purged**; build data (screenshots, diffs, Storybook statics) is transient. See ADR 0009 for the purge policy (TTL + per-branch retention + orphan-GC), which deletes storage files and database rows together.
+Default-branch baselines are the durable truth and are **never purged**; feature-branch baselines are GC'd after `branchTtlDays` (30d daily sweep); build data (screenshots, diffs, Storybook statics) is transient. See ADR 0009 for the purge policy (TTL + per-branch retention + orphan-GC + branch-GC), which deletes storage files and database rows together.
 
 ## Consequences
 

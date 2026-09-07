@@ -117,4 +117,4 @@ Trigger a manual retention purge (normally it runs on a schedule). Requires site
 storyshelf purge --url http://localhost:3000 --token $STORYSHELF_ADMIN_TOKEN
 ```
 
-Purges terminal builds older than `purge_ttl_days` (keeping the most recent per branch), removes their storage files and rows in one transaction, and cleans up orphaned baselines. Baselines and `persistent` builds are never purged.
+Purges terminal builds older than `purge_ttl_days` (keeping the most recent per branch), removes their storage files and rows in one transaction, cleans up orphaned baselines, and GCs stale branch baselines older than `branchTtlDays` (30d daily sweep; default-branch baselines and `persistent` builds are never purged).
