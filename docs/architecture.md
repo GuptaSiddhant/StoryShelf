@@ -1,5 +1,7 @@
 # StoryShelf Architecture
 
+> **Visual companion:** [`architecture-diagrams.md`](./architecture-diagrams.md) — 18 Mermaid diagrams (system context, containers, capture pipeline, baseline resolution, ER model, storage, deployment, etc.) derived from this spec.
+
 ## What StoryShelf Is
 
 A self-hosted visual testing platform for Storybook. Run visual regression tests in CI, review pixel-level diffs in a web UI, and approve changes before they ship. No per-snapshot billing. No vendor lock-in.

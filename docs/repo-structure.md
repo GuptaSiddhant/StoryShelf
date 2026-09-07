@@ -1,6 +1,7 @@
 # Repository Structure
 
 Annotated map of the StoryShelf monorepo. `AGENTS.md` is the workflow guide; this file is the spatial index.
+For a visual overview, see [`architecture-diagrams.md`](./architecture-diagrams.md) §2 (Package Map) and §3 (Adapter Composition).
 
 ## Workspaces vs fixtures
 
