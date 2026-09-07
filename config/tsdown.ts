@@ -47,5 +47,8 @@ export function cliConfig(entry: UserConfig["entry"]): UserConfig {
     dts: false,
     entry,
     fixedExtension: false,
+    // CLI binaries ship no source maps: the tarball stays small and no
+    // source is exposed beyond the bundled output.
+    sourcemap: false as const,
   };
 }
