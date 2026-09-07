@@ -101,6 +101,7 @@ Commands (write, require --yes unless --dry-run):
   sync [--package <n>] [--dry-run] [--yes] [--json]
     Create missing JSR packages + PATCH description/runtimeCompat/githubRepository drift.
   yank|unyank <pkg>@<ver> --yes     Yank or unyank a version
+  archive|unarchive <pkg> --yes   Archive a package (blocks new versions, hides from search) or undo
   set-desc <pkg> --text "..." --yes Set package description (max 250 chars)
   set-runtime <pkg> --node/--deno/--browser/--workerd/--bun true|false --yes
   set-github <pkg> --owner <o> --repo <r> --yes | set-github <pkg> --clear --yes
@@ -496,6 +497,16 @@ async function cmdSetDesc(positional, flags) {
   log(`updated @${SCOPE}/${jsr}: description`);
 }
 
+async function cmdArchive(positional, flags, archived) {
+  const jsr = requirePkg(positional);
+  requireYes(flags, archived ? "archive" : "unarchive");
+  await apiFetch(`/scopes/${SCOPE}/packages/${jsr}`, {
+    method: "PATCH",
+    json: { isArchived: archived },
+  });
+  log(`${archived ? "archived" : "unarchived"} @${SCOPE}/${jsr}`);
+}
+
 function parseBoolFlag(value, name) {
   if (value === true || value === "true" || value === "1") return true;
   if (value === false || value === "false" || value === "0") return false;
@@ -559,6 +570,8 @@ function runCommand(parsed) {
   if (command === "whoami") return cmdShow("/user");
   if (command === "yank") return cmdYank(positional, flags, true);
   if (command === "unyank") return cmdYank(positional, flags, false);
+  if (command === "archive") return cmdArchive(positional, flags, true);
+  if (command === "unarchive") return cmdArchive(positional, flags, false);
   if (command === "set-desc") return cmdSetDesc(positional, flags);
   if (command === "set-runtime") return cmdSetRuntime(positional, flags);
   if (command === "set-github") return cmdSetGithub(positional, flags);
