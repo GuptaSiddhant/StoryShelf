@@ -134,4 +134,15 @@ describe("BaselineModel", () => {
     const listed = await model.list("p1");
     expect(listed.map((b) => b.storyId)).toEqual(["components-button--primary"]);
   });
+
+  it("removeOrphans also deletes the storage object", async () => {
+    const { db, storage } = setup();
+    const model = new BaselineModel(db, storage);
+    await seedBaseline(model, storage, { storyId: "gone" });
+    const gonePath = baselinePath("p1", "main", "gone", "desktop");
+    await expect(storage.exists(gonePath)).resolves.toBe(true);
+    await model.removeOrphans("p1", new Set(["keep"]));
+    await expect(storage.exists(gonePath)).resolves.toBe(false);
+    await expect(model.list("p1")).resolves.toHaveLength(0);
+  });
 });

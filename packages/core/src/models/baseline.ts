@@ -126,6 +126,11 @@ export class BaselineModel {
     const toRemove = all.filter((baseline) => !validStoryIds.has(baseline.storyId));
     await Promise.all(
       toRemove.map(async (baseline) => {
+        try {
+          await this.storage.delete(baseline.screenshotPath);
+        } catch {
+          // ignore missing file
+        }
         await this.db.remove(baselines, baseline.id);
       }),
     );
