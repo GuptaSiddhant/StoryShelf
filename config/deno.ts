@@ -8,7 +8,7 @@ const SCHEMA_URL =
   "https://raw.githubusercontent.com/denoland/deno/refs/heads/main/cli/schemas/config-file.v1.json";
 const NPM_SCHEME = "npm:";
 const PUBLISH_INCLUDE = ["src", "README.md", "LICENSE"];
-const PUBLISH_EXCLUDE = ["**/*.test.ts", "**/*.test.tsx", "**/test-helpers"];
+const PUBLISH_EXCLUDE = ["**/*.test.ts", "**/*.test.tsx"];
 const SHORT_STRING_ARRAY_RE = /\[(\s*"[^"\n]*",?)+\s*\]/gu;
 const MAX_SINGLE_LINE_ARRAY = 80;
 

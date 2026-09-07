@@ -3,6 +3,7 @@ import type { AnySQLiteTable } from "drizzle-orm/sqlite-core";
 
 /* eslint-disable require-await, no-unnecessary-type-assertion, no-unnecessary-type-parameters, non-nullable-type-assertion-style */
 
+/** A drizzle SQL chunk inspected for matching and ordering. */
 export interface SqlChunk {
   value?: unknown;
   name?: string;
@@ -23,6 +24,7 @@ function textOf(chunk: SqlChunk | undefined): string | undefined {
   return chunk.value.join("");
 }
 
+/** Test whether an in-memory row satisfies a drizzle where-clause. */
 export function whereMatches(
   where: SQL,
   row: Record<string, unknown>,

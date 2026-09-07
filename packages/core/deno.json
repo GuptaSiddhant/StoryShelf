@@ -36,6 +36,6 @@
   },
   "publish": {
     "include": ["src", "README.md", "LICENSE"],
-    "exclude": ["**/*.test.ts", "**/*.test.tsx", "**/test-helpers"]
+    "exclude": ["**/*.test.ts", "**/*.test.tsx"]
   }
 }

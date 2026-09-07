@@ -68,7 +68,7 @@ const viewportSchema: z.ZodType<ShelfViewport> = z.object({
   height: z.number().int().positive(),
 });
 
-const brandThemeSchema = z.object({
+const brandThemeSchema: z.ZodType<BrandTheme> = z.object({
   accent: z.string(),
   surface: z.object({ base: z.string(), card: z.string() }),
   text: z.object({ primary: z.string(), secondary: z.string() }),
@@ -100,7 +100,7 @@ export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
   .strict();
 
 /** Zod schema validating the UI branding configuration. */
-export const uiConfigSchema = z
+export const uiConfigSchema: z.ZodType<UIConfig> = z
   .object({
     name: z.string().optional(),
     // oxlint-disable-next-line typescript/no-deprecated -- z.string().url() kept for zod v3 API compat

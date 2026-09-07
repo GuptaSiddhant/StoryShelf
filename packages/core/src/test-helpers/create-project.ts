@@ -4,6 +4,7 @@ import { ProjectModel } from "../models/project.ts";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 
+/** Create a test project with owner/repo defaults. */
 export async function createTestProject(
   db: DatabaseAdapter,
   overrides?: Partial<Project>,
@@ -13,6 +14,7 @@ export async function createTestProject(
   return await new ProjectModel(db).create({ name: "Test", gitRepository, ...rest });
 }
 
+/** Create a test build on main with sha-1 defaults. */
 export async function createTestBuild(
   db: DatabaseAdapter,
   projectId: string,
