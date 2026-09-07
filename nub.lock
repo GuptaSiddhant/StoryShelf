@@ -6,12 +6,36 @@ settings:
 
 catalogs:
   default:
+    '@hono/node-server':
+      specifier: ^1.17.0
+      version: 1.19.17
     '@types/node':
       specifier: ^26.0.0
       version: 26.4.1
+    '@types/picomatch':
+      specifier: ^4.0.1
+      version: 4.0.3
+    '@types/pngjs':
+      specifier: ^6.0.5
+      version: 6.0.5
+    '@types/prompts':
+      specifier: ^2.4.9
+      version: 2.4.9
+    '@types/unzipper':
+      specifier: 0.10.11
+      version: 0.10.11
     '@vitest/coverage-v8':
       specifier: ^4.0.0
       version: 4.1.11
+    adm-zip:
+      specifier: 0.6.0
+      version: 0.6.0
+    drizzle-orm:
+      specifier: ^0.44.0
+      version: 0.44.7
+    hono:
+      specifier: ^4.11.0
+      version: 4.13.7
     oxfmt:
       specifier: ^0.65.0
       version: 0.65.0
@@ -21,6 +45,9 @@ catalogs:
     oxlint-tsgolint:
       specifier: ^7.0.2001
       version: 7.0.2001
+    pino:
+      specifier: ^10.3.1
+      version: 10.3.1
     tsdown:
       specifier: ^0.22.14
       version: 0.22.14
@@ -33,6 +60,9 @@ catalogs:
     yaml:
       specifier: ^2.9.0
       version: 2.9.0
+    zod:
+      specifier: ^4.2.0
+      version: 4.5.4
 
 importers:
 
@@ -66,7 +96,7 @@ importers:
   apps/dev-server:
     dependencies:
       '@hono/node-server':
-        specifier: ^1.17.0
+        specifier: 'catalog:'
         version: 1.19.17(hono@4.13.7)
       '@storyshelf/auth-password':
         specifier: workspace:*
@@ -112,7 +142,7 @@ importers:
   apps/fly-app:
     dependencies:
       '@hono/node-server':
-        specifier: ^1.17.0
+        specifier: 'catalog:'
         version: 1.19.17(hono@4.13.7)
       '@storyshelf/auth-password':
         specifier: workspace:*
@@ -226,7 +256,7 @@ importers:
         specifier: ^13.0.0
         version: 13.1.0
       hono:
-        specifier: ^4.11.0
+        specifier: 'catalog:'
         version: 4.13.7
       picomatch:
         specifier: ^4.0.2
@@ -242,16 +272,16 @@ importers:
         specifier: 'catalog:'
         version: 26.4.1
       '@types/picomatch':
-        specifier: ^4.0.1
+        specifier: 'catalog:'
         version: 4.0.3
       '@types/prompts':
-        specifier: ^2.4.9
+        specifier: 'catalog:'
         version: 2.4.9
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.11(@types/node@26.4.1)(vite@8.2.2(@types/node@26.4.1)(yaml@2.9.0))(vitest@4.1.11)
       adm-zip:
-        specifier: 0.6.0
+        specifier: 'catalog:'
         version: 0.6.0
       oxfmt:
         specifier: 'catalog:'
@@ -275,10 +305,10 @@ importers:
   packages/core:
     dependencies:
       drizzle-orm:
-        specifier: ^0.44.0
+        specifier: 'catalog:'
         version: 0.44.7(@libsql/client@0.15.15)
       pino:
-        specifier: ^10.3.1
+        specifier: 'catalog:'
         version: 10.3.1
       pixelmatch:
         specifier: ^7.1.0
@@ -290,17 +320,17 @@ importers:
         specifier: 0.12.5
         version: 0.12.5
       zod:
-        specifier: ^4.2.0
+        specifier: 'catalog:'
         version: 4.5.4
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
         version: 26.4.1
       '@types/pngjs':
-        specifier: ^6.0.5
+        specifier: 'catalog:'
         version: 6.0.5
       '@types/unzipper':
-        specifier: 0.10.11
+        specifier: 'catalog:'
         version: 0.10.11
       '@vitest/coverage-v8':
         specifier: 'catalog:'
@@ -333,7 +363,7 @@ importers:
         specifier: workspace:*
         version: link:../core
       drizzle-orm:
-        specifier: ^0.44.0
+        specifier: 'catalog:'
         version: 0.44.7(@libsql/client@0.15.15)
     devDependencies:
       '@types/node':
@@ -370,7 +400,7 @@ importers:
         specifier: workspace:*
         version: link:../core
       drizzle-orm:
-        specifier: ^0.44.0
+        specifier: 'catalog:'
         version: 0.44.7(@libsql/client@0.15.15)
     devDependencies:
       '@types/node':
@@ -407,7 +437,7 @@ importers:
         specifier: workspace:*
         version: link:../core
       zod:
-        specifier: ^4.2.0
+        specifier: 'catalog:'
         version: 4.5.4
     devDependencies:
       '@types/node':
@@ -441,7 +471,7 @@ importers:
         specifier: workspace:*
         version: link:../core
       zod:
-        specifier: ^4.2.0
+        specifier: 'catalog:'
         version: 4.5.4
     devDependencies:
       '@types/node':
@@ -515,13 +545,13 @@ importers:
         specifier: workspace:*
         version: link:../core
       drizzle-orm:
-        specifier: ^0.44.0
+        specifier: 'catalog:'
         version: 0.44.7(@libsql/client@0.15.15)
       hono:
-        specifier: ^4.11.0
+        specifier: 'catalog:'
         version: 4.13.7
       zod:
-        specifier: ^4.2.0
+        specifier: 'catalog:'
         version: 4.5.4
     devDependencies:
       '@types/node':
@@ -531,7 +561,7 @@ importers:
         specifier: 'catalog:'
         version: 4.1.11(@types/node@26.4.1)(vite@8.2.2(@types/node@26.4.1)(yaml@2.9.0))(vitest@4.1.11)
       adm-zip:
-        specifier: 0.6.0
+        specifier: 'catalog:'
         version: 0.6.0
       oxfmt:
         specifier: 'catalog:'
@@ -543,7 +573,7 @@ importers:
         specifier: 'catalog:'
         version: 7.0.2001
       pino:
-        specifier: ^10.3.1
+        specifier: 'catalog:'
         version: 10.3.1
       tsdown:
         specifier: 'catalog:'
@@ -560,9 +590,6 @@ importers:
       '@storyshelf/core':
         specifier: workspace:*
         version: link:../core
-      adm-zip:
-        specifier: ^0.6.0
-        version: 0.6.0
       playwright:
         specifier: ^1.52.0
         version: 1.63.0
@@ -582,6 +609,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.11(@types/node@26.4.1)(vite@8.2.2(@types/node@26.4.1)(yaml@2.9.0))(vitest@4.1.11)
+      adm-zip:
+        specifier: 'catalog:'
+        version: 0.6.0
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0

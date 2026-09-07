@@ -47,13 +47,13 @@
   },
   "dependencies": {
     "@storyshelf/core": "workspace:*",
-    "adm-zip": "^0.6.0",
     "playwright": "^1.52.0"
   },
   "devDependencies": {
     "@storyshelf/db-sqlite": "workspace:*",
     "@storyshelf/router": "workspace:*",
     "@storyshelf/storage-local": "workspace:*",
+    "adm-zip": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "oxfmt": "catalog:",

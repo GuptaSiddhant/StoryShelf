@@ -11,7 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@hono/node-server": "^1.17.0",
+    "@hono/node-server": "catalog:",
     "@storyshelf/auth-password": "workspace:*",
     "@storyshelf/core": "workspace:*",
     "@storyshelf/db-sqlite": "workspace:*",

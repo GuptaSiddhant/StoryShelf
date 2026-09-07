@@ -44,17 +44,17 @@
   "dependencies": {
     "archiver": "8.0.0",
     "commander": "^13.0.0",
-    "hono": "^4.11.0",
+    "hono": "catalog:",
     "picomatch": "^4.0.2",
     "prompts": "^2.4.2"
   },
   "devDependencies": {
     "@storyshelf/core": "workspace:*",
     "@types/node": "catalog:",
-    "@types/picomatch": "^4.0.1",
-    "@types/prompts": "^2.4.9",
+    "@types/picomatch": "catalog:",
+    "@types/prompts": "catalog:",
     "@vitest/coverage-v8": "catalog:",
-    "adm-zip": "0.6.0",
+    "adm-zip": "catalog:",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",

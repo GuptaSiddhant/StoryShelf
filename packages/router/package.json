@@ -51,18 +51,18 @@
     "@hono/swagger-ui": "^0.6.1",
     "@hono/zod-openapi": "^1.1.5",
     "@storyshelf/core": "workspace:*",
-    "drizzle-orm": "^0.44.0",
-    "hono": "^4.11.0",
-    "zod": "^4.2.0"
+    "drizzle-orm": "catalog:",
+    "hono": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
-    "adm-zip": "0.6.0",
+    "adm-zip": "catalog:",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
-    "pino": "^10.3.1",
+    "pino": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

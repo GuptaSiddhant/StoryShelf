@@ -11,8 +11,16 @@
       "./packages/*"
     ],
     "catalog": {
+      "@hono/node-server": "^1.17.0",
       "@types/node": "^26.0.0",
+      "@types/picomatch": "^4.0.1",
+      "@types/pngjs": "^6.0.5",
+      "@types/prompts": "^2.4.9",
+      "@types/unzipper": "0.10.11",
       "@vitest/coverage-v8": "^4.0.0",
+      "adm-zip": "0.6.0",
+      "drizzle-orm": "^0.44.0",
+      "hono": "^4.11.0",
       "oxfmt": "^0.65.0",
       "oxlint": "^1.80.0",
       "oxlint-tsgolint": "^7.0.2001",
@@ -20,7 +28,8 @@
       "tsdown": "^0.22.14",
       "vitest": "^4.0.0",
       "pino": "^10.3.1",
-      "yaml": "^2.9.0"
+      "yaml": "^2.9.0",
+      "zod": "^4.2.0"
     }
   },
   "type": "module",

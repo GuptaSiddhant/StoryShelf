@@ -168,17 +168,17 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "drizzle-orm": "^0.44.0",
-    "pino": "^10.3.1",
+    "drizzle-orm": "catalog:",
+    "pino": "catalog:",
     "pixelmatch": "^7.1.0",
     "pngjs": "^7.0.0",
     "unzipper": "0.12.5",
-    "zod": "^4.2.0"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "@types/pngjs": "^6.0.5",
-    "@types/unzipper": "0.10.11",
+    "@types/pngjs": "catalog:",
+    "@types/unzipper": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "adm-zip": "0.6.0",
     "oxfmt": "catalog:",

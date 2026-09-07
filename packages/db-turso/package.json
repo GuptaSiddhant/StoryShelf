@@ -47,7 +47,7 @@
   "dependencies": {
     "@libsql/client": "^0.15.0",
     "@storyshelf/core": "workspace:*",
-    "drizzle-orm": "^0.44.0"
+    "drizzle-orm": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
