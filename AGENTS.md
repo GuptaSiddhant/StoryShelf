@@ -100,6 +100,7 @@ StoryShelf/
 - **No AsyncLocalStorage for models.** Use constructor injection. The store is for router handlers only.
 - **Logging:** pino baked into core via `createShelfLogger()`. Always structured objects, never interpolate into the message (`logger.info({ buildId }, "msg")`); attach errors as an `err` child (`logger.error({ err }, "msg")`); derive scoped children for background work (`logger.child({ buildId })`). Hosted observability (Sentry/PostHog/Datadog/GCP/OTEL) are optional pino `transports`, not separate loggers. See ADR 0014.
 - **UI:** server-rendered `hono/jsx` + HTMX + `hono/css`. Fixed UI with a `ui` brand config (logo/theme); header + sidebar layout; system theme with manual override; no client framework and no UI adapter — custom UIs consume `/api/v1`. HTMX is vendored locally; the review page uses a small vanilla-JS layer (theme toggle, keyboard review).
+- **Primary export first:** in every module, the primary exported item (the factory/router/class readers came for — e.g. `createShelfRouter`, `createLocalStorage`, model classes) sits as high as possible: doc header, imports, then the primary export before helpers, secondary types, and internal utilities. Skim-reading rule: the file's purpose must be obvious within the first screen.
 
 ## Database options
 
