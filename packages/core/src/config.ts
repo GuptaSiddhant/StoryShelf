@@ -52,6 +52,8 @@ export interface ShelfConfig {
   captureConcurrency?: number;
   scratchDir?: string;
   purgeTtlDays?: number;
+  branchTtlDays?: number | null;
+  branchGcIntervalMs?: number;
   maxUploadBytes?: number;
   /**
    * Max zip size (bytes) eligible for inline statics extraction at upload.
@@ -92,6 +94,8 @@ export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
     captureConcurrency: z.number().int().positive().optional(),
     scratchDir: z.string().optional(),
     purgeTtlDays: z.number().int().positive().optional(),
+    branchTtlDays: z.number().int().positive().nullable().optional(),
+    branchGcIntervalMs: z.number().int().positive().optional(),
     maxUploadBytes: z.number().int().positive().optional(),
     maxInlineUnzipSize: z.number().int().positive().optional(),
     viewports: z.array(viewportSchema).min(1, "at least one viewport required").optional(),

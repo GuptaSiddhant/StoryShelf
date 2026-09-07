@@ -72,4 +72,131 @@ describe("Retention", () => {
     expect(remaining.length).toBe(1);
     expect(remaining[0]?.id).toBe("b-recent");
   });
+
+  it("purges stale baseline branches via TTL", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const now = new Date();
+    const project = {
+      id: "p1",
+      name: "Test",
+      slug: "test",
+      gitRepository: null,
+      gitDefaultBranch: "main",
+      pixelThreshold: 0.1,
+      maxDiffRatio: 0.01,
+      publicBranchRegex: null,
+      executePlay: false,
+      playTimeoutMs: 10_000,
+      storybookMeta: null,
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    };
+    await db.insert(projects, project);
+
+    const oldDate = new Date(now.getTime() - 40 * 86_400_000).toISOString();
+    const recentDate = new Date(now.getTime() - 5 * 86_400_000).toISOString();
+
+    await db.insert(builds, {
+      id: "b-stale",
+      projectId: "p1",
+      gitSha: "sha-stale",
+      gitBranch: "feature/stale",
+      isDefault: false,
+      status: "approved",
+      snapshotCount: 0,
+      changedCount: 0,
+      approvedCount: 0,
+      rejectedCount: 0,
+      createdAt: oldDate,
+      updatedAt: oldDate,
+    });
+    await db.insert(builds, {
+      id: "b-fresh",
+      projectId: "p1",
+      gitSha: "sha-fresh",
+      gitBranch: "feature/fresh",
+      isDefault: false,
+      status: "approved",
+      snapshotCount: 0,
+      changedCount: 0,
+      approvedCount: 0,
+      rejectedCount: 0,
+      createdAt: recentDate,
+      updatedAt: recentDate,
+    });
+    await db.insert(builds, {
+      id: "b-main",
+      projectId: "p1",
+      gitSha: "sha-main",
+      gitBranch: "main",
+      isDefault: true,
+      status: "approved",
+      snapshotCount: 0,
+      changedCount: 0,
+      approvedCount: 0,
+      rejectedCount: 0,
+      createdAt: oldDate,
+      updatedAt: oldDate,
+    });
+
+    const { BaselineModel } = await import("../models/baseline.ts");
+    const baselineModel = new BaselineModel(db, storage);
+    await storage.write("src.png", Buffer.from([1]));
+    await baselineModel.upsert("p1", "s1", "desktop", "feature/stale", "snap1", "src.png");
+    await baselineModel.upsert("p1", "s1", "desktop", "feature/fresh", "snap2", "src.png");
+    await baselineModel.upsert("p1", "s1", "desktop", "main", "snap3", "src.png");
+
+    const retention = new Retention(db, storage);
+    const result = await retention.purgeStaleBranches(project, 30);
+    expect(result.removedBranches).toBe(1);
+    expect(result.removedBaselines).toBe(1);
+    const remaining = await baselineModel.list("p1");
+    expect(remaining.map((b) => b.branch).toSorted()).toEqual(["feature/fresh", "main"]);
+  });
+
+  it("never purges the default branch", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const now = new Date();
+    const project = {
+      id: "p1",
+      name: "Test",
+      slug: "test",
+      gitRepository: null,
+      gitDefaultBranch: "main",
+      pixelThreshold: 0.1,
+      maxDiffRatio: 0.01,
+      publicBranchRegex: null,
+      executePlay: false,
+      playTimeoutMs: 10_000,
+      storybookMeta: null,
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    };
+    await db.insert(projects, project);
+    const oldDate = new Date(now.getTime() - 40 * 86_400_000).toISOString();
+    await db.insert(builds, {
+      id: "b-main",
+      projectId: "p1",
+      gitSha: "sha-main",
+      gitBranch: "main",
+      isDefault: true,
+      status: "approved",
+      snapshotCount: 0,
+      changedCount: 0,
+      approvedCount: 0,
+      rejectedCount: 0,
+      createdAt: oldDate,
+      updatedAt: oldDate,
+    });
+    const { BaselineModel } = await import("../models/baseline.ts");
+    const baselineModel = new BaselineModel(db, storage);
+    await storage.write("src.png", Buffer.from([1]));
+    await baselineModel.upsert("p1", "s1", "desktop", "main", "snap1", "src.png");
+    const retention = new Retention(db, storage);
+    const result = await retention.purgeStaleBranches(project, 30);
+    expect(result.removedBranches).toBe(0);
+    expect(result.removedBaselines).toBe(0);
+  });
 });

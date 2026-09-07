@@ -257,7 +257,13 @@ export const okSchema = z.object({ ok: z.boolean() }).openapi("Ok");
 export const errorSchema = z.object({ message: z.string() }).openapi("Error");
 
 /** OpenAPI schema for the retention purge result. */
-export const purgeSchema = z.object({ removedBuilds: z.number() }).openapi("PurgeResult");
+export const purgeSchema = z
+  .object({
+    removedBuilds: z.number(),
+    removedBranches: z.number().optional(),
+    removedBaselines: z.number().optional(),
+  })
+  .openapi("PurgeResult");
 
 /** OpenAPI schema for the retention purge input. */
 export const purgeInputSchema = z.object({ ttlDays: z.number().optional() }).openapi("PurgeInput");

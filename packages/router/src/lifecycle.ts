@@ -10,6 +10,7 @@ import type { AdapterInitContext } from "@storyshelf/core/adapter/metadata";
 import type { ShelfOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 import type { ShelfApp, ShelfLifecycle } from "./app-types.ts";
+import { startBranchGcTimer } from "./retention-timer.ts";
 import type { ServerRuntime } from "./runtime.ts";
 
 /** Mutable init-settlement cell shared by the gate, health, and `init()`. */
@@ -49,7 +50,17 @@ export function attachLifecycle(
 ): void {
   const initCtx: AdapterInitContext = { config: runtime.config, logger: runtime.logger };
   kickInit(options, initCtx, runtime.logger, cell);
-  Object.assign(app, { lifecycle: createLifecycle(options, initCtx, runtime.logger, cell) });
+  const timer = startBranchGcInterval(options, runtime);
+  Object.assign(app, {
+    lifecycle: createLifecycle(options, initCtx, runtime.logger, cell, timer),
+  });
+}
+
+function startBranchGcInterval(
+  options: ShelfOptions,
+  runtime: ServerRuntime,
+): { stop(): void } | null {
+  return startBranchGcTimer(options.database, options.storage, runtime.config, runtime.logger);
 }
 
 /** Build the `app.lifecycle` namespace closing over one settlement cell. */
@@ -58,6 +69,7 @@ function createLifecycle(
   ctx: AdapterInitContext,
   logger: Logger,
   cell: LifecycleCell,
+  timer: { stop(): void } | null = null,
 ): ShelfLifecycle {
   return {
     get ready() {
@@ -73,6 +85,7 @@ function createLifecycle(
       }
     },
     close: async () => {
+      timer?.stop();
       const result = await runAdapterCloses(collectCloses(options), ctx, logger);
       if (!result.ok) {
         throw new AdapterLifecycleError("close", result.failures);

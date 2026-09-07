@@ -145,4 +145,31 @@ describe("BaselineModel", () => {
     await expect(storage.exists(gonePath)).resolves.toBe(false);
     await expect(model.list("p1")).resolves.toHaveLength(0);
   });
+
+  it("removeForBranch deletes only that branch", async () => {
+    const { db, storage } = setup();
+    const model = new BaselineModel(db, storage);
+    await seedBaseline(model, storage, { branch: "feature", storyId: "s1" });
+    await seedBaseline(model, storage, { branch: "main", storyId: "s1" });
+    const featurePath = baselinePath("p1", "feature", "s1", "desktop");
+    await expect(storage.exists(featurePath)).resolves.toBe(true);
+    const removed = await model.removeForBranch("p1", "feature");
+    expect(removed).toBe(1);
+    await expect(storage.exists(featurePath)).resolves.toBe(false);
+    const remaining = await model.list("p1");
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0]?.branch).toBe("main");
+  });
+
+  it("removeStaleBranches deletes multiple branches", async () => {
+    const { db, storage } = setup();
+    const model = new BaselineModel(db, storage);
+    await seedBaseline(model, storage, { branch: "stale-1", storyId: "s1" });
+    await seedBaseline(model, storage, { branch: "stale-2", storyId: "s1" });
+    await seedBaseline(model, storage, { branch: "fresh", storyId: "s1" });
+    const removed = await model.removeStaleBranches("p1", new Set(["stale-1", "stale-2"]));
+    expect(removed).toBe(2);
+    const remaining = await model.list("p1");
+    expect(remaining.map((b) => b.branch)).toEqual(["fresh"]);
+  });
 });

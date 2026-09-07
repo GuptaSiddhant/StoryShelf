@@ -2,6 +2,7 @@ import { and, desc, eq, inArray, lt } from "drizzle-orm";
 import type { Logger } from "pino";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
+import { BaselineModel } from "../models/baseline.ts";
 import { BuildModel } from "../models/build.ts";
 import { LabelModel } from "../models/label.ts";
 import { builds } from "../schema/build.ts";
@@ -18,6 +19,12 @@ export interface PurgeOptions {
 export interface PurgeResult {
   removedBuilds: number;
   removedFiles: number;
+}
+
+/** Counts of stale branches and baselines removed. */
+export interface BranchGcResult {
+  removedBranches: number;
+  removedBaselines: number;
 }
 /** Removes expired transient builds while keeping baselines and persistent builds. */
 export class Retention {
@@ -96,4 +103,51 @@ export class Retention {
     );
     return files.length;
   }
+
+  async purgeStaleBranches(project: Project, ttlDays: number): Promise<BranchGcResult> {
+    if (ttlDays <= 0) {
+      return { removedBranches: 0, removedBaselines: 0 };
+    }
+    const cutoff = new Date(Date.now() - ttlDays * 86_400_000).toISOString();
+    const rows = await this.db.list(builds, {
+      where: eq(builds.projectId, project.id),
+    });
+    const stale = collectStaleBranches(rows, project.gitDefaultBranch, cutoff);
+    if (stale.size === 0) {
+      return { removedBranches: 0, removedBaselines: 0 };
+    }
+    const baselines = new BaselineModel(this.db, this.storage);
+    const removedBaselines = await baselines.removeStaleBranches(project.id, stale);
+    this.logger?.info(
+      { projectId: project.id, removedBranches: stale.size, removedBaselines },
+      "branch GC complete",
+    );
+    return { removedBranches: stale.size, removedBaselines };
+  }
+}
+
+function collectStaleBranches(
+  rows: { gitBranch: string; updatedAt: string }[],
+  defaultBranch: string,
+  cutoff: string,
+): Set<string> {
+  const latestAt = branchLatestAt(rows);
+  const stale = new Set<string>();
+  for (const [branch, updatedAt] of latestAt) {
+    if (branch !== defaultBranch && updatedAt < cutoff) {
+      stale.add(branch);
+    }
+  }
+  return stale;
+}
+
+function branchLatestAt(rows: { gitBranch: string; updatedAt: string }[]): Map<string, string> {
+  const latestAt = new Map<string, string>();
+  for (const row of rows) {
+    const current = latestAt.get(row.gitBranch);
+    if (!current || row.updatedAt > current) {
+      latestAt.set(row.gitBranch, row.updatedAt);
+    }
+  }
+  return latestAt;
 }

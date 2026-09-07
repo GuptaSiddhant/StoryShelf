@@ -136,4 +136,34 @@ export class BaselineModel {
     );
     return toRemove.length;
   }
+
+  async removeForBranch(projectId: string, branch: string): Promise<number> {
+    const all = await this.list(projectId);
+    const toRemove = all.filter((baseline) => baseline.branch === branch);
+    await Promise.all(
+      toRemove.map(async (baseline) => {
+        try {
+          await this.storage.delete(baseline.screenshotPath);
+        } catch {
+          // ignore missing file
+        }
+        await this.db.remove(baselines, baseline.id);
+      }),
+    );
+    return toRemove.length;
+  }
+
+  // oxlint-disable-next-line eslint/require-await -- delegates to async removeForBranch via Promise.all
+  async removeStaleBranches(
+    projectId: string,
+    staleBranches: ReadonlySet<string>,
+  ): Promise<number> {
+    if (staleBranches.size === 0) {
+      return 0;
+    }
+    const results = await Promise.all(
+      [...staleBranches].map((branch) => this.removeForBranch(projectId, branch)),
+    );
+    return results.reduce((sum, count) => sum + count, 0);
+  }
 }
