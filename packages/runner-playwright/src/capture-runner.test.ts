@@ -60,7 +60,7 @@ const playwright = vi.hoisted(() => {
   };
 });
 
-vi.mock("playwright", () => ({ chromium: playwright.chromium }));
+vi.mock("playwright-core", () => ({ chromium: playwright.chromium }));
 
 const STORIES: StoryEntry[] = [
   {

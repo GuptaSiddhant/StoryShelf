@@ -732,7 +732,7 @@ StoryShelf ships a **fixed, server-rendered UI** — `hono/jsx` + HTMX + `hono/c
 ### Docker (recommended)
 
 ```dockerfile
-FROM mcr.microsoft.com/playwright:v1.52.0-noble
+FROM mcr.microsoft.com/playwright:v1.63.0-noble
 # Playwright image includes Chromium, Firefox, WebKit + system deps
 
 WORKDIR /app

@@ -8,7 +8,7 @@ import type {
 } from "@storyshelf/core/adapter/capture-runner";
 import { StorybookAdapter } from "@storyshelf/core/capture";
 import type { Logger } from "@storyshelf/core/logger";
-import { chromium, type Browser } from "playwright";
+import { chromium, type Browser } from "playwright-core";
 
 declare const __PKG_VERSION__: string | undefined;
 

@@ -38,7 +38,7 @@ COPY --from=builder /app/apps/fly-app/dist ./dist
 COPY --from=builder /app/apps/fly-app/package.json ./package.json
 COPY --from=builder /app/node_modules ./node_modules
 # Install chromium + system deps (node:slim has no browsers)
-RUN npm i -g playwright@1.62.1 && playwright install --with-deps chromium
+RUN npm i -g playwright@1.63.0 && playwright install --with-deps chromium
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV DATA_DIR=/data

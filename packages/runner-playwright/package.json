@@ -47,7 +47,7 @@
   },
   "dependencies": {
     "@storyshelf/core": "workspace:*",
-    "playwright": "^1.52.0"
+    "playwright-core": "1.63.0"
   },
   "devDependencies": {
     "@storyshelf/db-sqlite": "workspace:*",
