@@ -62,7 +62,11 @@ describe("loadStorybookConfig", () => {
     mkdirSync(join(dir, ".storybook"), { recursive: true });
     writeFileSync(
       join(dir, ".storybook", "storyshelf.json"),
-      JSON.stringify({ slug: "demo", url: "https://shelf.example.com", buildDir: "dist-storybook" }),
+      JSON.stringify({
+        slug: "demo",
+        url: "https://shelf.example.com",
+        buildDir: "dist-storybook",
+      }),
     );
     await expect(loadStorybookConfig(dir)).resolves.toEqual({
       slug: "demo",
@@ -84,6 +88,42 @@ describe("loadStorybookConfig", () => {
       JSON.stringify({ url: "https://shelf.example.com" }),
     );
     await expect(loadStorybookConfig(dir)).resolves.toBeNull();
+  });
+
+  it("returns null for a non-http URL", async () => {
+    mkdirSync(join(dir, ".storybook"), { recursive: true });
+    writeFileSync(
+      join(dir, ".storybook", "storyshelf.json"),
+      JSON.stringify({ slug: "demo", url: "not a url" }),
+    );
+    await expect(loadStorybookConfig(dir)).resolves.toBeNull();
+  });
+
+  it("returns null for empty-string fields", async () => {
+    mkdirSync(join(dir, ".storybook"), { recursive: true });
+    writeFileSync(
+      join(dir, ".storybook", "storyshelf.json"),
+      JSON.stringify({ slug: "demo", buildDir: "" }),
+    );
+    await expect(loadStorybookConfig(dir)).resolves.toBeNull();
+  });
+
+  it("returns null when buildCommand and buildScriptName are both set", async () => {
+    mkdirSync(join(dir, ".storybook"), { recursive: true });
+    writeFileSync(
+      join(dir, ".storybook", "storyshelf.json"),
+      JSON.stringify({ slug: "demo", buildCommand: "a", buildScriptName: "b" }),
+    );
+    await expect(loadStorybookConfig(dir)).resolves.toBeNull();
+  });
+
+  it("strips unknown keys", async () => {
+    mkdirSync(join(dir, ".storybook"), { recursive: true });
+    writeFileSync(
+      join(dir, ".storybook", "storyshelf.json"),
+      JSON.stringify({ slug: "demo", future: "x" }),
+    );
+    await expect(loadStorybookConfig(dir)).resolves.toEqual({ slug: "demo" });
   });
 });
 

@@ -1,24 +1,107 @@
 import { execSync } from "node:child_process";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
-import { z } from "zod";
 
-export const storybookConfigSchema = z
-  .object({
-    slug: z.string().min(1, "slug is required"),
-    // oxlint-disable-next-line typescript/no-deprecated -- z.string().url() kept for zod v3 API compat
-    url: z.string().url().optional(),
-    buildDir: z.string().min(1).optional(),
-    buildCommand: z.string().min(1).optional(),
-    buildScriptName: z.string().min(1).optional(),
-    skip: z.string().min(1).optional(),
-  })
-  .refine((data) => !(data.buildCommand && data.buildScriptName), {
-    message: "buildCommand and buildScriptName are mutually exclusive",
-    path: ["buildCommand"],
-  });
+/** Validated `.storybook/storyshelf.json` contents. */
+export interface StorybookConfig {
+  slug: string;
+  url?: string;
+  buildDir?: string;
+  buildCommand?: string;
+  buildScriptName?: string;
+  skip?: string;
+}
 
-export type StorybookConfig = z.infer<typeof storybookConfigSchema>;
+/** Parse an unknown value into a `StorybookConfig`, or return the reason it is invalid. */
+function parseStorybookConfig(value: unknown): ParseResult {
+  if (typeof value !== "object" || value === null) {
+    return { ok: false, error: "expected an object" };
+  }
+  const record: Record<string, unknown> = value as Record<string, unknown>;
+  const slug = readSlug(record);
+  if (!slug.ok) {
+    return slug;
+  }
+  const optional = readOptionalStrings(record, OPTIONAL_CONFIG_KEYS);
+  if (!optional.ok) {
+    return optional;
+  }
+  return checkCrossFieldRules(slug.slug, optional.values);
+}
+
+/** Read the required slug field. */
+function readSlug(
+  record: Record<string, unknown>,
+): { ok: true; slug: string } | { ok: false; error: string } {
+  const slug = record["slug"];
+  if (typeof slug !== "string" || slug.length === 0) {
+    return { ok: false, error: "slug is required" };
+  }
+  return { ok: true, slug };
+}
+
+/** Optional config keys with plain string values. */
+const OPTIONAL_CONFIG_KEYS = [
+  "url",
+  "buildDir",
+  "buildCommand",
+  "buildScriptName",
+  "skip",
+] as const;
+
+type ParseResult = { ok: true; config: StorybookConfig } | { ok: false; error: string };
+
+/** Read optional non-empty string fields; any present-but-invalid field is an error. */
+function readOptionalStrings(
+  record: Record<string, unknown>,
+  keys: readonly string[],
+): { ok: true; values: Record<string, string> } | { ok: false; error: string } {
+  const values: Record<string, string> = {};
+  for (const key of keys) {
+    const raw = record[key];
+    if (raw === undefined) {
+      continue;
+    }
+    if (typeof raw !== "string" || raw.length === 0) {
+      return { ok: false, error: `${key} must be a non-empty string` };
+    }
+    values[key] = raw;
+  }
+  return { ok: true, values };
+}
+
+/** Enforce url shape and the buildCommand/buildScriptName exclusion. */
+function checkCrossFieldRules(slug: string, values: Record<string, string>): ParseResult {
+  const url = values["url"];
+  if (url !== undefined && !isHttpUrl(url)) {
+    return { ok: false, error: "url must be a valid http(s) URL" };
+  }
+  if (values["buildCommand"] && values["buildScriptName"]) {
+    return { ok: false, error: "buildCommand and buildScriptName are mutually exclusive" };
+  }
+  const { buildDir, buildCommand, buildScriptName, skip } = values;
+  return {
+    ok: true,
+    config: {
+      slug,
+      ...(url === undefined ? {} : { url }),
+      ...(buildDir === undefined ? {} : { buildDir }),
+      ...(buildCommand === undefined ? {} : { buildCommand }),
+      ...(buildScriptName === undefined ? {} : { buildScriptName }),
+      ...(skip === undefined ? {} : { skip }),
+    },
+  };
+}
+
+/** True for http(s) URLs. */
+function isHttpUrl(value: string): boolean {
+  try {
+    const protocol = new URL(value).protocol;
+    return protocol === "http:" || protocol === "https:";
+  } catch {
+    return false;
+  }
+}
 
 const CONFIG_RELATIVE = join(".storybook", "storyshelf.json");
 
@@ -62,11 +145,11 @@ export async function loadStorybookConfig(
   try {
     const raw = await readFile(full, "utf8");
     const parsed = JSON.parse(raw) as unknown;
-    const result = storybookConfigSchema.safeParse(parsed);
-    if (!result.success) {
+    const result = parseStorybookConfig(parsed);
+    if (!result.ok) {
       return null;
     }
-    return result.data;
+    return result.config;
   } catch {
     return null;
   }
@@ -87,11 +170,11 @@ export async function writeStorybookConfig(
   await mkdir(dir, { recursive: true });
   const existing = await loadStorybookConfig(cwd, customPath);
   const merged = mergeConfigs(existing, config);
-  const result = storybookConfigSchema.safeParse(merged);
-  if (!result.success) {
-    throw new Error(`Invalid storybook config: ${result.error.message}`);
+  const result = parseStorybookConfig(merged);
+  if (!result.ok) {
+    throw new Error(`Invalid storybook config: ${result.error}`);
   }
-  await writeFile(full, `${JSON.stringify(result.data, null, 2)}\n`, "utf8");
+  await writeFile(full, `${JSON.stringify(result.config, null, 2)}\n`, "utf8");
   return full;
 }
 
@@ -154,7 +237,9 @@ async function parseMetaSource(mainPath: string): Promise<StorybookMeta> {
   return meta;
 }
 
-function parseMetaLists(raw: string): Pick<StorybookMeta, "addons" | "storiesGlobs" | "staticDirs"> {
+function parseMetaLists(
+  raw: string,
+): Pick<StorybookMeta, "addons" | "storiesGlobs" | "staticDirs"> {
   const lists: Pick<StorybookMeta, "addons" | "storiesGlobs" | "staticDirs"> = {};
   const keys = [
     ["addons", "addons"],
