@@ -71,13 +71,17 @@ function envOf(...names: string[]): string | undefined {
 }
 
 /** Layer explicit options over env and the client config file. */
-function collectUploadOptions(options: UploadOptions, cfg: StorybookConfig | null): CollectedUploadOptions {
+function collectUploadOptions(
+  options: UploadOptions,
+  cfg: StorybookConfig | null,
+): CollectedUploadOptions {
   return {
     url: options.url ?? cfg?.url ?? envOf("STORYSHELF_URL"),
     slug: options.slug ?? cfg?.slug ?? envOf("STORYSHELF_SLUG"),
     token: options.token ?? envOf("STORYSHELF_TOKEN", "SHELF_TOKEN"),
     sha: options.sha ?? envOf("GITHUB_SHA", "VERCEL_GIT_COMMIT_SHA", "CI_COMMIT_SHA"),
-    branch: options.branch ?? envOf("GITHUB_REF_NAME", "VERCEL_GIT_COMMIT_REF", "CI_COMMIT_REF_NAME"),
+    branch:
+      options.branch ?? envOf("GITHUB_REF_NAME", "VERCEL_GIT_COMMIT_REF", "CI_COMMIT_REF_NAME"),
     buildDir: options.buildDir ?? cfg?.buildDir ?? "storybook-static",
     buildCommand: options.buildCommand ?? cfg?.buildCommand,
     buildScriptName: options.buildScriptName ?? cfg?.buildScriptName,
@@ -98,7 +102,9 @@ interface ResolvedUploadOptions extends CollectedUploadOptions {
 }
 
 /** Throw on the first missing required upload option. */
-function assertUploadOptions(collected: CollectedUploadOptions): asserts collected is ResolvedUploadOptions {
+function assertUploadOptions(
+  collected: CollectedUploadOptions,
+): asserts collected is ResolvedUploadOptions {
   if (!collected.url) {
     throw new Error("--url is required (or .storybook/storyshelf.json / STORYSHELF_URL)");
   }

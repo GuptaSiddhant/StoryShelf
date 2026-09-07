@@ -94,7 +94,9 @@ async function executeCreate(
 ): Promise<void> {
   const client = createClient(url, token);
   const project = (await client.projects.create(payload)) as ProjectResponse;
-  const tokenRes = (await client.projects.tokens.create(project.slug, { name: "ci" })) as TokenResponse;
+  const tokenRes = (await client.projects.tokens.create(project.slug, {
+    name: "ci",
+  })) as TokenResponse;
   // Write client config without token
   const written = await writeStorybookConfig({ slug: project.slug, url }, cwd);
   printLine(`Project slug: ${project.slug}`);

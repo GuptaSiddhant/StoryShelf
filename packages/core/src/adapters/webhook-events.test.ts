@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { WebhookModel } from "../models/webhook.ts";
+import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { hmacSha256 } from "../utils/hash.ts";
 import { emitWebhookEvent } from "./webhook-events.ts";
 
@@ -14,14 +14,22 @@ describe("emitWebhookEvent", () => {
   it("signs deliveries with the decrypted secret, not the ciphertext", async () => {
     const { db } = makeDatabase();
     const model = new WebhookModel(db, TEST_SECRET);
-    await model.create("p1", { url: "https://example.com/hook", secret: "whsec-plain", events: [] });
+    await model.create("p1", {
+      url: "https://example.com/hook",
+      secret: "whsec-plain",
+      events: [],
+    });
 
     const seen: { url: string; signature: string; body: string }[] = [];
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: string, init: { headers: Record<string, string>; body: string }) => {
         await Promise.resolve();
-        seen.push({ url, signature: init.headers["X-StoryShelf-Signature"] ?? "", body: init.body });
+        seen.push({
+          url,
+          signature: init.headers["X-StoryShelf-Signature"] ?? "",
+          body: init.body,
+        });
         return new Response("{}", { status: 200 });
       }),
     );
@@ -36,7 +44,11 @@ describe("emitWebhookEvent", () => {
   it("skips webhooks whose secret cannot be decrypted", async () => {
     const { db } = makeDatabase();
     const model = new WebhookModel(db, TEST_SECRET);
-    await model.create("p1", { url: "https://example.com/hook", secret: "whsec-plain", events: [] });
+    await model.create("p1", {
+      url: "https://example.com/hook",
+      secret: "whsec-plain",
+      events: [],
+    });
 
     const fetchMock = vi.fn(async () => {
       await Promise.resolve();
@@ -52,7 +64,11 @@ describe("emitWebhookEvent", () => {
   it("delivers only subscribed events", async () => {
     const { db } = makeDatabase();
     const model = new WebhookModel(db, TEST_SECRET);
-    await model.create("p1", { url: "https://example.com/hook", secret: "s", events: ["build:created"] });
+    await model.create("p1", {
+      url: "https://example.com/hook",
+      secret: "s",
+      events: ["build:created"],
+    });
 
     const fetchMock = vi.fn(async () => {
       await Promise.resolve();

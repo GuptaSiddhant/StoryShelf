@@ -51,7 +51,6 @@
     "@hono/swagger-ui": "^0.6.1",
     "@hono/zod-openapi": "^1.1.5",
     "@storyshelf/core": "workspace:*",
-    "drizzle-orm": "catalog:",
     "hono": "catalog:",
     "zod": "catalog:"
   },

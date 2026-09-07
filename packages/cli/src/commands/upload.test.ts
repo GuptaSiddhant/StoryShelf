@@ -40,12 +40,33 @@ describe("runUpload validation", () => {
     it(`throws without ${field}`, async () => {
       await expect(runUpload({ ...partial, cwd: dir })).rejects.toThrow(message);
     });
-  }  const cases: { field: string; partial: Record<string, string>; message: string }[] = [
-    { field: "url", partial: { slug: "demo", token: "t", sha: "s", branch: "b" }, message: "--url is required" },
-    { field: "slug", partial: { url: "u", token: "t", sha: "s", branch: "b" }, message: "--slug is required" },
-    { field: "token", partial: { url: "u", slug: "s", sha: "s", branch: "b" }, message: "--token is required" },
-    { field: "sha", partial: { url: "u", slug: "s", token: "t", branch: "b" }, message: "--sha is required" },
-    { field: "branch", partial: { url: "u", slug: "s", token: "t", sha: "s" }, message: "--branch is required" },
+  }
+  const cases: { field: string; partial: Record<string, string>; message: string }[] = [
+    {
+      field: "url",
+      partial: { slug: "demo", token: "t", sha: "s", branch: "b" },
+      message: "--url is required",
+    },
+    {
+      field: "slug",
+      partial: { url: "u", token: "t", sha: "s", branch: "b" },
+      message: "--slug is required",
+    },
+    {
+      field: "token",
+      partial: { url: "u", slug: "s", sha: "s", branch: "b" },
+      message: "--token is required",
+    },
+    {
+      field: "sha",
+      partial: { url: "u", slug: "s", token: "t", branch: "b" },
+      message: "--sha is required",
+    },
+    {
+      field: "branch",
+      partial: { url: "u", slug: "s", token: "t", sha: "s" },
+      message: "--branch is required",
+    },
   ];
   for (const { field, partial, message } of cases) {
     throwsWithout(field, partial, message);
@@ -108,10 +129,12 @@ describe("runUpload success", () => {
       contentType: "application/zip",
     });
     const zip = new AdmZip(putBytes);
-    expect(zip.getEntries().map((entry) => entry.entryName).toSorted()).toEqual([
-      "iframe.html",
-      "index.json",
-    ]);
+    expect(
+      zip
+        .getEntries()
+        .map((entry) => entry.entryName)
+        .toSorted(),
+    ).toEqual(["iframe.html", "index.json"]);
   });
 
   it("throws on invalid --label flags", async () => {
@@ -152,4 +175,3 @@ function okJson(payload: unknown): Response {
     },
   } as Response;
 }
-

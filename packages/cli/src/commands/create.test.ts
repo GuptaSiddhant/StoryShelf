@@ -2,8 +2,8 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { runCreate } from "./create.ts";
 import { loadStorybookConfig } from "../config.ts";
+import { runCreate } from "./create.ts";
 
 let dir: string;
 let savedExitCode: typeof process.exitCode;

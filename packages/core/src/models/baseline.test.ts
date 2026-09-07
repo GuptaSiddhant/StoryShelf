@@ -5,7 +5,10 @@ import { BaselineModel } from "./baseline.ts";
 
 const PNG = Buffer.from([137, 80, 78, 71]);
 
-function setup(): { db: ReturnType<typeof makeDatabase>["db"]; storage: ReturnType<typeof makeStorage>["storage"] } {
+function setup(): {
+  db: ReturnType<typeof makeDatabase>["db"];
+  storage: ReturnType<typeof makeStorage>["storage"];
+} {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
   return { db, storage };
@@ -19,7 +22,14 @@ async function seedBaseline(
   const branch = overrides.branch ?? "main";
   const storyId = overrides.storyId ?? "components-button--primary";
   await storage.write("source/shot.png", PNG);
-  const baseline = await model.upsert("p1", storyId, "desktop", branch, "snap-1", "source/shot.png");
+  const baseline = await model.upsert(
+    "p1",
+    storyId,
+    "desktop",
+    branch,
+    "snap-1",
+    "source/shot.png",
+  );
   return { id: baseline.id };
 }
 
@@ -34,8 +44,22 @@ describe("BaselineModel", () => {
     const { db, storage } = setup();
     const model = new BaselineModel(db, storage);
     await storage.write("source/shot.png", PNG);
-    const main = await model.upsert("p1", "story", "desktop", "main", "snap-main", "source/shot.png");
-    const feature = await model.upsert("p1", "story", "desktop", "feature", "snap-feature", "source/shot.png");
+    const main = await model.upsert(
+      "p1",
+      "story",
+      "desktop",
+      "main",
+      "snap-main",
+      "source/shot.png",
+    );
+    const feature = await model.upsert(
+      "p1",
+      "story",
+      "desktop",
+      "feature",
+      "snap-feature",
+      "source/shot.png",
+    );
     const resolved = await model.resolve("p1", "story", "desktop", "feature", "main");
     expect(resolved?.id).toBe(feature.id);
     expect(main.id).toBeDefined();
@@ -45,7 +69,13 @@ describe("BaselineModel", () => {
     const { db, storage } = setup();
     const model = new BaselineModel(db, storage);
     const { id } = await seedBaseline(model, storage);
-    const resolved = await model.resolve("p1", "components-button--primary", "desktop", "feature", "main");
+    const resolved = await model.resolve(
+      "p1",
+      "components-button--primary",
+      "desktop",
+      "feature",
+      "main",
+    );
     expect(resolved?.id).toBe(id);
   });
 
@@ -59,12 +89,26 @@ describe("BaselineModel", () => {
     const { db, storage } = setup();
     const model = new BaselineModel(db, storage);
     await storage.write("source/shot.png", PNG);
-    const created = await model.upsert("p1", "story", "desktop", "main", "snap-1", "source/shot.png");
+    const created = await model.upsert(
+      "p1",
+      "story",
+      "desktop",
+      "main",
+      "snap-1",
+      "source/shot.png",
+    );
     expect(created.snapshotId).toBe("snap-1");
     expect(created.screenshotPath).toBe(baselinePath("p1", "main", "story", "desktop"));
 
     await storage.write("source/shot2.png", Buffer.from([1, 2, 3]));
-    const updated = await model.upsert("p1", "story", "desktop", "main", "snap-2", "source/shot2.png");
+    const updated = await model.upsert(
+      "p1",
+      "story",
+      "desktop",
+      "main",
+      "snap-2",
+      "source/shot2.png",
+    );
     expect(updated.id).toBe(created.id);
     expect(updated.snapshotId).toBe("snap-2");
     await expect(model.read(updated)).resolves.toEqual(Buffer.from([1, 2, 3]));

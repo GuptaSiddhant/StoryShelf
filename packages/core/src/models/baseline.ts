@@ -74,13 +74,19 @@ export class BaselineModel {
         screenshotPath,
         updatedAt: new Date().toISOString(),
       });
-      await emitWebhookEvent(this.db, projectId, "baseline:updated", {
-        baselineId: baseline.id,
-        storyId,
-        viewport,
-        branch,
-        snapshotId,
-      }, this.secret);
+      await emitWebhookEvent(
+        this.db,
+        projectId,
+        "baseline:updated",
+        {
+          baselineId: baseline.id,
+          storyId,
+          viewport,
+          branch,
+          snapshotId,
+        },
+        this.secret,
+      );
     } else {
       const now = new Date().toISOString();
       baseline = await this.db.insert(baselines, {
@@ -94,13 +100,19 @@ export class BaselineModel {
         createdAt: now,
         updatedAt: now,
       });
-      await emitWebhookEvent(this.db, projectId, "baseline:created", {
-        baselineId: baseline.id,
-        storyId,
-        viewport,
-        branch,
-        snapshotId,
-      }, this.secret);
+      await emitWebhookEvent(
+        this.db,
+        projectId,
+        "baseline:created",
+        {
+          baselineId: baseline.id,
+          storyId,
+          viewport,
+          branch,
+          snapshotId,
+        },
+        this.secret,
+      );
     }
     return baseline;
   }

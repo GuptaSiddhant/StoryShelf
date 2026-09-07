@@ -66,7 +66,11 @@ describe("WebhookModel", () => {
 
   it("lists webhooks for a project", async () => {
     const { db } = makeDatabase();
-    await model(db).create("p1", { url: "https://webhook1.com", secret: "secret-1", events: ["push"] });
+    await model(db).create("p1", {
+      url: "https://webhook1.com",
+      secret: "secret-1",
+      events: ["push"],
+    });
     await model(db).create("p1", {
       url: "https://webhook2.com",
       secret: "secret-2",

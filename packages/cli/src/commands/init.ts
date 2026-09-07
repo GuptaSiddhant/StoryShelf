@@ -59,7 +59,11 @@ function describeMeta(meta: StorybookMeta): string {
 
 type PromptName = "url" | "slug";
 
-function buildQuestions(url: string | undefined, slug: string | undefined, hint: string): {
+function buildQuestions(
+  url: string | undefined,
+  slug: string | undefined,
+  hint: string,
+): {
   type: "text";
   name: PromptName;
   message: string;
@@ -111,7 +115,10 @@ interface MergedInitOptions {
 }
 
 /** Layer explicit options over an existing config file. */
-function mergeWithExisting(options: InitOptions, existing: StorybookConfig | null): MergedInitOptions {
+function mergeWithExisting(
+  options: InitOptions,
+  existing: StorybookConfig | null,
+): MergedInitOptions {
   const url = options.url ?? process.env["STORYSHELF_URL"];
   const slug = options.slug ?? process.env["STORYSHELF_SLUG"];
   if (!existing) {
@@ -144,7 +151,12 @@ async function resolveInitAnswers(options: InitOptions, cwd: string): Promise<In
   if (!answers) {
     return null;
   }
-  return { ...merged, url: narrowAnswer(answers.url) ?? merged.url, slug: narrowAnswer(answers.slug) ?? merged.slug, detected };
+  return {
+    ...merged,
+    url: narrowAnswer(answers.url) ?? merged.url,
+    slug: narrowAnswer(answers.slug) ?? merged.slug,
+    detected,
+  };
 }
 
 interface InitConfig {
@@ -269,7 +281,12 @@ async function runTokenLoop(
 }
 
 /** Sync storybook_meta to the server when the project already exists. */
-async function syncStorybookMeta(url: string, slug: string, cwd: string, token?: string): Promise<void> {
+async function syncStorybookMeta(
+  url: string,
+  slug: string,
+  cwd: string,
+  token?: string,
+): Promise<void> {
   const metaToSync = await detectStorybookMeta(cwd);
   if (Object.keys(metaToSync).length === 0) {
     return;
@@ -288,7 +305,11 @@ async function syncStorybookMeta(url: string, slug: string, cwd: string, token?:
 }
 
 /** Write the config and sync meta once the slug is known. */
-async function finalizeInit(answers: InitAnswers, cwd: string, options: InitOptions): Promise<void> {
+async function finalizeInit(
+  answers: InitAnswers,
+  cwd: string,
+  options: InitOptions,
+): Promise<void> {
   if (!answers.slug) {
     printError("--slug is required (or run `storyshelf create --url <url> --name <name>`)");
     process.exitCode = 1;
