@@ -104,7 +104,7 @@ export const commentSchema = z
     projectId: z.string(),
     buildId: z.string(),
     snapshotId: z.string().nullable(),
-    userId: z.string(),
+    userId: z.string().nullable(),
     body: z.string(),
     parentId: z.string().nullable(),
     resolved: z.boolean(),

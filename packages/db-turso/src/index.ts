@@ -8,7 +8,8 @@ import { drizzle } from "drizzle-orm/libsql";
 declare const __PKG_VERSION__: string | undefined;
 
 const STORYBOOK_META_ALTER = "ALTER TABLE projects ADD COLUMN storybook_meta TEXT";
-const WEBHOOK_SECRET_ALTER = "ALTER TABLE webhooks ADD COLUMN secret_encrypted TEXT NOT NULL DEFAULT ''";
+const WEBHOOK_SECRET_ALTER =
+  "ALTER TABLE webhooks ADD COLUMN secret_encrypted TEXT NOT NULL DEFAULT ''";
 const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN secret";
 
 /**
@@ -30,21 +31,72 @@ export function createTursoDatabase(options: { url: string; authToken?: string }
       category: "database",
     },
     migrate: async () => {
-      await client.executeMultiple(DDL);
-      try {
-        await client.execute(STORYBOOK_META_ALTER);
-      } catch {
-        // Column already exists — ignore
-      }
-      try {
-        await client.execute(WEBHOOK_SECRET_ALTER);
-        await client.execute(WEBHOOK_SECRET_DROP);
-      } catch {
-        // Already migrated (or fresh schema) — ignore for idempotency
-      }
+      await runMigrations(client);
     },
     close: () => {
       client.close();
     },
   });
+}
+
+async function runMigrations(client: ReturnType<typeof createClient>): Promise<void> {
+  await client.executeMultiple(DDL);
+  await execIgnore(client, STORYBOOK_META_ALTER);
+  await execWebhookMigration(client);
+  await migrateCommentsTable(client);
+}
+
+async function execIgnore(client: ReturnType<typeof createClient>, sql: string): Promise<void> {
+  try {
+    await client.execute(sql);
+  } catch {
+    // idempotent — already migrated
+  }
+}
+
+async function execWebhookMigration(client: ReturnType<typeof createClient>): Promise<void> {
+  try {
+    await client.execute(WEBHOOK_SECRET_ALTER);
+    await client.execute(WEBHOOK_SECRET_DROP);
+  } catch {
+    // already migrated — ignore
+  }
+}
+
+async function migrateCommentsTable(client: ReturnType<typeof createClient>): Promise<void> {
+  try {
+    const result = await client.execute(
+      "SELECT sql FROM sqlite_master WHERE type='table' AND name='comments'",
+    );
+    const sql = (result.rows[0] as unknown as { sql: string } | undefined)?.sql;
+    if (!sql?.includes("user_id TEXT NOT NULL REFERENCES users")) {
+      return;
+    }
+    await recreateCommentsTable(client);
+  } catch {
+    await execIgnore(client, "PRAGMA foreign_keys = ON");
+  }
+}
+
+async function recreateCommentsTable(client: ReturnType<typeof createClient>): Promise<void> {
+  await client.execute("PRAGMA foreign_keys = OFF");
+  await client.execute(`
+    CREATE TABLE comments_new (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      build_id TEXT NOT NULL REFERENCES builds(id) ON DELETE CASCADE,
+      snapshot_id TEXT REFERENCES snapshots(id) ON DELETE CASCADE,
+      user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+      body TEXT NOT NULL,
+      parent_id TEXT,
+      resolved INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+  await client.execute("INSERT INTO comments_new SELECT * FROM comments");
+  await client.execute("DROP TABLE comments");
+  await client.execute("ALTER TABLE comments_new RENAME TO comments");
+  await client.execute("CREATE INDEX IF NOT EXISTS comments_build_id_idx ON comments (build_id)");
+  await client.execute("PRAGMA foreign_keys = ON");
 }

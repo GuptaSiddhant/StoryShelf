@@ -28,7 +28,7 @@ function CommentCard(props: CommentCardProps): HtmlEscapedString | Promise<HtmlE
   return (
     <div key={comment.id} class="comment">
       <div class="comment__head">
-        <strong>{comment.userId}</strong>
+        <strong>{comment.userId ?? "anonymous"}</strong>
         <span>· {new Date(comment.createdAt).toLocaleString()}</span>
         {comment.resolved ? <Badge tone="success">resolved</Badge> : null}
       </div>

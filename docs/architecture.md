@@ -106,7 +106,7 @@ comments (
   project_id          text NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   build_id            text NOT NULL REFERENCES builds(id) ON DELETE CASCADE,
   snapshot_id         text REFERENCES snapshots(id) ON DELETE CASCADE,  -- NULL = build-level comment
-  user_id             text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id             text REFERENCES users(id) ON DELETE CASCADE,        -- NULL = anonymous (no auth)
   body                text NOT NULL,
   parent_id           text REFERENCES comments(id) ON DELETE CASCADE,   -- NULL = top-level, else reply
   resolved            boolean NOT NULL DEFAULT false,                   -- feedback addressed

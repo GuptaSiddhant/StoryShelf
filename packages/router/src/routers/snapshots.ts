@@ -94,7 +94,7 @@ export function registerSnapshots(app: ShelfApp): void {
     const project = await resolveAuthorizedProject(c, slug, ...APPROVER_ROLES);
     const build = await buildForProject(project.id, buildId);
     await snapshotForBuild(build, snapshotId);
-    const userId = getStore().user?.id ?? "anonymous";
+    const userId = getStore().user?.id ?? null;
     await approveSnapshot(snapshotId, userId);
     return c.json({ ok: true });
   });
@@ -104,7 +104,7 @@ export function registerSnapshots(app: ShelfApp): void {
     const project = await resolveAuthorizedProject(c, slug, ...APPROVER_ROLES);
     const build = await buildForProject(project.id, buildId);
     const snapshot = await snapshotForBuild(build, snapshotId);
-    const userId = getStore().user?.id ?? "anonymous";
+    const userId = getStore().user?.id ?? null;
     await new SnapshotModel(getStore().db).review(snapshot.id, "rejected", userId);
     await refreshBuild(build.id);
     return c.json({ ok: true });
@@ -115,7 +115,7 @@ export function registerSnapshots(app: ShelfApp): void {
     const project = await resolveAuthorizedProject(c, slug, ...APPROVER_ROLES);
     const build = await buildForProject(project.id, buildId);
     const snapshots = await new SnapshotModel(getStore().db).listByBuild(build.id);
-    const userId = getStore().user?.id ?? "anonymous";
+    const userId = getStore().user?.id ?? null;
     await Promise.all(
       snapshots
         .filter((snapshot) => snapshot.status === "new" || snapshot.status === "changed")
@@ -131,7 +131,7 @@ export function registerSnapshots(app: ShelfApp): void {
     const project = await resolveAuthorizedProject(c, slug, ...APPROVER_ROLES);
     const build = await buildForProject(project.id, buildId);
     const snapshots = await new SnapshotModel(getStore().db).listByBuild(build.id);
-    const userId = getStore().user?.id ?? "anonymous";
+    const userId = getStore().user?.id ?? null;
     await Promise.all(
       snapshots
         .filter((snapshot) => snapshot.status === "new" || snapshot.status === "changed")

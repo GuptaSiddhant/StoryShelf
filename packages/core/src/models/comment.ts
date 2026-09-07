@@ -24,7 +24,7 @@ export class CommentModel {
   async create(
     projectId: string,
     buildId: string,
-    userId: string,
+    userId: string | null,
     input: CommentCreateInput,
   ): Promise<Comment> {
     const now = new Date().toISOString();

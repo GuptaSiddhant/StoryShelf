@@ -74,7 +74,7 @@ export class SnapshotModel {
   }
 
   /** Record a reviewer's decision on a snapshot. */
-  async review(id: string, status: SnapshotStatus, userId: string): Promise<Snapshot> {
+  async review(id: string, status: SnapshotStatus, userId: string | null): Promise<Snapshot> {
     return await this.update(id, {
       status,
       reviewedBy: userId,

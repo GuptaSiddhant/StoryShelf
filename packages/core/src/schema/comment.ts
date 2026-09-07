@@ -16,9 +16,7 @@ export const comments = sqliteTable(
       .notNull()
       .references(() => builds.id, { onDelete: "cascade" }),
     snapshotId: text("snapshot_id").references(() => snapshots.id, { onDelete: "cascade" }),
-    userId: text("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
     body: text("body").notNull(),
     parentId: text("parent_id"),
     resolved: integer("resolved", { mode: "boolean" }).notNull().default(false),
@@ -34,7 +32,7 @@ export interface Comment {
   projectId: string;
   buildId: string;
   snapshotId: string | null;
-  userId: string;
+  userId: string | null;
   body: string;
   parentId: string | null;
   resolved: boolean;

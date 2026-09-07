@@ -63,7 +63,7 @@ export function registerComments(app: ShelfApp): void {
     const project = await resolveAuthorizedProject(c, slug, ...DEVELOPER_ROLES);
     const build = await buildForProject(project.id, buildId);
     const body = c.req.valid("json");
-    const userId = getStore().user?.id ?? "anonymous";
+    const userId = getStore().user?.id ?? null;
     const comment = await new CommentModel(getStore().db).create(
       project.id,
       build.id,

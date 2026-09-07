@@ -242,7 +242,7 @@ export async function refreshBuild(buildId: string): Promise<void> {
 }
 
 /** Approve a snapshot, promote its screenshot to baseline, and refresh the build. */
-export async function approveSnapshot(snapshotId: string, userId: string): Promise<void> {
+export async function approveSnapshot(snapshotId: string, userId: string | null): Promise<void> {
   const { db, config } = getStore();
   const snapshots = new SnapshotModel(db);
   const snapshot = await snapshots.get(snapshotId);
