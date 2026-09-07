@@ -1,6 +1,7 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { createShelfLogger } from "@storyshelf/core/logger";
-import { projects } from "@storyshelf/core/schema";
+import { schema } from "@storyshelf/core/schema";
+import type { Project } from "@storyshelf/core/schema";
 import { sql } from "drizzle-orm";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -26,19 +27,19 @@ describe("createSqliteDatabase", () => {
     await initDb(db);
 
     const now = new Date().toISOString();
-    const project = await db.insert(projects, {
+    const project = (await db.insert(schema.projects, {
       id: "p1",
       name: "Demo",
       slug: "demo",
       createdAt: now,
       updatedAt: now,
-    });
+    })) as Project;
     expect(project.name).toBe("Demo");
 
-    const found = await db.get(projects, "p1");
+    const found = (await db.get(schema.projects, "p1")) as Project | null;
     expect(found?.slug).toBe("demo");
 
-    const listed = await db.list(projects);
+    const listed = await db.list(schema.projects);
     expect(listed).toHaveLength(1);
 
     await closeDb(db);
@@ -48,7 +49,7 @@ describe("createSqliteDatabase", () => {
     const db = createSqliteDatabase(":memory:");
     await initDb(db);
 
-    await db.insert(projects, {
+    await db.insert(schema.projects, {
       id: "p1",
       name: "Demo",
       slug: "demo",
@@ -56,12 +57,12 @@ describe("createSqliteDatabase", () => {
       updatedAt: new Date().toISOString(),
     });
 
-    await db.update(projects, "p1", { name: "Renamed" });
-    const renamed = await db.get(projects, "p1");
+    await db.update(schema.projects, "p1", { name: "Renamed" });
+    const renamed = (await db.get(schema.projects, "p1")) as Project | null;
     expect(renamed?.name).toBe("Renamed");
 
-    await db.remove(projects, "p1");
-    const afterRemove = await db.get(projects, "p1");
+    await db.remove(schema.projects, "p1");
+    const afterRemove = await db.get(schema.projects, "p1");
     expect(afterRemove).toBeNull();
 
     await closeDb(db);
@@ -71,7 +72,7 @@ describe("createSqliteDatabase", () => {
     const db = createSqliteDatabase(":memory:");
     await initDb(db);
 
-    await expect(db.get(projects, "missing")).resolves.toBeNull();
+    await expect(db.get(schema.projects, "missing")).resolves.toBeNull();
 
     await closeDb(db);
   });
@@ -81,10 +82,22 @@ describe("createSqliteDatabase", () => {
     await initDb(db);
 
     const now = new Date().toISOString();
-    await db.insert(projects, { id: "p1", name: "A", slug: "a", createdAt: now, updatedAt: now });
-    await db.insert(projects, { id: "p2", name: "B", slug: "b", createdAt: now, updatedAt: now });
+    await db.insert(schema.projects, {
+      id: "p1",
+      name: "A",
+      slug: "a",
+      createdAt: now,
+      updatedAt: now,
+    });
+    await db.insert(schema.projects, {
+      id: "p2",
+      name: "B",
+      slug: "b",
+      createdAt: now,
+      updatedAt: now,
+    });
 
-    await expect(db.count(projects)).resolves.toBe(2);
+    await expect(db.count(schema.projects)).resolves.toBe(2);
     // Raw SQL has no field metadata, so the proxy returns array rows as-is.
     const rows = await db.all<unknown[]>(sql`select slug from projects order by slug`);
     expect(rows).toEqual([["a"], ["b"]]);

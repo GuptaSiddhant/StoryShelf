@@ -2,12 +2,12 @@
  * Database schema: table handles, row types, and the schema object passed
  * to the database client.
  *
- * Table handles are re-exported with their narrow per-entity types (not
- * widened) so generic adapters (`db.list(builds, …)`, `eq(builds.projectId,
- * …)`) keep full type inference through the `@storyshelf/core/schema`
- * subpath. Exact column types live on the narrow per-entity definitions,
- * and the row interfaces are pinned to them by `schema-types.test.ts`.
+ * Table handles are available on the `schema` object with full type
+ * inference (`schema.builds`, …); exact column types live on the narrow
+ * per-entity definitions, and the row interfaces are pinned to them by
+ * `schema-types.test.ts`.
  */
+import type { AnySQLiteTable } from "drizzle-orm/sqlite-core";
 import { baselines as baselinesTable } from "./baseline.ts";
 import { builds as buildsTable } from "./build.ts";
 import { comments as commentsTable } from "./comment.ts";
@@ -21,20 +21,8 @@ import { users as usersTable } from "./user.ts";
 import { webhooks as webhooksTable } from "./webhook.ts";
 
 /**
- * Narrow table handles, re-exported so generic adapters keep full type
- * inference through the `@storyshelf/core/schema` subpath.
+ * Row types for each table.
  */
-export { baselines } from "./baseline.ts";
-export { buildLabels, labelTypes } from "./label.ts";
-export { builds } from "./build.ts";
-export { comments } from "./comment.ts";
-export { projectMembers } from "./member.ts";
-export { projects } from "./project.ts";
-export { projectStatusConfigs } from "./status-config.ts";
-export { snapshots } from "./snapshot.ts";
-export { tokens } from "./token.ts";
-export { users } from "./user.ts";
-export { webhooks } from "./webhook.ts";
 export type { Build } from "./build.ts";
 export type { Comment } from "./comment.ts";
 export type { BuildLabel, LabelType } from "./label.ts";
@@ -47,7 +35,20 @@ export type { User } from "./user.ts";
 export type { Webhook } from "./webhook.ts";
 
 /** Full Drizzle schema object passed to the database client. */
-export const schema = {
+export const schema: {
+  projects: AnySQLiteTable;
+  projectStatusConfigs: AnySQLiteTable;
+  builds: AnySQLiteTable;
+  snapshots: AnySQLiteTable;
+  baselines: AnySQLiteTable;
+  comments: AnySQLiteTable;
+  labelTypes: AnySQLiteTable;
+  buildLabels: AnySQLiteTable;
+  tokens: AnySQLiteTable;
+  webhooks: AnySQLiteTable;
+  users: AnySQLiteTable;
+  projectMembers: AnySQLiteTable;
+} = {
   projects: projectsTable,
   projectStatusConfigs: projectStatusConfigsTable,
   builds: buildsTable,

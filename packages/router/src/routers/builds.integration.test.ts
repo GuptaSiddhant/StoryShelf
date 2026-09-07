@@ -1,7 +1,6 @@
 import { LabelModel } from "@storyshelf/core/models";
-import { builds } from "@storyshelf/core/schema";
+import { schema } from "@storyshelf/core/schema";
 import type { Build } from "@storyshelf/core/schema";
-import { projects } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { storybookZipPath } from "@storyshelf/core/utils";
@@ -51,9 +50,9 @@ describe("build list label filter", () => {
   it("filters builds by label value", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    await db.insert(projects, project);
-    await db.insert(builds, makeBuild("b1"));
-    await db.insert(builds, makeBuild("b2"));
+    await db.insert(schema.projects, project);
+    await db.insert(schema.builds, makeBuild("b1"));
+    await db.insert(schema.builds, makeBuild("b2"));
 
     const labelModel = new LabelModel(db);
     await labelModel.attach("p1", "b1", "environment", "staging");
@@ -73,8 +72,8 @@ describe("build list label filter", () => {
   it("returns empty when no build carries the label value", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    await db.insert(projects, project);
-    await db.insert(builds, makeBuild("b1"));
+    await db.insert(schema.projects, project);
+    await db.insert(schema.builds, makeBuild("b1"));
 
     const app = createShelfRouter({ database: db, storage, logger: silentLogger });
     const response = await app.request(
@@ -89,9 +88,9 @@ describe("build list label filter", () => {
   it("combines label filter with branch filter", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    await db.insert(projects, project);
-    await db.insert(builds, makeBuild("b1", "main"));
-    await db.insert(builds, makeBuild("b2", "feature/x"));
+    await db.insert(schema.projects, project);
+    await db.insert(schema.builds, makeBuild("b1", "main"));
+    await db.insert(schema.builds, makeBuild("b2", "feature/x"));
 
     const labelModel = new LabelModel(db);
     await labelModel.attach("p1", "b1", "environment", "staging");
@@ -111,9 +110,9 @@ describe("build list label filter", () => {
   it("does not filter when label params are absent", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    await db.insert(projects, project);
-    await db.insert(builds, makeBuild("b1"));
-    await db.insert(builds, makeBuild("b2"));
+    await db.insert(schema.projects, project);
+    await db.insert(schema.builds, makeBuild("b1"));
+    await db.insert(schema.builds, makeBuild("b2"));
 
     const app = createShelfRouter({ database: db, storage, logger: silentLogger });
     const response = await app.request("/api/v1/projects/test-project/builds");
@@ -153,7 +152,7 @@ describe("streaming build upload (JSON + PUT)", () => {
   }> {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    await db.insert(projects, project);
+    await db.insert(schema.projects, project);
     const app = createShelfRouter({ database: db, storage, logger: silentLogger });
     return { db, storage, app };
   }
@@ -246,7 +245,7 @@ describe("streaming build upload (JSON + PUT)", () => {
   it("rejects oversize uploads with 413", async () => {
     const { db } = makeDatabase();
     const { storage: memStorage } = makeStorage();
-    await db.insert(projects, project);
+    await db.insert(schema.projects, project);
     const app = createShelfRouter({
       database: db,
       storage: memStorage,

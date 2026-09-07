@@ -1,6 +1,5 @@
-import { builds } from "@storyshelf/core/schema";
+import { schema } from "@storyshelf/core/schema";
 import type { Build } from "@storyshelf/core/schema";
-import { projects } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { storybookDir } from "@storyshelf/core/utils";
@@ -54,8 +53,8 @@ function mockBuild(overrides: Partial<Build> = {}): Build {
 async function seededApp(): Promise<{ app: ReturnType<typeof createShelfRouter> }> {
   const { db } = makeDatabase();
   const { storage, objects } = makeStorage();
-  await db.insert(projects, mockProject());
-  await db.insert(builds, mockBuild({ public: true }));
+  await db.insert(schema.projects, mockProject());
+  await db.insert(schema.builds, mockBuild({ public: true }));
 
   objects.set(`${storybookDir("p1", "b1")}/index.html`, Buffer.from("<html>storybook</html>"));
   objects.set(`${storybookDir("p1", "b1")}/iframe.html`, Buffer.from("<html>preview</html>"));
@@ -78,7 +77,7 @@ describe("storybook routes", () => {
   it("returns 404 when no published build exists", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    await db.insert(projects, mockProject());
+    await db.insert(schema.projects, mockProject());
     const app = createShelfRouter({ database: db, storage, logger: silentLogger });
     const response = await app.request("/projects/test-project/storybook");
     expect(response.status).toBe(404);
@@ -102,8 +101,8 @@ describe("storybook routes", () => {
   it("serves a preparing state when statics are not yet extracted", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    await db.insert(projects, mockProject());
-    await db.insert(builds, mockBuild({ public: true }));
+    await db.insert(schema.projects, mockProject());
+    await db.insert(schema.builds, mockBuild({ public: true }));
     const app = createShelfRouter({ database: db, storage, logger: silentLogger });
     const response = await app.request("/projects/test-project/storybook/build/b1/");
     expect(response.status).toBe(200);
@@ -162,8 +161,8 @@ describe("storybook routes", () => {
   it("serves a non-public build when auth is disabled", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    await db.insert(projects, mockProject());
-    await db.insert(builds, mockBuild({ public: false }));
+    await db.insert(schema.projects, mockProject());
+    await db.insert(schema.builds, mockBuild({ public: false }));
     const app = createShelfRouter({ database: db, storage, logger: silentLogger });
     const response = await app.request("/projects/test-project/storybook/build/b1/");
     expect(response.status).toBe(200);

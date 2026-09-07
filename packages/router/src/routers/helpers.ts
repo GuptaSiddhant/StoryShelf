@@ -1,11 +1,9 @@
 import { MemberModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
 import { TokenModel } from "@storyshelf/core/models";
-import { projects } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { ProjectRole } from "@storyshelf/core/types";
 import { sha256 } from "@storyshelf/core/utils";
-import { eq } from "drizzle-orm";
 import type { Context, Next } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -68,8 +66,7 @@ export function requireRole(...roles: ProjectRole[]) {
 /** Look up a project by its URL slug, returning null when absent. */
 export async function findProjectBySlug(slug: string): Promise<Project | null> {
   const { db } = getStore();
-  const rows = await db.list(projects, { where: eq(projects.slug, slug), limit: 1 });
-  return rows[0] ?? null;
+  return await new ProjectModel(db).getBySlug(slug);
 }
 
 async function resolveProjectByToken(c: Context, slug: string): Promise<Project | null> {
