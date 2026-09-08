@@ -2,6 +2,13 @@
   "name": "@storyshelf/router",
   "version": "0.3.2",
   "description": "StoryShelf HTTP server: Hono router, API routes, and server-rendered UI over @storyshelf/core.",
+  "keywords": [
+    "chromatic-alternative",
+    "hono",
+    "self-hosted",
+    "storybook",
+    "visual-testing"
+  ],
   "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
   "bugs": {
     "url": "https://github.com/GuptaSiddhant/StoryShelf/issues"

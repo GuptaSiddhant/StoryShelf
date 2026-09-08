@@ -2,6 +2,13 @@
   "name": "storyshelf",
   "version": "0.3.2",
   "description": "StoryShelf CLI: create projects, upload builds, purge, and retry from CI.",
+  "keywords": [
+    "ci",
+    "cli",
+    "self-hosted",
+    "storybook",
+    "visual-testing"
+  ],
   "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
   "bugs": {
     "url": "https://github.com/GuptaSiddhant/StoryShelf/issues"

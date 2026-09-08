@@ -2,6 +2,13 @@
   "name": "@storyshelf/core",
   "version": "0.3.2",
   "description": "StoryShelf core: adapter interfaces, models, capture pipeline, diff, and retention (no HTTP).",
+  "keywords": [
+    "chromatic-alternative",
+    "self-hosted",
+    "storybook",
+    "visual-regression-testing",
+    "visual-testing"
+  ],
   "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
   "bugs": {
     "url": "https://github.com/GuptaSiddhant/StoryShelf/issues"

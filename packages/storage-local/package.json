@@ -2,6 +2,12 @@
   "name": "@storyshelf/storage-local",
   "version": "0.3.2",
   "description": "Local filesystem storage adapter for StoryShelf.",
+  "keywords": [
+    "filesystem",
+    "self-hosted",
+    "storage",
+    "storybook"
+  ],
   "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
   "bugs": {
     "url": "https://github.com/GuptaSiddhant/StoryShelf/issues"

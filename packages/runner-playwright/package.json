@@ -2,6 +2,13 @@
   "name": "@storyshelf/runner-playwright",
   "version": "0.3.2",
   "description": "Pure Playwright CaptureRunner implementation for StoryShelf: renders Storybook screenshots in-process (no db/storage coupling).",
+  "keywords": [
+    "playwright",
+    "screenshot",
+    "self-hosted",
+    "storybook",
+    "visual-testing"
+  ],
   "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
   "bugs": {
     "url": "https://github.com/GuptaSiddhant/StoryShelf/issues"
@@ -53,9 +60,9 @@
     "@storyshelf/db-sqlite": "workspace:*",
     "@storyshelf/router": "workspace:*",
     "@storyshelf/storage-local": "workspace:*",
-    "adm-zip": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "adm-zip": "catalog:",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",

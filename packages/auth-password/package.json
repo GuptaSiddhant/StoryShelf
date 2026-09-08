@@ -2,6 +2,11 @@
   "name": "@storyshelf/auth-password",
   "version": "0.3.2",
   "description": "Shared-password auth adapter for StoryShelf.",
+  "keywords": [
+    "auth",
+    "self-hosted",
+    "storybook"
+  ],
   "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
   "bugs": {
     "url": "https://github.com/GuptaSiddhant/StoryShelf/issues"

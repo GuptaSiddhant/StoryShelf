@@ -2,6 +2,13 @@
   "name": "@storyshelf/auth-oauth",
   "version": "0.3.2",
   "description": "OIDC authorization-code auth adapter for StoryShelf.",
+  "keywords": [
+    "auth",
+    "oauth",
+    "oidc",
+    "self-hosted",
+    "storybook"
+  ],
   "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
   "bugs": {
     "url": "https://github.com/GuptaSiddhant/StoryShelf/issues"

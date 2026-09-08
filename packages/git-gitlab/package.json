@@ -2,6 +2,13 @@
   "name": "@storyshelf/git-gitlab",
   "version": "0.3.2",
   "description": "GitLab commit status adapter for StoryShelf.",
+  "keywords": [
+    "ci",
+    "gitlab",
+    "merge-gate",
+    "self-hosted",
+    "storybook"
+  ],
   "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
   "bugs": {
     "url": "https://github.com/GuptaSiddhant/StoryShelf/issues"

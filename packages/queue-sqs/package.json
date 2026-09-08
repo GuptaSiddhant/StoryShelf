@@ -2,6 +2,13 @@
   "name": "@storyshelf/queue-sqs",
   "version": "0.3.2",
   "description": "SQS capture job queue adapter for StoryShelf (AWS cloud deployments).",
+  "keywords": [
+    "aws",
+    "queue",
+    "self-hosted",
+    "sqs",
+    "storybook"
+  ],
   "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
   "bugs": {
     "url": "https://github.com/GuptaSiddhant/StoryShelf/issues"
