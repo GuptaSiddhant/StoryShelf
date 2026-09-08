@@ -1,11 +1,27 @@
 import { ZipArchive } from "archiver";
-import { execSync } from "node:child_process";
-import { access, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import * as picomatch from "picomatch";
 import { createClient, type BuildCreated } from "../client.ts";
 import { loadStorybookConfig, type StorybookConfig } from "../config.ts";
 import { createSpinner, printLine, spinnerFrames } from "../output.ts";
+import { assertBuildOutput, ensureBuildDir } from "./storybook-build.ts";
+
+/**
+ * Upload a built Storybook and create a build record.
+ *
+ * @param options - Upload command options.
+ */
+export async function runUpload(options: UploadOptions): Promise<void> {
+  const cwd = options.cwd ?? process.cwd();
+  const cfg = await loadStorybookConfig(cwd, options.config);
+  const collected = collectUploadOptions(options, cfg);
+  if (shouldSkipUpload(collected.skip, collected.branch)) {
+    printLine(`Skipped per config skip="${collected.skip}" for branch "${collected.branch}"`);
+    return;
+  }
+  assertUploadOptions(collected);
+  await buildAndPost(cwd, collected, options.forceBuild, options.dryRun);
+}
 
 /** Options for the `upload` command. */
 export interface UploadOptions {
@@ -39,6 +55,8 @@ export interface UploadOptions {
   authorName?: string;
   /** Build labels as `key=value` strings (repeatable). */
   label?: string[];
+  /** Validate everything but send no requests. */
+  dryRun?: boolean;
   /** Working directory (defaults to process.cwd()). Test seam for fs access. */
   cwd?: string;
 }
@@ -57,6 +75,14 @@ interface CollectedUploadOptions {
   authorEmail?: string;
   authorName?: string;
   label?: string[];
+}
+
+interface ResolvedUploadOptions extends CollectedUploadOptions {
+  url: string;
+  slug: string;
+  token: string;
+  sha: string;
+  branch: string;
 }
 
 /** First set value among the given env var names. */
@@ -91,14 +117,6 @@ function collectUploadOptions(
     authorName: options.authorName,
     label: options.label,
   };
-}
-
-interface ResolvedUploadOptions extends CollectedUploadOptions {
-  url: string;
-  slug: string;
-  token: string;
-  sha: string;
-  branch: string;
 }
 
 /** Throw on the first missing required upload option. */
@@ -153,28 +171,12 @@ function zipBuildDirStream(cwd: string, buildDir: string): ZipArchive {
   return archive;
 }
 
-/**
- * Upload a built Storybook and create a build record.
- *
- * @param options - Upload command options.
- */
-export async function runUpload(options: UploadOptions): Promise<void> {
-  const cwd = options.cwd ?? process.cwd();
-  const cfg = await loadStorybookConfig(cwd, options.config);
-  const collected = collectUploadOptions(options, cfg);
-  if (shouldSkipUpload(collected.skip, collected.branch)) {
-    printLine(`Skipped per config skip="${collected.skip}" for branch "${collected.branch}"`);
-    return;
-  }
-  assertUploadOptions(collected);
-  await buildAndPost(cwd, collected, options.forceBuild);
-}
-
 /** Ensure, create, and stream the build directory. */
 async function buildAndPost(
   cwd: string,
   collected: ResolvedUploadOptions,
   force?: boolean,
+  dryRun?: boolean,
 ): Promise<void> {
   await ensureBuildDir({
     cwd,
@@ -183,6 +185,13 @@ async function buildAndPost(
     buildScriptName: collected.buildScriptName,
     force,
   });
+  await assertBuildOutput(cwd, collected.buildDir);
+  if (dryRun) {
+    printLine(
+      `Dry run: would upload ${collected.buildDir} as ${collected.sha} on ${collected.branch}`,
+    );
+    return;
+  }
   const client = createClient(collected.url, collected.token);
   const created: BuildCreated = await client.projects.builds.createJson(collected.slug, {
     gitSha: collected.sha,
@@ -210,41 +219,5 @@ async function putZipStream(
   } catch (error) {
     spinner.stop("Upload failed");
     throw error;
-  }
-}
-
-async function ensureBuildDir(opts: {
-  cwd: string;
-  buildDir: string;
-  buildCommand?: string;
-  buildScriptName?: string;
-  force?: boolean;
-}): Promise<void> {
-  if (opts.buildCommand && opts.buildScriptName) {
-    throw new Error("buildCommand and buildScriptName are mutually exclusive");
-  }
-  const full = resolve(opts.cwd, opts.buildDir);
-  const shouldBuild = opts.force ?? (await needsBuild(full));
-  if (!shouldBuild) {
-    return;
-  }
-  const command =
-    opts.buildCommand ??
-    `npm run ${opts.buildScriptName ?? "build-storybook"} -- --output-dir ${opts.buildDir}`;
-  printLine(`Building Storybook: ${command}`);
-  execSync(command, {
-    stdio: "inherit",
-    env: { ...process.env, STORYBOOK_BUILD_STORIES_JSON: "true" },
-  });
-}
-
-/** True when the build directory is missing or empty. */
-async function needsBuild(full: string): Promise<boolean> {
-  try {
-    await access(full);
-    const entries = await readdir(full);
-    return entries.length === 0;
-  } catch {
-    return true;
   }
 }

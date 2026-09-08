@@ -1,12 +1,45 @@
 import { Command } from "commander";
 import { pathToFileURL } from "node:url";
+import { runBuild, type BuildOptions } from "./commands/build.ts";
+import type { ConnectionOptions } from "./commands/connection.ts";
 import { runCreate, type CreateOptions } from "./commands/create.ts";
 import { runDefaultCommand, handleError } from "./commands/default.ts";
+import { runDoctor, type DoctorOptions } from "./commands/doctor.ts";
 import { runInit, type InitOptions } from "./commands/init.ts";
 import { runPurge, type PurgeOptions } from "./commands/purge.ts";
 import { runRetry, type RetryOptions } from "./commands/retry.ts";
 import { runServerInit, type ServerInitOptions } from "./commands/server/init.ts";
+import { runServerServe, type ServerServeOptions } from "./commands/server/serve.ts";
 import { runUpload, type UploadOptions } from "./commands/upload.ts";
+import { runWhoami } from "./commands/whoami.ts";
+
+/**
+ * Build the StoryShelf CLI program with all subcommands registered.
+ *
+ * @returns The configured commander Command instance.
+ */
+export function createProgram(): Command {
+  const program = new Command();
+  program
+    .name("storyshelf")
+    .description("Self-hosted visual testing for Storybook.")
+    .version("0.2.0");
+  const commands = [
+    buildInitCommand(),
+    buildCreateCommand(),
+    buildServerCommand(),
+    buildPurgeCommand(),
+    buildUploadCommand(),
+    buildBuildCommand(),
+    buildDoctorCommand(),
+    buildWhoamiCommand(),
+    buildRetryCommand(),
+  ];
+  for (const command of commands) {
+    program.addCommand(command);
+  }
+  return program;
+}
 
 function run<TArgs>(fn: (args: TArgs) => Promise<void>): (args: TArgs) => Promise<void> {
   return async (args: TArgs) => {
@@ -47,6 +80,12 @@ function buildServerCommand(): Command {
     .description("Scaffold a new StoryShelf server project")
     .option("--dir <dir>", "output directory")
     .action(run<ServerInitOptions>(runServerInit));
+  const serve = new Command("serve")
+    .description("Run a scaffolded StoryShelf server project")
+    .option("--dir <dir>", "server project directory (default cwd)")
+    .option("--port <port>", "port override (sets PORT)")
+    .action(run<ServerServeOptions>(runServerServe));
+  server.addCommand(serve, { isDefault: true });
   return server;
 }
 
@@ -71,6 +110,7 @@ function buildUploadCommand(): Command {
     .option("--build-command <cmd>", "build command to run if buildDir missing/empty")
     .option("--build-script-name <name>", "npm script to build Storybook (default build-storybook)")
     .option("--force-build", "force rebuild even if buildDir exists")
+    .option("--dry-run", "validate and build without sending any requests")
     .option("--skip <glob>", "skip upload for matching branch (glob)")
     .option("--message <message>", "commit message")
     .option("--author-email <email>", "author email")
@@ -84,6 +124,40 @@ function buildUploadCommand(): Command {
     .action(run<UploadOptions>(runUpload));
 }
 
+function buildBuildCommand(): Command {
+  return new Command("build")
+    .description("Build Storybook for upload (no server contact)")
+    .option("--build-dir <dir>", "built Storybook directory (default storybook-static)")
+    .option("-c, --config <path>", "config file path (default .storybook/storyshelf.json)")
+    .option("--build-command <cmd>", "build command to run if buildDir missing/empty")
+    .option("--build-script-name <name>", "npm script to build Storybook (default build-storybook)")
+    .option("--force-build", "force rebuild even if buildDir exists")
+    .action(run<BuildOptions>(runBuild));
+}
+
+function buildDoctorCommand(): Command {
+  return new Command("doctor")
+    .description("Diagnose whether an upload would succeed (no side effects)")
+    .option("--url <url>", "server base URL (or .storybook/storyshelf.json)")
+    .option("--slug <slug>", "project slug (or .storybook/storyshelf.json)")
+    .option("--token <token>", "CI token (or STORYSHELF_TOKEN env)")
+    .option("--build-dir <dir>", "built Storybook directory (default storybook-static)")
+    .option("-c, --config <path>", "config file path (default .storybook/storyshelf.json)")
+    .option("--build-command <cmd>", "build command to run if buildDir missing/empty")
+    .option("--build-script-name <name>", "npm script to build Storybook (default build-storybook)")
+    .action(run<DoctorOptions>(runDoctor));
+}
+
+function buildWhoamiCommand(): Command {
+  return new Command("whoami")
+    .description("Verify the token against the server and print the project")
+    .option("--url <url>", "server base URL (or .storybook/storyshelf.json)")
+    .option("--slug <slug>", "project slug (or .storybook/storyshelf.json)")
+    .option("--token <token>", "CI token (or STORYSHELF_TOKEN env)")
+    .option("-c, --config <path>", "config file path (default .storybook/storyshelf.json)")
+    .action(run<ConnectionOptions>(runWhoami));
+}
+
 function buildRetryCommand(): Command {
   return new Command("retry")
     .description("Retry a failed StoryShelf build")
@@ -92,26 +166,6 @@ function buildRetryCommand(): Command {
     .requiredOption("--build-id <id>", "build id")
     .option("--token <token>", "CI token (or STORYSHELF_TOKEN env)")
     .action(run<RetryOptions>(runRetry));
-}
-
-/**
- * Build the StoryShelf CLI program with all subcommands registered.
- *
- * @returns The configured commander Command instance.
- */
-export function createProgram(): Command {
-  const program = new Command();
-  program
-    .name("storyshelf")
-    .description("Self-hosted visual testing for Storybook.")
-    .version("0.2.0");
-  program.addCommand(buildInitCommand());
-  program.addCommand(buildCreateCommand());
-  program.addCommand(buildServerCommand());
-  program.addCommand(buildPurgeCommand());
-  program.addCommand(buildUploadCommand());
-  program.addCommand(buildRetryCommand());
-  return program;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

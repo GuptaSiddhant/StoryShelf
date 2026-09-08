@@ -1,3 +1,13 @@
+export function createClient(baseUrl: string, token?: string): Client {
+  const authHeaders = buildAuthHeaders(token);
+  const requestHeaders = (contentType?: string): Record<string, string> =>
+    buildRequestHeaders(authHeaders, contentType);
+
+  return {
+    projects: createProjectsApi(baseUrl, authHeaders, requestHeaders),
+  };
+}
+
 /** Metadata posted to create a build before streaming its bundle. */
 export interface BuildCreateInput {
   gitSha: string;
@@ -158,16 +168,6 @@ function createProjectsApi(
     tokens: createTokensApi(baseUrl, requestHeaders),
     builds: createBuildsApi(baseUrl, authHeaders, requestHeaders),
     admin: createAdminApi(baseUrl, requestHeaders),
-  };
-}
-
-export function createClient(baseUrl: string, token?: string): Client {
-  const authHeaders = buildAuthHeaders(token);
-  const requestHeaders = (contentType?: string): Record<string, string> =>
-    buildRequestHeaders(authHeaders, contentType);
-
-  return {
-    projects: createProjectsApi(baseUrl, authHeaders, requestHeaders),
   };
 }
 

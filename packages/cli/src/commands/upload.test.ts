@@ -152,6 +152,38 @@ describe("runUpload success", () => {
   });
 });
 
+describe("runUpload dry run", () => {
+  it("sends no requests and reports what would upload", async () => {
+    const buildDir = join(dir, "storybook-static");
+    mkdirSync(buildDir, { recursive: true });
+    writeFileSync(join(buildDir, "index.json"), "{}");
+    const fetched = vi.fn(async () => {
+      await Promise.resolve();
+      return okJson({});
+    });
+    vi.stubGlobal("fetch", fetched);
+    await runUpload({ ...baseOptions(), dryRun: true });
+    expect(fetched).not.toHaveBeenCalled();
+  });
+
+  it("still runs the build step before reporting", async () => {
+    const fetched = vi.fn(async () => {
+      await Promise.resolve();
+      return okJson({});
+    });
+    vi.stubGlobal("fetch", fetched);
+    await expect(
+      runUpload({
+        ...baseOptions(),
+        buildDir: "storybook-static",
+        buildCommand: "exit 1",
+        dryRun: true,
+      }),
+    ).rejects.toThrow();
+    expect(fetched).not.toHaveBeenCalled();
+  });
+});
+
 /** Collect a streamed request body into a buffer. */
 async function collectBody(body: unknown): Promise<Buffer> {
   const chunks: Buffer[] = [];

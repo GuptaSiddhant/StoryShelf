@@ -1,6 +1,6 @@
 ---
 title: CLI reference
-description: The storyshelf command-line interface — init, create, server, upload, retry, and purge.
+description: The storyshelf command-line interface — init, create, server, build, doctor, whoami, upload, retry, and purge.
 ---
 
 The StoryShelf CLI (`storyshelf`) exposes a `storyshelf` binary for CI pipelines. Install it globally, or prefix with `npx storyshelf`:
@@ -55,6 +55,51 @@ storyshelf server init
 
 Generates `server.ts` + `package.json` (and `Dockerfile`/`compose.yaml` if selected) in the target directory.
 
+## `storyshelf server serve`
+
+Run a scaffolded server project (also the default for bare `storyshelf server`). Looks for `server.ts`, `server.js`/`server.mjs`, then `index.ts`/`index.js`/`index.mjs` in the directory and spawns it with output inherited; without any entry it directs you to `storyshelf server init`.
+
+```bash
+storyshelf server serve --dir ./my-storyshelf --port 3000
+```
+
+## `storyshelf build`
+
+Build the Storybook output directory without uploading — same `buildDir`/`buildCommand`/`buildScriptName` resolution as `upload`, but no server contact (no `url`/`slug`/`token` needed). Useful for verifying the build locally or splitting CI into build-once/upload-later jobs.
+
+```bash
+storyshelf build
+storyshelf build --force-build
+storyshelf build --build-dir dist-storybook --build-command "nx run app:build-storybook"
+```
+
+Prints `Build ready: <dir>` and fails fast when the output lacks `index.json`. `upload` keeps its implicit build-if-missing step, so existing flows are unchanged.
+
+## `storyshelf doctor`
+
+Diagnose whether an upload would succeed — without uploading anything and without building. Prints one line per check (`✓` pass, `!` warning, `✗` fail) and exits 1 when any check fails:
+
+```bash
+storyshelf doctor
+# ✓ Storybook setup found (/repo/.storybook/main.ts)
+# ✓ Config loaded (slug "my-design-system")
+# ✓ Connection: http://localhost:3000 / my-design-system (token present)
+# ✓ Server reachable, project "My Design System" readable
+# ! Build output missing — upload would run: npm run build-storybook -- --output-dir storybook-static
+```
+
+Checks, in order: `.storybook/main.*` exists, config file parses, url/slug/token resolve (flags > file > env), server reachable with token accepted (401/403/404 get specific messages), build output present with `index.json`.
+
+## `storyshelf whoami`
+
+Verify the token against the server and print the project it can read. Same connection resolution as `upload`; fail-fast credential check for pipeline setup:
+
+```bash
+storyshelf whoami
+# Server: http://localhost:3000
+# Project: My Design System (my-design-system)
+```
+
 ## `storyshelf upload`
 
 Build (optionally), zip, and upload a Storybook build for capture. When `.storybook/storyshelf.json` exists (`slug`, `url`, `buildDir`, `skip` — see [Configuration](/guides/config/)), `--url`/`--slug` can be omitted and are resolved as `flags > env > file` (`STORYSHELF_TOKEN`/`GITHUB_SHA`/`GITHUB_REF_NAME` are fallback envs). If `buildDir` is missing or empty or `--force-build` is given, `upload` runs `buildCommand` or `npm run <buildScriptName>` before zipping.
@@ -92,6 +137,7 @@ storyshelf upload --config ./config/storyshelf.json --force-build
 | `--message` | Build message (commit message) |
 | `--author-name`, `--author-email` | Author attribution |
 | `--label key=value` | Attach a build label (repeatable) |
+| `--dry-run` | Validate, build if needed, and report what would upload — send no requests |
 
 :::note
 The CLI does **not** run Playwright. It streams the zipped static build to the server (JSON metadata, then a `PUT` of the zip); the server renders and diffs asynchronously. The upload request returns `202` immediately.
