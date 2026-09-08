@@ -7,13 +7,6 @@ import type { ProjectStatusConfig } from "../schema/status-config.ts";
 import { decrypt, encrypt } from "../utils/encrypt.ts";
 import { ulid } from "../utils/ulid.ts";
 
-/** Input for creating a git-provider status config. */
-export interface StatusConfigCreateInput {
-  provider: string;
-  config: unknown;
-  token: string;
-}
-
 /** Data operations for per-project status provider configs. */
 export class StatusConfigModel {
   constructor(
@@ -74,4 +67,11 @@ export class StatusConfigModel {
       await this.db.remove(projectStatusConfigs, row.id);
     }
   }
+}
+
+/** Input for creating a git-provider status config. */
+export interface StatusConfigCreateInput {
+  provider: string;
+  config: unknown;
+  token: string;
 }

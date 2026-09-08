@@ -2,28 +2,6 @@ import { WebhookModel } from "../models/webhook.ts";
 import { hmacSha256 } from "../utils/hash.ts";
 import type { DatabaseAdapter } from "./database.ts";
 
-/** Outbound webhook payload delivered to subscribers. */
-export interface WebhookEvent {
-  event: string;
-  projectId: string;
-  data: Record<string, unknown>;
-  timestamp: string;
-}
-
-async function sendWebhook(url: string, secret: string, event: WebhookEvent): Promise<void> {
-  const body = JSON.stringify(event);
-  const signature = hmacSha256(secret, body);
-  await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-StoryShelf-Event": event.event,
-      "X-StoryShelf-Signature": signature,
-    },
-    body,
-  });
-}
-
 /**
  * Deliver an event to every subscribed webhook of a project.
  *
@@ -69,4 +47,26 @@ export async function emitWebhookEvent(
       }
     }),
   );
+}
+
+/** Outbound webhook payload delivered to subscribers. */
+export interface WebhookEvent {
+  event: string;
+  projectId: string;
+  data: Record<string, unknown>;
+  timestamp: string;
+}
+
+async function sendWebhook(url: string, secret: string, event: WebhookEvent): Promise<void> {
+  const body = JSON.stringify(event);
+  const signature = hmacSha256(secret, body);
+  await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-StoryShelf-Event": event.event,
+      "X-StoryShelf-Signature": signature,
+    },
+    body,
+  });
 }

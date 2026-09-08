@@ -5,14 +5,6 @@ import { projects } from "../schema/project.ts";
 import type { Project } from "../schema/project.ts";
 import { slugify, ulid } from "../utils/ulid.ts";
 
-/** Input for creating a project. */
-export interface ProjectCreateInput {
-  name: string;
-  gitRepository?: string;
-  gitDefaultBranch?: string;
-  storybookMeta?: unknown;
-}
-
 /** Data operations for project records. */
 export class ProjectModel {
   /**
@@ -98,4 +90,12 @@ export class ProjectModel {
     }
     return `${base}-${suffix}`;
   }
+}
+
+/** Input for creating a project. */
+export interface ProjectCreateInput {
+  name: string;
+  gitRepository?: string;
+  gitDefaultBranch?: string;
+  storybookMeta?: unknown;
 }

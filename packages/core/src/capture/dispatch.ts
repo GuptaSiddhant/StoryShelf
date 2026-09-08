@@ -9,6 +9,23 @@ import { executeCaptureJob, type CaptureJobOptions } from "./orchestrator.ts";
 import { hasApprovedBuildForSha, isAlreadyMerged } from "./skip-checks.ts";
 import { postStatusesForBuild } from "./status-fanout.ts";
 
+/** Build the queue's job runner: post pending, apply skip rules, capture, report. */
+export function createDispatchJob(deps: DispatchDeps): (job: CaptureDispatchJob) => Promise<void> {
+  return async (job: CaptureDispatchJob): Promise<void> => {
+    const target = await loadJobTarget(deps, job);
+    if (!target) {
+      return;
+    }
+    const pendingUrl = `/projects/${target.project.slug}/builds/${job.buildId}`;
+    await postPending(deps, target.project, pendingUrl, target.build.gitSha);
+    const ctx: JobContext = { deps, build: target.build, project: target.project, pendingUrl };
+    if ((await maybeSkipMerged(ctx)) || (await maybeSkipDuplicate(ctx))) {
+      return;
+    }
+    await runAndReport(ctx, job);
+  };
+}
+
 /** Dependencies for building the capture queue's job runner. */
 export interface DispatchDeps {
   db: DatabaseAdapter;
@@ -170,21 +187,4 @@ async function loadJobTarget(
     return null;
   }
   return { build, project };
-}
-
-/** Build the queue's job runner: post pending, apply skip rules, capture, report. */
-export function createDispatchJob(deps: DispatchDeps): (job: CaptureDispatchJob) => Promise<void> {
-  return async (job: CaptureDispatchJob): Promise<void> => {
-    const target = await loadJobTarget(deps, job);
-    if (!target) {
-      return;
-    }
-    const pendingUrl = `/projects/${target.project.slug}/builds/${job.buildId}`;
-    await postPending(deps, target.project, pendingUrl, target.build.gitSha);
-    const ctx: JobContext = { deps, build: target.build, project: target.project, pendingUrl };
-    if ((await maybeSkipMerged(ctx)) || (await maybeSkipDuplicate(ctx))) {
-      return;
-    }
-    await runAndReport(ctx, job);
-  };
 }

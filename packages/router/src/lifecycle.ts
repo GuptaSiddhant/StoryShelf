@@ -13,6 +13,21 @@ import type { ShelfApp, ShelfLifecycle } from "./app-types.ts";
 import { startBranchGcTimer } from "./retention-timer.ts";
 import type { ServerRuntime } from "./runtime.ts";
 
+/** Kick eager init and attach the `app.lifecycle` namespace (single run). */
+export function attachLifecycle(
+  app: ShelfApp,
+  options: ShelfOptions,
+  runtime: ServerRuntime,
+  cell: LifecycleCell,
+): void {
+  const initCtx: AdapterInitContext = { config: runtime.config, logger: runtime.logger };
+  kickInit(options, initCtx, runtime.logger, cell);
+  const timer = startBranchGcInterval(options, runtime);
+  Object.assign(app, {
+    lifecycle: createLifecycle(options, initCtx, runtime.logger, cell, timer),
+  });
+}
+
 /** Mutable init-settlement cell shared by the gate, health, and `init()`. */
 export interface LifecycleCell {
   ready: Promise<AdapterInitResult>;
@@ -39,21 +54,6 @@ function kickInit(
 ): void {
   cell.ready = runAdapterInits(collectInits(options), ctx, logger);
   trackSettlement(cell, cell.ready);
-}
-
-/** Kick eager init and attach the `app.lifecycle` namespace (single run). */
-export function attachLifecycle(
-  app: ShelfApp,
-  options: ShelfOptions,
-  runtime: ServerRuntime,
-  cell: LifecycleCell,
-): void {
-  const initCtx: AdapterInitContext = { config: runtime.config, logger: runtime.logger };
-  kickInit(options, initCtx, runtime.logger, cell);
-  const timer = startBranchGcInterval(options, runtime);
-  Object.assign(app, {
-    lifecycle: createLifecycle(options, initCtx, runtime.logger, cell, timer),
-  });
 }
 
 function startBranchGcInterval(

@@ -1,10 +1,23 @@
 import type { Logger } from "../logger.ts";
 
-const DEFAULT_TIMEOUT_MS = 30_000;
-const DEFAULT_RETRIES = 3;
-const MAX_RETRY_AFTER_MS = 30_000;
-const BACKOFF_BASE_MS = 1000;
-const MAX_BODY_SNIPPET = 500;
+/**
+ * Fetch JSON with timeout, retries, and structured errors.
+ *
+ * Retries network failures, 429, and 502/503/504 (honoring `Retry-After`);
+ * every other status throws {@link HttpError} immediately.
+ *
+ * @param url - Absolute request URL.
+ * @param options - Method, headers, JSON body, timeout, retries, logger.
+ * @returns The parsed JSON response body.
+ */
+export async function httpJson<T>(url: string, options: HttpRequestOptions = {}): Promise<T> {
+  return await requestWithRetry<T>(
+    url,
+    options,
+    options.retries ?? DEFAULT_RETRIES,
+    options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+  );
+}
 
 /** Failed HTTP response: status code plus a snippet of the response body. */
 export class HttpError extends Error {
@@ -33,6 +46,12 @@ export interface HttpRequestOptions {
   retries?: number;
   logger?: Logger;
 }
+
+const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_RETRIES = 3;
+const MAX_RETRY_AFTER_MS = 30_000;
+const BACKOFF_BASE_MS = 1000;
+const MAX_BODY_SNIPPET = 500;
 
 /** Whether a failure is worth retrying: network errors, 429, and 502/503/504. */
 function shouldRetry(error: unknown, attempt: number, maxAttempts: number): boolean {
@@ -77,25 +96,6 @@ async function sleep(ms: number): Promise<void> {
   await new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
-}
-
-/**
- * Fetch JSON with timeout, retries, and structured errors.
- *
- * Retries network failures, 429, and 502/503/504 (honoring `Retry-After`);
- * every other status throws {@link HttpError} immediately.
- *
- * @param url - Absolute request URL.
- * @param options - Method, headers, JSON body, timeout, retries, logger.
- * @returns The parsed JSON response body.
- */
-export async function httpJson<T>(url: string, options: HttpRequestOptions = {}): Promise<T> {
-  return await requestWithRetry<T>(
-    url,
-    options,
-    options.retries ?? DEFAULT_RETRIES,
-    options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-  );
 }
 
 /* oxlint-disable eslint/no-await-in-loop -- retry attempts run sequentially by design */

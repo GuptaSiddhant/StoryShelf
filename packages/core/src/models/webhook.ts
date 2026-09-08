@@ -6,13 +6,6 @@ import type { Webhook } from "../schema/webhook.ts";
 import { decrypt, encrypt } from "../utils/encrypt.ts";
 import { ulid } from "../utils/ulid.ts";
 
-/** Input for creating a webhook subscription. */
-export interface WebhookCreateInput {
-  url: string;
-  events?: string[];
-  secret: string;
-}
-
 /** Data operations for webhook subscriptions. */
 export class WebhookModel {
   /**
@@ -83,4 +76,11 @@ export class WebhookModel {
       return [];
     }
   }
+}
+
+/** Input for creating a webhook subscription. */
+export interface WebhookCreateInput {
+  url: string;
+  events?: string[];
+  secret: string;
 }

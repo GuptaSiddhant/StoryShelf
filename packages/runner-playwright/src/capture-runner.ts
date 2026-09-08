@@ -9,35 +9,9 @@ import type {
 import { StorybookAdapter } from "@storyshelf/core/capture";
 import type { Logger } from "@storyshelf/core/logger";
 import { chromium, type Browser } from "playwright-core";
-
-declare const __PKG_VERSION__: string | undefined;
-
 import { createStaticServer } from "./static-server.ts";
 
-interface ScreenshotContext {
-  browser: Browser;
-  adapter: StorySourceAdapter;
-  baseUrl: string;
-}
-
-/** A render that may currently be in flight, so that `cancel` can abort it. */
-interface ActiveRun {
-  cancelled: boolean;
-  browser: Browser | null;
-}
-
-const activeRuns = new Map<string, ActiveRun>();
-
-/** Input for a Playwright capture run over a built Storybook directory. */
-export interface PlaywrightRenderInput {
-  buildId: string;
-  storybookDir: string;
-  stories: StoryEntry[];
-  viewports: Viewport[];
-  logger?: Logger;
-  executePlay?: boolean;
-  playTimeoutMs?: number;
-}
+declare const __PKG_VERSION__: string | undefined;
 
 /** Create a CaptureRunner that renders Storybook stories with Playwright. */
 export function createPlaywrightCaptureRunner(): CaptureRunner {
@@ -68,6 +42,31 @@ export function createPlaywrightCaptureRunner(): CaptureRunner {
     },
   };
 }
+
+/** Input for a Playwright capture run over a built Storybook directory. */
+export interface PlaywrightRenderInput {
+  buildId: string;
+  storybookDir: string;
+  stories: StoryEntry[];
+  viewports: Viewport[];
+  logger?: Logger;
+  executePlay?: boolean;
+  playTimeoutMs?: number;
+}
+
+interface ScreenshotContext {
+  browser: Browser;
+  adapter: StorySourceAdapter;
+  baseUrl: string;
+}
+
+/** A render that may currently be in flight, so that `cancel` can abort it. */
+interface ActiveRun {
+  cancelled: boolean;
+  browser: Browser | null;
+}
+
+const activeRuns = new Map<string, ActiveRun>();
 
 async function closeBrowser(browser: Browser | null): Promise<void> {
   if (!browser) {

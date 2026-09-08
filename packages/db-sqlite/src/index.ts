@@ -7,13 +7,6 @@ import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 
 declare const __PKG_VERSION__: string | undefined;
 
-const STORYBOOK_META_ALTER = "ALTER TABLE projects ADD COLUMN storybook_meta TEXT";
-const WEBHOOK_SECRET_ALTER =
-  "ALTER TABLE webhooks ADD COLUMN secret_encrypted TEXT NOT NULL DEFAULT ''";
-const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN secret";
-
-type ProxyMethod = "run" | "all" | "values" | "get";
-
 /**
  * Create a SQLite-backed DatabaseAdapter using node:sqlite and Drizzle ORM.
  *
@@ -43,6 +36,13 @@ export function createSqliteDatabase(path: string): DatabaseAdapter {
     },
   });
 }
+
+const STORYBOOK_META_ALTER = "ALTER TABLE projects ADD COLUMN storybook_meta TEXT";
+const WEBHOOK_SECRET_ALTER =
+  "ALTER TABLE webhooks ADD COLUMN secret_encrypted TEXT NOT NULL DEFAULT ''";
+const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN secret";
+
+type ProxyMethod = "run" | "all" | "values" | "get";
 
 /**
  * Execute one Drizzle statement against DatabaseSync, returning proxy-shaped rows.

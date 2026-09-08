@@ -15,44 +15,6 @@ import type { Logger } from "@storyshelf/core/logger";
 
 declare const __PKG_VERSION__: string | undefined;
 
-/** Options for configuring an SQS-backed CaptureQueue. */
-export interface SqsCaptureQueueOptions {
-  /** SQS queue URL. */
-  queueUrl: string;
-  /** Optional pre-configured SQSClient. */
-  client?: SQSClient;
-  /** Optional logger for queue diagnostics. */
-  logger?: Logger;
-}
-
-interface QueuedBody {
-  buildId?: string;
-  status?: JobStatus;
-  queuedAt?: string;
-  startedAt?: string;
-  finishedAt?: string;
-  error?: string;
-  reqId?: string;
-}
-
-function parseBody(raw: string): QueuedBody {
-  return JSON.parse(raw) as QueuedBody;
-}
-
-function hasQueuedOrRunningStatus(body: QueuedBody): boolean {
-  const status = body.status ?? "queued";
-  return ["queued", "running"].includes(status);
-}
-
-function mapQueueEntry(raw: { Body?: string }): QueueEntry {
-  const body = parseBody(raw.Body ?? "{}");
-  return {
-    buildId: body.buildId ?? "unknown",
-    status: body.status ?? "queued",
-    queuedAt: body.queuedAt ?? new Date().toISOString(),
-  };
-}
-
 /**
  * Create an SQS-backed `CaptureQueue`.
  *
@@ -193,5 +155,43 @@ export function createSqsCaptureQueue(options: SqsCaptureQueueOptions): CaptureQ
         .map((msg) => mapQueueEntry(msg))
         .toSorted((left, right) => right.queuedAt.localeCompare(left.queuedAt));
     },
+  };
+}
+
+/** Options for configuring an SQS-backed CaptureQueue. */
+export interface SqsCaptureQueueOptions {
+  /** SQS queue URL. */
+  queueUrl: string;
+  /** Optional pre-configured SQSClient. */
+  client?: SQSClient;
+  /** Optional logger for queue diagnostics. */
+  logger?: Logger;
+}
+
+interface QueuedBody {
+  buildId?: string;
+  status?: JobStatus;
+  queuedAt?: string;
+  startedAt?: string;
+  finishedAt?: string;
+  error?: string;
+  reqId?: string;
+}
+
+function parseBody(raw: string): QueuedBody {
+  return JSON.parse(raw) as QueuedBody;
+}
+
+function hasQueuedOrRunningStatus(body: QueuedBody): boolean {
+  const status = body.status ?? "queued";
+  return ["queued", "running"].includes(status);
+}
+
+function mapQueueEntry(raw: { Body?: string }): QueueEntry {
+  const body = parseBody(raw.Body ?? "{}");
+  return {
+    buildId: body.buildId ?? "unknown",
+    status: body.status ?? "queued",
+    queuedAt: body.queuedAt ?? new Date().toISOString(),
   };
 }

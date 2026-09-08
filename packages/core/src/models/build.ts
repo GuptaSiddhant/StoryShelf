@@ -8,45 +8,6 @@ import { snapshots } from "../schema/snapshot.ts";
 import type { BuildStatus } from "../types.ts";
 import { ulid } from "../utils/ulid.ts";
 
-/**
- * Return whether a build is publicly viewable without a session.
- *
- * A build is public iff `builds.public` is set or its branch matches the
- * project's `public_branch_regex` (ADR 0011). Supplying an empty/nonexistent
- * regex makes every build require auth.
- */
-export function isPublicBuild(
-  project: { publicBranchRegex: string | null },
-  build: Pick<Build, "public" | "gitBranch">,
-): boolean {
-  if (build.public) {
-    return true;
-  }
-  if (!project.publicBranchRegex) {
-    return false;
-  }
-  return new RegExp(project.publicBranchRegex, "u").test(build.gitBranch);
-}
-
-/** Input for creating a build. */
-export interface BuildCreateInput {
-  gitSha: string;
-  gitBranch: string;
-  isDefault?: boolean;
-  authorEmail?: string;
-  authorName?: string;
-  message?: string;
-  public?: boolean;
-}
-
-/** Filter options for listing builds. */
-export interface BuildListFilter {
-  status?: BuildStatus;
-  branch?: string;
-  labelKey?: string;
-  labelValue?: string;
-}
-
 /** Data operations for build records. */
 export class BuildModel {
   constructor(private readonly db: DatabaseAdapter) {}
@@ -143,4 +104,43 @@ export class BuildModel {
   async remove(id: string): Promise<void> {
     await this.db.remove(builds, id);
   }
+}
+
+/**
+ * Return whether a build is publicly viewable without a session.
+ *
+ * A build is public iff `builds.public` is set or its branch matches the
+ * project's `public_branch_regex` (ADR 0011). Supplying an empty/nonexistent
+ * regex makes every build require auth.
+ */
+export function isPublicBuild(
+  project: { publicBranchRegex: string | null },
+  build: Pick<Build, "public" | "gitBranch">,
+): boolean {
+  if (build.public) {
+    return true;
+  }
+  if (!project.publicBranchRegex) {
+    return false;
+  }
+  return new RegExp(project.publicBranchRegex, "u").test(build.gitBranch);
+}
+
+/** Input for creating a build. */
+export interface BuildCreateInput {
+  gitSha: string;
+  gitBranch: string;
+  isDefault?: boolean;
+  authorEmail?: string;
+  authorName?: string;
+  message?: string;
+  public?: boolean;
+}
+
+/** Filter options for listing builds. */
+export interface BuildListFilter {
+  status?: BuildStatus;
+  branch?: string;
+  labelKey?: string;
+  labelValue?: string;
 }

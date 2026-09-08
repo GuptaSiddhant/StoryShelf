@@ -18,53 +18,6 @@ import type { ReadableStream as NodeWebStream } from "node:stream/web";
 import { getStore } from "../store.ts";
 import { notFound } from "./helpers.ts";
 
-/** Roles permitted to view builds, snapshots, and comments. */
-export const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];
-/** Roles permitted to upload builds and write comments. */
-export const DEVELOPER_ROLES: readonly ProjectRole[] = ["developer", "approver", "admin"];
-/** Roles permitted to approve or reject snapshots and delete builds. */
-export const APPROVER_ROLES: readonly ProjectRole[] = ["approver", "admin"];
-
-/** JSON input schema for creating a build before streaming its bundle. */
-export const buildCreateJsonSchema = z
-  .object({
-    gitSha: z.string().min(1),
-    gitBranch: z.string().min(1),
-    authorEmail: z.string().optional(),
-    authorName: z.string().optional(),
-    message: z.string().optional(),
-    labels: z.array(z.object({ key: z.string().min(1), value: z.string() })).optional(),
-  })
-  .openapi("BuildCreate");
-
-/** Metadata accepted by either build-creation route. */
-export interface BuildCreateMetadata {
-  gitSha: string;
-  gitBranch: string;
-  authorEmail?: string;
-  authorName?: string;
-  message?: string;
-  labels?: { key: string; value: string }[];
-}
-
-/* oxlint-disable eslint/no-await-in-loop -- label attach is intentionally sequential */
-async function attachLabels(
-  db: DatabaseAdapter,
-  projectId: string,
-  buildId: string,
-  labels: { key: string; value: string }[],
-): Promise<void> {
-  const models = new LabelModel(db);
-  for (const { key, value } of labels) {
-    const existing = await models.getType(projectId, key);
-    if (!existing) {
-      await models.createType(projectId, { key, name: key });
-    }
-    await models.attach(projectId, buildId, key, value);
-  }
-}
-/* oxlint-enable eslint/no-await-in-loop */
-
 /**
  * Create a build record with labels and the `build:created` webhook.
  * Shared by the build-creation route.
@@ -144,15 +97,6 @@ export async function storeUploadStream(
   }
 }
 
-/** Parse a Content-Length header value into bytes, or undefined when unknown. */
-function parseContentLength(value: string | undefined): number | undefined {
-  if (!value) {
-    return undefined;
-  }
-  const parsed = Math.trunc(Number(value));
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
-}
-
 /**
  * Best-effort inline statics extraction for small uploads (see
  * `maxInlineUnzipSize`). Never throws: failures are logged and the capture
@@ -182,6 +126,7 @@ export async function persistInlineStatics(
     logger.error({ err: error, buildId }, "inline statics persist failed; capture will backfill");
   }
 }
+
 /** Query filters accepted by the build list endpoint. */
 export const buildListQuery = z.object({
   status: z.enum(BUILD_STATUSES).optional(),
@@ -265,4 +210,60 @@ export async function approveSnapshot(snapshotId: string, userId: string | null)
     snapshot.screenshotPath,
   );
   await refreshBuild(build.id);
+}
+
+/** Roles permitted to view builds, snapshots, and comments. */
+export const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];
+/** Roles permitted to upload builds and write comments. */
+export const DEVELOPER_ROLES: readonly ProjectRole[] = ["developer", "approver", "admin"];
+/** Roles permitted to approve or reject snapshots and delete builds. */
+export const APPROVER_ROLES: readonly ProjectRole[] = ["approver", "admin"];
+
+/** JSON input schema for creating a build before streaming its bundle. */
+export const buildCreateJsonSchema = z
+  .object({
+    gitSha: z.string().min(1),
+    gitBranch: z.string().min(1),
+    authorEmail: z.string().optional(),
+    authorName: z.string().optional(),
+    message: z.string().optional(),
+    labels: z.array(z.object({ key: z.string().min(1), value: z.string() })).optional(),
+  })
+  .openapi("BuildCreate");
+
+/** Metadata accepted by either build-creation route. */
+export interface BuildCreateMetadata {
+  gitSha: string;
+  gitBranch: string;
+  authorEmail?: string;
+  authorName?: string;
+  message?: string;
+  labels?: { key: string; value: string }[];
+}
+
+/* oxlint-disable eslint/no-await-in-loop -- label attach is intentionally sequential */
+async function attachLabels(
+  db: DatabaseAdapter,
+  projectId: string,
+  buildId: string,
+  labels: { key: string; value: string }[],
+): Promise<void> {
+  const models = new LabelModel(db);
+  for (const { key, value } of labels) {
+    const existing = await models.getType(projectId, key);
+    if (!existing) {
+      await models.createType(projectId, { key, name: key });
+    }
+    await models.attach(projectId, buildId, key, value);
+  }
+}
+/* oxlint-enable eslint/no-await-in-loop */
+
+/** Parse a Content-Length header value into bytes, or undefined when unknown. */
+function parseContentLength(value: string | undefined): number | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const parsed = Math.trunc(Number(value));
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
 }

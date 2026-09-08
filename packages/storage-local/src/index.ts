@@ -6,38 +6,6 @@ import { pipeline } from "node:stream/promises";
 
 declare const __PKG_VERSION__: string | undefined;
 
-async function pathExists(target: string): Promise<boolean> {
-  try {
-    await access(target);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function toAbsolute(root: string, path: string): string {
-  const target = resolve(root, path);
-  const rel = relative(root, target);
-  if (rel === ".." || rel.startsWith(`..${sep}`)) {
-    throw new Error(`Path escapes storage directory: ${path}`);
-  }
-  return target;
-}
-
-async function walk(root: string, dir: string): Promise<string[]> {
-  const entries = await readdir(dir, { withFileTypes: true });
-  const nested = await Promise.all(
-    entries.map(async (entry) => {
-      const full = join(dir, entry.name);
-      if (entry.isDirectory()) {
-        return await walk(root, full);
-      }
-      return [relative(root, full)];
-    }),
-  );
-  return nested.flat();
-}
-
 /**
  * Create a local filesystem-backed StorageAdapter rooted at the given directory.
  *
@@ -88,6 +56,38 @@ export function createLocalStorage(dataDir: string): StorageAdapter {
     },
     ...buildStreamMethods(root),
   };
+}
+
+async function pathExists(target: string): Promise<boolean> {
+  try {
+    await access(target);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function toAbsolute(root: string, path: string): string {
+  const target = resolve(root, path);
+  const rel = relative(root, target);
+  if (rel === ".." || rel.startsWith(`..${sep}`)) {
+    throw new Error(`Path escapes storage directory: ${path}`);
+  }
+  return target;
+}
+
+async function walk(root: string, dir: string): Promise<string[]> {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const nested = await Promise.all(
+    entries.map(async (entry) => {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        return await walk(root, full);
+      }
+      return [relative(root, full)];
+    }),
+  );
+  return nested.flat();
 }
 
 /** Streaming reads/writes for a local storage root (split for lint limits). */

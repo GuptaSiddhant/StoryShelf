@@ -6,6 +6,20 @@ import { checkIsMerged } from "./merge.ts";
 import { getMetadata } from "./metadata.ts";
 import { postCommitStatus } from "./status.ts";
 
+/** GitHub commit-status provider for StoryShelf merge gates. */
+export const gitHubHost: GitHostProvider = {
+  metadata: getMetadata(),
+  create(opts: { config: unknown; token: string; logger?: Logger }): GitHostAdapter {
+    const cfg = githubConfigSchema.parse(opts.config);
+    return createGitHubStatusAdapter({
+      token: opts.token,
+      owner: cfg.owner,
+      repo: cfg.repo,
+      logger: opts.logger,
+    });
+  },
+};
+
 interface GitHubStatusOptions {
   token: string;
   owner: string;
@@ -49,17 +63,3 @@ function createGitHubStatusAdapter(options: GitHubStatusOptions): GitHostAdapter
     },
   };
 }
-
-/** GitHub commit-status provider for StoryShelf merge gates. */
-export const gitHubHost: GitHostProvider = {
-  metadata: getMetadata(),
-  create(opts: { config: unknown; token: string; logger?: Logger }): GitHostAdapter {
-    const cfg = githubConfigSchema.parse(opts.config);
-    return createGitHubStatusAdapter({
-      token: opts.token,
-      owner: cfg.owner,
-      repo: cfg.repo,
-      logger: opts.logger,
-    });
-  },
-};

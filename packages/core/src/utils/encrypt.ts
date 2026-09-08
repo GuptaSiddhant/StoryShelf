@@ -1,16 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 
 /**
- * Derive a 32-byte AES-256 key from the server secret.
- *
- * Reuses the existing `sha256` pattern (`utils/hash.ts`) so key derivation
- * is consistent with token hashing and session HMAC.
- */
-function deriveKey(secret: string): Buffer {
-  return createHash("sha256").update(secret).digest();
-}
-
-/**
  * Encrypt a plaintext secret for storage.
  *
  * Format: `base64url(iv):base64url(authTag):base64url(ciphertext)` (12B IV).
@@ -48,4 +38,14 @@ export function decrypt(secret: string | undefined, ciphertext: string): string 
   decipher.setAuthTag(tag);
   const dec = Buffer.concat([decipher.update(enc), decipher.final()]);
   return dec.toString("utf8");
+}
+
+/**
+ * Derive a 32-byte AES-256 key from the server secret.
+ *
+ * Reuses the existing `sha256` pattern (`utils/hash.ts`) so key derivation
+ * is consistent with token hashing and session HMAC.
+ */
+function deriveKey(secret: string): Buffer {
+  return createHash("sha256").update(secret).digest();
 }

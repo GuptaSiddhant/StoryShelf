@@ -6,18 +6,6 @@ import type { Snapshot } from "../schema/snapshot.ts";
 import type { SnapshotStatus } from "../types.ts";
 import { ulid } from "../utils/ulid.ts";
 
-/** Input for creating a snapshot. */
-export interface SnapshotCreateInput {
-  storyId: string;
-  storyName: string;
-  storyTitle: string;
-  storyImportPath?: string;
-  viewportName: string;
-  viewportWidth: number;
-  viewportHeight: number;
-  screenshotPath: string;
-}
-
 /** Data operations for snapshot records. */
 export class SnapshotModel {
   /**
@@ -81,4 +69,16 @@ export class SnapshotModel {
       reviewedAt: new Date().toISOString(),
     });
   }
+}
+
+/** Input for creating a snapshot. */
+export interface SnapshotCreateInput {
+  storyId: string;
+  storyName: string;
+  storyTitle: string;
+  storyImportPath?: string;
+  viewportName: string;
+  viewportWidth: number;
+  viewportHeight: number;
+  screenshotPath: string;
 }

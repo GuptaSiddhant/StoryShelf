@@ -1,27 +1,6 @@
 import pino from "pino";
 import type { Logger } from "pino";
 
-/** Pino logger type shared across StoryShelf. */
-export type { Logger };
-
-/** A pino worker transport to attach to the logger output. */
-export interface PinoTransport {
-  /** Package name or absolute path of the transport module. */
-  target: string;
-  /** Options passed to the transport worker. */
-  options?: Record<string, unknown>;
-}
-
-/** Configuration for constructing the shelf logger. */
-export interface LoggerOptions {
-  /** Minimum level to emit. Defaults to `LOG_LEVEL` env, then `"info"`. */
-  level?: string;
-  /** Extra pino worker transports appended to the default stdout sink. */
-  transports?: PinoTransport[];
-  /** Deployment environment recorded in the `env` base field. Defaults to `NODE_ENV`. */
-  env?: string;
-}
-
 /**
  * Create the structured JSON logger used across StoryShelf.
  *
@@ -54,4 +33,25 @@ export function createShelfLogger(options: LoggerOptions = {}): Logger {
     },
     transport,
   );
+}
+
+/** Pino logger type shared across StoryShelf. */
+export type { Logger };
+
+/** A pino worker transport to attach to the logger output. */
+export interface PinoTransport {
+  /** Package name or absolute path of the transport module. */
+  target: string;
+  /** Options passed to the transport worker. */
+  options?: Record<string, unknown>;
+}
+
+/** Configuration for constructing the shelf logger. */
+export interface LoggerOptions {
+  /** Minimum level to emit. Defaults to `LOG_LEVEL` env, then `"info"`. */
+  level?: string;
+  /** Extra pino worker transports appended to the default stdout sink. */
+  transports?: PinoTransport[];
+  /** Deployment environment recorded in the `env` base field. Defaults to `NODE_ENV`. */
+  env?: string;
 }

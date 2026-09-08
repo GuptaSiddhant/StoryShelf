@@ -6,6 +6,24 @@ import { checkIsMerged } from "./merge.ts";
 import { getMetadata } from "./metadata.ts";
 import { postCommitStatus } from "./status.ts";
 
+/** GitLab commit-status provider for StoryShelf merge gates. */
+export const gitLabHost: GitHostProvider = {
+  metadata: getMetadata(),
+  create(opts: { config: unknown; token: string; logger?: Logger }): GitHostAdapter {
+    const cfg = gitlabConfigSchema.parse(opts.config) as GitLabStatusOptions & {
+      owner: string;
+      repo: string;
+    };
+    return createGitLabStatusAdapter({
+      token: opts.token,
+      owner: cfg.owner,
+      repo: cfg.repo,
+      host: cfg.host,
+      logger: opts.logger,
+    });
+  },
+};
+
 interface GitLabStatusOptions {
   token: string;
   owner: string;
@@ -58,21 +76,3 @@ function createGitLabStatusAdapter(options: GitLabStatusOptions): GitHostAdapter
     },
   };
 }
-
-/** GitLab commit-status provider for StoryShelf merge gates. */
-export const gitLabHost: GitHostProvider = {
-  metadata: getMetadata(),
-  create(opts: { config: unknown; token: string; logger?: Logger }): GitHostAdapter {
-    const cfg = gitlabConfigSchema.parse(opts.config) as GitLabStatusOptions & {
-      owner: string;
-      repo: string;
-    };
-    return createGitLabStatusAdapter({
-      token: opts.token,
-      owner: cfg.owner,
-      repo: cfg.repo,
-      host: cfg.host,
-      logger: opts.logger,
-    });
-  },
-};

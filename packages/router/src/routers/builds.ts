@@ -27,6 +27,89 @@ import {
 } from "./schemas.ts";
 import { registerSnapshots } from "./snapshots.ts";
 
+/** Register the build list, upload, fetch, retry, and delete endpoints. */
+export function registerBuilds(app: ShelfApp): void {
+  app.openapi(listBuildsRoute, async (c) => {
+    const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...VIEW_ROLES);
+    const { status, branch, labelKey, labelValue } = c.req.valid("query");
+    const builds = new BuildModel(getStore().db).list(project.id, {
+      status,
+      branch: branch ?? undefined,
+      labelKey: labelKey ?? undefined,
+      labelValue: labelValue ?? undefined,
+    });
+    return c.json(await builds);
+  });
+
+  app.openapi(createBuildRoute, async (c) => {
+    const project = await resolveAuthorizedProject(
+      c,
+      c.req.valid("param").slug,
+      ...DEVELOPER_ROLES,
+    );
+    const parsed = buildCreateJsonSchema.safeParse(await c.req.json());
+    if (!parsed.success) {
+      throw new HTTPException(400, { message: parsed.error.message });
+    }
+    const build = await createBuildRecord(project, parsed.data);
+    const uploadUrl = `/api/v1/projects/${project.slug}/builds/${build.id}/zip`;
+    return c.json({ build, uploadUrl }, 202);
+  });
+
+  app.openapi(uploadZipRoute, async (c) => {
+    const { slug, buildId } = c.req.valid("param");
+    const project = await resolveAuthorizedProject(c, slug, ...DEVELOPER_ROLES);
+    const build = await buildForProject(project.id, buildId);
+    const maxBytes = getStore().config.maxUploadBytes ?? DEFAULT_MAX_UPLOAD_BYTES;
+    await storeUploadStream(
+      getStore().storage,
+      storybookZipPath(project.id, build.id),
+      c.req.raw.body,
+      maxBytes,
+    );
+
+    const reqId = c.get("requestId");
+    await getStore().enqueueCapture?.(build.id, reqId);
+    const { storage, config, logger } = getStore();
+    await persistInlineStatics(
+      storage,
+      config.scratchDir,
+      config.maxInlineUnzipSize,
+      c.req.header("content-length"),
+      project.id,
+      build.id,
+      logger,
+    );
+    return c.json(build, 202);
+  });
+
+  app.openapi(getBuildRoute, async (c) => {
+    const { slug, buildId } = c.req.valid("param");
+    const project = await resolveAuthorizedProject(c, slug, ...VIEW_ROLES);
+    const build = await buildForProject(project.id, buildId);
+    return c.json(build);
+  });
+
+  app.openapi(retryBuildRoute, async (c) => {
+    const { slug, buildId } = c.req.valid("param");
+    const project = await resolveAuthorizedProject(c, slug, ...DEVELOPER_ROLES);
+    const build = await buildForProject(project.id, buildId);
+    const updated = await new BuildModel(getStore().db).setStatus(build.id, "pending");
+    return c.json(updated, 202);
+  });
+
+  app.openapi(deleteBuildRoute, async (c) => {
+    const { slug, buildId } = c.req.valid("param");
+    const project = await resolveAuthorizedProject(c, slug, ...APPROVER_ROLES);
+    const build = await buildForProject(project.id, buildId);
+    await new BuildModel(getStore().db).remove(build.id);
+    return c.body(null, 204);
+  });
+
+  registerSnapshots(app);
+  registerComments(app);
+}
+
 const listBuildsRoute = createRoute({
   method: "get",
   path: "/api/v1/projects/{slug}/builds",
@@ -136,86 +219,3 @@ const deleteBuildRoute = createRoute({
     ...notFoundResponse,
   },
 });
-
-/** Register the build list, upload, fetch, retry, and delete endpoints. */
-export function registerBuilds(app: ShelfApp): void {
-  app.openapi(listBuildsRoute, async (c) => {
-    const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...VIEW_ROLES);
-    const { status, branch, labelKey, labelValue } = c.req.valid("query");
-    const builds = new BuildModel(getStore().db).list(project.id, {
-      status,
-      branch: branch ?? undefined,
-      labelKey: labelKey ?? undefined,
-      labelValue: labelValue ?? undefined,
-    });
-    return c.json(await builds);
-  });
-
-  app.openapi(createBuildRoute, async (c) => {
-    const project = await resolveAuthorizedProject(
-      c,
-      c.req.valid("param").slug,
-      ...DEVELOPER_ROLES,
-    );
-    const parsed = buildCreateJsonSchema.safeParse(await c.req.json());
-    if (!parsed.success) {
-      throw new HTTPException(400, { message: parsed.error.message });
-    }
-    const build = await createBuildRecord(project, parsed.data);
-    const uploadUrl = `/api/v1/projects/${project.slug}/builds/${build.id}/zip`;
-    return c.json({ build, uploadUrl }, 202);
-  });
-
-  app.openapi(uploadZipRoute, async (c) => {
-    const { slug, buildId } = c.req.valid("param");
-    const project = await resolveAuthorizedProject(c, slug, ...DEVELOPER_ROLES);
-    const build = await buildForProject(project.id, buildId);
-    const maxBytes = getStore().config.maxUploadBytes ?? DEFAULT_MAX_UPLOAD_BYTES;
-    await storeUploadStream(
-      getStore().storage,
-      storybookZipPath(project.id, build.id),
-      c.req.raw.body,
-      maxBytes,
-    );
-
-    const reqId = c.get("requestId");
-    await getStore().enqueueCapture?.(build.id, reqId);
-    const { storage, config, logger } = getStore();
-    await persistInlineStatics(
-      storage,
-      config.scratchDir,
-      config.maxInlineUnzipSize,
-      c.req.header("content-length"),
-      project.id,
-      build.id,
-      logger,
-    );
-    return c.json(build, 202);
-  });
-
-  app.openapi(getBuildRoute, async (c) => {
-    const { slug, buildId } = c.req.valid("param");
-    const project = await resolveAuthorizedProject(c, slug, ...VIEW_ROLES);
-    const build = await buildForProject(project.id, buildId);
-    return c.json(build);
-  });
-
-  app.openapi(retryBuildRoute, async (c) => {
-    const { slug, buildId } = c.req.valid("param");
-    const project = await resolveAuthorizedProject(c, slug, ...DEVELOPER_ROLES);
-    const build = await buildForProject(project.id, buildId);
-    const updated = await new BuildModel(getStore().db).setStatus(build.id, "pending");
-    return c.json(updated, 202);
-  });
-
-  app.openapi(deleteBuildRoute, async (c) => {
-    const { slug, buildId } = c.req.valid("param");
-    const project = await resolveAuthorizedProject(c, slug, ...APPROVER_ROLES);
-    const build = await buildForProject(project.id, buildId);
-    await new BuildModel(getStore().db).remove(build.id);
-    return c.body(null, 204);
-  });
-
-  registerSnapshots(app);
-  registerComments(app);
-}

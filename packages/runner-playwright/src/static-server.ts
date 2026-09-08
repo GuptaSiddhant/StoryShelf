@@ -9,6 +9,37 @@ export interface StaticServer {
   close(): Promise<void>;
 }
 
+/**
+ * Serve a built Storybook directory over HTTP on 127.0.0.1 for capture.
+ *
+ * @param rootDir - Directory containing the built Storybook (`index.html` entry).
+ * @returns The server URL and a `close` function to stop it.
+ */
+export async function createStaticServer(rootDir: string): Promise<StaticServer> {
+  const root = normalize(rootDir);
+  const info = await stat(root).catch(() => null);
+  if (!info || !info.isDirectory()) {
+    throw new Error(
+      `Storybook directory not found: ${rootDir}. Upload the built Storybook before capturing.`,
+    );
+  }
+
+  const server = createServer((req, res) => {
+    handleRequest(root, req.url ?? "/", res).catch(() => {
+      sendNotFound(res);
+    });
+  });
+
+  const port = await listen(server);
+
+  return {
+    url: `http://127.0.0.1:${port}`,
+    close: async () => {
+      await closeServer(server);
+    },
+  };
+}
+
 const MIME_TYPES: Record<string, string> = {
   ".css": "text/css; charset=utf-8",
   ".html": "text/html; charset=utf-8",
@@ -78,35 +109,4 @@ async function closeServer(server: Server): Promise<void> {
       }
     });
   });
-}
-
-/**
- * Serve a built Storybook directory over HTTP on 127.0.0.1 for capture.
- *
- * @param rootDir - Directory containing the built Storybook (`index.html` entry).
- * @returns The server URL and a `close` function to stop it.
- */
-export async function createStaticServer(rootDir: string): Promise<StaticServer> {
-  const root = normalize(rootDir);
-  const info = await stat(root).catch(() => null);
-  if (!info || !info.isDirectory()) {
-    throw new Error(
-      `Storybook directory not found: ${rootDir}. Upload the built Storybook before capturing.`,
-    );
-  }
-
-  const server = createServer((req, res) => {
-    handleRequest(root, req.url ?? "/", res).catch(() => {
-      sendNotFound(res);
-    });
-  });
-
-  const port = await listen(server);
-
-  return {
-    url: `http://127.0.0.1:${port}`,
-    close: async () => {
-      await closeServer(server);
-    },
-  };
 }

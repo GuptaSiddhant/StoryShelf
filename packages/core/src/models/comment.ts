@@ -6,13 +6,6 @@ import type { Comment } from "../schema/comment.ts";
 import { projects } from "../schema/project.ts";
 import { ulid } from "../utils/ulid.ts";
 
-/** Input for creating a review comment. */
-export interface CommentCreateInput {
-  body: string;
-  snapshotId?: string;
-  parentId?: string;
-}
-
 /** Data operations for review comments. */
 export class CommentModel {
   constructor(private readonly db: DatabaseAdapter) {}
@@ -52,4 +45,11 @@ export class CommentModel {
       updatedAt: new Date().toISOString(),
     });
   }
+}
+
+/** Input for creating a review comment. */
+export interface CommentCreateInput {
+  body: string;
+  snapshotId?: string;
+  parentId?: string;
 }

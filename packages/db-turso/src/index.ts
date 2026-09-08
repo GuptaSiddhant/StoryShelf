@@ -7,11 +7,6 @@ import { drizzle } from "drizzle-orm/libsql";
 
 declare const __PKG_VERSION__: string | undefined;
 
-const STORYBOOK_META_ALTER = "ALTER TABLE projects ADD COLUMN storybook_meta TEXT";
-const WEBHOOK_SECRET_ALTER =
-  "ALTER TABLE webhooks ADD COLUMN secret_encrypted TEXT NOT NULL DEFAULT ''";
-const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN secret";
-
 /**
  * Create a Turso/libSQL-backed DatabaseAdapter using Drizzle ORM.
  *
@@ -38,6 +33,11 @@ export function createTursoDatabase(options: { url: string; authToken?: string }
     },
   });
 }
+
+const STORYBOOK_META_ALTER = "ALTER TABLE projects ADD COLUMN storybook_meta TEXT";
+const WEBHOOK_SECRET_ALTER =
+  "ALTER TABLE webhooks ADD COLUMN secret_encrypted TEXT NOT NULL DEFAULT ''";
+const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN secret";
 
 async function runMigrations(client: ReturnType<typeof createClient>): Promise<void> {
   await client.executeMultiple(DDL);

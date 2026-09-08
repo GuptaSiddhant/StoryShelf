@@ -14,26 +14,6 @@ import type { BuildStatus } from "../types.ts";
 import { diffPath, screenshotPath } from "../utils/paths.ts";
 import type { Viewport } from "./adapter.ts";
 
-/** Persistence inputs for a completed capture run. */
-export interface CaptureContext {
-  /** Database adapter. */
-  db: DatabaseAdapter;
-  /** Storage adapter. */
-  storage: StorageAdapter;
-  /** The project being captured. */
-  project: Project;
-  /** The build being captured. */
-  build: Build;
-  /** Viewports at which stories were captured. */
-  viewports: Viewport[];
-  /** Screenshot buffers produced by the capture renderer. */
-  captures: RenderedSnapshot[];
-  /** Optional logger for capture diagnostics. */
-  logger?: Logger;
-  /** Server secret for decrypting webhook secrets at send time. */
-  secret?: string | undefined;
-}
-
 /**
  * Persist a completed capture run: write screenshots, diff against the branch
  * baseline, create snapshots, and finalize the build.
@@ -84,6 +64,26 @@ export async function persistCapture(
     }
   }
   await finalize(ctx, new Set(ctx.captures.map((c) => c.story.id)), failedStoryIds, flakyIds);
+}
+
+/** Persistence inputs for a completed capture run. */
+export interface CaptureContext {
+  /** Database adapter. */
+  db: DatabaseAdapter;
+  /** Storage adapter. */
+  storage: StorageAdapter;
+  /** The project being captured. */
+  project: Project;
+  /** The build being captured. */
+  build: Build;
+  /** Viewports at which stories were captured. */
+  viewports: Viewport[];
+  /** Screenshot buffers produced by the capture renderer. */
+  captures: RenderedSnapshot[];
+  /** Optional logger for capture diagnostics. */
+  logger?: Logger;
+  /** Server secret for decrypting webhook secrets at send time. */
+  secret?: string | undefined;
 }
 
 function viewportByName(ctx: CaptureContext, name: string): Viewport {

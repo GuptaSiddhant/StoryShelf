@@ -9,23 +9,6 @@ import { builds } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 import { TERMINAL_BUILD_STATUSES } from "../types.ts";
 
-/** Options controlling which builds a retention purge removes. */
-export interface PurgeOptions {
-  ttlDays: number;
-  keepLatestPerBranch: boolean;
-}
-
-/** Counts of builds and files removed by a retention purge. */
-export interface PurgeResult {
-  removedBuilds: number;
-  removedFiles: number;
-}
-
-/** Counts of stale branches and baselines removed. */
-export interface BranchGcResult {
-  removedBranches: number;
-  removedBaselines: number;
-}
 /** Removes expired transient builds while keeping baselines and persistent builds. */
 export class Retention {
   constructor(
@@ -124,6 +107,24 @@ export class Retention {
     );
     return { removedBranches: stale.size, removedBaselines };
   }
+}
+
+/** Options controlling which builds a retention purge removes. */
+export interface PurgeOptions {
+  ttlDays: number;
+  keepLatestPerBranch: boolean;
+}
+
+/** Counts of builds and files removed by a retention purge. */
+export interface PurgeResult {
+  removedBuilds: number;
+  removedFiles: number;
+}
+
+/** Counts of stale branches and baselines removed. */
+export interface BranchGcResult {
+  removedBranches: number;
+  removedBaselines: number;
 }
 
 function collectStaleBranches(
