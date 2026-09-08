@@ -25,7 +25,11 @@ export const SNAPSHOT_STATUSES = [
 /** Review status of a snapshot. */
 export type SnapshotStatus = (typeof SNAPSHOT_STATUSES)[number];
 
-/** Build statuses eligible for retention purging. */
+/**
+ * Build statuses considered terminal for retention purging.
+ * Only builds that have finished review (`approved`, `rejected`, `failed`)
+ * are eligible for TTL-based cleanup; `pending`/`reviewing` builds are kept.
+ */
 export const TERMINAL_BUILD_STATUSES: readonly BuildStatus[] = ["approved", "rejected", "failed"];
 
 /** All site-wide user roles. */
@@ -52,8 +56,11 @@ export const SEEDED_LABEL_KEYS = [
   "custom",
 ] as const;
 
-/** Label type keys reserved for internal use. */
+/** Label type keys reserved for internal bookkeeping (cannot be created by users). */
 export const RESERVED_LABEL_KEYS = ["build"] as const;
 
-/** Label key marking a build as exempt from retention purging. */
+/**
+ * Label key that marks a build as exempt from retention purging.
+ * Attach `persistent=true` to keep a build indefinitely, even after its TTL expires.
+ */
 export const PERSISTENT_LABEL_KEY = "persistent";

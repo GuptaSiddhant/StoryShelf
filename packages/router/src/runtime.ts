@@ -5,6 +5,11 @@ import { validateConfig, validateUiConfig } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 import { createShelfLogger } from "@storyshelf/core/logger";
 
+/**
+ * Resolved server runtime derived from {@link ShelfOptions}.
+ * Holds the validated config, UI branding, structured logger, and
+ * computed helpers like whether auth is enabled and which git hosts are wired.
+ */
 export interface ServerRuntime {
   config: ShelfConfig;
   ui: UIConfig;
@@ -28,6 +33,14 @@ function addOptionalSnapshots(
   }
 }
 
+/**
+ * Build a snapshot of adapter metadata for the `/api/v1/health` and docs.
+ * Collects the name/version of every wired adapter so operators can verify
+ * the running configuration at a glance.
+ *
+ * @param options - Router options containing the wired adapters
+ * @returns Metadata map keyed by adapter category (e.g. `database`, `git:github`)
+ */
 export function buildAdapterSnapshot(
   options: ShelfOptions,
 ): Record<string, AdapterMetadata | GitAdapterMetadata> {

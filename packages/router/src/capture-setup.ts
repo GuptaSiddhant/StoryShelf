@@ -5,6 +5,11 @@ import type { CaptureJobOptions } from "@storyshelf/core/capture";
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 
+/**
+ * Wiring for the capture queue: the queue instance (if any) and a helper
+ * to enqueue a build for rendering. When no `captureRunner` is configured
+ * both are null/undefined and builds remain `pending` until a runner is added.
+ */
 export interface QueueWiring {
   queue: CaptureQueue | null;
   enqueueCapture: ((buildId: string, reqId?: string) => Promise<void>) | undefined;

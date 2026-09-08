@@ -6,7 +6,24 @@ import { httpJson } from "@storyshelf/core/utils";
 import { apiBase, gitlabHeaders, projectId } from "./helpers.ts";
 import { mapStatus } from "./mapper.ts";
 
-/** Post a StoryShelf build status to a GitLab commit SHA. */
+/**
+ * Post a StoryShelf build status to a GitLab commit.
+ *
+ * Creates a commit status under `storyshelf/<context>` so the MR shows
+ * StoryShelf's check alongside other CI. Maps StoryShelf's `CheckStatus`
+ * to GitLab's `state` and posts to `/projects/:id/statuses/:sha`.
+ *
+ * @param opts - Commit and auth details
+ * @param opts.owner - Project owner / namespace
+ * @param opts.repo - Project name
+ * @param opts.host - GitLab host URL; defaults to `https://gitlab.com` when undefined
+ * @param opts.token - GitLab PAT with `api` scope (`PRIVATE-TOKEN`)
+ * @param opts.context - StoryShelf context (e.g. `storybook`); namespaced as `storyshelf/<context>`
+ * @param opts.gitSha - Full commit SHA to attach the status to
+ * @param opts.status - StoryShelf build status to report
+ * @param opts.url - Target URL for the status (link back to the StoryShelf build page)
+ * @param opts.logger - Optional logger for debug/error output
+ */
 export async function postCommitStatus(opts: {
   owner: string;
   repo: string;

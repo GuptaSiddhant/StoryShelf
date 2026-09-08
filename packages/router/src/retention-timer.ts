@@ -9,10 +9,22 @@ import { Retention } from "@storyshelf/core/retention";
 const DEFAULT_BRANCH_TTL_DAYS = 30;
 const DEFAULT_BRANCH_GC_INTERVAL_MS = 86_400_000;
 
+/** Handle for the background branch-GC interval; call `stop()` on server shutdown. */
 export interface BranchGcTimer {
   stop(): void;
 }
 
+/**
+ * Start a daily sweep that removes baselines for branches that have not
+ * been updated within `branchTtlDays`. Returns a timer handle or `null`
+ * when GC is disabled (`branchTtlDays: null` or non-positive interval).
+ *
+ * @param db - Database adapter to list projects
+ * @param storage - Storage adapter for baseline cleanup
+ * @param config - Shelf config supplying `branchTtlDays` and `branchGcIntervalMs`
+ * @param logger - Structured logger for sweep diagnostics
+ * @returns Timer handle with `stop()`, or `null` if GC is disabled
+ */
 export function startBranchGcTimer(
   db: DatabaseAdapter,
   storage: StorageAdapter,

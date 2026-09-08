@@ -20,18 +20,25 @@ import { tokens as tokensTable } from "./token.ts";
 import { users as usersTable } from "./user.ts";
 import { webhooks as webhooksTable } from "./webhook.ts";
 
-/**
- * Row types for each table.
- */
+/** Build row as stored in the `builds` table. */
 export type { Build } from "./build.ts";
+/** Review comment row as stored in the `comments` table. */
 export type { Comment } from "./comment.ts";
+/** Build label and label type rows. */
 export type { BuildLabel, LabelType } from "./label.ts";
+/** Project membership row linking a user to a project role. */
 export type { ProjectMember } from "./member.ts";
+/** Project row and its embedded Storybook metadata. */
 export type { Project, StorybookMeta } from "./project.ts";
+/** Per-project git provider status-check configuration row. */
 export type { ProjectStatusConfig } from "./status-config.ts";
+/** Snapshot row capturing a single story at one viewport. */
 export type { Snapshot } from "./snapshot.ts";
+/** CI token row (stores only the hash). */
 export type { Token } from "./token.ts";
+/** User row for authenticated identities. */
 export type { User } from "./user.ts";
+/** Webhook subscription row. */
 export type { Webhook } from "./webhook.ts";
 
 /** Full Drizzle schema object passed to the database client. */

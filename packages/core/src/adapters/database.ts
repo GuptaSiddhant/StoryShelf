@@ -50,4 +50,9 @@ export interface DrizzleAdapterOptions {
   close: () => Promise<void> | void;
 }
 
+/**
+ * Create a {@link DatabaseAdapter} from a Drizzle instance.
+ * Used by `db-sqlite` and `db-turso` to wrap their drivers; most consumers
+ * should use those packages directly.
+ */
 export { createDrizzleAdapter } from "./drizzle-factory.ts";

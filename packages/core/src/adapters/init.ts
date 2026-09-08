@@ -48,9 +48,17 @@ export interface AdapterInitResult {
 /** Lifecycle phase a run covers. */
 export type LifecyclePhase = "init" | "close";
 
-/** Thrown when an `app.lifecycle.init()` or `close()` run has failures. */
+/**
+ * Thrown when an `app.lifecycle.init()` or `close()` run finishes with failures.
+ *
+ * Inspect `phase` to know which hook failed and `failures` for per-adapter
+ * diagnostics. The router converts this into a 500 with structured details
+ * during health checks.
+ */
 export class AdapterLifecycleError extends Error {
+  /** Which lifecycle phase failed (`init` or `close`). */
   readonly phase: LifecyclePhase;
+  /** One entry per adapter hook that failed. */
   readonly failures: AdapterInitFailure[];
   constructor(phase: LifecyclePhase, failures: AdapterInitFailure[]) {
     super(`Adapter ${phase} failed: ${failures.map((f) => `${f.category}/${f.kind}`).join(", ")}`);
@@ -60,4 +68,5 @@ export class AdapterLifecycleError extends Error {
   }
 }
 
+/** Collect every `init` hook from the configured adapters. */
 export { collectCloses, collectInits, runAdapterCloses, runAdapterInits } from "./init-runner.ts";

@@ -1,3 +1,13 @@
+/**
+ * Create a typed API client for a StoryShelf server.
+ *
+ * Wraps `fetch` with bearer auth and JSON helpers so commands can call
+ * `client.projects.builds.createJson(...)` without hand-rolling URLs or headers.
+ *
+ * @param baseUrl - Server origin, e.g. `https://shelf.example.com`
+ * @param token - Optional bearer token (CI or admin token); sent as `Authorization: Bearer <token>`
+ * @returns Namespaced client with `projects`, `builds`, `tokens`, and `admin` helpers
+ */
 export function createClient(baseUrl: string, token?: string): Client {
   const authHeaders = buildAuthHeaders(token);
   const requestHeaders = (contentType?: string): Record<string, string> =>
@@ -172,10 +182,20 @@ function createProjectsApi(
 }
 
 // Re-export old helpers for backward compatibility with tests
+/** Strip trailing slashes from a URL so `base + path` never doubles them. */
 export function normalizeBaseUrl(value: string): string {
   return value.replace(/\/+$/u, "");
 }
 
+/**
+ * POST JSON and parse the JSON response.
+ *
+ * @param url - Absolute request URL
+ * @param body - Payload serialized as JSON
+ * @param headers - Extra headers merged with `content-type: application/json`
+ * @returns Parsed response body
+ * @throws If the response is not `ok` (includes status and body text)
+ */
 export async function postJson<TData>(
   url: string,
   body: unknown,
@@ -192,6 +212,14 @@ export async function postJson<TData>(
   return (await response.json()) as TData;
 }
 
+/**
+ * POST a `FormData` body and parse the JSON response.
+ *
+ * @param url - Absolute request URL
+ * @param form - Multipart form payload
+ * @param headers - Extra headers (e.g. auth)
+ * @returns Parsed response body
+ */
 export async function postForm<TData>(
   url: string,
   form: FormData,
@@ -204,6 +232,16 @@ export async function postForm<TData>(
   return (await response.json()) as TData;
 }
 
+/**
+ * POST a `FormData` body with future progress reporting and parse the JSON response.
+ * Currently behaves like {@link postForm}; the name is kept for CLI compatibility
+ * and to allow streaming progress hooks without a breaking change.
+ *
+ * @param url - Absolute request URL
+ * @param form - Multipart form payload
+ * @param headers - Extra headers (e -g - auth)
+ * @returns Parsed response body
+ */
 export async function postFormWithProgress<TData>(
   url: string,
   form: FormData,

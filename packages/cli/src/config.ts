@@ -116,6 +116,13 @@ const MAIN_CANDIDATES = [
   ".storybook/main.tsx",
 ];
 
+/**
+ * Locate the Storybook config file (`.storybook/main.*`) in the project.
+ * Probes `.js`, `.ts`, `.mjs`, `.cjs`, `.mts`, `.cts`, `.jsx`, `.tsx` in order.
+ *
+ * @param cwd - Project root to search from; defaults to `process.cwd()`
+ * @returns Absolute path to the first candidate that exists, or `null` if none found
+ */
 export async function findStorybookMain(cwd: string = process.cwd()): Promise<string | null> {
   for (const candidate of MAIN_CANDIDATES) {
     const full = resolve(cwd, candidate);
@@ -130,6 +137,12 @@ export async function findStorybookMain(cwd: string = process.cwd()): Promise<st
   return null;
 }
 
+/**
+ * Ensure a Storybook config exists, throwing a human-readable error otherwise.
+ *
+ * @param cwd - Project root to search from
+ * @throws If `.storybook/main.*` cannot be found
+ */
 export async function assertStorybookMain(cwd: string = process.cwd()): Promise<void> {
   const found = await findStorybookMain(cwd);
   if (!found) {
@@ -137,6 +150,13 @@ export async function assertStorybookMain(cwd: string = process.cwd()): Promise<
   }
 }
 
+/**
+ * Load and validate `.storybook/storyshelf.json` if it exists.
+ *
+ * @param cwd - Project root
+ * @param customPath - Optional explicit config path (overrides the conventional location)
+ * @returns Validated config or `null` when the file is missing or invalid
+ */
 export async function loadStorybookConfig(
   cwd: string = process.cwd(),
   customPath?: string,
@@ -160,6 +180,16 @@ function mergeConfigs(existing: StorybookConfig | null, config: StorybookConfig)
   return existing ? { ...existing, ...config } : { ...config };
 }
 
+/**
+ * Persist a `StorybookConfig` to `.storybook/storyshelf.json`, merging with any
+ * existing file so unrelated keys are preserved.
+ *
+ * @param config - Partial config to write (merged with existing)
+ * @param cwd - Project root
+ * @param customPath - Optional explicit path
+ * @returns Absolute path to the written file
+ * @throws If the merged result fails validation
+ */
 export async function writeStorybookConfig(
   config: StorybookConfig,
   cwd: string = process.cwd(),
@@ -178,6 +208,7 @@ export async function writeStorybookConfig(
   return full;
 }
 
+/** Lightweight metadata extracted from `.storybook/main.*` for `storyshelf init`. */
 export interface StorybookMeta {
   framework?: { name?: string; options?: unknown };
   addons?: string[];
@@ -186,6 +217,12 @@ export interface StorybookMeta {
   packagePath?: string;
 }
 
+/**
+ * Detect the relative path from project root to the Storybook config directory.
+ *
+ * @param cwd - Project root
+ * @returns Relative path (e.g. `.` or `packages/app/.storybook`'s parent)
+ */
 export async function detectPackagePath(cwd: string = process.cwd()): Promise<string> {
   const main = await findStorybookMain(cwd);
   if (!main) {
@@ -195,6 +232,12 @@ export async function detectPackagePath(cwd: string = process.cwd()): Promise<st
   return rel === "" ? "." : rel;
 }
 
+/**
+ * Extract framework, addons, and globs from `.storybook/main.*` for `storyshelf init`.
+ *
+ * @param cwd - Project root
+ * @returns Metadata with framework name, addons, and story globs when discoverable
+ */
 export async function detectStorybookMeta(cwd: string = process.cwd()): Promise<StorybookMeta> {
   const mainPath = await findStorybookMain(cwd);
   if (!mainPath) {
@@ -255,6 +298,12 @@ function parseMetaLists(
   return lists;
 }
 
+/**
+ * Read the package name from `package.json` if present.
+ *
+ * @param cwd - Project root
+ * @returns Package name or `null` when unreadable or missing
+ */
 export async function detectPackageName(cwd: string = process.cwd()): Promise<string | null> {
   try {
     const raw = await readFile(resolve(cwd, "package.json"), "utf8");
@@ -268,6 +317,13 @@ export async function detectPackageName(cwd: string = process.cwd()): Promise<st
   }
 }
 
+/**
+ * Detect the git repository slug (`owner/repo`) from `remote.origin.url`.
+ * Handles `git@`, `https://`, and `ssh://` forms and strips `.git`.
+ *
+ * @param cwd - Project root (used as `git -C` cwd)
+ * @returns Normalized `owner/repo` or `null` when not a git repo
+ */
 export function detectGitRepository(cwd: string = process.cwd()): string | null {
   try {
     const url = execSync("git config --get remote.origin.url", { cwd, encoding: "utf8" }).trim();
@@ -286,6 +342,12 @@ export function detectGitRepository(cwd: string = process.cwd()): string | null 
   }
 }
 
+/**
+ * Detect the default git branch, preferring `origin/HEAD` then `HEAD`.
+ *
+ * @param cwd - Project root
+ * @returns Branch name (e.g. `main`) or `null` when not determinable
+ */
 export function detectGitDefaultBranch(cwd: string = process.cwd()): string | null {
   try {
     const ref = execSync("git symbolic-ref refs/remotes/origin/HEAD", {

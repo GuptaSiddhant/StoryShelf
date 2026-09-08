@@ -20,7 +20,13 @@ export function encrypt(secret: string | undefined, plaintext: string): string {
 }
 
 /**
- * Decrypt a value produced by `encrypt`.
+ * Decrypt a value produced by {@link encrypt}.
+ *
+ * @param secret - Server secret used to derive the AES-256 key; must match
+ * the secret used for encryption or decryption fails.
+ * @param ciphertext - Encrypted payload in `iv:tag:ciphertext` (base64url) format.
+ * @returns The original plaintext secret.
+ * @throws If `secret` is missing or the payload is malformed or tampered with.
  */
 export function decrypt(secret: string | undefined, ciphertext: string): string {
   if (!secret) {

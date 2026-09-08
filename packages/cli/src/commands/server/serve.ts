@@ -3,11 +3,13 @@ import { access } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { printLine } from "../../output.ts";
 
-/** Options for the `server serve` command. */
+/**
+ * Options for `storyshelf server serve` — runs a scaffolded server project.
+ */
 export interface ServerServeOptions {
-  /** Server project directory (defaults to cwd). */
+  /** Server project directory containing `server.ts` (defaults to `process.cwd()`). */
   dir?: string;
-  /** Port override (sets PORT for the child). */
+  /** Port override; sets `PORT` for the child process. */
   port?: string;
 }
 
@@ -21,18 +23,27 @@ const SERVER_CANDIDATES = [
   "index.mjs",
 ] as const;
 
+/** Options for spawning the child server process. */
 export interface SpawnOptions {
   cwd: string;
   env: NodeJS.ProcessEnv;
 }
 
+/** Function that spawns the server child process and resolves with its exit code. */
 export type SpawnProcess = (
   command: string,
   args: readonly string[],
   options: SpawnOptions,
 ) => Promise<number>;
 
-/** Locate the server entry, trying init output names then index fallbacks. */
+/**
+ * Locate the server entry file in a scaffolded project.
+ * Tries `server.ts`, `server.js`, `server.mjs`, then `index.*` fallbacks.
+ *
+ * @param dir - Absolute path to the server project directory
+ * @returns Absolute path to the first entry that exists
+ * @throws If no candidate is found (suggests running `storyshelf server init`)
+ */
 export async function resolveServerFile(dir: string): Promise<string> {
   for (const candidate of SERVER_CANDIDATES) {
     const full = join(dir, candidate);

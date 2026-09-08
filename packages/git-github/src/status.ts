@@ -6,7 +6,23 @@ import { httpJson } from "@storyshelf/core/utils";
 import { githubHeaders, repoPath } from "./api.ts";
 import { mapStatus } from "./mapper.ts";
 
-/** Post a StoryShelf build status to a GitHub commit SHA. */
+/**
+ * Post a StoryShelf build status to a GitHub commit.
+ *
+ * Creates a commit status under `storyshelf/<context>` so the PR shows
+ * StoryShelf's check alongside other CI. Maps StoryShelf's `CheckStatus`
+ * (`pending`/`success`/`failure`) to GitHub's `state`.
+ *
+ * @param opts - Commit and auth details
+ * @param opts.token - GitHub PAT with `repo:status` scope
+ * @param opts.owner - Repository owner
+ * @param opts.repo - Repository name
+ * @param opts.context - StoryShelf context (e.g. `storybook`); namespaced as `storyshelf/<context>`
+ * @param opts.gitSha - Full commit SHA to attach the status to
+ * @param opts.status - StoryShelf build status to report
+ * @param opts.url - Target URL for the status (link back to the StoryShelf build page)
+ * @param opts.logger - Optional logger for debug/error output
+ */
 export async function postCommitStatus(opts: {
   token: string;
   owner: string;

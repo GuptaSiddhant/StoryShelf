@@ -7,9 +7,11 @@ import { printError, printLine } from "../../output.ts";
 import { generateComposeYaml, generateDockerfile, generateDockerignore } from "./docker.ts";
 import { INFRA_PROMPTS, PROJECT_PROMPTS } from "./prompts.ts";
 
-/** Options for the `server init` command. */
+/**
+ * Options for `storyshelf server init` — scaffolds a new StoryShelf server project.
+ */
 export interface ServerInitOptions {
-  /** Output directory. */
+  /** Output directory for the generated server (defaults to `storyshelf-server`). */
   dir?: string;
 }
 
@@ -236,9 +238,13 @@ function printNextSteps(answers: Answers): void {
 }
 
 /**
- * Scaffold a new StoryShelf server project.
+ * Scaffold a new StoryShelf server project via interactive prompts.
  *
- * @param _options - Server init command options.
+ * Asks for project name, database, storage, auth, and git provider choices,
+ * then generates `server.ts`, `package.json`, and optional Docker files in
+ * the chosen directory.
+ *
+ * @param _options - Reserved for future CLI flags; currently prompts for all choices interactively
  */
 export async function runServerInit(_options: ServerInitOptions): Promise<void> {
   const responses = await prompts([...PROJECT_PROMPTS, ...INFRA_PROMPTS]);
