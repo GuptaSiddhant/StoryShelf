@@ -73,7 +73,7 @@ storyshelf build --force-build
 storyshelf build --build-dir dist-storybook --build-command "nx run app:build-storybook"
 ```
 
-Prints `Build ready: <dir>` and fails fast when the output lacks `index.json`. `upload` keeps its implicit build-if-missing step, so existing flows are unchanged.
+Prints `Build ready: <dir>` and fails fast when the output lacks `index.json`. `upload` keeps its implicit build-if-missing step, so existing flows are unchanged. The build script is invoked with the detected package runner (see [Configuration](/guides/config/)).
 
 ## `storyshelf doctor`
 

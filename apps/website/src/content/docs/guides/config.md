@@ -26,7 +26,7 @@ Created by `storyshelf init` or `storyshelf create` (both fail if `.storybook/ma
 | `url`             | `--url`                      | `STORYSHELF_URL`  | Server URL                                                                                                                         |
 | `buildDir`        | `--build-dir` / `-d`         | —                 | Built Storybook directory (default `storybook-static`). If missing or empty, `upload` will build                                   |
 | `buildCommand`    | `--build-command`            | —                 | Custom build command (e.g. `nx run app:build-storybook`). Mutually exclusive with `buildScriptName`                                |
-| `buildScriptName` | `--build-script-name` / `-b` | —                 | npm script to run (default `build-storybook`)                                                                                      |
+| `buildScriptName` | `--build-script-name` / `-b` | —                 | package script to run (default `build-storybook`)                                                                                     |
 | `skip`            | `--skip`                     | —                 | Glob to skip upload (e.g. `"main"`, `"release/*"`). `branch` matched via `picomatch`; when matched `upload` exits 0 without `POST` |
 
 **Note:** `buildDir` default is Storybook's default `storybook-static` unless `buildDir` is set in file. `buildCommand` and `buildScriptName` are mutually exclusive (validated by `zod` `refine`).
@@ -70,7 +70,7 @@ Each upload resolves `packagePath` (`relative(cwd, dirname(.storybook))`) and is
 `storyshelf upload` (and `storyshelf` with no args defaults to `upload` when config exists, else shows help to run `init`):
 
 1. `skip` glob matches `branch` → exit 0, no `POST`.
-2. `buildDir` missing or empty or `--force-build` → run `buildCommand` or `npm run <buildScriptName> -- --output-dir <buildDir>` with `STORYBOOK_BUILD_STORIES_JSON=true` (so Storybook emits `stories.json` with `parameters` for per-story controls like `disableSnapshot`/`flakyTest` — see **Interaction testing**).
+2. `buildDir` missing or empty or `--force-build` → run `buildCommand` or the detected package runner's script invocation (`npm run <buildScriptName> -- --output-dir <buildDir>`; `pnpm`/`bun`/`nub run <buildScriptName> --output-dir <buildDir>`; `yarn <buildScriptName> --output-dir <buildDir>`; `deno task <buildScriptName> --output-dir <buildDir>`) with `STORYBOOK_BUILD_STORIES_JSON=true` (so Storybook emits `stories.json` with `parameters` for per-story controls like `disableSnapshot`/`flakyTest` — see **Interaction testing**). The runner is detected from the invoking agent env, then the `packageManager` field, then lockfiles (`nub.lock`, `bun.lockb`/`bun.lock`, `pnpm-lock.yaml`, `yarn.lock`, `package-lock.json`, `deno.lock`), defaulting to `npm`.
 3. `zip.addLocalFolder(buildDir)` → `POST /api/v1/projects/{slug}/builds`.
 
 ## Server config vs client config

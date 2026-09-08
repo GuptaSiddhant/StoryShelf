@@ -3,6 +3,12 @@ declare const __PKG_VERSION__: string;
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import prompts from "prompts";
+import {
+  detectPackageRunner,
+  installCommand,
+  startCommand,
+  type PackageRunner,
+} from "../../config.ts";
 import { printError, printLine } from "../../output.ts";
 import { generateComposeYaml, generateDockerfile, generateDockerignore } from "./docker.ts";
 import { INFRA_PROMPTS, PROJECT_PROMPTS } from "./prompts.ts";
@@ -224,7 +230,7 @@ async function writeDockerFiles(outDir: string, docker: boolean): Promise<void> 
   printLine(`Created Dockerfile, .dockerignore, compose.yaml`);
 }
 
-function printNextSteps(answers: Answers): void {
+function printNextSteps(answers: Answers, runner: PackageRunner): void {
   printLine(`\nScaffolded ${answers.name} in ${resolve(answers.dir)}`);
   printLine(`\nNext steps:`);
   printLine(`  cd ${answers.dir}`);
@@ -232,8 +238,8 @@ function printNextSteps(answers: Answers): void {
   if (answers.docker) {
     printLine(`  docker compose up`);
   } else {
-    printLine(`  npm install`);
-    printLine(`  npm start`);
+    printLine(`  ${installCommand(runner)}`);
+    printLine(`  ${startCommand(runner)}`);
   }
 }
 
@@ -259,5 +265,5 @@ export async function runServerInit(_options: ServerInitOptions): Promise<void> 
   await mkdir(outDir, { recursive: true });
 
   await writeFiles(outDir, answers);
-  printNextSteps(answers);
+  printNextSteps(answers, await detectPackageRunner(process.cwd()));
 }

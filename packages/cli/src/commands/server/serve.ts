@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { access } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { detectPackageRunner, installCommand } from "../../config.ts";
 import { printLine } from "../../output.ts";
 
 /**
@@ -133,8 +134,9 @@ async function warnIfUninstalled(dir: string): Promise<void> {
   try {
     await access(join(dir, "node_modules"));
   } catch {
+    const runner = await detectPackageRunner(dir);
     printLine(
-      `Warning: no node_modules in ${dir} — run "npm install" there first if the server fails to start.`,
+      `Warning: no node_modules in ${dir} — run "${installCommand(runner)}" there first if the server fails to start.`,
     );
   }
 }

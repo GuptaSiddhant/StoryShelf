@@ -91,7 +91,8 @@ async function checkServer(connection: ResolvedConnection): Promise<Check> {
 async function checkBuildOutput(cwd: string, inputs: BuildInputs): Promise<Check> {
   const full = resolve(cwd, inputs.buildDir);
   if (await needsBuild(full)) {
-    const command = resolveBuildCommand(
+    const command = await resolveBuildCommand(
+      cwd,
       inputs.buildDir,
       inputs.buildCommand,
       inputs.buildScriptName,
