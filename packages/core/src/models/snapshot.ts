@@ -1,5 +1,5 @@
 /** Snapshot records for captured stories within a build. */
-import { eq } from "drizzle-orm";
+import { eq, getTableColumns } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../db/database.ts";
 import type { Snapshot } from "../schema/snapshot.ts";
@@ -8,7 +8,7 @@ import { ulid } from "../utils/ulid.ts";
 
 /** Tables required by {@link SnapshotModel}. */
 export interface SnapshotTables {
-  snapshots: { buildId: SQLWrapper } & Table & { $inferSelect: Snapshot; $inferInsert: Snapshot };
+  snapshots: Table;
 }
 
 /** Data operations for snapshot records. */
@@ -32,7 +32,7 @@ export class SnapshotModel {
    */
   async create(projectId: string, buildId: string, input: SnapshotCreateInput): Promise<Snapshot> {
     const now = new Date().toISOString();
-    return await this.db.insert(this.tables.snapshots, {
+    return (await this.db.insert(this.tables.snapshots, {
       id: ulid(),
       projectId,
       buildId,
@@ -47,27 +47,30 @@ export class SnapshotModel {
       status: "pending",
       createdAt: now,
       updatedAt: now,
-    } as never);
+    })) as unknown as Snapshot;
   }
 
   /** List all snapshots belonging to a build. */
   async listByBuild(buildId: string): Promise<Snapshot[]> {
-    return await this.db.list(this.tables.snapshots, {
-      where: eq(this.tables.snapshots.buildId, buildId),
-    });
+    return (await this.db.list(this.tables.snapshots, {
+      where: eq(
+        getTableColumns(this.tables.snapshots)["buildId"] as unknown as SQLWrapper,
+        buildId,
+      ),
+    })) as unknown as Snapshot[];
   }
 
   /** Fetch a snapshot by id, or null if not found. */
   async get(id: string): Promise<Snapshot | null> {
-    return await this.db.get(this.tables.snapshots, id);
+    return (await this.db.get(this.tables.snapshots, id)) as unknown as Snapshot | null;
   }
 
   /** Update mutable fields of a snapshot. */
   async update(id: string, patch: Partial<Snapshot>): Promise<Snapshot> {
-    return await this.db.update(this.tables.snapshots, id, {
+    return (await this.db.update(this.tables.snapshots, id, {
       ...patch,
       updatedAt: new Date().toISOString(),
-    } as never);
+    })) as unknown as Snapshot;
   }
 
   /** Set the status of a snapshot. */

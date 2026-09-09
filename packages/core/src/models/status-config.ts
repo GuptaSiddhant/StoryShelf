@@ -1,6 +1,6 @@
 /* oxlint-disable eslint/no-await-in-loop, typescript/promise-function-async, eslint/require-await */
 /** Per-project git-provider status check configurations. */
-import { eq } from "drizzle-orm";
+import { eq, getTableColumns } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../db/database.ts";
 import type { ProjectStatusConfig } from "../schema/status-config.ts";
@@ -9,10 +9,7 @@ import { ulid } from "../utils/ulid.ts";
 
 /** Tables required by {@link StatusConfigModel}. */
 export interface StatusConfigTables {
-  projectStatusConfigs: { projectId: SQLWrapper; id: SQLWrapper } & Table & {
-      $inferSelect: ProjectStatusConfig;
-      $inferInsert: ProjectStatusConfig;
-    };
+  projectStatusConfigs: Table;
 }
 
 /** Data operations for per-project status provider configs. */
@@ -25,17 +22,23 @@ export class StatusConfigModel {
 
   /** List all status configs for a project. */
   async list(projectId: string): Promise<ProjectStatusConfig[]> {
-    return await this.db.list(this.tables.projectStatusConfigs, {
-      where: eq(this.tables.projectStatusConfigs.projectId, projectId),
-    });
+    return (await this.db.list(this.tables.projectStatusConfigs, {
+      where: eq(
+        getTableColumns(this.tables.projectStatusConfigs)["projectId"] as unknown as SQLWrapper,
+        projectId,
+      ),
+    })) as unknown as ProjectStatusConfig[];
   }
 
   /** Fetch a config by id scoped to a project, or null. */
   async get(projectId: string, id: string): Promise<ProjectStatusConfig | null> {
-    const rows = await this.db.list(this.tables.projectStatusConfigs, {
-      where: eq(this.tables.projectStatusConfigs.id, id),
+    const rows = (await this.db.list(this.tables.projectStatusConfigs, {
+      where: eq(
+        getTableColumns(this.tables.projectStatusConfigs)["id"] as unknown as SQLWrapper,
+        id,
+      ),
       limit: 1,
-    });
+    })) as unknown as ProjectStatusConfig[];
     const found = rows[0] ?? null;
     return found?.projectId === projectId ? found : null;
   }
@@ -52,7 +55,7 @@ export class StatusConfigModel {
 
   async create(projectId: string, input: StatusConfigCreateInput): Promise<ProjectStatusConfig> {
     const now = new Date().toISOString();
-    return await this.db.insert(this.tables.projectStatusConfigs, {
+    return (await this.db.insert(this.tables.projectStatusConfigs, {
       id: ulid(),
       projectId,
       provider: input.provider,
@@ -60,7 +63,7 @@ export class StatusConfigModel {
       tokenEncrypted: encrypt(this.secret, input.token),
       createdAt: now,
       updatedAt: now,
-    } as never);
+    })) as unknown as ProjectStatusConfig;
   }
 
   async remove(projectId: string, id: string): Promise<void> {

@@ -1,9 +1,9 @@
-import { and, desc, eq, inArray, lt } from "drizzle-orm";
+import { and, desc, eq, getTableColumns, inArray, lt } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
 import type { Logger } from "pino";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import type { DatabaseAdapter } from "../db/database.ts";
-import { BaselineModel, type BaselineTables } from "../models/baseline.ts";
+import { BaselineModel } from "../models/baseline.ts";
 import { BuildModel, type BuildTables } from "../models/build.ts";
 import { LabelModel, type LabelTables } from "../models/label.ts";
 import type { Project } from "../schema/project.ts";
@@ -11,26 +11,9 @@ import { TERMINAL_BUILD_STATUSES } from "../types.ts";
 
 /** Table handles for retention queries. */
 export interface RetentionTables {
-  builds: {
-    projectId: SQLWrapper;
-    status: SQLWrapper;
-    updatedAt: SQLWrapper;
-    gitBranch: SQLWrapper;
-    id: SQLWrapper;
-    createdAt: SQLWrapper;
-  } & Table;
-  buildLabels: {
-    projectId: SQLWrapper;
-    typeKey: SQLWrapper;
-    value: SQLWrapper;
-    buildId: SQLWrapper;
-  } & Table;
-  baselines: {
-    projectId: SQLWrapper;
-    storyId: SQLWrapper;
-    viewportName: SQLWrapper;
-    branch: SQLWrapper;
-  } & Table;
+  builds: Table;
+  buildLabels: Table;
+  baselines: Table;
 }
 
 /** Removes expired transient builds while keeping baselines and persistent builds. */
@@ -46,9 +29,11 @@ export class Retention {
     const cutoff = new Date(Date.now() - options.ttlDays * 86_400_000).toISOString();
     const candidates = await this.db.list(this.tables.builds, {
       where: and(
-        eq(this.tables.builds.projectId, project.id),
-        inArray(this.tables.builds.status, [...TERMINAL_BUILD_STATUSES]),
-        lt(this.tables.builds.updatedAt, cutoff),
+        eq(getTableColumns(this.tables.builds)["projectId"] as unknown as SQLWrapper, project.id),
+        inArray(getTableColumns(this.tables.builds)["status"] as unknown as SQLWrapper, [
+          ...TERMINAL_BUILD_STATUSES,
+        ]),
+        lt(getTableColumns(this.tables.builds)["updatedAt"] as unknown as SQLWrapper, cutoff),
       ),
     });
 
@@ -58,7 +43,7 @@ export class Retention {
     const labelModel = new LabelModel(this.db, this.tables as unknown as LabelTables);
     const target = await Promise.all(
       candidates.map(async (build) => {
-        const buildId = (build as { id: string })["id"];
+        const buildId = (build as { id: string }).id;
         if (keep.has(buildId) || (await labelModel.hasPersistent(project.id, buildId))) {
           return null;
         }
@@ -89,8 +74,11 @@ export class Retention {
 
   private async latestPerBranch(projectId: string): Promise<Set<string>> {
     const rows = (await this.db.list(this.tables.builds, {
-      where: eq(this.tables.builds.projectId, projectId),
-      orderBy: desc(this.tables.builds.updatedAt),
+      where: eq(
+        getTableColumns(this.tables.builds)["projectId"] as unknown as SQLWrapper,
+        projectId,
+      ),
+      orderBy: desc(getTableColumns(this.tables.builds)["updatedAt"] as unknown as SQLWrapper),
     })) as unknown as { gitBranch: string; id: string }[];
     const latest = new Map<string, string>();
     for (const row of rows) {
@@ -120,17 +108,16 @@ export class Retention {
     }
     const cutoff = new Date(Date.now() - ttlDays * 86_400_000).toISOString();
     const rows = (await this.db.list(this.tables.builds, {
-      where: eq(this.tables.builds.projectId, project.id),
+      where: eq(
+        getTableColumns(this.tables.builds)["projectId"] as unknown as SQLWrapper,
+        project.id,
+      ),
     })) as unknown as { gitBranch: string; updatedAt: string }[];
     const stale = collectStaleBranches(rows, project.gitDefaultBranch, cutoff);
     if (stale.size === 0) {
       return { removedBranches: 0, removedBaselines: 0 };
     }
-    const baselines = new BaselineModel(
-      this.db,
-      this.tables as unknown as BaselineTables,
-      this.storage,
-    );
+    const baselines = new BaselineModel(this.db, this.tables, this.storage);
     const removedBaselines = await baselines.removeStaleBranches(project.id, stale);
     this.logger?.info(
       { projectId: project.id, removedBranches: stale.size, removedBaselines },

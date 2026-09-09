@@ -6,7 +6,7 @@ import { WebhookModel } from "./webhook.ts";
 const TEST_SECRET = "test-server-secret";
 
 function model(db: ReturnType<typeof makeDatabase>["db"]): WebhookModel {
-  return new WebhookModel(db, { webhooks: webhooks as unknown as never }, TEST_SECRET);
+  return new WebhookModel(db, { webhooks: webhooks }, TEST_SECRET);
 }
 
 describe("WebhookModel", () => {
@@ -37,7 +37,7 @@ describe("WebhookModel", () => {
 
   it("throws on create when the server secret is unset", async () => {
     const { db } = makeDatabase();
-    const withoutSecret = new WebhookModel(db, { webhooks: webhooks as unknown as never });
+    const withoutSecret = new WebhookModel(db, { webhooks: webhooks });
     await expect(
       withoutSecret.create("p1", { url: "https://example.com/webhook", secret: "s", events: [] }),
     ).rejects.toThrow("secret is not configured");
@@ -50,9 +50,9 @@ describe("WebhookModel", () => {
       secret: "secret-123",
       events: [],
     });
-    expect(() =>
-      new WebhookModel(db, { webhooks: webhooks as unknown as never }).decryptSecret(created),
-    ).toThrow("secret is not configured");
+    expect(() => new WebhookModel(db, { webhooks: webhooks }).decryptSecret(created)).toThrow(
+      "secret is not configured",
+    );
   });
 
   it("gets a webhook by id", async () => {

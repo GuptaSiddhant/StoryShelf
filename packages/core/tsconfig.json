@@ -1,7 +1,7 @@
 {
   "extends": "../../config/tsconfig.base.json",
   "include": ["src"],
-  "exclude": ["node_modules", "dist", ".turbo"],
+  "exclude": ["node_modules", "dist", ".turbo", "src/**/*.test.ts", "src/**/*.integration.test.ts"],
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src"

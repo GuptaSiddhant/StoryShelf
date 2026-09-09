@@ -80,10 +80,10 @@ async function makeContext(options: {
   const ctx: CaptureContext = {
     db,
     tables: {
-      builds: builds as unknown as never,
-      buildLabels: buildLabels as unknown as never,
-      snapshots: snapshots as unknown as never,
-      baselines: baselines as unknown as never,
+      builds: builds,
+      buildLabels: buildLabels,
+      snapshots: snapshots,
+      baselines: baselines,
     },
     storage,
     project: mockProject,

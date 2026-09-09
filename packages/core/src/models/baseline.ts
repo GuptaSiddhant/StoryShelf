@@ -1,6 +1,6 @@
 /* oxlint-disable typescript/promise-function-async -- map callbacks return promises from async helpers */
 /** Per-branch baseline screenshots with default-branch fallback. */
-import { and, eq } from "drizzle-orm";
+import { and, eq, getTableColumns } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { emitWebhookEvent } from "../adapters/webhook-events.ts";
@@ -12,12 +12,7 @@ import type { WebhookTables } from "./webhook.ts";
 
 /** Tables required by {@link BaselineModel}. */
 export interface BaselineTables {
-  baselines: {
-    projectId: SQLWrapper;
-    storyId: SQLWrapper;
-    viewportName: SQLWrapper;
-    branch: SQLWrapper;
-  } & Table & { $inferSelect: Baseline; $inferInsert: Baseline };
+  baselines: Table;
 }
 
 /** Data operations for baseline screenshots. */
@@ -36,15 +31,18 @@ export class BaselineModel {
     viewport: string,
     branch: string,
   ): Promise<Baseline | null> {
-    const rows = await this.db.list(this.tables.baselines, {
+    const rows = (await this.db.list(this.tables.baselines, {
       where: and(
-        eq(this.tables.baselines.projectId, projectId),
-        eq(this.tables.baselines.storyId, storyId),
-        eq(this.tables.baselines.viewportName, viewport),
-        eq(this.tables.baselines.branch, branch),
+        eq(getTableColumns(this.tables.baselines)["projectId"] as unknown as SQLWrapper, projectId),
+        eq(getTableColumns(this.tables.baselines)["storyId"] as unknown as SQLWrapper, storyId),
+        eq(
+          getTableColumns(this.tables.baselines)["viewportName"] as unknown as SQLWrapper,
+          viewport,
+        ),
+        eq(getTableColumns(this.tables.baselines)["branch"] as unknown as SQLWrapper, branch),
       ),
       limit: 1,
-    });
+    })) as unknown as Baseline[];
     return rows[0] ?? null;
   }
 
@@ -83,11 +81,11 @@ export class BaselineModel {
     const existing = await this.getFor(projectId, storyId, viewport, branch);
     let baseline: Baseline;
     if (existing) {
-      baseline = await this.db.update(this.tables.baselines, existing.id, {
+      baseline = (await this.db.update(this.tables.baselines, existing.id, {
         snapshotId,
         screenshotPath,
         updatedAt: new Date().toISOString(),
-      } as never);
+      })) as unknown as Baseline;
       if (this.webhookTables) {
         await emitWebhookEvent(
           this.db,
@@ -106,7 +104,7 @@ export class BaselineModel {
       }
     } else {
       const now = new Date().toISOString();
-      baseline = await this.db.insert(this.tables.baselines, {
+      baseline = (await this.db.insert(this.tables.baselines, {
         id: ulid(),
         projectId,
         storyId,
@@ -116,7 +114,7 @@ export class BaselineModel {
         screenshotPath,
         createdAt: now,
         updatedAt: now,
-      } as never);
+      })) as unknown as Baseline;
       if (this.webhookTables) {
         await emitWebhookEvent(
           this.db,
@@ -138,9 +136,12 @@ export class BaselineModel {
   }
 
   async list(projectId: string): Promise<Baseline[]> {
-    return await this.db.list(this.tables.baselines, {
-      where: eq(this.tables.baselines.projectId, projectId),
-    });
+    return (await this.db.list(this.tables.baselines, {
+      where: eq(
+        getTableColumns(this.tables.baselines)["projectId"] as unknown as SQLWrapper,
+        projectId,
+      ),
+    })) as unknown as Baseline[];
   }
 
   async removeOrphans(projectId: string, validStoryIds: Set<string>): Promise<number> {

@@ -8,7 +8,7 @@ import { emitWebhookEvent } from "./webhook-events.ts";
 const TEST_SECRET = "test-server-secret";
 
 function webhookTables() {
-  return { webhooks: webhooks as unknown as never };
+  return { webhooks };
 }
 
 describe("emitWebhookEvent", () => {

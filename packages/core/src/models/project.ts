@@ -1,5 +1,5 @@
 /** Project records and slug management. */
-import { eq } from "drizzle-orm";
+import { eq, getTableColumns } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../db/database.ts";
 import type { Project } from "../schema/project.ts";
@@ -7,7 +7,7 @@ import { slugify, ulid } from "../utils/ulid.ts";
 
 /** Tables required by {@link ProjectModel}. */
 export interface ProjectTables {
-  projects: { slug: SQLWrapper } & Table & { $inferSelect: Project; $inferInsert: Project };
+  projects: Table;
 }
 
 /** Data operations for project records. */
@@ -30,7 +30,7 @@ export class ProjectModel {
   async create(input: ProjectCreateInput): Promise<Project> {
     const now = new Date().toISOString();
     const slug = await this.uniqueSlug(input.name);
-    return this.db.insert(this.tables.projects, {
+    return (await this.db.insert(this.tables.projects, {
       id: ulid(),
       name: input.name,
       slug,
@@ -39,26 +39,26 @@ export class ProjectModel {
       storybookMeta: input.storybookMeta ? JSON.stringify(input.storybookMeta) : null,
       createdAt: now,
       updatedAt: now,
-    } as never);
+    })) as unknown as Project;
   }
 
   /** Fetch a project by id, or null if not found. */
   async get(id: string): Promise<Project | null> {
-    return await this.db.get(this.tables.projects, id);
+    return (await this.db.get(this.tables.projects, id)) as unknown as Project | null;
   }
 
   /** Fetch a project by its slug, or null if not found. */
   async getBySlug(slug: string): Promise<Project | null> {
-    const rows = await this.db.list(this.tables.projects, {
-      where: eq(this.tables.projects.slug, slug),
+    const rows = (await this.db.list(this.tables.projects, {
+      where: eq(getTableColumns(this.tables.projects)["slug"] as unknown as SQLWrapper, slug),
       limit: 1,
-    });
+    })) as unknown as Project[];
     return rows[0] ?? null;
   }
 
   /** List all projects. */
   async list(): Promise<Project[]> {
-    return await this.db.list(this.tables.projects);
+    return (await this.db.list(this.tables.projects)) as unknown as Project[];
   }
 
   /** Update mutable fields of a project. */
@@ -78,10 +78,10 @@ export class ProjectModel {
     ) {
       normalized.storybookMeta = JSON.stringify(patch.storybookMeta);
     }
-    return await this.db.update(this.tables.projects, id, {
+    return (await this.db.update(this.tables.projects, id, {
       ...normalized,
       updatedAt: new Date().toISOString(),
-    });
+    })) as unknown as Project;
   }
 
   /** Delete a project by id. */
@@ -91,9 +91,9 @@ export class ProjectModel {
 
   private async uniqueSlug(name: string): Promise<string> {
     const base = slugify(name) || "project";
-    const existing = await this.db.list(this.tables.projects, {
-      where: eq(this.tables.projects.slug, base),
-    });
+    const existing = (await this.db.list(this.tables.projects, {
+      where: eq(getTableColumns(this.tables.projects)["slug"] as unknown as SQLWrapper, base),
+    })) as unknown as Project[];
     if (existing.length === 0) {
       return base;
     }

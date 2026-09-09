@@ -1,5 +1,5 @@
 /** Webhook subscriptions for project events. */
-import { eq } from "drizzle-orm";
+import { eq, getTableColumns } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../db/database.ts";
 import type { Webhook } from "../schema/webhook.ts";
@@ -8,10 +8,7 @@ import { ulid } from "../utils/ulid.ts";
 
 /** Tables required by {@link WebhookModel}. */
 export interface WebhookTables {
-  webhooks: { projectId: SQLWrapper; id: SQLWrapper } & Table & {
-      $inferSelect: Webhook;
-      $inferInsert: Webhook;
-    };
+  webhooks: Table;
 }
 
 /** Data operations for webhook subscriptions. */
@@ -29,9 +26,12 @@ export class WebhookModel {
 
   /** List all webhooks for a project. */
   async list(projectId: string): Promise<Webhook[]> {
-    return await this.db.list(this.tables.webhooks, {
-      where: eq(this.tables.webhooks.projectId, projectId),
-    });
+    return (await this.db.list(this.tables.webhooks, {
+      where: eq(
+        getTableColumns(this.tables.webhooks)["projectId"] as unknown as SQLWrapper,
+        projectId,
+      ),
+    })) as unknown as Webhook[];
   }
 
   /**
@@ -43,7 +43,7 @@ export class WebhookModel {
    */
   async create(projectId: string, input: WebhookCreateInput): Promise<Webhook> {
     const now = new Date().toISOString();
-    return await this.db.insert(this.tables.webhooks, {
+    return (await this.db.insert(this.tables.webhooks, {
       id: ulid(),
       projectId,
       url: input.url,
@@ -51,7 +51,7 @@ export class WebhookModel {
       events: input.events && input.events.length > 0 ? JSON.stringify(input.events) : null,
       createdAt: now,
       updatedAt: now,
-    } as never);
+    })) as unknown as Webhook;
   }
 
   /** Decrypt the secret for a stored row (in memory only, at send time). */
@@ -61,10 +61,10 @@ export class WebhookModel {
 
   /** Fetch a webhook by id scoped to a project, or null if not found. */
   async get(projectId: string, id: string): Promise<Webhook | null> {
-    const rows = await this.db.list(this.tables.webhooks, {
-      where: eq(this.tables.webhooks.id, id),
+    const rows = (await this.db.list(this.tables.webhooks, {
+      where: eq(getTableColumns(this.tables.webhooks)["id"] as unknown as SQLWrapper, id),
       limit: 1,
-    });
+    })) as unknown as Webhook[];
     const found = rows[0] ?? null;
     return found?.projectId === projectId ? found : null;
   }

@@ -1,15 +1,14 @@
 /** Build and snapshot review comments. */
-import { eq } from "drizzle-orm";
+import { eq, getTableColumns } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../db/database.ts";
 import type { Comment } from "../schema/comment.ts";
-import type { Project } from "../schema/project.ts";
 import { ulid } from "../utils/ulid.ts";
 
 /** Tables required by {@link CommentModel}. */
 export interface CommentTables {
-  comments: { buildId: SQLWrapper } & Table & { $inferSelect: Comment; $inferInsert: Comment };
-  projects: Table & { $inferSelect: Project; $inferInsert: Project };
+  comments: Table;
+  projects: Table;
 }
 
 /** Data operations for review comments. */
@@ -20,9 +19,9 @@ export class CommentModel {
   ) {}
 
   async listByBuild(buildId: string): Promise<Comment[]> {
-    return await this.db.list(this.tables.comments, {
-      where: eq(this.tables.comments.buildId, buildId),
-    });
+    return (await this.db.list(this.tables.comments, {
+      where: eq(getTableColumns(this.tables.comments)["buildId"] as unknown as SQLWrapper, buildId),
+    })) as unknown as Comment[];
   }
 
   async create(
@@ -32,11 +31,13 @@ export class CommentModel {
     input: CommentCreateInput,
   ): Promise<Comment> {
     const now = new Date().toISOString();
-    const project = await this.db.get(this.tables.projects, projectId);
+    const project = (await this.db.get(this.tables.projects, projectId)) as unknown as {
+      id: string;
+    } | null;
     if (!project) {
       throw new Error(`Project not found: ${projectId}`);
     }
-    return await this.db.insert(this.tables.comments, {
+    return (await this.db.insert(this.tables.comments, {
       id: ulid(),
       projectId,
       buildId,
@@ -47,14 +48,14 @@ export class CommentModel {
       resolved: false,
       createdAt: now,
       updatedAt: now,
-    } as never);
+    })) as unknown as Comment;
   }
 
   async resolve(id: string): Promise<Comment> {
-    return await this.db.update(this.tables.comments, id, {
+    return (await this.db.update(this.tables.comments, id, {
       resolved: true,
       updatedAt: new Date().toISOString(),
-    } as never);
+    })) as unknown as Comment;
   }
 }
 

@@ -25,9 +25,9 @@ function makeProject(overrides: Partial<Project> = {}): Project {
 
 function retentionTables() {
   return {
-    builds: builds as unknown as never,
-    buildLabels: buildLabels as unknown as never,
-    baselines: baselines as unknown as never,
+    builds,
+    buildLabels,
+    baselines,
   };
 }
 
@@ -112,7 +112,8 @@ describe("Retention purge integration", () => {
     expect(result.removedBuilds).toBe(2);
     expect(result.removedFiles).toBeGreaterThanOrEqual(0);
     const survivors = await db.list(builds);
-    expect(survivors.map((build) => build["id"] as string).toSorted()).toEqual(["b1", "b3", "b5"]);
+    // oxlint-disable-next-line typescript/no-unnecessary-type-assertion -- narrows build["id"] to string for toSorted
+    expect(survivors.map((build) => build.id as string).toSorted()).toEqual(["b1", "b3", "b5"]);
   });
 
   it("purges all terminal builds when keepLatestPerBranch is false", async () => {

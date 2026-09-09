@@ -1,25 +1,16 @@
 /** Build labels and project label types. */
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, getTableColumns } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../db/database.ts";
-import type { Build } from "../schema/build.ts";
 import type { BuildLabel, LabelType } from "../schema/label.ts";
 import { PERSISTENT_LABEL_KEY, RESERVED_LABEL_KEYS, SEEDED_LABEL_KEYS } from "../types.ts";
 import { ulid } from "../utils/ulid.ts";
 
 /** Tables required by {@link LabelModel}. */
 export interface LabelTables {
-  builds: { createdAt: SQLWrapper } & Table & { $inferSelect: Build; $inferInsert: Build };
-  buildLabels: {
-    projectId: SQLWrapper;
-    typeKey: SQLWrapper;
-    value: SQLWrapper;
-    buildId: SQLWrapper;
-  } & Table & { $inferSelect: BuildLabel; $inferInsert: BuildLabel };
-  labelTypes: { projectId: SQLWrapper; key: SQLWrapper } & Table & {
-      $inferSelect: LabelType;
-      $inferInsert: LabelType;
-    };
+  builds: Table;
+  buildLabels: Table;
+  labelTypes: Table;
 }
 
 /** Data operations for label types and build labels. */
@@ -51,27 +42,33 @@ export class LabelModel {
           key,
           name: SEEDED_NAMES[key] ?? key,
           createdAt: now,
-        } as never);
+        });
       }),
     );
   }
 
   /** List all label types for a project. */
   async listTypes(projectId: string): Promise<LabelType[]> {
-    return await this.db.list(this.tables.labelTypes, {
-      where: eq(this.tables.labelTypes.projectId, projectId),
-    });
+    return (await this.db.list(this.tables.labelTypes, {
+      where: eq(
+        getTableColumns(this.tables.labelTypes)["projectId"] as unknown as SQLWrapper,
+        projectId,
+      ),
+    })) as unknown as LabelType[];
   }
 
   /** Fetch a label type by key, or null if not found. */
   async getType(projectId: string, key: string): Promise<LabelType | null> {
-    const rows = await this.db.list(this.tables.labelTypes, {
+    const rows = (await this.db.list(this.tables.labelTypes, {
       where: and(
-        eq(this.tables.labelTypes.projectId, projectId),
-        eq(this.tables.labelTypes.key, key),
+        eq(
+          getTableColumns(this.tables.labelTypes)["projectId"] as unknown as SQLWrapper,
+          projectId,
+        ),
+        eq(getTableColumns(this.tables.labelTypes)["key"] as unknown as SQLWrapper, key),
       ),
       limit: 1,
-    });
+    })) as unknown as LabelType[];
     return rows[0] ?? null;
   }
 
@@ -80,7 +77,7 @@ export class LabelModel {
     projectId: string,
     input: { key: string; name: string; linkTemplate?: string; color?: string },
   ): Promise<LabelType> {
-    return await this.db.insert(this.tables.labelTypes, {
+    return (await this.db.insert(this.tables.labelTypes, {
       id: ulid(),
       projectId,
       key: input.key,
@@ -88,7 +85,7 @@ export class LabelModel {
       linkTemplate: input.linkTemplate,
       color: input.color,
       createdAt: new Date().toISOString(),
-    } as never);
+    })) as unknown as LabelType;
   }
 
   /** Update a custom label type's name, template or color. */
@@ -104,11 +101,11 @@ export class LabelModel {
     if (!existing) {
       return null;
     }
-    return await this.db.update(this.tables.labelTypes, existing.id, {
+    return (await this.db.update(this.tables.labelTypes, existing.id, {
       name: input.name ?? existing.name,
       linkTemplate: input.linkTemplate === undefined ? existing.linkTemplate : input.linkTemplate,
       color: input.color === undefined ? existing.color : input.color,
-    } as never);
+    })) as unknown as LabelType;
   }
 
   /** Remove a custom label type, rejecting reserved or persistent types. */
@@ -129,51 +126,63 @@ export class LabelModel {
     typeKey: string,
     value: string,
   ): Promise<BuildLabel> {
-    return await this.db.insert(this.tables.buildLabels, {
+    return (await this.db.insert(this.tables.buildLabels, {
       id: ulid(),
       projectId,
       buildId,
       typeKey,
       value,
       createdAt: new Date().toISOString(),
-    } as never);
+    })) as unknown as BuildLabel;
   }
 
   /** List all labels attached to a build. */
   async listForBuild(buildId: string): Promise<BuildLabel[]> {
-    return await this.db.list(this.tables.buildLabels, {
-      where: eq(this.tables.buildLabels.buildId, buildId),
-    });
+    return (await this.db.list(this.tables.buildLabels, {
+      where: eq(
+        getTableColumns(this.tables.buildLabels)["buildId"] as unknown as SQLWrapper,
+        buildId,
+      ),
+    })) as unknown as BuildLabel[];
   }
 
   /** Return the id of the latest build carrying a given label value, if any. */
   async latestBuildId(projectId: string, typeKey: string, value: string): Promise<string | null> {
-    const labels = await this.db.list(this.tables.buildLabels, {
+    const labels = (await this.db.list(this.tables.buildLabels, {
       where: and(
-        eq(this.tables.buildLabels.projectId, projectId),
-        eq(this.tables.buildLabels.typeKey, typeKey),
-        eq(this.tables.buildLabels.value, value),
+        eq(
+          getTableColumns(this.tables.buildLabels)["projectId"] as unknown as SQLWrapper,
+          projectId,
+        ),
+        eq(getTableColumns(this.tables.buildLabels)["typeKey"] as unknown as SQLWrapper, typeKey),
+        eq(getTableColumns(this.tables.buildLabels)["value"] as unknown as SQLWrapper, value),
       ),
-    });
+    })) as unknown as BuildLabel[];
     if (labels.length === 0) {
       return null;
     }
     const idSet = new Set(labels.map((l) => l.buildId));
-    const rows = await this.db.list(this.tables.builds, {
-      orderBy: desc(this.tables.builds.createdAt),
-    });
+    const rows = (await this.db.list(this.tables.builds, {
+      orderBy: desc(getTableColumns(this.tables.builds)["createdAt"] as unknown as SQLWrapper),
+    })) as unknown as { id: string }[];
     return rows.find((b) => idSet.has(b.id))?.id ?? null;
   }
 
   /** Return whether a build is marked as persistent. */
   async hasPersistent(projectId: string, buildId: string): Promise<boolean> {
-    const labels = await this.db.list(this.tables.buildLabels, {
+    const labels = (await this.db.list(this.tables.buildLabels, {
       where: and(
-        eq(this.tables.buildLabels.projectId, projectId),
-        eq(this.tables.buildLabels.buildId, buildId),
-        eq(this.tables.buildLabels.typeKey, PERSISTENT_LABEL_KEY),
+        eq(
+          getTableColumns(this.tables.buildLabels)["projectId"] as unknown as SQLWrapper,
+          projectId,
+        ),
+        eq(getTableColumns(this.tables.buildLabels)["buildId"] as unknown as SQLWrapper, buildId),
+        eq(
+          getTableColumns(this.tables.buildLabels)["typeKey"] as unknown as SQLWrapper,
+          PERSISTENT_LABEL_KEY,
+        ),
       ),
-    });
+    })) as unknown as BuildLabel[];
     return labels.length > 0;
   }
 }

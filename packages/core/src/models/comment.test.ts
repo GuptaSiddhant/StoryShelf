@@ -43,8 +43,8 @@ describe("CommentModel", () => {
   it("creates a comment on a build when project exists", async () => {
     const db = await makeDbWithProject();
     const model = new CommentModel(db, {
-      comments: comments as unknown as never,
-      projects: projects as unknown as never,
+      comments: comments,
+      projects: projects,
     });
     const comment = await model.create(mockProject.id, "b1", "user-123", {
       body: "Great component!",
@@ -60,8 +60,8 @@ describe("CommentModel", () => {
   it("throws when project does not exist", async () => {
     const { db } = makeDatabase();
     const model = new CommentModel(db, {
-      comments: comments as unknown as never,
-      projects: projects as unknown as never,
+      comments: comments,
+      projects: projects,
     });
     await expect(
       model.create("nonexistent-id", "b1", "user-123", { body: "comment" }),
@@ -71,8 +71,8 @@ describe("CommentModel", () => {
   it("lists comments by build", async () => {
     const db = await makeDbWithProject();
     const model = new CommentModel(db, {
-      comments: comments as unknown as never,
-      projects: projects as unknown as never,
+      comments: comments,
+      projects: projects,
     });
 
     await model.create(mockProject.id, "b1", "user-1", { body: "First comment" });
@@ -87,8 +87,8 @@ describe("CommentModel", () => {
   it("resolves a comment", async () => {
     const db = await makeDbWithProject();
     const model = new CommentModel(db, {
-      comments: comments as unknown as never,
-      projects: projects as unknown as never,
+      comments: comments,
+      projects: projects,
     });
 
     const comment = await model.create(mockProject.id, "b1", "user-1", {

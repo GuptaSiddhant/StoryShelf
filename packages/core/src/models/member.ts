@@ -1,5 +1,5 @@
 /** Project membership and role resolution. */
-import { and, eq } from "drizzle-orm";
+import { and, eq, getTableColumns } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../db/database.ts";
 import type { ProjectMember } from "../schema/member.ts";
@@ -8,10 +8,7 @@ import { ulid } from "../utils/ulid.ts";
 
 /** Tables required by {@link MemberModel}. */
 export interface MemberTables {
-  projectMembers: { projectId: SQLWrapper; userId: SQLWrapper } & Table & {
-      $inferSelect: ProjectMember;
-      $inferInsert: ProjectMember;
-    };
+  projectMembers: Table;
 }
 
 /** Data operations for project membership and roles. */
@@ -27,20 +24,26 @@ export class MemberModel {
 
   /** List all members of a project. */
   async list(projectId: string): Promise<ProjectMember[]> {
-    return await this.db.list(this.tables.projectMembers, {
-      where: eq(this.tables.projectMembers.projectId, projectId),
-    });
+    return (await this.db.list(this.tables.projectMembers, {
+      where: eq(
+        getTableColumns(this.tables.projectMembers)["projectId"] as unknown as SQLWrapper,
+        projectId,
+      ),
+    })) as unknown as ProjectMember[];
   }
 
   /** Fetch a project member by project and user id, or null if not found. */
   async get(projectId: string, userId: string): Promise<ProjectMember | null> {
-    const rows = await this.db.list(this.tables.projectMembers, {
+    const rows = (await this.db.list(this.tables.projectMembers, {
       where: and(
-        eq(this.tables.projectMembers.projectId, projectId),
-        eq(this.tables.projectMembers.userId, userId),
+        eq(
+          getTableColumns(this.tables.projectMembers)["projectId"] as unknown as SQLWrapper,
+          projectId,
+        ),
+        eq(getTableColumns(this.tables.projectMembers)["userId"] as unknown as SQLWrapper, userId),
       ),
       limit: 1,
-    });
+    })) as unknown as ProjectMember[];
     return rows[0] ?? null;
   }
 
@@ -48,15 +51,17 @@ export class MemberModel {
   async set(projectId: string, userId: string, role: ProjectRole): Promise<ProjectMember> {
     const existing = await this.get(projectId, userId);
     if (existing) {
-      return this.db.update(this.tables.projectMembers, existing.id, { role } as never);
+      return (await this.db.update(this.tables.projectMembers, existing.id, {
+        role,
+      })) as unknown as ProjectMember;
     }
-    return this.db.insert(this.tables.projectMembers, {
+    return (await this.db.insert(this.tables.projectMembers, {
       id: ulid(),
       projectId,
       userId,
       role,
       createdAt: new Date().toISOString(),
-    } as never);
+    })) as unknown as ProjectMember;
   }
 
   /** Remove a user from a project if they are a member. */
