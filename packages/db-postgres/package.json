@@ -1,0 +1,87 @@
+{
+  "name": "@storyshelf/db-postgres",
+  "version": "0.3.2",
+  "description": "Postgres database adapter for StoryShelf (postgres.js + Drizzle, RDS/Cloud SQL/Supabase/Neon compatible).",
+  "keywords": [
+    "database",
+    "drizzle",
+    "postgres",
+    "storybook"
+  ],
+  "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
+  "bugs": {
+    "url": "https://github.com/GuptaSiddhant/StoryShelf/issues"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Siddhant Gupta",
+    "url": "https://guptasiddhant.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GuptaSiddhant/StoryShelf.git",
+    "directory": "packages/db-postgres"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "default": "./dist/index.mjs"
+    },
+    "./ddl": {
+      "source": "./src/ddl.ts",
+      "default": "./dist/ddl.mjs"
+    },
+    "./schema": {
+      "source": "./src/schema/index.ts",
+      "default": "./dist/schema.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.mjs",
+      "./ddl": "./dist/ddl.mjs",
+      "./schema": "./dist/schema.mjs",
+      "./package.json": "./package.json"
+    },
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown -w",
+    "fmt": "oxfmt ./src",
+    "lint": "oxlint --type-aware --type-check ./src",
+    "test": "vitest run",
+    "prepublishOnly": "nub run build"
+  },
+  "dependencies": {
+    "@storyshelf/core": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "postgres": "^3.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:",
+    "oxlint-tsgolint": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "jsr": {
+    "runtimeCompat": {
+      "node": true,
+      "deno": true,
+      "browser": false,
+      "workerd": false,
+      "bun": true
+    }
+  }
+}

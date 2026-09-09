@@ -68,6 +68,8 @@ This generates `server.ts` + `package.json` with the correct imports and depende
 | Capture queue | `InMemoryCaptureQueue` (built-in) | Async, concurrency-limited, in-process |
 | Auth | `@storyshelf/auth-oauth` or `@storyshelf/auth-password` | OIDC or shared password |
 
+Swap the database layer for `@storyshelf/db-postgres` (Postgres via `postgres.js` + Drizzle, see [Postgres provider recipes](#postgres-provider-recipes) below) or `@storyshelf/db-turso` (Turso/libSQL) without changing the rest of the stack.
+
 One `npm start` (or `fly deploy`, `railway up`, `render.com`, etc.) and you're running.
 
 ### Cloud assembly (all clouds equal)
@@ -160,3 +162,64 @@ await app.lifecycle.init(); // migrations + credential checks, fail fast
 ```
 
 This runs on **any** platform that supports Node-compatible `fetch` + `crypto` + `sqlite`/`libsql` — including all clouds above.
+
+### Postgres provider recipes
+
+`@storyshelf/db-postgres` uses `postgres.js` + Drizzle and speaks the standard Postgres wire protocol. Use `createPostgresDatabase({ url })` for all providers — only the connection string and TLS/pooling options change.
+
+| Provider | Connection string shape | TLS | Pooling notes |
+|----------|-------------------------|-----|---------------|
+| Self-hosted | `postgres://user:pass@localhost:5432/shelf` | `ssl: false` or omit for plain TCP; `ssl: true` if TLS is enforced | Default `max: 10`; tune `max` / `idleTimeout` |
+| AWS RDS | `postgres://user:pass@<rds-endpoint>:5432/db?sslmode=require` | `ssl: true` or `ssl: { ca: rdsCaBundle }` for custom CA bundle | IAM auth via injected `client` with a refreshed token; `prepare: true` (default) is fine |
+| GCP Cloud SQL | `postgres://user:pass@<cloudsql-ip>:5432/db` | `ssl: { ca, cert, key }` for mutual TLS | Via Cloud SQL Connector or injected `client` with IAM credentials |
+| Supabase | `postgres://postgres.<ref>:<pass>@<pooler-host>:6543/postgres?pgbouncer=true` (pooler) or `:5432` (direct) | `ssl: true` | PgBouncer (port `6543`, transaction mode) requires `prepare: false`; direct `5432` can keep `prepare: true` |
+| Neon | `postgres://user:pass@<neon-host>/db?sslmode=require` | `ssl: true` | Serverless — keep `max` low (e.g. `max: 5`); pooled endpoints via PgBouncer need `prepare: false` |
+| Azure Database for PostgreSQL | `postgres://user:pass@<server>.postgres.database.azure.com:5432/db?sslmode=require` | `ssl: true` | Microsoft Entra ID via injected `client` with access token |
+
+For IAM or custom TLS (RDS IAM, Azure Entra ID, GCP mutual TLS, Supabase pooler), inject a preconfigured `postgres.js` client — other options are ignored and the caller owns the lifecycle:
+
+```ts
+import postgres from "postgres";
+import { createPostgresDatabase } from "@storyshelf/db-postgres";
+
+const client = postgres(process.env.DATABASE_URL!, { ssl: true });
+const database = createPostgresDatabase({ client });
+```
+
+See the [`@storyshelf/db-postgres` package reference](../packages/db-postgres/) for full `PostgresDatabaseOptions` (`url`/`connectionString`, `ssl`, `prepare`, `max`, `idleTimeout`, `connectTimeout`, `client`).
+
+### Minimal Postgres + S3 recipe
+
+```ts
+import { createShelfRouter } from "@storyshelf/router";
+import { createPostgresDatabase } from "@storyshelf/db-postgres";
+import { createS3Storage } from "@storyshelf/storage-s3";
+import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
+import { InMemoryCaptureQueue } from "@storyshelf/core/capture";
+
+const database = createPostgresDatabase({
+  url: process.env.DATABASE_URL!,
+  ssl: true,
+  prepare: false, // set false when using Supabase/Neon PgBouncer on :6543
+  max: 10,
+});
+const storage = createS3Storage({
+  bucket: process.env.S3_BUCKET!,
+  region: process.env.S3_REGION,
+  endpoint: process.env.S3_ENDPOINT, // for R2/MinIO
+  accessKeyId: process.env.S3_ACCESS_KEY_ID!,
+  secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
+});
+const capture = createPlaywrightCaptureRunner();
+const queue = new InMemoryCaptureQueue({ concurrency: 2 });
+
+export const app = createShelfRouter({
+  database,
+  storage,
+  captureRunner: capture,
+  captureQueue: queue,
+  config: { scratchDir: "/tmp/scratch" },
+  auth: ...,
+});
+await app.lifecycle.init();
+```

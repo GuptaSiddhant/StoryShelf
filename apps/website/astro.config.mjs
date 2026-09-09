@@ -50,6 +50,7 @@ export default defineConfig({
             { label: "@storyshelf/router", slug: "packages/router" },
             { label: "storyshelf", slug: "packages/cli" },
             { label: "@storyshelf/runner-playwright", slug: "packages/runner-playwright" },
+            { label: "@storyshelf/db-postgres", slug: "packages/db-postgres" },
             { label: "@storyshelf/db-sqlite", slug: "packages/db-sqlite" },
             { label: "@storyshelf/db-turso", slug: "packages/db-turso" },
             { label: "@storyshelf/storage-local", slug: "packages/storage-local" },

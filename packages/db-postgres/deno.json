@@ -1,0 +1,14 @@
+{
+  "$schema": "https://raw.githubusercontent.com/denoland/deno/refs/heads/main/cli/schemas/config-file.v1.json",
+  "name": "@storyshelf/db-postgres",
+  "version": "0.3.2",
+  "exports": {
+    ".": "./src/index.ts",
+    "./ddl": "./src/ddl.ts",
+    "./schema": "./src/schema/index.ts"
+  },
+  "publish": {
+    "include": ["src", "README.md", "LICENSE"],
+    "exclude": ["**/*.test.ts", "**/*.test.tsx", "**/test-helpers"]
+  }
+}
