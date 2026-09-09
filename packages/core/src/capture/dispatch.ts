@@ -1,8 +1,9 @@
 import type { GitHostProvider } from "../adapters/git-host/index.ts";
 import type { DatabaseAdapter } from "../db/database.ts";
 import type { Logger } from "../logger.ts";
-import { BuildModel } from "../models/build.ts";
-import { ProjectModel } from "../models/project.ts";
+import { BuildModel, type BuildTables } from "../models/build.ts";
+import { ProjectModel, type ProjectTables } from "../models/project.ts";
+import type { StatusConfigTables } from "../models/status-config.ts";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 import { executeCaptureJob, type CaptureJobOptions } from "./orchestrator.ts";
@@ -26,9 +27,13 @@ export function createDispatchJob(deps: DispatchDeps): (job: CaptureDispatchJob)
   };
 }
 
+/** Table handles required by dispatch. */
+export type DispatchTables = BuildTables & ProjectTables & StatusConfigTables;
+
 /** Dependencies for building the capture queue's job runner. */
 export interface DispatchDeps {
   db: DatabaseAdapter;
+  tables: DispatchTables;
   jobOptions: CaptureJobOptions;
   gitHosts: GitHostProvider[];
   secret: string | undefined;
@@ -56,6 +61,7 @@ async function postPending(
 ): Promise<void> {
   await postStatusesForBuild({
     db: deps.db,
+    tables: deps.tables,
     project,
     sha,
     status: "pending",
@@ -77,6 +83,7 @@ async function postTerminal(
 ): Promise<void> {
   await postStatusesForBuild({
     db: deps.db,
+    tables: deps.tables,
     project,
     sha,
     status,
@@ -92,7 +99,7 @@ async function postTerminal(
 async function approveWithoutCapture(ctx: JobContext, reason: string): Promise<void> {
   const { deps, build, project, pendingUrl } = ctx;
   deps.logger.info({ buildId: build.id, sha: build.gitSha, branch: build.gitBranch }, reason);
-  await new BuildModel(deps.db).setStatus(build.id, "approved").catch(() => {}); // Intentionally empty — fire-and-forget
+  await new BuildModel(deps.db, deps.tables).setStatus(build.id, "approved").catch(() => {}); // Intentionally empty — fire-and-forget
   await postTerminal(deps, project, pendingUrl, build.gitSha, "success").catch(() => {}); // Intentionally empty — fire-and-forget
 }
 
@@ -107,6 +114,7 @@ async function maybeSkipMerged(ctx: JobContext): Promise<boolean> {
     branch: build.gitBranch,
     secret: deps.secret,
     db: deps.db,
+    tables: deps.tables,
     projectId: project.id,
     logger: deps.logger,
   }).catch(() => false);
@@ -119,7 +127,13 @@ async function maybeSkipMerged(ctx: JobContext): Promise<boolean> {
 
 async function maybeSkipDuplicate(ctx: JobContext): Promise<boolean> {
   const { deps, build, project } = ctx;
-  const dup = await hasApprovedBuildForSha(deps.db, project.id, build.gitSha, build.id);
+  const dup = await hasApprovedBuildForSha(
+    deps.db,
+    deps.tables,
+    project.id,
+    build.gitSha,
+    build.id,
+  );
   if (dup) {
     await approveWithoutCapture(ctx, "skipping capture — duplicate sha already approved");
     return true;
@@ -141,7 +155,7 @@ function terminalState(status: string | undefined): "success" | "failure" | null
 /** Post the terminal status for a finished capture. */
 async function reportTerminalStatus(ctx: JobContext, buildId: string): Promise<void> {
   const { deps, build, project, pendingUrl } = ctx;
-  const updated = await new BuildModel(deps.db).get(buildId);
+  const updated = await new BuildModel(deps.db, deps.tables).get(buildId);
   const terminal = terminalState(updated?.status);
   if (terminal) {
     await postTerminal(deps, project, pendingUrl, build.gitSha, terminal);
@@ -156,6 +170,7 @@ async function runAndReport(ctx: JobContext, job: CaptureDispatchJob): Promise<v
   } catch (error: unknown) {
     await postStatusesForBuild({
       db: deps.db,
+      tables: deps.tables,
       project,
       sha: build.gitSha,
       status: "failure",
@@ -175,13 +190,13 @@ async function loadJobTarget(
   deps: DispatchDeps,
   job: CaptureDispatchJob,
 ): Promise<{ build: Build; project: Project } | null> {
-  const builds = new BuildModel(deps.db);
+  const builds = new BuildModel(deps.db, deps.tables);
   const build = await builds.get(job.buildId);
   if (!build) {
     await executeCaptureJob({ buildId: job.buildId, reqId: job.reqId }, deps.jobOptions);
     return null;
   }
-  const project = await new ProjectModel(deps.db).get(build.projectId);
+  const project = await new ProjectModel(deps.db, deps.tables).get(build.projectId);
   if (!project) {
     await executeCaptureJob({ buildId: job.buildId, reqId: job.reqId }, deps.jobOptions);
     return null;

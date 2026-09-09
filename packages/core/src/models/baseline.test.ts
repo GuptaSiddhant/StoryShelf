@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { baselines } from "../../../db-sqlite/src/schema/index.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { baselinePath } from "../utils/paths.ts";
 import { BaselineModel } from "./baseline.ts";
@@ -36,13 +37,13 @@ async function seedBaseline(
 describe("BaselineModel", () => {
   it("returns null from getFor when no baseline exists", async () => {
     const { db, storage } = setup();
-    const model = new BaselineModel(db, storage);
+    const model = new BaselineModel(db, { baselines: baselines as unknown as never }, storage);
     await expect(model.getFor("p1", "story", "desktop", "main")).resolves.toBeNull();
   });
 
   it("resolves the branch-specific baseline over the default", async () => {
     const { db, storage } = setup();
-    const model = new BaselineModel(db, storage);
+    const model = new BaselineModel(db, { baselines: baselines as unknown as never }, storage);
     await storage.write("source/shot.png", PNG);
     const main = await model.upsert(
       "p1",
@@ -67,7 +68,7 @@ describe("BaselineModel", () => {
 
   it("falls back to the default branch baseline", async () => {
     const { db, storage } = setup();
-    const model = new BaselineModel(db, storage);
+    const model = new BaselineModel(db, { baselines: baselines as unknown as never }, storage);
     const { id } = await seedBaseline(model, storage);
     const resolved = await model.resolve(
       "p1",
@@ -81,13 +82,13 @@ describe("BaselineModel", () => {
 
   it("resolves null when neither branch has a baseline", async () => {
     const { db, storage } = setup();
-    const model = new BaselineModel(db, storage);
+    const model = new BaselineModel(db, { baselines: baselines as unknown as never }, storage);
     await expect(model.resolve("p1", "story", "desktop", "feature", "main")).resolves.toBeNull();
   });
 
   it("upsert creates then updates the same branch baseline", async () => {
     const { db, storage } = setup();
-    const model = new BaselineModel(db, storage);
+    const model = new BaselineModel(db, { baselines: baselines as unknown as never }, storage);
     await storage.write("source/shot.png", PNG);
     const created = await model.upsert(
       "p1",
@@ -116,7 +117,7 @@ describe("BaselineModel", () => {
 
   it("lists baselines scoped to the project", async () => {
     const { db, storage } = setup();
-    const model = new BaselineModel(db, storage);
+    const model = new BaselineModel(db, { baselines: baselines as unknown as never }, storage);
     await seedBaseline(model, storage);
     await seedBaseline(model, storage, { storyId: "other", branch: "feature" });
     const listed = await model.list("p1");
@@ -126,7 +127,7 @@ describe("BaselineModel", () => {
 
   it("removeOrphans deletes baselines for unknown stories", async () => {
     const { db, storage } = setup();
-    const model = new BaselineModel(db, storage);
+    const model = new BaselineModel(db, { baselines: baselines as unknown as never }, storage);
     await seedBaseline(model, storage);
     await seedBaseline(model, storage, { storyId: "gone" });
     const removed = await model.removeOrphans("p1", new Set(["components-button--primary"]));
@@ -137,7 +138,7 @@ describe("BaselineModel", () => {
 
   it("removeOrphans also deletes the storage object", async () => {
     const { db, storage } = setup();
-    const model = new BaselineModel(db, storage);
+    const model = new BaselineModel(db, { baselines: baselines as unknown as never }, storage);
     await seedBaseline(model, storage, { storyId: "gone" });
     const gonePath = baselinePath("p1", "main", "gone", "desktop");
     await expect(storage.exists(gonePath)).resolves.toBe(true);
@@ -148,7 +149,7 @@ describe("BaselineModel", () => {
 
   it("removeForBranch deletes only that branch", async () => {
     const { db, storage } = setup();
-    const model = new BaselineModel(db, storage);
+    const model = new BaselineModel(db, { baselines: baselines as unknown as never }, storage);
     await seedBaseline(model, storage, { branch: "feature", storyId: "s1" });
     await seedBaseline(model, storage, { branch: "main", storyId: "s1" });
     const featurePath = baselinePath("p1", "feature", "s1", "desktop");
@@ -163,7 +164,7 @@ describe("BaselineModel", () => {
 
   it("removeStaleBranches deletes multiple branches", async () => {
     const { db, storage } = setup();
-    const model = new BaselineModel(db, storage);
+    const model = new BaselineModel(db, { baselines: baselines as unknown as never }, storage);
     await seedBaseline(model, storage, { branch: "stale-1", storyId: "s1" });
     await seedBaseline(model, storage, { branch: "stale-2", storyId: "s1" });
     await seedBaseline(model, storage, { branch: "fresh", storyId: "s1" });

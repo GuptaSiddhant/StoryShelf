@@ -51,9 +51,6 @@ export interface DrizzleAdapterOptions {
 }
 
 /**
- * Create a {@link DatabaseAdapter} from a Drizzle instance.
- * Used by `db-sqlite` and `db-turso` to wrap their drivers; most consumers
- * should use those packages directly.
+ * Create a {@link DatabaseAdapter} from a Drizzle instance for Postgres.
  */
-export { createDrizzleAdapter } from "./drizzle-factory.ts";
 export { createDrizzlePgAdapter } from "./drizzle-factory-pg.ts";

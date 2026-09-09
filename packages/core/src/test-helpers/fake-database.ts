@@ -1,5 +1,4 @@
-import type { SQL } from "drizzle-orm";
-import type { AnySQLiteTable } from "drizzle-orm/sqlite-core";
+import type { SQL, Table } from "drizzle-orm";
 import type { DatabaseAdapter, ListOptions } from "../db/database.ts";
 import { orderRows, whereMatches } from "./sql-chunks.ts";
 
@@ -14,9 +13,9 @@ function withoutUndefined(values: unknown): Record<string, unknown> {
 /* eslint-disable require-await, no-unnecessary-type-assertion, no-unnecessary-type-parameters, non-nullable-type-assertion-style */
 /** Create an in-memory database adapter for capture pipeline tests. */
 export function makeDatabase(): { db: DatabaseAdapter } {
-  const tables = new Map<AnySQLiteTable, Map<string, unknown>>();
+  const tables = new Map<Table, Map<string, unknown>>();
 
-  const rowsOf = (table: AnySQLiteTable): Map<string, unknown> => {
+  const rowsOf = (table: Table): Map<string, unknown> => {
     let rowMap = tables.get(table);
     if (!rowMap) {
       rowMap = new Map();
@@ -25,7 +24,7 @@ export function makeDatabase(): { db: DatabaseAdapter } {
     return rowMap;
   };
 
-  const insertRow = async <T extends AnySQLiteTable>(
+  const insertRow = async <T extends Table>(
     table: T,
     values: T["$inferInsert"],
   ): Promise<T["$inferSelect"]> => {
@@ -34,7 +33,7 @@ export function makeDatabase(): { db: DatabaseAdapter } {
     return row as T["$inferSelect"];
   };
 
-  const updateRow = async <T extends AnySQLiteTable>(
+  const updateRow = async <T extends Table>(
     table: T,
     id: string,
     values: Partial<T["$inferInsert"]>,
@@ -48,7 +47,7 @@ export function makeDatabase(): { db: DatabaseAdapter } {
     return merged as T["$inferSelect"];
   };
 
-  const getRow = async <T extends AnySQLiteTable>(
+  const getRow = async <T extends Table>(
     table: T,
     id: string,
   ): Promise<T["$inferSelect"] | null> => {
@@ -59,7 +58,7 @@ export function makeDatabase(): { db: DatabaseAdapter } {
     return found as T["$inferSelect"];
   };
 
-  const listRows = async <T extends AnySQLiteTable>(
+  const listRows = async <T extends Table>(
     table: T,
     opts: ListOptions = {},
   ): Promise<T["$inferSelect"][]> => {
@@ -77,7 +76,7 @@ export function makeDatabase(): { db: DatabaseAdapter } {
     return current as T["$inferSelect"][];
   };
 
-  const countRows = async (table: AnySQLiteTable, where?: SQL): Promise<number> => {
+  const countRows = async (table: Table, where?: SQL): Promise<number> => {
     const matching = await listRows(table, where ? { where } : {});
     return matching.length;
   };

@@ -1,6 +1,5 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { createShelfLogger } from "@storyshelf/core/logger";
-import { schema } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import { sql } from "drizzle-orm";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -8,6 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createSqliteDatabase } from "./index.ts";
+import { schema } from "./schema/index.ts";
 
 const silentLogger = createShelfLogger({ level: "silent" });
 

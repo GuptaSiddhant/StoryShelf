@@ -1,17 +1,26 @@
 /** Snapshot records for captured stories within a build. */
 import { eq } from "drizzle-orm";
+import type { SQLWrapper, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../db/database.ts";
-import { snapshots } from "../schema/snapshot.ts";
 import type { Snapshot } from "../schema/snapshot.ts";
 import type { SnapshotStatus } from "../types.ts";
 import { ulid } from "../utils/ulid.ts";
+
+/** Tables required by {@link SnapshotModel}. */
+export interface SnapshotTables {
+  snapshots: { buildId: SQLWrapper } & Table & { $inferSelect: Snapshot; $inferInsert: Snapshot };
+}
 
 /** Data operations for snapshot records. */
 export class SnapshotModel {
   /**
    * @param db - Database adapter.
+   * @param tables - Table handles.
    */
-  constructor(private readonly db: DatabaseAdapter) {}
+  constructor(
+    private readonly db: DatabaseAdapter,
+    private readonly tables: SnapshotTables,
+  ) {}
 
   /**
    * Create a snapshot for a story within a build.
@@ -23,7 +32,7 @@ export class SnapshotModel {
    */
   async create(projectId: string, buildId: string, input: SnapshotCreateInput): Promise<Snapshot> {
     const now = new Date().toISOString();
-    return await this.db.insert(snapshots, {
+    return await this.db.insert(this.tables.snapshots, {
       id: ulid(),
       projectId,
       buildId,
@@ -38,22 +47,27 @@ export class SnapshotModel {
       status: "pending",
       createdAt: now,
       updatedAt: now,
-    });
+    } as never);
   }
 
   /** List all snapshots belonging to a build. */
   async listByBuild(buildId: string): Promise<Snapshot[]> {
-    return await this.db.list(snapshots, { where: eq(snapshots.buildId, buildId) });
+    return await this.db.list(this.tables.snapshots, {
+      where: eq(this.tables.snapshots.buildId, buildId),
+    });
   }
 
   /** Fetch a snapshot by id, or null if not found. */
   async get(id: string): Promise<Snapshot | null> {
-    return await this.db.get(snapshots, id);
+    return await this.db.get(this.tables.snapshots, id);
   }
 
   /** Update mutable fields of a snapshot. */
   async update(id: string, patch: Partial<Snapshot>): Promise<Snapshot> {
-    return await this.db.update(snapshots, id, { ...patch, updatedAt: new Date().toISOString() });
+    return await this.db.update(this.tables.snapshots, id, {
+      ...patch,
+      updatedAt: new Date().toISOString(),
+    } as never);
   }
 
   /** Set the status of a snapshot. */

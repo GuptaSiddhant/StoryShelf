@@ -1,42 +1,68 @@
 import { and, desc, eq, inArray, lt } from "drizzle-orm";
+import type { SQLWrapper, Table } from "drizzle-orm";
 import type { Logger } from "pino";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import type { DatabaseAdapter } from "../db/database.ts";
-import { BaselineModel } from "../models/baseline.ts";
-import { BuildModel } from "../models/build.ts";
-import { LabelModel } from "../models/label.ts";
-import { builds } from "../schema/build.ts";
+import { BaselineModel, type BaselineTables } from "../models/baseline.ts";
+import { BuildModel, type BuildTables } from "../models/build.ts";
+import { LabelModel, type LabelTables } from "../models/label.ts";
 import type { Project } from "../schema/project.ts";
 import { TERMINAL_BUILD_STATUSES } from "../types.ts";
+
+/** Table handles for retention queries. */
+export interface RetentionTables {
+  builds: {
+    projectId: SQLWrapper;
+    status: SQLWrapper;
+    updatedAt: SQLWrapper;
+    gitBranch: SQLWrapper;
+    id: SQLWrapper;
+    createdAt: SQLWrapper;
+  } & Table;
+  buildLabels: {
+    projectId: SQLWrapper;
+    typeKey: SQLWrapper;
+    value: SQLWrapper;
+    buildId: SQLWrapper;
+  } & Table;
+  baselines: {
+    projectId: SQLWrapper;
+    storyId: SQLWrapper;
+    viewportName: SQLWrapper;
+    branch: SQLWrapper;
+  } & Table;
+}
 
 /** Removes expired transient builds while keeping baselines and persistent builds. */
 export class Retention {
   constructor(
     private readonly db: DatabaseAdapter,
     private readonly storage: StorageAdapter,
+    private readonly tables: RetentionTables,
     private readonly logger?: Logger,
   ) {}
 
   async purge(project: Project, options: PurgeOptions): Promise<PurgeResult> {
     const cutoff = new Date(Date.now() - options.ttlDays * 86_400_000).toISOString();
-    const candidates = await this.db.list(builds, {
+    const candidates = await this.db.list(this.tables.builds, {
       where: and(
-        eq(builds.projectId, project.id),
-        inArray(builds.status, [...TERMINAL_BUILD_STATUSES]),
-        lt(builds.updatedAt, cutoff),
+        eq(this.tables.builds.projectId, project.id),
+        inArray(this.tables.builds.status, [...TERMINAL_BUILD_STATUSES]),
+        lt(this.tables.builds.updatedAt, cutoff),
       ),
     });
 
     const keep = options.keepLatestPerBranch
       ? await this.latestPerBranch(project.id)
       : new Set<string>();
-    const labelModel = new LabelModel(this.db);
+    const labelModel = new LabelModel(this.db, this.tables as unknown as LabelTables);
     const target = await Promise.all(
       candidates.map(async (build) => {
-        if (keep.has(build.id) || (await labelModel.hasPersistent(project.id, build.id))) {
+        const buildId = (build as { id: string })["id"];
+        if (keep.has(buildId) || (await labelModel.hasPersistent(project.id, buildId))) {
           return null;
         }
-        return build.id;
+        return buildId;
       }),
     );
 
@@ -47,8 +73,8 @@ export class Retention {
         removed: await this.removeBuild(buildId),
       })),
     );
-    const removedBuilds = results.filter((r) => r.removed).length;
-    const removedFiles = results.reduce((sum, r) => sum + r.files, 0);
+    const removedBuilds = results.filter((r: { removed: boolean }) => r.removed).length;
+    const removedFiles = results.reduce((sum: number, r: { files: number }) => sum + r.files, 0);
     this.logger?.info(
       { projectId: project.id, removedBuilds, removedFiles },
       "build retention purge complete",
@@ -57,20 +83,21 @@ export class Retention {
   }
 
   private async removeBuild(buildId: string): Promise<boolean> {
-    await new BuildModel(this.db).remove(buildId);
+    await new BuildModel(this.db, this.tables as unknown as BuildTables).remove(buildId);
     return true;
   }
 
   private async latestPerBranch(projectId: string): Promise<Set<string>> {
-    const rows = await this.db.list(builds, {
-      where: eq(builds.projectId, projectId),
-      orderBy: desc(builds.updatedAt),
-    });
+    const rows = (await this.db.list(this.tables.builds, {
+      where: eq(this.tables.builds.projectId, projectId),
+      orderBy: desc(this.tables.builds.updatedAt),
+    })) as unknown as { gitBranch: string; id: string }[];
     const latest = new Map<string, string>();
     for (const row of rows) {
-      const current = latest.get(row.gitBranch);
+      const branch = row.gitBranch;
+      const current = latest.get(branch);
       if (!current) {
-        latest.set(row.gitBranch, row.id);
+        latest.set(branch, row.id);
       }
     }
     return new Set(latest.values());
@@ -92,14 +119,18 @@ export class Retention {
       return { removedBranches: 0, removedBaselines: 0 };
     }
     const cutoff = new Date(Date.now() - ttlDays * 86_400_000).toISOString();
-    const rows = await this.db.list(builds, {
-      where: eq(builds.projectId, project.id),
-    });
+    const rows = (await this.db.list(this.tables.builds, {
+      where: eq(this.tables.builds.projectId, project.id),
+    })) as unknown as { gitBranch: string; updatedAt: string }[];
     const stale = collectStaleBranches(rows, project.gitDefaultBranch, cutoff);
     if (stale.size === 0) {
       return { removedBranches: 0, removedBaselines: 0 };
     }
-    const baselines = new BaselineModel(this.db, this.storage);
+    const baselines = new BaselineModel(
+      this.db,
+      this.tables as unknown as BaselineTables,
+      this.storage,
+    );
     const removedBaselines = await baselines.removeStaleBranches(project.id, stale);
     this.logger?.info(
       { projectId: project.id, removedBranches: stale.size, removedBaselines },

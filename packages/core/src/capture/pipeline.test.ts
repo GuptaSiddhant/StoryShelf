@@ -1,11 +1,9 @@
 import { PNG } from "pngjs";
 import { describe, expect, it } from "vitest";
+import { baselines, buildLabels, builds, snapshots } from "../../../db-sqlite/src/schema/index.ts";
 import type { RenderedSnapshot } from "../adapters/capture-runner.ts";
-import { baselines } from "../schema/baseline.ts";
-import { builds } from "../schema/build.ts";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
-import { snapshots } from "../schema/snapshot.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { diffPath } from "../utils/paths.ts";
 import type { StoryEntry, Viewport } from "./adapter.ts";
@@ -81,6 +79,12 @@ async function makeContext(options: {
   await db.insert(builds, mockBuild);
   const ctx: CaptureContext = {
     db,
+    tables: {
+      builds: builds as unknown as never,
+      buildLabels: buildLabels as unknown as never,
+      snapshots: snapshots as unknown as never,
+      baselines: baselines as unknown as never,
+    },
     storage,
     project: mockProject,
     build: mockBuild,

@@ -1,7 +1,7 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { createShelfLogger } from "@storyshelf/core/logger";
-import { schema } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
+import { schema } from "@storyshelf/db-sqlite/schema";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

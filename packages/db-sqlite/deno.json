@@ -3,7 +3,10 @@
   "name": "@storyshelf/db-sqlite",
   "version": "0.3.2",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./drizzle-factory": "./src/drizzle-factory.ts",
+    "./ddl": "./src/ddl.ts",
+    "./schema": "./src/schema/index.ts"
   },
   "publish": {
     "include": ["src", "README.md", "LICENSE"],

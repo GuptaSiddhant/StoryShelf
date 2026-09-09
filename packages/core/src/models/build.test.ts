@@ -1,15 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { projects } from "../schema/project.ts";
-import { snapshots } from "../schema/snapshot.ts";
+import { buildLabels, builds, projects, snapshots } from "../../../db-sqlite/src/schema/index.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { BuildModel, isPublicBuild } from "./build.ts";
 import { ProjectModel } from "./project.ts";
 
+function buildTables() {
+  return {
+    builds: builds as unknown as never,
+    buildLabels: buildLabels as unknown as never,
+    snapshots: snapshots as unknown as never,
+  };
+}
+
+function projectTables() {
+  return { projects: projects as unknown as never };
+}
+
 describe("BuildModel", () => {
   it("creates a build with default status pending", async () => {
     const { db } = makeDatabase();
-    const model = new BuildModel(db);
-    const project = await new ProjectModel(db).create({
+    const model = new BuildModel(db, buildTables());
+    const project = await new ProjectModel(db, projectTables()).create({
       name: "Test",
       gitRepository: "owner/repo",
     });
@@ -26,7 +37,7 @@ describe("BuildModel", () => {
 
   it("gets a build by id", async () => {
     const { db } = makeDatabase();
-    const model = new BuildModel(db);
+    const model = new BuildModel(db, buildTables());
     const build = await model.create("p1", { gitSha: "sha-1", gitBranch: "main" });
     const fetched = await model.get(build.id);
     expect(fetched?.id).toBe(build.id);
@@ -35,7 +46,7 @@ describe("BuildModel", () => {
 
   it("updates build status", async () => {
     const { db } = makeDatabase();
-    const model = new BuildModel(db);
+    const model = new BuildModel(db, buildTables());
     const build = await model.create("p1", { gitSha: "sha-1", gitBranch: "main" });
     const updated = await model.setStatus(build.id, "capturing" as const);
     expect(updated.status).toBe("capturing");
@@ -43,7 +54,7 @@ describe("BuildModel", () => {
 
   it("recomputes build counts", async () => {
     const { db } = makeDatabase();
-    const model = new BuildModel(db);
+    const model = new BuildModel(db, buildTables());
     const build = await model.create("p1", { gitSha: "sha-1", gitBranch: "main" });
 
     await db.insert(snapshots, {
@@ -87,7 +98,7 @@ describe("BuildModel", () => {
 
   it("removes a build", async () => {
     const { db } = makeDatabase();
-    const model = new BuildModel(db);
+    const model = new BuildModel(db, buildTables());
     const build = await model.create("p1", { gitSha: "sha-1", gitBranch: "main" });
     await model.remove(build.id);
     const deleted = await model.get(build.id);
@@ -128,8 +139,8 @@ describe("isPublicBuild", () => {
 describe("BuildModel latestPublished", () => {
   it("returns the most recent public build", async () => {
     const { db } = makeDatabase();
-    const model = new BuildModel(db);
-    const project = await new ProjectModel(db).create({
+    const model = new BuildModel(db, buildTables());
+    const project = await new ProjectModel(db, projectTables()).create({
       name: "Test",
       gitRepository: "owner/repo",
     });
@@ -147,7 +158,7 @@ describe("BuildModel latestPublished", () => {
 
   it("returns the most recent build whose branch matches the project regex", async () => {
     const { db } = makeDatabase();
-    const model = new BuildModel(db);
+    const model = new BuildModel(db, buildTables());
     await db.insert(projects, {
       id: "p1",
       name: "Test",
@@ -170,8 +181,8 @@ describe("BuildModel latestPublished", () => {
 
   it("returns null when no build is public", async () => {
     const { db } = makeDatabase();
-    const model = new BuildModel(db);
-    const project = await new ProjectModel(db).create({
+    const model = new BuildModel(db, buildTables());
+    const project = await new ProjectModel(db, projectTables()).create({
       name: "Test",
       gitRepository: "owner/repo",
     });

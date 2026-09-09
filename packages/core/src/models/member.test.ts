@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { projectMembers } from "../../../db-sqlite/src/schema/index.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { MemberModel } from "./member.ts";
 
 describe("MemberModel", () => {
   it("sets a member role on a project", async () => {
     const { db } = makeDatabase();
-    const model = new MemberModel(db);
+    const model = new MemberModel(db, { projectMembers: projectMembers as unknown as never });
     const member = await model.set("p1", "user-1", "admin");
     expect(member.id).toBeDefined();
     expect(member.role).toBe("admin");
@@ -13,7 +14,7 @@ describe("MemberModel", () => {
 
   it("gets members of a project", async () => {
     const { db } = makeDatabase();
-    const model = new MemberModel(db);
+    const model = new MemberModel(db, { projectMembers: projectMembers as unknown as never });
     await model.set("p1", "user-1", "admin");
     await model.set("p1", "user-2", "viewer");
     const members = await model.list("p1");
@@ -24,7 +25,7 @@ describe("MemberModel", () => {
 
   it("removes a member from a project", async () => {
     const { db } = makeDatabase();
-    const model = new MemberModel(db);
+    const model = new MemberModel(db, { projectMembers: projectMembers as unknown as never });
     await model.set("p1", "user-1", "admin");
     await model.remove("p1", "user-1");
     const members = await model.list("p1");
@@ -33,7 +34,7 @@ describe("MemberModel", () => {
 
   it("updates a member role", async () => {
     const { db } = makeDatabase();
-    const model = new MemberModel(db);
+    const model = new MemberModel(db, { projectMembers: projectMembers as unknown as never });
     await model.set("p1", "user-1", "viewer");
     // In a full impl there'd be an update method; test the set/reset cycle
     const members = await model.list("p1");

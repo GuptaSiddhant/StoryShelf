@@ -1,25 +1,37 @@
 /** Webhook subscriptions for project events. */
 import { eq } from "drizzle-orm";
+import type { SQLWrapper, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../db/database.ts";
-import { webhooks } from "../schema/webhook.ts";
 import type { Webhook } from "../schema/webhook.ts";
 import { decrypt, encrypt } from "../utils/encrypt.ts";
 import { ulid } from "../utils/ulid.ts";
+
+/** Tables required by {@link WebhookModel}. */
+export interface WebhookTables {
+  webhooks: { projectId: SQLWrapper; id: SQLWrapper } & Table & {
+      $inferSelect: Webhook;
+      $inferInsert: Webhook;
+    };
+}
 
 /** Data operations for webhook subscriptions. */
 export class WebhookModel {
   /**
    * @param db - Database adapter.
+   * @param tables - Table handles.
    * @param secret - Server secret for webhook-secret encryption (throws on write/decrypt when unset).
    */
   constructor(
     private readonly db: DatabaseAdapter,
+    private readonly tables: WebhookTables,
     private readonly secret?: string,
   ) {}
 
   /** List all webhooks for a project. */
   async list(projectId: string): Promise<Webhook[]> {
-    return await this.db.list(webhooks, { where: eq(webhooks.projectId, projectId) });
+    return await this.db.list(this.tables.webhooks, {
+      where: eq(this.tables.webhooks.projectId, projectId),
+    });
   }
 
   /**
@@ -31,7 +43,7 @@ export class WebhookModel {
    */
   async create(projectId: string, input: WebhookCreateInput): Promise<Webhook> {
     const now = new Date().toISOString();
-    return await this.db.insert(webhooks, {
+    return await this.db.insert(this.tables.webhooks, {
       id: ulid(),
       projectId,
       url: input.url,
@@ -39,7 +51,7 @@ export class WebhookModel {
       events: input.events && input.events.length > 0 ? JSON.stringify(input.events) : null,
       createdAt: now,
       updatedAt: now,
-    });
+    } as never);
   }
 
   /** Decrypt the secret for a stored row (in memory only, at send time). */
@@ -49,7 +61,10 @@ export class WebhookModel {
 
   /** Fetch a webhook by id scoped to a project, or null if not found. */
   async get(projectId: string, id: string): Promise<Webhook | null> {
-    const rows = await this.db.list(webhooks, { where: eq(webhooks.id, id), limit: 1 });
+    const rows = await this.db.list(this.tables.webhooks, {
+      where: eq(this.tables.webhooks.id, id),
+      limit: 1,
+    });
     const found = rows[0] ?? null;
     return found?.projectId === projectId ? found : null;
   }
@@ -58,7 +73,7 @@ export class WebhookModel {
   async remove(projectId: string, id: string): Promise<void> {
     const existing = await this.get(projectId, id);
     if (existing) {
-      await this.db.remove(webhooks, existing.id);
+      await this.db.remove(this.tables.webhooks, existing.id);
     }
   }
 

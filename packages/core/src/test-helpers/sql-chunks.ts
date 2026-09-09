@@ -1,5 +1,4 @@
-import { getTableColumns, type SQL } from "drizzle-orm";
-import type { AnySQLiteTable } from "drizzle-orm/sqlite-core";
+import { getTableColumns, type SQL, type Table } from "drizzle-orm";
 
 /* eslint-disable require-await, no-unnecessary-type-assertion, no-unnecessary-type-parameters, non-nullable-type-assertion-style */
 
@@ -25,11 +24,7 @@ function textOf(chunk: SqlChunk | undefined): string | undefined {
 }
 
 /** Test whether an in-memory row satisfies a drizzle where-clause. */
-export function whereMatches(
-  where: SQL,
-  row: Record<string, unknown>,
-  table: AnySQLiteTable,
-): boolean {
+export function whereMatches(where: SQL, row: Record<string, unknown>, table: Table): boolean {
   let current = where.queryChunks as unknown as SqlChunk[];
   let wrapped = current[1]?.queryChunks;
   while (wrapped !== undefined && textOf(current[0]) === "(" && textOf(current.at(-1)) === ")") {
@@ -49,11 +44,7 @@ export function whereMatches(
   return matchChunk(current, row, table);
 }
 
-function matchChunk(
-  chunks: SqlChunk[],
-  row: Record<string, unknown>,
-  table: AnySQLiteTable,
-): boolean {
+function matchChunk(chunks: SqlChunk[], row: Record<string, unknown>, table: Table): boolean {
   const text = chunks.map((c) => textOf(c) ?? "").join("");
   if (text.includes(" in ")) {
     return inArrayMatches(chunks, row, table);
@@ -64,11 +55,7 @@ function matchChunk(
   return eqMatches(chunks, row, table);
 }
 
-function eqMatches(
-  chunks: SqlChunk[],
-  row: Record<string, unknown>,
-  table: AnySQLiteTable,
-): boolean {
+function eqMatches(chunks: SqlChunk[], row: Record<string, unknown>, table: Table): boolean {
   let columnName: string | undefined;
   let argument: unknown;
   for (const chunk of chunks) {
@@ -85,11 +72,7 @@ function eqMatches(
 }
 
 /* eslint-disable complexity, max-depth -- handles drizzle's varied chunk shapes */
-function inArrayMatches(
-  chunks: SqlChunk[],
-  row: Record<string, unknown>,
-  table: AnySQLiteTable,
-): boolean {
+function inArrayMatches(chunks: SqlChunk[], row: Record<string, unknown>, table: Table): boolean {
   let columnName: string | undefined;
   const values: unknown[] = [];
   const collect = (nodes: unknown[]): void => {
@@ -149,11 +132,7 @@ function inArrayMatches(
 }
 /* eslint-enable complexity, max-depth */
 
-function ltMatches(
-  chunks: SqlChunk[],
-  row: Record<string, unknown>,
-  table: AnySQLiteTable,
-): boolean {
+function ltMatches(chunks: SqlChunk[], row: Record<string, unknown>, table: Table): boolean {
   let columnName: string | undefined;
   let argument: unknown;
   for (const chunk of chunks) {
@@ -223,7 +202,7 @@ function findOrderColumn(nodes: SqlChunk[]): string | undefined {
 }
 
 /** Sort rows per a drizzle order-by expression (single-column asc/desc). */
-export function orderRows(rows: unknown[], orderBy: SQL, table: AnySQLiteTable): unknown[] {
+export function orderRows(rows: unknown[], orderBy: SQL, table: Table): unknown[] {
   const chunks = orderBy.queryChunks as unknown as SqlChunk[];
   const columnName = findOrderColumn(chunks);
   if (columnName === undefined) {
@@ -240,7 +219,7 @@ export function orderRows(rows: unknown[], orderBy: SQL, table: AnySQLiteTable):
   });
 }
 
-function columnKey(table: AnySQLiteTable, dbName: string): string {
+function columnKey(table: Table, dbName: string): string {
   for (const [property, column] of Object.entries(getTableColumns(table))) {
     if (column.name === dbName) {
       return property;

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { baselines, projects } from "../../../db-sqlite/src/schema/index.ts";
 import { BaselineModel } from "../models/baseline.ts";
-import { baselines } from "../schema/baseline.ts";
-import { projects } from "../schema/project.ts";
 import type { Project } from "../schema/project.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 
@@ -27,7 +26,11 @@ describe("Branch baseline fallback", () => {
     const { storage } = makeStorage();
     await db.insert(projects, mockProject);
 
-    const baselineModel = new BaselineModel(db, storage);
+    const baselineModel = new BaselineModel(
+      db,
+      { baselines: baselines as unknown as never },
+      storage,
+    );
     await db.insert(baselines, {
       id: "bl1",
       projectId: "p1",
@@ -50,7 +53,11 @@ describe("Branch baseline fallback", () => {
     const { storage } = makeStorage();
     await db.insert(projects, mockProject);
 
-    const baselineModel = new BaselineModel(db, storage);
+    const baselineModel = new BaselineModel(
+      db,
+      { baselines: baselines as unknown as never },
+      storage,
+    );
     await db.insert(baselines, {
       id: "bl1",
       projectId: "p1",
@@ -79,7 +86,11 @@ describe("Branch baseline fallback", () => {
     const { storage } = makeStorage();
     await db.insert(projects, mockProject);
 
-    const baselineModel = new BaselineModel(db, storage);
+    const baselineModel = new BaselineModel(
+      db,
+      { baselines: baselines as unknown as never },
+      storage,
+    );
 
     const resolved = await baselineModel.resolve("p1", "story-1", "desktop", "main", "main");
     expect(resolved).toBeNull();
@@ -90,7 +101,11 @@ describe("Branch baseline fallback", () => {
     const { storage } = makeStorage();
     await db.insert(projects, mockProject);
 
-    const baselineModel = new BaselineModel(db, storage);
+    const baselineModel = new BaselineModel(
+      db,
+      { baselines: baselines as unknown as never },
+      storage,
+    );
     await db.insert(baselines, {
       id: "bl-main",
       projectId: "p1",

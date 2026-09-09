@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { webhooks } from "../../../db-sqlite/src/schema/index.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { WebhookModel } from "./webhook.ts";
 
 const TEST_SECRET = "test-server-secret";
 
 function model(db: ReturnType<typeof makeDatabase>["db"]): WebhookModel {
-  return new WebhookModel(db, TEST_SECRET);
+  return new WebhookModel(db, { webhooks: webhooks as unknown as never }, TEST_SECRET);
 }
 
 describe("WebhookModel", () => {
@@ -36,7 +37,7 @@ describe("WebhookModel", () => {
 
   it("throws on create when the server secret is unset", async () => {
     const { db } = makeDatabase();
-    const withoutSecret = new WebhookModel(db);
+    const withoutSecret = new WebhookModel(db, { webhooks: webhooks as unknown as never });
     await expect(
       withoutSecret.create("p1", { url: "https://example.com/webhook", secret: "s", events: [] }),
     ).rejects.toThrow("secret is not configured");
@@ -49,7 +50,9 @@ describe("WebhookModel", () => {
       secret: "secret-123",
       events: [],
     });
-    expect(() => new WebhookModel(db).decryptSecret(created)).toThrow("secret is not configured");
+    expect(() =>
+      new WebhookModel(db, { webhooks: webhooks as unknown as never }).decryptSecret(created),
+    ).toThrow("secret is not configured");
   });
 
   it("gets a webhook by id", async () => {
@@ -76,8 +79,8 @@ describe("WebhookModel", () => {
       secret: "secret-2",
       events: ["pull_request"],
     });
-    const webhooks = await model(db).list("p1");
-    expect(webhooks.length).toBe(2);
+    const listed = await model(db).list("p1");
+    expect(listed.length).toBe(2);
   });
 
   it("removes a webhook", async () => {
@@ -88,7 +91,7 @@ describe("WebhookModel", () => {
       events: ["push"],
     });
     await model(db).remove("p1", webhook.id);
-    const webhooks = await model(db).list("p1");
-    expect(webhooks.length).toBe(0);
+    const listed = await model(db).list("p1");
+    expect(listed.length).toBe(0);
   });
 });

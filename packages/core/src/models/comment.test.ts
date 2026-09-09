@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { comments, projects } from "../../../db-sqlite/src/schema/index.ts";
 import type { DatabaseAdapter } from "../db/database.ts";
-import { projects } from "../schema/project.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { CommentModel } from "./comment.ts";
 
@@ -42,7 +42,10 @@ async function makeDbWithProject(): Promise<DatabaseAdapter> {
 describe("CommentModel", () => {
   it("creates a comment on a build when project exists", async () => {
     const db = await makeDbWithProject();
-    const model = new CommentModel(db);
+    const model = new CommentModel(db, {
+      comments: comments as unknown as never,
+      projects: projects as unknown as never,
+    });
     const comment = await model.create(mockProject.id, "b1", "user-123", {
       body: "Great component!",
     });
@@ -56,7 +59,10 @@ describe("CommentModel", () => {
 
   it("throws when project does not exist", async () => {
     const { db } = makeDatabase();
-    const model = new CommentModel(db);
+    const model = new CommentModel(db, {
+      comments: comments as unknown as never,
+      projects: projects as unknown as never,
+    });
     await expect(
       model.create("nonexistent-id", "b1", "user-123", { body: "comment" }),
     ).rejects.toThrow("Project not found: nonexistent-id");
@@ -64,20 +70,26 @@ describe("CommentModel", () => {
 
   it("lists comments by build", async () => {
     const db = await makeDbWithProject();
-    const model = new CommentModel(db);
+    const model = new CommentModel(db, {
+      comments: comments as unknown as never,
+      projects: projects as unknown as never,
+    });
 
     await model.create(mockProject.id, "b1", "user-1", { body: "First comment" });
     await model.create(mockProject.id, "b1", "user-2", { body: "Second comment" });
 
-    const comments = await model.listByBuild("b1");
-    expect(comments).toHaveLength(2);
-    expect(comments.map((c) => c.body)).toContain("First comment");
-    expect(comments.map((c) => c.body)).toContain("Second comment");
+    const rows = await model.listByBuild("b1");
+    expect(rows).toHaveLength(2);
+    expect(rows.map((c) => c.body)).toContain("First comment");
+    expect(rows.map((c) => c.body)).toContain("Second comment");
   });
 
   it("resolves a comment", async () => {
     const db = await makeDbWithProject();
-    const model = new CommentModel(db);
+    const model = new CommentModel(db, {
+      comments: comments as unknown as never,
+      projects: projects as unknown as never,
+    });
 
     const comment = await model.create(mockProject.id, "b1", "user-1", {
       body: "Comment to resolve",

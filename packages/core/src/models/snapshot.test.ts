@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { snapshots } from "../../../db-sqlite/src/schema/index.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { SnapshotModel } from "./snapshot.ts";
 
 describe("SnapshotModel", () => {
   it("creates a snapshot for a build", async () => {
     const { db } = makeDatabase();
-    const model = new SnapshotModel(db);
+    const model = new SnapshotModel(db, { snapshots: snapshots as unknown as never });
     const snapshot = await model.create("p1", "b1", {
       storyId: "a",
       storyName: "A",
@@ -25,7 +26,7 @@ describe("SnapshotModel", () => {
 
   it("lists snapshots by build", async () => {
     const { db } = makeDatabase();
-    const model = new SnapshotModel(db);
+    const model = new SnapshotModel(db, { snapshots: snapshots as unknown as never });
     await model.create("p1", "b1", {
       storyId: "a",
       storyName: "A",
@@ -47,15 +48,15 @@ describe("SnapshotModel", () => {
       screenshotPath: "/path/b.png",
     });
 
-    const snapshots = await model.listByBuild("b1");
-    expect(snapshots).toHaveLength(2);
-    expect(snapshots.map((s) => s.storyName)).toContain("A");
-    expect(snapshots.map((s) => s.storyName)).toContain("B");
+    const rows = await model.listByBuild("b1");
+    expect(rows).toHaveLength(2);
+    expect(rows.map((s) => s.storyName)).toContain("A");
+    expect(rows.map((s) => s.storyName)).toContain("B");
   });
 
   it("gets a snapshot by id", async () => {
     const { db } = makeDatabase();
-    const model = new SnapshotModel(db);
+    const model = new SnapshotModel(db, { snapshots: snapshots as unknown as never });
     const snapshot = await model.create("p1", "b1", {
       storyId: "a",
       storyName: "A",
@@ -73,7 +74,7 @@ describe("SnapshotModel", () => {
 
   it("upplies snapshot status", async () => {
     const { db } = makeDatabase();
-    const model = new SnapshotModel(db);
+    const model = new SnapshotModel(db, { snapshots: snapshots as unknown as never });
     const snapshot = await model.create("p1", "b1", {
       storyId: "a",
       storyName: "A",
@@ -90,7 +91,7 @@ describe("SnapshotModel", () => {
 
   it("records reviewer decision", async () => {
     const { db } = makeDatabase();
-    const model = new SnapshotModel(db);
+    const model = new SnapshotModel(db, { snapshots: snapshots as unknown as never });
     const snapshot = await model.create("p1", "b1", {
       storyId: "a",
       storyName: "A",
@@ -108,7 +109,7 @@ describe("SnapshotModel", () => {
 
   it("removes snapshot indirectly via build cascade", async () => {
     const { db } = makeDatabase();
-    const model = new SnapshotModel(db);
+    const model = new SnapshotModel(db, { snapshots: snapshots as unknown as never });
     const snap = await model.create("p1", "b1", {
       storyId: "a",
       storyName: "A",

@@ -1,9 +1,9 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
-import { createDrizzleAdapter } from "@storyshelf/core/adapter/database";
-import { DDL } from "@storyshelf/core/ddl";
-import { schema } from "@storyshelf/core/schema";
 import { drizzle, type AsyncRemoteCallback } from "drizzle-orm/sqlite-proxy";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
+import { DDL } from "./ddl.ts";
+import { createDrizzleAdapter } from "./drizzle-factory.ts";
+import { schema } from "./schema/index.ts";
 
 declare const __PKG_VERSION__: string | undefined;
 

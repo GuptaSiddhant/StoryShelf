@@ -1,8 +1,8 @@
 import { createClient } from "@libsql/client";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
-import { createDrizzleAdapter } from "@storyshelf/core/adapter/database";
-import { DDL } from "@storyshelf/core/ddl";
-import { schema } from "@storyshelf/core/schema";
+import { DDL } from "@storyshelf/db-sqlite/ddl";
+import { createDrizzleAdapter } from "@storyshelf/db-sqlite/drizzle-factory";
+import { schema } from "@storyshelf/db-sqlite/schema";
 import { drizzle } from "drizzle-orm/libsql";
 
 declare const __PKG_VERSION__: string | undefined;

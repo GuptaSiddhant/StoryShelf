@@ -3,14 +3,29 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  baselines,
+  buildLabels,
+  builds,
+  projects,
+  snapshots,
+} from "../../../db-sqlite/src/schema/index.ts";
 import type { CaptureRunner, RenderResult } from "../adapters/capture-runner.ts";
 import { BuildModel } from "../models/build.ts";
 import { ProjectModel } from "../models/project.ts";
-import { builds } from "../schema/build.ts";
-import { snapshots } from "../schema/snapshot.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { storybookDir, storybookZipPath } from "../utils/paths.ts";
 import { executeCaptureJob } from "./orchestrator.ts";
+
+function tables() {
+  return {
+    builds: builds as unknown as never,
+    buildLabels: buildLabels as unknown as never,
+    snapshots: snapshots as unknown as never,
+    baselines: baselines as unknown as never,
+    projects: projects as unknown as never,
+  };
+}
 
 const STORY_ID = "components-button--primary";
 
@@ -89,8 +104,8 @@ describe("executeCaptureJob", () => {
   it("loads the target, extracts, renders, and persists the capture end to end", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const project = await new ProjectModel(db).create({ name: "Orchestrator" });
-    const build = await new BuildModel(db).create(project.id, {
+    const project = await new ProjectModel(db, tables()).create({ name: "Orchestrator" });
+    const build = await new BuildModel(db, tables()).create(project.id, {
       gitSha: "sha-abc",
       gitBranch: "main",
       isDefault: true,
@@ -98,7 +113,10 @@ describe("executeCaptureJob", () => {
     await storage.write(storybookZipPath(project.id, build.id), zipWithIndex());
     const { runner, render } = fakeRunner();
 
-    await executeCaptureJob({ buildId: build.id }, { db, storage, runner, scratchDir });
+    await executeCaptureJob(
+      { buildId: build.id },
+      { db, tables: tables(), storage, runner, scratchDir },
+    );
 
     const updatedBuild = await db.get(builds, build.id);
     expect(updatedBuild?.status).toBe("approved");
@@ -110,8 +128,8 @@ describe("executeCaptureJob", () => {
   it("marks the build failed when the renderer rejects", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const project = await new ProjectModel(db).create({ name: "Orchestrator" });
-    const build = await new BuildModel(db).create(project.id, {
+    const project = await new ProjectModel(db, tables()).create({ name: "Orchestrator" });
+    const build = await new BuildModel(db, tables()).create(project.id, {
       gitSha: "sha-abc",
       gitBranch: "main",
     });
@@ -124,7 +142,10 @@ describe("executeCaptureJob", () => {
     });
 
     await expect(
-      executeCaptureJob({ buildId: build.id }, { db, storage, runner, scratchDir }),
+      executeCaptureJob(
+        { buildId: build.id },
+        { db, tables: tables(), storage, runner, scratchDir },
+      ),
     ).rejects.toThrow("browser exploded");
 
     const updatedBuild = await db.get(builds, build.id);
@@ -134,8 +155,8 @@ describe("executeCaptureJob", () => {
   it("persists statics before render so preview survives render failure", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const project = await new ProjectModel(db).create({ name: "Orchestrator" });
-    const build = await new BuildModel(db).create(project.id, {
+    const project = await new ProjectModel(db, tables()).create({ name: "Orchestrator" });
+    const build = await new BuildModel(db, tables()).create(project.id, {
       gitSha: "sha-abc",
       gitBranch: "main",
     });
@@ -151,7 +172,10 @@ describe("executeCaptureJob", () => {
     });
 
     await expect(
-      executeCaptureJob({ buildId: build.id }, { db, storage, runner, scratchDir }),
+      executeCaptureJob(
+        { buildId: build.id },
+        { db, tables: tables(), storage, runner, scratchDir },
+      ),
     ).rejects.toThrow("browser exploded");
 
     expect(await storage.exists(`${storybookDir(project.id, build.id)}/iframe.html`)).toBe(true);
@@ -165,7 +189,7 @@ describe("executeCaptureJob", () => {
     await expect(
       executeCaptureJob(
         { buildId: "missing" },
-        { db, storage, runner: fakeRunner().runner, scratchDir },
+        { db, tables: tables(), storage, runner: fakeRunner().runner, scratchDir },
       ),
     ).rejects.toThrow("Build not found");
   });
@@ -173,8 +197,8 @@ describe("executeCaptureJob", () => {
   it("blocks path traversal in the streamed extract", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const project = await new ProjectModel(db).create({ name: "Orchestrator" });
-    const build = await new BuildModel(db).create(project.id, {
+    const project = await new ProjectModel(db, tables()).create({ name: "Orchestrator" });
+    const build = await new BuildModel(db, tables()).create(project.id, {
       gitSha: "sha-abc",
       gitBranch: "main",
     });
@@ -191,7 +215,10 @@ describe("executeCaptureJob", () => {
     const { runner } = fakeRunner();
 
     await expect(
-      executeCaptureJob({ buildId: build.id }, { db, storage, runner, scratchDir }),
+      executeCaptureJob(
+        { buildId: build.id },
+        { db, tables: tables(), storage, runner, scratchDir },
+      ),
     ).rejects.toThrow("path traversal");
 
     const updatedBuild = await db.get(builds, build.id);

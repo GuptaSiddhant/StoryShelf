@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { projectStatusConfigs } from "../../../db-sqlite/src/schema/index.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { StatusConfigModel } from "./status-config.ts";
 
@@ -6,7 +7,14 @@ const SECRET = "test-secret-00000000";
 
 function setup(): { db: ReturnType<typeof makeDatabase>["db"]; model: StatusConfigModel } {
   const { db } = makeDatabase();
-  return { db, model: new StatusConfigModel(db, SECRET) };
+  return {
+    db,
+    model: new StatusConfigModel(
+      db,
+      { projectStatusConfigs: projectStatusConfigs as unknown as never },
+      SECRET,
+    ),
+  };
 }
 
 describe("StatusConfigModel", () => {

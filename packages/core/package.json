@@ -86,10 +86,6 @@
       "source": "./src/config.ts",
       "default": "./dist/config.mjs"
     },
-    "./ddl": {
-      "source": "./src/ddl.ts",
-      "default": "./dist/ddl.mjs"
-    },
     "./diff": {
       "source": "./src/diff/index.ts",
       "default": "./dist/diff.mjs"
@@ -148,7 +144,6 @@
       "./adapter/webhook-events": "./dist/adapter/webhook-events.mjs",
       "./capture": "./dist/capture.mjs",
       "./config": "./dist/config.mjs",
-      "./ddl": "./dist/ddl.mjs",
       "./diff": "./dist/diff.mjs",
       "./logger": "./dist/logger.mjs",
       "./models": "./dist/models.mjs",

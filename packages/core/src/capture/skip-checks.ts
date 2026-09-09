@@ -1,18 +1,19 @@
 import type { GitHostProvider } from "../adapters/git-host/index.ts";
 import type { DatabaseAdapter } from "../db/database.ts";
 import type { Logger } from "../logger.ts";
-import { BuildModel } from "../models/build.ts";
-import { StatusConfigModel } from "../models/status-config.ts";
+import { BuildModel, type BuildTables } from "../models/build.ts";
+import { StatusConfigModel, type StatusConfigTables } from "../models/status-config.ts";
 import type { ProjectStatusConfig } from "../schema/status-config.ts";
 
 /** Skip capture when another approved build already covers the same commit. */
 export async function hasApprovedBuildForSha(
   db: DatabaseAdapter,
+  tables: BuildTables,
   projectId: string,
   sha: string,
   excludeBuildId: string,
 ): Promise<boolean> {
-  const builds = await new BuildModel(db).list(projectId);
+  const builds = await new BuildModel(db, tables).list(projectId);
   return builds.some((b) => b.gitSha === sha && b.id !== excludeBuildId && b.status === "approved");
 }
 
@@ -23,6 +24,7 @@ export interface MergeCheck {
   branch: string;
   secret: string | undefined;
   db: DatabaseAdapter;
+  tables: StatusConfigTables;
   projectId: string;
   logger?: Logger;
 }
@@ -117,7 +119,7 @@ export async function isAlreadyMerged(opts: MergeCheck): Promise<boolean> {
   if (opts.providers.length === 0) {
     return false;
   }
-  const model = new StatusConfigModel(opts.db, opts.secret);
+  const model = new StatusConfigModel(opts.db, opts.tables, opts.secret);
   const rows = await model.list(opts.projectId);
   for (const row of rows) {
     // eslint-disable-next-line no-await-in-loop -- short-circuit on first merged status

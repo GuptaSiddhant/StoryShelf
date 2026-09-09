@@ -1,30 +1,39 @@
 /* oxlint-disable eslint/no-await-in-loop, typescript/promise-function-async, eslint/require-await */
 /** Per-project git-provider status check configurations. */
 import { eq } from "drizzle-orm";
+import type { SQLWrapper, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../db/database.ts";
-import { projectStatusConfigs } from "../schema/status-config.ts";
 import type { ProjectStatusConfig } from "../schema/status-config.ts";
 import { decrypt, encrypt } from "../utils/encrypt.ts";
 import { ulid } from "../utils/ulid.ts";
+
+/** Tables required by {@link StatusConfigModel}. */
+export interface StatusConfigTables {
+  projectStatusConfigs: { projectId: SQLWrapper; id: SQLWrapper } & Table & {
+      $inferSelect: ProjectStatusConfig;
+      $inferInsert: ProjectStatusConfig;
+    };
+}
 
 /** Data operations for per-project status provider configs. */
 export class StatusConfigModel {
   constructor(
     private readonly db: DatabaseAdapter,
+    private readonly tables: StatusConfigTables,
     private readonly secret: string | undefined,
   ) {}
 
   /** List all status configs for a project. */
   async list(projectId: string): Promise<ProjectStatusConfig[]> {
-    return await this.db.list(projectStatusConfigs, {
-      where: eq(projectStatusConfigs.projectId, projectId),
+    return await this.db.list(this.tables.projectStatusConfigs, {
+      where: eq(this.tables.projectStatusConfigs.projectId, projectId),
     });
   }
 
   /** Fetch a config by id scoped to a project, or null. */
   async get(projectId: string, id: string): Promise<ProjectStatusConfig | null> {
-    const rows = await this.db.list(projectStatusConfigs, {
-      where: eq(projectStatusConfigs.id, id),
+    const rows = await this.db.list(this.tables.projectStatusConfigs, {
+      where: eq(this.tables.projectStatusConfigs.id, id),
       limit: 1,
     });
     const found = rows[0] ?? null;
@@ -43,7 +52,7 @@ export class StatusConfigModel {
 
   async create(projectId: string, input: StatusConfigCreateInput): Promise<ProjectStatusConfig> {
     const now = new Date().toISOString();
-    return await this.db.insert(projectStatusConfigs, {
+    return await this.db.insert(this.tables.projectStatusConfigs, {
       id: ulid(),
       projectId,
       provider: input.provider,
@@ -51,20 +60,20 @@ export class StatusConfigModel {
       tokenEncrypted: encrypt(this.secret, input.token),
       createdAt: now,
       updatedAt: now,
-    });
+    } as never);
   }
 
   async remove(projectId: string, id: string): Promise<void> {
     const existing = await this.get(projectId, id);
     if (existing) {
-      await this.db.remove(projectStatusConfigs, existing.id);
+      await this.db.remove(this.tables.projectStatusConfigs, existing.id);
     }
   }
 
   async removeByProject(projectId: string): Promise<void> {
     const rows = await this.list(projectId);
     for (const row of rows) {
-      await this.db.remove(projectStatusConfigs, row.id);
+      await this.db.remove(this.tables.projectStatusConfigs, row.id);
     }
   }
 }

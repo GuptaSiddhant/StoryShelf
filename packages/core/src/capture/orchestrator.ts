@@ -2,19 +2,23 @@ import type { Logger } from "pino";
 import type { CaptureRunner } from "../adapters/capture-runner.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import type { DatabaseAdapter } from "../db/database.ts";
-import { BuildModel } from "../models/build.ts";
-import { ProjectModel } from "../models/project.ts";
+import { BuildModel, type BuildTables } from "../models/build.ts";
+import { ProjectModel, type ProjectTables } from "../models/project.ts";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 import { DEFAULT_VIEWPORTS, isDisabledStory, isFlakyStory } from "./adapter.ts";
 import type { Viewport } from "./adapter.ts";
-import { persistCapture } from "./pipeline.ts";
+import { persistCapture, type PipelineTables } from "./pipeline.ts";
 import { extractStorybookToScratch, persistStorybookStatics } from "./statics.ts";
 import { StorybookAdapter } from "./storybook.ts";
+
+/** Table handles required by the orchestrator. */
+export type OrchestratorTables = BuildTables & ProjectTables & PipelineTables;
 
 /** Inputs for running a capture job against a Storybook build. */
 export interface CaptureJobOptions {
   db: DatabaseAdapter;
+  tables: OrchestratorTables;
   storage: StorageAdapter;
   runner: CaptureRunner;
   scratchDir: string;
@@ -33,7 +37,7 @@ export async function executeCaptureJob(
   input: { buildId: string; reqId?: string },
   options: CaptureJobOptions,
 ): Promise<void> {
-  const builds = new BuildModel(options.db);
+  const builds = new BuildModel(options.db, options.tables);
   const { build, project } = await loadTarget(options, input.buildId);
   const logger = options.logger?.child({ buildId: input.buildId, reqId: input.reqId });
   await builds.setStatus(build.id, "capturing");
@@ -93,6 +97,7 @@ export async function executeCaptureJob(
     await persistCapture(
       {
         db: options.db,
+        tables: options.tables,
         storage: options.storage,
         project,
         build,
@@ -123,11 +128,11 @@ async function loadTarget(
   options: CaptureJobOptions,
   buildId: string,
 ): Promise<{ build: Build; project: Project }> {
-  const build = await new BuildModel(options.db).get(buildId);
+  const build = await new BuildModel(options.db, options.tables).get(buildId);
   if (!build) {
     throw new Error(`Build not found: ${buildId}`);
   }
-  const project = await new ProjectModel(options.db).get(build.projectId);
+  const project = await new ProjectModel(options.db, options.tables).get(build.projectId);
   if (!project) {
     throw new Error(`Project not found: ${build.projectId}`);
   }

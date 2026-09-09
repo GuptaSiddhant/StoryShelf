@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { builds } from "../schema/build.ts";
+import { baselines, buildLabels, builds } from "../../../db-sqlite/src/schema/index.ts";
 import type { Project } from "../schema/project.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { Retention } from "./purge.ts";
@@ -20,6 +20,14 @@ function makeProject(overrides: Partial<Project> = {}): Project {
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
     ...overrides,
+  };
+}
+
+function retentionTables() {
+  return {
+    builds: builds as unknown as never,
+    buildLabels: buildLabels as unknown as never,
+    baselines: baselines as unknown as never,
   };
 }
 
@@ -98,13 +106,13 @@ describe("Retention purge integration", () => {
     ];
     const db = await createTestDb(rows);
 
-    const retention = new Retention(db, storage);
+    const retention = new Retention(db, storage, retentionTables());
     const result = await retention.purge(project, { ttlDays: 30, keepLatestPerBranch: true });
 
     expect(result.removedBuilds).toBe(2);
     expect(result.removedFiles).toBeGreaterThanOrEqual(0);
     const survivors = await db.list(builds);
-    expect(survivors.map((build) => build.id).toSorted()).toEqual(["b1", "b3", "b5"]);
+    expect(survivors.map((build) => build["id"] as string).toSorted()).toEqual(["b1", "b3", "b5"]);
   });
 
   it("purges all terminal builds when keepLatestPerBranch is false", async () => {
@@ -135,7 +143,7 @@ describe("Retention purge integration", () => {
     const db = await createTestDb(rows);
     const project = makeProject({ id: "p2", name: "Full Purge Test", slug: "full-purge-test" });
 
-    const retention = new Retention(db, storage);
+    const retention = new Retention(db, storage, retentionTables());
     const result = await retention.purge(project, { ttlDays: 30, keepLatestPerBranch: false });
 
     expect(result.removedBuilds).toBe(2);
@@ -169,7 +177,7 @@ describe("Retention purge integration", () => {
     const db = await createTestDb(rows);
     const project = makeProject({ id: "p3", name: "Non-Terminal Test", slug: "non-terminal-test" });
 
-    const retention = new Retention(db, storage);
+    const retention = new Retention(db, storage, retentionTables());
     const result = await retention.purge(project, { ttlDays: 30, keepLatestPerBranch: true });
 
     expect(result.removedBuilds).toBe(0);

@@ -4,9 +4,9 @@ import type { StorageAdapter } from "../adapters/storage.ts";
 import type { DatabaseAdapter } from "../db/database.ts";
 import { diffImages } from "../diff/engine.ts";
 import { DEFAULT_DIFF_OPTIONS } from "../diff/options.ts";
-import { BaselineModel } from "../models/baseline.ts";
-import { BuildModel } from "../models/build.ts";
-import { SnapshotModel } from "../models/snapshot.ts";
+import { BaselineModel, type BaselineTables } from "../models/baseline.ts";
+import { BuildModel, type BuildTables } from "../models/build.ts";
+import { SnapshotModel, type SnapshotTables } from "../models/snapshot.ts";
 import type { Baseline } from "../schema/baseline.ts";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
@@ -66,10 +66,15 @@ export async function persistCapture(
   await finalize(ctx, new Set(ctx.captures.map((c) => c.story.id)), failedStoryIds, flakyIds);
 }
 
+/** Table handles required by the capture pipeline. */
+export type PipelineTables = BuildTables & BaselineTables & SnapshotTables;
+
 /** Persistence inputs for a completed capture run. */
 export interface CaptureContext {
   /** Database adapter. */
   db: DatabaseAdapter;
+  /** Table handles. */
+  tables: PipelineTables;
   /** Storage adapter. */
   storage: StorageAdapter;
   /** The project being captured. */
@@ -113,7 +118,7 @@ async function resolveBaseline(
   storyId: string,
   viewport: string,
 ): Promise<Baseline | null> {
-  const baselines = new BaselineModel(ctx.db, ctx.storage, ctx.secret);
+  const baselines = new BaselineModel(ctx.db, ctx.tables, ctx.storage, ctx.secret);
   return await baselines.resolve(
     ctx.project.id,
     storyId,
@@ -129,7 +134,7 @@ async function createWithoutBaseline(
   viewport: Viewport,
   screenshot: string,
 ): Promise<void> {
-  const snapshots = new SnapshotModel(ctx.db);
+  const snapshots = new SnapshotModel(ctx.db, ctx.tables);
   const status = ctx.build.isDefault ? "approved" : "new";
   const snapshot = await snapshots.create(ctx.project.id, ctx.build.id, {
     storyId: capture.story.id,
@@ -144,7 +149,7 @@ async function createWithoutBaseline(
   await snapshots.setStatus(snapshot.id, status);
 
   if (ctx.build.isDefault) {
-    const baselines = new BaselineModel(ctx.db, ctx.storage, ctx.secret);
+    const baselines = new BaselineModel(ctx.db, ctx.tables, ctx.storage, ctx.secret);
     await baselines.upsert(
       ctx.project.id,
       capture.story.id,
@@ -172,7 +177,7 @@ async function createWithBaseline(
   };
   const result = diffImages(previous, current, options);
 
-  const snapshots = new SnapshotModel(ctx.db);
+  const snapshots = new SnapshotModel(ctx.db, ctx.tables);
   const snapshot = await snapshots.create(ctx.project.id, ctx.build.id, {
     storyId: capture.story.id,
     storyName: capture.story.name,
@@ -204,7 +209,7 @@ async function finalize(
   failedStoryIds: ReadonlySet<string>,
   flakyFailedStoryIds: ReadonlySet<string> = new Set(),
 ): Promise<void> {
-  const builds = new BuildModel(ctx.db);
+  const builds = new BuildModel(ctx.db, ctx.tables);
   const build = await builds.updateCounts(ctx.build.id);
   const hasCaptures = storyIds.size > 0;
   let status: BuildStatus = "reviewing";
@@ -223,7 +228,7 @@ async function finalize(
   await builds.setStatus(ctx.build.id, status);
 
   if (ctx.build.isDefault && hasCaptures) {
-    const baselines = new BaselineModel(ctx.db, ctx.storage, ctx.secret);
+    const baselines = new BaselineModel(ctx.db, ctx.tables, ctx.storage, ctx.secret);
     await baselines.removeOrphans(ctx.project.id, new Set(storyIds));
   }
 }

@@ -1,8 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { builds } from "../schema/build.ts";
-import { projects } from "../schema/project.ts";
+import { baselines, buildLabels, builds, projects } from "../../../db-sqlite/src/schema/index.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { Retention } from "./purge.ts";
+
+function retentionTables() {
+  return {
+    builds: builds as unknown as never,
+    buildLabels: buildLabels as unknown as never,
+    baselines: baselines as unknown as never,
+  };
+}
+
+function baselineTables() {
+  return { baselines: baselines as unknown as never };
+}
 
 describe("Retention", () => {
   it("purges expired terminal builds", async () => {
@@ -63,7 +74,7 @@ describe("Retention", () => {
       updatedAt: recentDate,
     });
 
-    const retention = new Retention(db, storage);
+    const retention = new Retention(db, storage, retentionTables());
     const result = await retention.purge(project, { ttlDays: 30, keepLatestPerBranch: false });
 
     // B-old should be purged, b-recent should remain
@@ -141,13 +152,13 @@ describe("Retention", () => {
     });
 
     const { BaselineModel } = await import("../models/baseline.ts");
-    const baselineModel = new BaselineModel(db, storage);
+    const baselineModel = new BaselineModel(db, baselineTables(), storage);
     await storage.write("src.png", Buffer.from([1]));
     await baselineModel.upsert("p1", "s1", "desktop", "feature/stale", "snap1", "src.png");
     await baselineModel.upsert("p1", "s1", "desktop", "feature/fresh", "snap2", "src.png");
     await baselineModel.upsert("p1", "s1", "desktop", "main", "snap3", "src.png");
 
-    const retention = new Retention(db, storage);
+    const retention = new Retention(db, storage, retentionTables());
     const result = await retention.purgeStaleBranches(project, 30);
     expect(result.removedBranches).toBe(1);
     expect(result.removedBaselines).toBe(1);
@@ -191,10 +202,10 @@ describe("Retention", () => {
       updatedAt: oldDate,
     });
     const { BaselineModel } = await import("../models/baseline.ts");
-    const baselineModel = new BaselineModel(db, storage);
+    const baselineModel = new BaselineModel(db, baselineTables(), storage);
     await storage.write("src.png", Buffer.from([1]));
     await baselineModel.upsert("p1", "s1", "desktop", "main", "snap1", "src.png");
-    const retention = new Retention(db, storage);
+    const retention = new Retention(db, storage, retentionTables());
     const result = await retention.purgeStaleBranches(project, 30);
     expect(result.removedBranches).toBe(0);
     expect(result.removedBaselines).toBe(0);

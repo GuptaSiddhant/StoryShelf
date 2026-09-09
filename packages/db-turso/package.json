@@ -54,6 +54,7 @@
   "dependencies": {
     "@libsql/client": "^0.15.0",
     "@storyshelf/core": "workspace:*",
+    "@storyshelf/db-sqlite": "workspace:*",
     "drizzle-orm": "catalog:"
   },
   "devDependencies": {

@@ -1,4 +1,4 @@
-import { WebhookModel } from "../models/webhook.ts";
+import { WebhookModel, type WebhookTables } from "../models/webhook.ts";
 import { hmacSha256 } from "../utils/hash.ts";
 import type { DatabaseAdapter } from "./database.ts";
 
@@ -6,6 +6,7 @@ import type { DatabaseAdapter } from "./database.ts";
  * Deliver an event to every subscribed webhook of a project.
  *
  * @param db - Database adapter for loading subscriptions.
+ * @param tables - Webhook table handles.
  * @param projectId - Project whose webhooks receive the event.
  * @param event - Event name (e.g. "baseline:created").
  * @param data - Event payload.
@@ -13,12 +14,13 @@ import type { DatabaseAdapter } from "./database.ts";
  */
 export async function emitWebhookEvent(
   db: DatabaseAdapter,
+  tables: WebhookTables,
   projectId: string,
   event: string,
   data: Record<string, unknown>,
   secret: string | undefined,
 ): Promise<void> {
-  const webhookModel = new WebhookModel(db, secret);
+  const webhookModel = new WebhookModel(db, tables, secret);
   const webhooks = await webhookModel.list(projectId);
   const eventPayload: WebhookEvent = {
     event,

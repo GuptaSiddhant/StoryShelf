@@ -2,12 +2,13 @@ import type { Logger } from "pino";
 import { buildCommentMarkdown } from "../adapters/git-host/helpers.ts";
 import type { CheckStatus, GitHostProvider } from "../adapters/git-host/index.ts";
 import type { DatabaseAdapter } from "../db/database.ts";
-import { StatusConfigModel } from "../models/status-config.ts";
+import { StatusConfigModel, type StatusConfigTables } from "../models/status-config.ts";
 import type { Project } from "../schema/project.ts";
 
 /** Post build check statuses (and review comments) to every configured git provider. */
 async function postStatusesForBuild(opts: {
   db: DatabaseAdapter;
+  tables: StatusConfigTables;
   project: Project;
   sha: string;
   status: CheckStatus;
@@ -19,7 +20,7 @@ async function postStatusesForBuild(opts: {
   if (opts.providers.length === 0) {
     return;
   }
-  const model = new StatusConfigModel(opts.db, opts.secret);
+  const model = new StatusConfigModel(opts.db, opts.tables, opts.secret);
   const rows = await model.list(opts.project.id);
   const ctx = `storyshelf/${opts.project.slug}`;
   await Promise.allSettled(

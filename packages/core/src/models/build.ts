@@ -1,20 +1,41 @@
 /** Build records, status transitions, and publication helpers. */
 import { and, desc, eq, inArray } from "drizzle-orm";
+import type { SQLWrapper, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../db/database.ts";
-import { builds } from "../schema/build.ts";
 import type { Build } from "../schema/build.ts";
-import { buildLabels } from "../schema/label.ts";
-import { snapshots } from "../schema/snapshot.ts";
+import type { BuildLabel } from "../schema/label.ts";
+import type { Snapshot } from "../schema/snapshot.ts";
 import type { BuildStatus } from "../types.ts";
 import { ulid } from "../utils/ulid.ts";
 
+/** Tables required by {@link BuildModel}. */
+export interface BuildTables {
+  builds: {
+    id: SQLWrapper;
+    projectId: SQLWrapper;
+    status: SQLWrapper;
+    gitBranch: SQLWrapper;
+    createdAt: SQLWrapper;
+  } & Table & { $inferSelect: Build; $inferInsert: Build };
+  buildLabels: {
+    projectId: SQLWrapper;
+    typeKey: SQLWrapper;
+    value: SQLWrapper;
+    buildId: SQLWrapper;
+  } & Table & { $inferSelect: BuildLabel; $inferInsert: BuildLabel };
+  snapshots: { buildId: SQLWrapper } & Table & { $inferSelect: Snapshot; $inferInsert: Snapshot };
+}
+
 /** Data operations for build records. */
 export class BuildModel {
-  constructor(private readonly db: DatabaseAdapter) {}
+  constructor(
+    private readonly db: DatabaseAdapter,
+    private readonly tables: BuildTables,
+  ) {}
 
   async create(projectId: string, input: BuildCreateInput): Promise<Build> {
     const now = new Date().toISOString();
-    return await this.db.insert(builds, {
+    return await this.db.insert(this.tables.builds, {
       id: ulid(),
       projectId,
       gitSha: input.gitSha,
@@ -27,36 +48,39 @@ export class BuildModel {
       status: "pending",
       createdAt: now,
       updatedAt: now,
-    });
+    } as never);
   }
 
   async get(id: string): Promise<Build | null> {
-    return await this.db.get(builds, id);
+    return await this.db.get(this.tables.builds, id);
   }
 
   async list(projectId: string, filter: BuildListFilter = {}): Promise<Build[]> {
-    const conditions = [eq(builds.projectId, projectId)];
+    const conditions = [eq(this.tables.builds.projectId, projectId)];
     if (filter.status) {
-      conditions.push(eq(builds.status, filter.status));
+      conditions.push(eq(this.tables.builds.status, filter.status));
     }
     if (filter.branch) {
-      conditions.push(eq(builds.gitBranch, filter.branch));
+      conditions.push(eq(this.tables.builds.gitBranch, filter.branch));
     }
     if (filter.labelKey && filter.labelValue) {
-      const labels = await this.db.list(buildLabels, {
+      const labels = await this.db.list(this.tables.buildLabels, {
         where: and(
-          eq(buildLabels.projectId, projectId),
-          eq(buildLabels.typeKey, filter.labelKey),
-          eq(buildLabels.value, filter.labelValue),
+          eq(this.tables.buildLabels.projectId, projectId),
+          eq(this.tables.buildLabels.typeKey, filter.labelKey),
+          eq(this.tables.buildLabels.value, filter.labelValue),
         ),
       });
       const ids = labels.map((l) => l.buildId);
       if (ids.length === 0) {
         return [];
       }
-      conditions.push(inArray(builds.id, ids));
+      conditions.push(inArray(this.tables.builds.id, ids));
     }
-    return this.db.list(builds, { where: and(...conditions), orderBy: desc(builds.createdAt) });
+    return this.db.list(this.tables.builds, {
+      where: and(...conditions),
+      orderBy: desc(this.tables.builds.createdAt),
+    });
   }
 
   /** Return the most recent build intended for publishing, if any. */
@@ -77,7 +101,10 @@ export class BuildModel {
     id: string,
     patch: Partial<Pick<Build, "status" | "public" | "message" | "authorEmail" | "authorName">>,
   ): Promise<Build> {
-    return await this.db.update(builds, id, { ...patch, updatedAt: new Date().toISOString() });
+    return await this.db.update(this.tables.builds, id, {
+      ...patch,
+      updatedAt: new Date().toISOString(),
+    } as never);
   }
 
   async setStatus(id: string, status: BuildStatus): Promise<Build> {
@@ -85,24 +112,26 @@ export class BuildModel {
   }
 
   async updateCounts(id: string): Promise<Build> {
-    const rows = await this.db.list(snapshots, { where: eq(snapshots.buildId, id) });
+    const rows = await this.db.list(this.tables.snapshots, {
+      where: eq(this.tables.snapshots.buildId, id),
+    });
     const snapshotCount = rows.length;
     const changedCount = rows.filter((s) => s.status === "changed" || s.status === "new").length;
     const approvedCount = rows.filter(
       (s) => s.status === "approved" || s.status === "unchanged",
     ).length;
     const rejectedCount = rows.filter((s) => s.status === "rejected").length;
-    return this.db.update(builds, id, {
+    return this.db.update(this.tables.builds, id, {
       snapshotCount,
       changedCount,
       approvedCount,
       rejectedCount,
       updatedAt: new Date().toISOString(),
-    });
+    } as never);
   }
 
   async remove(id: string): Promise<void> {
-    await this.db.remove(builds, id);
+    await this.db.remove(this.tables.builds, id);
   }
 }
 
