@@ -10,6 +10,16 @@ import { WebhookModel } from "@storyshelf/core/models";
 import type { LabelType } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { Token } from "@storyshelf/core/schema";
+import {
+  buildLabels,
+  builds,
+  labelTypes as labelTypesTable,
+  projectMembers,
+  projectStatusConfigs,
+  projects,
+  tokens as tokensTable,
+  webhooks as webhooksTable,
+} from "@storyshelf/db-sqlite/schema";
 import type { Context } from "hono";
 import {
   renderProjectSettingsPage,
@@ -21,7 +31,6 @@ import type { SettingsStatusConfig } from "../pages/settings-status.tsx";
 import type { SettingsWebhook } from "../pages/settings-webhooks.tsx";
 import { getStore } from "../store.ts";
 import { notFound } from "./helpers.ts";
-
 /** Aggregated data for rendering a settings tab. */
 export interface SettingsData {
   project: Project;
@@ -39,7 +48,7 @@ async function loadTokenSummaries(
   db: DatabaseAdapter,
   projectId: string,
 ): Promise<Omit<Token, "hash">[]> {
-  const tokensDb = await new TokenModel(db).list(projectId);
+  const tokensDb = await new TokenModel(db, { tokens: tokensTable }).list(projectId);
   return tokensDb.map(({ hash: _hash, ...rest }) => rest);
 }
 
@@ -48,7 +57,7 @@ async function loadWebhookSummaries(
   db: DatabaseAdapter,
   projectId: string,
 ): Promise<SettingsWebhook[]> {
-  const webhooksDb = await new WebhookModel(db).list(projectId);
+  const webhooksDb = await new WebhookModel(db, { webhooks: webhooksTable }).list(projectId);
   return webhooksDb.map((webhook) => ({
     id: webhook.id,
     url: webhook.url,
@@ -62,7 +71,9 @@ async function loadStatusConfigSummaries(
   secret: string | undefined,
   projectId: string,
 ): Promise<SettingsStatusConfig[]> {
-  const statusConfigsDb = await new StatusConfigModel(db, secret).list(projectId);
+  const statusConfigsDb = await new StatusConfigModel(db, { projectStatusConfigs }, secret).list(
+    projectId,
+  );
   return statusConfigsDb.map((row) => ({
     id: row.id,
     provider: row.provider,
@@ -91,13 +102,17 @@ async function loadProjectRoster(
   db: DatabaseAdapter,
   projectId: string,
 ): Promise<{ labelTypes: LabelType[]; members: SettingsMember[] }> {
-  const labelTypes = await new LabelModel(db).listTypes(projectId);
-  const members = await new MemberModel(db).list(projectId);
+  const labelTypes = await new LabelModel(db, {
+    builds,
+    buildLabels,
+    labelTypes: labelTypesTable,
+  }).listTypes(projectId);
+  const members = await new MemberModel(db, { projectMembers }).list(projectId);
   return { labelTypes, members };
 }
 
 async function loadSettingsData(slug: string): Promise<SettingsData | null> {
-  const project = await new ProjectModel(getStore().db).getBySlug(slug);
+  const project = await new ProjectModel(getStore().db, { projects }).getBySlug(slug);
   if (!project) {
     return null;
   }
@@ -139,7 +154,7 @@ export async function renderSettingsPage(
 
 /** Find a project by slug or throw 404. */
 export async function findProject(slug: string): Promise<Project> {
-  const project = await new ProjectModel(getStore().db).getBySlug(slug);
+  const project = await new ProjectModel(getStore().db, { projects }).getBySlug(slug);
   if (!project) {
     notFound("Project not found");
   }

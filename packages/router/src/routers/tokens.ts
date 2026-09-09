@@ -2,6 +2,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { TokenModel } from "@storyshelf/core/models";
 import type { ProjectRole } from "@storyshelf/core/types";
 import { randomToken } from "@storyshelf/core/utils";
+import { tokens as tokensTable } from "@storyshelf/db-sqlite/schema";
 import type { ShelfApp } from "../index.tsx";
 import { getStore } from "../store.ts";
 import { resolveAuthorizedProject, notFound } from "./helpers.ts";
@@ -12,7 +13,6 @@ import {
   tokenPublicSchema,
   unauthorized,
 } from "./schemas.ts";
-
 const ADMIN_ROLES: readonly ProjectRole[] = ["admin"];
 
 const listTokensRoute = createRoute({
@@ -59,7 +59,7 @@ const deleteTokenRoute = createRoute({
 export function registerTokens(app: ShelfApp): void {
   app.openapi(listTokensRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
-    const tokens = await new TokenModel(getStore().db).list(project.id);
+    const tokens = await new TokenModel(getStore().db, { tokens: tokensTable }).list(project.id);
     return c.json(tokens.map(({ hash: _hash, ...rest }) => rest));
   });
 
@@ -67,18 +67,25 @@ export function registerTokens(app: ShelfApp): void {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
     const body = c.req.valid("json");
     const token = randomToken("shelf_");
-    await new TokenModel(getStore().db).create(project.id, body.name, token.hash);
+    await new TokenModel(getStore().db, { tokens: tokensTable }).create(
+      project.id,
+      body.name,
+      token.hash,
+    );
     return c.json({ ...body, token: token.value }, 201);
   });
 
   app.openapi(deleteTokenRoute, async (c) => {
     const { slug, tokenId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
-    const found = await new TokenModel(getStore().db).get(project.id, tokenId);
+    const found = await new TokenModel(getStore().db, { tokens: tokensTable }).get(
+      project.id,
+      tokenId,
+    );
     if (!found) {
       notFound("Token not found");
     }
-    await new TokenModel(getStore().db).remove(found.id);
+    await new TokenModel(getStore().db, { tokens: tokensTable }).remove(found.id);
     return c.body(null, 204);
   });
 }

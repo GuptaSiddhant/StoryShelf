@@ -2,6 +2,12 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { LabelModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
 import type { ProjectRole } from "@storyshelf/core/types";
+import {
+  buildLabels,
+  builds,
+  labelTypes,
+  projects as projectsTable,
+} from "@storyshelf/db-sqlite/schema";
 import type { ShelfApp } from "../index.tsx";
 import { getStore } from "../store.ts";
 import { forbidden, requireSiteAdmin, resolveAuthorizedProject } from "./helpers.ts";
@@ -14,7 +20,6 @@ import {
   projectUpdateSchema,
   unauthorized,
 } from "./schemas.ts";
-
 const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];
 const ADMIN_ROLES: readonly ProjectRole[] = ["admin"];
 
@@ -100,16 +105,16 @@ const deleteProjectRoute = createRoute({
 export function registerProjects(app: ShelfApp): void {
   app.openapi(listProjectsRoute, async (c) => {
     requireSessionUser();
-    const projects = new ProjectModel(getStore().db);
+    const projects = new ProjectModel(getStore().db, { projects: projectsTable });
     return c.json(await projects.list());
   });
 
   app.openapi(createProjectRoute, async (c) => {
     requireSiteAdmin();
     const body = c.req.valid("json");
-    const projects = new ProjectModel(getStore().db);
+    const projects = new ProjectModel(getStore().db, { projects: projectsTable });
     const project = await projects.create(body);
-    await new LabelModel(getStore().db).seedFor(project.id);
+    await new LabelModel(getStore().db, { builds, buildLabels, labelTypes }).seedFor(project.id);
     return c.json(project, 201);
   });
 
@@ -122,7 +127,10 @@ export function registerProjects(app: ShelfApp): void {
   app.openapi(updateProjectRoute, async (c) => {
     const { slug } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
-    const updated = await new ProjectModel(getStore().db).update(project.id, c.req.valid("json"));
+    const updated = await new ProjectModel(getStore().db, { projects: projectsTable }).update(
+      project.id,
+      c.req.valid("json"),
+    );
     return c.json(updated);
   });
 
@@ -130,7 +138,7 @@ export function registerProjects(app: ShelfApp): void {
     requireSiteAdmin();
     const { slug } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...VIEW_ROLES);
-    await new ProjectModel(getStore().db).remove(project.id);
+    await new ProjectModel(getStore().db, { projects: projectsTable }).remove(project.id);
     return c.body(null, 204);
   });
 }

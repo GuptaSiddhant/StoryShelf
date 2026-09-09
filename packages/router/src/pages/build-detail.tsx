@@ -2,24 +2,36 @@ import { BuildModel } from "@storyshelf/core/models";
 import { CommentModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
 import { SnapshotModel } from "@storyshelf/core/models";
+import {
+  buildLabels,
+  builds,
+  comments as commentsTable,
+  projects,
+  snapshots as snapshotsTable,
+} from "@storyshelf/db-sqlite/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { getStore } from "../store.ts";
 import { Badge, statusTone } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
-
 /** Build overview page: snapshot grid, bulk actions, and build comments. */
 export async function renderBuildDetailPage(buildId: string): Promise<RenderedContent | null> {
   const { db } = getStore();
-  const build = await new BuildModel(db).get(buildId);
+  const build = await new BuildModel(db, { builds, buildLabels, snapshots: snapshotsTable }).get(
+    buildId,
+  );
   if (!build) {
     return null;
   }
-  const project = await new ProjectModel(db).get(build.projectId);
+  const project = await new ProjectModel(db, { projects }).get(build.projectId);
   if (!project) {
     return null;
   }
-  const snapshots = await new SnapshotModel(db).listByBuild(build.id);
-  const comments = await new CommentModel(db).listByBuild(build.id);
+  const snapshots = await new SnapshotModel(db, { snapshots: snapshotsTable }).listByBuild(
+    build.id,
+  );
+  const comments = await new CommentModel(db, { comments: commentsTable, projects }).listByBuild(
+    build.id,
+  );
   const canReview = !getStore().authEnabled || Boolean(getStore().user);
 
   const grouped = new Map<string, typeof snapshots>();

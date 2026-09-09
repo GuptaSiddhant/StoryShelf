@@ -1,11 +1,11 @@
 import { ProjectModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
+import { projects } from "@storyshelf/db-sqlite/schema";
 import type { Context } from "hono";
 import type { ShelfApp } from "../index.tsx";
 import { getStore } from "../store.ts";
 import { hxRedirect } from "./htmx.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
-
 /** General project settings (name, repo, thresholds) and danger-zone delete. */
 export function registerGeneralSettings(app: ShelfApp): void {
   app.get("/projects/:slug/settings", async (c) => c.html(await renderSettingsPage(c, "general")));
@@ -59,7 +59,7 @@ async function persistGeneralUpdate(
   fields: GeneralFields,
 ): Promise<Response> {
   try {
-    await new ProjectModel(getStore().db).update(project.id, {
+    await new ProjectModel(getStore().db, { projects }).update(project.id, {
       name: fields.name,
       gitRepository: fields.gitRepository ?? undefined,
       gitDefaultBranch: fields.gitDefaultBranch ?? undefined,
@@ -118,7 +118,7 @@ async function persistTestsUpdate(
   playTimeoutMs: number | undefined,
 ): Promise<Response> {
   try {
-    await new ProjectModel(getStore().db).update(project.id, {
+    await new ProjectModel(getStore().db, { projects }).update(project.id, {
       executePlay,
       playTimeoutMs: playTimeoutMs ?? undefined,
     });
@@ -131,6 +131,6 @@ async function persistTestsUpdate(
 
 async function handleDeleteProject(c: Context): Promise<Response> {
   const project = await findProject(c.req.param("slug") ?? "");
-  await new ProjectModel(getStore().db).remove(project.id);
+  await new ProjectModel(getStore().db, { projects }).remove(project.id);
   return hxRedirect(c, "/projects");
 }

@@ -2,11 +2,16 @@
 import { createRoute } from "@hono/zod-openapi";
 import { ProjectModel } from "@storyshelf/core/models";
 import { Retention } from "@storyshelf/core/retention";
+import {
+  baselines,
+  buildLabels,
+  builds,
+  projects as projectsTable,
+} from "@storyshelf/db-sqlite/schema";
 import type { ShelfApp } from "../index.tsx";
 import { getStore } from "../store.ts";
 import { requireSiteAdmin } from "./helpers.ts";
 import { forbidden as forbiddenResponse, purgeInputSchema, purgeSchema } from "./schemas.ts";
-
 const purgeRoute = createRoute({
   method: "post",
   path: "/api/v1/admin/purge",
@@ -38,8 +43,13 @@ export function registerAdmin(app: ShelfApp): void {
 
 // oxlint-disable-next-line typescript/promise-function-async
 async function purgeBuilds(ttlDays: number): Promise<number> {
-  const projects = await new ProjectModel(getStore().db).list();
-  const retention = new Retention(getStore().db, getStore().storage, getStore().logger);
+  const projects = await new ProjectModel(getStore().db, { projects: projectsTable }).list();
+  const retention = new Retention(
+    getStore().db,
+    getStore().storage,
+    { builds, buildLabels, baselines },
+    getStore().logger,
+  );
   const results = await Promise.all(
     projects.map((project) => retention.purge(project, { ttlDays, keepLatestPerBranch: true })),
   );
@@ -52,8 +62,13 @@ async function purgeBranches(): Promise<{ removedBranches: number; removedBaseli
   if (branchTtl === null) {
     return { removedBranches: 0, removedBaselines: 0 };
   }
-  const projects = await new ProjectModel(getStore().db).list();
-  const retention = new Retention(getStore().db, getStore().storage, getStore().logger);
+  const projects = await new ProjectModel(getStore().db, { projects: projectsTable }).list();
+  const retention = new Retention(
+    getStore().db,
+    getStore().storage,
+    { builds, buildLabels, baselines },
+    getStore().logger,
+  );
   const results = await Promise.all(
     projects.map((project) => retention.purgeStaleBranches(project, branchTtl)),
   );

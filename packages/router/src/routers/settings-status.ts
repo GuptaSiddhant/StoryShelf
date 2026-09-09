@@ -1,12 +1,12 @@
 import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import { StatusConfigModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
+import { projectStatusConfigs } from "@storyshelf/db-sqlite/schema";
 import type { Context } from "hono";
 import type { ShelfApp } from "../index.tsx";
 import { getStore } from "../store.ts";
 import { hxRedirect } from "./htmx.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
-
 /** Merge-gate status-config settings (provider configs + tokens, delete). */
 export function registerStatusSettings(app: ShelfApp): void {
   app.get("/projects/:slug/settings/status", async (c) =>
@@ -101,7 +101,7 @@ async function persistStatusConfig(
   config: unknown,
 ): Promise<Response> {
   const { db, config: shelfConfig } = getStore();
-  await new StatusConfigModel(db, shelfConfig.secret).create(project.id, {
+  await new StatusConfigModel(db, { projectStatusConfigs }, shelfConfig.secret).create(project.id, {
     provider: provider.metadata.kind,
     config,
     token,
@@ -121,6 +121,9 @@ function parseJsonConfig(raw: string): unknown {
 async function handleDeleteStatus(c: Context): Promise<Response> {
   const project = await findProject(c.req.param("slug") ?? "");
   const { db, config: shelfConfig } = getStore();
-  await new StatusConfigModel(db, shelfConfig.secret).remove(project.id, c.req.param("id") ?? "");
+  await new StatusConfigModel(db, { projectStatusConfigs }, shelfConfig.secret).remove(
+    project.id,
+    c.req.param("id") ?? "",
+  );
   return hxRedirect(c, `/projects/${project.slug}/settings/status`);
 }

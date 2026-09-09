@@ -4,12 +4,12 @@ import { ProjectModel } from "@storyshelf/core/models";
 import type { Build } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import { storybookDir } from "@storyshelf/core/utils";
+import { buildLabels, builds, labelTypes, projects, snapshots } from "@storyshelf/db-sqlite/schema";
 import { posix } from "node:path";
 import type { ShelfApp } from "../index.tsx";
 import { renderStorybookPage, renderStorybookPreparingPage } from "../pages/storybook.tsx";
 import { getStore } from "../store.ts";
 import { currentProjectRole, notFound } from "./helpers.ts";
-
 const VIEW_ROLES: ReadonlySet<string> = new Set(["viewer", "developer", "approver", "admin"]);
 
 const MIME: Record<string, string> = {
@@ -80,11 +80,15 @@ export function registerStorybook(app: ShelfApp): void {
   // Resolver: latest published build on the default branch.
   app.get("/projects/:slug/storybook", async (c) => {
     const slug = c.req.param("slug");
-    const project = await new ProjectModel(getStore().db).getBySlug(slug);
+    const project = await new ProjectModel(getStore().db, { projects }).getBySlug(slug);
     if (!project) {
       notFound("Project not found");
     }
-    const build = await new BuildModel(getStore().db).latestPublished(project);
+    const build = await new BuildModel(getStore().db, {
+      builds,
+      buildLabels,
+      snapshots,
+    }).latestPublished(project);
     if (!build) {
       notFound("No published Storybook for this project");
     }
@@ -102,15 +106,21 @@ export function registerStorybook(app: ShelfApp): void {
       return c.notFound();
     }
     const value = c.req.param("value");
-    const project = await new ProjectModel(getStore().db).getBySlug(slug);
+    const project = await new ProjectModel(getStore().db, { projects }).getBySlug(slug);
     if (!project) {
       notFound("Project not found");
     }
-    const buildId = await new LabelModel(getStore().db).latestBuildId(project.id, key, value);
+    const buildId = await new LabelModel(getStore().db, {
+      builds,
+      buildLabels,
+      labelTypes,
+    }).latestBuildId(project.id, key, value);
     if (!buildId) {
       notFound("No build carries that label");
     }
-    const build = await new BuildModel(getStore().db).get(buildId);
+    const build = await new BuildModel(getStore().db, { builds, buildLabels, snapshots }).get(
+      buildId,
+    );
     if (!build || !(await canViewBuild(build, project))) {
       return c.redirect("/auth/login", 302);
     }
@@ -133,11 +143,13 @@ export function registerStorybook(app: ShelfApp): void {
     } catch {
       return c.notFound();
     }
-    const project = await new ProjectModel(getStore().db).getBySlug(slug);
+    const project = await new ProjectModel(getStore().db, { projects }).getBySlug(slug);
     if (!project) {
       notFound("Project not found");
     }
-    const build = await new BuildModel(getStore().db).get(buildId);
+    const build = await new BuildModel(getStore().db, { builds, buildLabels, snapshots }).get(
+      buildId,
+    );
     if (!build || build.projectId !== project.id) {
       notFound("Build not found");
     }

@@ -1,11 +1,11 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { CommentModel } from "@storyshelf/core/models";
+import { comments, projects } from "@storyshelf/db-sqlite/schema";
 import type { ShelfApp } from "../index.tsx";
 import { getStore } from "../store.ts";
 import { VIEW_ROLES, DEVELOPER_ROLES, buildForProject } from "./builds.handlers.ts";
 import { resolveAuthorizedProject, notFound as throwNotFound } from "./helpers.ts";
 import { commentSchema, commentCreateSchema, notFound, unauthorized } from "./schemas.ts";
-
 const listCommentsRoute = createRoute({
   method: "get",
   path: "/api/v1/projects/{slug}/builds/{buildId}/comments",
@@ -55,7 +55,9 @@ export function registerComments(app: ShelfApp): void {
     const { slug, buildId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...VIEW_ROLES);
     const build = await buildForProject(project.id, buildId);
-    return c.json(await new CommentModel(getStore().db).listByBuild(build.id));
+    return c.json(
+      await new CommentModel(getStore().db, { comments, projects }).listByBuild(build.id),
+    );
   });
 
   app.openapi(createCommentRoute, async (c) => {
@@ -64,7 +66,7 @@ export function registerComments(app: ShelfApp): void {
     const build = await buildForProject(project.id, buildId);
     const body = c.req.valid("json");
     const userId = getStore().user?.id ?? null;
-    const comment = await new CommentModel(getStore().db).create(
+    const comment = await new CommentModel(getStore().db, { comments, projects }).create(
       project.id,
       build.id,
       userId,
@@ -77,7 +79,9 @@ export function registerComments(app: ShelfApp): void {
     const { slug, buildId, commentId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...DEVELOPER_ROLES);
     const build = await buildForProject(project.id, buildId);
-    const comment = await new CommentModel(getStore().db).resolve(commentId);
+    const comment = await new CommentModel(getStore().db, { comments, projects }).resolve(
+      commentId,
+    );
     if (comment.buildId !== build.id) {
       throwNotFound("Comment not found");
     }

@@ -1,11 +1,11 @@
 import { TokenModel } from "@storyshelf/core/models";
 import { randomToken } from "@storyshelf/core/utils";
+import { tokens } from "@storyshelf/db-sqlite/schema";
 import type { Context } from "hono";
 import type { ShelfApp } from "../index.tsx";
 import { getStore } from "../store.ts";
 import { hxRedirect } from "./htmx.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
-
 /** CI token settings (create with one-time display, delete). */
 export function registerTokenSettings(app: ShelfApp): void {
   app.get("/projects/:slug/settings/tokens", async (c) =>
@@ -26,7 +26,7 @@ async function handleCreateToken(c: Context): Promise<Response> {
     );
   }
   const token = randomToken("shelf_");
-  await new TokenModel(getStore().db).create(project.id, tokenName, token.hash);
+  await new TokenModel(getStore().db, { tokens }).create(project.id, tokenName, token.hash);
   return await renderTokenCreated(c, token.value);
 }
 
@@ -40,6 +40,6 @@ async function renderTokenCreated(c: Context, tokenValue: string): Promise<Respo
 
 async function handleDeleteToken(c: Context): Promise<Response> {
   const project = await findProject(c.req.param("slug") ?? "");
-  await new TokenModel(getStore().db).remove(c.req.param("tokenId") ?? "");
+  await new TokenModel(getStore().db, { tokens }).remove(c.req.param("tokenId") ?? "");
   return hxRedirect(c, `/projects/${project.slug}/settings/tokens`);
 }

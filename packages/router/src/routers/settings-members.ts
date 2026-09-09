@@ -1,9 +1,9 @@
 import { MemberModel } from "@storyshelf/core/models";
+import { projectMembers } from "@storyshelf/db-sqlite/schema";
 import type { ShelfApp } from "../index.tsx";
 import { getStore } from "../store.ts";
 import { hxRedirect } from "./htmx.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
-
 /** Project member settings (assign roles, remove members). */
 export function registerMemberSettings(app: ShelfApp): void {
   app.get("/projects/:slug/settings/members", async (c) =>
@@ -22,13 +22,16 @@ export function registerMemberSettings(app: ShelfApp): void {
         400,
       );
     }
-    await new MemberModel(getStore().db).set(project.id, userId, role as never);
+    await new MemberModel(getStore().db, { projectMembers }).set(project.id, userId, role as never);
     return hxRedirect(c, `/projects/${project.slug}/settings/members`);
   });
 
   app.post("/projects/:slug/settings/members/:userId/remove", async (c) => {
     const project = await findProject(c.req.param("slug") ?? "");
-    await new MemberModel(getStore().db).remove(project.id, c.req.param("userId") ?? "");
+    await new MemberModel(getStore().db, { projectMembers }).remove(
+      project.id,
+      c.req.param("userId") ?? "",
+    );
     return hxRedirect(c, `/projects/${project.slug}/settings/members`);
   });
 }

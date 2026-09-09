@@ -1,6 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { MemberModel } from "@storyshelf/core/models";
 import type { ProjectRole } from "@storyshelf/core/types";
+import { projectMembers } from "@storyshelf/db-sqlite/schema";
 import type { ShelfApp } from "../index.tsx";
 import { getStore } from "../store.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
@@ -11,7 +12,6 @@ import {
   notFound,
   unauthorized,
 } from "./schemas.ts";
-
 const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];
 const ADMIN_ROLES: readonly ProjectRole[] = ["admin"];
 
@@ -75,14 +75,18 @@ const deleteMemberRoute = createRoute({
 export function registerMembers(app: ShelfApp): void {
   app.openapi(listMembersRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...VIEW_ROLES);
-    return c.json(await new MemberModel(getStore().db).list(project.id));
+    return c.json(await new MemberModel(getStore().db, { projectMembers }).list(project.id));
   });
 
   app.openapi(setMemberRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
     const body = c.req.valid("json");
     return c.json(
-      await new MemberModel(getStore().db).set(project.id, body.userId, body.role),
+      await new MemberModel(getStore().db, { projectMembers }).set(
+        project.id,
+        body.userId,
+        body.role,
+      ),
       201,
     );
   });
@@ -91,13 +95,15 @@ export function registerMembers(app: ShelfApp): void {
     const { slug, userId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
     const body = c.req.valid("json");
-    return c.json(await new MemberModel(getStore().db).set(project.id, userId, body.role));
+    return c.json(
+      await new MemberModel(getStore().db, { projectMembers }).set(project.id, userId, body.role),
+    );
   });
 
   app.openapi(deleteMemberRoute, async (c) => {
     const { slug, userId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
-    await new MemberModel(getStore().db).remove(project.id, userId);
+    await new MemberModel(getStore().db, { projectMembers }).remove(project.id, userId);
     return c.body(null, 204);
   });
 }

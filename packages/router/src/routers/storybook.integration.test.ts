@@ -1,8 +1,8 @@
-import { schema } from "@storyshelf/core/schema";
 import type { Build } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { storybookDir } from "@storyshelf/core/utils";
+import { schema } from "@storyshelf/db-sqlite/schema";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfRouter } from "../index.tsx";

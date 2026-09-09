@@ -170,6 +170,7 @@
         "packages/core/src/retention/purge.ts",
         "packages/db-sqlite/src/drizzle-factory.ts",
         "packages/router/src/routers/auth.ts",
+        "packages/router/src/routers/media.ts",
         "packages/router/src/routers/builds.handlers.ts",
         "packages/router/src/routers/builds.ts",
         "packages/router/src/routers/helpers.ts",

@@ -1,12 +1,11 @@
 import { LabelModel } from "@storyshelf/core/models";
-import { schema } from "@storyshelf/core/schema";
 import type { Build } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
+import { buildLabels, builds, labelTypes, schema } from "@storyshelf/db-sqlite/schema";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfRouter } from "../index.tsx";
-
 const silentLogger = pino({ level: "silent" });
 
 describe("Label-driven build resolution", () => {
@@ -48,7 +47,7 @@ describe("Label-driven build resolution", () => {
   it("creates and lists label types", async () => {
     const { db } = makeDatabase();
     await db.insert(schema.projects, mockProject);
-    const labelModel = new LabelModel(db);
+    const labelModel = new LabelModel(db, { builds, buildLabels, labelTypes });
 
     const labelType = await labelModel.createType("p1", {
       key: "custom",
@@ -69,7 +68,7 @@ describe("Label-driven build resolution", () => {
     const { db } = makeDatabase();
     await db.insert(schema.projects, mockProject);
     await db.insert(schema.builds, mockBuild);
-    const labelModel = new LabelModel(db);
+    const labelModel = new LabelModel(db, { builds, buildLabels, labelTypes });
 
     const label = await labelModel.attach("p1", "b1", "branch", "main");
     expect(label.buildId).toBe("b1");
@@ -85,7 +84,7 @@ describe("Label-driven build resolution", () => {
     const { db } = makeDatabase();
     await db.insert(schema.projects, mockProject);
     await db.insert(schema.builds, mockBuild);
-    const labelModel = new LabelModel(db);
+    const labelModel = new LabelModel(db, { builds, buildLabels, labelTypes });
 
     await labelModel.attach("p1", "b1", "branch", "main");
 
@@ -96,7 +95,7 @@ describe("Label-driven build resolution", () => {
   it("returns null for non-existent label", async () => {
     const { db } = makeDatabase();
     await db.insert(schema.projects, mockProject);
-    const labelModel = new LabelModel(db);
+    const labelModel = new LabelModel(db, { builds, buildLabels, labelTypes });
 
     const latestBuildId = await labelModel.latestBuildId("p1", "branch", "nonexistent");
     expect(latestBuildId).toBeNull();
@@ -106,7 +105,7 @@ describe("Label-driven build resolution", () => {
     const { db } = makeDatabase();
     await db.insert(schema.projects, mockProject);
     await db.insert(schema.builds, mockBuild);
-    const labelModel = new LabelModel(db);
+    const labelModel = new LabelModel(db, { builds, buildLabels, labelTypes });
 
     expect(await labelModel.hasPersistent("p1", "b1")).toBe(false);
 
@@ -118,7 +117,7 @@ describe("Label-driven build resolution", () => {
   it("removes custom label types", async () => {
     const { db } = makeDatabase();
     await db.insert(schema.projects, mockProject);
-    const labelModel = new LabelModel(db);
+    const labelModel = new LabelModel(db, { builds, buildLabels, labelTypes });
 
     await labelModel.createType("p1", { key: "custom", name: "Custom" });
     await labelModel.removeType("p1", "custom");
@@ -130,7 +129,7 @@ describe("Label-driven build resolution", () => {
   it("rejects removal of reserved label types", async () => {
     const { db } = makeDatabase();
     await db.insert(schema.projects, mockProject);
-    const labelModel = new LabelModel(db);
+    const labelModel = new LabelModel(db, { builds, buildLabels, labelTypes });
 
     await expect(labelModel.removeType("p1", "persistent")).rejects.toThrow(
       "Label type 'persistent' cannot be removed.",
@@ -159,7 +158,7 @@ describe("PATCH label-type endpoint", () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
     await db.insert(schema.projects, localProject);
-    const labelModel = new LabelModel(db);
+    const labelModel = new LabelModel(db, { builds, buildLabels, labelTypes });
     await labelModel.createType("p1", {
       key: "custom",
       name: "Custom",

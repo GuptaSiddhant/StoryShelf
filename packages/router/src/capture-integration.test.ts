@@ -3,9 +3,9 @@ import { BuildModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
 import { SnapshotModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
+import { buildLabels, builds, projects, snapshots } from "@storyshelf/db-sqlite/schema";
 import { describe, expect, it } from "vitest";
 import { createShelfRouter } from "./index.tsx";
-
 function makeApp(): ReturnType<typeof createShelfRouter> {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
@@ -43,17 +43,17 @@ describe("Capture pipeline integration", () => {
 
   it("creates and reviews a snapshot", async () => {
     const { db } = makeDatabase();
-    const project = await new ProjectModel(db).create({
+    const project = await new ProjectModel(db, { projects }).create({
       name: "Snapshot Test",
       gitDefaultBranch: "main",
     });
-    const build = await new BuildModel(db).create(project.id, {
+    const build = await new BuildModel(db, { builds, buildLabels, snapshots }).create(project.id, {
       gitSha: "sha-abc",
       gitBranch: "main",
       isDefault: true,
     });
 
-    const snapshot = await new SnapshotModel(db).create(project.id, build.id, {
+    const snapshot = await new SnapshotModel(db, { snapshots }).create(project.id, build.id, {
       storyId: "components-button--primary",
       storyName: "Components/Button",
       storyTitle: "Components/Button",
@@ -64,8 +64,8 @@ describe("Capture pipeline integration", () => {
       screenshotPath: `/screenshots/${build.id}-test.png`,
     });
 
-    await new SnapshotModel(db).review(snapshot.id, "approved", "user-1");
-    const updatedSnapshot = await new SnapshotModel(db).get(snapshot.id);
+    await new SnapshotModel(db, { snapshots }).review(snapshot.id, "approved", "user-1");
+    const updatedSnapshot = await new SnapshotModel(db, { snapshots }).get(snapshot.id);
     expect(updatedSnapshot?.status).toBe("approved");
   });
 

@@ -1,21 +1,30 @@
 import { BuildModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
+import {
+  buildLabels,
+  builds as buildsTable,
+  projects as projectsTable,
+  snapshots,
+} from "@storyshelf/db-sqlite/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { getStore } from "../store.ts";
 import { Badge, statusTone } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
-
 /** Project builds page: filterable build history for one project. */
 export async function renderProjectBuildsPage(
   slug: string,
   query: { status?: string; branch?: string } = {},
 ): Promise<RenderedContent | null> {
-  const projects = await new ProjectModel(getStore().db).list();
+  const projects = await new ProjectModel(getStore().db, { projects: projectsTable }).list();
   const project = projects.find((item) => item.slug === slug);
   if (!project) {
     return null;
   }
-  const builds = await new BuildModel(getStore().db).list(project.id, {
+  const builds = await new BuildModel(getStore().db, {
+    builds: buildsTable,
+    buildLabels,
+    snapshots,
+  }).list(project.id, {
     status: query.status as never,
     branch: query.branch,
   });

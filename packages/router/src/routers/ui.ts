@@ -5,6 +5,15 @@ import { LabelModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
 import { SnapshotModel } from "@storyshelf/core/models";
 import type { ProjectRole } from "@storyshelf/core/types";
+import {
+  baselines as baselinesTable,
+  buildLabels,
+  builds,
+  comments as commentsTable,
+  labelTypes,
+  projects,
+  snapshots as snapshotsTable,
+} from "@storyshelf/db-sqlite/schema";
 import type { ShelfApp } from "../index.tsx";
 import { renderBuildDetailPage } from "../pages/build-detail.tsx";
 import { renderBuildDiffPage } from "../pages/build-diff.tsx";
@@ -18,7 +27,6 @@ import { getStore } from "../store.ts";
 import { currentProjectRole } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
 import { registerSettingsPages } from "./settings.ts";
-
 function asString(value: FormDataEntryValue | null): string | undefined {
   return typeof value === "string" ? value.trim() : undefined;
 }
@@ -89,12 +97,12 @@ export function registerUiPages(app: ShelfApp): void {
       );
     }
     try {
-      const project = await new ProjectModel(getStore().db).create({
+      const project = await new ProjectModel(getStore().db, { projects }).create({
         name,
         gitRepository,
         gitDefaultBranch,
       });
-      await new LabelModel(getStore().db).seedFor(project.id);
+      await new LabelModel(getStore().db, { builds, buildLabels, labelTypes }).seedFor(project.id);
       return hxRedirect(c, `/projects/${project.slug}/builds`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to create project";
@@ -129,7 +137,7 @@ export function registerUiPages(app: ShelfApp): void {
 
   app.get("/projects/:slug/jobs", async (c) => {
     const slug = c.req.param("slug");
-    const project = await new ProjectModel(getStore().db).getBySlug(slug);
+    const project = await new ProjectModel(getStore().db, { projects }).getBySlug(slug);
     if (!project) {
       return c.notFound();
     }
@@ -149,17 +157,30 @@ export function registerUiPages(app: ShelfApp): void {
     const slug = c.req.param("slug");
     const buildId = c.req.param("buildId");
     const snapshotId = c.req.query("snapshot");
-    const project = await new ProjectModel(getStore().db).getBySlug(slug);
+    const project = await new ProjectModel(getStore().db, { projects }).getBySlug(slug);
     if (!project) {
       return c.notFound();
     }
-    const build = await new BuildModel(getStore().db).get(buildId);
+    const build = await new BuildModel(getStore().db, {
+      builds,
+      buildLabels,
+      snapshots: snapshotsTable,
+    }).get(buildId);
     if (!build || build.projectId !== project.id) {
       return c.notFound();
     }
-    const snapshots = await new SnapshotModel(getStore().db).listByBuild(build.id);
-    const comments = await new CommentModel(getStore().db).listByBuild(build.id);
-    const baselines = new BaselineModel(getStore().db, getStore().storage);
+    const snapshots = await new SnapshotModel(getStore().db, {
+      snapshots: snapshotsTable,
+    }).listByBuild(build.id);
+    const comments = await new CommentModel(getStore().db, {
+      comments: commentsTable,
+      projects,
+    }).listByBuild(build.id);
+    const baselines = new BaselineModel(
+      getStore().db,
+      { baselines: baselinesTable },
+      getStore().storage,
+    );
     const hasBaselineEntries = await Promise.all(
       snapshots.map(async (snapshot) => {
         const baseline = await baselines.resolve(

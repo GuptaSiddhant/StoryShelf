@@ -3,10 +3,15 @@ import { BuildModel } from "@storyshelf/core/models";
 import { SnapshotModel } from "@storyshelf/core/models";
 import type { Snapshot } from "@storyshelf/core/schema";
 import type { ProjectRole } from "@storyshelf/core/types";
+import {
+  baselines as baselinesTable,
+  buildLabels,
+  builds,
+  snapshots,
+} from "@storyshelf/db-sqlite/schema";
 import type { ShelfApp } from "../index.tsx";
 import { getStore } from "../store.ts";
 import { notFound, resolveAuthorizedProject } from "./helpers.ts";
-
 const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];
 
 const PNG = "image/png";
@@ -49,11 +54,17 @@ export function registerMedia(app: ShelfApp): void {
       c.req.param("snapshotId"),
       project.id,
     );
-    const build = await new BuildModel(getStore().db).get(snapshot.buildId);
+    const build = await new BuildModel(getStore().db, { builds, buildLabels, snapshots }).get(
+      snapshot.buildId,
+    );
     if (!build) {
       notFound("Build not found");
     }
-    const baselines = new BaselineModel(getStore().db, getStore().storage);
+    const baselines = new BaselineModel(
+      getStore().db,
+      { baselines: baselinesTable },
+      getStore().storage,
+    );
     const baseline = await baselines.resolve(
       project.id,
       snapshot.storyId,
@@ -73,7 +84,7 @@ async function findSnapshot(
   snapshotId: string,
   projectId: string,
 ): Promise<Snapshot> {
-  const snapshot = await new SnapshotModel(getStore().db).get(snapshotId);
+  const snapshot = await new SnapshotModel(getStore().db, { snapshots }).get(snapshotId);
   if (!snapshot || snapshot.buildId !== buildId || snapshot.projectId !== projectId) {
     notFound("Snapshot not found");
   }

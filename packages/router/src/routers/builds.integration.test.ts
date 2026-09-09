@@ -1,14 +1,13 @@
 import { LabelModel } from "@storyshelf/core/models";
-import { schema } from "@storyshelf/core/schema";
 import type { Build } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { storybookZipPath } from "@storyshelf/core/utils";
+import { buildLabels, builds, labelTypes, schema } from "@storyshelf/db-sqlite/schema";
 import { Readable } from "node:stream";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfRouter } from "../index.tsx";
-
 const silentLogger = pino({ level: "silent" });
 
 const makeBuild = (id: string, gitBranch = "main"): Build => ({
@@ -54,7 +53,7 @@ describe("build list label filter", () => {
     await db.insert(schema.builds, makeBuild("b1"));
     await db.insert(schema.builds, makeBuild("b2"));
 
-    const labelModel = new LabelModel(db);
+    const labelModel = new LabelModel(db, { builds, buildLabels, labelTypes });
     await labelModel.attach("p1", "b1", "environment", "staging");
     await labelModel.attach("p1", "b2", "environment", "production");
 
@@ -92,7 +91,7 @@ describe("build list label filter", () => {
     await db.insert(schema.builds, makeBuild("b1", "main"));
     await db.insert(schema.builds, makeBuild("b2", "feature/x"));
 
-    const labelModel = new LabelModel(db);
+    const labelModel = new LabelModel(db, { builds, buildLabels, labelTypes });
     await labelModel.attach("p1", "b1", "environment", "staging");
     await labelModel.attach("p1", "b2", "environment", "staging");
 
@@ -187,7 +186,9 @@ describe("streaming build upload (JSON + PUT)", () => {
       `/api/v1/projects/stream-project/builds/${created.build.id}/zip`,
     );
     expect(await storage.exists(storybookZipPath("p1", created.build.id))).toBe(false);
-    const labels = await new LabelModel(db).listForBuild(created.build.id);
+    const labels = await new LabelModel(db, { builds, buildLabels, labelTypes }).listForBuild(
+      created.build.id,
+    );
     expect(labels.map((label) => `${label.typeKey}=${label.value}`)).toEqual(["pr=7"]);
   });
 

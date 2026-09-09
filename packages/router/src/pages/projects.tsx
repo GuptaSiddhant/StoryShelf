@@ -1,19 +1,26 @@
 import { BuildModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
+import {
+  buildLabels,
+  builds as buildsTable,
+  projects as projectsTable,
+  snapshots,
+} from "@storyshelf/db-sqlite/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { getStore } from "../store.ts";
 import { Badge } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
-
 /** Projects overview page: project cards with latest build plus next steps. */
 export async function renderProjectsPage(): Promise<RenderedContent> {
   const { db, user } = getStore();
-  const projects = await new ProjectModel(db).list();
+  const projects = await new ProjectModel(db, { projects: projectsTable }).list();
   const canCreate = !user || user.role === "admin" || user.role === "member";
 
   const recentCounts = await Promise.all(
     projects.map(async (project) => {
-      const builds = await new BuildModel(db).list(project.id);
+      const builds = await new BuildModel(db, { builds: buildsTable, buildLabels, snapshots }).list(
+        project.id,
+      );
       return { slug: project.slug, count: builds.length, latest: builds[0] ?? null };
     }),
   );

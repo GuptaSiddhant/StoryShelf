@@ -2,6 +2,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { DEFAULT_MAX_UPLOAD_BYTES } from "@storyshelf/core/config";
 import { BuildModel } from "@storyshelf/core/models";
 import { storybookZipPath } from "@storyshelf/core/utils";
+import { buildLabels, builds as buildsTable, snapshots } from "@storyshelf/db-sqlite/schema";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfApp } from "../index.tsx";
 import { getStore } from "../store.ts";
@@ -26,13 +27,16 @@ import {
   unauthorized,
 } from "./schemas.ts";
 import { registerSnapshots } from "./snapshots.ts";
-
 /** Register the build list, upload, fetch, retry, and delete endpoints. */
 export function registerBuilds(app: ShelfApp): void {
   app.openapi(listBuildsRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...VIEW_ROLES);
     const { status, branch, labelKey, labelValue } = c.req.valid("query");
-    const builds = new BuildModel(getStore().db).list(project.id, {
+    const builds = new BuildModel(getStore().db, {
+      builds: buildsTable,
+      buildLabels,
+      snapshots,
+    }).list(project.id, {
       status,
       branch: branch ?? undefined,
       labelKey: labelKey ?? undefined,
@@ -94,7 +98,11 @@ export function registerBuilds(app: ShelfApp): void {
     const { slug, buildId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...DEVELOPER_ROLES);
     const build = await buildForProject(project.id, buildId);
-    const updated = await new BuildModel(getStore().db).setStatus(build.id, "pending");
+    const updated = await new BuildModel(getStore().db, {
+      builds: buildsTable,
+      buildLabels,
+      snapshots,
+    }).setStatus(build.id, "pending");
     return c.json(updated, 202);
   });
 
@@ -102,7 +110,9 @@ export function registerBuilds(app: ShelfApp): void {
     const { slug, buildId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...APPROVER_ROLES);
     const build = await buildForProject(project.id, buildId);
-    await new BuildModel(getStore().db).remove(build.id);
+    await new BuildModel(getStore().db, { builds: buildsTable, buildLabels, snapshots }).remove(
+      build.id,
+    );
     return c.body(null, 204);
   });
 

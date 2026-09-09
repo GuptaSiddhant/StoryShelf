@@ -575,6 +575,9 @@ importers:
       '@storyshelf/core':
         specifier: workspace:*
         version: link:../core
+      '@storyshelf/db-sqlite':
+        specifier: workspace:*
+        version: link:../db-sqlite
       hono:
         specifier: 'catalog:'
         version: 4.13.7

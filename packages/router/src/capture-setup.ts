@@ -4,6 +4,14 @@ import { createDispatchJob, InMemoryCaptureQueue } from "@storyshelf/core/captur
 import type { CaptureJobOptions } from "@storyshelf/core/capture";
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
+import {
+  baselines,
+  buildLabels,
+  builds,
+  projectStatusConfigs,
+  projects,
+  snapshots,
+} from "@storyshelf/db-sqlite/schema";
 
 /**
  * Wiring for the capture queue: the queue instance (if any) and a helper
@@ -30,6 +38,7 @@ export function setupCaptureQueue(
   }
   const jobOptions: CaptureJobOptions = {
     db: options.database,
+    tables: { projects, builds, buildLabels, snapshots, baselines },
     storage: options.storage,
     runner: options.captureRunner,
     scratchDir: config.scratchDir,
@@ -39,6 +48,7 @@ export function setupCaptureQueue(
   };
   const runJob = createDispatchJob({
     db: options.database,
+    tables: { projects, builds, buildLabels, snapshots, projectStatusConfigs },
     jobOptions,
     gitHosts,
     secret: config.secret,

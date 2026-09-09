@@ -1,10 +1,15 @@
 import { BuildModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
+import {
+  buildLabels,
+  builds as buildsTable,
+  projects as projectsTable,
+  snapshots,
+} from "@storyshelf/db-sqlite/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { getStore } from "../store.ts";
 import { Badge, statusTone } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
-
 interface QueueView {
   buildId: string;
   status: string;
@@ -70,12 +75,16 @@ export async function renderComputeJobsPage(
   queueView: QueueView[],
   canRetry: boolean,
 ): Promise<RenderedContent | null> {
-  const projects = await new ProjectModel(getStore().db).list();
+  const projects = await new ProjectModel(getStore().db, { projects: projectsTable }).list();
   const project = projects.find((item) => item.slug === slug);
   if (!project) {
     return null;
   }
-  const builds = await new BuildModel(getStore().db).list(project.id);
+  const builds = await new BuildModel(getStore().db, {
+    builds: buildsTable,
+    buildLabels,
+    snapshots,
+  }).list(project.id);
   const recentBuilds = builds.slice(0, 20);
   const queueByBuild = new Map(queueView.map((job) => [job.buildId, job]));
 

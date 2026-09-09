@@ -1,10 +1,10 @@
 import { LabelModel } from "@storyshelf/core/models";
+import { buildLabels, builds, labelTypes } from "@storyshelf/db-sqlite/schema";
 import type { Context } from "hono";
 import type { ShelfApp } from "../index.tsx";
 import { getStore } from "../store.ts";
 import { hxRedirect } from "./htmx.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
-
 /** Label-type settings (create custom types, delete removable ones). */
 export function registerLabelSettings(app: ShelfApp): void {
   app.get("/projects/:slug/settings/labels", async (c) =>
@@ -38,7 +38,7 @@ async function persistLabelType(
   linkTemplate: string | undefined,
 ): Promise<Response> {
   try {
-    await new LabelModel(getStore().db).createType(projectId, {
+    await new LabelModel(getStore().db, { builds, buildLabels, labelTypes }).createType(projectId, {
       key,
       name: labelName,
       linkTemplate,
@@ -53,7 +53,10 @@ async function persistLabelType(
 async function handleDeleteLabelType(c: Context): Promise<Response> {
   const project = await findProject(c.req.param("slug") ?? "");
   try {
-    await new LabelModel(getStore().db).removeType(project.id, c.req.param("key") ?? "");
+    await new LabelModel(getStore().db, { builds, buildLabels, labelTypes }).removeType(
+      project.id,
+      c.req.param("key") ?? "",
+    );
   } catch {
     return c.html(
       (await renderSettingsPage(c, "labels", { globalError: "Cannot delete built-in label" })) ??

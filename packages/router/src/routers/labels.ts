@@ -1,6 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { LabelModel } from "@storyshelf/core/models";
 import type { ProjectRole } from "@storyshelf/core/types";
+import { buildLabels, builds, labelTypes } from "@storyshelf/db-sqlite/schema";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfApp } from "../index.tsx";
 import { getStore } from "../store.ts";
@@ -12,7 +13,6 @@ import {
   notFound,
   unauthorized,
 } from "./schemas.ts";
-
 const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];
 const ADMIN_ROLES: readonly ProjectRole[] = ["admin"];
 
@@ -76,19 +76,32 @@ const updateLabelRoute = createRoute({
 export function registerLabels(app: ShelfApp): void {
   app.openapi(listLabelsRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...VIEW_ROLES);
-    return c.json(await new LabelModel(getStore().db).listTypes(project.id));
+    return c.json(
+      await new LabelModel(getStore().db, { builds, buildLabels, labelTypes }).listTypes(
+        project.id,
+      ),
+    );
   });
 
   app.openapi(createLabelRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
     const body = c.req.valid("json");
-    return c.json(await new LabelModel(getStore().db).createType(project.id, body), 201);
+    return c.json(
+      await new LabelModel(getStore().db, { builds, buildLabels, labelTypes }).createType(
+        project.id,
+        body,
+      ),
+      201,
+    );
   });
 
   app.openapi(deleteLabelRoute, async (c) => {
     const { slug, key } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
-    await new LabelModel(getStore().db).removeType(project.id, key);
+    await new LabelModel(getStore().db, { builds, buildLabels, labelTypes }).removeType(
+      project.id,
+      key,
+    );
     return c.body(null, 204);
   });
 
@@ -97,7 +110,11 @@ export function registerLabels(app: ShelfApp): void {
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
     const body = c.req.valid("json");
     try {
-      const updated = await new LabelModel(getStore().db).updateType(project.id, key, body);
+      const updated = await new LabelModel(getStore().db, {
+        builds,
+        buildLabels,
+        labelTypes,
+      }).updateType(project.id, key, body);
       if (!updated) {
         throw new HTTPException(404, { message: "Label type not found" });
       }
