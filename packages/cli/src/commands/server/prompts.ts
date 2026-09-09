@@ -49,6 +49,7 @@ export const INFRA_PROMPTS: Prompt[] = [
     choices: [
       { title: "SQLite (local)", value: "sqlite" },
       { title: "Turso (serverless)", value: "turso" },
+      { title: "Postgres (RDS/Cloud SQL/Supabase/Neon/self-hosted)", value: "postgres" },
     ],
   },
   {

@@ -21,7 +21,7 @@ export interface ServerInitOptions {
   dir?: string;
 }
 
-type DatabaseChoice = "sqlite" | "turso";
+type DatabaseChoice = "sqlite" | "turso" | "postgres";
 type StorageChoice = "local" | "s3";
 type AuthChoice = "none" | "password" | "oauth";
 type GitChoice = "none" | "github" | "gitlab";
@@ -39,6 +39,7 @@ interface Answers {
 const DB_PACKAGE: Record<DatabaseChoice, string> = {
   sqlite: "@storyshelf/db-sqlite",
   turso: "@storyshelf/db-turso",
+  postgres: "@storyshelf/db-postgres",
 };
 
 const STORAGE_PACKAGE: Record<StorageChoice, string> = {
@@ -61,6 +62,7 @@ const GIT_PACKAGE: Record<GitChoice, string | null> = {
 const DB_IMPORT: Record<DatabaseChoice, string> = {
   sqlite: `import { createSqliteDatabase } from "@storyshelf/db-sqlite";`,
   turso: `import { createTursoDatabase } from "@storyshelf/db-turso";`,
+  postgres: `import { createPostgresDatabase } from "@storyshelf/db-postgres";`,
 };
 
 const STORAGE_IMPORT: Record<StorageChoice, string> = {
@@ -71,6 +73,7 @@ const STORAGE_IMPORT: Record<StorageChoice, string> = {
 const DB_INIT: Record<DatabaseChoice, string> = {
   sqlite: `createSqliteDatabase(\`\${dataDir}/shelf.db\`)`,
   turso: `createTursoDatabase({ url: process.env.TURSO_DATABASE_URL!, authToken: process.env.TURSO_AUTH_TOKEN })`,
+  postgres: `createPostgresDatabase({ url: process.env.DATABASE_URL! })`,
 };
 
 const STORAGE_INIT: Record<StorageChoice, string> = {
@@ -216,17 +219,21 @@ async function writeFiles(outDir: string, answers: Answers): Promise<void> {
   await writeFile(join(outDir, "package.json"), pkgCode);
   printLine(`Created package.json`);
 
-  await writeDockerFiles(outDir, answers.docker);
+  await writeDockerFiles(outDir, answers.docker, answers.database);
 }
 
-async function writeDockerFiles(outDir: string, docker: boolean): Promise<void> {
+async function writeDockerFiles(
+  outDir: string,
+  docker: boolean,
+  database: DatabaseChoice = "sqlite",
+): Promise<void> {
   if (!docker) {
     return;
   }
 
   await writeFile(join(outDir, "Dockerfile"), generateDockerfile());
   await writeFile(join(outDir, ".dockerignore"), generateDockerignore());
-  await writeFile(join(outDir, "compose.yaml"), generateComposeYaml());
+  await writeFile(join(outDir, "compose.yaml"), generateComposeYaml(database));
   printLine(`Created Dockerfile, .dockerignore, compose.yaml`);
 }
 
