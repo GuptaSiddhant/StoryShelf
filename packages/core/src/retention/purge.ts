@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray, lt } from "drizzle-orm";
 import type { Logger } from "pino";
-import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
+import type { DatabaseAdapter } from "../db/database.ts";
 import { BaselineModel } from "../models/baseline.ts";
 import { BuildModel } from "../models/build.ts";
 import { LabelModel } from "../models/label.ts";

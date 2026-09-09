@@ -1,7 +1,7 @@
 import type { Logger } from "pino";
-import type { DatabaseAdapter } from "../adapters/database.ts";
 import { buildCommentMarkdown } from "../adapters/git-host/helpers.ts";
 import type { CheckStatus, GitHostProvider } from "../adapters/git-host/index.ts";
+import type { DatabaseAdapter } from "../db/database.ts";
 import { StatusConfigModel } from "../models/status-config.ts";
 import type { Project } from "../schema/project.ts";
 

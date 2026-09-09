@@ -1,6 +1,6 @@
 /** Build records, status transitions, and publication helpers. */
 import { and, desc, eq, inArray } from "drizzle-orm";
-import type { DatabaseAdapter } from "../adapters/database.ts";
+import type { DatabaseAdapter } from "../db/database.ts";
 import { builds } from "../schema/build.ts";
 import type { Build } from "../schema/build.ts";
 import { buildLabels } from "../schema/label.ts";

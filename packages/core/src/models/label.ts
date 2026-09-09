@@ -1,6 +1,6 @@
 /** Build labels and project label types. */
 import { and, desc, eq } from "drizzle-orm";
-import type { DatabaseAdapter } from "../adapters/database.ts";
+import type { DatabaseAdapter } from "../db/database.ts";
 import { builds } from "../schema/build.ts";
 import { buildLabels, labelTypes } from "../schema/label.ts";
 import type { BuildLabel, LabelType } from "../schema/label.ts";

@@ -1,4 +1,4 @@
-import type { DatabaseAdapter } from "../adapters/database.ts";
+import type { DatabaseAdapter } from "../db/database.ts";
 import { BuildModel } from "../models/build.ts";
 import { ProjectModel } from "../models/project.ts";
 import type { Build } from "../schema/build.ts";

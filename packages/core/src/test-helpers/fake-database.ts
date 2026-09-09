@@ -1,6 +1,6 @@
 import type { SQL } from "drizzle-orm";
 import type { AnySQLiteTable } from "drizzle-orm/sqlite-core";
-import type { DatabaseAdapter, ListOptions } from "../adapters/database.ts";
+import type { DatabaseAdapter, ListOptions } from "../db/database.ts";
 import { orderRows, whereMatches } from "./sql-chunks.ts";
 
 function withoutUndefined(values: unknown): Record<string, unknown> {

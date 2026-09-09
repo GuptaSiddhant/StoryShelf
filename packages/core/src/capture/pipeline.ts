@@ -1,7 +1,7 @@
 import type { Logger } from "pino";
 import type { RenderedSnapshot } from "../adapters/capture-runner.ts";
-import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
+import type { DatabaseAdapter } from "../db/database.ts";
 import { diffImages } from "../diff/engine.ts";
 import { DEFAULT_DIFF_OPTIONS } from "../diff/options.ts";
 import { BaselineModel } from "../models/baseline.ts";

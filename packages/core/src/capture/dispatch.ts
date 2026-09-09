@@ -1,5 +1,5 @@
-import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { GitHostProvider } from "../adapters/git-host/index.ts";
+import type { DatabaseAdapter } from "../db/database.ts";
 import type { Logger } from "../logger.ts";
 import { BuildModel } from "../models/build.ts";
 import { ProjectModel } from "../models/project.ts";

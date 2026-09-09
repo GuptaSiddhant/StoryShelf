@@ -1,6 +1,6 @@
 /** Project records and slug management. */
 import { eq } from "drizzle-orm";
-import type { DatabaseAdapter } from "../adapters/database.ts";
+import type { DatabaseAdapter } from "../db/database.ts";
 import { projects } from "../schema/project.ts";
 import type { Project } from "../schema/project.ts";
 import { slugify, ulid } from "../utils/ulid.ts";

@@ -1,6 +1,6 @@
 /** Snapshot records for captured stories within a build. */
 import { eq } from "drizzle-orm";
-import type { DatabaseAdapter } from "../adapters/database.ts";
+import type { DatabaseAdapter } from "../db/database.ts";
 import { snapshots } from "../schema/snapshot.ts";
 import type { Snapshot } from "../schema/snapshot.ts";
 import type { SnapshotStatus } from "../types.ts";

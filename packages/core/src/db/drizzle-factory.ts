@@ -1,8 +1,8 @@
 import type { SQL } from "drizzle-orm";
 import { eq, getTableColumns } from "drizzle-orm";
 import type { AnySQLiteTable, SQLiteColumn } from "drizzle-orm/sqlite-core";
+import type { AdapterLifecycle } from "../adapters/metadata.ts";
 import type { DatabaseAdapter, DrizzleAdapterOptions, ListOptions } from "./database.ts";
-import type { AdapterLifecycle } from "./metadata.ts";
 
 /** A value or a promise of one (sync node:sqlite vs async libSQL drivers). */
 type MaybePromise<T> = T | Promise<T>;
@@ -43,7 +43,15 @@ function idOf(table: AnySQLiteTable): SQLiteColumn {
   return id;
 }
 
-function applyListOptions(query: DrizzleSelectChain, opts: ListOptions): DrizzleSelectChain {
+/** Chainable filter surface shared by dialect select chains. */
+export interface ChainFilter<C> {
+  where(where: SQL): C;
+  orderBy(order: SQL): C;
+  limit(n: number): C;
+  offset(n: number): C;
+}
+
+export function applyListOptions<C extends ChainFilter<C>>(query: C, opts: ListOptions): C {
   let current = query;
   if (opts.where) {
     current = current.where(opts.where);
@@ -64,7 +72,7 @@ function applyListOptions(query: DrizzleSelectChain, opts: ListOptions): Drizzle
  * Build the database lifecycle: migrations run in `init`, the connection
  * closes in `close`. Close tolerates repeated calls (drivers may not).
  */
-function buildLifecycle(options: DrizzleAdapterOptions): AdapterLifecycle {
+export function buildLifecycle(options: DrizzleAdapterOptions): AdapterLifecycle {
   let closed = false;
   return {
     init: async () => {

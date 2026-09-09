@@ -1,6 +1,6 @@
 /** Build and snapshot review comments. */
 import { eq } from "drizzle-orm";
-import type { DatabaseAdapter } from "../adapters/database.ts";
+import type { DatabaseAdapter } from "../db/database.ts";
 import { comments } from "../schema/comment.ts";
 import type { Comment } from "../schema/comment.ts";
 import { projects } from "../schema/project.ts";

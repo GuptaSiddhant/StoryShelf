@@ -1,7 +1,7 @@
 import type { Logger } from "pino";
 import type { CaptureRunner } from "../adapters/capture-runner.ts";
-import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
+import type { DatabaseAdapter } from "../db/database.ts";
 import { BuildModel } from "../models/build.ts";
 import { ProjectModel } from "../models/project.ts";
 import type { Build } from "../schema/build.ts";

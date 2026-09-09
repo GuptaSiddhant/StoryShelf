@@ -1,9 +1,9 @@
 /* oxlint-disable typescript/promise-function-async -- map callbacks return promises from async helpers */
 /** Per-branch baseline screenshots with default-branch fallback. */
 import { and, eq } from "drizzle-orm";
-import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { emitWebhookEvent } from "../adapters/webhook-events.ts";
+import type { DatabaseAdapter } from "../db/database.ts";
 import { baselines } from "../schema/baseline.ts";
 import type { Baseline } from "../schema/baseline.ts";
 import { baselinePath } from "../utils/paths.ts";

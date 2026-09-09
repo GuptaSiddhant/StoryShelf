@@ -1,7 +1,7 @@
 /* oxlint-disable eslint/no-await-in-loop, typescript/promise-function-async, eslint/require-await */
 /** Per-project git-provider status check configurations. */
 import { eq } from "drizzle-orm";
-import type { DatabaseAdapter } from "../adapters/database.ts";
+import type { DatabaseAdapter } from "../db/database.ts";
 import { projectStatusConfigs } from "../schema/status-config.ts";
 import type { ProjectStatusConfig } from "../schema/status-config.ts";
 import { decrypt, encrypt } from "../utils/encrypt.ts";
