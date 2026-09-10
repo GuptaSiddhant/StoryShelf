@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/auth-password",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "Shared-password auth adapter for StoryShelf.",
   "keywords": [
     "auth",

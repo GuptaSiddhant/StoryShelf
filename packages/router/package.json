@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/router",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "StoryShelf HTTP server: Hono router, API routes, and server-rendered UI over @storyshelf/core.",
   "keywords": [
     "chromatic-alternative",

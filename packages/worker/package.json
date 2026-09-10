@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/worker",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "Remote capture worker for StoryShelf: polls a CaptureQueue and runs the capture pipeline with any CaptureRunner.",
   "keywords": [
     "capture",
