@@ -12,6 +12,8 @@ export interface Project {
   executePlay: boolean;
   playTimeoutMs: number;
   runA11y?: boolean;
+  browser?: string;
+  viewports?: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -76,6 +76,8 @@ export interface CaptureRunner extends Adapter<{
     playTimeoutMs?: number;
     /** Whether to run a11y checks (axe) before screenshot; annotated as non-blocking. */
     runA11y?: boolean;
+    /** Browser to use for rendering (chromium default). */
+    browser?: BrowserName;
   }): Promise<RenderResult>;
 
   /** Cancel a pending or in-flight render for a build. */

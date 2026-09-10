@@ -14,6 +14,8 @@ export const projects = pgTable("projects", {
   executePlay: boolean("execute_play").notNull().default(false),
   playTimeoutMs: integer("play_timeout_ms").notNull().default(10_000),
   runA11y: boolean("run_a11y").notNull().default(false),
+  browser: text("browser").notNull().default("chromium"),
+  viewports: text("viewports"),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull(),
 });
@@ -32,6 +34,8 @@ export interface Project {
   executePlay: boolean;
   playTimeoutMs: number;
   runA11y?: boolean;
+  browser?: string;
+  viewports?: string | null;
   createdAt: string;
   updatedAt: string;
 }

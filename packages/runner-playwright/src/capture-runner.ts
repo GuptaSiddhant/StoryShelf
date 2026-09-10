@@ -1,4 +1,5 @@
 import type {
+  BrowserName,
   CaptureRunner,
   RenderResult,
   RenderedSnapshot,
@@ -8,15 +9,19 @@ import type {
 } from "@storyshelf/core/adapter/capture-runner";
 import { StorybookAdapter } from "@storyshelf/core/capture";
 import type { Logger } from "@storyshelf/core/logger";
-import { chromium, type Browser } from "playwright-core";
+import { chromium, firefox, webkit, type Browser } from "playwright-core";
 import { createStaticServer } from "./static-server.ts";
 
 declare const __PKG_VERSION__: string | undefined;
 
 /** Create a CaptureRunner that renders Storybook stories with Playwright. */
 export function createPlaywrightCaptureRunner(
-  options: { supportedBrowsers?: readonly ("chromium" | "firefox" | "webkit" | "chrome")[] } = {},
+  options: {
+    browser?: BrowserName;
+    supportedBrowsers?: readonly BrowserName[];
+  } = {},
 ): CaptureRunner {
+  const defaultBrowser = options.browser ?? "chromium";
   return {
     metadata: {
       name: "Playwright",
@@ -24,13 +29,13 @@ export function createPlaywrightCaptureRunner(
       description: "Playwright capture runner",
       kind: "playwright",
       category: "capture-runner",
-      supportedBrowsers: options.supportedBrowsers ?? ["chromium", "firefox", "webkit"],
+      supportedBrowsers: options.supportedBrowsers ?? ["chromium", "firefox", "webkit", "chrome"],
     },
     async render(input: PlaywrightRenderInput) {
       const active: ActiveRun = { cancelled: false, browser: null };
       activeRuns.set(input.buildId, active);
       try {
-        return await renderAll(input, active);
+        return await renderAll(input, active, defaultBrowser);
       } finally {
         activeRuns.delete(input.buildId);
       }
@@ -56,6 +61,7 @@ export interface PlaywrightRenderInput {
   executePlay?: boolean;
   playTimeoutMs?: number;
   runA11y?: boolean;
+  browser?: BrowserName;
 }
 
 interface ScreenshotContext {
@@ -83,9 +89,19 @@ async function closeBrowser(browser: Browser | null): Promise<void> {
   }
 }
 
-async function renderAll(input: PlaywrightRenderInput, active: ActiveRun): Promise<RenderResult> {
+async function renderAll(
+  input: PlaywrightRenderInput,
+  active: ActiveRun,
+  defaultBrowser: BrowserName,
+): Promise<RenderResult> {
   const server = await createStaticServer(input.storybookDir);
-  const browser = await chromium.launch();
+  const launchBrowser = async (): Promise<Browser> => {
+    const name = input.browser ?? defaultBrowser;
+    if (name === "firefox") return await firefox.launch();
+    if (name === "webkit") return await webkit.launch();
+    return await chromium.launch();
+  };
+  const browser = await launchBrowser();
   active.browser = browser;
   const adapter = new StorybookAdapter();
   const ctx: ScreenshotContext & {

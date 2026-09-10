@@ -1,5 +1,6 @@
 import type { Logger } from "pino";
 import type { CaptureRunner } from "../adapters/capture-runner.ts";
+import type { BrowserName } from "../adapters/capture-runner.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import type { DatabaseAdapter } from "../db/database.ts";
 import { BuildModel, type BuildTables } from "../models/build.ts";
@@ -67,7 +68,18 @@ export async function executeCaptureJob(
     const adapter = new StorybookAdapter();
     const discovered = await adapter.discover(extractedDir);
     const stories = discovered.filter((s) => !isDisabledStory(s));
-    const viewports = options.viewports ?? DEFAULT_VIEWPORTS;
+    // Resolve viewports: project-specific viewports (stored as JSON string) override ShelfConfig
+    let viewports = options.viewports ?? DEFAULT_VIEWPORTS;
+    const rawViewports = (project as unknown as { viewports?: string | null }).viewports;
+    if (rawViewports) {
+      try {
+        const parsed = JSON.parse(rawViewports) as Viewport[];
+        if (Array.isArray(parsed) && parsed.length > 0) viewports = parsed;
+      } catch {
+        // Invalid JSON, fallback to default
+      }
+    }
+    const browser = (project as unknown as { browser?: string }).browser as BrowserName | undefined;
 
     const renderStart = performance.now();
     const result = await options.runner.render({
@@ -78,7 +90,8 @@ export async function executeCaptureJob(
       logger,
       executePlay: project.executePlay ?? false,
       playTimeoutMs: project.playTimeoutMs ?? 10_000,
-      runA11y: (project as unknown as { runA11y?: boolean }).runA11y ?? false,
+      runA11y: project.runA11y ?? false,
+      browser: browser ?? "chromium",
     });
     const renderDuration = performance.now() - renderStart;
     logger?.info(
