@@ -186,7 +186,7 @@ const client = postgres(process.env.DATABASE_URL!, { ssl: true });
 const database = createPostgresDatabase({ client });
 ```
 
-See the [`@storyshelf/db-postgres` package reference](../packages/db-postgres/) for full `PostgresDatabaseOptions` (`url`/`connectionString`, `ssl`, `prepare`, `max`, `idleTimeout`, `connectTimeout`, `client`).
+See the [`@storyshelf/db-postgres` package reference](/packages/db-postgres/) for full `PostgresDatabaseOptions` (`url`/`connectionString`, `ssl`, `prepare`, `max`, `idleTimeout`, `connectTimeout`, `client`).
 
 ### Minimal Postgres + S3 recipe
 

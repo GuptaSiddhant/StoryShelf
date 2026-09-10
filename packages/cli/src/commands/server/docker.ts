@@ -85,3 +85,50 @@ export function generateComposeYaml(database = "sqlite"): string {
 
   return lines.join("\n");
 }
+
+const WORKER_DOCKERFILE_LINES = [
+  "FROM node:lts-alpine AS builder",
+  "WORKDIR /app",
+  "COPY package.json ./",
+  "RUN npm install",
+  "COPY worker.ts ./",
+  "RUN npx esbuild worker.ts --bundle --platform=node --format=esm \\",
+  "  --external:playwright-core \\",
+  "  --outfile=dist/worker.mjs",
+  "",
+  "FROM mcr.microsoft.com/playwright:v1.63.0-noble",
+  "WORKDIR /app",
+  "COPY --from=builder /app/dist/worker.mjs ./",
+  "COPY --from=builder /app/node_modules/playwright-core ./node_modules/playwright-core",
+  "ENV DATA_DIR=/data",
+  'CMD ["node", "dist/worker.mjs"]',
+];
+
+const WORKER_COMPOSE_LINES = [
+  "  worker:",
+  "    build:",
+  "      dockerfile: Dockerfile.worker",
+  "    volumes:",
+  "      - storyshelf-data:/data",
+  "    environment:",
+  "      - SECRET=change-me",
+  "      - DATA_DIR=/data",
+  // oxlint-disable-next-line no-template-curly-in-string -- literal compose interpolation
+  "      - QUEUE_URL=${QUEUE_URL}",
+  "      - WORKER_CONCURRENCY=2",
+  "    depends_on:",
+  "      storyshelf:",
+  "        condition: service_started",
+];
+
+export function generateWorkerDockerfile(): string {
+  return WORKER_DOCKERFILE_LINES.join("\n");
+}
+
+export function generateWorkerComposeSnippet(): string {
+  return WORKER_COMPOSE_LINES.join("\n");
+}
+
+export function generateComposeYamlWithWorker(database = "sqlite"): string {
+  return `${generateComposeYaml(database)}\n${generateWorkerComposeSnippet()}`;
+}

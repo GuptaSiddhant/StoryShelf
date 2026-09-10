@@ -48,6 +48,8 @@
     "test": "turbo test",
     "audit": "turbo audit",
     "verify": "turbo verify --filter='./packages/*' --filter='website'",
+    "clean": "node ./scripts/clean.mjs",
+    "clean:cache": "node ./scripts/clean.mjs --cache-only",
     "web:build": "nub run --filter website build",
     "web:dev": "nub run --filter website dev",
     "release": "nub ./scripts/release.mjs",

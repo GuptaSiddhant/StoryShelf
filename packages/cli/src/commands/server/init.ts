@@ -10,7 +10,14 @@ import {
   type PackageRunner,
 } from "../../config.ts";
 import { printError, printLine } from "../../output.ts";
-import { generateComposeYaml, generateDockerfile, generateDockerignore } from "./docker.ts";
+import { detectInstalledAdapters } from "../shared/detect-adapters.ts";
+import {
+  generateComposeYaml,
+  generateComposeYamlWithWorker,
+  generateDockerfile,
+  generateDockerignore,
+  generateWorkerDockerfile,
+} from "./docker.ts";
 import { INFRA_PROMPTS, PROJECT_PROMPTS } from "./prompts.ts";
 
 /**
@@ -25,6 +32,7 @@ type DatabaseChoice = "sqlite" | "turso" | "postgres";
 type StorageChoice = "local" | "s3";
 type AuthChoice = "none" | "password" | "oauth";
 type GitChoice = "none" | "github" | "gitlab";
+type QueueChoice = "memory" | "sqs";
 
 interface Answers {
   name: string;
@@ -33,7 +41,9 @@ interface Answers {
   storage: StorageChoice;
   auth: AuthChoice;
   git: GitChoice;
+  queue: QueueChoice;
   docker: boolean;
+  includeWorker?: boolean;
 }
 
 const DB_PACKAGE: Record<DatabaseChoice, string> = {
@@ -57,6 +67,11 @@ const GIT_PACKAGE: Record<GitChoice, string | null> = {
   none: null,
   github: "@storyshelf/git-github",
   gitlab: "@storyshelf/git-gitlab",
+};
+
+const QUEUE_PACKAGE: Record<QueueChoice, string | null> = {
+  memory: null,
+  sqs: "@storyshelf/queue-sqs",
 };
 
 const DB_IMPORT: Record<DatabaseChoice, string> = {
@@ -89,6 +104,10 @@ function buildImports(answers: Answers): string[] {
     STORAGE_IMPORT[answers.storage],
   ];
 
+  if (answers.queue === "sqs") {
+    imports.push(`import { createSqsCaptureQueue } from "@storyshelf/queue-sqs";`);
+  }
+
   if (answers.auth !== "none") {
     imports.push(`import { createPasswordAuth } from "${AUTH_PACKAGE[answers.auth]}";`);
   }
@@ -96,26 +115,35 @@ function buildImports(answers: Answers): string[] {
     const host = answers.git === "github" ? "gitHubHost" : "gitLabHost";
     imports.push(`import { ${host} } from "${GIT_PACKAGE[answers.git]}";`);
   }
-  imports.push(`import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";`);
+  if (answers.queue === "memory") {
+    imports.push(`import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";`);
+  }
   return imports;
 }
 
 function buildAdapterLines(answers: Answers): string[] {
-  return [
+  const lines = [
     `// Adapters — swap these for your deployment`,
     `const database = ${DB_INIT[answers.database]};`,
     `const storage = ${STORAGE_INIT[answers.storage]};`,
-    `const captureRunner = createPlaywrightCaptureRunner();`,
   ];
+  if (answers.queue === "sqs") {
+    lines.push(`const captureQueue = createSqsCaptureQueue({ queueUrl: process.env.QUEUE_URL! });`);
+  }
+  if (answers.queue === "memory") {
+    lines.push(`const captureRunner = createPlaywrightCaptureRunner();`);
+  }
+  return lines;
 }
 
 function buildRouterLines(answers: Answers): string[] {
-  const lines = [
-    `const app = createShelfRouter({`,
-    `  database,`,
-    `  storage,`,
-    `  captureRunner,`,
-  ];
+  const lines = [`const app = createShelfRouter({`, `  database,`, `  storage,`];
+
+  if (answers.queue === "sqs") {
+    lines.push(`  captureQueue,`);
+  } else {
+    lines.push(`  captureRunner,`);
+  }
 
   if (answers.auth !== "none") {
     lines.push(`  auth: createPasswordAuth({ password: process.env.AUTH_PASSWORD! }),`);
@@ -125,16 +153,17 @@ function buildRouterLines(answers: Answers): string[] {
     lines.push(`  gitHosts: [${host}],`);
   }
 
-  lines.push(
-    `  config: {`,
-    `    secret: process.env.SECRET,`,
-    `    scratchDir: dataDir,`,
-    `  },`,
-    `});`,
-    ``,
-    `await app.lifecycle.init();`,
-    `const logger = app.lifecycle.logger;`,
-  );
+  if (answers.queue === "memory") {
+    lines.push(
+      `  config: {`,
+      `    secret: process.env.SECRET,`,
+      `    scratchDir: dataDir,`,
+      `  },`,
+    );
+  } else {
+    lines.push(`  config: {`, `    secret: process.env.SECRET,`, `  },`);
+  }
+  lines.push(`});`, ``, `await app.lifecycle.init();`, `const logger = app.lifecycle.logger;`);
 
   return lines;
 }
@@ -168,23 +197,72 @@ function generateServer(answers: Answers): string {
   ].join("\n");
 }
 
+function generateWorkerFile(answers: Answers): string {
+  return [
+    `import { createSqsCaptureQueue } from "@storyshelf/queue-sqs";`,
+    `import { createCaptureWorker } from "@storyshelf/worker";`,
+    `import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";`,
+    DB_IMPORT[answers.database],
+    STORAGE_IMPORT[answers.storage],
+    ``,
+    `const dataDir = process.env.DATA_DIR || "./data";`,
+    `const database = ${DB_INIT[answers.database]};`,
+    `const storage = ${STORAGE_INIT[answers.storage]};`,
+    `const queue = createSqsCaptureQueue({ queueUrl: process.env.QUEUE_URL! });`,
+    `const runner = createPlaywrightCaptureRunner();`,
+    ``,
+    `const worker = createCaptureWorker({`,
+    `  queue,`,
+    `  db: database,`,
+    `  storage,`,
+    `  runner,`,
+    `  scratchDir: dataDir,`,
+    `  config: { concurrency: Number(process.env.WORKER_CONCURRENCY) || 2 },`,
+    `});`,
+    ``,
+    `await worker.start();`,
+    ``,
+    `const shutdown = async () => {`,
+    `  await worker.stop();`,
+    `};`,
+    `process.on("SIGTERM", () => { shutdown().catch(() => {}); });`,
+    `process.on("SIGINT", () => { shutdown().catch(() => {}); });`,
+    ``,
+  ].join("\n");
+}
+
 function buildDeps(answers: Answers): Record<string, string> {
   const deps: Record<string, string> = {
     "@hono/node-server": "^1.17.0",
     "@storyshelf/core": __PKG_VERSION__ ?? "0.0.0",
     "@storyshelf/router": __PKG_VERSION__ ?? "0.0.0",
     [DB_PACKAGE[answers.database]]: __PKG_VERSION__ ?? "0.0.0",
-    "@storyshelf/runner-playwright": __PKG_VERSION__ ?? "0.0.0",
   };
 
   if (answers.storage !== "local") {
     deps[STORAGE_PACKAGE[answers.storage]] = __PKG_VERSION__ ?? "0.0.0";
+  }
+  if (answers.queue === "sqs") {
+    deps["@storyshelf/queue-sqs"] = __PKG_VERSION__ ?? "0.0.0";
+    if (answers.includeWorker) {
+      deps["@storyshelf/worker"] = __PKG_VERSION__ ?? "0.0.0";
+      deps["@storyshelf/runner-playwright"] = __PKG_VERSION__ ?? "0.0.0";
+    }
+  } else {
+    deps["@storyshelf/runner-playwright"] = __PKG_VERSION__ ?? "0.0.0";
   }
   if (answers.auth !== "none") {
     deps[AUTH_PACKAGE[answers.auth] ?? ""] = __PKG_VERSION__ ?? "0.0.0";
   }
   if (answers.git !== "none") {
     deps[GIT_PACKAGE[answers.git] ?? ""] = __PKG_VERSION__ ?? "0.0.0";
+  }
+  // Queue dep when sqs
+  if (answers.queue !== "memory") {
+    const queuePkg = QUEUE_PACKAGE[answers.queue];
+    if (queuePkg) {
+      deps[queuePkg] = __PKG_VERSION__ ?? "0.0.0";
+    }
   }
 
   return deps;
@@ -207,6 +285,13 @@ function generatePackageJson(answers: Answers): string {
     },
   };
 
+  if (answers.includeWorker) {
+    (pkg.scripts as Record<string, string>)["worker"] =
+      "node --experimental-transform-types worker.ts";
+    (pkg.scripts as Record<string, string>)["worker:dev"] =
+      "node --experimental-transform-types --watch worker.ts";
+  }
+
   return JSON.stringify(pkg, null, 2);
 }
 
@@ -215,25 +300,47 @@ async function writeFiles(outDir: string, answers: Answers): Promise<void> {
   await writeFile(join(outDir, "server.ts"), serverCode);
   printLine(`Created server.ts`);
 
+  if (answers.includeWorker) {
+    const workerCode = generateWorkerFile(answers);
+    await writeFile(join(outDir, "worker.ts"), workerCode);
+    printLine(`Created worker.ts`);
+  }
+
   const pkgCode = generatePackageJson(answers);
   await writeFile(join(outDir, "package.json"), pkgCode);
   printLine(`Created package.json`);
 
-  await writeDockerFiles(outDir, answers.docker, answers.database);
+  await writeDockerFiles(outDir, answers);
 }
 
-async function writeDockerFiles(
-  outDir: string,
-  docker: boolean,
-  database: DatabaseChoice = "sqlite",
-): Promise<void> {
-  if (!docker) {
+async function writeDockerFiles(outDir: string, answers: Answers): Promise<void> {
+  if (!answers.docker) {
+    return;
+  }
+
+  if (answers.queue === "sqs" && answers.includeWorker) {
+    // Server is slim when queue is remote; worker has playwright
+    const slimDockerfile = [
+      "FROM node:lts-alpine",
+      "WORKDIR /app",
+      "COPY package.json ./",
+      "RUN npm install --omit=dev",
+      "COPY server.ts ./",
+      "RUN npx esbuild server.ts --bundle --platform=node --format=esm --outfile=dist/server.mjs",
+      "EXPOSE 3000",
+      'CMD ["node", "dist/server.mjs"]',
+    ].join("\n");
+    await writeFile(join(outDir, "Dockerfile"), slimDockerfile);
+    await writeFile(join(outDir, "Dockerfile.worker"), generateWorkerDockerfile());
+    await writeFile(join(outDir, ".dockerignore"), generateDockerignore());
+    await writeFile(join(outDir, "compose.yaml"), generateComposeYamlWithWorker(answers.database));
+    printLine(`Created Dockerfile, Dockerfile.worker, .dockerignore, compose.yaml`);
     return;
   }
 
   await writeFile(join(outDir, "Dockerfile"), generateDockerfile());
   await writeFile(join(outDir, ".dockerignore"), generateDockerignore());
-  await writeFile(join(outDir, "compose.yaml"), generateComposeYaml(database));
+  await writeFile(join(outDir, "compose.yaml"), generateComposeYaml(answers.database));
   printLine(`Created Dockerfile, .dockerignore, compose.yaml`);
 }
 
@@ -244,10 +351,27 @@ function printNextSteps(answers: Answers, runner: PackageRunner): void {
 
   if (answers.docker) {
     printLine(`  docker compose up`);
+    if (answers.includeWorker) {
+      printLine(`  # or separately:`);
+      printLine(`  # docker compose up storyshelf worker`);
+    }
   } else {
     printLine(`  ${installCommand(runner)}`);
     printLine(`  ${startCommand(runner)}`);
+    if (answers.includeWorker) {
+      printLine(`  # in another terminal:`);
+      printLine(`  npx storyshelf worker serve --dir .`);
+    }
   }
+}
+
+function promptInitial(choices: { value: string }[], value?: string): number | undefined {
+  if (value === undefined || value === "") {
+    return undefined;
+  }
+  const idx = choices.findIndex((c) => c.value === value);
+  if (idx === -1) return undefined;
+  return idx;
 }
 
 /**
@@ -260,7 +384,25 @@ function printNextSteps(answers: Answers, runner: PackageRunner): void {
  * @param _options - Reserved for future CLI flags; currently prompts for all choices interactively
  */
 export async function runServerInit(_options: ServerInitOptions): Promise<void> {
-  const responses = await prompts([...PROJECT_PROMPTS, ...INFRA_PROMPTS]);
+  // Try to autofill from existing package.json (standalone worker dir or re-init)
+  const cwdPkg = detectInstalledAdapters(process.cwd());
+
+  const infraWithInitial = INFRA_PROMPTS.map((prompt) => {
+    if (prompt.type !== "select") {
+      return prompt;
+    }
+    const detected = cwdPkg[prompt.name as keyof typeof cwdPkg] as string | undefined;
+    const initial = promptInitial(prompt.choices, detected);
+    if (initial !== undefined) {
+      return { ...prompt, initial };
+    }
+    return prompt;
+  });
+
+  const responses = (await prompts([...PROJECT_PROMPTS, ...infraWithInitial])) as Record<
+    string,
+    unknown
+  >;
 
   if (!responses["name"] || !responses["dir"]) {
     printError("Cancelled.");
@@ -268,6 +410,23 @@ export async function runServerInit(_options: ServerInitOptions): Promise<void> 
   }
 
   const answers = responses as unknown as Answers;
+  // Default queue to memory if not answered (prompts initial unset)
+  if (!answers.queue) {
+    answers.queue = "memory";
+  }
+
+  // Hybrid: if queue is SQS, ask whether to generate worker alongside
+  if (answers.queue === "sqs") {
+    const workerAnswer = (await prompts({
+      type: "confirm",
+      name: "includeWorker",
+      message: "Generate worker service alongside server?",
+      initial: true,
+    } as never)) as Record<string, unknown>;
+    const includeWorkerValue = workerAnswer["includeWorker"] as boolean | undefined;
+    answers.includeWorker = includeWorkerValue ?? true;
+  }
+
   const outDir = resolve(answers.dir);
   await mkdir(outDir, { recursive: true });
 

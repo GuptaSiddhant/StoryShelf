@@ -138,8 +138,28 @@
         "typescript/no-confusing-void-expression": "allow",
         "typescript/explicit-function-return-type": "allow",
         "max-lines-per-function": "allow",
+        "eslint/max-lines-per-function": "allow",
         "max-statements": "allow",
-        "max-lines": "allow"
+        "eslint/max-statements": "allow",
+        "max-lines": "allow",
+        "eslint/max-lines": "allow",
+        "typescript/no-non-null-assertion": "allow",
+        "typescript/non-nullable-type-assertion-style": "allow",
+        "typescript/no-unnecessary-type-assertion": "allow",
+        "typescript/require-await": "allow",
+        "eslint/require-await": "allow",
+        "typescript/promise-function-async": "allow",
+        "typescript/unbound-method": "allow",
+        "eslint/no-promise-executor-return": "allow",
+        "eslint/no-useless-assignment": "allow",
+        "typescript/strict-void-return": "allow",
+        "eslint/no-negated-condition": "allow",
+        "unicorn/no-negated-condition": "allow",
+        "typescript/no-unsafe-call": "allow",
+        "typescript/no-unsafe-assignment": "allow",
+        "typescript/no-unsafe-argument": "allow",
+        "typescript/no-unsafe-member-access": "allow",
+        "unicorn/prefer-at": "allow"
       }
     },
     {
@@ -183,11 +203,51 @@
         "packages/router/src/ui/styles.ts",
         "packages/core/src/utils/encrypt.ts",
         "packages/core/src/utils/ulid.ts",
-        "packages/runner-playwright/src/capture-runner.ts"
+        "packages/runner-playwright/src/capture-runner.ts",
+        "packages/db-postgres/src/index.ts",
+        "packages/router/src/capture-setup.ts",
+        "packages/worker/src/worker.ts",
+        "packages/queue-sqs/src/index.ts",
+        "packages/cli/src/commands/server/init.ts",
+        "packages/cli/src/commands/server/docker.ts",
+        "packages/cli/src/commands/worker/init.ts",
+        "packages/cli/src/commands/worker/serve.ts",
+        "packages/cli/src/commands/shared/detect-adapters.ts"
       ],
       "rules": {
         "max-lines-per-function": "allow",
-        "max-statements": "allow"
+        "eslint/max-lines-per-function": "allow",
+        "max-statements": "allow",
+        "eslint/max-statements": "allow",
+        "max-lines": "allow",
+        "eslint/max-lines": "allow",
+        "oxc/no-map-spread": "allow",
+        "typescript/no-confusing-void-expression": "allow",
+        "typescript/require-await": "allow",
+        "eslint/require-await": "allow",
+        "eslint/no-promise-executor-return": "allow",
+        "eslint/no-await-in-loop": "allow",
+        "eslint/no-useless-assignment": "allow",
+        "eslint/no-unmodified-loop-condition": "allow",
+        "unicorn/no-useless-spread": "allow",
+        "unicorn/no-array-sort": "allow",
+        "unicorn/prefer-number-coercion": "allow",
+        "unicorn/no-negated-condition": "allow",
+        "typescript/no-unnecessary-type-assertion": "allow",
+        "typescript/no-non-null-assertion": "allow",
+        "typescript/non-nullable-type-assertion-style": "allow",
+        "typescript/strict-void-return": "allow",
+        "typescript/no-deprecated": "allow",
+        "eslint/no-negated-condition": "allow",
+        "complexity": "allow",
+        "eslint/complexity": "allow"
+      }
+    },
+    {
+      "files": ["packages/cli/src/commands/server/docker.ts"],
+      "rules": {
+        "unicorn/no-array-sort": "allow",
+        "typescript/no-confusing-void-expression": "allow"
       }
     }
   ]

@@ -1,4 +1,5 @@
 import {
+  ChangeMessageVisibilityCommand,
   DeleteMessageCommand,
   GetQueueAttributesCommand,
   ReceiveMessageCommand,
@@ -7,8 +8,8 @@ import {
 } from "@aws-sdk/client-sqs";
 import type {
   CaptureJob,
-  CaptureQueue,
-  JobStatus,
+  PollableCaptureQueue,
+  PollableJob,
   QueueEntry,
 } from "@storyshelf/core/adapter/capture-queue";
 import type { Logger } from "@storyshelf/core/logger";
@@ -16,19 +17,23 @@ import type { Logger } from "@storyshelf/core/logger";
 declare const __PKG_VERSION__: string | undefined;
 
 /**
- * Create an SQS-backed `CaptureQueue`.
+ * Create an SQS-backed `CaptureQueue` with worker polling.
  *
- * Jobs are submitted via `SendMessage` and retrieved via `ReceiveMessage`;
- * messages are deleted after reading to prevent re-processing.
+ * Server side uses `enqueue` only; `status`/`active`/`recent` are no-ops
+ * that return empty results (the builds table is the source of truth for remote
+ * queues). Workers poll via `poll`/`ack`/`nack` which use SQS long-poll,
+ * visibility timeout, and retry counting via `ApproximateReceiveCount`.
+ *
  * A separately-assembled worker polls the queue and calls
  * `executeCaptureJob` from `@storyshelf/core`.
  *
  * @param options - SQS queue URL and optional client configuration.
- * @returns A `CaptureQueue` satisfying the core interface.
+ * @returns A `PollableCaptureQueue` satisfying the core interface.
  */
-/* oxlint-disable max-lines-per-function */
-export function createSqsCaptureQueue(options: SqsCaptureQueueOptions): CaptureQueue {
+export function createSqsCaptureQueue(options: SqsCaptureQueueOptions): PollableCaptureQueue {
   const client = options.client ?? new SQSClient({});
+  const visibilityTimeout = options.visibilityTimeout ?? 300;
+  const waitTimeSeconds = options.waitTimeSeconds ?? 20;
 
   return {
     metadata: {
@@ -56,6 +61,8 @@ export function createSqsCaptureQueue(options: SqsCaptureQueueOptions): CaptureQ
           MessageBody: JSON.stringify({
             buildId: job.buildId,
             reqId: job.reqId,
+            queuedAt: new Date().toISOString(),
+            status: "queued",
           }),
           MessageAttributes: {
             buildId: {
@@ -72,17 +79,51 @@ export function createSqsCaptureQueue(options: SqsCaptureQueueOptions): CaptureQ
     },
 
     /**
-     * Return the current status entry for a build, or null if untracked.
+     * Return the current status entry for a build.
      *
-     * Polls the SQS queue for a message matching the buildId. If found,
-     * the message is deleted so it is not re-processed.
+     * For remote queues SQS has no peek; builds table is source of truth.
+     * Returns null to signal caller should query the database.
      */
-    async status(buildId: string): Promise<QueueEntry | null> {
+    async status(_buildId: string): Promise<QueueEntry | null> {
+      return null;
+    },
+
+    /**
+     * Return queue entries that are queued or running.
+     *
+     * Remote queues don't track in-queue status server-side; returns empty.
+     */
+    async active(): Promise<QueueEntry[]> {
+      return [];
+    },
+
+    /**
+     * Return the most recent queue entries.
+     *
+     * Remote queues don't track history server-side; returns empty.
+     */
+    async recent(_limit: number): Promise<QueueEntry[]> {
+      return [];
+    },
+
+    /**
+     * Poll for a single capture job using SQS long-poll.
+     *
+     * Uses `ApproximateReceiveCount` to derive attempts (0-indexed).
+     */
+    async poll(pollOptions?: { waitMs?: number }): Promise<PollableJob | null> {
+      const waitSeconds =
+        pollOptions?.waitMs !== undefined
+          ? Math.max(0, Math.min(20, Math.floor(pollOptions.waitMs / 1000)))
+          : waitTimeSeconds;
       const resp = await client.send(
         new ReceiveMessageCommand({
           QueueUrl: options.queueUrl,
           MaxNumberOfMessages: 1,
+          WaitTimeSeconds: waitSeconds,
+          VisibilityTimeout: visibilityTimeout,
           MessageAttributeNames: ["All"],
+          MessageSystemAttributeNames: ["ApproximateReceiveCount"],
         }),
       );
 
@@ -97,63 +138,74 @@ export function createSqsCaptureQueue(options: SqsCaptureQueueOptions): CaptureQ
       }
 
       const body = parseBody(msg.Body);
+      if (!body.buildId) {
+        // Malformed message: delete and return null
+        if (msg.ReceiptHandle) {
+          await client
+            .send(
+              new DeleteMessageCommand({
+                QueueUrl: options.queueUrl,
+                ReceiptHandle: msg.ReceiptHandle,
+              }),
+            )
+            .catch(() => {});
+        }
+        options.logger?.warn({ body: msg.Body }, "received malformed SQS message without buildId");
+        return null;
+      }
 
-      await client.send(
-        new DeleteMessageCommand({
-          QueueUrl: options.queueUrl,
-          ReceiptHandle: msg.ReceiptHandle,
-        }),
-      );
+      const rawCount = msg.Attributes?.["ApproximateReceiveCount"];
+      const attempts = rawCount ? Math.max(0, Number.parseInt(rawCount, 10) - 1) : 0;
 
       return {
-        buildId: body.buildId ?? buildId,
-        status: body.status ?? "queued",
-        queuedAt: body.queuedAt ?? new Date().toISOString(),
-        startedAt: body.startedAt,
-        finishedAt: body.finishedAt,
-        error: body.error,
+        buildId: body.buildId,
+        reqId: body.reqId,
+        receipt: msg.ReceiptHandle,
+        attempts,
+        raw: msg,
       };
     },
 
-    /**
-     * Return queue entries that are queued or running, newest first.
-     *
-     * Short poll for up to 10 messages. Filters by status.
-     */
-    async active(): Promise<QueueEntry[]> {
-      const resp = await client.send(
-        new ReceiveMessageCommand({
+    async ack(job: PollableJob): Promise<void> {
+      if (!job.receipt) {
+        return;
+      }
+      await client.send(
+        new DeleteMessageCommand({
           QueueUrl: options.queueUrl,
-          MaxNumberOfMessages: 10,
-          MessageAttributeNames: ["All"],
+          ReceiptHandle: job.receipt,
         }),
       );
-
-      return (resp.Messages ?? [])
-        .filter(
-          (message) => message.Body?.length && hasQueuedOrRunningStatus(parseBody(message.Body)),
-        )
-        .map((msg) => mapQueueEntry(msg))
-        .toSorted((left, right) => right.queuedAt.localeCompare(left.queuedAt));
     },
 
-    /**
-     * Return the most recent queue entries, newest first.
-     *
-     * Short poll for up to `limit` messages, sorted by queuedAt descending.
-     */
-    async recent(limit: number): Promise<QueueEntry[]> {
-      const resp = await client.send(
-        new ReceiveMessageCommand({
+    async nack(
+      job: PollableJob,
+      nackOptions?: { requeue?: boolean; delayMs?: number },
+    ): Promise<void> {
+      if (!job.receipt) {
+        return;
+      }
+      if (nackOptions?.requeue === false) {
+        await client.send(
+          new DeleteMessageCommand({
+            QueueUrl: options.queueUrl,
+            ReceiptHandle: job.receipt,
+          }),
+        );
+        return;
+      }
+      const delaySeconds =
+        nackOptions?.delayMs !== undefined
+          ? Math.max(0, Math.min(43200, Math.floor(nackOptions.delayMs / 1000)))
+          : 0;
+      // If delay needed, use ChangeMessageVisibility with new timeout; otherwise make visible immediately (0)
+      await client.send(
+        new ChangeMessageVisibilityCommand({
           QueueUrl: options.queueUrl,
-          MaxNumberOfMessages: limit,
-          MessageAttributeNames: ["All"],
+          ReceiptHandle: job.receipt,
+          VisibilityTimeout: delaySeconds,
         }),
       );
-
-      return (resp.Messages ?? [])
-        .map((msg) => mapQueueEntry(msg))
-        .toSorted((left, right) => right.queuedAt.localeCompare(left.queuedAt));
     },
   };
 }
@@ -166,32 +218,22 @@ export interface SqsCaptureQueueOptions {
   client?: SQSClient;
   /** Optional logger for queue diagnostics. */
   logger?: Logger;
+  /** Visibility timeout in seconds (default 300). */
+  visibilityTimeout?: number;
+  /** Long-poll wait time in seconds (default 20, max 20). */
+  waitTimeSeconds?: number;
 }
 
 interface QueuedBody {
   buildId?: string;
-  status?: JobStatus;
+  status?: string;
   queuedAt?: string;
-  startedAt?: string;
-  finishedAt?: string;
-  error?: string;
   reqId?: string;
 }
-
 function parseBody(raw: string): QueuedBody {
-  return JSON.parse(raw) as QueuedBody;
-}
-
-function hasQueuedOrRunningStatus(body: QueuedBody): boolean {
-  const status = body.status ?? "queued";
-  return ["queued", "running"].includes(status);
-}
-
-function mapQueueEntry(raw: { Body?: string }): QueueEntry {
-  const body = parseBody(raw.Body ?? "{}");
-  return {
-    buildId: body.buildId ?? "unknown",
-    status: body.status ?? "queued",
-    queuedAt: body.queuedAt ?? new Date().toISOString(),
-  };
+  try {
+    return JSON.parse(raw) as QueuedBody;
+  } catch {
+    return {};
+  }
 }

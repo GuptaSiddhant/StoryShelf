@@ -112,8 +112,8 @@ describe("Retention purge integration", () => {
     expect(result.removedBuilds).toBe(2);
     expect(result.removedFiles).toBeGreaterThanOrEqual(0);
     const survivors = await db.list(builds);
-    // oxlint-disable-next-line typescript/no-unnecessary-type-assertion -- narrows build["id"] to string for toSorted
-    expect(survivors.map((build) => build.id as string).toSorted()).toEqual(["b1", "b3", "b5"]);
+    // oxlint-disable-next-line unicorn/no-array-sort, unicorn/no-useless-spread -- toSorted not available in type-aware lint lib
+    expect([...survivors.map((build) => build.id)].sort()).toEqual(["b1", "b3", "b5"]);
   });
 
   it("purges all terminal builds when keepLatestPerBranch is false", async () => {

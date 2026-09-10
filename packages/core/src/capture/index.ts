@@ -18,6 +18,7 @@ export {
 export { executeCaptureJob, type CaptureJobOptions } from "./orchestrator.ts";
 export { persistCapture, type CaptureContext } from "./pipeline.ts";
 export { InMemoryCaptureQueue, type InMemoryCaptureQueueOptions } from "./queue.ts";
+export type { PollableCaptureQueue, PollableJob } from "../adapters/capture-queue.ts";
 export { StorybookAdapter } from "./storybook.ts";
 export { createDispatchJob, type CaptureDispatchJob, type DispatchDeps } from "./dispatch.ts";
 export { extractStorybookToScratch, persistStorybookStatics } from "./statics.ts";

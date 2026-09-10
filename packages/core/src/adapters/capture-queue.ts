@@ -20,6 +20,16 @@ export interface CaptureJob {
   reqId?: string;
 }
 
+/** A job polled from a queue with transport metadata. */
+export interface PollableJob extends CaptureJob {
+  /** Transport receipt handle (SQS, Redis pop token, etc.). */
+  receipt?: string;
+  /** Number of delivery attempts already made (0 = first delivery). */
+  attempts?: number;
+  /** Raw transport message for debugging. */
+  raw?: unknown;
+}
+
 /**
  * A capture job queue, decoupled from the runtime.
  *
@@ -44,4 +54,14 @@ export interface CaptureQueue extends Adapter<{ readonly category: "capture-queu
   active(): Promise<QueueEntry[]>;
   /** The most recent queue entries, newest first. */
   recent(limit: number): Promise<QueueEntry[]>;
+}
+
+/** Extension for queues that support worker-side polling. */
+export interface PollableCaptureQueue extends CaptureQueue {
+  /** Poll for a single job; returns null if none available within waitMs. */
+  poll(options?: { waitMs?: number }): Promise<PollableJob | null>;
+  /** Acknowledge successful processing of a polled job. */
+  ack(job: PollableJob): Promise<void>;
+  /** Negatively acknowledge; requeue with optional delay when possible. */
+  nack(job: PollableJob, options?: { requeue?: boolean; delayMs?: number }): Promise<void>;
 }

@@ -23,13 +23,31 @@ export interface QueueWiring {
   enqueueCapture: ((buildId: string, reqId?: string) => Promise<void>) | undefined;
 }
 
-/** Assemble the capture queue and its enqueue hook when a runner is configured. */
+/** Assemble the capture queue and its enqueue hook. */
 export function setupCaptureQueue(
   options: ShelfOptions,
   config: ShelfConfig,
   gitHosts: GitHostProvider[],
   logger: Logger,
 ): QueueWiring {
+  if (!options.captureQueue && !options.captureRunner) {
+    return { queue: null, enqueueCapture: undefined };
+  }
+  if (options.captureQueue) {
+    const enqueueCapture = async (buildId: string, reqId?: string): Promise<void> => {
+      await options.captureQueue!.enqueue({ buildId, reqId });
+    };
+    if (!options.captureRunner) {
+      return { queue: options.captureQueue, enqueueCapture };
+    }
+    // Both queue and runner supplied: runner is ignored server-side for remote queues;
+    // enqueue goes to the supplied queue and capture is handled by an external worker.
+    if (!config.scratchDir) {
+      return { queue: options.captureQueue, enqueueCapture };
+    }
+    // If scratchDir is set with both, still prefer the supplied queue; no in-memory queue needed.
+    return { queue: options.captureQueue, enqueueCapture };
+  }
   if (!options.captureRunner) {
     return { queue: null, enqueueCapture: undefined };
   }

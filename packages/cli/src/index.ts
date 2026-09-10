@@ -12,6 +12,8 @@ import { runServerInit, type ServerInitOptions } from "./commands/server/init.ts
 import { runServerServe, type ServerServeOptions } from "./commands/server/serve.ts";
 import { runUpload, type UploadOptions } from "./commands/upload.ts";
 import { runWhoami } from "./commands/whoami.ts";
+import { runWorkerInit, type WorkerInitOptions } from "./commands/worker/init.ts";
+import { runWorkerServe, type WorkerServeOptions } from "./commands/worker/serve.ts";
 
 /**
  * Build the StoryShelf CLI program with all subcommands registered.
@@ -28,6 +30,7 @@ export function createProgram(): Command {
     buildInitCommand(),
     buildCreateCommand(),
     buildServerCommand(),
+    buildWorkerCommand(),
     buildPurgeCommand(),
     buildUploadCommand(),
     buildBuildCommand(),
@@ -87,6 +90,30 @@ function buildServerCommand(): Command {
     .action(run<ServerServeOptions>(runServerServe));
   server.addCommand(serve, { isDefault: true });
   return server;
+}
+
+function buildWorkerCommand(): Command {
+  const worker = new Command("worker").description("Worker operations");
+  worker
+    .command("init")
+    .description("Scaffold a new StoryShelf worker project")
+    .option("--dir <dir>", "output directory")
+    .action(run<WorkerInitOptions>(runWorkerInit));
+  worker
+    .command("serve")
+    .description("Run a scaffolded StoryShelf worker project")
+    .option("--dir <dir>", "worker project directory (default cwd)")
+    .option("--queue-url <url>", "SQS queue URL override (sets QUEUE_URL)")
+    .option("--concurrency <n>", "concurrency override (sets WORKER_CONCURRENCY)")
+    .action(run<WorkerServeOptions>(runWorkerServe));
+  const runCmd = new Command("run")
+    .description("Run a scaffolded worker (alias for worker serve)")
+    .option("--dir <dir>", "worker project directory (default cwd)")
+    .option("--queue-url <url>", "SQS queue URL override")
+    .option("--concurrency <n>", "concurrency override")
+    .action(run<WorkerServeOptions>(runWorkerServe));
+  worker.addCommand(runCmd);
+  return worker;
 }
 
 function buildPurgeCommand(): Command {

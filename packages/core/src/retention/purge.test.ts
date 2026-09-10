@@ -163,7 +163,8 @@ describe("Retention", () => {
     expect(result.removedBranches).toBe(1);
     expect(result.removedBaselines).toBe(1);
     const remaining = await baselineModel.list("p1");
-    expect(remaining.map((b) => b.branch).toSorted()).toEqual(["feature/fresh", "main"]);
+    // oxlint-disable-next-line unicorn/no-array-sort, unicorn/no-useless-spread -- toSorted not available in type-aware lint lib
+    expect([...remaining.map((b) => b.branch)].sort()).toEqual(["feature/fresh", "main"]);
   });
 
   it("never purges the default branch", async () => {
