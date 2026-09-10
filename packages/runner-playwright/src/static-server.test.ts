@@ -37,7 +37,7 @@ describe("createStaticServer", () => {
     try {
       const js = await fetch(`${server.url}/app.js`);
       expect(js.status).toBe(200);
-      expect(js.headers.get("content-type")).toContain("text/javascript");
+      expect(js.headers.get("content-type")).toContain("javascript");
       const json = await fetch(`${server.url}/data.json`);
       expect(json.headers.get("content-type")).toContain("application/json");
     } finally {

@@ -31,21 +31,24 @@ export async function persistCapture(
   ctx: CaptureContext,
   renderFailedStoryIds: ReadonlySet<string> = new Set(),
   flakyFailedStoryIds: ReadonlySet<string> = new Set(),
+  a11yFailedStoryIds: ReadonlySet<string> = new Set(),
 ): Promise<void> {
   const failedStoryIds = new Set(renderFailedStoryIds);
   const flakyIds = new Set(flakyFailedStoryIds);
+  const a11yIds = new Set(a11yFailedStoryIds);
   await Promise.all(
     ctx.captures.map(async (capture) => {
       try {
         await persistSnapshot(ctx, capture);
       } catch (error) {
         // A failure in one story/viewport must not abort the other persists.
-        // Flaky stories remain non-blocking even on persist failure.
-        if (flakyIds.has(capture.story.id)) {
-          flakyIds.add(capture.story.id);
+        // Flaky and a11y stories remain non-blocking even on persist failure.
+        if (flakyIds.has(capture.story.id) || a11yIds.has(capture.story.id)) {
+          if (flakyIds.has(capture.story.id)) flakyIds.add(capture.story.id);
+          if (a11yIds.has(capture.story.id)) a11yIds.add(capture.story.id);
           ctx.logger?.warn(
             { storyId: capture.story.id, viewport: capture.viewportName, err: error },
-            "capture failed for flaky story (non-blocking)",
+            "capture failed for flaky/a11y story (non-blocking)",
           );
         } else {
           failedStoryIds.add(capture.story.id);
@@ -57,13 +60,24 @@ export async function persistCapture(
       }
     }),
   );
-  // Also log flaky render failures as warnings
+  // Also log flaky and a11y render failures as warnings
   for (const id of flakyIds) {
     if (!failedStoryIds.has(id)) {
       ctx.logger?.warn({ storyId: id }, "flaky story failed (non-blocking)");
     }
   }
-  await finalize(ctx, new Set(ctx.captures.map((c) => c.story.id)), failedStoryIds, flakyIds);
+  for (const id of a11yIds) {
+    if (!failedStoryIds.has(id) && !flakyIds.has(id)) {
+      ctx.logger?.warn({ storyId: id }, "a11y violations found (non-blocking)");
+    }
+  }
+  await finalize(
+    ctx,
+    new Set(ctx.captures.map((c) => c.story.id)),
+    failedStoryIds,
+    flakyIds,
+    a11yIds,
+  );
 }
 
 /** Table handles required by the capture pipeline. */
@@ -208,6 +222,7 @@ async function finalize(
   storyIds: ReadonlySet<string>,
   failedStoryIds: ReadonlySet<string>,
   flakyFailedStoryIds: ReadonlySet<string> = new Set(),
+  a11yFailedStoryIds: ReadonlySet<string> = new Set(),
 ): Promise<void> {
   const builds = new BuildModel(ctx.db, ctx.tables);
   const build = await builds.updateCounts(ctx.build.id);
@@ -218,11 +233,17 @@ async function finalize(
   } else if (hasCaptures && build.changedCount === 0) {
     status = "approved";
   }
-  // Flaky failures do not block: log warning if any flaky stories failed
+  // Flaky and a11y failures do not block: log warning if any failed non-blocking
   if (flakyFailedStoryIds.size > 0 && failedStoryIds.size === 0) {
     ctx.logger?.warn(
       { flakyStoryIds: [...flakyFailedStoryIds] },
       "flaky stories failed (non-blocking)",
+    );
+  }
+  if (a11yFailedStoryIds.size > 0 && failedStoryIds.size === 0) {
+    ctx.logger?.warn(
+      { a11yStoryIds: [...a11yFailedStoryIds] },
+      "a11y violations found (non-blocking)",
     );
   }
   await builds.setStatus(ctx.build.id, status);

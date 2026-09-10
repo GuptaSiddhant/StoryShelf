@@ -13,6 +13,7 @@ export const projects = pgTable("projects", {
   storybookMeta: text("storybook_meta").$type<string | null | undefined>().default(null),
   executePlay: boolean("execute_play").notNull().default(false),
   playTimeoutMs: integer("play_timeout_ms").notNull().default(10_000),
+  runA11y: boolean("run_a11y").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull(),
 });
@@ -30,6 +31,7 @@ export interface Project {
   storybookMeta: string | null | undefined;
   executePlay: boolean;
   playTimeoutMs: number;
+  runA11y?: boolean;
   createdAt: string;
   updatedAt: string;
 }

@@ -13,6 +13,7 @@ export const projects = sqliteTable("projects", {
   storybookMeta: text("storybook_meta").$type<string | null | undefined>().default(null),
   executePlay: integer("execute_play", { mode: "boolean" }).notNull().default(false),
   playTimeoutMs: integer("play_timeout_ms").notNull().default(10_000),
+  runA11y: integer("run_a11y", { mode: "boolean" }).notNull().default(false),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
@@ -30,6 +31,7 @@ export interface Project {
   storybookMeta: string | null | undefined;
   executePlay: boolean;
   playTimeoutMs: number;
+  runA11y?: boolean;
   createdAt: string;
   updatedAt: string;
 }

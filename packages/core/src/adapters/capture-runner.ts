@@ -47,7 +47,12 @@ export interface RenderResult {
  * orchestrator's job (see `capture/orchestrator.ts`), keeping every adapter
  * implementation free of server concerns.
  */
-export interface CaptureRunner extends Adapter<{ readonly category: "capture-runner" }> {
+export type BrowserName = "chromium" | "firefox" | "webkit" | "chrome";
+
+export interface CaptureRunner extends Adapter<{
+  readonly category: "capture-runner";
+  readonly supportedBrowsers?: readonly BrowserName[];
+}> {
   /**
    * Render configured viewports for the given stories of an extracted
    * Storybook and return the screenshot buffers.
@@ -69,6 +74,8 @@ export interface CaptureRunner extends Adapter<{ readonly category: "capture-run
     executePlay?: boolean;
     /** Timeout for play function execution in ms. */
     playTimeoutMs?: number;
+    /** Whether to run a11y checks (axe) before screenshot; annotated as non-blocking. */
+    runA11y?: boolean;
   }): Promise<RenderResult>;
 
   /** Cancel a pending or in-flight render for a build. */

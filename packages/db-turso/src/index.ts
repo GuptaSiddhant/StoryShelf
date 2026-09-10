@@ -35,6 +35,7 @@ export function createTursoDatabase(options: { url: string; authToken?: string }
 }
 
 const STORYBOOK_META_ALTER = "ALTER TABLE projects ADD COLUMN storybook_meta TEXT";
+const RUN_A11Y_ALTER = "ALTER TABLE projects ADD COLUMN run_a11y INTEGER NOT NULL DEFAULT 0";
 const WEBHOOK_SECRET_ALTER =
   "ALTER TABLE webhooks ADD COLUMN secret_encrypted TEXT NOT NULL DEFAULT ''";
 const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN secret";
@@ -42,6 +43,7 @@ const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN secret";
 async function runMigrations(client: ReturnType<typeof createClient>): Promise<void> {
   await client.executeMultiple(DDL);
   await execIgnore(client, STORYBOOK_META_ALTER);
+  await execIgnore(client, RUN_A11Y_ALTER);
   await execWebhookMigration(client);
   await migrateCommentsTable(client);
 }

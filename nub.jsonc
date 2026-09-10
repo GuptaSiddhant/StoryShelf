@@ -15,6 +15,7 @@
       "adm-zip",
       "unzipper",
       "playwright-core",
+      "postgres",
       "yaml",
     ],
   },

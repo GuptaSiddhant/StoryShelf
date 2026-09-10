@@ -84,6 +84,8 @@ export function createPostgresDatabase(options: PostgresDatabaseOptions): Databa
 }
 
 const STORYBOOK_META_ALTER = "ALTER TABLE projects ADD COLUMN IF NOT EXISTS storybook_meta TEXT";
+const RUN_A11Y_ALTER =
+  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS run_a11y BOOLEAN NOT NULL DEFAULT false";
 const WEBHOOK_SECRET_ALTER =
   "ALTER TABLE webhooks ADD COLUMN IF NOT EXISTS secret_encrypted TEXT NOT NULL DEFAULT ''";
 const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN IF EXISTS secret";
@@ -91,6 +93,7 @@ const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN IF EXISTS secret";
 async function runMigrations(client: ReturnType<typeof postgres>): Promise<void> {
   await client.unsafe(DDL);
   await execIgnore(client, STORYBOOK_META_ALTER);
+  await execIgnore(client, RUN_A11Y_ALTER);
   await execIgnore(client, WEBHOOK_SECRET_ALTER);
   await execIgnore(client, WEBHOOK_SECRET_DROP);
   await migrateCommentsTable(client);

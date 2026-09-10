@@ -11,6 +11,7 @@ export interface Project {
   storybookMeta: string | null | undefined;
   executePlay: boolean;
   playTimeoutMs: number;
+  runA11y?: boolean;
   createdAt: string;
   updatedAt: string;
 }

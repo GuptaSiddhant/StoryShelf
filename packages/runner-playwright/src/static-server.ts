@@ -1,7 +1,8 @@
+import { isPathSafe, mimeFor } from "@storyshelf/core/utils";
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { createServer, type Server, type ServerResponse } from "node:http";
-import { extname, join, normalize, sep } from "node:path";
+import { join, normalize } from "node:path";
 
 /** A local HTTP server serving a built Storybook directory for capture. */
 export interface StaticServer {
@@ -40,24 +41,6 @@ export async function createStaticServer(rootDir: string): Promise<StaticServer>
   };
 }
 
-const MIME_TYPES: Record<string, string> = {
-  ".css": "text/css; charset=utf-8",
-  ".html": "text/html; charset=utf-8",
-  ".ico": "image/x-icon",
-  ".jpeg": "image/jpeg",
-  ".jpg": "image/jpeg",
-  ".js": "text/javascript; charset=utf-8",
-  ".json": "application/json; charset=utf-8",
-  ".map": "application/json; charset=utf-8",
-  ".mjs": "text/javascript; charset=utf-8",
-  ".png": "image/png",
-  ".svg": "image/svg+xml",
-};
-
-function mimeFor(file: string): string {
-  return MIME_TYPES[extname(file).toLowerCase()] ?? "application/octet-stream";
-}
-
 function sendNotFound(res: ServerResponse): void {
   res.writeHead(404, { "content-type": "text/plain" });
   res.end("Not found");
@@ -66,7 +49,7 @@ function sendNotFound(res: ServerResponse): void {
 async function resolveFile(root: string, urlPath: string): Promise<string | null> {
   const clean = (urlPath.split("?")[0] ?? "/").replace(/^\/+/u, "");
   const target = normalize(join(root, clean === "" ? "index.html" : clean));
-  if (target !== root && !target.startsWith(root + sep)) {
+  if (!isPathSafe(root, target)) {
     return null;
   }
   const info = await stat(target).catch(() => null);

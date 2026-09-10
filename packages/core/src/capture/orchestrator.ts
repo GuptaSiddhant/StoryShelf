@@ -78,6 +78,7 @@ export async function executeCaptureJob(
       logger,
       executePlay: project.executePlay ?? false,
       playTimeoutMs: project.playTimeoutMs ?? 10_000,
+      runA11y: (project as unknown as { runA11y?: boolean }).runA11y ?? false,
     });
     const renderDuration = performance.now() - renderStart;
     logger?.info(
@@ -88,8 +89,10 @@ export async function executeCaptureJob(
     const flakyStoryIds = new Set(stories.filter((s) => isFlakyStory(s)).map((s) => s.id));
     const blockingFailed = new Set<string>();
     const flakyFailed = new Set<string>();
+    const a11yFailed = new Set<string>();
     for (const f of result.failures) {
-      if (flakyStoryIds.has(f.storyId)) flakyFailed.add(f.storyId);
+      if (f.error.startsWith("a11y:")) a11yFailed.add(f.storyId);
+      else if (flakyStoryIds.has(f.storyId)) flakyFailed.add(f.storyId);
       else blockingFailed.add(f.storyId);
     }
 
@@ -108,6 +111,7 @@ export async function executeCaptureJob(
       },
       blockingFailed,
       flakyFailed,
+      a11yFailed,
     );
     const persistDuration = performance.now() - persistStart;
     logger?.info({ durationMs: Math.round(persistDuration) }, "capture persisted");

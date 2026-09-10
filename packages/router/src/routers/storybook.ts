@@ -3,7 +3,7 @@ import { LabelModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
 import type { Build } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
-import { storybookDir } from "@storyshelf/core/utils";
+import { isSafeSegment, mimeFor, storybookDir } from "@storyshelf/core/utils";
 import { buildLabels, builds, labelTypes, projects, snapshots } from "@storyshelf/db-sqlite/schema";
 import { posix } from "node:path";
 import type { ShelfApp } from "../index.tsx";
@@ -12,39 +12,8 @@ import { getStore } from "../store.ts";
 import { currentProjectRole, notFound } from "./helpers.ts";
 const VIEW_ROLES: ReadonlySet<string> = new Set(["viewer", "developer", "approver", "admin"]);
 
-const MIME: Record<string, string> = {
-  ".html": "text/html; charset=utf-8",
-  ".htm": "text/html; charset=utf-8",
-  ".js": "application/javascript",
-  ".mjs": "application/javascript",
-  ".json": "application/json",
-  ".css": "text/css; charset=utf-8",
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".gif": "image/gif",
-  ".svg": "image/svg+xml",
-  ".webp": "image/webp",
-  ".ico": "image/x-icon",
-  ".woff": "font/woff",
-  ".woff2": "font/woff2",
-  ".ttf": "font/ttf",
-  ".map": "application/json",
-  ".wasm": "application/wasm",
-};
-
 function contentTypeFor(path: string): string {
-  const ext = posix.extname(path).toLowerCase();
-  return MIME[ext] ?? "application/octet-stream";
-}
-
-function isSafeSegment(segment: string): boolean {
-  return (
-    segment !== ".." &&
-    !segment.startsWith("/") &&
-    !segment.includes("\\") &&
-    !segment.includes("..")
-  );
+  return mimeFor(path);
 }
 
 /**

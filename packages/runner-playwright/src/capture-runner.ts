@@ -14,7 +14,9 @@ import { createStaticServer } from "./static-server.ts";
 declare const __PKG_VERSION__: string | undefined;
 
 /** Create a CaptureRunner that renders Storybook stories with Playwright. */
-export function createPlaywrightCaptureRunner(): CaptureRunner {
+export function createPlaywrightCaptureRunner(
+  options: { supportedBrowsers?: readonly ("chromium" | "firefox" | "webkit" | "chrome")[] } = {},
+): CaptureRunner {
   return {
     metadata: {
       name: "Playwright",
@@ -22,6 +24,7 @@ export function createPlaywrightCaptureRunner(): CaptureRunner {
       description: "Playwright capture runner",
       kind: "playwright",
       category: "capture-runner",
+      supportedBrowsers: options.supportedBrowsers ?? ["chromium", "firefox", "webkit"],
     },
     async render(input: PlaywrightRenderInput) {
       const active: ActiveRun = { cancelled: false, browser: null };
@@ -52,6 +55,7 @@ export interface PlaywrightRenderInput {
   logger?: Logger;
   executePlay?: boolean;
   playTimeoutMs?: number;
+  runA11y?: boolean;
 }
 
 interface ScreenshotContext {
@@ -84,12 +88,17 @@ async function renderAll(input: PlaywrightRenderInput, active: ActiveRun): Promi
   const browser = await chromium.launch();
   active.browser = browser;
   const adapter = new StorybookAdapter();
-  const ctx: ScreenshotContext & { executePlay?: boolean; playTimeoutMs?: number } = {
+  const ctx: ScreenshotContext & {
+    executePlay?: boolean;
+    playTimeoutMs?: number;
+    runA11y?: boolean;
+  } = {
     browser,
     adapter,
     baseUrl: server.url,
     executePlay: input.executePlay,
     playTimeoutMs: input.playTimeoutMs,
+    runA11y: input.runA11y,
   };
   const captures: RenderedSnapshot[] = [];
   const failures: RenderResult["failures"] = [];
@@ -100,8 +109,19 @@ async function renderAll(input: PlaywrightRenderInput, active: ActiveRun): Promi
           throw new Error("Capture cancelled");
         }
         try {
-          const screenshot = await captureScreenshot(ctx, story, viewport);
+          const { screenshot, a11yViolations } = await captureScreenshot(ctx, story, viewport);
           captures.push({ story, viewportName: viewport.name, screenshot });
+          if (a11yViolations.length > 0) {
+            failures.push({
+              storyId: story.id,
+              viewportName: viewport.name,
+              error: `a11y: ${a11yViolations.join("; ")}`,
+            });
+            input.logger?.warn(
+              { storyId: story.id, viewport: viewport.name, violations: a11yViolations },
+              "a11y violations found",
+            );
+          }
         } catch (error) {
           failures.push({
             storyId: story.id,
@@ -144,10 +164,10 @@ async function safeCloseServer(server: { close(): Promise<void> }): Promise<void
 }
 
 async function captureScreenshot(
-  ctx: ScreenshotContext & { executePlay?: boolean; playTimeoutMs?: number },
+  ctx: ScreenshotContext & { executePlay?: boolean; playTimeoutMs?: number; runA11y?: boolean },
   story: StoryEntry,
   viewport: Viewport,
-): Promise<Buffer> {
+): Promise<{ screenshot: Buffer; a11yViolations: string[] }> {
   const page = await ctx.browser.newPage({
     viewport: { width: viewport.width, height: viewport.height },
   });
@@ -226,11 +246,60 @@ async function captureScreenshot(
         throw new Error(`play failed: ${messageOf(error)}`, { cause: error });
       }
     }
+    let a11yViolations: string[] = [];
+    if (ctx.runA11y) {
+      try {
+        a11yViolations = await checkA11y(page);
+      } catch {
+        // a11y check failures are non-blocking; ignore and continue to screenshot
+      }
+    }
     // Playwright page.screenshot supports animations: disabled to freeze CSS animations
-    return await page.screenshot({
+    const screenshot = await page.screenshot({
       animations: story.parameters?.pauseAnimationAtEnd ? "allow" : "disabled",
     });
+    return { screenshot, a11yViolations };
   } finally {
     await page.close();
   }
+}
+
+async function checkA11y(page: import("playwright-core").Page): Promise<string[]> {
+  return await page.evaluate(() => {
+    const doc = globalThis.document as unknown as Document;
+    const violations: string[] = [];
+    const root = doc.querySelector("#storybook-root");
+    if (!root) return violations;
+    // Images without alt
+    for (const img of root.querySelectorAll("img:not([alt])")) {
+      const html = (img as HTMLElement).outerHTML.slice(0, 120);
+      violations.push(`img missing alt: ${html}`);
+    }
+    // Buttons without accessible name
+    for (const btn of root.querySelectorAll("button")) {
+      const hasLabel =
+        btn.hasAttribute("aria-label") ||
+        btn.hasAttribute("aria-labelledby") ||
+        (btn.textContent ?? "").trim() !== "";
+      if (!hasLabel)
+        violations.push(`button missing label: ${(btn as HTMLElement).outerHTML.slice(0, 120)}`);
+    }
+    // Links without href or text
+    for (const a of root.querySelectorAll("a")) {
+      if (!a.hasAttribute("href"))
+        violations.push(`a missing href: ${(a as HTMLElement).outerHTML.slice(0, 120)}`);
+    }
+    // Form inputs without label
+    for (const input of root.querySelectorAll("input, select, textarea")) {
+      const el = input as HTMLInputElement;
+      const hasLabel =
+        el.hasAttribute("aria-label") ||
+        el.hasAttribute("aria-labelledby") ||
+        !!doc.querySelector(`label[for="${el.id}"]`) ||
+        el.id === "";
+      if (!hasLabel && el.type !== "hidden")
+        violations.push(`input missing label: ${el.outerHTML.slice(0, 120)}`);
+    }
+    return violations.slice(0, 10);
+  });
 }
