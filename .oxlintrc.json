@@ -159,6 +159,7 @@
         "typescript/no-unsafe-assignment": "allow",
         "typescript/no-unsafe-argument": "allow",
         "typescript/no-unsafe-member-access": "allow",
+        "typescript/no-unsafe-return": "allow",
         "unicorn/prefer-at": "allow"
       }
     },
