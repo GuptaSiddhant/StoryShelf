@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/auth-oauth",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "OIDC authorization-code auth adapter for StoryShelf.",
   "keywords": [
     "auth",

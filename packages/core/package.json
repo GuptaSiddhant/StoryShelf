@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/core",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "StoryShelf core: adapter interfaces, models, capture pipeline, diff, and retention (no HTTP).",
   "keywords": [
     "chromatic-alternative",
