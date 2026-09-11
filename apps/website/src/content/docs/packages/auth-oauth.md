@@ -32,7 +32,7 @@ const auth = createOAuthAuth({
   scopes: ["openid", "email", "profile"],
 });
 
-const app = createShelfRouter({ database, storage, auth });
+const app = createShelfApp({ database, storage, auth });
 ```
 
 The issuer, client credentials, session secret, and registered callback URL are required. The default scopes are `openid`, `email`, and `profile`.

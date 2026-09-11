@@ -1,5 +1,5 @@
+import { createShelfApp } from "@storyshelf/app";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
-import { createShelfRouter } from "@storyshelf/router";
 import { createLocalStorage } from "@storyshelf/storage-local";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -17,7 +17,7 @@ describe("dev server router assembly", () => {
     const database = createSqliteDatabase(join(scratch, "shelf.db"));
     const storage = createLocalStorage(scratch);
 
-    const app = createShelfRouter({
+    const app = createShelfApp({
       database,
       storage,
       config: { scratchDir: scratch },

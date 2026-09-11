@@ -1,7 +1,7 @@
 import { serve } from "@hono/node-server";
+import { createShelfApp } from "@storyshelf/app";
 import { createPasswordAuth } from "@storyshelf/auth-password";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
-import { createShelfRouter } from "@storyshelf/router";
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
 import { createLocalStorage } from "@storyshelf/storage-local";
 /**
@@ -31,7 +31,7 @@ const database = createSqliteDatabase(`${dataDir}/shelf.db`);
 const storage = createLocalStorage(dataDir);
 const captureRunner = createPlaywrightCaptureRunner();
 
-const app = createShelfRouter({
+const app = createShelfApp({
   database,
   storage,
   captureRunner,

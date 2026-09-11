@@ -18,7 +18,7 @@ npm install @storyshelf/auth-oauth
 
 ```ts
 import { createOAuthAuth } from "@storyshelf/auth-oauth";
-import { createShelfRouter } from "@storyshelf/router";
+import { createShelfApp } from "@storyshelf/app";
 
 const auth = createOAuthAuth({
   issuer: process.env.OIDC_ISSUER!,
@@ -29,7 +29,7 @@ const auth = createOAuthAuth({
   scopes: ["openid", "email", "profile"], // optional
 });
 
-const app = createShelfRouter({ database, storage, auth });
+const app = createShelfApp({ database, storage, auth });
 ```
 
 ## API
@@ -63,6 +63,6 @@ interface OAuthAuth extends AuthAdapter {
 
 ## How it fits in
 
-`auth-oauth` is the `auth` option for `createShelfRouter` when you want to sign in with an existing identity provider. When supplied, the router redirects unauthenticated UI requests to `loginUrl` and handles the OIDC callback to establish a session.
+`auth-oauth` is the `auth` option for `createShelfApp` when you want to sign in with an existing identity provider. When supplied, the router redirects unauthenticated UI requests to `loginUrl` and handles the OIDC callback to establish a session.
 
 See `docs/architecture.md` and ADR 0008.

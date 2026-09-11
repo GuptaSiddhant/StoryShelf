@@ -24,7 +24,7 @@ nub add @storyshelf/storage-local
 import { createLocalStorage } from "@storyshelf/storage-local";
 
 const storage = createLocalStorage("./data");
-const app = createShelfRouter({ database, storage });
+const app = createShelfApp({ database, storage });
 ```
 
 Directories are created as needed. Paths are resolved beneath the configured data directory; attempts to escape it are rejected. The adapter implements `StorageAdapter`: `read`, `write`, `delete`, `exists`, and `list(prefix)`.

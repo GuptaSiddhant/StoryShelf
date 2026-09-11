@@ -1,7 +1,7 @@
 /**
  * Adapter lifecycle contract: hooks every adapter can expose, plus the
  * settled-result and error types. The runner (`init-runner.ts`) collects
- * and executes the hooks; `createShelfRouter` kicks `init` eagerly and
+ * and executes the hooks; `createShelfApp` kicks `init` eagerly and
  * gates the first request on the shared result. All hooks must be
  * idempotent.
  */

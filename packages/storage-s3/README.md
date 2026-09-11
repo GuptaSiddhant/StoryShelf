@@ -18,7 +18,7 @@ npm install @storyshelf/storage-s3
 
 ```ts
 import { createS3Storage } from "@storyshelf/storage-s3";
-import { createShelfRouter } from "@storyshelf/router";
+import { createShelfApp } from "@storyshelf/app";
 
 const storage = createS3Storage({
   bucket: "my-shelf",
@@ -27,7 +27,7 @@ const storage = createS3Storage({
   region: "us-east-1",               // optional
 });
 
-const app = createShelfRouter({ database, storage });
+const app = createShelfApp({ database, storage });
 ```
 
 ## API
@@ -53,6 +53,6 @@ Helper that joins a storage prefix with a relative path into an object key.
 
 ## How it fits in
 
-`storage-s3` is the `storage` option for `createShelfRouter` in cloud or multi-node deployments. It implements the same `StorageAdapter` interface as `@storyshelf/storage-local`, so switching between local disk and object storage requires no changes elsewhere.
+`storage-s3` is the `storage` option for `createShelfApp` in cloud or multi-node deployments. It implements the same `StorageAdapter` interface as `@storyshelf/storage-local`, so switching between local disk and object storage requires no changes elsewhere.
 
 See `docs/architecture.md` and ADR 0006.

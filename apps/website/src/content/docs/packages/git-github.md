@@ -20,13 +20,13 @@ nub add @storyshelf/git-github
 
 ## Register the provider
 
-Pass `gitHubHost` in the `gitHosts` array of `createShelfRouter`:
+Pass `gitHubHost` in the `gitHosts` array of `createShelfApp`:
 
 ```ts
-import { createShelfRouter } from "@storyshelf/router";
+import { createShelfApp } from "@storyshelf/app";
 import { gitHubHost } from "@storyshelf/git-github";
 
-const app = createShelfRouter({
+const app = createShelfApp({
   database,
   storage,
   captureRunner,

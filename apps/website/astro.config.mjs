@@ -47,7 +47,7 @@ export default defineConfig({
           label: "Packages",
           items: [
             { label: "@storyshelf/core", slug: "packages/core" },
-            { label: "@storyshelf/router", slug: "packages/router" },
+            { label: "@storyshelf/app", slug: "packages/app" },
             { label: "storyshelf", slug: "packages/cli" },
             { label: "@storyshelf/runner-playwright", slug: "packages/runner-playwright" },
             { label: "@storyshelf/db-postgres", slug: "packages/db-postgres" },

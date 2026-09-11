@@ -53,7 +53,7 @@ See `docs/repo-structure.md` for the annotated map (workspaces vs fixtures, bund
 StoryShelf/
   packages/
     core/           @storyshelf/core           -- Adapter interfaces, models, capture pipeline, diff, retention (no HTTP)
-    router/         @storyshelf/router         -- Hono router, API routes, server-rendered UI over core (see ADR 0018)
+    app/            @storyshelf/app         -- Hono app, API routes, server-rendered UI over core (see ADR 0018)
     db-sqlite/      @storyshelf/db-sqlite      -- SQLite database adapter (node:sqlite + Drizzle)
     db-turso/       @storyshelf/db-turso       -- Turso/libSQL database adapter (@libsql/client + Drizzle)
     storage-local/  @storyshelf/storage-local  -- Local filesystem storage adapter
@@ -82,7 +82,7 @@ StoryShelf/
 
 ## Architecture in five sentences
 
-1. Consumers call `createShelfRouter({ database, storage, capture, ... })` -- every concern is an independent adapter interface.
+1. Consumers call `createShelfApp({ database, storage, capture, ... })` -- every concern is an independent adapter interface.
 2. Models use **constructor injection** (not AsyncLocalStorage) -- `new BuildsModel(db, storage)`.
 3. **Capture is server-side** -- the CLI uploads the built Storybook; the server renders stories with Playwright asynchronously (no repo cloning). Baselines are **per-branch with fallback to the default branch**.
 4. Diffs use **pixelmatch** -- configurable thresholds, overlay images stored on disk. Builds are transient and purged; baselines are permanent.
@@ -101,7 +101,7 @@ StoryShelf/
 - **Logging:** pino baked into core via `createShelfLogger()`. Always structured objects, never interpolate into the message (`logger.info({ buildId }, "msg")`); attach errors as an `err` child (`logger.error({ err }, "msg")`); derive scoped children for background work (`logger.child({ buildId })`). Hosted observability (Sentry/PostHog/Datadog/GCP/OTEL) are optional pino `transports`, not separate loggers. See ADR 0014.
 - **HTTP:** outbound calls go through the shared helper (`@storyshelf/core/utils`: `httpJson`/`HttpError`) — timeout plus retry with `Retry-After` built in. Never hand-roll fetch error handling per package, and never add client libraries (`ky`/`ofetch`) — see ADR 0019.
 - **UI:** server-rendered `hono/jsx` + HTMX + `hono/css`. Fixed UI with a `ui` brand config (logo/theme); header + sidebar layout; system theme with manual override; no client framework and no UI adapter — custom UIs consume `/api/v1`. HTMX is vendored locally; the review page uses a small vanilla-JS layer (theme toggle, keyboard review).
-- **Primary export first:** in every module, the primary exported item (the factory/router/class readers came for — e.g. `createShelfRouter`, `createLocalStorage`, model classes) sits as high as possible: doc header, imports, then the primary export before helpers, secondary types, and internal utilities. Skim-reading rule: the file's purpose must be obvious within the first screen.
+- **Primary export first:** in every module, the primary exported item (the factory/router/class readers came for — e.g. `createShelfApp`, `createLocalStorage`, model classes) sits as high as possible: doc header, imports, then the primary export before helpers, secondary types, and internal utilities. Skim-reading rule: the file's purpose must be obvious within the first screen.
 - **Single prod owner per third-party dep:** a runtime dependency lives in exactly one package's `dependencies` (e.g. `pino` in `@storyshelf/core`); other packages use `devDependencies` for tests and import types through the owner (`@storyshelf/core/logger`), never directly.
 
 ## Database options
@@ -147,7 +147,7 @@ StoryShelf/
 | 0015 | Pure Capture Renderer Adapter (capture adapters render only; server orchestrator owns loading/extraction/persistence) |
 | 0016 | Server Scaffolding Over Rigid Package (`storyshelf server init` generates the server; no universal server package) |
 | 0017 | Interaction Testing via Storybook `play` Function (executePlay, flaky/blocked/disabled semantics) |
-| 0018 | Split Core (Domain) from Router (HTTP) |
+| 0018 | Split Core (Domain) from App (HTTP) |
 | 0019 | Shared HTTP Helper in Core (`httpJson`/`HttpError` with timeout + retry; no client libraries) |
 
 ## Parallel Development with Worktrees

@@ -27,7 +27,7 @@ The `LoggerAdapter` interface is removed.
 
 ### 2. Composition root shares one instance
 
-`createShelfRouter` keeps returning `Hono` unchanged; it falls back to `createShelfLogger()` internally if no logger is supplied, so embedding without a server stays self-sufficient. The standard server wiring calls `createShelfLogger()` once at the composition root (`serve.ts`) and passes the same `Logger` to the router, the capture runner, and the retention job via `ShelfOptions.logger` / constructor injection — one instance, one JSON stream, covering both request-scoped and background logs.
+`createShelfApp` keeps returning `Hono` unchanged; it falls back to `createShelfLogger()` internally if no logger is supplied, so embedding without a server stays self-sufficient. The standard server wiring calls `createShelfLogger()` once at the composition root (`serve.ts`) and passes the same `Logger` to the router, the capture runner, and the retention job via `ShelfOptions.logger` / constructor injection — one instance, one JSON stream, covering both request-scoped and background logs.
 
 ### 3. Override hook
 

@@ -18,13 +18,13 @@ npm install @storyshelf/queue-sqs
 
 ```ts
 import { createSqsCaptureQueue } from "@storyshelf/queue-sqs";
-import { createShelfRouter } from "@storyshelf/router";
+import { createShelfApp } from "@storyshelf/app";
 
 const queue = createSqsCaptureQueue({
   queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs",
 });
 
-const app = createShelfRouter({
+const app = createShelfApp({
   database, storage,
   captureRunner: myRenderer,
   captureQueue: queue,
@@ -49,7 +49,7 @@ Creates an SQS-backed `CaptureQueue`. The returned adapter implements every meth
 
 ## How it fits in
 
-`queue-sqs` is the `captureQueue` option for `createShelfRouter` in AWS/cloud deployments. It implements the same `CaptureQueue` interface as `InMemoryCaptureQueue` (exported from `@storyshelf/core`), so switching between in-process and remote queues requires no changes to router or build logic.
+`queue-sqs` is the `captureQueue` option for `createShelfApp` in AWS/cloud deployments. It implements the same `CaptureQueue` interface as `InMemoryCaptureQueue` (exported from `@storyshelf/core`), so switching between in-process and remote queues requires no changes to router or build logic.
 
 See `docs/architecture.md` and ADR 0009.
 

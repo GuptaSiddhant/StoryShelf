@@ -18,13 +18,13 @@ npm install @storyshelf/storage-local
 
 ```ts
 import { createLocalStorage } from "@storyshelf/storage-local";
-import { createShelfRouter } from "@storyshelf/router";
+import { createShelfApp } from "@storyshelf/app";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 
 const storage = createLocalStorage("./data");
 const database = createSqliteDatabase("./data/shelf.db");
 
-const app = createShelfRouter({ database, storage });
+const app = createShelfApp({ database, storage });
 ```
 
 ## API
@@ -37,6 +37,6 @@ The returned adapter implements every method of the `StorageAdapter` interface (
 
 ## How it fits in
 
-`storage-local` is the default `storage` option for `createShelfRouter` in single-node deployments, storing screenshots, diff overlays, and storybook archives on disk. It implements the same `StorageAdapter` interface as `@storyshelf/storage-s3`, so moving to object storage later is a drop-in swap.
+`storage-local` is the default `storage` option for `createShelfApp` in single-node deployments, storing screenshots, diff overlays, and storybook archives on disk. It implements the same `StorageAdapter` interface as `@storyshelf/storage-s3`, so moving to object storage later is a drop-in swap.
 
 See `docs/architecture.md` and ADR 0006.

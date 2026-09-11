@@ -12,7 +12,7 @@ As new adapters are added (db-turso, storage-s3, auth-oauth, auth-password), the
 2. **Multiple server packages** — One per deployment target. Maintenance burden scales with adapter count.
 3. **Scaffolding** — Generate a server file with the user's chosen adapters. The user owns the code; we maintain templates, not combinations.
 
-The adapter composition pattern (ADR 0001) already supports this: `createShelfRouter({ database, storage, capture, ... })` takes all adapters as params. The missing piece is a developer-facing entry point.
+The adapter composition pattern (ADR 0001) already supports this: `createShelfApp({ database, storage, capture, ... })` takes all adapters as params. The missing piece is a developer-facing entry point.
 
 ## Decision
 
@@ -27,7 +27,7 @@ The adapter composition pattern (ADR 0001) already supports this: `createShelfRo
 ```typescript
 // server.ts
 import { serve } from "@hono/node-server";
-import { createShelfRouter } from "@storyshelf/core";
+import { createShelfApp } from "@storyshelf/core";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { createLocalStorage } from "@storyshelf/storage-local";
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
@@ -36,7 +36,7 @@ const database = createSqliteDatabase("./data/shelf.db");
 const storage = createLocalStorage("./data");
 const captureRunner = createPlaywrightCaptureRunner();
 
-const app = createShelfRouter({ database, storage, captureRunner });
+const app = createShelfApp({ database, storage, captureRunner });
 serve({ fetch: app.fetch, port: 3000 });
 ```
 

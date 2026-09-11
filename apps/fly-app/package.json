@@ -13,7 +13,7 @@
     "@storyshelf/auth-password": "workspace:*",
     "@storyshelf/core": "workspace:*",
     "@storyshelf/db-sqlite": "workspace:*",
-    "@storyshelf/router": "workspace:*",
+    "@storyshelf/app": "workspace:*",
     "@storyshelf/runner-playwright": "workspace:*",
     "@storyshelf/storage-local": "workspace:*"
   },

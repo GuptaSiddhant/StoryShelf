@@ -18,13 +18,13 @@ npm install @storyshelf/db-sqlite
 
 ```ts
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
-import { createShelfRouter } from "@storyshelf/router";
+import { createShelfApp } from "@storyshelf/app";
 import { createLocalStorage } from "@storyshelf/storage-local";
 
 const database = createSqliteDatabase("./data/shelf.db");
 
 const storage = createLocalStorage("./data");
-const app = createShelfRouter({ database, storage });
+const app = createShelfApp({ database, storage });
 await app.lifecycle.init();
 ```
 
@@ -38,6 +38,6 @@ The returned adapter implements every method of the `DatabaseAdapter` interface 
 
 ## How it fits in
 
-`db-sqlite` is the default `database` option for `createShelfRouter` in single-node self-hosted deployments. It implements the same `DatabaseAdapter` interface and shares the same Drizzle schema as `@storyshelf/db-turso`, so switching to a serverless database only means swapping this adapter.
+`db-sqlite` is the default `database` option for `createShelfApp` in single-node self-hosted deployments. It implements the same `DatabaseAdapter` interface and shares the same Drizzle schema as `@storyshelf/db-turso`, so switching to a serverless database only means swapping this adapter.
 
 See `docs/architecture.md` and ADR 0002.

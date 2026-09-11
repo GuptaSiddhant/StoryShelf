@@ -52,7 +52,9 @@
         ]
       }
     ],
-    "func-style": ["allow"],
+    "func-style": [
+      "allow"
+    ],
     "max-lines-per-function": [
       "error",
       {
@@ -98,7 +100,11 @@
     "eslint/no-underscore-dangle": [
       "error",
       {
-        "allow": ["_InPath", "_zod", "__PKG_VERSION__"]
+        "allow": [
+          "_InPath",
+          "_zod",
+          "__PKG_VERSION__"
+        ]
       }
     ],
     "typescript/explicit-member-accessibility": "allow",
@@ -133,7 +139,12 @@
   },
   "overrides": [
     {
-      "files": ["**/*.test.ts", "**/*.spec.ts", "**/mocks/**", "**/test-helpers/**"],
+      "files": [
+        "**/*.test.ts",
+        "**/*.spec.ts",
+        "**/mocks/**",
+        "**/test-helpers/**"
+      ],
       "rules": {
         "typescript/no-confusing-void-expression": "allow",
         "typescript/explicit-function-return-type": "allow",
@@ -213,7 +224,8 @@
         "packages/cli/src/commands/server/docker.ts",
         "packages/cli/src/commands/worker/init.ts",
         "packages/cli/src/commands/worker/serve.ts",
-        "packages/cli/src/commands/shared/detect-adapters.ts"
+        "packages/cli/src/commands/shared/detect-adapters.ts",
+        "packages/runner-puppeteer/src/capture-runner.ts"
       ],
       "rules": {
         "max-lines-per-function": "allow",
@@ -245,7 +257,9 @@
       }
     },
     {
-      "files": ["packages/cli/src/commands/server/docker.ts"],
+      "files": [
+        "packages/cli/src/commands/server/docker.ts"
+      ],
       "rules": {
         "unicorn/no-array-sort": "allow",
         "typescript/no-confusing-void-expression": "allow"

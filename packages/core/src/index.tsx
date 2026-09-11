@@ -2,9 +2,9 @@
  * StoryShelf core: domain-only barrel (no HTTP).
  *
  * Adapter interfaces, models, schema, capture pipeline, retention, and
- * config/logger/types helpers. Everything HTTP — `createShelfRouter`,
+ * config/logger/types helpers. Everything HTTP — `createShelfApp`,
  * routers, pages, middleware, the request store — lives in
- * `@storyshelf/router`. Prefer the granular subpaths (`core/adapter/*`,
+ * `@storyshelf/app`. Prefer the granular subpaths (`core/adapter/*`,
  * `core/models`, `core/capture`, …); this barrel exists for the small
  * shared surface below. Importing it must never pull Hono into a bundle.
  */

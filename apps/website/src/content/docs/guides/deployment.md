@@ -45,7 +45,7 @@ Then `https://<slug>.stories.example.com` serves the latest published Storybook,
 
 ## Deployment targets — bring your own assembly
 
-StoryShelf is **cross-runtime**: the core router (`createShelfRouter`) uses only Web-standard APIs (`Request`, `Response`, `fetch`, `ReadableStream`, `crypto`, `URL`). There is no Node coupling in the core. This means you can assemble and deploy on any platform that runs JavaScript.
+StoryShelf is **cross-runtime**: the core router (`createShelfApp`) uses only Web-standard APIs (`Request`, `Response`, `fetch`, `ReadableStream`, `crypto`, `URL`). There is no Node coupling in the core. This means you can assemble and deploy on any platform that runs JavaScript.
 
 ### Recommended assembly (self-hosted default)
 
@@ -113,10 +113,10 @@ export class HttpCaptureQueue implements CaptureQueue {
 }
 
 // In your serverless entry:
-import { createShelfRouter } from "@storyshelf/router";
+import { createShelfApp } from "@storyshelf/app";
 import { HttpCaptureQueue } from "./my-queue";
 
-const router = createShelfRouter({
+const router = createShelfApp({
   database: ...,
   storage: ...,
   captureRunner: ...,
@@ -130,7 +130,7 @@ const router = createShelfRouter({
 ### Minimal Turso + S3 recipe
 
 ```ts
-import { createShelfRouter } from "@storyshelf/router";
+import { createShelfApp } from "@storyshelf/app";
 import { createTursoDatabase } from "@storyshelf/db-turso";
 import { createS3Storage } from "@storyshelf/storage-s3";
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
@@ -150,7 +150,7 @@ const storage = createS3Storage({
 const capture = createPlaywrightCaptureRunner();
 const queue = new InMemoryCaptureQueue({ concurrency: 2 });
 
-export const app = createShelfRouter({
+export const app = createShelfApp({
   database,
   storage,
   captureRunner: capture,
@@ -191,7 +191,7 @@ See the [`@storyshelf/db-postgres` package reference](/packages/db-postgres/) fo
 ### Minimal Postgres + S3 recipe
 
 ```ts
-import { createShelfRouter } from "@storyshelf/router";
+import { createShelfApp } from "@storyshelf/app";
 import { createPostgresDatabase } from "@storyshelf/db-postgres";
 import { createS3Storage } from "@storyshelf/storage-s3";
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
@@ -213,7 +213,7 @@ const storage = createS3Storage({
 const capture = createPlaywrightCaptureRunner();
 const queue = new InMemoryCaptureQueue({ concurrency: 2 });
 
-export const app = createShelfRouter({
+export const app = createShelfApp({
   database,
   storage,
   captureRunner: capture,

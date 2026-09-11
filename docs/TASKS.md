@@ -93,7 +93,7 @@
 
 ### P2-1: Configuration Validation — Done (482e8f27)
 
-**Solution:** Added `shelfConfigSchema`/`uiConfigSchema` with `z.string().min(1)`, `z.url()`, `captureConcurrency` positive, `viewports` min 1. `validateConfig()`/`validateUiConfig()` called at `createShelfRouter` entry.
+**Solution:** Added `shelfConfigSchema`/`uiConfigSchema` with `z.string().min(1)`, `z.url()`, `captureConcurrency` positive, `viewports` min 1. `validateConfig()`/`validateUiConfig()` called at `createShelfApp` entry.
 
 **Files Modified:**
 - `packages/core/src/config.ts` — added Zod schemas, fixed `no-unused-vars` (removed Viewport import), `url` deprecation (`z.string().url()` → `z.url()`)

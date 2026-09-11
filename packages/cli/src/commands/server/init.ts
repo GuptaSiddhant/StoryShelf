@@ -99,7 +99,7 @@ const STORAGE_INIT: Record<StorageChoice, string> = {
 function buildImports(answers: Answers): string[] {
   const imports = [
     `import { serve } from "@hono/node-server";`,
-    `import { createShelfRouter } from "@storyshelf/router";`,
+    `import { createShelfApp } from "@storyshelf/app";`,
     DB_IMPORT[answers.database],
     STORAGE_IMPORT[answers.storage],
   ];
@@ -137,7 +137,7 @@ function buildAdapterLines(answers: Answers): string[] {
 }
 
 function buildRouterLines(answers: Answers): string[] {
-  const lines = [`const app = createShelfRouter({`, `  database,`, `  storage,`];
+  const lines = [`const app = createShelfApp({`, `  database,`, `  storage,`];
 
   if (answers.queue === "sqs") {
     lines.push(`  captureQueue,`);
@@ -235,7 +235,7 @@ function buildDeps(answers: Answers): Record<string, string> {
   const deps: Record<string, string> = {
     "@hono/node-server": "^1.17.0",
     "@storyshelf/core": __PKG_VERSION__ ?? "0.0.0",
-    "@storyshelf/router": __PKG_VERSION__ ?? "0.0.0",
+    "@storyshelf/app": __PKG_VERSION__ ?? "0.0.0",
     [DB_PACKAGE[answers.database]]: __PKG_VERSION__ ?? "0.0.0",
   };
 

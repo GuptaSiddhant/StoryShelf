@@ -28,19 +28,19 @@ There is no `tsdown-entry` key. Each `package.json` `exports` map carries `{ sou
 
 ## Public import surface
 
-- `@storyshelf/router` root barrel is the HTTP server: `createShelfRouter` plus
+- `@storyshelf/app` root barrel is the HTTP app: `createShelfApp` plus
   `ShelfApp`/`ShelfRouter`/`ShelfContext`/`ShelfLifecycle` and the re-exported
   option types (`ShelfOptions`/`ShelfConfig`/`UIConfig`/`BrandTheme` from core).
 - `@storyshelf/core` root barrel is domain-only (config/logger/types surface).
   Importing it must never pull Hono into bundles that do not serve it
-  (e.g. runners, workers) — enforced by keeping all HTTP modules in router.
+  (e.g. runners, workers) — enforced by keeping all HTTP modules in app.
 - Everything else lives under a subpath: adapter interfaces under
   `core/adapter/*`, runtime capture under `core/capture`, logging under
   `core/logger`, diff under `core/diff`, URLs under `core/urls`, storage paths
   under `core/paths`, tables/rows under `core/schema`, models under
   `core/models`, config under `core/config`, retention under `core/retention`,
   shared utils under `core/utils`, in-memory fakes under `core/test-helpers`.
-  Internal tooling (`store`, `middleware`, pages) has no entry outside router
+  Internal tooling (`store`, `middleware`, pages) has no entry outside app
   and may change without notice.
 - `Logger` canonical home is `core/logger` (the `core/types` re-export was
   removed in 0.2.0).
@@ -51,7 +51,7 @@ There is no `tsdown-entry` key. Each `package.json` `exports` map carries `{ sou
 - `packages/core/src/ddl.ts` — DDL derived from the entity modules (single derivation function), not a parallel hand-written copy.
 - `db-sqlite` / `db-turso` import the same schema from core (ADR 0002); they are driver shims over a shared factory (R3).
 
-## Router convention (lives in `packages/router/src/`)
+## App convention (lives in `packages/app/src/`)
 
 - One router module per area (`routers/builds.ts`, `routers/tokens.ts`, …).
 - When a router exceeds ~150 LOC, split into `<area>.handlers.ts` (data loading,

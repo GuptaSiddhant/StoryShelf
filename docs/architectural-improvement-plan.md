@@ -138,7 +138,7 @@ CREATE INDEX IF NOT EXISTS idx_baselines_project_story ON baselines(project_id, 
 
 **Files to Modify**:
 - `packages/core/src/config.ts` — add Zod schema
-- `packages/core/src/index.tsx` — validate on `createShelfRouter` entry
+- `packages/core/src/index.tsx` — validate on `createShelfApp` entry
 
 **Impact**: Fail-fast startup, clearer debugging.
 

@@ -18,14 +18,14 @@ npm install @storyshelf/auth-password
 
 ```ts
 import { createPasswordAuth } from "@storyshelf/auth-password";
-import { createShelfRouter } from "@storyshelf/router";
+import { createShelfApp } from "@storyshelf/app";
 
 const auth = createPasswordAuth({
   password: process.env.SHELF_PASSWORD!,
   secret: process.env.SHELF_SECRET!,
 });
 
-const app = createShelfRouter({ database, storage, auth });
+const app = createShelfApp({ database, storage, auth });
 ```
 
 ## API
@@ -54,6 +54,6 @@ interface PasswordAuth extends AuthAdapter {
 
 ## How it fits in
 
-`auth-password` is the `auth` option for `createShelfRouter` when you want simple single-password protection for a self-hosted instance. When supplied, the router gates the server-rendered UI behind a login page and signs sessions with the shared secret.
+`auth-password` is the `auth` option for `createShelfApp` when you want simple single-password protection for a self-hosted instance. When supplied, the router gates the server-rendered UI behind a login page and signs sessions with the shared secret.
 
 See `docs/architecture.md` and ADR 0008.

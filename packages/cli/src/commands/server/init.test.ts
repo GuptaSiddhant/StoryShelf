@@ -48,7 +48,7 @@ describe("runServerInit", () => {
 
     expect(existsSync(join(dir, "server.ts"))).toBe(true);
     const code = readFileSync(join(dir, "server.ts"), "utf8");
-    expect(code).toContain("createShelfRouter");
+    expect(code).toContain("createShelfApp");
     expect(code).toContain("createPlaywrightCaptureRunner");
     expect(code).not.toContain("createSqsCaptureQueue");
     const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {

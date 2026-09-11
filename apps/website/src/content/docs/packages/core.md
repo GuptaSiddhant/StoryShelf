@@ -3,7 +3,7 @@ title: "@storyshelf/core"
 description: StoryShelf's domain layer — adapters, models, capture pipeline, and review engine (no HTTP).
 ---
 
-`@storyshelf/core` is the domain layer at the center of StoryShelf. It provides adapter contracts, models, the server-side capture pipeline, pixel diff engine, and retention jobs — with no HTTP dependency, so queue workers and remote runners import it without pulling a server. The HTTP server lives in [@storyshelf/router](../router/).
+`@storyshelf/core` is the domain layer at the center of StoryShelf. It provides adapter contracts, models, the server-side capture pipeline, pixel diff engine, and retention jobs — with no HTTP dependency, so queue workers and remote runners import it without pulling a server. The HTTP server lives in [@storyshelf/app](../router/).
 
 ## Install
 
@@ -20,13 +20,13 @@ nub add @storyshelf/core
 
 ## Compose a server
 
-Pass a database and storage adapter to `createShelfRouter` from `@storyshelf/router` (see the [router package](../router/)). Capture, authentication, git providers, logging, branding, and server behavior are optional.
+Pass a database and storage adapter to `createShelfApp` from `@storyshelf/app` (see the [router package](../router/)). Capture, authentication, git providers, logging, branding, and server behavior are optional.
 
 ```ts
-import { createShelfRouter } from "@storyshelf/router";
+import { createShelfApp } from "@storyshelf/app";
 import { gitHubHost } from "@storyshelf/git-github";
 
-const app = createShelfRouter({
+const app = createShelfApp({
   database,
   storage,
   captureRunner,
@@ -52,7 +52,7 @@ process.on("SIGTERM", () => {
 ## Main APIs
 
 The barrel (`@storyshelf/core`) exports only the router and its types
-(`createShelfRouter`, `ShelfOptions`, `ShelfConfig`, `UIConfig`, `ShelfApp`).
+(`createShelfApp`, `ShelfOptions`, `ShelfConfig`, `UIConfig`, `ShelfApp`).
 Everything else lives under a subpath:
 
 - `executeCaptureJob({ buildId, reqId }, deps)` (`core/capture`) — the capture **orchestrator**: loads the build, marks it `capturing`, extracts the uploaded archive, discovers stories, delegates rendering to a pure `CaptureRunner`, and persists. Wired into the `Queue` when `capture` is supplied.

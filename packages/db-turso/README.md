@@ -18,13 +18,13 @@ npm install @storyshelf/db-turso
 
 ```ts
 import { createTursoDatabase } from "@storyshelf/db-turso";
-import { createShelfRouter } from "@storyshelf/router";
+import { createShelfApp } from "@storyshelf/app";
 
 const database = createTursoDatabase({
   url: process.env.TURSO_DATABASE_URL!,
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
-const app = createShelfRouter({ database, storage });
+const app = createShelfApp({ database, storage });
 await app.lifecycle.init();
 ```
 
@@ -38,6 +38,6 @@ The returned adapter implements every method of the `DatabaseAdapter` interface 
 
 ## How it fits in
 
-`db-turso` is the `database` option for `createShelfRouter` when running serverless or in the cloud. It shares the same Drizzle schema and `DatabaseAdapter` interface as `@storyshelf/db-sqlite`, so the rest of the stack is identical regardless of which driver you pick.
+`db-turso` is the `database` option for `createShelfApp` when running serverless or in the cloud. It shares the same Drizzle schema and `DatabaseAdapter` interface as `@storyshelf/db-sqlite`, so the rest of the stack is identical regardless of which driver you pick.
 
 See `docs/architecture.md` and ADR 0002.

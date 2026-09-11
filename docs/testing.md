@@ -22,7 +22,7 @@ Each adapter against its interface: SQLite via `:memory:` (Turso via a local lib
 
 ### 3. Integration (vitest, CI-always)
 
-`createShelfRouter({ database, storage, capture: <fake> })` drives the full `upload → capture → diff → review → approve` flow over HTTP. Capture is a fake runner here (a real one needs a browser).
+`createShelfApp({ database, storage, capture: <fake> })` drives the full `upload → capture → diff → review → approve` flow over HTTP. Capture is a fake runner here (a real one needs a browser).
 
 ### 4. Browser integration (gated: `nub run test:integration`)
 

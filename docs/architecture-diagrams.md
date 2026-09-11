@@ -18,7 +18,7 @@ flowchart TB
 
     subgraph StoryShelf["StoryShelf — Self-Hosted"]
         CLI["storyshelf CLI\npackages/cli"]
-        Server["StoryShelf Server\nHono + @storyshelf/router"]
+        Server["StoryShelf Server\nHono + @storyshelf/app"]
         Core["Domain Core\n@storyshelf/core"]
     end
 
@@ -62,7 +62,7 @@ flowchart TB
     end
 
     subgraph Router["HTTP — packages/router"]
-        hono["createShelfRouter\npackages/router/src/index.tsx:44\nOpenAPIHono"]
+        hono["createShelfApp\npackages/router/src/index.tsx:44\nOpenAPIHono"]
         mw["Middleware\nrequestId / requestLogging\ninitGate / rateLimit / csrf\nstoreScope / authGate"]
         routes["Routers\nprojects / builds / snapshots\nlabels / tokens / members\nwebhooks / status-configs / admin\nhealth / media / storybook / ui"]
         pages["Pages + UI\npages/*.tsx (hono/jsx)\nui/DocumentLayout + HTMX\nassets/htmx (vendored)"]
@@ -155,7 +155,7 @@ flowchart TB
 
 ---
 
-## 3. Adapter Composition — `createShelfRouter`
+## 3. Adapter Composition — `createShelfApp`
 
 Every adapter implements `Adapter<Extra>` (`packages/core/src/adapters/metadata.ts:88`) — `metadata { name, version, kind, category }` + optional `lifecycle { init, close, health }`.
 
@@ -173,7 +173,7 @@ flowchart LR
         config["config?: ShelfConfig"]
     end
 
-    createRouter["createShelfRouter(options)\npackages/router/src/index.tsx:44"]
+    createRouter["createShelfApp(options)\npackages/router/src/index.tsx:44"]
 
     subgraph Runtime["resolveRuntime(options)\npackages/router/src/runtime.ts"]
         cfg["ShelfConfig\nsecret / scratchDir\ncaptureConcurrency\npurgeTtlDays / viewports"]
@@ -209,7 +209,7 @@ flowchart LR
     class createRouter,Runtime,Lifecycle,Wiring,Routes2 router;
 ```
 
-**Lifecycle:** `createShelfRouter` kicks `lifecycle.init` eagerly (`Promise.allSettled`, `packages/router/src/lifecycle.ts:39`); callers `await app.lifecycle.init()` for fail-fast startup (migrations run here) or let first request gate on settlement (503 with per-adapter failures). `close()` on `SIGTERM`. Health is two-tier and ungated by init (`architecture.md:250`).
+**Lifecycle:** `createShelfApp` kicks `lifecycle.init` eagerly (`Promise.allSettled`, `packages/router/src/lifecycle.ts:39`); callers `await app.lifecycle.init()` for fail-fast startup (migrations run here) or let first request gate on settlement (503 with per-adapter failures). `close()` on `SIGTERM`. Health is two-tier and ungated by init (`architecture.md:250`).
 
 ---
 
@@ -812,7 +812,7 @@ flowchart TB
     class Edge,Turso,S3,QRemote,Worker cloud;
 ```
 
-`createShelfRouter` returns a plain `FetchHandler` — works on any runtime; only the in-process queue constrains Node (`architecture.md:247`).
+`createShelfApp` returns a plain `FetchHandler` — works on any runtime; only the in-process queue constrains Node (`architecture.md:247`).
 
 ### 13c. Dev (hot-restart from source, no build)
 

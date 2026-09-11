@@ -5,7 +5,7 @@ narrow exceptions below. Runtime behavior is unchanged.
 
 ## Unchanged (no action)
 
-- `@storyshelf/core` — `createShelfRouter` and all adapter/option types.
+- `@storyshelf/core` — `createShelfApp` and all adapter/option types.
 - `@storyshelf/core/schema` — still exports every table handle, row type, and the
   `schema` object (now re-exported from `schema/` internally).
 - `@storyshelf/core/ddl`, `/types`, `/models/*`, `/adapter/*` — same exports
@@ -17,7 +17,7 @@ narrow exceptions below. Runtime behavior is unchanged.
 
 ### 1. Barrel is router-only
 
-`@storyshelf/core` now exports `createShelfRouter` plus `ShelfOptions` /
+`@storyshelf/core` now exports `createShelfApp` plus `ShelfOptions` /
 `ShelfConfig` / `UIConfig` / `BrandTheme` / `ShelfApp` / `ShelfContext` — nothing
 else. Every other value moved to a subpath (new entries: `core/logger`,
 `core/capture`, `core/adapter/capture-queue`, `core/paths`, `core/urls`,
@@ -29,7 +29,7 @@ import { createShelfLogger, executeCaptureJob, InMemoryCaptureQueue, StorybookAd
 import type { CaptureQueue } from "@storyshelf/core";
 import type { Logger } from "@storyshelf/core/types";
 // After
-import { createShelfRouter } from "@storyshelf/core";
+import { createShelfApp } from "@storyshelf/core";
 import { createShelfLogger, type Logger } from "@storyshelf/core/logger";
 import { executeCaptureJob, InMemoryCaptureQueue, StorybookAdapter } from "@storyshelf/core/capture";
 import type { CaptureQueue } from "@storyshelf/core/adapter/capture-queue";

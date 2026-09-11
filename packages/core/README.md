@@ -1,6 +1,6 @@
 # @storyshelf/core
 
-The domain layer of StoryShelf: adapter interfaces, models, capture pipeline, diff engine, and retention logic — with no HTTP dependency, so workers import it without pulling a server. The Hono router lives in `@storyshelf/router`. Compose pluggable adapters into a complete self-hosted visual testing server.
+The domain layer of StoryShelf: adapter interfaces, models, capture pipeline, diff engine, and retention logic — with no HTTP dependency, so workers import it without pulling a server. The Hono router lives in `@storyshelf/app`. Compose pluggable adapters into a complete self-hosted visual testing server.
 
 ## Install
 
@@ -17,9 +17,9 @@ npm install @storyshelf/core
 ## Quick start
 
 ```ts
-import { createShelfRouter } from "@storyshelf/router";
+import { createShelfApp } from "@storyshelf/app";
 
-const app = createShelfRouter({
+const app = createShelfApp({
   database, // DatabaseAdapter
   storage, // StorageAdapter
   captureRunner, // CaptureRunner (optional)
@@ -36,7 +36,7 @@ serve({ fetch: app.fetch, port: 3000 });
 
 ## API
 
-### `createShelfRouter(options: ShelfOptions): Hono`
+### `createShelfApp(options: ShelfOptions): Hono`
 
 Assembles the router from the provided adapters. `ShelfOptions`:
 
@@ -94,13 +94,13 @@ All adapters are constructor-injected (no AsyncLocalStorage). See `docs/architec
 
 ### Logging
 
-`core` uses **pino** for structured JSON logging. `createShelfLogger({ level, transports, env })` (from `core/logger`) builds a logger writing to stdout by default, with optional extra pino worker transports (Sentry, PostHog, Datadog, GCP, OTEL collector, etc.). Pass the resulting `Logger` to `createShelfRouter({ logger })` (or construct it at your composition root) so request and background logs share one stream. The capture orchestrator derives a `reqId`-scoped child for background capture work, correlating each capture back to the triggering HTTP request. See ADR 0014.
+`core` uses **pino** for structured JSON logging. `createShelfLogger({ level, transports, env })` (from `core/logger`) builds a logger writing to stdout by default, with optional extra pino worker transports (Sentry, PostHog, Datadog, GCP, OTEL collector, etc.). Pass the resulting `Logger` to `createShelfApp({ logger })` (or construct it at your composition root) so request and background logs share one stream. The capture orchestrator derives a `reqId`-scoped child for background capture work, correlating each capture back to the triggering HTTP request. See ADR 0014.
 
 ### Capture, diff, and retention
 
 Import from `core/capture`, `core/diff`, and the model entries — never from the barrel:
 
-- `executeCaptureJob({ buildId, reqId }, deps)` (`core/capture`) — the capture **orchestrator**: loads the build, marks it `capturing`, extracts the uploaded archive into `scratchDir`, discovers stories, delegates rendering to a pure `CaptureRunner`, and persists. `createShelfRouter` wires it into a `CaptureQueue` when `capture` is supplied (and requires `ShelfConfig.scratchDir`). Also exports `CaptureJobOptions`.
+- `executeCaptureJob({ buildId, reqId }, deps)` (`core/capture`) — the capture **orchestrator**: loads the build, marks it `capturing`, extracts the uploaded archive into `scratchDir`, discovers stories, delegates rendering to a pure `CaptureRunner`, and persists. `createShelfApp` wires it into a `CaptureQueue` when `capture` is supplied (and requires `ShelfConfig.scratchDir`). Also exports `CaptureJobOptions`.
 - `persistCapture(ctx: CaptureContext)` (`core/capture`) — writes screenshots, diffs against the branch baseline, creates snapshots, and finalizes a build from a pure renderer's `captures`. Also exports `CaptureContext`.
 - `StorybookAdapter` (`core/capture`) — reads a built Storybook's `index.json`/`stories.json`.
 - `InMemoryCaptureQueue` (`core/capture`) — in-process, concurrency-limited queue for long-lived hosts; supply a remote queue with a separate worker for serverless.
@@ -114,7 +114,7 @@ Import from `core/capture`, `core/diff`, and the model entries — never from th
 
 ## How it fits in
 
-`core` is the framework everything else plugs into: `createShelfRouter` takes database, storage, capture, and auth adapters (from the `db-*`, `storage-*`, and `auth-*` packages) and produces a complete Hono server. The web UI is server-rendered `hono/jsx` + HTMX, and custom UIs can consume the JSON API under `/api/v1`.
+`core` is the framework everything else plugs into: `createShelfApp` takes database, storage, capture, and auth adapters (from the `db-*`, `storage-*`, and `auth-*` packages) and produces a complete Hono server. The web UI is server-rendered `hono/jsx` + HTMX, and custom UIs can consume the JSON API under `/api/v1`.
 
 See `docs/architecture.md` and the ADRs in `docs/adr/`.
 

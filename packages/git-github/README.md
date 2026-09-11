@@ -18,9 +18,9 @@ npm install @storyshelf/git-github
 
 ```ts
 import { gitHubHost } from "@storyshelf/git-github";
-import { createShelfRouter } from "@storyshelf/router";
+import { createShelfApp } from "@storyshelf/app";
 
-const app = createShelfRouter({
+const app = createShelfApp({
   database, storage,
   // ...adapters...
   gitHosts: [gitHubHost],

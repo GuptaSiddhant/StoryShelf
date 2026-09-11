@@ -28,7 +28,7 @@ const auth = createPasswordAuth({
   secret: process.env.SHELF_SECRET!,
 });
 
-const app = createShelfRouter({ database, storage, auth });
+const app = createShelfApp({ database, storage, auth });
 ```
 
 Both `password` and `secret` are required. The password is compared securely; the secret signs and verifies session cookies.

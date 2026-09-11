@@ -20,17 +20,17 @@ nub add @storyshelf/queue-sqs
 
 ## Register the queue
 
-Pass the SQS-backed queue as the `captureQueue` option of `createShelfRouter`:
+Pass the SQS-backed queue as the `captureQueue` option of `createShelfApp`:
 
 ```ts
-import { createShelfRouter } from "@storyshelf/router";
+import { createShelfApp } from "@storyshelf/app";
 import { createSqsCaptureQueue } from "@storyshelf/queue-sqs";
 
 const queue = createSqsCaptureQueue({
   queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs",
 });
 
-const app = createShelfRouter({
+const app = createShelfApp({
   database,
   storage,
   captureRunner: myRenderer,

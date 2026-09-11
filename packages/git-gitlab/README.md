@@ -18,9 +18,9 @@ npm install @storyshelf/git-gitlab
 
 ```ts
 import { gitLabHost } from "@storyshelf/git-gitlab";
-import { createShelfRouter } from "@storyshelf/router";
+import { createShelfApp } from "@storyshelf/app";
 
-const app = createShelfRouter({
+const app = createShelfApp({
   database, storage,
   // ...adapters...
   gitHosts: [gitLabHost],

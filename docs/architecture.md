@@ -247,7 +247,7 @@ CI machine / local dev                  StoryShelf server
 
 Every adapter extends the shared `Adapter<Extra>` base (`core/adapter/metadata`): mandatory `metadata: { name, version, description?, kind, category }` plus an optional `lifecycle: { init?, close?, health? }` sub-object. `category` (`database | storage | auth | capture-runner | capture-queue | git-host`) names the concern so metadata reads standalone; `kind` stays an open string (`sqlite`, `local`, `s3`, …) for third-party implementations. All hooks must be idempotent.
 
-`createShelfRouter` kicks every `lifecycle.init` eagerly via `Promise.allSettled` and exposes `app.lifecycle { ready, init(), close() }`: `await app.lifecycle.init()` before serving for fail-fast startup (database migrations run here — there is no top-level `migrate()`), otherwise the first request gates on settlement (503 with per-adapter failures); `await app.lifecycle.close()` on `SIGTERM`/`SIGINT`.
+`createShelfApp` kicks every `lifecycle.init` eagerly via `Promise.allSettled` and exposes `app.lifecycle { ready, init(), close() }`: `await app.lifecycle.init()` before serving for fail-fast startup (database migrations run here — there is no top-level `migrate()`), otherwise the first request gates on settlement (503 with per-adapter failures); `await app.lifecycle.close()` on `SIGTERM`/`SIGINT`.
 
 ### Health
 
@@ -278,7 +278,7 @@ interface CaptureRunner {
 
 ### Capture Orchestrator
 
-Because renderers are pure, the server-side **orchestrator** owns everything else (`capture/orchestrator.ts`): it loads the build/project, marks the build `capturing`, extracts the uploaded archive to a scratch dir (with path-traversal protection), discovers stories, delegates rendering to the pure `CaptureRunner`, then persists snapshots/diffs/baselines (see `capture/pipeline.ts`) and finalizes the build. The orchestrator is wired into the queue by `createShelfRouter` and requires a `ShelfConfig.scratchDir`.
+Because renderers are pure, the server-side **orchestrator** owns everything else (`capture/orchestrator.ts`): it loads the build/project, marks the build `capturing`, extracts the uploaded archive to a scratch dir (with path-traversal protection), discovers stories, delegates rendering to the pure `CaptureRunner`, then persists snapshots/diffs/baselines (see `capture/pipeline.ts`) and finalizes the build. The orchestrator is wired into the queue by `createShelfApp` and requires a `ShelfConfig.scratchDir`.
 
 One local renderer in v1 — `@storyshelf/runner-playwright` (the server already has Playwright via the base image). The interface is kept thin so v2 can add a **remote** runner (offload capture to a worker fleet via a queue) without changing the pipeline or orchestration — a future `@storyshelf/runner-remote` implements the same pure `CaptureRunner` interface and plugs in at the `serve` assembly point the same way.
 
@@ -607,9 +607,9 @@ StoryShelf/
       package.json        # subpaths: adapter/*, capture, config, ddl, diff,
                           # logger, models, paths, retention, schema, types,
                           # urls, utils, test-helpers
-    router/               # HTTP server over core (see ADR 0018)
+    app/                  # HTTP app over core (see ADR 0018)
       src/
-        index.tsx         # createShelfRouter entry point (ShelfApp/ShelfRouter)
+        index.tsx         # createShelfApp entry point (ShelfApp/ShelfRouter)
         routers/          # API + UI routes (incl. health, OpenAPI)
         pages/            # UI page components (server-rendered JSX)
         ui/               # DocumentLayout, theme, components, styles
@@ -720,12 +720,12 @@ StoryShelf/
 StoryShelf ships a **fixed, server-rendered UI** — `hono/jsx` + HTMX + `hono/css`. No client framework, no UI build step, no pluggable-UI adapter. Custom interfaces are built against `/api/v1` (the same contract the CLI uses, so it cannot be a second-class citizen). See ADR 0012.
 
 - **Layout:** a branded top **header** (logo + name + accent, project context, theme toggle, user menu) plus a neutral left **sidebar** (Builds, Storybook, Settings). The content area is monochrome and image-first.
-- **Pages** live in `router/src/pages/*.tsx` and render directly from models (no API/UI contract duplication).
-- **Layout & theming** live in `router/src/ui/` — a `DocumentLayout` (head, vendored HTMX, styles) plus a `BrandTheme` of light/dark color tokens.
+- **Pages** live in `app/src/pages/*.tsx` and render directly from models (no API/UI contract duplication).
+- **Layout & theming** live in `app/src/ui/` — a `DocumentLayout` (head, vendored HTMX, styles) plus a `BrandTheme` of light/dark color tokens.
 - **Theme:** follows the system (`prefers-color-scheme`) with a manual light/dark override, persisted in a cookie so the server renders the correct theme on first paint.
-- **Brand config** is passed as `ui: { name, logo, favicon, theme }` to `createShelfRouter` (see `ShelfOptions`). Env vars (`SS_BRAND_NAME`, `SS_LOGO_URL`) supply defaults so self-hosters can rebrand with a `docker run`, no code.
+- **Brand config** is passed as `ui: { name, logo, favicon, theme }` to `createShelfApp` (see `ShelfOptions`). Env vars (`SS_BRAND_NAME`, `SS_LOGO_URL`) supply defaults so self-hosters can rebrand with a `docker run`, no code.
 - **HTMX is vendored locally** (no CDN), so air-gapped deployments work.
-- **Diff view (v1):** a simple three-up grid — baseline | current | diff overlay. A minimal vanilla-JS layer in `router/src/ui/document.tsx` (the inline `clientScript`) covers the theme toggle and keyboard approve/reject; the wipe slider and zoom are deferred to v2. The published-Storybook page is an `<iframe>` of Storybook's own static build.
+- **Diff view (v1):** a simple three-up grid — baseline | current | diff overlay. A minimal vanilla-JS layer in `app/src/ui/document.tsx` (the inline `clientScript`) covers the theme toggle and keyboard approve/reject; the wipe slider and zoom are deferred to v2. The published-Storybook page is an `<iframe>` of Storybook's own static build.
 
 ## Deployment
 

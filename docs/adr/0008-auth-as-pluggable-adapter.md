@@ -80,7 +80,7 @@ app.post("/auth/logout", ...);    // destroy session
 
 ### Auth route mounting
 
-The `createShelfRouter` factory mounts auth routes based on the configured adapter:
+The `createShelfApp` factory mounts auth routes based on the configured adapter:
 
 ```typescript
 if (options.auth) {

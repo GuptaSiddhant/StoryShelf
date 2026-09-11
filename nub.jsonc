@@ -15,6 +15,7 @@
       "adm-zip",
       "unzipper",
       "playwright-core",
+      "puppeteer-core",
       "postgres",
       "yaml",
     ],

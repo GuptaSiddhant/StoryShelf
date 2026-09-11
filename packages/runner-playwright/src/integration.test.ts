@@ -1,9 +1,9 @@
+import { createShelfApp } from "@storyshelf/app";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import { screenshotPath } from "@storyshelf/core/paths";
 import type { Build, Snapshot } from "@storyshelf/core/schema";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
-import { createShelfRouter } from "@storyshelf/router";
 import { createLocalStorage } from "@storyshelf/storage-local";
 import AdmZip from "adm-zip";
 import { execFile, type ExecException } from "node:child_process";
@@ -19,7 +19,7 @@ const FIXTURE_DIR = process.env["FIXTURE_DIR"]
 const FIXTURE_STATIC_DIR = join(FIXTURE_DIR, "storybook-static");
 
 let harness: {
-  app: ReturnType<typeof createShelfRouter>;
+  app: ReturnType<typeof createShelfApp>;
   db: DatabaseAdapter;
   storage: StorageAdapter;
   staticDir: string;
@@ -107,7 +107,7 @@ async function createHarness(): Promise<void> {
   await mkdir(dataDir, { recursive: true });
   const db = createSqliteDatabase(join(tmp, "shelf.db"));
   const storage = createLocalStorage(dataDir);
-  const app = createShelfRouter({
+  const app = createShelfApp({
     database: db,
     storage,
     captureRunner: createPlaywrightCaptureRunner(),
