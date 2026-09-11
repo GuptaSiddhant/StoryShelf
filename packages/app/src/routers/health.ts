@@ -1,22 +1,22 @@
-/**
- * Two-tier health: lightweight liveness (GET, no auth) and deep readiness
- * (POST, site-admin). Neither is gated by adapter init — liveness must
- * answer mid-migration so orchestrators don't kill the machine, and deep
- * reports the init settlement state instead of being masked by the gate.
- */
-import type { AdapterInitResult, AdapterInitSources } from "@storyshelf/core/adapter/init";
 import type {
   AdapterHealth,
   AdapterLifecycle,
   AdapterMetadata,
 } from "@storyshelf/core/adapter/metadata";
+/**
+ * Two-tier health: lightweight liveness (GET, no auth) and deep readiness
+ * (POST, site-admin). Neither is gated by adapter setup — liveness must
+ * answer mid-migration so orchestrators don't kill the machine, and deep
+ * reports the setup settlement state instead of being masked by the gate.
+ */
+import type { AdapterSetupResult, AdapterSetupSources } from "@storyshelf/core/adapter/setup";
 import type { ShelfRouter } from "../app-types.ts";
 import { requireSiteAdmin } from "./helpers.ts";
 
 /** Dependencies for the health routes (no adapter I/O on the GET path). */
 export interface HealthDeps {
-  sources: AdapterInitSources;
-  getSettled: () => AdapterInitResult | null;
+  sources: AdapterSetupSources;
+  getSettled: () => AdapterSetupResult | null;
   bootTimeMs: number;
   version: string;
 }
@@ -60,7 +60,7 @@ function pushTarget(targets: ProbeTarget[], adapter: ProbeTarget | undefined): v
   }
 }
 
-function targetsOf(sources: AdapterInitSources): ProbeTarget[] {
+function targetsOf(sources: AdapterSetupSources): ProbeTarget[] {
   const targets: ProbeTarget[] = [];
   pushTarget(targets, sources.database);
   pushTarget(targets, sources.storage);
@@ -146,13 +146,13 @@ async function probeHealth(target: ProbeTarget): Promise<AdapterReport> {
 
 async function probeTarget(
   target: ProbeTarget,
-  initErrors: ReadonlyMap<string, string>,
+  setupErrors: ReadonlyMap<string, string>,
   starting: boolean,
 ): Promise<AdapterReport> {
   const { category, kind, name } = target.metadata;
-  const initError = initErrors.get(`${category}/${kind}`);
-  if (initError !== undefined) {
-    return { category, kind, name, state: "failed", detail: sanitize(initError) };
+  const setupError = setupErrors.get(`${category}/${kind}`);
+  if (setupError !== undefined) {
+    return { category, kind, name, state: "failed", detail: sanitize(setupError) };
   }
   if (starting) {
     return { category, kind, name, state: "starting" };
@@ -160,14 +160,14 @@ async function probeTarget(
   return await probeHealth(target);
 }
 
-function collectInitErrors(settled: AdapterInitResult | null): ReadonlyMap<string, string> {
-  const initErrors = new Map<string, string>();
+function collectSetupErrors(settled: AdapterSetupResult | null): ReadonlyMap<string, string> {
+  const setupErrors = new Map<string, string>();
   if (settled) {
     for (const failure of settled.failures) {
-      initErrors.set(`${failure.category}/${failure.kind}`, failure.error);
+      setupErrors.set(`${failure.category}/${failure.kind}`, failure.error);
     }
   }
-  return initErrors;
+  return setupErrors;
 }
 
 function overallStatus(reports: AdapterReport[]): ReadinessBody["status"] {
@@ -195,10 +195,10 @@ export function registerHealth(app: ShelfRouter, deps: HealthDeps): void {
   app.post("/api/v1/health", async (c) => {
     requireSiteAdmin();
     const settled = deps.getSettled();
-    const initErrors = collectInitErrors(settled);
+    const setupErrors = collectSetupErrors(settled);
     const targets = targetsOf(deps.sources);
     const reports = await Promise.all(
-      targets.map(async (target) => await probeTarget(target, initErrors, settled === null)),
+      targets.map(async (target) => await probeTarget(target, setupErrors, settled === null)),
     );
     const body: ReadinessBody = { status: overallStatus(reports), adapters: reports };
     c.header("Cache-Control", "no-store");

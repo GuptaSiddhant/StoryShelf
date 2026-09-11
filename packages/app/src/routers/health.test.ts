@@ -1,4 +1,4 @@
-import { AdapterLifecycleError } from "@storyshelf/core/adapter/init";
+import { AdapterLifecycleError } from "@storyshelf/core/adapter/setup";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
@@ -38,20 +38,37 @@ const noSessionAuth = {
   },
 };
 
+function brokenLifecycle(message: string): {
+  setup: () => Promise<void>;
+  teardown: () => Promise<void>;
+  health: () => Promise<{ ok: boolean }>;
+} {
+  return {
+    setup: async (): Promise<void> => {
+      await Promise.resolve();
+      throw new Error(message);
+    },
+    teardown: async (): Promise<void> => {
+      await Promise.resolve();
+    },
+    health: async () => ({ ok: true }),
+  };
+}
+
 describe("app.lifecycle", () => {
-  it("init resolves when no adapter exposes hooks", async () => {
+  it("setup resolves when no adapter exposes hooks", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
     const app = createShelfApp({ database: db, storage, logger: silentLogger });
-    await expect(app.lifecycle.init()).resolves.toBeUndefined();
+    await expect(app.lifecycle.setup()).resolves.toBeUndefined();
     await expect(app.lifecycle.ready).resolves.toMatchObject({ ok: true });
   });
 
-  it("close resolves when no adapter exposes hooks", async () => {
+  it("teardown resolves when no adapter exposes hooks", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
     const app = createShelfApp({ database: db, storage, logger: silentLogger });
-    await expect(app.lifecycle.close()).resolves.toBeUndefined();
+    await expect(app.lifecycle.teardown()).resolves.toBeUndefined();
   });
 
   it("exposes the passed logger instance", () => {
@@ -69,40 +86,24 @@ describe("app.lifecycle", () => {
     expect(typeof app.lifecycle.logger.child).toBe("function");
   });
 
-  it("init throws AdapterInitError naming the failed adapter", async () => {
+  it("setup throws AdapterLifecycleError naming the failed adapter", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const broken = {
-      ...db,
-      lifecycle: {
-        init: async (): Promise<void> => {
-          await Promise.resolve();
-          throw new Error("db down");
-        },
-      },
-    };
+    const broken = { ...db, lifecycle: brokenLifecycle("db down") };
     const app = createShelfApp({ database: broken, storage, logger: silentLogger });
-    const failure = await app.lifecycle.init().catch((error: unknown) => error);
+    const failure = await app.lifecycle.setup().catch((error: unknown) => error);
     expect(failure).toBeInstanceOf(AdapterLifecycleError);
-    const initError = failure as AdapterLifecycleError;
-    expect(initError.phase).toBe("init");
-    expect(initError.failures).toHaveLength(1);
-    expect(initError.failures[0]?.category).toBe("database");
-    expect(initError.message).toContain("database");
+    const setupError = failure as AdapterLifecycleError;
+    expect(setupError.phase).toBe("setup");
+    expect(setupError.failures).toHaveLength(1);
+    expect(setupError.failures[0]?.category).toBe("database");
+    expect(setupError.message).toContain("database");
   });
 
-  it("gates API requests with 503 after failed init", async () => {
+  it("gates API requests with 503 after failed setup", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const broken = {
-      ...db,
-      lifecycle: {
-        init: async (): Promise<void> => {
-          await Promise.resolve();
-          throw new Error("db down");
-        },
-      },
-    };
+    const broken = { ...db, lifecycle: brokenLifecycle("db down") };
     const app = createShelfApp({ database: broken, storage, logger: silentLogger });
     await app.lifecycle.ready;
     const response = await app.request("/api/v1/projects");
@@ -111,13 +112,13 @@ describe("app.lifecycle", () => {
       error: string;
       failures: { category: string; kind: string }[];
     };
-    expect(body.error).toContain("initialize");
+    expect(body.error).toContain("setup");
     expect(body.failures[0]?.category).toBe("database");
   });
 });
 
 describe("health endpoints", () => {
-  it("GET /api/v1/health answers liveness without auth or init", async () => {
+  it("GET /api/v1/health answers liveness without auth or setup", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
     const app = createShelfApp({ database: db, storage, logger: silentLogger });
@@ -129,18 +130,10 @@ describe("health endpoints", () => {
     expect(typeof body.version).toBe("string");
   });
 
-  it("GET /api/v1/health stays 200 after failed init", async () => {
+  it("GET /api/v1/health stays 200 after failed setup", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const broken = {
-      ...db,
-      lifecycle: {
-        init: async (): Promise<void> => {
-          await Promise.resolve();
-          throw new Error("db down");
-        },
-      },
-    };
+    const broken = { ...db, lifecycle: brokenLifecycle("db down") };
     const app = createShelfApp({ database: broken, storage, logger: silentLogger });
     await app.lifecycle.ready;
     const response = await app.request("/api/v1/health");
@@ -151,7 +144,7 @@ describe("health endpoints", () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
     const app = createShelfApp({ database: db, storage, logger: silentLogger });
-    await app.lifecycle.init();
+    await app.lifecycle.setup();
     const response = await app.request("/api/v1/health", { method: "POST" });
     expect(response.status).toBe(200);
     const body = (await response.json()) as {
@@ -163,18 +156,10 @@ describe("health endpoints", () => {
     expect(body.adapters.every((a) => a.state === "ok")).toBe(true);
   });
 
-  it("POST /api/v1/health reports init failures as degraded", async () => {
+  it("POST /api/v1/health reports setup failures as degraded", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const broken = {
-      ...db,
-      lifecycle: {
-        init: async (): Promise<void> => {
-          await Promise.resolve();
-          throw new Error("db down");
-        },
-      },
-    };
+    const broken = { ...db, lifecycle: brokenLifecycle("db down") };
     const app = createShelfApp({ database: broken, storage, logger: silentLogger });
     await app.lifecycle.ready;
     const response = await app.request("/api/v1/health", { method: "POST" });
@@ -196,7 +181,7 @@ describe("health endpoints", () => {
       auth: noSessionAuth,
       logger: silentLogger,
     });
-    await app.lifecycle.init();
+    await app.lifecycle.setup();
     const response = await app.request("/api/v1/health", { method: "POST" });
     expect(response.status).toBe(403);
   });
@@ -205,7 +190,7 @@ describe("health endpoints", () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
     const app = createShelfApp({ database: db, storage, auth: adminAuth, logger: silentLogger });
-    await app.lifecycle.init();
+    await app.lifecycle.setup();
     const response = await app.request("/api/v1/health", { method: "POST" });
     expect(response.status).toBe(200);
   });

@@ -1,7 +1,7 @@
 /**
  * Adapter lifecycle contract: hooks every adapter can expose, plus the
- * settled-result and error types. The runner (`init-runner.ts`) collects
- * and executes the hooks; `createShelfApp` kicks `init` eagerly and
+ * settled-result and error types. The runner (`setup-runner.ts`) collects
+ * and executes the hooks; `createShelfApp` kicks `setup` eagerly and
  * gates the first request on the shared result. All hooks must be
  * idempotent.
  */
@@ -10,11 +10,11 @@ import type { CaptureQueue } from "./capture-queue.ts";
 import type { CaptureRunner } from "./capture-runner.ts";
 import type { DatabaseAdapter } from "./database.ts";
 import type { GitHostProvider } from "./git-host/index.ts";
-import type { AdapterInitContext } from "./metadata.ts";
+import type { AdapterSetupContext } from "./metadata.ts";
 import type { StorageAdapter } from "./storage.ts";
 
 /** Adapters that can take part in lifecycle runs. */
-export interface AdapterInitSources {
+export interface AdapterSetupSources {
   database: DatabaseAdapter;
   storage: StorageAdapter;
   captureRunner?: CaptureRunner;
@@ -28,11 +28,11 @@ export interface HookEntry {
   readonly category: string;
   readonly kind: string;
   readonly name: string;
-  readonly run: (ctx: AdapterInitContext) => Promise<void>;
+  readonly run: (ctx: AdapterSetupContext) => Promise<void>;
 }
 
 /** One failed hook, with its adapter identity attached. */
-export interface AdapterInitFailure {
+export interface AdapterSetupFailure {
   readonly category: string;
   readonly kind: string;
   readonly name: string;
@@ -40,27 +40,27 @@ export interface AdapterInitFailure {
 }
 
 /** Settled outcome of a lifecycle run (never rejects — use `ok`). */
-export interface AdapterInitResult {
+export interface AdapterSetupResult {
   readonly ok: boolean;
-  readonly failures: AdapterInitFailure[];
+  readonly failures: AdapterSetupFailure[];
 }
 
 /** Lifecycle phase a run covers. */
-export type LifecyclePhase = "init" | "close";
+export type LifecyclePhase = "setup" | "teardown";
 
 /**
- * Thrown when an `app.lifecycle.init()` or `close()` run finishes with failures.
+ * Thrown when an `app.lifecycle.setup()` or `teardown()` run finishes with failures.
  *
  * Inspect `phase` to know which hook failed and `failures` for per-adapter
  * diagnostics. The router converts this into a 500 with structured details
  * during health checks.
  */
 export class AdapterLifecycleError extends Error {
-  /** Which lifecycle phase failed (`init` or `close`). */
+  /** Which lifecycle phase failed (`setup` or `teardown`). */
   readonly phase: LifecyclePhase;
   /** One entry per adapter hook that failed. */
-  readonly failures: AdapterInitFailure[];
-  constructor(phase: LifecyclePhase, failures: AdapterInitFailure[]) {
+  readonly failures: AdapterSetupFailure[];
+  constructor(phase: LifecyclePhase, failures: AdapterSetupFailure[]) {
     super(`Adapter ${phase} failed: ${failures.map((f) => `${f.category}/${f.kind}`).join(", ")}`);
     this.name = "AdapterLifecycleError";
     this.phase = phase;
@@ -68,5 +68,10 @@ export class AdapterLifecycleError extends Error {
   }
 }
 
-/** Collect every `init` hook from the configured adapters. */
-export { collectCloses, collectInits, runAdapterCloses, runAdapterInits } from "./init-runner.ts";
+/** Collect every `setup` hook from the configured adapters. */
+export {
+  collectSetups,
+  collectTeardowns,
+  runAdapterSetups,
+  runAdapterTeardowns,
+} from "./setup-runner.ts";

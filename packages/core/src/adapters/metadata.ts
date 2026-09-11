@@ -41,11 +41,11 @@ export interface GitAdapterMetadata extends AdapterMetadata {
   readonly schema: z.ZodType;
 }
 
-/** Context passed to an adapter's `init` on server startup. */
-export interface AdapterInitContext {
+/** Context passed to an adapter's `setup` on server startup. */
+export interface AdapterSetupContext {
   /** Resolved shelf configuration (scratchDir, secret, …). Never log the secret. */
   readonly config: ShelfConfig;
-  /** Scoped logger for init-time diagnostics. */
+  /** Scoped logger for setup-time diagnostics. */
   readonly logger: Logger;
 }
 
@@ -53,29 +53,29 @@ export interface AdapterInitContext {
 export interface AdapterHealth {
   /** Whether the adapter is currently usable. */
   readonly ok: boolean;
-  /** Probe latency in milliseconds, when measured. */
-  readonly latencyMs?: number;
   /** Short human-readable detail (must not contain secrets). */
   readonly detail?: string;
 }
 
 /**
- * Optional lifecycle every adapter can expose.
+ * Optional lifecycle every adapter can expose — all or nothing.
  *
- * Grouped in a sub-object (rather than flattened onto each adapter) so
- * future hooks (`drain?`, `reinit?`, …) land in one place. All hooks must
- * be idempotent — the router may run them more than once per process.
+ * An adapter either omits `lifecycle` entirely or implements all three
+ * hooks; partial implementations are not allowed. Grouped in a sub-object
+ * (rather than flattened onto each adapter) so future hooks land in one
+ * place. All hooks must be idempotent — the router may run them more than
+ * once per process.
  */
 export interface AdapterLifecycle {
   /**
    * One-shot setup: migrations, directory creation, credential validation.
    * Throw when something required is missing.
    */
-  init?: (ctx: AdapterInitContext) => Promise<void>;
-  /** Teardown: close clients and handles. Must tolerate repeated calls. */
-  close?: () => Promise<void>;
+  setup: (ctx: AdapterSetupContext) => Promise<void>;
+  /** Teardown: destroy clients and handles. Must tolerate repeated calls. */
+  teardown: () => Promise<void>;
   /** Ongoing liveness probe (cheap: SELECT 1, access(), head-bucket). */
-  health?: () => Promise<AdapterHealth>;
+  health: () => Promise<AdapterHealth>;
 }
 
 /**

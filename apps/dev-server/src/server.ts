@@ -45,7 +45,7 @@ const app = createShelfApp({
   },
 });
 
-await app.lifecycle.init();
+await app.lifecycle.setup();
 const logger = app.lifecycle.logger;
 
 const server = serve({ fetch: app.fetch, port }, () => {
@@ -53,7 +53,7 @@ const server = serve({ fetch: app.fetch, port }, () => {
 });
 
 const shutdown = async (): Promise<void> => {
-  await app.lifecycle.close();
+  await app.lifecycle.teardown();
   server.close();
 };
 process.on("SIGTERM", () => {

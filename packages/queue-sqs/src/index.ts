@@ -32,6 +32,8 @@ declare const __PKG_VERSION__: string | undefined;
  */
 export function createSqsCaptureQueue(options: SqsCaptureQueueOptions): PollableCaptureQueue {
   const client = options.client ?? new SQSClient({});
+  const ownsClient = options.client === undefined;
+  let destroyed = false;
   const visibilityTimeout = options.visibilityTimeout ?? 300;
   const waitTimeSeconds = options.waitTimeSeconds ?? 20;
 
@@ -44,8 +46,20 @@ export function createSqsCaptureQueue(options: SqsCaptureQueueOptions): Pollable
       category: "capture-queue",
     },
     lifecycle: {
-      init: async () => {
+      setup: async () => {
         await client.send(new GetQueueAttributesCommand({ QueueUrl: options.queueUrl }));
+      },
+      teardown: () => {
+        if (!ownsClient || destroyed) {
+          return Promise.resolve();
+        }
+        destroyed = true;
+        client.destroy();
+        return Promise.resolve();
+      },
+      health: async () => {
+        await client.send(new GetQueueAttributesCommand({ QueueUrl: options.queueUrl }));
+        return { ok: true };
       },
     },
     /**

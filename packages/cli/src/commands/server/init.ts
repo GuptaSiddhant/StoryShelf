@@ -170,7 +170,7 @@ function buildRouterLines(answers: Answers): string[] {
   } else {
     lines.push(`  config: {`, `    secret: process.env.SECRET,`, `  },`);
   }
-  lines.push(`});`, ``, `await app.lifecycle.init();`, `const logger = app.lifecycle.logger;`);
+  lines.push(`});`, ``, `await app.lifecycle.setup();`, `const logger = app.lifecycle.logger;`);
 
   return lines;
 }
@@ -191,7 +191,7 @@ function generateServer(answers: Answers): string {
     `});`,
     ``,
     `const shutdown = async () => {`,
-    `  await app.lifecycle.close();`,
+    `  await app.lifecycle.teardown();`,
     `  server.close();`,
     `};`,
     `process.on("SIGTERM", () => {`,

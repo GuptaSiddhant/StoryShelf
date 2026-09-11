@@ -22,7 +22,7 @@ describe("dev server router assembly", () => {
       storage,
       config: { scratchDir: scratch },
     });
-    await app.lifecycle.init();
+    await app.lifecycle.setup();
 
     const html = await app.request("/");
     expect(html.status).toBe(200);
@@ -31,6 +31,6 @@ describe("dev server router assembly", () => {
     expect(api.status).toBe(200);
     await expect(api.json()).resolves.toEqual([]);
 
-    await app.lifecycle.close();
+    await app.lifecycle.teardown();
   });
 });

@@ -159,11 +159,19 @@ function toUser(payload: SessionPayload): AuthUser {
 /** Lifecycle: fail fast when password or secret is missing. */
 function buildLifecycle(options: PasswordAuthOptions): PasswordAuth["lifecycle"] {
   return {
-    init: async () => {
+    setup: async () => {
       if (options.password === "" || options.secret === "") {
         throw new Error("Password auth requires a non-empty password and secret");
       }
       await Promise.resolve();
+    },
+    teardown: async () => {
+      // Stateless — nothing to destroy.
+      await Promise.resolve();
+    },
+    health: async () => {
+      await Promise.resolve();
+      return { ok: true };
     },
   };
 }

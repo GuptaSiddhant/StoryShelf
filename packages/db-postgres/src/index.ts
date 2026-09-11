@@ -80,6 +80,9 @@ export function createPostgresDatabase(options: PostgresDatabaseOptions): Databa
     close: async () => {
       await client.end();
     },
+    ping: async () => {
+      await client.unsafe("SELECT 1");
+    },
   });
 }
 

@@ -178,17 +178,17 @@ describe("metadata and lifecycle", () => {
     expect(queue.metadata.category).toBe("capture-queue");
   });
 
-  it("init pings redis", async () => {
+  it("setup pings redis", async () => {
     const { client, calls } = makeFakeRedis();
     const queue = createRedisCaptureQueue({ client: client as never });
-    await queue.lifecycle?.init?.({} as never);
+    await queue.lifecycle?.setup({} as never);
     expect(calls.some((c) => c.method === "ping")).toBe(true);
   });
 
-  it("close quits owned client, not external", async () => {
+  it("teardown quits owned client, not external", async () => {
     const { client, calls } = makeFakeRedis();
     const queue = createRedisCaptureQueue({ client: client as never });
-    await queue.lifecycle?.close?.();
+    await queue.lifecycle?.teardown();
     // external client should not be quit
     expect(calls.some((c) => c.method === "quit")).toBe(false);
   });

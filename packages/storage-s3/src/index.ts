@@ -33,16 +33,7 @@ export function createS3Storage(options: S3StorageOptions): StorageAdapter {
       kind: "s3",
       category: "storage",
     },
-    lifecycle: {
-      init: async () => {
-        await client.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix, MaxKeys: 1 }));
-      },
-      health: async () => {
-        const started = Date.now();
-        await client.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix, MaxKeys: 1 }));
-        return { ok: true, latencyMs: Date.now() - started };
-      },
-    },
+    lifecycle: buildLifecycle(client, injectedClient === undefined, bucket, prefix),
     async read(path) {
       return await s3Read(ctx, path);
     },
@@ -92,6 +83,33 @@ interface S3Context {
   client: S3Client;
   bucket: string;
   prefix: string;
+}
+
+/** All-or-nothing lifecycle: probe bucket access, destroy owned clients. */
+function buildLifecycle(
+  client: S3Client,
+  ownsClient: boolean,
+  bucket: string,
+  prefix: string,
+): StorageAdapter["lifecycle"] {
+  let destroyed = false;
+  return {
+    setup: async () => {
+      await client.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix, MaxKeys: 1 }));
+    },
+    teardown: () => {
+      if (!ownsClient || destroyed) {
+        return Promise.resolve();
+      }
+      destroyed = true;
+      client.destroy();
+      return Promise.resolve();
+    },
+    health: async () => {
+      await client.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix, MaxKeys: 1 }));
+      return { ok: true };
+    },
+  };
 }
 
 function s3Rel(prefix: string, key: string): string {

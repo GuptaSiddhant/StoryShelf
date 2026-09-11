@@ -34,6 +34,9 @@ export function createSqliteDatabase(path: string): DatabaseAdapter {
     close: () => {
       sqlite.close();
     },
+    ping: () => {
+      sqlite.prepare("SELECT 1").get();
+    },
   });
 }
 

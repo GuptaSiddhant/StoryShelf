@@ -10,9 +10,9 @@ import { createTursoDatabase } from "./index.ts";
 
 const silentLogger = createShelfLogger({ level: "silent" });
 
-/** Run the adapter's init hook (migrations live there now). */
+/** Run the adapter's setup hook (migrations live there now). */
 async function initDb(db: DatabaseAdapter): Promise<void> {
-  await db.lifecycle?.init?.({ config: {}, logger: silentLogger });
+  await db.lifecycle?.setup({ config: {}, logger: silentLogger });
 }
 
 function createTempTurso(): { dir: string; db: ReturnType<typeof createTursoDatabase> } {
@@ -25,7 +25,7 @@ async function cleanupTurso(
   dir: string,
   db: ReturnType<typeof createTursoDatabase>,
 ): Promise<void> {
-  await db.lifecycle?.close?.();
+  await db.lifecycle?.teardown();
   rmSync(dir, { recursive: true, force: true });
 }
 

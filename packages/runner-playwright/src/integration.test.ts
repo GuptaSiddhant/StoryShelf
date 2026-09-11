@@ -113,7 +113,7 @@ async function createHarness(): Promise<void> {
     captureRunner: createPlaywrightCaptureRunner(),
     config: { captureConcurrency: 1, scratchDir: dataDir, purgeTtlDays: 30 },
   });
-  await app.lifecycle.init();
+  await app.lifecycle.setup();
   harness = { app, db, storage, staticDir, tmp };
 }
 
@@ -130,7 +130,7 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
     if (!current) {
       return;
     }
-    await current.app.lifecycle.close();
+    await current.app.lifecycle.teardown();
     await rm(current.tmp, { recursive: true, force: true });
   });
 

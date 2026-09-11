@@ -48,6 +48,8 @@ export interface DrizzleAdapterOptions {
   metadata: AdapterMetadata & { readonly category: "database" };
   migrate: () => Promise<void> | void;
   close: () => Promise<void> | void;
+  /** Cheap liveness probe (e.g. `SELECT 1`); omitted when the driver has none. */
+  ping?: () => Promise<void> | void;
 }
 
 /**

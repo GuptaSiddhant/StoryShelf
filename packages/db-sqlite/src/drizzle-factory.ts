@@ -25,15 +25,24 @@ export function createDrizzleAdapter(db: unknown, options: DrizzleAdapterOptions
   return {
     metadata: options.metadata,
     lifecycle: {
-      init: async () => {
+      setup: async () => {
         await options.migrate();
       },
-      close: async () => {
+      teardown: async () => {
         if (closed) {
           return;
         }
         closed = true;
         await options.close();
+      },
+      health: async () => {
+        if (closed) {
+          return { ok: false, detail: "database closed" };
+        }
+        if (options.ping) {
+          await options.ping();
+        }
+        return { ok: true };
       },
     },
     insert: async <T extends AnySQLiteTable>(

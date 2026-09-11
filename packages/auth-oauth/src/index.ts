@@ -240,11 +240,19 @@ async function fetchUserInfo(
 /** Lifecycle: fail fast when OIDC wiring is missing. */
 function buildLifecycle(options: OAuthAuthOptions): OAuthAuth["lifecycle"] {
   return {
-    init: async () => {
+    setup: async () => {
       if (options.issuer === "" || options.clientId === "" || options.clientSecret === "") {
         throw new Error("OAuth auth requires a non-empty issuer, clientId, and clientSecret");
       }
       await Promise.resolve();
+    },
+    teardown: async () => {
+      // Stateless — nothing to destroy.
+      await Promise.resolve();
+    },
+    health: async () => {
+      await Promise.resolve();
+      return { ok: true };
     },
   };
 }

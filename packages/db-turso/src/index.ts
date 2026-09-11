@@ -31,6 +31,9 @@ export function createTursoDatabase(options: { url: string; authToken?: string }
     close: () => {
       client.close();
     },
+    ping: async () => {
+      await client.execute("SELECT 1");
+    },
   });
 }
 

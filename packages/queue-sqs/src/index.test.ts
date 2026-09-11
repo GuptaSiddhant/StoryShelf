@@ -94,7 +94,7 @@ describe("metadata and lifecycle", () => {
       queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs",
       client,
     });
-    await queue.lifecycle?.init?.({} as never);
+    await queue.lifecycle?.setup({} as never);
     expect(sent).toContain(GetQueueAttributesCommand.name);
   });
 });

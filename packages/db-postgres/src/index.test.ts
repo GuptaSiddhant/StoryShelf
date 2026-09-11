@@ -22,10 +22,10 @@ describe("createPostgresDatabase", () => {
     expect(db.metadata.kind).toBe("postgres");
     expect(db.metadata.name).toBe("Postgres");
 
-    await db.lifecycle?.init?.({} as never);
+    await db.lifecycle?.setup({} as never);
     expect(client.unsafe).toHaveBeenCalled();
 
-    await db.lifecycle?.close?.();
+    await db.lifecycle?.teardown();
     expect(client.end).toHaveBeenCalled();
   });
 

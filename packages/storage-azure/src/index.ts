@@ -28,13 +28,16 @@ export function createAzureStorage(options: AzureStorageOptions): StorageAdapter
       category: "storage",
     },
     lifecycle: {
-      init: async () => {
+      setup: async () => {
         await containerExists(container);
       },
+      teardown: async () => {
+        // ContainerClient holds no closable handle — sockets are process-global.
+        await Promise.resolve();
+      },
       health: async () => {
-        const started = Date.now();
         await containerExists(container);
-        return { ok: true, latencyMs: Date.now() - started };
+        return { ok: true };
       },
     },
     async read(path) {

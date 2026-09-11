@@ -17,7 +17,7 @@ import {
   resolveRequestUser,
   storeScope,
 } from "./middleware/index.ts";
-import { initGate, type MiddlewareWiring } from "./middleware/init-gate.ts";
+import { setupGate, type MiddlewareWiring } from "./middleware/setup-gate.ts";
 import { registerAdmin } from "./routers/admin.ts";
 import { registerAssets } from "./routers/assets.ts";
 import { registerAuth } from "./routers/auth.ts";
@@ -38,7 +38,7 @@ import { resolveRuntime } from "./runtime.ts";
  * Create the StoryShelf Hono app with all API routes and HTML pages.
  *
  * Adapter `init` hooks kick off eagerly in the background (the constructor
- * stays synchronous). Await `app.lifecycle.init()` before serving for
+ * stays synchronous). Await `app.lifecycle.setup()` before serving for
  * fail-fast startup, or let the first request gate on settlement.
  */
 export function createShelfApp(options: ShelfOptions): ShelfApp {
@@ -79,7 +79,7 @@ function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
   // Pino-http, which expects a Node server response (`res.on`) incompatible
   // With Hono's Web `Request`/`Response` model.
   app.use("*", requestLogging(logger));
-  app.use("*", initGate(getReady));
+  app.use("*", setupGate(getReady));
   app.use("/api/v1/*", rateLimit({ windowMs: 60_000, max: 100 }));
   app.use("/api/v1/tokens/*", rateLimit({ windowMs: 60_000, max: 10 }));
   app.use("/api/v1/webhooks/*", rateLimit({ windowMs: 60_000, max: 20 }));

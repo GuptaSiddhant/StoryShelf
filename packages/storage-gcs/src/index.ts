@@ -26,13 +26,16 @@ export function createGcsStorage(options: GcsStorageOptions): StorageAdapter {
       category: "storage",
     },
     lifecycle: {
-      init: async () => {
+      setup: async () => {
         await bucket.getFiles({ maxResults: 1 });
       },
+      teardown: async () => {
+        // GCS Storage exposes no close — connections are process-global.
+        await Promise.resolve();
+      },
       health: async () => {
-        const started = Date.now();
         await bucket.getFiles({ maxResults: 1 });
-        return { ok: true, latencyMs: Date.now() - started };
+        return { ok: true };
       },
     },
     async read(path) {

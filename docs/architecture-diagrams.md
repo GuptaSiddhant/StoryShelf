@@ -62,8 +62,8 @@ flowchart TB
     end
 
     subgraph Router["HTTP — packages/router"]
-        hono["createShelfApp\npackages/router/src/index.tsx:44\nOpenAPIHono"]
-        mw["Middleware\nrequestId / requestLogging\ninitGate / rateLimit / csrf\nstoreScope / authGate"]
+        hono["createShelfApp\npackages/app/src/index.tsx:44\nOpenAPIHono"]
+        mw["Middleware\nrequestId / requestLogging\nsetupGate / rateLimit / csrf\nstoreScope / authGate"]
         routes["Routers\nprojects / builds / snapshots\nlabels / tokens / members\nwebhooks / status-configs / admin\nhealth / media / storybook / ui"]
         pages["Pages + UI\npages/*.tsx (hono/jsx)\nui/DocumentLayout + HTMX\nassets/htmx (vendored)"]
         openapi["OpenAPI\n/api/v1/openapi.json\n/api/v1/docs (Swagger UI)"]
@@ -181,9 +181,9 @@ flowchart LR
         log2["createShelfLogger()\npackages/core/src/logger.ts"]
     end
 
-    subgraph Lifecycle["Lifecycle\npackages/router/src/lifecycle.ts:44"]
-        init["attachLifecycle\nrunAdapterInits (Promise.allSettled)\napp.lifecycle { ready, init(), close() }"]
-        gate["initGate middleware\n503 until settled"]
+    subgraph Lifecycle["Lifecycle\npackages/app/src/lifecycle.ts:44"]
+        init["attachLifecycle\nrunAdapterSetups (Promise.allSettled)\napp.lifecycle { ready, setup(), teardown() }"]
+        gate["setupGate middleware\n503 until settled"]
         health["GET /api/v1/health (liveness)\nPOST /api/v1/health (readiness)"]
     end
 
@@ -229,7 +229,7 @@ sequenceDiagram
     Client->>Hono: Request (HTTP)
     Hono->>MW: requestId()
     MW->>MW: requestLogging(logger) — pino structured
-    MW->>MW: initGate(getReady) — 503 if init failed
+    MW->>MW: setupGate(getReady) — 503 if setup failed
     MW->>MW: rateLimit (/api/v1/*, 100/min)
     MW->>MW: csrf() (/projects/:slug/settings/*)
     MW->>Store: storeScope({ db, storage, config, ui, logger, authEnabled, enqueueCapture, queue, gitHosts, resolveUser })
@@ -733,11 +733,11 @@ Never purged: `baselines/**` + builds with `persistent` label (`architecture.md:
 ```mermaid
 flowchart TB
     subgraph Init["Startup — packages/router/src/lifecycle.ts:33"]
-        kick["kickInit() — runAdapterInits(collectInits(options))<br/>Promise.allSettled, never rejects"]
-        cell["LifecycleCell { ready: Promise, settled: AdapterInitResult|null }"]
-        awaitInit["await app.lifecycle.init()<br/>fail-fast (migrations run here)"]
-        gate2["initGate middleware<br/>first request awaits cell.ready<br/>503 + per-adapter failures if !ok"]
-        close["app.lifecycle.close()<br/>runAdapterCloses on SIGTERM/SIGINT"]
+        kick["kickSetup() — runAdapterSetups(collectSetups(options))<br/>Promise.allSettled, never rejects"]
+        cell["LifecycleCell { ready: Promise, settled: AdapterSetupResult|null }"]
+        awaitInit["await app.lifecycle.setup()<br/>fail-fast (migrations run here)"]
+        gate2["setupGate middleware<br/>first request awaits cell.ready<br/>503 + per-adapter failures if !ok"]
+        close["app.lifecycle.teardown()<br/>runAdapterTeardowns on SIGTERM/SIGINT"]
     end
 
     subgraph Health["Health — ungated by init"]

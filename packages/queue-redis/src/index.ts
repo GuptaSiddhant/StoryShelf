@@ -96,13 +96,17 @@ function buildQueueLifecycle(
   ownsClient: boolean,
 ): PollableCaptureQueue["lifecycle"] {
   return {
-    init: async () => {
+    setup: async () => {
       await client.ping();
     },
-    close: async () => {
+    teardown: async () => {
       if (ownsClient) {
         await client.quit().catch(() => {});
       }
+    },
+    health: async () => {
+      await client.ping();
+      return { ok: true };
     },
   };
 }

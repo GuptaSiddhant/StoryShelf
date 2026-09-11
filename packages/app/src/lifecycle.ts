@@ -1,40 +1,25 @@
+import type { AdapterSetupContext } from "@storyshelf/core/adapter/metadata";
 import {
   AdapterLifecycleError,
-  collectCloses,
-  collectInits,
-  runAdapterCloses,
-  runAdapterInits,
-} from "@storyshelf/core/adapter/init";
-import type { AdapterInitResult } from "@storyshelf/core/adapter/init";
-import type { AdapterInitContext } from "@storyshelf/core/adapter/metadata";
+  collectSetups,
+  collectTeardowns,
+  runAdapterSetups,
+  runAdapterTeardowns,
+} from "@storyshelf/core/adapter/setup";
+import type { AdapterSetupResult } from "@storyshelf/core/adapter/setup";
 import type { ShelfOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 import type { ShelfRouter, ShelfLifecycle } from "./app-types.ts";
 import { startBranchGcTimer } from "./retention-timer.ts";
 import type { ServerRuntime } from "./runtime.ts";
 
-/** Kick eager init and attach the `app.lifecycle` namespace (single run). */
-export function attachLifecycle(
-  app: ShelfRouter,
-  options: ShelfOptions,
-  runtime: ServerRuntime,
-  cell: LifecycleCell,
-): void {
-  const initCtx: AdapterInitContext = { config: runtime.config, logger: runtime.logger };
-  kickInit(options, initCtx, runtime.logger, cell);
-  const timer = startBranchGcInterval(options, runtime);
-  Object.assign(app, {
-    lifecycle: createLifecycle(options, initCtx, runtime.logger, cell, timer),
-  });
-}
-
-/** Mutable init-settlement cell shared by the gate, health, and `init()`. */
+/** Mutable setup-settlement cell shared by the gate, health, and `setup()`. */
 export interface LifecycleCell {
-  ready: Promise<AdapterInitResult>;
-  settled: AdapterInitResult | null;
+  ready: Promise<AdapterSetupResult>;
+  settled: AdapterSetupResult | null;
 }
 
-function trackSettlement(cell: LifecycleCell, promise: Promise<AdapterInitResult>): void {
+function trackSettlement(cell: LifecycleCell, promise: Promise<AdapterSetupResult>): void {
   promise.then(
     (result) => {
       cell.settled = result;
@@ -45,15 +30,30 @@ function trackSettlement(cell: LifecycleCell, promise: Promise<AdapterInitResult
   );
 }
 
-/** Kick the eager background init run (resolves; never rejects). */
-function kickInit(
+/** Kick the eager background setup run (resolves; never rejects). */
+function kickSetup(
   options: ShelfOptions,
-  ctx: AdapterInitContext,
+  ctx: AdapterSetupContext,
   logger: Logger,
   cell: LifecycleCell,
 ): void {
-  cell.ready = runAdapterInits(collectInits(options), ctx, logger);
+  cell.ready = runAdapterSetups(collectSetups(options), ctx, logger);
   trackSettlement(cell, cell.ready);
+}
+
+/** Kick eager setup and attach the `app.lifecycle` namespace (single run). */
+export function attachLifecycle(
+  app: ShelfRouter,
+  options: ShelfOptions,
+  runtime: ServerRuntime,
+  cell: LifecycleCell,
+): void {
+  const setupCtx: AdapterSetupContext = { config: runtime.config, logger: runtime.logger };
+  kickSetup(options, setupCtx, runtime.logger, cell);
+  const timer = startBranchGcInterval(options, runtime);
+  Object.assign(app, {
+    lifecycle: createLifecycle(options, setupCtx, runtime.logger, cell, timer),
+  });
 }
 
 function startBranchGcInterval(
@@ -66,7 +66,7 @@ function startBranchGcInterval(
 /** Build the `app.lifecycle` namespace closing over one settlement cell. */
 function createLifecycle(
   options: ShelfOptions,
-  ctx: AdapterInitContext,
+  ctx: AdapterSetupContext,
   logger: Logger,
   cell: LifecycleCell,
   timer: { stop(): void } | null = null,
@@ -76,19 +76,19 @@ function createLifecycle(
       return cell.ready;
     },
     logger,
-    init: async () => {
-      const result = await runAdapterInits(collectInits(options), ctx, logger);
+    setup: async () => {
+      const result = await runAdapterSetups(collectSetups(options), ctx, logger);
       cell.ready = Promise.resolve(result);
       cell.settled = result;
       if (!result.ok) {
-        throw new AdapterLifecycleError("init", result.failures);
+        throw new AdapterLifecycleError("setup", result.failures);
       }
     },
-    close: async () => {
+    teardown: async () => {
       timer?.stop();
-      const result = await runAdapterCloses(collectCloses(options), ctx, logger);
+      const result = await runAdapterTeardowns(collectTeardowns(options), ctx, logger);
       if (!result.ok) {
-        throw new AdapterLifecycleError("close", result.failures);
+        throw new AdapterLifecycleError("teardown", result.failures);
       }
     },
   };

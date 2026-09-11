@@ -24,13 +24,16 @@ export function createLocalStorage(dataDir: string): StorageAdapter {
       category: "storage",
     },
     lifecycle: {
-      init: async () => {
+      setup: async () => {
         await mkdir(root, { recursive: true });
       },
+      teardown: async () => {
+        // No handles held — nothing to destroy.
+        await Promise.resolve();
+      },
       health: async () => {
-        const started = Date.now();
         const ok = await pathExists(root);
-        return { ok, latencyMs: Date.now() - started };
+        return { ok };
       },
     },
     async read(path) {

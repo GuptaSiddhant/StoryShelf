@@ -1,22 +1,23 @@
 import type { Logger } from "pino";
+import type { AdapterLifecycle, AdapterMetadata, AdapterSetupContext } from "./metadata.ts";
 import type {
-  AdapterInitFailure,
-  AdapterInitResult,
-  AdapterInitSources,
+  AdapterSetupFailure,
+  AdapterSetupResult,
+  AdapterSetupSources,
   HookEntry,
-} from "./init.ts";
-import type { AdapterInitContext, AdapterLifecycle, AdapterMetadata } from "./metadata.ts";
+} from "./setup.ts";
 
 interface LifecycleCarrier {
   readonly metadata: AdapterMetadata;
   readonly lifecycle?: AdapterLifecycle;
 }
 
-function hookEntry(adapter: LifecycleCarrier, hook: "init" | "close"): HookEntry | null {
-  const fn = adapter.lifecycle?.[hook];
-  if (!fn) {
+function hookEntry(adapter: LifecycleCarrier, hook: "setup" | "teardown"): HookEntry | null {
+  const lifecycle = adapter.lifecycle;
+  if (!lifecycle) {
     return null;
   }
+  const fn = lifecycle[hook];
   const { category, kind, name } = adapter.metadata;
   return {
     category,
@@ -31,7 +32,7 @@ function hookEntry(adapter: LifecycleCarrier, hook: "init" | "close"): HookEntry
 function pushHook(
   entries: HookEntry[],
   adapter: LifecycleCarrier | undefined,
-  hook: "init" | "close",
+  hook: "setup" | "teardown",
 ): void {
   if (!adapter) {
     return;
@@ -42,7 +43,11 @@ function pushHook(
   }
 }
 
-function pushAll(entries: HookEntry[], sources: AdapterInitSources, hook: "init" | "close"): void {
+function pushAll(
+  entries: HookEntry[],
+  sources: AdapterSetupSources,
+  hook: "setup" | "teardown",
+): void {
   pushHook(entries, sources.database, hook);
   pushHook(entries, sources.storage, hook);
   pushHook(entries, sources.captureRunner, hook);
@@ -53,17 +58,17 @@ function pushAll(entries: HookEntry[], sources: AdapterInitSources, hook: "init"
   }
 }
 
-/** Collect every available `init` hook in deterministic order. */
-export function collectInits(sources: AdapterInitSources): HookEntry[] {
+/** Collect every available `setup` hook in deterministic order. */
+export function collectSetups(sources: AdapterSetupSources): HookEntry[] {
   const entries: HookEntry[] = [];
-  pushAll(entries, sources, "init");
+  pushAll(entries, sources, "setup");
   return entries;
 }
 
-/** Collect every available `close` hook in deterministic order. */
-export function collectCloses(sources: AdapterInitSources): HookEntry[] {
+/** Collect every available `teardown` hook in deterministic order. */
+export function collectTeardowns(sources: AdapterSetupSources): HookEntry[] {
   const entries: HookEntry[] = [];
-  pushAll(entries, sources, "close");
+  pushAll(entries, sources, "teardown");
   return entries;
 }
 
@@ -71,7 +76,7 @@ function messageOf(reason: unknown): string {
   return reason instanceof Error ? reason.message : String(reason);
 }
 
-function toFailure(entry: HookEntry, reason: unknown): AdapterInitFailure {
+function toFailure(entry: HookEntry, reason: unknown): AdapterSetupFailure {
   return { category: entry.category, kind: entry.kind, name: entry.name, error: messageOf(reason) };
 }
 
@@ -80,8 +85,8 @@ function toResult(
   outcomes: PromiseSettledResult<void>[],
   logger: Logger,
   verb: string,
-): AdapterInitResult {
-  const failures: AdapterInitFailure[] = [];
+): AdapterSetupResult {
+  const failures: AdapterSetupFailure[] = [];
   for (const [index, entry] of entries.entries()) {
     const outcome: PromiseSettledResult<void> | undefined = outcomes[index];
     if (outcome?.status === "rejected") {
@@ -96,30 +101,30 @@ function toResult(
   return { ok: failures.length === 0, failures };
 }
 
-/** Run init hooks concurrently; failures are collected, never thrown. */
-export async function runAdapterInits(
+/** Run setup hooks concurrently; failures are collected, never thrown. */
+export async function runAdapterSetups(
   entries: HookEntry[],
-  ctx: AdapterInitContext,
+  ctx: AdapterSetupContext,
   logger: Logger,
-): Promise<AdapterInitResult> {
+): Promise<AdapterSetupResult> {
   const outcomes = await Promise.allSettled(
     entries.map(async (entry) => {
       await entry.run(ctx);
     }),
   );
-  return toResult(entries, outcomes, logger, "init");
+  return toResult(entries, outcomes, logger, "setup");
 }
 
-/** Run close hooks concurrently; failures are collected, never thrown. */
-export async function runAdapterCloses(
+/** Run teardown hooks concurrently; failures are collected, never thrown. */
+export async function runAdapterTeardowns(
   entries: HookEntry[],
-  ctx: AdapterInitContext,
+  ctx: AdapterSetupContext,
   logger: Logger,
-): Promise<AdapterInitResult> {
+): Promise<AdapterSetupResult> {
   const outcomes = await Promise.allSettled(
     entries.map(async (entry) => {
       await entry.run(ctx);
     }),
   );
-  return toResult(entries, outcomes, logger, "close");
+  return toResult(entries, outcomes, logger, "teardown");
 }

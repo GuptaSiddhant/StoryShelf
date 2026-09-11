@@ -62,13 +62,13 @@
       "source": "./src/adapters/git-host/helpers.ts",
       "default": "./dist/adapter/git-host/helpers.mjs"
     },
-    "./adapter/init": {
-      "source": "./src/adapters/init.ts",
-      "default": "./dist/adapter/init.mjs"
-    },
     "./adapter/metadata": {
       "source": "./src/adapters/metadata.ts",
       "default": "./dist/adapter/metadata.mjs"
+    },
+    "./adapter/setup": {
+      "source": "./src/adapters/setup.ts",
+      "default": "./dist/adapter/setup.mjs"
     },
     "./adapter/storage": {
       "source": "./src/adapters/storage.ts",
@@ -138,8 +138,8 @@
       "./adapter/git-host": "./dist/adapter/git-host.mjs",
       "./adapter/git-host/comments": "./dist/adapter/git-host/comments.mjs",
       "./adapter/git-host/helpers": "./dist/adapter/git-host/helpers.mjs",
-      "./adapter/init": "./dist/adapter/init.mjs",
       "./adapter/metadata": "./dist/adapter/metadata.mjs",
+      "./adapter/setup": "./dist/adapter/setup.mjs",
       "./adapter/storage": "./dist/adapter/storage.mjs",
       "./adapter/webhook-events": "./dist/adapter/webhook-events.mjs",
       "./capture": "./dist/capture.mjs",

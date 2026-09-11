@@ -28,21 +28,31 @@ export function applyListOptions<C extends ChainFilter<C>>(query: C, opts: ListO
 }
 
 /**
- * Build the database lifecycle: migrations run in `init`, the connection
- * closes in `close`. Close tolerates repeated calls (drivers may not).
+ * Build the database lifecycle: migrations run in `setup`, the connection
+ * is destroyed in `teardown`, `health` pings when the driver provides one.
+ * Teardown tolerates repeated calls (drivers may not).
  */
 export function buildLifecycle(options: DrizzleAdapterOptions): AdapterLifecycle {
   let closed = false;
   return {
-    init: async () => {
+    setup: async () => {
       await options.migrate();
     },
-    close: async () => {
+    teardown: async () => {
       if (closed) {
         return;
       }
       closed = true;
       await options.close();
+    },
+    health: async () => {
+      if (closed) {
+        return { ok: false, detail: "database closed" };
+      }
+      if (options.ping) {
+        await options.ping();
+      }
+      return { ok: true };
     },
   };
 }
