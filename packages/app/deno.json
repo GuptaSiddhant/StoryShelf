@@ -5,6 +5,11 @@
   "exports": {
     ".": "./src/index.tsx"
   },
+  "imports": {
+    "hono/jsx": "npm:hono@4.13.7/jsx",
+    "hono/jsx/jsx-runtime": "npm:hono@4.13.7/jsx/jsx-runtime",
+    "hono/jsx/jsx-dev-runtime": "npm:hono@4.13.7/jsx/jsx-dev-runtime"
+  },
   "publish": {
     "include": ["src", "README.md", "LICENSE"],
     "exclude": ["**/*.test.ts", "**/*.test.tsx", "**/test-helpers"]
