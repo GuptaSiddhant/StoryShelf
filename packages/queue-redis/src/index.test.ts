@@ -361,7 +361,7 @@ describe("nack", () => {
     expect(calls.some((c) => c.method === "lrem")).toBe(true);
     expect(calls.some((c) => c.method === "lpush" && c.args[0] === "shelf:queue")).toBe(true);
     // attempts incremented
-    const lpush = [...calls].reverse().find((c) => c.method === "lpush");
+    const lpush = calls.toReversed().find((c) => c.method === "lpush");
     const payload = JSON.parse(lpush?.args[1] as string) as Record<string, unknown>;
     expect(payload["attempts"]).toBe(1);
   });
