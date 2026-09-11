@@ -32,7 +32,7 @@ type DatabaseChoice = "sqlite" | "turso" | "postgres";
 type StorageChoice = "local" | "s3";
 type AuthChoice = "none" | "password" | "oauth";
 type GitChoice = "none" | "github" | "gitlab";
-type QueueChoice = "memory" | "sqs";
+type QueueChoice = "memory" | "sqs" | "redis";
 
 interface Answers {
   name: string;
@@ -72,6 +72,7 @@ const GIT_PACKAGE: Record<GitChoice, string | null> = {
 const QUEUE_PACKAGE: Record<QueueChoice, string | null> = {
   memory: null,
   sqs: "@storyshelf/queue-sqs",
+  redis: "@storyshelf/queue-redis",
 };
 
 const DB_IMPORT: Record<DatabaseChoice, string> = {
@@ -107,6 +108,9 @@ function buildImports(answers: Answers): string[] {
   if (answers.queue === "sqs") {
     imports.push(`import { createSqsCaptureQueue } from "@storyshelf/queue-sqs";`);
   }
+  if (answers.queue === "redis") {
+    imports.push(`import { createRedisCaptureQueue } from "@storyshelf/queue-redis";`);
+  }
 
   if (answers.auth !== "none") {
     imports.push(`import { createPasswordAuth } from "${AUTH_PACKAGE[answers.auth]}";`);
@@ -130,6 +134,9 @@ function buildAdapterLines(answers: Answers): string[] {
   if (answers.queue === "sqs") {
     lines.push(`const captureQueue = createSqsCaptureQueue({ queueUrl: process.env.QUEUE_URL! });`);
   }
+  if (answers.queue === "redis") {
+    lines.push(`const captureQueue = createRedisCaptureQueue({ url: process.env.REDIS_URL! });`);
+  }
   if (answers.queue === "memory") {
     lines.push(`const captureRunner = createPlaywrightCaptureRunner();`);
   }
@@ -139,7 +146,7 @@ function buildAdapterLines(answers: Answers): string[] {
 function buildRouterLines(answers: Answers): string[] {
   const lines = [`const app = createShelfApp({`, `  database,`, `  storage,`];
 
-  if (answers.queue === "sqs") {
+  if (answers.queue === "sqs" || answers.queue === "redis") {
     lines.push(`  captureQueue,`);
   } else {
     lines.push(`  captureRunner,`);
@@ -198,8 +205,16 @@ function generateServer(answers: Answers): string {
 }
 
 function generateWorkerFile(answers: Answers): string {
+  const queueImport =
+    answers.queue === "redis"
+      ? `import { createRedisCaptureQueue } from "@storyshelf/queue-redis";`
+      : `import { createSqsCaptureQueue } from "@storyshelf/queue-sqs";`;
+  const queueInit =
+    answers.queue === "redis"
+      ? `const queue = createRedisCaptureQueue({ url: process.env.REDIS_URL! });`
+      : `const queue = createSqsCaptureQueue({ queueUrl: process.env.QUEUE_URL! });`;
   return [
-    `import { createSqsCaptureQueue } from "@storyshelf/queue-sqs";`,
+    queueImport,
     `import { createCaptureWorker } from "@storyshelf/worker";`,
     `import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";`,
     DB_IMPORT[answers.database],
@@ -208,7 +223,7 @@ function generateWorkerFile(answers: Answers): string {
     `const dataDir = process.env.DATA_DIR || "./data";`,
     `const database = ${DB_INIT[answers.database]};`,
     `const storage = ${STORAGE_INIT[answers.storage]};`,
-    `const queue = createSqsCaptureQueue({ queueUrl: process.env.QUEUE_URL! });`,
+    queueInit,
     `const runner = createPlaywrightCaptureRunner();`,
     ``,
     `const worker = createCaptureWorker({`,
@@ -242,8 +257,10 @@ function buildDeps(answers: Answers): Record<string, string> {
   if (answers.storage !== "local") {
     deps[STORAGE_PACKAGE[answers.storage]] = __PKG_VERSION__ ?? "0.0.0";
   }
-  if (answers.queue === "sqs") {
-    deps["@storyshelf/queue-sqs"] = __PKG_VERSION__ ?? "0.0.0";
+  if (answers.queue === "sqs" || answers.queue === "redis") {
+    const queuePkg =
+      answers.queue === "redis" ? "@storyshelf/queue-redis" : "@storyshelf/queue-sqs";
+    deps[queuePkg] = __PKG_VERSION__ ?? "0.0.0";
     if (answers.includeWorker) {
       deps["@storyshelf/worker"] = __PKG_VERSION__ ?? "0.0.0";
       deps["@storyshelf/runner-playwright"] = __PKG_VERSION__ ?? "0.0.0";
@@ -318,7 +335,7 @@ async function writeDockerFiles(outDir: string, answers: Answers): Promise<void>
     return;
   }
 
-  if (answers.queue === "sqs" && answers.includeWorker) {
+  if ((answers.queue === "sqs" || answers.queue === "redis") && answers.includeWorker) {
     // Server is slim when queue is remote; worker has playwright
     const slimDockerfile = [
       "FROM node:lts-alpine",
@@ -415,8 +432,8 @@ export async function runServerInit(_options: ServerInitOptions): Promise<void> 
     answers.queue = "memory";
   }
 
-  // Hybrid: if queue is SQS, ask whether to generate worker alongside
-  if (answers.queue === "sqs") {
+  // Hybrid: if queue is SQS or Redis, ask whether to generate worker alongside
+  if (answers.queue === "sqs" || answers.queue === "redis") {
     const workerAnswer = (await prompts({
       type: "confirm",
       name: "includeWorker",

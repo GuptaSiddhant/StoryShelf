@@ -88,7 +88,8 @@ export const INFRA_PROMPTS: Prompt[] = [
     message: "Which capture queue?",
     choices: [
       { title: "In-memory (single server)", value: "memory" },
-      { title: "SQS (remote worker)", value: "sqs" },
+      { title: "Redis (self-hosted, Docker Compose)", value: "redis" },
+      { title: "SQS (AWS remote worker)", value: "sqs" },
     ],
   },
   {
@@ -125,6 +126,7 @@ export const WORKER_INFRA_PROMPTS: Prompt[] = [
     message: "Which queue?",
     choices: [
       { title: "SQS (AWS)", value: "sqs" },
+      { title: "Redis (self-hosted)", value: "redis" },
       { title: "In-memory (local dev only)", value: "memory" },
     ],
   },

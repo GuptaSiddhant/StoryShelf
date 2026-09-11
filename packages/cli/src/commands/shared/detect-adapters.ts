@@ -4,7 +4,7 @@ import { join } from "node:path";
 export interface DetectedAdapters {
   database?: "sqlite" | "turso" | "postgres";
   storage?: "local" | "s3";
-  queue?: "memory" | "sqs";
+  queue?: "memory" | "sqs" | "redis";
   git?: "none" | "github" | "gitlab";
 }
 
@@ -55,6 +55,8 @@ export function detectInstalledAdapters(dir: string): DetectedAdapters {
 
   if (deps.has("@storyshelf/queue-sqs")) {
     result.queue = "sqs";
+  } else if (deps.has("@storyshelf/queue-redis")) {
+    result.queue = "redis";
   } else if (deps.has("@storyshelf/worker")) {
     // worker present implies a queue; default to memory if no explicit queue dep but worker present
     // leave queue undefined so caller defaults to memory

@@ -60,6 +60,7 @@ export default defineConfig({
             { label: "@storyshelf/git-github", slug: "packages/git-github" },
             { label: "@storyshelf/git-gitlab", slug: "packages/git-gitlab" },
             { label: "@storyshelf/queue-sqs", slug: "packages/queue-sqs" },
+            { label: "@storyshelf/queue-redis", slug: "packages/queue-redis" },
           ],
         },
       ],

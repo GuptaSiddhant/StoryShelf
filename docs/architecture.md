@@ -670,6 +670,15 @@ StoryShelf/
         static-server.ts  # local HTTP server for the extracted Storybook during capture
         viewport.ts       # default viewports
       package.json
+
+    queue-redis/
+      src/
+        index.ts          # Redis CaptureQueue (ioredis, BLMOVE, delayed ZSET)
+      package.json
+    queue-sqs/
+      src/
+        index.ts          # SQS CaptureQueue (AWS SDK v3, SQS long-poll)
+      package.json
 ```
 
 ## Tech Stack

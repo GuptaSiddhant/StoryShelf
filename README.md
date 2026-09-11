@@ -8,18 +8,22 @@ Self-hosted visual testing platform for Storybook. Run visual regression tests i
 
 ```
 packages/
-  core/           @storyshelf/core          — Hono router, models, capture pipeline, diff, retention
+  core/           @storyshelf/core          — Adapter interfaces, models, capture pipeline, diff, retention (no HTTP)
+  app/            @storyshelf/app           — Hono app, API routes, server-rendered UI over core
   db-sqlite/      @storyshelf/db-sqlite      — SQLite database adapter (node:sqlite + Drizzle)
   db-turso/       @storyshelf/db-turso       — Turso/libSQL database adapter
+  db-postgres/    @storyshelf/db-postgres    — Postgres database adapter (postgres.js + Drizzle)
   storage-local/  @storyshelf/storage-local — local filesystem storage
   storage-s3/     @storyshelf/storage-s3    — S3-compatible storage
   auth-oauth/     @storyshelf/auth-oauth    — OIDC auth
   auth-password/  @storyshelf/auth-password — shared-password auth
   git-github/     @storyshelf/git-github    — GitHub commit status / merge gate / PR comments
-  git-gitlab/     @storyshelf/git-gitlab    — GitLab commit status / merge gate / MR comments
+  git-gitlab/     @storyshelf/git-gitlab    — GitLab commit statuses, MR comments, merge-gate helpers
   queue-sqs/      @storyshelf/queue-sqs     — AWS SQS capture job queue
+  queue-redis/    @storyshelf/queue-redis   — Redis capture job queue (ioredis)
   cli/            storyshelf              — CLI client (server init, init, create, upload, purge, retry)
   runner-playwright/ @storyshelf/runner-playwright — Playwright capture runner
+  runner-puppeteer/ @storyshelf/runner-puppeteer — Puppeteer capture runner
 apps/
   dev-server/     dev-server      — local dev server (from TS source via nub watch)
   website/        website         — public docs (Astro Starlight)

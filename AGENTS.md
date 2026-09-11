@@ -65,6 +65,7 @@ StoryShelf/
     git-github/     @storyshelf/git-github      -- GitHub status checks, PR comments, merge-gate helpers (@octokit)
     git-gitlab/     @storyshelf/git-gitlab      -- GitLab commit statuses, MR comments, merge-gate helpers
     queue-sqs/      @storyshelf/queue-sqs       -- SQS-backed remote CaptureQueue (AWS SDK v3)
+    queue-redis/    @storyshelf/queue-redis     -- Redis-backed remote CaptureQueue (ioredis)
   apps/
     dev-server/     dev-server      -- Local dev server, runs from TS source via `nub run serve` (no build; Playwright capture + optional shared-password auth)
     website/        website         -- Public docs & marketing site (Astro Starlight)
