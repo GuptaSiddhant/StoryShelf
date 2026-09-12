@@ -373,7 +373,7 @@ describe("createAzureStorage - lifecycle", () => {
     });
 
     await storage.lifecycle?.setup({} as never);
-    await storage.lifecycle?.health({} as never);
+    await storage.lifecycle?.health();
 
     expect(calls).toContain("containerExists");
   });
@@ -384,7 +384,7 @@ describe("createAzureStorage - lifecycle", () => {
     });
     const storage = createAzureStorage({ container: "bkt", client: client as never });
 
-    await expect(storage.lifecycle?.setup()).rejects.toThrow("Container not found");
+    await expect(storage.lifecycle?.setup({} as never)).rejects.toThrow("Container not found");
   });
 
   it("health reports ok", async () => {
