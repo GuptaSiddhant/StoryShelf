@@ -196,6 +196,17 @@ describe("createGcsStorage - delete and exists", () => {
     await expect(storage.delete("missing.png")).resolves.toBeUndefined();
   });
 
+  it("delete rethrows non-404 errors", async () => {
+    const { client } = makeGcsClient({
+      delete: async (): Promise<void> => {
+        throw new Error("boom");
+      },
+    });
+    const storage = createGcsStorage({ bucket: "bkt", client: client as never });
+
+    await expect(storage.delete("a.txt")).rejects.toThrow("boom");
+  });
+
   it("exists returns true when GCS reports the file exists", async () => {
     const { client } = makeGcsClient({
       exists: async () => [true],
@@ -248,6 +259,38 @@ describe("createGcsStorage - list", () => {
 
     await expect(storage.list("a")).resolves.toEqual(["a/1.png"]);
   });
+
+  it("follows nextQuery across pages until the pageToken is exhausted", async () => {
+    const { client, calls } = makeGcsClient({
+      getFiles: async (opts) => {
+        const token = (opts as { pageToken?: string }).pageToken;
+        const files = token
+          ? [{ name: "app/a/3.png" }]
+          : [{ name: "app/a/1.png" }, { name: "app/a/2.png" }];
+        const nextQuery = token ? null : { pageToken: "next" };
+        return [files as never, nextQuery] as never;
+      },
+    });
+    const storage = createGcsStorage({ bucket: "bkt", prefix: "app", client: client as never });
+
+    const result = await storage.list("a");
+
+    expect(result).toEqual(["a/1.png", "a/2.png", "a/3.png"]);
+    expect(calls).toContain('getFiles:{"prefix":"app/a","autoPaginate":false}');
+    expect(calls).toContain('getFiles:{"pageToken":"next"}');
+  });
+
+  it("list sends no prefix when listPrefix is empty and no storage prefix is set", async () => {
+    const fakeFiles = [{ name: "a/1.png" }] as unknown as { name: string }[];
+    const { client, calls } = makeGcsClient({
+      getFiles: async () => [fakeFiles as never],
+    });
+    const storage = createGcsStorage({ bucket: "bkt", client: client as never });
+
+    await expect(storage.list("")).resolves.toEqual(["a/1.png"]);
+
+    expect(calls).toContain('getFiles:{"autoPaginate":false}');
+  });
 });
 
 describe("createGcsStorage - streams", () => {
@@ -258,6 +301,24 @@ describe("createGcsStorage - streams", () => {
     await storage.writeStream("x/y.bin", Readable.from([Buffer.from("streamed")]));
 
     expect(calls).toEqual(expect.arrayContaining(["createWriteStream:app/x/y.bin"]));
+  });
+
+  it("writeStream deletes the partial object when the pipeline fails", async () => {
+    const { client, calls } = makeGcsClient({
+      createWriteStream: (): NodeJS.WritableStream =>
+        new Writable({
+          write(_chunk, _encoding, callback): void {
+            callback(new Error("boom"));
+          },
+        }),
+    });
+    const storage = createGcsStorage({ bucket: "bkt", prefix: "app", client: client as never });
+
+    await expect(
+      storage.writeStream("x/y.bin", Readable.from([Buffer.from("streamed")])),
+    ).rejects.toThrow("boom");
+
+    expect(calls).toEqual(expect.arrayContaining(["delete:app/x/y.bin"]));
   });
 
   it("readStream returns a readable for existing objects", async () => {
@@ -282,5 +343,41 @@ describe("createGcsStorage - streams", () => {
     const storage = createGcsStorage({ bucket: "bkt", client: client as never });
 
     await expect(storage.readStream("missing.bin")).rejects.toThrow();
+  });
+});
+
+describe("createGcsStorage - lifecycle", () => {
+  it("setup and health probe the bucket", async () => {
+    const { client, calls } = makeGcsClient();
+    const storage = createGcsStorage({ bucket: "bkt", prefix: "app", client: client as never });
+
+    await storage.lifecycle?.setup({} as never);
+    await storage.lifecycle?.health();
+
+    expect(calls).toContain('getFiles:{"prefix":"app/","maxResults":1}');
+  });
+
+  it("health probes with no prefix when none is configured", async () => {
+    const { client, calls } = makeGcsClient();
+    const storage = createGcsStorage({ bucket: "bkt", client: client as never });
+
+    await storage.lifecycle?.health();
+
+    expect(calls).toContain('getFiles:{"maxResults":1}');
+  });
+
+  it("health reports ok", async () => {
+    const { client } = makeGcsClient();
+    const storage = createGcsStorage({ bucket: "bkt", client: client as never });
+
+    await expect(storage.lifecycle?.health()).resolves.toEqual({ ok: true });
+  });
+
+  it("teardown is a no-op", async () => {
+    const { client, calls } = makeGcsClient();
+    const storage = createGcsStorage({ bucket: "bkt", client: client as never });
+
+    await expect(storage.lifecycle?.teardown()).resolves.toBeUndefined();
+    expect(calls).toEqual([]);
   });
 });

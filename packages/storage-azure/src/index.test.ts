@@ -251,12 +251,23 @@ describe("createAzureStorage - delete and exists", () => {
 
     await expect(storage.exists("x/y.png")).resolves.toBe(false);
   });
+
+  it("delete rethrows non-404 errors", async () => {
+    const { client } = makeAzureClient({
+      deleteIfExists: async (): Promise<void> => {
+        throw new Error("boom");
+      },
+    });
+    const storage = createAzureStorage({ container: "bkt", client: client as never });
+
+    await expect(storage.delete("a.txt")).rejects.toThrow("boom");
+  });
 });
 
 describe("createAzureStorage - list", () => {
   it("list calls listBlobsFlat with prefix and strips the storage prefix", async () => {
     const { client } = makeAzureClient({
-      listBlobsFlat: async function* (): AsyncIterable<{ name: string }> {
+      async *listBlobsFlat(): AsyncIterable<{ name: string }> {
         yield { name: "app/a/1.png" };
         yield { name: "app/a/2.png" };
       },
@@ -274,7 +285,7 @@ describe("createAzureStorage - list", () => {
 
   it("list returns an empty array when there are no blobs", async () => {
     const { client } = makeAzureClient({
-      listBlobsFlat: async function* (): AsyncIterable<{ name: string }> {},
+      async *listBlobsFlat(): AsyncIterable<{ name: string }> {},
     });
     const storage = createAzureStorage({
       container: "bkt",
@@ -287,7 +298,7 @@ describe("createAzureStorage - list", () => {
 
   it("returns unprefixed keys when no prefix is configured", async () => {
     const { client } = makeAzureClient({
-      listBlobsFlat: async function* (): AsyncIterable<{ name: string }> {
+      async *listBlobsFlat(): AsyncIterable<{ name: string }> {
         yield { name: "a/1.png" };
       },
     });
@@ -349,5 +360,45 @@ describe("createAzureStorage - streams", () => {
     const storage = createAzureStorage({ container: "bkt", client: client as never });
 
     await expect(storage.readStream("missing.bin")).rejects.toThrow();
+  });
+});
+
+describe("createAzureStorage - lifecycle", () => {
+  it("setup and health probe the container", async () => {
+    const { client, calls } = makeAzureClient();
+    const storage = createAzureStorage({
+      container: "bkt",
+      prefix: "app",
+      client: client as never,
+    });
+
+    await storage.lifecycle?.setup({} as never);
+    await storage.lifecycle?.health({} as never);
+
+    expect(calls).toContain("containerExists");
+  });
+
+  it("setup rejects when the container does not exist", async () => {
+    const { client } = makeAzureClient({
+      containerExists: async () => false,
+    });
+    const storage = createAzureStorage({ container: "bkt", client: client as never });
+
+    await expect(storage.lifecycle?.setup()).rejects.toThrow("Container not found");
+  });
+
+  it("health reports ok", async () => {
+    const { client } = makeAzureClient();
+    const storage = createAzureStorage({ container: "bkt", client: client as never });
+
+    await expect(storage.lifecycle?.health()).resolves.toEqual({ ok: true });
+  });
+
+  it("teardown is a no-op", async () => {
+    const { client, calls } = makeAzureClient();
+    const storage = createAzureStorage({ container: "bkt", client: client as never });
+
+    await expect(storage.lifecycle?.teardown()).resolves.toBeUndefined();
+    expect(calls).toEqual([]);
   });
 });

@@ -105,9 +105,8 @@ function buildLifecycle(
       await Promise.resolve();
     },
     health: async () => {
-      const started = Date.now();
       await client.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix, MaxKeys: 1 }));
-      return { ok: true, latencyMs: Date.now() - started };
+      return { ok: true };
     },
   };
 }

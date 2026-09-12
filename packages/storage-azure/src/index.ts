@@ -36,9 +36,8 @@ export function createAzureStorage(options: AzureStorageOptions): StorageAdapter
         await Promise.resolve();
       },
       health: async () => {
-        const started = Date.now();
         await containerExists(container, containerName);
-        return { ok: true, latencyMs: Date.now() - started };
+        return { ok: true };
       },
     },
     async read(path) {

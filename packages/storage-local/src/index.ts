@@ -32,9 +32,8 @@ export function createLocalStorage(dataDir: string): StorageAdapter {
         await Promise.resolve();
       },
       health: async () => {
-        const started = Date.now();
         const ok = await pathExists(root);
-        return { ok, latencyMs: Date.now() - started };
+        return { ok };
       },
     },
     async read(path) {
