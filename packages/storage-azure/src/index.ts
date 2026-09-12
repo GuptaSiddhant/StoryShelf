@@ -29,15 +29,16 @@ export function createAzureStorage(options: AzureStorageOptions): StorageAdapter
     },
     lifecycle: {
       setup: async () => {
-        await containerExists(container);
+        await containerExists(container, containerName);
       },
       teardown: async () => {
         // ContainerClient holds no closable handle — sockets are process-global.
         await Promise.resolve();
       },
       health: async () => {
-        await containerExists(container);
-        return { ok: true };
+        const started = Date.now();
+        await containerExists(container, containerName);
+        return { ok: true, latencyMs: Date.now() - started };
       },
     },
     async read(path) {
@@ -99,8 +100,11 @@ function azureRel(prefix: string, key: string): string {
 }
 
 function isNotFound(error: unknown): boolean {
-  const status = (error as { statusCode?: number }).statusCode;
-  return status === 404;
+  const err = error as { statusCode?: number; code?: string };
+  if (err.statusCode === 404) {
+    return true;
+  }
+  return err.code === "BlobNotFound" || err.code === "ContainerNotFound" || err.code === "404";
 }
 
 function resolveContainerClient(
@@ -143,14 +147,21 @@ function buildAccountUrl(accountName: string | undefined): string | undefined {
   return `https://${accountName}.blob.core.windows.net`;
 }
 
-async function containerExists(container: ContainerClient): Promise<void> {
+async function containerExists(container: ContainerClient, containerName: string): Promise<void> {
   const exists = (container as unknown as { exists?: () => Promise<boolean> }).exists;
   if (typeof exists === "function") {
-    await exists.call(container);
+    const ok = await exists.call(container);
+    if (!ok) {
+      throw new Error(`Container not found: ${containerName}`);
+    }
     return;
   }
   const iterator = container.listBlobsFlat({ prefix: "" })[Symbol.asyncIterator]();
-  await iterator.next();
+  try {
+    await iterator.next();
+  } finally {
+    await (iterator as { return?: () => Promise<unknown> }).return?.();
+  }
 }
 
 async function azureRead(ctx: AzureContext, path: string): Promise<Buffer> {
@@ -233,16 +244,68 @@ async function azureList(ctx: AzureContext, listPrefix: string): Promise<string[
 
 async function azureWriteStream(ctx: AzureContext, path: string, stream: Readable): Promise<void> {
   const blob = ctx.container.getBlockBlobClient(azureKey(ctx.prefix, path));
-  const withStream = blob as unknown as { uploadStream?: (s: Readable) => Promise<void> };
-  if (typeof withStream.uploadStream === "function") {
-    await withStream.uploadStream(stream);
+  if (await tryAzureStreamUpload(blob, stream)) {
     return;
   }
+  await writeStreamBuffered(ctx, path, stream, blob);
+}
+
+async function tryAzureStreamUpload(
+  blob: ReturnType<ContainerClient["getBlockBlobClient"]>,
+  stream: Readable,
+): Promise<boolean> {
+  const withStream = blob as unknown as { uploadStream?: (s: Readable) => Promise<void> };
+  if (typeof withStream.uploadStream !== "function") {
+    return false;
+  }
+  try {
+    await withStream.uploadStream(stream);
+    return true;
+  } catch (error) {
+    await deleteBlobQuiet(blob);
+    throw error;
+  }
+}
+
+async function writeStreamBuffered(
+  ctx: AzureContext,
+  path: string,
+  stream: Readable,
+  blob: ReturnType<ContainerClient["getBlockBlobClient"]>,
+): Promise<void> {
+  try {
+    const data = await collectStream(stream);
+    await azureWrite(ctx, path, data);
+  } catch (error) {
+    await deleteBlobQuiet(blob);
+    throw error;
+  }
+}
+
+async function collectStream(stream: Readable): Promise<Buffer> {
   const chunks: Buffer[] = [];
   for await (const chunk of stream) {
     chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : Buffer.from(chunk as Uint8Array));
   }
-  await azureWrite(ctx, path, Buffer.concat(chunks));
+  return Buffer.concat(chunks);
+}
+
+async function deleteBlobQuiet(
+  blob: ReturnType<ContainerClient["getBlockBlobClient"]>,
+): Promise<void> {
+  try {
+    const withDelete = blob as unknown as {
+      deleteIfExists?: () => Promise<void>;
+      delete?: () => Promise<void>;
+    };
+    if (typeof withDelete.deleteIfExists === "function") {
+      await withDelete.deleteIfExists();
+      return;
+    }
+    await withDelete.delete?.();
+  } catch {
+    // ignore - best-effort cleanup
+  }
 }
 
 async function azureReadStream(ctx: AzureContext, path: string): Promise<Readable> {
@@ -254,7 +317,7 @@ async function azureReadStream(ctx: AzureContext, path: string): Promise<Readabl
   const response = await blob.download();
   const body = response.readableStreamBody as unknown as Readable | undefined;
   if (!body) {
-    throw new Error(`No object at "${path}"`);
+    return Readable.from([]);
   }
   return body;
 }

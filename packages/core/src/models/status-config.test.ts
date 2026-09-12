@@ -9,7 +9,7 @@ function setup(): { db: ReturnType<typeof makeDatabase>["db"]; model: StatusConf
   const { db } = makeDatabase();
   return {
     db,
-    model: new StatusConfigModel(db, { projectStatusConfigs: projectStatusConfigs }, SECRET),
+    model: new StatusConfigModel(db, { projectStatusConfigs }, SECRET),
   };
 }
 

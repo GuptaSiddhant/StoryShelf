@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { HttpError, httpJson } from "./http.ts";
 
 function jsonResponse(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
-  return new Response(JSON.stringify(body), { status, headers });
+  return Response.json(body, { status, headers });
 }
 
 afterEach(() => {
@@ -49,10 +49,10 @@ describe("httpJson", () => {
       return jsonResponse({ message: "nope" }, 404);
     });
     vi.stubGlobal("fetch", fetchMock);
-    const error = await httpJson("https://example.com/api").catch((cause: unknown) => cause);
-    expect(error).toBeInstanceOf(HttpError);
-    expect((error as HttpError).status).toBe(404);
-    expect((error as HttpError).body).toContain("nope");
+    const caught = await httpJson("https://example.com/api").catch((error: unknown) => error);
+    expect(caught).toBeInstanceOf(HttpError);
+    expect((caught as HttpError).status).toBe(404);
+    expect((caught as HttpError).body).toContain("nope");
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 
@@ -62,8 +62,8 @@ describe("httpJson", () => {
       return jsonResponse({ detail: "x".repeat(600) }, 400);
     });
     vi.stubGlobal("fetch", fetchMock);
-    const error = await httpJson("https://example.com/api").catch((cause: unknown) => cause);
-    expect((error as HttpError).body).toHaveLength(500);
+    const caught2 = await httpJson("https://example.com/api").catch((error: unknown) => error);
+    expect((caught2 as HttpError).body).toHaveLength(500);
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 
@@ -84,10 +84,10 @@ describe("httpJson", () => {
       return jsonResponse({}, 503);
     });
     vi.stubGlobal("fetch", fetchMock);
-    const error = await httpJson("https://example.com/api", { retries: 1 }).catch(
-      (cause: unknown) => cause,
+    const caught3 = await httpJson("https://example.com/api", { retries: 1 }).catch(
+      (error: unknown) => error,
     );
-    expect(error).toBeInstanceOf(HttpError);
+    expect(caught3).toBeInstanceOf(HttpError);
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 

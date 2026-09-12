@@ -7,9 +7,9 @@ describe("LabelModel", () => {
   it("creates a label type", async () => {
     const { db } = makeDatabase();
     const model = new LabelModel(db, {
-      builds: builds,
-      buildLabels: buildLabels,
-      labelTypes: labelTypes,
+      builds,
+      buildLabels,
+      labelTypes,
     });
     const type = await model.createType("p1", {
       key: "pr",
@@ -26,9 +26,9 @@ describe("LabelModel", () => {
   it("gets label types for a project", async () => {
     const { db } = makeDatabase();
     const model = new LabelModel(db, {
-      builds: builds,
-      buildLabels: buildLabels,
-      labelTypes: labelTypes,
+      builds,
+      buildLabels,
+      labelTypes,
     });
     await model.createType("p1", { key: "pr", name: "Pull request" });
     await model.createType("p1", { key: "jira", name: "Jira issue" });
@@ -39,9 +39,9 @@ describe("LabelModel", () => {
   it("removes a label type", async () => {
     const { db } = makeDatabase();
     const model = new LabelModel(db, {
-      builds: builds,
-      buildLabels: buildLabels,
-      labelTypes: labelTypes,
+      builds,
+      buildLabels,
+      labelTypes,
     });
     await model.createType("p1", { key: "custom", name: "Custom" });
     const types = await model.listTypes("p1");
@@ -51,9 +51,9 @@ describe("LabelModel", () => {
   it("updates a label type name, template and color", async () => {
     const { db } = makeDatabase();
     const model = new LabelModel(db, {
-      builds: builds,
-      buildLabels: buildLabels,
-      labelTypes: labelTypes,
+      builds,
+      buildLabels,
+      labelTypes,
     });
     await model.createType("p1", {
       key: "pr",
@@ -74,9 +74,9 @@ describe("LabelModel", () => {
   it("updateType returns null for a non-existent label type", async () => {
     const { db } = makeDatabase();
     const model = new LabelModel(db, {
-      builds: builds,
-      buildLabels: buildLabels,
-      labelTypes: labelTypes,
+      builds,
+      buildLabels,
+      labelTypes,
     });
     const updated = await model.updateType("p1", "missing", { name: "X" });
     expect(updated).toBeNull();
@@ -85,9 +85,9 @@ describe("LabelModel", () => {
   it("updateType rejects reserved label types", async () => {
     const { db } = makeDatabase();
     const model = new LabelModel(db, {
-      builds: builds,
-      buildLabels: buildLabels,
-      labelTypes: labelTypes,
+      builds,
+      buildLabels,
+      labelTypes,
     });
     await expect(model.updateType("p1", "persistent", { name: "X" })).rejects.toThrow(
       "Label type 'persistent' cannot be updated.",

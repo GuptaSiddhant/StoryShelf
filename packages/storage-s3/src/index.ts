@@ -97,17 +97,17 @@ function buildLifecycle(
     setup: async () => {
       await client.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix, MaxKeys: 1 }));
     },
-    teardown: () => {
-      if (!ownsClient || destroyed) {
-        return Promise.resolve();
+    teardown: async () => {
+      if (ownsClient && !destroyed) {
+        destroyed = true;
+        client.destroy();
       }
-      destroyed = true;
-      client.destroy();
-      return Promise.resolve();
+      await Promise.resolve();
     },
     health: async () => {
+      const started = Date.now();
       await client.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix, MaxKeys: 1 }));
-      return { ok: true };
+      return { ok: true, latencyMs: Date.now() - started };
     },
   };
 }
@@ -133,7 +133,18 @@ async function s3WriteStream(ctx: S3Context, path: string, stream: Readable): Pr
     client: ctx.client,
     params: { Bucket: ctx.bucket, Key: s3Key(ctx.prefix, path), Body: stream },
   });
-  await upload.done();
+  try {
+    await upload.done();
+  } catch (error) {
+    try {
+      await ctx.client.send(
+        new DeleteObjectCommand({ Bucket: ctx.bucket, Key: s3Key(ctx.prefix, path) }),
+      );
+    } catch {
+      // ignore cleanup failure - original error is rethrown
+    }
+    throw error;
+  }
 }
 
 async function s3ReadStream(ctx: S3Context, path: string): Promise<Readable> {
@@ -176,11 +187,24 @@ async function s3Exists(ctx: S3Context, path: string): Promise<boolean> {
 }
 
 async function s3List(ctx: S3Context, listPrefix: string): Promise<string[]> {
-  const response = await ctx.client.send(
-    new ListObjectsV2Command({ Bucket: ctx.bucket, Prefix: s3Key(ctx.prefix, listPrefix) }),
-  );
-  return (response.Contents ?? [])
-    .map((item) => item.Key)
-    .filter((key): key is string => key !== undefined)
-    .map((key) => s3Rel(ctx.prefix, key));
+  const prefix = s3Key(ctx.prefix, listPrefix);
+  const results: string[] = [];
+  let token: string | undefined;
+  do {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- pagination requires sequential awaits
+    const response = await ctx.client.send(
+      new ListObjectsV2Command({
+        Bucket: ctx.bucket,
+        Prefix: prefix,
+        ContinuationToken: token,
+      }),
+    );
+    for (const item of response.Contents ?? []) {
+      if (item.Key !== undefined) {
+        results.push(s3Rel(ctx.prefix, item.Key));
+      }
+    }
+    token = response.IsTruncated ? response.NextContinuationToken : undefined;
+  } while (token !== undefined);
+  return results;
 }

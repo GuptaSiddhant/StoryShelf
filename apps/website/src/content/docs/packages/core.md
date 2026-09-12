@@ -3,7 +3,7 @@ title: "@storyshelf/core"
 description: StoryShelf's domain layer — adapters, models, capture pipeline, and review engine (no HTTP).
 ---
 
-`@storyshelf/core` is the domain layer at the center of StoryShelf. It provides adapter contracts, models, the server-side capture pipeline, pixel diff engine, and retention jobs — with no HTTP dependency, so queue workers and remote runners import it without pulling a server. The HTTP server lives in [@storyshelf/app](../router/).
+`@storyshelf/core` is the domain layer at the center of StoryShelf. It provides adapter contracts, models, the server-side capture pipeline, pixel diff engine, and retention jobs — with no HTTP dependency, so queue workers and remote runners import it without pulling a server. The HTTP server lives in [@storyshelf/app](../app/).
 
 ## Install
 
@@ -20,7 +20,7 @@ nub add @storyshelf/core
 
 ## Compose a server
 
-Pass a database and storage adapter to `createShelfApp` from `@storyshelf/app` (see the [router package](../router/)). Capture, authentication, git providers, logging, branding, and server behavior are optional.
+Pass a database and storage adapter to `createShelfApp` from `@storyshelf/app` (see the [app package](../app/)). Capture, authentication, git providers, logging, branding, and server behavior are optional.
 
 ```ts
 import { createShelfApp } from "@storyshelf/app";

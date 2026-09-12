@@ -26,7 +26,7 @@ describe("Branch baseline fallback", () => {
     const { storage } = makeStorage();
     await db.insert(projects, mockProject);
 
-    const baselineModel = new BaselineModel(db, { baselines: baselines }, storage);
+    const baselineModel = new BaselineModel(db, { baselines }, storage);
     await db.insert(baselines, {
       id: "bl1",
       projectId: "p1",
@@ -49,7 +49,7 @@ describe("Branch baseline fallback", () => {
     const { storage } = makeStorage();
     await db.insert(projects, mockProject);
 
-    const baselineModel = new BaselineModel(db, { baselines: baselines }, storage);
+    const baselineModel = new BaselineModel(db, { baselines }, storage);
     await db.insert(baselines, {
       id: "bl1",
       projectId: "p1",
@@ -78,7 +78,7 @@ describe("Branch baseline fallback", () => {
     const { storage } = makeStorage();
     await db.insert(projects, mockProject);
 
-    const baselineModel = new BaselineModel(db, { baselines: baselines }, storage);
+    const baselineModel = new BaselineModel(db, { baselines }, storage);
 
     const resolved = await baselineModel.resolve("p1", "story-1", "desktop", "main", "main");
     expect(resolved).toBeNull();
@@ -89,7 +89,7 @@ describe("Branch baseline fallback", () => {
     const { storage } = makeStorage();
     await db.insert(projects, mockProject);
 
-    const baselineModel = new BaselineModel(db, { baselines: baselines }, storage);
+    const baselineModel = new BaselineModel(db, { baselines }, storage);
     await db.insert(baselines, {
       id: "bl-main",
       projectId: "p1",

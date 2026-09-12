@@ -11,7 +11,7 @@ describe("createShelfLogger", () => {
 
   afterEach(() => {
     if (savedLevel === undefined) {
-      delete process.env["LOG_LEVEL"];
+      delete process.env.LOG_LEVEL;
     } else {
       process.env[LOG_LEVEL] = savedLevel;
     }
@@ -23,7 +23,7 @@ describe("createShelfLogger", () => {
   });
 
   it("defaults to info level", () => {
-    delete process.env["LOG_LEVEL"];
+    delete process.env.LOG_LEVEL;
     const logger = createShelfLogger();
     expect(logger.level).toBe("info");
   });

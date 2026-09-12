@@ -33,9 +33,9 @@ export interface Project {
   storybookMeta: string | null | undefined;
   executePlay: boolean;
   playTimeoutMs: number;
-  runA11y?: boolean;
-  browser?: string;
-  viewports?: string | null;
+  runA11y: boolean;
+  browser: string;
+  viewports: string | null;
   createdAt: string;
   updatedAt: string;
 }

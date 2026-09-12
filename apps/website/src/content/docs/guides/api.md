@@ -16,7 +16,7 @@ The full API is described by an [OpenAPI 3.0](https://spec.openapis.org/oas/v3.0
 
 ## Static copy
 
-A build-time copy is also emitted for CI, codegen, and SDK tooling without a live server. The website's `prebuild` hook runs an `openapi` script that generates it from the router source via `packages/core/scripts/generate-openapi.ts` (no package wiring — the script lives where `@storyshelf/core`'s deps resolve) and publishes it at `/openapi.json` here.
+A build-time copy is also emitted for CI, codegen, and SDK tooling without a live server. The website's `prebuild` hook runs an `openapi` script that generates it from the router source via `packages/app/scripts/generate-openapi.ts` (no package wiring — the script lives where `@storyshelf/app`'s deps resolve) and publishes it at `/openapi.json` here.
 
 So the spec is available three ways: the live endpoint (`GET /api/v1/openapi.json`), the same generator script run manually, and this site's static copy.
 

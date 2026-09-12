@@ -6,7 +6,7 @@ import { SnapshotModel } from "./snapshot.ts";
 describe("SnapshotModel", () => {
   it("creates a snapshot for a build", async () => {
     const { db } = makeDatabase();
-    const model = new SnapshotModel(db, { snapshots: snapshots });
+    const model = new SnapshotModel(db, { snapshots });
     const snapshot = await model.create("p1", "b1", {
       storyId: "a",
       storyName: "A",
@@ -26,7 +26,7 @@ describe("SnapshotModel", () => {
 
   it("lists snapshots by build", async () => {
     const { db } = makeDatabase();
-    const model = new SnapshotModel(db, { snapshots: snapshots });
+    const model = new SnapshotModel(db, { snapshots });
     await model.create("p1", "b1", {
       storyId: "a",
       storyName: "A",
@@ -56,7 +56,7 @@ describe("SnapshotModel", () => {
 
   it("gets a snapshot by id", async () => {
     const { db } = makeDatabase();
-    const model = new SnapshotModel(db, { snapshots: snapshots });
+    const model = new SnapshotModel(db, { snapshots });
     const snapshot = await model.create("p1", "b1", {
       storyId: "a",
       storyName: "A",
@@ -74,7 +74,7 @@ describe("SnapshotModel", () => {
 
   it("upplies snapshot status", async () => {
     const { db } = makeDatabase();
-    const model = new SnapshotModel(db, { snapshots: snapshots });
+    const model = new SnapshotModel(db, { snapshots });
     const snapshot = await model.create("p1", "b1", {
       storyId: "a",
       storyName: "A",
@@ -91,7 +91,7 @@ describe("SnapshotModel", () => {
 
   it("records reviewer decision", async () => {
     const { db } = makeDatabase();
-    const model = new SnapshotModel(db, { snapshots: snapshots });
+    const model = new SnapshotModel(db, { snapshots });
     const snapshot = await model.create("p1", "b1", {
       storyId: "a",
       storyName: "A",
@@ -109,7 +109,7 @@ describe("SnapshotModel", () => {
 
   it("removes snapshot indirectly via build cascade", async () => {
     const { db } = makeDatabase();
-    const model = new SnapshotModel(db, { snapshots: snapshots });
+    const model = new SnapshotModel(db, { snapshots });
     const snap = await model.create("p1", "b1", {
       storyId: "a",
       storyName: "A",

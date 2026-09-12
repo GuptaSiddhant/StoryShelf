@@ -6,7 +6,7 @@ import { TokenModel } from "./token.ts";
 describe("TokenModel", () => {
   it("creates a token for a project", async () => {
     const { db } = makeDatabase();
-    const model = new TokenModel(db, { tokens: tokens });
+    const model = new TokenModel(db, { tokens });
     const token = await model.create("p1", "deploy-token", "abc123def456");
     expect(token.id).toBeDefined();
     expect(token.name).toBe("deploy-token");
@@ -15,7 +15,7 @@ describe("TokenModel", () => {
 
   it("gets a token by id", async () => {
     const { db } = makeDatabase();
-    const model = new TokenModel(db, { tokens: tokens });
+    const model = new TokenModel(db, { tokens });
     const token = await model.create("p1", "api-key", "token-hash-xyz");
     const fetched = await model.get("p1", token.id);
     expect(fetched?.id).toBe(token.id);
@@ -25,7 +25,7 @@ describe("TokenModel", () => {
 
   it("lists tokens for a project", async () => {
     const { db } = makeDatabase();
-    const model = new TokenModel(db, { tokens: tokens });
+    const model = new TokenModel(db, { tokens });
     await model.create("p1", "token-1", "hash-1");
     await model.create("p1", "token-2", "hash-2");
     const listed = await model.list("p1");
@@ -36,7 +36,7 @@ describe("TokenModel", () => {
 
   it("removes a token", async () => {
     const { db } = makeDatabase();
-    const model = new TokenModel(db, { tokens: tokens });
+    const model = new TokenModel(db, { tokens });
     const token = await model.create("p1", "temp-token", "hash-temp");
     await model.remove(token.id);
     const listed = await model.list("p1");
@@ -45,7 +45,7 @@ describe("TokenModel", () => {
 
   it("finds a token by hash", async () => {
     const { db } = makeDatabase();
-    const model = new TokenModel(db, { tokens: tokens });
+    const model = new TokenModel(db, { tokens });
     const token = await model.create("p1", "active-token", "hash-active");
     const found = await model.findByHash("hash-active");
     expect(found?.id).toBe(token.id);

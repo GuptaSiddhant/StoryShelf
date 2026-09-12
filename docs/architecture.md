@@ -222,7 +222,7 @@ data/                                    # --data-dir flag (default: ./data)
 
 **Design decisions:**
 - **Local filesystem is the default.** One `docker run` to self-host. No cloud accounts needed.
-- **S3-compatible storage is an alternative.** MinIO for self-hosted S3. Cloudflare R2, AWS S3, DigitalOcean Spaces for cloud. Same adapter interface, two implementations.
+- **Cloud adapters are drop-in alternatives.** S3-compatible (R2, MinIO, AWS S3, Spaces), Google Cloud Storage (GCS + emulator), and Azure Blob Storage (Azurite) — same `StorageAdapter` interface, four implementations.
 - **No "container" abstraction.** Just paths. Storage adapter is `read/write/delete/exists/list` over a flat path namespace.
 - **Baselines stored separately from builds, under their own branch.** Baselines are the "truth" — builds are transient, baselines persist.
 
@@ -640,6 +640,16 @@ StoryShelf/
         index.ts          # StorageAdapter for S3-compatible (AWS S3, R2, MinIO)
       package.json
 
+    storage-gcs/
+      src/
+        index.ts          # StorageAdapter for Google Cloud Storage (GCS + emulator)
+      package.json
+
+    storage-azure/
+      src/
+        index.ts          # StorageAdapter for Azure Blob Storage (Azurite)
+      package.json
+
     auth-oauth/
       src/
         index.ts          # AuthAdapter for OAuth/OIDC (GitHub, GitLab, Keycloak, etc.)
@@ -688,7 +698,7 @@ StoryShelf/
 | **Runtime** | Node.js 22+ | Playwright's best-supported runtime; LTS |
 | **HTTP framework** | Hono (OpenAPIHono) | Type-safe routes, OpenAPI spec generation, edge-compatible |
 | **Database** | SQLite via `node:sqlite` + Drizzle ORM (local). Turso/libSQL via `@libsql/client` + Drizzle (serverless). | Zero-config on VPS/Docker. Turso for Vercel/Cloudflare Workers. Same schema, same queries, different connection. |
-| **Storage** | Local filesystem (default). S3-compatible (R2, MinIO, S3) as alternative. | Local for Docker/VPS. S3 for cloud. Same adapter interface, two implementations. |
+| **Storage** | Local filesystem (default). S3-compatible (R2, MinIO, S3), GCS, Azure Blob as alternatives. | Local for Docker/VPS. S3/GCS/Azure for cloud. Same adapter interface, four implementations. |
 | **Screenshot capture** | Playwright (server-side) | Industry standard. Deterministic rendering in a pinned image. `toHaveScreenshot` battle-tested |
 | **Pixel diff** | pixelmatch + pngjs | Same libraries Playwright uses internally. Fast, reliable, widely adopted |
 | **Server UI** | hono/jsx + HTMX + hono/css | Server-rendered, fixed UI with brand theming; no client framework or build step |

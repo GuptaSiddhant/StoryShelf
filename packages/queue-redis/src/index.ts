@@ -138,8 +138,9 @@ function buildCoreMethods(
      * For remote queues Redis has no peek; builds table is source of truth.
      * Returns null to signal caller should query the database.
      */
-    status(_buildId: string): Promise<QueueEntry | null> {
-      return Promise.resolve(null);
+    async status(_buildId: string): Promise<QueueEntry | null> {
+      await Promise.resolve();
+      return null;
     },
 
     /**
@@ -147,8 +148,9 @@ function buildCoreMethods(
      *
      * Remote queues don't track in-queue status server-side; returns empty.
      */
-    active(): Promise<QueueEntry[]> {
-      return Promise.resolve([]);
+    async active(): Promise<QueueEntry[]> {
+      await Promise.resolve();
+      return [];
     },
 
     /**
@@ -156,8 +158,9 @@ function buildCoreMethods(
      *
      * Remote queues don't track history server-side; returns empty.
      */
-    recent(_limit: number): Promise<QueueEntry[]> {
-      return Promise.resolve([]);
+    async recent(_limit: number): Promise<QueueEntry[]> {
+      await Promise.resolve();
+      return [];
     },
   };
 }
@@ -255,7 +258,7 @@ async function requeueJob(
   }
   const payload = buildRequeuePayload(body);
   if (delayMs > 0) {
-    const due = Date.now() + Math.min(delayMs, 43200 * 1000);
+    const due = Date.now() + Math.min(delayMs, 43_200 * 1000);
     await client.zadd(delayedKey, due.toString(), payload);
     return;
   }
@@ -365,12 +368,12 @@ async function brpopFallback(
   timeoutSec: number,
 ): Promise<string | null> {
   // Fallback to blocking pop without processing list (at-most-once)
-  const raw = await client.brpop(source, timeoutSec);
+  const raw: unknown = await client.brpop(source, timeoutSec);
   if (!raw) {
     return null;
   }
   // brpop returns [key, value] tuple
-  const value = Array.isArray(raw) ? (raw[1] as string) : (raw as unknown as string);
+  const value: unknown = Array.isArray(raw) ? raw[1] : raw;
   if (typeof value !== "string") {
     return null;
   }

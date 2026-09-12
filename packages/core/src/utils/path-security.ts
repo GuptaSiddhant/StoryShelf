@@ -17,7 +17,7 @@ export function isPathSafe(root: string, candidate: string): boolean {
   return (
     normalizedCandidate === normalizedRoot ||
     normalizedCandidate.startsWith(normalizedRoot + sep) ||
-    normalizedCandidate.startsWith(normalizedRoot + "/")
+    normalizedCandidate.startsWith(`${normalizedRoot}/`)
   );
 }
 

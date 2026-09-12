@@ -49,13 +49,12 @@ export function createSqsCaptureQueue(options: SqsCaptureQueueOptions): Pollable
       setup: async () => {
         await client.send(new GetQueueAttributesCommand({ QueueUrl: options.queueUrl }));
       },
-      teardown: () => {
+      teardown: async () => {
         if (!ownsClient || destroyed) {
-          return Promise.resolve();
+          return;
         }
         destroyed = true;
         client.destroy();
-        return Promise.resolve();
       },
       health: async () => {
         await client.send(new GetQueueAttributesCommand({ QueueUrl: options.queueUrl }));
@@ -210,7 +209,7 @@ export function createSqsCaptureQueue(options: SqsCaptureQueueOptions): Pollable
       }
       const delaySeconds =
         nackOptions?.delayMs !== undefined
-          ? Math.max(0, Math.min(43200, Math.floor(nackOptions.delayMs / 1000)))
+          ? Math.max(0, Math.min(43_200, Math.floor(nackOptions.delayMs / 1000)))
           : 0;
       // If delay needed, use ChangeMessageVisibility with new timeout; otherwise make visible immediately (0)
       await client.send(

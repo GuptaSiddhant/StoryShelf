@@ -27,7 +27,7 @@ function makeFakeRedis(overrides: Record<string, unknown> = {}): {
     }),
     lpush: vi.fn(async (key: string, value: string) => {
       calls.push({ method: "lpush", args: [key, value] });
-      if (!store[key]) store[key] = [];
+      store[key] ??= [];
       store[key].unshift(value);
       return store[key].length;
     }),
@@ -43,7 +43,7 @@ function makeFakeRedis(overrides: Record<string, unknown> = {}): {
     }),
     zadd: vi.fn(async (key: string, score: string, member: string) => {
       calls.push({ method: "zadd", args: [key, score, member] });
-      if (!zsets[key]) zsets[key] = new Map();
+      zsets[key] ??= new Map();
       zsets[key].set(member, Number(score));
       return 1;
     }),
@@ -70,7 +70,7 @@ function makeFakeRedis(overrides: Record<string, unknown> = {}): {
       }
       if (!store[src] || store[src].length === 0) return null;
       const val = store[src].pop()!;
-      if (!store[dst]) store[dst] = [];
+      store[dst] ??= [];
       store[dst].unshift(val);
       return val;
     }),
@@ -78,7 +78,7 @@ function makeFakeRedis(overrides: Record<string, unknown> = {}): {
       calls.push({ method: "brpoplpush", args: [src, dst, _t] });
       if (!store[src] || store[src].length === 0) return null;
       const val = store[src].pop()!;
-      if (!store[dst]) store[dst] = [];
+      store[dst] ??= [];
       store[dst].unshift(val);
       return val;
     }),
@@ -108,7 +108,7 @@ function makeFakeRedis(overrides: Record<string, unknown> = {}): {
             }
             if (op.method === "lpush") {
               const [k, v] = op.args as [string, string];
-              if (!store[k]) store[k] = [];
+              store[k] ??= [];
               store[k].unshift(v as string);
             }
           }
@@ -306,7 +306,7 @@ describe("poll", () => {
     const fake: FakeRedis = {
       ping: async () => "PONG",
       lpush: async (k: string, v: string) => {
-        if (!store[k]) store[k] = [];
+        store[k] ??= [];
         store[k].unshift(v);
         return 1;
       },
@@ -318,7 +318,7 @@ describe("poll", () => {
       brpoplpush: async (src: string, dst: string) => {
         if (!store[src] || store[src].length === 0) return null;
         const v = store[src].pop()!;
-        if (!store[dst]) store[dst] = [];
+        store[dst] ??= [];
         store[dst].unshift(v);
         return v;
       },

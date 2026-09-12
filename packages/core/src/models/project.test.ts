@@ -6,7 +6,7 @@ import { ProjectModel } from "./project.ts";
 describe("ProjectModel", () => {
   it("creates a project with unique slug", async () => {
     const { db } = makeDatabase();
-    const model = new ProjectModel(db, { projects: projects });
+    const model = new ProjectModel(db, { projects });
     const project = await model.create({
       name: "Test Project",
       gitRepository: "owner/repo",
@@ -20,7 +20,7 @@ describe("ProjectModel", () => {
 
   it("creates project with custom default branch", async () => {
     const { db } = makeDatabase();
-    const model = new ProjectModel(db, { projects: projects });
+    const model = new ProjectModel(db, { projects });
     const project = await model.create({
       name: "Test Project",
       gitRepository: "owner/repo",
@@ -31,7 +31,7 @@ describe("ProjectModel", () => {
 
   it("gets a project by id", async () => {
     const { db } = makeDatabase();
-    const model = new ProjectModel(db, { projects: projects });
+    const model = new ProjectModel(db, { projects });
     const project = await model.create({
       name: "Test Project",
       gitRepository: "owner/repo",
@@ -43,7 +43,7 @@ describe("ProjectModel", () => {
 
   it("gets a project by slug", async () => {
     const { db } = makeDatabase();
-    const model = new ProjectModel(db, { projects: projects });
+    const model = new ProjectModel(db, { projects });
     const project = await model.create({
       name: "Test Project",
       gitRepository: "owner/repo",
@@ -55,7 +55,7 @@ describe("ProjectModel", () => {
 
   it("lists all projects", async () => {
     const { db } = makeDatabase();
-    const model = new ProjectModel(db, { projects: projects });
+    const model = new ProjectModel(db, { projects });
     await model.create({ name: "Project 1", gitRepository: "owner/repo" });
     await model.create({ name: "Project 2", gitRepository: "owner/repo" });
     const listed = await model.list();
@@ -64,7 +64,7 @@ describe("ProjectModel", () => {
 
   it("updates project fields", async () => {
     const { db } = makeDatabase();
-    const model = new ProjectModel(db, { projects: projects });
+    const model = new ProjectModel(db, { projects });
     const project = await model.create({
       name: "Test Project",
       gitRepository: "owner/repo",
@@ -75,7 +75,7 @@ describe("ProjectModel", () => {
 
   it("removes a project", async () => {
     const { db } = makeDatabase();
-    const model = new ProjectModel(db, { projects: projects });
+    const model = new ProjectModel(db, { projects });
     await model.create({ name: "To Be Deleted", gitRepository: "owner/repo" });
     // Id is ulid, but let's test
     await model.remove("p1");

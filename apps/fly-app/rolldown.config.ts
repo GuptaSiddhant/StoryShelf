@@ -22,7 +22,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@storyshelf/core": resolve(root, "packages/core/src/index.tsx"),
-      "@storyshelf/app": resolve(root, "packages/router/src/index.tsx"),
+      "@storyshelf/app": resolve(root, "packages/app/src/index.tsx"),
       "@storyshelf/db-sqlite": resolve(root, "packages/db-sqlite/src/index.ts"),
       "@storyshelf/storage-local": resolve(root, "packages/storage-local/src/index.ts"),
       "@storyshelf/runner-playwright": resolve(root, "packages/runner-playwright/src/index.ts"),

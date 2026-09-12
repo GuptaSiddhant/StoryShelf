@@ -34,8 +34,9 @@ export function setupCaptureQueue(
     return { queue: null, enqueueCapture: undefined };
   }
   if (options.captureQueue) {
+    const queue = options.captureQueue;
     const enqueueCapture = async (buildId: string, reqId?: string): Promise<void> => {
-      await options.captureQueue!.enqueue({ buildId, reqId });
+      await queue.enqueue({ buildId, reqId });
     };
     if (!options.captureRunner) {
       return { queue: options.captureQueue, enqueueCapture };

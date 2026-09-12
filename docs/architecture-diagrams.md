@@ -61,7 +61,7 @@ flowchart TB
         cli["storyshelf\ncommander\nupload / init / create / retry / purge / server init"]
     end
 
-    subgraph Router["HTTP — packages/router"]
+    subgraph Router["HTTP — packages/app"]
         hono["createShelfApp\npackages/app/src/index.tsx:44\nOpenAPIHono"]
         mw["Middleware\nrequestId / requestLogging\nsetupGate / rateLimit / csrf\nstoreScope / authGate"]
         routes["Routers\nprojects / builds / snapshots\nlabels / tokens / members\nwebhooks / status-configs / admin\nhealth / media / storybook / ui"]
@@ -173,9 +173,9 @@ flowchart LR
         config["config?: ShelfConfig"]
     end
 
-    createRouter["createShelfApp(options)\npackages/router/src/index.tsx:44"]
+    createRouter["createShelfApp(options)\npackages/app/src/index.tsx:44"]
 
-    subgraph Runtime["resolveRuntime(options)\npackages/router/src/runtime.ts"]
+    subgraph Runtime["resolveRuntime(options)\npackages/app/src/runtime.ts"]
         cfg["ShelfConfig\nsecret / scratchDir\ncaptureConcurrency\npurgeTtlDays / viewports"]
         uicfg["UIConfig\nname / logo / theme"]
         log2["createShelfLogger()\npackages/core/src/logger.ts"]
@@ -187,9 +187,9 @@ flowchart LR
         health["GET /api/v1/health (liveness)\nPOST /api/v1/health (readiness)"]
     end
 
-    subgraph Wiring["Wiring\npackages/router/src/index.tsx:74"]
+    subgraph Wiring["Wiring\npackages/app/src/index.tsx:74"]
         mw2["wireMiddleware\nrequestId / requestLogging\nrateLimit / csrf\nstoreScope(AsyncLocalStorage)\nauthGate"]
-        qsetup["setupCaptureQueue\npackages/router/src/capture-setup.ts:14\nInMemoryCaptureQueue | SQS"]
+        qsetup["setupCaptureQueue\npackages/app/src/capture-setup.ts:14\nInMemoryCaptureQueue | SQS"]
     end
 
     subgraph Routes2["registerAllRoutes"]
@@ -209,7 +209,7 @@ flowchart LR
     class createRouter,Runtime,Lifecycle,Wiring,Routes2 router;
 ```
 
-**Lifecycle:** `createShelfApp` kicks `lifecycle.init` eagerly (`Promise.allSettled`, `packages/router/src/lifecycle.ts:39`); callers `await app.lifecycle.init()` for fail-fast startup (migrations run here) or let first request gate on settlement (503 with per-adapter failures). `close()` on `SIGTERM`. Health is two-tier and ungated by init (`architecture.md:250`).
+**Lifecycle:** `createShelfApp` kicks `lifecycle.init` eagerly (`Promise.allSettled`, `packages/app/src/lifecycle.ts:39`); callers `await app.lifecycle.init()` for fail-fast startup (migrations run here) or let first request gate on settlement (503 with per-adapter failures). `close()` on `SIGTERM`. Health is two-tier and ungated by init (`architecture.md:250`).
 
 ---
 
@@ -219,8 +219,8 @@ flowchart LR
 sequenceDiagram
     participant Client
     participant Hono as Hono App
-    participant MW as Middleware Stack<br/>packages/router/src/index.tsx:74
-    participant Store as AsyncLocalStorage<br/>packages/router/src/store.ts
+    participant MW as Middleware Stack<br/>packages/app/src/index.tsx:74
+    participant Store as AsyncLocalStorage<br/>packages/app/src/store.ts
     participant Handler as Route Handler
     participant Model as Model<br/>packages/core/src/models/*
     participant DB as DatabaseAdapter
@@ -254,7 +254,7 @@ Server-side render per ADR 0015 — the CLI never runs Playwright; the renderer 
 sequenceDiagram
     participant CI as CI / Developer
     participant CLI as storyshelf CLI<br/>packages/cli/src/commands/upload.ts
-    participant API as POST /api/v1/projects/:id/builds<br/>packages/router/src/routers/builds.ts
+    participant API as POST /api/v1/projects/:id/builds<br/>packages/app/src/routers/builds.ts
     participant Q as CaptureQueue<br/>core/capture / queue-sqs
     participant Orc as Orchestrator<br/>core/capture/orchestrator.ts:32
     participant FS as StorageAdapter<br/>local / S3
@@ -732,7 +732,7 @@ Never purged: `baselines/**` + builds with `persistent` label (`architecture.md:
 
 ```mermaid
 flowchart TB
-    subgraph Init["Startup — packages/router/src/lifecycle.ts:33"]
+    subgraph Init["Startup — packages/app/src/lifecycle.ts:33"]
         kick["kickSetup() — runAdapterSetups(collectSetups(options))<br/>Promise.allSettled, never rejects"]
         cell["LifecycleCell { ready: Promise, settled: AdapterSetupResult|null }"]
         awaitInit["await app.lifecycle.setup()<br/>fail-fast (migrations run here)"]
@@ -914,8 +914,8 @@ Uses same libs Playwright does internally (`architecture.md:424`); overlay store
 |---|---------|------|----------------|
 | 1 | System Context | flowchart | `architecture.md:11` workflow |
 | 2 | Package Map | flowchart | `package.json` workspaces, `repo-structure.md` |
-| 3 | Adapter Composition | flowchart | `packages/router/src/index.tsx:44`, `core/config.ts:146` |
-| 4 | Middleware Chain | sequence | `packages/router/src/index.tsx:74`, `router/middleware/*` |
+| 3 | Adapter Composition | flowchart | `packages/app/src/index.tsx:44`, `core/config.ts:146` |
+| 4 | Middleware Chain | sequence | `packages/app/src/index.tsx:74`, `app/middleware/*` |
 | 5 | Capture Pipeline | sequence | `core/capture/orchestrator.ts:32`, `runner-playwright` |
 | 6 | Baseline Resolution | flowchart | `architecture.md:363`, ADR 0009 |
 | 7 | State Machine | stateDiagram | `architecture.md:55,81` |
@@ -924,7 +924,7 @@ Uses same libs Playwright does internally (`architecture.md:424`); overlay store
 | 10 | URL Model | flowchart | `architecture.md:471`, `core/urls.ts` |
 | 11 | Labels | flowchart | `architecture.md:490`, `core/schema/label.ts` |
 | 12 | Retention | flowchart | `core/retention/purge.ts:30`, ADR 0009 |
-| 13 | Lifecycle/Health | flowchart | `router/lifecycle.ts:33`, `architecture.md:250` |
+| 13 | Lifecycle/Health | flowchart | `app/lifecycle.ts:33`, `architecture.md:250` |
 | 14 | Deployment | flowchart ×3 | `architecture.md:732`, `docs/adr/*` |
 | 15 | Auth/RBAC | flowchart | `architecture.md:199`, ADR 0008 |
 | 16 | Diff Engine | flowchart | `core/diff`, `architecture.md:405` |

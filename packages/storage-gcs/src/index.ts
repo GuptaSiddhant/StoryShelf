@@ -27,15 +27,16 @@ export function createGcsStorage(options: GcsStorageOptions): StorageAdapter {
     },
     lifecycle: {
       setup: async () => {
-        await bucket.getFiles({ maxResults: 1 });
+        await bucket.getFiles(gcsHealthQuery(prefix));
       },
       teardown: async () => {
         // GCS Storage exposes no close — connections are process-global.
         await Promise.resolve();
       },
       health: async () => {
-        await bucket.getFiles({ maxResults: 1 });
-        return { ok: true };
+        const started = Date.now();
+        await bucket.getFiles(gcsHealthQuery(prefix));
+        return { ok: true, latencyMs: Date.now() - started };
       },
     },
     async read(path) {
@@ -95,8 +96,18 @@ function gcsRel(prefix: string, key: string): string {
 }
 
 function isNotFound(error: unknown): boolean {
-  const code = (error as { code?: number }).code;
-  return code === 404;
+  const err = error as {
+    code?: number | string;
+    statusCode?: number;
+    errors?: { reason?: string }[];
+  };
+  if (err.code === 404 || err.code === "404" || err.code === "notFound") {
+    return true;
+  }
+  if (err.statusCode === 404) {
+    return true;
+  }
+  return err.errors?.[0]?.reason === "notFound";
 }
 
 function resolveClientOptions(
@@ -116,6 +127,10 @@ function resolveClientOptions(
     config.apiEndpoint = options.apiEndpoint;
   }
   return config;
+}
+
+function gcsHealthQuery(prefix: string): { prefix?: string; maxResults: number } {
+  return prefix === "" ? { maxResults: 1 } : { prefix: `${prefix}/`, maxResults: 1 };
 }
 
 async function gcsRead(ctx: GcsContext, path: string): Promise<Buffer> {
@@ -141,14 +156,46 @@ async function gcsExists(ctx: GcsContext, path: string): Promise<boolean> {
 
 async function gcsList(ctx: GcsContext, listPrefix: string): Promise<string[]> {
   const prefix = gcsKey(ctx.prefix, listPrefix);
-  const [files] = await ctx.bucket.getFiles(prefix === "" ? undefined : { prefix });
-  return files.map((file) => file.name).map((key) => gcsRel(ctx.prefix, key));
+  const results: string[] = [];
+  let query: Record<string, unknown> | undefined =
+    prefix === "" ? { autoPaginate: false } : { prefix, autoPaginate: false };
+  while (query !== undefined) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- pagination requires sequential awaits
+    const [files, nextQuery] = (await ctx.bucket.getFiles(query as never)) as unknown as [
+      { name: string }[],
+      Record<string, unknown> | null,
+    ];
+    for (const file of files) {
+      results.push(gcsRel(ctx.prefix, file.name));
+    }
+    query = nextQueryQuery(nextQuery);
+  }
+  return results;
+}
+
+function nextQueryQuery(
+  nextQuery: Record<string, unknown> | null,
+): Record<string, unknown> | undefined {
+  if (!nextQuery || typeof nextQuery !== "object") {
+    return undefined;
+  }
+  const token = (nextQuery as { pageToken?: string }).pageToken;
+  return token ? nextQuery : undefined;
 }
 
 async function gcsWriteStream(ctx: GcsContext, path: string, stream: Readable): Promise<void> {
   const file = ctx.bucket.file(gcsKey(ctx.prefix, path));
   const dest = file.createWriteStream({ resumable: false });
-  await pipeline(stream, dest);
+  try {
+    await pipeline(stream, dest);
+  } catch (error) {
+    try {
+      await file.delete({ ignoreNotFound: true });
+    } catch {
+      // ignore cleanup failure, rethrow original error
+    }
+    throw error;
+  }
 }
 
 async function gcsReadStream(ctx: GcsContext, path: string): Promise<Readable> {
