@@ -3,7 +3,88 @@
 All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 `scripts/release.mjs` (every workspace package shares one version).
 
-## Unreleased (breaking)
+## Unreleased
+
+**New adapters**
+- `@storyshelf/queue-redis` — Redis-backed remote capture queue (`ioredis`).
+- `@storyshelf/storage-azure` — Azure Blob Storage adapter.
+- `@storyshelf/storage-gcs` — Google Cloud Storage adapter.
+
+**Adapter lifecycle**
+- `AdapterLifecycle` is now mandatory and all-or-nothing: every adapter
+  implements `setup`/`teardown`/`health`. Storage `health` results no longer
+  report `latencyMs` (they return `{ ok }`).
+
+**JSR**
+- `@storyshelf/app` ships the `hono/jsx` import map so JSX rendering resolves on
+  deno/JSR consumers.
+
+## 0.5.0 — Rename to `app`, per-project browsers (2026-09-06)
+
+**Breaking rename**
+- `@storyshelf/router` → `@storyshelf/app`; `createShelfRouter` →
+  `createShelfApp` (ADR 0018 was the split, this release makes the name
+  permanent). Migrate imports and the `createShelfRouter(...)` call.
+- The old `@storyshelf/router` name is deprecated on npm/JSR.
+
+**Capture**
+- Per-project browser and viewport configuration (`core`, `db`, `runner`).
+- A11y annotation support, `staticServer` utils, and browsers metadata
+  (`core`, `runner`).
+
+## 0.4.0 — `db-postgres`, worker, HTTP helper (2026-09-06)
+
+**New packages**
+- `@storyshelf/db-postgres` — Postgres adapter for managed providers; the CLI
+  gained `create server`/`init` support for a Postgres option with a local
+  Docker Compose service.
+- `@storyshelf/worker` — remote capture worker with SQS queue and hybrid CLI.
+
+**Domain split (ADR 0018)**
+- `@storyshelf/router` (the HTTP layer) is split out of `@storyshelf/core`;
+  core stays domain-only. Renamed `app` in 0.5.0.
+- Models are dialect-agnostic over the widened `DatabaseAdapter` (tables as
+  interface); SQLite-specifics live in `db-sqlite`. Drizzle factories colocate
+  under `core/src/db`.
+
+**Retention & purging**
+- TTL branch GC: daily sweep removes stale baselines; orphan baseline storage
+  objects are deleted on GC.
+
+**HTTP & logging**
+- Shared `httpJson`/`HttpError` helper in `core` (timeout + retry with
+  `Retry-After`); fetch-based git providers (ADR 0019).
+- Single pino owner in core (`createShelfLogger`), env-driven level default
+  (ADR 0014).
+
+**CLI**
+- New `build`, `doctor`, `whoami`, `upload --dry-run`, `server serve`,
+  `jsr archive/unarchive` commands.
+- Drops `zod` for hand-rolled config validation; publishes npm-clean on npm
+  as bare `storyshelf` (and is no longer published to JSR under `@storyshelf/cli`).
+- Detects the user's package runner for builds and scaffolding.
+
+**Tooling & hygiene**
+- oxfmt/oxlint pre-commit hooks with conventional-commit gate.
+- LICENSE (MIT) + npm/JSR keywords on publishable packages; `primary export
+  first` lint enforced; dense router/core modules broken down into helpers.
+- Topological publish order derived from manifests; GitHub Release split into
+  its own job; OIDC check runs early.
+
+## 0.3.2 — Release tooling & retention fix (2026-09-06)
+
+- `latestPerBranch` retention query now uses the query builder and honors
+  `orderBy` (fixes camelCase-column failure on real databases).
+- Publish order derived topologically from manifests; validation gates once;
+  npm/JSR publishers depend only on that gate (JSR failures never block npm).
+- Release pipeline inline scripts extracted to `scripts/`; `check-npm-oidc`
+  fails fast before install.
+
+## 0.3.1 — Release fix (2026-09-06)
+
+- Fix `ref_name` evaluation in the release workflow (double-brace expressions).
+
+## 0.3.0 — Streaming uploads + webhook secrets (2026-09-06)
 
 **Webhook secrets encrypted at rest (#45)**
 - `webhooks.secret` (plaintext) is replaced by `secret_encrypted` (AES-256-GCM
@@ -27,6 +108,10 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
   servers. The deprecated `--storybook-dir` alias is removed (use
   `--build-dir`); JSON creation accepts `labels: [{ key, value }]`, and the
   CLI gained repeatable `--label key=value`.
+- Small zips persist Storybook statics inline at upload time.
+
+**Adapters**
+- Mandatory metadata category plus adapter lifecycle and two-tier health.
 
 ## 0.2.0 — Repository restructure (2026-09-05)
 
