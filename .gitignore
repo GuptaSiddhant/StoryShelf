@@ -48,6 +48,9 @@ data
 nub.lock.bak
 .astro
 
+# scratch space for agents (prefer over /tmp)
+.tmp
+
 # opencode state
 .opencode/
 .ocx/
