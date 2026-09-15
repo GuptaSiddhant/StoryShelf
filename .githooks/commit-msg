@@ -6,7 +6,7 @@ subject="$(sed -n '1p' "$MSG_FILE")"
 
 # Allow auto-generated and work-flow messages that are not Conventional Commits.
 case "$subject" in
-  'Merge '* | 'fixup!'* | 'squash!'* | 'Revert "'*) exit 0 ;;
+  'Merge '* | 'fixup!'* | 'squash!'* | 'Revert "'* | 'v'* ) exit 0 ;;
 esac
 
 if ! printf '%s\n' "$subject" |
