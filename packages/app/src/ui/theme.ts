@@ -9,9 +9,9 @@ export interface BrandTheme {
 
 /** Default light brand theme. */
 export const LIGHT_THEME: BrandTheme = {
-  accent: "#2b7fff",
+  accent: "#1d5fcf",
   surface: { base: "#f6f6f7", card: "#ffffff" },
-  text: { primary: "#09090b", secondary: "#71717b" },
+  text: { primary: "#09090b", secondary: "#5a5a6b" },
   border: "#e4e4e7",
   status: { approved: "#16a34a", new: "#d97706", rejected: "#dc2626" },
 };

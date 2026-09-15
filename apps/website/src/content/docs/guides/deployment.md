@@ -125,7 +125,7 @@ const router = createShelfApp({
 });
 ```
 
-> **TODO**: Add cross-runtime queue integration test (e.g., spin up a test worker against a real queue backend) — currently only unit-tested with `InMemoryCaptureQueue`.
+> **Note:** Cross-runtime queue integration is currently unit-tested with `InMemoryCaptureQueue`. A real-queue worker test (SQS / Workers Queues / Azure Storage Queues) is tracked separately.
 
 ### Minimal Turso + S3 recipe
 

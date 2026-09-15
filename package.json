@@ -57,6 +57,8 @@
     "trust": "node ./scripts/npm-trust-all.mjs"
   },
   "devDependencies": {
+    "axe-core": "^4.13.0",
+    "jsdom": "^30.0.1",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",

@@ -11,11 +11,6 @@ export default defineConfig({
       description: "Self-hosted visual testing for Storybook.",
       social: [
         {
-          label: "OpenAPI",
-          href: `${(process.env.BASE_PATH || "/").replace(/\/?$/u, "/")}openapi/`,
-          icon: "document",
-        },
-        {
           label: "GitHub",
           href: "https://github.com/GuptaSiddhant/StoryShelf",
           icon: "github",
@@ -29,7 +24,7 @@ export default defineConfig({
             { label: "CI setup", slug: "guides/ci" },
             { label: "Interaction testing", slug: "guides/interaction-testing" },
             { label: "REST API", slug: "guides/api" },
-            { label: "API Reference", link: "/openapi/" },
+            { label: "OpenAPI", link: "/openapi/" },
             { label: "Deployment", slug: "guides/deployment" },
             { label: "CLI", slug: "guides/cli" },
             { label: "Configuration", slug: "guides/config" },
@@ -39,6 +34,7 @@ export default defineConfig({
         {
           label: "Concepts",
           items: [
+            { label: "Projects", slug: "concepts/projects" },
             { label: "Baselines & branches", slug: "concepts/baselines" },
             { label: "Labels", slug: "concepts/labels" },
           ],

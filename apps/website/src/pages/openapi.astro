@@ -2,6 +2,8 @@
 const baseUrl = import.meta.env.BASE_URL.endsWith("/")
   ? import.meta.env.BASE_URL
   : import.meta.env.BASE_URL + "/";
+const site = Astro.site ? String(Astro.site).replace(/\/?$/u, "") : "https://storyshelf.dev";
+const canonical = `${site}${baseUrl}openapi/`;
 ---
 <!doctype html>
 <html lang="en">
@@ -9,7 +11,15 @@ const baseUrl = import.meta.env.BASE_URL.endsWith("/")
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>API Reference — StoryShelf</title>
-    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+    <meta name="description" content="REST API reference for StoryShelf — Storybook visual testing server. Read-only Swagger UI for /api/v1." />
+    <link rel="canonical" href={canonical} />
+    <meta property="og:title" content="API Reference — StoryShelf" />
+    <meta property="og:description" content="REST API reference for StoryShelf — Storybook visual testing server." />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="StoryShelf" />
+    <meta name="twitter:card" content="summary" />
+    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui.css" crossorigin="anonymous" />
     <style>
       body { margin: 0; }
       #swagger-ui { max-width: 1200px; margin: 0 auto; padding: 1rem; }
@@ -22,8 +32,8 @@ const baseUrl = import.meta.env.BASE_URL.endsWith("/")
   <body>
     <div class="header"><a href={baseUrl}>← StoryShelf</a> · API Reference</div>
     <div id="swagger-ui"></div>
-    <script is:inline src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
-    <script is:inline src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-standalone-preset.js"></script>
+    <script is:inline src="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui-bundle.js" crossorigin="anonymous"></script>
+    <script is:inline src="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui-standalone-preset.js" crossorigin="anonymous"></script>
     <script is:inline define:vars={{ baseUrl }}>
       window.onload = () => {
         const specUrl = new URL(baseUrl + "openapi.json", window.location.origin).href;
