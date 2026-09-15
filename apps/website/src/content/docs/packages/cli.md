@@ -5,6 +5,8 @@ description: Create projects, upload Storybooks, and manage builds from CI — n
 
 `storyshelf` provides the `storyshelf` binary for CI pipelines. It scaffolds servers, initializes client config, creates projects and tokens, uploads built Storybooks, retries captures, and purges expired builds — all over the server's `/api/v1` endpoints. It has **no Playwright or server dependencies**, so it installs cleanly in CI.
 
+> This page is the **package overview** (install + CI use). For the full flag-by-flag command reference, see the [CLI reference](../../guides/cli/).
+
 ## Install
 
 ```sh

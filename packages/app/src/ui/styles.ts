@@ -8,7 +8,7 @@ export function baseStyle(light: BrandTheme, dark: BrandTheme): string {
       --accent-contrast: #fff;
       --surface-base: ${light.surface.base};
       --surface-card: ${light.surface.card};
-      --surface-muted: #f4f4f5;
+      --surface-muted: ${light.surface.muted ?? "#f4f4f5"};
       --text-primary: ${light.text.primary};
       --text-secondary: ${light.text.secondary};
       --border: ${light.border};
@@ -18,38 +18,38 @@ export function baseStyle(light: BrandTheme, dark: BrandTheme): string {
       --status-approved: ${light.status.approved};
       --status-new: ${light.status.new};
       --status-rejected: ${light.status.rejected};
-      --topbar-bg: ${light.accent};
-      --sidebar-bg: #ffffff;
+      --topbar-bg: ${light.topbarBg ?? light.accent};
+      --sidebar-bg: ${light.sidebarBg ?? "#ffffff"};
       --sidebar-width: 240px;
     }
     [data-theme="dark"] {
       --accent: ${dark.accent};
       --surface-base: ${dark.surface.base};
       --surface-card: ${dark.surface.card};
-      --surface-muted: #1e1e22;
+      --surface-muted: ${dark.surface.muted ?? "#1e1e22"};
       --text-primary: ${dark.text.primary};
       --text-secondary: ${dark.text.secondary};
       --border: ${dark.border};
       --status-approved: ${dark.status.approved};
       --status-new: ${dark.status.new};
       --status-rejected: ${dark.status.rejected};
-      --topbar-bg: #0f172a;
-      --sidebar-bg: #111113;
+      --topbar-bg: ${dark.topbarBg ?? "#0f172a"};
+      --sidebar-bg: ${dark.sidebarBg ?? "#111113"};
     }
     @media (prefers-color-scheme: dark) {
       [data-theme="system"] {
         --accent: ${dark.accent};
         --surface-base: ${dark.surface.base};
         --surface-card: ${dark.surface.card};
-        --surface-muted: #1e1e22;
+        --surface-muted: ${dark.surface.muted ?? "#1e1e22"};
         --text-primary: ${dark.text.primary};
         --text-secondary: ${dark.text.secondary};
         --border: ${dark.border};
         --status-approved: ${dark.status.approved};
         --status-new: ${dark.status.new};
         --status-rejected: ${dark.status.rejected};
-        --topbar-bg: #0f172a;
-        --sidebar-bg: #111113;
+        --topbar-bg: ${dark.topbarBg ?? "#0f172a"};
+        --sidebar-bg: ${dark.sidebarBg ?? "#111113"};
       }
     }
     * { box-sizing: border-box; }
