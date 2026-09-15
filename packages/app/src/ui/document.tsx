@@ -198,9 +198,25 @@ const Sidebar: FC<{ nav?: NavConfig }> = ({ nav }) => {
             </a>
           </>
         ) : null}
-        <div class="sidebar__section">Resources</div>
-        <a class="sidebar__link" href="/api/v1/projects" aria-label="API (JSON)">
-          <span aria-hidden="true">{"{} "}</span> API
+        <div class="sidebar__section">Developer</div>
+        <a
+          class={`sidebar__link ${nav?.active === "api-docs" ? "sidebar__link--active" : ""}`}
+          href="/api/v1/docs"
+          aria-current={nav?.active === "api-docs" ? "page" : undefined}
+          aria-label="API docs (Swagger UI)"
+          title="Interactive OpenAPI — Swagger UI"
+        >
+          API docs
+        </a>
+        <a
+          class="sidebar__link"
+          href="/api/v1/openapi.json"
+          aria-label="OpenAPI spec (JSON)"
+          title="Raw OpenAPI 3.0 JSON"
+          target="_blank"
+          rel="noopener"
+        >
+          OpenAPI spec ↗
         </a>
       </nav>
     </aside>
