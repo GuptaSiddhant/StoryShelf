@@ -113,6 +113,47 @@ describe("createSqliteDatabase", () => {
     await closeDb(db);
   });
 
+  it("adds late projects columns (browser/viewports) to a stale volume", async () => {
+    const db = createSqliteDatabase(":memory:");
+    // Simulate a volume created before commit 83fd73e8 (v0.4.0-era DDL): the
+    // projects table predates the browser/viewports columns, so a fresh DDL
+    // run cannot add them — the in-place ALTERs must.
+    await db.all(sql`
+      CREATE TABLE projects (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        slug TEXT NOT NULL UNIQUE,
+        git_repository TEXT,
+        git_default_branch TEXT NOT NULL DEFAULT 'main',
+        pixel_threshold REAL NOT NULL DEFAULT 0.1,
+        max_diff_ratio REAL NOT NULL DEFAULT 0.01,
+        public_branch_regex TEXT,
+        storybook_meta TEXT,
+        execute_play INTEGER NOT NULL DEFAULT 0,
+        play_timeout_ms INTEGER NOT NULL DEFAULT 10000,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    `);
+    await initDb(db);
+
+    const now = new Date().toISOString();
+    const project = (await db.insert(schema.projects, {
+      id: "p1",
+      name: "Demo",
+      slug: "demo",
+      createdAt: now,
+      updatedAt: now,
+    })) as Project;
+    expect(project.browser).toBe("chromium");
+    expect(project.viewports).toBeNull();
+
+    const listed = await db.list(schema.projects);
+    expect(listed).toHaveLength(1);
+
+    await closeDb(db);
+  });
+
   it("close is idempotent", async () => {
     const db = createSqliteDatabase(":memory:");
     await initDb(db);

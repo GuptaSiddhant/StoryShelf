@@ -42,6 +42,9 @@ export function createSqliteDatabase(path: string): DatabaseAdapter {
 
 const STORYBOOK_META_ALTER = "ALTER TABLE projects ADD COLUMN storybook_meta TEXT";
 const RUN_A11Y_ALTER = "ALTER TABLE projects ADD COLUMN run_a11y INTEGER NOT NULL DEFAULT 0";
+const PROJECT_BROWSER_ALTER =
+  "ALTER TABLE projects ADD COLUMN browser TEXT NOT NULL DEFAULT 'chromium'";
+const PROJECT_VIEWPORTS_ALTER = "ALTER TABLE projects ADD COLUMN viewports TEXT";
 const WEBHOOK_SECRET_ALTER =
   "ALTER TABLE webhooks ADD COLUMN secret_encrypted TEXT NOT NULL DEFAULT ''";
 const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN secret";
@@ -120,11 +123,18 @@ function migrateCommentsTable(sqlite: DatabaseSync): void {
   sqlite.exec("PRAGMA foreign_keys = ON");
 }
 
+/** Back-fill projects columns shipped in DDL after initial release (idempotent). */
+function migrateProjectColumns(sqlite: DatabaseSync): void {
+  execIgnore(sqlite, STORYBOOK_META_ALTER);
+  execIgnore(sqlite, RUN_A11Y_ALTER);
+  execIgnore(sqlite, PROJECT_BROWSER_ALTER);
+  execIgnore(sqlite, PROJECT_VIEWPORTS_ALTER);
+}
+
 function runMigrations(sqlite: DatabaseSync): void {
   sqlite.exec("PRAGMA foreign_keys = ON");
   sqlite.exec(DDL);
-  execIgnore(sqlite, STORYBOOK_META_ALTER);
-  execIgnore(sqlite, RUN_A11Y_ALTER);
+  migrateProjectColumns(sqlite);
   try {
     sqlite.exec(WEBHOOK_SECRET_ALTER);
     sqlite.exec(WEBHOOK_SECRET_DROP);
