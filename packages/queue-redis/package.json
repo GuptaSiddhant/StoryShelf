@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/queue-redis",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Redis capture job queue adapter for StoryShelf (self-hosted, Docker Compose).",
   "keywords": [
     "queue",

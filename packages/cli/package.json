@@ -1,6 +1,6 @@
 {
   "name": "storyshelf",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "StoryShelf CLI: create projects, upload builds, purge, and retry from CI.",
   "keywords": [
     "ci",

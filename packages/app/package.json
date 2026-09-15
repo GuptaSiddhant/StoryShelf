@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/app",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "StoryShelf app: Hono app, API routes, and server-rendered UI over @storyshelf/core.",
   "keywords": [
     "chromatic-alternative",
