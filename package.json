@@ -1,46 +1,72 @@
 {
   "name": "storyshelf-monorepo",
   "private": true,
-  "type": "module",
   "description": "Self-hosted visual testing platform for Storybook.",
-  "repository": "git@github.com:GuptaSiddhant/storyshelf.git",
-  "author": "Siddhant Gupta <guptasiddhant@icloud.com>",
   "license": "MIT",
+  "author": "Siddhant Gupta <guptasiddhant@icloud.com>",
+  "repository": "git@github.com:GuptaSiddhant/StoryShelf.git",
   "workspaces": {
     "packages": [
-      "./packages/*", "website"
+      "./apps/*",
+      "./packages/*"
     ],
     "catalog": {
+      "@hono/node-server": "^1.17.0",
       "@types/node": "^26.0.0",
+      "@types/picomatch": "^4.0.1",
+      "@types/pngjs": "^6.0.5",
+      "@types/prompts": "^2.4.9",
+      "@types/unzipper": "0.10.11",
       "@vitest/coverage-v8": "^4.0.0",
+      "adm-zip": "0.6.0",
+      "drizzle-orm": "^0.44.0",
+      "hono": "^4.11.0",
       "oxfmt": "^0.65.0",
       "oxlint": "^1.80.0",
       "oxlint-tsgolint": "^7.0.2001",
       "typescript": "^7.0.2",
       "tsdown": "^0.22.14",
-      "vitest": "^4.0.0"
+      "vitest": "^4.0.0",
+      "pino": "^10.3.1",
+      "yaml": "^2.9.0",
+      "zod": "^4.2.0"
     }
   },
+  "type": "module",
   "scripts": {
     "build": "turbo build",
     "build:pkg": "turbo build --filter='./packages/*'",
     "core:build": "nub run --filter @storyshelf/core build",
     "core:dev": "nub run --filter @storyshelf/core dev",
-    "cli": "nub run --filter @storyshelf/cli start",
+    "cli": "nub run --filter storyshelf start",
     "docs": "nub run --filter website start",
+    "jsr": "nub ./scripts/jsr.mjs",
+    "serve": "nub run --filter dev-server serve",
     "fmt": "turbo fmt",
+    "hook:install": "git config core.hooksPath .githooks && chmod +x .githooks/pre-commit .githooks/commit-msg",
     "lint": "turbo lint",
-    "serve": "nub run --filter @storyshelf/cli start serve",
     "test": "turbo test",
-    "verify": "turbo verify --filter='./packages/*'",
+    "audit": "turbo audit",
+    "verify": "turbo verify --filter='./packages/*' --filter='website'",
+    "clean": "node ./scripts/clean.mjs",
+    "clean:cache": "node ./scripts/clean.mjs --cache-only",
     "web:build": "nub run --filter website build",
-    "web:dev": "nub run --filter website dev"
+    "web:dev": "nub run --filter website dev",
+    "release": "nub ./scripts/release.mjs",
+    "release:dry": "nub ./scripts/release.mjs --dry-run",
+    "trust": "node ./scripts/npm-trust-all.mjs"
   },
   "devDependencies": {
+    "axe-core": "^4.13.0",
+    "jsdom": "^30.0.1",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
-    "turbo": "^2.10.11"
+    "rolldown": "*",
+    "tsdown": "catalog:",
+    "turbo": "^2.10.11",
+    "typescript": "catalog:",
+    "yaml": "catalog:"
   },
   "devEngines": {
     "packageManager": {

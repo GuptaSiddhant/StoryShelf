@@ -28,10 +28,18 @@ vite.config.ts.timestamp*
 .npmrc
 
 storybook-static
+fixtures/**/node_modules
+fixtures/**/storybook-static
+fixtures/**/dist
+fixtures/**/pnpm-workspace.yaml
 .test-results
 test-report
 coverage
 openapi.json
+
+# pnpm trick for turbo prune (nub.lock is source of truth)
+pnpm-lock.yaml
+!fixtures/**/pnpm-lock.yaml
 
 # StoryShelf local data
 .data/
@@ -39,3 +47,10 @@ openapi.json
 data
 nub.lock.bak
 .astro
+
+# scratch space for agents (prefer over /tmp)
+.tmp
+
+# opencode state
+.opencode/
+.ocx/

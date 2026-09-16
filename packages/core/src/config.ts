@@ -1,69 +1,162 @@
+import type { Logger } from "pino";
+import { z } from "zod";
 import type { AuthAdapter } from "./adapters/auth.ts";
+import type { CaptureQueue } from "./adapters/capture-queue.ts";
 import type { CaptureRunner } from "./adapters/capture-runner.ts";
-import type { DatabaseAdapter } from "./adapters/database.ts";
-import type { LoggerAdapter } from "./adapters/logger.ts";
-import type { StatusAdapter } from "./adapters/status.ts";
+import type { GitHostProvider } from "./adapters/git-host/index.ts";
+import type { AdapterCategory } from "./adapters/metadata.ts";
 import type { StorageAdapter } from "./adapters/storage.ts";
-import type { Viewport } from "./capture/adapter.ts";
+import type { DatabaseAdapter } from "./db/database.ts";
 
-/** Branding colors used to theme the web UI. */
+/** Brand color theme for the server-rendered UI. */
 export interface BrandTheme {
-  /** Accent color. */
   accent: string;
-  /** Surface colors. */
   surface: { base: string; card: string };
-  /** Text colors. */
   text: { primary: string; secondary: string };
-  /** Border color. */
   border: string;
-  /** Status-specific colors. */
   status: { approved: string; new: string; rejected: string };
 }
 
-/** Branding and theme configuration for the web UI. */
+/** Branding overrides for the server-rendered UI. */
 export interface UIConfig {
-  /** Brand name shown in the UI. */
   name?: string;
-  /** URL to a logo image. */
   logo?: string;
-  /** URL to a favicon. */
   favicon?: string;
-  /** Theme used in light mode. */
   lightTheme?: BrandTheme;
-  /** Theme used in dark mode. */
   darkTheme?: BrandTheme;
 }
 
-/** Runtime configuration passed to the shelf router. */
-export interface ShelfConfig {
-  /** Session signing secret. */
-  secret?: string;
-  /** Domain used for published Storybook URLs. */
-  publishedBaseDomain?: string;
-  /** Number of concurrent capture jobs. */
-  captureConcurrency?: number;
-  /** Days after which builds are purged. */
-  purgeTtlDays?: number;
-  /** Viewports at which stories are captured. */
-  viewports?: Viewport[];
+/** Default cap for a single Storybook zip upload (1 GiB). */
+export const DEFAULT_MAX_UPLOAD_BYTES = 1024 * 1024 * 1024;
+
+/** A viewport in which stories are captured. */
+export interface ShelfViewport {
+  name: string;
+  width: number;
+  height: number;
 }
 
-/** Options used to construct a shelf router. */
+/** Metadata snapshot of a configured adapter. */
+export interface AdapterSnapshot {
+  name: string;
+  version: string;
+  description?: string;
+  kind: string;
+  category: AdapterCategory;
+}
+
+/** Shelf-level configuration (validated by {@link shelfConfigSchema}). */
+export interface ShelfConfig {
+  secret?: string;
+  publishedBaseDomain?: string;
+  captureConcurrency?: number;
+  scratchDir?: string;
+  purgeTtlDays?: number;
+  /** Branch baseline TTL, days; null disables branch GC (default 30). */
+  branchTtlDays?: number | null;
+  /** Branch GC interval, ms; daily sweep via interval clock (default 86_400_000). */
+  branchGcIntervalMs?: number;
+  maxUploadBytes?: number;
+  /**
+   * Max zip size (bytes) eligible for inline statics extraction at upload.
+   * Unset (or 0) disables inline extraction — statics land via capture.
+   */
+  maxInlineUnzipSize?: number;
+  viewports?: ShelfViewport[];
+  adapters?: Record<string, AdapterSnapshot>;
+}
+
+const viewportSchema: z.ZodType<ShelfViewport> = z.object({
+  name: z.string().min(1),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+});
+
+const brandThemeSchema: z.ZodType<BrandTheme> = z.object({
+  accent: z.string(),
+  surface: z.object({ base: z.string(), card: z.string() }),
+  text: z.object({ primary: z.string(), secondary: z.string() }),
+  border: z.string(),
+  status: z.object({ approved: z.string(), new: z.string(), rejected: z.string() }),
+});
+
+const adapterSnapshotSchema: z.ZodType<AdapterSnapshot> = z.object({
+  name: z.string(),
+  version: z.string(),
+  description: z.string().optional(),
+  kind: z.string(),
+  category: z.enum(["database", "storage", "auth", "capture-runner", "capture-queue", "git-host"]),
+});
+
+/** Zod schema validating the shelf-level configuration. */
+export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
+  .object({
+    secret: z.string().min(1).optional(),
+    publishedBaseDomain: z.string().optional(),
+    captureConcurrency: z.number().int().positive().optional(),
+    scratchDir: z.string().optional(),
+    purgeTtlDays: z.number().int().positive().optional(),
+    branchTtlDays: z.number().int().positive().nullable().optional(),
+    branchGcIntervalMs: z.number().int().positive().optional(),
+    maxUploadBytes: z.number().int().positive().optional(),
+    maxInlineUnzipSize: z.number().int().positive().optional(),
+    viewports: z.array(viewportSchema).min(1, "at least one viewport required").optional(),
+    adapters: z.record(z.string(), adapterSnapshotSchema).optional(),
+  })
+  .strict();
+
+/** Zod schema validating the UI branding configuration. */
+export const uiConfigSchema: z.ZodType<UIConfig> = z
+  .object({
+    name: z.string().optional(),
+    // oxlint-disable-next-line typescript/no-deprecated -- z.string().url() kept for zod v3 API compat
+    logo: z.string().url().optional(),
+    // oxlint-disable-next-line typescript/no-deprecated -- z.string().url() kept for zod v3 API compat
+    favicon: z.string().url().optional(),
+    lightTheme: brandThemeSchema.optional(),
+    darkTheme: brandThemeSchema.optional(),
+  })
+  .strict();
+
+/**
+ * Parse and validate a raw shelf-level configuration object.
+ *
+ * @param config - Unvalidated configuration record.
+ * @returns The validated shelf configuration.
+ */
+export function validateConfig(config: Record<string, unknown>): ShelfConfig {
+  const result = shelfConfigSchema.safeParse(config);
+  if (!result.success) {
+    const issues = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+    throw new Error(`Invalid ShelfConfig: ${issues}`);
+  }
+  return result.data;
+}
+
+/**
+ * Parse and validate a raw UI branding configuration object.
+ *
+ * @param config - Unvalidated UI configuration record.
+ * @returns The validated UI configuration.
+ */
+export function validateUiConfig(config: Record<string, unknown>): UIConfig {
+  const result = uiConfigSchema.safeParse(config);
+  if (!result.success) {
+    const issues = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+    throw new Error(`Invalid UIConfig: ${issues}`);
+  }
+  return result.data;
+}
+
+/** Adapter and configuration options for creating the shelf router. */
 export interface ShelfOptions {
-  /** Database adapter. */
   database: DatabaseAdapter;
-  /** Storage adapter. */
   storage: StorageAdapter;
-  /** Capture runner for asynchronous builds. */
-  capture?: CaptureRunner;
-  /** Authentication adapter. */
+  captureRunner?: CaptureRunner;
+  captureQueue?: CaptureQueue;
   auth?: AuthAdapter;
-  /** Git provider status adapter. */
-  status?: StatusAdapter;
-  /** Logger adapter. */
-  logger?: LoggerAdapter;
-  /** UI branding configuration. */
+  gitHosts?: GitHostProvider[];
+  logger?: Logger;
   ui?: UIConfig;
-  /** Runtime configuration. */
   config?: ShelfConfig;
 }

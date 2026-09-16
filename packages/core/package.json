@@ -1,36 +1,188 @@
 {
   "name": "@storyshelf/core",
-  "version": "0.1.0",
-  "type": "module",
-  "description": "StoryShelf core: Hono router, adapter interfaces, models, capture pipeline, diff, retention.",
+  "version": "0.5.1",
+  "description": "StoryShelf core: adapter interfaces, models, capture pipeline, diff, and retention (no HTTP).",
+  "keywords": [
+    "chromatic-alternative",
+    "self-hosted",
+    "storybook",
+    "visual-regression-testing",
+    "visual-testing"
+  ],
+  "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
+  "bugs": {
+    "url": "https://github.com/GuptaSiddhant/StoryShelf/issues"
+  },
+  "license": "MIT",
   "author": {
     "name": "Siddhant Gupta",
     "url": "https://guptasiddhant.com"
   },
-  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GuptaSiddhant/StoryShelf.git",
+    "directory": "packages/core"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": false,
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "source": "./src/index.tsx",
+      "default": "./dist/index.mjs"
+    },
+    "./adapter/auth": {
+      "source": "./src/adapters/auth.ts",
+      "default": "./dist/adapter/auth.mjs"
+    },
+    "./adapter/capture-queue": {
+      "source": "./src/adapters/capture-queue.ts",
+      "default": "./dist/adapter/capture-queue.mjs"
+    },
+    "./adapter/capture-runner": {
+      "source": "./src/adapters/capture-runner.ts",
+      "default": "./dist/adapter/capture-runner.mjs"
+    },
+    "./adapter/database": {
+      "source": "./src/adapters/database.ts",
+      "default": "./dist/adapter/database.mjs"
+    },
+    "./adapter/git-host": {
+      "source": "./src/adapters/git-host/index.ts",
+      "default": "./dist/adapter/git-host.mjs"
+    },
+    "./adapter/git-host/comments": {
+      "source": "./src/adapters/git-host/comments.ts",
+      "default": "./dist/adapter/git-host/comments.mjs"
+    },
+    "./adapter/git-host/helpers": {
+      "source": "./src/adapters/git-host/helpers.ts",
+      "default": "./dist/adapter/git-host/helpers.mjs"
+    },
+    "./adapter/metadata": {
+      "source": "./src/adapters/metadata.ts",
+      "default": "./dist/adapter/metadata.mjs"
+    },
+    "./adapter/setup": {
+      "source": "./src/adapters/setup.ts",
+      "default": "./dist/adapter/setup.mjs"
+    },
+    "./adapter/storage": {
+      "source": "./src/adapters/storage.ts",
+      "default": "./dist/adapter/storage.mjs"
+    },
+    "./adapter/webhook-events": {
+      "source": "./src/adapters/webhook-events.ts",
+      "default": "./dist/adapter/webhook-events.mjs"
+    },
+    "./capture": {
+      "source": "./src/capture/index.ts",
+      "default": "./dist/capture.mjs"
+    },
+    "./config": {
+      "source": "./src/config.ts",
+      "default": "./dist/config.mjs"
+    },
+    "./diff": {
+      "source": "./src/diff/index.ts",
+      "default": "./dist/diff.mjs"
+    },
+    "./logger": {
+      "source": "./src/logger.ts",
+      "default": "./dist/logger.mjs"
+    },
+    "./models": {
+      "source": "./src/models/index.ts",
+      "default": "./dist/models.mjs"
+    },
+    "./paths": {
+      "source": "./src/utils/paths.ts",
+      "default": "./dist/paths.mjs"
+    },
+    "./retention": {
+      "source": "./src/retention/purge.ts",
+      "default": "./dist/retention.mjs"
+    },
+    "./schema": {
+      "source": "./src/schema/index.ts",
+      "default": "./dist/schema.mjs"
+    },
+    "./test-helpers": {
+      "source": "./src/test-helpers/index.ts",
+      "default": "./dist/test-helpers.mjs"
+    },
+    "./types": {
+      "source": "./src/types.ts",
+      "default": "./dist/types.mjs"
+    },
+    "./urls": {
+      "source": "./src/urls.ts",
+      "default": "./dist/urls.mjs"
+    },
+    "./utils": {
+      "source": "./src/utils/index.ts",
+      "default": "./dist/utils.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.mjs",
+      "./adapter/auth": "./dist/adapter/auth.mjs",
+      "./adapter/capture-queue": "./dist/adapter/capture-queue.mjs",
+      "./adapter/capture-runner": "./dist/adapter/capture-runner.mjs",
+      "./adapter/database": "./dist/adapter/database.mjs",
+      "./adapter/git-host": "./dist/adapter/git-host.mjs",
+      "./adapter/git-host/comments": "./dist/adapter/git-host/comments.mjs",
+      "./adapter/git-host/helpers": "./dist/adapter/git-host/helpers.mjs",
+      "./adapter/metadata": "./dist/adapter/metadata.mjs",
+      "./adapter/setup": "./dist/adapter/setup.mjs",
+      "./adapter/storage": "./dist/adapter/storage.mjs",
+      "./adapter/webhook-events": "./dist/adapter/webhook-events.mjs",
+      "./capture": "./dist/capture.mjs",
+      "./config": "./dist/config.mjs",
+      "./diff": "./dist/diff.mjs",
+      "./logger": "./dist/logger.mjs",
+      "./models": "./dist/models.mjs",
+      "./paths": "./dist/paths.mjs",
+      "./retention": "./dist/retention.mjs",
+      "./schema": "./dist/schema.mjs",
+      "./test-helpers": "./dist/test-helpers.mjs",
+      "./types": "./dist/types.mjs",
+      "./urls": "./dist/urls.mjs",
+      "./utils": "./dist/utils.mjs",
+      "./package.json": "./package.json"
+    },
+    "access": "public"
+  },
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown -w",
-    "fmt": "oxfmt -c ../../.oxfmtrc.json ./src",
+    "fmt": "oxfmt ./src",
     "lint": "oxlint --type-aware --type-check ./src",
     "lint:fix": "nub run lint -- --fix",
+    "prepublishOnly": "nub run build",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@hono/zod-openapi": "^1.1.5",
-    "drizzle-orm": "^0.44.0",
-    "hono": "^4.11.0",
+    "drizzle-orm": "catalog:",
+    "pino": "catalog:",
     "pixelmatch": "^7.1.0",
     "pngjs": "^7.0.0",
-    "zod": "^4.2.0"
+    "unzipper": "0.12.5",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "@types/pngjs": "^6.0.5",
+    "@types/pngjs": "catalog:",
+    "@types/unzipper": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "adm-zip": "0.6.0",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
@@ -38,27 +190,13 @@
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
-  "types": "./dist/index.d.mts",
-  "exports": {
-    ".": "./dist/index.mjs",
-    "./adapter/database": "./dist/adapter/database.mjs",
-    "./adapter/storage": "./dist/adapter/storage.mjs",
-    "./adapter/capture-runner": "./dist/adapter/capture-runner.mjs",
-    "./adapter/auth": "./dist/adapter/auth.mjs",
-    "./adapter/status": "./dist/adapter/status.mjs",
-    "./adapter/logger": "./dist/adapter/logger.mjs",
-    "./schema": "./dist/schema.mjs",
-    "./ddl": "./dist/ddl.mjs",
-    "./types": "./dist/types.mjs",
-    "./models/project": "./dist/models/project.mjs",
-    "./models/build": "./dist/models/build.mjs",
-    "./models/snapshot": "./dist/models/snapshot.mjs",
-    "./models/baseline": "./dist/models/baseline.mjs",
-    "./models/member": "./dist/models/member.mjs",
-    "./models/comment": "./dist/models/comment.mjs",
-    "./models/label": "./dist/models/label.mjs",
-    "./models/token": "./dist/models/token.mjs",
-    "./models/webhook": "./dist/models/webhook.mjs",
-    "./package.json": "./package.json"
+  "jsr": {
+    "runtimeCompat": {
+      "node": true,
+      "deno": true,
+      "bun": true,
+      "workerd": false,
+      "browser": false
+    }
   }
 }

@@ -1,14 +1,3 @@
-import { defineConfig } from "tsdown";
+import { cliConfig } from "../../config/tsdown.ts";
 
-export default defineConfig({
-  banner: { js: "#!/usr/bin/env node" },
-  dts: false,
-  entry: { index: "./src/index.ts" },
-  platform: "node",
-  target: "node22",
-  treeshake: true,
-  cjsDefault: false,
-  fixedExtension: false,
-  deps: { neverBundle: true },
-  clean: true,
-});
+export default cliConfig({ index: "./src/index.ts" });

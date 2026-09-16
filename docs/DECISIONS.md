@@ -7,10 +7,10 @@ Decisions made during implementation (for review). Architectural decisions are i
 1. **Drizzle schema lives in `@storyshelf/core`**, not duplicated per adapter. Both `@storyshelf/db-sqlite` and `@storyshelf/db-turso` import the same schema from core (per ADR 0002 "shared schema"). This makes `db-sqlite`/`db-turso` depend on `core`.
    - *Trade-off:* `core` gains a dependency on `drizzle-orm`. Accepted — the schema is core domain logic.
 
-2. **Models are pure functions/classes over a minimal `DatabaseAdapter`**, not Drizzle-specific. Drizzle is used only inside the `sqlite`/`turso` adapters to translate the adapter's typed operations into SQL. The adapter interface is a small set of typed CRUD + query primitives (per-table generics), not raw SQL passthrough — keeps `turso` (remote HTTP driver) and `sqlite` (sync better-sqlite3) behind one async interface.
+2. **Models are pure functions/classes over a minimal `DatabaseAdapter`**, not Drizzle-specific. Drizzle is used only inside the `sqlite`/`turso` adapters to translate the adapter's typed operations into SQL. The adapter interface is a small set of typed CRUD + query primitives (per-table generics), not raw SQL passthrough — keeps `turso` (remote HTTP driver) and `sqlite` (sync node:sqlite) behind one async interface.
    - *Trade-off:* more indirection than writing Drizzle queries inline in models. Accepted for testability and the two-driver requirement.
 
-3. **`DatabaseAdapter` is async everywhere**, even for `sqlite` (better-sqlite3 is sync, wrapped in `Promise.resolve`). Uniformity beats micro-optimizing the local driver.
+3. **`DatabaseAdapter` is async everywhere**, even for `sqlite` (node:sqlite is sync, wrapped in `Promise.resolve`). Uniformity beats micro-optimizing the local driver.
 
 4. **Token/secret hashing**: API token values are stored SHA-256 hashed (consistent with `docs/architecture.md` tokens.hash). Webhook `secret` and session cookies use HMAC-SHA256 with the server `SECRET`; no encryption-at-rest in v1 (noted as a gap).
 
@@ -28,19 +28,47 @@ Decisions made during implementation (for review). Architectural decisions are i
 
 ## 2026-08-27 — Core scaffold (post-foundation)
 
-11. **Playwright lives in the CLI, not core.** Core's capture pipeline (`capture/pipeline.ts`) is browser-agnostic — it takes an injected `renderStory(story, viewport) => Buffer`. The real Playwright renderer + `CaptureRunner` implementation is constructed in `@storyshelf/cli` (the `serve`/`upload` commands). This keeps `@storyshelf/core` free of the heavy Playwright dependency and unit-testable (gated browser suite in CLI).
+11. **Playwright lives in `@storyshelf/runner-playwright`, not core.** Core's capture pipeline (`capture/pipeline.ts`) is browser-agnostic — it takes an injected `renderStory(story, viewport) => Buffer`. The real Playwright renderer + `CaptureRunner` implementation is constructed in `@storyshelf/runner-playwright` (wired in by your server scaffold via `storyshelf server init`). This keeps `@storyshelf/core` free of the heavy Playwright dependency and unit-testable (gated browser suite in the runner package).
 12. **Removed `erasableSyntaxOnly` from `tsconfig.base.json`** (StoryBooker had it `true`). It disallows constructor parameter properties, which the models use heavily; dropped for velocity. (One-line revert if we want to match StoryBooker exactly.)
 13. **Routers use plain Hono + zod (`validJson`)**, not `@hono/zod-openapi`, for the scaffold. OpenAPI spec generation is deferred (the `@hono/zod-openapi` dep is already in place for it).
 14. **ULID is implemented in-core** (`utils/ulid.ts`, `node:crypto`) rather than pulling an external `ulid`/`cuid` dependency.
 15. **`comments.parent_id` self-FK is stored as a plain text column** (no `.references()`), sidestepping Drizzle's circular-type-inference issue with self-referencing tables.
 16. **Diff overlay + baseline copy are the two storage writes on approve**; baselines are copied (not referenced) so they survive build purge, per ADR 0009.
-17. **Core's barrel entry exports only the router + adapter/option types — not models.** Consumers get `createShelfRouter` and the adapter/capture types from `@storyshelf/core`; the Drizzle models are reachable via deep imports (e.g. `@storyshelf/core/models/build`). This keeps the public surface small and lets models evolve without changing the barrel.
-    - *v2/future:* refactor `runCapture` so the capture-runner (CLI) doesn't need the models directly — have it take preloaded `build`/`project` (or query via `DatabaseAdapter`) instead of constructing `BuildModel`/`ProjectModel` itself.
+17. **Core's barrel entry exports only the router + adapter/option types — not models.** Consumers get `createShelfApp` and the adapter/capture types from `@storyshelf/core`; the Drizzle models are reachable via deep imports (e.g. `@storyshelf/core/models/build`). This keeps the public surface small and lets models evolve without changing the barrel.
+    - *Done:* `CaptureRunner` is now a **pure renderer** (ADR 0015) — it no longer constructs models or touches db/storage. The `@storyshelf/runner-playwright` runner's `renderStory`-style logic moved into a pure `render(input)` that returns buffers; loading/status/extraction/persistence moved into core's capture orchestrator (`executeCaptureJob`).
 
 ## 2026-08-27 — Dev workflow (source-linked, hot restart)
 
 18. **Dev runs TypeScript source directly — no build step.** Each package's `tsdown.config.ts` sets `exports: { devExports: "development" }`, so tsdown generates conditional `exports` where a `"development"` condition points each entry at its `.ts`/`.tsx` source (`default`/dist stays for prod). The `development` condition is activated at runtime by `nub.jsonc` → `{ "conditions": ["development"] }`, and at type-check time by `tsconfig.base.json` → `"customConditions": ["development"]` — so the editor, `tsc`, and `nub` all resolve to the same source.
-19. **`nub run serve`** runs the dev server: `nub watch ./packages/cli/src/index.ts serve --data-dir .dev-data`. `nub watch` restarts on any file in the resolved import graph (across all packages), `.env*`, the `tsconfig.json` extends chain, and `package.json` — no glob maintenance. Verified: touching `packages/core/src/index.tsx` restarts the server.
+19. **`nub run serve`** runs the dev server: `nub watch ./packages/node-server/src/index.ts serve --data-dir .dev-data`. `nub watch` restarts on any file in the resolved import graph (across all packages), `.env*`, the `tsconfig.json` extends chain, and `package.json` — no glob maintenance. Verified: touching `packages/core/src/index.tsx` restarts the server.
 20. **Node 26.6.0 is the dev runtime** (`.node-version` is the source of truth; `root package.json` `devEngines.runtime` = `26.x`). The CLI's `tsconfig.json` sets `jsx: react-jsx` + `jsxImportSource: hono/jsx` because, under `customConditions`, `tsc` now type-checks core's `.tsx` source via the main `@storyshelf/core` entry.
 21. **Generated `exports` drop the explicit `types` condition** (tsdown emits `development` + `default` only). Top-level `types` (`./dist/index.d.mts`) still covers type resolution; revisit if a `types` condition becomes necessary.
 
+## 2026-08-29 — CLI/server package split
+
+22. **`@storyshelf/cli` is client-only.** The CLI keeps only the `/api/v1` client verbs — `server init`, `init`, `create`, `upload`, `retry`, `purge` — and its dependencies include `commander`, `adm-zip`, `prompts` and `zod` (for `.storybook/storyshelf.json`). The `storyshelf server init` command generates a server project with the correct adapter imports and dependencies, replacing the need for a separate server package.
+   - *Trade-off:* users must run `npm install` after scaffolding, but they own the server file and can modify it freely.
+
+23. **The Playwright runner is its own package: `@storyshelf/runner-playwright`.** The `CaptureRunner` implementation (browser lifecycle, zip extraction, ephemeral static server, default viewports) is a separate package, mirroring the `db-*`/`storage-*`/`auth-*` adapter-package convention (ADR 0001). The server scaffold injects whichever runner it wants, so a v2 remote runner (offload capture to a worker fleet) becomes a dependency swap, not a router or pipeline change.
+   - *Trade-off:* four packages in the capture stack (core pipeline, server assembly, runner, queue in core) for one implementation. Accepted — the runner is the swappable concern per ADR 0003, and separation keeps `playwright` out of both core and the scaffolded server, gating the browser suite to the runner package.
+
+## 2026-08-29 — Server scaffolding
+
+24. **`@storyshelf/node-server` replaced by `storyshelf server init`.** The old package implied *the* universal server, but it hardcoded a specific stack (SQLite + local storage + Playwright + GitHub). The new approach uses `storyshelf server init` to generate a server project with the user's chosen adapters. This eliminates the combinatorial explosion of adapter combinations and lets users own their server file.
+25. **Cross-runtime serving is core's job, not a server package's.** `@storyshelf/core`'s `createShelfApp` returns a plain Hono app (Web `Request`/`Response` `FetchHandler`), so it already runs on Azure Functions, Cloudflare Workers, Vercel, Deno, or Bun. Only capture's in-process queue constrains the runtime; a new `CaptureQueue` adapter makes it swappable (in-memory for Node; a remote/durable queue + separate worker for serverless).
+
+## 2026-08-30 — OpenAPI API surface
+
+26. **The JSON API is now OpenAPI-native.** `createShelfApp` returns an `OpenAPIHono`; every JSON router (`projects`, `builds`, `labels`, `tokens`, `members`, `webhooks`, `admin`) registers routes via `createRoute` with shared response schemas in `routers/schemas.ts`. This finally uses the `@hono/zod-openapi` dependency that was parked during the scaffold (DECISIONS 13). The HTML/auth/media asset routers stay plain Hono routes (not part of the JSON surface).
+    - *Trade-off:* the zod schemas for request/response are now the single source of truth for both validation and the OpenAPI document; the old per-router zod validation (`validJson`) is replaced by `c.req.valid()`. `docs/architecture.md` remains the canonical model spec.
+27. **Spec + console are self-hosted endpoints, not a website build step.** `GET /api/v1/openapi.json` serves the OpenAPI 3.0 document (generated from the route registry), and `GET /api/v1/docs` renders an interactive Swagger UI (`@hono/swagger-ui`, vendored via npm like HTMX). The docs site's `/guides/api` page links to both rather than embedding a frozen snapshot, so the shipping spec always matches the running server.
+28. **The site-level static spec is generated by the website, not by core's build.** Drafting the document in core's *build* would force `core` to produce an artifact nobody asked for and wire a `@storyshelf/core` dependency (for turborepo `^build` ordering) into the docs site. Instead the generator lives next to the router (`packages/core/scripts/generate-openapi.ts`, runnable via `nub`) and the website exposes an `openapi` script that runs it with `--out ./public/openapi.json`; a `prebuild` hook invokes it, so `build` stays a plain `astro build`. Zero package wiring, and the spec is always cut from the current router source. `website#build` is `cache: false` in turborepo so the site always regenerates rather than restoring a stale copy. CLI/codegen can likewise call the same script.
+29. **`pino` joined the root workspace catalog** to resolve `@storyshelf/queue-sqs`'s `catalog:` reference, which was added without a catalog entry.
+
+
+
+## 2026-09-05 — Router-only barrel, private models
+
+30. **The `@storyshelf/core` barrel exports only the router and its types** (`createShelfApp`, `ShelfOptions`/`ShelfConfig`/`UIConfig`/`BrandTheme`, `ShelfApp`/`ShelfContext`). Everything else moved to subpaths (new `core/logger`, `core/capture`, `core/adapter/capture-queue`, `core/paths`, `core/urls`, `core/diff` entries). Rationale: consumers that do not serve HTTP (runners, workers, CLIs) must not import the Hono router to reach a helper.
+    - *Reverses 17:* the `core/models/*` deep entries are deleted — models are private implementation details with no public entry, since nothing outside core imports them. Row types remain reachable via `core/schema`.
+    - *Trade-off:* more import lines per consumer (router + logger + adapters from separate entries). Accepted — explicit dependency edges beat an implicit barrel.

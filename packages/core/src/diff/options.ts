@@ -6,7 +6,7 @@ export interface DiffOptions {
   maxDiffRatio: number;
   /** Whether to include antialiasing artifacts when counting differing pixels. */
   includeAntialiasing: boolean;
-  /** Whether a size mismatch between images should fail the diff. */
+  /** Whether a size mismatch between images should fail the diff. When false, only the overlapping region is diffed. */
   failOnSizeChange: boolean;
 }
 

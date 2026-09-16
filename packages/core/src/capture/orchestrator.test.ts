@@ -1,0 +1,227 @@
+import AdmZip from "adm-zip";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  baselines,
+  buildLabels,
+  builds,
+  projects,
+  snapshots,
+} from "../../../db-sqlite/src/schema/index.ts";
+import type { CaptureRunner, RenderResult } from "../adapters/capture-runner.ts";
+import { BuildModel } from "../models/build.ts";
+import { ProjectModel } from "../models/project.ts";
+import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
+import { storybookDir, storybookZipPath } from "../utils/paths.ts";
+import { executeCaptureJob } from "./orchestrator.ts";
+
+function tables() {
+  return {
+    builds: builds as unknown as never,
+    buildLabels: buildLabels as unknown as never,
+    snapshots: snapshots as unknown as never,
+    baselines: baselines as unknown as never,
+    projects: projects as unknown as never,
+  };
+}
+
+const STORY_ID = "components-button--primary";
+
+function zipWithIndex(): Buffer {
+  const zip = new AdmZip();
+  zip.addFile(
+    "index.json",
+    Buffer.from(
+      JSON.stringify({
+        v: 4,
+        entries: {
+          [STORY_ID]: {
+            id: STORY_ID,
+            name: "Primary",
+            title: "Components/Button",
+            importPath: "./Button.stories.tsx",
+            type: "story",
+          },
+        },
+      }),
+    ),
+  );
+  return zip.toBuffer();
+}
+
+function fakeRunner(overrides: Partial<CaptureRunner> = {}): {
+  runner: CaptureRunner;
+  render: ReturnType<typeof vi.fn>;
+} {
+  const result: RenderResult = {
+    captures: [
+      {
+        story: {
+          id: STORY_ID,
+          title: "Components/Button",
+          name: "Primary",
+          importPath: "./Button.stories.tsx",
+          type: "story",
+        },
+        viewportName: "desktop",
+        screenshot: Buffer.from([0, 1, 2]),
+      },
+    ],
+    failures: [],
+  };
+  const render =
+    overrides.render ??
+    vi.fn(async () => {
+      await Promise.resolve();
+      return result;
+    });
+  const cancel =
+    overrides.cancel ??
+    vi.fn(async () => {
+      await Promise.resolve();
+    });
+  const runner: CaptureRunner = {
+    metadata: { name: "Fake Runner", version: "0.0.0", kind: "fake", category: "capture-runner" },
+    render,
+    cancel,
+  };
+  return { runner, render: render as ReturnType<typeof vi.fn> };
+}
+
+let scratchDir: string;
+
+beforeEach(async () => {
+  scratchDir = await mkdtemp(join(tmpdir(), "storyshelf-orch-"));
+});
+
+afterEach(async () => {
+  await rm(scratchDir, { recursive: true, force: true });
+});
+
+describe("executeCaptureJob", () => {
+  it("loads the target, extracts, renders, and persists the capture end to end", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const project = await new ProjectModel(db, tables()).create({ name: "Orchestrator" });
+    const build = await new BuildModel(db, tables()).create(project.id, {
+      gitSha: "sha-abc",
+      gitBranch: "main",
+      isDefault: true,
+    });
+    await storage.write(storybookZipPath(project.id, build.id), zipWithIndex());
+    const { runner, render } = fakeRunner();
+
+    await executeCaptureJob(
+      { buildId: build.id },
+      { db, tables: tables(), storage, runner, scratchDir },
+    );
+
+    const updatedBuild = await db.get(builds, build.id);
+    expect(updatedBuild?.status).toBe("approved");
+    expect(render).toHaveBeenCalledTimes(1);
+    const rows = await db.list(snapshots);
+    expect(rows.map((row) => row.storyName)).toEqual(["Primary"]);
+  });
+
+  it("marks the build failed when the renderer rejects", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const project = await new ProjectModel(db, tables()).create({ name: "Orchestrator" });
+    const build = await new BuildModel(db, tables()).create(project.id, {
+      gitSha: "sha-abc",
+      gitBranch: "main",
+    });
+    await storage.write(storybookZipPath(project.id, build.id), zipWithIndex());
+    const { runner } = fakeRunner({
+      render: vi.fn(async () => {
+        await Promise.resolve();
+        throw new Error("browser exploded");
+      }),
+    });
+
+    await expect(
+      executeCaptureJob(
+        { buildId: build.id },
+        { db, tables: tables(), storage, runner, scratchDir },
+      ),
+    ).rejects.toThrow("browser exploded");
+
+    const updatedBuild = await db.get(builds, build.id);
+    expect(updatedBuild?.status).toBe("failed");
+  });
+
+  it("persists statics before render so preview survives render failure", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const project = await new ProjectModel(db, tables()).create({ name: "Orchestrator" });
+    const build = await new BuildModel(db, tables()).create(project.id, {
+      gitSha: "sha-abc",
+      gitBranch: "main",
+    });
+    const zip = new AdmZip();
+    zip.addFile("iframe.html", Buffer.from("<html>preview</html>"));
+    zip.addFile("index.json", Buffer.from(JSON.stringify({ v: 4, entries: {} })));
+    await storage.write(storybookZipPath(project.id, build.id), zip.toBuffer());
+    const { runner } = fakeRunner({
+      render: vi.fn(async () => {
+        await Promise.resolve();
+        throw new Error("browser exploded");
+      }),
+    });
+
+    await expect(
+      executeCaptureJob(
+        { buildId: build.id },
+        { db, tables: tables(), storage, runner, scratchDir },
+      ),
+    ).rejects.toThrow("browser exploded");
+
+    expect(await storage.exists(`${storybookDir(project.id, build.id)}/iframe.html`)).toBe(true);
+    const failedBuild = await db.get(builds, build.id);
+    expect(failedBuild?.status).toBe("failed");
+  });
+
+  it("throws when the build does not exist", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    await expect(
+      executeCaptureJob(
+        { buildId: "missing" },
+        { db, tables: tables(), storage, runner: fakeRunner().runner, scratchDir },
+      ),
+    ).rejects.toThrow("Build not found");
+  });
+
+  it("blocks path traversal in the streamed extract", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const project = await new ProjectModel(db, tables()).create({ name: "Orchestrator" });
+    const build = await new BuildModel(db, tables()).create(project.id, {
+      gitSha: "sha-abc",
+      gitBranch: "main",
+    });
+    const evil = new AdmZip();
+    evil.addFile("index.json", Buffer.from(JSON.stringify({ v: 4, entries: {} })));
+    evil.addFile("placeholder.txt", Buffer.from("escape"));
+    const evilEntry = evil.getEntries().find((entry) => entry.entryName === "placeholder.txt");
+    if (!evilEntry) {
+      throw new Error("test setup failed: placeholder entry missing");
+    }
+    // AdmZip sanitizes traversal on write; rename post-hoc to craft the attack.
+    evilEntry.entryName = "../../evil.txt";
+    await storage.write(storybookZipPath(project.id, build.id), evil.toBuffer());
+    const { runner } = fakeRunner();
+
+    await expect(
+      executeCaptureJob(
+        { buildId: build.id },
+        { db, tables: tables(), storage, runner, scratchDir },
+      ),
+    ).rejects.toThrow("path traversal");
+
+    const updatedBuild = await db.get(builds, build.id);
+    expect(updatedBuild?.status).toBe("failed");
+  });
+});

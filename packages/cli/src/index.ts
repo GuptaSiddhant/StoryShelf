@@ -1,23 +1,19 @@
 import { Command } from "commander";
 import { pathToFileURL } from "node:url";
-
+import { runBuild, type BuildOptions } from "./commands/build.ts";
+import type { ConnectionOptions } from "./commands/connection.ts";
+import { runCreate, type CreateOptions } from "./commands/create.ts";
+import { runDefaultCommand, handleError } from "./commands/default.ts";
+import { runDoctor, type DoctorOptions } from "./commands/doctor.ts";
 import { runInit, type InitOptions } from "./commands/init.ts";
 import { runPurge, type PurgeOptions } from "./commands/purge.ts";
 import { runRetry, type RetryOptions } from "./commands/retry.ts";
-import { runServe, type ServeOptions } from "./commands/serve.ts";
+import { runServerInit, type ServerInitOptions } from "./commands/server/init.ts";
+import { runServerServe, type ServerServeOptions } from "./commands/server/serve.ts";
 import { runUpload, type UploadOptions } from "./commands/upload.ts";
-import { printError } from "./output.ts";
-
-function handleError(error: unknown): void {
-  printError(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-}
-
-function run<TArgs>(fn: (args: TArgs) => Promise<void>): (args: TArgs) => Promise<void> {
-  return async (args: TArgs) => {
-    await fn(args).catch(handleError);
-  };
-}
+import { runWhoami } from "./commands/whoami.ts";
+import { runWorkerInit, type WorkerInitOptions } from "./commands/worker/init.ts";
+import { runWorkerServe, type WorkerServeOptions } from "./commands/worker/serve.ts";
 
 /**
  * Build the StoryShelf CLI program with all subcommands registered.
@@ -26,56 +22,185 @@ function run<TArgs>(fn: (args: TArgs) => Promise<void>): (args: TArgs) => Promis
  */
 export function createProgram(): Command {
   const program = new Command();
-  program.name("storyshelf").description("Self-hosted visual testing for Storybook.").version("0.1.0");
-
   program
-    .command("serve")
-    .description("Start the StoryShelf server")
-    .option("-p, --port <port>", "port to listen on", "3000")
-    .option("--data-dir <dir>", "data directory", "./data")
-    .option("--secret <secret>", "session secret")
-    .option("--capture-concurrency <n>", "concurrent capture jobs", "2")
-    .option("--purge-ttl-days <n>", "purge builds older than N days", "30")
-    .action(run<ServeOptions>(runServe));
+    .name("storyshelf")
+    .description("Self-hosted visual testing for Storybook.")
+    .version("0.2.0");
+  const commands = [
+    buildInitCommand(),
+    buildCreateCommand(),
+    buildServerCommand(),
+    buildWorkerCommand(),
+    buildPurgeCommand(),
+    buildUploadCommand(),
+    buildBuildCommand(),
+    buildDoctorCommand(),
+    buildWhoamiCommand(),
+    buildRetryCommand(),
+  ];
+  for (const command of commands) {
+    program.addCommand(command);
+  }
+  return program;
+}
 
-  program
-    .command("init")
-    .description("Create a project and CI token on a StoryShelf server")
-    .requiredOption("--url <url>", "server base URL")
-    .requiredOption("--name <name>", "project name")
+function run<TArgs>(fn: (args: TArgs) => Promise<void>): (args: TArgs) => Promise<void> {
+  return async (args: TArgs) => {
+    await fn(args).catch(handleError);
+  };
+}
+
+function buildInitCommand(): Command {
+  return new Command("init")
+    .description("Initialize Storybook project with .storybook/storyshelf.json (client config)")
+    .option("--url <url>", "server base URL")
+    .option("--slug <slug>", "project slug")
+    .option("--build-dir <dir>", "built Storybook directory (default storybook-static)")
+    .option("--build-command <cmd>", 'build command (e.g. "npm run build-storybook")')
+    .option("--build-script-name <name>", "npm script to build Storybook (default build-storybook)")
+    .option("--skip <glob>", "skip upload for matching branch (glob)")
+    .option("-c, --config <path>", "config file path (default .storybook/storyshelf.json)")
+    .option(
+      "--token <token>",
+      "auth token for sync (or STORYSHELF_TOKEN/STORYSHELF_ADMIN_TOKEN env)",
+    )
     .action(run<InitOptions>(runInit));
+}
 
-  program
-    .command("purge")
+function buildCreateCommand(): Command {
+  return new Command("create")
+    .description("Create a project on StoryShelf server (requires admin token)")
+    .option("--url <url>", "server base URL")
+    .option("--name <name>", "project name")
+    .option("--token <token>", "admin token (or STORYSHELF_ADMIN_TOKEN env)")
+    .action(run<CreateOptions>(runCreate));
+}
+
+function buildServerCommand(): Command {
+  const server = new Command("server").description("Server operations");
+  server
+    .command("init")
+    .description("Scaffold a new StoryShelf server project")
+    .option("--dir <dir>", "output directory")
+    .action(run<ServerInitOptions>(runServerInit));
+  const serve = new Command("serve")
+    .description("Run a scaffolded StoryShelf server project")
+    .option("--dir <dir>", "server project directory (default cwd)")
+    .option("--port <port>", "port override (sets PORT)")
+    .action(run<ServerServeOptions>(runServerServe));
+  server.addCommand(serve, { isDefault: true });
+  return server;
+}
+
+function buildWorkerCommand(): Command {
+  const worker = new Command("worker").description("Worker operations");
+  worker
+    .command("init")
+    .description("Scaffold a new StoryShelf worker project")
+    .option("--dir <dir>", "output directory")
+    .action(run<WorkerInitOptions>(runWorkerInit));
+  worker
+    .command("serve")
+    .description("Run a scaffolded StoryShelf worker project")
+    .option("--dir <dir>", "worker project directory (default cwd)")
+    .option("--queue-url <url>", "SQS queue URL override (sets QUEUE_URL)")
+    .option("--concurrency <n>", "concurrency override (sets WORKER_CONCURRENCY)")
+    .action(run<WorkerServeOptions>(runWorkerServe));
+  const runCmd = new Command("run")
+    .description("Run a scaffolded worker (alias for worker serve)")
+    .option("--dir <dir>", "worker project directory (default cwd)")
+    .option("--queue-url <url>", "SQS queue URL override")
+    .option("--concurrency <n>", "concurrency override")
+    .action(run<WorkerServeOptions>(runWorkerServe));
+  worker.addCommand(runCmd);
+  return worker;
+}
+
+function buildPurgeCommand(): Command {
+  return new Command("purge")
     .description("Purge expired builds on a StoryShelf server")
     .requiredOption("--url <url>", "server base URL")
+    .option("--token <token>", "admin token (or STORYSHELF_ADMIN_TOKEN env)")
     .action(run<PurgeOptions>(runPurge));
+}
 
-  program
-    .command("upload")
+function buildUploadCommand(): Command {
+  return new Command("upload")
     .description("Create a build record for a StoryShelf project")
-    .requiredOption("--url <url>", "server base URL")
-    .requiredOption("--slug <slug>", "project slug")
-    .requiredOption("--token <token>", "CI token")
-    .requiredOption("--sha <sha>", "git sha")
-    .requiredOption("--branch <branch>", "git branch")
-    .option("--storybook-dir <dir>", "built Storybook directory", "storybook-static")
+    .option("--url <url>", "server base URL (or .storybook/storyshelf.json)")
+    .option("--slug <slug>", "project slug (or .storybook/storyshelf.json)")
+    .option("--token <token>", "CI token (or STORYSHELF_TOKEN env)")
+    .option("--sha <sha>", "git sha (or GITHUB_SHA env)")
+    .option("--branch <branch>", "git branch (or GITHUB_REF_NAME env)")
+    .option("--build-dir <dir>", "built Storybook directory (default storybook-static)")
+    .option("-c, --config <path>", "config file path (default .storybook/storyshelf.json)")
+    .option("--build-command <cmd>", "build command to run if buildDir missing/empty")
+    .option("--build-script-name <name>", "npm script to build Storybook (default build-storybook)")
+    .option("--force-build", "force rebuild even if buildDir exists")
+    .option("--dry-run", "validate and build without sending any requests")
+    .option("--skip <glob>", "skip upload for matching branch (glob)")
     .option("--message <message>", "commit message")
     .option("--author-email <email>", "author email")
     .option("--author-name <name>", "author name")
+    .option(
+      "--label <key=value>",
+      "build label (repeatable: --label pr=123)",
+      (value: string, previous: string[]) => [...previous, value],
+      [] as string[],
+    )
     .action(run<UploadOptions>(runUpload));
+}
 
-  program
-    .command("retry")
+function buildBuildCommand(): Command {
+  return new Command("build")
+    .description("Build Storybook for upload (no server contact)")
+    .option("--build-dir <dir>", "built Storybook directory (default storybook-static)")
+    .option("-c, --config <path>", "config file path (default .storybook/storyshelf.json)")
+    .option("--build-command <cmd>", "build command to run if buildDir missing/empty")
+    .option("--build-script-name <name>", "npm script to build Storybook (default build-storybook)")
+    .option("--force-build", "force rebuild even if buildDir exists")
+    .action(run<BuildOptions>(runBuild));
+}
+
+function buildDoctorCommand(): Command {
+  return new Command("doctor")
+    .description("Diagnose whether an upload would succeed (no side effects)")
+    .option("--url <url>", "server base URL (or .storybook/storyshelf.json)")
+    .option("--slug <slug>", "project slug (or .storybook/storyshelf.json)")
+    .option("--token <token>", "CI token (or STORYSHELF_TOKEN env)")
+    .option("--build-dir <dir>", "built Storybook directory (default storybook-static)")
+    .option("-c, --config <path>", "config file path (default .storybook/storyshelf.json)")
+    .option("--build-command <cmd>", "build command to run if buildDir missing/empty")
+    .option("--build-script-name <name>", "npm script to build Storybook (default build-storybook)")
+    .action(run<DoctorOptions>(runDoctor));
+}
+
+function buildWhoamiCommand(): Command {
+  return new Command("whoami")
+    .description("Verify the token against the server and print the project")
+    .option("--url <url>", "server base URL (or .storybook/storyshelf.json)")
+    .option("--slug <slug>", "project slug (or .storybook/storyshelf.json)")
+    .option("--token <token>", "CI token (or STORYSHELF_TOKEN env)")
+    .option("-c, --config <path>", "config file path (default .storybook/storyshelf.json)")
+    .action(run<ConnectionOptions>(runWhoami));
+}
+
+function buildRetryCommand(): Command {
+  return new Command("retry")
     .description("Retry a failed StoryShelf build")
     .requiredOption("--url <url>", "server base URL")
     .requiredOption("--slug <slug>", "project slug")
     .requiredOption("--build-id <id>", "build id")
+    .option("--token <token>", "CI token (or STORYSHELF_TOKEN env)")
     .action(run<RetryOptions>(runRetry));
-
-  return program;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  createProgram().parse(process.argv);
+  const program = createProgram();
+  // Default: `storyshelf` with no args -> upload if config exists, else help to init
+  if (process.argv.length <= 2) {
+    await runDefaultCommand(program);
+  } else {
+    program.parse(process.argv);
+  }
 }

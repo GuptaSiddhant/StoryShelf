@@ -1,50 +1,58 @@
-import { and, eq } from "drizzle-orm";
-
-import type { DatabaseAdapter } from "../adapters/database.ts";
+/* oxlint-disable typescript/promise-function-async -- map callbacks return promises from async helpers */
+/** Per-branch baseline screenshots with default-branch fallback. */
+import { and, eq, getTableColumns } from "drizzle-orm";
+import type { SQLWrapper, Table } from "drizzle-orm";
 import type { StorageAdapter } from "../adapters/storage.ts";
-import { baselines, type Baseline } from "../schema.ts";
+import { emitWebhookEvent } from "../adapters/webhook-events.ts";
+import type { DatabaseAdapter } from "../db/database.ts";
+import type { Baseline } from "../schema/baseline.ts";
 import { baselinePath } from "../utils/paths.ts";
 import { ulid } from "../utils/ulid.ts";
+import type { WebhookTables } from "./webhook.ts";
 
-/** Data and storage operations for per-branch baselines. */
+/** Tables required by {@link BaselineModel}. */
+export interface BaselineTables {
+  baselines: Table;
+}
+
+/** Data operations for baseline screenshots. */
 export class BaselineModel {
-  /**
-   * @param db - Database adapter.
-   * @param storage - Storage adapter used to read and write baseline images.
-   */
   constructor(
     private readonly db: DatabaseAdapter,
+    private readonly tables: BaselineTables,
     private readonly storage: StorageAdapter,
+    private readonly secret?: string,
+    private readonly webhookTables?: WebhookTables,
   ) {}
 
-  /**
-   * Fetch the baseline for a specific story, viewport, and branch.
-   *
-   * @param projectId - Project ID.
-   * @param storyId - Story ID.
-   * @param viewport - Viewport name.
-   * @param branch - Git branch.
-   * @returns The matching baseline, or null.
-   */
-  async getFor(projectId: string, storyId: string, viewport: string, branch: string): Promise<Baseline | null> {
-    const rows = await this.db.list(baselines, {
-      where: and(eq(baselines.projectId, projectId), eq(baselines.storyId, storyId), eq(baselines.viewportName, viewport), eq(baselines.branch, branch)),
+  async getFor(
+    projectId: string,
+    storyId: string,
+    viewport: string,
+    branch: string,
+  ): Promise<Baseline | null> {
+    const rows = (await this.db.list(this.tables.baselines, {
+      where: and(
+        eq(getTableColumns(this.tables.baselines)["projectId"] as unknown as SQLWrapper, projectId),
+        eq(getTableColumns(this.tables.baselines)["storyId"] as unknown as SQLWrapper, storyId),
+        eq(
+          getTableColumns(this.tables.baselines)["viewportName"] as unknown as SQLWrapper,
+          viewport,
+        ),
+        eq(getTableColumns(this.tables.baselines)["branch"] as unknown as SQLWrapper, branch),
+      ),
       limit: 1,
-    });
+    })) as unknown as Baseline[];
     return rows[0] ?? null;
   }
 
-  /**
-   * Resolve the effective baseline, falling back to the default branch.
-   *
-   * @param projectId - Project ID.
-   * @param storyId - Story ID.
-   * @param viewport - Viewport name.
-   * @param branch - Current git branch.
-   * @param defaultBranch - Default branch used as fallback.
-   * @returns The resolved baseline, or null.
-   */
-  async resolve(projectId: string, storyId: string, viewport: string, branch: string, defaultBranch: string): Promise<Baseline | null> {
+  async resolve(
+    projectId: string,
+    storyId: string,
+    viewport: string,
+    branch: string,
+    defaultBranch: string,
+  ): Promise<Baseline | null> {
     if (branch !== defaultBranch) {
       const own = await this.getFor(projectId, storyId, viewport, branch);
       if (own) {
@@ -54,22 +62,10 @@ export class BaselineModel {
     return this.getFor(projectId, storyId, viewport, defaultBranch);
   }
 
-  /** Read the screenshot bytes of a baseline. */
   async read(baseline: Baseline): Promise<Buffer> {
     return await this.storage.read(baseline.screenshotPath);
   }
 
-  /**
-   * Upsert a baseline for a story, copying the source screenshot into place.
-   *
-   * @param projectId - Project ID.
-   * @param storyId - Story ID.
-   * @param viewport - Viewport name.
-   * @param branch - Git branch.
-   * @param snapshotId - ID of the approving snapshot.
-   * @param sourcePath - Storage path of the source screenshot.
-   * @returns The created or updated baseline.
-   */
   async upsert(
     projectId: string,
     storyId: string,
@@ -83,49 +79,114 @@ export class BaselineModel {
     await this.storage.write(screenshotPath, source);
 
     const existing = await this.getFor(projectId, storyId, viewport, branch);
+    let baseline: Baseline;
     if (existing) {
-      return this.db.update(baselines, existing.id, {
+      baseline = (await this.db.update(this.tables.baselines, existing.id, {
         snapshotId,
         screenshotPath,
         updatedAt: new Date().toISOString(),
-      });
+      })) as unknown as Baseline;
+      if (this.webhookTables) {
+        await emitWebhookEvent(
+          this.db,
+          this.webhookTables,
+          projectId,
+          "baseline:updated",
+          {
+            baselineId: baseline.id,
+            storyId,
+            viewport,
+            branch,
+            snapshotId,
+          },
+          this.secret,
+        );
+      }
+    } else {
+      const now = new Date().toISOString();
+      baseline = (await this.db.insert(this.tables.baselines, {
+        id: ulid(),
+        projectId,
+        storyId,
+        viewportName: viewport,
+        branch,
+        snapshotId,
+        screenshotPath,
+        createdAt: now,
+        updatedAt: now,
+      })) as unknown as Baseline;
+      if (this.webhookTables) {
+        await emitWebhookEvent(
+          this.db,
+          this.webhookTables,
+          projectId,
+          "baseline:created",
+          {
+            baselineId: baseline.id,
+            storyId,
+            viewport,
+            branch,
+            snapshotId,
+          },
+          this.secret,
+        );
+      }
     }
-    const now = new Date().toISOString();
-    return this.db.insert(baselines, {
-      id: ulid(),
-      projectId,
-      storyId,
-      viewportName: viewport,
-      branch,
-      snapshotId,
-      screenshotPath,
-      createdAt: now,
-      updatedAt: now,
-    });
+    return baseline;
   }
 
-  /** List all baselines for a project. */
   async list(projectId: string): Promise<Baseline[]> {
-    return await this.db.list(baselines, { where: eq(baselines.projectId, projectId) });
+    return (await this.db.list(this.tables.baselines, {
+      where: eq(
+        getTableColumns(this.tables.baselines)["projectId"] as unknown as SQLWrapper,
+        projectId,
+      ),
+    })) as unknown as Baseline[];
   }
 
-  /**
-   * Remove baselines whose stories are no longer valid.
-   *
-   * @param projectId - Project ID.
-   * @param validStoryIds - Set of currently valid story IDs.
-   * @returns The number of baselines removed.
-   */
   async removeOrphans(projectId: string, validStoryIds: Set<string>): Promise<number> {
     const all = await this.list(projectId);
     const toRemove = all.filter((baseline) => !validStoryIds.has(baseline.storyId));
     await Promise.all(
       toRemove.map(async (baseline) => {
-        await this.db.remove(baselines, baseline.id);
+        try {
+          await this.storage.delete(baseline.screenshotPath);
+        } catch {
+          // ignore missing file
+        }
+        await this.db.remove(this.tables.baselines, baseline.id);
       }),
     );
     return toRemove.length;
   }
-}
 
-export type { Baseline };
+  async removeForBranch(projectId: string, branch: string): Promise<number> {
+    const all = await this.list(projectId);
+    const toRemove = all.filter((baseline) => baseline.branch === branch);
+    await Promise.all(
+      toRemove.map(async (baseline) => {
+        try {
+          await this.storage.delete(baseline.screenshotPath);
+        } catch {
+          // ignore missing file
+        }
+        await this.db.remove(this.tables.baselines, baseline.id);
+      }),
+    );
+    return toRemove.length;
+  }
+
+  // oxlint-disable-next-line eslint/require-await -- delegates to async removeForBranch via Promise.all
+  async removeStaleBranches(
+    projectId: string,
+    staleBranches: ReadonlySet<string>,
+  ): Promise<number> {
+    if (staleBranches.size === 0) {
+      return 0;
+    }
+    const results = await Promise.all(
+      [...staleBranches].map((branch) => this.removeForBranch(projectId, branch)),
+    );
+    return results.reduce((sum, count) => sum + count, 0);
+  }
+}

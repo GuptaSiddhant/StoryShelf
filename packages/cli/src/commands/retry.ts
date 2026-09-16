@@ -1,4 +1,4 @@
-import { normalizeBaseUrl, postJson } from "../client.ts";
+import { createClient } from "../client.ts";
 import { printLine } from "../output.ts";
 
 interface BuildResponse {
@@ -13,6 +13,8 @@ export interface RetryOptions {
   slug: string;
   /** Build ID to retry. */
   buildId: string;
+  /** CI token (fallback to env). */
+  token?: string;
 }
 
 /**
@@ -21,10 +23,9 @@ export interface RetryOptions {
  * @param options - Retry command options.
  */
 export async function runRetry(options: RetryOptions): Promise<void> {
-  const base = normalizeBaseUrl(options.url);
-  const build = await postJson<BuildResponse>(
-    `${base}/api/v1/projects/${options.slug}/builds/${options.buildId}/retry`,
-    {},
-  );
-  printLine(`Build ${build.id} queued for retry`);
+  const token = options.token ?? process.env["STORYSHELF_TOKEN"] ?? process.env["SHELF_TOKEN"];
+  const client = createClient(options.url, token);
+  const build = await client.projects.builds.retry(options.slug, options.buildId);
+  const buildData = build as BuildResponse;
+  printLine(`Build ${buildData.id} queued for retry`);
 }

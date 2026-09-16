@@ -1,0 +1,78 @@
+{
+  "name": "@storyshelf/worker",
+  "version": "0.5.1",
+  "description": "Remote capture worker for StoryShelf: polls a CaptureQueue and runs the capture pipeline with any CaptureRunner.",
+  "keywords": [
+    "capture",
+    "queue",
+    "self-hosted",
+    "storybook",
+    "visual-testing",
+    "worker"
+  ],
+  "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
+  "bugs": {
+    "url": "https://github.com/GuptaSiddhant/StoryShelf/issues"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Siddhant Gupta",
+    "url": "https://guptasiddhant.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GuptaSiddhant/StoryShelf.git",
+    "directory": "packages/worker"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "default": "./dist/index.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.mjs",
+      "./package.json": "./package.json"
+    },
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown -w",
+    "fmt": "oxfmt ./src",
+    "lint": "oxlint --type-aware --type-check ./src",
+    "test": "vitest run",
+    "prepublishOnly": "nub run build"
+  },
+  "dependencies": {
+    "@storyshelf/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@storyshelf/db-sqlite": "workspace:*",
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:",
+    "oxlint-tsgolint": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "jsr": {
+    "runtimeCompat": {
+      "node": true,
+      "deno": true,
+      "browser": false,
+      "workerd": false,
+      "bun": true
+    }
+  }
+}

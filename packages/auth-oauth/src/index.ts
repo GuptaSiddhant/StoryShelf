@@ -1,26 +1,75 @@
-import { SESSION_COOKIE, type AuthAdapter, type AuthCallback, type AuthUser } from "@storyshelf/core/adapter/auth";
+import {
+  SESSION_COOKIE,
+  type AuthAdapter,
+  type AuthCallback,
+  type AuthUser,
+} from "@storyshelf/core/adapter/auth";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+declare const __PKG_VERSION__: string | undefined;
 
-interface SessionPayload {
-  userId: string;
-  email: string;
-  name: string;
-  avatarUrl?: string;
-  role: AuthUser["role"];
-  expiresAt: number;
-}
+/**
+ * Create an OAuth/OIDC auth adapter.
+ *
+ * @param options - OIDC provider and session configuration.
+ * @returns An OAuthAuth instance.
+ */
+export function createOAuthAuth(options: OAuthAuthOptions): OAuthAuth {
+  const { secret } = options;
+  const scopes = options.scopes ?? ["openid", "email", "profile"];
 
-interface TokenResponse {
-  access_token?: string;
-}
+  // Async is required by the AuthAdapter interface, though the logic is synchronous.
+  // eslint-disable-next-line require-await
+  const check = async (request: Request): Promise<AuthUser | null> => {
+    const token = readCookie(request, SESSION_COOKIE);
+    if (!token) {
+      return null;
+    }
+    const payload = verifyPayload(secret, token);
+    if (!payload || payload.expiresAt <= Date.now()) {
+      return null;
+    }
+    return toUser(payload);
+  };
 
-interface UserInfoResponse {
-  sub?: string;
-  email?: string;
-  name?: string;
-  picture?: string;
+  // eslint-disable-next-line require-await
+  const createSession = async (user: AuthUser): Promise<string> => {
+    const payload: SessionPayload = {
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+      avatarUrl: user.avatarUrl,
+      role: user.role,
+      expiresAt: Date.now() + SESSION_TTL_MS,
+    };
+    return signPayload(secret, payload);
+  };
+
+  const handleCallback = async (callback: AuthCallback): Promise<AuthUser | null> => {
+    const token = await exchangeCode(options, callback.code);
+    if (!token) {
+      return null;
+    }
+    return fetchUserInfo(options, token);
+  };
+
+  return {
+    metadata: {
+      name: "OAuth",
+      version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
+      description: "OAuth/OIDC auth adapter",
+      kind: "oauth",
+      category: "auth",
+    },
+    lifecycle: buildLifecycle(options),
+    check,
+    createSession,
+    async destroySession() {
+      await Promise.resolve();
+    },
+    handleCallback,
+    loginUrl: (state: string) => buildLoginUrl(options, scopes, state),
+  };
 }
 
 /** Options for configuring an OAuth/OIDC auth adapter. */
@@ -43,6 +92,28 @@ export interface OAuthAuthOptions {
 export interface OAuthAuth extends AuthAdapter {
   /** Build the provider authorization URL for a login flow with the given anti-CSRF `state`. */
   loginUrl(state: string): string;
+}
+
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+interface SessionPayload {
+  userId: string;
+  email: string;
+  name: string;
+  avatarUrl?: string;
+  role: AuthUser["role"];
+  expiresAt: number;
+}
+
+interface TokenResponse {
+  access_token?: string;
+}
+
+interface UserInfoResponse {
+  sub?: string;
+  email?: string;
+  name?: string;
+  picture?: string;
 }
 
 function hmacHex(secret: string, value: string): string {
@@ -166,58 +237,22 @@ async function fetchUserInfo(
   };
 }
 
-/**
- * Create an OAuth/OIDC auth adapter.
- *
- * @param options - OIDC provider and session configuration.
- * @returns An OAuthAuth instance.
- */
-export function createOAuthAuth(options: OAuthAuthOptions): OAuthAuth {
-  const { secret } = options;
-  const scopes = options.scopes ?? ["openid", "email", "profile"];
-
-  // Async is required by the AuthAdapter interface, though the logic is synchronous.
-  // eslint-disable-next-line require-await
-  const check = async (request: Request): Promise<AuthUser | null> => {
-    const token = readCookie(request, SESSION_COOKIE);
-    if (!token) {
-      return null;
-    }
-    const payload = verifyPayload(secret, token);
-    if (!payload || payload.expiresAt <= Date.now()) {
-      return null;
-    }
-    return toUser(payload);
-  };
-
-  // eslint-disable-next-line require-await
-  const createSession = async (user: AuthUser): Promise<string> => {
-    const payload: SessionPayload = {
-      userId: user.id,
-      email: user.email,
-      name: user.name,
-      avatarUrl: user.avatarUrl,
-      role: user.role,
-      expiresAt: Date.now() + SESSION_TTL_MS,
-    };
-    return signPayload(secret, payload);
-  };
-
-  const handleCallback = async (callback: AuthCallback): Promise<AuthUser | null> => {
-    const token = await exchangeCode(options, callback.code);
-    if (!token) {
-      return null;
-    }
-    return fetchUserInfo(options, token);
-  };
-
+/** Lifecycle: fail fast when OIDC wiring is missing. */
+function buildLifecycle(options: OAuthAuthOptions): OAuthAuth["lifecycle"] {
   return {
-    check,
-    createSession,
-    async destroySession() {
+    setup: async () => {
+      if (options.issuer === "" || options.clientId === "" || options.clientSecret === "") {
+        throw new Error("OAuth auth requires a non-empty issuer, clientId, and clientSecret");
+      }
       await Promise.resolve();
     },
-    handleCallback,
-    loginUrl: (state: string) => buildLoginUrl(options, scopes, state),
+    teardown: async () => {
+      // Stateless — nothing to destroy.
+      await Promise.resolve();
+    },
+    health: async () => {
+      await Promise.resolve();
+      return { ok: true };
+    },
   };
 }

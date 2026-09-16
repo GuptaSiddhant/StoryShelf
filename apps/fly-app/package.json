@@ -1,0 +1,24 @@
+{
+  "name": "fly-app",
+  "private": true,
+  "description": "StoryShelf Fly demo server (local adapters, workspace versions).",
+  "type": "module",
+  "scripts": {
+    "build": "rolldown -c rolldown.config.ts",
+    "start": "node dist/server.mjs",
+    "dev": "node --conditions=source --experimental-transform-types server.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "catalog:",
+    "@storyshelf/auth-password": "workspace:*",
+    "@storyshelf/core": "workspace:*",
+    "@storyshelf/db-sqlite": "workspace:*",
+    "@storyshelf/app": "workspace:*",
+    "@storyshelf/runner-playwright": "workspace:*",
+    "@storyshelf/storage-local": "workspace:*"
+  },
+  "devDependencies": {
+    "rolldown": "*",
+    "typescript": "catalog:"
+  }
+}

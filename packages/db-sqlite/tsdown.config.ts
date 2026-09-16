@@ -1,12 +1,8 @@
-import { defineConfig } from "tsdown";
+import { libConfig } from "../../config/tsdown.ts";
 
-export default defineConfig({
-  dts: true,
-  entry: { index: "./src/index.ts" },
-  platform: "node",
-  target: "node22",
-  treeshake: true,
-  cjsDefault: false,
-  deps: { neverBundle: true },
-  clean: true,
+export default libConfig({
+  index: "./src/index.ts",
+  "drizzle-factory": "./src/drizzle-factory.ts",
+  ddl: "./src/ddl.ts",
+  schema: "./src/schema/index.ts",
 });

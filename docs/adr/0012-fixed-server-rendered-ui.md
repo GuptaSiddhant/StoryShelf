@@ -28,7 +28,7 @@ A **fixed, server-rendered UI** — `hono/jsx` + HTMX + `hono/css`. No client fr
 
 ### Brand config
 
-`ui: { name, logo, favicon, theme }` passed to `createShelfRouter` (see `ShelfOptions` in ADR 0001). Env vars (`SS_BRAND_NAME`, `SS_LOGO_URL`) supply defaults so self-hosters can rebrand with a `docker run`, no code.
+`ui: { name, logo, favicon, theme }` passed to `createShelfApp` (see `ShelfOptions` in ADR 0001). Env vars (`SS_BRAND_NAME`, `SS_LOGO_URL`) supply defaults so self-hosters can rebrand with a `docker run`, no code.
 
 ### Diff view: simple three-up grid (v1)
 

@@ -3,7 +3,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist", "storybook-static", "build"],
+      "outputs": ["dist/**"],
       "env": [
         "PUBLISHED_BASE_DOMAIN",
         "STORAGE_S3_BUCKET",
@@ -35,6 +35,12 @@
     },
     "verify": {
       "dependsOn": ["build", "lint", "test"]
+    },
+    "audit": {
+      "cache": false
+    },
+    "website#build": {
+      "cache": false
     }
   }
 }

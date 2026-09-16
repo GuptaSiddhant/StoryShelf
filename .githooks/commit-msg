@@ -1,0 +1,19 @@
+#!/usr/bin/env sh
+set -e
+
+MSG_FILE="$1"
+subject="$(sed -n '1p' "$MSG_FILE")"
+
+# Allow auto-generated and work-flow messages that are not Conventional Commits.
+case "$subject" in
+  'Merge '* | 'fixup!'* | 'squash!'* | 'Revert "'* | 'v'* ) exit 0 ;;
+esac
+
+if ! printf '%s\n' "$subject" |
+  grep -Eq '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-zA-Z0-9._/-]+\))?(!)?: .+$'; then
+  echo "error: commit subject must follow Conventional Commits: <type>(<scope>): <subject>" >&2
+  echo "       types: feat fix docs style refactor perf test build ci chore revert" >&2
+  exit 1
+fi
+
+exit 0

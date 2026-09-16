@@ -1,0 +1,166 @@
+---
+title: CLI reference
+description: The storyshelf command-line interface — init, create, server, build, doctor, whoami, upload, retry, and purge.
+---
+
+The StoryShelf CLI (`storyshelf`) exposes a `storyshelf` binary for CI pipelines. Install it globally, or prefix with `npx storyshelf`:
+
+```bash
+npm install -g storyshelf
+```
+
+:::note
+This package is **client-only** — it talks to a running server over `/api/v1` and carries no Playwright or server dependencies. To scaffold a server, use `storyshelf server init` (see [Getting started](/guides/getting-started/)).
+:::
+
+## `storyshelf init`
+
+Initialize the current Storybook with `.storybook/storyshelf.json` (client config). Fails if `.storybook/main.*` is not found.
+
+```bash
+storyshelf init --url http://localhost:3000 --slug my-design-system --build-dir storybook-static
+# or with prompts:
+storyshelf init
+# ? Server URL? http://localhost:3000 (detected React-Vite • 1 addons)
+# ? Project slug? my-design-system
+# also: --build-dir, --build-command, --build-script-name, --skip, -c/--config
+```
+
+Writes `.storybook/storyshelf.json: { "slug": "...", "url": "...", "buildDir": "...", "skip": "..." }` (no token, see [Configuration](/guides/config/)). Token stays in `STORYSHELF_TOKEN` env / `--token`. If flags are missing, prompts are shown with detected framework hints.
+
+## `storyshelf create`
+
+Create a project on the server (requires site-admin token) and write `.storybook/storyshelf.json`. Fails if `.storybook/main.*` is not found.
+
+```bash
+storyshelf create --url http://localhost:3000 --name "My Design System" --token $STORYSHELF_ADMIN_TOKEN
+# also reads STORYSHELF_ADMIN_TOKEN / ADMIN_TOKEN env if --token omitted
+```
+
+Prints `Project slug: ...` and `CI token: ...` and writes `.storybook/storyshelf.json`. Store `CI token` in secrets (`STORYSHELF_TOKEN`).
+
+## `storyshelf server init`
+
+Scaffold a new StoryShelf server project.
+
+```bash
+storyshelf server init
+# ? Project name? my-storyshelf
+# ? Directory? ./my-storyshelf
+# ? Which database? SQLite
+# ? Which storage? Local filesystem
+# ? Which auth? None
+# ? Which git provider? GitHub
+```
+
+Generates `server.ts` + `package.json` (and `Dockerfile`/`compose.yaml` if selected) in the target directory.
+
+## `storyshelf server serve`
+
+Run a scaffolded server project (also the default for bare `storyshelf server`). Looks for `server.ts`, `server.js`/`server.mjs`, then `index.ts`/`index.js`/`index.mjs` in the directory and spawns it with output inherited; without any entry it directs you to `storyshelf server init`.
+
+```bash
+storyshelf server serve --dir ./my-storyshelf --port 3000
+```
+
+## `storyshelf build`
+
+Build the Storybook output directory without uploading — same `buildDir`/`buildCommand`/`buildScriptName` resolution as `upload`, but no server contact (no `url`/`slug`/`token` needed). Useful for verifying the build locally or splitting CI into build-once/upload-later jobs.
+
+```bash
+storyshelf build
+storyshelf build --force-build
+storyshelf build --build-dir dist-storybook --build-command "nx run app:build-storybook"
+```
+
+Prints `Build ready: <dir>` and fails fast when the output lacks `index.json`. `upload` keeps its implicit build-if-missing step, so existing flows are unchanged. The build script is invoked with the detected package runner (see [Configuration](/guides/config/)).
+
+## `storyshelf doctor`
+
+Diagnose whether an upload would succeed — without uploading anything and without building. Prints one line per check (`✓` pass, `!` warning, `✗` fail) and exits 1 when any check fails:
+
+```bash
+storyshelf doctor
+# ✓ Storybook setup found (/repo/.storybook/main.ts)
+# ✓ Config loaded (slug "my-design-system")
+# ✓ Connection: http://localhost:3000 / my-design-system (token present)
+# ✓ Server reachable, project "My Design System" readable
+# ! Build output missing — upload would run: npm run build-storybook -- --output-dir storybook-static
+```
+
+Checks, in order: `.storybook/main.*` exists, config file parses, url/slug/token resolve (flags > file > env), server reachable with token accepted (401/403/404 get specific messages), build output present with `index.json`.
+
+## `storyshelf whoami`
+
+Verify the token against the server and print the project it can read. Same connection resolution as `upload`; fail-fast credential check for pipeline setup:
+
+```bash
+storyshelf whoami
+# Server: http://localhost:3000
+# Project: My Design System (my-design-system)
+```
+
+## `storyshelf upload`
+
+Build (optionally), zip, and upload a Storybook build for capture. When `.storybook/storyshelf.json` exists (`slug`, `url`, `buildDir`, `skip` — see [Configuration](/guides/config/)), `--url`/`--slug` can be omitted and are resolved as `flags > env > file` (`STORYSHELF_TOKEN`/`GITHUB_SHA`/`GITHUB_REF_NAME` are fallback envs). If `buildDir` is missing or empty or `--force-build` is given, `upload` runs `buildCommand` or `npm run <buildScriptName>` before zipping.
+
+```bash
+# explicit flags
+storyshelf upload \
+  --url http://localhost:3000 \
+  --slug my-design-system \
+  --token shelf_xxx \
+  --sha "$GITHUB_SHA" \
+  --branch "$GITHUB_REF_NAME"
+
+# with .storybook/storyshelf.json present (no args defaults to upload)
+storyshelf
+# or
+storyshelf upload --token shelf_xxx --sha $GITHUB_SHA --branch main
+# with custom config path
+storyshelf upload --config ./config/storyshelf.json --force-build
+```
+
+| Flag | Description |
+|------|-------------|
+| `--url` | Server URL (or `.storybook/storyshelf.json` / `STORYSHELF_URL`) |
+| `--slug` | Project slug (or `.storybook/storyshelf.json` / `STORYSHELF_SLUG`) |
+| `--token` | Project API token (sent as `Authorization: Bearer`, or `STORYSHELF_TOKEN`) |
+| `--sha` | Git commit SHA (or `GITHUB_SHA`) |
+| `--branch` | Git branch (or `GITHUB_REF_NAME`) |
+| `--build-dir` / `-d` | Built Storybook directory (default `storybook-static`, or file `buildDir`) |
+| `--config` / `-c` | Config file path (default `.storybook/storyshelf.json`) |
+| `--build-command` | Custom build command (e.g. `nx run app:build-storybook`, mutually exclusive with `--build-script-name`) |
+| `--build-script-name` / `-b` | npm script to build Storybook (default `build-storybook`) |
+| `--force-build` | Force rebuild even if `buildDir` exists |
+| `--skip` | Glob to skip upload (e.g. `"main"`, `"release/*"` — file `skip` also supported) |
+| `--message` | Build message (commit message) |
+| `--author-name`, `--author-email` | Author attribution |
+| `--label key=value` | Attach a build label (repeatable) |
+| `--dry-run` | Validate, build if needed, and report what would upload — send no requests |
+
+:::note
+The CLI does **not** run Playwright. It streams the zipped static build to the server (JSON metadata, then a `PUT` of the zip); the server renders and diffs asynchronously. The upload request returns `202` immediately.
+:::
+
+When run with no subcommand, `storyshelf` defaults to `upload` if `.storybook/storyshelf.json` exists, otherwise shows help to run `storyshelf init`.
+
+The CLI also detects git tags on the uploaded SHA and attaches a `persistent` label per tag, so release builds survive retention. See [Labels](/concepts/labels/).
+
+## `storyshelf retry`
+
+Re-run capture for an existing build without a new commit — handy for flaky captures.
+
+```bash
+storyshelf retry --url http://localhost:3000 --slug my-design-system --build-id <id> [--token $STORYSHELF_TOKEN]
+```
+
+## `storyshelf purge`
+
+Trigger a manual retention purge (normally it runs on a schedule). Requires site-admin token when auth is enabled.
+
+```bash
+storyshelf purge --url http://localhost:3000 --token $STORYSHELF_ADMIN_TOKEN
+```
+
+Purges terminal builds older than `purge_ttl_days` (keeping the most recent per branch), removes their storage files and rows in one transaction, cleans up orphaned baselines, and GCs stale branch baselines older than `branchTtlDays` (30d daily sweep; default-branch baselines and `persistent` builds are never purged).

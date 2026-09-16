@@ -1,28 +1,49 @@
-import { and, eq } from "drizzle-orm";
-
-import type { DatabaseAdapter } from "../adapters/database.ts";
-import { projectMembers, type ProjectMember } from "../schema.ts";
+/** Project membership and role resolution. */
+import { and, eq, getTableColumns } from "drizzle-orm";
+import type { SQLWrapper, Table } from "drizzle-orm";
+import type { DatabaseAdapter } from "../db/database.ts";
+import type { ProjectMember } from "../schema/member.ts";
 import type { ProjectRole, SiteRole } from "../types.ts";
 import { ulid } from "../utils/ulid.ts";
+
+/** Tables required by {@link MemberModel}. */
+export interface MemberTables {
+  projectMembers: Table;
+}
 
 /** Data operations for project membership and roles. */
 export class MemberModel {
   /**
    * @param db - Database adapter.
+   * @param tables - Table handles.
    */
-  constructor(private readonly db: DatabaseAdapter) {}
+  constructor(
+    private readonly db: DatabaseAdapter,
+    private readonly tables: MemberTables,
+  ) {}
 
   /** List all members of a project. */
   async list(projectId: string): Promise<ProjectMember[]> {
-    return await this.db.list(projectMembers, { where: eq(projectMembers.projectId, projectId) });
+    return (await this.db.list(this.tables.projectMembers, {
+      where: eq(
+        getTableColumns(this.tables.projectMembers)["projectId"] as unknown as SQLWrapper,
+        projectId,
+      ),
+    })) as unknown as ProjectMember[];
   }
 
   /** Fetch a project member by project and user id, or null if not found. */
   async get(projectId: string, userId: string): Promise<ProjectMember | null> {
-    const rows = await this.db.list(projectMembers, {
-      where: and(eq(projectMembers.projectId, projectId), eq(projectMembers.userId, userId)),
+    const rows = (await this.db.list(this.tables.projectMembers, {
+      where: and(
+        eq(
+          getTableColumns(this.tables.projectMembers)["projectId"] as unknown as SQLWrapper,
+          projectId,
+        ),
+        eq(getTableColumns(this.tables.projectMembers)["userId"] as unknown as SQLWrapper, userId),
+      ),
       limit: 1,
-    });
+    })) as unknown as ProjectMember[];
     return rows[0] ?? null;
   }
 
@@ -30,27 +51,33 @@ export class MemberModel {
   async set(projectId: string, userId: string, role: ProjectRole): Promise<ProjectMember> {
     const existing = await this.get(projectId, userId);
     if (existing) {
-      return this.db.update(projectMembers, existing.id, { role });
+      return (await this.db.update(this.tables.projectMembers, existing.id, {
+        role,
+      })) as unknown as ProjectMember;
     }
-    return this.db.insert(projectMembers, {
+    return (await this.db.insert(this.tables.projectMembers, {
       id: ulid(),
       projectId,
       userId,
       role,
       createdAt: new Date().toISOString(),
-    });
+    })) as unknown as ProjectMember;
   }
 
   /** Remove a user from a project if they are a member. */
   async remove(projectId: string, userId: string): Promise<void> {
     const existing = await this.get(projectId, userId);
     if (existing) {
-      await this.db.remove(projectMembers, existing.id);
+      await this.db.remove(this.tables.projectMembers, existing.id);
     }
   }
 
   /** Resolve a user's effective project role, honoring site-wide admins. */
-  async effectiveRole(siteRole: SiteRole, projectId: string, userId: string): Promise<ProjectRole | null> {
+  async effectiveRole(
+    siteRole: SiteRole,
+    projectId: string,
+    userId: string,
+  ): Promise<ProjectRole | null> {
     if (siteRole === "admin") {
       return "admin";
     }
@@ -58,5 +85,3 @@ export class MemberModel {
     return member?.role ?? null;
   }
 }
-
-export type { ProjectMember };

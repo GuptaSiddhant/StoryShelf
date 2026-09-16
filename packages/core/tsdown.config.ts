@@ -1,39 +1,28 @@
-import { defineConfig, type UserConfig } from "tsdown";
+import { libConfig } from "../../config/tsdown.ts";
 
-const isWatchMode = process.argv.includes("--watch") || process.argv.includes("-w");
-
-const entry: UserConfig["entry"] = {
+export default libConfig({
   index: "./src/index.tsx",
+  "adapter/metadata": "./src/adapters/metadata.ts",
+  "adapter/setup": "./src/adapters/setup.ts",
   "adapter/database": "./src/adapters/database.ts",
   "adapter/storage": "./src/adapters/storage.ts",
   "adapter/capture-runner": "./src/adapters/capture-runner.ts",
   "adapter/auth": "./src/adapters/auth.ts",
-  "adapter/status": "./src/adapters/status.ts",
-  "adapter/logger": "./src/adapters/logger.ts",
-  schema: "./src/schema.ts",
-  ddl: "./src/ddl.ts",
+  "adapter/git-host": "./src/adapters/git-host/index.ts",
+  "adapter/git-host/helpers": "./src/adapters/git-host/helpers.ts",
+  "adapter/git-host/comments": "./src/adapters/git-host/comments.ts",
+  "adapter/capture-queue": "./src/adapters/capture-queue.ts",
+  "adapter/webhook-events": "./src/adapters/webhook-events.ts",
+  logger: "./src/logger.ts",
+  capture: "./src/capture/index.ts",
+  config: "./src/config.ts",
+  diff: "./src/diff/index.ts",
+  models: "./src/models/index.ts",
+  retention: "./src/retention/purge.ts",
+  paths: "./src/utils/paths.ts",
+  urls: "./src/urls.ts",
+  schema: "./src/schema/index.ts",
   types: "./src/types.ts",
-  "models/project": "./src/models/project.ts",
-  "models/build": "./src/models/build.ts",
-  "models/snapshot": "./src/models/snapshot.ts",
-  "models/baseline": "./src/models/baseline.ts",
-  "models/member": "./src/models/member.ts",
-  "models/comment": "./src/models/comment.ts",
-  "models/label": "./src/models/label.ts",
-  "models/token": "./src/models/token.ts",
-  "models/webhook": "./src/models/webhook.ts",
-};
-
-export default defineConfig({
-  dts: true,
-  entry,
-  platform: "node",
-  sourcemap: true,
-  target: "node22",
-  treeshake: true,
-  unbundle: true,
-  cjsDefault: false,
-  deps: { neverBundle: true },
-  shims: true,
-  clean: !isWatchMode,
+  utils: "./src/utils/index.ts",
+  "test-helpers": "./src/test-helpers/index.ts",
 });

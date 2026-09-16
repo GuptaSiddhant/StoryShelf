@@ -4,20 +4,20 @@ Step-by-step build order. Each step is independently reviewable. Decisions made 
 
 ## Phase 0 — Foundation (this step)
 
-1. Root workspace: `package.json` (nub workspaces + catalog), `turbo.json`, `tsconfig.base.json`, `.oxlintrc.json`, `.oxfmtrc.json`, `.npmrc`, `.gitignore`, `.nvmrc`.
+1. Root workspace: `package.json` (nub workspaces + catalog), `turbo.json`, `tsconfig.base.json`, `.oxlintrc.json`, `.oxfmtrc.json`, `.gitignore`.
 2. `@storyshelf/core` — the heart. Order within core:
    - `adapters/*` — interface types only (database, storage, capture-runner, auth, status, logger).
    - `models/*` — Drizzle schema + business logic (project, build, snapshot, baseline, member, comment, label, token, webhook).
    - `diff/*` — pixelmatch engine + overlay.
    - `capture/*` — StorySourceAdapter, storybook adapter, serve, pipeline, queue.
    - `retention/*` — purge.
-   - `routers/*` + `routers/pages/*` — API + server-rendered UI.
+   - `routers/*` + `pages/*` — API + server-rendered UI.
    - `urls.ts`, `store.ts`, `config.ts`, `index.ts`.
 3. Verify core typechecks + unit tests pass.
 
 ## Phase 1 — Database adapters (parallel)
 
-- `@storyshelf/db-sqlite` — better-sqlite3 + Drizzle, WAL, migration runner.
+- `@storyshelf/db-sqlite` — node:sqlite + Drizzle, WAL, migration runner.
 - `@storyshelf/db-turso` — @libsql/client + Drizzle, same schema.
 
 ## Phase 2 — Storage adapters (parallel)
@@ -32,13 +32,17 @@ Step-by-step build order. Each step is independently reviewable. Decisions made 
 
 ## Phase 4 — CLI
 
-- `@storyshelf/cli` — `upload`, `retry`, `init`, `purge`, `serve`.
+- `@storyshelf/cli` — client: `upload`, `retry`, `init`, `create`, `purge` + `server init` (no Playwright). `storyshelf server init` generates a server project with the user's chosen adapters (replaces the former `@storyshelf/node-server` package, per DECISIONS 24).
+- `@storyshelf/runner-playwright` — Playwright `CaptureRunner` (server-side capture).
 
-## Phase 5 — Examples & website
+## Phase 5 — Examples, fixtures & website
 
-- `examples/storybook` — deterministic component library + committed `storybook-static/`.
-- `examples/fly-app` — fly.io deploy.
-- `website/` — Astro Starlight docs + marketing.
+- `fixtures/storybook-8` — SB 8.6 Vite React (default, 7 stories; own pnpm install, built on demand)
+- `fixtures/storybook-9` — SB 9 Vite React
+- `fixtures/storybook-10` — SB 10 ESM + CSF-Next
+- `fixtures/storybook-11` — SB 11 alpha
+- `apps/fly-app` — fly.io deploy (pruned via turbo + nub trick)
+- `apps/website/` — Astro Starlight docs + marketing.
 
 ## Phase 6 — Verification & commit
 

@@ -1,5 +1,7 @@
 # StoryShelf Architecture
 
+> **Visual companion:** [`architecture-diagrams.md`](./architecture-diagrams.md) — 18 Mermaid diagrams (system context, containers, capture pipeline, baseline resolution, ER model, storage, deployment, etc.) derived from this spec.
+
 ## What StoryShelf Is
 
 A self-hosted visual testing platform for Storybook. Run visual regression tests in CI, review pixel-level diffs in a web UI, and approve changes before they ship. No per-snapshot billing. No vendor lock-in.
@@ -10,7 +12,7 @@ A self-hosted visual testing platform for Storybook. Run visual regression tests
 
 ```
 Developer pushes code
-  → CI runs: npx @storyshelf/cli upload --token=xxx
+  → CI runs: npx storyshelf upload --token=xxx
   → CLI builds Storybook (if needed), zips the static build
   → CLI uploads the zip + metadata (sha, branch, message, author) to StoryShelf server
   → Server creates a build, stores the zip, and enqueues capture (async, returns 202)
@@ -106,7 +108,7 @@ comments (
   project_id          text NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   build_id            text NOT NULL REFERENCES builds(id) ON DELETE CASCADE,
   snapshot_id         text REFERENCES snapshots(id) ON DELETE CASCADE,  -- NULL = build-level comment
-  user_id             text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id             text REFERENCES users(id) ON DELETE CASCADE,        -- NULL = anonymous (no auth)
   body                text NOT NULL,
   parent_id           text REFERENCES comments(id) ON DELETE CASCADE,   -- NULL = top-level, else reply
   resolved            boolean NOT NULL DEFAULT false,                   -- feedback addressed
@@ -152,7 +154,7 @@ webhooks (
   id                  text PRIMARY KEY,
   project_id          text NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   url                 text NOT NULL,
-  secret              text NOT NULL,           -- HMAC secret, encrypted at rest
+  secret_encrypted    text NOT NULL,           -- HMAC secret, AES-256-GCM with server SECRET
   events              text,                    -- JSON array or NULL for all
   created_at          text NOT NULL,
   updated_at          text NOT NULL
@@ -215,12 +217,12 @@ data/                                    # --data-dir flag (default: ./data)
           static/
     baselines/
       {branch}/
-        {storyId}/{viewport}.png         # canonical approved screenshot (NEVER TTL'd)
+        {storyId}/{viewport}.png         # canonical approved screenshot (default branch NEVER TTL'd; feature branches TTL'd via branchTtlDays 30d daily GC)
 ```
 
 **Design decisions:**
 - **Local filesystem is the default.** One `docker run` to self-host. No cloud accounts needed.
-- **S3-compatible storage is an alternative.** MinIO for self-hosted S3. Cloudflare R2, AWS S3, DigitalOcean Spaces for cloud. Same adapter interface, two implementations.
+- **Cloud adapters are drop-in alternatives.** S3-compatible (R2, MinIO, AWS S3, Spaces), Google Cloud Storage (GCS + emulator), and Azure Blob Storage (Azurite) — same `StorageAdapter` interface, four implementations.
 - **No "container" abstraction.** Just paths. Storage adapter is `read/write/delete/exists/list` over a flat path namespace.
 - **Baselines stored separately from builds, under their own branch.** Baselines are the "truth" — builds are transient, baselines persist.
 
@@ -230,29 +232,55 @@ The CLI does **not** run Playwright. It builds Storybook (or reuses an existing 
 
 ```
 CI machine / local dev                  StoryShelf server
----------------------                  -----------------
+---------------------
 1. storyshelf upload
 2. build Storybook (optional)
 3. zip static build           ------->  4. store zip, create build (status=pending)
                                         5. enqueue capture (async, 202 returned)
-                                        6. worker: unzip -> serve statics
-                                        7. worker: Playwright renders each story x viewport
-                                        8. worker: diff against baselines
-                                        9. worker: update build/snapshot statuses
+                                        6. orchestrator: load build, extract zip, discover stories
+                                        7. capture renderer: Playwright renders each story x viewport
+                                        8. orchestrator: diff against baselines, persist snapshots
+                                        9. orchestrator: update build/snapshot statuses
 ```
 
-### Capture Runner
+### Adapter Identity & Lifecycle
+
+Every adapter extends the shared `Adapter<Extra>` base (`core/adapter/metadata`): mandatory `metadata: { name, version, description?, kind, category }` plus an optional `lifecycle` sub-object. `lifecycle` is all or nothing — an adapter either omits it or implements all three hooks (`setup`, `teardown`, `health`). `category` (`database | storage | auth | capture-runner | capture-queue | git-host`) names the concern so metadata reads standalone; `kind` stays an open string (`sqlite`, `local`, `s3`, …) for third-party implementations. All hooks must be idempotent.
+
+`createShelfApp` kicks every `lifecycle.setup` eagerly via `Promise.allSettled` and exposes `app.lifecycle { ready, setup(), teardown() }`: `await app.lifecycle.setup()` before serving for fail-fast startup (database migrations run here — there is no top-level `migrate()`), otherwise the first request gates on settlement (503 with per-adapter failures); `await app.lifecycle.teardown()` on `SIGTERM`/`SIGINT`.
+
+### Health
+
+Two-tier, both ungated by init: `GET /api/v1/health` is open liveness (`{ status: "ok", uptimeSecs, version }`, no adapter I/O — the Fly/Docker probe path); `POST /api/v1/health` is site-admin deep readiness (`{ status, adapters: [{ category, kind, name, state, latencyMs?, detail? }] }`, 200 or 503, error text sanitized).
+
+### Capture Renderer (pure adapter)
+
+Capture adapters are **pure renderers** (ADR 0015). They render screenshots from an already-extracted Storybook directory and return PNG buffers; they never touch the database, storage, or build status. A `CaptureRunner` implementation renders and returns:
 
 ```typescript
+interface RenderedSnapshot {
+  story: StoryEntry;        // echoed back from the render request
+  viewportName: string;
+  screenshot: Buffer;       // PNG bytes
+}
+
 interface CaptureRunner {
-  /** Run the capture pipeline for a build (discover -> serve -> render -> diff -> store). */
-  run(buildId: string): Promise<void>;
-  /** Cancel a running capture. */
+  render(input: {
+    buildId: string;
+    storybookDir: string;   // already-extracted Storybook root
+    stories: StoryEntry[];
+    viewports: Viewport[];
+    logger?: Logger;
+  }): Promise<RenderResult>;  // { captures, failures }
   cancel(buildId: string): Promise<void>;
 }
 ```
 
-One local implementation in v1 (the server already has Playwright via the base image). The interface is kept thin so v2 can add a **remote** runner (offload capture to a worker fleet via a queue) without changing the pipeline.
+### Capture Orchestrator
+
+Because renderers are pure, the server-side **orchestrator** owns everything else (`capture/orchestrator.ts`): it loads the build/project, marks the build `capturing`, extracts the uploaded archive to a scratch dir (with path-traversal protection), discovers stories, delegates rendering to the pure `CaptureRunner`, then persists snapshots/diffs/baselines (see `capture/pipeline.ts`) and finalizes the build. The orchestrator is wired into the queue by `createShelfApp` and requires a `ShelfConfig.scratchDir`.
+
+One local renderer in v1 — `@storyshelf/runner-playwright` (the server already has Playwright via the base image). The interface is kept thin so v2 can add a **remote** runner (offload capture to a worker fleet via a queue) without changing the pipeline or orchestration — a future `@storyshelf/runner-remote` implements the same pure `CaptureRunner` interface and plugs in at the `serve` assembly point the same way.
 
 ### Capture Queue
 
@@ -261,6 +289,8 @@ Capture is CPU/IO-heavy and long-running (minutes to tens of minutes). It must n
 - `POST /builds` stores the zip and returns **202 Accepted** immediately.
 - An in-process queue with a **configurable concurrency** (`--capture-concurrency`, default `2`) runs captures.
 - A build stuck in `capturing` across a server restart is detected and re-queued (or marked `failed`).
+
+> **Note on Architecture:** The `CaptureQueue` interface is fully asynchronous — `enqueue`, `status`, `active` and `recent` all return `Promise<T>` — so the same contract backs both the in-process `InMemoryCaptureQueue` (Node long-lived server) and remote backends (SQS, Cloudflare Queues, Azure Storage Queues) where execution is left to a separately-assembled worker that polls the queue and runs `executeCaptureJob`.
 
 ### Story Source Adapter
 
@@ -410,25 +440,25 @@ Screenshots accumulate fast. Everything below the **baseline** is transient; the
 
 ### What is never purged
 
-- `baselines/**` files and `baselines` rows (all branches)
-- Builds bearing a `persistent` label (release/tag builds) and their storage files
+- Default-branch `baselines/**` files/rows (feature branches TTL'd — see below) and builds bearing a `persistent` label (release/tag builds) and their storage files
 
 ### What is purged
 
 - **Builds in a terminal review state** (`approved`/`rejected`) older than `purge_ttl` (default 30 days).
 - **Old builds of a branch**: retain the most recent build per branch (it is the branch's "current" state and powers the PR status link); purge older ones past TTL.
 - Builds stuck in non-terminal states are **not** purged (a `reviewing` build must not vanish before review).
+- **Stale branch baselines:** branches whose latest build is older than `branchTtlDays` (default 30, `null` = disabled) are GC'd — deletes `baselines/{branch}/**` files and `baselines` rows for that branch (default branch never GC'd).
 
-Purge removes **both** storage files (`builds/{buildId}/`) and database rows (`builds`, `snapshots`) in one transaction.
+Purge removes **both** storage files (`builds/{buildId}/` or `baselines/{branch}/**`) and database rows (`builds`, `snapshots`, or `baselines`) in one transaction.
 
 ### Orphaned baselines
 
-When a story is renamed or removed from Storybook, its baseline is never touched by normal builds. On each **default-branch** build, diff `index.json` against the `baselines` table and delete baselines whose `story_id` no longer exists.
+When a story is renamed or removed from Storybook, its baseline is never touched by normal builds. On each **default-branch** build, diff `index.json` against the `baselines` table and delete baselines whose `story_id` no longer exists (now also deletes the storage file).
 
 ### Trigger
 
-- **Scheduled**: an in-server timer driven by `--purge-interval` (default hourly).
-- **Manual**: `storyshelf purge` CLI command or `POST /api/v1/admin/purge` (admin).
+- **Scheduled**: in-server timers — build purge (`--purge-interval`, default hourly) and branch GC (`branchTtlDays` 30 + `branchGcIntervalMs` 24h daily interval clock via `retention-timer.ts`, staggered 1h).
+- **Manual**: `storyshelf purge` CLI command or `POST /api/v1/admin/purge` (admin; now runs both build purge and branch GC and returns `{removedBuilds,removedBranches,removedBaselines}`).
 
 ## Published Storybook
 
@@ -558,110 +588,106 @@ GET    /projects/:slug/settings                           # members, label types
 ```
 StoryShelf/
   packages/
-    core/
+    core/                 # domain only — no HTTP (see ADR 0018)
       src/
-        models/           # schema + business logic
-          project.ts
-          build.ts
-          snapshot.ts
-          baseline.ts
-          member.ts
-          comment.ts
-          label.ts
-          token.ts
-          webhook.ts
-        routers/          # API + UI routes
-          projects.ts
-          builds.ts
-          snapshots.ts
-          review.ts
-          comments.ts
-          labels.ts
-          tokens.ts
-          webhooks.ts
-          members.ts
-          admin.ts
-          pages/          # UI page components
-            projects-list.tsx
-            project-create.tsx
-            project-details.tsx
-            project-settings.tsx
-            build-list.tsx
-            build-review.tsx    # the review page (diff overlays + comment threads + labels)
-            labels.tsx          # label types config
-            label-details.tsx   # label page (external link + build history)
-            storybook.tsx       # published Storybook (browsable by designers/managers)
-            members.tsx         # project members management
-        adapters/         # interfaces only
-          database.ts
-          storage.ts
-          auth.ts
-          status.ts       # GitHub/GitLab status checks
-          capture-runner.ts
-          logger.ts
-        capture/          # server-side capture pipeline
-          adapter.ts      # StorySourceAdapter interface
-          storybook.ts    # Storybook adapter (index.json discovery)
-          serve.ts        # serve extracted statics for capture
-          pipeline.ts     # render -> screenshot -> store -> diff
-          queue.ts        # in-process queue + concurrency
-        diff/             # visual diff engine
-          engine.ts       # pixelmatch + overlay generation
-          options.ts      # DiffOptions, DiffResult types
-        retention/        # purge
-          purge.ts        # TTL + per-branch retention + orphan GC
-        ui/               # fixed server-rendered UI (hono/jsx + HTMX + hono/css)
-          document.tsx    # DocumentLayout: head, vendored HTMX, styles
-          theme.ts        # light/dark color tokens (BrandTheme)
-          brand.ts        # name/logo/favicon from the ui config
-          scripts/        # vanilla JS: theme toggle, keyboard review
+        adapters/         # interfaces only (+ lifecycle runner, webhook sender)
+        models/           # business logic (constructor-injected over DatabaseAdapter)
+        schema/           # Drizzle tables + row types (narrow handles via `core/schema`)
+        capture/          # orchestrator, pipeline, queues, storybook discovery
+        retention/        # purge (build TTL + per-branch keep-latest + orphan GC + branch GC via purgeStaleBranches)
+        diff/             # visual diff engine (pixelmatch + overlay)
+        config.ts         # ShelfOptions/ShelfConfig/UIConfig + validation
+        logger.ts         # pino factory (`core/logger`)
         urls.ts           # type-safe URL builder
-        store.ts          # AsyncLocalStorage context
-        config.ts         # RouterConfig
-        index.ts          # createShelfRouter entry point
-      package.json
+        types.ts          # status/role enums
+        ddl.ts            # raw SQL DDL
+        utils/            # hash/encrypt/ulid/paths (`core/utils`)
+        test-helpers/     # in-memory fakes (`core/test-helpers`)
+        index.tsx         # domain-only barrel (config/logger/types surface)
+      package.json        # subpaths: adapter/*, capture, config, ddl, diff,
+                          # logger, models, paths, retention, schema, types,
+                          # urls, utils, test-helpers
+    app/                  # HTTP app over core (see ADR 0018)
+      src/
+        index.tsx         # createShelfApp entry point (ShelfApp/ShelfRouter)
+        routers/          # API + UI routes (incl. health, OpenAPI)
+        pages/            # UI page components (server-rendered JSX)
+        ui/               # DocumentLayout, theme, components, styles
+        middleware/       # request id/logging/gate/rate-limit/scope/auth
+        store.ts          # AsyncLocalStorage request context
+        assets/           # vendored HTMX (served locally, no CDN)
+      scripts/
+        generate-openapi.ts  # OpenAPI snapshot for the website prebuild
+      package.json        # single `index` entry
 
     db-sqlite/
       src/
-        database.ts       # DatabaseAdapter for SQLite (via better-sqlite3 + Drizzle)
-        migrate.ts        # Migration runner
+        index.ts          # DatabaseAdapter for SQLite (via node:sqlite + Drizzle)
       package.json
 
     db-turso/
       src/
-        database.ts       # DatabaseAdapter for Turso/libSQL (via @libsql/client + Drizzle)
-        migrate.ts        # Migration runner
+        index.ts          # DatabaseAdapter for Turso/libSQL (via @libsql/client + Drizzle)
       package.json
 
     storage-local/
       src/
-        filesystem.ts     # StorageAdapter for local filesystem
+        index.ts          # StorageAdapter for local filesystem
       package.json
 
     storage-s3/
       src/
-        s3.ts             # StorageAdapter for S3-compatible (AWS S3, R2, MinIO)
+        index.ts          # StorageAdapter for S3-compatible (AWS S3, R2, MinIO)
+      package.json
+
+    storage-gcs/
+      src/
+        index.ts          # StorageAdapter for Google Cloud Storage (GCS + emulator)
+      package.json
+
+    storage-azure/
+      src/
+        index.ts          # StorageAdapter for Azure Blob Storage (Azurite)
       package.json
 
     auth-oauth/
       src/
-        oauth.ts          # AuthAdapter for OAuth/OIDC (GitHub, GitLab, Keycloak, etc.)
+        index.ts          # AuthAdapter for OAuth/OIDC (GitHub, GitLab, Keycloak, etc.)
       package.json
 
     auth-password/
       src/
-        password.ts       # AuthAdapter: shared password via env var
+        index.ts          # AuthAdapter: shared password via env var
       package.json
 
     cli/
       src/
-        index.ts          # CLI entry (commander)
+        index.ts          # CLI client entry (commander: upload/init/create/server/purge/retry, no Playwright)
+        config.ts         # .storybook/storyshelf.json load/write + .storybook/main.* guard
         commands/
-          upload.ts       # storyshelf upload (build Storybook -> zip -> upload; git tags -> persistent label)
+          upload.ts       # storyshelf upload (build Storybook -> zip -> upload; git tags -> persistent label; defaults to upload)
           retry.ts        # storyshelf retry (re-run capture for a build)
-          init.ts         # storyshelf init (create project, generate token)
+          init.ts         # storyshelf init (write .storybook/storyshelf.json, prompts, fails if no main.*)
+          create/         # storyshelf create (create project + token with admin token, writes config, fails if no main.*)
           purge.ts        # storyshelf purge (manual retention purge)
-          serve.ts        # storyshelf serve (dev mode)
+          server/init.ts  # storyshelf server init (scaffold server project; prompts infra)
+      package.json
+
+    runner-playwright/
+      src/
+        index.ts          # CaptureRunner entry
+        capture-runner.ts # Playwright CaptureRunner (unzip -> static server -> render -> store)
+        static-server.ts  # local HTTP server for the extracted Storybook during capture
+        viewport.ts       # default viewports
+      package.json
+
+    queue-redis/
+      src/
+        index.ts          # Redis CaptureQueue (ioredis, BLMOVE, delayed ZSET)
+      package.json
+    queue-sqs/
+      src/
+        index.ts          # SQS CaptureQueue (AWS SDK v3, SQS long-poll)
       package.json
 ```
 
@@ -671,8 +697,8 @@ StoryShelf/
 |---------|--------|-----------|
 | **Runtime** | Node.js 22+ | Playwright's best-supported runtime; LTS |
 | **HTTP framework** | Hono (OpenAPIHono) | Type-safe routes, OpenAPI spec generation, edge-compatible |
-| **Database** | SQLite via `better-sqlite3` + Drizzle ORM (local). Turso/libSQL via `@libsql/client` + Drizzle (serverless). | Zero-config on VPS/Docker. Turso for Vercel/Cloudflare Workers. Same schema, same queries, different connection. |
-| **Storage** | Local filesystem (default). S3-compatible (R2, MinIO, S3) as alternative. | Local for Docker/VPS. S3 for cloud. Same adapter interface, two implementations. |
+| **Database** | SQLite via `node:sqlite` + Drizzle ORM (local). Turso/libSQL via `@libsql/client` + Drizzle (serverless). | Zero-config on VPS/Docker. Turso for Vercel/Cloudflare Workers. Same schema, same queries, different connection. |
+| **Storage** | Local filesystem (default). S3-compatible (R2, MinIO, S3), GCS, Azure Blob as alternatives. | Local for Docker/VPS. S3/GCS/Azure for cloud. Same adapter interface, four implementations. |
 | **Screenshot capture** | Playwright (server-side) | Industry standard. Deterministic rendering in a pinned image. `toHaveScreenshot` battle-tested |
 | **Pixel diff** | pixelmatch + pngjs | Same libraries Playwright uses internally. Fast, reliable, widely adopted |
 | **Server UI** | hono/jsx + HTMX + hono/css | Server-rendered, fixed UI with brand theming; no client framework or build step |
@@ -713,19 +739,19 @@ StoryShelf/
 StoryShelf ships a **fixed, server-rendered UI** — `hono/jsx` + HTMX + `hono/css`. No client framework, no UI build step, no pluggable-UI adapter. Custom interfaces are built against `/api/v1` (the same contract the CLI uses, so it cannot be a second-class citizen). See ADR 0012.
 
 - **Layout:** a branded top **header** (logo + name + accent, project context, theme toggle, user menu) plus a neutral left **sidebar** (Builds, Storybook, Settings). The content area is monochrome and image-first.
-- **Pages** live in `core/src/routers/pages/*.tsx` and render directly from models (no API/UI contract duplication).
-- **Layout & theming** live in `core/src/ui/` — a `DocumentLayout` (head, vendored HTMX, styles) plus a `BrandTheme` of light/dark color tokens.
+- **Pages** live in `app/src/pages/*.tsx` and render directly from models (no API/UI contract duplication).
+- **Layout & theming** live in `app/src/ui/` — a `DocumentLayout` (head, vendored HTMX, styles) plus a `BrandTheme` of light/dark color tokens.
 - **Theme:** follows the system (`prefers-color-scheme`) with a manual light/dark override, persisted in a cookie so the server renders the correct theme on first paint.
-- **Brand config** is passed as `ui: { name, logo, favicon, theme }` to `createShelfRouter` (see `ShelfOptions`). Env vars (`SS_BRAND_NAME`, `SS_LOGO_URL`) supply defaults so self-hosters can rebrand with a `docker run`, no code.
+- **Brand config** is passed as `ui: { name, logo, favicon, theme }` to `createShelfApp` (see `ShelfOptions`). Env vars (`SS_BRAND_NAME`, `SS_LOGO_URL`) supply defaults so self-hosters can rebrand with a `docker run`, no code.
 - **HTMX is vendored locally** (no CDN), so air-gapped deployments work.
-- **Diff view (v1):** a simple three-up grid — baseline | current | diff overlay. A minimal vanilla-JS layer in `core/src/ui/scripts/` covers the theme toggle and keyboard approve/reject; the wipe slider and zoom are deferred to v2. The published-Storybook page is an `<iframe>` of Storybook's own static build.
+- **Diff view (v1):** a simple three-up grid — baseline | current | diff overlay. A minimal vanilla-JS layer in `app/src/ui/document.tsx` (the inline `clientScript`) covers the theme toggle and keyboard approve/reject; the wipe slider and zoom are deferred to v2. The published-Storybook page is an `<iframe>` of Storybook's own static build.
 
 ## Deployment
 
 ### Docker (recommended)
 
 ```dockerfile
-FROM mcr.microsoft.com/playwright:v1.52.0-noble
+FROM mcr.microsoft.com/playwright:v1.63.0-noble
 # Playwright image includes Chromium, Firefox, WebKit + system deps
 
 WORKDIR /app
@@ -737,7 +763,7 @@ RUN nubx nub run build
 EXPOSE 3000
 VOLUME /app/data
 
-CMD ["node", "packages/cli/dist/index.js", "serve", "--port", "3000", "--data-dir", "/app/data"]
+CMD ["node", "--experimental-transform-types", "server.ts"]
 ```
 
 ```yaml
@@ -754,6 +780,8 @@ services:
       # Capture + retention
       - CAPTURE_CONCURRENCY=2
       - PURGE_TTL_DAYS=30
+      - BRANCH_TTL_DAYS=30
+      - BRANCH_GC_INTERVAL_MS=86400000
       - PURGE_INTERVAL_MINUTES=60
       # Published Storybook subdomains (optional — omit for path-based URLs only)
       # - PUBLISHED_BASE_DOMAIN=stories.example.com   # requires wildcard DNS + TLS
@@ -779,11 +807,11 @@ nubx nub run dev          # starts Hono dev server
 
 ## Testing
 
-See `docs/testing.md`. Unit, adapter-contract, and integration tests run on every CI (`nub run test`, vitest, hermetic — no browser). The capture pipeline is browser-gated: a separate `nub run test:integration` suite runs real Playwright against the committed Storybook fixture in `examples/storybook`.
+See `docs/testing.md`. Unit, adapter-contract, and integration tests run on every CI (`nub run test`, vitest, hermetic — no browser). The capture pipeline is browser-gated: a separate `nub run test:integration` suite runs real Playwright against the committed Storybook fixture in `fixtures/storybook-8`.
 
 ## Website, Docs & Examples
 
-See `docs/website.md`. The public site (`website/`, Astro Starlight) hosts guides plus an auto-generated API reference from the Hono OpenAPI spec. `examples/storybook` is the deterministic capture fixture; `examples/fly-app` deploys StoryShelf to fly.io as a public demo.
+See `docs/website.md`. The public site (`apps/website/`, Astro Starlight) hosts guides plus an auto-generated API reference from the Hono OpenAPI spec. `fixtures/storybook-8` is the deterministic capture fixture; `examples/fly-app` deploys StoryShelf to fly.io as a public demo.
 
 ## Deliberately Deferred (v2)
 

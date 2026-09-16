@@ -1,0 +1,157 @@
+import type { Logger } from "pino";
+import type { CaptureRunner } from "../adapters/capture-runner.ts";
+import type { BrowserName } from "../adapters/capture-runner.ts";
+import type { StorageAdapter } from "../adapters/storage.ts";
+import type { DatabaseAdapter } from "../db/database.ts";
+import { BuildModel, type BuildTables } from "../models/build.ts";
+import { ProjectModel, type ProjectTables } from "../models/project.ts";
+import type { Build } from "../schema/build.ts";
+import type { Project } from "../schema/project.ts";
+import { DEFAULT_VIEWPORTS, isDisabledStory, isFlakyStory } from "./adapter.ts";
+import type { Viewport } from "./adapter.ts";
+import { persistCapture, type PipelineTables } from "./pipeline.ts";
+import { extractStorybookToScratch, persistStorybookStatics } from "./statics.ts";
+import { StorybookAdapter } from "./storybook.ts";
+
+/** Table handles required by the orchestrator. */
+export type OrchestratorTables = BuildTables & ProjectTables & PipelineTables;
+
+/** Inputs for running a capture job against a Storybook build. */
+export interface CaptureJobOptions {
+  db: DatabaseAdapter;
+  tables: OrchestratorTables;
+  storage: StorageAdapter;
+  runner: CaptureRunner;
+  scratchDir: string;
+  viewports?: Viewport[];
+  logger?: Logger;
+  /** Server secret for decrypting webhook secrets at send time. */
+  secret?: string | undefined;
+}
+/**
+ * Run the full capture for a build: extract, render, persist, and finalize.
+ *
+ * @param input - Build id plus the originating request id.
+ * @param options - Adapters, scratch dir, viewports, and logger.
+ */
+export async function executeCaptureJob(
+  input: { buildId: string; reqId?: string },
+  options: CaptureJobOptions,
+): Promise<void> {
+  const builds = new BuildModel(options.db, options.tables);
+  const { build, project } = await loadTarget(options, input.buildId);
+  const logger = options.logger?.child({ buildId: input.buildId, reqId: input.reqId });
+  await builds.setStatus(build.id, "capturing");
+
+  const startTime = performance.now();
+  let extractedDir: string | undefined;
+  try {
+    const extractStart = performance.now();
+    extractedDir = await extractStorybookToScratch(
+      options.storage,
+      options.scratchDir,
+      project.id,
+      build.id,
+    );
+    const extractDuration = performance.now() - extractStart;
+    logger?.info({ durationMs: Math.round(extractDuration) }, "storybook extracted");
+
+    // Persist the extracted statics to storage so the published Storybook
+    // (`storybookDir`) can be served after the scratch dir is cleaned up.
+    const staticsStart = performance.now();
+    await persistStorybookStatics(options.storage, extractedDir, project.id, build.id);
+    logger?.info(
+      { durationMs: Math.round(performance.now() - staticsStart) },
+      "storybook statics persisted",
+    );
+
+    const adapter = new StorybookAdapter();
+    const discovered = await adapter.discover(extractedDir);
+    const stories = discovered.filter((s) => !isDisabledStory(s));
+    // Resolve viewports: project-specific viewports (stored as JSON string) override ShelfConfig
+    let viewports = options.viewports ?? DEFAULT_VIEWPORTS;
+    const rawViewports = (project as unknown as { viewports?: string | null }).viewports;
+    if (rawViewports) {
+      try {
+        const parsed = JSON.parse(rawViewports) as Viewport[];
+        if (Array.isArray(parsed) && parsed.length > 0) viewports = parsed;
+      } catch {
+        // Invalid JSON, fallback to default
+      }
+    }
+    const browser = (project as unknown as { browser?: string }).browser as BrowserName | undefined;
+
+    const renderStart = performance.now();
+    const result = await options.runner.render({
+      buildId: build.id,
+      storybookDir: extractedDir,
+      stories,
+      viewports,
+      logger,
+      executePlay: project.executePlay ?? false,
+      playTimeoutMs: project.playTimeoutMs ?? 10_000,
+      runA11y: project.runA11y ?? false,
+      browser: browser ?? "chromium",
+    });
+    const renderDuration = performance.now() - renderStart;
+    logger?.info(
+      { durationMs: Math.round(renderDuration), storyCount: stories.length },
+      "stories rendered",
+    );
+
+    const flakyStoryIds = new Set(stories.filter((s) => isFlakyStory(s)).map((s) => s.id));
+    const blockingFailed = new Set<string>();
+    const flakyFailed = new Set<string>();
+    const a11yFailed = new Set<string>();
+    for (const f of result.failures) {
+      if (f.error.startsWith("a11y:")) a11yFailed.add(f.storyId);
+      else if (flakyStoryIds.has(f.storyId)) flakyFailed.add(f.storyId);
+      else blockingFailed.add(f.storyId);
+    }
+
+    const persistStart = performance.now();
+    await persistCapture(
+      {
+        db: options.db,
+        tables: options.tables,
+        storage: options.storage,
+        project,
+        build,
+        viewports,
+        captures: result.captures,
+        logger,
+        secret: options.secret,
+      },
+      blockingFailed,
+      flakyFailed,
+      a11yFailed,
+    );
+    const persistDuration = performance.now() - persistStart;
+    logger?.info({ durationMs: Math.round(persistDuration) }, "capture persisted");
+
+    const totalDuration = performance.now() - startTime;
+    logger?.info({ durationMs: Math.round(totalDuration) }, "capture completed");
+  } catch (error) {
+    const totalDuration = performance.now() - startTime;
+    logger?.error({ durationMs: Math.round(totalDuration), err: error }, "capture failed");
+    await builds.setStatus(build.id, "failed").catch((markError: unknown) => {
+      logger?.error({ err: markError }, "failed to mark build failed after capture error");
+    });
+    throw error;
+  }
+}
+
+async function loadTarget(
+  options: CaptureJobOptions,
+  buildId: string,
+): Promise<{ build: Build; project: Project }> {
+  const build = await new BuildModel(options.db, options.tables).get(buildId);
+  if (!build) {
+    throw new Error(`Build not found: ${buildId}`);
+  }
+  const project = await new ProjectModel(options.db, options.tables).get(build.projectId);
+  if (!project) {
+    throw new Error(`Project not found: ${build.projectId}`);
+  }
+  return { build, project };
+}

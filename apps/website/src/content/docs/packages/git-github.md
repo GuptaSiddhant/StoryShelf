@@ -1,0 +1,68 @@
+---
+title: "@storyshelf/git-github"
+description: GitHub commit-status provider for StoryShelf's visual-testing merge gate.
+---
+
+`@storyshelf/git-github` posts commit statuses to GitHub so visual tests show up as PR checks. It implements the `GitHostProvider`/`GitHostAdapter` contracts from `@storyshelf/core`: the server reads each project's saved status config, decrypts its token, and posts `pending` while capturing, `success` when approved, and `failure` on rejection or capture errors, plus a single updatable PR comment (`<!-- storyshelf:<url> -->`). The adapter exposes `metadata` (`name`, `version`, `description`, `kind:"github"`, `logo`, `schema`) with `version` injected from `package.json` via `__PKG_VERSION__`.
+
+## Install
+
+```sh
+nub add @storyshelf/git-github
+```
+
+[![JSR](https://jsr.io/badges/@storyshelf/git-github)](https://jsr.io/@storyshelf/git-github) [![JSR Score](https://jsr.io/badges/@storyshelf/git-github/score)](https://jsr.io/@storyshelf/git-github)
+
+- [npm package](https://www.npmjs.com/package/@storyshelf/git-github) — install tarballs and version history.
+- [JSR package](https://jsr.io/@storyshelf/git-github) — TypeScript-first registry page.
+- [Public API reference](https://jsr.io/@storyshelf/git-github/doc) — generated docs for every export; start here to learn the API.
+- [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/git-github) — package directory on `main`.
+
+## Register the provider
+
+Pass `gitHubHost` in the `gitHosts` array of `createShelfApp`:
+
+```ts
+import { createShelfApp } from "@storyshelf/app";
+import { gitHubHost } from "@storyshelf/git-github";
+
+const app = createShelfApp({
+  database,
+  storage,
+  captureRunner,
+  gitHosts: [gitHubHost],
+  config: {
+    secret: process.env.SHELF_SECRET, // also encrypts status tokens
+  },
+});
+```
+
+Multiple providers can be registered (e.g. `gitHubHost` plus a GitLab provider once available). `gitHosts` is an array — every registered provider that has a saved config for the build's project receives each status update (fanout per build) and hosts also expose `isMerged` (skip capture if PR already merged) and `upsertComment` (one comment per build).
+
+## Configure a project
+
+Status integrations are **per project**. Configure one from the UI under **Project → Settings → Git status**, or via the REST API:
+
+```http
+POST /api/v1/projects/{slug}/status-configs
+Content-Type: application/json
+
+{
+  "provider": "github",
+  "config": { "owner": "acme", "repo": "widgets" },
+  "token": "github_pat_..."
+}
+```
+
+- **`config`** — `{ owner, repo }`. Validated by `gitHubHost.metadata.schema`.
+- **`token`** — a GitHub token with `repo:status` scope. It is stored encrypt-at-rest with AES-256-GCM keyed by the `secret` in `ShelfConfig`; only the `provider`, `config`, and `hasToken` flag are readable from the API.
+
+Statuses are posted under the context `storyshelf/{project-slug}` (e.g. `storyshelf/my-app`), pointing at the build review page.
+
+## Merge gate
+
+Mark StoryShelf's status check as required in GitHub branch protection so PRs can't merge until visual review is approved. The check name is the context shown above.
+
+## Direct use
+
+The package exports only `gitHubHost: GitHostProvider`. Create a bound instance per project via `gitHubHost.create({ config: { owner, repo }, token, logger })`, then `adapter.setStatus` / `adapter.upsertComment` / `adapter.isMerged`.

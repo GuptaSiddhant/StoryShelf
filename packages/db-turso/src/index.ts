@@ -1,16 +1,11 @@
 import { createClient } from "@libsql/client";
-import { eq, getTableColumns } from "drizzle-orm";
+import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import { DDL } from "@storyshelf/db-sqlite/ddl";
+import { createDrizzleAdapter } from "@storyshelf/db-sqlite/drizzle-factory";
+import { schema } from "@storyshelf/db-sqlite/schema";
 import { drizzle } from "drizzle-orm/libsql";
-import type { AnySQLiteTable, SQLiteColumn } from "drizzle-orm/sqlite-core";
 
-import type { DatabaseAdapter, ListOptions } from "@storyshelf/core/adapter/database";
-import { schema } from "@storyshelf/core/schema";
-import { DDL } from "@storyshelf/core/ddl";
-
-function idOf(table: AnySQLiteTable): SQLiteColumn {
-  // eslint-disable-next-line no-non-null-assertion -- every table has an `id` column
-  return getTableColumns(table)["id"]!;
-}
+declare const __PKG_VERSION__: string | undefined;
 
 /**
  * Create a Turso/libSQL-backed DatabaseAdapter using Drizzle ORM.
@@ -22,47 +17,96 @@ export function createTursoDatabase(options: { url: string; authToken?: string }
   const client = createClient({ url: options.url, authToken: options.authToken });
   const db = drizzle(client, { schema });
 
-  return {
-    async insert(table, values) {
-      return await db.insert(table).values(values).returning().get();
+  return createDrizzleAdapter(db, {
+    metadata: {
+      name: "Turso",
+      version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
+      description: "Turso/libSQL database adapter",
+      kind: "turso",
+      category: "database",
     },
-    async update(table, id, values) {
-      return await db.update(table).set(values).where(eq(idOf(table), id)).returning().get();
+    migrate: async () => {
+      await runMigrations(client);
     },
-    async get(table, id) {
-      return (await db.select().from(table).where(eq(idOf(table), id)).limit(1).get()) ?? null;
-    },
-    async remove(table, id) {
-      await db.delete(table).where(eq(idOf(table), id)).run();
-    },
-    async list(table, opts: ListOptions = {}) {
-      const query = db.select().from(table);
-      if (opts.where) {
-        query.where(opts.where);
-      }
-      if (opts.orderBy) {
-        query.orderBy(opts.orderBy);
-      }
-      if (opts.limit !== undefined) {
-        query.limit(opts.limit);
-      }
-      if (opts.offset !== undefined) {
-        query.offset(opts.offset);
-      }
-      return await query.all();
-    },
-    async count(table, where) {
-      return await db.$count(table, where);
-    },
-    async all(query) {
-      return await db.all(query);
-    },
-    async migrate() {
-      await client.executeMultiple(DDL);
-    },
-    // eslint-disable-next-line require-await -- client.close() is synchronous
-    async close() {
+    close: () => {
       client.close();
     },
-  };
+    ping: async () => {
+      await client.execute("SELECT 1");
+    },
+  });
+}
+
+const STORYBOOK_META_ALTER = "ALTER TABLE projects ADD COLUMN storybook_meta TEXT";
+const RUN_A11Y_ALTER = "ALTER TABLE projects ADD COLUMN run_a11y INTEGER NOT NULL DEFAULT 0";
+const PROJECT_BROWSER_ALTER =
+  "ALTER TABLE projects ADD COLUMN browser TEXT NOT NULL DEFAULT 'chromium'";
+const PROJECT_VIEWPORTS_ALTER = "ALTER TABLE projects ADD COLUMN viewports TEXT";
+const WEBHOOK_SECRET_ALTER =
+  "ALTER TABLE webhooks ADD COLUMN secret_encrypted TEXT NOT NULL DEFAULT ''";
+const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN secret";
+
+async function runMigrations(client: ReturnType<typeof createClient>): Promise<void> {
+  await client.executeMultiple(DDL);
+  await execIgnore(client, STORYBOOK_META_ALTER);
+  await execIgnore(client, RUN_A11Y_ALTER);
+  await execIgnore(client, PROJECT_BROWSER_ALTER);
+  await execIgnore(client, PROJECT_VIEWPORTS_ALTER);
+  await execWebhookMigration(client);
+  await migrateCommentsTable(client);
+}
+
+async function execIgnore(client: ReturnType<typeof createClient>, sql: string): Promise<void> {
+  try {
+    await client.execute(sql);
+  } catch {
+    // idempotent — already migrated
+  }
+}
+
+async function execWebhookMigration(client: ReturnType<typeof createClient>): Promise<void> {
+  try {
+    await client.execute(WEBHOOK_SECRET_ALTER);
+    await client.execute(WEBHOOK_SECRET_DROP);
+  } catch {
+    // already migrated — ignore
+  }
+}
+
+async function migrateCommentsTable(client: ReturnType<typeof createClient>): Promise<void> {
+  try {
+    const result = await client.execute(
+      "SELECT sql FROM sqlite_master WHERE type='table' AND name='comments'",
+    );
+    const sql = (result.rows[0] as unknown as { sql: string } | undefined)?.sql;
+    if (!sql?.includes("user_id TEXT NOT NULL REFERENCES users")) {
+      return;
+    }
+    await recreateCommentsTable(client);
+  } catch {
+    await execIgnore(client, "PRAGMA foreign_keys = ON");
+  }
+}
+
+async function recreateCommentsTable(client: ReturnType<typeof createClient>): Promise<void> {
+  await client.execute("PRAGMA foreign_keys = OFF");
+  await client.execute(`
+    CREATE TABLE comments_new (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      build_id TEXT NOT NULL REFERENCES builds(id) ON DELETE CASCADE,
+      snapshot_id TEXT REFERENCES snapshots(id) ON DELETE CASCADE,
+      user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+      body TEXT NOT NULL,
+      parent_id TEXT,
+      resolved INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+  await client.execute("INSERT INTO comments_new SELECT * FROM comments");
+  await client.execute("DROP TABLE comments");
+  await client.execute("ALTER TABLE comments_new RENAME TO comments");
+  await client.execute("CREATE INDEX IF NOT EXISTS comments_build_id_idx ON comments (build_id)");
+  await client.execute("PRAGMA foreign_keys = ON");
 }

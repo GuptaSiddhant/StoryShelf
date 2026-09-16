@@ -1,15 +1,67 @@
 import { SESSION_COOKIE, type AuthAdapter, type AuthUser } from "@storyshelf/core/adapter/auth";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+declare const __PKG_VERSION__: string | undefined;
 
-interface SessionPayload {
-  userId: string;
-  email: string;
-  name: string;
-  avatarUrl?: string;
-  role: AuthUser["role"];
-  expiresAt: number;
+/**
+ * Create a shared-password auth adapter.
+ *
+ * @param options - Password and session signing configuration.
+ * @returns A PasswordAuth instance.
+ */
+export function createPasswordAuth(options: PasswordAuthOptions): PasswordAuth {
+  const { password, secret } = options;
+
+  // Async is required by the AuthAdapter interface, though the logic is synchronous.
+  // eslint-disable-next-line require-await
+  const check = async (request: Request): Promise<AuthUser | null> => {
+    const token = readCookie(request, SESSION_COOKIE);
+    if (!token) {
+      return null;
+    }
+    const payload = verifyPayload(secret, token);
+    if (!payload || payload.expiresAt <= Date.now()) {
+      return null;
+    }
+    return toUser(payload);
+  };
+
+  // eslint-disable-next-line require-await
+  const createSession = async (user: AuthUser): Promise<string> => {
+    const payload: SessionPayload = {
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+      avatarUrl: user.avatarUrl,
+      role: user.role,
+      expiresAt: Date.now() + SESSION_TTL_MS,
+    };
+    return signPayload(secret, payload);
+  };
+
+  const login = async (input: string, user: AuthUser): Promise<string> => {
+    if (!equalStrings(input, password)) {
+      throw new Error("Invalid password");
+    }
+    return await createSession(user);
+  };
+
+  return {
+    metadata: {
+      name: "Password Auth",
+      version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
+      description: "Shared-password auth adapter",
+      kind: "password",
+      category: "auth",
+    },
+    lifecycle: buildLifecycle(options),
+    check,
+    createSession,
+    async destroySession() {
+      await Promise.resolve();
+    },
+    login,
+  };
 }
 
 /** Options for configuring a shared-password auth adapter. */
@@ -24,6 +76,17 @@ export interface PasswordAuthOptions {
 export interface PasswordAuth extends AuthAdapter {
   /** Verify `password` and, if correct, create a session for `user`, returning a session token. */
   login(password: string, user: AuthUser): Promise<string>;
+}
+
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+interface SessionPayload {
+  userId: string;
+  email: string;
+  name: string;
+  avatarUrl?: string;
+  role: AuthUser["role"];
+  expiresAt: number;
 }
 
 function hmacHex(secret: string, value: string): string {
@@ -93,55 +156,22 @@ function toUser(payload: SessionPayload): AuthUser {
   };
 }
 
-/**
- * Create a shared-password auth adapter.
- *
- * @param options - Password and session signing configuration.
- * @returns A PasswordAuth instance.
- */
-export function createPasswordAuth(options: PasswordAuthOptions): PasswordAuth {
-  const { password, secret } = options;
-
-  // Async is required by the AuthAdapter interface, though the logic is synchronous.
-  // eslint-disable-next-line require-await
-  const check = async (request: Request): Promise<AuthUser | null> => {
-    const token = readCookie(request, SESSION_COOKIE);
-    if (!token) {
-      return null;
-    }
-    const payload = verifyPayload(secret, token);
-    if (!payload || payload.expiresAt <= Date.now()) {
-      return null;
-    }
-    return toUser(payload);
-  };
-
-  // eslint-disable-next-line require-await
-  const createSession = async (user: AuthUser): Promise<string> => {
-    const payload: SessionPayload = {
-      userId: user.id,
-      email: user.email,
-      name: user.name,
-      avatarUrl: user.avatarUrl,
-      role: user.role,
-      expiresAt: Date.now() + SESSION_TTL_MS,
-    };
-    return signPayload(secret, payload);
-  };
-
-  const login = async (input: string, user: AuthUser): Promise<string> => {
-    if (!equalStrings(input, password)) {
-      throw new Error("Invalid password");
-    }
-    return await createSession(user);
-  };
-
+/** Lifecycle: fail fast when password or secret is missing. */
+function buildLifecycle(options: PasswordAuthOptions): PasswordAuth["lifecycle"] {
   return {
-    check,
-    createSession,
-    async destroySession() {
+    setup: async () => {
+      if (options.password === "" || options.secret === "") {
+        throw new Error("Password auth requires a non-empty password and secret");
+      }
       await Promise.resolve();
     },
-    login,
+    teardown: async () => {
+      // Stateless — nothing to destroy.
+      await Promise.resolve();
+    },
+    health: async () => {
+      await Promise.resolve();
+      return { ok: true };
+    },
   };
 }
