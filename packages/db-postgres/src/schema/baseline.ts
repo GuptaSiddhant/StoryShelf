@@ -14,6 +14,7 @@ export const baselines = pgTable(
     branch: text("branch").notNull(),
     snapshotId: text("snapshot_id"),
     screenshotPath: text("screenshot_path").notNull(),
+    infraHash: text("infra_hash"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull(),
   },
@@ -37,6 +38,7 @@ export interface Baseline {
   branch: string;
   snapshotId: string | null;
   screenshotPath: string;
+  infraHash: string | null;
   createdAt: string;
   updatedAt: string;
 }

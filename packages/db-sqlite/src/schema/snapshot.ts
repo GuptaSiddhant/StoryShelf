@@ -29,6 +29,7 @@ export const snapshots = sqliteTable(
     status: text("status").$type<SnapshotStatus>().notNull().default("pending"),
     reviewedBy: text("reviewed_by"),
     reviewedAt: text("reviewed_at"),
+    infraHash: text("infra_hash"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -58,6 +59,7 @@ export interface Snapshot {
   status: SnapshotStatus;
   reviewedBy: string | null;
   reviewedAt: string | null;
+  infraHash: string | null;
   createdAt: string;
   updatedAt: string;
 }

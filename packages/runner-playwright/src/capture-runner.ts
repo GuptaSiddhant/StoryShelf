@@ -215,6 +215,7 @@ async function captureScreenshot(
                 channel?: { on: (e: string, cb: (err: unknown) => void) => void };
               };
             };
+            // oxlint-disable-next-line typescript/dot-notation -- __STORYBOOK_PREVIEW__ is a Storybook global
             const preview = win["__STORYBOOK_PREVIEW__"];
             if (!preview) return;
             // Try channel-based error capture for play failures
@@ -271,6 +272,31 @@ async function captureScreenshot(
         // a11y check failures are non-blocking; ignore and continue to screenshot
       }
     }
+    // SteadySnap lite: wait for fonts and freeze videos
+    const burst = (story.parameters as { burst?: number } | undefined)?.burst ?? 1;
+    const waitForFonts =
+      (story.parameters as { waitForFonts?: boolean } | undefined)?.waitForFonts ?? burst > 1;
+    if (waitForFonts) {
+      try {
+        // oxlint-disable-next-line promise-function-async -- fonts.ready returns a Promise
+        await page.evaluate(async () => {
+          await (globalThis as unknown as { document: { fonts: { ready: Promise<void> } } })
+            .document.fonts.ready;
+        });
+      } catch {
+        // fonts.ready is best-effort
+      }
+    }
+    try {
+      await page.evaluate(() => {
+        for (const v of (globalThis as unknown as { document: Document }).document.querySelectorAll(
+          "video",
+        ))
+          (v as HTMLVideoElement).pause();
+      });
+    } catch {
+      // video pause is best-effort
+    }
     // Diff screenshots only: auto-crop small components (60% whitespace) with 16px padding and min/max clamp, fullPage on overflow
     const box = await page
       .locator("#storybook-root")
@@ -288,11 +314,22 @@ async function captureScreenshot(
     if (plan.viewport.width !== viewport.width || plan.viewport.height !== viewport.height) {
       await page.setViewportSize(plan.viewport);
     }
-    const screenshot = await page.screenshot({
-      animations: story.parameters?.pauseAnimationAtEnd ? "allow" : "disabled",
-      ...(plan.fullPage ? { fullPage: true } : {}),
-      ...(plan.clip ? { clip: plan.clip } : {}),
-    });
+    const burstCount = Math.max(1, Math.min(5, burst));
+    const shots: Buffer[] = [];
+    for (let index = 0; index < burstCount; index += 1) {
+      if (index > 0) await page.waitForTimeout(100);
+      const shot = await page.screenshot({
+        animations: story.parameters?.pauseAnimationAtEnd ? "allow" : "disabled",
+        ...(plan.fullPage ? { fullPage: true } : {}),
+        ...(plan.clip ? { clip: plan.clip } : {}),
+      });
+      shots.push(shot as Buffer);
+    }
+    // Burst stability vote: pick the middle burst (most stable heuristic without pixel diff)
+    const screenshot =
+      shots[Math.floor(shots.length / 2)] ??
+      shots[0] ??
+      ((await page.screenshot({ animations: "disabled" })) as Buffer);
     return { screenshot, a11yViolations };
   } finally {
     await page.close();
@@ -330,7 +367,7 @@ async function checkA11y(page: import("playwright-core").Page): Promise<string[]
       const hasLabel =
         el.hasAttribute("aria-label") ||
         el.hasAttribute("aria-labelledby") ||
-        !!doc.querySelector(`label[for="${el.id}"]`) ||
+        Boolean(doc.querySelector(`label[for="${el.id}"]`)) ||
         el.id === "";
       if (!hasLabel && el.type !== "hidden")
         violations.push(`input missing label: ${el.outerHTML.slice(0, 120)}`);

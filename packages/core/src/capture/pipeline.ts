@@ -13,6 +13,7 @@ import type { Project } from "../schema/project.ts";
 import type { BuildStatus } from "../types.ts";
 import { diffPath, screenshotPath } from "../utils/paths.ts";
 import type { Viewport } from "./adapter.ts";
+import { infraHashFor, SIZING_DEFAULTS } from "./sizing.ts";
 
 /**
  * Persist a completed capture run: write screenshots, diff against the branch
@@ -124,7 +125,7 @@ async function persistSnapshot(ctx: CaptureContext, capture: RenderedSnapshot): 
     await createWithoutBaseline(ctx, capture, viewport, screenshot);
     return;
   }
-  await createWithBaseline(ctx, capture, viewport, screenshot, baseline.screenshotPath);
+  await createWithBaseline(ctx, capture, viewport, screenshot, baseline);
 }
 
 async function resolveBaseline(
@@ -150,6 +151,7 @@ async function createWithoutBaseline(
 ): Promise<void> {
   const snapshots = new SnapshotModel(ctx.db, ctx.tables);
   const status = ctx.build.isDefault ? "approved" : "new";
+  const infraHash = infraHashFor(ctx.project.browser ?? "chromium", ctx.viewports, SIZING_DEFAULTS);
   const snapshot = await snapshots.create(ctx.project.id, ctx.build.id, {
     storyId: capture.story.id,
     storyName: capture.story.name,
@@ -159,6 +161,7 @@ async function createWithoutBaseline(
     viewportWidth: viewport.width,
     viewportHeight: viewport.height,
     screenshotPath: screenshot,
+    infraHash,
   });
   await snapshots.setStatus(snapshot.id, status);
 
@@ -171,6 +174,7 @@ async function createWithoutBaseline(
       ctx.build.gitBranch,
       snapshot.id,
       screenshot,
+      infraHash,
     );
   }
 }
@@ -180,10 +184,10 @@ async function createWithBaseline(
   capture: RenderedSnapshot,
   viewport: Viewport,
   screenshot: string,
-  baselinePath: string,
+  baseline: Baseline,
 ): Promise<void> {
   const current = await ctx.storage.read(screenshot);
-  const previous = await ctx.storage.read(baselinePath);
+  const previous = await ctx.storage.read(baseline.screenshotPath);
   const options = {
     ...DEFAULT_DIFF_OPTIONS,
     pixelThreshold: ctx.project.pixelThreshold,
@@ -191,6 +195,7 @@ async function createWithBaseline(
   };
   const result = diffImages(previous, current, options);
 
+  const infraHash = infraHashFor(ctx.project.browser ?? "chromium", ctx.viewports, SIZING_DEFAULTS);
   const snapshots = new SnapshotModel(ctx.db, ctx.tables);
   const snapshot = await snapshots.create(ctx.project.id, ctx.build.id, {
     storyId: capture.story.id,
@@ -201,20 +206,45 @@ async function createWithBaseline(
     viewportWidth: viewport.width,
     viewportHeight: viewport.height,
     screenshotPath: screenshot,
+    infraHash,
   });
 
-  const status = result.passed ? "unchanged" : "changed";
+  // Automigrate: infra-induced size change with project.automigrate enabled
+  const shouldAutomigrate =
+    result.sizeChanged &&
+    !result.passed &&
+    (ctx.project as unknown as { automigrate?: boolean }).automigrate &&
+    baseline.infraHash !== null &&
+    baseline.infraHash !== infraHash;
+
+  const status = shouldAutomigrate ? "unchanged" : result.passed ? "unchanged" : "changed";
   const diff = diffPath(ctx.project.id, ctx.build.id, capture.story.id, capture.viewportName);
-  if (!result.passed && result.diffImage) {
+  const passed = shouldAutomigrate ? true : result.passed;
+  const pixels = shouldAutomigrate ? 0 : result.diffPixels;
+  const ratio = shouldAutomigrate ? 0 : result.diffRatio;
+  if (!passed && result.diffImage) {
     await ctx.storage.write(diff, result.diffImage);
   }
   await snapshots.update(snapshot.id, {
     status,
-    diffPath: !result.passed && result.diffImage ? diff : null,
-    diffPixels: result.diffPixels,
-    diffRatio: result.diffRatio,
-    diffPassed: result.passed,
+    diffPath: !passed && result.diffImage ? diff : null,
+    diffPixels: pixels,
+    diffRatio: ratio,
+    diffPassed: passed,
+    infraHash,
   });
+  if (shouldAutomigrate && ctx.build.isDefault) {
+    const baselines = new BaselineModel(ctx.db, ctx.tables, ctx.storage, ctx.secret);
+    await baselines.upsert(
+      ctx.project.id,
+      capture.story.id,
+      capture.viewportName,
+      ctx.build.gitBranch,
+      snapshot.id,
+      screenshot,
+      infraHash,
+    );
+  }
 }
 
 async function finalize(

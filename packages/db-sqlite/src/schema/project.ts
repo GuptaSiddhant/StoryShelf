@@ -16,6 +16,7 @@ export const projects = sqliteTable("projects", {
   runA11y: integer("run_a11y", { mode: "boolean" }).notNull().default(false),
   browser: text("browser").notNull().default("chromium"),
   viewports: text("viewports"),
+  automigrate: integer("automigrate", { mode: "boolean" }).notNull().default(false),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
@@ -36,6 +37,7 @@ export interface Project {
   runA11y: boolean;
   browser: string;
   viewports: string | null;
+  automigrate: boolean;
   createdAt: string;
   updatedAt: string;
 }

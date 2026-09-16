@@ -20,6 +20,7 @@ export interface Snapshot {
   status: SnapshotStatus;
   reviewedBy: string | null;
   reviewedAt: string | null;
+  infraHash: string | null;
   createdAt: string;
   updatedAt: string;
 }

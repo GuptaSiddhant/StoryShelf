@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS projects (
   run_a11y BOOLEAN NOT NULL DEFAULT false,
   browser TEXT NOT NULL DEFAULT 'chromium',
   viewports TEXT,
+  automigrate BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );
@@ -66,6 +67,7 @@ CREATE TABLE IF NOT EXISTS snapshots (
   status TEXT NOT NULL DEFAULT 'pending',
   reviewed_by TEXT,
   reviewed_at TIMESTAMPTZ,
+  infra_hash TEXT,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );
@@ -79,6 +81,7 @@ CREATE TABLE IF NOT EXISTS baselines (
   branch TEXT NOT NULL,
   snapshot_id TEXT,
   screenshot_path TEXT NOT NULL,
+  infra_hash TEXT,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );

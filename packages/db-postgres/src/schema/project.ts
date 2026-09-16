@@ -16,6 +16,7 @@ export const projects = pgTable("projects", {
   runA11y: boolean("run_a11y").notNull().default(false),
   browser: text("browser").notNull().default("chromium"),
   viewports: text("viewports"),
+  automigrate: boolean("automigrate").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull(),
 });
@@ -36,6 +37,7 @@ export interface Project {
   runA11y?: boolean;
   browser?: string;
   viewports?: string | null;
+  automigrate: boolean;
   createdAt: string;
   updatedAt: string;
 }

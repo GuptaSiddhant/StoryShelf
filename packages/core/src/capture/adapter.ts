@@ -16,6 +16,10 @@ export interface StoryParameters {
   minHeight?: number;
   maxWidth?: number;
   maxHeight?: number;
+  /** Burst count for steady capture (1 = single shot, 3 = burst 100ms); default 1. */
+  burst?: number;
+  /** Whether to wait for fonts.ready before screenshot; default true when burst >1. */
+  waitForFonts?: boolean;
 }
 
 /** Return whether a story is marked flaky (failures stay non-blocking). */

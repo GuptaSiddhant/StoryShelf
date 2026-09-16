@@ -73,6 +73,7 @@ export class BaselineModel {
     branch: string,
     snapshotId: string,
     sourcePath: string,
+    infraHash?: string | null,
   ): Promise<Baseline> {
     const screenshotPath = baselinePath(projectId, branch, storyId, viewport);
     const source = await this.storage.read(sourcePath);
@@ -84,6 +85,7 @@ export class BaselineModel {
       baseline = (await this.db.update(this.tables.baselines, existing.id, {
         snapshotId,
         screenshotPath,
+        infraHash: infraHash ?? existing.infraHash ?? null,
         updatedAt: new Date().toISOString(),
       })) as unknown as Baseline;
       if (this.webhookTables) {
@@ -112,6 +114,7 @@ export class BaselineModel {
         branch,
         snapshotId,
         screenshotPath,
+        infraHash: infraHash ?? null,
         createdAt: now,
         updatedAt: now,
       })) as unknown as Baseline;

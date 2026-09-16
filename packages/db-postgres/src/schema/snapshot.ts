@@ -38,6 +38,7 @@ export const snapshots = pgTable(
     status: text("status").$type<SnapshotStatus>().notNull().default("pending"),
     reviewedBy: text("reviewed_by"),
     reviewedAt: timestamp("reviewed_at", { withTimezone: true, mode: "string" }),
+    infraHash: text("infra_hash"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull(),
   },
@@ -67,6 +68,7 @@ export interface Snapshot {
   status: SnapshotStatus;
   reviewedBy: string | null;
   reviewedAt: string | null;
+  infraHash: string | null;
   createdAt: string;
   updatedAt: string;
 }

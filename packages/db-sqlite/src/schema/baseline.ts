@@ -14,6 +14,7 @@ export const baselines = sqliteTable(
     branch: text("branch").notNull(),
     snapshotId: text("snapshot_id"),
     screenshotPath: text("screenshot_path").notNull(),
+    infraHash: text("infra_hash"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -37,6 +38,7 @@ export interface Baseline {
   branch: string;
   snapshotId: string | null;
   screenshotPath: string;
+  infraHash: string | null;
   createdAt: string;
   updatedAt: string;
 }

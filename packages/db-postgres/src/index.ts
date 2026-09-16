@@ -64,7 +64,8 @@ export function createPostgresDatabase(options: PostgresDatabaseOptions): Databa
       connect_timeout: options.connectTimeout,
     });
 
-  const db = drizzle(client, { schema });
+  // oxlint-disable-next-line typescript/no-unsafe-argument -- postgres instance may be from isolated store vs workspace
+  const db = drizzle(client as never, { schema });
 
   return createDrizzlePgAdapter(db, {
     metadata: {
@@ -92,9 +93,19 @@ const RUN_A11Y_ALTER =
 const PROJECT_BROWSER_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS browser TEXT NOT NULL DEFAULT 'chromium'";
 const PROJECT_VIEWPORTS_ALTER = "ALTER TABLE projects ADD COLUMN IF NOT EXISTS viewports TEXT";
+const PROJECT_AUTOMIGRATE_ALTER =
+  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS automigrate BOOLEAN NOT NULL DEFAULT false";
+const SNAPSHOT_INFRA_HASH_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS infra_hash TEXT";
+const BASELINE_INFRA_HASH_ALTER = "ALTER TABLE baselines ADD COLUMN IF NOT EXISTS infra_hash TEXT";
 const WEBHOOK_SECRET_ALTER =
   "ALTER TABLE webhooks ADD COLUMN IF NOT EXISTS secret_encrypted TEXT NOT NULL DEFAULT ''";
 const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN IF EXISTS secret";
+
+async function migrateProjectExtras(client: ReturnType<typeof postgres>): Promise<void> {
+  await execIgnore(client, PROJECT_AUTOMIGRATE_ALTER);
+  await execIgnore(client, SNAPSHOT_INFRA_HASH_ALTER);
+  await execIgnore(client, BASELINE_INFRA_HASH_ALTER);
+}
 
 async function runMigrations(client: ReturnType<typeof postgres>): Promise<void> {
   await client.unsafe(DDL);
@@ -102,6 +113,7 @@ async function runMigrations(client: ReturnType<typeof postgres>): Promise<void>
   await execIgnore(client, RUN_A11Y_ALTER);
   await execIgnore(client, PROJECT_BROWSER_ALTER);
   await execIgnore(client, PROJECT_VIEWPORTS_ALTER);
+  await migrateProjectExtras(client);
   await execIgnore(client, WEBHOOK_SECRET_ALTER);
   await execIgnore(client, WEBHOOK_SECRET_DROP);
   await migrateCommentsTable(client);

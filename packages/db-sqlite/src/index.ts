@@ -45,6 +45,10 @@ const RUN_A11Y_ALTER = "ALTER TABLE projects ADD COLUMN run_a11y INTEGER NOT NUL
 const PROJECT_BROWSER_ALTER =
   "ALTER TABLE projects ADD COLUMN browser TEXT NOT NULL DEFAULT 'chromium'";
 const PROJECT_VIEWPORTS_ALTER = "ALTER TABLE projects ADD COLUMN viewports TEXT";
+const PROJECT_AUTOMIGRATE_ALTER =
+  "ALTER TABLE projects ADD COLUMN automigrate INTEGER NOT NULL DEFAULT 0";
+const SNAPSHOT_INFRA_HASH_ALTER = "ALTER TABLE snapshots ADD COLUMN infra_hash TEXT";
+const BASELINE_INFRA_HASH_ALTER = "ALTER TABLE baselines ADD COLUMN infra_hash TEXT";
 const WEBHOOK_SECRET_ALTER =
   "ALTER TABLE webhooks ADD COLUMN secret_encrypted TEXT NOT NULL DEFAULT ''";
 const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN secret";
@@ -129,12 +133,19 @@ function migrateProjectColumns(sqlite: DatabaseSync): void {
   execIgnore(sqlite, RUN_A11Y_ALTER);
   execIgnore(sqlite, PROJECT_BROWSER_ALTER);
   execIgnore(sqlite, PROJECT_VIEWPORTS_ALTER);
+  execIgnore(sqlite, PROJECT_AUTOMIGRATE_ALTER);
+}
+
+function migrateInfraHash(sqlite: DatabaseSync): void {
+  execIgnore(sqlite, SNAPSHOT_INFRA_HASH_ALTER);
+  execIgnore(sqlite, BASELINE_INFRA_HASH_ALTER);
 }
 
 function runMigrations(sqlite: DatabaseSync): void {
   sqlite.exec("PRAGMA foreign_keys = ON");
   sqlite.exec(DDL);
   migrateProjectColumns(sqlite);
+  migrateInfraHash(sqlite);
   try {
     sqlite.exec(WEBHOOK_SECRET_ALTER);
     sqlite.exec(WEBHOOK_SECRET_DROP);

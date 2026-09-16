@@ -14,6 +14,7 @@ export interface Project {
   runA11y?: boolean;
   browser?: string;
   viewports?: string | null;
+  automigrate?: boolean;
   createdAt: string;
   updatedAt: string;
 }

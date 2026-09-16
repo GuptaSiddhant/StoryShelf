@@ -7,6 +7,7 @@ export interface Baseline {
   branch: string;
   snapshotId: string | null;
   screenshotPath: string;
+  infraHash: string | null;
   createdAt: string;
   updatedAt: string;
 }
