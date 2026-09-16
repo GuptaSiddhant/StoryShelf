@@ -10,6 +10,7 @@ import type { Project } from "../schema/project.ts";
 import { DEFAULT_VIEWPORTS, isDisabledStory, isFlakyStory } from "./adapter.ts";
 import type { Viewport } from "./adapter.ts";
 import { persistCapture, type PipelineTables } from "./pipeline.ts";
+import { resolveViewports } from "./sizing.ts";
 import { extractStorybookToScratch, persistStorybookStatics } from "./statics.ts";
 import { StorybookAdapter } from "./storybook.ts";
 
@@ -68,17 +69,9 @@ export async function executeCaptureJob(
     const adapter = new StorybookAdapter();
     const discovered = await adapter.discover(extractedDir);
     const stories = discovered.filter((s) => !isDisabledStory(s));
-    // Resolve viewports: project-specific viewports (stored as JSON string) override ShelfConfig
-    let viewports = options.viewports ?? DEFAULT_VIEWPORTS;
+    // Resolve viewports via single helper (project JSON → server override → default)
     const rawViewports = (project as unknown as { viewports?: string | null }).viewports;
-    if (rawViewports) {
-      try {
-        const parsed = JSON.parse(rawViewports) as Viewport[];
-        if (Array.isArray(parsed) && parsed.length > 0) viewports = parsed;
-      } catch {
-        // Invalid JSON, fallback to default
-      }
-    }
+    const viewports = resolveViewports(rawViewports, DEFAULT_VIEWPORTS, options.viewports);
     const browser = (project as unknown as { browser?: string }).browser as BrowserName | undefined;
 
     const renderStart = performance.now();

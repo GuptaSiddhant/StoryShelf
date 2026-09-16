@@ -5,6 +5,17 @@ export interface StoryParameters {
   diffThreshold?: number;
   pauseAnimationAtEnd?: boolean;
   flakyTest?: boolean;
+  /** Force auto-crop (true) or full viewport (false) for this story; undefined uses 60% whitespace rule. */
+  autoCrop?: boolean;
+  /** Whitespace fraction (0..1) above which we crop; default 0.6. */
+  autoCropThreshold?: number;
+  /** Whether overflow should trigger fullPage; default true. */
+  fullPageOnOverflow?: boolean;
+  /** Min dimensions for the final PNG (clamp after padding). */
+  minWidth?: number;
+  minHeight?: number;
+  maxWidth?: number;
+  maxHeight?: number;
 }
 
 /** Return whether a story is marked flaky (failures stay non-blocking). */

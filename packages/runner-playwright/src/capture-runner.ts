@@ -8,6 +8,7 @@ import type {
   Viewport,
 } from "@storyshelf/core/adapter/capture-runner";
 import { StorybookAdapter } from "@storyshelf/core/capture";
+import { getScreenshotPlan } from "@storyshelf/core/capture";
 import type { Logger } from "@storyshelf/core/logger";
 import { chromium, firefox, webkit, type Browser } from "playwright-core";
 import { createStaticServer } from "./static-server.ts";
@@ -270,9 +271,27 @@ async function captureScreenshot(
         // a11y check failures are non-blocking; ignore and continue to screenshot
       }
     }
-    // Playwright page.screenshot supports animations: disabled to freeze CSS animations
+    // Diff screenshots only: auto-crop small components (60% whitespace) with 16px padding and min/max clamp, fullPage on overflow
+    const box = await page
+      .locator("#storybook-root")
+      .boundingBox()
+      .catch(() => null);
+    const plan = getScreenshotPlan(viewport, box, {
+      autoCrop: story.parameters?.autoCrop,
+      whitespaceThreshold: story.parameters?.autoCropThreshold,
+      fullPageOnOverflow: story.parameters?.fullPageOnOverflow,
+      minWidth: story.parameters?.minWidth,
+      minHeight: story.parameters?.minHeight,
+      maxWidth: story.parameters?.maxWidth,
+      maxHeight: story.parameters?.maxHeight,
+    });
+    if (plan.viewport.width !== viewport.width || plan.viewport.height !== viewport.height) {
+      await page.setViewportSize(plan.viewport);
+    }
     const screenshot = await page.screenshot({
       animations: story.parameters?.pauseAnimationAtEnd ? "allow" : "disabled",
+      ...(plan.fullPage ? { fullPage: true } : {}),
+      ...(plan.clip ? { clip: plan.clip } : {}),
     });
     return { screenshot, a11yViolations };
   } finally {

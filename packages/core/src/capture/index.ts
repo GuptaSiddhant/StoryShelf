@@ -22,3 +22,11 @@ export type { PollableCaptureQueue, PollableJob } from "../adapters/capture-queu
 export { StorybookAdapter } from "./storybook.ts";
 export { createDispatchJob, type CaptureDispatchJob, type DispatchDeps } from "./dispatch.ts";
 export { extractStorybookToScratch, persistStorybookStatics } from "./statics.ts";
+export {
+  getScreenshotPlan,
+  resolveViewports as resolveCaptureViewports,
+  SIZING_DEFAULTS,
+  type BoundingBox,
+  type ScreenshotPlan,
+  type SizingOptions,
+} from "./sizing.ts";

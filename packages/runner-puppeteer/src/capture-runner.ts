@@ -8,6 +8,7 @@ import type {
   Viewport,
 } from "@storyshelf/core/adapter/capture-runner";
 import { StorybookAdapter } from "@storyshelf/core/capture";
+import { getScreenshotPlan } from "@storyshelf/core/capture";
 import type { Logger } from "@storyshelf/core/logger";
 import puppeteer, { type Browser } from "puppeteer-core";
 import { createStaticServer } from "./static-server.ts";
@@ -269,7 +270,37 @@ async function captureScreenshot(
         // a11y check failures are non-blocking; ignore and continue to screenshot
       }
     }
-    const screenshot = (await page.screenshot({ type: "png" })) as Buffer;
+    // Diff screenshots only: auto-crop small components (60% whitespace) with 16px padding and min/max clamp, fullPage on overflow
+    let box: { x: number; y: number; width: number; height: number } | null = null;
+    try {
+      const el = await page.$("#storybook-root");
+      if (el)
+        box = (await el.boundingBox()) as {
+          x: number;
+          y: number;
+          width: number;
+          height: number;
+        } | null;
+    } catch {
+      // boundingBox is best-effort
+    }
+    const plan = getScreenshotPlan(viewport, box, {
+      autoCrop: story.parameters?.autoCrop,
+      whitespaceThreshold: story.parameters?.autoCropThreshold,
+      fullPageOnOverflow: story.parameters?.fullPageOnOverflow,
+      minWidth: story.parameters?.minWidth,
+      minHeight: story.parameters?.minHeight,
+      maxWidth: story.parameters?.maxWidth,
+      maxHeight: story.parameters?.maxHeight,
+    });
+    if (plan.viewport.width !== viewport.width || plan.viewport.height !== viewport.height) {
+      await page.setViewport({ width: plan.viewport.width, height: plan.viewport.height });
+    }
+    const screenshot = (await page.screenshot({
+      type: "png",
+      ...(plan.fullPage ? { fullPage: true } : {}),
+      ...(plan.clip ? { clip: plan.clip } : {}),
+    })) as Buffer;
     return { screenshot, a11yViolations };
   } finally {
     await page.close();
