@@ -1,12 +1,11 @@
 name: Fly Deploy
 
-# Tag-push only (same as release.yml): `nub ./scripts/release.mjs <bump>` tags v<version>
-# Deploys the workspace version of the demo (apps/fly-app, local adapters).
+# Every push to main: deploys the workspace version of the demo
+# (apps/fly-app, local adapters). Manual via workflow_dispatch.
 on:
   push:
-    tags:
-      - "v*.*.*"
-      - "v*.*.*-*"
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
