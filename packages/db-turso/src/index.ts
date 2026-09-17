@@ -1,6 +1,6 @@
 import { createClient } from "@libsql/client";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
-import { DDL } from "@storyshelf/db-sqlite/ddl";
+import { DDL, tableColumns } from "@storyshelf/db-sqlite/ddl";
 import { createDrizzleAdapter } from "@storyshelf/db-sqlite/drizzle-factory";
 import { schema } from "@storyshelf/db-sqlite/schema";
 import { drizzle } from "drizzle-orm/libsql";
@@ -37,40 +37,40 @@ export function createTursoDatabase(options: { url: string; authToken?: string }
   });
 }
 
-const STORYBOOK_META_ALTER = "ALTER TABLE projects ADD COLUMN storybook_meta TEXT";
-const RUN_A11Y_ALTER = "ALTER TABLE projects ADD COLUMN run_a11y INTEGER NOT NULL DEFAULT 0";
-const PROJECT_BROWSER_ALTER =
-  "ALTER TABLE projects ADD COLUMN browser TEXT NOT NULL DEFAULT 'chromium'";
-const PROJECT_VIEWPORTS_ALTER = "ALTER TABLE projects ADD COLUMN viewports TEXT";
-const PROJECT_AUTOMIGRATE_ALTER =
-  "ALTER TABLE projects ADD COLUMN automigrate INTEGER NOT NULL DEFAULT 0";
-const SNAPSHOT_INFRA_HASH_ALTER = "ALTER TABLE snapshots ADD COLUMN infra_hash TEXT";
-const BASELINE_INFRA_HASH_ALTER = "ALTER TABLE baselines ADD COLUMN infra_hash TEXT";
-const WEBHOOK_SECRET_ALTER =
-  "ALTER TABLE webhooks ADD COLUMN secret_encrypted TEXT NOT NULL DEFAULT ''";
 const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN secret";
 
 async function runMigrations(client: ReturnType<typeof createClient>): Promise<void> {
   await client.executeMultiple(DDL);
-  await migrateProjectColumns(client);
-  await migrateInfraHash(client);
-  await execWebhookMigration(client);
+  await ensureColumns(client, DDL);
+  await execIgnore(client, WEBHOOK_SECRET_DROP);
   await migrateCommentsTable(client);
 }
 
-/** Back-fill projects columns shipped in DDL after initial release (idempotent). */
-async function migrateProjectColumns(client: ReturnType<typeof createClient>): Promise<void> {
-  await execIgnore(client, STORYBOOK_META_ALTER);
-  await execIgnore(client, RUN_A11Y_ALTER);
-  await execIgnore(client, PROJECT_BROWSER_ALTER);
-  await execIgnore(client, PROJECT_VIEWPORTS_ALTER);
-  await execIgnore(client, PROJECT_AUTOMIGRATE_ALTER);
+/** Add any DDL column missing from a volume created before it shipped. */
+async function ensureColumns(client: ReturnType<typeof createClient>, ddl: string): Promise<void> {
+  const inspected = await Promise.all(
+    [...tableColumns(ddl)].map(async ([table, columns]) => {
+      const result = await client.execute(`PRAGMA table_info(${table})`);
+      const rows = result.rows as unknown as { name: unknown }[];
+      const existing = new Set(rows.map((row) => String(row.name)));
+      return { table, columns, existing };
+    }),
+  );
+  const statements = inspected.flatMap(({ table, columns, existing }) =>
+    columns
+      .filter((column) => isMissing(column, existing))
+      .map((column) => [table, column] as const),
+  );
+  await Promise.all(
+    statements.map(async ([table, column]) => {
+      await execIgnore(client, `ALTER TABLE ${table} ADD COLUMN ${column}`);
+    }),
+  );
 }
 
-/** Back-fill infra_hash columns shipped with steadySnap (idempotent). */
-async function migrateInfraHash(client: ReturnType<typeof createClient>): Promise<void> {
-  await execIgnore(client, SNAPSHOT_INFRA_HASH_ALTER);
-  await execIgnore(client, BASELINE_INFRA_HASH_ALTER);
+function isMissing(column: string, existing: Set<string>): boolean {
+  const [name] = column.split(/\s+/u);
+  return name !== undefined && !existing.has(name);
 }
 
 async function execIgnore(client: ReturnType<typeof createClient>, sql: string): Promise<void> {
@@ -78,15 +78,6 @@ async function execIgnore(client: ReturnType<typeof createClient>, sql: string):
     await client.execute(sql);
   } catch {
     // idempotent — already migrated
-  }
-}
-
-async function execWebhookMigration(client: ReturnType<typeof createClient>): Promise<void> {
-  try {
-    await client.execute(WEBHOOK_SECRET_ALTER);
-    await client.execute(WEBHOOK_SECRET_DROP);
-  } catch {
-    // already migrated — ignore
   }
 }
 

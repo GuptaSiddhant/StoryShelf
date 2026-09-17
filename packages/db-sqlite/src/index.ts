@@ -1,7 +1,7 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { drizzle, type AsyncRemoteCallback } from "drizzle-orm/sqlite-proxy";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
-import { DDL } from "./ddl.ts";
+import { DDL, tableColumns } from "./ddl.ts";
 import { createDrizzleAdapter } from "./drizzle-factory.ts";
 import { schema } from "./schema/index.ts";
 
@@ -40,17 +40,6 @@ export function createSqliteDatabase(path: string): DatabaseAdapter {
   });
 }
 
-const STORYBOOK_META_ALTER = "ALTER TABLE projects ADD COLUMN storybook_meta TEXT";
-const RUN_A11Y_ALTER = "ALTER TABLE projects ADD COLUMN run_a11y INTEGER NOT NULL DEFAULT 0";
-const PROJECT_BROWSER_ALTER =
-  "ALTER TABLE projects ADD COLUMN browser TEXT NOT NULL DEFAULT 'chromium'";
-const PROJECT_VIEWPORTS_ALTER = "ALTER TABLE projects ADD COLUMN viewports TEXT";
-const PROJECT_AUTOMIGRATE_ALTER =
-  "ALTER TABLE projects ADD COLUMN automigrate INTEGER NOT NULL DEFAULT 0";
-const SNAPSHOT_INFRA_HASH_ALTER = "ALTER TABLE snapshots ADD COLUMN infra_hash TEXT";
-const BASELINE_INFRA_HASH_ALTER = "ALTER TABLE baselines ADD COLUMN infra_hash TEXT";
-const WEBHOOK_SECRET_ALTER =
-  "ALTER TABLE webhooks ADD COLUMN secret_encrypted TEXT NOT NULL DEFAULT ''";
 const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN secret";
 
 type ProxyMethod = "run" | "all" | "values" | "get";
@@ -127,27 +116,25 @@ function migrateCommentsTable(sqlite: DatabaseSync): void {
   sqlite.exec("PRAGMA foreign_keys = ON");
 }
 
-/** Back-fill projects columns shipped in DDL after initial release (idempotent). */
-function migrateProjectColumns(sqlite: DatabaseSync): void {
-  execIgnore(sqlite, STORYBOOK_META_ALTER);
-  execIgnore(sqlite, RUN_A11Y_ALTER);
-  execIgnore(sqlite, PROJECT_BROWSER_ALTER);
-  execIgnore(sqlite, PROJECT_VIEWPORTS_ALTER);
-  execIgnore(sqlite, PROJECT_AUTOMIGRATE_ALTER);
-}
-
-function migrateInfraHash(sqlite: DatabaseSync): void {
-  execIgnore(sqlite, SNAPSHOT_INFRA_HASH_ALTER);
-  execIgnore(sqlite, BASELINE_INFRA_HASH_ALTER);
+/** Add any DDL column missing from a volume created before it shipped. */
+function ensureColumns(sqlite: DatabaseSync, ddl: string): void {
+  for (const [table, columns] of tableColumns(ddl)) {
+    const rows = sqlite.prepare(`PRAGMA table_info(${table})`).all() as unknown as unknown[][];
+    const existing = new Set(rows.map((row) => String(row[1])));
+    for (const column of columns) {
+      const [name] = column.split(/\s+/u);
+      if (name && !existing.has(name)) {
+        execIgnore(sqlite, `ALTER TABLE ${table} ADD COLUMN ${column}`);
+      }
+    }
+  }
 }
 
 function runMigrations(sqlite: DatabaseSync): void {
   sqlite.exec("PRAGMA foreign_keys = ON");
   sqlite.exec(DDL);
-  migrateProjectColumns(sqlite);
-  migrateInfraHash(sqlite);
+  ensureColumns(sqlite, DDL);
   try {
-    sqlite.exec(WEBHOOK_SECRET_ALTER);
     sqlite.exec(WEBHOOK_SECRET_DROP);
   } catch {
     // already migrated — ignore

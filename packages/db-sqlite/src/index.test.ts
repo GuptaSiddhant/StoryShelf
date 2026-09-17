@@ -1,7 +1,7 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import type { Project } from "@storyshelf/core/schema";
-import { sql } from "drizzle-orm";
+import { getTableColumns, sql } from "drizzle-orm";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -113,11 +113,10 @@ describe("createSqliteDatabase", () => {
     await closeDb(db);
   });
 
-  it("adds late projects columns (browser/viewports) to a stale volume", async () => {
+  it("back-fills a stale volume with every current projects column", async () => {
     const db = createSqliteDatabase(":memory:");
-    // Simulate a volume created before commit 83fd73e8 (v0.4.0-era DDL): the
-    // projects table predates the browser/viewports columns, so a fresh DDL
-    // run cannot add them — the in-place ALTERs must.
+    // Simulate the oldest deployed volume: only the pre-ADR-0017 columns exist.
+    // The fresh DDL run cannot add later columns, so the in-place reconciliation must.
     await db.all(sql`
       CREATE TABLE projects (
         id TEXT PRIMARY KEY,
@@ -128,14 +127,18 @@ describe("createSqliteDatabase", () => {
         pixel_threshold REAL NOT NULL DEFAULT 0.1,
         max_diff_ratio REAL NOT NULL DEFAULT 0.01,
         public_branch_regex TEXT,
-        storybook_meta TEXT,
-        execute_play INTEGER NOT NULL DEFAULT 0,
-        play_timeout_ms INTEGER NOT NULL DEFAULT 10000,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )
     `);
     await initDb(db);
+
+    const expected = Object.values(getTableColumns(schema.projects)).map((column) => column.name);
+    const rows = await db.all<unknown[]>(sql`PRAGMA table_info(projects)`);
+    const present = new Set(rows.map((row) => String(row[1])));
+    for (const column of expected) {
+      expect(present.has(column)).toBe(true);
+    }
 
     const now = new Date().toISOString();
     const project = (await db.insert(schema.projects, {
@@ -145,8 +148,9 @@ describe("createSqliteDatabase", () => {
       createdAt: now,
       updatedAt: now,
     })) as Project;
+    expect(project.executePlay).toBe(false);
+    expect(project.playTimeoutMs).toBe(10_000);
     expect(project.browser).toBe("chromium");
-    expect(project.viewports).toBeNull();
 
     const listed = await db.list(schema.projects);
     expect(listed).toHaveLength(1);

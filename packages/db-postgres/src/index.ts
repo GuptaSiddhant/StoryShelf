@@ -88,6 +88,10 @@ export function createPostgresDatabase(options: PostgresDatabaseOptions): Databa
 }
 
 const STORYBOOK_META_ALTER = "ALTER TABLE projects ADD COLUMN IF NOT EXISTS storybook_meta TEXT";
+const EXECUTE_PLAY_ALTER =
+  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS execute_play BOOLEAN NOT NULL DEFAULT false";
+const PLAY_TIMEOUT_MS_ALTER =
+  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS play_timeout_ms INTEGER NOT NULL DEFAULT 10000";
 const RUN_A11Y_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS run_a11y BOOLEAN NOT NULL DEFAULT false";
 const PROJECT_BROWSER_ALTER =
@@ -102,6 +106,8 @@ const WEBHOOK_SECRET_ALTER =
 const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN IF EXISTS secret";
 
 async function migrateProjectExtras(client: ReturnType<typeof postgres>): Promise<void> {
+  await execIgnore(client, EXECUTE_PLAY_ALTER);
+  await execIgnore(client, PLAY_TIMEOUT_MS_ALTER);
   await execIgnore(client, PROJECT_AUTOMIGRATE_ALTER);
   await execIgnore(client, SNAPSHOT_INFRA_HASH_ALTER);
   await execIgnore(client, BASELINE_INFRA_HASH_ALTER);

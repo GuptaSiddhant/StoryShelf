@@ -154,3 +154,26 @@ CREATE TABLE IF NOT EXISTS project_members (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS project_members_project_user_idx ON project_members (project_id, user_id);
 `;
+
+const CONSTRAINT_PREFIX = /^(?:PRIMARY|FOREIGN|UNIQUE|CHECK|CONSTRAINT)\s/iu;
+const TABLE_BLOCK = /CREATE TABLE IF NOT EXISTS\s+(?<table>\w+)\s*\((?<body>[\s\S]*?)\n\);/gu;
+
+/**
+ * Parse the `CREATE TABLE` statements in a DDL string into a map of table name
+ * → column definition fragments (e.g. `name TEXT NOT NULL`). Table-level
+ * constraints are skipped; every StoryShelf column is declared inline.
+ */
+export function tableColumns(ddl: string): Map<string, string[]> {
+  const tables = new Map<string, string[]>();
+  for (const match of ddl.matchAll(TABLE_BLOCK)) {
+    const columns = (match.groups?.["body"] ?? "")
+      .split("\n")
+      .map((line) => line.trim().replace(/,$/u, ""))
+      .filter((line) => line !== "" && !CONSTRAINT_PREFIX.test(line));
+    const table = match.groups?.["table"];
+    if (table) {
+      tables.set(table, columns);
+    }
+  }
+  return tables;
+}

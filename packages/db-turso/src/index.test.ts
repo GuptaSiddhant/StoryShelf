@@ -3,6 +3,7 @@ import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import type { Project } from "@storyshelf/core/schema";
 import { schema } from "@storyshelf/db-sqlite/schema";
+import { getTableColumns } from "drizzle-orm";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -77,12 +78,10 @@ describe("createTursoDatabase", () => {
     await cleanupTurso(dir, db);
   });
 
-  it("adds late projects columns to a stale volume", async () => {
+  it("back-fills a stale volume with every current projects column", async () => {
     const dir = mkdtempSync(join(tmpdir(), "storyshelf-turso-"));
     const url = `file:${join(dir, "test.db")}`;
-    // Simulate a volume created before the browser/viewports/automigrate
-    // columns shipped: the existing projects table cannot gain them from DDL,
-    // so the in-place ALTERs must.
+    // Simulate the oldest deployed volume: only the pre-ADR-0017 columns exist.
     const seed = createClient({ url });
     await seed.execute(`
       CREATE TABLE projects (
@@ -94,9 +93,6 @@ describe("createTursoDatabase", () => {
         pixel_threshold REAL NOT NULL DEFAULT 0.1,
         max_diff_ratio REAL NOT NULL DEFAULT 0.01,
         public_branch_regex TEXT,
-        storybook_meta TEXT,
-        execute_play INTEGER NOT NULL DEFAULT 0,
-        play_timeout_ms INTEGER NOT NULL DEFAULT 10000,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )
@@ -106,6 +102,17 @@ describe("createTursoDatabase", () => {
     const db = createTursoDatabase({ url });
     await initDb(db);
 
+    const expected = Object.values(getTableColumns(schema.projects)).map((column) => column.name);
+    const inspector = createClient({ url });
+    const info = await inspector.execute("PRAGMA table_info(projects)");
+    inspector.close();
+    const present = new Set(
+      info.rows.map((row) => String((row as unknown as { name: unknown }).name)),
+    );
+    for (const column of expected) {
+      expect(present.has(column)).toBe(true);
+    }
+
     const now = new Date().toISOString();
     const project = (await db.insert(schema.projects, {
       id: "p1",
@@ -114,8 +121,9 @@ describe("createTursoDatabase", () => {
       createdAt: now,
       updatedAt: now,
     })) as Project;
+    expect(project.executePlay).toBe(false);
+    expect(project.playTimeoutMs).toBe(10_000);
     expect(project.browser).toBe("chromium");
-    expect(project.viewports).toBeNull();
 
     const listed = await db.list(schema.projects);
     expect(listed).toHaveLength(1);
