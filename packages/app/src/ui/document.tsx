@@ -1,4 +1,5 @@
 import type { FC } from "hono/jsx";
+import { getCsrfToken } from "../middleware/csrf.ts";
 import { getStore } from "../store.ts";
 import { baseStyle } from "./styles.ts";
 import { DARK_THEME, LIGHT_THEME } from "./theme.ts";
@@ -21,7 +22,7 @@ export const DocumentLayout: FC<{ title: string; nav?: NavConfig; children?: unk
   nav,
   children,
 }) => {
-  const { ui } = getStore();
+  const { ui, config } = getStore();
   const name = ui.name ?? "StoryShelf";
   const light = ui.lightTheme ?? LIGHT_THEME;
   const dark = ui.darkTheme ?? DARK_THEME;
@@ -32,6 +33,7 @@ export const DocumentLayout: FC<{ title: string; nav?: NavConfig; children?: unk
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="color-scheme" content="light dark" />
+        <meta name="csrf-token" content={getCsrfToken(config.secret)} />
         {ui.favicon ? <link rel="icon" href={ui.favicon} /> : null}
         <title>
           {title} · {name}
@@ -257,6 +259,12 @@ function clientScript(): string {
   return `
   (function(){
     var theme=window.__storyshelfTheme;
+    var csrfMeta=document.querySelector('meta[name="csrf-token"]');
+    if(csrfMeta){
+      document.body.addEventListener('htmx:configRequest',function(e){
+        e.detail.headers['x-csrf-token']=csrfMeta.getAttribute('content');
+      });
+    }
     var toggle=document.querySelector('[data-theme-toggle]');
     if(toggle&&theme){
       toggle.addEventListener('click',function(){

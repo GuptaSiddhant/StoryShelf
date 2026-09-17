@@ -1,19 +1,22 @@
 import type { Context, Next } from "hono";
 import { createHash, randomBytes } from "node:crypto";
 
-const CSRF_SECRET = process.env["CSRF_SECRET"] ?? randomBytes(32).toString("hex");
+const DEFAULT_SESSION = "default";
+const FALLBACK_SECRET = randomBytes(32).toString("hex");
 
-function generateToken(sessionId: string): string {
+/** Use the app secret when provided so tokens survive restarts and instances. */
+function resolveSecret(secret?: string): string {
+  return secret ?? FALLBACK_SECRET;
+}
+
+function generateToken(secret: string, sessionId: string): string {
   const timestamp = Date.now().toString(36);
   const payload = `${sessionId}:${timestamp}`;
-  const signature = createHash("sha256")
-    .update(`${CSRF_SECRET}:${payload}`)
-    .digest("hex")
-    .slice(0, 16);
+  const signature = createHash("sha256").update(`${secret}:${payload}`).digest("hex").slice(0, 16);
   return `${payload}:${signature}`;
 }
 
-function verifyToken(token: string, sessionId: string): boolean {
+function verifyToken(secret: string, token: string, sessionId: string): boolean {
   const parts = token.split(":");
   if (parts.length !== 3) {
     return false;
@@ -23,7 +26,7 @@ function verifyToken(token: string, sessionId: string): boolean {
     return false;
   }
   const expectedSignature = createHash("sha256")
-    .update(`${CSRF_SECRET}:${sessionId}:${payloadTimestamp}`)
+    .update(`${secret}:${sessionId}:${payloadTimestamp}`)
     .digest("hex")
     .slice(0, 16);
   if (signature !== expectedSignature) {
@@ -34,28 +37,30 @@ function verifyToken(token: string, sessionId: string): boolean {
   return age > 0 && age < 24 * 60 * 60 * 1000;
 }
 
+function sessionIdFrom(c: Context): string {
+  return c.req.header("session-id") ?? DEFAULT_SESSION;
+}
+
 /** Hono middleware issuing CSRF tokens on safe methods and verifying them on writes. */
-export function csrf() {
+export function csrf(secret?: string) {
+  const resolvedSecret = resolveSecret(secret);
   // oxlint-disable-next-line typescript/no-invalid-void-type -- Hono middleware may not return Response
   return async (c: Context, next: Next): Promise<Response | void> => {
     const { method } = c.req;
     if (method === "GET" || method === "HEAD" || method === "OPTIONS") {
-      const sessionId = c.req.header("session-id") ?? "default";
-      const token = generateToken(sessionId);
-      c.header("X-CSRF-Token", token);
+      c.header("X-CSRF-Token", generateToken(resolvedSecret, sessionIdFrom(c)));
       await next();
       return;
     }
-    const sessionId = c.req.header("session-id") ?? "default";
     const token = c.req.header("x-csrf-token") ?? c.req.query("csrf_token");
-    if (!token || !verifyToken(token, sessionId)) {
+    if (!token || !verifyToken(resolvedSecret, token, sessionIdFrom(c))) {
       return c.json({ error: "Invalid CSRF token" }, 403);
     }
     await next();
   };
 }
 
-/** Generate a CSRF token for the given session. */
-export function getCsrfToken(sessionId: string): string {
-  return generateToken(sessionId);
+/** Generate a CSRF token for the given session (bound to the same secret as `csrf`). */
+export function getCsrfToken(secret?: string, sessionId: string = DEFAULT_SESSION): string {
+  return generateToken(resolveSecret(secret), sessionId);
 }

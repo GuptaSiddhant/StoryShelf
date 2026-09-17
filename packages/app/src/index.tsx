@@ -83,7 +83,7 @@ function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
   app.use("/api/v1/*", rateLimit({ windowMs: 60_000, max: 100 }));
   app.use("/api/v1/tokens/*", rateLimit({ windowMs: 60_000, max: 10 }));
   app.use("/api/v1/webhooks/*", rateLimit({ windowMs: 60_000, max: 20 }));
-  app.use("/projects/:slug/settings/*", csrf());
+  app.use("/projects/:slug/settings/*", csrf(config.secret));
   app.use(
     "*",
     storeScope({
