@@ -1,4 +1,5 @@
 import type { Project } from "@storyshelf/core/schema";
+import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Interaction-tests settings tab: play execution toggle and timeout. */
 export function renderSettingsTests(
@@ -30,6 +31,7 @@ export function renderSettingsTests(
           hx-target="body"
           hx-swap="outerHTML"
         >
+          {csrfField()}
           <div class="field">
             <label class="field__label" style="display:flex; gap:.5rem; align-items:center;">
               <input

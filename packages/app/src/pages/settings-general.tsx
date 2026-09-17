@@ -1,4 +1,5 @@
 import type { Project } from "@storyshelf/core/schema";
+import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Form state for the settings tabs (field errors and global error). */
 export interface SettingsFormState {
@@ -29,6 +30,7 @@ export function renderSettingsGeneral(
           hx-target="body"
           hx-swap="outerHTML"
         >
+          {csrfField()}
           <div class="field">
             <label class="field__label" for="name">
               Name

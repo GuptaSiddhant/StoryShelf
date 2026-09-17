@@ -1,6 +1,7 @@
 import type { Project } from "@storyshelf/core/schema";
 import type { Token } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
+import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Tokens settings tab: project CLI tokens plus the create-token form. */
 export function renderSettingsTokens(
@@ -41,6 +42,7 @@ export function renderSettingsTokens(
                         hx-post={`/projects/${project.slug}/settings/tokens/${token.id}/delete`}
                         hx-target="body"
                       >
+                        {csrfField()}
                         <button class="btn btn--ghost" type="submit">
                           Revoke
                         </button>
@@ -68,6 +70,7 @@ export function renderSettingsTokens(
             hx-post={`/projects/${project.slug}/settings/tokens`}
             hx-target="body"
           >
+            {csrfField()}
             <div class="field">
               <label class="field__label" for="tokenName">
                 Name

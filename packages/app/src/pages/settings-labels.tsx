@@ -2,6 +2,7 @@ import type { LabelType } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { Badge } from "../ui/components.tsx";
+import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Labels settings tab: label-type table plus the create-type form. */
 export function renderSettingsLabels(
@@ -45,6 +46,7 @@ export function renderSettingsLabels(
                         hx-post={`/projects/${project.slug}/settings/labels/${labelType.key}/delete`}
                         hx-target="body"
                       >
+                        {csrfField()}
                         <button
                           class="btn btn--ghost"
                           type="submit"
@@ -78,6 +80,7 @@ export function renderSettingsLabels(
             hx-post={`/projects/${project.slug}/settings/labels`}
             hx-target="body"
           >
+            {csrfField()}
             <div class="grid grid--2">
               <div class="field">
                 <label class="field__label" for="key">

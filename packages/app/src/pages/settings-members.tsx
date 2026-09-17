@@ -1,6 +1,7 @@
 import type { Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { Badge } from "../ui/components.tsx";
+import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Project member row as rendered in the members settings tab. */
 export interface SettingsMember {
@@ -62,6 +63,7 @@ export function renderSettingsMembers(
                         hx-post={`/projects/${project.slug}/settings/members/${member.userId}/remove`}
                         hx-target="body"
                       >
+                        {csrfField()}
                         <button class="btn btn--ghost" type="submit">
                           Remove
                         </button>
@@ -89,6 +91,7 @@ export function renderSettingsMembers(
             hx-post={`/projects/${project.slug}/settings/members`}
             hx-target="body"
           >
+            {csrfField()}
             <div class="field">
               <label class="field__label" for="userId">
                 User ID

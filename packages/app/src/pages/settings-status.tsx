@@ -2,6 +2,7 @@ import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import type { Project } from "@storyshelf/core/schema";
 import type { FC } from "hono/jsx";
 import { Badge, Field, SelectField, TextareaField } from "../ui/components.tsx";
+import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Git status configuration row as rendered in the status settings tab. */
 export interface SettingsStatusConfig {
@@ -60,6 +61,7 @@ const StatusConfigRow: FC<{
             hx-post={`/projects/${project.slug}/settings/status/${config.id}/delete`}
             hx-target="body"
           >
+            {csrfField()}
             <button class="btn btn--ghost" type="submit">
               Delete
             </button>
@@ -84,6 +86,7 @@ const StatusCreateCard: FC<{
         hx-post={`/projects/${project.slug}/settings/status`}
         hx-target="body"
       >
+        {csrfField()}
         <SelectField
           label="Provider"
           name="provider"

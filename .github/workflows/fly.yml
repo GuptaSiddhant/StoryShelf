@@ -45,3 +45,19 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: flyctl status -a storyshelf
+
+      # The vendored HTMX bundle must be present in the image or every hx-*
+      # interaction (and CSRF header injection) silently breaks at runtime.
+      - name: Smoke test vendored HTMX asset
+        run: |
+          for i in $(seq 1 10); do
+            if curl -fsS https://storyshelf.fly.dev/assets/htmx.js -o /tmp/htmx.js \
+              && grep -q "htmx" /tmp/htmx.js; then
+              echo "Served /assets/htmx.js ($(wc -c </tmp/htmx.js) bytes)"
+              exit 0
+            fi
+            echo "Attempt $i: asset not ready, retrying"
+            sleep 6
+          done
+          echo "::error::/assets/htmx.js was not served correctly"
+          exit 1

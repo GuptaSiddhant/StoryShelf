@@ -37,6 +37,10 @@ WORKDIR /app
 COPY --from=builder /app/apps/fly-app/dist ./dist
 COPY --from=builder /app/apps/fly-app/package.json ./package.json
 COPY --from=builder /app/node_modules ./node_modules
+# Vendored HTMX bundle. The app resolves it as `../assets/htmx.min.js` relative
+# to `import.meta.url`, which for the bundled `/app/dist/server.mjs` is
+# `/app/assets/htmx.min.js` — a path the bundler does not emit on its own.
+COPY --from=builder /app/packages/app/src/assets/htmx.min.js ./assets/htmx.min.js
 # Install chromium + system deps (node:slim has no browsers)
 RUN npm i -g playwright@1.63.0 && playwright install --with-deps chromium
 ENV NODE_ENV=production

@@ -41,6 +41,25 @@ function sessionIdFrom(c: Context): string {
   return c.req.header("session-id") ?? DEFAULT_SESSION;
 }
 
+/** Read a CSRF token from the request header, query string, or form body. */
+async function tokenFromRequest(c: Context): Promise<string | undefined> {
+  const header = c.req.header("x-csrf-token");
+  if (header) {
+    return header;
+  }
+  const query = c.req.query("csrf_token");
+  if (query) {
+    return query;
+  }
+  const contentType = c.req.header("content-type") ?? "";
+  if (!contentType.includes("form")) {
+    return undefined;
+  }
+  const body = await c.req.parseBody();
+  const value = body["csrf_token"];
+  return typeof value === "string" ? value : undefined;
+}
+
 /** Hono middleware issuing CSRF tokens on safe methods and verifying them on writes. */
 export function csrf(secret?: string) {
   const resolvedSecret = resolveSecret(secret);
@@ -52,7 +71,7 @@ export function csrf(secret?: string) {
       await next();
       return;
     }
-    const token = c.req.header("x-csrf-token") ?? c.req.query("csrf_token");
+    const token = await tokenFromRequest(c);
     if (!token || !verifyToken(resolvedSecret, token, sessionIdFrom(c))) {
       return c.json({ error: "Invalid CSRF token" }, 403);
     }

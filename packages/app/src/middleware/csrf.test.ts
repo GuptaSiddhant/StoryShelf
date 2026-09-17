@@ -39,4 +39,23 @@ describe("csrf", () => {
     const res = await app("test-secret").request("/protected/page");
     expect(res.headers.get("x-csrf-token")).toBeTruthy();
   });
+
+  it("accepts a token submitted in the form body (native fallback)", async () => {
+    const token = getCsrfToken("test-secret");
+    const res = await app("test-secret").request("/protected/page", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ csrf_token: token }).toString(),
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it("rejects a form body without a token", async () => {
+    const res = await app("test-secret").request("/protected/page", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ name: "x" }).toString(),
+    });
+    expect(res.status).toBe(403);
+  });
 });

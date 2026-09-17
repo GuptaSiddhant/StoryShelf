@@ -1,5 +1,6 @@
 import type { Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
+import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Webhook row as rendered in the webhooks settings tab. */
 export interface SettingsWebhook {
@@ -78,6 +79,7 @@ export function renderSettingsWebhooks(
                         hx-post={`/projects/${project.slug}/settings/webhooks/${webhook.id}/delete`}
                         hx-target="body"
                       >
+                        {csrfField()}
                         <button class="btn btn--ghost" type="submit">
                           Delete
                         </button>
@@ -105,6 +107,7 @@ export function renderSettingsWebhooks(
             hx-post={`/projects/${project.slug}/settings/webhooks`}
             hx-target="body"
           >
+            {csrfField()}
             <div class="field">
               <label class="field__label" for="url">
                 URL
