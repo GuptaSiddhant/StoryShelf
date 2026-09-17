@@ -233,7 +233,7 @@ export function registerUiPages(app: ShelfRouter): void {
   });
 
   app.get("/projects/:slug/library", async (c) => {
-    const html = await renderLibraryPage(c.req.param("slug"));
+    const html = await renderLibraryPage(c.req.param("slug"), c.req.query("branch"));
     if (!html) {
       return c.notFound();
     }

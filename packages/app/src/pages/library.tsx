@@ -2,9 +2,9 @@
 import { BuildModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
 import { SnapshotModel } from "@storyshelf/core/models";
-import type { Snapshot } from "@storyshelf/core/schema";
 import type { Build } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
+import type { Snapshot } from "@storyshelf/core/schema";
 import {
   buildLabels,
   builds,
@@ -15,29 +15,52 @@ import type { HtmlEscapedString } from "hono/utils/html";
 import { getStore } from "../store.ts";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
-/** Library page: gallery of all stories/components from latest default-branch build, grouped by title. */
-export async function renderLibraryPage(slug: string): Promise<RenderedContent | null> {
+/** Library page: gallery grouped by title from latest build on selected branch. */
+export async function renderLibraryPage(
+  slug: string,
+  branch?: string,
+): Promise<RenderedContent | null> {
   const { db } = getStore();
   const project = await new ProjectModel(db, { projects }).getBySlug(slug);
   if (!project) return null;
-  const build = await getLibraryBuild(db, project);
+  const build = await getLibraryBuild(db, project, branch);
   if (!build) return renderEmptyLibrary(project);
   const snapshots = await new SnapshotModel(db, { snapshots: snapshotsTable }).listByBuild(
     build.id,
   );
   if (snapshots.length === 0) return renderEmptySnapshots(project, build);
-  return renderLibraryGrid(project, build, snapshots);
+  const branches = await distinctBranches(db, project.id);
+  return renderLibraryGrid(project, build, snapshots, branches);
 }
 
 async function getLibraryBuild(
   db: ReturnType<typeof getStore>["db"],
   project: Project,
+  branch?: string,
 ): Promise<Build | null> {
   const buildModel = new BuildModel(db, { builds, buildLabels, snapshots: snapshotsTable });
-  const defaults = await buildModel.list(project.id, { branch: project.gitDefaultBranch });
-  if (defaults[0]) return defaults[0];
+  const trimmed = branch?.trim();
+  const target = trimmed === undefined || trimmed === "" ? project.gitDefaultBranch : trimmed;
+  const byBranch = await buildModel.list(project.id, { branch: target });
+  if (byBranch[0]) return byBranch[0];
+  if (target !== project.gitDefaultBranch) {
+    const defaults = await buildModel.list(project.id, { branch: project.gitDefaultBranch });
+    if (defaults[0]) return defaults[0];
+  }
   const all = await buildModel.list(project.id);
   return all[0] ?? null;
+}
+
+async function distinctBranches(
+  db: ReturnType<typeof getStore>["db"],
+  projectId: string,
+): Promise<string[]> {
+  const buildsList = await new BuildModel(db, {
+    builds,
+    buildLabels,
+    snapshots: snapshotsTable,
+  }).list(projectId);
+  return [...new Set(buildsList.map((b) => b.gitBranch))].toSorted((a, b) => a.localeCompare(b));
 }
 
 function renderEmptyLibrary(project: Project): RenderedContent {
@@ -98,42 +121,105 @@ function distinctViewports(snapshots: Snapshot[]): string[] {
   return [...new Set(snapshots.map((s) => s.viewportName))].toSorted();
 }
 
-function renderLibraryGrid(project: Project, build: Build, snapshots: Snapshot[]): RenderedContent {
+function renderLibraryGrid(
+  project: Project,
+  build: Build,
+  snapshots: Snapshot[],
+  branches: string[],
+): RenderedContent {
   const byTitle = groupByTitle(snapshots);
-  const titles = [...byTitle.keys()].toSorted((a, b) => a.localeCompare(b));
   const viewportNames = distinctViewports(snapshots);
-  const hasMultipleViewports = viewportNames.length > 1;
-
+  const multi = viewportNames.length > 1;
   return (
     <DocumentLayout
       title="Library"
       nav={{ active: "library", projectSlug: project.slug, projectName: project.name }}
     >
-      <div class="page-header">
-        <h1 class="page-header__title">Library</h1>
-        <p class="page-header__desc">
-          {snapshots.length} stories · Latest build{" "}
-          <a href={`/projects/${project.slug}/builds/${build.id}`}>
-            {build.gitBranch} · {build.gitSha.slice(0, 7)}
-          </a>{" "}
-          · {new Date(build.createdAt).toLocaleString()} · {build.status}
-        </p>
-      </div>
-      {hasMultipleViewports ? (
+      {renderLibraryHeader(project, build, snapshots.length, branches)}
+      {multi ? (
         <div class="card card--padded" style="margin-bottom:1rem;">
           <span class="field__hint">Viewports: {viewportNames.join(" · ")}</span>
         </div>
       ) : null}
-      <div style="display:grid; gap:1.5rem;">
-        {titles.map((title) =>
-          renderTitleGroup(title, byTitle.get(title) ?? [], project, build, hasMultipleViewports),
-        )}
-      </div>
+      {renderTitleList(byTitle, project, build, multi)}
     </DocumentLayout>
   );
 }
 
-// oxlint-disable-next-line typescript/promise-function-async -- Hono JSX may return Promise<HtmlEscapedString>
+function renderLibraryHeader(
+  project: Project,
+  build: Build,
+  storyCount: number,
+  branches: string[],
+): HtmlEscapedString | Promise<HtmlEscapedString> {
+  return (
+    <div class="page-header">
+      <div class="page-header__row">
+        <div>
+          <h1 class="page-header__title">Library</h1>
+          <p class="page-header__desc">
+            {storyCount} stories · Latest build{" "}
+            <a href={`/projects/${project.slug}/builds/${build.id}`}>
+              {build.gitBranch} · {build.gitSha.slice(0, 7)}
+            </a>{" "}
+            · {new Date(build.createdAt).toLocaleString()} · {build.status}
+          </p>
+        </div>
+        <div class="page-header__actions">{renderBranchPicker(project, build, branches)}</div>
+      </div>
+    </div>
+  );
+}
+
+function renderBranchPicker(
+  project: Project,
+  build: Build,
+  branches: string[],
+): HtmlEscapedString | Promise<HtmlEscapedString> {
+  return (
+    <form
+      method="get"
+      action={`/projects/${project.slug}/library`}
+      style="display:flex; gap:.5rem; align-items:center;"
+    >
+      <label class="field__label" for="branch-picker" style="margin:0;">
+        Branch
+      </label>
+      <select
+        id="branch-picker"
+        name="branch"
+        class="field__input"
+        style="min-height:44px; padding:.4rem .6rem;"
+      >
+        {branches.map((b) => (
+          <option value={b} selected={b === build.gitBranch ? true : undefined}>
+            {b}
+          </option>
+        ))}
+      </select>
+      <button class="btn btn--secondary" type="submit">
+        View
+      </button>
+    </form>
+  );
+}
+
+function renderTitleList(
+  byTitle: Map<string, Snapshot[]>,
+  project: Project,
+  build: Build,
+  multi: boolean,
+): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const titles = [...byTitle.keys()].toSorted((a, b) => a.localeCompare(b));
+  return (
+    <div style="display:grid; gap:1.5rem;">
+      {titles.map((title) =>
+        renderTitleGroup(title, byTitle.get(title) ?? [], project, build, multi),
+      )}
+    </div>
+  );
+}
+
 function renderTitleGroup(
   title: string,
   group: Snapshot[],
@@ -174,7 +260,6 @@ function groupByViewport(group: Snapshot[]): Map<string, Snapshot[]> {
   return map;
 }
 
-// oxlint-disable-next-line typescript/promise-function-async -- Hono JSX may return Promise<HtmlEscapedString>
 function renderViewportGroup(
   vName: string,
   snaps: Snapshot[],
@@ -188,18 +273,14 @@ function renderViewportGroup(
         <h3 style="margin:0 0 .5rem; font-size:.9rem; color:var(--text-secondary);">{vName}</h3>
       ) : null}
       <div class="snapshot-grid">
-        {
-          // oxlint-disable-next-line typescript/promise-function-async -- Hono JSX may return Promise<HtmlEscapedString>
-          snaps
-            .toSorted((a, b) => a.storyName.localeCompare(b.storyName))
-            .map((snap) => renderSnapshotCard(snap, project, build))
-        }
+        {snaps
+          .toSorted((a, b) => a.storyName.localeCompare(b.storyName))
+          .map((snap) => renderSnapshotCard(snap, project, build))}
       </div>
     </div>
   );
 }
 
-// oxlint-disable-next-line typescript/promise-function-async -- Hono JSX may return Promise<HtmlEscapedString>
 function renderSnapshotCard(
   snap: Snapshot,
   project: Project,
