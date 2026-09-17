@@ -64,6 +64,8 @@ export interface PuppeteerRenderInput {
   playTimeoutMs?: number;
   runA11y?: boolean;
   browser?: BrowserName;
+  /** Test/extension seam: story source adapter (defaults to `StorybookAdapter`). */
+  adapter?: StorySourceAdapter;
 }
 
 interface ScreenshotContext {
@@ -103,7 +105,7 @@ async function renderAll(
     args: runnerOptions.args ?? ["--no-sandbox", "--disable-setuid-sandbox"],
   });
   active.browser = browser;
-  const adapter = new StorybookAdapter();
+  const adapter = input.adapter ?? new StorybookAdapter();
   const ctx: ScreenshotContext & {
     executePlay?: boolean;
     playTimeoutMs?: number;
@@ -188,6 +190,7 @@ async function captureScreenshot(
   await page.setViewport({ width: viewport.width, height: viewport.height });
   try {
     await page.goto(ctx.adapter.buildUrl(ctx.baseUrl, story.id), { waitUntil: "networkidle0" });
+    await ctx.adapter.waitForReady?.(page);
     if (ctx.adapter.screenshotSelector) {
       await page.waitForSelector(ctx.adapter.screenshotSelector, { visible: false });
       const delay = story.parameters?.delay ?? 500;

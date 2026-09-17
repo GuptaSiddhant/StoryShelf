@@ -54,12 +54,28 @@ export interface StoryEntry {
   parameters?: StoryParameters;
 }
 
+/** Minimal structural page handle handed to `StorySourceAdapter.waitForReady`. */
+export interface CapturePage {
+  evaluate(
+    pageFunction: string | ((...args: unknown[]) => unknown),
+    arg?: unknown,
+  ): Promise<unknown>;
+  waitForSelector(selector: string, options?: Record<string, unknown>): Promise<unknown>;
+}
+
 /** Adapter that discovers and renders stories from a Storybook build. */
 export interface StorySourceAdapter {
   name: string;
   discover(source: string): Promise<StoryEntry[]>;
   buildUrl(baseUrl: string, storyId: string): string;
   screenshotSelector?: string;
+  /**
+   * Optional hook invoked after navigation and before the screenshot sequence,
+   * letting a custom source wait until it is ready to capture. The built-in
+   * Storybook adapter leaves this undefined (rendered via iframe). See
+   * ADR 0005.
+   */
+  waitForReady?(page: CapturePage): Promise<void>;
 }
 
 /** A viewport size at which stories are captured. */

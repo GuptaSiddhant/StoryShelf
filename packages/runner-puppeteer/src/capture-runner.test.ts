@@ -3,9 +3,9 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createPlaywrightCaptureRunner } from "./capture-runner.ts";
+import { createPuppeteerCaptureRunner } from "./capture-runner.ts";
 
-const playwright = vi.hoisted(() => {
+const puppeteer = vi.hoisted(() => {
   let closed = false;
   const pendingGotos: ((error: Error) => void)[] = [];
   let lastBrowser: typeof browser | null = null;
@@ -22,6 +22,9 @@ const playwright = vi.hoisted(() => {
         pendingGotos.push(reject);
       });
     },
+    setViewport: async (): Promise<void> => {
+      await Promise.resolve();
+    },
     waitForSelector: async (): Promise<unknown> => {
       await Promise.resolve();
       return null;
@@ -29,12 +32,10 @@ const playwright = vi.hoisted(() => {
     evaluate: async (): Promise<void> => {
       await Promise.resolve();
     },
-    locator: (): { boundingBox: () => Promise<null> } => ({
-      boundingBox: async (): Promise<null> => {
-        await Promise.resolve();
-        return null;
-      },
-    }),
+    $: async (): Promise<null> => {
+      await Promise.resolve();
+      return null;
+    },
     screenshot: async (): Promise<Buffer> => {
       await Promise.resolve();
       return Buffer.from([0]);
@@ -60,14 +61,12 @@ const playwright = vi.hoisted(() => {
   };
   return {
     browser,
-    chromium: {
-      launch: async (): Promise<typeof browser> => {
-        closed = false;
-        browser.closed = false;
-        lastBrowser = browser;
-        await Promise.resolve();
-        return browser;
-      },
+    launch: async (): Promise<typeof browser> => {
+      closed = false;
+      browser.closed = false;
+      lastBrowser = browser;
+      await Promise.resolve();
+      return browser;
     },
     lastBrowser: (): typeof browser | null => lastBrowser,
     configureHang: (hang: boolean): void => {
@@ -76,7 +75,7 @@ const playwright = vi.hoisted(() => {
   };
 });
 
-vi.mock("playwright-core", () => ({ chromium: playwright.chromium }));
+vi.mock("puppeteer-core", () => ({ default: { launch: puppeteer.launch } }));
 
 const STORIES: StoryEntry[] = [
   {
@@ -104,10 +103,10 @@ afterEach(async () => {
   await rm(tmp, { recursive: true, force: true });
 });
 
-describe("createPlaywrightCaptureRunner.render", () => {
+describe("createPuppeteerCaptureRunner.render", () => {
   it("reports a story as failed when the in-flight browser is cancelled", async () => {
-    const runner = createPlaywrightCaptureRunner();
-    playwright.configureHang(true);
+    const runner = createPuppeteerCaptureRunner();
+    puppeteer.configureHang(true);
     const renderPromise = runner.render({
       buildId: "build-1",
       storybookDir,
@@ -124,12 +123,12 @@ describe("createPlaywrightCaptureRunner.render", () => {
     expect(result.captures).toHaveLength(0);
     expect(result.failures).toHaveLength(1);
     expect(result.failures[0]?.storyId).toBe("components-button--primary");
-    const browser = playwright.lastBrowser();
+    const browser = puppeteer.lastBrowser();
     expect(browser?.closed).toBe(true);
   }, 30_000);
 
   it("resolves cancel for builds that are not rendering", async () => {
-    const runner = createPlaywrightCaptureRunner();
+    const runner = createPuppeteerCaptureRunner();
     await expect(runner.cancel("does-not-exist")).resolves.toBeUndefined();
   });
 
@@ -143,8 +142,8 @@ describe("createPlaywrightCaptureRunner.render", () => {
       buildUrl: (): string => "/",
       waitForReady,
     };
-    const runner = createPlaywrightCaptureRunner();
-    playwright.configureHang(false);
+    const runner = createPuppeteerCaptureRunner();
+    puppeteer.configureHang(false);
     const result = await runner.render({
       buildId: "build-1",
       storybookDir,

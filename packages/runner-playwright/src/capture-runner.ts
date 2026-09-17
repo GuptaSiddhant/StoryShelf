@@ -63,6 +63,8 @@ export interface PlaywrightRenderInput {
   playTimeoutMs?: number;
   runA11y?: boolean;
   browser?: BrowserName;
+  /** Test/extension seam: story source adapter (defaults to `StorybookAdapter`). */
+  adapter?: StorySourceAdapter;
 }
 
 interface ScreenshotContext {
@@ -104,7 +106,7 @@ async function renderAll(
   };
   const browser = await launchBrowser();
   active.browser = browser;
-  const adapter = new StorybookAdapter();
+  const adapter = input.adapter ?? new StorybookAdapter();
   const ctx: ScreenshotContext & {
     executePlay?: boolean;
     playTimeoutMs?: number;
@@ -190,6 +192,7 @@ async function captureScreenshot(
   });
   try {
     await page.goto(ctx.adapter.buildUrl(ctx.baseUrl, story.id), { waitUntil: "networkidle" });
+    await ctx.adapter.waitForReady?.(page);
     if (ctx.adapter.screenshotSelector) {
       await page.waitForSelector(ctx.adapter.screenshotSelector, { state: "attached" });
       const delay = story.parameters?.delay ?? 500;

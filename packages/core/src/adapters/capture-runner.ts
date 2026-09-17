@@ -2,7 +2,7 @@
  * Capture-runner adapter interface: render story screenshots for a build.
  */
 import type { Logger } from "pino";
-import type { StoryEntry, Viewport } from "../capture/adapter.ts";
+import type { StoryEntry, StorySourceAdapter, Viewport } from "../capture/adapter.ts";
 import type { Adapter } from "./metadata.ts";
 
 export type { JobStatus } from "./capture-queue.ts";
@@ -78,6 +78,12 @@ export interface CaptureRunner extends Adapter<{
     runA11y?: boolean;
     /** Browser to use for rendering (chromium default). */
     browser?: BrowserName;
+    /**
+     * Test/extension seam: override the story source adapter (defaults to
+     * `StorybookAdapter`). Only the renderer uses it; discovery stays the
+     * orchestrator's job.
+     */
+    adapter?: StorySourceAdapter;
   }): Promise<RenderResult>;
 
   /** Cancel a pending or in-flight render for a build. */
