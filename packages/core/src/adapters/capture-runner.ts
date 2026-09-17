@@ -14,6 +14,8 @@ export interface RenderedSnapshot {
   story: StoryEntry;
   /** Viewport name the screenshot was captured at. */
   viewportName: string;
+  /** Exact viewport dimensions captured at; falls back to the project list lookup in the pipeline. */
+  viewport?: Viewport;
   /** PNG screenshot bytes. */
   screenshot: Buffer;
 }

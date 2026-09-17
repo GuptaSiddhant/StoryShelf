@@ -36,7 +36,7 @@ Project-scoped; global `ShelfConfig.viewports` stays the default for viewports.
 
 `StoryEntry.parameters?: StoryParameters` where `StoryParameters {disableSnapshot?, delay?, diffThreshold?, pauseAnimationAtEnd?, flakyTest?}`.
 
-`StorybookAdapter.discover()` merges file-based parameters (`stories.json` preferred, fallback `index.json` + runtime `page.evaluate(() => __STORYBOOK_PREVIEW__.extract()[id].parameters)` for SB 8 without `buildStoriesJson`) as `{...chromatic, ...storyshelf}`. Existing Chromatic repos work unchanged.
+`StorybookAdapter.discover()` merges file-based parameters (`stories.json` preferred, fallback `index.json` + runtime `page.evaluate(() => __STORYBOOK_PREVIEW__.extract()[id].parameters)` for SB 8 without `buildStoriesJson`) as `{...chromatic, ...storyshelf}`; the runtime fallback runs once per build and is cached across stories/viewports (feature #81). Existing Chromatic repos work unchanged.
 
 Flaky detection: `isFlaky = tags?.some(t => t.toLowerCase() === 'flaky-test') || merged?.flakyTest === true`. Whole-story, case-insensitive, no custom tag name (single `flaky-test`).
 
@@ -65,7 +65,7 @@ Per review, UI waive is not a good use of resources — flaky should be marked `
 
 | Alternative | Why rejected |
 |-------------|--------------|
-| Full `parameters.chromatic` passthrough (modes/themes/viewports per story) | Scope creep; per-story viewports already deferred, global `viewports` suffices for v1 |
+| Full `parameters.chromatic` passthrough (modes/themes per story) | Scope creep; modes/themes deferred. Per-story **viewports** shipped separately (issue #82): `parameters.viewport` default resolves against the built-in MINIMAL_VIEWPORTS, captured in addition to the project's global list (union, deduped by name) |
 | Custom `flaky` tag name per project | Unneeded complexity; single `flaky-test` (case-insensitive) covers both `chromatic` and `storyshelf` users |
 | Per-viewport flaky (one viewport flaky, one blocking) | Tags are story-level; viewport-level would require `parameters` per viewport, deferred |
 | Host externally-generated JUnit/coverage reports | Orthogonal report-hub feature; interaction testing is the higher-leverage complement to visual diff |
@@ -82,7 +82,7 @@ Per review, UI waive is not a good use of resources — flaky should be marked `
 
 **Negative:**
 - One extra project migration (`execute_play`, `play_timeout_ms`) needed for `db-sqlite`/`db-turso`.
-- Runtime `page.evaluate` fallback adds ~1 evaluate per story when `stories.json` missing — negligible but extra browser round-trip.
+- Runtime `page.evaluate` fallback adds ~1 evaluate **per run** (cached, not per story) when `stories.json`/`index.json` carries no parameters — negligible but an extra round-trip.
 - Flaky stories still charge capture time + storage (unlike `disableSnapshot`).
 
 ## Links

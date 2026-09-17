@@ -294,6 +294,11 @@ Capture is CPU/IO-heavy and long-running (minutes to tens of minutes). It must n
 
 ### Story Source Adapter
 
+> Want to understand what happens *inside* the Storybook StoryShelf captures — the iframe, the
+> channel/postMessage protocol, `#storybook-root`, `play` functions, and the index files `discover()`
+> reads? See [`storybook-internals.md`](./storybook-internals.md), a study guide mapping Storybook's
+> internals to this interface and chapter 10 for what the capture pipeline could do next.
+
 ```typescript
 interface StorySourceAdapter {
   name: string;
@@ -818,7 +823,7 @@ See `docs/website.md`. The public site (`apps/website/`, Astro Starlight) hosts 
 1. **TurboSnap / `--only-changed`** -- v1 re-renders every story on every build. Functionally correct (unchanged stories auto-approve), but server CPU scales linearly with story count. This is the top scaling limit.
 2. **Git-provider merge gate (GitHub App / GitLab)** -- rich check runs, per-snapshot annotations, and auto-reject on review rejection. v1 has the primitive (required commit status); the full integration is ADR 0010.
 3. **Remote capture runners** -- offload capture to a worker fleet (SQS/HTTP). The `CaptureRunner` interface anticipates this.
-4. **`parameters.chromatic` equivalents** -- `modes`/themes, per-story `delay`, `disableSnapshot`. `waitForReady` covers the basic "wait for data" case only.
+4. **`parameters.chromatic` equivalents** -- `modes`/themes (args matrix). Per-story `delay`, `disableSnapshot`, `flakyTest`, `autoCrop`/sizing are implemented; `waitForReady` covers the basic "wait for data" case.
 5. **Ladle / Histoire / custom pages** -- the `StorySourceAdapter` interface anticipates them.
-6. **Per-story `delay` / viewport presets per project** -- global viewport defaults only in v1.
+6. **Per-story viewport presets** -- a story's Storybook `defaultViewport` is captured **in addition to** the project's global list (union, deduped by name; issue #82), including inline `parameters.viewport.viewports`. Global defaults remain the project-level surface.
 7. **Linked projects / design-system propagation** -- when a design-system project approves a change, re-diff dependent projects against the new baseline. Not urgent; modeled as a future dependency edge between projects.

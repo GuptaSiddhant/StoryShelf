@@ -179,4 +179,26 @@ describe("persistCapture", () => {
     const build = await ctx.db.get(builds, "b1");
     expect(build?.status).toBe("reviewing");
   });
+
+  it("uses the renderer's viewport dims for a story-only viewport not in the project list", async () => {
+    const tablet: Viewport = { name: "tablet", width: 834, height: 1112 };
+    const { ctx } = await makeContext({
+      captures: [
+        {
+          story: storyOf("a"),
+          viewportName: tablet.name,
+          viewport: tablet,
+          screenshot: png(4, 4, [0, 255, 0]),
+        },
+      ],
+    });
+
+    await persistCapture(ctx);
+
+    const rows = await ctx.db.list(snapshots);
+    const row = rows.find((snapshot) => snapshot.storyId === "a");
+    expect(row?.viewportName).toBe("tablet");
+    expect(row?.viewportWidth).toBe(834);
+    expect(row?.viewportHeight).toBe(1112);
+  });
 });

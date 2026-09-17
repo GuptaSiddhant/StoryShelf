@@ -13,13 +13,20 @@ export {
   type StoryEntry,
   type StoryParameters,
   type StorySourceAdapter,
+  type StoryViewportConfig,
+  type StoryViewportDefinition,
   type Viewport,
 } from "./adapter.ts";
 export { executeCaptureJob, type CaptureJobOptions } from "./orchestrator.ts";
 export { persistCapture, type CaptureContext } from "./pipeline.ts";
 export { InMemoryCaptureQueue, type InMemoryCaptureQueueOptions } from "./queue.ts";
 export type { PollableCaptureQueue, PollableJob } from "../adapters/capture-queue.ts";
-export { StorybookAdapter, mergeParameters } from "./storybook.ts";
+export {
+  STORYBOOK_BUILTIN_VIEWPORTS,
+  StorybookAdapter,
+  mergeParameters,
+  resolveStoryViewports,
+} from "./storybook.ts";
 export { createDispatchJob, type CaptureDispatchJob, type DispatchDeps } from "./dispatch.ts";
 export { extractStorybookToScratch, persistStorybookStatics } from "./statics.ts";
 export {

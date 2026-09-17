@@ -157,6 +157,30 @@ describe("StorybookAdapter.discover", () => {
     });
   });
 
+  it("carries Storybook viewport config through parameters", async () => {
+    const adapter = new StorybookAdapter();
+    const index = {
+      v: 5,
+      entries: {
+        s1: {
+          id: "s1",
+          title: "T",
+          name: "N",
+          type: "story",
+          subtype: "story",
+          tags: [],
+          parameters: {
+            viewport: { defaultViewport: "tablet" },
+          },
+        },
+      },
+    };
+    await withIndex(index, async (dir) => {
+      const [s] = await adapter.discover(dir);
+      expect(s?.parameters).toEqual({ viewport: { defaultViewport: "tablet" } });
+    });
+  });
+
   it("builds iframe URL correctly", () => {
     const adapter = new StorybookAdapter();
     expect(adapter.buildUrl("http://127.0.0.1:1234", "a--b")).toBe(

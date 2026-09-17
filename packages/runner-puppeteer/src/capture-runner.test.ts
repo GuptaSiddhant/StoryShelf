@@ -209,4 +209,47 @@ describe("createPuppeteerCaptureRunner.render", () => {
     expect(result.captures).toHaveLength(1);
     expect(result.captures[0]?.story.parameters).toEqual({ delay: 250, diffThreshold: 0.2 });
   }, 30_000);
+
+  it("captures at the story's default viewport in addition to the global list", async () => {
+    const story: StoryEntry = {
+      id: "components-button--primary",
+      title: "Components/Button",
+      name: "Primary",
+      type: "story",
+      parameters: { viewport: { defaultViewport: "tablet" } },
+    };
+    const runner = createPuppeteerCaptureRunner();
+    puppeteer.configureHang(false);
+    const result = await runner.render({
+      buildId: "build-1",
+      storybookDir,
+      stories: [story],
+      viewports: VIEWPORTS,
+    });
+
+    expect(result.captures).toHaveLength(2);
+    expect(result.captures.map((c) => c.viewportName)).toEqual(["desktop", "tablet"]);
+    expect(result.captures[1]?.viewport).toEqual({ name: "tablet", width: 834, height: 1112 });
+  }, 30_000);
+
+  it("does not duplicate a story default that matches a global viewport name", async () => {
+    const story: StoryEntry = {
+      id: "components-button--primary",
+      title: "Components/Button",
+      name: "Primary",
+      type: "story",
+      parameters: { viewport: { defaultViewport: "desktop" } },
+    };
+    const runner = createPuppeteerCaptureRunner();
+    puppeteer.configureHang(false);
+    const result = await runner.render({
+      buildId: "build-1",
+      storybookDir,
+      stories: [story],
+      viewports: VIEWPORTS,
+    });
+
+    expect(result.captures).toHaveLength(1);
+    expect(result.captures.map((c) => c.viewportName)).toEqual(["desktop"]);
+  }, 30_000);
 });

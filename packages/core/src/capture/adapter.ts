@@ -1,3 +1,18 @@
+/** A custom viewport registered on a story via `parameters.viewport`. */
+export interface StoryViewportDefinition {
+  name?: string;
+  styles?: {
+    width?: string | number;
+    height?: string | number;
+  };
+}
+
+/** Storybook `parameters.viewport` config; carried through discovery for per-story viewport capture. */
+export interface StoryViewportConfig {
+  defaultViewport?: string;
+  viewports?: Record<string, StoryViewportDefinition>;
+}
+
 /** Per-story capture parameters from the Storybook index. */
 export interface StoryParameters {
   disableSnapshot?: boolean;
@@ -20,6 +35,8 @@ export interface StoryParameters {
   burst?: number;
   /** Whether to wait for fonts.ready before screenshot; default true when burst >1. */
   waitForFonts?: boolean;
+  /** Storybook viewport config; adds the story's default viewport to the project list at capture time. */
+  viewport?: StoryViewportConfig;
 }
 
 /** Return whether a story is marked flaky (failures stay non-blocking). */

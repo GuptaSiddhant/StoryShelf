@@ -7,7 +7,12 @@ import type {
   StorySourceAdapter,
   Viewport,
 } from "@storyshelf/core/adapter/capture-runner";
-import { StorybookAdapter, getScreenshotPlan, mergeParameters } from "@storyshelf/core/capture";
+import {
+  StorybookAdapter,
+  getScreenshotPlan,
+  mergeParameters,
+  resolveStoryViewports,
+} from "@storyshelf/core/capture";
 import type { StoryParameters } from "@storyshelf/core/capture";
 import type { Logger } from "@storyshelf/core/logger";
 import puppeteer, { type Browser } from "puppeteer-core";
@@ -209,8 +214,8 @@ async function renderAll(
   const captures: RenderedSnapshot[] = [];
   const failures: RenderResult["failures"] = [];
   try {
-    const tasks = input.viewports.flatMap((viewport) =>
-      input.stories.map(async (story) => {
+    const tasks = input.stories.flatMap((story) =>
+      resolveStoryViewports(story, input.viewports).map(async (viewport) => {
         if (active.cancelled) {
           throw new Error("Capture cancelled");
         }
@@ -220,7 +225,12 @@ async function renderAll(
             a11yViolations,
             story: renderedStory,
           } = await captureScreenshot(ctx, story, viewport);
-          captures.push({ story: renderedStory, viewportName: viewport.name, screenshot });
+          captures.push({
+            story: renderedStory,
+            viewportName: viewport.name,
+            viewport,
+            screenshot,
+          });
           if (a11yViolations.length > 0) {
             failures.push({
               storyId: story.id,

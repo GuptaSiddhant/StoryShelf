@@ -111,7 +111,7 @@ function viewportByName(ctx: CaptureContext, name: string): Viewport {
 }
 
 async function persistSnapshot(ctx: CaptureContext, capture: RenderedSnapshot): Promise<void> {
-  const viewport = viewportByName(ctx, capture.viewportName);
+  const viewport = capture.viewport ?? viewportByName(ctx, capture.viewportName);
   const screenshot = screenshotPath(
     ctx.project.id,
     ctx.build.id,
