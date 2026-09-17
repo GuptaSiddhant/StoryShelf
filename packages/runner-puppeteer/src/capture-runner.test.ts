@@ -3,13 +3,18 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createPuppeteerCaptureRunner } from "./capture-runner.ts";
+import {
+  createPuppeteerCaptureRunner,
+  createRuntimeParamsState,
+  runtimeParametersForStory,
+} from "./capture-runner.ts";
 
 const puppeteer = vi.hoisted(() => {
   let closed = false;
   const pendingGotos: ((error: Error) => void)[] = [];
   let lastBrowser: typeof browser | null = null;
   let hangNextGoto = true;
+  let extractResult: unknown;
   const makePage = () => ({
     goto: async (): Promise<void> => {
       if (closed) {
@@ -29,8 +34,9 @@ const puppeteer = vi.hoisted(() => {
       await Promise.resolve();
       return null;
     },
-    evaluate: async (): Promise<void> => {
+    evaluate: async (): Promise<unknown> => {
       await Promise.resolve();
+      return extractResult;
     },
     $: async (): Promise<null> => {
       await Promise.resolve();
@@ -71,6 +77,9 @@ const puppeteer = vi.hoisted(() => {
     lastBrowser: (): typeof browser | null => lastBrowser,
     configureHang: (hang: boolean): void => {
       hangNextGoto = hang;
+    },
+    setExtractResult: (map: unknown): void => {
+      extractResult = map;
     },
   };
 });
@@ -154,5 +163,50 @@ describe("createPuppeteerCaptureRunner.render", () => {
 
     expect(result.captures).toHaveLength(1);
     expect(waitForReady).toHaveBeenCalledTimes(1);
+  }, 30_000);
+
+  it("enriches parameters from the runtime preview once per run", async () => {
+    const runtime = createRuntimeParamsState();
+    let evaluateCalls = 0;
+    const page = {
+      evaluate: async (): Promise<unknown> => {
+        evaluateCalls += 1;
+        return {
+          "components-button--primary": {
+            parameters: { chromatic: { delay: 250 }, storyshelf: { diffThreshold: 0.2 } },
+          },
+        };
+      },
+    };
+    const params = await runtimeParametersForStory(runtime, page, "components-button--primary");
+    await runtimeParametersForStory(runtime, page, "components-button--primary");
+
+    expect(params).toEqual({ delay: 250, diffThreshold: 0.2 });
+    expect(evaluateCalls).toBe(1);
+  });
+
+  it("falls back to runtime parameters when the index carries none", async () => {
+    puppeteer.setExtractResult({
+      "components-button--primary": {
+        parameters: { chromatic: { delay: 250 }, storyshelf: { diffThreshold: 0.2 } },
+      },
+    });
+    const adapter = {
+      name: "fake",
+      discover: async (): Promise<StoryEntry[]> => [],
+      buildUrl: (): string => "/",
+    };
+    const runner = createPuppeteerCaptureRunner();
+    puppeteer.configureHang(false);
+    const result = await runner.render({
+      buildId: "build-1",
+      storybookDir,
+      stories: STORIES,
+      viewports: VIEWPORTS,
+      adapter,
+    });
+
+    expect(result.captures).toHaveLength(1);
+    expect(result.captures[0]?.story.parameters).toEqual({ delay: 250, diffThreshold: 0.2 });
   }, 30_000);
 });

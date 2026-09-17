@@ -7,8 +7,8 @@ import type {
   StorySourceAdapter,
   Viewport,
 } from "@storyshelf/core/adapter/capture-runner";
-import { StorybookAdapter } from "@storyshelf/core/capture";
-import { getScreenshotPlan } from "@storyshelf/core/capture";
+import { StorybookAdapter, getScreenshotPlan, mergeParameters } from "@storyshelf/core/capture";
+import type { StoryParameters } from "@storyshelf/core/capture";
 import type { Logger } from "@storyshelf/core/logger";
 import puppeteer, { type Browser } from "puppeteer-core";
 import { createStaticServer } from "./static-server.ts";
@@ -74,6 +74,92 @@ interface ScreenshotContext {
   baseUrl: string;
 }
 
+/** Per-run cache of story parameters read from the running preview. */
+export interface RuntimeParamsState {
+  extractFailed?: boolean;
+  extractPromise?: Promise<Map<string, StoryParameters>>;
+}
+
+/** Create the per-run runtime-parameter cache shared across captures. */
+export function createRuntimeParamsState(): RuntimeParamsState {
+  return {};
+}
+
+/** A page handle able to run the extraction script. */
+type RuntimeParamsPage = {
+  evaluate: (pageFunction: unknown, ...args: unknown[]) => Promise<unknown>;
+};
+
+interface ExtractedEntry {
+  parameters?: { chromatic?: StoryParameters; storyshelf?: StoryParameters };
+}
+
+/**
+ * Read story parameters from the running preview via
+ * `__STORYBOOK_PREVIEW__.extract()`, once per run and lazily. Fills the
+ * ADR 0017 gap for SB 8 builds without `buildStoriesJson`, where the index
+ * carries no parameters at all. The evaluate runs on whichever capture page
+ * triggers it first; results are cached in the shared state for every
+ * subsequent story/viewport so there is a single extra browser round-trip per
+ * build (not per story).
+ */
+export async function runtimeParametersForStory(
+  state: RuntimeParamsState,
+  page: RuntimeParamsPage,
+  storyId: string,
+): Promise<StoryParameters | undefined> {
+  const map = state.extractFailed ? undefined : await extractedParametersMap(state, page);
+  return map?.get(storyId);
+}
+
+async function extractedParametersMap(
+  state: RuntimeParamsState,
+  page: RuntimeParamsPage,
+): Promise<Map<string, StoryParameters>> {
+  state.extractPromise ??= loadExtractedParametersMap(state, page);
+  return await state.extractPromise;
+}
+
+async function loadExtractedParametersMap(
+  state: RuntimeParamsState,
+  page: RuntimeParamsPage,
+): Promise<Map<string, StoryParameters>> {
+  let raw: Record<string, ExtractedEntry> | null;
+  try {
+    raw = await readExtractedParameters(page);
+  } catch {
+    state.extractFailed = true;
+    return new Map();
+  }
+  const out = new Map<string, StoryParameters>();
+  if (raw) {
+    for (const [id, entry] of Object.entries(raw)) {
+      const merged = mergeParameters(entry);
+      if (merged) out.set(id, merged);
+    }
+  }
+  if (out.size === 0) state.extractFailed = true;
+  return out;
+}
+
+async function readExtractedParameters(
+  page: RuntimeParamsPage,
+): Promise<Record<string, ExtractedEntry> | null> {
+  const map = (await page.evaluate(() => {
+    const win = globalThis as unknown as {
+      __STORYBOOK_PREVIEW__?: { extract?: () => unknown };
+    };
+    // oxlint-disable-next-line typescript/dot-notation -- __STORYBOOK_PREVIEW__ is a Storybook global
+    const preview = win["__STORYBOOK_PREVIEW__"];
+    if (!preview || typeof preview.extract !== "function") return null;
+    const extracted = preview.extract();
+    return extracted && typeof extracted === "object"
+      ? (extracted as Record<string, ExtractedEntry>)
+      : null;
+  })) as Record<string, ExtractedEntry> | null;
+  return map && Object.keys(map).length > 0 ? map : null;
+}
+
 /** A render that may currently be in flight, so that `cancel` can abort it. */
 interface ActiveRun {
   cancelled: boolean;
@@ -110,6 +196,7 @@ async function renderAll(
     executePlay?: boolean;
     playTimeoutMs?: number;
     runA11y?: boolean;
+    runtimeParams: RuntimeParamsState;
   } = {
     browser,
     adapter,
@@ -117,6 +204,7 @@ async function renderAll(
     executePlay: input.executePlay,
     playTimeoutMs: input.playTimeoutMs,
     runA11y: input.runA11y,
+    runtimeParams: createRuntimeParamsState(),
   };
   const captures: RenderedSnapshot[] = [];
   const failures: RenderResult["failures"] = [];
@@ -127,8 +215,12 @@ async function renderAll(
           throw new Error("Capture cancelled");
         }
         try {
-          const { screenshot, a11yViolations } = await captureScreenshot(ctx, story, viewport);
-          captures.push({ story, viewportName: viewport.name, screenshot });
+          const {
+            screenshot,
+            a11yViolations,
+            story: renderedStory,
+          } = await captureScreenshot(ctx, story, viewport);
+          captures.push({ story: renderedStory, viewportName: viewport.name, screenshot });
           if (a11yViolations.length > 0) {
             failures.push({
               storyId: story.id,
@@ -182,15 +274,29 @@ async function safeCloseServer(server: { close(): Promise<void> }): Promise<void
 }
 
 async function captureScreenshot(
-  ctx: ScreenshotContext & { executePlay?: boolean; playTimeoutMs?: number; runA11y?: boolean },
-  story: StoryEntry,
+  ctx: ScreenshotContext & {
+    executePlay?: boolean;
+    playTimeoutMs?: number;
+    runA11y?: boolean;
+    runtimeParams: RuntimeParamsState;
+  },
+  inputStory: StoryEntry,
   viewport: Viewport,
-): Promise<{ screenshot: Buffer; a11yViolations: string[] }> {
+): Promise<{ screenshot: Buffer; a11yViolations: string[]; story: StoryEntry }> {
+  let story = inputStory;
   const page = await ctx.browser.newPage();
   await page.setViewport({ width: viewport.width, height: viewport.height });
   try {
     await page.goto(ctx.adapter.buildUrl(ctx.baseUrl, story.id), { waitUntil: "networkidle0" });
     await ctx.adapter.waitForReady?.(page);
+    if (!story.parameters) {
+      const params = await runtimeParametersForStory(
+        ctx.runtimeParams,
+        page as unknown as RuntimeParamsPage,
+        story.id,
+      );
+      if (params) story = { ...story, parameters: params };
+    }
     if (ctx.adapter.screenshotSelector) {
       await page.waitForSelector(ctx.adapter.screenshotSelector, { visible: false });
       const delay = story.parameters?.delay ?? 500;
@@ -346,7 +452,7 @@ async function captureScreenshot(
       shots[Math.floor(shots.length / 2)] ??
       shots[0] ??
       ((await page.screenshot({ type: "png" })) as Buffer);
-    return { screenshot, a11yViolations };
+    return { screenshot, a11yViolations, story };
   } finally {
     await page.close();
   }

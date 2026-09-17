@@ -19,7 +19,8 @@ interface StorybookIndex {
   >;
 }
 
-function mergeParameters(entry: {
+/** Merge the `chromatic` and `storyshelf` parameter layers (`storyshelf` wins). */
+export function mergeParameters(entry: {
   parameters?: { chromatic?: StoryParameters; storyshelf?: StoryParameters };
 }): StoryParameters | undefined {
   const merged: StoryParameters = {
