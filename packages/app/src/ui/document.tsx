@@ -190,6 +190,13 @@ const Sidebar: FC<{ nav?: NavConfig }> = ({ nav }) => {
               <span aria-hidden="true">⌗</span> Labels
             </a>
             <a
+              class={`sidebar__link ${nav.active === "library" ? "sidebar__link--active" : ""}`}
+              href={`/projects/${nav.projectSlug}/library`}
+              aria-current={nav.active === "library" ? "page" : undefined}
+            >
+              <span aria-hidden="true">▤</span> Library
+            </a>
+            <a
               class={`sidebar__link ${nav.active === "settings" ? "sidebar__link--active" : ""}`}
               href={`/projects/${nav.projectSlug}/settings`}
               aria-current={nav.active === "settings" ? "page" : undefined}

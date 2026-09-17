@@ -19,6 +19,7 @@ import { renderBuildDetailPage } from "../pages/build-detail.tsx";
 import { renderBuildDiffPage } from "../pages/build-diff.tsx";
 import { renderComputeJobsPage, renderActiveQueue } from "../pages/compute-jobs.tsx";
 import { renderLabelDetailPage, renderLabelsPage } from "../pages/label-detail.tsx";
+import { renderLibraryPage } from "../pages/library.tsx";
 import { renderProjectBuildsPage } from "../pages/project-builds.tsx";
 import { renderProjectCreatePage } from "../pages/project-create.tsx";
 import { renderProjectsPage } from "../pages/projects.tsx";
@@ -225,6 +226,14 @@ export function registerUiPages(app: ShelfRouter): void {
     const base = `/projects/${slug}/labels/${key}/`;
     const value = c.req.path.startsWith(base) ? decodeRest(c.req.path.slice(base.length)) : "";
     const html = await renderLabelDetailPage(slug, key, value);
+    if (!html) {
+      return c.notFound();
+    }
+    return c.html(html);
+  });
+
+  app.get("/projects/:slug/library", async (c) => {
+    const html = await renderLibraryPage(c.req.param("slug"));
     if (!html) {
       return c.notFound();
     }
