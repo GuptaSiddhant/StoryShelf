@@ -1,11 +1,13 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { LabelModel } from "@storyshelf/core/models";
+import { MemberModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
 import type { ProjectRole } from "@storyshelf/core/types";
 import {
   buildLabels,
   builds,
   labelTypes,
+  projectMembers,
   projects as projectsTable,
 } from "@storyshelf/db-sqlite/schema";
 import type { ShelfRouter } from "../app-types.ts";
@@ -110,11 +112,15 @@ export function registerProjects(app: ShelfRouter): void {
   });
 
   app.openapi(createProjectRoute, async (c) => {
-    requireSiteAdmin();
+    requireSiteAdmin(c);
     const body = c.req.valid("json");
     const projects = new ProjectModel(getStore().db, { projects: projectsTable });
     const project = await projects.create(body);
     await new LabelModel(getStore().db, { builds, buildLabels, labelTypes }).seedFor(project.id);
+    const creator = getStore().user;
+    if (creator) {
+      await new MemberModel(getStore().db, { projectMembers }).set(project.id, creator.id, "admin");
+    }
     return c.json(project, 201);
   });
 
@@ -135,7 +141,7 @@ export function registerProjects(app: ShelfRouter): void {
   });
 
   app.openapi(deleteProjectRoute, async (c) => {
-    requireSiteAdmin();
+    requireSiteAdmin(c);
     const { slug } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...VIEW_ROLES);
     await new ProjectModel(getStore().db, { projects: projectsTable }).remove(project.id);

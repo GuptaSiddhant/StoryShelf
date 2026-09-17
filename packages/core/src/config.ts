@@ -48,6 +48,12 @@ export interface AdapterSnapshot {
 /** Shelf-level configuration (validated by {@link shelfConfigSchema}). */
 export interface ShelfConfig {
   secret?: string;
+  /**
+   * Bootstrap site-admin bearer token (`STORYSHELF_ADMIN_TOKEN`/`ADMIN_TOKEN`).
+   * Grants site-admin API access when no admin user exists yet; never
+   * mint sessions from it. Distinct from `secret` (session signing).
+   */
+  adminToken?: string;
   publishedBaseDomain?: string;
   captureConcurrency?: number;
   scratchDir?: string;
@@ -92,6 +98,7 @@ const adapterSnapshotSchema: z.ZodType<AdapterSnapshot> = z.object({
 export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
   .object({
     secret: z.string().min(1).optional(),
+    adminToken: z.string().min(1).optional(),
     publishedBaseDomain: z.string().optional(),
     captureConcurrency: z.number().int().positive().optional(),
     scratchDir: z.string().optional(),

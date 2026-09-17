@@ -24,6 +24,7 @@ const dataDir = env["DATA_DIR"] ?? "/data";
 const port = Number(env["PORT"] ?? 3000);
 const secret = env["SECRET"];
 const authPassword = env["AUTH_PASSWORD"];
+const adminToken = env["STORYSHELF_ADMIN_TOKEN"] ?? env["ADMIN_TOKEN"];
 
 mkdirSync(dataDir, { recursive: true });
 
@@ -38,6 +39,7 @@ const app = createShelfApp({
   auth: authPassword && secret ? createPasswordAuth({ password: authPassword, secret }) : undefined,
   config: {
     secret,
+    adminToken,
     scratchDir: dataDir,
   },
 });

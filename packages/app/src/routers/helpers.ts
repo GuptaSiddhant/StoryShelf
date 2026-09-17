@@ -3,7 +3,7 @@ import { ProjectModel } from "@storyshelf/core/models";
 import { TokenModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
 import type { ProjectRole } from "@storyshelf/core/types";
-import { sha256 } from "@storyshelf/core/utils";
+import { sha256, timingSafeEqualString } from "@storyshelf/core/utils";
 import { projectMembers, projects, tokens } from "@storyshelf/db-sqlite/schema";
 import type { Context, Next } from "hono";
 import { HTTPException } from "hono/http-exception";
@@ -100,10 +100,29 @@ export async function resolveProject(c: Context, slug: string): Promise<Project>
 }
 
 /**
+ * True when the request bears the configured bootstrap admin token.
+ * Covers site-admin routes AND project routes (as admin) so a fresh
+ * instance is fully operable before any user exists. Timing-safe;
+ * unset `adminToken` never matches.
+ */
+export function requestHasAdminToken(c: Context): boolean {
+  const adminToken = getStore().config.adminToken;
+  if (!adminToken) {
+    return false;
+  }
+  const header = c.req.header("authorization");
+  if (!header?.startsWith("Bearer ")) {
+    return false;
+  }
+  return timingSafeEqualString(header.slice("Bearer ".length), adminToken);
+}
+
+/**
  * Enforce the caller's project role for a given project.
  *
  * Authorization model (ADR 0008):
  * - No auth adapter configured -> all operations permitted (development mode).
+ * - Bootstrap admin token -> grants access as admin (see `requestHasAdminToken`).
  * - Bearer token (CLI) -> grants access to its own project regardless of role.
  * - Session user -> must have an effective role in `minRoles`.
  */
@@ -131,19 +150,23 @@ export async function resolveAuthorizedProject(
   if (!found) {
     notFound("Project not found");
   }
+  if (requestHasAdminToken(c)) {
+    return found;
+  }
   await assertRole(found.id, ...minRoles);
   return found;
 }
 
 /** Require a site-level admin (or permit when auth is disabled). */
-export function requireSiteAdmin(): void {
+export function requireSiteAdmin(c: Context): void {
   if (!getStore().authEnabled) {
     return;
   }
   const { user } = getStore();
-  if (user?.role !== "admin") {
-    forbidden();
+  if (user?.role === "admin" || requestHasAdminToken(c)) {
+    return;
   }
+  forbidden();
 }
 
 /** Require the current session user to hold one of the given project roles. */

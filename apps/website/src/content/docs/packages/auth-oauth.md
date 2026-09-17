@@ -3,7 +3,7 @@ title: "@storyshelf/auth-oauth"
 description: Add OAuth and OpenID Connect login to StoryShelf.
 ---
 
-`@storyshelf/auth-oauth` authenticates users with an OpenID Connect provider such as Keycloak, Authentik, Okta, GitHub, GitLab, or Google. It uses the authorization-code flow and seven-day HMAC-signed sessions.
+`@storyshelf/auth-oauth` authenticates users with an OpenID Connect provider via the authorization-code flow, with seven-day HMAC-signed sessions. Endpoints currently follow the Keycloak layout (`{issuer}/protocol/openid-connect/{auth,token,userinfo}`), so Keycloak works out of the box and any provider exposing those paths works too; generic OIDC Discovery and per-provider presets are planned. Like all auth adapters it proves identity only — roles come from project memberships.
 
 ## Install
 

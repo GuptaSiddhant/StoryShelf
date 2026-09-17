@@ -193,7 +193,7 @@ export function registerHealth(app: ShelfRouter, deps: HealthDeps): void {
   });
 
   app.post("/api/v1/health", async (c) => {
-    requireSiteAdmin();
+    requireSiteAdmin(c);
     const settled = deps.getSettled();
     const setupErrors = collectSetupErrors(settled);
     const targets = targetsOf(deps.sources);

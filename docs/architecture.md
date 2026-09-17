@@ -796,6 +796,10 @@ services:
       - OIDC_CLIENT_SECRET=your-client-secret
       # Or for shared password auth:
       # - AUTH_PASSWORD=your-shared-password
+      # Bootstrap (optional — first site admin before any user exists):
+      # - STORYSHELF_ADMIN_TOKEN=your-long-random-token  # or ADMIN_TOKEN
+      #   `SECRET` signs sessions; `STORYSHELF_ADMIN_TOKEN` grants site-admin
+      #   API access (project creation, purge). Never the same value.
 
 volumes:
   storyshelf-data:

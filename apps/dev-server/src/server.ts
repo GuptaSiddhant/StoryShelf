@@ -22,6 +22,7 @@ const dataDir = env["DATA_DIR"] ?? ".dev-data";
 const port = Number(env["PORT"] ?? 3000);
 const secret = env["SECRET"];
 const authPassword = env["AUTH_PASSWORD"];
+const adminToken = env["STORYSHELF_ADMIN_TOKEN"] ?? env["ADMIN_TOKEN"];
 
 // Ensure the data directory exists for the sqlite file and storage.
 mkdirSync(dataDir, { recursive: true });
@@ -40,7 +41,9 @@ const app = createShelfApp({
   config: {
     // `SECRET` signs auth sessions; `scratchDir` is where an uploaded
     // Storybook archive is extracted before Playwright renders it.
+    // `STORYSHELF_ADMIN_TOKEN` bootstraps site-admin API access.
     secret,
+    adminToken,
     scratchDir: dataDir,
   },
 });

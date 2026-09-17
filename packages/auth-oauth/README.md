@@ -1,6 +1,8 @@
 # @storyshelf/auth-oauth
 
-An OAuth/OIDC auth adapter for StoryShelf: authenticates users against an OpenID Connect provider (e.g. Keycloak) via the authorization-code flow. Sessions are HMAC-signed cookies with a 7-day TTL.
+An OIDC auth adapter for StoryShelf (kept under its historic `auth-oauth` name): authenticates users against an OpenID Connect provider via the authorization-code flow. Endpoints follow the Keycloak layout (`{issuer}/protocol/openid-connect/{auth,token,userinfo}`), so any provider exposing those paths works; generic OIDC Discovery and per-provider presets are planned. Sessions are HMAC-signed cookies with a 7-day TTL.
+
+> **Scope note:** this adapter authenticates (proves identity) but never authorizes. Project roles come from memberships; new users sign in with the site `member` role. Group-to-role mapping is planned separately.
 
 ## Install
 

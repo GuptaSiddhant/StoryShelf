@@ -28,7 +28,7 @@ const purgeRoute = createRoute({
 /** Register the site-admin retention purge endpoint. */
 export function registerAdmin(app: ShelfRouter): void {
   app.openapi(purgeRoute, async (c) => {
-    requireSiteAdmin();
+    requireSiteAdmin(c);
     const body = c.req.valid("json");
     const ttlDays = body.ttlDays ?? getStore().config.purgeTtlDays ?? 30;
     const removedBuilds = await purgeBuilds(ttlDays);
