@@ -5,6 +5,7 @@ import { SnapshotModel } from "@storyshelf/core/models";
 import type { Build } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { Snapshot } from "@storyshelf/core/schema";
+import { storybookDir } from "@storyshelf/core/utils";
 import {
   buildLabels,
   builds,
@@ -12,6 +13,7 @@ import {
   snapshots as snapshotsTable,
 } from "@storyshelf/db-sqlite/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
+import { posix } from "node:path";
 import { getStore } from "../store.ts";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
@@ -20,7 +22,7 @@ export async function renderLibraryPage(
   slug: string,
   branch?: string,
 ): Promise<RenderedContent | null> {
-  const { db } = getStore();
+  const { db, storage } = getStore();
   const project = await new ProjectModel(db, { projects }).getBySlug(slug);
   if (!project) return null;
   const build = await getLibraryBuild(db, project, branch);
@@ -30,7 +32,8 @@ export async function renderLibraryPage(
   );
   if (snapshots.length === 0) return renderEmptySnapshots(project, build);
   const branches = await distinctBranches(db, project.id);
-  return renderLibraryGrid(project, build, snapshots, branches);
+  const docsByStory = await docsEntriesByStory(storage, project.id, build.id, snapshots);
+  return renderLibraryGrid(project, build, snapshots, branches, docsByStory);
 }
 
 async function getLibraryBuild(
@@ -61,6 +64,83 @@ async function distinctBranches(
     snapshots: snapshotsTable,
   }).list(projectId);
   return [...new Set(buildsList.map((b) => b.gitBranch))].toSorted((a, b) => a.localeCompare(b));
+}
+
+/** Storybook index entries (only the docs subset we need). */
+interface LibraryIndexEntry {
+  id?: string;
+  type?: string;
+}
+
+/**
+ * Map snapshot story ids to their component's docs entry id. Reads the build's
+ * Storybook index from storage and returns an empty map when statics are
+ * purged or the build has no docs entries, so the Library never links to a
+ * docs page that does not exist.
+ */
+async function docsEntriesByStory(
+  storage: ReturnType<typeof getStore>["storage"],
+  projectId: string,
+  buildId: string,
+  snapshots: Snapshot[],
+): Promise<Map<string, string>> {
+  const prefixes = await readDocsPrefixes(storage, projectId, buildId);
+  const byStory = new Map<string, string>();
+  for (const snap of snapshots) {
+    const docsId = docsEntryId(prefixes, snap.storyId);
+    if (docsId) byStory.set(snap.storyId, docsId);
+  }
+  return byStory;
+}
+
+async function readDocsPrefixes(
+  storage: ReturnType<typeof getStore>["storage"],
+  projectId: string,
+  buildId: string,
+): Promise<Set<string>> {
+  const candidates = await Promise.all(
+    ["index.json", "stories.json"].map((name) =>
+      readIndexEntries(storage, projectId, buildId, name),
+    ),
+  );
+  const prefixes = new Set<string>();
+  for (const entries of candidates) {
+    if (entries) {
+      for (const entry of Object.values(entries)) {
+        if (entry?.type === "docs" && typeof entry.id === "string" && entry.id.endsWith("--docs")) {
+          prefixes.add(entry.id.slice(0, -"--docs".length));
+        }
+      }
+      return prefixes;
+    }
+  }
+  return prefixes;
+}
+
+async function readIndexEntries(
+  storage: ReturnType<typeof getStore>["storage"],
+  projectId: string,
+  buildId: string,
+  name: string,
+): Promise<Record<string, LibraryIndexEntry> | null> {
+  try {
+    const raw = await storage.read(posix.join(storybookDir(projectId, buildId), name));
+    const parsed = JSON.parse(raw.toString("utf8")) as {
+      entries?: Record<string, LibraryIndexEntry>;
+    };
+    return parsed.entries ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function docsEntryId(prefixes: Set<string>, storyId: string): string | undefined {
+  for (const prefix of prefixes) {
+    if (storyId.startsWith(`${prefix}--`) || storyId === prefix) {
+      return `${prefix}--docs`;
+    }
+  }
+  return undefined;
 }
 
 function renderEmptyLibrary(project: Project): RenderedContent {
@@ -126,6 +206,7 @@ function renderLibraryGrid(
   build: Build,
   snapshots: Snapshot[],
   branches: string[],
+  docsByStory: Map<string, string>,
 ): RenderedContent {
   const byTitle = groupByTitle(snapshots);
   const viewportNames = distinctViewports(snapshots);
@@ -141,7 +222,7 @@ function renderLibraryGrid(
           <span class="field__hint">Viewports: {viewportNames.join(" · ")}</span>
         </div>
       ) : null}
-      {renderTitleList(byTitle, project, build, multi)}
+      {renderTitleList(byTitle, project, build, multi, docsByStory)}
     </DocumentLayout>
   );
 }
@@ -209,12 +290,13 @@ function renderTitleList(
   project: Project,
   build: Build,
   multi: boolean,
+  docsByStory: Map<string, string>,
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
   const titles = [...byTitle.keys()].toSorted((a, b) => a.localeCompare(b));
   return (
     <div style="display:grid; gap:1.5rem;">
       {titles.map((title) =>
-        renderTitleGroup(title, byTitle.get(title) ?? [], project, build, multi),
+        renderTitleGroup(title, byTitle.get(title) ?? [], project, build, multi, docsByStory),
       )}
     </div>
   );
@@ -226,6 +308,7 @@ function renderTitleGroup(
   project: Project,
   build: Build,
   hasMultipleViewports: boolean,
+  docsByStory: Map<string, string>,
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
   const byViewport = groupByViewport(group);
   const vNames = [...byViewport.keys()].toSorted();
@@ -243,6 +326,7 @@ function renderTitleGroup(
             project,
             build,
             hasMultipleViewports,
+            docsByStory,
           ),
         )}
       </div>
@@ -266,6 +350,7 @@ function renderViewportGroup(
   project: Project,
   build: Build,
   hasMultipleViewports: boolean,
+  docsByStory: Map<string, string>,
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
   return (
     <div key={vName}>
@@ -275,7 +360,7 @@ function renderViewportGroup(
       <div class="snapshot-grid">
         {snaps
           .toSorted((a, b) => a.storyName.localeCompare(b.storyName))
-          .map((snap) => renderSnapshotCard(snap, project, build))}
+          .map((snap) => renderSnapshotCard(snap, project, build, docsByStory))}
       </div>
     </div>
   );
@@ -285,7 +370,9 @@ function renderSnapshotCard(
   snap: Snapshot,
   project: Project,
   build: Build,
+  docsByStory: Map<string, string>,
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const docsId = docsByStory.get(snap.storyId);
   return (
     <div key={snap.id} class="snapshot-card">
       <div class="snapshot-card__head">
@@ -303,22 +390,45 @@ function renderSnapshotCard(
           style="max-height:240px; object-fit:contain;"
         />
         <div style="display:flex; gap:.4rem; flex-wrap:wrap;">
-          <a
-            class="btn btn--secondary"
-            href={`/projects/${project.slug}/builds/${build.id}/diff?snapshot=${snap.id}`}
-          >
-            Review
-          </a>
-          <a
-            class="btn btn--ghost"
-            href={`/projects/${project.slug}/storybook/build/${build.id}/?storyId=${encodeURIComponent(snap.storyId)}`}
-            target="_blank"
-            rel="noopener"
-          >
-            Preview ↗
-          </a>
+          {renderCardActions(snap, project, build, docsId)}
         </div>
       </div>
     </div>
+  );
+}
+
+function renderCardActions(
+  snap: Snapshot,
+  project: Project,
+  build: Build,
+  docsId: string | undefined,
+): HtmlEscapedString | Promise<HtmlEscapedString> {
+  return (
+    <>
+      <a
+        class="btn btn--secondary"
+        href={`/projects/${project.slug}/builds/${build.id}/diff?snapshot=${snap.id}`}
+      >
+        Review
+      </a>
+      <a
+        class="btn btn--ghost"
+        href={`/projects/${project.slug}/storybook/build/${build.id}/?storyId=${encodeURIComponent(snap.storyId)}`}
+        target="_blank"
+        rel="noopener"
+      >
+        Preview ↗
+      </a>
+      {docsId ? (
+        <a
+          class="btn btn--ghost"
+          href={`/projects/${project.slug}/storybook/build/${build.id}/?storyId=${encodeURIComponent(docsId)}&viewMode=docs`}
+          target="_blank"
+          rel="noopener"
+        >
+          Docs ↗
+        </a>
+      ) : null}
+    </>
   );
 }

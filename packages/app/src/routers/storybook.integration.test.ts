@@ -167,4 +167,26 @@ describe("storybook routes", () => {
     const response = await app.request("/projects/test-project/storybook/build/b1/");
     expect(response.status).toBe(200);
   });
+
+  it("serves the landing page with docs viewMode when requested", async () => {
+    const { app } = await seededApp();
+    const response = await app.request(
+      "/projects/test-project/storybook/build/b1/?storyId=a--b&viewMode=docs",
+    );
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toContain("iframe.html?id=a--b");
+    expect(body).toContain("viewMode=docs");
+  });
+
+  it("ignores unknown viewMode values on the landing page", async () => {
+    const { app } = await seededApp();
+    const response = await app.request(
+      "/projects/test-project/storybook/build/b1/?storyId=a--b&viewMode=bogus",
+    );
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toContain("iframe.html?id=a--b");
+    expect(body).not.toContain("viewMode=");
+  });
 });

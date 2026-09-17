@@ -131,7 +131,8 @@ export function registerStorybook(app: ShelfRouter): void {
         return c.html(renderStorybookPreparingPage(project, build, slug), 200);
       }
       const storyId = c.req.query("storyId") ?? c.req.query("id") ?? undefined;
-      return c.html(renderStorybookPage(project, build, slug, { storyId }), 200);
+      const viewMode = c.req.query("viewMode") === "docs" ? "docs" : undefined;
+      return c.html(renderStorybookPage(project, build, slug, { storyId, viewMode }), 200);
     }
 
     const segments = rest.split("/");

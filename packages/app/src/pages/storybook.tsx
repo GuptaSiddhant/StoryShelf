@@ -48,12 +48,12 @@ export function renderStorybookPage(
   project: Project,
   build: Build,
   slug: string,
-  options?: { storyId?: string },
+  options?: { storyId?: string; viewMode?: "docs" },
 ): string {
   const { ui } = getStore();
   const name = ui.name ?? "StoryShelf";
-  const iframeSrc = storybookIframeSrc(options?.storyId);
-  const copyUrl = storybookCopyUrl(slug, build.id, options?.storyId);
+  const iframeSrc = storybookIframeSrc(options?.storyId, options?.viewMode);
+  const copyUrl = storybookCopyUrl(slug, build.id, options?.storyId, options?.viewMode);
   return `<!doctype html>
 <html lang="en" data-theme="system">
   <head>
@@ -91,18 +91,25 @@ export function renderStorybookPage(
 </html>`;
 }
 
-function storybookIframeSrc(storyId?: string): string {
+function storybookIframeSrc(storyId?: string, viewMode?: "docs"): string {
   const id = storyId?.trim() ?? "";
   if (id !== "" && /^[a-zA-Z0-9._/-]+$/u.test(id)) {
-    return `./iframe.html?id=${encodeURIComponent(id)}`;
+    const mode = viewMode === "docs" ? "&viewMode=docs" : "";
+    return `./iframe.html?id=${encodeURIComponent(id)}${mode}`;
   }
   return "./iframe.html";
 }
 
-function storybookCopyUrl(slug: string, buildId: string, storyId?: string): string {
+function storybookCopyUrl(
+  slug: string,
+  buildId: string,
+  storyId?: string,
+  viewMode?: "docs",
+): string {
   const id = storyId?.trim() ?? "";
   if (id !== "" && /^[a-zA-Z0-9._/-]+$/u.test(id)) {
-    return `/projects/${slug}/storybook/build/${buildId}/?storyId=${encodeURIComponent(id)}`;
+    const mode = viewMode === "docs" ? "&viewMode=docs" : "";
+    return `/projects/${slug}/storybook/build/${buildId}/?storyId=${encodeURIComponent(id)}${mode}`;
   }
   return `/projects/${slug}/storybook/build/${buildId}/`;
 }
