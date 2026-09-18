@@ -1,10 +1,12 @@
 import starlight from "@astrojs/starlight";
+import mermaid from "astro-mermaid";
 import { defineConfig } from "astro/config";
 
 export default defineConfig({
   site: "https://storyshelf.dev",
   base: process.env.BASE_PATH || "/",
   integrations: [
+    mermaid({ autoTheme: true }),
     starlight({
       title: "StoryShelf",
       plugins: [],

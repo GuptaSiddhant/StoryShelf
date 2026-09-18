@@ -1,11 +1,11 @@
 ---
-title: "storyshelf"
-description: Create projects, upload Storybooks, and manage builds from CI — no Playwright, no server deps.
+title: "@storyshelf/cli"
+description: Client-only CLI package — install, config schema, and programmatic usage.
 ---
 
-`storyshelf` provides the `storyshelf` binary for CI pipelines. It scaffolds servers, initializes client config, creates projects and tokens, uploads built Storybooks, retries captures, and purges expired builds — all over the server's `/api/v1` endpoints. It has **no Playwright or server dependencies**, so it installs cleanly in CI.
+> **User guide:** For step-by-step CLI usage with examples, see the [CLI guide](/guides/cli/).
 
-> This page is the **package overview** (install + CI use). For the full flag-by-flag command reference, see the [CLI reference](../../guides/cli/).
+`@storyshelf/cli` provides the `storyshelf` binary for CI pipelines. It is **client-only** — no Playwright, no server dependencies, installs cleanly in CI.
 
 ## Install
 
@@ -22,36 +22,27 @@ npm install -g storyshelf
 - [npm package](https://www.npmjs.com/package/storyshelf) — install tarballs and version history.
 - [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/cli) — package directory on `main`.
 
-## Use from CI
+## Config schema
 
-Scaffold a server (once):
+Client config written to `.storybook/storyshelf.json`:
 
-```sh
-storyshelf server init --dir ./my-shelf
+```json
+{
+  "slug": "string (required)",
+  "url": "string (optional)",
+  "buildDir": "string (default: storybook-static)",
+  "buildCommand": "string (optional, mutually exclusive with buildScriptName)",
+  "buildScriptName": "string (default: build-storybook)",
+  "skip": "string (optional, glob pattern to skip upload)"
+}
 ```
 
-Initialize client config (writes `.storybook/storyshelf.json`):
+Validation: `zod` schema with `refine` for mutual exclusivity.
 
-```sh
-storyshelf init --url https://shelf.example.com --slug my-app
-```
+## Programmatic use
 
-Create a project on the server (requires site-admin token, writes `.storybook/storyshelf.json`):
-
-```sh
-storyshelf create --url https://shelf.example.com --name my-app --token $STORYSHELF_ADMIN_TOKEN
-```
-
-Upload the built Storybook on each commit (when `.storybook/storyshelf.json` exists, `--url/--slug` can be omitted and `storyshelf` defaults to `upload`):
-
-```sh
-storyshelf upload --token "$STORYSHELF_TOKEN" --sha "$GIT_SHA" --branch "$GIT_BRANCH" \
-  --build-dir storybook-static
-# or simply: storyshelf (when config exists)
-```
-
-Use `storyshelf retry` for a failed capture and `storyshelf purge` for manual retention cleanup. The complete flags and CI workflows are in the [CLI reference](../../guides/cli/) and [CI setup guide](../../guides/ci/).
+The CLI is designed for shell use. For programmatic access, use the REST API directly (`/api/v1` endpoints) or the `@storyshelf/core` models.
 
 ## How it fits
 
-The CLI talks to the server's `/api/v1` endpoints. To start the server, use `storyshelf server init` to scaffold a new project, or see the [Deployment guide](../../guides/deployment/).
+The CLI talks to the server's `/api/v1` endpoints. To start the server, use `storyshelf server init` to scaffold a new project, or see the [Deployment guide](/guides/deployment/).

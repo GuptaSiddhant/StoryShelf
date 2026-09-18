@@ -3,6 +3,8 @@ title: CLI reference
 description: The storyshelf command-line interface — init, create, server, build, doctor, whoami, upload, retry, and purge.
 ---
 
+> **Package reference:** For technical details (install, config schema, programmatic use), see [@storyshelf/cli package docs](/packages/cli/).
+
 The StoryShelf CLI (`storyshelf`) exposes a `storyshelf` binary for CI pipelines. Install it globally, or prefix with `npx storyshelf`:
 
 ```bash
