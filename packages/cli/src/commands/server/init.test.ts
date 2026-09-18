@@ -189,4 +189,103 @@ describe("runServerInit", () => {
     const code = readFileSync(join(dir, "server.ts"), "utf8");
     expect(code).toContain("captureRunner");
   });
+
+  it("writes the AWS reference stack and forces postgres/s3/sqs", async () => {
+    vi.mocked(prompts)
+      .mockResolvedValueOnce({
+        name: "my-server",
+        dir: "./my-server",
+        deployTarget: "aws",
+        database: "sqlite",
+        storage: "local",
+        auth: "oauth",
+        git: "github",
+        queue: "memory",
+        docker: false,
+      })
+      .mockResolvedValueOnce({
+        awsRegion: "eu-west-1",
+        dbEngine: "dsql",
+        domainName: "",
+        samlMetadataUrl: "",
+      });
+    const cwd = process.cwd();
+    process.chdir(tmpRoot);
+    try {
+      await runServerInit({});
+    } finally {
+      process.chdir(cwd);
+    }
+
+    const serverCode = readFileSync(join(dir, "server.ts"), "utf8");
+    expect(serverCode).toContain("createPostgresDatabase");
+    expect(serverCode).toContain("createS3Storage");
+    expect(serverCode).toContain("createSqsCaptureQueue");
+    expect(serverCode).toContain("cognitoPreset");
+    expect(existsSync(join(dir, "worker.ts"))).toBe(true);
+    expect(existsSync(join(dir, "terraform", "database.tf"))).toBe(true);
+    const databaseTf = readFileSync(join(dir, "terraform", "database.tf"), "utf8");
+    expect(databaseTf).toContain("aws_dsql_cluster");
+    const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
+      dependencies: Record<string, string>;
+      scripts: Record<string, string>;
+    };
+    expect(pkg.dependencies["@storyshelf/db-postgres"]).toBeDefined();
+    expect(pkg.scripts["infra:plan"]).toBeDefined();
+    expect(pkg.scripts["infra:apply"]).toBeDefined();
+    expect(pkg.scripts["docker:up"]).toBeUndefined();
+  });
+
+  it("emits OIDC wiring for oauth on non-AWS targets", async () => {
+    vi.mocked(prompts).mockResolvedValue({
+      name: "my-server",
+      dir: "./my-server",
+      deployTarget: "local",
+      database: "sqlite",
+      storage: "local",
+      auth: "oauth",
+      git: "none",
+      queue: "memory",
+      docker: false,
+    });
+    const cwd = process.cwd();
+    process.chdir(tmpRoot);
+    try {
+      await runServerInit({});
+    } finally {
+      process.chdir(cwd);
+    }
+    const code = readFileSync(join(dir, "server.ts"), "utf8");
+    expect(code).toContain("createOAuthAuth");
+    expect(code).toContain("OIDC_ISSUER");
+    expect(code).not.toContain("cognitoPreset");
+    expect(existsSync(join(dir, "terraform"))).toBe(false);
+  });
+
+  it("adds docker scripts for the docker target", async () => {
+    vi.mocked(prompts).mockResolvedValue({
+      name: "my-server",
+      dir: "./my-server",
+      deployTarget: "docker",
+      database: "sqlite",
+      storage: "local",
+      auth: "none",
+      git: "none",
+      queue: "memory",
+      docker: true,
+    });
+    const cwd = process.cwd();
+    process.chdir(tmpRoot);
+    try {
+      await runServerInit({});
+    } finally {
+      process.chdir(cwd);
+    }
+    const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
+      scripts: Record<string, string>;
+    };
+    expect(pkg.scripts["docker:up"]).toBeDefined();
+    expect(pkg.scripts["docker:down"]).toBeDefined();
+    expect(pkg.scripts["infra:plan"]).toBeUndefined();
+  });
 });

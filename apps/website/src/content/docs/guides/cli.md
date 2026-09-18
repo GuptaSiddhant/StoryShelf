@@ -57,6 +57,8 @@ storyshelf server init
 
 Generates `server.ts` + `package.json` (and `Dockerfile`/`compose.yaml` if selected) in the target directory.
 
+Choose the deploy target when prompted: `local` (bare node), `docker` (compose, with `docker:*` npm scripts), or `aws` (ECS + S3 + SQS + Postgres + Cognito reference stack). The AWS target pins the enterprise stack — Postgres, S3, SQS with a colocated worker — asks for region, Postgres engine (`rds` default, `dsql` serverless option), optional domain and SAML metadata URL, and writes `terraform/` plus `infra:*` npm scripts (`infra:init`, `infra:plan`, `infra:apply`, `infra:destroy`, `infra:outputs`). Selecting OAuth auth on AWS wires `cognitoPreset` automatically.
+
 ## `storyshelf server serve`
 
 Run a scaffolded server project (also the default for bare `storyshelf server`). Looks for `server.ts`, `server.js`/`server.mjs`, then `index.ts`/`index.js`/`index.mjs` in the directory and spawns it with output inherited; without any entry it directs you to `storyshelf server init`.

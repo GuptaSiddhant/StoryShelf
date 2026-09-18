@@ -45,6 +45,16 @@ export const PROJECT_PROMPTS: Prompt[] = [
 export const INFRA_PROMPTS: Prompt[] = [
   {
     type: "select",
+    name: "deployTarget",
+    message: "Deploy target?",
+    choices: [
+      { title: "Local (bare node)", value: "local" },
+      { title: "Docker (compose)", value: "docker" },
+      { title: "AWS (ECS + S3 + SQS + Postgres + Cognito)", value: "aws" },
+    ],
+  },
+  {
+    type: "select",
     name: "database",
     message: "Which database?",
     choices: [
@@ -135,5 +145,36 @@ export const WORKER_INFRA_PROMPTS: Prompt[] = [
     name: "docker",
     message: "Generate Docker files?",
     initial: true,
+  },
+];
+
+/** Follow-up prompts for the AWS deploy target (single prompts call). */
+export const AWS_INFRA_PROMPTS: Prompt[] = [
+  {
+    type: "text",
+    name: "awsRegion",
+    message: "AWS region?",
+    initial: "us-east-1",
+  },
+  {
+    type: "select",
+    name: "dbEngine",
+    message: "Postgres engine?",
+    choices: [
+      { title: "RDS (VPC-isolated, battle-tested)", value: "rds" },
+      { title: "Aurora DSQL (serverless)", value: "dsql" },
+    ],
+  },
+  {
+    type: "text",
+    name: "domainName",
+    message: "Public domain for the ALB? (empty leaves it HTTP-only)",
+    initial: "",
+  },
+  {
+    type: "text",
+    name: "samlMetadataUrl",
+    message: "SAML metadata URL for Cognito federation? (empty skips it)",
+    initial: "",
   },
 ];

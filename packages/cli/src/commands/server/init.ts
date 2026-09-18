@@ -18,7 +18,8 @@ import {
   generateDockerignore,
   generateWorkerDockerfile,
 } from "./docker.ts";
-import { INFRA_PROMPTS, PROJECT_PROMPTS } from "./prompts.ts";
+import { INFRA_PROMPTS, PROJECT_PROMPTS, AWS_INFRA_PROMPTS } from "./prompts.ts";
+import { generateAwsTerraformFiles } from "./terraform-aws.ts";
 
 /**
  * Options for `storyshelf server init` — scaffolds a new StoryShelf server project.
@@ -33,6 +34,7 @@ type StorageChoice = "local" | "s3";
 type AuthChoice = "none" | "password" | "oauth";
 type GitChoice = "none" | "github" | "gitlab";
 type QueueChoice = "memory" | "sqs" | "redis";
+type DeployTarget = "local" | "docker" | "aws";
 
 interface Answers {
   name: string;
@@ -44,6 +46,18 @@ interface Answers {
   queue: QueueChoice;
   docker: boolean;
   includeWorker?: boolean;
+  /** Deploy target. Absent in older mocked answers — derived from `docker`. */
+  deployTarget?: DeployTarget;
+  /** AWS-only follow-ups (asked when deployTarget is `aws`). */
+  awsRegion?: string;
+  dbEngine?: "rds" | "dsql";
+  domainName?: string;
+  samlMetadataUrl?: string;
+}
+
+/** Normalize the deploy target, preserving pre-target answers. */
+function resolveDeployTarget(answers: Answers): DeployTarget {
+  return answers.deployTarget ?? (answers.docker ? "docker" : "local");
 }
 
 const DB_PACKAGE: Record<DatabaseChoice, string> = {
@@ -112,8 +126,14 @@ function buildImports(answers: Answers): string[] {
     imports.push(`import { createRedisCaptureQueue } from "@storyshelf/queue-redis";`);
   }
 
-  if (answers.auth !== "none") {
+  if (answers.auth === "password") {
     imports.push(`import { createPasswordAuth } from "${AUTH_PACKAGE[answers.auth]}";`);
+  }
+  if (answers.auth === "oauth") {
+    imports.push(`import { createOAuthAuth } from "@storyshelf/auth-oauth";`);
+    if (resolveDeployTarget(answers) === "aws") {
+      imports.push(`import { cognitoPreset } from "@storyshelf/auth-oauth/presets";`);
+    }
   }
   if (answers.git !== "none") {
     const host = answers.git === "github" ? "gitHubHost" : "gitLabHost";
@@ -152,8 +172,30 @@ function buildRouterLines(answers: Answers): string[] {
     lines.push(`  captureRunner,`);
   }
 
-  if (answers.auth !== "none") {
+  if (answers.auth === "password") {
     lines.push(`  auth: createPasswordAuth({ password: process.env.AUTH_PASSWORD! }),`);
+  }
+  if (answers.auth === "oauth" && resolveDeployTarget(answers) === "aws") {
+    lines.push(
+      `  auth: createOAuthAuth(cognitoPreset(process.env.COGNITO_REGION!, process.env.COGNITO_USER_POOL_ID!, {`,
+      `    clientId: process.env.OIDC_CLIENT_ID!,`,
+      `    clientSecret: process.env.OIDC_CLIENT_SECRET!,`,
+      `    secret: process.env.SECRET!,`,
+      `    redirectUrl: process.env.OIDC_REDIRECT_URL!,`,
+      `    adminGroups: (process.env.ADMIN_GROUPS ?? "shelf-admins").split(","),`,
+      `  })),`,
+    );
+  }
+  if (answers.auth === "oauth" && resolveDeployTarget(answers) !== "aws") {
+    lines.push(
+      `  auth: createOAuthAuth({`,
+      `    issuer: process.env.OIDC_ISSUER!,`,
+      `    clientId: process.env.OIDC_CLIENT_ID!,`,
+      `    clientSecret: process.env.OIDC_CLIENT_SECRET!,`,
+      `    secret: process.env.SECRET!,`,
+      `    redirectUrl: process.env.OIDC_REDIRECT_URL!,`,
+      `  }),`,
+    );
   }
   if (answers.git !== "none") {
     const host = answers.git === "github" ? "gitHubHost" : "gitLabHost";
@@ -309,6 +351,23 @@ function generatePackageJson(answers: Answers): string {
       "node --experimental-transform-types --watch worker.ts";
   }
 
+  if (resolveDeployTarget(answers) === "docker") {
+    const scripts = pkg.scripts as Record<string, string>;
+    scripts["docker:build"] = "docker compose build";
+    scripts["docker:up"] = "docker compose up --build";
+    scripts["docker:down"] = "docker compose down";
+    scripts["docker:logs"] = "docker compose logs -f";
+  }
+
+  if (resolveDeployTarget(answers) === "aws") {
+    const scripts = pkg.scripts as Record<string, string>;
+    scripts["infra:init"] = "terraform -chdir=terraform init";
+    scripts["infra:plan"] = "terraform -chdir=terraform plan -out=tfplan";
+    scripts["infra:apply"] = "terraform -chdir=terraform apply tfplan";
+    scripts["infra:destroy"] = "terraform -chdir=terraform destroy";
+    scripts["infra:outputs"] = "terraform -chdir=terraform output -json";
+  }
+
   return JSON.stringify(pkg, null, 2);
 }
 
@@ -327,7 +386,27 @@ async function writeFiles(outDir: string, answers: Answers): Promise<void> {
   await writeFile(join(outDir, "package.json"), pkgCode);
   printLine(`Created package.json`);
 
+  if (resolveDeployTarget(answers) === "aws") {
+    await writeTerraformFiles(outDir, answers);
+  }
+
   await writeDockerFiles(outDir, answers);
+}
+
+/** Write the AWS Terraform reference stack (`terraform/*.tf` + README). */
+async function writeTerraformFiles(outDir: string, answers: Answers): Promise<void> {
+  const files = generateAwsTerraformFiles({
+    project: answers.name,
+    region: answers.awsRegion ?? "us-east-1",
+    dbEngine: answers.dbEngine ?? "rds",
+    ...(answers.domainName ? { domainName: answers.domainName } : {}),
+    ...(answers.samlMetadataUrl ? { samlMetadataUrl: answers.samlMetadataUrl } : {}),
+  });
+  await mkdir(join(outDir, "terraform"), { recursive: true });
+  for (const [relative, contents] of Object.entries(files)) {
+    await writeFile(join(outDir, relative), contents);
+  }
+  printLine(`Created terraform/ (${Object.keys(files).length} files)`);
 }
 
 async function writeDockerFiles(outDir: string, answers: Answers): Promise<void> {
@@ -366,19 +445,34 @@ function printNextSteps(answers: Answers, runner: PackageRunner): void {
   printLine(`\nNext steps:`);
   printLine(`  cd ${answers.dir}`);
 
-  if (answers.docker) {
-    printLine(`  docker compose up`);
+  const target = resolveDeployTarget(answers);
+  if (target === "aws") {
+    printLine(`  terraform -chdir=terraform init`);
+    printLine(`  terraform -chdir=terraform plan -out=tfplan   # review before applying`);
+    printLine(`  terraform -chdir=terraform apply tfplan       # or: npm run infra:apply`);
+    printLine(`  # wire outputs into env (terraform output -json / npm run infra:outputs):`);
+    printLine(`  #   S3_BUCKET / AWS_REGION, QUEUE_URL, DATABASE_URL, COGNITO_* credentials`);
+    printLine(`  npm install`);
+    printLine(`  npm start`);
+    return;
+  }
+
+  if (target === "docker") {
+    printLine(`  npm run docker:up      # builds + starts app (+ worker)`);
+    printLine(`  npm run docker:logs    # follow logs`);
+    printLine(`  npm run docker:down    # tear down`);
     if (answers.includeWorker) {
       printLine(`  # or separately:`);
       printLine(`  # docker compose up storyshelf worker`);
     }
-  } else {
-    printLine(`  ${installCommand(runner)}`);
-    printLine(`  ${startCommand(runner)}`);
-    if (answers.includeWorker) {
-      printLine(`  # in another terminal:`);
-      printLine(`  npx storyshelf worker serve --dir .`);
-    }
+    return;
+  }
+
+  printLine(`  ${installCommand(runner)}`);
+  printLine(`  ${startCommand(runner)}`);
+  if (answers.includeWorker) {
+    printLine(`  # in another terminal:`);
+    printLine(`  npx storyshelf worker serve --dir .`);
   }
 }
 
@@ -432,8 +526,26 @@ export async function runServerInit(_options: ServerInitOptions): Promise<void> 
     answers.queue = "memory";
   }
 
+  // AWS target: fixed enterprise reference stack (Postgres + S3 + SQS +
+  // colocated worker). Dockerfiles still generate for ECR image builds.
+  if (resolveDeployTarget(answers) === "aws") {
+    answers.database = "postgres";
+    answers.storage = "s3";
+    answers.queue = "sqs";
+    answers.includeWorker = true;
+    answers.docker = true;
+    const awsAnswers = (await prompts(AWS_INFRA_PROMPTS)) as Record<string, unknown>;
+    answers.awsRegion = (awsAnswers["awsRegion"] as string | undefined) ?? "us-east-1";
+    answers.dbEngine = (awsAnswers["dbEngine"] as "rds" | "dsql" | undefined) ?? "rds";
+    answers.domainName = (awsAnswers["domainName"] as string | undefined) ?? undefined;
+    answers.samlMetadataUrl = (awsAnswers["samlMetadataUrl"] as string | undefined) ?? undefined;
+  }
+
   // Hybrid: if queue is SQS or Redis, ask whether to generate worker alongside
-  if (answers.queue === "sqs" || answers.queue === "redis") {
+  if (
+    resolveDeployTarget(answers) !== "aws" &&
+    (answers.queue === "sqs" || answers.queue === "redis")
+  ) {
     const workerAnswer = (await prompts({
       type: "confirm",
       name: "includeWorker",
