@@ -81,6 +81,16 @@ StoryShelf/
     adr/                  -- Architecture Decision Records
 ```
 
+**Terminology note:** When working in this repo:
+- `"app"` / `"packages/app"` → the **product UI** (Hono JSX + HTMX server, `/api/v1` endpoints, build-review diff pages). Commands: `nub run build`, `nub run lint`, test in `packages/app/`.
+- `"website"` / `"apps/website"` → the **public docs site** (Astro Starlight Markdown docs, SEO, SRI hashes). Commands: `nub run --filter website build`, `nub run --filter website start`. Docs lives in `apps/website/src/content/docs/`.
+
+This distinction matters for:
+- Which package to modify (UI vs docs)
+- Which test suite to run (vitest in `packages/` vs hermetic `nub run test` at repo root)
+- Which build command to use
+- Directory paths when editing files
+
 ## Architecture in five sentences
 
 1. Consumers call `createShelfApp({ database, storage, capture, ... })` -- every concern is an independent adapter interface.
