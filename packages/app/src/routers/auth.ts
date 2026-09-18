@@ -1,9 +1,17 @@
 import { SESSION_COOKIE, type AuthAdapter, type AuthUser } from "@storyshelf/core/adapter/auth";
 import { randomToken } from "@storyshelf/core/utils";
+import {
+  projectGroupMappings,
+  projectMembers,
+  projects,
+  users,
+} from "@storyshelf/db-sqlite/schema";
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
 import { renderLoginPage } from "../pages/login.tsx";
+import { getStore } from "../store.ts";
+import { syncLoginMemberships } from "./auth-sync.ts";
 import { hxRedirect } from "./htmx.ts";
 
 const OAUTH_STATE_COOKIE = "storyshelf_oauth_state";
@@ -78,6 +86,11 @@ export function registerAuth(app: ShelfRouter, auth: AuthAdapter): void {
     if (!user) {
       return c.html(await renderLoginPage({ error: "SSO sign in failed" }), 401);
     }
+    await syncLoginMemberships(
+      getStore().db,
+      { users, projects, projectMembers, projectGroupMappings },
+      user,
+    );
     const token = await auth.createSession(user);
     c.header("set-cookie", sessionCookieHeader(token));
     return c.redirect("/");

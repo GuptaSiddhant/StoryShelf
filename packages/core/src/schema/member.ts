@@ -6,5 +6,7 @@ export interface ProjectMember {
   projectId: string;
   userId: string;
   role: ProjectRole;
+  /** Provenance: `manual` grants vs `oidc:<group>` synced grants. */
+  source: string;
   createdAt: string;
 }

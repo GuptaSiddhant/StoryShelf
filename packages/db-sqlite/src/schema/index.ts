@@ -13,6 +13,7 @@ import { builds as buildsTable } from "./build.ts";
 import { comments as commentsTable } from "./comment.ts";
 import { buildLabels as buildLabelsTable, labelTypes as labelTypesTable } from "./label.ts";
 import { projectMembers as projectMembersTable } from "./member.ts";
+import { projectGroupMappings as projectGroupMappingsTable } from "./project-group-mapping.ts";
 import { projects as projectsTable } from "./project.ts";
 import { snapshots as snapshotsTable } from "./snapshot.ts";
 import { projectStatusConfigs as projectStatusConfigsTable } from "./status-config.ts";
@@ -25,6 +26,7 @@ export { baselines } from "./baseline.ts";
 export { comments } from "./comment.ts";
 export { buildLabels, labelTypes } from "./label.ts";
 export { projectMembers } from "./member.ts";
+export { projectGroupMappings } from "./project-group-mapping.ts";
 export { projects } from "./project.ts";
 export { snapshots } from "./snapshot.ts";
 export { projectStatusConfigs } from "./status-config.ts";
@@ -40,6 +42,8 @@ export type { Comment } from "./comment.ts";
 export type { BuildLabel, LabelType } from "./label.ts";
 /** Project membership row linking a user to a project role. */
 export type { ProjectMember } from "./member.ts";
+/** Identity-provider group to project-role mapping row. */
+export type { ProjectGroupMapping } from "./project-group-mapping.ts";
 /** Project row and its embedded Storybook metadata. */
 export type { Project, StorybookMeta } from "./project.ts";
 /** Per-project git provider status-check configuration row. */
@@ -67,6 +71,7 @@ export const schema: {
   webhooks: AnySQLiteTable;
   users: AnySQLiteTable;
   projectMembers: AnySQLiteTable;
+  projectGroupMappings: AnySQLiteTable;
 } = {
   projects: projectsTable,
   projectStatusConfigs: projectStatusConfigsTable,
@@ -80,6 +85,7 @@ export const schema: {
   webhooks: webhooksTable,
   users: usersTable,
   projectMembers: projectMembersTable,
+  projectGroupMappings: projectGroupMappingsTable,
 };
 
 /** The full database schema type. */

@@ -17,6 +17,8 @@ export type { Comment } from "./comment.ts";
 export type { BuildLabel, LabelType } from "./label.ts";
 /** Project membership row linking a user to a project role. */
 export type { ProjectMember } from "./member.ts";
+/** Identity-provider group to project-role mapping row. */
+export type { ProjectGroupMapping } from "./project-group-mapping.ts";
 /** Project row and its embedded Storybook metadata. */
 export type { Project, StorybookMeta } from "./project.ts";
 /** Snapshot row capturing a single story at one viewport. */

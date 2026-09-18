@@ -1,6 +1,7 @@
 import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import type { LabelType } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
+import type { ProjectGroupMapping } from "@storyshelf/core/schema";
 import type { Token } from "@storyshelf/core/schema";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import { renderSettingsGeneral } from "./settings-general.tsx";
@@ -28,6 +29,7 @@ export interface ProjectSettingsData {
   labelTypes: LabelType[];
   tokens: Omit<Token, "hash">[];
   members: SettingsMember[];
+  groupMappings: ProjectGroupMapping[];
   webhooks: SettingsWebhook[];
   statusConfigs: SettingsStatusConfig[];
   gitHosts: GitHostProvider[];
@@ -73,7 +75,8 @@ function renderActiveTab(data: ProjectSettingsData, formState?: SettingsFormStat
   if (activeTab === "tokens") return renderSettingsTokens(project, data.tokens, data.isAdmin);
   if (activeTab === "webhooks")
     return renderSettingsWebhooks(project, data.webhooks, data.isAdmin, formState);
-  if (activeTab === "members") return renderSettingsMembers(project, data.members, data.isAdmin);
+  if (activeTab === "members")
+    return renderSettingsMembers(project, data.members, data.groupMappings, data.isAdmin);
   if (activeTab === "status")
     return renderSettingsStatus(project, data.statusConfigs, data.gitHosts, data.isAdmin);
   return null;

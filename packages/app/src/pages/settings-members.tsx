@@ -1,4 +1,5 @@
 import type { Project } from "@storyshelf/core/schema";
+import type { ProjectGroupMapping } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { Badge } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
@@ -16,6 +17,7 @@ export interface SettingsMember {
 export function renderSettingsMembers(
   project: Project,
   members: SettingsMember[],
+  groupMappings: ProjectGroupMapping[],
   isAdmin: boolean,
 ): unknown {
   return (
@@ -117,6 +119,100 @@ export function renderSettingsMembers(
             </div>
             <button class="btn btn--primary" type="submit">
               Add member
+            </button>
+          </form>
+        </div>
+      ) : null}
+
+      <div class="card card--padded" style="margin-top:1rem;">
+        <h3 style="margin:0 0 .3rem;">Identity-provider group mappings</h3>
+        <p class="field__hint">
+          Map an IdP group (name or provider ID, exact match) to a project role. Members sync at
+          next login; removing a mapping revokes synced grants but never manual ones. Wildcards are
+          not expanded.
+        </p>
+        <div class="table-wrap" style="margin-top:.75rem;">
+          <table>
+            <thead>
+              <tr>
+                <th>Group</th>
+                <th>Role</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {groupMappings.map((mapping): HtmlEscapedString | Promise<HtmlEscapedString> => (
+                <tr key={mapping.id}>
+                  <td>
+                    <code>{mapping.groupName}</code>
+                  </td>
+                  <td>
+                    <Badge tone={mapping.role === "admin" ? "danger" : "info"}>
+                      {mapping.role}
+                    </Badge>
+                  </td>
+                  <td>
+                    {isAdmin ? (
+                      <form
+                        method="post"
+                        action={`/projects/${project.slug}/settings/members/groups/${mapping.id}/remove`}
+                        hx-post={`/projects/${project.slug}/settings/members/groups/${mapping.id}/remove`}
+                        hx-target="body"
+                      >
+                        {csrfField()}
+                        <button class="btn btn--ghost" type="submit">
+                          Remove
+                        </button>
+                      </form>
+                    ) : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {groupMappings.length === 0 ? (
+          <p class="field__hint" style="margin-top:.5rem;">
+            No group mappings yet.
+          </p>
+        ) : null}
+      </div>
+
+      {isAdmin ? (
+        <div class="card card--padded" style="margin-top:1rem;">
+          <h3 style="margin:0 0 .5rem;">Add group mapping</h3>
+          <form
+            method="post"
+            action={`/projects/${project.slug}/settings/members/groups`}
+            hx-post={`/projects/${project.slug}/settings/members/groups`}
+            hx-target="body"
+          >
+            {csrfField()}
+            <div class="field">
+              <label class="field__label" for="groupName">
+                Group name or ID (exact match)
+              </label>
+              <input
+                class="field__input"
+                id="groupName"
+                name="groupName"
+                required
+                placeholder="team-design"
+              />
+            </div>
+            <div class="field">
+              <label class="field__label" for="groupRole">
+                Role
+              </label>
+              <select class="field__input" id="groupRole" name="role">
+                <option value="viewer">viewer</option>
+                <option value="developer">developer</option>
+                <option value="approver">approver</option>
+                <option value="admin">admin</option>
+              </select>
+            </div>
+            <button class="btn btn--primary" type="submit">
+              Add mapping
             </button>
           </form>
         </div>

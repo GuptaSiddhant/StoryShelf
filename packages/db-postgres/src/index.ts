@@ -106,6 +106,8 @@ const WEBHOOK_SECRET_ALTER =
 const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN IF EXISTS secret";
 const TOKEN_USER_ALTER =
   "ALTER TABLE tokens ADD COLUMN IF NOT EXISTS user_id TEXT REFERENCES users(id) ON DELETE CASCADE";
+const MEMBER_SOURCE_ALTER =
+  "ALTER TABLE project_members ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'manual'";
 
 async function migrateProjectExtras(client: ReturnType<typeof postgres>): Promise<void> {
   await execIgnore(client, EXECUTE_PLAY_ALTER);
@@ -125,6 +127,7 @@ async function runMigrations(client: ReturnType<typeof postgres>): Promise<void>
   await execIgnore(client, WEBHOOK_SECRET_ALTER);
   await execIgnore(client, WEBHOOK_SECRET_DROP);
   await execIgnore(client, TOKEN_USER_ALTER);
+  await execIgnore(client, MEMBER_SOURCE_ALTER);
   await migrateCommentsTable(client);
 }
 

@@ -28,4 +28,38 @@ export class UserModel {
     })) as unknown as User[];
     return rows[0] ?? null;
   }
+
+  /**
+   * Insert or update a user row from an authenticated identity (login sync).
+   * Email, name, avatar, and site role refresh on every login; the row id
+   * (the provider `sub`) is stable.
+   */
+  async upsert(input: {
+    id: string;
+    email: string;
+    name: string;
+    avatarUrl?: string | null;
+    role: User["role"];
+  }): Promise<User> {
+    const now = new Date().toISOString();
+    const existing = await this.get(input.id);
+    if (!existing) {
+      return (await this.db.insert(this.tables.users, {
+        id: input.id,
+        email: input.email,
+        name: input.name,
+        avatarUrl: input.avatarUrl ?? null,
+        role: input.role,
+        lastLoginAt: now,
+        createdAt: now,
+      })) as unknown as User;
+    }
+    return (await this.db.update(this.tables.users, existing.id, {
+      email: input.email,
+      name: input.name,
+      avatarUrl: input.avatarUrl ?? null,
+      role: input.role,
+      lastLoginAt: now,
+    })) as unknown as User;
+  }
 }

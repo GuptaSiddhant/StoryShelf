@@ -19,6 +19,12 @@ export interface AuthUser {
   avatarUrl?: string;
   /** Site-wide role. */
   role: SiteRole;
+  /**
+   * Identity-provider group memberships (names or IDs, provider-dependent).
+   * Populated by OIDC adapters when the provider exposes group claims;
+   * absent otherwise. Drives group-to-role mapping at login.
+   */
+  groups?: string[];
 }
 
 /** Data passed to an auth adapter when an OAuth callback is received. */

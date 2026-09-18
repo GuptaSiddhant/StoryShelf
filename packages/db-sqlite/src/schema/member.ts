@@ -15,6 +15,7 @@ export const projectMembers = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     role: text("role").$type<ProjectRole>().notNull().default("viewer"),
+    source: text("source").notNull().default("manual"),
     createdAt: text("created_at").notNull(),
   },
   (t) => [uniqueIndex("project_members_project_user_idx").on(t.projectId, t.userId)],
@@ -26,5 +27,7 @@ export interface ProjectMember {
   projectId: string;
   userId: string;
   role: ProjectRole;
+  /** Provenance: `manual` grants vs `oidc:<group>` synced grants. */
+  source: string;
   createdAt: string;
 }

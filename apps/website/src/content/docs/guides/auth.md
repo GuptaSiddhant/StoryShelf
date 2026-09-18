@@ -38,6 +38,14 @@ OIDC_CLIENT_SECRET=your-client-secret
 
 Users are created on first login (from the provider's identity) and assigned project roles.
 
+### Team sync via identity-provider groups
+
+The OIDC adapter reads group memberships from the token/userinfo response and syncs project access at each login:
+
+- **Site roles**: `adminGroups`/`viewerGroups` (exact group name or provider ID match) grant the site `admin`/`viewer` role; everyone else signs in as `member`.
+- **Project roles**: each project's Members settings tab maps IdP group names to project roles. On login the highest matched role wins (recorded as `oidc:<group>`); memberships from groups the user no longer matches are removed, while manual grants are never touched. Mapping edits apply at next login.
+- **Claim names** default to `["groups", "cognito:groups"]` and are configurable via `groupClaims`. Use the matching provider preset (`keycloak`/`okta`/`entra`/`cognito`/`auth0`) from `@storyshelf/auth-oauth` — see its package page for per-provider setup (Okta claim config, Entra manifest + object IDs, Cognito default, Auth0 Actions snippet). Group names match **exactly**; wildcards are rejected because a broad pattern can silently grant org-wide access.
+
 ## Project roles
 
 Auth enables project-scoped roles, tracked per project via membership:

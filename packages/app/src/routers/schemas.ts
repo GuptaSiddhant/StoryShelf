@@ -200,6 +200,25 @@ export const memberSetSchema = z
   })
   .openapi("MemberSetInput");
 
+/** OpenAPI schema for an identity-provider group mapping. */
+export const groupMappingSchema = z
+  .object({
+    id: z.string(),
+    projectId: z.string(),
+    groupName: z.string(),
+    role: z.enum(PROJECT_ROLES),
+    createdAt: z.string(),
+  })
+  .openapi("GroupMapping");
+
+/** OpenAPI schema for creating a group mapping. */
+export const groupMappingCreateSchema = z
+  .object({
+    groupName: z.string().min(1),
+    role: z.enum(PROJECT_ROLES),
+  })
+  .openapi("GroupMappingCreateInput");
+
 /** OpenAPI schema for a public webhook (secret omitted). */
 export const webhookPublicSchema = z
   .object({

@@ -10,6 +10,7 @@ export { CommentModel, type CommentCreateInput } from "./comment.ts";
 export { LabelModel } from "./label.ts";
 export { MemberModel } from "./member.ts";
 export { ProjectModel, type ProjectCreateInput } from "./project.ts";
+export { ProjectGroupMappingModel } from "./project-group-mapping.ts";
 export { SnapshotModel, type SnapshotCreateInput } from "./snapshot.ts";
 export { StatusConfigModel, type StatusConfigCreateInput } from "./status-config.ts";
 export { TokenModel } from "./token.ts";

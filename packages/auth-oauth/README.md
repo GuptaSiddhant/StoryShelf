@@ -46,8 +46,47 @@ interface OAuthAuthOptions {
   secret: string;        // secret used to HMAC-sign session cookies
   redirectUrl: string;   // callback/redirect URI registered with the provider
   scopes?: string[];     // defaults to ["openid", "email", "profile"]
+  discoveryUrl?: string | null;  // defaults to {issuer}/.well-known/openid-configuration; null disables discovery
+  authorizationEndpoint?: string; // explicit overrides (skip discovery for these)
+  tokenEndpoint?: string;
+  userinfoEndpoint?: string;
+  groupClaims?: string[];  // defaults to ["groups", "cognito:groups"]
+  adminGroups?: string[];  // exact-match groups granting site admin
+  viewerGroups?: string[]; // exact-match groups granting site viewer
 }
 ```
+
+Endpoints resolve via OIDC Discovery (cached after the first callback, warmed
+at setup), falling back to explicit overrides and then the Keycloak layout.
+Group memberships are read from the configured claims and stored on the
+session; Entra group overage (`_claim_names`) fails closed with a message
+pointing at directory setup.
+
+### Provider presets
+
+```ts
+import {
+  auth0Preset,
+  cognitoPreset,
+  entraPreset,
+  keycloakPreset,
+  oktaPreset,
+} from "@storyshelf/auth-oauth";
+
+const auth = createOAuthAuth(
+  entraPreset("tenant-id", {
+    clientId, clientSecret, secret, redirectUrl,
+    adminGroups: ["<object-id of shelf-admins>"],
+  }),
+);
+```
+
+- `keycloakPreset(realmUrl, options)` — realm issuer, Keycloak endpoint layout.
+- `oktaPreset(domain, authorizationServerId, options)` — custom authorization server v1 endpoints.
+- `entraPreset(tenantId, options)` — tenant issuer; groups arrive as object IDs (match on IDs, not names).
+- `cognitoPreset(region, userPoolId, options)` — groups arrive as `cognito:groups`.
+- `auth0Preset(domain, options)` — Auth0 emits no group claim by default; add a tenant Action writing a namespaced custom claim (e.g. `https://storyshelf/groups`) and pass it via `groupClaims`.
+- Google Workspace has no OIDC group path (requires Admin SDK domain-wide delegation) and is not supported.
 
 ### `createOAuthAuth(options: OAuthAuthOptions): OAuthAuth`
 

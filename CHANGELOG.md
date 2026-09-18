@@ -17,6 +17,20 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 - **Action required after upgrade:** re-create CI tokens used for
   approve/reject/manage flows; run DB migrations for the new `user_id` column.
 
+**Auth: site-viewer auditor, OIDC team sync**
+- New site `viewer` role: read-only visibility into all projects without
+  membership; explicit membership takes precedence. Request logs carry the
+  user id on request end for read attribution.
+- OIDC adapter generalizes endpoints via Discovery (Keycloak layout fallback),
+  extracts group memberships from configurable claims, and ships Keycloak,
+  Okta, Entra ID, Cognito, and Auth0 presets. `adminGroups`/`viewerGroups`
+  map groups to site roles (exact match); Entra group overage fails closed.
+- New `project_group_mappings` table maps IdP groups to project roles per
+  project (API + Members settings tab); login syncs memberships (highest role
+  wins, removals revoke synced grants only, manual grants untouched).
+- **Action required after upgrade:** run DB migrations for `project_members.source`
+  and the new `project_group_mappings` table.
+
 **New adapters**
 - `@storyshelf/queue-redis` — Redis-backed remote capture queue (`ioredis`).
 - `@storyshelf/storage-azure` — Azure Blob Storage adapter.

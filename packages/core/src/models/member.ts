@@ -48,11 +48,17 @@ export class MemberModel {
   }
 
   /** Set a user's role in a project, creating the membership if needed. */
-  async set(projectId: string, userId: string, role: ProjectRole): Promise<ProjectMember> {
+  async set(
+    projectId: string,
+    userId: string,
+    role: ProjectRole,
+    source = "manual",
+  ): Promise<ProjectMember> {
     const existing = await this.get(projectId, userId);
     if (existing) {
       return (await this.db.update(this.tables.projectMembers, existing.id, {
         role,
+        source,
       })) as unknown as ProjectMember;
     }
     return (await this.db.insert(this.tables.projectMembers, {
@@ -60,6 +66,7 @@ export class MemberModel {
       projectId,
       userId,
       role,
+      source,
       createdAt: new Date().toISOString(),
     })) as unknown as ProjectMember;
   }

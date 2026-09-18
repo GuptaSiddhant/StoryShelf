@@ -10,6 +10,8 @@ import { buildLabels, labelTypes } from "./schema/label.ts";
 import type { BuildLabel, LabelType } from "./schema/label.ts";
 import { projectMembers } from "./schema/member.ts";
 import type { ProjectMember } from "./schema/member.ts";
+import { projectGroupMappings } from "./schema/project-group-mapping.ts";
+import type { ProjectGroupMapping } from "./schema/project-group-mapping.ts";
 import { projects } from "./schema/project.ts";
 import type { Project } from "./schema/project.ts";
 import { snapshots } from "./schema/snapshot.ts";
@@ -41,6 +43,7 @@ it("row interfaces match drizzle inference exactly", () => {
   expectTypeOf<Webhook>().toEqualTypeOf<typeof webhooks.$inferSelect>();
   expectTypeOf<User>().toEqualTypeOf<typeof users.$inferSelect>();
   expectTypeOf<ProjectMember>().toEqualTypeOf<typeof projectMembers.$inferSelect>();
+  expectTypeOf<ProjectGroupMapping>().toEqualTypeOf<typeof projectGroupMappings.$inferSelect>();
 });
 
 const DDL_TABLES = [
@@ -56,6 +59,7 @@ const DDL_TABLES = [
   "webhooks",
   "users",
   "project_members",
+  "project_group_mappings",
 ];
 
 const DDL_INDEXES = [
@@ -69,6 +73,7 @@ const DDL_INDEXES = [
   "label_types_project_key_idx",
   "build_labels_build_type_value_idx",
   "project_members_project_user_idx",
+  "project_group_mappings_project_group_idx",
 ];
 
 /**

@@ -35,10 +35,23 @@ const auth = createOAuthAuth({
 const app = createShelfApp({ database, storage, auth });
 ```
 
-The issuer, client credentials, session secret, and registered callback URL are required. The default scopes are `openid`, `email`, and `profile`.
+The issuer, client credentials, session secret, and registered callback URL are required. The default scopes are `openid`, `email`, and `profile`. Endpoints resolve via OIDC Discovery with Keycloak-layout fallback; see the package README for explicit endpoint overrides.
+
+## Provider setup
+
+Use a preset from `@storyshelf/auth-oauth` instead of hand-building endpoint URLs:
+
+- **Keycloak** — `keycloakPreset(realmUrl, options)`; optionally add a Group Membership mapper emitting `groups`.
+- **Okta** — `oktaPreset(domain, authorizationServerId, options)`; configure a `groups` claim (filter or expression) and request the `groups` scope.
+- **Microsoft Entra ID** — `entraPreset(tenantId, options)`; set `groupMembershipClaims` in the app manifest. Groups arrive as **object IDs**, so map IDs not display names. Beyond ~200 memberships the claim is omitted (overage) — login fails closed; restrict emitted groups to this app.
+- **Amazon Cognito** — `cognitoPreset(region, userPoolId, options)`; groups arrive as `cognito:groups` (read by default).
+- **Auth0** — `auth0Preset(domain, options)` plus a tenant Action writing a namespaced custom claim (Auth0 emits no group claim by default); pass the claim name via `groupClaims`.
+- **Google Workspace** — not supported (no OIDC group path; would need Admin SDK domain-wide delegation).
+
+Map groups to the site `admin`/`viewer` roles with `adminGroups`/`viewerGroups` (exact match). Project-level mapping (`group name → project role`) lives in each project's Members settings tab and syncs at next login.
 
 ## API
 
-`createOAuthAuth(options)` returns an `AuthAdapter` with `loginUrl(state)`, `handleCallback(callback)`, `check(request)`, `createSession(user)`, and `destroySession(sessionId)`. The callback exchanges the authorization code, fetches user information, and returns an `AuthUser` or `null`.
+`createOAuthAuth(options)` returns an `AuthAdapter` with `loginUrl(state)`, `handleCallback(callback)`, `check(request)`, `createSession(user)`, and `destroySession(sessionId)`. The callback exchanges the authorization code, fetches user information (groups included), and returns an `AuthUser` or `null`.
 
 Register `redirectUrl` with the provider before deployment. The [authentication guide](../../guides/auth/) covers provider configuration and project roles.
