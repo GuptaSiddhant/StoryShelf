@@ -31,6 +31,8 @@ export default defineConfig({
             { label: "CLI", slug: "guides/cli" },
             { label: "Configuration", slug: "guides/config" },
             { label: "Auth", slug: "guides/auth" },
+            { label: "Chromatic comparison", slug: "guides/chromatic-comparison" },
+            { label: "Chromatic migration", slug: "guides/chromatic-migration" },
           ],
         },
         {
