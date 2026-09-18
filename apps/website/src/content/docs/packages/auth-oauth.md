@@ -3,7 +3,7 @@ title: "@storyshelf/auth-oauth"
 description: Add OAuth and OpenID Connect login to StoryShelf.
 ---
 
-`@storyshelf/auth-oauth` authenticates users with an OpenID Connect provider via the authorization-code flow, with seven-day HMAC-signed sessions. Endpoints currently follow the Keycloak layout (`{issuer}/protocol/openid-connect/{auth,token,userinfo}`), so Keycloak works out of the box and any provider exposing those paths works too; generic OIDC Discovery and per-provider presets are planned. Like all auth adapters it proves identity only — roles come from project memberships.
+`@storyshelf/auth-oauth` authenticates users with an OpenID Connect provider via the authorization-code flow, with seven-day HMAC-signed sessions. Endpoints resolve via OIDC Discovery with Keycloak-layout fallback, and per-provider presets are available via `@storyshelf/auth-oauth/presets`. Like all auth adapters it proves identity only — roles come from project memberships.
 
 ## Install
 
@@ -49,6 +49,29 @@ Use a preset from `@storyshelf/auth-oauth` instead of hand-building endpoint URL
 - **Google Workspace** — not supported (no OIDC group path; would need Admin SDK domain-wide delegation).
 
 Map groups to the site `admin`/`viewer` roles with `adminGroups`/`viewerGroups` (exact match). Project-level mapping (`group name → project role`) lives in each project's Members settings tab and syncs at next login.
+
+### Worked example: Microsoft Entra ID
+
+```ts
+import { createOAuthAuth } from "@storyshelf/auth-oauth";
+import { entraPreset } from "@storyshelf/auth-oauth/presets";
+
+const auth = createOAuthAuth(
+  entraPreset(process.env.ENTRA_TENANT_ID!, {
+    clientId: process.env.OIDC_CLIENT_ID!,
+    clientSecret: process.env.OIDC_CLIENT_SECRET!,
+    secret: process.env.SHELF_SECRET!,
+    redirectUrl: process.env.OIDC_REDIRECT_URL!,
+    // Entra emits group object IDs, not display names — map IDs here.
+    // Requires groupMembershipClaims in the app manifest.
+    adminGroups: ["3b4c5d6e-7f8a-9b0c-d1e2-f3a4b5c6d7e8"],
+  }),
+);
+
+const app = createShelfApp({ database, storage, auth });
+```
+
+The other presets follow the same shape — `keycloakPreset(realmUrl, base)`, `oktaPreset(domain, authorizationServerId, base)`, `cognitoPreset(region, userPoolId, base)`, `auth0Preset(domain, base)` — each returning options for `createOAuthAuth`. See the package README for a copy-pasteable example of each.
 
 ## API
 

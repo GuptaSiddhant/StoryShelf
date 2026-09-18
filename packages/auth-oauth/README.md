@@ -1,6 +1,6 @@
 # @storyshelf/auth-oauth
 
-An OIDC auth adapter for StoryShelf (kept under its historic `auth-oauth` name): authenticates users against an OpenID Connect provider via the authorization-code flow. Endpoints follow the Keycloak layout (`{issuer}/protocol/openid-connect/{auth,token,userinfo}`), so any provider exposing those paths works; generic OIDC Discovery and per-provider presets are planned. Sessions are HMAC-signed cookies with a 7-day TTL.
+An OIDC auth adapter for StoryShelf (kept under its historic `auth-oauth` name): authenticates users against an OpenID Connect provider via the authorization-code flow. Endpoints resolve via OIDC Discovery with explicit overrides, falling back to the Keycloak layout (`{issuer}/protocol/openid-connect/{auth,token,userinfo}`); provider presets live under `@storyshelf/auth-oauth/presets`. Sessions are HMAC-signed cookies with a 7-day TTL.
 
 > **Scope note:** this adapter authenticates (proves identity) but never authorizes. Project roles come from memberships; new users sign in with the site `member` role. Group-to-role mapping is planned separately.
 
@@ -65,20 +65,49 @@ pointing at directory setup.
 ### Provider presets
 
 ```ts
+import { createOAuthAuth } from "@storyshelf/auth-oauth";
 import {
   auth0Preset,
   cognitoPreset,
   entraPreset,
   keycloakPreset,
   oktaPreset,
-} from "@storyshelf/auth-oauth";
+} from "@storyshelf/auth-oauth/presets";
 
-const auth = createOAuthAuth(
+const base = {
+  clientId: process.env.OIDC_CLIENT_ID!,
+  clientSecret: process.env.OIDC_CLIENT_SECRET!,
+  secret: process.env.SHELF_SECRET!,
+  redirectUrl: process.env.OIDC_REDIRECT_URL!,
+};
+
+// Keycloak (self-hosted default — realm URL only)
+const keycloak = createOAuthAuth(
+  keycloakPreset("https://id.example.com/realms/teams", {
+    ...base,
+    adminGroups: ["shelf-admins"],
+  }),
+);
+
+// Okta (custom authorization server + groups claim/scope configured in Okta)
+const okta = createOAuthAuth(oktaPreset("id.example.okta.com", "default", { ...base }));
+
+// Microsoft Entra ID (groups arrive as object IDs — match on IDs, not names)
+const entra = createOAuthAuth(
   entraPreset("tenant-id", {
-    clientId, clientSecret, secret, redirectUrl,
+    ...base,
     adminGroups: ["<object-id of shelf-admins>"],
   }),
 );
+
+// Amazon Cognito (groups arrive as cognito:groups — read by default)
+const cognito = createOAuthAuth(cognitoPreset("us-east-1", "us-east-1_abc123", { ...base }));
+
+// Auth0 (tenant Action must write a namespaced custom claim first)
+const auth0 = createOAuthAuth({
+  ...auth0Preset("tenant.us.auth0.com", { ...base }),
+  groupClaims: ["https://storyshelf/groups"],
+});
 ```
 
 - `keycloakPreset(realmUrl, options)` — realm issuer, Keycloak endpoint layout.
