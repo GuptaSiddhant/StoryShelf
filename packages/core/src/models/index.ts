@@ -13,4 +13,5 @@ export { ProjectModel, type ProjectCreateInput } from "./project.ts";
 export { SnapshotModel, type SnapshotCreateInput } from "./snapshot.ts";
 export { StatusConfigModel, type StatusConfigCreateInput } from "./status-config.ts";
 export { TokenModel } from "./token.ts";
+export { UserModel } from "./user.ts";
 export { WebhookModel, type WebhookCreateInput } from "./webhook.ts";

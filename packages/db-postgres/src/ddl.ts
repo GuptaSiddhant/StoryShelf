@@ -124,6 +124,7 @@ CREATE TABLE IF NOT EXISTS tokens (
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   hash TEXT NOT NULL UNIQUE,
+  user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
   last_used_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL
 );

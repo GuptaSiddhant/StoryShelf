@@ -67,11 +67,11 @@ export function registerTokens(app: ShelfRouter): void {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
     const body = c.req.valid("json");
     const token = randomToken("shelf_");
-    await new TokenModel(getStore().db, { tokens: tokensTable }).create(
-      project.id,
-      body.name,
-      token.hash,
-    );
+    await new TokenModel(getStore().db, { tokens: tokensTable }).create(project.id, {
+      name: body.name,
+      hash: token.hash,
+      userId: getStore().user?.id ?? null,
+    });
     return c.json({ ...body, token: token.value }, 201);
   });
 

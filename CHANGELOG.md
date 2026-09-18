@@ -5,6 +5,18 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 
 ## Unreleased
 
+**Auth: admin-token bootstrap, user-bound tokens**
+- New `ShelfConfig.adminToken` (`STORYSHELF_ADMIN_TOKEN`/`ADMIN_TOKEN` env):
+  bearer grants site-admin API access before any user exists. Distinct from
+  `secret` (session signing); never mints sessions.
+- API tokens are bound to their creating user (`tokens.user_id`) and resolve
+  to that user's live project role; bearer callers are now subject to route
+  role requirements. Legacy ownerless tokens resolve as viewer; tokens whose
+  owner is deleted are denied. Re-issue CI tokens that approve or manage.
+- Project creation records the session creator as project admin.
+- **Action required after upgrade:** re-create CI tokens used for
+  approve/reject/manage flows; run DB migrations for the new `user_id` column.
+
 **New adapters**
 - `@storyshelf/queue-redis` — Redis-backed remote capture queue (`ioredis`).
 - `@storyshelf/storage-azure` — Azure Blob Storage adapter.

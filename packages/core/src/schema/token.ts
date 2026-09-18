@@ -4,6 +4,8 @@ export interface Token {
   projectId: string;
   name: string;
   hash: string;
+  /** Owning user, or null for legacy pre-binding tokens (resolved as viewer). */
+  userId: string | null;
   lastUsedAt: string | null;
   createdAt: string;
 }

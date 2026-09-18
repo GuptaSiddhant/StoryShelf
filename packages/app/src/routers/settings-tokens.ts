@@ -26,7 +26,11 @@ async function handleCreateToken(c: Context): Promise<Response> {
     );
   }
   const token = randomToken("shelf_");
-  await new TokenModel(getStore().db, { tokens }).create(project.id, tokenName, token.hash);
+  await new TokenModel(getStore().db, { tokens }).create(project.id, {
+    name: tokenName,
+    hash: token.hash,
+    userId: getStore().user?.id ?? null,
+  });
   return await renderTokenCreated(c, token.value);
 }
 

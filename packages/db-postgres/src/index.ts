@@ -104,6 +104,8 @@ const BASELINE_INFRA_HASH_ALTER = "ALTER TABLE baselines ADD COLUMN IF NOT EXIST
 const WEBHOOK_SECRET_ALTER =
   "ALTER TABLE webhooks ADD COLUMN IF NOT EXISTS secret_encrypted TEXT NOT NULL DEFAULT ''";
 const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN IF EXISTS secret";
+const TOKEN_USER_ALTER =
+  "ALTER TABLE tokens ADD COLUMN IF NOT EXISTS user_id TEXT REFERENCES users(id) ON DELETE CASCADE";
 
 async function migrateProjectExtras(client: ReturnType<typeof postgres>): Promise<void> {
   await execIgnore(client, EXECUTE_PLAY_ALTER);
@@ -122,6 +124,7 @@ async function runMigrations(client: ReturnType<typeof postgres>): Promise<void>
   await migrateProjectExtras(client);
   await execIgnore(client, WEBHOOK_SECRET_ALTER);
   await execIgnore(client, WEBHOOK_SECRET_DROP);
+  await execIgnore(client, TOKEN_USER_ALTER);
   await migrateCommentsTable(client);
 }
 

@@ -25,16 +25,20 @@ export class TokenModel {
    * Create a token record storing its hash.
    *
    * @param projectId - Project ID.
-   * @param name - Token name.
-   * @param hash - Hashed token value.
+   * @param input - Token name, hash, and optional owning user ID (null for
+   * legacy/admin-token minting; such tokens resolve as viewer).
    * @returns The created token.
    */
-  async create(projectId: string, name: string, hash: string): Promise<Token> {
+  async create(
+    projectId: string,
+    input: { name: string; hash: string; userId?: string | null },
+  ): Promise<Token> {
     return (await this.db.insert(this.tables.tokens, {
       id: ulid(),
       projectId,
-      name,
-      hash,
+      name: input.name,
+      hash: input.hash,
+      userId: input.userId ?? null,
       createdAt: new Date().toISOString(),
     })) as unknown as Token;
   }

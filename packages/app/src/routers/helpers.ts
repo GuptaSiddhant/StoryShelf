@@ -1,10 +1,12 @@
 import { MemberModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
 import { TokenModel } from "@storyshelf/core/models";
+import { UserModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
+import type { Token } from "@storyshelf/core/schema";
 import type { ProjectRole } from "@storyshelf/core/types";
 import { sha256, timingSafeEqualString } from "@storyshelf/core/utils";
-import { projectMembers, projects, tokens } from "@storyshelf/db-sqlite/schema";
+import { projectMembers, projects, tokens, users } from "@storyshelf/db-sqlite/schema";
 import type { Context, Next } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -69,7 +71,10 @@ export async function findProjectBySlug(slug: string): Promise<Project | null> {
   return await new ProjectModel(db, { projects }).getBySlug(slug);
 }
 
-async function resolveProjectByToken(c: Context, slug: string): Promise<Project | null> {
+async function resolveProjectByToken(
+  c: Context,
+  slug: string,
+): Promise<{ project: Project; token: Token } | null> {
   const authHeader = c.req.header("authorization");
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.slice("Bearer ".length);
@@ -81,16 +86,33 @@ async function resolveProjectByToken(c: Context, slug: string): Promise<Project 
     if (!project || project.slug !== slug) {
       forbidden();
     }
-    return project;
+    return { project, token: found };
   }
   return null;
 }
 
+/**
+ * Resolve a bearer token to an effective project role.
+ * Tokens without an owner (legacy pre-binding rows) resolve as viewer;
+ * tokens whose owner no longer exists resolve to null (deny).
+ */
+async function tokenProjectRole(token: Token, projectId: string): Promise<ProjectRole | null> {
+  if (!token.userId) {
+    return "viewer";
+  }
+  const { db } = getStore();
+  const user = await new UserModel(db, { users }).get(token.userId);
+  if (!user) {
+    return null;
+  }
+  return await new MemberModel(db, { projectMembers }).effectiveRole(user.role, projectId, user.id);
+}
+
 /** Resolve a project by slug, honoring CLI bearer-token access. */
 export async function resolveProject(c: Context, slug: string): Promise<Project> {
-  const project = await resolveProjectByToken(c, slug);
-  if (project) {
-    return project;
+  const viaToken = await resolveProjectByToken(c, slug);
+  if (viaToken) {
+    return viaToken.project;
   }
   const found = await findProjectBySlug(slug);
   if (!found) {
@@ -142,9 +164,13 @@ export async function resolveAuthorizedProject(
   slug: string,
   ...minRoles: ProjectRole[]
 ): Promise<Project> {
-  const project = await resolveProjectByToken(c, slug);
-  if (project) {
-    return project;
+  const viaToken = await resolveProjectByToken(c, slug);
+  if (viaToken) {
+    const role = await tokenProjectRole(viaToken.token, viaToken.project.id);
+    if (!role || !minRoles.includes(role)) {
+      forbidden();
+    }
+    return viaToken.project;
   }
   const found = await findProjectBySlug(slug);
   if (!found) {
