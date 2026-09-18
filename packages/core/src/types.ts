@@ -33,7 +33,7 @@ export type SnapshotStatus = (typeof SNAPSHOT_STATUSES)[number];
 export const TERMINAL_BUILD_STATUSES: readonly BuildStatus[] = ["approved", "rejected", "failed"];
 
 /** All site-wide user roles. */
-export const SITE_ROLES = ["admin", "member"] as const;
+export const SITE_ROLES = ["admin", "member", "viewer"] as const;
 
 /** Site-wide role of a user. */
 export type SiteRole = (typeof SITE_ROLES)[number];

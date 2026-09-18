@@ -82,6 +82,13 @@ export class MemberModel {
       return "admin";
     }
     const member = await this.get(projectId, userId);
-    return member?.role ?? null;
+    if (member) {
+      return member.role;
+    }
+    // Site viewers read every project; explicit membership always wins.
+    if (siteRole === "viewer") {
+      return "viewer";
+    }
+    return null;
   }
 }

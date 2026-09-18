@@ -49,11 +49,15 @@ Auth enables project-scoped roles, tracked per project via membership:
 | `approver` | View + approve/reject snapshots |
 | `admin` | Full control, including members and settings |
 
-Site-wide `admin` users (from the auth provider) bypass project roles entirely. For a public deployment, restrict access by granting roles through project settings.
+Site-wide roles are `admin`, `member`, and `viewer`. Site `admin` users (from the auth provider) bypass project roles entirely. Site `viewer` is a read-only auditor role: it can view every project without membership, but cannot mutate, manage, or administer anything; all `viewer` reads carry the user id in request logs. For a public deployment, restrict access by granting roles through project settings.
+
+## First admin bootstrap
+
+With auth enabled and an empty database, no one can log in as admin yet. Set `STORYSHELF_ADMIN_TOKEN` (or `ADMIN_TOKEN`) on the server: its bearer value grants site-admin API access (project creation, purge) without a session. It never mints sessions and is distinct from `SECRET` (session signing). Creating a project as a logged-in user also records them as that project's admin.
 
 ## API tokens vs. user auth
 
-Auth gates the **web UI**. The **CLI does not use user login** — it authenticates with **per-project API tokens** sent as `Authorization: Bearer <token>` (CI, `STORYSHELF_TOKEN`) and **site-admin tokens** (`STORYSHELF_ADMIN_TOKEN`) for project creation. Tokens are minted by [`storyshelf create`](/guides/cli/) (requires admin token, writes `.storybook/storyshelf.json`) or in project settings; client config alone can be initialized via [`storyshelf init`](/guides/cli/).
+Auth gates the **web UI**. The **CLI does not use user login** — it authenticates with **per-project API tokens** sent as `Authorization: Bearer <token>` (CI, `STORYSHELF_TOKEN`) and **site-admin tokens** (`STORYSHELF_ADMIN_TOKEN`) for project creation. Tokens are bound to the user who mints them and resolve to that user's live project role, so bearer callers pass the same role requirements as sessions; demoting a user instantly downgrades their tokens. Legacy tokens minted before user binding resolve as viewer, and tokens whose owner was deleted are denied — re-issue them. Tokens are minted by [`storyshelf create`](/guides/cli/) (requires admin token, writes `.storybook/storyshelf.json`) or in project settings; client config alone can be initialized via [`storyshelf init`](/guides/cli/).
 
 ## Public Storybooks
 

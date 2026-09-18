@@ -27,6 +27,7 @@ export function storeScope(deps: StoreScopeDeps) {
   // oxlint-disable-next-line typescript/no-invalid-void-type -- Hono middleware may not return Response
   return async (c: Context, next: Next): Promise<Response | void> => {
     const user = await deps.resolveUser(c);
+    c.set("userId", user?.id ?? null);
     await runWithStore(
       {
         db: deps.db,

@@ -41,4 +41,29 @@ describe("MemberModel", () => {
     const user1 = members.find((m) => m.userId === "user-1");
     expect(user1?.role).toBe("viewer");
   });
+
+  it("resolves site admin to project admin without membership", async () => {
+    const { db } = makeDatabase();
+    const model = new MemberModel(db, { projectMembers });
+    await expect(model.effectiveRole("admin", "p1", "user-9")).resolves.toBe("admin");
+  });
+
+  it("resolves site viewer to project viewer without membership", async () => {
+    const { db } = makeDatabase();
+    const model = new MemberModel(db, { projectMembers });
+    await expect(model.effectiveRole("viewer", "p1", "user-9")).resolves.toBe("viewer");
+  });
+
+  it("prefers explicit membership over the site viewer floor", async () => {
+    const { db } = makeDatabase();
+    const model = new MemberModel(db, { projectMembers });
+    await model.set("p1", "user-9", "developer");
+    await expect(model.effectiveRole("viewer", "p1", "user-9")).resolves.toBe("developer");
+  });
+
+  it("resolves site member without membership to null", async () => {
+    const { db } = makeDatabase();
+    const model = new MemberModel(db, { projectMembers });
+    await expect(model.effectiveRole("member", "p1", "user-9")).resolves.toBeNull();
+  });
 });

@@ -9,6 +9,7 @@ export function requestLogging(logger: Logger) {
     const id = c.get("requestId");
     logger.info({ reqId: id, method: c.req.method, url: c.req.path }, "request start");
     await next();
+    const userId = c.get("userId") as string | null | undefined;
     logger.info(
       {
         reqId: id,
@@ -16,6 +17,7 @@ export function requestLogging(logger: Logger) {
         url: c.req.path,
         status: c.res.status,
         durationMs: Math.round(performance.now() - started),
+        ...(userId ? { userId } : {}),
       },
       "request end",
     );
