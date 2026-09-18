@@ -132,12 +132,12 @@ Keep Chromatic running in parallel for 1-2 sprints:
 
 ## 10. Team onboarding checklist
 
-- [ ] Reviewers know how to approve/reject in StoryShelf UI
-- [ ] GitHub status check renamed from `chromatic` to `storyshelf/<project-slug>`
-- [ ] Branch protection rules updated to require StoryShelf status
-- [ ] CI secrets rotated (`CHROMATIC_PROJECT_TOKEN` → `STORYSHELF_TOKEN`)
-- [ ] Documentation updated with StoryShelf workflow
-- [ ] Chromatic subscription canceled (after verification period)
+- ☐ Reviewers know how to approve/reject in StoryShelf UI
+- ☐ GitHub status check renamed from `chromatic` to `storyshelf/<project-slug>`
+- ☐ Branch protection rules updated to require StoryShelf status
+- ☐ CI secrets rotated (`CHROMATIC_PROJECT_TOKEN` → `STORYSHELF_TOKEN`)
+- ☐ Documentation updated with StoryShelf workflow
+- ☐ Chromatic subscription canceled (after verification period)
 
 ## FAQ
 
