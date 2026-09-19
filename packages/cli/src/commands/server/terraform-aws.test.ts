@@ -32,14 +32,16 @@ describe("AWS Terraform modules", () => {
     expect(versions).toContain("hashicorp/aws");
   });
 
-  it("declares db_engine with an rds/dsql validation", () => {
+  it("declares only live variables", () => {
     const variables = generateAwsVariables();
-    expect(variables).toContain('variable "db_engine"');
-    expect(variables).toContain('"rds"');
-    expect(variables).toContain('"dsql"');
+    expect(variables).toContain('variable "project"');
+    expect(variables).toContain('variable "region"');
     expect(variables).toContain('variable "vpc_id"');
     expect(variables).toContain('variable "domain_name"');
     expect(variables).toContain('variable "saml_metadata_url"');
+    // db_engine is baked at scaffold time, like storage and queue; a
+    // variable here would be dead config that terraform validate flags.
+    expect(variables).not.toContain("db_engine");
   });
 
   it("provisions a private S3 bucket with transient expiry", () => {

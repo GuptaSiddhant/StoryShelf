@@ -63,17 +63,6 @@ variable "region" {
   default     = "us-east-1"
 }
 
-variable "db_engine" {
-  description = "Postgres engine: \\"rds\\" (Aurora/RDS, VPC-isolated) or \\"dsql\\" (serverless)."
-  type        = string
-  default     = "rds"
-
-  validation {
-    condition     = contains(["rds", "dsql"], var.db_engine)
-    error_message = "db_engine must be \\"rds\\" or \\"dsql\\"."
-  }
-}
-
 variable "vpc_id" {
   description = "Existing VPC id. Empty creates a new VPC."
   type        = string
