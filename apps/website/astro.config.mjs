@@ -3,7 +3,7 @@ import mermaid from "astro-mermaid";
 import { defineConfig } from "astro/config";
 
 export default defineConfig({
-  site: "https://storyshelf.dev",
+  site: "https://storyshelf.js.org",
   base: process.env.BASE_PATH || "/",
   integrations: [
     mermaid({ autoTheme: true }),
