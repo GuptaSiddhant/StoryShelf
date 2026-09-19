@@ -37,7 +37,8 @@ test-report
 coverage
 openapi.json
 
-# pnpm trick for turbo prune (nub.lock is source of truth)
+# turbo prune emits the pruned pnpm-format lock as pnpm-lock.yaml (renamed to
+# nub.lock in Docker); never commit a root-level copy (nub.lock is source of truth)
 pnpm-lock.yaml
 !fixtures/**/pnpm-lock.yaml
 

@@ -64,7 +64,7 @@
     "oxlint-tsgolint": "catalog:",
     "rolldown": "*",
     "tsdown": "catalog:",
-    "turbo": "^2.10.11",
+    "turbo": "^2.11.2",
     "typescript": "catalog:",
     "yaml": "catalog:"
   },

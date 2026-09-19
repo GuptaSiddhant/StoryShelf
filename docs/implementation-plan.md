@@ -41,7 +41,7 @@ Step-by-step build order. Each step is independently reviewable. Decisions made 
 - `fixtures/storybook-9` — SB 9 Vite React
 - `fixtures/storybook-10` — SB 10 ESM + CSF-Next
 - `fixtures/storybook-11` — SB 11 alpha
-- `apps/fly-app` — fly.io deploy (pruned via turbo + nub trick)
+- `apps/fly-app` — fly.io deploy (pruned via `turbo prune`, native nub support since turbo 2.11)
 - `apps/website/` — Astro Starlight docs + marketing.
 
 ## Phase 6 — Verification & commit

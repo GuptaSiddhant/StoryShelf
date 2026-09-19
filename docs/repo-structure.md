@@ -81,4 +81,4 @@ There is no `tsdown-entry` key. Each `package.json` `exports` map carries `{ sou
 | `config/tsconfig.base.json` | Strict TS, `hono/jsx`, `customConditions: ["source"]` |
 | `config/tsdown.ts` | `libConfig` / `cliConfig` |
 | `.oxlintrc.json` | Rule-based lint (no per-file path exemptions) |
-| `scripts/` | Release/publish tooling only (`release.mjs`, `jsr.mjs`, `public-packages.mjs`, `npm-trust-all.mjs`, `prune-nub-lock.mjs`) |
+| `scripts/` | Release/publish tooling only (`release.mjs`, `jsr.mjs`, `public-packages.mjs`, `npm-trust-all.mjs`) |

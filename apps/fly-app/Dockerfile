@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1
 # Fly demo — local adapters, workspace versions, rolldown bundle.
 # Build context MUST be repo root: `fly deploy . --config apps/fly-app/fly.toml --dockerfile apps/fly-app/Dockerfile`
-# Uses turbo prune + pnpm trick to trim nub.lock so `nub install --frozen-lockfile` only fetches fly-app deps.
+# Turbo 2.11+ prunes nub.lock natively (pnpm v9 format) — output lock is
+# pnpm-lock.yaml, renamed to nub.lock for `nub install --frozen-lockfile`.
 
 FROM ghcr.io/nubjs/nub:0.8.1 AS pruner
 WORKDIR /app
@@ -9,9 +10,7 @@ COPY package.json nub.lock nub.jsonc turbo.json ./
 COPY config ./config
 COPY packages ./packages
 COPY apps ./apps
-COPY scripts ./scripts
-# Trick turbo into pruning nub.lock as pnpm-lock.yaml (nub.lock is pnpm v9 format)
-RUN cp nub.lock pnpm-lock.yaml && npx --yes turbo@2.10.12 prune fly-app --docker --out-dir out && node scripts/prune-nub-lock.mjs out --verbose && rm pnpm-lock.yaml
+RUN nubx --yes turbo@2.11.2 prune fly-app --docker --out-dir out && mv out/json/pnpm-lock.yaml out/json/nub.lock
 
 FROM ghcr.io/nubjs/nub:0.8.1 AS builder
 WORKDIR /app
@@ -29,7 +28,7 @@ RUN --mount=type=cache,target=/root/.cache/nub,id=nub-cache \
 # Then copy pruned source for bundling (full) — overwrites package.json with full source
 COPY --from=pruner /app/out/full ./
 # Bundle workspace @storyshelf/* into single mjs; keep native + npm deps external
-RUN npx rolldown -c apps/fly-app/rolldown.config.ts
+RUN nubx rolldown -c apps/fly-app/rolldown.config.ts
 
 FROM node:26-bookworm-slim
 WORKDIR /app
