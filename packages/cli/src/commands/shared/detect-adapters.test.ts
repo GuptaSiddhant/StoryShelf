@@ -110,6 +110,26 @@ describe("detectInstalledAdapters", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it("detects gcp pubsub queue", () => {
+    const dir = makeTmp();
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({ dependencies: { "@storyshelf/queue-gcp": "0.3.2" } }),
+    );
+    expect(detectInstalledAdapters(dir).queue).toBe("gcp-pubsub");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("detects gcs storage", () => {
+    const dir = makeTmp();
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({ dependencies: { "@storyshelf/storage-gcs": "0.3.2" } }),
+    );
+    expect(detectInstalledAdapters(dir).storage).toBe("gcs");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it("detects github git provider", () => {
     const dir = makeTmp();
     writeFileSync(

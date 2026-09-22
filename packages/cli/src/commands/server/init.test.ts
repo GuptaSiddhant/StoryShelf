@@ -290,6 +290,59 @@ describe("runServerInit", () => {
     expect(pkg.scripts["docker:up"]).toBeUndefined();
   });
 
+  it("writes the GCP reference stack and forces postgres/gcs/pubsub", async () => {
+    vi.mocked(prompts)
+      .mockResolvedValueOnce({
+        name: "my-server",
+        dir: "./my-server",
+        deployTarget: "gcp",
+        database: "sqlite",
+        storage: "local",
+        auth: "oauth",
+        git: "github",
+        queue: "memory",
+        docker: false,
+      })
+      .mockResolvedValueOnce({
+        gcpProjectId: "acme-gcp-project",
+        gcpLocation: "europe-west1",
+        domainName: "",
+        identityTenant: "",
+      });
+    const cwd = process.cwd();
+    process.chdir(tmpRoot);
+    try {
+      await runServerInit({});
+    } finally {
+      process.chdir(cwd);
+    }
+
+    const serverCode = readFileSync(join(dir, "server.ts"), "utf8");
+    expect(serverCode).toContain("createPostgresDatabase");
+    expect(serverCode).toContain("createGcsStorage");
+    expect(serverCode).toContain("createGcpPubSubQueue");
+    expect(serverCode).toContain("GOOGLE_CLOUD_PROJECT");
+    expect(serverCode).not.toContain("cognitoPreset");
+    expect(existsSync(join(dir, "worker.ts"))).toBe(true);
+    const workerCode = readFileSync(join(dir, "worker.ts"), "utf8");
+    expect(workerCode).toContain("createGcpPubSubQueue");
+    expect(existsSync(join(dir, "terraform", "queue.tf"))).toBe(true);
+    const queueTf = readFileSync(join(dir, "terraform", "queue.tf"), "utf8");
+    expect(queueTf).toContain("google_pubsub_subscription");
+    expect(existsSync(join(dir, "terraform", "terraform.tfvars.example"))).toBe(true);
+    const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
+      dependencies: Record<string, string>;
+      scripts: Record<string, string>;
+    };
+    expect(pkg.dependencies["@storyshelf/db-postgres"]).toBeDefined();
+    expect(pkg.dependencies["@storyshelf/storage-gcs"]).toBeDefined();
+    expect(pkg.dependencies["@storyshelf/queue-gcp"]).toBeDefined();
+    expect(pkg.dependencies["@google-cloud/pubsub"]).toBe("^6.1.0");
+    expect(pkg.scripts["infra:plan"]).toBeDefined();
+    expect(pkg.scripts["infra:apply"]).toBeDefined();
+    expect(pkg.scripts["docker:up"]).toBeUndefined();
+  });
+
   it("emits OIDC wiring for oauth on non-AWS targets", async () => {
     vi.mocked(prompts).mockResolvedValue({
       name: "my-server",

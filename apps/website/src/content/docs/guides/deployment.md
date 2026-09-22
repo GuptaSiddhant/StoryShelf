@@ -121,6 +121,32 @@ terraform -chdir=terraform apply tfplan       # or: npm run infra:apply
 
 Wire the outputs into env (`terraform output -json` / `npm run infra:outputs`): `AZURE_STORAGE_CONNECTION` (+ `AZURE_SERVICE_BUS_CONNECTION` for that backend), `DATABASE_URL`, `OIDC_CLIENT_ID` / `OIDC_ISSUER` (`https://login.microsoftonline.com/{tenant}/v2.0`), `SECRET`. Output keys (`app_fqdn`, `storage_connection_string`, `servicebus_connection_string`, `queue_name`, `database_url`, `entra_application_id`, `entra_tenant_id`) are a stable contract parsed by CI — always present, `""` when not provisioned for the backend. Authenticate with `az login` (or a service principal / managed identity) — never check connection strings into env files. Hostname binding + managed TLS is a post-apply step once the scaffolded DNS records resolve (see the generated `terraform/README.md`, including the CI test profile with unique project prefix per run and documented destroy).
 
+### GCP reference stack (enterprise)
+
+For Google Cloud enterprise deployments, `storyshelf server init` offers a `gcp` deploy target that pins the full reference stack — Cloud Run app + worker, GCS bucket, Pub/Sub topic + pull subscription with dead-lettering, Cloud SQL Postgres (`db-f1-micro` shared-core default), Secret Manager, Identity Platform tenant, and optional Cloud DNS with automatic managed TLS via the domain mapping — and writes it as Terraform under `terraform/`:
+
+```bash
+storyshelf server init
+# ? Deploy target? Google Cloud (Cloud Run + GCS + Pub/Sub + Postgres + Identity Platform)
+# ? GCP project ID? my-gcp-project
+# ? GCP region? us-central1
+# ? Public domain for the app? (empty skips DNS)
+# ? Identity Platform tenant display name? (empty skips it)
+```
+
+Then review and apply explicitly — Terraform is never auto-applied:
+
+```bash
+cd my-server
+gcloud auth login
+gcloud config set project my-gcp-project
+terraform -chdir=terraform init
+terraform -chdir=terraform plan -out=tfplan   # review before applying
+terraform -chdir=terraform apply tfplan       # or: npm run infra:apply
+```
+
+Wire the outputs into env (`terraform output -json` / `npm run infra:outputs`): `GCS_BUCKET` + `GOOGLE_CLOUD_PROJECT`, `DATABASE_URL` (`?sslmode=require`), `OIDC_*`, `SECRET`. Output keys (`run_url`, `gcs_bucket`, `pubsub_topic`, `pubsub_subscription`, `database_url`, `identity_tenant_id`) are a stable contract parsed by CI — always present. Grant the runtime service account Pub/Sub, Cloud SQL Client, and Secret Manager accessor roles post-apply — Terraform creates the resources, IAM bindings stay with your org policy. See the generated `terraform/README.md` for the CI test profile (unique project prefix per run, documented destroy).
+
 ### Cloud assembly (all clouds equal)
 
 You can swap each layer independently. All major serverless platforms are first-class targets — **no single cloud is preferred**.

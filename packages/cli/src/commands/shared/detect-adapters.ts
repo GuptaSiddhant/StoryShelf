@@ -3,8 +3,8 @@ import { join } from "node:path";
 
 export interface DetectedAdapters {
   database?: "sqlite" | "turso" | "postgres";
-  storage?: "local" | "s3" | "azure";
-  queue?: "memory" | "sqs" | "redis" | "azure-storage-queues" | "azure-service-bus";
+  storage?: "local" | "s3" | "azure" | "gcs";
+  queue?: "memory" | "sqs" | "redis" | "azure-storage-queues" | "azure-service-bus" | "gcp-pubsub";
   git?: "none" | "github" | "gitlab";
 }
 
@@ -49,6 +49,8 @@ export function detectInstalledAdapters(dir: string): DetectedAdapters {
 
   if (deps.has("@storyshelf/storage-azure")) {
     result.storage = "azure";
+  } else if (deps.has("@storyshelf/storage-gcs")) {
+    result.storage = "gcs";
   } else if (deps.has("@storyshelf/storage-s3")) {
     result.storage = "s3";
   } else if (deps.has("@storyshelf/storage-local")) {
@@ -58,6 +60,8 @@ export function detectInstalledAdapters(dir: string): DetectedAdapters {
   if (deps.has("@storyshelf/queue-azure")) {
     // One package serves both backends — disambiguate via the installed SDK.
     result.queue = deps.has("@azure/service-bus") ? "azure-service-bus" : "azure-storage-queues";
+  } else if (deps.has("@storyshelf/queue-gcp")) {
+    result.queue = "gcp-pubsub";
   } else if (deps.has("@storyshelf/queue-sqs")) {
     result.queue = "sqs";
   } else if (deps.has("@storyshelf/queue-redis")) {

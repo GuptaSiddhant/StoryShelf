@@ -55,6 +55,10 @@ export const INFRA_PROMPTS: Prompt[] = [
         title: "Azure (Container Apps + Blob + Queues/Service Bus + Postgres + Entra)",
         value: "azure",
       },
+      {
+        title: "Google Cloud (Cloud Run + GCS + Pub/Sub + Postgres + Identity Platform)",
+        value: "gcp",
+      },
     ],
   },
   {
@@ -74,6 +78,7 @@ export const INFRA_PROMPTS: Prompt[] = [
     choices: [
       { title: "Local filesystem", value: "local" },
       { title: "S3-compatible", value: "s3" },
+      { title: "GCS (Google Cloud Storage)", value: "gcs" },
     ],
   },
   {
@@ -112,6 +117,7 @@ export const INFRA_PROMPTS: Prompt[] = [
         title: "Azure Service Bus (native dead-lettering, remote worker)",
         value: "azure-service-bus",
       },
+      { title: "GCP Pub/Sub (emulator-local, remote worker)", value: "gcp-pubsub" },
     ],
   },
   {
@@ -140,6 +146,7 @@ export const WORKER_INFRA_PROMPTS: Prompt[] = [
     choices: [
       { title: "Local filesystem", value: "local" },
       { title: "S3-compatible", value: "s3" },
+      { title: "GCS (Google Cloud Storage)", value: "gcs" },
     ],
   },
   {
@@ -151,6 +158,7 @@ export const WORKER_INFRA_PROMPTS: Prompt[] = [
       { title: "Redis (self-hosted)", value: "redis" },
       { title: "Azure Storage Queues", value: "azure-storage-queues" },
       { title: "Azure Service Bus", value: "azure-service-bus" },
+      { title: "GCP Pub/Sub", value: "gcp-pubsub" },
       { title: "In-memory (local dev only)", value: "memory" },
     ],
   },
@@ -159,6 +167,34 @@ export const WORKER_INFRA_PROMPTS: Prompt[] = [
     name: "docker",
     message: "Generate Docker files?",
     initial: true,
+  },
+];
+
+/** Follow-up prompts for the GCP deploy target (single prompts call). */
+export const GCP_INFRA_PROMPTS: Prompt[] = [
+  {
+    type: "text",
+    name: "gcpProjectId",
+    message: "GCP project ID?",
+    initial: "",
+  },
+  {
+    type: "text",
+    name: "gcpLocation",
+    message: "GCP region?",
+    initial: "us-central1",
+  },
+  {
+    type: "text",
+    name: "domainName",
+    message: "Public domain for the app? (empty skips DNS)",
+    initial: "",
+  },
+  {
+    type: "text",
+    name: "identityTenant",
+    message: "Identity Platform tenant display name? (empty skips it)",
+    initial: "",
   },
 ];
 

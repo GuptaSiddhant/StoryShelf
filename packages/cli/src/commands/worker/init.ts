@@ -14,8 +14,8 @@ export interface WorkerInitOptions {
 }
 
 type DatabaseChoice = "sqlite" | "turso" | "postgres";
-type StorageChoice = "local" | "s3";
-type QueueChoice = "sqs" | "azure-storage-queues" | "azure-service-bus" | "memory";
+type StorageChoice = "local" | "s3" | "azure" | "gcs";
+type QueueChoice = "sqs" | "azure-storage-queues" | "azure-service-bus" | "gcp-pubsub" | "memory";
 
 interface Answers {
   name: string;
@@ -35,18 +35,23 @@ const DB_PACKAGE: Record<DatabaseChoice, string> = {
 const STORAGE_PACKAGE: Record<StorageChoice, string> = {
   local: "@storyshelf/storage-local",
   s3: "@storyshelf/storage-s3",
+  azure: "@storyshelf/storage-azure",
+  gcs: "@storyshelf/storage-gcs",
 };
 
 const QUEUE_PACKAGE: Record<QueueChoice, string | null> = {
   sqs: "@storyshelf/queue-sqs",
   "azure-storage-queues": "@storyshelf/queue-azure",
   "azure-service-bus": "@storyshelf/queue-azure",
+  "gcp-pubsub": "@storyshelf/queue-gcp",
   memory: null,
 };
 
 /** Azure SDK pins (must match @storyshelf/queue-azure peerDependencies). */
 const AZURE_STORAGE_QUEUE_SDK = "^12.31.0";
 const AZURE_SERVICE_BUS_SDK = "^7.9.5";
+/** Pub/Sub SDK pin (must match @storyshelf/queue-gcp peerDependencies). */
+const GCP_PUBSUB_SDK = "^6.1.0";
 
 const DB_IMPORT: Record<DatabaseChoice, string> = {
   sqlite: `import { createSqliteDatabase } from "@storyshelf/db-sqlite";`,
@@ -57,6 +62,8 @@ const DB_IMPORT: Record<DatabaseChoice, string> = {
 const STORAGE_IMPORT: Record<StorageChoice, string> = {
   local: `import { createLocalStorage } from "@storyshelf/storage-local";`,
   s3: `import { createS3Storage } from "@storyshelf/storage-s3";`,
+  azure: `import { createAzureStorage } from "@storyshelf/storage-azure";`,
+  gcs: `import { createGcsStorage } from "@storyshelf/storage-gcs";`,
 };
 
 const DB_INIT: Record<DatabaseChoice, string> = {
@@ -68,6 +75,8 @@ const DB_INIT: Record<DatabaseChoice, string> = {
 const STORAGE_INIT: Record<StorageChoice, string> = {
   local: `createLocalStorage(dataDir)`,
   s3: `createS3Storage({ bucket: process.env.S3_BUCKET!, region: process.env.AWS_REGION })`,
+  azure: `createAzureStorage({ container: "storybook", connectionString: process.env.AZURE_STORAGE_CONNECTION! })`,
+  gcs: `createGcsStorage({ bucket: process.env.GCS_BUCKET! })`,
 };
 
 function workerQueueImport(queue: QueueChoice): string {
@@ -76,6 +85,9 @@ function workerQueueImport(queue: QueueChoice): string {
   }
   if (queue === "azure-service-bus") {
     return `import { createAzureServiceBusQueue } from "@storyshelf/queue-azure/service-bus";`;
+  }
+  if (queue === "gcp-pubsub") {
+    return `import { createGcpPubSubQueue } from "@storyshelf/queue-gcp";`;
   }
   if (queue === "sqs") {
     return `import { createSqsCaptureQueue } from "@storyshelf/queue-sqs";`;
@@ -89,6 +101,9 @@ function workerQueueInit(queue: QueueChoice): string {
   }
   if (queue === "azure-service-bus") {
     return `const queue = createAzureServiceBusQueue({ queueName: "capture-jobs", connectionString: process.env.AZURE_SERVICE_BUS_CONNECTION! });`;
+  }
+  if (queue === "gcp-pubsub") {
+    return `const queue = createGcpPubSubQueue({ topic: "capture-jobs", subscription: "capture-jobs-worker", projectId: process.env.GOOGLE_CLOUD_PROJECT! });`;
   }
   if (queue === "sqs") {
     return `const queue = createSqsCaptureQueue({ queueUrl: process.env.QUEUE_URL! });`;
@@ -150,6 +165,9 @@ function buildDeps(answers: Answers): Record<string, string> {
   }
   if (answers.queue === "azure-service-bus") {
     deps["@azure/service-bus"] = AZURE_SERVICE_BUS_SDK;
+  }
+  if (answers.queue === "gcp-pubsub") {
+    deps["@google-cloud/pubsub"] = GCP_PUBSUB_SDK;
   }
   return deps;
 }

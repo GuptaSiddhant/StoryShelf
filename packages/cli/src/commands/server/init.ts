@@ -23,9 +23,11 @@ import {
   PROJECT_PROMPTS,
   AWS_INFRA_PROMPTS,
   AZURE_INFRA_PROMPTS,
+  GCP_INFRA_PROMPTS,
 } from "./prompts.ts";
 import { generateAwsTerraformFiles } from "./terraform-aws.ts";
 import { generateAzureTerraformFiles } from "./terraform-azure.ts";
+import { generateGcpTerraformFiles } from "./terraform-gcp.ts";
 
 /**
  * Options for `storyshelf server init` — scaffolds a new StoryShelf server project.
@@ -36,15 +38,23 @@ export interface ServerInitOptions {
 }
 
 type DatabaseChoice = "sqlite" | "turso" | "postgres";
-type StorageChoice = "local" | "s3" | "azure";
+type StorageChoice = "local" | "s3" | "azure" | "gcs";
 type AuthChoice = "none" | "password" | "oauth";
 type GitChoice = "none" | "github" | "gitlab";
-type QueueChoice = "memory" | "sqs" | "redis" | "azure-storage-queues" | "azure-service-bus";
-type DeployTarget = "local" | "docker" | "aws" | "azure";
+type QueueChoice =
+  | "memory"
+  | "sqs"
+  | "redis"
+  | "azure-storage-queues"
+  | "azure-service-bus"
+  | "gcp-pubsub";
+type DeployTarget = "local" | "docker" | "aws" | "azure" | "gcp";
 
 /** Azure SDK pins (must match @storyshelf/queue-azure peerDependencies). */
 const AZURE_STORAGE_QUEUE_SDK = "^12.31.0";
 const AZURE_SERVICE_BUS_SDK = "^7.9.5";
+/** Pub/Sub SDK pin (must match @storyshelf/queue-gcp peerDependencies). */
+const GCP_PUBSUB_SDK = "^6.1.0";
 
 /** npm peer SDK for the chosen Azure queue backend. */
 function azureSdkDep(queue: "azure-storage-queues" | "azure-service-bus"): {
@@ -78,6 +88,10 @@ interface Answers {
   azureLocation?: string;
   azureQueueBackend?: "storage-queues" | "service-bus";
   entraTenantId?: string;
+  /** GCP-only follow-ups (asked when deployTarget is `gcp`). */
+  gcpProjectId?: string;
+  gcpLocation?: string;
+  identityTenant?: string;
 }
 
 /** Remote queues need a separately-assembled worker; memory runs in-process. */
@@ -100,6 +114,7 @@ const STORAGE_PACKAGE: Record<StorageChoice, string> = {
   local: "@storyshelf/storage-local",
   s3: "@storyshelf/storage-s3",
   azure: "@storyshelf/storage-azure",
+  gcs: "@storyshelf/storage-gcs",
 };
 
 const AUTH_PACKAGE: Record<AuthChoice, string | null> = {
@@ -120,6 +135,7 @@ const QUEUE_PACKAGE: Record<QueueChoice, string | null> = {
   redis: "@storyshelf/queue-redis",
   "azure-storage-queues": "@storyshelf/queue-azure",
   "azure-service-bus": "@storyshelf/queue-azure",
+  "gcp-pubsub": "@storyshelf/queue-gcp",
 };
 
 const DB_IMPORT: Record<DatabaseChoice, string> = {
@@ -132,6 +148,7 @@ const STORAGE_IMPORT: Record<StorageChoice, string> = {
   local: `import { createLocalStorage } from "@storyshelf/storage-local";`,
   s3: `import { createS3Storage } from "@storyshelf/storage-s3";`,
   azure: `import { createAzureStorage } from "@storyshelf/storage-azure";`,
+  gcs: `import { createGcsStorage } from "@storyshelf/storage-gcs";`,
 };
 
 const DB_INIT: Record<DatabaseChoice, string> = {
@@ -144,6 +161,7 @@ const STORAGE_INIT: Record<StorageChoice, string> = {
   local: `createLocalStorage(dataDir)`,
   s3: `createS3Storage({ bucket: process.env.S3_BUCKET!, region: process.env.AWS_REGION })`,
   azure: `createAzureStorage({ container: "storybook", connectionString: process.env.AZURE_STORAGE_CONNECTION! })`,
+  gcs: `createGcsStorage({ bucket: process.env.GCS_BUCKET! })`,
 };
 
 function buildImports(answers: Answers): string[] {
@@ -169,6 +187,9 @@ function buildImports(answers: Answers): string[] {
     imports.push(
       `import { createAzureServiceBusQueue } from "@storyshelf/queue-azure/service-bus";`,
     );
+  }
+  if (answers.queue === "gcp-pubsub") {
+    imports.push(`import { createGcpPubSubQueue } from "@storyshelf/queue-gcp";`);
   }
 
   if (answers.auth === "password") {
@@ -210,6 +231,11 @@ function buildAdapterLines(answers: Answers): string[] {
   if (answers.queue === "azure-service-bus") {
     lines.push(
       `const captureQueue = createAzureServiceBusQueue({ queueName: "capture-jobs", connectionString: process.env.AZURE_SERVICE_BUS_CONNECTION! });`,
+    );
+  }
+  if (answers.queue === "gcp-pubsub") {
+    lines.push(
+      `const captureQueue = createGcpPubSubQueue({ topic: "capture-jobs", subscription: "capture-jobs-worker", projectId: process.env.GOOGLE_CLOUD_PROJECT! });`,
     );
   }
   if (answers.queue === "memory") {
@@ -311,6 +337,9 @@ function workerQueueImport(queue: QueueChoice): string {
   if (queue === "azure-service-bus") {
     return `import { createAzureServiceBusQueue } from "@storyshelf/queue-azure/service-bus";`;
   }
+  if (queue === "gcp-pubsub") {
+    return `import { createGcpPubSubQueue } from "@storyshelf/queue-gcp";`;
+  }
   return `import { createSqsCaptureQueue } from "@storyshelf/queue-sqs";`;
 }
 
@@ -323,6 +352,9 @@ function workerQueueInit(queue: QueueChoice): string {
   }
   if (queue === "azure-service-bus") {
     return `const queue = createAzureServiceBusQueue({ queueName: "capture-jobs", connectionString: process.env.AZURE_SERVICE_BUS_CONNECTION! });`;
+  }
+  if (queue === "gcp-pubsub") {
+    return `const queue = createGcpPubSubQueue({ topic: "capture-jobs", subscription: "capture-jobs-worker", projectId: process.env.GOOGLE_CLOUD_PROJECT! });`;
   }
   return `const queue = createSqsCaptureQueue({ queueUrl: process.env.QUEUE_URL! });`;
 }
@@ -390,6 +422,13 @@ function buildDeps(answers: Answers): Record<string, string> {
       deps["@storyshelf/worker"] = __PKG_VERSION__ ?? "0.0.0";
       deps["@storyshelf/runner-playwright"] = __PKG_VERSION__ ?? "0.0.0";
     }
+  } else if (answers.queue === "gcp-pubsub") {
+    deps["@storyshelf/queue-gcp"] = __PKG_VERSION__ ?? "0.0.0";
+    deps["@google-cloud/pubsub"] = GCP_PUBSUB_SDK;
+    if (answers.includeWorker) {
+      deps["@storyshelf/worker"] = __PKG_VERSION__ ?? "0.0.0";
+      deps["@storyshelf/runner-playwright"] = __PKG_VERSION__ ?? "0.0.0";
+    }
   } else {
     deps["@storyshelf/runner-playwright"] = __PKG_VERSION__ ?? "0.0.0";
   }
@@ -450,7 +489,11 @@ function generatePackageJson(answers: Answers): string {
     scripts["docker:logs"] = "docker compose logs -f";
   }
 
-  if (resolveDeployTarget(answers) === "aws" || resolveDeployTarget(answers) === "azure") {
+  if (
+    resolveDeployTarget(answers) === "aws" ||
+    resolveDeployTarget(answers) === "azure" ||
+    resolveDeployTarget(answers) === "gcp"
+  ) {
     addInfraScripts(pkg.scripts as Record<string, string>);
   }
 
@@ -480,7 +523,27 @@ async function writeFiles(outDir: string, answers: Answers): Promise<void> {
     await writeAzureTerraformFiles(outDir, answers);
   }
 
+  if (resolveDeployTarget(answers) === "gcp") {
+    await writeGcpTerraformFiles(outDir, answers);
+  }
+
   await writeDockerFiles(outDir, answers);
+}
+
+/** Write the GCP Terraform reference stack (`terraform/*.tf` + README). */
+async function writeGcpTerraformFiles(outDir: string, answers: Answers): Promise<void> {
+  const files = generateGcpTerraformFiles({
+    project: answers.name,
+    gcpProjectId: answers.gcpProjectId ?? "",
+    location: answers.gcpLocation ?? "us-central1",
+    ...(answers.domainName ? { domainName: answers.domainName } : {}),
+    ...(answers.identityTenant ? { identityTenant: answers.identityTenant } : {}),
+  });
+  await mkdir(join(outDir, "terraform"), { recursive: true });
+  for (const [relative, contents] of Object.entries(files)) {
+    await writeFile(join(outDir, relative), contents);
+  }
+  printLine(`Created terraform/ (${Object.keys(files).length} files)`);
 }
 
 /** Write the Azure Terraform reference stack (`terraform/*.tf` + README). */
@@ -572,6 +635,18 @@ function printNextSteps(answers: Answers, runner: PackageRunner): void {
     printLine(
       `  #   AZURE_STORAGE_CONNECTION (+ AZURE_SERVICE_BUS_CONNECTION), DATABASE_URL, OIDC_* credentials`,
     );
+    printLine(`  npm install`);
+    printLine(`  npm start`);
+    return;
+  }
+
+  if (target === "gcp") {
+    printLine(`  gcloud auth login`);
+    printLine(`  terraform -chdir=terraform init`);
+    printLine(`  terraform -chdir=terraform plan -out=tfplan   # review before applying`);
+    printLine(`  terraform -chdir=terraform apply tfplan       # or: npm run infra:apply`);
+    printLine(`  # wire outputs into env (terraform output -json / npm run infra:outputs):`);
+    printLine(`  #   GCS_BUCKET + GOOGLE_CLOUD_PROJECT, DATABASE_URL, OIDC_* credentials`);
     printLine(`  npm install`);
     printLine(`  npm start`);
     return;
@@ -682,10 +757,27 @@ export async function runServerInit(_options: ServerInitOptions): Promise<void> 
     answers.entraTenantId = (azureAnswers["entraTenantId"] as string | undefined) ?? undefined;
   }
 
+  // GCP target: fixed enterprise reference stack (Postgres + GCS +
+  // Pub/Sub + colocated worker). Dockerfiles still generate for
+  // Artifact Registry image builds.
+  if (resolveDeployTarget(answers) === "gcp") {
+    answers.database = "postgres";
+    answers.storage = "gcs";
+    answers.queue = "gcp-pubsub";
+    answers.includeWorker = true;
+    answers.docker = true;
+    const gcpAnswers = (await prompts(GCP_INFRA_PROMPTS)) as Record<string, unknown>;
+    answers.gcpProjectId = (gcpAnswers["gcpProjectId"] as string | undefined) ?? undefined;
+    answers.gcpLocation = (gcpAnswers["gcpLocation"] as string | undefined) ?? "us-central1";
+    answers.domainName = (gcpAnswers["domainName"] as string | undefined) ?? undefined;
+    answers.identityTenant = (gcpAnswers["identityTenant"] as string | undefined) ?? undefined;
+  }
+
   // Hybrid: if queue is remote, ask whether to generate worker alongside
   if (
     resolveDeployTarget(answers) !== "aws" &&
     resolveDeployTarget(answers) !== "azure" &&
+    resolveDeployTarget(answers) !== "gcp" &&
     isRemoteQueue(answers.queue)
   ) {
     const workerAnswer = (await prompts({

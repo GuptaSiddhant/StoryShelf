@@ -133,6 +133,34 @@ describe("runWorkerInit", () => {
     expect(pkg.dependencies["@azure/storage-queue"]).toBe("^12.31.0");
   });
 
+  it("scaffolds worker.ts for gcp pubsub", async () => {
+    vi.mocked(prompts).mockResolvedValue({
+      name: "my-worker",
+      dir: "./my-worker",
+      database: "postgres",
+      storage: "local",
+      queue: "gcp-pubsub",
+      docker: false,
+    });
+
+    const cwd = process.cwd();
+    process.chdir(tmpRoot);
+    try {
+      await runWorkerInit({});
+    } finally {
+      process.chdir(cwd);
+    }
+
+    const workerCode = readFileSync(join(dir, "worker.ts"), "utf8");
+    expect(workerCode).toContain("createGcpPubSubQueue");
+    expect(workerCode).toContain("GOOGLE_CLOUD_PROJECT");
+    const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
+      dependencies: Record<string, string>;
+    };
+    expect(pkg.dependencies["@storyshelf/queue-gcp"]).toBeDefined();
+    expect(pkg.dependencies["@google-cloud/pubsub"]).toBe("^6.1.0");
+  });
+
   it("cancels when name/dir missing", async () => {
     vi.mocked(prompts).mockResolvedValue({});
     const cwd = process.cwd();
