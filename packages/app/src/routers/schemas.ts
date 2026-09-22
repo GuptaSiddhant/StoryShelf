@@ -1,4 +1,5 @@
 import { z } from "@hono/zod-openapi";
+import { BROWSER_NAMES } from "@storyshelf/core/adapter/capture-runner";
 import { BUILD_STATUSES, PROJECT_ROLES, SNAPSHOT_STATUSES } from "@storyshelf/core/types";
 
 const storybookMetaSchema = z.record(z.string(), z.unknown()).nullable().optional();
@@ -17,6 +18,8 @@ export const projectSchema = z
     storybookMeta: z.string().nullable().optional(),
     executePlay: z.boolean(),
     playTimeoutMs: z.number(),
+    // Stored rows predate enum validation, so the response stays a plain string.
+    browser: z.string().optional(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -46,6 +49,7 @@ export const projectUpdateSchema = z
     storybookMeta: storybookMetaSchema,
     executePlay: z.boolean().optional(),
     playTimeoutMs: z.number().int().min(1000).max(30_000).optional(),
+    browser: z.enum(BROWSER_NAMES).optional(),
   })
   .openapi("ProjectUpdateInput");
 

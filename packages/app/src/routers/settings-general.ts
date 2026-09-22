@@ -1,3 +1,4 @@
+import { BROWSER_NAMES } from "@storyshelf/core/adapter/capture-runner";
 import { ProjectModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
 import { projects } from "@storyshelf/db-sqlite/schema";
@@ -24,6 +25,7 @@ interface GeneralFields {
   pixelThreshold?: string;
   maxDiffRatio?: string;
   publicBranchRegex?: string;
+  browser?: string;
 }
 
 /** Read the general-settings form fields (name validated by the caller). */
@@ -34,6 +36,7 @@ function readGeneralFields(form: FormData): Omit<GeneralFields, "name"> {
     pixelThreshold: asString(form.get("pixelThreshold")),
     maxDiffRatio: asString(form.get("maxDiffRatio")),
     publicBranchRegex: asString(form.get("publicBranchRegex")),
+    browser: asString(form.get("browser")),
   };
 }
 
@@ -49,6 +52,17 @@ async function handleGeneralUpdate(c: Context): Promise<Response> {
     );
   }
   const fields: GeneralFields = { ...readGeneralFields(form), name: name.trim() };
+  if (
+    fields.browser !== undefined &&
+    !(BROWSER_NAMES as readonly string[]).includes(fields.browser)
+  ) {
+    return c.html(
+      (await renderSettingsPage(c, "general", {
+        globalError: `Invalid browser "${fields.browser}". Choose one of: ${BROWSER_NAMES.join(", ")}.`,
+      })) ?? "",
+      400,
+    );
+  }
   return await persistGeneralUpdate(c, project, slug, fields);
 }
 
@@ -67,6 +81,7 @@ async function persistGeneralUpdate(
       maxDiffRatio: fields.maxDiffRatio ? Number(fields.maxDiffRatio) : undefined,
       publicBranchRegex:
         fields.publicBranchRegex === "" ? null : (fields.publicBranchRegex ?? undefined),
+      browser: fields.browser ?? undefined,
     });
     return hxRedirect(c, `/projects/${slug}/settings`);
   } catch (error) {

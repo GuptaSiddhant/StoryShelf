@@ -14,6 +14,7 @@ export function renderSettingsGeneral(
   isAdmin: boolean,
 ): unknown {
   const errors = formState?.errors ?? {};
+  const browser = project.browser ?? "chromium";
   return (
     <div class="grid" style="max-width: 720px;">
       {formState?.globalError ? (
@@ -103,6 +104,30 @@ export function renderSettingsGeneral(
               />
               <p class="field__hint">Allowed diff ratio 0–1</p>
             </div>
+          </div>
+          <div class="field">
+            <label class="field__label" for="browser">
+              Capture browser
+            </label>
+            <select class="field__input" id="browser" name="browser" disabled={!isAdmin}>
+              <option value="chromium" selected={browser === "chromium" ? true : undefined}>
+                Chromium (default)
+              </option>
+              <option value="firefox" selected={browser === "firefox" ? true : undefined}>
+                Firefox
+              </option>
+              <option value="webkit" selected={browser === "webkit" ? true : undefined}>
+                WebKit (Safari engine)
+              </option>
+              <option value="chrome" selected={browser === "chrome" ? true : undefined}>
+                Chrome (Chromium engine)
+              </option>
+            </select>
+            <p class="field__hint">
+              Rendering engine for captures. Baselines track the browser, so switching starts a
+              fresh baseline. Firefox and WebKit need Playwright system dependencies installed on
+              the server.
+            </p>
           </div>
           <div class="field">
             <label class="field__label" for="publicBranchRegex">

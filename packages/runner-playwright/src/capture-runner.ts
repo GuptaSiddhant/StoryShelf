@@ -1,11 +1,12 @@
-import type {
-  BrowserName,
-  CaptureRunner,
-  RenderResult,
-  RenderedSnapshot,
-  StoryEntry,
-  StorySourceAdapter,
-  Viewport,
+import {
+  BROWSER_NAMES,
+  type BrowserName,
+  type CaptureRunner,
+  type RenderResult,
+  type RenderedSnapshot,
+  type StoryEntry,
+  type StorySourceAdapter,
+  type Viewport,
 } from "@storyshelf/core/adapter/capture-runner";
 import {
   StorybookAdapter,
@@ -35,7 +36,7 @@ export function createPlaywrightCaptureRunner(
       description: "Playwright capture runner",
       kind: "playwright",
       category: "capture-runner",
-      supportedBrowsers: options.supportedBrowsers ?? ["chromium", "firefox", "webkit", "chrome"],
+      supportedBrowsers: options.supportedBrowsers ?? BROWSER_NAMES,
     },
     async render(input: PlaywrightRenderInput) {
       const active: ActiveRun = { cancelled: false, browser: null };
