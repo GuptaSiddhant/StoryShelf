@@ -34,6 +34,7 @@ Each adapter against its interface: SQLite via `:memory:` (Turso via a local lib
 - **Unit:** colocated `*.test.ts` next to sources (hermetic — tmp dirs, fake adapters, mocked `fetch`; never a browser, network, or Storybook build).
 - **HTTP-level integration:** `*.integration.test.ts` in the same dirs (real router over HTTP with fake capture runner; still hermetic and CI-always).
 - **Real browser:** gated behind `RUN_INTEGRATION=1` (`nub run test:integration`, Playwright + `fixtures/storybook-8` by default).
+- **Real cloud:** `*.live.test.ts` next to sources, gated behind `LIVE_CLOUD=1` — strictly real providers, no fakes, no emulators. See "Live cloud tests" below.
 - **Shared doubles** live in `packages/core/src/test-helpers/` (`fake-adapters.ts`, `create-project.ts`) — never in shippable modules. Test files (and `test-helpers/`) are exempt from size lint rules via `.oxlintrc.json` patterns, not per-file paths.
 
 ## Fixtures
@@ -44,3 +45,80 @@ Each adapter against its interface: SQLite via `:memory:` (Turso via a local lib
 - All fixtures are deterministic (system fonts, no network) and share the same `Button` stories (including `play`/`flaky-test`/`disableSnapshot`/`delay` variants). `storybook-static/` is built on demand, not committed.
 - PNG fixtures for the diff engine.
 - `index.json` fixtures for `discover()`.
+
+## Live cloud tests (gated: `LIVE_CLOUD=1`)
+
+Strictly real providers — no injected fake clients, no emulators (Service Bus
+and Pub/Sub have no local emulators in this harness by design). Hermetic
+`turbo test` never touches the network: live files `skipIf(LIVE_CLOUD !== "1")`
+and construct adapters inside `beforeAll`, so skipped runs don't even read
+cloud env vars. Live results must never come from the turbo cache — always
+run with `--force`. Nightly + manual dispatch per provider:
+
+- `.github/workflows/live-cloud-aws.yml` — S3 + SQS
+- `.github/workflows/live-cloud-azure.yml` — Blob + Storage Queues + Service Bus (matrix)
+- `.github/workflows/live-cloud-gcp.yml` — GCS + Pub/Sub
+
+Each workflow also validates its terraform scaffold generator (`fmt` +
+`init -backend=false` + `validate`, mirroring the CLI's
+`terraform-*.integration.test.ts`). Scaffold output keys are a frozen
+contract pinned by `terraform-*.test.ts` — renames break CI.
+
+### Output → env map
+
+| Target | Terraform output | Env / secret |
+|---|---|---|
+| AWS | `s3_bucket` | `S3_BUCKET` (+ `AWS_REGION`) |
+| AWS | `queue_url` | `QUEUE_URL` |
+| AWS | `db_endpoint` | `DATABASE_URL` (`?sslmode=require`) |
+| AWS | `user_pool_id` / `app_client_id` | `COGNITO_*` / `OIDC_*` (phase 4) |
+| Azure | `storage_connection_string` | `AZURE_STORAGE_CONNECTION` |
+| Azure | `servicebus_connection_string` | `AZURE_SERVICE_BUS_CONNECTION` |
+| Azure | `queue_name` (`capture-jobs`) | `LIVE_AZURE_QUEUE` |
+| Azure | (container, pre-provisioned) | `LIVE_AZURE_CONTAINER` |
+| Azure | `database_url` | `DATABASE_URL` (phase 4) |
+| GCP | `gcs_bucket` | `LIVE_GCS_BUCKET` |
+| GCP | `pubsub_topic` / `pubsub_subscription` | `LIVE_PUBSUB_TOPIC` / `LIVE_PUBSUB_SUBSCRIPTION` |
+| GCP | (project) | `GCP_PROJECT_ID` |
+| GCP | (service-account key JSON) | `GCP_SERVICE_ACCOUNT_JSON` |
+
+AWS creds come from the standard SDK chain (`AWS_ACCESS_KEY_ID` /
+`AWS_SECRET_ACCESS_KEY` or an IAM role). GCP creds come from ADC
+(`GOOGLE_APPLICATION_CREDENTIALS` locally, `google-github-actions/auth`
+in CI).
+
+### Manual runbook (follow these steps later)
+
+1. **Provision** (per target, one-time): `storyshelf server init --target
+   <aws|azure|gcp>`, then under the generated `terraform/`:
+   ```sh
+   terraform init
+   terraform plan -var "project=shelf-manual-<name>" -out=tfplan  # review!
+   terraform apply tfplan
+   terraform output -json   # or: npm run infra:outputs
+   ```
+   Use a personal `shelf-manual-<name>` prefix so parallel runs never share
+   resources. Prefer serverless/cheap engines (AWS DSQL, Cloud SQL `f1-micro`).
+2. **Map outputs to env** using the table above, plus credentials
+   (`AWS_*`, `GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json`).
+3. **Run** (from the repo root, or per package):
+   ```sh
+   export PATH="$HOME/.nub/bin:$PATH"
+   LIVE_CLOUD=1 S3_BUCKET=... QUEUE_URL=... \
+     nubx turbo test --filter='@storyshelf/storage-s3' --filter='@storyshelf/queue-sqs' --force
+   ```
+   Per-package equivalent: `cd packages/storage-s3 && LIVE_CLOUD=1 S3_BUCKET=... ./node_modules/.bin/vitest run`.
+4. **Teardown:** suites delete their own keys/messages (unique
+   `live/<run-id>/<uuid>` prefixes, per-run build ids), but the
+   infrastructure is yours — `terraform destroy -var
+   "project=shelf-manual-<name>" -auto-approve` when done.
+5. **Costs:** live suites are a handful of API calls; the spend is idle
+   infrastructure (RDS, Cloud SQL, Service Bus namespace). Destroy promptly.
+
+### Phase 4 (ancillary, not yet wired)
+
+Turso (`TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN`), Postgres-generic
+(`DATABASE_URL`), Redis (`REDIS_URL`), OIDC (`OIDC_ISSUER/CLIENT_ID/SECRET`),
+GitHub (`repo:status` PAT + test repo), GitLab (`api` token + test project).
+Long-lived test resources + per-run prefix isolation; no scaffold covers
+these, so they stay manual until their live suites land.

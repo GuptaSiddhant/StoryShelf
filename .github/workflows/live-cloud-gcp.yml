@@ -1,0 +1,97 @@
+name: Live Cloud GCP
+
+# Phase 3 live tests: GCS + Pub/Sub against strictly real GCP (no fakes,
+# no emulators). Bucket/topic/subscription are pre-provisioned (manually or
+# via `terraform apply` from `storyshelf server init --target gcp`); this
+# workflow only consumes `terraform output -json` values as secrets and
+# never creates infrastructure.
+#
+# Required repository secrets:
+# - GCP_PROJECT_ID (GCP project id)
+# - GCP_SERVICE_ACCOUNT_JSON (service-account key JSON with storage + pubsub roles)
+# - LIVE_GCS_BUCKET (terraform output: gcs_bucket)
+# - LIVE_PUBSUB_TOPIC (terraform output: pubsub_topic)
+# - LIVE_PUBSUB_SUBSCRIPTION (terraform output: pubsub_subscription)
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "45 3 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-cloud-gcp
+  cancel-in-progress: true
+
+jobs:
+  # The scaffold generator stays valid: fmt-clean and `terraform validate`-clean.
+  # Uses the same gate as packages/cli/.../terraform-gcp.integration.test.ts
+  # (skips when no terraform binary — here we install one, so it always runs).
+  scaffold-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.x"
+          terraform_wrapper: false
+
+      - name: Setup Nub
+        uses: nubjs/setup-nub@v0
+
+      - name: Install dependencies
+        run: nub ci
+
+      - name: Validate generated GCP stack
+        run: nub run test --filter='./packages/cli'
+        env:
+          CI: "true"
+
+  # Real GCS + Pub/Sub suites. Hermetic tests in the same packages also run
+  # (they must stay green); live files skip without LIVE_CLOUD=1.
+  live-gcp:
+    runs-on: ubuntu-latest
+    needs: [scaffold-validate]
+    env:
+      LIVE_CLOUD: "1"
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      LIVE_GCS_BUCKET: ${{ secrets.LIVE_GCS_BUCKET }}
+      LIVE_PUBSUB_TOPIC: ${{ secrets.LIVE_PUBSUB_TOPIC }}
+      LIVE_PUBSUB_SUBSCRIPTION: ${{ secrets.LIVE_PUBSUB_SUBSCRIPTION }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Setup Nub
+        uses: nubjs/setup-nub@v0
+
+      - name: Install dependencies
+        run: nub ci
+
+      - name: Fail fast on missing secrets
+        run: |
+          set -e
+          for v in GCP_PROJECT_ID LIVE_GCS_BUCKET LIVE_PUBSUB_TOPIC LIVE_PUBSUB_SUBSCRIPTION; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Missing required secret (or env): $v. See workflow header."
+              exit 1
+            fi
+          done
+          if [ -z "$GOOGLE_APPLICATION_CREDENTIALS" ] && [ -z "${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}" ]; then
+            echo "::error::Missing GCP credentials (GCP_SERVICE_ACCOUNT_JSON)."
+            exit 1
+          fi
+
+      - name: Run GCS + Pub/Sub suites (hermetic + live)
+        # --force: live results must never come from the turbo cache.
+        run: nubx turbo test --filter='@storyshelf/storage-gcs' --filter='@storyshelf/queue-gcp' --force
