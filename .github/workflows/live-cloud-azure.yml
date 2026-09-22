@@ -1,0 +1,99 @@
+name: Live Cloud Azure
+
+# Phase 2 live tests: Blob + Storage Queues + Service Bus against strictly
+# real Azure (no fakes, no Azurite — Service Bus has no emulator per the
+# package README). Container/queues are pre-provisioned (manually or via
+# `terraform apply` from `storyshelf server init --target azure`); this
+# workflow only consumes `terraform output -json` values as secrets and
+# never creates infrastructure.
+#
+# Required repository secrets:
+# - AZURE_STORAGE_CONNECTION (terraform output: storage_connection_string)
+# - LIVE_AZURE_CONTAINER (existing blob container name)
+# - LIVE_AZURE_QUEUE (existing queue name, defaults to `capture-jobs`)
+# - AZURE_SERVICE_BUS_CONNECTION, only for the service-bus leg
+#   (terraform output: servicebus_connection_string; "" when the scaffold
+#   uses the storage-queues backend)
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 3 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-cloud-azure
+  cancel-in-progress: true
+
+jobs:
+  # The scaffold generator stays valid: fmt-clean and `terraform validate`-clean.
+  # Uses the same gate as packages/cli/.../terraform-azure.integration.test.ts
+  # (skips when no terraform binary — here we install one, so it always runs).
+  scaffold-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.x"
+          terraform_wrapper: false
+
+      - name: Setup Nub
+        uses: nubjs/setup-nub@v0
+
+      - name: Install dependencies
+        run: nub ci
+
+      - name: Validate generated Azure stack
+        run: nub run test --filter='./packages/cli'
+        env:
+          CI: "true"
+
+  # Real Blob + queue suites, one leg per backend. Hermetic tests in the same
+  # packages also run (they must stay green); live files skip without
+  # LIVE_CLOUD=1, and each queue suite additionally skips without its own
+  # connection string, so legs never cross-talk.
+  live-azure:
+    runs-on: ubuntu-latest
+    needs: [scaffold-validate]
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [storage-queues, service-bus]
+    env:
+      LIVE_CLOUD: "1"
+      AZURE_STORAGE_CONNECTION: ${{ secrets.AZURE_STORAGE_CONNECTION }}
+      AZURE_SERVICE_BUS_CONNECTION: ${{ secrets.AZURE_SERVICE_BUS_CONNECTION }}
+      LIVE_AZURE_CONTAINER: ${{ secrets.LIVE_AZURE_CONTAINER }}
+      LIVE_AZURE_QUEUE: ${{ secrets.LIVE_AZURE_QUEUE }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Nub
+        uses: nubjs/setup-nub@v0
+
+      - name: Install dependencies
+        run: nub ci
+
+      - name: Fail fast on missing secrets
+        run: |
+          set -e
+          for v in AZURE_STORAGE_CONNECTION LIVE_AZURE_CONTAINER; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Missing required secret (or env): $v. See workflow header."
+              exit 1
+            fi
+          done
+          if [ "${{ matrix.backend }}" = "service-bus" ] && [ -z "$AZURE_SERVICE_BUS_CONNECTION" ]; then
+            echo "::error::service-bus leg requires AZURE_SERVICE_BUS_CONNECTION."
+            exit 1
+          fi
+
+      - name: Run Blob + queue suites (hermetic + live)
+        # --force: live results must never come from the turbo cache.
+        run: nubx turbo test --filter='@storyshelf/storage-azure' --filter='@storyshelf/queue-azure' --force
