@@ -1,0 +1,101 @@
+{
+  "name": "@storyshelf/queue-azure",
+  "version": "0.5.1",
+  "description": "Azure capture queue adapter for StoryShelf: Storage Queues or Service Bus.",
+  "keywords": [
+    "azure",
+    "queue",
+    "self-hosted",
+    "storage-queues",
+    "service-bus",
+    "storybook"
+  ],
+  "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
+  "bugs": {
+    "url": "https://github.com/GuptaSiddhant/StoryShelf/issues"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Siddhant Gupta",
+    "url": "https://guptasiddhant.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GuptaSiddhant/StoryShelf.git",
+    "directory": "packages/queue-azure"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "default": "./dist/index.mjs"
+    },
+    "./service-bus": {
+      "source": "./src/service-bus.ts",
+      "default": "./dist/service-bus.mjs"
+    },
+    "./storage-queues": {
+      "source": "./src/storage-queues.ts",
+      "default": "./dist/storage-queues.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.mjs",
+      "./service-bus": "./dist/service-bus.mjs",
+      "./storage-queues": "./dist/storage-queues.mjs",
+      "./package.json": "./package.json"
+    },
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown -w",
+    "fmt": "oxfmt ./src",
+    "lint": "oxlint --type-aware --type-check ./src",
+    "test": "vitest run",
+    "prepublishOnly": "nub run build"
+  },
+  "peerDependencies": {
+    "@azure/storage-queue": "^12.31.0",
+    "@azure/service-bus": "^7.9.5"
+  },
+  "peerDependenciesMeta": {
+    "@azure/storage-queue": {
+      "optional": true
+    },
+    "@azure/service-bus": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@storyshelf/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@azure/service-bus": "^7.9.5",
+    "@azure/storage-queue": "^12.31.0",
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:",
+    "oxlint-tsgolint": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "jsr": {
+    "runtimeCompat": {
+      "node": true,
+      "deno": true,
+      "browser": false,
+      "workerd": false,
+      "bun": true
+    }
+  }
+}

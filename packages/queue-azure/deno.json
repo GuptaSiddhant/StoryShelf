@@ -1,0 +1,14 @@
+{
+  "$schema": "https://raw.githubusercontent.com/denoland/deno/refs/heads/main/cli/schemas/config-file.v1.json",
+  "name": "@storyshelf/queue-azure",
+  "version": "0.5.1",
+  "exports": {
+    ".": "./src/index.ts",
+    "./storage-queues": "./src/storage-queues.ts",
+    "./service-bus": "./src/service-bus.ts"
+  },
+  "publish": {
+    "include": ["src", "README.md", "LICENSE"],
+    "exclude": ["**/*.test.ts", "**/*.test.tsx", "**/test-helpers"]
+  }
+}
