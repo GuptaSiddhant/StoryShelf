@@ -3,8 +3,8 @@ import { join } from "node:path";
 
 export interface DetectedAdapters {
   database?: "sqlite" | "turso" | "postgres";
-  storage?: "local" | "s3";
-  queue?: "memory" | "sqs" | "redis";
+  storage?: "local" | "s3" | "azure";
+  queue?: "memory" | "sqs" | "redis" | "azure-storage-queues" | "azure-service-bus";
   git?: "none" | "github" | "gitlab";
 }
 
@@ -47,13 +47,18 @@ export function detectInstalledAdapters(dir: string): DetectedAdapters {
     result.database = "sqlite";
   }
 
-  if (deps.has("@storyshelf/storage-s3")) {
+  if (deps.has("@storyshelf/storage-azure")) {
+    result.storage = "azure";
+  } else if (deps.has("@storyshelf/storage-s3")) {
     result.storage = "s3";
   } else if (deps.has("@storyshelf/storage-local")) {
     result.storage = "local";
   }
 
-  if (deps.has("@storyshelf/queue-sqs")) {
+  if (deps.has("@storyshelf/queue-azure")) {
+    // One package serves both backends — disambiguate via the installed SDK.
+    result.queue = deps.has("@azure/service-bus") ? "azure-service-bus" : "azure-storage-queues";
+  } else if (deps.has("@storyshelf/queue-sqs")) {
     result.queue = "sqs";
   } else if (deps.has("@storyshelf/queue-redis")) {
     result.queue = "redis";

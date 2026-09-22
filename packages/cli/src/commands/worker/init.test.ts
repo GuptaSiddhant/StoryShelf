@@ -105,6 +105,34 @@ describe("runWorkerInit", () => {
     expect(workerCode).toContain("remote queue");
   });
 
+  it("scaffolds worker.ts for azure storage queues", async () => {
+    vi.mocked(prompts).mockResolvedValue({
+      name: "my-worker",
+      dir: "./my-worker",
+      database: "postgres",
+      storage: "local",
+      queue: "azure-storage-queues",
+      docker: false,
+    });
+
+    const cwd = process.cwd();
+    process.chdir(tmpRoot);
+    try {
+      await runWorkerInit({});
+    } finally {
+      process.chdir(cwd);
+    }
+
+    const workerCode = readFileSync(join(dir, "worker.ts"), "utf8");
+    expect(workerCode).toContain("createAzureStorageQueuesQueue");
+    expect(workerCode).toContain("AZURE_STORAGE_CONNECTION");
+    const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
+      dependencies: Record<string, string>;
+    };
+    expect(pkg.dependencies["@storyshelf/queue-azure"]).toBeDefined();
+    expect(pkg.dependencies["@azure/storage-queue"]).toBe("^12.31.0");
+  });
+
   it("cancels when name/dir missing", async () => {
     vi.mocked(prompts).mockResolvedValue({});
     const cwd = process.cwd();

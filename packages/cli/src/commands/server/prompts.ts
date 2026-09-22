@@ -51,6 +51,10 @@ export const INFRA_PROMPTS: Prompt[] = [
       { title: "Local (bare node)", value: "local" },
       { title: "Docker (compose)", value: "docker" },
       { title: "AWS (ECS + S3 + SQS + Postgres + Cognito)", value: "aws" },
+      {
+        title: "Azure (Container Apps + Blob + Queues/Service Bus + Postgres + Entra)",
+        value: "azure",
+      },
     ],
   },
   {
@@ -100,6 +104,14 @@ export const INFRA_PROMPTS: Prompt[] = [
       { title: "In-memory (single server)", value: "memory" },
       { title: "Redis (self-hosted, Docker Compose)", value: "redis" },
       { title: "SQS (AWS remote worker)", value: "sqs" },
+      {
+        title: "Azure Storage Queues (Azurite-local, remote worker)",
+        value: "azure-storage-queues",
+      },
+      {
+        title: "Azure Service Bus (native dead-lettering, remote worker)",
+        value: "azure-service-bus",
+      },
     ],
   },
   {
@@ -137,6 +149,8 @@ export const WORKER_INFRA_PROMPTS: Prompt[] = [
     choices: [
       { title: "SQS (AWS)", value: "sqs" },
       { title: "Redis (self-hosted)", value: "redis" },
+      { title: "Azure Storage Queues", value: "azure-storage-queues" },
+      { title: "Azure Service Bus", value: "azure-service-bus" },
       { title: "In-memory (local dev only)", value: "memory" },
     ],
   },
@@ -145,6 +159,37 @@ export const WORKER_INFRA_PROMPTS: Prompt[] = [
     name: "docker",
     message: "Generate Docker files?",
     initial: true,
+  },
+];
+
+/** Follow-up prompts for the Azure deploy target (single prompts call). */
+export const AZURE_INFRA_PROMPTS: Prompt[] = [
+  {
+    type: "text",
+    name: "azureLocation",
+    message: "Azure region?",
+    initial: "eastus",
+  },
+  {
+    type: "select",
+    name: "azureQueueBackend",
+    message: "Azure capture queue backend?",
+    choices: [
+      { title: "Storage Queues (Azurite-testable, visibility-timeout)", value: "storage-queues" },
+      { title: "Service Bus (native dead-lettering, SQS + DLQ parity)", value: "service-bus" },
+    ],
+  },
+  {
+    type: "text",
+    name: "domainName",
+    message: "Public domain for the app? (empty skips DNS)",
+    initial: "",
+  },
+  {
+    type: "text",
+    name: "entraTenantId",
+    message: "Entra tenant ID for the app registration? (empty skips it)",
+    initial: "",
   },
 ];
 

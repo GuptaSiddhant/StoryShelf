@@ -15,7 +15,7 @@ export interface WorkerInitOptions {
 
 type DatabaseChoice = "sqlite" | "turso" | "postgres";
 type StorageChoice = "local" | "s3";
-type QueueChoice = "sqs" | "memory";
+type QueueChoice = "sqs" | "azure-storage-queues" | "azure-service-bus" | "memory";
 
 interface Answers {
   name: string;
@@ -39,8 +39,14 @@ const STORAGE_PACKAGE: Record<StorageChoice, string> = {
 
 const QUEUE_PACKAGE: Record<QueueChoice, string | null> = {
   sqs: "@storyshelf/queue-sqs",
+  "azure-storage-queues": "@storyshelf/queue-azure",
+  "azure-service-bus": "@storyshelf/queue-azure",
   memory: null,
 };
+
+/** Azure SDK pins (must match @storyshelf/queue-azure peerDependencies). */
+const AZURE_STORAGE_QUEUE_SDK = "^12.31.0";
+const AZURE_SERVICE_BUS_SDK = "^7.9.5";
 
 const DB_IMPORT: Record<DatabaseChoice, string> = {
   sqlite: `import { createSqliteDatabase } from "@storyshelf/db-sqlite";`,
@@ -64,15 +70,35 @@ const STORAGE_INIT: Record<StorageChoice, string> = {
   s3: `createS3Storage({ bucket: process.env.S3_BUCKET!, region: process.env.AWS_REGION })`,
 };
 
+function workerQueueImport(queue: QueueChoice): string {
+  if (queue === "azure-storage-queues") {
+    return `import { createAzureStorageQueuesQueue } from "@storyshelf/queue-azure/storage-queues";`;
+  }
+  if (queue === "azure-service-bus") {
+    return `import { createAzureServiceBusQueue } from "@storyshelf/queue-azure/service-bus";`;
+  }
+  if (queue === "sqs") {
+    return `import { createSqsCaptureQueue } from "@storyshelf/queue-sqs";`;
+  }
+  return `// In-memory queue is server-side only; worker uses a remote queue.`;
+}
+
+function workerQueueInit(queue: QueueChoice): string {
+  if (queue === "azure-storage-queues") {
+    return `const queue = createAzureStorageQueuesQueue({ queueName: "capture-jobs", connectionString: process.env.AZURE_STORAGE_CONNECTION! });`;
+  }
+  if (queue === "azure-service-bus") {
+    return `const queue = createAzureServiceBusQueue({ queueName: "capture-jobs", connectionString: process.env.AZURE_SERVICE_BUS_CONNECTION! });`;
+  }
+  if (queue === "sqs") {
+    return `const queue = createSqsCaptureQueue({ queueUrl: process.env.QUEUE_URL! });`;
+  }
+  return `const queue = null as unknown as never; // replace with a remote queue`;
+}
+
 function generateWorker(answers: Answers): string {
-  const queueLine =
-    answers.queue === "sqs"
-      ? `import { createSqsCaptureQueue } from "@storyshelf/queue-sqs";`
-      : `// In-memory queue is server-side only; worker uses a remote queue.`;
-  const queueInit =
-    answers.queue === "sqs"
-      ? `const queue = createSqsCaptureQueue({ queueUrl: process.env.QUEUE_URL! });`
-      : `const queue = null as unknown as never; // replace with a remote queue`;
+  const queueLine = workerQueueImport(answers.queue);
+  const queueInit = workerQueueInit(answers.queue);
 
   return [
     queueLine,
@@ -118,6 +144,12 @@ function buildDeps(answers: Answers): Record<string, string> {
   const qp = QUEUE_PACKAGE[answers.queue];
   if (qp) {
     deps[qp] = __PKG_VERSION__ ?? "0.0.0";
+  }
+  if (answers.queue === "azure-storage-queues") {
+    deps["@azure/storage-queue"] = AZURE_STORAGE_QUEUE_SDK;
+  }
+  if (answers.queue === "azure-service-bus") {
+    deps["@azure/service-bus"] = AZURE_SERVICE_BUS_SDK;
   }
   return deps;
 }

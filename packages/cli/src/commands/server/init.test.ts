@@ -236,6 +236,60 @@ describe("runServerInit", () => {
     expect(pkg.scripts["docker:up"]).toBeUndefined();
   });
 
+  it("writes the Azure reference stack and forces postgres/azure/service-bus", async () => {
+    vi.mocked(prompts)
+      .mockResolvedValueOnce({
+        name: "my-server",
+        dir: "./my-server",
+        deployTarget: "azure",
+        database: "sqlite",
+        storage: "local",
+        auth: "oauth",
+        git: "github",
+        queue: "memory",
+        docker: false,
+      })
+      .mockResolvedValueOnce({
+        azureLocation: "westeurope",
+        azureQueueBackend: "service-bus",
+        domainName: "",
+        entraTenantId: "",
+      });
+    const cwd = process.cwd();
+    process.chdir(tmpRoot);
+    try {
+      await runServerInit({});
+    } finally {
+      process.chdir(cwd);
+    }
+
+    const serverCode = readFileSync(join(dir, "server.ts"), "utf8");
+    expect(serverCode).toContain("createPostgresDatabase");
+    expect(serverCode).toContain("createAzureStorage");
+    expect(serverCode).toContain("createAzureServiceBusQueue");
+    expect(serverCode).toContain("AZURE_SERVICE_BUS_CONNECTION");
+    expect(serverCode).not.toContain("cognitoPreset");
+    expect(serverCode).toContain("OIDC_ISSUER");
+    expect(existsSync(join(dir, "worker.ts"))).toBe(true);
+    const workerCode = readFileSync(join(dir, "worker.ts"), "utf8");
+    expect(workerCode).toContain("createAzureServiceBusQueue");
+    expect(existsSync(join(dir, "terraform", "queue.tf"))).toBe(true);
+    const queueTf = readFileSync(join(dir, "terraform", "queue.tf"), "utf8");
+    expect(queueTf).toContain("azurerm_servicebus_queue");
+    expect(existsSync(join(dir, "terraform", "terraform.tfvars.example"))).toBe(true);
+    const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
+      dependencies: Record<string, string>;
+      scripts: Record<string, string>;
+    };
+    expect(pkg.dependencies["@storyshelf/db-postgres"]).toBeDefined();
+    expect(pkg.dependencies["@storyshelf/storage-azure"]).toBeDefined();
+    expect(pkg.dependencies["@storyshelf/queue-azure"]).toBeDefined();
+    expect(pkg.dependencies["@azure/service-bus"]).toBe("^7.9.5");
+    expect(pkg.scripts["infra:plan"]).toBeDefined();
+    expect(pkg.scripts["infra:apply"]).toBeDefined();
+    expect(pkg.scripts["docker:up"]).toBeUndefined();
+  });
+
   it("emits OIDC wiring for oauth on non-AWS targets", async () => {
     vi.mocked(prompts).mockResolvedValue({
       name: "my-server",

@@ -373,8 +373,9 @@ resource "aws_route53_record" "app" {
 `;
 }
 
-export function generateAwsOutputs(): string {
+export function generateAwsOutputs(dbEngine: "rds" | "dsql"): string {
   return `${header()}# Outputs feed directly into the scaffolded server's env.
+# Keys are a stable contract parsed by CI — do not rename.
 output "alb_dns_name" {
   value = aws_lb.main.dns_name
 }
@@ -387,6 +388,10 @@ output "queue_url" {
   value = aws_sqs_queue.capture.url
 }
 
+output "db_endpoint" {
+  value = ${generateAwsDbEndpoint(dbEngine)}
+}
+
 output "user_pool_id" {
   value = aws_cognito_user_pool.main.id
 }
@@ -394,6 +399,36 @@ output "user_pool_id" {
 output "app_client_id" {
   value = aws_cognito_user_pool_client.shelf.id
 }
+`;
+}
+
+/** Connection endpoint per Postgres engine (DSQL has no endpoint attribute). */
+function generateAwsDbEndpoint(dbEngine: "rds" | "dsql"): string {
+  if (dbEngine === "dsql") {
+    return `"\${aws_dsql_cluster.main.identifier}.dsql.\${var.region}.on.aws"`;
+  }
+  return "aws_db_instance.main.endpoint";
+}
+
+function generateAwsCiProfile(): string {
+  return `## CI test profile
+
+Smallest footprint, unique resources per run, documented destroy.
+Prefer the serverless engine for CI (no instance to pay for idle):
+
+\`\`\`sh
+export PROJECT="shelf-ci-$GITHUB_RUN_ID"   # unique prefix per run (all names derive from it)
+terraform init
+terraform plan -var "project=$PROJECT" -out=tfplan
+terraform apply tfplan
+terraform output -json   # or: npm run infra:outputs
+# ... run live tests against the outputs ...
+terraform destroy -var "project=$PROJECT" -auto-approve
+\`\`\`
+
+Re-scaffold with the DSQL engine for the cheapest CI runs
+(\`dbEngine: "dsql"\`); RDS uses the smallest burstable class
+(\`db.t4g.micro\`) when you need a classic instance.
 `;
 }
 
@@ -421,7 +456,7 @@ terraform output -json   # or: npm run infra:outputs
 |---|---|---|
 | \`s3_bucket\` | \`S3_BUCKET\` (+ \`AWS_REGION\`) | \`storage-s3\` |
 | \`queue_url\` | \`QUEUE_URL\` | \`queue-sqs\` |
-| db endpoint | \`DATABASE_URL\` (\`?sslmode=require\`) | \`db-postgres\` |
+| \`db_endpoint\` | \`DATABASE_URL\` (\`?sslmode=require\`) | \`db-postgres\` |
 | \`user_pool_id\` / \`app_client_id\` | \`COGNITO_USER_POOL_ID\` / \`OIDC_CLIENT_ID\` | \`auth-oauth\` (cognito preset) |
 | Secrets Manager | \`SECRET\` / \`OIDC_CLIENT_SECRET\` / \`ADMIN_TOKEN\` | sessions / OIDC / bootstrap |
 
@@ -431,6 +466,20 @@ npm start
 \`\`\`
 
 Credentials come from IAM (ECS task roles) — never check access keys into env files.
+
+${generateAwsCiProfile()}`;
+}
+
+export function generateAwsTfvarsExample(): string {
+  return `# Copy to terraform.tfvars and fill in per environment.
+# CI test profile: pass a unique project per run instead —
+#   terraform plan -var "project=shelf-ci-$GITHUB_RUN_ID"
+# db_engine is baked at scaffold time (rds | dsql); prefer dsql for CI.
+project           = "my-storyshelf"
+region            = "us-east-1"
+vpc_id            = ""
+domain_name       = ""
+saml_metadata_url = ""
 `;
 }
 
@@ -447,7 +496,8 @@ const AWS_FILES: ReadonlyArray<readonly [string, (options: AwsTerraformOptions) 
   ["terraform/compute.tf", () => generateAwsCompute()],
   ["terraform/secrets.tf", () => generateAwsSecrets()],
   ["terraform/dns.tf", () => generateAwsDns()],
-  ["terraform/outputs.tf", () => generateAwsOutputs()],
+  ["terraform/outputs.tf", (options) => generateAwsOutputs(options.dbEngine)],
+  ["terraform/terraform.tfvars.example", () => generateAwsTfvarsExample()],
 ];
 
 /** Generate every Terraform file for the AWS reference stack. */

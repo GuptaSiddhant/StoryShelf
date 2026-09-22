@@ -18,8 +18,14 @@ import {
   generateDockerignore,
   generateWorkerDockerfile,
 } from "./docker.ts";
-import { INFRA_PROMPTS, PROJECT_PROMPTS, AWS_INFRA_PROMPTS } from "./prompts.ts";
+import {
+  INFRA_PROMPTS,
+  PROJECT_PROMPTS,
+  AWS_INFRA_PROMPTS,
+  AZURE_INFRA_PROMPTS,
+} from "./prompts.ts";
 import { generateAwsTerraformFiles } from "./terraform-aws.ts";
+import { generateAzureTerraformFiles } from "./terraform-azure.ts";
 
 /**
  * Options for `storyshelf server init` — scaffolds a new StoryShelf server project.
@@ -30,11 +36,26 @@ export interface ServerInitOptions {
 }
 
 type DatabaseChoice = "sqlite" | "turso" | "postgres";
-type StorageChoice = "local" | "s3";
+type StorageChoice = "local" | "s3" | "azure";
 type AuthChoice = "none" | "password" | "oauth";
 type GitChoice = "none" | "github" | "gitlab";
-type QueueChoice = "memory" | "sqs" | "redis";
-type DeployTarget = "local" | "docker" | "aws";
+type QueueChoice = "memory" | "sqs" | "redis" | "azure-storage-queues" | "azure-service-bus";
+type DeployTarget = "local" | "docker" | "aws" | "azure";
+
+/** Azure SDK pins (must match @storyshelf/queue-azure peerDependencies). */
+const AZURE_STORAGE_QUEUE_SDK = "^12.31.0";
+const AZURE_SERVICE_BUS_SDK = "^7.9.5";
+
+/** npm peer SDK for the chosen Azure queue backend. */
+function azureSdkDep(queue: "azure-storage-queues" | "azure-service-bus"): {
+  name: string;
+  version: string;
+} {
+  if (queue === "azure-service-bus") {
+    return { name: "@azure/service-bus", version: AZURE_SERVICE_BUS_SDK };
+  }
+  return { name: "@azure/storage-queue", version: AZURE_STORAGE_QUEUE_SDK };
+}
 
 interface Answers {
   name: string;
@@ -53,6 +74,15 @@ interface Answers {
   dbEngine?: "rds" | "dsql";
   domainName?: string;
   samlMetadataUrl?: string;
+  /** Azure-only follow-ups (asked when deployTarget is `azure`). */
+  azureLocation?: string;
+  azureQueueBackend?: "storage-queues" | "service-bus";
+  entraTenantId?: string;
+}
+
+/** Remote queues need a separately-assembled worker; memory runs in-process. */
+function isRemoteQueue(queue: QueueChoice): boolean {
+  return queue !== "memory";
 }
 
 /** Normalize the deploy target, preserving pre-target answers. */
@@ -69,6 +99,7 @@ const DB_PACKAGE: Record<DatabaseChoice, string> = {
 const STORAGE_PACKAGE: Record<StorageChoice, string> = {
   local: "@storyshelf/storage-local",
   s3: "@storyshelf/storage-s3",
+  azure: "@storyshelf/storage-azure",
 };
 
 const AUTH_PACKAGE: Record<AuthChoice, string | null> = {
@@ -87,6 +118,8 @@ const QUEUE_PACKAGE: Record<QueueChoice, string | null> = {
   memory: null,
   sqs: "@storyshelf/queue-sqs",
   redis: "@storyshelf/queue-redis",
+  "azure-storage-queues": "@storyshelf/queue-azure",
+  "azure-service-bus": "@storyshelf/queue-azure",
 };
 
 const DB_IMPORT: Record<DatabaseChoice, string> = {
@@ -98,6 +131,7 @@ const DB_IMPORT: Record<DatabaseChoice, string> = {
 const STORAGE_IMPORT: Record<StorageChoice, string> = {
   local: `import { createLocalStorage } from "@storyshelf/storage-local";`,
   s3: `import { createS3Storage } from "@storyshelf/storage-s3";`,
+  azure: `import { createAzureStorage } from "@storyshelf/storage-azure";`,
 };
 
 const DB_INIT: Record<DatabaseChoice, string> = {
@@ -109,6 +143,7 @@ const DB_INIT: Record<DatabaseChoice, string> = {
 const STORAGE_INIT: Record<StorageChoice, string> = {
   local: `createLocalStorage(dataDir)`,
   s3: `createS3Storage({ bucket: process.env.S3_BUCKET!, region: process.env.AWS_REGION })`,
+  azure: `createAzureStorage({ container: "storybook", connectionString: process.env.AZURE_STORAGE_CONNECTION! })`,
 };
 
 function buildImports(answers: Answers): string[] {
@@ -124,6 +159,16 @@ function buildImports(answers: Answers): string[] {
   }
   if (answers.queue === "redis") {
     imports.push(`import { createRedisCaptureQueue } from "@storyshelf/queue-redis";`);
+  }
+  if (answers.queue === "azure-storage-queues") {
+    imports.push(
+      `import { createAzureStorageQueuesQueue } from "@storyshelf/queue-azure/storage-queues";`,
+    );
+  }
+  if (answers.queue === "azure-service-bus") {
+    imports.push(
+      `import { createAzureServiceBusQueue } from "@storyshelf/queue-azure/service-bus";`,
+    );
   }
 
   if (answers.auth === "password") {
@@ -157,6 +202,16 @@ function buildAdapterLines(answers: Answers): string[] {
   if (answers.queue === "redis") {
     lines.push(`const captureQueue = createRedisCaptureQueue({ url: process.env.REDIS_URL! });`);
   }
+  if (answers.queue === "azure-storage-queues") {
+    lines.push(
+      `const captureQueue = createAzureStorageQueuesQueue({ queueName: "capture-jobs", connectionString: process.env.AZURE_STORAGE_CONNECTION! });`,
+    );
+  }
+  if (answers.queue === "azure-service-bus") {
+    lines.push(
+      `const captureQueue = createAzureServiceBusQueue({ queueName: "capture-jobs", connectionString: process.env.AZURE_SERVICE_BUS_CONNECTION! });`,
+    );
+  }
   if (answers.queue === "memory") {
     lines.push(`const captureRunner = createPlaywrightCaptureRunner();`);
   }
@@ -166,7 +221,7 @@ function buildAdapterLines(answers: Answers): string[] {
 function buildRouterLines(answers: Answers): string[] {
   const lines = [`const app = createShelfApp({`, `  database,`, `  storage,`];
 
-  if (answers.queue === "sqs" || answers.queue === "redis") {
+  if (isRemoteQueue(answers.queue)) {
     lines.push(`  captureQueue,`);
   } else {
     lines.push(`  captureRunner,`);
@@ -246,15 +301,35 @@ function generateServer(answers: Answers): string {
   ].join("\n");
 }
 
+function workerQueueImport(queue: QueueChoice): string {
+  if (queue === "redis") {
+    return `import { createRedisCaptureQueue } from "@storyshelf/queue-redis";`;
+  }
+  if (queue === "azure-storage-queues") {
+    return `import { createAzureStorageQueuesQueue } from "@storyshelf/queue-azure/storage-queues";`;
+  }
+  if (queue === "azure-service-bus") {
+    return `import { createAzureServiceBusQueue } from "@storyshelf/queue-azure/service-bus";`;
+  }
+  return `import { createSqsCaptureQueue } from "@storyshelf/queue-sqs";`;
+}
+
+function workerQueueInit(queue: QueueChoice): string {
+  if (queue === "redis") {
+    return `const queue = createRedisCaptureQueue({ url: process.env.REDIS_URL! });`;
+  }
+  if (queue === "azure-storage-queues") {
+    return `const queue = createAzureStorageQueuesQueue({ queueName: "capture-jobs", connectionString: process.env.AZURE_STORAGE_CONNECTION! });`;
+  }
+  if (queue === "azure-service-bus") {
+    return `const queue = createAzureServiceBusQueue({ queueName: "capture-jobs", connectionString: process.env.AZURE_SERVICE_BUS_CONNECTION! });`;
+  }
+  return `const queue = createSqsCaptureQueue({ queueUrl: process.env.QUEUE_URL! });`;
+}
+
 function generateWorkerFile(answers: Answers): string {
-  const queueImport =
-    answers.queue === "redis"
-      ? `import { createRedisCaptureQueue } from "@storyshelf/queue-redis";`
-      : `import { createSqsCaptureQueue } from "@storyshelf/queue-sqs";`;
-  const queueInit =
-    answers.queue === "redis"
-      ? `const queue = createRedisCaptureQueue({ url: process.env.REDIS_URL! });`
-      : `const queue = createSqsCaptureQueue({ queueUrl: process.env.QUEUE_URL! });`;
+  const queueImport = workerQueueImport(answers.queue);
+  const queueInit = workerQueueInit(answers.queue);
   return [
     queueImport,
     `import { createCaptureWorker } from "@storyshelf/worker";`,
@@ -307,6 +382,14 @@ function buildDeps(answers: Answers): Record<string, string> {
       deps["@storyshelf/worker"] = __PKG_VERSION__ ?? "0.0.0";
       deps["@storyshelf/runner-playwright"] = __PKG_VERSION__ ?? "0.0.0";
     }
+  } else if (answers.queue === "azure-storage-queues" || answers.queue === "azure-service-bus") {
+    deps["@storyshelf/queue-azure"] = __PKG_VERSION__ ?? "0.0.0";
+    const sdk = azureSdkDep(answers.queue);
+    deps[sdk.name] = sdk.version;
+    if (answers.includeWorker) {
+      deps["@storyshelf/worker"] = __PKG_VERSION__ ?? "0.0.0";
+      deps["@storyshelf/runner-playwright"] = __PKG_VERSION__ ?? "0.0.0";
+    }
   } else {
     deps["@storyshelf/runner-playwright"] = __PKG_VERSION__ ?? "0.0.0";
   }
@@ -325,6 +408,14 @@ function buildDeps(answers: Answers): Record<string, string> {
   }
 
   return deps;
+}
+
+function addInfraScripts(scripts: Record<string, string>): void {
+  scripts["infra:init"] = "terraform -chdir=terraform init";
+  scripts["infra:plan"] = "terraform -chdir=terraform plan -out=tfplan";
+  scripts["infra:apply"] = "terraform -chdir=terraform apply tfplan";
+  scripts["infra:destroy"] = "terraform -chdir=terraform destroy";
+  scripts["infra:outputs"] = "terraform -chdir=terraform output -json";
 }
 
 function generatePackageJson(answers: Answers): string {
@@ -359,13 +450,8 @@ function generatePackageJson(answers: Answers): string {
     scripts["docker:logs"] = "docker compose logs -f";
   }
 
-  if (resolveDeployTarget(answers) === "aws") {
-    const scripts = pkg.scripts as Record<string, string>;
-    scripts["infra:init"] = "terraform -chdir=terraform init";
-    scripts["infra:plan"] = "terraform -chdir=terraform plan -out=tfplan";
-    scripts["infra:apply"] = "terraform -chdir=terraform apply tfplan";
-    scripts["infra:destroy"] = "terraform -chdir=terraform destroy";
-    scripts["infra:outputs"] = "terraform -chdir=terraform output -json";
+  if (resolveDeployTarget(answers) === "aws" || resolveDeployTarget(answers) === "azure") {
+    addInfraScripts(pkg.scripts as Record<string, string>);
   }
 
   return JSON.stringify(pkg, null, 2);
@@ -390,7 +476,27 @@ async function writeFiles(outDir: string, answers: Answers): Promise<void> {
     await writeTerraformFiles(outDir, answers);
   }
 
+  if (resolveDeployTarget(answers) === "azure") {
+    await writeAzureTerraformFiles(outDir, answers);
+  }
+
   await writeDockerFiles(outDir, answers);
+}
+
+/** Write the Azure Terraform reference stack (`terraform/*.tf` + README). */
+async function writeAzureTerraformFiles(outDir: string, answers: Answers): Promise<void> {
+  const files = generateAzureTerraformFiles({
+    project: answers.name,
+    location: answers.azureLocation ?? "eastus",
+    queueBackend: answers.azureQueueBackend ?? "storage-queues",
+    ...(answers.domainName ? { domainName: answers.domainName } : {}),
+    ...(answers.entraTenantId ? { entraTenantId: answers.entraTenantId } : {}),
+  });
+  await mkdir(join(outDir, "terraform"), { recursive: true });
+  for (const [relative, contents] of Object.entries(files)) {
+    await writeFile(join(outDir, relative), contents);
+  }
+  printLine(`Created terraform/ (${Object.keys(files).length} files)`);
 }
 
 /** Write the AWS Terraform reference stack (`terraform/*.tf` + README). */
@@ -414,7 +520,7 @@ async function writeDockerFiles(outDir: string, answers: Answers): Promise<void>
     return;
   }
 
-  if ((answers.queue === "sqs" || answers.queue === "redis") && answers.includeWorker) {
+  if (isRemoteQueue(answers.queue) && answers.includeWorker) {
     // Server is slim when queue is remote; worker has playwright
     const slimDockerfile = [
       "FROM node:lts-alpine",
@@ -452,6 +558,20 @@ function printNextSteps(answers: Answers, runner: PackageRunner): void {
     printLine(`  terraform -chdir=terraform apply tfplan       # or: npm run infra:apply`);
     printLine(`  # wire outputs into env (terraform output -json / npm run infra:outputs):`);
     printLine(`  #   S3_BUCKET / AWS_REGION, QUEUE_URL, DATABASE_URL, COGNITO_* credentials`);
+    printLine(`  npm install`);
+    printLine(`  npm start`);
+    return;
+  }
+
+  if (target === "azure") {
+    printLine(`  az login`);
+    printLine(`  terraform -chdir=terraform init`);
+    printLine(`  terraform -chdir=terraform plan -out=tfplan   # review before applying`);
+    printLine(`  terraform -chdir=terraform apply tfplan       # or: npm run infra:apply`);
+    printLine(`  # wire outputs into env (terraform output -json / npm run infra:outputs):`);
+    printLine(
+      `  #   AZURE_STORAGE_CONNECTION (+ AZURE_SERVICE_BUS_CONNECTION), DATABASE_URL, OIDC_* credentials`,
+    );
     printLine(`  npm install`);
     printLine(`  npm start`);
     return;
@@ -541,10 +661,32 @@ export async function runServerInit(_options: ServerInitOptions): Promise<void> 
     answers.samlMetadataUrl = (awsAnswers["samlMetadataUrl"] as string | undefined) ?? undefined;
   }
 
-  // Hybrid: if queue is SQS or Redis, ask whether to generate worker alongside
+  // Azure target: fixed enterprise reference stack (Postgres + Blob +
+  // Storage Queues/Service Bus + colocated worker). Dockerfiles still
+  // generate for ACR image builds.
+  if (resolveDeployTarget(answers) === "azure") {
+    answers.database = "postgres";
+    answers.storage = "azure";
+    answers.includeWorker = true;
+    answers.docker = true;
+    const azureAnswers = (await prompts(AZURE_INFRA_PROMPTS)) as Record<string, unknown>;
+    answers.azureLocation = (azureAnswers["azureLocation"] as string | undefined) ?? "eastus";
+    const backend = azureAnswers["azureQueueBackend"] as
+      | "storage-queues"
+      | "service-bus"
+      | undefined;
+    answers.azureQueueBackend = backend ?? "storage-queues";
+    answers.queue =
+      answers.azureQueueBackend === "service-bus" ? "azure-service-bus" : "azure-storage-queues";
+    answers.domainName = (azureAnswers["domainName"] as string | undefined) ?? undefined;
+    answers.entraTenantId = (azureAnswers["entraTenantId"] as string | undefined) ?? undefined;
+  }
+
+  // Hybrid: if queue is remote, ask whether to generate worker alongside
   if (
     resolveDeployTarget(answers) !== "aws" &&
-    (answers.queue === "sqs" || answers.queue === "redis")
+    resolveDeployTarget(answers) !== "azure" &&
+    isRemoteQueue(answers.queue)
   ) {
     const workerAnswer = (await prompts({
       type: "confirm",

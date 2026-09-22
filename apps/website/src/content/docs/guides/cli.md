@@ -57,7 +57,7 @@ storyshelf server init
 
 Generates `server.ts` + `package.json` (and `Dockerfile`/`compose.yaml` if selected) in the target directory.
 
-Choose the deploy target when prompted: `local` (bare node), `docker` (compose, with `docker:*` npm scripts), or `aws` (ECS + S3 + SQS + Postgres + Cognito reference stack). The AWS target pins the enterprise stack — Postgres, S3, SQS with a colocated worker — asks for region, Postgres engine (`rds` default, `dsql` serverless option), optional domain and SAML metadata URL, and writes `terraform/` plus `infra:*` npm scripts (`infra:init`, `infra:plan`, `infra:apply`, `infra:destroy`, `infra:outputs`). Selecting OAuth auth on AWS wires `cognitoPreset` automatically.
+Choose the deploy target when prompted: `local` (bare node), `docker` (compose, with `docker:*` npm scripts), `aws` (ECS + S3 + SQS + Postgres + Cognito reference stack), or `azure` (Container Apps + Blob + Storage Queues/Service Bus + Postgres + Entra reference stack). The AWS target pins the enterprise stack — Postgres, S3, SQS with a colocated worker — asks for region, Postgres engine (`rds` default, `dsql` serverless option), optional domain and SAML metadata URL, and writes `terraform/` plus `infra:*` npm scripts (`infra:init`, `infra:plan`, `infra:apply`, `infra:destroy`, `infra:outputs`). Selecting OAuth auth on AWS wires `cognitoPreset` automatically. The Azure target pins the equivalent stack — Postgres Flexible, Blob storage, Storage Queues or Service Bus (your choice) with a colocated worker — asks for region, queue backend, optional domain and Entra tenant ID, and writes the same `terraform/` + `infra:*` layout with stable `terraform output -json` keys for CI.
 
 ## `storyshelf server serve`
 

@@ -94,7 +94,32 @@ terraform -chdir=terraform plan -out=tfplan   # review before applying
 terraform -chdir=terraform apply tfplan       # or: npm run infra:apply
 ```
 
-Wire the outputs into env (`terraform output -json` / `npm run infra:outputs`): `S3_BUCKET` + `AWS_REGION`, `QUEUE_URL`, `DATABASE_URL` (`?sslmode=require`), `COGNITO_REGION` / `COGNITO_USER_POOL_ID` / `OIDC_*`, `SECRET`. Credentials come from IAM task roles — never check access keys into env files. Corporate SSO federates through Cognito SAML (Entra/Okta via `samlMetadataUrl`); `adminGroups: ["shelf-admins"]` maps the Cognito group to site admin.
+Wire the outputs into env (`terraform output -json` / `npm run infra:outputs`): `S3_BUCKET` + `AWS_REGION`, `QUEUE_URL`, `DATABASE_URL` (`?sslmode=require`), `COGNITO_REGION` / `COGNITO_USER_POOL_ID` / `OIDC_*`, `SECRET`. Output keys (`alb_dns_name`, `s3_bucket`, `queue_url`, `db_endpoint`, `user_pool_id`, `app_client_id`) are a stable contract parsed by CI — they never change. Credentials come from IAM task roles — never check access keys into env files. Corporate SSO federates through Cognito SAML (Entra/Okta via `samlMetadataUrl`); `adminGroups: ["shelf-admins"]` maps the Cognito group to site admin.
+
+### Azure reference stack (enterprise)
+
+For Azure enterprise deployments, `storyshelf server init` offers an `azure` deploy target that pins the full reference stack — Container Apps app + worker, Blob storage, Storage Queues or Service Bus (your choice; Service Bus dead-letters poison messages natively), Postgres Flexible Server (B1ms burstable default), Key Vault, Microsoft Entra app registration, and an optional DNS zone — and writes it as Terraform under `terraform/`:
+
+```bash
+storyshelf server init
+# ? Deploy target? Azure (Container Apps + Blob + Queues/Service Bus + Postgres + Entra)
+# ? Azure region? eastus
+# ? Azure capture queue backend? Storage Queues / Service Bus
+# ? Public domain for the app? (empty skips DNS)
+# ? Entra tenant ID for the app registration? (empty skips it)
+```
+
+Then review and apply explicitly — Terraform is never auto-applied:
+
+```bash
+cd my-server
+az login
+terraform -chdir=terraform init
+terraform -chdir=terraform plan -out=tfplan   # review before applying
+terraform -chdir=terraform apply tfplan       # or: npm run infra:apply
+```
+
+Wire the outputs into env (`terraform output -json` / `npm run infra:outputs`): `AZURE_STORAGE_CONNECTION` (+ `AZURE_SERVICE_BUS_CONNECTION` for that backend), `DATABASE_URL`, `OIDC_CLIENT_ID` / `OIDC_ISSUER` (`https://login.microsoftonline.com/{tenant}/v2.0`), `SECRET`. Output keys (`app_fqdn`, `storage_connection_string`, `servicebus_connection_string`, `queue_name`, `database_url`, `entra_application_id`, `entra_tenant_id`) are a stable contract parsed by CI — always present, `""` when not provisioned for the backend. Authenticate with `az login` (or a service principal / managed identity) — never check connection strings into env files. Hostname binding + managed TLS is a post-apply step once the scaffolded DNS records resolve (see the generated `terraform/README.md`, including the CI test profile with unique project prefix per run and documented destroy).
 
 ### Cloud assembly (all clouds equal)
 

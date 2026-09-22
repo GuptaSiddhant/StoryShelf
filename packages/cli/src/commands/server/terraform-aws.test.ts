@@ -25,6 +25,17 @@ const options: AwsTerraformOptions = {
   dbEngine: "rds",
 };
 
+function outputNames(outputsTf: string): string[] {
+  const names: string[] = [];
+  for (const match of outputsTf.matchAll(/^output "(?<name>[^"]+)" \{/gmu)) {
+    const name = match.groups?.["name"];
+    if (name !== undefined) {
+      names.push(name);
+    }
+  }
+  return names.toSorted();
+}
+
 describe("AWS Terraform modules", () => {
   it("pins terraform and provider versions", () => {
     const versions = generateAwsVersions();
@@ -96,16 +107,39 @@ describe("AWS Terraform modules", () => {
   });
 
   it("outputs every env var the server needs", () => {
-    const outputs = generateAwsOutputs();
     for (const name of [
       "alb_dns_name",
       "s3_bucket",
       "queue_url",
+      "db_endpoint",
       "user_pool_id",
       "app_client_id",
     ]) {
-      expect(outputs).toContain(`output "${name}"`);
+      expect(generateAwsOutputs("rds")).toContain(`output "${name}"`);
+      expect(generateAwsOutputs("dsql")).toContain(`output "${name}"`);
     }
+  });
+
+  it("emits a frozen output contract for both engines", () => {
+    const frozen = [
+      "alb_dns_name",
+      "app_client_id",
+      "db_endpoint",
+      "queue_url",
+      "s3_bucket",
+      "user_pool_id",
+    ];
+    for (const engine of ["rds", "dsql"] as const) {
+      expect(outputNames(generateAwsOutputs(engine))).toEqual(frozen);
+    }
+  });
+
+  it("derives the DSQL endpoint from the documented format", () => {
+    const dsql = generateAwsOutputs("dsql");
+    expect(dsql).toContain(".dsql.");
+    expect(dsql).toContain(".on.aws");
+    expect(dsql).toContain("aws_dsql_cluster.main.identifier");
+    expect(generateAwsOutputs("rds")).toContain("aws_db_instance.main.endpoint");
   });
 
   it("references no non-AWS provider", () => {
@@ -130,12 +164,15 @@ describe("AWS Terraform modules", () => {
       "terraform/dns.tf",
       "terraform/outputs.tf",
       "terraform/database.tf",
+      "terraform/terraform.tfvars.example",
       "terraform/README.md",
     ]) {
       expect(Object.keys(files)).toContain(path);
     }
     expect(files["terraform/README.md"]).toContain("terraform plan");
     expect(files["terraform/README.md"]).toContain("S3_BUCKET");
+    expect(files["terraform/README.md"]).toContain("terraform destroy");
+    expect(files["terraform/terraform.tfvars.example"]).toContain("saml_metadata_url");
   });
 });
 
@@ -144,5 +181,7 @@ describe("AWS Terraform README", () => {
     const readme = generateAwsReadme("acme-shelf");
     expect(readme).toContain("plan -out=tfplan");
     expect(readme).toContain("IAM");
+    expect(readme).toContain("CI test profile");
+    expect(readme).toContain("shelf-ci-");
   });
 });

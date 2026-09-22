@@ -70,6 +70,46 @@ describe("detectInstalledAdapters", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it("detects azure storage queues via the storage SDK", () => {
+    const dir = makeTmp();
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({
+        dependencies: {
+          "@storyshelf/queue-azure": "0.3.2",
+          "@azure/storage-queue": "^12.31.0",
+        },
+      }),
+    );
+    expect(detectInstalledAdapters(dir).queue).toBe("azure-storage-queues");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("detects azure service bus via the service bus SDK", () => {
+    const dir = makeTmp();
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({
+        dependencies: {
+          "@storyshelf/queue-azure": "0.3.2",
+          "@azure/service-bus": "^7.9.5",
+        },
+      }),
+    );
+    expect(detectInstalledAdapters(dir).queue).toBe("azure-service-bus");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("detects azure blob storage", () => {
+    const dir = makeTmp();
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({ dependencies: { "@storyshelf/storage-azure": "0.3.2" } }),
+    );
+    expect(detectInstalledAdapters(dir).storage).toBe("azure");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it("detects github git provider", () => {
     const dir = makeTmp();
     writeFileSync(
