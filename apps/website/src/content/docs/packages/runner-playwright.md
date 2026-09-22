@@ -3,7 +3,7 @@ title: "@storyshelf/runner-playwright"
 description: Pure Playwright CaptureRunner — renders Storybook screenshots in-process for the StoryShelf server.
 ---
 
-`@storyshelf/runner-playwright` is the default **pure** `CaptureRunner` implementation for StoryShelf. It serves an already-extracted Storybook directory over a local HTTP server, launches Chromium, renders every story at each configured viewport, and returns the screenshot buffers. It performs **no** database, storage, or build-state management — core's capture orchestrator (ADR 0015) owns that.
+`@storyshelf/runner-playwright` is the default **pure** `CaptureRunner` implementation for StoryShelf. It serves an already-extracted Storybook directory over a local HTTP server, launches the project's browser (Chromium by default — Firefox and WebKit are also supported), renders every story at each configured viewport, and returns the screenshot buffers. It performs **no** database, storage, or build-state management — core's capture orchestrator (ADR 0015) owns that.
 
 ## Install
 

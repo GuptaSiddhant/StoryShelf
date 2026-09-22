@@ -11,7 +11,7 @@ This page compares Chromatic (SaaS) and StoryShelf (self-hosted) factually. No r
 |--------|-----------|------------|
 | **Pricing model** | Per-snapshot billing | Free (self-hosted, unlimited) |
 | **Hosting** | SaaS only (Chromatic cloud) | Self-hosted (your infrastructure) |
-| **Browsers** | Chrome, Firefox, Safari, Edge | Chromium only (via Playwright) |
+| **Browsers** | Chrome, Firefox, Safari, Edge (branded, cloud) | Chromium (default), Firefox, WebKit via Playwright (per-project `browser`) |
 | **TurboSnap** | Yes (dependency graph) | Not implemented |
 | **Modes / Globals** | Yes | Not implemented |
 | **Accessibility testing** | Yes | Not implemented |
@@ -41,7 +41,7 @@ Billed snapshots = visual snapshots + accessibility snapshots. TurboSnap copies 
 
 | | Chromatic | StoryShelf |
 |--|-----------|------------|
-| **Capture** | Cloud browsers | Server-side Playwright (your CI/server) |
+| **Capture** | Cloud browsers | Self-hosted on your infra: Playwright (Chromium/Firefox/WebKit) or lightweight Puppeteer (Chromium-only, chrome-headless-shell) |
 | **Baselines** | Global + branch | Per-branch with default-branch fallback |
 | **Storage** | Chromatic cloud | Your S3-compatible or local filesystem |
 | **Database** | Chromatic managed | Your SQLite/Turso/Postgres |
@@ -60,7 +60,7 @@ Billed snapshots = visual snapshots + accessibility snapshots. TurboSnap copies 
 - CI integration (GitHub Actions, GitLab CI, etc.)
 
 ### StoryShelf gaps (vs Chromatic)
-- **No cross-browser testing** — Chromium only. No Firefox, Safari, Edge.
+- **Cross-browser gaps** — Chromium (default), Firefox, and WebKit are selectable per project (Settings → General → Capture browser, or `PATCH /api/v1/projects/:slug` with `browser`); baselines track the browser. No branded Safari/Edge binaries; one browser per build.
 - **No TurboSnap** — Every changed story captures a full snapshot. No dependency-graph optimization.
 - **No Modes/Globals** — Cannot test stories under different themes, locales, or viewports via Storybook globals.
 - **No accessibility testing** — No aXe integration.
@@ -85,14 +85,14 @@ If migrating from Chromatic:
 | **Parameters** | Dual-key support: `chromatic:` and `storyshelf:` keys both work; `storyshelf:` wins on conflict. |
 | **TurboSnap** | Not replicated. Expect 5-10× more snapshots initially. |
 | **Modes/Globals** | Not supported. Theming/i18n test matrices need workarounds. |
-| **Cross-browser** | Not supported. Chromium only. |
+| **Cross-browser** | Chromium / Firefox / WebKit per project (Settings or API); one browser per build; no branded Safari/Edge. |
 | **Team workflow** | Similar — PR status checks, review UI, approve/reject. |
 
 ## When to choose each
 
 **Choose Chromatic if:**
 - You want zero infrastructure maintenance
-- You need cross-browser testing (Firefox, Safari, Edge)
+- You need branded Safari/Edge binaries or multi-browser matrices in a single build
 - You rely on TurboSnap for large Storybooks
 - You need Modes/Globals for theme/locale matrices
 - You need built-in accessibility testing

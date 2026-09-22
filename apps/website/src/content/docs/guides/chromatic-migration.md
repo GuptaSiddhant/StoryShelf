@@ -103,7 +103,7 @@ StoryShelf reads both `chromatic:` and `storyshelf:` parameter keys. **`storyshe
 | Feature | Chromatic | StoryShelf | Impact |
 |---------|-----------|------------|--------|
 | **TurboSnap** | Yes (dependency graph) | No | 5-10× more snapshots on large Storybooks |
-| **Cross-browser** | Chrome, FF, Safari, Edge | Chromium only | No Safari/FF/Edge coverage |
+| **Cross-browser** | Chrome, FF, Safari, Edge (branded, cloud) | Chromium / Firefox / WebKit, one per build | Set in project Settings → General or via API; baselines tracked per browser; no branded Safari/Edge |
 | **Modes/Globals** | Yes | No | Theme/locale matrices need workarounds |
 | **A11y testing** | Yes (aXe) | No | Separate aXe job needed |
 | **Cloud parallelization** | Automatic | Manual (`captureConcurrency`) | Limited by your server CPU/memory |
@@ -148,7 +148,7 @@ A: No public API. Baselines must be re-accepted on first StoryShelf run.
 A: Not implemented. Every changed story captures a full snapshot.
 
 **Q: Can I test Safari/Firefox?**
-A: No. StoryShelf uses Playwright Chromium only.
+A: Yes — set the project's capture browser to `firefox` or `webkit` (Safari's engine) in Settings → General, or via `PATCH /api/v1/projects/:slug`. Each build captures one browser; baselines track the browser.
 
 **Q: What about Modes/Globals?**
 A: Not supported. Workaround: duplicate stories with different args, or use separate Storybook configs.
