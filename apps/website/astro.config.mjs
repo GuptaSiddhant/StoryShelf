@@ -29,6 +29,7 @@ export default defineConfig({
               items: [
                 { label: "CI setup", slug: "guides/ci" },
                 { label: "Interaction testing", slug: "guides/interaction-testing" },
+                { label: "Review workflow", slug: "guides/review" },
               ],
             },
             {
@@ -43,12 +44,14 @@ export default defineConfig({
                 { label: "Cloud assembly", slug: "guides/deployment/cloud" },
               ],
             },
+            { label: "Project settings", slug: "guides/project-settings" },
             {
               label: "API",
               collapsed: true,
               items: [
                 { label: "REST API", slug: "guides/api" },
                 { label: "OpenAPI", link: "/openapi/" },
+                { label: "Webhooks", slug: "guides/webhooks" },
               ],
             },
             {
@@ -81,8 +84,13 @@ export default defineConfig({
           collapsed: true,
           items: [
             { label: "Projects", slug: "concepts/projects" },
+            { label: "Builds & snapshots", slug: "concepts/builds" },
+            { label: "Capture & viewports", slug: "concepts/capture" },
             { label: "Baselines & branches", slug: "concepts/baselines" },
             { label: "Labels", slug: "concepts/labels" },
+            { label: "Retention & purge", slug: "concepts/retention" },
+            { label: "Published Storybook", slug: "concepts/publishing" },
+            { label: "Roles & tokens", slug: "concepts/roles" },
           ],
         },
         {

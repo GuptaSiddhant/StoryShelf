@@ -14,4 +14,58 @@ hero:
       variant: minimal
 ---
 
-Run visual regression tests in CI, review pixel-level diffs in a web UI, and approve changes before they ship — on your own infrastructure. No per-snapshot billing, no vendor lock-in.
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Run visual regression tests in CI, review pixel diffs in a web UI, and approve changes before they ship — on your own infrastructure. No per-snapshot billing, no vendor lock-in.
+
+<CardGrid stagger>
+  <Card title="Projects" icon="puzzle">
+    One project = one Storybook. Tokens, members, and branch-aware baselines per slug — many Storybooks per repo.
+  </Card>
+  <Card title="Baselines" icon="approve-check">
+    Per-branch with default fallback. Accept once per branch, auto-approve on `main`, persistent tags never purged.
+  </Card>
+  <Card title="Capture" icon="rocket">
+    Server-side Playwright or lightweight Puppeteer. Chromium/Firefox/WebKit per project, viewports & sizing aware.
+  </Card>
+  <Card title="Published Storybook" icon="open-book">
+    Share the latest build at `/storybook` or `*.stories.example.com` — path or subdomain, public-branch gated.
+  </Card>
+  <Card title="Labels" icon="tag">
+    Typed build labels (`pr`, `jira`, `figma`) with link templates and stable `/labels/pr/42` URLs.
+  </Card>
+  <Card title="Self-host anywhere" icon="cloud">
+    Docker Compose locally or AWS/Azure/GCP Terraform stacks. Bring your own database, storage, and queue.
+  </Card>
+  <Card title="Review workflow" icon="comment">
+    Approve/reject, threaded comments, retry flaky captures, and merge-gate status checks — `storyshelf/<slug>`.
+  </Card>
+  <Card title="Retention & purge" icon="trash">
+    Builds purge after 30d; default-branch baselines live forever. Branch GC after 30d — tag with `persistent` to keep.
+  </Card>
+</CardGrid>
+
+## Quick links
+
+<CardGrid stagger>
+  <LinkCard title="Getting started" href="./guides/getting-started/" description="Scaffold a server, create a project, upload your first build." />
+  <LinkCard title="CI setup" href="./guides/ci/" description="GitHub Actions & GitLab CI, plus the required status check." />
+  <LinkCard title="Interaction testing" href="./guides/interaction-testing/" description="Run play functions, mark flaky tests, tune per-story delay." />
+  <LinkCard title="Deployment" href="./guides/deployment/" description="Docker Compose locally or AWS/Azure/GCP Terraform stacks." />
+  <LinkCard title="CLI — Client & Server" href="./guides/cli/" description="storyshelf upload/init/create and server init/serve." />
+  <LinkCard title="REST API & OpenAPI" href="./guides/api/" description="Versioned /api/v1 with live Swagger at /api/v1/docs." />
+  <LinkCard title="Chromatic comparison" href="./guides/chromatic-comparison/" description="Honest pricing, TurboSnap, and migration notes vs Chromatic." />
+  <LinkCard title="Core Concepts" href="./concepts/projects/" description="Projects, baselines, labels, builds, capture, retention — the mental model." />
+</CardGrid>
+
+## Chromatic comparison at a glance
+
+| | Chromatic (SaaS) | StoryShelf (self-hosted) |
+|---|---|---|
+| **Pricing** | 5k snapshots free, then $179/mo per 35k | MIT, unlimited — infra cost only |
+| **Browsers** | Chrome, Firefox, Safari, Edge (cloud) | Chromium/Firefox/WebKit per project + lightweight Puppeteer |
+| **Hosting** | Chromatic cloud only | Your infra — Docker, Fly, Vercel, Lambda, Azure, GCP |
+| **Data** | US/EU regions | Your DB/storage — full residency |
+| **Lock-in** | Proprietary | Open source, standard `/api/v1` |
+
+Full breakdown and migration guide: [Comparison](./guides/chromatic-comparison/) · [Migration](./guides/chromatic-migration/).
