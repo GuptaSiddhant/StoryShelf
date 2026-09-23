@@ -10,15 +10,31 @@ declare const __PKG_VERSION__: string | undefined;
  * @param options - Password and session signing configuration.
  * @returns A PasswordAuth instance.
  */
+const SHARED_ADMIN_USER: AuthUser = {
+  id: "shared",
+  email: "admin@local",
+  name: "Admin",
+  role: "admin",
+};
+const SHARED_VIEWER_USER: AuthUser = {
+  id: "shared-viewer",
+  email: "viewer@local",
+  name: "Viewer",
+  role: "viewer",
+};
+
 export function createPasswordAuth(options: PasswordAuthOptions): PasswordAuth {
-  const { password, secret } = options;
+  const { password, viewerPassword, secret } = options;
   const sessions = createSessionHandlers(secret);
 
-  const login = async (input: string, user: AuthUser): Promise<string> => {
-    if (!equalStrings(input, password)) {
-      throw new Error("Invalid password");
+  const login = async (input: string, user?: AuthUser): Promise<string> => {
+    if (equalStrings(input, password)) {
+      return await sessions.createSession(user ?? SHARED_ADMIN_USER);
     }
-    return await sessions.createSession(user);
+    if (viewerPassword !== undefined && equalStrings(input, viewerPassword)) {
+      return await sessions.createSession(SHARED_VIEWER_USER);
+    }
+    throw new Error("Invalid password");
   };
 
   return {
@@ -41,16 +57,18 @@ export function createPasswordAuth(options: PasswordAuthOptions): PasswordAuth {
 
 /** Options for configuring a shared-password auth adapter. */
 export interface PasswordAuthOptions {
-  /** The shared password users must present to log in. */
+  /** The shared password users must present to log in (admin when tiered). */
   password: string;
+  /** Optional viewer-tier password — when set, enables tiered mode: `password` → admin, `viewerPassword` → viewer. */
+  viewerPassword?: string;
   /** Secret used to sign and verify session cookies. */
   secret: string;
 }
 
-/** Auth adapter that authenticates with a single shared password. */
+/** Auth adapter that authenticates with a single shared password (or tiered admin/viewer when `viewerPassword` is set). */
 export interface PasswordAuth extends AuthAdapter {
-  /** Verify `password` and, if correct, create a session for `user`, returning a session token. */
-  login(password: string, user: AuthUser): Promise<string>;
+  /** Verify `password` and, if correct, create a session for `user` (or the built-in tiered user), returning a session token. */
+  login(password: string, user?: AuthUser): Promise<string>;
 }
 
 function equalStrings(left: string, right: string): boolean {
@@ -59,12 +77,15 @@ function equalStrings(left: string, right: string): boolean {
   return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
 }
 
-/** Lifecycle: fail fast when password or secret is missing. */
+/** Lifecycle: fail fast when password or secret is missing (tiered viewer password validated when present). */
 function buildLifecycle(options: PasswordAuthOptions): PasswordAuth["lifecycle"] {
   return {
     setup: async () => {
       if (options.password === "" || options.secret === "") {
         throw new Error("Password auth requires a non-empty password and secret");
+      }
+      if (options.viewerPassword !== undefined && options.viewerPassword === "") {
+        throw new Error("Password auth viewerPassword must be non-empty when set");
       }
       await Promise.resolve();
     },

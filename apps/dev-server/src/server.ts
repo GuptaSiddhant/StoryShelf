@@ -22,6 +22,7 @@ const dataDir = env["DATA_DIR"] ?? ".dev-data";
 const port = Number(env["PORT"] ?? 3000);
 const secret = env["SECRET"];
 const authPassword = env["AUTH_PASSWORD"];
+const authViewerPassword = env["AUTH_VIEWER_PASSWORD"];
 const adminToken = env["STORYSHELF_ADMIN_TOKEN"] ?? env["ADMIN_TOKEN"];
 
 // Ensure the data directory exists for the sqlite file and storage.
@@ -37,7 +38,11 @@ const app = createShelfApp({
   storage,
   captureRunner,
   // Enable a shared-password login by setting AUTH_PASSWORD (and SECRET).
-  auth: authPassword && secret ? createPasswordAuth({ password: authPassword, secret }) : undefined,
+  // Optional tiered demo: AUTH_VIEWER_PASSWORD → viewer role (read-only).
+  auth:
+    authPassword && secret
+      ? createPasswordAuth({ password: authPassword, viewerPassword: authViewerPassword, secret })
+      : undefined,
   config: {
     // `SECRET` signs auth sessions; `scratchDir` is where an uploaded
     // Storybook archive is extracted before Playwright renders it.
