@@ -145,6 +145,36 @@ describe("poll", () => {
     expect(logger.warn).toHaveBeenCalledOnce();
   });
 
+  describe("host logger binding", () => {
+    const malformed = () => [
+      DEQUEUED({ messageText: "not-json", messageId: "m-bad", popReceipt: "pr-bad" }),
+    ];
+
+    it("warns through the bound host logger", async () => {
+      const { client } = makeClient({ receive: malformed });
+      const queue = createAzureStorageQueuesQueue({ ...options, client });
+      const warn = vi.fn();
+      queue.setLogger?.({ warn } as unknown as Logger);
+      expect(await queue.poll()).toBeNull();
+      expect(warn).toHaveBeenCalledOnce();
+    });
+
+    it("prefers the explicit options logger over the bound one", async () => {
+      const { client } = makeClient({ receive: malformed });
+      const explicit = vi.fn();
+      const bound = vi.fn();
+      const queue = createAzureStorageQueuesQueue({
+        ...options,
+        client,
+        logger: { warn: explicit } as unknown as Logger,
+      });
+      queue.setLogger?.({ warn: bound } as unknown as Logger);
+      expect(await queue.poll()).toBeNull();
+      expect(explicit).toHaveBeenCalledOnce();
+      expect(bound).not.toHaveBeenCalled();
+    });
+  });
+
   it("deletes null-body messages and warns", async () => {
     const logger = { warn: vi.fn() };
     const { client, calls } = makeClient({

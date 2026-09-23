@@ -198,6 +198,40 @@ describe("poll", () => {
     expect(logger.warn).toHaveBeenCalledOnce();
   });
 
+  describe("host logger binding", () => {
+    const malformed = () => [
+      RECEIVED({
+        ackId: "ack-bad",
+        message: { data: new TextEncoder().encode("not-json") },
+      }),
+    ];
+
+    it("warns through the bound host logger", async () => {
+      const { subscriber } = makeSubscriber({ messages: malformed });
+      const queue = createGcpPubSubQueue({ ...options, subscriber, publisher: makePublisher([]) });
+      const warn = vi.fn();
+      queue.setLogger?.({ warn } as unknown as Logger);
+      expect(await queue.poll()).toBeNull();
+      expect(warn).toHaveBeenCalledOnce();
+    });
+
+    it("prefers the explicit options logger over the bound one", async () => {
+      const { subscriber } = makeSubscriber({ messages: malformed });
+      const explicit = vi.fn();
+      const bound = vi.fn();
+      const queue = createGcpPubSubQueue({
+        ...options,
+        subscriber,
+        publisher: makePublisher([]),
+        logger: { warn: explicit } as unknown as Logger,
+      });
+      queue.setLogger?.({ warn: bound } as unknown as Logger);
+      expect(await queue.poll()).toBeNull();
+      expect(explicit).toHaveBeenCalledOnce();
+      expect(bound).not.toHaveBeenCalled();
+    });
+  });
+
   it("acknowledges null-body messages and warns", async () => {
     const logger = { warn: vi.fn() };
     const { subscriber, calls } = makeSubscriber({

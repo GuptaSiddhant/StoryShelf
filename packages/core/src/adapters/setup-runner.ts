@@ -72,6 +72,30 @@ export function collectTeardowns(sources: AdapterSetupSources): HookEntry[] {
   return entries;
 }
 
+interface LoggerCarrier {
+  readonly metadata: AdapterMetadata;
+  readonly setLogger?: (logger: Logger) => void;
+}
+
+/**
+ * Bind the host logger on every adapter that accepts one, scoped by kind.
+ * Adapters without `setLogger` keep today's behavior (silent when no
+ * explicit `options.logger` was passed at construction).
+ */
+export function bindAdapterLoggers(sources: AdapterSetupSources, logger: Logger): void {
+  const adapters: ReadonlyArray<LoggerCarrier | undefined> = [
+    sources.database,
+    sources.storage,
+    sources.captureRunner,
+    sources.captureQueue,
+    sources.auth,
+    ...(sources.gitHosts ?? []),
+  ];
+  for (const adapter of adapters) {
+    adapter?.setLogger?.(logger.child({ component: adapter.metadata.kind }));
+  }
+}
+
 function messageOf(reason: unknown): string {
   return reason instanceof Error ? reason.message : String(reason);
 }

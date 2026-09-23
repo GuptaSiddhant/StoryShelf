@@ -90,4 +90,10 @@ export interface Adapter<Extra extends object = Record<string, unknown>> {
   readonly metadata: AdapterMetadata & Extra;
   /** Optional lifecycle hooks. */
   readonly lifecycle?: AdapterLifecycle;
+  /**
+   * Bind the host-owned runtime logger. Called by the app/worker when
+   * present; factories must never create their own loggers — they only
+   * store what they are given (explicit `options.logger` wins over bound).
+   */
+  setLogger?(logger: Logger): void;
 }

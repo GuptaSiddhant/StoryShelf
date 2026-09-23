@@ -36,6 +36,7 @@ export function createSqsCaptureQueue(options: SqsCaptureQueueOptions): Pollable
   let destroyed = false;
   const visibilityTimeout = options.visibilityTimeout ?? 300;
   const waitTimeSeconds = options.waitTimeSeconds ?? 20;
+  let boundLogger: Logger | undefined = options.logger;
 
   return {
     metadata: {
@@ -44,6 +45,9 @@ export function createSqsCaptureQueue(options: SqsCaptureQueueOptions): Pollable
       description: "SQS-backed capture queue",
       kind: "sqs",
       category: "capture-queue",
+    },
+    setLogger(bound: Logger): void {
+      boundLogger ??= bound;
     },
     lifecycle: {
       setup: async () => {
@@ -163,7 +167,7 @@ export function createSqsCaptureQueue(options: SqsCaptureQueueOptions): Pollable
             )
             .catch(() => {});
         }
-        options.logger?.warn({ body: msg.Body }, "received malformed SQS message without buildId");
+        boundLogger?.warn({ body: msg.Body }, "received malformed SQS message without buildId");
         return null;
       }
 

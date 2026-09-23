@@ -1,4 +1,5 @@
 import type { PollableJob } from "@storyshelf/core/adapter/capture-queue";
+import { createShelfLogger } from "@storyshelf/core/logger";
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_WORKER_CONFIG, resolveWorkerConfig } from "./config.ts";
 import { createCaptureWorker } from "./index.ts";
@@ -426,5 +427,48 @@ describe("createCaptureWorker", () => {
     await worker.stop();
     await startPromise.catch(() => {});
     expect(worker.isRunning()).toBe(false);
+  });
+
+  it("binds a scoped child logger on the queue", () => {
+    const setLogger = vi.fn();
+    const queue = {
+      ...createMockQueue([]),
+      setLogger,
+    };
+    const { db, storage, runner } = createFakeAdapters();
+    createCaptureWorker({
+      queue: queue as unknown as import("@storyshelf/core/adapter/capture-queue").CaptureQueue,
+      db,
+      storage,
+      runner,
+      scratchDir: "/tmp",
+      logger: createShelfLogger({ level: "silent" }),
+    });
+    expect(setLogger).toHaveBeenCalledOnce();
+    const bound = setLogger.mock.calls[0]?.[0] as {
+      bindings?: () => Record<string, unknown>;
+    };
+    expect(bound.bindings?.()).toMatchObject({ component: "mock" });
+  });
+
+  it("binds the default logger on the queue when none is passed", () => {
+    const setLogger = vi.fn();
+    const queue = {
+      ...createMockQueue([]),
+      setLogger,
+    };
+    const { db, storage, runner } = createFakeAdapters();
+    createCaptureWorker({
+      queue: queue as unknown as import("@storyshelf/core/adapter/capture-queue").CaptureQueue,
+      db,
+      storage,
+      runner,
+      scratchDir: "/tmp",
+    });
+    expect(setLogger).toHaveBeenCalledOnce();
+    const bound = setLogger.mock.calls[0]?.[0] as {
+      bindings?: () => Record<string, unknown>;
+    };
+    expect(bound.bindings?.()).toMatchObject({ component: "mock" });
   });
 });

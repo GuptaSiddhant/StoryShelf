@@ -1,3 +1,4 @@
+import type { Logger } from "@storyshelf/core/logger";
 import { describe, expect, it, vi } from "vitest";
 import { createRedisCaptureQueue } from "./index.ts";
 
@@ -251,6 +252,31 @@ describe("poll", () => {
     const job = await queue.poll();
     expect(job).toBeNull();
     expect(calls.some((c) => c.method === "lrem")).toBe(true);
+  });
+
+  describe("host logger binding", () => {
+    it("warns through the bound host logger", async () => {
+      const { client } = makeFakeRedis({ blmove: () => "not-json" });
+      const queue = createRedisCaptureQueue({ client: client as never });
+      const warn = vi.fn();
+      queue.setLogger?.({ warn } as unknown as Logger);
+      expect(await queue.poll()).toBeNull();
+      expect(warn).toHaveBeenCalledOnce();
+    });
+
+    it("prefers the explicit options logger over the bound one", async () => {
+      const { client } = makeFakeRedis({ blmove: () => "not-json" });
+      const explicit = vi.fn();
+      const bound = vi.fn();
+      const queue = createRedisCaptureQueue({
+        client: client as never,
+        logger: { warn: explicit } as unknown as Logger,
+      });
+      queue.setLogger?.({ warn: bound } as unknown as Logger);
+      expect(await queue.poll()).toBeNull();
+      expect(explicit).toHaveBeenCalledOnce();
+      expect(bound).not.toHaveBeenCalled();
+    });
   });
 
   it("promotes due delayed jobs before poll", async () => {

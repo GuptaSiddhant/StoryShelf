@@ -1,6 +1,7 @@
 import type { AdapterSetupContext } from "@storyshelf/core/adapter/metadata";
 import {
   AdapterLifecycleError,
+  bindAdapterLoggers,
   collectSetups,
   collectTeardowns,
   runAdapterSetups,
@@ -49,6 +50,7 @@ export function attachLifecycle(
   cell: LifecycleCell,
 ): void {
   const setupCtx: AdapterSetupContext = { config: runtime.config, logger: runtime.logger };
+  bindAdapterLoggers(options, runtime.logger);
   kickSetup(options, setupCtx, runtime.logger, cell);
   const timer = startBranchGcInterval(options, runtime);
   Object.assign(app, {

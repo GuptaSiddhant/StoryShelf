@@ -49,6 +49,9 @@ export function createGcpPubSubQueue(options: GcpPubSubQueueOptions): PollableCa
   const state = createPubSubState(options);
   return {
     metadata: buildPubSubMetadata(),
+    setLogger(bound: Logger): void {
+      state.logger ??= bound;
+    },
     lifecycle: {
       setup: async () => {
         await setupPubSub(state);

@@ -49,6 +49,9 @@ export function createAzureStorageQueuesQueue(
   const state = createStorageState(options);
   return {
     metadata: buildStorageMetadata(),
+    setLogger(bound: Logger): void {
+      state.logger ??= bound;
+    },
     lifecycle: {
       setup: async () => {
         await setupStorage(state.client);

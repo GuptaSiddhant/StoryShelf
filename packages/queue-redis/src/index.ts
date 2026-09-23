@@ -54,6 +54,9 @@ export function createRedisCaptureQueue(options: RedisCaptureQueueOptions): Poll
       category: "capture-queue",
     },
     lifecycle: buildQueueLifecycle(client, ownsClient),
+    setLogger(bound: Logger): void {
+      rt.logger ??= bound;
+    },
     ...buildCoreMethods(rt),
     ...buildPollMethods(rt),
   };

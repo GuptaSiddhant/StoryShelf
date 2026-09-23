@@ -6,7 +6,8 @@ import {
   SendMessageCommand,
   type SQSClient,
 } from "@aws-sdk/client-sqs";
-import { describe, expect, it } from "vitest";
+import type { Logger } from "@storyshelf/core/logger";
+import { describe, expect, it, vi } from "vitest";
 import { createSqsCaptureQueue } from "./index.ts";
 
 /** A fake SQS response handler keyed by the command constructor name. */
@@ -444,6 +445,39 @@ describe("nack", () => {
     const job = await queue.poll();
     await queue.nack(job!, { requeue: false });
     expect(sent).toContain(DeleteMessageCommand.name);
+  });
+
+  describe("host logger binding", () => {
+    const queueUrl = "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs";
+    const malformed = {
+      [ReceiveMessageCommand.name]: () => ({
+        Messages: [{ Body: "not-json", ReceiptHandle: "receipt-1" }],
+      }),
+    };
+
+    it("warns through the bound host logger", async () => {
+      const { client } = makeClient(malformed);
+      const queue = createSqsCaptureQueue({ queueUrl, client });
+      const warn = vi.fn();
+      queue.setLogger?.({ warn } as unknown as Logger);
+      expect(await queue.poll()).toBeNull();
+      expect(warn).toHaveBeenCalledOnce();
+    });
+
+    it("prefers the explicit options logger over the bound one", async () => {
+      const { client } = makeClient(malformed);
+      const explicit = vi.fn();
+      const bound = vi.fn();
+      const queue = createSqsCaptureQueue({
+        queueUrl,
+        client,
+        logger: { warn: explicit } as unknown as Logger,
+      });
+      queue.setLogger?.({ warn: bound } as unknown as Logger);
+      expect(await queue.poll()).toBeNull();
+      expect(explicit).toHaveBeenCalledOnce();
+      expect(bound).not.toHaveBeenCalled();
+    });
   });
 
   it("nack without receipt does nothing", async () => {

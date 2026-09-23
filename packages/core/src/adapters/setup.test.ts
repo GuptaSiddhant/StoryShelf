@@ -1,8 +1,9 @@
 import { pino } from "pino";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import {
   AdapterLifecycleError,
+  bindAdapterLoggers,
   collectSetups,
   collectTeardowns,
   runAdapterSetups,
@@ -11,6 +12,13 @@ import {
 
 const silentLogger = pino({ level: "silent" });
 const ctx = { config: {}, logger: silentLogger };
+
+function fakeAdapter(kind: string, setLogger?: (logger: unknown) => void) {
+  return {
+    metadata: { name: kind, version: "0.0.0", kind, category: "capture-queue" },
+    ...(setLogger ? { setLogger } : {}),
+  };
+}
 
 describe("adapter lifecycle runner", () => {
   it("collects no hooks from adapters without lifecycle", () => {
@@ -121,5 +129,41 @@ describe("adapter lifecycle runner", () => {
     };
     const result = await runAdapterSetups(collectSetups({ database, storage }), ctx, silentLogger);
     expect(result.failures[0]?.error).toBe("plain string failure");
+  });
+});
+
+describe("bindAdapterLoggers", () => {
+  it("binds scoped children on adapters that accept a logger", () => {
+    const child = vi.fn(() => silentLogger);
+    const parent = { child } as unknown as typeof silentLogger;
+    const setLoggerDb = vi.fn();
+    const setLoggerQueue = vi.fn();
+    bindAdapterLoggers(
+      {
+        database: fakeAdapter("postgres", setLoggerDb),
+        storage: fakeAdapter("local"),
+        captureQueue: fakeAdapter("sqs", setLoggerQueue),
+      } as never,
+      parent,
+    );
+    expect(child).toHaveBeenCalledTimes(2);
+    expect(child).toHaveBeenCalledWith({ component: "postgres" });
+    expect(child).toHaveBeenCalledWith({ component: "sqs" });
+    expect(setLoggerDb).toHaveBeenCalledOnce();
+    expect(setLoggerQueue).toHaveBeenCalledOnce();
+    expect(setLoggerDb.mock.calls[0]?.[0]).toBe(silentLogger);
+  });
+
+  it("binds nothing when no adapter accepts a logger", () => {
+    const child = vi.fn(() => silentLogger);
+    const parent = { child } as unknown as typeof silentLogger;
+    bindAdapterLoggers(
+      {
+        database: fakeAdapter("postgres"),
+        storage: fakeAdapter("local"),
+      } as never,
+      parent,
+    );
+    expect(child).not.toHaveBeenCalled();
   });
 });

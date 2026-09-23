@@ -180,6 +180,37 @@ describe("poll", () => {
     expect(logger.warn).toHaveBeenCalledOnce();
   });
 
+  describe("host logger binding", () => {
+    const malformed = () => [RECEIVED({ body: "not-json", messageId: "m-bad" })];
+
+    it("warns through the bound host logger", async () => {
+      const { receiver } = makeReceiver({ receive: malformed });
+      const sender = makeSender([]);
+      const queue = createAzureServiceBusQueue({ ...options, sender, receiver });
+      const warn = vi.fn();
+      queue.setLogger?.({ warn } as unknown as Logger);
+      expect(await queue.poll()).toBeNull();
+      expect(warn).toHaveBeenCalledOnce();
+    });
+
+    it("prefers the explicit options logger over the bound one", async () => {
+      const { receiver } = makeReceiver({ receive: malformed });
+      const sender = makeSender([]);
+      const explicit = vi.fn();
+      const bound = vi.fn();
+      const queue = createAzureServiceBusQueue({
+        ...options,
+        sender,
+        receiver,
+        logger: { warn: explicit } as unknown as Logger,
+      });
+      queue.setLogger?.({ warn: bound } as unknown as Logger);
+      expect(await queue.poll()).toBeNull();
+      expect(explicit).toHaveBeenCalledOnce();
+      expect(bound).not.toHaveBeenCalled();
+    });
+  });
+
   it("returns a job with attempts derived from deliveryCount", async () => {
     const { receiver } = makeReceiver({
       receive: () => [RECEIVED({ deliveryCount: 3 })],

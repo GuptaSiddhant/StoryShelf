@@ -70,6 +70,7 @@ export class AdapterLifecycleError extends Error {
 
 /** Collect every `setup` hook from the configured adapters. */
 export {
+  bindAdapterLoggers,
   collectSetups,
   collectTeardowns,
   runAdapterSetups,

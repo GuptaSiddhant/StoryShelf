@@ -60,6 +60,9 @@ export function createAzureServiceBusQueue(
   const state = createServiceBusState(options);
   return {
     metadata: buildServiceBusMetadata(),
+    setLogger(bound: Logger): void {
+      state.logger ??= bound;
+    },
     lifecycle: {
       setup: async () => {
         await setupServiceBus(state);
