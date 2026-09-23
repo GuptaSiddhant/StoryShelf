@@ -18,7 +18,7 @@ import { createLocalStorage } from "@storyshelf/storage-local";
  *  - @storyshelf/runner-playwright → Chromium via playwright base image
  */
 import { mkdirSync } from "node:fs";
-import { seedDemo } from "./seed-demo.ts";
+import { seedDemo } from "./src/seed-demo.ts";
 
 const env = process.env;
 const dataDir = env["DATA_DIR"] ?? "/data";

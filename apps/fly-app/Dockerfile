@@ -10,7 +10,7 @@ COPY package.json nub.lock nub.jsonc turbo.json ./
 COPY config ./config
 COPY packages ./packages
 COPY apps ./apps
-COPY fixtures ./fixtures
+COPY fixtures/storybook-8 ./fixtures/storybook-8
 RUN nubx --yes turbo@2.11.2 prune fly-app --docker --out-dir out && mv out/json/pnpm-lock.yaml out/json/nub.lock
 
 FROM ghcr.io/nubjs/nub:0.8.1 AS builder
@@ -30,12 +30,12 @@ RUN --mount=type=cache,target=/root/.cache/nub,id=nub-cache \
 COPY --from=pruner /app/out/full ./
 # Ensure demo seed file is present even if prune cache is stale (new file)
 COPY apps/fly-app/src/seed-demo.ts ./apps/fly-app/src/seed-demo.ts
-# Copy fixtures for demo seed — build static inside image so repo stays clean (fixtures/**/storybook-static is gitignored)
-COPY fixtures ./fixtures
+# Copy only the fixture needed for demo seed — build static inside image so repo stays clean (fixtures/**/storybook-static is gitignored)
+COPY fixtures/storybook-8 ./fixtures/storybook-8
 USER root
-RUN npm i -g pnpm@9 && chown -R node:node /app/fixtures
+RUN chown -R node:node /app/fixtures
 USER node
-RUN rm -f fixtures/storybook-8/pnpm-workspace.yaml && pnpm --dir fixtures/storybook-8 install --frozen-lockfile && pnpm --dir fixtures/storybook-8 run build-storybook
+RUN npm --prefix fixtures/storybook-8 install && npm --prefix fixtures/storybook-8 run build-storybook
 # Bundle workspace @storyshelf/* into single mjs; keep native + npm deps external
 RUN nubx rolldown -c apps/fly-app/rolldown.config.ts
 
@@ -45,7 +45,7 @@ WORKDIR /app
 COPY --from=builder /app/apps/fly-app/dist ./dist
 COPY --from=builder /app/apps/fly-app/package.json ./package.json
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/fixtures ./fixtures
+COPY --from=builder /app/fixtures/storybook-8 ./fixtures/storybook-8
 # Vendored HTMX bundle. The app resolves it as `../assets/htmx.min.js` relative
 # to `import.meta.url`, which for the bundled `/app/dist/server.mjs` is
 # `/app/assets/htmx.min.js` — a path the bundler does not emit on its own.
