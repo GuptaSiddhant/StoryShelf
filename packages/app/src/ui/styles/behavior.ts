@@ -1,6 +1,6 @@
 /** Behavioral CSS: HTMX indicators, skeletons, tables, stats. */
 export function behaviorCss(): string {
-  return `${htmxCss()}\n${dataCss()}`;
+  return `${htmxCss()}\n${dataCss()}\n${chromeCss()}`;
 }
 
 function htmxCss(): string {
@@ -29,4 +29,10 @@ function dataCss(): string {
     .grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     @media (max-width: 880px) { .grid--2, .grid--3 { grid-template-columns: 1fr; } }`;
+}
+
+/** Truly global chrome rules (depend on ancestors outside any one subtree). */
+function chromeCss(): string {
+  return `
+    [data-theme="light"] [data-theme-icon="light"], [data-theme="dark"] [data-theme-icon="dark"], [data-theme="system"] [data-theme-icon="system"] { display: inline; }`;
 }
