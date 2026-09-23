@@ -31,7 +31,7 @@ COPY --from=pruner /app/out/full ./
 # Copy fixtures for demo seed — build static inside image so repo stays clean (fixtures/**/storybook-static is gitignored)
 COPY fixtures ./fixtures
 USER root
-RUN npm i -g pnpm@9
+RUN npm i -g pnpm@9 && chown -R node:node /app/fixtures
 USER node
 RUN pnpm --dir fixtures/storybook-8 install --frozen-lockfile && pnpm --dir fixtures/storybook-8 run build-storybook
 # Bundle workspace @storyshelf/* into single mjs; keep native + npm deps external
