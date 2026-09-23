@@ -1,3 +1,4 @@
+/** Buffered CRUD and listing tests for S3 storage. */
 import {
   DeleteObjectCommand,
   GetObjectCommand,
@@ -7,9 +8,8 @@ import {
   S3ServiceException,
   type S3Client,
 } from "@aws-sdk/client-s3";
-import { Readable } from "node:stream";
 import { describe, expect, it } from "vitest";
-import { createS3Storage, s3Key } from "./index.ts";
+import { createS3Storage } from "./index.ts";
 
 /** Minimal stand-in for the S3 response `Body` with the shape the SDK uses. */
 interface FakeBody {
@@ -60,31 +60,7 @@ function notFoundError(): S3ServiceException {
   });
 }
 
-describe("s3Key", () => {
-  it("joins a prefix and path into an S3 key", () => {
-    expect(s3Key("", "a/b.txt")).toBe("a/b.txt");
-    expect(s3Key("app", "a/b.txt")).toBe("app/a/b.txt");
-    expect(s3Key("app", "")).toBe("app/");
-  });
-});
-
-describe("createS3Storage - construct and write", () => {
-  it("constructs a StorageAdapter without throwing", () => {
-    const storage = createS3Storage({
-      bucket: "test-bucket",
-      prefix: "app",
-      endpoint: "http://localhost:9000",
-      region: "us-east-1",
-    });
-
-    expect(storage).toBeDefined();
-    expect(typeof storage.read).toBe("function");
-    expect(typeof storage.write).toBe("function");
-    expect(typeof storage.delete).toBe("function");
-    expect(typeof storage.exists).toBe("function");
-    expect(typeof storage.list).toBe("function");
-  });
-
+describe("createS3Storage - write and read", () => {
   it("write sends PutObjectCommand with the bucketed, prefixed key and body", async () => {
     const { client, sent } = makeClient();
     const storage = createS3Storage({ bucket: "bkt", prefix: "app", client });
@@ -181,54 +157,5 @@ describe("createS3Storage - list", () => {
     const storage = createS3Storage({ bucket: "bkt", client });
 
     await expect(storage.list("a")).resolves.toEqual(["a/1.png"]);
-  });
-});
-
-describe("createS3Storage - streams", () => {
-  it("writeStream uploads small bodies with a single PUT", async () => {
-    const { client, sent } = makeClient();
-    const storage = createS3Storage({ bucket: "bkt", prefix: "app", client });
-
-    await storage.writeStream("x/y.bin", Readable.from([Buffer.from("streamed")]));
-
-    expect(sent).toEqual([PutObjectCommand.name]);
-  });
-
-  it("readStream returns node stream bodies directly", async () => {
-    const payload = Buffer.from("direct-bytes");
-    const { client } = makeClient({
-      [GetObjectCommand.name]: () => ({ Body: Readable.from([payload]) }),
-    });
-    const storage = createS3Storage({ bucket: "bkt", client });
-
-    const chunks: Buffer[] = [];
-    for await (const chunk of await storage.readStream("a.bin")) {
-      chunks.push(Buffer.from(chunk as Uint8Array));
-    }
-    expect(Buffer.concat(chunks)).toEqual(payload);
-  });
-
-  it("readStream converts web-stream bodies to node streams", async () => {
-    const payload = Buffer.from("web-bytes");
-    const web = Readable.toWeb(Readable.from([payload]));
-    const { client } = makeClient({ [GetObjectCommand.name]: () => ({ Body: web }) });
-    const storage = createS3Storage({ bucket: "bkt", client });
-
-    const chunks: Buffer[] = [];
-    for await (const chunk of await storage.readStream("a.bin")) {
-      chunks.push(Buffer.from(chunk as Uint8Array));
-    }
-    expect(Buffer.concat(chunks)).toEqual(payload);
-  });
-
-  it("readStream rejects when GetObject throws", async () => {
-    const { client } = makeClient({
-      [GetObjectCommand.name]: () => {
-        throw notFoundError();
-      },
-    });
-    const storage = createS3Storage({ bucket: "bkt", client });
-
-    await expect(storage.readStream("missing.bin")).rejects.toThrow();
   });
 });
