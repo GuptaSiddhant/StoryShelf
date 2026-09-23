@@ -48,8 +48,9 @@ function countMatches(source: string, pattern: RegExp): number {
 }
 
 describe("ui-building-blocks contract", () => {
-  it("has no raw button or tab classes in pages/", async () => {
-    const forbidden = /class="btn(?:"|\s)|class="tabs(?:"|\s)|tabs__link/u;
+  it("has no raw button, tab, badge, alert, empty, or stat classes in pages/", async () => {
+    const forbidden =
+      /class="btn(?:"|\s)|class="tabs(?:"|\s)|tabs__link|class="badge(?:"|\s)|badge--[a-z]+|class="alert(?:"|\s)|alert--[a-z]+|alert__title|alert__body|class="empty(?:"|\s)|empty__title|empty__desc|empty__action|class="stat(?:"|\s)|stat__value|stat__label/u;
     const offenders = (await pageSources()).filter(({ source }) => forbidden.test(source));
     expect(offenders.map(({ file }) => file)).toEqual([]);
   });

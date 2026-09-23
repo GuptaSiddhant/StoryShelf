@@ -1,6 +1,6 @@
 import type { Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Button } from "../ui/components.tsx";
+import { Alert, Badge, Button } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Webhook row as rendered in the webhooks settings tab. */
@@ -20,18 +20,11 @@ export function renderSettingsWebhooks(
   return (
     <div class="grid max-w-form">
       {formState?.secret ? (
-        <div class="alert alert--success" role="alert">
-          <strong class="alert__title">Webhook created</strong>
-          <div class="alert__body">
-            Copy the signing secret now — shown once: <code>{formState.secret}</code>
-          </div>
-        </div>
+        <Alert tone="success" title="Webhook created">
+          Copy the signing secret now — shown once: <code>{formState.secret}</code>
+        </Alert>
       ) : null}
-      {formState?.globalError ? (
-        <div class="alert alert--danger" role="alert">
-          {formState.globalError}
-        </div>
-      ) : null}
+      {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
 
       <div class="card card--padded">
         <h2 style="margin:0 0 .3rem;">Webhooks</h2>
@@ -64,9 +57,7 @@ export function renderSettingsWebhooks(
                       <div style="display:flex; gap:.25rem; flex-wrap:wrap;">
                         {webhook.events.map(
                           (event): HtmlEscapedString | Promise<HtmlEscapedString> => (
-                            <span key={event} class="badge badge--neutral">
-                              {event}
-                            </span>
+                            <Badge tone="neutral">{event}</Badge>
                           ),
                         )}
                       </div>

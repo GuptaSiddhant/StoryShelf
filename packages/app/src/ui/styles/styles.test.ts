@@ -10,7 +10,6 @@ describe("baseStyle", () => {
       "--ring",
       "--surface-card",
       "--text-primary",
-      ".badge--success",
       ".field__input",
       ".card",
       ".sidebar__link--active",
@@ -23,10 +22,14 @@ describe("baseStyle", () => {
     }
   });
 
-  it("no longer carries button styles (owned by hono/css in buttons.tsx)", () => {
+  it("no longer carries button or feedback styles (owned by hono/css)", () => {
     const css = baseStyle(LIGHT_THEME, DARK_THEME);
     expect(css).not.toContain(".btn--primary");
     expect(css).not.toContain(".tabs__link");
+    expect(css).not.toContain(".badge--success");
+    expect(css).not.toContain(".alert--danger");
+    expect(css).not.toContain(".empty__title");
+    expect(css).not.toContain(".stat__value");
   });
 
   it("honors custom brand accent overrides", () => {

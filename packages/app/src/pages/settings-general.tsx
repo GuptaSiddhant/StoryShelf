@@ -1,5 +1,5 @@
 import type { Project } from "@storyshelf/core/schema";
-import { Button } from "../ui/components.tsx";
+import { Alert, Button } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Form state for the settings tabs (field errors and global error). */
@@ -18,11 +18,7 @@ export function renderSettingsGeneral(
   const browser = project.browser ?? "chromium";
   return (
     <div class="grid max-w-form">
-      {formState?.globalError ? (
-        <div class="alert alert--danger" role="alert">
-          {formState.globalError}
-        </div>
-      ) : null}
+      {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
       <div class="card card--padded">
         <h2 style="margin:0 0 .5rem;">General</h2>
         <form

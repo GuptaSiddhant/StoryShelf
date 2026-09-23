@@ -8,7 +8,7 @@ import {
 } from "@storyshelf/db-sqlite/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { getStore } from "../store.ts";
-import { Badge, Button, statusTone } from "../ui/components.tsx";
+import { Badge, Button, EmptyState, statusTone } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 /** Project builds page: filterable build history for one project. */
 export async function renderProjectBuildsPage(
@@ -120,14 +120,14 @@ export async function renderProjectBuildsPage(
       </div>
 
       {builds.length === 0 ? (
-        <div class="empty">
-          <h2 class="empty__title">No builds</h2>
-          <p class="empty__desc">
-            {query.status || query.branch
+        <EmptyState
+          title="No builds"
+          description={
+            query.status || query.branch
               ? "No builds match the current filter."
-              : "Upload your first build with the CLI. Builds appear here once uploaded."}
-          </p>
-        </div>
+              : "Upload your first build with the CLI. Builds appear here once uploaded."
+          }
+        />
       ) : (
         <div class="table-wrap">
           <table>

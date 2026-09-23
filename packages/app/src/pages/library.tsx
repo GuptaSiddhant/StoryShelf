@@ -15,7 +15,7 @@ import {
 import type { HtmlEscapedString } from "hono/utils/html";
 import { posix } from "node:path";
 import { getStore } from "../store.ts";
-import { Button } from "../ui/components.tsx";
+import { Button, EmptyState } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
 /** Library page: gallery grouped by title from latest build on selected branch. */
@@ -156,10 +156,7 @@ function renderEmptyLibrary(project: Project): RenderedContent {
           All stories/components from the latest build on {project.gitDefaultBranch}.
         </p>
       </div>
-      <div class="empty">
-        <h2 class="empty__title">No builds yet</h2>
-        <p class="empty__desc">Upload a build to populate the library.</p>
-      </div>
+      <EmptyState title="No builds yet" description="Upload a build to populate the library." />
     </DocumentLayout>
   );
 }
@@ -176,13 +173,15 @@ function renderEmptySnapshots(project: Project, build: Build): RenderedContent {
           Latest build {build.gitBranch} · {build.gitSha.slice(0, 7)} · {build.status}
         </p>
       </div>
-      <div class="empty">
-        <h2 class="empty__title">No stories in latest build</h2>
-        <p class="empty__desc">The latest build has no snapshots yet.</p>
-        <Button variant="secondary" href={`/projects/${project.slug}/builds/${build.id}`}>
-          View build
-        </Button>
-      </div>
+      <EmptyState
+        title="No stories in latest build"
+        description="The latest build has no snapshots yet."
+        action={
+          <Button variant="secondary" href={`/projects/${project.slug}/builds/${build.id}`}>
+            View build
+          </Button>
+        }
+      />
     </DocumentLayout>
   );
 }

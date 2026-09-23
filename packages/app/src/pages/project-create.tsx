@@ -1,4 +1,4 @@
-import { Button } from "../ui/components.tsx";
+import { Alert, Button } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
 /** Form state for the project creation page (values and validation errors). */
@@ -36,10 +36,9 @@ export function renderProjectCreatePage(state: ProjectCreateFormState = {}): Ren
       </div>
 
       {state.globalError ? (
-        <div class="alert alert--danger" role="alert">
-          <strong class="alert__title">Could not create project</strong>
-          <div class="alert__body">{state.globalError}</div>
-        </div>
+        <Alert tone="danger" title="Could not create project">
+          {state.globalError}
+        </Alert>
       ) : null}
 
       <div class="card card--padded" style="max-width: 640px;">

@@ -1,7 +1,7 @@
 import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import type { Project } from "@storyshelf/core/schema";
 import type { FC } from "hono/jsx";
-import { Badge, Button, Field, SelectField, TextareaField } from "../ui/components.tsx";
+import { Alert, Badge, Button, Field, SelectField, TextareaField } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Git status configuration row as rendered in the status settings tab. */
@@ -141,11 +141,7 @@ export function renderSettingsStatus(
   const byProvider = new Map(providers.map((provider) => [provider.metadata.kind, provider]));
   return (
     <div class="grid max-w-form">
-      {formState?.globalError ? (
-        <div class="alert alert--danger" role="alert">
-          {formState.globalError}
-        </div>
-      ) : null}
+      {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
 
       <div class="card card--padded">
         <h2 style="margin:0 0 .3rem;">Git status</h2>

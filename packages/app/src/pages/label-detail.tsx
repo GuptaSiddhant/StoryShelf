@@ -10,7 +10,7 @@ import {
 } from "@storyshelf/db-sqlite/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { getStore } from "../store.ts";
-import { Badge, Button, statusTone } from "../ui/components.tsx";
+import { Badge, Button, EmptyState, statusTone } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 /** Resolve a label type's `link_template` against a build, or return null. */
 export function resolveLabelLink(
@@ -92,12 +92,10 @@ export async function renderLabelDetailPage(
       </div>
 
       {builds.length === 0 ? (
-        <div class="empty">
-          <h2 class="empty__title">No builds</h2>
-          <p class="empty__desc">
-            No build currently bears the label {key}: {value}.
-          </p>
-        </div>
+        <EmptyState
+          title="No builds"
+          description={`No build currently bears the label ${key}: ${value}.`}
+        />
       ) : (
         <div class="table-wrap">
           <table>
@@ -202,10 +200,10 @@ export async function renderLabelsPage(slug: string): Promise<RenderedContent | 
       </div>
 
       {labelTypes.length === 0 ? (
-        <div class="empty">
-          <h2 class="empty__title">No label types</h2>
-          <p class="empty__desc">No label types are configured for this project.</p>
-        </div>
+        <EmptyState
+          title="No label types"
+          description="No label types are configured for this project."
+        />
       ) : (
         <div class="table-wrap">
           <table>

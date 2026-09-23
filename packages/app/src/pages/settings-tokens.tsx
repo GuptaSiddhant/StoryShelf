@@ -1,7 +1,7 @@
 import type { Project } from "@storyshelf/core/schema";
 import type { Token } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Button } from "../ui/components.tsx";
+import { Alert, Button } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Tokens settings tab: project CLI tokens plus the create-token form. */
@@ -14,12 +14,9 @@ export function renderSettingsTokens(
   return (
     <div class="grid max-w-form">
       {secret ? (
-        <div class="alert alert--success" role="alert">
-          <strong class="alert__title">Token created</strong>
-          <div class="alert__body">
-            Copy now — shown once: <code>{secret}</code>
-          </div>
-        </div>
+        <Alert tone="success" title="Token created">
+          Copy now — shown once: <code>{secret}</code>
+        </Alert>
       ) : null}
       <div class="card card--padded">
         <h2 style="margin:0 0 .3rem;">API tokens</h2>

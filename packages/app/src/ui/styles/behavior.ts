@@ -25,9 +25,6 @@ function dataCss(): string {
     tbody tr:hover { background: var(--surface-subtle); }
     tr:last-child td { border-bottom: 0; }
     td.nowrap { white-space: nowrap; }
-    .stat { text-align: center; padding: .5rem; }
-    .stat__value { font-size: 1.35rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
-    .stat__label { color: var(--text-secondary); font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; }
     .grid { display: grid; gap: 1rem; }
     .grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }

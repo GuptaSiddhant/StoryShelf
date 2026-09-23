@@ -1,5 +1,5 @@
 import type { Project } from "@storyshelf/core/schema";
-import { Button } from "../ui/components.tsx";
+import { Alert, Button } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Interaction-tests settings tab: play execution toggle and timeout. */
@@ -10,11 +10,7 @@ export function renderSettingsTests(
 ): unknown {
   return (
     <div class="grid max-w-form">
-      {formState?.globalError ? (
-        <div class="alert alert--danger" role="alert">
-          {formState.globalError}
-        </div>
-      ) : null}
+      {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
       <div class="card card--padded">
         <h2 style="margin:0 0 .5rem;">Interaction tests</h2>
         <p class="field__hint" style="margin-bottom:1rem;">

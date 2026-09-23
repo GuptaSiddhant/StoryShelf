@@ -8,7 +8,7 @@ import {
 } from "@storyshelf/db-sqlite/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { getStore } from "../store.ts";
-import { Badge, Button } from "../ui/components.tsx";
+import { Badge, Button, EmptyState } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 /** Projects overview page: project cards with latest build plus next steps. */
 export async function renderProjectsPage(): Promise<RenderedContent> {
@@ -47,19 +47,17 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
       </div>
 
       {projects.length === 0 ? (
-        <div class="empty">
-          <h2 class="empty__title">No projects yet</h2>
-          <p class="empty__desc">
-            Create your first project to start visual testing. Projects are free and unlimited.
-          </p>
-          {canCreate ? (
-            <div class="empty__action">
+        <EmptyState
+          title="No projects yet"
+          description="Create your first project to start visual testing. Projects are free and unlimited."
+          action={
+            canCreate ? (
               <Button variant="primary" href="/projects/new">
                 Create project
               </Button>
-            </div>
-          ) : null}
-        </div>
+            ) : null
+          }
+        />
       ) : (
         <div class="grid">
           {projects.map((project): HtmlEscapedString | Promise<HtmlEscapedString> => {

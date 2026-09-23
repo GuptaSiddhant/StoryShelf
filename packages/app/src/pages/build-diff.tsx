@@ -3,6 +3,7 @@ import type { Comment } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
+import { EmptyState } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import { DiffComments } from "./build-diff-comments.tsx";
 import { DiffHeader } from "./build-diff-header.tsx";
@@ -59,9 +60,7 @@ function DiffReviewGrid(
             />
           </>
         ) : (
-          <div class="empty">
-            <p class="empty__desc">Select a snapshot to review.</p>
-          </div>
+          <EmptyState description="Select a snapshot to review." />
         )}
       </div>
     </div>
@@ -91,10 +90,10 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
       />
 
       {snapshots.length === 0 ? (
-        <div class="empty">
-          <h2 class="empty__title">No snapshots</h2>
-          <p class="empty__desc">This build has no snapshots yet. Capture may still be running.</p>
-        </div>
+        <EmptyState
+          title="No snapshots"
+          description="This build has no snapshots yet. Capture may still be running."
+        />
       ) : (
         <DiffReviewGrid
           project={project}

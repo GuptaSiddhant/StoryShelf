@@ -15,7 +15,7 @@ import {
 } from "@storyshelf/db-sqlite/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { getStore } from "../store.ts";
-import { Badge, Button, statusTone } from "../ui/components.tsx";
+import { Badge, Button, EmptyState, Stat, statusTone } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
 /** Map a capture log level to its badge tone. */
@@ -124,21 +124,14 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
       </div>
 
       <div class="grid grid--3" style="margin-bottom:1rem;">
-        <div class="card card--padded stat">
-          <div class="stat__value">{snapshots.length}</div>
-          <div class="stat__label">Snapshots</div>
+        <div class="card card--padded">
+          <Stat label="Snapshots" value={snapshots.length} />
         </div>
-        <div class="card card--padded stat">
-          <div class="stat__value" style="color: var(--status-new);">
-            {build.changedCount}
-          </div>
-          <div class="stat__label">Changed / new</div>
+        <div class="card card--padded">
+          <Stat label="Changed / new" value={build.changedCount} tone="warning" />
         </div>
-        <div class="card card--padded stat">
-          <div class="stat__value" style="color: var(--status-approved);">
-            {build.approvedCount}
-          </div>
-          <div class="stat__label">Approved / unchanged</div>
+        <div class="card card--padded">
+          <Stat label="Approved / unchanged" value={build.approvedCount} tone="success" />
         </div>
       </div>
 
@@ -207,10 +200,10 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
       ) : null}
 
       {snapshots.length === 0 ? (
-        <div class="empty">
-          <h2 class="empty__title">No snapshots yet</h2>
-          <p class="empty__desc">Capture is pending or failed. Try retrying capture.</p>
-        </div>
+        <EmptyState
+          title="No snapshots yet"
+          description="Capture is pending or failed. Try retrying capture."
+        />
       ) : (
         <div class="snapshot-grid">
           {snapshots.map((snap): HtmlEscapedString | Promise<HtmlEscapedString> => (

@@ -1,4 +1,4 @@
-import { Button } from "../ui/components.tsx";
+import { Alert, Button } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
 /** Form state for the sign-in page (SSO link and error message). */
@@ -16,10 +16,9 @@ export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
           <h1 class="page-header__title">Sign in</h1>
 
           {state.error ? (
-            <div class="alert alert--danger" role="alert">
-              <strong class="alert__title">Could not sign in</strong>
-              <div class="alert__body">{state.error}</div>
-            </div>
+            <Alert tone="danger" title="Could not sign in">
+              {state.error}
+            </Alert>
           ) : null}
 
           <form method="post" action="/auth/login" novalidate>
