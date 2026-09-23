@@ -1,4 +1,5 @@
 import type { Project } from "@storyshelf/core/schema";
+import { Button } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Form state for the settings tabs (field errors and global error). */
@@ -143,9 +144,9 @@ export function renderSettingsGeneral(
             <p class="field__hint">Branches matching this regex are publicly viewable.</p>
           </div>
           {isAdmin ? (
-            <button class="btn btn--primary" type="submit">
+            <Button variant="primary" type="submit">
               Save changes
-            </button>
+            </Button>
           ) : (
             <p class="field__hint">You need admin access to edit settings.</p>
           )}
@@ -166,9 +167,9 @@ export function renderSettingsGeneral(
             hx-target="body"
             hx-confirm="Delete this project? This cannot be undone."
           >
-            <button class="btn btn--danger" type="submit">
+            <Button variant="danger" type="submit">
               Delete project
-            </button>
+            </Button>
           </form>
         </div>
       ) : null}

@@ -1,5 +1,7 @@
 import { createShelfLogger } from "@storyshelf/core/logger";
+import { BuildModel, ProjectModel, SnapshotModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
+import { buildLabels, builds, projects, snapshots } from "@storyshelf/db-sqlite/schema";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
 
@@ -28,5 +30,37 @@ describe("DocumentLayout stylesheet", () => {
     expect(css).not.toContain("&gt;");
     expect(css).not.toContain("&lt;");
     expect(css).not.toContain("&#39;");
+  });
+
+  it("collects hono/css component styles into the storyshelf-css tag", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const project = await new ProjectModel(db, { projects }).create({ name: "Docs" });
+    const build = await new BuildModel(db, { builds, buildLabels, snapshots }).create(project.id, {
+      gitSha: "abc123",
+      gitBranch: "main",
+    });
+    await new SnapshotModel(db, { snapshots }).create(project.id, build.id, {
+      storyId: "button--primary",
+      storyName: "Primary",
+      storyTitle: "Button",
+      viewportName: "desktop",
+      viewportWidth: 1280,
+      viewportHeight: 720,
+      screenshotPath: "screenshots/primary.png",
+    });
+    const app = createShelfApp({
+      database: db,
+      storage,
+      logger: createShelfLogger({ level: "silent" }),
+    });
+    const html = await (
+      await app.request(`/projects/${project.slug}/builds/${build.id}/diff`)
+    ).text();
+    expect(html).toContain('id="storyshelf-css"');
+    const collected = /<style id="storyshelf-css">(?<css>[\s\S]*)<\/style>/u.exec(html)?.groups?.[
+      "css"
+    ];
+    expect(collected ?? "").toContain("ss-btn-");
   });
 });

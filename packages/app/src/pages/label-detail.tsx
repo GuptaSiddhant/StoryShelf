@@ -10,7 +10,7 @@ import {
 } from "@storyshelf/db-sqlite/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { getStore } from "../store.ts";
-import { Badge, statusTone } from "../ui/components.tsx";
+import { Badge, Button, statusTone } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 /** Resolve a label type's `link_template` against a build, or return null. */
 export function resolveLabelLink(
@@ -84,9 +84,9 @@ export async function renderLabelDetailPage(
             </p>
           </div>
           <div class="page-header__actions">
-            <a class="btn btn--ghost" href={`/projects/${project.slug}/labels`}>
+            <Button variant="ghost" href={`/projects/${project.slug}/labels`}>
               All labels
-            </a>
+            </Button>
           </div>
         </div>
       </div>
@@ -133,18 +133,18 @@ export async function renderLabelDetailPage(
                     </td>
                     <td class="field__hint">{new Date(build.createdAt).toLocaleString()}</td>
                     <td style="white-space:nowrap;">
-                      <a
-                        class="btn btn--secondary"
+                      <Button
+                        variant="secondary"
                         href={`/projects/${project.slug}/builds/${build.id}`}
                       >
                         View
-                      </a>
+                      </Button>
                       {link ? (
                         <>
                           <span style="margin-left:.35rem;" />
-                          <a class="btn btn--ghost" href={link} target="_blank" rel="noreferrer">
+                          <Button variant="ghost" href={link} target="_blank" rel="noreferrer">
                             Open link
-                          </a>
+                          </Button>
                         </>
                       ) : null}
                     </td>

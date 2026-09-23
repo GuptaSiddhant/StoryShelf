@@ -15,7 +15,7 @@ import {
 } from "@storyshelf/db-sqlite/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { getStore } from "../store.ts";
-import { Badge, statusTone } from "../ui/components.tsx";
+import { Badge, Button, statusTone } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
 /** Map a capture log level to its badge tone. */
@@ -106,18 +106,18 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
             </p>
           </div>
           <div class="page-header__actions">
-            <a class="btn btn--primary" href={`/projects/${project.slug}/builds/${build.id}/diff`}>
+            <Button variant="primary" href={`/projects/${project.slug}/builds/${build.id}/diff`}>
               Review diffs
-            </a>
+            </Button>
             <form
               method="post"
               action={`/api/v1/projects/${project.slug}/builds/${build.id}/retry`}
               hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/retry`}
               hx-target="body"
             >
-              <button class="btn btn--secondary" type="submit">
+              <Button variant="secondary" type="submit">
                 Retry capture
-              </button>
+              </Button>
             </form>
           </div>
         </div>
@@ -188,9 +188,9 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
             hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/approve-all`}
             hx-target="body"
           >
-            <button class="btn btn--primary" type="submit">
+            <Button variant="primary" type="submit">
               Approve all
-            </button>
+            </Button>
           </form>
           <form
             method="post"
@@ -198,9 +198,9 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
             hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/reject-all`}
             hx-target="body"
           >
-            <button class="btn btn--danger" type="submit">
+            <Button variant="danger" type="submit">
               Reject all
-            </button>
+            </Button>
           </form>
           <span class="field__hint">Or review individually in the diff view.</span>
         </div>
@@ -237,12 +237,12 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
                   {snap.diffPixels === null ? "" : ` · ${snap.diffPixels} px`}
                 </div>
                 <div style="display:flex; gap:.4rem; flex-wrap:wrap; margin-top:.2rem;">
-                  <a
-                    class="btn btn--secondary"
+                  <Button
+                    variant="secondary"
                     href={`/projects/${project.slug}/builds/${build.id}/diff?snapshot=${snap.id}`}
                   >
                     Review
-                  </a>
+                  </Button>
                   {canReview && (snap.status === "new" || snap.status === "changed") ? (
                     <>
                       <form
@@ -251,9 +251,9 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
                         hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${snap.id}/approve`}
                         hx-target="body"
                       >
-                        <button class="btn btn--ghost" type="submit">
+                        <Button variant="ghost" type="submit">
                           Approve
-                        </button>
+                        </Button>
                       </form>
                       <form
                         method="post"
@@ -261,9 +261,9 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
                         hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${snap.id}/reject`}
                         hx-target="body"
                       >
-                        <button class="btn btn--ghost" type="submit">
+                        <Button variant="ghost" type="submit">
                           Reject
-                        </button>
+                        </Button>
                       </form>
                     </>
                   ) : null}
@@ -321,9 +321,9 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
             placeholder="Leave a comment on this build…"
           />
           <div>
-            <button class="btn btn--primary" type="submit">
+            <Button variant="primary" type="submit">
               Comment
-            </button>
+            </Button>
           </div>
         </form>
       </div>

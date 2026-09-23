@@ -2,7 +2,7 @@ import type { Build } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge, statusTone } from "../ui/components.tsx";
+import { Badge, Button, statusTone } from "../ui/components.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -43,15 +43,16 @@ function SnapshotActions(
         hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${selected.id}/approve`}
         hx-target="body"
       >
-        <button
-          class="btn btn--primary btn--sm"
+        <Button
+          variant="primary"
+          size="sm"
           type="submit"
           data-approve
           accesskey="a"
           title="Approve (a)"
         >
           Approve
-        </button>
+        </Button>
       </form>
       <form
         method="post"
@@ -59,15 +60,16 @@ function SnapshotActions(
         hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${selected.id}/reject`}
         hx-target="body"
       >
-        <button
-          class="btn btn--danger btn--sm"
+        <Button
+          variant="danger"
+          size="sm"
           type="submit"
           data-reject
           accesskey="r"
           title="Reject (r)"
         >
           Reject
-        </button>
+        </Button>
       </form>
     </div>
   );

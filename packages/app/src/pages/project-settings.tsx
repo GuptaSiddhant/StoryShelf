@@ -3,6 +3,7 @@ import type { LabelType } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { ProjectGroupMapping } from "@storyshelf/core/schema";
 import type { Token } from "@storyshelf/core/schema";
+import { Tabs } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import { renderSettingsGeneral } from "./settings-general.tsx";
 import { renderSettingsLabels } from "./settings-labels.tsx";
@@ -49,30 +50,33 @@ function tabHref(project: Project, tab: SettingsTab): string {
     : `/projects/${project.slug}/settings/${tab}`;
 }
 
-function renderTabLink(
-  project: Project,
-  activeTab: SettingsTab,
-  tab: SettingsTab,
-  label: string,
-): unknown {
-  const active = activeTab === tab;
-  return (
-    <a
-      class={`tabs__link ${active ? "tabs__link--active" : ""}`}
-      href={tabHref(project, tab)}
-      aria-current={active ? "page" : undefined}
-    >
-      {label}
-    </a>
-  );
-}
+const TAB_LABELS: Record<SettingsTab, string> = {
+  general: "General",
+  tests: "Tests",
+  labels: "Labels",
+  tokens: "Tokens",
+  webhooks: "Webhooks",
+  members: "Members",
+  status: "Git status",
+};
+
+const SETTINGS_TABS: SettingsTab[] = [
+  "general",
+  "tests",
+  "labels",
+  "tokens",
+  "webhooks",
+  "members",
+  "status",
+];
 
 function renderActiveTab(data: ProjectSettingsData, formState?: SettingsFormState): unknown {
   const { project, activeTab } = data;
   if (activeTab === "general") return renderSettingsGeneral(project, formState, data.isAdmin);
   if (activeTab === "tests") return renderSettingsTests(project, data.isAdmin, formState);
   if (activeTab === "labels") return renderSettingsLabels(project, data.labelTypes, data.isAdmin);
-  if (activeTab === "tokens") return renderSettingsTokens(project, data.tokens, data.isAdmin);
+  if (activeTab === "tokens")
+    return renderSettingsTokens(project, data.tokens, data.isAdmin, formState?.secret);
   if (activeTab === "webhooks")
     return renderSettingsWebhooks(project, data.webhooks, data.isAdmin, formState);
   if (activeTab === "members")
@@ -117,15 +121,14 @@ export function renderProjectSettingsPage(
         </div>
       </div>
 
-      <nav class="tabs" aria-label="Settings sections">
-        {renderTabLink(project, activeTab, "general", "General")}
-        {renderTabLink(project, activeTab, "tests", "Tests")}
-        {renderTabLink(project, activeTab, "labels", "Labels")}
-        {renderTabLink(project, activeTab, "tokens", "Tokens")}
-        {renderTabLink(project, activeTab, "webhooks", "Webhooks")}
-        {renderTabLink(project, activeTab, "members", "Members")}
-        {renderTabLink(project, activeTab, "status", "Git status")}
-      </nav>
+      <Tabs
+        label="Settings sections"
+        tabs={SETTINGS_TABS.map((tab) => ({
+          label: TAB_LABELS[tab],
+          href: tabHref(project, tab),
+          active: activeTab === tab,
+        }))}
+      />
 
       {renderActiveTab(data, formState)}
     </DocumentLayout>

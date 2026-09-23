@@ -1,3 +1,4 @@
+import { Button } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
 /** Form state for the project creation page (values and validation errors). */
@@ -123,12 +124,12 @@ export function renderProjectCreatePage(state: ProjectCreateFormState = {}): Ren
           </div>
 
           <div style="display:flex; gap:.5rem; margin-top:1rem;">
-            <button class="btn btn--primary" type="submit">
+            <Button variant="primary" type="submit">
               Create project
-            </button>
-            <a class="btn btn--secondary" href="/projects">
+            </Button>
+            <Button variant="secondary" href="/projects">
               Cancel
-            </a>
+            </Button>
           </div>
         </form>
       </div>

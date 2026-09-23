@@ -1,7 +1,7 @@
 import type { Project } from "@storyshelf/core/schema";
 import type { ProjectGroupMapping } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge } from "../ui/components.tsx";
+import { Badge, Button } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Project member row as rendered in the members settings tab. */
@@ -66,9 +66,9 @@ export function renderSettingsMembers(
                         hx-target="body"
                       >
                         {csrfField()}
-                        <button class="btn btn--ghost" type="submit">
+                        <Button variant="ghost" type="submit">
                           Remove
-                        </button>
+                        </Button>
                       </form>
                     ) : null}
                   </td>
@@ -117,9 +117,9 @@ export function renderSettingsMembers(
                 <option value="admin">admin</option>
               </select>
             </div>
-            <button class="btn btn--primary" type="submit">
+            <Button variant="primary" type="submit">
               Add member
-            </button>
+            </Button>
           </form>
         </div>
       ) : null}
@@ -160,9 +160,9 @@ export function renderSettingsMembers(
                         hx-target="body"
                       >
                         {csrfField()}
-                        <button class="btn btn--ghost" type="submit">
+                        <Button variant="ghost" type="submit">
                           Remove
-                        </button>
+                        </Button>
                       </form>
                     ) : null}
                   </td>
@@ -211,9 +211,9 @@ export function renderSettingsMembers(
                 <option value="admin">admin</option>
               </select>
             </div>
-            <button class="btn btn--primary" type="submit">
+            <Button variant="primary" type="submit">
               Add mapping
-            </button>
+            </Button>
           </form>
         </div>
       ) : null}

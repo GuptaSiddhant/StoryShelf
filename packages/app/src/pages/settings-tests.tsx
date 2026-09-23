@@ -1,4 +1,5 @@
 import type { Project } from "@storyshelf/core/schema";
+import { Button } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Interaction-tests settings tab: play execution toggle and timeout. */
@@ -68,9 +69,9 @@ export function renderSettingsTests(
             </p>
           </div>
           {isAdmin ? (
-            <button class="btn btn--primary" type="submit">
+            <Button variant="primary" type="submit">
               Save changes
-            </button>
+            </Button>
           ) : (
             <p class="field__hint">You need admin access to edit settings.</p>
           )}

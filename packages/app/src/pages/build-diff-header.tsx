@@ -2,7 +2,7 @@ import type { Build } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge, statusTone } from "../ui/components.tsx";
+import { Badge, Button, statusTone } from "../ui/components.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -32,9 +32,9 @@ function ReviewActions(props: ReviewActionsProps): HtmlEscapedString | Promise<H
         hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/approve-all`}
         hx-target="body"
       >
-        <button class="btn btn--primary btn--sm" type="submit">
+        <Button variant="primary" size="sm" type="submit">
           Approve all ({pendingCount})
-        </button>
+        </Button>
       </form>
       <form
         method="post"
@@ -42,9 +42,9 @@ function ReviewActions(props: ReviewActionsProps): HtmlEscapedString | Promise<H
         hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/reject-all`}
         hx-target="body"
       >
-        <button class="btn btn--secondary btn--sm" type="submit">
+        <Button variant="secondary" size="sm" type="submit">
           Reject all
-        </button>
+        </Button>
       </form>
     </>
   );
@@ -125,12 +125,13 @@ export function DiffHeader(props: DiffHeaderProps): HtmlEscapedString | Promise<
           />
         </div>
         <div class="page-header__actions">
-          <a
-            class="btn btn--secondary btn--sm"
+          <Button
+            variant="secondary"
+            size="sm"
             href={`/projects/${project.slug}/builds/${build.id}`}
           >
             Build overview
-          </a>
+          </Button>
           {canReview && pendingCount > 0 ? (
             <ReviewActions project={project} build={build} pendingCount={pendingCount} />
           ) : null}

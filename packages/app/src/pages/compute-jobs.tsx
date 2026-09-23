@@ -8,7 +8,7 @@ import {
 } from "@storyshelf/db-sqlite/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { getStore } from "../store.ts";
-import { Badge, statusTone } from "../ui/components.tsx";
+import { Badge, Button, statusTone } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 interface QueueView {
   buildId: string;
@@ -116,9 +116,9 @@ export async function renderComputeJobsPage(
             </p>
           </div>
           <div class="page-header__actions">
-            <a class="btn btn--secondary" href={`/projects/${project.slug}/builds`}>
+            <Button variant="secondary" href={`/projects/${project.slug}/builds`}>
               Back to builds
-            </a>
+            </Button>
           </div>
         </div>
       </div>
@@ -156,12 +156,12 @@ export async function renderComputeJobsPage(
                   </td>
                   <td class="field__hint">{new Date(build.createdAt).toLocaleString()}</td>
                   <td style="white-space:nowrap;">
-                    <a
-                      class="btn btn--secondary"
+                    <Button
+                      variant="secondary"
                       href={`/projects/${project.slug}/builds/${build.id}`}
                     >
                       View
-                    </a>
+                    </Button>
                     {canRetry && (build.status === "failed" || build.status === "pending") ? (
                       <>
                         <span style="margin-left:.35rem;" />
@@ -172,9 +172,9 @@ export async function renderComputeJobsPage(
                           hx-target="body"
                           style="display:inline;"
                         >
-                          <button class="btn btn--ghost" type="submit">
+                          <Button variant="ghost" type="submit">
                             Retry
-                          </button>
+                          </Button>
                         </form>
                       </>
                     ) : null}

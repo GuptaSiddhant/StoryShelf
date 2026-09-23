@@ -15,6 +15,7 @@ import {
 import type { HtmlEscapedString } from "hono/utils/html";
 import { posix } from "node:path";
 import { getStore } from "../store.ts";
+import { Button } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
 /** Library page: gallery grouped by title from latest build on selected branch. */
@@ -178,9 +179,9 @@ function renderEmptySnapshots(project: Project, build: Build): RenderedContent {
       <div class="empty">
         <h2 class="empty__title">No stories in latest build</h2>
         <p class="empty__desc">The latest build has no snapshots yet.</p>
-        <a class="btn btn--secondary" href={`/projects/${project.slug}/builds/${build.id}`}>
+        <Button variant="secondary" href={`/projects/${project.slug}/builds/${build.id}`}>
           View build
-        </a>
+        </Button>
       </div>
     </DocumentLayout>
   );
@@ -278,9 +279,9 @@ function renderBranchPicker(
           </option>
         ))}
       </select>
-      <button class="btn btn--secondary" type="submit">
+      <Button variant="secondary" type="submit">
         View
-      </button>
+      </Button>
     </form>
   );
 }
@@ -405,29 +406,29 @@ function renderCardActions(
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
   return (
     <>
-      <a
-        class="btn btn--secondary"
+      <Button
+        variant="secondary"
         href={`/projects/${project.slug}/builds/${build.id}/diff?snapshot=${snap.id}`}
       >
         Review
-      </a>
-      <a
-        class="btn btn--ghost"
+      </Button>
+      <Button
+        variant="ghost"
         href={`/projects/${project.slug}/storybook/build/${build.id}/?storyId=${encodeURIComponent(snap.storyId)}`}
         target="_blank"
         rel="noopener"
       >
         Preview ↗
-      </a>
+      </Button>
       {docsId ? (
-        <a
-          class="btn btn--ghost"
+        <Button
+          variant="ghost"
           href={`/projects/${project.slug}/storybook/build/${build.id}/?storyId=${encodeURIComponent(docsId)}&viewMode=docs`}
           target="_blank"
           rel="noopener"
         >
           Docs ↗
-        </a>
+        </Button>
       ) : null}
     </>
   );

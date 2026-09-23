@@ -1,6 +1,7 @@
 import type { Project } from "@storyshelf/core/schema";
 import type { Token } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
+import { Button } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Tokens settings tab: project CLI tokens plus the create-token form. */
@@ -8,9 +9,18 @@ export function renderSettingsTokens(
   project: Project,
   tokens: Omit<Token, "hash">[],
   isAdmin: boolean,
+  secret?: string,
 ): unknown {
   return (
     <div class="grid max-w-form">
+      {secret ? (
+        <div class="alert alert--success" role="alert">
+          <strong class="alert__title">Token created</strong>
+          <div class="alert__body">
+            Copy now — shown once: <code>{secret}</code>
+          </div>
+        </div>
+      ) : null}
       <div class="card card--padded">
         <h2 style="margin:0 0 .3rem;">API tokens</h2>
         <p class="field__hint">
@@ -43,9 +53,9 @@ export function renderSettingsTokens(
                         hx-target="body"
                       >
                         {csrfField()}
-                        <button class="btn btn--ghost" type="submit">
+                        <Button variant="ghost" type="submit">
                           Revoke
-                        </button>
+                        </Button>
                       </form>
                     ) : null}
                   </td>
@@ -83,9 +93,9 @@ export function renderSettingsTokens(
                 placeholder="ci"
               />
             </div>
-            <button class="btn btn--primary" type="submit">
+            <Button variant="primary" type="submit">
               Create token
-            </button>
+            </Button>
           </form>
           <p class="field__hint mt-1" style="margin-top:.5rem;">
             Token value is shown once after creation. Store it securely.

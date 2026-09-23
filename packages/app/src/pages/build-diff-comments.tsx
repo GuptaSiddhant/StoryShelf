@@ -2,7 +2,7 @@ import type { Build } from "@storyshelf/core/schema";
 import type { Comment } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge } from "../ui/components.tsx";
+import { Badge, Button } from "../ui/components.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -41,9 +41,9 @@ function CommentCard(props: CommentCardProps): HtmlEscapedString | Promise<HtmlE
           hx-target="body"
           class="comment__actions"
         >
-          <button class="btn btn--ghost" type="submit">
+          <Button variant="ghost" size="sm" type="submit">
             Mark resolved
-          </button>
+          </Button>
         </form>
       ) : null}
     </div>
@@ -80,9 +80,9 @@ function CommentForm(props: CommentFormProps): HtmlEscapedString | Promise<HtmlE
         placeholder="Leave feedback on this snapshot…"
       />
       <div>
-        <button class="btn btn--primary" type="submit">
+        <Button variant="primary" type="submit">
           Comment
-        </button>
+        </Button>
       </div>
     </form>
   );

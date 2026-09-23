@@ -8,7 +8,7 @@ import {
 } from "@storyshelf/db-sqlite/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { getStore } from "../store.ts";
-import { Badge, statusTone } from "../ui/components.tsx";
+import { Badge, Button, statusTone } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 /** Project builds page: filterable build history for one project. */
 export async function renderProjectBuildsPage(
@@ -55,12 +55,12 @@ export async function renderProjectBuildsPage(
             </p>
           </div>
           <div class="page-header__actions">
-            <a class="btn btn--secondary" href={`/projects/${project.slug}/settings`}>
+            <Button variant="secondary" href={`/projects/${project.slug}/settings`}>
               Settings
-            </a>
-            <a class="btn btn--ghost" href={`/projects/${project.slug}/builds`}>
+            </Button>
+            <Button variant="ghost" href={`/projects/${project.slug}/builds`}>
               Refresh
-            </a>
+            </Button>
           </div>
         </div>
       </div>
@@ -108,13 +108,13 @@ export async function renderProjectBuildsPage(
               placeholder="main"
             />
           </div>
-          <button class="btn btn--secondary" type="submit">
+          <Button variant="secondary" type="submit">
             Filter
-          </button>
+          </Button>
           {query.status || query.branch ? (
-            <a class="btn btn--ghost" href={`/projects/${project.slug}/builds`}>
+            <Button variant="ghost" href={`/projects/${project.slug}/builds`}>
               Clear
-            </a>
+            </Button>
           ) : null}
         </form>
       </div>
@@ -166,19 +166,19 @@ export async function renderProjectBuildsPage(
                   </td>
                   <td class="field__hint">{new Date(build.createdAt).toLocaleString()}</td>
                   <td style="white-space:nowrap;">
-                    <a
-                      class="btn btn--secondary"
+                    <Button
+                      variant="secondary"
                       href={`/projects/${project.slug}/builds/${build.id}`}
                     >
                       View
-                    </a>
+                    </Button>
                     <span style="margin-left:.35rem;" />
-                    <a
-                      class="btn btn--ghost"
+                    <Button
+                      variant="ghost"
                       href={`/projects/${project.slug}/builds/${build.id}/diff`}
                     >
                       Review
-                    </a>
+                    </Button>
                   </td>
                 </tr>
               ))}

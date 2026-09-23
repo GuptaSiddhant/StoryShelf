@@ -1,7 +1,7 @@
 import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import type { Project } from "@storyshelf/core/schema";
 import type { FC } from "hono/jsx";
-import { Badge, Field, SelectField, TextareaField } from "../ui/components.tsx";
+import { Badge, Button, Field, SelectField, TextareaField } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Git status configuration row as rendered in the status settings tab. */
@@ -62,9 +62,9 @@ const StatusConfigRow: FC<{
             hx-target="body"
           >
             {csrfField()}
-            <button class="btn btn--ghost" type="submit">
+            <Button variant="ghost" type="submit">
               Delete
-            </button>
+            </Button>
           </form>
         ) : null}
       </td>
@@ -110,9 +110,9 @@ const StatusCreateCard: FC<{
           error={formState?.errors?.["config"]}
           hint="JSON configuration for the provider. See the provider documentation for its fields."
         />
-        <button class="btn btn--primary" type="submit">
+        <Button variant="primary" type="submit">
           Add git provider
-        </button>
+        </Button>
       </form>
     </div>
   );

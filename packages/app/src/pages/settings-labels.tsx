@@ -1,7 +1,7 @@
 import type { LabelType } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge } from "../ui/components.tsx";
+import { Badge, Button } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Labels settings tab: label-type table plus the create-type form. */
@@ -47,13 +47,13 @@ export function renderSettingsLabels(
                         hx-target="body"
                       >
                         {csrfField()}
-                        <button
-                          class="btn btn--ghost"
+                        <Button
+                          variant="ghost"
                           type="submit"
                           aria-label={`Delete ${labelType.key}`}
                         >
                           Delete
-                        </button>
+                        </Button>
                       </form>
                     ) : (
                       <span class="field__hint">built-in</span>
@@ -121,9 +121,9 @@ export function renderSettingsLabels(
               />
               <p class="field__hint">Use {"{value}"} placeholder. Optional.</p>
             </div>
-            <button class="btn btn--primary" type="submit">
+            <Button variant="primary" type="submit">
               Add label type
-            </button>
+            </Button>
           </form>
         </div>
       ) : null}

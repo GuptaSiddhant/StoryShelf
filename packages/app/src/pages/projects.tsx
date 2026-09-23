@@ -8,7 +8,7 @@ import {
 } from "@storyshelf/db-sqlite/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { getStore } from "../store.ts";
-import { Badge } from "../ui/components.tsx";
+import { Badge, Button } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 /** Projects overview page: project cards with latest build plus next steps. */
 export async function renderProjectsPage(): Promise<RenderedContent> {
@@ -38,9 +38,9 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
           </div>
           <div class="page-header__actions">
             {canCreate ? (
-              <a class="btn btn--primary" href="/projects/new">
+              <Button variant="primary" href="/projects/new">
                 New project
-              </a>
+              </Button>
             ) : null}
           </div>
         </div>
@@ -54,9 +54,9 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
           </p>
           {canCreate ? (
             <div class="empty__action">
-              <a class="btn btn--primary" href="/projects/new">
+              <Button variant="primary" href="/projects/new">
                 Create project
-              </a>
+              </Button>
             </div>
           ) : null}
         </div>
@@ -99,12 +99,12 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
                     )}
                   </div>
                   <div class="row-actions">
-                    <a class="btn btn--secondary" href={`/projects/${project.slug}/builds`}>
+                    <Button variant="secondary" href={`/projects/${project.slug}/builds`}>
                       Builds {info?.count ? `(${info.count})` : ""}
-                    </a>
-                    <a class="btn btn--ghost" href={`/projects/${project.slug}/settings`}>
+                    </Button>
+                    <Button variant="ghost" href={`/projects/${project.slug}/settings`}>
                       Settings
-                    </a>
+                    </Button>
                   </div>
                 </div>
               </div>

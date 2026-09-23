@@ -1,3 +1,4 @@
+import { Button } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
 /** Landing page introducing capture, diff, and review. */
@@ -13,12 +14,12 @@ export function renderRootPage(): RenderedContent {
           review changes before they ship.
         </p>
         <div style="display:flex; gap:.5rem; justify-content:center; flex-wrap:wrap;">
-          <a class="btn btn--primary" href="/projects">
+          <Button variant="primary" href="/projects">
             View projects
-          </a>
-          <a class="btn btn--secondary" href="/projects/new">
+          </Button>
+          <Button variant="secondary" href="/projects/new">
             Create project
-          </a>
+          </Button>
         </div>
         <p class="field__hint" style="margin-top:1rem;">
           Tip: use{" "}

@@ -31,15 +31,7 @@ async function handleCreateToken(c: Context): Promise<Response> {
     hash: token.hash,
     userId: getStore().user?.id ?? null,
   });
-  return await renderTokenCreated(c, token.value);
-}
-
-/** Re-render the tokens tab with the one-time secret banner injected. */
-async function renderTokenCreated(c: Context, tokenValue: string): Promise<Response> {
-  const html = await renderSettingsPage(c, "tokens");
-  const inject = `<div class="alert alert--success" role="alert"><strong class="alert__title">Token created</strong><div class="alert__body">Copy now — shown once: <code>${tokenValue}</code></div></div>`;
-  const withToken = html.replace('<nav class="tabs"', `${inject}<nav class="tabs"`);
-  return c.html(withToken);
+  return c.html((await renderSettingsPage(c, "tokens", { secret: token.value })) ?? "");
 }
 
 async function handleDeleteToken(c: Context): Promise<Response> {

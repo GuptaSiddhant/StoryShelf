@@ -10,7 +10,6 @@ describe("baseStyle", () => {
       "--ring",
       "--surface-card",
       "--text-primary",
-      ".btn--primary",
       ".badge--success",
       ".field__input",
       ".card",
@@ -22,6 +21,12 @@ describe("baseStyle", () => {
     ]) {
       expect(css).toContain(token);
     }
+  });
+
+  it("no longer carries button styles (owned by hono/css in buttons.tsx)", () => {
+    const css = baseStyle(LIGHT_THEME, DARK_THEME);
+    expect(css).not.toContain(".btn--primary");
+    expect(css).not.toContain(".tabs__link");
   });
 
   it("honors custom brand accent overrides", () => {

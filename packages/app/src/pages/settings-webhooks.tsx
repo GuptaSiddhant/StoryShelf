@@ -1,5 +1,6 @@
 import type { Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
+import { Button } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Webhook row as rendered in the webhooks settings tab. */
@@ -80,9 +81,9 @@ export function renderSettingsWebhooks(
                         hx-target="body"
                       >
                         {csrfField()}
-                        <button class="btn btn--ghost" type="submit">
+                        <Button variant="ghost" type="submit">
                           Delete
-                        </button>
+                        </Button>
                       </form>
                     ) : null}
                   </td>
@@ -138,9 +139,9 @@ export function renderSettingsWebhooks(
               />
               <p class="field__hint">Comma-separated. Leave blank to receive all events.</p>
             </div>
-            <button class="btn btn--primary" type="submit">
+            <Button variant="primary" type="submit">
               Add webhook
-            </button>
+            </Button>
           </form>
         </div>
       ) : null}

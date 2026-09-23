@@ -1,6 +1,7 @@
 import type { FC } from "hono/jsx";
 import { getCsrfToken } from "../middleware/csrf.ts";
 import { getStore } from "../store.ts";
+import { Style } from "./css.ts";
 import { baseStyle } from "./styles.ts";
 import { DARK_THEME, LIGHT_THEME } from "./theme.ts";
 
@@ -39,6 +40,7 @@ export const DocumentLayout: FC<{ title: string; nav?: NavConfig; children?: unk
           {title} · {name}
         </title>
         <style dangerouslySetInnerHTML={{ __html: baseStyle(light, dark) }} />
+        <Style />
         <script dangerouslySetInnerHTML={{ __html: themeScript() }} />
       </head>
       <body>

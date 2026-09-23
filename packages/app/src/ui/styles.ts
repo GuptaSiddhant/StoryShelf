@@ -1,4 +1,3 @@
-import { buttonsCss } from "./buttons.tsx";
 import { feedbackCss } from "./feedback.tsx";
 import { formsCss } from "./forms.tsx";
 import { layoutCss } from "./layout.tsx";
@@ -15,7 +14,6 @@ export function baseStyle(light: BrandTheme, dark: BrandTheme): string {
     tokenCss(light, dark),
     baseCss(),
     shellCss(),
-    buttonsCss(),
     feedbackCss(),
     formsCss(),
     layoutCss(),

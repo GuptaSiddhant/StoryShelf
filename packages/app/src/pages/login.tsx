@@ -1,3 +1,4 @@
+import { Button } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
 /** Form state for the sign-in page (SSO link and error message). */
@@ -36,17 +37,17 @@ export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
                 autocomplete="current-password"
               />
             </div>
-            <button class="btn btn--primary" type="submit">
+            <Button variant="primary" type="submit">
               Sign in
-            </button>
+            </Button>
           </form>
 
           {state.ssoUrl ? (
             <div class="stack mt-1" style="text-align:center;">
               <span class="muted">or</span>
-              <a class="btn btn--secondary" href={state.ssoUrl}>
+              <Button variant="secondary" href={state.ssoUrl}>
                 Sign in with SSO
-              </a>
+              </Button>
             </div>
           ) : null}
         </div>
