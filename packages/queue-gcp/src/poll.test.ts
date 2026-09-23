@@ -1,3 +1,4 @@
+/** Poll/ack/nack tests for the Pub/Sub queue. */
 import type { v1 } from "@google-cloud/pubsub";
 import type { Logger } from "@storyshelf/core/logger";
 import { describe, expect, it, vi } from "vitest";
@@ -69,99 +70,7 @@ const RECEIVED = (overrides: Record<string, unknown> = {}): unknown => ({
   ...overrides,
 });
 
-describe("metadata and lifecycle", () => {
-  it("has correct metadata", () => {
-    const { subscriber } = makeSubscriber();
-    const queue = createGcpPubSubQueue({ ...options, subscriber, publisher: makePublisher([]) });
-    expect(queue.metadata.name).toBe("GCP Pub/Sub Queue");
-    expect(queue.metadata.kind).toBe("gcp-pubsub");
-    expect(queue.metadata.category).toBe("capture-queue");
-    expect(queue.metadata.version).toBe("0.0.0");
-  });
-
-  it("setup verifies the topic", async () => {
-    const inputs: Call[] = [];
-    const { subscriber } = makeSubscriber();
-    const queue = createGcpPubSubQueue({
-      ...options,
-      subscriber,
-      publisher: makePublisher(inputs),
-    });
-    await queue.lifecycle?.setup({} as never);
-    const [request] = inputs;
-    expect(request?.args[0]).toMatchObject({
-      topic: "projects/acme-shelf/topics/capture-jobs",
-    });
-  });
-
-  it("health verifies the subscription and reports ok", async () => {
-    const { subscriber, calls } = makeSubscriber();
-    const queue = createGcpPubSubQueue({ ...options, subscriber, publisher: makePublisher([]) });
-    const health = await queue.lifecycle?.health();
-    expect(health).toEqual({ ok: true });
-    expect(calls).toContain("getSubscription");
-  });
-
-  it("teardown closes owned clients and is idempotent", async () => {
-    const inputs: Call[] = [];
-    const queue = createGcpPubSubQueue({ ...options, publisher: makePublisher(inputs) });
-    await queue.lifecycle?.teardown();
-    await queue.lifecycle?.teardown();
-    expect(inputs).toEqual([]);
-  });
-
-  it("teardown never closes injected clients", async () => {
-    const inputs: Call[] = [];
-    const { subscriber, calls } = makeSubscriber();
-    const queue = createGcpPubSubQueue({
-      ...options,
-      subscriber,
-      publisher: makePublisher(inputs),
-    });
-    await queue.lifecycle?.teardown();
-    expect(calls).not.toContain("close");
-    expect(inputs).toEqual([]);
-  });
-});
-
-describe("enqueue", () => {
-  it("publishes a serialized job body with the buildId attribute", async () => {
-    const inputs: Call[] = [];
-    const { subscriber } = makeSubscriber();
-    const queue = createGcpPubSubQueue({
-      ...options,
-      subscriber,
-      publisher: makePublisher(inputs),
-    });
-    await queue.enqueue({ buildId: "build-1", reqId: "req-1" });
-    const [request] = inputs[0]?.args ?? [];
-    const typed = request as {
-      topic: string;
-      messages: { data: Uint8Array; attributes: Record<string, string> }[];
-    };
-    expect(typed.topic).toBe("projects/acme-shelf/topics/capture-jobs");
-    const body = JSON.parse(new TextDecoder().decode(typed.messages[0]?.data)) as Record<
-      string,
-      unknown
-    >;
-    expect(body["buildId"]).toBe("build-1");
-    expect(body["reqId"]).toBe("req-1");
-    expect(body["status"]).toBe("queued");
-    expect(typed.messages[0]?.attributes["buildId"]).toBe("build-1");
-  });
-});
-
-describe("status/active/recent", () => {
-  it("returns null/empty (DB is source of truth)", async () => {
-    const { subscriber } = makeSubscriber();
-    const queue = createGcpPubSubQueue({ ...options, subscriber, publisher: makePublisher([]) });
-    expect(await queue.status("build-1")).toBeNull();
-    expect(await queue.active()).toEqual([]);
-    expect(await queue.recent(5)).toEqual([]);
-  });
-});
-
-describe("poll", () => {
+describe("createGcpPubSubQueue - poll", () => {
   it("returns null when no messages", async () => {
     const { subscriber } = makeSubscriber({ messages: () => [] });
     const queue = createGcpPubSubQueue({ ...options, subscriber, publisher: makePublisher([]) });
@@ -196,40 +105,6 @@ describe("poll", () => {
     expect(await queue.poll()).toBeNull();
     expect(calls).toContain("acknowledge");
     expect(logger.warn).toHaveBeenCalledOnce();
-  });
-
-  describe("host logger binding", () => {
-    const malformed = () => [
-      RECEIVED({
-        ackId: "ack-bad",
-        message: { data: new TextEncoder().encode("not-json") },
-      }),
-    ];
-
-    it("warns through the bound host logger", async () => {
-      const { subscriber } = makeSubscriber({ messages: malformed });
-      const queue = createGcpPubSubQueue({ ...options, subscriber, publisher: makePublisher([]) });
-      const warn = vi.fn();
-      queue.setLogger?.({ warn } as unknown as Logger);
-      expect(await queue.poll()).toBeNull();
-      expect(warn).toHaveBeenCalledOnce();
-    });
-
-    it("prefers the explicit options logger over the bound one", async () => {
-      const { subscriber } = makeSubscriber({ messages: malformed });
-      const explicit = vi.fn();
-      const bound = vi.fn();
-      const queue = createGcpPubSubQueue({
-        ...options,
-        subscriber,
-        publisher: makePublisher([]),
-        logger: { warn: explicit } as unknown as Logger,
-      });
-      queue.setLogger?.({ warn: bound } as unknown as Logger);
-      expect(await queue.poll()).toBeNull();
-      expect(explicit).toHaveBeenCalledOnce();
-      expect(bound).not.toHaveBeenCalled();
-    });
   });
 
   it("acknowledges null-body messages and warns", async () => {
@@ -268,7 +143,41 @@ describe("poll", () => {
   });
 });
 
-describe("ack/nack", () => {
+describe("createGcpPubSubQueue - host logger binding", () => {
+  const malformed = () => [
+    RECEIVED({
+      ackId: "ack-bad",
+      message: { data: new TextEncoder().encode("not-json") },
+    }),
+  ];
+
+  it("warns through the bound host logger", async () => {
+    const { subscriber } = makeSubscriber({ messages: malformed });
+    const queue = createGcpPubSubQueue({ ...options, subscriber, publisher: makePublisher([]) });
+    const warn = vi.fn();
+    queue.setLogger?.({ warn } as unknown as Logger);
+    expect(await queue.poll()).toBeNull();
+    expect(warn).toHaveBeenCalledOnce();
+  });
+
+  it("prefers the explicit options logger over the bound one", async () => {
+    const { subscriber } = makeSubscriber({ messages: malformed });
+    const explicit = vi.fn();
+    const bound = vi.fn();
+    const queue = createGcpPubSubQueue({
+      ...options,
+      subscriber,
+      publisher: makePublisher([]),
+      logger: { warn: explicit } as unknown as Logger,
+    });
+    queue.setLogger?.({ warn: bound } as unknown as Logger);
+    expect(await queue.poll()).toBeNull();
+    expect(explicit).toHaveBeenCalledOnce();
+    expect(bound).not.toHaveBeenCalled();
+  });
+});
+
+describe("createGcpPubSubQueue - ack/nack", () => {
   it("acks by acknowledging the receipted message", async () => {
     const { subscriber, inputs, calls } = makeSubscriber();
     const queue = createGcpPubSubQueue({ ...options, subscriber, publisher: makePublisher([]) });

@@ -1,14 +1,15 @@
+/** Poll/ack/nack tests for the SQS capture queue. */
 import {
   ChangeMessageVisibilityCommand,
   DeleteMessageCommand,
-  GetQueueAttributesCommand,
   ReceiveMessageCommand,
-  SendMessageCommand,
   type SQSClient,
 } from "@aws-sdk/client-sqs";
 import type { Logger } from "@storyshelf/core/logger";
 import { describe, expect, it, vi } from "vitest";
 import { createSqsCaptureQueue } from "./index.ts";
+
+const QUEUE_URL = "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs";
 
 /** A fake SQS response handler keyed by the command constructor name. */
 type Handler = (input: Record<string, unknown>) => unknown;
@@ -37,115 +38,15 @@ function makeClient(handlers: Record<string, Handler> = {}): {
   };
 }
 
-describe("enqueue", () => {
-  it("enqueues a job by sending SendMessageCommand", async () => {
-    const { client, sent } = makeClient();
-    const queue = createSqsCaptureQueue({
-      queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs",
-      client,
-    });
-
-    await queue.enqueue({ buildId: "build-1", reqId: "req-1" });
-
-    expect(sent).toContain(SendMessageCommand.name);
-  });
-
-  it("includes buildId and status in MessageAttributes", async () => {
-    const { client, inputs } = makeClient();
-    const queue = createSqsCaptureQueue({
-      queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs",
-      client,
-    });
-    await queue.enqueue({ buildId: "build-42" });
-    const input = inputs[0] as { MessageAttributes?: Record<string, { StringValue: string }> };
-    expect(input.MessageAttributes?.["buildId"]?.StringValue).toBe("build-42");
-    expect(input.MessageAttributes?.["status"]?.StringValue).toBe("queued");
-  });
-
-  it("serializes queuedAt and buildId in MessageBody", async () => {
-    const { client, inputs } = makeClient();
-    const queue = createSqsCaptureQueue({
-      queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs",
-      client,
-    });
-    await queue.enqueue({ buildId: "build-1" });
-    const body = JSON.parse((inputs[0] as { MessageBody: string }).MessageBody) as Record<
-      string,
-      unknown
-    >;
-    expect(body["buildId"]).toBe("build-1");
-    expect(typeof body["queuedAt"]).toBe("string");
-  });
-});
-
-describe("metadata and lifecycle", () => {
-  it("has correct metadata", () => {
-    const { client } = makeClient();
-    const queue = createSqsCaptureQueue({
-      queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs",
-      client,
-    });
-    expect(queue.metadata.kind).toBe("sqs");
-    expect(queue.metadata.category).toBe("capture-queue");
-  });
-
-  it("init checks queue attributes", async () => {
-    const { client, sent } = makeClient();
-    const queue = createSqsCaptureQueue({
-      queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs",
-      client,
-    });
-    await queue.lifecycle?.setup({} as never);
-    expect(sent).toContain(GetQueueAttributesCommand.name);
-  });
-});
-
-describe("status/active/recent", () => {
-  it("status returns null (DB is source of truth)", async () => {
-    const { client } = makeClient();
-    const queue = createSqsCaptureQueue({
-      queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs",
-      client,
-    });
-
-    const result = await queue.status("build-1");
-    expect(result).toBeNull();
-  });
-
-  it("active returns empty array", async () => {
-    const { client } = makeClient();
-    const queue = createSqsCaptureQueue({
-      queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs",
-      client,
-    });
-
-    const result = await queue.active();
-    expect(result).toEqual([]);
-  });
-
-  it("recent returns empty array", async () => {
-    const { client } = makeClient();
-    const queue = createSqsCaptureQueue({
-      queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs",
-      client,
-    });
-
-    const result = await queue.recent(5);
-    expect(result).toEqual([]);
-  });
-});
-
 describe("poll", () => {
   it("returns null when no messages", async () => {
     const { client } = makeClient({
       [ReceiveMessageCommand.name]: () => ({ Messages: [] }),
     });
-    const queue = createSqsCaptureQueue({
-      queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs",
-      client,
-    });
+    const queue = createSqsCaptureQueue({ queueUrl: QUEUE_URL, client });
 
     const job = await queue.poll();
+
     expect(job).toBeNull();
   });
 
@@ -153,10 +54,8 @@ describe("poll", () => {
     const { client } = makeClient({
       [ReceiveMessageCommand.name]: () => ({ Messages: [{ ReceiptHandle: "r1" }] }),
     });
-    const queue = createSqsCaptureQueue({
-      queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs",
-      client,
-    });
+    const queue = createSqsCaptureQueue({ queueUrl: QUEUE_URL, client });
+
     expect(await queue.poll()).toBeNull();
   });
 
@@ -164,12 +63,11 @@ describe("poll", () => {
     const { client } = makeClient({
       [ReceiveMessageCommand.name]: () => ({ Messages: [{ Body: "", ReceiptHandle: "r1" }] }),
     });
-    const queue = createSqsCaptureQueue({
-      queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs",
-      client,
-    });
+    const queue = createSqsCaptureQueue({ queueUrl: QUEUE_URL, client });
+
     // Empty body is falsy, should return null
     const job = await queue.poll();
+
     expect(job).toBeNull();
   });
 
@@ -181,11 +79,10 @@ describe("poll", () => {
         ],
       }),
     });
-    const queue = createSqsCaptureQueue({
-      queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs",
-      client,
-    });
+    const queue = createSqsCaptureQueue({ queueUrl: QUEUE_URL, client });
+
     const job = await queue.poll();
+
     expect(job).toBeNull();
     expect(sent).toContain(DeleteMessageCommand.name);
   });
@@ -202,12 +99,10 @@ describe("poll", () => {
         ],
       }),
     });
-    const queue = createSqsCaptureQueue({
-      queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs",
-      client,
-    });
+    const queue = createSqsCaptureQueue({ queueUrl: QUEUE_URL, client });
 
     const job = await queue.poll();
+
     expect(job?.buildId).toBe("build-1");
     expect(job?.reqId).toBe("req-1");
     expect(job?.receipt).toBe("receipt-1");
@@ -220,11 +115,10 @@ describe("poll", () => {
         Messages: [{ Body: JSON.stringify({ buildId: "build-1" }), ReceiptHandle: "r1" }],
       }),
     });
-    const queue = createSqsCaptureQueue({
-      queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs",
-      client,
-    });
+    const queue = createSqsCaptureQueue({ queueUrl: QUEUE_URL, client });
+
     const job = await queue.poll();
+
     expect(job?.attempts).toBe(0);
   });
 
@@ -240,10 +134,8 @@ describe("poll", () => {
         ],
       }),
     });
-    const queue = createSqsCaptureQueue({
-      queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs",
-      client,
-    });
+    const queue = createSqsCaptureQueue({ queueUrl: QUEUE_URL, client });
+
     expect((await queue.poll())?.attempts).toBe(0);
   });
 
@@ -251,10 +143,8 @@ describe("poll", () => {
     const { client, inputs } = makeClient({
       [ReceiveMessageCommand.name]: () => ({ Messages: [] }),
     });
-    const queue = createSqsCaptureQueue({
-      queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs",
-      client,
-    });
+    const queue = createSqsCaptureQueue({ queueUrl: QUEUE_URL, client });
+
     await queue.poll({ waitMs: -5000 });
     expect((inputs[0] as { WaitTimeSeconds: number }).WaitTimeSeconds).toBe(0);
     await queue.poll({ waitMs: 50_000 });
@@ -266,12 +156,14 @@ describe("poll", () => {
       [ReceiveMessageCommand.name]: () => ({ Messages: [] }),
     });
     const queue = createSqsCaptureQueue({
-      queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs",
+      queueUrl: QUEUE_URL,
       client,
       visibilityTimeout: 600,
       waitTimeSeconds: 5,
     });
+
     await queue.poll();
+
     expect((inputs[0] as { VisibilityTimeout: number }).VisibilityTimeout).toBe(600);
     expect((inputs[0] as { WaitTimeSeconds: number }).WaitTimeSeconds).toBe(5);
   });
@@ -288,12 +180,10 @@ describe("poll", () => {
         ],
       }),
     });
-    const queue = createSqsCaptureQueue({
-      queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs",
-      client,
-    });
+    const queue = createSqsCaptureQueue({ queueUrl: QUEUE_URL, client });
 
     const job = await queue.poll();
+
     expect(job).toBeNull();
     expect(sent).toContain(DeleteMessageCommand.name);
   });
@@ -310,11 +200,10 @@ describe("poll", () => {
         ],
       }),
     });
-    const queue = createSqsCaptureQueue({
-      queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs",
-      client,
-    });
+    const queue = createSqsCaptureQueue({ queueUrl: QUEUE_URL, client });
+
     const job = await queue.poll();
+
     expect(job?.raw).toBeDefined();
   });
 });
@@ -332,24 +221,21 @@ describe("ack", () => {
         ],
       }),
     });
-    const queue = createSqsCaptureQueue({
-      queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs",
-      client,
-    });
+    const queue = createSqsCaptureQueue({ queueUrl: QUEUE_URL, client });
 
     const job = await queue.poll();
     expect(job).not.toBeNull();
     await queue.ack(job!);
+
     expect(sent).toContain(DeleteMessageCommand.name);
   });
 
   it("ack without receipt does nothing", async () => {
     const { client, sent } = makeClient();
-    const queue = createSqsCaptureQueue({
-      queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs",
-      client,
-    });
+    const queue = createSqsCaptureQueue({ queueUrl: QUEUE_URL, client });
+
     await queue.ack({ buildId: "b1" });
+
     expect(sent).not.toContain(DeleteMessageCommand.name);
   });
 });
@@ -367,13 +253,11 @@ describe("nack", () => {
         ],
       }),
     });
-    const queue = createSqsCaptureQueue({
-      queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs",
-      client,
-    });
+    const queue = createSqsCaptureQueue({ queueUrl: QUEUE_URL, client });
 
     const job = await queue.poll();
     await queue.nack(job!, { requeue: true, delayMs: 2000 });
+
     expect(sent).toContain(ChangeMessageVisibilityCommand.name);
   });
 
@@ -389,12 +273,11 @@ describe("nack", () => {
         ],
       }),
     });
-    const queue = createSqsCaptureQueue({
-      queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs",
-      client,
-    });
+    const queue = createSqsCaptureQueue({ queueUrl: QUEUE_URL, client });
+
     const job = await queue.poll();
     await queue.nack(job!, {});
+
     expect(sent).toContain(ChangeMessageVisibilityCommand.name);
     const lastInput = inputs[inputs.length - 1] as { VisibilityTimeout: number };
     expect(lastInput.VisibilityTimeout).toBe(0);
@@ -412,10 +295,8 @@ describe("nack", () => {
         ],
       }),
     });
-    const queue = createSqsCaptureQueue({
-      queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs",
-      client,
-    });
+    const queue = createSqsCaptureQueue({ queueUrl: QUEUE_URL, client });
+
     const job = await queue.poll();
     await queue.nack(job!, { requeue: true, delayMs: -100 });
     expect((inputs[inputs.length - 1] as { VisibilityTimeout: number }).VisibilityTimeout).toBe(0);
@@ -437,18 +318,15 @@ describe("nack", () => {
         ],
       }),
     });
-    const queue = createSqsCaptureQueue({
-      queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs",
-      client,
-    });
+    const queue = createSqsCaptureQueue({ queueUrl: QUEUE_URL, client });
 
     const job = await queue.poll();
     await queue.nack(job!, { requeue: false });
+
     expect(sent).toContain(DeleteMessageCommand.name);
   });
 
   describe("host logger binding", () => {
-    const queueUrl = "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs";
     const malformed = {
       [ReceiveMessageCommand.name]: () => ({
         Messages: [{ Body: "not-json", ReceiptHandle: "receipt-1" }],
@@ -457,9 +335,10 @@ describe("nack", () => {
 
     it("warns through the bound host logger", async () => {
       const { client } = makeClient(malformed);
-      const queue = createSqsCaptureQueue({ queueUrl, client });
+      const queue = createSqsCaptureQueue({ queueUrl: QUEUE_URL, client });
       const warn = vi.fn();
       queue.setLogger?.({ warn } as unknown as Logger);
+
       expect(await queue.poll()).toBeNull();
       expect(warn).toHaveBeenCalledOnce();
     });
@@ -469,11 +348,12 @@ describe("nack", () => {
       const explicit = vi.fn();
       const bound = vi.fn();
       const queue = createSqsCaptureQueue({
-        queueUrl,
+        queueUrl: QUEUE_URL,
         client,
         logger: { warn: explicit } as unknown as Logger,
       });
       queue.setLogger?.({ warn: bound } as unknown as Logger);
+
       expect(await queue.poll()).toBeNull();
       expect(explicit).toHaveBeenCalledOnce();
       expect(bound).not.toHaveBeenCalled();
@@ -482,11 +362,10 @@ describe("nack", () => {
 
   it("nack without receipt does nothing", async () => {
     const { client, sent } = makeClient();
-    const queue = createSqsCaptureQueue({
-      queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/capture-jobs",
-      client,
-    });
+    const queue = createSqsCaptureQueue({ queueUrl: QUEUE_URL, client });
+
     await queue.nack({ buildId: "b1" }, { requeue: true });
+
     expect(sent).not.toContain(ChangeMessageVisibilityCommand.name);
     expect(sent).not.toContain(DeleteMessageCommand.name);
   });

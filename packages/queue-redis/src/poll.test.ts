@@ -1,14 +1,11 @@
+/** Worker polling tests: poll/ack/nack, delayed promotion, and move fallbacks. */
 import type { Logger } from "@storyshelf/core/logger";
 import { describe, expect, it, vi } from "vitest";
 import { createRedisCaptureQueue } from "./index.ts";
 
-// oxlint-disable max-statements
+type FakeRedis = Record<string, unknown>;
 
-type FakeRedis = {
-  // oxlint-disable-next-line no-explicit-any
-  [key: string]: any;
-};
-
+/** In-memory Redis stand-in with list, ZSET, and blocking-move behavior. */
 function makeFakeRedis(overrides: Record<string, unknown> = {}): {
   client: FakeRedis;
   calls: { method: string; args: unknown[] }[];
@@ -134,86 +131,6 @@ function makeFakeRedis(overrides: Record<string, unknown> = {}): {
 
   return { client, calls };
 }
-
-describe("enqueue", () => {
-  it("enqueues a job via lpush", async () => {
-    const { client, calls } = makeFakeRedis();
-    const queue = createRedisCaptureQueue({ client: client as never });
-
-    await queue.enqueue({ buildId: "build-1", reqId: "req-1" });
-
-    expect(calls.some((c) => c.method === "lpush")).toBe(true);
-    const lpush = calls.find((c) => c.method === "lpush");
-    expect(lpush?.args[0]).toBe("shelf:queue");
-    const payload = JSON.parse(lpush?.args[1] as string) as Record<string, unknown>;
-    expect(payload["buildId"]).toBe("build-1");
-    expect(payload["reqId"]).toBe("req-1");
-    expect(payload["attempts"]).toBe(0);
-  });
-
-  it("uses custom key", async () => {
-    const { client, calls } = makeFakeRedis();
-    const queue = createRedisCaptureQueue({ client: client as never, key: "my:queue" });
-
-    await queue.enqueue({ buildId: "build-42" });
-
-    expect(calls.find((c) => c.method === "lpush")?.args[0]).toBe("my:queue");
-  });
-
-  it("serializes queuedAt", async () => {
-    const { client, calls } = makeFakeRedis();
-    const queue = createRedisCaptureQueue({ client: client as never });
-    await queue.enqueue({ buildId: "build-1" });
-    const payload = JSON.parse(
-      calls.find((c) => c.method === "lpush")?.args[1] as string,
-    ) as Record<string, unknown>;
-    expect(typeof payload["queuedAt"]).toBe("string");
-  });
-});
-
-describe("metadata and lifecycle", () => {
-  it("has correct metadata", () => {
-    const { client } = makeFakeRedis();
-    const queue = createRedisCaptureQueue({ client: client as never });
-    expect(queue.metadata.kind).toBe("redis");
-    expect(queue.metadata.category).toBe("capture-queue");
-  });
-
-  it("setup pings redis", async () => {
-    const { client, calls } = makeFakeRedis();
-    const queue = createRedisCaptureQueue({ client: client as never });
-    await queue.lifecycle?.setup({} as never);
-    expect(calls.some((c) => c.method === "ping")).toBe(true);
-  });
-
-  it("teardown quits owned client, not external", async () => {
-    const { client, calls } = makeFakeRedis();
-    const queue = createRedisCaptureQueue({ client: client as never });
-    await queue.lifecycle?.teardown();
-    // external client should not be quit
-    expect(calls.some((c) => c.method === "quit")).toBe(false);
-  });
-});
-
-describe("status/active/recent", () => {
-  it("status returns null", async () => {
-    const { client } = makeFakeRedis();
-    const queue = createRedisCaptureQueue({ client: client as never });
-    expect(await queue.status("build-1")).toBeNull();
-  });
-
-  it("active returns empty", async () => {
-    const { client } = makeFakeRedis();
-    const queue = createRedisCaptureQueue({ client: client as never });
-    expect(await queue.active()).toEqual([]);
-  });
-
-  it("recent returns empty", async () => {
-    const { client } = makeFakeRedis();
-    const queue = createRedisCaptureQueue({ client: client as never });
-    expect(await queue.recent(5)).toEqual([]);
-  });
-});
 
 describe("poll", () => {
   it("returns null when queue empty", async () => {
