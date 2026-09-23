@@ -23,8 +23,14 @@ export default defineConfig({
           label: "Guides",
           items: [
             { label: "Getting started", slug: "guides/getting-started" },
-            { label: "CI setup", slug: "guides/ci" },
-            { label: "Interaction testing", slug: "guides/interaction-testing" },
+            {
+              label: "Workflow",
+              collapsed: true,
+              items: [
+                { label: "CI setup", slug: "guides/ci" },
+                { label: "Interaction testing", slug: "guides/interaction-testing" },
+              ],
+            },
             {
               label: "Deployment",
               collapsed: false,
@@ -63,11 +69,16 @@ export default defineConfig({
                 { label: "Configuration", slug: "guides/config" },
               ],
             },
-            { label: "Auth", slug: "guides/auth" },
+            {
+              label: "Security",
+              collapsed: true,
+              items: [{ label: "Auth", slug: "guides/auth" }],
+            },
           ],
         },
         {
-          label: "Concepts",
+          label: "Core Concepts",
+          collapsed: true,
           items: [
             { label: "Projects", slug: "concepts/projects" },
             { label: "Baselines & branches", slug: "concepts/baselines" },
