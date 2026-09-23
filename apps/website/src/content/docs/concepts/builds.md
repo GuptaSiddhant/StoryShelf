@@ -5,6 +5,8 @@ description: A build is one upload; snapshots are one screenshot per story × vi
 
 A **build** is one upload of a Storybook (one `POST /api/v1/projects/:slug/builds` + zip `PUT`). A **snapshot** is one screenshot for one `story × viewport` inside that build. A project holds many builds; each build holds many snapshots.
 
+![Build review — baseline, current, and diff overlay](/screenshots/build-review.png)
+
 ## Lifecycle
 
 ```mermaid

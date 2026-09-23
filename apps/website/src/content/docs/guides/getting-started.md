@@ -5,6 +5,8 @@ description: Install StoryShelf and capture your first build.
 
 StoryShelf is a self-hosted visual testing platform for Storybook. You run one server, point your CI at it, and review pixel diffs in the browser.
 
+![Projects list — your Storybooks at a glance](/screenshots/projects-list.png)
+
 ## 1. Scaffold a server
 
 Use the CLI to scaffold a new server project:
@@ -73,3 +75,5 @@ StoryShelf renders every story server-side and diffs it against the branch basel
 ## 5. Review
 
 Open the build review page, approve or reject changed stories, and merge when the status check goes green.
+
+![Build review — approve or reject diffs](/screenshots/build-review.png)

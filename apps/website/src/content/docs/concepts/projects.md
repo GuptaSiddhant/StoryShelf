@@ -56,6 +56,8 @@ Each project has settings for:
 - **Tokens** — CI API tokens.
 - **Webhooks** — notify external systems of build events.
 
+![Projects list — your Storybooks at a glance](/screenshots/projects-list.png)
+
 ## Projects vs. builds
 
 A project contains **builds** (one per upload, identified by ULID rather than git SHA so re-runs are possible) and **baselines** (per branch). Builds are transient and purged by retention; default-branch baselines are permanent, feature-branch baselines are GC'd after `branchTtlDays` (30d daily sweep). See [Baselines & branches](/concepts/baselines/).

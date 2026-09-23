@@ -5,6 +5,8 @@ description: Share the latest Storybook — path-based URLs, per-project subdoma
 
 Beyond diff review, StoryShelf **publishes** the uploaded Storybook build as a browsable site for designers and PMs.
 
+![Projects list — published Storybook is the latest build per branch](/screenshots/projects-list.png)
+
 ## URL structure
 
 All three are the same published artifact — the **latest published build** for the project (most recent build whose branch is public). They are resolvers that 302 to a canonical build-scoped path that serves assets:

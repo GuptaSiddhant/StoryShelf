@@ -5,6 +5,8 @@ description: Try StoryShelf at storyshelf.fly.dev — viewer-open, seeded with f
 
 The public demo at **`https://storyshelf.fly.dev`** is a full StoryShelf server (Fly `iad`, SQLite + local storage + Playwright) seeded with the `fixtures/storybook-8` project. It resets on redeploy and is intended for **viewer** triage — anyone can review diffs, only admins can mutate.
 
+![Projects list — the demo projects](/screenshots/projects-list.png)
+
 ## Access
 
 The demo runs tiered shared-password auth (`@storyshelf/auth-password`):
@@ -19,6 +21,8 @@ Open `https://storyshelf.fly.dev` → enter `demo` at the login → browse. If a
 - Project `storybook-fixture` (slug `storybook-fixture`) from `fixtures/storybook-8` — 7 stories, viewports `desktop`/`mobile`.
 - A `reviewing` build with `changed` snapshots for the diff overlay demo.
 - The `viewer` account can open the build review (`/projects/storybook-fixture/builds/:buildId`) and the published Storybook (`/projects/storybook-fixture/storybook`), but **Approve/Reject** and **Settings** require admin.
+
+![Build review — baseline, current, and diff overlay](/screenshots/build-review.png)
 
 ## Related
 

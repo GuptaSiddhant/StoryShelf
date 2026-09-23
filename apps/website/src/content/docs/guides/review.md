@@ -5,6 +5,8 @@ description: Approve, reject, comment, and retry — the build review flow that 
 
 Every build lands in `reviewing` once diffing finishes (default-branch builds auto-approve). Review is per-snapshot; the build gate is the merge gate.
 
+![Build review — three-up diff viewer](/screenshots/build-review.png)
+
 ## Approve / reject
 
 - **One snapshot:** `POST /api/v1/projects/:slug/builds/:id/snapshots/:snapshotId/approve` (or `/reject`). Approving copies that snapshot’s PNG to `baselines/{branch}/{storyId}/{viewport}.png` — the branch’s new expected.

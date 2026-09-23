@@ -5,6 +5,8 @@ description: How StoryShelf renders stories — orchestrator, pure CaptureRunner
 
 Capture is server-side. The CLI uploads a zipped static Storybook; the server extracts it, serves it locally, and screenshots every story.
 
+![Build review — capture output with three-up diff](/screenshots/build-review.png)
+
 ## Pipeline
 
 ```mermaid
