@@ -38,7 +38,7 @@ export const DocumentLayout: FC<{ title: string; nav?: NavConfig; children?: unk
         <title>
           {title} · {name}
         </title>
-        <style>{baseStyle(light, dark)}</style>
+        <style dangerouslySetInnerHTML={{ __html: baseStyle(light, dark) }} />
         <script dangerouslySetInnerHTML={{ __html: themeScript() }} />
       </head>
       <body>

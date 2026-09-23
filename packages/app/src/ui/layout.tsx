@@ -49,7 +49,7 @@ export function layoutCss(): string {
   return `
     .card { background: var(--surface-card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
     .card--padded { padding: 1rem; }
-    .card--padded > h2:first-child, .card--padded > h3:first-child { margin: 0 0 .5rem; font-weight: 650; letter-spacing: -.01em; }
+    .card--padded h2:first-child, .card--padded h3:first-child { margin: 0 0 .5rem; font-weight: 650; letter-spacing: -.01em; }
     .page-header { margin-bottom: 1.25rem; }
     .page-header__row { display: flex; gap: 1rem; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
     .page-header__title { margin: 0; font-size: 1.45rem; line-height: 1.2; letter-spacing: -0.02em; font-weight: 700; }
