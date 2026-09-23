@@ -53,8 +53,16 @@ export default defineConfig({
                 { label: "Migration", slug: "guides/chromatic-migration" },
               ],
             },
-            { label: "CLI", slug: "guides/cli" },
-            { label: "Configuration", slug: "guides/config" },
+            {
+              label: "CLI",
+              collapsed: true,
+              items: [
+                { label: "Overview", slug: "guides/cli" },
+                { label: "Client", slug: "guides/cli/client" },
+                { label: "Server", slug: "guides/cli/server" },
+                { label: "Configuration", slug: "guides/config" },
+              ],
+            },
             { label: "Auth", slug: "guides/auth" },
           ],
         },
