@@ -52,6 +52,8 @@ nub.lock.bak
 # scratch space for agents (prefer over /tmp)
 .tmp
 
-# opencode state
-.opencode/
+# opencode state (keep skills versioned)
+.opencode/**
+!.opencode/skills/
+!.opencode/skills/**
 .ocx/
