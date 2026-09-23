@@ -78,6 +78,8 @@ async function main() {
     },
   ];
   for (const story of stories) {
+    const screenshotPath = `${project.id}/builds/${build.id}/screenshots/${story.id}/${viewport.name}.png`;
+    const diffPath = `${project.id}/builds/${build.id}/diffs/${story.id}/${viewport.name}.png`;
     const snap = await snapModel.create(project.id, build.id, {
       storyId: story.id,
       storyName: story.name,
@@ -86,16 +88,25 @@ async function main() {
       viewportName: viewport.name,
       viewportWidth: viewport.width,
       viewportHeight: viewport.height,
-      screenshotPath: `${project.id}/builds/${build.id}/screenshots/${story.id}/${viewport.name}.png`,
+      screenshotPath,
+    });
+    await storage.write(screenshotPath, transparentPng);
+    await storage.write(diffPath, redPng);
+    await snapModel.update(snap.id, {
       status: "changed",
       diffPixels: 2345,
       diffRatio: 0.08,
-      diffPath: `${project.id}/builds/${build.id}/diffs/${story.id}/${viewport.name}.png`,
+      diffPath,
     });
-    await storage.write(snap.screenshotPath, transparentPng);
-    if (snap.diffPath) await storage.write(snap.diffPath, redPng);
-    await snapModel.setStatus(snap.id, "changed");
   }
+
+  await db.update(builds, build.id, {
+    status: "reviewing",
+    snapshotCount: stories.length,
+    changedCount: stories.length,
+    approvedCount: 0,
+    updatedAt: now,
+  });
 
   // Baseline for primary on main
   const baselineModel = new BaselineModel(db, { baselines }, storage, "test-secret");
@@ -138,7 +149,7 @@ async function main() {
     console.log("✓ projects-list.png");
     await page.close();
 
-    // Build review (three-up)
+    // Build detail (snapshot cards + bulk actions)
     page = await browser.newPage({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 2 });
     await page.goto(`${base}/projects/${project.slug}/builds/${build.id}`, {
       waitUntil: "networkidle",
@@ -146,6 +157,16 @@ async function main() {
     await page.waitForTimeout(1200);
     await page.screenshot({ path: join(outDir, "build-review.png"), fullPage: true });
     console.log("✓ build-review.png");
+    await page.close();
+
+    // Diff review (sticky review bar + baseline | current | diff viewer)
+    page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 2 });
+    await page.goto(`${base}/projects/${project.slug}/builds/${build.id}/diff`, {
+      waitUntil: "networkidle",
+    });
+    await page.waitForTimeout(1200);
+    await page.screenshot({ path: join(outDir, "diff-review.png"), fullPage: false });
+    console.log("✓ diff-review.png");
     await page.close();
 
     console.log("App screenshots done ->", outDir);

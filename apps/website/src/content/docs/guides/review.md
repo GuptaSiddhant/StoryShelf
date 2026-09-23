@@ -5,7 +5,9 @@ description: Approve, reject, comment, and retry — the build review flow that 
 
 Every build lands in `reviewing` once diffing finishes (default-branch builds auto-approve). Review is per-snapshot; the build gate is the merge gate.
 
-![Build review — three-up diff viewer](/screenshots/build-review.png)
+![Diff review — snapshot navigator, baseline | current | diff viewer, and comment thread](/screenshots/diff-review.png)
+
+The review bar stays pinned while scrolling, with the snapshot title, status, and Approve/Reject actions. The `Split | Baseline | Current | Diff` switcher focuses a single pane for large screenshots; keyboard shortcuts (`←`/`→` navigate, `a` approve, `r` reject) work throughout.
 
 ## Approve / reject
 
