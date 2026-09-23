@@ -24,7 +24,7 @@ function snapshotNavCss(): string {
 
 function diffGridCss(): string {
   return `
-    .diff-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; margin-top: 1rem; }
+    .diff-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; }
     .diff-grid[data-view="baseline"] [data-pane]:not([data-pane="baseline"]) { display: none; }
     .diff-grid[data-view="current"] [data-pane]:not([data-pane="current"]) { display: none; }
     .diff-grid[data-view="diff"] [data-pane]:not([data-pane="diff"]) { display: none; }

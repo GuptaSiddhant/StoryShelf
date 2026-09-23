@@ -27,6 +27,7 @@ function utilityCss(): string {
     .login { max-width: 360px; margin: 3rem auto; }
     .login .btn { width: 100%; margin-top: 1rem; }
     .max-w-form { max-width: 880px; }
+    .max-w-prose { max-width: 640px; }
     .table-gap { margin-top: .75rem; }
     .mt-1 { margin-top: 1rem; }
     @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }`;

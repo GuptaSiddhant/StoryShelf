@@ -8,7 +8,7 @@ import {
 } from "@storyshelf/db-sqlite/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { getStore } from "../store.ts";
-import { Badge, Button, EmptyState } from "../ui/components.tsx";
+import { Badge, Button, EmptyState, Meta } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 /** Projects overview page: project cards with latest build plus next steps. */
 export async function renderProjectsPage(): Promise<RenderedContent> {
@@ -72,13 +72,13 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
                     <h2 class="review-bar__title">
                       <a href={`/projects/${project.slug}/builds`}>{project.name}</a>
                     </h2>
-                    <p class="field__hint">
+                    <Meta>
                       <code>{project.slug}</code>{" "}
                       {project.gitRepository ? `· ${project.gitRepository}` : ""} · default{" "}
                       <Badge tone="neutral">{project.gitDefaultBranch}</Badge>
-                    </p>
+                    </Meta>
                     {info?.latest ? (
-                      <p class="field__hint">
+                      <Meta>
                         Latest: {info.latest.gitBranch} · {info.latest.gitSha.slice(0, 7)} ·{" "}
                         <Badge
                           tone={
@@ -91,9 +91,9 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
                         >
                           {info.latest.status}
                         </Badge>
-                      </p>
+                      </Meta>
                     ) : (
-                      <p class="field__hint">No builds yet.</p>
+                      <Meta>No builds yet.</Meta>
                     )}
                   </div>
                   <div class="row-actions">

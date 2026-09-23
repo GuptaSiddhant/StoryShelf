@@ -8,7 +8,15 @@ import {
 } from "@storyshelf/db-sqlite/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { getStore } from "../store.ts";
-import { Badge, Button, EmptyState, statusTone } from "../ui/components.tsx";
+import {
+  Badge,
+  Button,
+  EmptyState,
+  Field,
+  Meta,
+  SelectField,
+  statusTone,
+} from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 /** Project builds page: filterable build history for one project. */
 export async function renderProjectBuildsPage(
@@ -66,48 +74,28 @@ export async function renderProjectBuildsPage(
       </div>
 
       <div class="card card--padded">
-        <form
-          method="get"
-          action={`/projects/${project.slug}/builds`}
-          style="display:flex; gap:.5rem; flex-wrap:wrap; align-items:end;"
-        >
-          <div class="field" style="margin:0; min-width:160px;">
-            <label class="field__label" for="status">
-              Status
-            </label>
-            <select class="field__input" id="status" name="status">
-              <option value="" selected={!query.status}>
-                All
-              </option>
-              <option value="pending" selected={query.status === "pending"}>
-                pending
-              </option>
-              <option value="reviewing" selected={query.status === "reviewing"}>
-                reviewing
-              </option>
-              <option value="approved" selected={query.status === "approved"}>
-                approved
-              </option>
-              <option value="rejected" selected={query.status === "rejected"}>
-                rejected
-              </option>
-              <option value="failed" selected={query.status === "failed"}>
-                failed
-              </option>
-            </select>
-          </div>
-          <div class="field" style="margin:0; min-width:180px;">
-            <label class="field__label" for="branch">
-              Branch
-            </label>
-            <input
-              class="field__input"
-              id="branch"
-              name="branch"
-              value={query.branch ?? ""}
-              placeholder="main"
-            />
-          </div>
+        <form method="get" action={`/projects/${project.slug}/builds`} class="row-actions">
+          <SelectField
+            label="Status"
+            name="status"
+            layout="inline"
+            value={query.status ?? ""}
+            options={[
+              { value: "", label: "All" },
+              { value: "pending", label: "pending" },
+              { value: "reviewing", label: "reviewing" },
+              { value: "approved", label: "approved" },
+              { value: "rejected", label: "rejected" },
+              { value: "failed", label: "failed" },
+            ]}
+          />
+          <Field
+            label="Branch"
+            name="branch"
+            layout="inline"
+            value={query.branch ?? ""}
+            placeholder="main"
+          />
           <Button variant="secondary" type="submit">
             Filter
           </Button>
@@ -146,25 +134,27 @@ export async function renderProjectBuildsPage(
                 <tr key={build.id}>
                   <td>
                     <div style="font-weight:600;">{build.gitBranch}</div>
-                    <div class="field__hint" style="font-family: ui-monospace, monospace;">
+                    <Meta as="div">
                       {build.gitSha.slice(0, 7)}{" "}
                       {build.message ? `· ${build.message.slice(0, 60)}` : ""}
-                    </div>
+                    </Meta>
                   </td>
                   <td>
                     <Badge tone={statusTone(build.status)}>{build.status}</Badge>
                   </td>
                   <td>
-                    <span class="field__hint">
+                    <Meta as="span">
                       {build.changedCount} changed · {build.approvedCount} approved ·{" "}
                       {build.snapshotCount} total
-                    </span>
+                    </Meta>
                   </td>
                   <td>
                     <div>{build.authorName ?? "—"}</div>
-                    <div class="field__hint">{build.authorEmail ?? ""}</div>
+                    <Meta as="div">{build.authorEmail ?? ""}</Meta>
                   </td>
-                  <td class="field__hint">{new Date(build.createdAt).toLocaleString()}</td>
+                  <td>
+                    <Meta as="span">{new Date(build.createdAt).toLocaleString()}</Meta>
+                  </td>
                   <td style="white-space:nowrap;">
                     <Button
                       variant="secondary"

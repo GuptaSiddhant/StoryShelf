@@ -1,4 +1,4 @@
-import { Button } from "../ui/components.tsx";
+import { Button, Meta } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
 /** Landing page introducing capture, diff, and review. */
@@ -13,45 +13,47 @@ export function renderRootPage(): RenderedContent {
           Self-hosted visual testing for Storybook. Capture every story, diff against baselines, and
           review changes before they ship.
         </p>
-        <div style="display:flex; gap:.5rem; justify-content:center; flex-wrap:wrap;">
-          <Button variant="primary" href="/projects">
-            View projects
-          </Button>
-          <Button variant="secondary" href="/projects/new">
-            Create project
-          </Button>
+        <div class="stack">
+          <div style="display:flex; gap:.5rem; justify-content:center; flex-wrap:wrap;">
+            <Button variant="primary" href="/projects">
+              View projects
+            </Button>
+            <Button variant="secondary" href="/projects/new">
+              Create project
+            </Button>
+          </div>
+          <Meta>
+            Tip: use{" "}
+            <code>
+              npx storyshelf create --url &lt;url&gt; --name &lt;name&gt; --token
+              $STORYSHELF_ADMIN_TOKEN
+            </code>{" "}
+            to create a project and token for CI, or <code>npx storyshelf init</code> to write{" "}
+            <code>.storybook/storyshelf.json</code>.
+          </Meta>
         </div>
-        <p class="field__hint" style="margin-top:1rem;">
-          Tip: use{" "}
-          <code>
-            npx storyshelf create --url &lt;url&gt; --name &lt;name&gt; --token
-            $STORYSHELF_ADMIN_TOKEN
-          </code>{" "}
-          to create a project and token for CI, or <code>npx storyshelf init</code> to write{" "}
-          <code>.storybook/storyshelf.json</code>.
-        </p>
       </div>
 
       <div class="grid grid--3" style="margin-top:1rem;">
         <div class="card card--padded">
           <h3 style="margin:0 0 .3rem;">Capture</h3>
-          <p class="field__hint">
+          <Meta>
             Upload your Storybook build. Server renders stories with Playwright — deterministic, no
             repo cloning.
-          </p>
+          </Meta>
         </div>
         <div class="card card--padded">
           <h3 style="margin:0 0 .3rem;">Diff</h3>
-          <p class="field__hint">
+          <Meta>
             Pixel-perfect diff with pixelmatch. Configurable thresholds, overlay images stored on
             disk.
-          </p>
+          </Meta>
         </div>
         <div class="card card--padded">
           <h3 style="margin:0 0 .3rem;">Review</h3>
-          <p class="field__hint">
+          <Meta>
             Per-branch baselines with fallback to default. Approve changes per-story or bulk.
-          </p>
+          </Meta>
         </div>
       </div>
     </DocumentLayout>

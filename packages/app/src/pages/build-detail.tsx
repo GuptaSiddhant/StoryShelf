@@ -15,7 +15,15 @@ import {
 } from "@storyshelf/db-sqlite/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { getStore } from "../store.ts";
-import { Badge, Button, EmptyState, Stat, statusTone } from "../ui/components.tsx";
+import {
+  Badge,
+  Button,
+  EmptyState,
+  Meta,
+  Stat,
+  TextareaField,
+  statusTone,
+} from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
 /** Map a capture log level to its badge tone. */
@@ -143,23 +151,19 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
               <summary>
                 Attempt {attempt.attemptNo}{" "}
                 <Badge tone={statusTone(attempt.status)}>{attempt.status}</Badge>{" "}
-                <span class="field__hint">
+                <Meta as="span">
                   {attempt.storyCount} stories
                   {attempt.reqId ? ` · ${attempt.reqId}` : ""}
-                </span>
+                </Meta>
               </summary>
-              {attempt.error ? (
-                <pre class="field__input" style="white-space:pre-wrap;">
-                  {attempt.error}
-                </pre>
-              ) : null}
+              {attempt.error ? <Meta as="pre">{attempt.error}</Meta> : null}
               <div style="display:grid; gap:.25rem; margin-top:.5rem;">
                 {(attemptLogs.get(attempt.id) ?? []).map(
                   (line): HtmlEscapedString | Promise<HtmlEscapedString> => (
                     <div key={line.id} style="display:flex; gap:.4rem; align-items:baseline;">
                       <Badge tone={logTone(line.level)}>{line.level}</Badge>
                       <span>{line.message}</span>
-                      {line.fields ? <code class="field__hint">{line.fields}</code> : null}
+                      {line.fields ? <Meta as="code">{line.fields}</Meta> : null}
                     </div>
                   ),
                 )}
@@ -174,7 +178,7 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
           class="card card--padded"
           style="display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; margin-bottom:1rem;"
         >
-          <span class="field__hint">Bulk actions:</span>
+          <Meta as="span">Bulk actions:</Meta>
           <form
             method="post"
             action={`/api/v1/projects/${project.slug}/builds/${build.id}/approve-all`}
@@ -195,7 +199,7 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
               Reject all
             </Button>
           </form>
-          <span class="field__hint">Or review individually in the diff view.</span>
+          <Meta as="span">Or review individually in the diff view.</Meta>
         </div>
       ) : null}
 
@@ -222,13 +226,13 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
                     / {snap.storyName}
                   </span>
                 </div>
-                <div class="field__hint" style="font-size:.8rem;">
+                <Meta as="div">
                   {snap.storyId}
                   {snap.diffRatio !== null && snap.diffRatio !== undefined
                     ? ` · diff ${(snap.diffRatio * 100).toFixed(2)}%`
                     : ""}
                   {snap.diffPixels === null ? "" : ` · ${snap.diffPixels} px`}
-                </div>
+                </Meta>
                 <div style="display:flex; gap:.4rem; flex-wrap:wrap; margin-top:.2rem;">
                   <Button
                     variant="secondary"
@@ -270,9 +274,7 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
       <div class="card card--padded mt-1">
         <h2 style="margin:0 0 .5rem;">Comments</h2>
         {comments.length === 0 ? (
-          <p class="field__hint">
-            No comments. Add one in the diff review page for a specific snapshot.
-          </p>
+          <Meta>No comments. Add one in the diff review page for a specific snapshot.</Meta>
         ) : null}
         <div style="display:grid; gap:.6rem;">
           {comments.map((comment): HtmlEscapedString | Promise<HtmlEscapedString> => (
@@ -300,14 +302,10 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
           action={`/api/v1/projects/${project.slug}/builds/${build.id}/comments`}
           hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/comments`}
           hx-target="body"
-          style="margin-top:1rem; display:grid; gap:.5rem; max-width:640px;"
+          class="stack mt-1 max-w-prose"
         >
-          <label class="field__label" for="comment-body">
-            Add build comment
-          </label>
-          <textarea
-            class="field__input field__input--textarea"
-            id="comment-body"
+          <TextareaField
+            label="Add build comment"
             name="body"
             rows={3}
             required

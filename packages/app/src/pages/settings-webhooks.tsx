@@ -1,6 +1,6 @@
 import type { Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Alert, Badge, Button } from "../ui/components.tsx";
+import { Alert, Badge, Button, Field, Meta } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Webhook row as rendered in the webhooks settings tab. */
@@ -28,10 +28,10 @@ export function renderSettingsWebhooks(
 
       <div class="card card--padded">
         <h2 style="margin:0 0 .3rem;">Webhooks</h2>
-        <p class="field__hint">
+        <Meta>
           Notify external services when builds are created, updated, approved or rejected. Payloads
           are POSTed as JSON and signed with the webhook secret.
-        </p>
+        </Meta>
         <div class="table-wrap table-gap">
           <table>
             <thead>
@@ -52,7 +52,7 @@ export function renderSettingsWebhooks(
                   </td>
                   <td>
                     {webhook.events.length === 0 ? (
-                      <span class="field__hint">all events</span>
+                      <Meta as="span">all events</Meta>
                     ) : (
                       <div style="display:flex; gap:.25rem; flex-wrap:wrap;">
                         {webhook.events.map(
@@ -83,11 +83,7 @@ export function renderSettingsWebhooks(
             </tbody>
           </table>
         </div>
-        {webhooks.length === 0 ? (
-          <p class="field__hint mt-1" style="margin-top:.5rem;">
-            No webhooks configured.
-          </p>
-        ) : null}
+        {webhooks.length === 0 ? <Meta>No webhooks configured.</Meta> : null}
       </div>
 
       {isAdmin ? (
@@ -100,36 +96,20 @@ export function renderSettingsWebhooks(
             hx-target="body"
           >
             {csrfField()}
-            <div class="field">
-              <label class="field__label" for="url">
-                URL
-              </label>
-              <input
-                class={`field__input ${formState?.errors?.["url"] ? "field__input--error" : ""}`}
-                id="url"
-                name="url"
-                type="url"
-                required
-                placeholder="https://example.com/hooks/storyshelf"
-              />
-              {formState?.errors?.["url"] ? (
-                <p class="field__error" role="alert">
-                  {formState.errors["url"]}
-                </p>
-              ) : null}
-            </div>
-            <div class="field">
-              <label class="field__label" for="events">
-                Events
-              </label>
-              <input
-                class="field__input"
-                id="events"
-                name="events"
-                placeholder="build.created, build.approved, snapshot.reviewed"
-              />
-              <p class="field__hint">Comma-separated. Leave blank to receive all events.</p>
-            </div>
+            <Field
+              label="URL"
+              name="url"
+              type="url"
+              required
+              placeholder="https://example.com/hooks/storyshelf"
+              error={formState?.errors?.["url"]}
+            />
+            <Field
+              label="Events"
+              name="events"
+              placeholder="build.created, build.approved, snapshot.reviewed"
+              hint="Comma-separated. Leave blank to receive all events."
+            />
             <Button variant="primary" type="submit">
               Add webhook
             </Button>

@@ -2,7 +2,7 @@ import type { Build } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge, Button, statusTone } from "../ui/components.tsx";
+import { Badge, Button, Meta, statusTone } from "../ui/components.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -110,7 +110,7 @@ function BaselinePane(
         <div class="diff-placeholder">
           <div>
             <div>New story — no baseline yet</div>
-            <div class="field__hint">First capture; approve to set the baseline.</div>
+            <Meta as="div">First capture; approve to set the baseline.</Meta>
           </div>
         </div>
       )}
@@ -226,10 +226,17 @@ export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<
           ) : null}
         </div>
       </div>
-      <DiffPaneGrid project={project} build={build} selected={selected} hasBaseline={hasBaseline} />
-      <p class="field__hint mt-1">
-        Keyboard: <kbd>←</kbd> <kbd>→</kbd> navigate · <kbd>a</kbd> approve · <kbd>r</kbd> reject
-      </p>
+      <div class="stack">
+        <DiffPaneGrid
+          project={project}
+          build={build}
+          selected={selected}
+          hasBaseline={hasBaseline}
+        />
+        <Meta>
+          Keyboard: <kbd>←</kbd> <kbd>→</kbd> navigate · <kbd>a</kbd> approve · <kbd>r</kbd> reject
+        </Meta>
+      </div>
     </div>
   );
 }

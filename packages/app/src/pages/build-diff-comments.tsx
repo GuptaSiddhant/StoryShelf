@@ -2,7 +2,7 @@ import type { Build } from "@storyshelf/core/schema";
 import type { Comment } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge, Button } from "../ui/components.tsx";
+import { Badge, Button, Meta, TextareaField } from "../ui/components.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -68,12 +68,8 @@ function CommentForm(props: CommentFormProps): HtmlEscapedString | Promise<HtmlE
       class="stack mt-1"
     >
       <input type="hidden" name="snapshotId" value={selectedId} />
-      <label class="field__label" for="comment-body">
-        Add comment
-      </label>
-      <textarea
-        class="field__input field__input--textarea"
-        id="comment-body"
+      <TextareaField
+        label="Add comment"
         name="body"
         rows={3}
         required
@@ -107,7 +103,7 @@ export function DiffComments(
             canReview={canReview}
           />
         ))}
-        {visible.length === 0 ? <p class="field__hint">No comments on this snapshot.</p> : null}
+        {visible.length === 0 ? <Meta>No comments on this snapshot.</Meta> : null}
       </div>
 
       <CommentForm project={project} build={build} selectedId={selectedId} />

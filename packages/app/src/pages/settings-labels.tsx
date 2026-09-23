@@ -1,7 +1,7 @@
 import type { LabelType } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge, Button } from "../ui/components.tsx";
+import { Badge, Button, Field, Meta } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Labels settings tab: label-type table plus the create-type form. */
@@ -14,10 +14,10 @@ export function renderSettingsLabels(
     <div class="grid max-w-form">
       <div class="card card--padded">
         <h2 style="margin:0 0 .3rem;">Label types</h2>
-        <p class="field__hint">
+        <Meta>
           Labels attach typed values to builds (e.g. pr=123, jira=ABC-123). Values link out via the
           template.
-        </p>
+        </Meta>
         <div class="table-wrap table-gap">
           <table>
             <thead>
@@ -56,7 +56,7 @@ export function renderSettingsLabels(
                         </Button>
                       </form>
                     ) : (
-                      <span class="field__hint">built-in</span>
+                      <Meta as="span">built-in</Meta>
                     )}
                   </td>
                 </tr>
@@ -64,11 +64,7 @@ export function renderSettingsLabels(
             </tbody>
           </table>
         </div>
-        {labelTypes.length === 0 ? (
-          <p class="field__hint mt-1" style="margin-top:.5rem;">
-            No label types configured.
-          </p>
-        ) : null}
+        {labelTypes.length === 0 ? <Meta>No label types configured.</Meta> : null}
       </div>
 
       {isAdmin ? (
@@ -82,45 +78,22 @@ export function renderSettingsLabels(
           >
             {csrfField()}
             <div class="grid grid--2">
-              <div class="field">
-                <label class="field__label" for="key">
-                  Key
-                </label>
-                <input
-                  class="field__input"
-                  id="key"
-                  name="key"
-                  required
-                  placeholder="jira"
-                  pattern="^[a-z0-9_-]+$"
-                />
-                <p class="field__hint">Lowercase, no spaces.</p>
-              </div>
-              <div class="field">
-                <label class="field__label" for="labelName">
-                  Name
-                </label>
-                <input
-                  class="field__input"
-                  id="labelName"
-                  name="labelName"
-                  required
-                  placeholder="Jira issue"
-                />
-              </div>
-            </div>
-            <div class="field">
-              <label class="field__label" for="linkTemplate">
-                Link template
-              </label>
-              <input
-                class="field__input"
-                id="linkTemplate"
-                name="linkTemplate"
-                placeholder="https://jira.example.com/browse/{value}"
+              <Field
+                label="Key"
+                name="key"
+                required
+                placeholder="jira"
+                pattern="^[a-z0-9_-]+$"
+                hint="Lowercase, no spaces."
               />
-              <p class="field__hint">Use {"{value}"} placeholder. Optional.</p>
+              <Field label="Name" name="labelName" required placeholder="Jira issue" />
             </div>
+            <Field
+              label="Link template"
+              name="linkTemplate"
+              placeholder="https://jira.example.com/browse/{value}"
+              hint="Use {value} placeholder. Optional."
+            />
             <Button variant="primary" type="submit">
               Add label type
             </Button>

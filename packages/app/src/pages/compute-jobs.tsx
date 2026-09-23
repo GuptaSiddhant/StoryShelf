@@ -8,7 +8,7 @@ import {
 } from "@storyshelf/db-sqlite/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { getStore } from "../store.ts";
-import { Badge, Button, statusTone } from "../ui/components.tsx";
+import { Badge, Button, EmptyState, Meta, statusTone } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 interface QueueView {
   buildId: string;
@@ -32,7 +32,7 @@ export function renderActiveQueue(slug: string, queueView: QueueView[]): Rendere
     >
       <h2 style="margin:0 0 .5rem;">Active queue</h2>
       {queueView.length === 0 ? (
-        <p class="field__hint">No captures are currently queued or running.</p>
+        <Meta>No captures are currently queued or running.</Meta>
       ) : (
         <div class="table-wrap">
           <table>
@@ -55,9 +55,13 @@ export function renderActiveQueue(slug: string, queueView: QueueView[]): Rendere
                   <td>
                     <Badge tone={statusTone(job.status)}>{job.status}</Badge>
                   </td>
-                  <td class="field__hint">{new Date(job.queuedAt).toLocaleTimeString()}</td>
-                  <td class="field__hint">
-                    {job.startedAt ? new Date(job.startedAt).toLocaleTimeString() : "—"}
+                  <td>
+                    <Meta as="span">{new Date(job.queuedAt).toLocaleTimeString()}</Meta>
+                  </td>
+                  <td>
+                    <Meta as="span">
+                      {job.startedAt ? new Date(job.startedAt).toLocaleTimeString() : "—"}
+                    </Meta>
                   </td>
                 </tr>
               ))}
@@ -127,7 +131,7 @@ export async function renderComputeJobsPage(
 
       <div class="card card--padded">
         <h2 style="margin:0 0 .3rem;">Recent builds</h2>
-        <p class="field__hint">Capture history for {project.name}. Failed jobs can be retried.</p>
+        <Meta>Capture history for {project.name}. Failed jobs can be retried.</Meta>
         <div class="table-wrap table-gap">
           <table>
             <thead>
@@ -144,17 +148,21 @@ export async function renderComputeJobsPage(
                 <tr key={build.id}>
                   <td>
                     <div style="font-weight:600;">{build.gitBranch}</div>
-                    <div class="field__hint" style="font-family: ui-monospace, monospace;">
+                    <Meta as="div" mono>
                       {build.gitSha.slice(0, 7)}
-                    </div>
+                    </Meta>
                   </td>
                   <td>
                     <Badge tone={statusTone(build.status)}>{build.status}</Badge>
                   </td>
-                  <td class="field__hint">
-                    {build.snapshotCount} total · {build.changedCount} changed
+                  <td>
+                    <Meta as="span">
+                      {build.snapshotCount} total · {build.changedCount} changed
+                    </Meta>
                   </td>
-                  <td class="field__hint">{new Date(build.createdAt).toLocaleString()}</td>
+                  <td>
+                    <Meta as="span">{new Date(build.createdAt).toLocaleString()}</Meta>
+                  </td>
                   <td style="white-space:nowrap;">
                     <Button
                       variant="secondary"
@@ -179,12 +187,9 @@ export async function renderComputeJobsPage(
                       </>
                     ) : null}
                     {queueByBuild.get(build.id)?.error ? (
-                      <div
-                        class="field__hint"
-                        style="margin-top:.25rem; color: var(--status-rejected);"
-                      >
+                      <Meta as="div" tone="danger">
                         {queueByBuild.get(build.id)?.error}
-                      </div>
+                      </Meta>
                     ) : null}
                   </td>
                 </tr>
@@ -192,11 +197,7 @@ export async function renderComputeJobsPage(
             </tbody>
           </table>
         </div>
-        {recentBuilds.length === 0 ? (
-          <p class="field__hint mt-1" style="margin-top:.5rem;">
-            No builds yet.
-          </p>
-        ) : null}
+        {recentBuilds.length === 0 ? <EmptyState description="No builds yet." /> : null}
       </div>
     </DocumentLayout>
   );

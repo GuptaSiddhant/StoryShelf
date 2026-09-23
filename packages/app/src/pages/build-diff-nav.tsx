@@ -2,7 +2,7 @@ import type { Build } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge, statusTone } from "../ui/components.tsx";
+import { Badge, Meta, statusTone } from "../ui/components.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -22,7 +22,7 @@ export function DiffNav(props: DiffNavProps): HtmlEscapedString | Promise<HtmlEs
       <div class="card">
         <div class="review-nav__head">
           <strong>Snapshots</strong>
-          <span class="field__hint">{snapshots.length} total</span>
+          <Meta as="span">{snapshots.length} total</Meta>
         </div>
         <div data-diff-nav data-current={selectedId} class="review-nav__list">
           {snapshots.map((snap): HtmlEscapedString | Promise<HtmlEscapedString> => (

@@ -1,7 +1,15 @@
 import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import type { Project } from "@storyshelf/core/schema";
 import type { FC } from "hono/jsx";
-import { Alert, Badge, Button, Field, SelectField, TextareaField } from "../ui/components.tsx";
+import {
+  Alert,
+  Badge,
+  Button,
+  Field,
+  Meta,
+  SelectField,
+  TextareaField,
+} from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Git status configuration row as rendered in the status settings tab. */
@@ -124,7 +132,7 @@ function renderCreateSection(
   formState?: StatusFormState,
 ): unknown {
   if (providers.length === 0) {
-    return <p class="field__hint">No git providers registered on this server.</p>;
+    return <Meta>No git providers registered on this server.</Meta>;
   }
   return <StatusCreateCard project={project} providers={providers} formState={formState} />;
 }
@@ -145,11 +153,11 @@ export function renderSettingsStatus(
 
       <div class="card card--padded">
         <h2 style="margin:0 0 .3rem;">Git status</h2>
-        <p class="field__hint">
+        <Meta>
           Post commit statuses to a git provider so visual tests show up in your PR checks. Status
           is reported for each configured provider: pending while capturing, success on approval,
           failure on rejection or capture errors.
-        </p>
+        </Meta>
         <div class="table-wrap table-gap">
           <table>
             <thead>
@@ -175,9 +183,7 @@ export function renderSettingsStatus(
           </table>
         </div>
         {statusConfigs.length === 0 ? (
-          <p class="field__hint mt-1" style="margin-top:.5rem;">
-            No git providers configured for this project.
-          </p>
+          <Meta>No git providers configured for this project.</Meta>
         ) : null}
       </div>
 

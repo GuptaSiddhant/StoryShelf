@@ -1,5 +1,5 @@
 import type { Project } from "@storyshelf/core/schema";
-import { Alert, Button } from "../ui/components.tsx";
+import { Alert, Button, Field, Meta, SelectField } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Form state for the settings tabs (field errors and global error). */
@@ -29,122 +29,62 @@ export function renderSettingsGeneral(
           hx-swap="outerHTML"
         >
           {csrfField()}
-          <div class="field">
-            <label class="field__label" for="name">
-              Name
-            </label>
-            <input
-              class={`field__input ${errors["name"] ? "field__input--error" : ""}`}
-              id="name"
-              name="name"
-              value={project.name}
-            />
-            {errors["name"] ? (
-              <p class="field__error" role="alert">
-                {errors["name"]}
-              </p>
-            ) : null}
-          </div>
-          <div class="field">
-            <label class="field__label" for="gitRepository">
-              Git repository
-            </label>
-            <input
-              class="field__input"
-              id="gitRepository"
-              name="gitRepository"
-              value={project.gitRepository ?? ""}
-              placeholder="owner/repo"
-            />
-          </div>
-          <div class="field">
-            <label class="field__label" for="gitDefaultBranch">
-              Default branch
-            </label>
-            <input
-              class="field__input"
-              id="gitDefaultBranch"
-              name="gitDefaultBranch"
-              value={project.gitDefaultBranch}
-            />
-          </div>
+          <Field label="Name" name="name" value={project.name} error={errors["name"]} />
+          <Field
+            label="Git repository"
+            name="gitRepository"
+            value={project.gitRepository ?? ""}
+            placeholder="owner/repo"
+          />
+          <Field label="Default branch" name="gitDefaultBranch" value={project.gitDefaultBranch} />
           <div class="grid grid--2">
-            <div class="field">
-              <label class="field__label" for="pixelThreshold">
-                Pixel threshold
-              </label>
-              <input
-                class="field__input"
-                id="pixelThreshold"
-                name="pixelThreshold"
-                type="number"
-                step="0.01"
-                min="0"
-                max="1"
-                value={String(project.pixelThreshold)}
-              />
-              <p class="field__hint">Per-pixel color distance 0–1</p>
-            </div>
-            <div class="field">
-              <label class="field__label" for="maxDiffRatio">
-                Max diff ratio
-              </label>
-              <input
-                class="field__input"
-                id="maxDiffRatio"
-                name="maxDiffRatio"
-                type="number"
-                step="0.001"
-                min="0"
-                max="1"
-                value={String(project.maxDiffRatio)}
-              />
-              <p class="field__hint">Allowed diff ratio 0–1</p>
-            </div>
-          </div>
-          <div class="field">
-            <label class="field__label" for="browser">
-              Capture browser
-            </label>
-            <select class="field__input" id="browser" name="browser" disabled={!isAdmin}>
-              <option value="chromium" selected={browser === "chromium" ? true : undefined}>
-                Chromium (default)
-              </option>
-              <option value="firefox" selected={browser === "firefox" ? true : undefined}>
-                Firefox
-              </option>
-              <option value="webkit" selected={browser === "webkit" ? true : undefined}>
-                WebKit (Safari engine)
-              </option>
-              <option value="chrome" selected={browser === "chrome" ? true : undefined}>
-                Chrome (Chromium engine)
-              </option>
-            </select>
-            <p class="field__hint">
-              Rendering engine for captures. Baselines track the browser, so switching starts a
-              fresh baseline. Firefox and WebKit need Playwright system dependencies installed on
-              the server.
-            </p>
-          </div>
-          <div class="field">
-            <label class="field__label" for="publicBranchRegex">
-              Public branch regex
-            </label>
-            <input
-              class="field__input"
-              id="publicBranchRegex"
-              name="publicBranchRegex"
-              value={project.publicBranchRegex ?? ""}
-              placeholder="^main$"
+            <Field
+              label="Pixel threshold"
+              name="pixelThreshold"
+              type="number"
+              step="0.01"
+              min="0"
+              max="1"
+              value={String(project.pixelThreshold)}
+              hint="Per-pixel color distance 0–1"
             />
-            <p class="field__hint">Branches matching this regex are publicly viewable.</p>
+            <Field
+              label="Max diff ratio"
+              name="maxDiffRatio"
+              type="number"
+              step="0.001"
+              min="0"
+              max="1"
+              value={String(project.maxDiffRatio)}
+              hint="Allowed diff ratio 0–1"
+            />
           </div>
+          <SelectField
+            label="Capture browser"
+            name="browser"
+            value={browser}
+            disabled={!isAdmin}
+            options={[
+              { value: "chromium", label: "Chromium (default)" },
+              { value: "firefox", label: "Firefox" },
+              { value: "webkit", label: "WebKit (Safari engine)" },
+              { value: "chrome", label: "Chrome (Chromium engine)" },
+            ]}
+            hint="Rendering engine for captures. Baselines track the browser, so switching starts a fresh baseline. Firefox and WebKit need Playwright system dependencies installed on the server."
+          />
+          <Field
+            label="Public branch regex"
+            name="publicBranchRegex"
+            value={project.publicBranchRegex ?? ""}
+            placeholder="^main$"
+            hint="Branches matching this regex are publicly viewable."
+          />
           {isAdmin ? (
             <Button variant="primary" type="submit">
               Save changes
             </Button>
           ) : (
-            <p class="field__hint">You need admin access to edit settings.</p>
+            <Meta>You need admin access to edit settings.</Meta>
           )}
         </form>
       </div>
@@ -152,10 +92,10 @@ export function renderSettingsGeneral(
       {isAdmin ? (
         <div class="card card--padded" style="border-color: var(--status-rejected);">
           <h3 style="margin:0 0 .4rem; color: var(--status-rejected);">Danger zone</h3>
-          <p class="field__hint">
+          <Meta>
             Deleting a project removes all builds, snapshots, baselines and tokens. This cannot be
             undone.
-          </p>
+          </Meta>
           <form
             method="post"
             action={`/projects/${project.slug}/delete`}

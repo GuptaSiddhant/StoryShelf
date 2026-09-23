@@ -166,6 +166,47 @@ const statLabel = css`
   letter-spacing: 0.06em;
 `;
 
+const metaText = css`
+  /* meta */
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+`;
+
+const metaMono = css`
+  /* meta-mono */
+  ${metaText}
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+`;
+
+const metaCode = css`
+  /* meta-code */
+  ${metaMono}
+  font-size: 0.85em;
+`;
+
+const metaPre = css`
+  /* meta-pre */
+  ${metaMono}
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem;
+  font-size: 0.8rem;
+  overflow: auto;
+`;
+
+const metaDanger = css`
+  /* meta-danger */
+  ${metaText}
+  color: var(--status-rejected);
+`;
+
+type MetaAs = "p" | "span" | "div" | "code" | "pre";
+type MetaTone = "neutral" | "danger";
+
 /** Small status pill with a color tone. */
 // eslint-disable-next-line promise-function-async -- JSX component return type
 export const Badge: FC<{ tone?: BadgeTone; children?: unknown }> = ({
@@ -264,4 +305,37 @@ export const Stat: FC<{ label: string; value: string | number; tone?: StatTone }
       <div class={statLabel}>{label}</div>
     </div>
   );
+};
+
+/** Muted secondary text for metadata and descriptions (not a form hint). */
+// eslint-disable-next-line promise-function-async -- JSX component return type
+export const Meta: FC<{
+  as?: MetaAs;
+  mono?: boolean;
+  tone?: MetaTone;
+  children?: unknown;
+}> = ({ as = "p", mono = false, tone = "neutral", children }) => {
+  const cls =
+    as === "pre"
+      ? metaPre
+      : as === "code"
+        ? metaCode
+        : tone === "danger"
+          ? metaDanger
+          : mono
+            ? metaMono
+            : metaText;
+  if (as === "span") {
+    return <span class={cls}>{children}</span>;
+  }
+  if (as === "div") {
+    return <div class={cls}>{children}</div>;
+  }
+  if (as === "code") {
+    return <code class={cls}>{children}</code>;
+  }
+  if (as === "pre") {
+    return <pre class={cls}>{children}</pre>;
+  }
+  return <p class={cls}>{children}</p>;
 };

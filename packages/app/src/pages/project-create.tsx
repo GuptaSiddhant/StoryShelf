@@ -1,4 +1,4 @@
-import { Alert, Button } from "../ui/components.tsx";
+import { Alert, Button, Field } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
 /** Form state for the project creation page (values and validation errors). */
@@ -50,77 +50,34 @@ export function renderProjectCreatePage(state: ProjectCreateFormState = {}): Ren
           hx-swap="outerHTML"
           novalidate
         >
-          <div class="field">
-            <label class="field__label" for="name">
-              Name <span aria-hidden="true">*</span>
-            </label>
-            <input
-              class={`field__input ${errors["name"] ? "field__input--error" : ""}`}
-              id="name"
-              name="name"
-              type="text"
-              required
-              autofocus
-              value={values.name ?? ""}
-              placeholder="Design System"
-              aria-invalid={errors["name"] ? "true" : undefined}
-              aria-describedby={errors["name"] ? "name-error" : "name-hint"}
-              autocomplete="off"
-            />
-            {errors["name"] ? (
-              <p class="field__error" id="name-error" role="alert">
-                {errors["name"]}
-              </p>
-            ) : (
-              <p class="field__hint" id="name-hint">
-                Human readable name. A URL-friendly slug is generated automatically.
-              </p>
-            )}
-          </div>
+          <Field
+            label="Name"
+            name="name"
+            required
+            autofocus
+            value={values.name ?? ""}
+            placeholder="Design System"
+            error={errors["name"]}
+            hint="Human readable name. A URL-friendly slug is generated automatically."
+            autocomplete="off"
+          />
 
-          <div class="field">
-            <label class="field__label" for="gitRepository">
-              Git repository
-            </label>
-            <input
-              class={`field__input ${errors["gitRepository"] ? "field__input--error" : ""}`}
-              id="gitRepository"
-              name="gitRepository"
-              type="text"
-              value={values.gitRepository ?? ""}
-              placeholder="acme/design-system"
-              aria-invalid={errors["gitRepository"] ? "true" : undefined}
-              aria-describedby={
-                errors["gitRepository"] ? "gitRepository-error" : "gitRepository-hint"
-              }
-            />
-            {errors["gitRepository"] ? (
-              <p class="field__error" id="gitRepository-error" role="alert">
-                {errors["gitRepository"]}
-              </p>
-            ) : (
-              <p class="field__hint" id="gitRepository-hint">
-                Optional owner/repo for status checks and links.
-              </p>
-            )}
-          </div>
+          <Field
+            label="Git repository"
+            name="gitRepository"
+            value={values.gitRepository ?? ""}
+            placeholder="acme/design-system"
+            error={errors["gitRepository"]}
+            hint="Optional owner/repo for status checks and links."
+          />
 
-          <div class="field">
-            <label class="field__label" for="gitDefaultBranch">
-              Default branch
-            </label>
-            <input
-              class="field__input"
-              id="gitDefaultBranch"
-              name="gitDefaultBranch"
-              type="text"
-              value={values.gitDefaultBranch ?? "main"}
-              placeholder="main"
-            />
-            <p class="field__hint">
-              Baselines fall back to this branch when no branch-specific baseline exists.
-            </p>
-          </div>
+          <Field
+            label="Default branch"
+            name="gitDefaultBranch"
+            value={values.gitDefaultBranch ?? "main"}
+            placeholder="main"
+            hint="Baselines fall back to this branch when no branch-specific baseline exists."
+          />
 
           <div style="display:flex; gap:.5rem; margin-top:1rem;">
             <Button variant="primary" type="submit">

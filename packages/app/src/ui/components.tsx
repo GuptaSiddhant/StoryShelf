@@ -7,6 +7,6 @@
  * Import from here; the family modules are an organizational detail.
  */
 export { Button, Tabs } from "./buttons.tsx";
-export { Alert, Badge, EmptyState, Stat, statusTone } from "./feedback.tsx";
-export { Field, SelectField, TextareaField } from "./forms.tsx";
+export { Alert, Badge, EmptyState, Meta, Stat, statusTone } from "./feedback.tsx";
+export { CheckField, Field, SelectField, TextareaField } from "./forms.tsx";
 export { Card, PageHeader } from "./layout.tsx";

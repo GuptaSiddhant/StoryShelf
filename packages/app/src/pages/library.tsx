@@ -15,7 +15,7 @@ import {
 import type { HtmlEscapedString } from "hono/utils/html";
 import { posix } from "node:path";
 import { getStore } from "../store.ts";
-import { Button, EmptyState } from "../ui/components.tsx";
+import { Button, EmptyState, Meta, SelectField } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
 /** Library page: gallery grouped by title from latest build on selected branch. */
@@ -219,7 +219,7 @@ function renderLibraryGrid(
       {renderLibraryHeader(project, build, snapshots.length, branches)}
       {multi ? (
         <div class="card card--padded">
-          <span class="field__hint">Viewports: {viewportNames.join(" · ")}</span>
+          <Meta as="span">Viewports: {viewportNames.join(" · ")}</Meta>
         </div>
       ) : null}
       {renderTitleList(byTitle, project, build, multi, docsByStory)}
@@ -258,26 +258,14 @@ function renderBranchPicker(
   branches: string[],
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
   return (
-    <form
-      method="get"
-      action={`/projects/${project.slug}/library`}
-      style="display:flex; gap:.5rem; align-items:center;"
-    >
-      <label class="field__label" for="branch-picker" style="margin:0;">
-        Branch
-      </label>
-      <select
-        id="branch-picker"
+    <form method="get" action={`/projects/${project.slug}/library`} class="row-actions">
+      <SelectField
+        label="Branch"
         name="branch"
-        class="field__input"
-        style="min-height:44px; padding:.4rem .6rem;"
-      >
-        {branches.map((b) => (
-          <option value={b} selected={b === build.gitBranch ? true : undefined}>
-            {b}
-          </option>
-        ))}
-      </select>
+        layout="inline"
+        value={build.gitBranch}
+        options={branches.map((b) => ({ value: b, label: b }))}
+      />
       <Button variant="secondary" type="submit">
         View
       </Button>
@@ -316,7 +304,7 @@ function renderTitleGroup(
     <div key={title} class="card">
       <div class="card--padded" style="border-bottom:1px solid var(--border);">
         <h2 style="margin:0; font-size:1.1rem;">{title}</h2>
-        <span class="field__hint">{group.length} stories</span>
+        <Meta as="span">{group.length} stories</Meta>
       </div>
       <div style="padding:1rem; display:grid; gap:1rem;">
         {vNames.map((vName) =>

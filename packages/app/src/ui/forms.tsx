@@ -1,29 +1,91 @@
 import type { FC } from "hono/jsx";
+import { css } from "./css.ts";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
-// eslint-disable-next-line promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString>
-const FieldAssistant: FC<{ name: string; error: string | undefined; hint: string | undefined }> = ({
-  name,
-  error,
-  hint,
-}) => {
-  if (error) {
-    return (
-      <p class="field__error" id={`${name}-error`} role="alert">
-        {error}
-      </p>
-    );
+type FieldLayout = "stack" | "inline";
+
+const fieldWrap = css`
+  /* field */
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 0.875rem;
+`;
+
+const fieldWrapInline = css`
+  /* field-inline */
+  ${fieldWrap}
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0;
+`;
+
+const fieldLabel = css`
+  /* field-label */
+  font-weight: 600;
+  font-size: 0.85rem;
+`;
+
+const fieldInput = css`
+  /* field-input */
+  width: 100%;
+  padding: 0.55rem 0.65rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-card);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.875rem;
+  box-shadow: var(--shadow);
+  &::placeholder {
+    color: var(--text-muted);
   }
-  if (hint) {
-    return (
-      <p class="field__hint" id={`${name}-hint`}>
-        {hint}
-      </p>
-    );
+  &:focus {
+    outline: 2px solid var(--ring);
+    outline-offset: 0;
+    border-color: var(--ring);
   }
-  return null;
-};
+`;
+
+const fieldInputError = css`
+  /* field-input-error */
+  ${fieldInput}
+  border-color: var(--status-rejected);
+  &:focus {
+    outline-color: var(--status-rejected);
+    border-color: var(--status-rejected);
+  }
+`;
+
+const fieldTextarea = css`
+  /* field-textarea */
+  ${fieldInput}
+  resize: vertical;
+  min-height: 5rem;
+`;
+
+const fieldTextareaError = css`
+  /* field-textarea-error */
+  ${fieldInputError}
+  resize: vertical;
+  min-height: 5rem;
+`;
+
+const fieldHint = css`
+  /* field-hint */
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+`;
+
+const fieldError = css`
+  /* field-error */
+  margin: 0;
+  color: var(--status-rejected);
+  font-size: 0.82rem;
+  font-weight: 600;
+`;
 
 function fieldDescribedBy(
   name: string,
@@ -39,6 +101,29 @@ function fieldDescribedBy(
   return undefined;
 }
 
+// eslint-disable-next-line promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString>
+const FieldAssistant: FC<{ name: string; error: string | undefined; hint: string | undefined }> = ({
+  name,
+  error,
+  hint,
+}) => {
+  if (error) {
+    return (
+      <p class={fieldError} id={`${name}-error`} role="alert">
+        {error}
+      </p>
+    );
+  }
+  if (hint) {
+    return (
+      <p class={fieldHint} id={`${name}-hint`}>
+        {hint}
+      </p>
+    );
+  }
+  return null;
+};
+
 /** Labeled text input with error and hint states. */
 // eslint-disable-next-line promise-function-async -- JSX component return type
 export const Field: FC<{
@@ -48,29 +133,110 @@ export const Field: FC<{
   value?: string;
   placeholder?: string;
   required?: boolean;
+  disabled?: boolean;
+  autofocus?: boolean;
+  pattern?: string;
+  min?: string;
+  max?: string;
+  step?: string;
+  layout?: FieldLayout;
   error?: string;
   hint?: string;
   autocomplete?: string;
-}> = ({ label, name, type = "text", value, placeholder, required, error, hint, autocomplete }) => {
+}> = ({
+  label,
+  name,
+  type = "text",
+  value,
+  placeholder,
+  required,
+  disabled,
+  autofocus,
+  pattern,
+  min,
+  max,
+  step,
+  layout = "stack",
+  error,
+  hint,
+  autocomplete,
+}) => {
   return (
-    <div class="field">
-      <label class="field__label" for={name}>
+    <div class={layout === "inline" ? fieldWrapInline : fieldWrap}>
+      <label class={fieldLabel} for={name}>
         {label}
         {required ? <span aria-hidden="true"> *</span> : null}
       </label>
       <input
-        class={`field__input ${error ? "field__input--error" : ""}`}
+        class={error ? fieldInputError : fieldInput}
         id={name}
         name={name}
         type={type}
         value={value}
         placeholder={placeholder}
         required={required}
+        disabled={disabled}
+        autofocus={autofocus}
+        pattern={pattern}
+        min={min}
+        max={max}
+        step={step}
         aria-invalid={error ? "true" : undefined}
         aria-describedby={fieldDescribedBy(name, error, hint)}
         autocomplete={autocomplete}
       />
       <FieldAssistant name={name} error={error} hint={hint} />
+    </div>
+  );
+};
+
+const checkLabel = css`
+  /* check-label */
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+`;
+
+const checkInput = css`
+  /* check-input */
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--accent);
+  flex: none;
+`;
+
+/** Inline checkbox row with an optional hint. */
+// eslint-disable-next-line promise-function-async -- JSX component return type
+export const CheckField: FC<{
+  label: unknown;
+  name: string;
+  value?: string;
+  checked?: boolean;
+  disabled?: boolean;
+  hint?: string;
+}> = ({ label, name, value, checked, disabled, hint }) => {
+  return (
+    <div class={fieldWrap}>
+      <label class={checkLabel} for={name}>
+        <input
+          class={checkInput}
+          type="checkbox"
+          id={name}
+          name={name}
+          value={value}
+          checked={checked}
+          disabled={disabled}
+        />
+        {label}
+      </label>
+      {hint ? (
+        <p class={fieldHint} id={`${name}-hint`}>
+          {hint}
+        </p>
+      ) : null}
     </div>
   );
 };
@@ -83,20 +249,22 @@ export const TextareaField: FC<{
   value?: string;
   placeholder?: string;
   rows?: number;
+  required?: boolean;
   hint?: string;
   error?: string;
-}> = ({ label, name, value, placeholder, rows = 3, hint, error }) => {
+}> = ({ label, name, value, placeholder, rows = 3, required, hint, error }) => {
   return (
-    <div class="field">
-      <label class="field__label" for={name}>
+    <div class={fieldWrap}>
+      <label class={fieldLabel} for={name}>
         {label}
       </label>
       <textarea
-        class={`field__input field__input--textarea ${error ? "field__input--error" : ""}`}
+        class={error ? fieldTextareaError : fieldTextarea}
         id={name}
         name={name}
         placeholder={placeholder}
         rows={rows}
+        required={required}
         aria-invalid={error ? "true" : undefined}
         aria-describedby={fieldDescribedBy(name, error, hint)}
       >
@@ -115,16 +283,21 @@ export const SelectField: FC<{
   value?: string;
   options: { value: string; label: string }[];
   hint?: string;
-}> = ({ label, name, value, options, hint }) => {
+  disabled?: boolean;
+  required?: boolean;
+  layout?: FieldLayout;
+}> = ({ label, name, value, options, hint, disabled, required, layout = "stack" }) => {
   return (
-    <div class="field">
-      <label class="field__label" for={name}>
+    <div class={layout === "inline" ? fieldWrapInline : fieldWrap}>
+      <label class={fieldLabel} for={name}>
         {label}
       </label>
       <select
-        class="field__input"
+        class={fieldInput}
         id={name}
         name={name}
+        disabled={disabled}
+        required={required}
         aria-describedby={hint ? `${name}-hint` : undefined}
       >
         {options.map((opt) => (
@@ -134,26 +307,10 @@ export const SelectField: FC<{
         ))}
       </select>
       {hint ? (
-        <p class="field__hint" id={`${name}-hint`}>
+        <p class={fieldHint} id={`${name}-hint`}>
           {hint}
         </p>
       ) : null}
     </div>
   );
 };
-
-/** Form field styles owned by this module. */
-export function formsCss(): string {
-  return `
-    .field { display: grid; gap: .35rem; margin-bottom: .875rem; }
-    .field__label { font-weight: 600; font-size: .85rem; }
-    .field__input { width: 100%; padding: .55rem .65rem; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface-card); color: var(--text-primary); font: inherit; font-size: .875rem; box-shadow: var(--shadow); }
-    .field__input::placeholder { color: var(--text-muted); }
-    .field__input:focus { outline: 2px solid var(--ring); outline-offset: 0; border-color: var(--ring); }
-    .field__input--error { border-color: var(--status-rejected); }
-    .field__input--error:focus { outline-color: var(--status-rejected); border-color: var(--status-rejected); }
-    .field__input--textarea { resize: vertical; min-height: 5rem; }
-    select.field__input { appearance: auto; }
-    .field__hint { margin: 0; color: var(--text-secondary); font-size: .82rem; }
-    .field__error { margin: 0; color: var(--status-rejected); font-size: .82rem; font-weight: 600; }`;
-}

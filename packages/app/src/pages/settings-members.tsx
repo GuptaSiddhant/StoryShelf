@@ -1,7 +1,7 @@
 import type { Project } from "@storyshelf/core/schema";
 import type { ProjectGroupMapping } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge, Button } from "../ui/components.tsx";
+import { Badge, Button, Field, Meta, SelectField } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Project member row as rendered in the members settings tab. */
@@ -24,9 +24,7 @@ export function renderSettingsMembers(
     <div class="grid max-w-form">
       <div class="card card--padded">
         <h2 style="margin:0 0 .3rem;">Members</h2>
-        <p class="field__hint">
-          Project members and their roles. Site admins have implicit admin access.
-        </p>
+        <Meta>Project members and their roles. Site admins have implicit admin access.</Meta>
         <div class="table-wrap table-gap">
           <table>
             <thead>
@@ -77,11 +75,7 @@ export function renderSettingsMembers(
             </tbody>
           </table>
         </div>
-        {members.length === 0 ? (
-          <p class="field__hint mt-1" style="margin-top:.5rem;">
-            No members yet.
-          </p>
-        ) : null}
+        {members.length === 0 ? <Meta>No members yet.</Meta> : null}
       </div>
 
       {isAdmin ? (
@@ -94,29 +88,17 @@ export function renderSettingsMembers(
             hx-target="body"
           >
             {csrfField()}
-            <div class="field">
-              <label class="field__label" for="userId">
-                User ID
-              </label>
-              <input
-                class="field__input"
-                id="userId"
-                name="userId"
-                required
-                placeholder="user_..."
-              />
-            </div>
-            <div class="field">
-              <label class="field__label" for="role">
-                Role
-              </label>
-              <select class="field__input" id="role" name="role">
-                <option value="viewer">viewer</option>
-                <option value="developer">developer</option>
-                <option value="approver">approver</option>
-                <option value="admin">admin</option>
-              </select>
-            </div>
+            <Field label="User ID" name="userId" required placeholder="user_..." />
+            <SelectField
+              label="Role"
+              name="role"
+              options={[
+                { value: "viewer", label: "viewer" },
+                { value: "developer", label: "developer" },
+                { value: "approver", label: "approver" },
+                { value: "admin", label: "admin" },
+              ]}
+            />
             <Button variant="primary" type="submit">
               Add member
             </Button>
@@ -126,11 +108,11 @@ export function renderSettingsMembers(
 
       <div class="card card--padded mt-1">
         <h3 style="margin:0 0 .3rem;">Identity-provider group mappings</h3>
-        <p class="field__hint">
+        <Meta>
           Map an IdP group (name or provider ID, exact match) to a project role. Members sync at
           next login; removing a mapping revokes synced grants but never manual ones. Wildcards are
           not expanded.
-        </p>
+        </Meta>
         <div class="table-wrap table-gap">
           <table>
             <thead>
@@ -171,11 +153,7 @@ export function renderSettingsMembers(
             </tbody>
           </table>
         </div>
-        {groupMappings.length === 0 ? (
-          <p class="field__hint mt-1" style="margin-top:.5rem;">
-            No group mappings yet.
-          </p>
-        ) : null}
+        {groupMappings.length === 0 ? <Meta>No group mappings yet.</Meta> : null}
       </div>
 
       {isAdmin ? (
@@ -188,29 +166,22 @@ export function renderSettingsMembers(
             hx-target="body"
           >
             {csrfField()}
-            <div class="field">
-              <label class="field__label" for="groupName">
-                Group name or ID (exact match)
-              </label>
-              <input
-                class="field__input"
-                id="groupName"
-                name="groupName"
-                required
-                placeholder="team-design"
-              />
-            </div>
-            <div class="field">
-              <label class="field__label" for="groupRole">
-                Role
-              </label>
-              <select class="field__input" id="groupRole" name="role">
-                <option value="viewer">viewer</option>
-                <option value="developer">developer</option>
-                <option value="approver">approver</option>
-                <option value="admin">admin</option>
-              </select>
-            </div>
+            <Field
+              label="Group name or ID (exact match)"
+              name="groupName"
+              required
+              placeholder="team-design"
+            />
+            <SelectField
+              label="Role"
+              name="role"
+              options={[
+                { value: "viewer", label: "viewer" },
+                { value: "developer", label: "developer" },
+                { value: "approver", label: "approver" },
+                { value: "admin", label: "admin" },
+              ]}
+            />
             <Button variant="primary" type="submit">
               Add mapping
             </Button>

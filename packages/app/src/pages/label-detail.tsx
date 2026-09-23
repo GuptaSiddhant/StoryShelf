@@ -10,7 +10,7 @@ import {
 } from "@storyshelf/db-sqlite/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { getStore } from "../store.ts";
-import { Badge, Button, EmptyState, statusTone } from "../ui/components.tsx";
+import { Badge, Button, EmptyState, Meta, statusTone } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 /** Resolve a label type's `link_template` against a build, or return null. */
 export function resolveLabelLink(
@@ -117,19 +117,21 @@ export async function renderLabelDetailPage(
                   <tr key={build.id}>
                     <td>
                       <div style="font-weight:600;">{build.gitBranch}</div>
-                      <div class="field__hint" style="font-family: ui-monospace, monospace;">
+                      <Meta as="div" mono>
                         {build.gitSha.slice(0, 7)}{" "}
                         {build.message ? `· ${build.message.slice(0, 60)}` : ""}
-                      </div>
+                      </Meta>
                     </td>
                     <td>
                       <Badge tone={statusTone(build.status)}>{build.status}</Badge>
                     </td>
                     <td>
                       <div>{build.authorName ?? "—"}</div>
-                      <div class="field__hint">{build.authorEmail ?? ""}</div>
+                      <Meta as="div">{build.authorEmail ?? ""}</Meta>
                     </td>
-                    <td class="field__hint">{new Date(build.createdAt).toLocaleString()}</td>
+                    <td>
+                      <Meta as="span">{new Date(build.createdAt).toLocaleString()}</Meta>
+                    </td>
                     <td style="white-space:nowrap;">
                       <Button
                         variant="secondary"

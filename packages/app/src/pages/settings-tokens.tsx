@@ -1,7 +1,7 @@
 import type { Project } from "@storyshelf/core/schema";
 import type { Token } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Alert, Button } from "../ui/components.tsx";
+import { Alert, Button, Field, Meta } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Tokens settings tab: project CLI tokens plus the create-token form. */
@@ -20,9 +20,7 @@ export function renderSettingsTokens(
       ) : null}
       <div class="card card--padded">
         <h2 style="margin:0 0 .3rem;">API tokens</h2>
-        <p class="field__hint">
-          Tokens are used by the CLI to upload builds. They are scoped to this project.
-        </p>
+        <Meta>Tokens are used by the CLI to upload builds. They are scoped to this project.</Meta>
         <div class="table-wrap table-gap">
           <table>
             <thead>
@@ -61,11 +59,7 @@ export function renderSettingsTokens(
             </tbody>
           </table>
         </div>
-        {tokens.length === 0 ? (
-          <p class="field__hint mt-1" style="margin-top:.5rem;">
-            No tokens yet. Create one for CI.
-          </p>
-        ) : null}
+        {tokens.length === 0 ? <Meta>No tokens yet. Create one for CI.</Meta> : null}
       </div>
 
       {isAdmin ? (
@@ -78,25 +72,12 @@ export function renderSettingsTokens(
             hx-target="body"
           >
             {csrfField()}
-            <div class="field">
-              <label class="field__label" for="tokenName">
-                Name
-              </label>
-              <input
-                class="field__input"
-                id="tokenName"
-                name="tokenName"
-                required
-                placeholder="ci"
-              />
-            </div>
+            <Field label="Name" name="tokenName" required placeholder="ci" />
             <Button variant="primary" type="submit">
               Create token
             </Button>
           </form>
-          <p class="field__hint mt-1" style="margin-top:.5rem;">
-            Token value is shown once after creation. Store it securely.
-          </p>
+          <Meta>Token value is shown once after creation. Store it securely.</Meta>
         </div>
       ) : null}
     </div>
