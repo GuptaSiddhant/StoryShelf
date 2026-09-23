@@ -4,6 +4,8 @@ import { baselines } from "./schema/baseline.ts";
 import type { Baseline } from "./schema/baseline.ts";
 import { builds } from "./schema/build.ts";
 import type { Build } from "./schema/build.ts";
+import { captureAttempts, captureLogs } from "./schema/capture-attempt.ts";
+import type { CaptureAttempt, CaptureLog } from "./schema/capture-attempt.ts";
 import { comments } from "./schema/comment.ts";
 import type { Comment } from "./schema/comment.ts";
 import { buildLabels, labelTypes } from "./schema/label.ts";
@@ -34,6 +36,8 @@ it("row interfaces match drizzle inference exactly", () => {
   expectTypeOf<Project>().toEqualTypeOf<typeof projects.$inferSelect>();
   expectTypeOf<ProjectStatusConfig>().toEqualTypeOf<typeof projectStatusConfigs.$inferSelect>();
   expectTypeOf<Build>().toEqualTypeOf<typeof builds.$inferSelect>();
+  expectTypeOf<CaptureAttempt>().toEqualTypeOf<typeof captureAttempts.$inferSelect>();
+  expectTypeOf<CaptureLog>().toEqualTypeOf<typeof captureLogs.$inferSelect>();
   expectTypeOf<Snapshot>().toEqualTypeOf<typeof snapshots.$inferSelect>();
   expectTypeOf<Baseline>().toEqualTypeOf<typeof baselines.$inferSelect>();
   expectTypeOf<Comment>().toEqualTypeOf<typeof comments.$inferSelect>();
@@ -50,6 +54,8 @@ const DDL_TABLES = [
   "projects",
   "project_status_configs",
   "builds",
+  "capture_attempts",
+  "capture_logs",
   "snapshots",
   "baselines",
   "comments",
@@ -65,6 +71,9 @@ const DDL_TABLES = [
 const DDL_INDEXES = [
   "builds_project_gitsha_idx",
   "builds_git_branch_idx",
+  "capture_attempts_build_no_idx",
+  "capture_attempts_build_id_idx",
+  "capture_logs_attempt_seq_idx",
   "snapshots_build_story_viewport_idx",
   "snapshots_build_id_idx",
   "baselines_project_story_viewport_branch_idx",

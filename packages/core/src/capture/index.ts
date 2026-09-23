@@ -17,7 +17,12 @@ export {
   type StoryViewportDefinition,
   type Viewport,
 } from "./adapter.ts";
-export { executeCaptureJob, type CaptureJobOptions } from "./orchestrator.ts";
+export {
+  executeCaptureJob,
+  type CaptureAttemptRef,
+  type CaptureJobInput,
+  type CaptureJobOptions,
+} from "./orchestrator.ts";
 export { persistCapture, type CaptureContext } from "./pipeline.ts";
 export { InMemoryCaptureQueue, type InMemoryCaptureQueueOptions } from "./queue.ts";
 export type { PollableCaptureQueue, PollableJob } from "../adapters/capture-queue.ts";

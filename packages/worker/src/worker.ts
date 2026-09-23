@@ -9,11 +9,13 @@ import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import { createDispatchJob } from "@storyshelf/core/capture";
 import type { CaptureJobOptions, DispatchDeps } from "@storyshelf/core/capture";
-import type { Logger } from "@storyshelf/core/logger";
+import { createShelfLogger, type Logger } from "@storyshelf/core/logger";
 import {
   baselines,
   buildLabels,
   builds,
+  captureAttempts,
+  captureLogs,
   projectStatusConfigs,
   projects,
   snapshots,
@@ -28,6 +30,8 @@ export type WorkerTables = {
   snapshots: typeof snapshots;
   baselines: typeof baselines;
   projectStatusConfigs: typeof projectStatusConfigs;
+  captureAttempts: typeof captureAttempts;
+  captureLogs: typeof captureLogs;
 };
 
 /** Options for creating a capture worker. */
@@ -81,9 +85,11 @@ export function createCaptureWorker(options: WorkerOptions): WorkerHandle {
     snapshots,
     baselines,
     projectStatusConfigs,
+    captureAttempts,
+    captureLogs,
   };
   const gitHosts = options.gitHosts ?? [];
-  const logger = options.logger;
+  const logger = options.logger ?? createShelfLogger();
 
   const jobOptions: CaptureJobOptions = {
     db: options.db,
@@ -93,6 +99,8 @@ export function createCaptureWorker(options: WorkerOptions): WorkerHandle {
       buildLabels: tables.buildLabels,
       snapshots: tables.snapshots,
       baselines: tables.baselines,
+      captureAttempts: tables.captureAttempts,
+      captureLogs: tables.captureLogs,
     },
     storage: options.storage,
     runner: options.runner,
@@ -110,16 +118,19 @@ export function createCaptureWorker(options: WorkerOptions): WorkerHandle {
       buildLabels: tables.buildLabels,
       snapshots: tables.snapshots,
       projectStatusConfigs: tables.projectStatusConfigs,
+      captureAttempts: tables.captureAttempts,
+      captureLogs: tables.captureLogs,
     },
     jobOptions,
     gitHosts,
     secret: options.secret,
-    logger: logger ?? (console as unknown as Logger),
+    logger,
   };
 
   const runJob = createDispatchJob(dispatchDeps);
 
   const pollable = options.queue as PollableCaptureQueue;
+  pollable.setLogger?.(logger.child({ component: pollable.metadata.kind }));
   const doPoll =
     options.poll ??
     ((): ((o?: { waitMs?: number }) => Promise<PollableJob | null>) => {

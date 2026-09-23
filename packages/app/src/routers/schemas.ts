@@ -101,6 +101,41 @@ export const snapshotSchema = z
   })
   .openapi("Snapshot");
 
+/** OpenAPI schema for a capture attempt (one run of a build's capture). */
+export const attemptSchema = z
+  .object({
+    id: z.string(),
+    projectId: z.string(),
+    buildId: z.string(),
+    attemptNo: z.number(),
+    status: z.enum(["queued", "running", "completed", "failed", "cancelled"]),
+    error: z.string().nullable(),
+    reqId: z.string().nullable(),
+    storyCount: z.number(),
+    failedCount: z.number(),
+    queuedAt: z.string(),
+    startedAt: z.string().nullable(),
+    finishedAt: z.string().nullable(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+  })
+  .openapi("CaptureAttempt");
+
+/** OpenAPI schema for a single capture log line within an attempt. */
+export const attemptLogSchema = z
+  .object({
+    id: z.string(),
+    projectId: z.string(),
+    buildId: z.string(),
+    attemptId: z.string(),
+    seq: z.number(),
+    level: z.string(),
+    message: z.string(),
+    fields: z.string().nullable(),
+    createdAt: z.string(),
+  })
+  .openapi("CaptureLog");
+
 /** OpenAPI schema for a build comment. */
 export const commentSchema = z
   .object({

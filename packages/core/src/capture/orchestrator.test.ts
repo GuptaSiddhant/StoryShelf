@@ -7,6 +7,8 @@ import {
   baselines,
   buildLabels,
   builds,
+  captureAttempts,
+  captureLogs,
   projects,
   snapshots,
 } from "../../../db-sqlite/src/schema/index.ts";
@@ -24,6 +26,8 @@ function tables() {
     snapshots: snapshots as unknown as never,
     baselines: baselines as unknown as never,
     projects: projects as unknown as never,
+    captureAttempts: captureAttempts as unknown as never,
+    captureLogs: captureLogs as unknown as never,
   };
 }
 

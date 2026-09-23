@@ -1,10 +1,14 @@
 import { BuildModel } from "@storyshelf/core/models";
+import { CaptureAttemptModel } from "@storyshelf/core/models";
+import { CaptureLogModel } from "@storyshelf/core/models";
 import { CommentModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
 import { SnapshotModel } from "@storyshelf/core/models";
 import {
   buildLabels,
   builds,
+  captureAttempts,
+  captureLogs,
   comments as commentsTable,
   projects,
   snapshots as snapshotsTable,
@@ -13,6 +17,20 @@ import type { HtmlEscapedString } from "hono/utils/html";
 import { getStore } from "../store.ts";
 import { Badge, statusTone } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
+
+/** Map a capture log level to its badge tone. */
+function logTone(level: string): "neutral" | "success" | "warning" | "danger" | "info" {
+  if (level === "error") {
+    return "danger";
+  }
+  if (level === "warn") {
+    return "warning";
+  }
+  if (level === "info") {
+    return "info";
+  }
+  return "neutral";
+}
 /** Build overview page: snapshot grid, bulk actions, and build comments. */
 export async function renderBuildDetailPage(buildId: string): Promise<RenderedContent | null> {
   const { db } = getStore();
@@ -32,6 +50,13 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
   const comments = await new CommentModel(db, { comments: commentsTable, projects }).listByBuild(
     build.id,
   );
+  const attempts = await new CaptureAttemptModel(db, { captureAttempts }).listByBuild(build.id);
+  const logs = new CaptureLogModel(db, { captureLogs });
+  const attemptLogs = new Map<string, Awaited<ReturnType<typeof logs.listByAttempt>>>();
+  /* oxlint-disable-next-line eslint/no-await-in-loop -- attempts are few; sequential reads keep code simple */
+  for (const attempt of attempts) {
+    attemptLogs.set(attempt.id, await logs.listByAttempt(attempt.id));
+  }
   const canReview = !getStore().authEnabled || Boolean(getStore().user);
 
   const grouped = new Map<string, typeof snapshots>();
@@ -116,6 +141,40 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
           <div class="stat__label">Approved / unchanged</div>
         </div>
       </div>
+
+      {attempts.length > 0 ? (
+        <div class="card card--padded" style="margin-bottom:1rem;">
+          <h2 style="margin:0 0 .5rem;">Capture attempts</h2>
+          {attempts.map((attempt, index): HtmlEscapedString | Promise<HtmlEscapedString> => (
+            <details key={attempt.id} open={index === attempts.length - 1}>
+              <summary>
+                Attempt {attempt.attemptNo}{" "}
+                <Badge tone={statusTone(attempt.status)}>{attempt.status}</Badge>{" "}
+                <span class="field__hint">
+                  {attempt.storyCount} stories
+                  {attempt.reqId ? ` · ${attempt.reqId}` : ""}
+                </span>
+              </summary>
+              {attempt.error ? (
+                <pre class="field__input" style="white-space:pre-wrap;">
+                  {attempt.error}
+                </pre>
+              ) : null}
+              <div style="display:grid; gap:.25rem; margin-top:.5rem;">
+                {(attemptLogs.get(attempt.id) ?? []).map(
+                  (line): HtmlEscapedString | Promise<HtmlEscapedString> => (
+                    <div key={line.id} style="display:flex; gap:.4rem; align-items:baseline;">
+                      <Badge tone={logTone(line.level)}>{line.level}</Badge>
+                      <span>{line.message}</span>
+                      {line.fields ? <code class="field__hint">{line.fields}</code> : null}
+                    </div>
+                  ),
+                )}
+              </div>
+            </details>
+          ))}
+        </div>
+      ) : null}
 
       {canReview && (build.status === "reviewing" || build.status === "comparing") ? (
         <div

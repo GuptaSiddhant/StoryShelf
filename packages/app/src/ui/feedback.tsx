@@ -15,19 +15,41 @@ export const Badge: FC<{ tone?: BadgeTone; children?: unknown }> = ({
 
 /** Map a build or snapshot status string to its badge tone. */
 export function statusTone(status: string): BadgeTone {
-  if (status === "approved" || status === "unchanged") {
+  if (isSuccessStatus(status)) {
     return "success";
   }
-  if (status === "rejected" || status === "failed") {
+  if (isDangerStatus(status)) {
     return "danger";
   }
-  if (status === "changed" || status === "new" || status === "reviewing") {
+  if (isWarningStatus(status)) {
     return "warning";
   }
-  if (status === "capturing" || status === "comparing" || status === "pending") {
+  if (isInfoStatus(status)) {
     return "info";
   }
   return "neutral";
+}
+
+function isSuccessStatus(status: string): boolean {
+  return status === "approved" || status === "unchanged" || status === "completed";
+}
+
+function isDangerStatus(status: string): boolean {
+  return status === "rejected" || status === "failed";
+}
+
+function isWarningStatus(status: string): boolean {
+  return status === "changed" || status === "new" || status === "reviewing";
+}
+
+function isInfoStatus(status: string): boolean {
+  return (
+    status === "capturing" ||
+    status === "comparing" ||
+    status === "pending" ||
+    status === "queued" ||
+    status === "running"
+  );
 }
 
 /** Alert banner with an optional title. */

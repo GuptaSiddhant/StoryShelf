@@ -8,6 +8,8 @@ import {
   baselines,
   buildLabels,
   builds,
+  captureAttempts,
+  captureLogs,
   projectStatusConfigs,
   projects,
   snapshots,
@@ -57,7 +59,7 @@ export function setupCaptureQueue(
   }
   const jobOptions: CaptureJobOptions = {
     db: options.database,
-    tables: { projects, builds, buildLabels, snapshots, baselines },
+    tables: { projects, builds, buildLabels, snapshots, baselines, captureAttempts, captureLogs },
     storage: options.storage,
     runner: options.captureRunner,
     scratchDir: config.scratchDir,
@@ -67,7 +69,15 @@ export function setupCaptureQueue(
   };
   const runJob = createDispatchJob({
     db: options.database,
-    tables: { projects, builds, buildLabels, snapshots, projectStatusConfigs },
+    tables: {
+      projects,
+      builds,
+      buildLabels,
+      snapshots,
+      projectStatusConfigs,
+      captureAttempts,
+      captureLogs,
+    },
     jobOptions,
     gitHosts,
     secret: config.secret,

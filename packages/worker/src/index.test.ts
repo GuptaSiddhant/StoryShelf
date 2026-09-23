@@ -376,6 +376,8 @@ describe("createCaptureWorker", () => {
       snapshots: {} as never,
       baselines: {} as never,
       projectStatusConfigs: {} as never,
+      captureAttempts: {} as never,
+      captureLogs: {} as never,
     };
     const worker = createCaptureWorker({
       queue: queue as unknown as import("@storyshelf/core/adapter/capture-queue").CaptureQueue,

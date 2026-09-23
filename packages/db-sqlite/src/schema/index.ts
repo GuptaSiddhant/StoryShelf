@@ -10,6 +10,10 @@
 import type { AnySQLiteTable } from "drizzle-orm/sqlite-core";
 import { baselines as baselinesTable } from "./baseline.ts";
 import { builds as buildsTable } from "./build.ts";
+import {
+  captureAttempts as captureAttemptsTable,
+  captureLogs as captureLogsTable,
+} from "./capture-attempt.ts";
 import { comments as commentsTable } from "./comment.ts";
 import { buildLabels as buildLabelsTable, labelTypes as labelTypesTable } from "./label.ts";
 import { projectMembers as projectMembersTable } from "./member.ts";
@@ -22,6 +26,7 @@ import { users as usersTable } from "./user.ts";
 import { webhooks as webhooksTable } from "./webhook.ts";
 
 export { builds } from "./build.ts";
+export { captureAttempts, captureLogs } from "./capture-attempt.ts";
 export { baselines } from "./baseline.ts";
 export { comments } from "./comment.ts";
 export { buildLabels, labelTypes } from "./label.ts";
@@ -34,6 +39,8 @@ export { tokens } from "./token.ts";
 export { users } from "./user.ts";
 export { webhooks } from "./webhook.ts";
 
+/** A capture attempt and its log lines for a single build run. */
+export type { CaptureAttempt, CaptureLog } from "./capture-attempt.ts";
 /** Build row as stored in the `builds` table. */
 export type { Build } from "./build.ts";
 /** Review comment row as stored in the `comments` table. */
@@ -62,6 +69,8 @@ export const schema: {
   projects: AnySQLiteTable;
   projectStatusConfigs: AnySQLiteTable;
   builds: AnySQLiteTable;
+  captureAttempts: AnySQLiteTable;
+  captureLogs: AnySQLiteTable;
   snapshots: AnySQLiteTable;
   baselines: AnySQLiteTable;
   comments: AnySQLiteTable;
@@ -76,6 +85,8 @@ export const schema: {
   projects: projectsTable,
   projectStatusConfigs: projectStatusConfigsTable,
   builds: buildsTable,
+  captureAttempts: captureAttemptsTable,
+  captureLogs: captureLogsTable,
   snapshots: snapshotsTable,
   baselines: baselinesTable,
   comments: commentsTable,

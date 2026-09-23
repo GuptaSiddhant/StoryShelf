@@ -532,6 +532,11 @@ DELETE /api/v1/projects/:projectId/builds/:buildId
 # Snapshots (read-only API, mutations via review endpoints)
 GET    /api/v1/projects/:projectId/builds/:buildId/snapshots
 
+# Attempts (per-build capture history; one row per run, same build ID)
+GET    /api/v1/projects/:projectId/builds/:buildId/attempts
+GET    /api/v1/projects/:projectId/builds/:buildId/attempts/:attemptNo
+GET    /api/v1/projects/:projectId/builds/:buildId/attempts/:attemptNo/logs
+
 # Review
 POST   /api/v1/projects/:projectId/builds/:buildId/snapshots/:snapshotId/approve
 POST   /api/v1/projects/:projectId/builds/:buildId/snapshots/:snapshotId/reject

@@ -6,6 +6,7 @@ import { diffImages } from "../diff/engine.ts";
 import { DEFAULT_DIFF_OPTIONS } from "../diff/options.ts";
 import { BaselineModel, type BaselineTables } from "../models/baseline.ts";
 import { BuildModel, type BuildTables } from "../models/build.ts";
+import { emitAttemptLog, type AttemptLogRecorder } from "../models/capture-attempt.ts";
 import { SnapshotModel, type SnapshotTables } from "../models/snapshot.ts";
 import type { Baseline } from "../schema/baseline.ts";
 import type { Build } from "../schema/build.ts";
@@ -51,6 +52,16 @@ export async function persistCapture(
             { storyId: capture.story.id, viewport: capture.viewportName, err: error },
             "capture failed for flaky/a11y story (non-blocking)",
           );
+          await emitAttemptLog(
+            ctx.recordLog,
+            ctx.logger,
+            "warn",
+            "capture failed for flaky/a11y story (non-blocking)",
+            {
+              storyId: capture.story.id,
+              viewport: capture.viewportName,
+            },
+          );
         } else {
           failedStoryIds.add(capture.story.id);
         }
@@ -58,6 +69,10 @@ export async function persistCapture(
           { storyId: capture.story.id, viewport: capture.viewportName, err: error },
           "capture failed for story",
         );
+        await emitAttemptLog(ctx.recordLog, ctx.logger, "error", "capture failed for story", {
+          storyId: capture.story.id,
+          viewport: capture.viewportName,
+        });
       }
     }),
   );
@@ -65,11 +80,23 @@ export async function persistCapture(
   for (const id of flakyIds) {
     if (!failedStoryIds.has(id)) {
       ctx.logger?.warn({ storyId: id }, "flaky story failed (non-blocking)");
+      await emitAttemptLog(ctx.recordLog, ctx.logger, "warn", "flaky story failed (non-blocking)", {
+        storyId: id,
+      });
     }
   }
   for (const id of a11yIds) {
     if (!failedStoryIds.has(id) && !flakyIds.has(id)) {
       ctx.logger?.warn({ storyId: id }, "a11y violations found (non-blocking)");
+      await emitAttemptLog(
+        ctx.recordLog,
+        ctx.logger,
+        "warn",
+        "a11y violations found (non-blocking)",
+        {
+          storyId: id,
+        },
+      );
     }
   }
   await finalize(
@@ -102,6 +129,8 @@ export interface CaptureContext {
   captures: RenderedSnapshot[];
   /** Optional logger for capture diagnostics. */
   logger?: Logger;
+  /** Optional per-attempt log recorder (mirrors logger lines into the DB). */
+  recordLog?: AttemptLogRecorder;
   /** Server secret for decrypting webhook secrets at send time. */
   secret?: string | undefined;
 }
@@ -269,11 +298,23 @@ async function finalize(
       { flakyStoryIds: [...flakyFailedStoryIds] },
       "flaky stories failed (non-blocking)",
     );
+    await emitAttemptLog(ctx.recordLog, ctx.logger, "warn", "flaky stories failed (non-blocking)", {
+      flakyStoryIds: [...flakyFailedStoryIds],
+    });
   }
   if (a11yFailedStoryIds.size > 0 && failedStoryIds.size === 0) {
     ctx.logger?.warn(
       { a11yStoryIds: [...a11yFailedStoryIds] },
       "a11y violations found (non-blocking)",
+    );
+    await emitAttemptLog(
+      ctx.recordLog,
+      ctx.logger,
+      "warn",
+      "a11y violations found (non-blocking)",
+      {
+        a11yStoryIds: [...a11yFailedStoryIds],
+      },
     );
   }
   await builds.setStatus(ctx.build.id, status);

@@ -179,4 +179,50 @@ describe("createSqliteDatabase", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it("cascades attempt history when a build is removed (purge parity)", async () => {
+    const db = createSqliteDatabase(":memory:");
+    await initDb(db);
+    const now = new Date().toISOString();
+    await db.insert(schema.projects, {
+      id: "p1",
+      name: "Demo",
+      slug: "demo",
+      createdAt: now,
+      updatedAt: now,
+    });
+    await db.insert(schema.builds, {
+      id: "b1",
+      projectId: "p1",
+      gitSha: "sha",
+      gitBranch: "main",
+      createdAt: now,
+      updatedAt: now,
+    });
+    await db.insert(schema.captureAttempts, {
+      id: "a1",
+      projectId: "p1",
+      buildId: "b1",
+      attemptNo: 1,
+      queuedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await db.insert(schema.captureLogs, {
+      id: "l1",
+      projectId: "p1",
+      buildId: "b1",
+      attemptId: "a1",
+      seq: 1,
+      message: "capture started",
+      createdAt: now,
+    });
+
+    await db.remove(schema.builds, "b1");
+
+    expect(await db.get(schema.captureAttempts, "a1")).toBeNull();
+    expect(await db.get(schema.captureLogs, "l1")).toBeNull();
+
+    await closeDb(db);
+  });
 });

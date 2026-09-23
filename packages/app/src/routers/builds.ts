@@ -6,6 +6,7 @@ import { buildLabels, builds as buildsTable, snapshots } from "@storyshelf/db-sq
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
+import { registerAttempts } from "./attempts.ts";
 import {
   VIEW_ROLES,
   DEVELOPER_ROLES,
@@ -103,6 +104,7 @@ export function registerBuilds(app: ShelfRouter): void {
       buildLabels,
       snapshots,
     }).setStatus(build.id, "pending");
+    await getStore().enqueueCapture?.(build.id, c.get("requestId"));
     return c.json(updated, 202);
   });
 
@@ -118,6 +120,7 @@ export function registerBuilds(app: ShelfRouter): void {
 
   registerSnapshots(app);
   registerComments(app);
+  registerAttempts(app);
 }
 
 const listBuildsRoute = createRoute({
@@ -214,7 +217,7 @@ const retryBuildRoute = createRoute({
   responses: {
     202: {
       content: { "application/json": { schema: buildSchema } },
-      description: "Build reset to pending",
+      description: "Build reset to pending and capture re-queued (new attempt)",
     },
     ...notFoundResponse,
   },
