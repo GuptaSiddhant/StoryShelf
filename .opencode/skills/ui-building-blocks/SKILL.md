@@ -20,8 +20,15 @@ this — keep it green and lower its per-file style ceilings as you migrate.
   (`../ui/components.tsx`: `Button`, `Tabs`, `Badge`, `Alert`, `EmptyState`,
   `Stat`, `Field`, `TextareaField`, `SelectField`, `CheckField`, `Card`,
   `CardSection`, `PageHeader`, `SectionTitle`, `Meta`) and
-  the shell (`../ui/document.tsx`: `DocumentLayout`). Never import a family
+  the shell (`../ui/document.tsx`: `DocumentLayout`), plus shared
+  cross-page style objects (`../ui/styles/review.ts`: diff viewer/nav,
+  snapshot cards, comment threads). Never import a family
   module (`buttons.tsx`, `feedback.tsx`, …) directly.
+- **Shared cross-page patterns are the one colocation exception.**
+  `snapshot-card` (build detail + library) and `comment` (build detail +
+  diff thread) are used by two pages each — they live once as labeled
+  hono/css objects in `ui/styles/review.ts`, imported by class object
+  (never by string name). Single-page patterns colocate in their file.
 - **No raw classes in pages:** `class="btn…"`, `class="tabs…"`,
   `tabs__link`, hand-rolled `page-header`/`card`/`empty` markup are banned —
   use the facade component with `variant`/`size`/`tone` props instead.

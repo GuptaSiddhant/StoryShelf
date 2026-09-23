@@ -8,7 +8,15 @@ import {
 } from "@storyshelf/db-sqlite/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { getStore } from "../store.ts";
-import { Badge, Button, Card, EmptyState, Meta, PageHeader } from "../ui/components.tsx";
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Meta,
+  PageHeader,
+  SectionTitle,
+} from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 /** Projects overview page: project cards with latest build plus next steps. */
 export async function renderProjectsPage(): Promise<RenderedContent> {
@@ -63,9 +71,9 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
                   style="justify-content:space-between; align-items:flex-start; gap:1rem;"
                 >
                   <div class="truncate" style="min-width:0;">
-                    <h2 class="review-bar__title">
+                    <SectionTitle>
                       <a href={`/projects/${project.slug}/builds`}>{project.name}</a>
-                    </h2>
+                    </SectionTitle>
                     <Meta>
                       <code>{project.slug}</code>{" "}
                       {project.gitRepository ? `· ${project.gitRepository}` : ""} · default{" "}
@@ -107,7 +115,7 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
 
       <div class="mt-1">
         <Card>
-          <h3 class="review-bar__title">Next steps</h3>
+          <SectionTitle level={3}>Next steps</SectionTitle>
           <ol class="muted" style="margin:.4rem 0 0; padding-left:1.2rem;">
             <li>
               Create a project (or run{" "}

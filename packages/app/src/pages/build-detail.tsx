@@ -27,6 +27,16 @@ import {
   statusTone,
 } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
+import {
+  reviewComment,
+  reviewCommentBody,
+  reviewCommentHead,
+  snapshotCard,
+  snapshotCardBody,
+  snapshotCardHead,
+  snapshotCardMeta,
+  snapshotGrid,
+} from "../ui/styles/review.ts";
 
 /** Map a capture log level to its badge tone. */
 function logTone(level: string): "neutral" | "success" | "warning" | "danger" | "info" {
@@ -201,16 +211,16 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
           description="Capture is pending or failed. Try retrying capture."
         />
       ) : (
-        <div class="snapshot-grid">
+        <div class={snapshotGrid}>
           {snapshots.map((snap): HtmlEscapedString | Promise<HtmlEscapedString> => (
-            <div key={snap.id} class="snapshot-card">
-              <div class="snapshot-card__head">
+            <div key={snap.id} class={snapshotCard}>
+              <div class={snapshotCardHead}>
                 <Badge tone={statusTone(snap.status)}>{snap.status}</Badge>
-                <span class="snapshot-card__meta">
+                <span class={snapshotCardMeta}>
                   {snap.viewportName} · {snap.viewportWidth}×{snap.viewportHeight}
                 </span>
               </div>
-              <div class="snapshot-card__body">
+              <div class={snapshotCardBody}>
                 <div style="font-weight:650; font-size:.95rem; line-height:1.2;">
                   {snap.storyTitle}
                   <span style="color:var(--text-secondary); font-weight:400;">
@@ -271,8 +281,8 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
           ) : null}
           <div style="display:grid; gap:.6rem;">
             {comments.map((comment): HtmlEscapedString | Promise<HtmlEscapedString> => (
-              <div key={comment.id} class="comment">
-                <div class="comment__head">
+              <div key={comment.id} class={reviewComment}>
+                <div class={reviewCommentHead}>
                   <strong>{comment.userId ?? "anonymous"}</strong>
                   <span>· {new Date(comment.createdAt).toLocaleString()}</span>
                   {comment.snapshotId ? (
@@ -285,7 +295,7 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
                   )}
                   {comment.resolved ? <Badge tone="success">resolved</Badge> : null}
                 </div>
-                <p class="comment__body">{comment.body}</p>
+                <p class={reviewCommentBody}>{comment.body}</p>
               </div>
             ))}
           </div>

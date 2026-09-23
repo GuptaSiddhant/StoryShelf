@@ -5,6 +5,7 @@ import type { Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { EmptyState } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
+import { reviewLayout, reviewMain } from "../ui/styles/review.ts";
 import { DiffComments } from "./build-diff-comments.tsx";
 import { DiffHeader } from "./build-diff-header.tsx";
 import { DiffNav } from "./build-diff-nav.tsx";
@@ -39,9 +40,9 @@ function DiffReviewGrid(
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, snapshots, comments, selected, canReview, hasBaseline } = props;
   return (
-    <div class="review-layout">
+    <div class={reviewLayout}>
       <DiffNav project={project} build={build} snapshots={snapshots} selectedId={selected?.id} />
-      <div class="review-main">
+      <div class={reviewMain}>
         {selected ? (
           <>
             <DiffViewer

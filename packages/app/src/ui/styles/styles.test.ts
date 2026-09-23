@@ -10,9 +10,6 @@ describe("baseStyle", () => {
       "--ring",
       "--surface-card",
       "--text-primary",
-      ".diff-grid",
-      ".review-bar",
-      ".segmented",
       '[data-theme="dark"]',
     ]) {
       expect(css).toContain(token);
@@ -34,6 +31,11 @@ describe("baseStyle", () => {
     expect(css).not.toContain(".breadcrumbs ol");
     expect(css).not.toContain(".sidebar__link--active");
     expect(css).not.toContain(".topbar__inner");
+    expect(css).not.toContain(".diff-grid");
+    expect(css).not.toContain(".review-bar");
+    expect(css).not.toContain(".segmented");
+    expect(css).not.toContain(".snapshot-card");
+    expect(css).not.toContain(".comment__head");
   });
 
   it("honors custom brand accent overrides", () => {

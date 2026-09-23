@@ -3,6 +3,17 @@ import type { Project } from "@storyshelf/core/schema";
 import type { Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { Badge, Button, Card, Meta, statusTone } from "../ui/components.tsx";
+import {
+  diffGrid,
+  diffPane,
+  diffPaneImg,
+  diffPaneLabel,
+  diffPlaceholder,
+  reviewBar,
+  reviewBarMeta,
+  reviewBarTitle,
+  viewSwitch,
+} from "../ui/styles/review.ts";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -94,20 +105,20 @@ function BaselinePane(
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, selected, hasBaseline } = props;
   return (
-    <div class="diff-pane" data-pane="baseline">
-      <div class="diff-pane__label">
+    <div class={diffPane} data-pane="baseline">
+      <div class={diffPaneLabel}>
         <span>Baseline</span>
       </div>
       {hasBaseline[selected.id] ? (
         <img
-          class="diff-pane__img"
+          class={diffPaneImg}
           src={imageUrl(project, build, selected, "baseline")}
           alt={`Baseline for ${selected.storyTitle} / ${selected.storyName}`}
           loading="lazy"
           decoding="async"
         />
       ) : (
-        <div class="diff-placeholder">
+        <div class={diffPlaceholder}>
           <div>
             <div>New story — no baseline yet</div>
             <Meta as="div">First capture; approve to set the baseline.</Meta>
@@ -122,12 +133,12 @@ function BaselinePane(
 function CurrentPane(props: SinglePaneProps): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, selected } = props;
   return (
-    <div class="diff-pane" data-pane="current">
-      <div class="diff-pane__label">
+    <div class={diffPane} data-pane="current">
+      <div class={diffPaneLabel}>
         <span>Current</span>
       </div>
       <img
-        class="diff-pane__img"
+        class={diffPaneImg}
         src={imageUrl(project, build, selected, "image")}
         alt={`Current for ${selected.storyTitle} / ${selected.storyName}`}
         loading="lazy"
@@ -141,8 +152,8 @@ function CurrentPane(props: SinglePaneProps): HtmlEscapedString | Promise<HtmlEs
 function DiffPane(props: SinglePaneProps): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, selected } = props;
   return (
-    <div class="diff-pane" data-pane="diff">
-      <div class="diff-pane__label">
+    <div class={diffPane} data-pane="diff">
+      <div class={diffPaneLabel}>
         <span>Diff</span>
         {selected.diffRatio === null ? null : (
           <span class="mono">{(selected.diffRatio * 100).toFixed(1)}%</span>
@@ -150,14 +161,14 @@ function DiffPane(props: SinglePaneProps): HtmlEscapedString | Promise<HtmlEscap
       </div>
       {selected.diffPath ? (
         <img
-          class="diff-pane__img"
+          class={diffPaneImg}
           src={imageUrl(project, build, selected, "diff")}
           alt={`Diff for ${selected.storyTitle} / ${selected.storyName}`}
           loading="lazy"
           decoding="async"
         />
       ) : (
-        <div class="diff-placeholder">
+        <div class={diffPlaceholder}>
           {selected.status === "unchanged" || selected.status === "approved"
             ? "No diff — within threshold"
             : "No diff yet"}
@@ -170,7 +181,7 @@ function DiffPane(props: SinglePaneProps): HtmlEscapedString | Promise<HtmlEscap
 /** View-mode segmented control (split / single pane). */
 function ViewSwitch(): HtmlEscapedString | Promise<HtmlEscapedString> {
   return (
-    <div class="segmented" role="group" aria-label="Diff view" data-view-switch>
+    <div class={viewSwitch} role="group" aria-label="Diff view" data-view-switch>
       <button type="button" data-view-value="split" aria-pressed="true">
         Split
       </button>
@@ -191,7 +202,7 @@ function ViewSwitch(): HtmlEscapedString | Promise<HtmlEscapedString> {
 function DiffPaneGrid(props: DiffPaneGridProps): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, selected, hasBaseline } = props;
   return (
-    <div class="diff-grid" data-view="split">
+    <div class={diffGrid} data-view="split">
       <BaselinePane project={project} build={build} selected={selected} hasBaseline={hasBaseline} />
       <CurrentPane project={project} build={build} selected={selected} />
       <DiffPane project={project} build={build} selected={selected} />
@@ -204,12 +215,12 @@ export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<
   const { project, build, selected, canReview, hasBaseline } = props;
   return (
     <Card>
-      <div class="review-bar">
+      <div class={reviewBar}>
         <div>
-          <h2 class="review-bar__title">
+          <h2 class={reviewBarTitle}>
             {selected.storyTitle} — {selected.storyName}
           </h2>
-          <p class="review-bar__meta">
+          <p class={reviewBarMeta}>
             <span>
               {selected.viewportName} · {selected.viewportWidth}×{selected.viewportHeight}
             </span>

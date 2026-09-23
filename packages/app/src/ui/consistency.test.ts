@@ -50,7 +50,7 @@ function countMatches(source: string, pattern: RegExp): number {
 describe("ui-building-blocks contract", () => {
   it("has no raw component classes in pages/", async () => {
     const forbidden =
-      /class="btn(?:"|\s)|class="tabs(?:"|\s)|tabs__link|class="badge(?:"|\s)|badge--[a-z]+|class="alert(?:"|\s)|alert--[a-z]+|alert__title|alert__body|class="empty(?:"|\s)|empty__title|empty__desc|empty__action|class="stat(?:"|\s)|stat__value|stat__label|class="field(?:"|\s)|field__label|field__input|field__hint|field__error|class="card(?:"|\s)|card--padded|class="page-header(?:"|\s)|page-header__title|page-header__desc|page-header__meta|page-header__actions|page-header__row|class="breadcrumbs(?:"|\s)/u;
+      /class="btn(?:"|\s)|class="tabs(?:"|\s)|tabs__link|class="badge(?:"|\s)|badge--[a-z]+|class="alert(?:"|\s)|alert--[a-z]+|alert__title|alert__body|class="empty(?:"|\s)|empty__title|empty__desc|empty__action|class="stat(?:"|\s)|stat__value|stat__label|class="field(?:"|\s)|field__label|field__input|field__hint|field__error|class="card(?:"|\s)|card--padded|class="page-header(?:"|\s)|page-header__title|page-header__desc|page-header__meta|page-header__actions|page-header__row|class="breadcrumbs(?:"|\s)|class="diff-[a-z-]+|class="review-[a-z-]+|class="snapshot-[a-z-]+|class="segmented(?:"|\s)|comment__head|comment__body|comment__actions/u;
     // Exception: the root landing hero is a one-off marketing block with
     // custom centering/padding that no primitive covers. Everything else
     // in root.tsx must comply.
@@ -65,9 +65,9 @@ describe("ui-building-blocks contract", () => {
     expect(offenders.map(({ file }) => file)).toEqual([]);
   });
 
-  it("imports UI only through the facade and the document shell", async () => {
+  it("imports UI only through the facade, the document shell, and shared review styles", async () => {
     const directImport =
-      /from\s+"\.\.\/ui\/(?!components\.tsx|document\.tsx|csrf-field\.tsx)[^"]+"/u;
+      /from\s+"\.\.\/ui\/(?!components\.tsx|document\.tsx|csrf-field\.tsx|styles\/review\.ts)[^"]+"/u;
     const offenders = (await pageSources()).filter(({ source }) => directImport.test(source));
     expect(offenders.map(({ file }) => file)).toEqual([]);
   });

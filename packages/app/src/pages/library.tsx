@@ -26,6 +26,14 @@ import {
   SelectField,
 } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
+import {
+  diffPaneImg,
+  snapshotCard,
+  snapshotCardBody,
+  snapshotCardHead,
+  snapshotCardMeta,
+  snapshotGrid,
+} from "../ui/styles/review.ts";
 
 /** Library page: gallery grouped by title from latest build on selected branch. */
 export async function renderLibraryPage(
@@ -353,10 +361,8 @@ function renderViewportGroup(
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
   return (
     <div key={vName}>
-      {hasMultipleViewports ? (
-        <h3 style="margin:0 0 .5rem; font-size:.9rem; color:var(--text-secondary);">{vName}</h3>
-      ) : null}
-      <div class="snapshot-grid">
+      {hasMultipleViewports ? <SectionTitle level={3}>{vName}</SectionTitle> : null}
+      <div class={snapshotGrid}>
         {snaps
           .toSorted((a, b) => a.storyName.localeCompare(b.storyName))
           .map((snap) => renderSnapshotCard(snap, project, build, docsByStory))}
@@ -373,24 +379,22 @@ function renderSnapshotCard(
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
   const docsId = docsByStory.get(snap.storyId);
   return (
-    <div key={snap.id} class="snapshot-card">
-      <div class="snapshot-card__head">
-        <span style="font-weight:650;">{snap.storyName}</span>
-        <span class="snapshot-card__meta">
+    <div key={snap.id} class={snapshotCard}>
+      <div class={snapshotCardHead}>
+        <strong>{snap.storyName}</strong>
+        <span class={snapshotCardMeta}>
           {snap.viewportWidth}×{snap.viewportHeight}
         </span>
       </div>
-      <div class="snapshot-card__body">
+      <div class={snapshotCardBody}>
         <img
-          class="diff-pane__img"
+          class={diffPaneImg}
           src={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${snap.id}/image`}
           alt={`${snap.storyTitle} / ${snap.storyName}`}
           loading="lazy"
           style="max-height:240px; object-fit:contain;"
         />
-        <div style="display:flex; gap:.4rem; flex-wrap:wrap;">
-          {renderCardActions(snap, project, build, docsId)}
-        </div>
+        <div class="row-actions">{renderCardActions(snap, project, build, docsId)}</div>
       </div>
     </div>
   );

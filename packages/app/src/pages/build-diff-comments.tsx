@@ -2,7 +2,13 @@ import type { Build } from "@storyshelf/core/schema";
 import type { Comment } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge, Button, Card, Meta, TextareaField } from "../ui/components.tsx";
+import { Badge, Button, Card, Meta, SectionTitle, TextareaField } from "../ui/components.tsx";
+import {
+  reviewComment,
+  reviewCommentActions,
+  reviewCommentBody,
+  reviewCommentHead,
+} from "../ui/styles/review.ts";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -26,20 +32,20 @@ interface CommentCardProps {
 function CommentCard(props: CommentCardProps): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, comment, canReview } = props;
   return (
-    <div key={comment.id} class="comment">
-      <div class="comment__head">
+    <div key={comment.id} class={reviewComment}>
+      <div class={reviewCommentHead}>
         <strong>{comment.userId ?? "anonymous"}</strong>
         <span>· {new Date(comment.createdAt).toLocaleString()}</span>
         {comment.resolved ? <Badge tone="success">resolved</Badge> : null}
       </div>
-      <p class="comment__body">{comment.body}</p>
+      <p class={reviewCommentBody}>{comment.body}</p>
       {!comment.resolved && canReview ? (
         <form
           method="post"
           action={`/api/v1/projects/${project.slug}/builds/${build.id}/comments/${comment.id}/resolve`}
           hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/comments/${comment.id}/resolve`}
           hx-target="body"
-          class="comment__actions"
+          class={reviewCommentActions}
         >
           <Button variant="ghost" size="sm" type="submit">
             Mark resolved
@@ -92,7 +98,7 @@ export function DiffComments(
   const visible = comments.filter((c) => !c.snapshotId || c.snapshotId === selectedId);
   return (
     <Card>
-      <h3 class="review-bar__title">Comments</h3>
+      <SectionTitle level={3}>Comments</SectionTitle>
       <div class="stack">
         {visible.map((comment): HtmlEscapedString | Promise<HtmlEscapedString> => (
           <CommentCard
