@@ -5,6 +5,7 @@ import {
   Alert,
   Badge,
   Button,
+  Card,
   Field,
   Meta,
   SelectField,
@@ -86,7 +87,7 @@ const StatusCreateCard: FC<{
   formState?: StatusFormState;
 }> = ({ project, providers, formState }) => {
   return (
-    <div class="card card--padded">
+    <Card>
       <h3 style="margin:0 0 .5rem;">Add git provider</h3>
       <form
         method="post"
@@ -122,7 +123,7 @@ const StatusCreateCard: FC<{
           Add git provider
         </Button>
       </form>
-    </div>
+    </Card>
   );
 };
 
@@ -151,7 +152,7 @@ export function renderSettingsStatus(
     <div class="grid max-w-form">
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
 
-      <div class="card card--padded">
+      <Card>
         <h2 style="margin:0 0 .3rem;">Git status</h2>
         <Meta>
           Post commit statuses to a git provider so visual tests show up in your PR checks. Status
@@ -185,7 +186,7 @@ export function renderSettingsStatus(
         {statusConfigs.length === 0 ? (
           <Meta>No git providers configured for this project.</Meta>
         ) : null}
-      </div>
+      </Card>
 
       {isAdmin ? renderCreateSection(project, providers, formState) : null}
     </div>

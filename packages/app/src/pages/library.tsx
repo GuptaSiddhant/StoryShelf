@@ -15,7 +15,16 @@ import {
 import type { HtmlEscapedString } from "hono/utils/html";
 import { posix } from "node:path";
 import { getStore } from "../store.ts";
-import { Button, EmptyState, Meta, SelectField } from "../ui/components.tsx";
+import {
+  Button,
+  Card,
+  CardSection,
+  EmptyState,
+  Meta,
+  PageHeader,
+  SectionTitle,
+  SelectField,
+} from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
 /** Library page: gallery grouped by title from latest build on selected branch. */
@@ -150,12 +159,12 @@ function renderEmptyLibrary(project: Project): RenderedContent {
       title="Library"
       nav={{ active: "library", projectSlug: project.slug, projectName: project.name }}
     >
-      <div class="page-header">
-        <h1 class="page-header__title">Library</h1>
-        <p class="page-header__desc">
-          All stories/components from the latest build on {project.gitDefaultBranch}.
-        </p>
-      </div>
+      <PageHeader
+        title="Library"
+        description={
+          <>All stories/components from the latest build on {project.gitDefaultBranch}.</>
+        }
+      />
       <EmptyState title="No builds yet" description="Upload a build to populate the library." />
     </DocumentLayout>
   );
@@ -167,12 +176,14 @@ function renderEmptySnapshots(project: Project, build: Build): RenderedContent {
       title="Library"
       nav={{ active: "library", projectSlug: project.slug, projectName: project.name }}
     >
-      <div class="page-header">
-        <h1 class="page-header__title">Library</h1>
-        <p class="page-header__desc">
-          Latest build {build.gitBranch} · {build.gitSha.slice(0, 7)} · {build.status}
-        </p>
-      </div>
+      <PageHeader
+        title="Library"
+        description={
+          <>
+            Latest build {build.gitBranch} · {build.gitSha.slice(0, 7)} · {build.status}
+          </>
+        }
+      />
       <EmptyState
         title="No stories in latest build"
         description="The latest build has no snapshots yet."
@@ -218,9 +229,9 @@ function renderLibraryGrid(
     >
       {renderLibraryHeader(project, build, snapshots.length, branches)}
       {multi ? (
-        <div class="card card--padded">
+        <Card>
           <Meta as="span">Viewports: {viewportNames.join(" · ")}</Meta>
-        </div>
+        </Card>
       ) : null}
       {renderTitleList(byTitle, project, build, multi, docsByStory)}
     </DocumentLayout>
@@ -234,21 +245,19 @@ function renderLibraryHeader(
   branches: string[],
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
   return (
-    <div class="page-header">
-      <div class="page-header__row">
-        <div>
-          <h1 class="page-header__title">Library</h1>
-          <p class="page-header__desc">
-            {storyCount} stories · Latest build{" "}
-            <a href={`/projects/${project.slug}/builds/${build.id}`}>
-              {build.gitBranch} · {build.gitSha.slice(0, 7)}
-            </a>{" "}
-            · {new Date(build.createdAt).toLocaleString()} · {build.status}
-          </p>
-        </div>
-        <div class="page-header__actions">{renderBranchPicker(project, build, branches)}</div>
-      </div>
-    </div>
+    <PageHeader
+      title="Library"
+      description={
+        <>
+          {storyCount} stories · Latest build{" "}
+          <a href={`/projects/${project.slug}/builds/${build.id}`}>
+            {build.gitBranch} · {build.gitSha.slice(0, 7)}
+          </a>{" "}
+          · {new Date(build.createdAt).toLocaleString()} · {build.status}
+        </>
+      }
+      actions={renderBranchPicker(project, build, branches)}
+    />
   );
 }
 
@@ -301,24 +310,26 @@ function renderTitleGroup(
   const byViewport = groupByViewport(group);
   const vNames = [...byViewport.keys()].toSorted();
   return (
-    <div key={title} class="card">
-      <div class="card--padded" style="border-bottom:1px solid var(--border);">
-        <h2 style="margin:0; font-size:1.1rem;">{title}</h2>
+    <Card key={title} padded={false}>
+      <CardSection divider>
+        <SectionTitle>{title}</SectionTitle>
         <Meta as="span">{group.length} stories</Meta>
-      </div>
-      <div style="padding:1rem; display:grid; gap:1rem;">
-        {vNames.map((vName) =>
-          renderViewportGroup(
-            vName,
-            byViewport.get(vName) ?? [],
-            project,
-            build,
-            hasMultipleViewports,
-            docsByStory,
-          ),
-        )}
-      </div>
-    </div>
+      </CardSection>
+      <CardSection>
+        <div class="stack">
+          {vNames.map((vName) =>
+            renderViewportGroup(
+              vName,
+              byViewport.get(vName) ?? [],
+              project,
+              build,
+              hasMultipleViewports,
+              docsByStory,
+            ),
+          )}
+        </div>
+      </CardSection>
+    </Card>
   );
 }
 

@@ -1,4 +1,4 @@
-import { Button, Meta } from "../ui/components.tsx";
+import { Button, Card, Meta } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
 /** Landing page introducing capture, diff, and review. */
@@ -35,26 +35,26 @@ export function renderRootPage(): RenderedContent {
       </div>
 
       <div class="grid grid--3" style="margin-top:1rem;">
-        <div class="card card--padded">
+        <Card>
           <h3 style="margin:0 0 .3rem;">Capture</h3>
           <Meta>
             Upload your Storybook build. Server renders stories with Playwright — deterministic, no
             repo cloning.
           </Meta>
-        </div>
-        <div class="card card--padded">
+        </Card>
+        <Card>
           <h3 style="margin:0 0 .3rem;">Diff</h3>
           <Meta>
             Pixel-perfect diff with pixelmatch. Configurable thresholds, overlay images stored on
             disk.
           </Meta>
-        </div>
-        <div class="card card--padded">
+        </Card>
+        <Card>
           <h3 style="margin:0 0 .3rem;">Review</h3>
           <Meta>
             Per-branch baselines with fallback to default. Approve changes per-story or bulk.
           </Meta>
-        </div>
+        </Card>
       </div>
     </DocumentLayout>
   );

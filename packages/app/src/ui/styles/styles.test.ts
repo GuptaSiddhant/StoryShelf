@@ -10,7 +10,6 @@ describe("baseStyle", () => {
       "--ring",
       "--surface-card",
       "--text-primary",
-      ".card",
       ".sidebar__link--active",
       ".diff-grid",
       ".review-bar",
@@ -21,7 +20,7 @@ describe("baseStyle", () => {
     }
   });
 
-  it("no longer carries button, feedback, or form styles (owned by hono/css)", () => {
+  it("no longer carries button, feedback, form, or layout styles (owned by hono/css)", () => {
     const css = baseStyle(LIGHT_THEME, DARK_THEME);
     expect(css).not.toContain(".btn--primary");
     expect(css).not.toContain(".tabs__link");
@@ -31,6 +30,9 @@ describe("baseStyle", () => {
     expect(css).not.toContain(".stat__value");
     expect(css).not.toContain(".field__input");
     expect(css).not.toContain(".field__label");
+    expect(css).not.toContain(".card--padded");
+    expect(css).not.toContain(".page-header__title");
+    expect(css).not.toContain(".breadcrumbs ol");
   });
 
   it("honors custom brand accent overrides", () => {

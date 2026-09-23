@@ -1,6 +1,6 @@
 import type { Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Alert, Badge, Button, Field, Meta } from "../ui/components.tsx";
+import { Alert, Badge, Button, Card, Field, Meta } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Webhook row as rendered in the webhooks settings tab. */
@@ -26,7 +26,7 @@ export function renderSettingsWebhooks(
       ) : null}
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
 
-      <div class="card card--padded">
+      <Card>
         <h2 style="margin:0 0 .3rem;">Webhooks</h2>
         <Meta>
           Notify external services when builds are created, updated, approved or rejected. Payloads
@@ -84,10 +84,10 @@ export function renderSettingsWebhooks(
           </table>
         </div>
         {webhooks.length === 0 ? <Meta>No webhooks configured.</Meta> : null}
-      </div>
+      </Card>
 
       {isAdmin ? (
-        <div class="card card--padded">
+        <Card>
           <h3 style="margin:0 0 .5rem;">Create webhook</h3>
           <form
             method="post"
@@ -114,7 +114,7 @@ export function renderSettingsWebhooks(
               Add webhook
             </Button>
           </form>
-        </div>
+        </Card>
       ) : null}
     </div>
   );

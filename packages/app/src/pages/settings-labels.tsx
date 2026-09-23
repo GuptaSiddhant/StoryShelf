@@ -1,7 +1,7 @@
 import type { LabelType } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge, Button, Field, Meta } from "../ui/components.tsx";
+import { Badge, Button, Card, Field, Meta } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Labels settings tab: label-type table plus the create-type form. */
@@ -12,7 +12,7 @@ export function renderSettingsLabels(
 ): unknown {
   return (
     <div class="grid max-w-form">
-      <div class="card card--padded">
+      <Card>
         <h2 style="margin:0 0 .3rem;">Label types</h2>
         <Meta>
           Labels attach typed values to builds (e.g. pr=123, jira=ABC-123). Values link out via the
@@ -65,10 +65,10 @@ export function renderSettingsLabels(
           </table>
         </div>
         {labelTypes.length === 0 ? <Meta>No label types configured.</Meta> : null}
-      </div>
+      </Card>
 
       {isAdmin ? (
-        <div class="card card--padded">
+        <Card>
           <h3 style="margin:0 0 .5rem;">Create label type</h3>
           <form
             method="post"
@@ -98,7 +98,7 @@ export function renderSettingsLabels(
               Add label type
             </Button>
           </form>
-        </div>
+        </Card>
       ) : null}
     </div>
   );

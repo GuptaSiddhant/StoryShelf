@@ -1,7 +1,7 @@
 import type { Project } from "@storyshelf/core/schema";
 import type { ProjectGroupMapping } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge, Button, Field, Meta, SelectField } from "../ui/components.tsx";
+import { Badge, Button, Card, Field, Meta, SelectField } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Project member row as rendered in the members settings tab. */
@@ -22,7 +22,7 @@ export function renderSettingsMembers(
 ): unknown {
   return (
     <div class="grid max-w-form">
-      <div class="card card--padded">
+      <Card>
         <h2 style="margin:0 0 .3rem;">Members</h2>
         <Meta>Project members and their roles. Site admins have implicit admin access.</Meta>
         <div class="table-wrap table-gap">
@@ -76,10 +76,10 @@ export function renderSettingsMembers(
           </table>
         </div>
         {members.length === 0 ? <Meta>No members yet.</Meta> : null}
-      </div>
+      </Card>
 
       {isAdmin ? (
-        <div class="card card--padded">
+        <Card>
           <h3 style="margin:0 0 .5rem;">Add member</h3>
           <form
             method="post"
@@ -103,89 +103,93 @@ export function renderSettingsMembers(
               Add member
             </Button>
           </form>
-        </div>
+        </Card>
       ) : null}
 
-      <div class="card card--padded mt-1">
-        <h3 style="margin:0 0 .3rem;">Identity-provider group mappings</h3>
-        <Meta>
-          Map an IdP group (name or provider ID, exact match) to a project role. Members sync at
-          next login; removing a mapping revokes synced grants but never manual ones. Wildcards are
-          not expanded.
-        </Meta>
-        <div class="table-wrap table-gap">
-          <table>
-            <thead>
-              <tr>
-                <th>Group</th>
-                <th>Role</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {groupMappings.map((mapping): HtmlEscapedString | Promise<HtmlEscapedString> => (
-                <tr key={mapping.id}>
-                  <td>
-                    <code>{mapping.groupName}</code>
-                  </td>
-                  <td>
-                    <Badge tone={mapping.role === "admin" ? "danger" : "info"}>
-                      {mapping.role}
-                    </Badge>
-                  </td>
-                  <td>
-                    {isAdmin ? (
-                      <form
-                        method="post"
-                        action={`/projects/${project.slug}/settings/members/groups/${mapping.id}/remove`}
-                        hx-post={`/projects/${project.slug}/settings/members/groups/${mapping.id}/remove`}
-                        hx-target="body"
-                      >
-                        {csrfField()}
-                        <Button variant="ghost" type="submit">
-                          Remove
-                        </Button>
-                      </form>
-                    ) : null}
-                  </td>
+      <div class="mt-1">
+        <Card>
+          <h3 style="margin:0 0 .3rem;">Identity-provider group mappings</h3>
+          <Meta>
+            Map an IdP group (name or provider ID, exact match) to a project role. Members sync at
+            next login; removing a mapping revokes synced grants but never manual ones. Wildcards
+            are not expanded.
+          </Meta>
+          <div class="table-wrap table-gap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Group</th>
+                  <th>Role</th>
+                  <th></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {groupMappings.length === 0 ? <Meta>No group mappings yet.</Meta> : null}
+              </thead>
+              <tbody>
+                {groupMappings.map((mapping): HtmlEscapedString | Promise<HtmlEscapedString> => (
+                  <tr key={mapping.id}>
+                    <td>
+                      <code>{mapping.groupName}</code>
+                    </td>
+                    <td>
+                      <Badge tone={mapping.role === "admin" ? "danger" : "info"}>
+                        {mapping.role}
+                      </Badge>
+                    </td>
+                    <td>
+                      {isAdmin ? (
+                        <form
+                          method="post"
+                          action={`/projects/${project.slug}/settings/members/groups/${mapping.id}/remove`}
+                          hx-post={`/projects/${project.slug}/settings/members/groups/${mapping.id}/remove`}
+                          hx-target="body"
+                        >
+                          {csrfField()}
+                          <Button variant="ghost" type="submit">
+                            Remove
+                          </Button>
+                        </form>
+                      ) : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {groupMappings.length === 0 ? <Meta>No group mappings yet.</Meta> : null}
+        </Card>
       </div>
 
       {isAdmin ? (
-        <div class="card card--padded mt-1">
-          <h3 style="margin:0 0 .5rem;">Add group mapping</h3>
-          <form
-            method="post"
-            action={`/projects/${project.slug}/settings/members/groups`}
-            hx-post={`/projects/${project.slug}/settings/members/groups`}
-            hx-target="body"
-          >
-            {csrfField()}
-            <Field
-              label="Group name or ID (exact match)"
-              name="groupName"
-              required
-              placeholder="team-design"
-            />
-            <SelectField
-              label="Role"
-              name="role"
-              options={[
-                { value: "viewer", label: "viewer" },
-                { value: "developer", label: "developer" },
-                { value: "approver", label: "approver" },
-                { value: "admin", label: "admin" },
-              ]}
-            />
-            <Button variant="primary" type="submit">
-              Add mapping
-            </Button>
-          </form>
+        <div class="mt-1">
+          <Card>
+            <h3 style="margin:0 0 .5rem;">Add group mapping</h3>
+            <form
+              method="post"
+              action={`/projects/${project.slug}/settings/members/groups`}
+              hx-post={`/projects/${project.slug}/settings/members/groups`}
+              hx-target="body"
+            >
+              {csrfField()}
+              <Field
+                label="Group name or ID (exact match)"
+                name="groupName"
+                required
+                placeholder="team-design"
+              />
+              <SelectField
+                label="Role"
+                name="role"
+                options={[
+                  { value: "viewer", label: "viewer" },
+                  { value: "developer", label: "developer" },
+                  { value: "approver", label: "approver" },
+                  { value: "admin", label: "admin" },
+                ]}
+              />
+              <Button variant="primary" type="submit">
+                Add mapping
+              </Button>
+            </form>
+          </Card>
         </div>
       ) : null}
     </div>

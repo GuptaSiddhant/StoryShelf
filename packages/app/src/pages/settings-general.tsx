@@ -1,5 +1,5 @@
 import type { Project } from "@storyshelf/core/schema";
-import { Alert, Button, Field, Meta, SelectField } from "../ui/components.tsx";
+import { Alert, Button, Card, Field, Meta, SelectField } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Form state for the settings tabs (field errors and global error). */
@@ -19,7 +19,7 @@ export function renderSettingsGeneral(
   return (
     <div class="grid max-w-form">
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
-      <div class="card card--padded">
+      <Card>
         <h2 style="margin:0 0 .5rem;">General</h2>
         <form
           method="post"
@@ -87,10 +87,10 @@ export function renderSettingsGeneral(
             <Meta>You need admin access to edit settings.</Meta>
           )}
         </form>
-      </div>
+      </Card>
 
       {isAdmin ? (
-        <div class="card card--padded" style="border-color: var(--status-rejected);">
+        <Card tone="danger">
           <h3 style="margin:0 0 .4rem; color: var(--status-rejected);">Danger zone</h3>
           <Meta>
             Deleting a project removes all builds, snapshots, baselines and tokens. This cannot be
@@ -107,7 +107,7 @@ export function renderSettingsGeneral(
               Delete project
             </Button>
           </form>
-        </div>
+        </Card>
       ) : null}
     </div>
   );

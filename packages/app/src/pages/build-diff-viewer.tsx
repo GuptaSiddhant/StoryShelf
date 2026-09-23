@@ -2,7 +2,7 @@ import type { Build } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge, Button, Meta, statusTone } from "../ui/components.tsx";
+import { Badge, Button, Card, Meta, statusTone } from "../ui/components.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -203,7 +203,7 @@ function DiffPaneGrid(props: DiffPaneGridProps): HtmlEscapedString | Promise<Htm
 export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, selected, canReview, hasBaseline } = props;
   return (
-    <div class="card card--padded">
+    <Card>
       <div class="review-bar">
         <div>
           <h2 class="review-bar__title">
@@ -237,6 +237,6 @@ export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<
           Keyboard: <kbd>←</kbd> <kbd>→</kbd> navigate · <kbd>a</kbd> approve · <kbd>r</kbd> reject
         </Meta>
       </div>
-    </div>
+    </Card>
   );
 }

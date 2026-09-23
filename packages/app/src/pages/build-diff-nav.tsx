@@ -2,7 +2,7 @@ import type { Build } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge, Meta, statusTone } from "../ui/components.tsx";
+import { Badge, Card, Meta, statusTone } from "../ui/components.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -19,7 +19,7 @@ export function DiffNav(props: DiffNavProps): HtmlEscapedString | Promise<HtmlEs
   const { project, build, snapshots, selectedId } = props;
   return (
     <div class="review-nav">
-      <div class="card">
+      <Card padded={false}>
         <div class="review-nav__head">
           <strong>Snapshots</strong>
           <Meta as="span">{snapshots.length} total</Meta>
@@ -51,7 +51,7 @@ export function DiffNav(props: DiffNavProps): HtmlEscapedString | Promise<HtmlEs
             </a>
           ))}
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

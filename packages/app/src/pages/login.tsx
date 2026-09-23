@@ -1,4 +1,4 @@
-import { Alert, Button, Field } from "../ui/components.tsx";
+import { Alert, Button, Card, Field, PageHeader } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
 /** Form state for the sign-in page (SSO link and error message). */
@@ -12,8 +12,8 @@ export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
   return (
     <DocumentLayout title="Sign in">
       <div class="login">
-        <div class="card card--padded">
-          <h1 class="page-header__title">Sign in</h1>
+        <Card>
+          <PageHeader title="Sign in" />
 
           {state.error ? (
             <Alert tone="danger" title="Could not sign in">
@@ -43,7 +43,7 @@ export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
               </Button>
             </div>
           ) : null}
-        </div>
+        </Card>
       </div>
     </DocumentLayout>
   );

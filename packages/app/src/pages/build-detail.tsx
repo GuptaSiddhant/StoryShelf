@@ -18,8 +18,10 @@ import { getStore } from "../store.ts";
 import {
   Badge,
   Button,
+  Card,
   EmptyState,
   Meta,
+  PageHeader,
   Stat,
   TextareaField,
   statusTone,
@@ -80,40 +82,24 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
       title={`Build ${build.gitBranch}`}
       nav={{ active: "builds", projectSlug: project.slug, projectName: project.name }}
     >
-      <div class="page-header">
-        <nav class="breadcrumbs" aria-label="Breadcrumb">
-          <ol>
-            <li>
-              <a href="/projects">Projects</a>
-            </li>
-            <li>
-              <a href={`/projects/${project.slug}/builds`}>{project.name}</a>
-            </li>
-            <li>
-              <span aria-current="page">
-                {build.gitBranch} · {build.gitSha.slice(0, 7)}
-              </span>
-            </li>
-          </ol>
-        </nav>
-        <div class="page-header__row">
-          <div>
-            <h1 class="page-header__title">
-              {build.gitBranch}{" "}
-              <span style="color:var(--text-secondary); font-weight:400;">
-                · {build.gitSha.slice(0, 7)}
-              </span>{" "}
-              <Badge tone={statusTone(build.status)}>{build.status}</Badge>
-            </h1>
-            <p class="page-header__desc">
-              {build.message ?? "No commit message"}{" "}
-              {build.authorName
-                ? `· ${build.authorName}${build.authorEmail ? ` <${build.authorEmail}>` : ""}`
-                : ""}{" "}
-              · {new Date(build.createdAt).toLocaleString()}
-            </p>
-          </div>
-          <div class="page-header__actions">
+      <PageHeader
+        title={
+          <>
+            {build.gitBranch} <Meta as="span">· {build.gitSha.slice(0, 7)}</Meta>{" "}
+            <Badge tone={statusTone(build.status)}>{build.status}</Badge>
+          </>
+        }
+        description={
+          <>
+            {build.message ?? "No commit message"}{" "}
+            {build.authorName
+              ? `· ${build.authorName}${build.authorEmail ? ` <${build.authorEmail}>` : ""}`
+              : ""}{" "}
+            · {new Date(build.createdAt).toLocaleString()}
+          </>
+        }
+        actions={
+          <>
             <Button variant="primary" href={`/projects/${project.slug}/builds/${build.id}/diff`}>
               Review diffs
             </Button>
@@ -127,24 +113,29 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
                 Retry capture
               </Button>
             </form>
-          </div>
-        </div>
-      </div>
+          </>
+        }
+        breadcrumbs={[
+          { label: "Projects", href: "/projects" },
+          { label: project.name, href: `/projects/${project.slug}/builds` },
+          { label: `${build.gitBranch} · ${build.gitSha.slice(0, 7)}` },
+        ]}
+      />
 
       <div class="grid grid--3" style="margin-bottom:1rem;">
-        <div class="card card--padded">
+        <Card>
           <Stat label="Snapshots" value={snapshots.length} />
-        </div>
-        <div class="card card--padded">
+        </Card>
+        <Card>
           <Stat label="Changed / new" value={build.changedCount} tone="warning" />
-        </div>
-        <div class="card card--padded">
+        </Card>
+        <Card>
           <Stat label="Approved / unchanged" value={build.approvedCount} tone="success" />
-        </div>
+        </Card>
       </div>
 
       {attempts.length > 0 ? (
-        <div class="card card--padded">
+        <Card>
           <h2 style="margin:0 0 .5rem;">Capture attempts</h2>
           {attempts.map((attempt, index): HtmlEscapedString | Promise<HtmlEscapedString> => (
             <details key={attempt.id} open={index === attempts.length - 1}>
@@ -170,36 +161,37 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
               </div>
             </details>
           ))}
-        </div>
+        </Card>
       ) : null}
 
       {canReview && (build.status === "reviewing" || build.status === "comparing") ? (
-        <div
-          class="card card--padded"
-          style="display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; margin-bottom:1rem;"
-        >
-          <Meta as="span">Bulk actions:</Meta>
-          <form
-            method="post"
-            action={`/api/v1/projects/${project.slug}/builds/${build.id}/approve-all`}
-            hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/approve-all`}
-            hx-target="body"
-          >
-            <Button variant="primary" type="submit">
-              Approve all
-            </Button>
-          </form>
-          <form
-            method="post"
-            action={`/api/v1/projects/${project.slug}/builds/${build.id}/reject-all`}
-            hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/reject-all`}
-            hx-target="body"
-          >
-            <Button variant="danger" type="submit">
-              Reject all
-            </Button>
-          </form>
-          <Meta as="span">Or review individually in the diff view.</Meta>
+        <div class="mb-1">
+          <Card>
+            <div class="row-actions">
+              <Meta as="span">Bulk actions:</Meta>
+              <form
+                method="post"
+                action={`/api/v1/projects/${project.slug}/builds/${build.id}/approve-all`}
+                hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/approve-all`}
+                hx-target="body"
+              >
+                <Button variant="primary" type="submit">
+                  Approve all
+                </Button>
+              </form>
+              <form
+                method="post"
+                action={`/api/v1/projects/${project.slug}/builds/${build.id}/reject-all`}
+                hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/reject-all`}
+                hx-target="body"
+              >
+                <Button variant="danger" type="submit">
+                  Reject all
+                </Button>
+              </form>
+              <Meta as="span">Or review individually in the diff view.</Meta>
+            </div>
+          </Card>
         </div>
       ) : null}
 
@@ -271,52 +263,54 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
         </div>
       )}
 
-      <div class="card card--padded mt-1">
-        <h2 style="margin:0 0 .5rem;">Comments</h2>
-        {comments.length === 0 ? (
-          <Meta>No comments. Add one in the diff review page for a specific snapshot.</Meta>
-        ) : null}
-        <div style="display:grid; gap:.6rem;">
-          {comments.map((comment): HtmlEscapedString | Promise<HtmlEscapedString> => (
-            <div key={comment.id} class="comment">
-              <div class="comment__head">
-                <strong>{comment.userId ?? "anonymous"}</strong>
-                <span>· {new Date(comment.createdAt).toLocaleString()}</span>
-                {comment.snapshotId ? (
-                  <Badge tone="neutral">
-                    {snapshots.find((snapshot) => snapshot.id === comment.snapshotId)?.storyName ??
-                      comment.snapshotId.slice(0, 6)}
-                  </Badge>
-                ) : (
-                  <Badge tone="neutral">build</Badge>
-                )}
-                {comment.resolved ? <Badge tone="success">resolved</Badge> : null}
+      <div class="mt-1">
+        <Card>
+          <h2 style="margin:0 0 .5rem;">Comments</h2>
+          {comments.length === 0 ? (
+            <Meta>No comments. Add one in the diff review page for a specific snapshot.</Meta>
+          ) : null}
+          <div style="display:grid; gap:.6rem;">
+            {comments.map((comment): HtmlEscapedString | Promise<HtmlEscapedString> => (
+              <div key={comment.id} class="comment">
+                <div class="comment__head">
+                  <strong>{comment.userId ?? "anonymous"}</strong>
+                  <span>· {new Date(comment.createdAt).toLocaleString()}</span>
+                  {comment.snapshotId ? (
+                    <Badge tone="neutral">
+                      {snapshots.find((snapshot) => snapshot.id === comment.snapshotId)
+                        ?.storyName ?? comment.snapshotId.slice(0, 6)}
+                    </Badge>
+                  ) : (
+                    <Badge tone="neutral">build</Badge>
+                  )}
+                  {comment.resolved ? <Badge tone="success">resolved</Badge> : null}
+                </div>
+                <p class="comment__body">{comment.body}</p>
               </div>
-              <p class="comment__body">{comment.body}</p>
-            </div>
-          ))}
-        </div>
-
-        <form
-          method="post"
-          action={`/api/v1/projects/${project.slug}/builds/${build.id}/comments`}
-          hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/comments`}
-          hx-target="body"
-          class="stack mt-1 max-w-prose"
-        >
-          <TextareaField
-            label="Add build comment"
-            name="body"
-            rows={3}
-            required
-            placeholder="Leave a comment on this build…"
-          />
-          <div>
-            <Button variant="primary" type="submit">
-              Comment
-            </Button>
+            ))}
           </div>
-        </form>
+
+          <form
+            method="post"
+            action={`/api/v1/projects/${project.slug}/builds/${build.id}/comments`}
+            hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/comments`}
+            hx-target="body"
+            class="stack mt-1 max-w-prose"
+          >
+            <TextareaField
+              label="Add build comment"
+              name="body"
+              rows={3}
+              required
+              placeholder="Leave a comment on this build…"
+            />
+            <div>
+              <Button variant="primary" type="submit">
+                Comment
+              </Button>
+            </div>
+          </form>
+        </Card>
       </div>
     </DocumentLayout>
   );

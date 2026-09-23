@@ -2,7 +2,7 @@ import type { Build } from "@storyshelf/core/schema";
 import type { Comment } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge, Button, Meta, TextareaField } from "../ui/components.tsx";
+import { Badge, Button, Card, Meta, TextareaField } from "../ui/components.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -91,7 +91,7 @@ export function DiffComments(
   const { project, build, selectedId, comments, canReview } = props;
   const visible = comments.filter((c) => !c.snapshotId || c.snapshotId === selectedId);
   return (
-    <div class="card card--padded">
+    <Card>
       <h3 class="review-bar__title">Comments</h3>
       <div class="stack">
         {visible.map((comment): HtmlEscapedString | Promise<HtmlEscapedString> => (
@@ -107,6 +107,6 @@ export function DiffComments(
       </div>
 
       <CommentForm project={project} build={build} selectedId={selectedId} />
-    </div>
+    </Card>
   );
 }

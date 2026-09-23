@@ -8,7 +8,16 @@ import {
 } from "@storyshelf/db-sqlite/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { getStore } from "../store.ts";
-import { Badge, Button, EmptyState, Meta, statusTone } from "../ui/components.tsx";
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Meta,
+  PageHeader,
+  SectionTitle,
+  statusTone,
+} from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 interface QueueView {
   buildId: string;
@@ -22,15 +31,14 @@ interface QueueView {
 /** Live-refreshing partial showing the currently queued and running captures. */
 export function renderActiveQueue(slug: string, queueView: QueueView[]): RenderedContent {
   return (
-    <div
-      class="card card--padded"
+    <Card
       id="active-queue"
       hx-get={`/projects/${slug}/jobs?partial=queue`}
       hx-trigger="every 5s"
       hx-swap="outerHTML"
       hx-target="#active-queue"
     >
-      <h2 style="margin:0 0 .5rem;">Active queue</h2>
+      <SectionTitle>Active queue</SectionTitle>
       {queueView.length === 0 ? (
         <Meta>No captures are currently queued or running.</Meta>
       ) : (
@@ -69,7 +77,7 @@ export function renderActiveQueue(slug: string, queueView: QueueView[]): Rendere
           </table>
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -97,39 +105,24 @@ export async function renderComputeJobsPage(
       title={`${project.name} · Compute jobs`}
       nav={{ active: "builds", projectSlug: project.slug, projectName: project.name }}
     >
-      <div class="page-header">
-        <nav class="breadcrumbs" aria-label="Breadcrumb">
-          <ol>
-            <li>
-              <a href="/projects">Projects</a>
-            </li>
-            <li>
-              <a href={`/projects/${project.slug}/builds`}>{project.name}</a>
-            </li>
-            <li>
-              <span aria-current="page">Compute jobs</span>
-            </li>
-          </ol>
-        </nav>
-        <div class="page-header__row">
-          <div>
-            <h1 class="page-header__title">Compute jobs</h1>
-            <p class="page-header__desc">
-              Capture jobs run on this server. Queued and running jobs refresh live; recent history
-              is below.
-            </p>
-          </div>
-          <div class="page-header__actions">
-            <Button variant="secondary" href={`/projects/${project.slug}/builds`}>
-              Back to builds
-            </Button>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Compute jobs"
+        description="Capture jobs run on this server. Queued and running jobs refresh live; recent history is below."
+        actions={
+          <Button variant="secondary" href={`/projects/${project.slug}/builds`}>
+            Back to builds
+          </Button>
+        }
+        breadcrumbs={[
+          { label: "Projects", href: "/projects" },
+          { label: project.name, href: `/projects/${project.slug}/builds` },
+          { label: "Compute jobs" },
+        ]}
+      />
 
       {renderActiveQueue(project.slug, queueView)}
 
-      <div class="card card--padded">
+      <Card>
         <h2 style="margin:0 0 .3rem;">Recent builds</h2>
         <Meta>Capture history for {project.name}. Failed jobs can be retried.</Meta>
         <div class="table-wrap table-gap">
@@ -198,7 +191,7 @@ export async function renderComputeJobsPage(
           </table>
         </div>
         {recentBuilds.length === 0 ? <EmptyState description="No builds yet." /> : null}
-      </div>
+      </Card>
     </DocumentLayout>
   );
 }

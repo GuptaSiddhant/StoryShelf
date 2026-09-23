@@ -18,7 +18,8 @@ this — keep it green and lower its per-file style ceilings as you migrate.
 
 - **Pages** (`pages/*.tsx`) may import UI only from the facade
   (`../ui/components.tsx`: `Button`, `Tabs`, `Badge`, `Alert`, `EmptyState`,
-  `Stat`, `Field`, `TextareaField`, `SelectField`, `Card`, `PageHeader`) and
+  `Stat`, `Field`, `TextareaField`, `SelectField`, `CheckField`, `Card`,
+  `CardSection`, `PageHeader`, `SectionTitle`, `Meta`) and
   the shell (`../ui/document.tsx`: `DocumentLayout`). Never import a family
   module (`buttons.tsx`, `feedback.tsx`, …) directly.
 - **No raw classes in pages:** `class="btn…"`, `class="tabs…"`,
@@ -27,6 +28,13 @@ this — keep it green and lower its per-file style ceilings as you migrate.
 - **No `style="…"` in pages.** If a layout recurs, add a block component
   (`Stack`, `Row`, `TableActions`, `SectionTitle`) to the facade; one-off
   spacing is a design smell, not an exception.
+- **Sanctioned utilities** (the only raw classes allowed in `pages/`):
+  layout flow (`grid`, `grid--2/3`, `stack`, `row-actions`, `mt-1`, `mb-1`,
+  `max-w-form`, `max-w-prose`, `table-wrap`, `table-gap`), text
+  (`muted`, `mono`, `truncate`), shell (`content`, `login`). Everything
+  else must be a facade component.
+- **Documented exceptions** (in `ui/consistency.test.ts`, nowhere else):
+  the root landing hero keeps one raw `card` div (unique marketing style).
 - **Inline/table/card actions use `size="sm"`** (32px). `md` (40px) is for
   standalone forms and page-header primary actions only.
 

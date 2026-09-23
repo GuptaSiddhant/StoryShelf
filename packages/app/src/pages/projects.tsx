@@ -8,7 +8,7 @@ import {
 } from "@storyshelf/db-sqlite/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { getStore } from "../store.ts";
-import { Badge, Button, EmptyState, Meta } from "../ui/components.tsx";
+import { Badge, Button, Card, EmptyState, Meta, PageHeader } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 /** Projects overview page: project cards with latest build plus next steps. */
 export async function renderProjectsPage(): Promise<RenderedContent> {
@@ -28,23 +28,17 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
 
   return (
     <DocumentLayout title="Projects" nav={{ active: "projects" }}>
-      <div class="page-header">
-        <div class="page-header__row">
-          <div>
-            <h1 class="page-header__title">Projects</h1>
-            <p class="page-header__desc">
-              Each project is one Storybook. Create a project, then upload builds from CI.
-            </p>
-          </div>
-          <div class="page-header__actions">
-            {canCreate ? (
-              <Button variant="primary" href="/projects/new">
-                New project
-              </Button>
-            ) : null}
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Projects"
+        description="Each project is one Storybook. Create a project, then upload builds from CI."
+        actions={
+          canCreate ? (
+            <Button variant="primary" href="/projects/new">
+              New project
+            </Button>
+          ) : null
+        }
+      />
 
       {projects.length === 0 ? (
         <EmptyState
@@ -63,7 +57,7 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
           {projects.map((project): HtmlEscapedString | Promise<HtmlEscapedString> => {
             const info = countsBySlug.get(project.slug);
             return (
-              <div key={project.id} class="card card--padded">
+              <Card key={project.id}>
                 <div
                   class="row-actions"
                   style="justify-content:space-between; align-items:flex-start; gap:1rem;"
@@ -105,32 +99,34 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
                     </Button>
                   </div>
                 </div>
-              </div>
+              </Card>
             );
           })}
         </div>
       )}
 
-      <div class="card card--padded mt-1">
-        <h3 class="review-bar__title">Next steps</h3>
-        <ol class="muted" style="margin:.4rem 0 0; padding-left:1.2rem;">
-          <li>
-            Create a project (or run{" "}
-            <code>
-              npx storyshelf create --url http://localhost:3000 --name "My Storybook" --token
-              $STORYSHELF_ADMIN_TOKEN
-            </code>
-            , or <code>init --url --slug</code> to write <code>.storybook/storyshelf.json</code>)
-          </li>
-          <li>
-            Generate a token in <strong>Settings → Tokens</strong> and set{" "}
-            <code>STORYSHELF_TOKEN</code> in CI.
-          </li>
-          <li>
-            Upload: <code>npx storyshelf upload</code> (or <code>npx storyshelf</code> defaults to
-            upload when config exists)
-          </li>
-        </ol>
+      <div class="mt-1">
+        <Card>
+          <h3 class="review-bar__title">Next steps</h3>
+          <ol class="muted" style="margin:.4rem 0 0; padding-left:1.2rem;">
+            <li>
+              Create a project (or run{" "}
+              <code>
+                npx storyshelf create --url http://localhost:3000 --name "My Storybook" --token
+                $STORYSHELF_ADMIN_TOKEN
+              </code>
+              , or <code>init --url --slug</code> to write <code>.storybook/storyshelf.json</code>)
+            </li>
+            <li>
+              Generate a token in <strong>Settings → Tokens</strong> and set{" "}
+              <code>STORYSHELF_TOKEN</code> in CI.
+            </li>
+            <li>
+              Upload: <code>npx storyshelf upload</code> (or <code>npx storyshelf</code> defaults to
+              upload when config exists)
+            </li>
+          </ol>
+        </Card>
       </div>
     </DocumentLayout>
   );

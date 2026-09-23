@@ -30,5 +30,6 @@ function utilityCss(): string {
     .max-w-prose { max-width: 640px; }
     .table-gap { margin-top: .75rem; }
     .mt-1 { margin-top: 1rem; }
+    .mb-1 { margin-bottom: 1rem; }
     @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }`;
 }

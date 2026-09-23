@@ -11,9 +11,11 @@ import { getStore } from "../store.ts";
 import {
   Badge,
   Button,
+  Card,
   EmptyState,
   Field,
   Meta,
+  PageHeader,
   SelectField,
   statusTone,
 } from "../ui/components.tsx";
@@ -42,38 +44,28 @@ export async function renderProjectBuildsPage(
       title={project.name}
       nav={{ active: "builds", projectSlug: project.slug, projectName: project.name }}
     >
-      <div class="page-header">
-        <nav class="breadcrumbs" aria-label="Breadcrumb">
-          <ol>
-            <li>
-              <a href="/projects">Projects</a>
-            </li>
-            <li>
-              <span aria-current="page">{project.name}</span>
-            </li>
-          </ol>
-        </nav>
-        <div class="page-header__row">
-          <div>
-            <h1 class="page-header__title">{project.name}</h1>
-            <p class="page-header__desc">
-              <code>{project.slug}</code>{" "}
-              {project.gitRepository ? `· ${project.gitRepository}` : ""} ·{" "}
-              <Badge tone="neutral">{project.gitDefaultBranch}</Badge>
-            </p>
-          </div>
-          <div class="page-header__actions">
+      <PageHeader
+        title={project.name}
+        description={
+          <>
+            <code>{project.slug}</code> {project.gitRepository ? `· ${project.gitRepository}` : ""}{" "}
+            · <Badge tone="neutral">{project.gitDefaultBranch}</Badge>
+          </>
+        }
+        actions={
+          <>
             <Button variant="secondary" href={`/projects/${project.slug}/settings`}>
               Settings
             </Button>
             <Button variant="ghost" href={`/projects/${project.slug}/builds`}>
               Refresh
             </Button>
-          </div>
-        </div>
-      </div>
+          </>
+        }
+        breadcrumbs={[{ label: "Projects", href: "/projects" }, { label: project.name }]}
+      />
 
-      <div class="card card--padded">
+      <Card>
         <form method="get" action={`/projects/${project.slug}/builds`} class="row-actions">
           <SelectField
             label="Status"
@@ -105,7 +97,7 @@ export async function renderProjectBuildsPage(
             </Button>
           ) : null}
         </form>
-      </div>
+      </Card>
 
       {builds.length === 0 ? (
         <EmptyState

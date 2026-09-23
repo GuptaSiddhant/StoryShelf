@@ -1,5 +1,5 @@
 import type { Project } from "@storyshelf/core/schema";
-import { Alert, Button, CheckField, Field, Meta } from "../ui/components.tsx";
+import { Alert, Button, Card, CheckField, Field, Meta } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Interaction-tests settings tab: play execution toggle and timeout. */
@@ -11,7 +11,7 @@ export function renderSettingsTests(
   return (
     <div class="grid max-w-form">
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
-      <div class="card card--padded">
+      <Card>
         <h2 style="margin:0 0 .5rem;">Interaction tests</h2>
         <Meta>
           When enabled, Storybook <code>play</code> functions run before each screenshot. Failures
@@ -56,8 +56,8 @@ export function renderSettingsTests(
             <Meta>You need admin access to edit settings.</Meta>
           )}
         </form>
-      </div>
-      <div class="card card--padded">
+      </Card>
+      <Card>
         <h3 style="margin:0 0 .4rem;">How to mark stories</h3>
         <Meta as="pre">
           {`// Disable snapshot entirely (skip capture + play)
@@ -79,7 +79,7 @@ export const Flaky2: Story = {
           non-blocking when flaky. GitHub status stays
           <code>success</code> with a warning comment.
         </Meta>
-      </div>
+      </Card>
     </div>
   );
 }

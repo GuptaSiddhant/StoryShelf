@@ -10,7 +10,7 @@ import {
 } from "@storyshelf/db-sqlite/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { getStore } from "../store.ts";
-import { Badge, Button, EmptyState, Meta, statusTone } from "../ui/components.tsx";
+import { Badge, Button, EmptyState, Meta, PageHeader, statusTone } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 /** Resolve a label type's `link_template` against a build, or return null. */
 export function resolveLabelLink(
@@ -57,39 +57,29 @@ export async function renderLabelDetailPage(
       title={`${key}: ${value}`}
       nav={{ active: "labels", projectSlug: project.slug, projectName: project.name }}
     >
-      <div class="page-header">
-        <nav class="breadcrumbs" aria-label="Breadcrumb">
-          <ol>
-            <li>
-              <a href="/projects">Projects</a>
-            </li>
-            <li>
-              <a href={`/projects/${project.slug}/builds`}>{project.name}</a>
-            </li>
-            <li>
-              <span aria-current="page">
-                {labelType ? labelType.name : key}: {value}
-              </span>
-            </li>
-          </ol>
-        </nav>
-        <div class="page-header__row">
-          <div>
-            <h1 class="page-header__title">
-              {labelType ? labelType.name : key}: {value}
-            </h1>
-            <p class="page-header__desc">
-              <Badge tone="neutral">{key}</Badge> Builds bearing this{" "}
-              {labelType ? labelType.name.toLowerCase() : "label"}, latest first.
-            </p>
-          </div>
-          <div class="page-header__actions">
-            <Button variant="ghost" href={`/projects/${project.slug}/labels`}>
-              All labels
-            </Button>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title={
+          <>
+            {labelType ? labelType.name : key}: {value}
+          </>
+        }
+        description={
+          <>
+            <Badge tone="neutral">{key}</Badge> Builds bearing this{" "}
+            {labelType ? labelType.name.toLowerCase() : "label"}, latest first.
+          </>
+        }
+        actions={
+          <Button variant="ghost" href={`/projects/${project.slug}/labels`}>
+            All labels
+          </Button>
+        }
+        breadcrumbs={[
+          { label: "Projects", href: "/projects" },
+          { label: project.name, href: `/projects/${project.slug}/builds` },
+          { label: `${labelType ? labelType.name : key}: ${value}` },
+        ]}
+      />
 
       {builds.length === 0 ? (
         <EmptyState
@@ -177,29 +167,15 @@ export async function renderLabelsPage(slug: string): Promise<RenderedContent | 
       title={`Labels · ${project.name}`}
       nav={{ active: "labels", projectSlug: project.slug, projectName: project.name }}
     >
-      <div class="page-header">
-        <nav class="breadcrumbs" aria-label="Breadcrumb">
-          <ol>
-            <li>
-              <a href="/projects">Projects</a>
-            </li>
-            <li>
-              <a href={`/projects/${project.slug}/builds`}>{project.name}</a>
-            </li>
-            <li>
-              <span aria-current="page">Labels</span>
-            </li>
-          </ol>
-        </nav>
-        <div class="page-header__row">
-          <div>
-            <h1 class="page-header__title">Labels</h1>
-            <p class="page-header__desc">
-              Typed labels attach values to builds and link out to external systems.
-            </p>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Labels"
+        description="Typed labels attach values to builds and link out to external systems."
+        breadcrumbs={[
+          { label: "Projects", href: "/projects" },
+          { label: project.name, href: `/projects/${project.slug}/builds` },
+          { label: "Labels" },
+        ]}
+      />
 
       {labelTypes.length === 0 ? (
         <EmptyState

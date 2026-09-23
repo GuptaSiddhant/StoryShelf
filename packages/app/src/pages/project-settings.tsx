@@ -3,7 +3,7 @@ import type { LabelType } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { ProjectGroupMapping } from "@storyshelf/core/schema";
 import type { Token } from "@storyshelf/core/schema";
-import { Tabs } from "../ui/components.tsx";
+import { PageHeader, Tabs } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import { renderSettingsGeneral } from "./settings-general.tsx";
 import { renderSettingsLabels } from "./settings-labels.tsx";
@@ -97,29 +97,17 @@ export function renderProjectSettingsPage(
       title={`${project.name} · Settings`}
       nav={{ active: "settings", projectSlug: project.slug, projectName: project.name }}
     >
-      <div class="page-header">
-        <nav class="breadcrumbs" aria-label="Breadcrumb">
-          <ol>
-            <li>
-              <a href="/projects">Projects</a>
-            </li>
-            <li>
-              <a href={`/projects/${project.slug}/builds`}>{project.name}</a>
-            </li>
-            <li>
-              <span aria-current="page">Settings</span>
-            </li>
-          </ol>
-        </nav>
-        <div class="page-header__row">
-          <div>
-            <h1 class="page-header__title">Project settings</h1>
-            <p class="page-header__desc">
-              Manage general settings, labels, tokens, webhooks and members for {project.name}.
-            </p>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Project settings"
+        description={
+          <>Manage general settings, labels, tokens, webhooks and members for {project.name}.</>
+        }
+        breadcrumbs={[
+          { label: "Projects", href: "/projects" },
+          { label: project.name, href: `/projects/${project.slug}/builds` },
+          { label: "Settings" },
+        ]}
+      />
 
       <Tabs
         label="Settings sections"

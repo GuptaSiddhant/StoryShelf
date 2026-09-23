@@ -2,7 +2,7 @@ import type { Build } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge, Button, statusTone } from "../ui/components.tsx";
+import { Badge, Button, PageHeader, statusTone } from "../ui/components.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -50,81 +50,32 @@ function ReviewActions(props: ReviewActionsProps): HtmlEscapedString | Promise<H
   );
 }
 
-interface DiffStatsProps {
-  snapshots: Snapshot[];
-  pendingCount: number;
-  approvedCount: number;
-}
-
-/** Compact meta line replacing the old three-stat card. */
-function DiffStats(props: DiffStatsProps): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { snapshots, pendingCount, approvedCount } = props;
-  return (
-    <p class="page-header__meta">
-      <span>{snapshots.length} snapshots</span>
-      <span aria-hidden="true">·</span>
-      <span>{pendingCount} need review</span>
-      <span aria-hidden="true">·</span>
-      <span>{approvedCount} approved</span>
-    </p>
-  );
-}
-
-interface DiffBreadcrumbsProps {
-  project: Project;
-  build: Build;
-}
-
-/** Projects → project → build breadcrumb trail. */
-function DiffBreadcrumbs(
-  props: DiffBreadcrumbsProps,
-): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { project, build } = props;
-  return (
-    <nav class="breadcrumbs" aria-label="Breadcrumb">
-      <ol>
-        <li>
-          <a href="/projects">Projects</a>
-        </li>
-        <li>
-          <a href={`/projects/${project.slug}/builds`}>{project.name}</a>
-        </li>
-        <li>
-          <a href={`/projects/${project.slug}/builds/${build.id}`}>Build {build.gitBranch}</a>
-        </li>
-        <li>
-          <span aria-current="page">Review</span>
-        </li>
-      </ol>
-    </nav>
-  );
-}
-
 /** Page header with breadcrumbs, review actions, and snapshot stats. */
 export function DiffHeader(props: DiffHeaderProps): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, snapshots, pendingCount, canReview } = props;
   return (
-    <div class="page-header">
-      <DiffBreadcrumbs project={project} build={build} />
-      <div class="page-header__row">
-        <div>
-          <h1 class="page-header__title">
-            {build.gitBranch}{" "}
-            <span class="muted mono" style="font-weight:400;">
-              · {build.gitSha.slice(0, 7)}
-            </span>
-          </h1>
-          <p class="page-header__desc">
-            {build.message ?? "No message"} {build.authorName ? `· ${build.authorName}` : ""} ·{" "}
-            <Badge tone={statusTone(build.status)}>{build.status}</Badge>
-          </p>
-          <DiffStats
-            snapshots={snapshots}
-            pendingCount={pendingCount}
-            approvedCount={build.approvedCount}
-          />
-        </div>
-        <div class="page-header__actions">
+    <PageHeader
+      title={
+        <>
+          {build.gitBranch}{" "}
+          <span class="muted mono" style="font-weight:400;">
+            · {build.gitSha.slice(0, 7)}
+          </span>
+        </>
+      }
+      description={
+        <>
+          {build.message ?? "No message"} {build.authorName ? `· ${build.authorName}` : ""} ·{" "}
+          <Badge tone={statusTone(build.status)}>{build.status}</Badge>
+        </>
+      }
+      meta={
+        <>
+          {snapshots.length} snapshots · {pendingCount} need review · {build.approvedCount} approved
+        </>
+      }
+      actions={
+        <>
           <Button
             variant="secondary"
             size="sm"
@@ -135,8 +86,14 @@ export function DiffHeader(props: DiffHeaderProps): HtmlEscapedString | Promise<
           {canReview && pendingCount > 0 ? (
             <ReviewActions project={project} build={build} pendingCount={pendingCount} />
           ) : null}
-        </div>
-      </div>
-    </div>
+        </>
+      }
+      breadcrumbs={[
+        { label: "Projects", href: "/projects" },
+        { label: project.name, href: `/projects/${project.slug}/builds` },
+        { label: `Build ${build.gitBranch}`, href: `/projects/${project.slug}/builds/${build.id}` },
+        { label: "Review" },
+      ]}
+    />
   );
 }

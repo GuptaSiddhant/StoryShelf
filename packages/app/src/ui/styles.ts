@@ -1,4 +1,3 @@
-import { layoutCss } from "./layout.tsx";
 import { baseCss } from "./styles/base.ts";
 import { behaviorCss } from "./styles/behavior.ts";
 import { reviewCss } from "./styles/review.ts";
@@ -8,12 +7,5 @@ import type { BrandTheme } from "./theme.ts";
 
 /** Build the global CSS stylesheet from the light and dark brand themes. */
 export function baseStyle(light: BrandTheme, dark: BrandTheme): string {
-  return [
-    tokenCss(light, dark),
-    baseCss(),
-    shellCss(),
-    layoutCss(),
-    reviewCss(),
-    behaviorCss(),
-  ].join("\n");
+  return [tokenCss(light, dark), baseCss(), shellCss(), reviewCss(), behaviorCss()].join("\n");
 }
