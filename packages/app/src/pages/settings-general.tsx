@@ -16,7 +16,7 @@ export function renderSettingsGeneral(
   const errors = formState?.errors ?? {};
   const browser = project.browser ?? "chromium";
   return (
-    <div class="grid" style="max-width: 720px;">
+    <div class="grid max-w-form">
       {formState?.globalError ? (
         <div class="alert alert--danger" role="alert">
           {formState.globalError}

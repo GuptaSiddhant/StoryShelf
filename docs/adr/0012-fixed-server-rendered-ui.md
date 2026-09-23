@@ -37,14 +37,36 @@ The review page shows each changed/new story as a **three-up grid** — baseline
 ## Consequences
 
 **Positive:**
+
 - Rebranding is a config change (accent + logo), not a fork
 - Image-first layout suits visual review; status color is the visual language
 - No client framework or build step keeps the deployment single-artifact and air-gapped-friendly (HTMX vendored locally)
 - The simple diff view ships fast; the rich diff interactions can be added later without re-architecting
 
 **Negative:**
+
 - The three-up grid is less fluid than a wipe slider for large screenshots; reviewers may want the slider sooner than expected
 - A header + sidebar consumes more vertical/horizontal space than a single top bar on small screens
 - Theme persistence via cookie is slightly more machinery than a pure client-side toggle
 
 **Deferred (v2):** wipe slider + zoom, richer keyboard navigation, comment notifications, and any white-labeling beyond the `BrandTheme` tokens.
+
+## Amendment 2026-09-23: shadcn-like professional theme, content-first
+
+Neutral zinc chrome (`--surface-*`, `--text-*`, `--border`) with color reserved for
+accent actions and status badges/dots; accent stays a `BrandTheme` token so
+self-host rebranding still works (`ui.accent` only). Branded topbar kept,
+sidebar neutralized (card bg, 220px, accent active indicator). `BrandTheme`
+gains optional `accentContrast/ring/surface.subtle/text.muted/borderSubtle/
+radius/radiusSm/shadow` with fallbacks so old configs validate.
+
+Styles split from monolithic `ui/styles.ts` into colocated family `*Css()`
+(`buttons/feedback/forms/layout`) plus `ui/styles/` (`tokens/base/shell/
+review/behavior`) joined by the thin `baseStyle()` composer into the single
+head `<style>` (inline kept; cached CSS endpoint deferred).
+
+Review page: stats card collapsed into a header meta line, sticky `.review-bar`
+(title + badge + prev/next + approve/reject), `Split|Baseline|Current|Diff`
+segmented view modes via `data-view` (pure CSS + tiny vanilla JS, image URLs
+and HTMX contracts unchanged), responsive stack below 1024px, skeleton/empty
+placeholders, real `a`/`r` keyboard handlers alongside arrow navigation.

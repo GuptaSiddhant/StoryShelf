@@ -143,7 +143,7 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
       </div>
 
       {attempts.length > 0 ? (
-        <div class="card card--padded" style="margin-bottom:1rem;">
+        <div class="card card--padded">
           <h2 style="margin:0 0 .5rem;">Capture attempts</h2>
           {attempts.map((attempt, index): HtmlEscapedString | Promise<HtmlEscapedString> => (
             <details key={attempt.id} open={index === attempts.length - 1}>
@@ -274,7 +274,7 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
         </div>
       )}
 
-      <div class="card card--padded" style="margin-top:1rem;">
+      <div class="card card--padded mt-1">
         <h2 style="margin:0 0 .5rem;">Comments</h2>
         {comments.length === 0 ? (
           <p class="field__hint">

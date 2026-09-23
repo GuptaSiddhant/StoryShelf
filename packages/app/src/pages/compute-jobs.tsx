@@ -128,7 +128,7 @@ export async function renderComputeJobsPage(
       <div class="card card--padded">
         <h2 style="margin:0 0 .3rem;">Recent builds</h2>
         <p class="field__hint">Capture history for {project.name}. Failed jobs can be retried.</p>
-        <div class="table-wrap" style="margin-top:.75rem;">
+        <div class="table-wrap table-gap">
           <table>
             <thead>
               <tr>
@@ -193,7 +193,7 @@ export async function renderComputeJobsPage(
           </table>
         </div>
         {recentBuilds.length === 0 ? (
-          <p class="field__hint" style="margin-top:.5rem;">
+          <p class="field__hint mt-1" style="margin-top:.5rem;">
             No builds yet.
           </p>
         ) : null}

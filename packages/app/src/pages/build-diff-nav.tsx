@@ -18,13 +18,13 @@ export interface DiffNavProps {
 export function DiffNav(props: DiffNavProps): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, snapshots, selectedId } = props;
   return (
-    <div style="flex: 0 0 320px; max-width: 36%; min-width: 260px;">
+    <div class="review-nav">
       <div class="card">
-        <div style="padding:.6rem .75rem; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+        <div class="review-nav__head">
           <strong>Snapshots</strong>
           <span class="field__hint">{snapshots.length} total</span>
         </div>
-        <div data-diff-nav data-current={selectedId} style="max-height: 70vh; overflow:auto;">
+        <div data-diff-nav data-current={selectedId} class="review-nav__list">
           {snapshots.map((snap): HtmlEscapedString | Promise<HtmlEscapedString> => (
             <a
               key={snap.id}
@@ -32,21 +32,20 @@ export function DiffNav(props: DiffNavProps): HtmlEscapedString | Promise<HtmlEs
               data-snapshot-link
               data-snapshot-id={snap.id}
               class={`snapshot-nav ${selectedId === snap.id ? "snapshot-nav--active" : ""}`}
-              style={`display:flex; flex-direction:column; gap:.2rem; padding:.6rem .75rem; border-bottom:1px solid var(--border); text-decoration:none; color:inherit; background:${selectedId === snap.id ? "var(--surface-muted)" : "transparent"};`}
               hx-get={`/projects/${project.slug}/builds/${build.id}/diff?snapshot=${snap.id}`}
               hx-target="body"
               hx-push-url="true"
             >
-              <span style="display:flex; gap:.4rem; align-items:center; flex-wrap:wrap;">
+              <span class="snapshot-nav__title">
                 <Badge tone={statusTone(snap.status)}>{snap.status}</Badge>
-                <span style="font-weight:600; font-size:.9rem;">
+                <span class="truncate">
                   {snap.storyTitle} / {snap.storyName}
                 </span>
               </span>
-              <span class="field__hint" style="font-size:.8rem;">
+              <span class="snapshot-nav__meta">
                 {snap.viewportName} · {snap.viewportWidth}×{snap.viewportHeight}
                 {snap.diffRatio !== null && snap.diffRatio !== undefined
-                  ? ` · ${(snap.diffRatio * 100).toFixed(2)}%`
+                  ? ` · ${(snap.diffRatio * 100).toFixed(1)}%`
                   : ""}
               </span>
             </a>

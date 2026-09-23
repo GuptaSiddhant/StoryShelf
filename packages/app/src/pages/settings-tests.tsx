@@ -8,7 +8,7 @@ export function renderSettingsTests(
   formState?: { globalError?: string },
 ): unknown {
   return (
-    <div class="grid" style="max-width: 720px;">
+    <div class="grid max-w-form">
       {formState?.globalError ? (
         <div class="alert alert--danger" role="alert">
           {formState.globalError}
@@ -80,7 +80,7 @@ export function renderSettingsTests(
         <h3 style="margin:0 0 .4rem;">How to mark stories</h3>
         <pre
           class="field__hint"
-          style="white-space:pre-wrap; background: var(--surface); padding:.75rem; border-radius:.5rem;"
+          style="white-space:pre-wrap; background: var(--surface-card); padding:.75rem; border-radius:.5rem;"
         >
           {`// Disable snapshot entirely (skip capture + play)
 export const Hidden: Story = {

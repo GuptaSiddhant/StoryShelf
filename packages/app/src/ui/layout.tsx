@@ -43,3 +43,21 @@ export const PageHeader: FC<{
     </div>
   );
 };
+
+/** Card and page-header styles owned by this module. */
+export function layoutCss(): string {
+  return `
+    .card { background: var(--surface-card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+    .card--padded { padding: 1rem; }
+    .card--padded > h2:first-child, .card--padded > h3:first-child { margin: 0 0 .5rem; font-weight: 650; letter-spacing: -.01em; }
+    .page-header { margin-bottom: 1.25rem; }
+    .page-header__row { display: flex; gap: 1rem; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+    .page-header__title { margin: 0; font-size: 1.45rem; line-height: 1.2; letter-spacing: -0.02em; font-weight: 700; }
+    .page-header__desc { margin: .35rem 0 0; color: var(--text-secondary); font-size: .9rem; max-width: 65ch; }
+    .page-header__meta { margin: .4rem 0 0; color: var(--text-secondary); font-size: .82rem; display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+    .page-header__actions { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+    .breadcrumbs ol { list-style: none; padding: 0; margin: 0 0 .5rem; display: flex; gap: .4rem; flex-wrap: wrap; color: var(--text-secondary); font-size: .82rem; }
+    .breadcrumbs li + li::before { content: "/"; margin-right: .4rem; color: var(--text-muted); }
+    .breadcrumbs a { color: var(--text-secondary); }
+    .breadcrumbs a:hover { color: var(--text-primary); }`;
+}

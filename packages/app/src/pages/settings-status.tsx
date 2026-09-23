@@ -140,7 +140,7 @@ export function renderSettingsStatus(
 ): unknown {
   const byProvider = new Map(providers.map((provider) => [provider.metadata.kind, provider]));
   return (
-    <div class="grid" style="max-width: 880px;">
+    <div class="grid max-w-form">
       {formState?.globalError ? (
         <div class="alert alert--danger" role="alert">
           {formState.globalError}
@@ -154,7 +154,7 @@ export function renderSettingsStatus(
           is reported for each configured provider: pending while capturing, success on approval,
           failure on rejection or capture errors.
         </p>
-        <div class="table-wrap" style="margin-top:.75rem;">
+        <div class="table-wrap table-gap">
           <table>
             <thead>
               <tr>
@@ -179,7 +179,7 @@ export function renderSettingsStatus(
           </table>
         </div>
         {statusConfigs.length === 0 ? (
-          <p class="field__hint" style="margin-top:.5rem;">
+          <p class="field__hint mt-1" style="margin-top:.5rem;">
             No git providers configured for this project.
           </p>
         ) : null}

@@ -36,14 +36,20 @@ function SnapshotActions(
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, selected } = props;
   return (
-    <div style="display:flex; gap:.5rem;">
+    <div class="row-actions">
       <form
         method="post"
         action={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${selected.id}/approve`}
         hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${selected.id}/approve`}
         hx-target="body"
       >
-        <button class="btn btn--primary" type="submit" accesskey="a" title="Approve (a)">
+        <button
+          class="btn btn--primary btn--sm"
+          type="submit"
+          data-approve
+          accesskey="a"
+          title="Approve (a)"
+        >
           Approve
         </button>
       </form>
@@ -53,7 +59,13 @@ function SnapshotActions(
         hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${selected.id}/reject`}
         hx-target="body"
       >
-        <button class="btn btn--danger" type="submit" accesskey="r" title="Reject (r)">
+        <button
+          class="btn btn--danger btn--sm"
+          type="submit"
+          data-reject
+          accesskey="r"
+          title="Reject (r)"
+        >
           Reject
         </button>
       </form>
@@ -80,20 +92,24 @@ function BaselinePane(
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, selected, hasBaseline } = props;
   return (
-    <div class="diff-pane">
-      <div class="diff-pane__label">Baseline</div>
+    <div class="diff-pane" data-pane="baseline">
+      <div class="diff-pane__label">
+        <span>Baseline</span>
+      </div>
       {hasBaseline[selected.id] ? (
         <img
           class="diff-pane__img"
           src={imageUrl(project, build, selected, "baseline")}
           alt={`Baseline for ${selected.storyTitle} / ${selected.storyName}`}
           loading="lazy"
+          decoding="async"
         />
       ) : (
-        <div style="aspect-ratio: 16/9; display:grid; place-items:center; background:var(--surface-muted); color:var(--text-secondary); font-size:.85rem;">
-          No baseline
-          <br />
-          <span class="field__hint">first capture for this story</span>
+        <div class="diff-placeholder">
+          <div>
+            <div>New story — no baseline yet</div>
+            <div class="field__hint">First capture; approve to set the baseline.</div>
+          </div>
         </div>
       )}
     </div>
@@ -104,13 +120,16 @@ function BaselinePane(
 function CurrentPane(props: SinglePaneProps): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, selected } = props;
   return (
-    <div class="diff-pane">
-      <div class="diff-pane__label">Current</div>
+    <div class="diff-pane" data-pane="current">
+      <div class="diff-pane__label">
+        <span>Current</span>
+      </div>
       <img
         class="diff-pane__img"
         src={imageUrl(project, build, selected, "image")}
         alt={`Current for ${selected.storyTitle} / ${selected.storyName}`}
         loading="lazy"
+        decoding="async"
       />
     </div>
   );
@@ -120,9 +139,12 @@ function CurrentPane(props: SinglePaneProps): HtmlEscapedString | Promise<HtmlEs
 function DiffPane(props: SinglePaneProps): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, selected } = props;
   return (
-    <div class="diff-pane">
+    <div class="diff-pane" data-pane="diff">
       <div class="diff-pane__label">
-        Diff {selected.diffRatio === null ? "" : `· ${(selected.diffRatio * 100).toFixed(2)}%`}
+        <span>Diff</span>
+        {selected.diffRatio === null ? null : (
+          <span class="mono">{(selected.diffRatio * 100).toFixed(1)}%</span>
+        )}
       </div>
       {selected.diffPath ? (
         <img
@@ -130,9 +152,10 @@ function DiffPane(props: SinglePaneProps): HtmlEscapedString | Promise<HtmlEscap
           src={imageUrl(project, build, selected, "diff")}
           alt={`Diff for ${selected.storyTitle} / ${selected.storyName}`}
           loading="lazy"
+          decoding="async"
         />
       ) : (
-        <div style="aspect-ratio: 16/9; display:grid; place-items:center; color:var(--text-secondary);">
+        <div class="diff-placeholder">
           {selected.status === "unchanged" || selected.status === "approved"
             ? "No diff — within threshold"
             : "No diff yet"}
@@ -142,11 +165,31 @@ function DiffPane(props: SinglePaneProps): HtmlEscapedString | Promise<HtmlEscap
   );
 }
 
+/** View-mode segmented control (split / single pane). */
+function ViewSwitch(): HtmlEscapedString | Promise<HtmlEscapedString> {
+  return (
+    <div class="segmented" role="group" aria-label="Diff view" data-view-switch>
+      <button type="button" data-view-value="split" aria-pressed="true">
+        Split
+      </button>
+      <button type="button" data-view-value="baseline" aria-pressed="false">
+        Baseline
+      </button>
+      <button type="button" data-view-value="current" aria-pressed="false">
+        Current
+      </button>
+      <button type="button" data-view-value="diff" aria-pressed="false">
+        Diff
+      </button>
+    </div>
+  );
+}
+
 /** Baseline | current | diff image panes. */
 function DiffPaneGrid(props: DiffPaneGridProps): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, selected, hasBaseline } = props;
   return (
-    <div class="diff-grid" style="margin-top:1rem;">
+    <div class="diff-grid" data-view="split">
       <BaselinePane project={project} build={build} selected={selected} hasBaseline={hasBaseline} />
       <CurrentPane project={project} build={build} selected={selected} />
       <DiffPane project={project} build={build} selected={selected} />
@@ -159,25 +202,31 @@ export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<
   const { project, build, selected, canReview, hasBaseline } = props;
   return (
     <div class="card card--padded">
-      <div style="display:flex; justify-content:space-between; gap:.5rem; align-items:center; flex-wrap:wrap;">
+      <div class="review-bar">
         <div>
-          <h2 style="margin:0; font-size:1.05rem;">
+          <h2 class="review-bar__title">
             {selected.storyTitle} — {selected.storyName}
           </h2>
-          <p class="field__hint" style="margin:.2rem 0 0;">
-            {selected.viewportName} · {selected.viewportWidth}×{selected.viewportHeight} ·{" "}
+          <p class="review-bar__meta">
+            <span>
+              {selected.viewportName} · {selected.viewportWidth}×{selected.viewportHeight}
+            </span>
             <Badge tone={statusTone(selected.status)}>{selected.status}</Badge>
-            {selected.diffPixels === null ? "" : ` · ${selected.diffPixels} px`}
+            {selected.diffPixels === null ? null : (
+              <span class="mono">{selected.diffPixels} px</span>
+            )}
           </p>
         </div>
-        {canReview && (selected.status === "new" || selected.status === "changed") ? (
-          <SnapshotActions project={project} build={build} selected={selected} />
-        ) : null}
+        <div class="row-actions">
+          <ViewSwitch />
+          {canReview && (selected.status === "new" || selected.status === "changed") ? (
+            <SnapshotActions project={project} build={build} selected={selected} />
+          ) : null}
+        </div>
       </div>
       <DiffPaneGrid project={project} build={build} selected={selected} hasBaseline={hasBaseline} />
-      <p class="field__hint" style="margin-top:.6rem;">
-        Keyboard: <kbd>←</kbd> <kbd>→</kbd> navigate · <kbd>a</kbd> approve · <kbd>r</kbd> reject ·{" "}
-        <kbd>?</kbd> help
+      <p class="field__hint mt-1">
+        Keyboard: <kbd>←</kbd> <kbd>→</kbd> navigate · <kbd>a</kbd> approve · <kbd>r</kbd> reject
       </p>
     </div>
   );

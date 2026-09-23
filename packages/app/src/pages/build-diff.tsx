@@ -38,33 +38,31 @@ function DiffReviewGrid(
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, snapshots, comments, selected, canReview, hasBaseline } = props;
   return (
-    <div class="grid" style="gap:1rem;">
-      <div style="display:flex; gap:1rem; align-items:stretch;">
-        <DiffNav project={project} build={build} snapshots={snapshots} selectedId={selected?.id} />
-        <div style="flex:1; min-width:0; display:grid; gap:1rem;">
-          {selected ? (
-            <>
-              <DiffViewer
-                project={project}
-                build={build}
-                selected={selected}
-                canReview={canReview}
-                hasBaseline={hasBaseline}
-              />
-              <DiffComments
-                project={project}
-                build={build}
-                selectedId={selected.id}
-                comments={comments}
-                canReview={canReview}
-              />
-            </>
-          ) : (
-            <div class="empty">
-              <p class="empty__desc">Select a snapshot to review.</p>
-            </div>
-          )}
-        </div>
+    <div class="review-layout">
+      <DiffNav project={project} build={build} snapshots={snapshots} selectedId={selected?.id} />
+      <div class="review-main">
+        {selected ? (
+          <>
+            <DiffViewer
+              project={project}
+              build={build}
+              selected={selected}
+              canReview={canReview}
+              hasBaseline={hasBaseline}
+            />
+            <DiffComments
+              project={project}
+              build={build}
+              selectedId={selected.id}
+              comments={comments}
+              canReview={canReview}
+            />
+          </>
+        ) : (
+          <div class="empty">
+            <p class="empty__desc">Select a snapshot to review.</p>
+          </div>
+        )}
       </div>
     </div>
   );

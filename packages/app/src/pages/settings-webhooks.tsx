@@ -17,7 +17,7 @@ export function renderSettingsWebhooks(
   formState?: { errors?: Record<string, string>; globalError?: string; secret?: string },
 ): unknown {
   return (
-    <div class="grid" style="max-width: 880px;">
+    <div class="grid max-w-form">
       {formState?.secret ? (
         <div class="alert alert--success" role="alert">
           <strong class="alert__title">Webhook created</strong>
@@ -38,7 +38,7 @@ export function renderSettingsWebhooks(
           Notify external services when builds are created, updated, approved or rejected. Payloads
           are POSTed as JSON and signed with the webhook secret.
         </p>
-        <div class="table-wrap" style="margin-top:.75rem;">
+        <div class="table-wrap table-gap">
           <table>
             <thead>
               <tr>
@@ -92,7 +92,7 @@ export function renderSettingsWebhooks(
           </table>
         </div>
         {webhooks.length === 0 ? (
-          <p class="field__hint" style="margin-top:.5rem;">
+          <p class="field__hint mt-1" style="margin-top:.5rem;">
             No webhooks configured.
           </p>
         ) : null}

@@ -39,7 +39,7 @@ function CommentCard(props: CommentCardProps): HtmlEscapedString | Promise<HtmlE
           action={`/api/v1/projects/${project.slug}/builds/${build.id}/comments/${comment.id}/resolve`}
           hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/comments/${comment.id}/resolve`}
           hx-target="body"
-          style="margin-top:.5rem;"
+          class="comment__actions"
         >
           <button class="btn btn--ghost" type="submit">
             Mark resolved
@@ -65,7 +65,7 @@ function CommentForm(props: CommentFormProps): HtmlEscapedString | Promise<HtmlE
       action={`/api/v1/projects/${project.slug}/builds/${build.id}/comments`}
       hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/comments`}
       hx-target="body"
-      style="margin-top:1rem; display:grid; gap:.5rem;"
+      class="stack mt-1"
     >
       <input type="hidden" name="snapshotId" value={selectedId} />
       <label class="field__label" for="comment-body">
@@ -96,8 +96,8 @@ export function DiffComments(
   const visible = comments.filter((c) => !c.snapshotId || c.snapshotId === selectedId);
   return (
     <div class="card card--padded">
-      <h3 style="margin:0 0 .5rem;">Comments</h3>
-      <div style="display:grid; gap:.75rem;">
+      <h3 class="review-bar__title">Comments</h3>
+      <div class="stack">
         {visible.map((comment): HtmlEscapedString | Promise<HtmlEscapedString> => (
           <CommentCard
             key={comment.id}

@@ -141,3 +141,19 @@ export const SelectField: FC<{
     </div>
   );
 };
+
+/** Form field styles owned by this module. */
+export function formsCss(): string {
+  return `
+    .field { display: grid; gap: .35rem; margin-bottom: .875rem; }
+    .field__label { font-weight: 600; font-size: .85rem; }
+    .field__input { width: 100%; padding: .55rem .65rem; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface-card); color: var(--text-primary); font: inherit; font-size: .875rem; box-shadow: var(--shadow); }
+    .field__input::placeholder { color: var(--text-muted); }
+    .field__input:focus { outline: 2px solid var(--ring); outline-offset: 0; border-color: var(--ring); }
+    .field__input--error { border-color: var(--status-rejected); }
+    .field__input--error:focus { outline-color: var(--status-rejected); border-color: var(--status-rejected); }
+    .field__input--textarea { resize: vertical; min-height: 5rem; }
+    select.field__input { appearance: auto; }
+    .field__hint { margin: 0; color: var(--text-secondary); font-size: .82rem; }
+    .field__error { margin: 0; color: var(--status-rejected); font-size: .82rem; font-weight: 600; }`;
+}

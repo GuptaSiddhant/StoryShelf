@@ -10,9 +10,9 @@ export interface LoginPageState {
 export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
   return (
     <DocumentLayout title="Sign in">
-      <div class="login" style="max-width: 360px; margin: 3rem auto;">
+      <div class="login">
         <div class="card card--padded">
-          <h1 style="margin-top:0;">Sign in</h1>
+          <h1 class="page-header__title">Sign in</h1>
 
           {state.error ? (
             <div class="alert alert--danger" role="alert">
@@ -36,19 +36,15 @@ export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
                 autocomplete="current-password"
               />
             </div>
-            <button class="btn btn--primary" type="submit" style="width:100%; margin-top:1rem;">
+            <button class="btn btn--primary" type="submit">
               Sign in
             </button>
           </form>
 
           {state.ssoUrl ? (
-            <div style="margin-top:1rem; text-align:center;">
-              <span style="color: var(--color-text-secondary); font-size:.875rem;">or</span>
-              <a
-                class="btn btn--secondary"
-                href={state.ssoUrl}
-                style="display:block; margin-top:.5rem;"
-              >
+            <div class="stack mt-1" style="text-align:center;">
+              <span class="muted">or</span>
+              <a class="btn btn--secondary" href={state.ssoUrl}>
                 Sign in with SSO
               </a>
             </div>

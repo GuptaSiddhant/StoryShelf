@@ -93,3 +93,26 @@ export const Stat: FC<{ label: string; value: string | number }> = ({ label, val
     </div>
   );
 };
+
+/** Badge, alert, and empty-state styles owned by this module. */
+export function feedbackCss(): string {
+  return `
+    .badge { display: inline-flex; align-items: center; gap: .3rem; padding: .15rem .55rem; border-radius: 999px; font-size: .72rem; font-weight: 600; letter-spacing: .02em; border: 1px solid var(--border); background: var(--surface-muted); color: var(--text-secondary); white-space: nowrap; }
+    .badge::before { content: ""; display: none; width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
+    .badge--dot::before { display: inline-block; }
+    .badge--success { background: color-mix(in srgb, var(--status-approved) 12%, var(--surface-card)); color: var(--status-approved); border-color: color-mix(in srgb, var(--status-approved) 32%, var(--border)); }
+    .badge--warning { background: color-mix(in srgb, var(--status-new) 12%, var(--surface-card)); color: var(--status-new); border-color: color-mix(in srgb, var(--status-new) 32%, var(--border)); }
+    .badge--danger { background: color-mix(in srgb, var(--status-rejected) 12%, var(--surface-card)); color: var(--status-rejected); border-color: color-mix(in srgb, var(--status-rejected) 32%, var(--border)); }
+    .badge--info { background: color-mix(in srgb, var(--accent) 9%, var(--surface-card)); color: var(--accent); border-color: color-mix(in srgb, var(--accent) 28%, var(--border)); }
+    .badge--neutral { background: var(--surface-muted); color: var(--text-secondary); }
+    .alert { border-radius: var(--radius-sm); padding: .7rem .8rem; border: 1px solid var(--border); background: var(--surface-card); font-size: .875rem; }
+    .alert--info { border-color: color-mix(in srgb, var(--accent) 25%, var(--border)); background: color-mix(in srgb, var(--accent) 6%, var(--surface-card)); }
+    .alert--success { border-color: color-mix(in srgb, var(--status-approved) 25%, var(--border)); background: color-mix(in srgb, var(--status-approved) 6%, var(--surface-card)); }
+    .alert--warning { border-color: color-mix(in srgb, var(--status-new) 25%, var(--border)); background: color-mix(in srgb, var(--status-new) 6%, var(--surface-card)); }
+    .alert--danger { border-color: color-mix(in srgb, var(--status-rejected) 25%, var(--border)); background: color-mix(in srgb, var(--status-rejected) 6%, var(--surface-card)); }
+    .alert__title { display: block; margin-bottom: .2rem; font-weight: 650; }
+    .empty { text-align: center; padding: 2rem 1rem; border: 1px dashed var(--border); border-radius: var(--radius); background: var(--surface-card); }
+    .empty__title { margin: 0 0 .3rem; font-size: 1.05rem; font-weight: 650; letter-spacing: -.01em; }
+    .empty__desc { margin: 0 auto; color: var(--text-secondary); font-size: .875rem; max-width: 50ch; }
+    .empty__action { margin-top: 1rem; }`;
+}

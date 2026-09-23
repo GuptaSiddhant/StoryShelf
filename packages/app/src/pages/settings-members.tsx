@@ -21,13 +21,13 @@ export function renderSettingsMembers(
   isAdmin: boolean,
 ): unknown {
   return (
-    <div class="grid" style="max-width: 880px;">
+    <div class="grid max-w-form">
       <div class="card card--padded">
         <h2 style="margin:0 0 .3rem;">Members</h2>
         <p class="field__hint">
           Project members and their roles. Site admins have implicit admin access.
         </p>
-        <div class="table-wrap" style="margin-top:.75rem;">
+        <div class="table-wrap table-gap">
           <table>
             <thead>
               <tr>
@@ -78,7 +78,7 @@ export function renderSettingsMembers(
           </table>
         </div>
         {members.length === 0 ? (
-          <p class="field__hint" style="margin-top:.5rem;">
+          <p class="field__hint mt-1" style="margin-top:.5rem;">
             No members yet.
           </p>
         ) : null}
@@ -124,14 +124,14 @@ export function renderSettingsMembers(
         </div>
       ) : null}
 
-      <div class="card card--padded" style="margin-top:1rem;">
+      <div class="card card--padded mt-1">
         <h3 style="margin:0 0 .3rem;">Identity-provider group mappings</h3>
         <p class="field__hint">
           Map an IdP group (name or provider ID, exact match) to a project role. Members sync at
           next login; removing a mapping revokes synced grants but never manual ones. Wildcards are
           not expanded.
         </p>
-        <div class="table-wrap" style="margin-top:.75rem;">
+        <div class="table-wrap table-gap">
           <table>
             <thead>
               <tr>
@@ -172,14 +172,14 @@ export function renderSettingsMembers(
           </table>
         </div>
         {groupMappings.length === 0 ? (
-          <p class="field__hint" style="margin-top:.5rem;">
+          <p class="field__hint mt-1" style="margin-top:.5rem;">
             No group mappings yet.
           </p>
         ) : null}
       </div>
 
       {isAdmin ? (
-        <div class="card card--padded" style="margin-top:1rem;">
+        <div class="card card--padded mt-1">
           <h3 style="margin:0 0 .5rem;">Add group mapping</h3>
           <form
             method="post"

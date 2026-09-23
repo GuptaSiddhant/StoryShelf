@@ -61,23 +61,26 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
           ) : null}
         </div>
       ) : (
-        <div class="grid" style="gap:.75rem;">
+        <div class="grid">
           {projects.map((project): HtmlEscapedString | Promise<HtmlEscapedString> => {
             const info = countsBySlug.get(project.slug);
             return (
               <div key={project.id} class="card card--padded">
-                <div style="display:flex; justify-content:space-between; gap:1rem; flex-wrap:wrap; align-items:flex-start;">
-                  <div style="min-width:0;">
-                    <h2 style="margin:0; font-size:1.15rem;">
+                <div
+                  class="row-actions"
+                  style="justify-content:space-between; align-items:flex-start; gap:1rem;"
+                >
+                  <div class="truncate" style="min-width:0;">
+                    <h2 class="review-bar__title">
                       <a href={`/projects/${project.slug}/builds`}>{project.name}</a>
                     </h2>
-                    <p class="field__hint" style="margin:.2rem 0 0;">
+                    <p class="field__hint">
                       <code>{project.slug}</code>{" "}
                       {project.gitRepository ? `· ${project.gitRepository}` : ""} · default{" "}
                       <Badge tone="neutral">{project.gitDefaultBranch}</Badge>
                     </p>
                     {info?.latest ? (
-                      <p class="field__hint" style="margin:.3rem 0 0;">
+                      <p class="field__hint">
                         Latest: {info.latest.gitBranch} · {info.latest.gitSha.slice(0, 7)} ·{" "}
                         <Badge
                           tone={
@@ -92,12 +95,10 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
                         </Badge>
                       </p>
                     ) : (
-                      <p class="field__hint" style="margin:.3rem 0 0;">
-                        No builds yet.
-                      </p>
+                      <p class="field__hint">No builds yet.</p>
                     )}
                   </div>
-                  <div style="display:flex; gap:.5rem; flex-wrap:wrap;">
+                  <div class="row-actions">
                     <a class="btn btn--secondary" href={`/projects/${project.slug}/builds`}>
                       Builds {info?.count ? `(${info.count})` : ""}
                     </a>
@@ -112,9 +113,9 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
         </div>
       )}
 
-      <div class="card card--padded" style="margin-top:1rem;">
-        <h3 style="margin:0 0 .4rem;">Next steps</h3>
-        <ol style="margin:.4rem 0 0; padding-left:1.2rem; color:var(--text-secondary);">
+      <div class="card card--padded mt-1">
+        <h3 class="review-bar__title">Next steps</h3>
+        <ol class="muted" style="margin:.4rem 0 0; padding-left:1.2rem;">
           <li>
             Create a project (or run{" "}
             <code>

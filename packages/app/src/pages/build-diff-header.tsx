@@ -32,7 +32,7 @@ function ReviewActions(props: ReviewActionsProps): HtmlEscapedString | Promise<H
         hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/approve-all`}
         hx-target="body"
       >
-        <button class="btn btn--primary" type="submit">
+        <button class="btn btn--primary btn--sm" type="submit">
           Approve all ({pendingCount})
         </button>
       </form>
@@ -42,7 +42,7 @@ function ReviewActions(props: ReviewActionsProps): HtmlEscapedString | Promise<H
         hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/reject-all`}
         hx-target="body"
       >
-        <button class="btn btn--danger" type="submit">
+        <button class="btn btn--secondary btn--sm" type="submit">
           Reject all
         </button>
       </form>
@@ -56,30 +56,17 @@ interface DiffStatsProps {
   approvedCount: number;
 }
 
-/** Snapshot/pending/approved counters. */
+/** Compact meta line replacing the old three-stat card. */
 function DiffStats(props: DiffStatsProps): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { snapshots, pendingCount, approvedCount } = props;
   return (
-    <div class="card card--padded" style="margin-bottom:1rem;">
-      <div class="grid grid--3" style="text-align:center;">
-        <div class="stat">
-          <div class="stat__value">{snapshots.length}</div>
-          <div class="stat__label">Snapshots</div>
-        </div>
-        <div class="stat">
-          <div class="stat__value" style="color: var(--status-new);">
-            {pendingCount}
-          </div>
-          <div class="stat__label">Needs review</div>
-        </div>
-        <div class="stat">
-          <div class="stat__value" style="color: var(--status-approved);">
-            {approvedCount}
-          </div>
-          <div class="stat__label">Approved</div>
-        </div>
-      </div>
-    </div>
+    <p class="page-header__meta">
+      <span>{snapshots.length} snapshots</span>
+      <span aria-hidden="true">·</span>
+      <span>{pendingCount} need review</span>
+      <span aria-hidden="true">·</span>
+      <span>{approvedCount} approved</span>
+    </p>
   );
 }
 
@@ -117,37 +104,38 @@ function DiffBreadcrumbs(
 export function DiffHeader(props: DiffHeaderProps): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, snapshots, pendingCount, canReview } = props;
   return (
-    <>
-      <div class="page-header">
-        <DiffBreadcrumbs project={project} build={build} />
-        <div class="page-header__row">
-          <div>
-            <h1 class="page-header__title">
-              {build.gitBranch}{" "}
-              <span style="color:var(--text-secondary); font-weight:400;">
-                · {build.gitSha.slice(0, 7)}
-              </span>
-            </h1>
-            <p class="page-header__desc">
-              {build.message ?? "No message"} {build.authorName ? `· ${build.authorName}` : ""} ·{" "}
-              <Badge tone={statusTone(build.status)}>{build.status}</Badge>
-            </p>
-          </div>
-          <div class="page-header__actions">
-            <a class="btn btn--secondary" href={`/projects/${project.slug}/builds/${build.id}`}>
-              Build overview
-            </a>
-            {canReview && pendingCount > 0 ? (
-              <ReviewActions project={project} build={build} pendingCount={pendingCount} />
-            ) : null}
-          </div>
+    <div class="page-header">
+      <DiffBreadcrumbs project={project} build={build} />
+      <div class="page-header__row">
+        <div>
+          <h1 class="page-header__title">
+            {build.gitBranch}{" "}
+            <span class="muted mono" style="font-weight:400;">
+              · {build.gitSha.slice(0, 7)}
+            </span>
+          </h1>
+          <p class="page-header__desc">
+            {build.message ?? "No message"} {build.authorName ? `· ${build.authorName}` : ""} ·{" "}
+            <Badge tone={statusTone(build.status)}>{build.status}</Badge>
+          </p>
+          <DiffStats
+            snapshots={snapshots}
+            pendingCount={pendingCount}
+            approvedCount={build.approvedCount}
+          />
+        </div>
+        <div class="page-header__actions">
+          <a
+            class="btn btn--secondary btn--sm"
+            href={`/projects/${project.slug}/builds/${build.id}`}
+          >
+            Build overview
+          </a>
+          {canReview && pendingCount > 0 ? (
+            <ReviewActions project={project} build={build} pendingCount={pendingCount} />
+          ) : null}
         </div>
       </div>
-      <DiffStats
-        snapshots={snapshots}
-        pendingCount={pendingCount}
-        approvedCount={build.approvedCount}
-      />
-    </>
+    </div>
   );
 }

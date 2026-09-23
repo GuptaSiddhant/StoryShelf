@@ -65,7 +65,7 @@ export async function renderProjectBuildsPage(
         </div>
       </div>
 
-      <div class="card card--padded" style="margin-bottom:1rem;">
+      <div class="card card--padded">
         <form
           method="get"
           action={`/projects/${project.slug}/builds`}

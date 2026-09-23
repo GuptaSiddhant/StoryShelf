@@ -218,7 +218,7 @@ function renderLibraryGrid(
     >
       {renderLibraryHeader(project, build, snapshots.length, branches)}
       {multi ? (
-        <div class="card card--padded" style="margin-bottom:1rem;">
+        <div class="card card--padded">
           <span class="field__hint">Viewports: {viewportNames.join(" · ")}</span>
         </div>
       ) : null}

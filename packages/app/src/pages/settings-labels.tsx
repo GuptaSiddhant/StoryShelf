@@ -11,14 +11,14 @@ export function renderSettingsLabels(
   isAdmin: boolean,
 ): unknown {
   return (
-    <div class="grid" style="max-width: 880px;">
+    <div class="grid max-w-form">
       <div class="card card--padded">
         <h2 style="margin:0 0 .3rem;">Label types</h2>
         <p class="field__hint">
           Labels attach typed values to builds (e.g. pr=123, jira=ABC-123). Values link out via the
           template.
         </p>
-        <div class="table-wrap" style="margin-top:.75rem;">
+        <div class="table-wrap table-gap">
           <table>
             <thead>
               <tr>
@@ -65,7 +65,7 @@ export function renderSettingsLabels(
           </table>
         </div>
         {labelTypes.length === 0 ? (
-          <p class="field__hint" style="margin-top:.5rem;">
+          <p class="field__hint mt-1" style="margin-top:.5rem;">
             No label types configured.
           </p>
         ) : null}

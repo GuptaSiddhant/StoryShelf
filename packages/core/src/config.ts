@@ -11,10 +11,18 @@ import type { DatabaseAdapter } from "./db/database.ts";
 /** Brand color theme for the server-rendered UI. */
 export interface BrandTheme {
   accent: string;
-  surface: { base: string; card: string };
-  text: { primary: string; secondary: string };
+  accentContrast?: string;
+  ring?: string;
+  surface: { base: string; card: string; muted?: string; subtle?: string };
+  text: { primary: string; secondary: string; muted?: string };
   border: string;
+  borderSubtle?: string;
   status: { approved: string; new: string; rejected: string };
+  sidebarBg?: string;
+  topbarBg?: string;
+  radius?: string;
+  radiusSm?: string;
+  shadow?: string;
 }
 
 /** Branding overrides for the server-rendered UI. */
@@ -80,10 +88,23 @@ const viewportSchema: z.ZodType<ShelfViewport> = z.object({
 
 const brandThemeSchema: z.ZodType<BrandTheme> = z.object({
   accent: z.string(),
-  surface: z.object({ base: z.string(), card: z.string() }),
-  text: z.object({ primary: z.string(), secondary: z.string() }),
+  accentContrast: z.string().optional(),
+  ring: z.string().optional(),
+  surface: z.object({
+    base: z.string(),
+    card: z.string(),
+    muted: z.string().optional(),
+    subtle: z.string().optional(),
+  }),
+  text: z.object({ primary: z.string(), secondary: z.string(), muted: z.string().optional() }),
   border: z.string(),
+  borderSubtle: z.string().optional(),
   status: z.object({ approved: z.string(), new: z.string(), rejected: z.string() }),
+  sidebarBg: z.string().optional(),
+  topbarBg: z.string().optional(),
+  radius: z.string().optional(),
+  radiusSm: z.string().optional(),
+  shadow: z.string().optional(),
 });
 
 const adapterSnapshotSchema: z.ZodType<AdapterSnapshot> = z.object({

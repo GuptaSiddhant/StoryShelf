@@ -10,13 +10,13 @@ export function renderSettingsTokens(
   isAdmin: boolean,
 ): unknown {
   return (
-    <div class="grid" style="max-width: 880px;">
+    <div class="grid max-w-form">
       <div class="card card--padded">
         <h2 style="margin:0 0 .3rem;">API tokens</h2>
         <p class="field__hint">
           Tokens are used by the CLI to upload builds. They are scoped to this project.
         </p>
-        <div class="table-wrap" style="margin-top:.75rem;">
+        <div class="table-wrap table-gap">
           <table>
             <thead>
               <tr>
@@ -55,7 +55,7 @@ export function renderSettingsTokens(
           </table>
         </div>
         {tokens.length === 0 ? (
-          <p class="field__hint" style="margin-top:.5rem;">
+          <p class="field__hint mt-1" style="margin-top:.5rem;">
             No tokens yet. Create one for CI.
           </p>
         ) : null}
@@ -87,7 +87,7 @@ export function renderSettingsTokens(
               Create token
             </button>
           </form>
-          <p class="field__hint" style="margin-top:.5rem;">
+          <p class="field__hint mt-1" style="margin-top:.5rem;">
             Token value is shown once after creation. Store it securely.
           </p>
         </div>
