@@ -25,14 +25,37 @@ export default defineConfig({
             { label: "Getting started", slug: "guides/getting-started" },
             { label: "CI setup", slug: "guides/ci" },
             { label: "Interaction testing", slug: "guides/interaction-testing" },
-            { label: "REST API", slug: "guides/api" },
-            { label: "OpenAPI", link: "/openapi/" },
-            { label: "Deployment", slug: "guides/deployment" },
+            {
+              label: "Deployment",
+              collapsed: false,
+              items: [
+                { label: "Overview", slug: "guides/deployment" },
+                { label: "Docker Compose", slug: "guides/deployment/docker-compose" },
+                { label: "AWS", slug: "guides/deployment/aws" },
+                { label: "Azure", slug: "guides/deployment/azure" },
+                { label: "GCP", slug: "guides/deployment/gcp" },
+                { label: "Cloud assembly", slug: "guides/deployment/cloud" },
+              ],
+            },
+            {
+              label: "API",
+              collapsed: true,
+              items: [
+                { label: "REST API", slug: "guides/api" },
+                { label: "OpenAPI", link: "/openapi/" },
+              ],
+            },
+            {
+              label: "Chromatic",
+              collapsed: true,
+              items: [
+                { label: "Comparison", slug: "guides/chromatic-comparison" },
+                { label: "Migration", slug: "guides/chromatic-migration" },
+              ],
+            },
             { label: "CLI", slug: "guides/cli" },
             { label: "Configuration", slug: "guides/config" },
             { label: "Auth", slug: "guides/auth" },
-            { label: "Chromatic comparison", slug: "guides/chromatic-comparison" },
-            { label: "Chromatic migration", slug: "guides/chromatic-migration" },
           ],
         },
         {
