@@ -15,7 +15,7 @@ StoryShelf has two layers of authorization: **site roles** (from the auth provid
 | `member` | Default — can create/join projects via membership |
 | `viewer` | Read-only auditor — can read every project without membership, cannot mutate/manage/administer; all reads carry the user id in request logs |
 
-`adminGroups` / `viewerGroups` (exact group name or provider object ID) map IdP groups to site roles. Everyone else signs in as `member`.
+`adminGroups` / `viewerGroups` (exact group name or provider object ID) map IdP groups to site roles. Everyone else signs in as `member`. The shared-password adapter (`auth-password`) mirrors this tier without an IdP: `AUTH_PASSWORD` → `admin`, optional `AUTH_VIEWER_PASSWORD` → `viewer` (see [Live Demo](/guides/demo/) → `demo` viewer password and [Auth guide](/guides/auth/) tiered mode).
 
 ## Project roles
 

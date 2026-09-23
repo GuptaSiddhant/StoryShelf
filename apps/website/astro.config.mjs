@@ -23,6 +23,7 @@ export default defineConfig({
           label: "Guides",
           items: [
             { label: "Getting started", slug: "guides/getting-started" },
+            { label: "Live Demo", slug: "guides/demo" },
             {
               label: "Workflow",
               collapsed: true,

@@ -26,6 +26,21 @@ AUTH_PASSWORD=your-shared-password
 
 Anyone with the password can log in as a full user. Good for a small team that wants a cheap login without standing up an identity provider.
 
+### Tiered viewer password (demo: open for viewers, not editors)
+
+For a public demo that should be **read-only for viewers** but writable for admins, add a second password:
+
+```bash
+AUTH_PASSWORD=your-admin-password      # → site admin
+AUTH_VIEWER_PASSWORD=demo              # → site viewer (read-only)
+SECRET=your-hmac-secret                # signs both tiers
+```
+
+- `AUTH_PASSWORD` → `admin` (full control: upload, approve/reject, members, settings)
+- `AUTH_VIEWER_PASSWORD` → `viewer` (read all projects without membership, cannot mutate — see [Roles & tokens](../../concepts/roles/))
+
+When `AUTH_VIEWER_PASSWORD` is omitted, the adapter stays single-password (admin only) — existing installs keep working. The demo app at `storyshelf.fly.dev` runs in this tiered mode; publish the viewer password to demo users and keep the admin secret private. If the two passwords are set equal, admin wins.
+
 ## OIDC / OAuth
 
 Plug into any OpenID Connect / OAuth2 provider — Keycloak, Authentik, Okta, GitHub, GitLab, Google. Configure via environment variables:
