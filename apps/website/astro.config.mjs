@@ -68,6 +68,7 @@ export default defineConfig({
         },
         {
           label: "Packages",
+          collapsed: true,
           items: [
             { label: "@storyshelf/core", slug: "packages/core" },
             { label: "@storyshelf/app", slug: "packages/app" },
