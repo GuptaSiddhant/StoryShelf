@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/runner-puppeteer",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Puppeteer CaptureRunner for StoryShelf (Chromium via chrome-headless-shell, smaller image).",
   "keywords": [
     "puppeteer",

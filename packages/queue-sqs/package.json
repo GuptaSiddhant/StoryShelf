@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/queue-sqs",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "SQS capture job queue adapter for StoryShelf (AWS cloud deployments).",
   "keywords": [
     "aws",

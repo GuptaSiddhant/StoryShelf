@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/queue-azure",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Azure capture queue adapter for StoryShelf: Storage Queues or Service Bus.",
   "keywords": [
     "azure",

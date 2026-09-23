@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/db-postgres",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Postgres database adapter for StoryShelf (postgres.js + Drizzle, RDS/Cloud SQL/Supabase/Neon compatible).",
   "keywords": [
     "database",

@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/db-sqlite",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "SQLite database adapter for StoryShelf (node:sqlite + Drizzle).",
   "keywords": [
     "database",
