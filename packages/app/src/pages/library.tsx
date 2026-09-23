@@ -20,10 +20,12 @@ import {
   Card,
   CardSection,
   EmptyState,
+  HStack,
   Meta,
   PageHeader,
   SectionTitle,
   SelectField,
+  VStack,
 } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
@@ -284,17 +286,19 @@ function renderBranchPicker(
   branches: string[],
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
   return (
-    <form method="get" action={`/projects/${project.slug}/library`} class="row-actions">
-      <SelectField
-        label="Branch"
-        name="branch"
-        layout="inline"
-        value={build.gitBranch}
-        options={branches.map((b) => ({ value: b, label: b }))}
-      />
-      <Button variant="secondary" type="submit">
-        View
-      </Button>
+    <form method="get" action={`/projects/${project.slug}/library`}>
+      <HStack>
+        <SelectField
+          label="Branch"
+          name="branch"
+          layout="inline"
+          value={build.gitBranch}
+          options={branches.map((b) => ({ value: b, label: b }))}
+        />
+        <Button variant="secondary" type="submit">
+          View
+        </Button>
+      </HStack>
     </form>
   );
 }
@@ -308,11 +312,11 @@ function renderTitleList(
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
   const titles = [...byTitle.keys()].toSorted((a, b) => a.localeCompare(b));
   return (
-    <div class="stack">
+    <VStack>
       {titles.map((title) =>
         renderTitleGroup(title, byTitle.get(title) ?? [], project, build, multi, docsByStory),
       )}
-    </div>
+    </VStack>
   );
 }
 
@@ -333,7 +337,7 @@ function renderTitleGroup(
         <Meta as="span">{group.length} stories</Meta>
       </CardSection>
       <CardSection>
-        <div class="stack">
+        <VStack>
           {vNames.map((vName) =>
             renderViewportGroup(
               vName,
@@ -344,7 +348,7 @@ function renderTitleGroup(
               docsByStory,
             ),
           )}
-        </div>
+        </VStack>
       </CardSection>
     </Card>
   );
@@ -402,7 +406,7 @@ function renderSnapshotCard(
           alt={`${snap.storyTitle} / ${snap.storyName}`}
           loading="lazy"
         />
-        <div class="row-actions">{renderCardActions(snap, project, build, docsId)}</div>
+        <HStack>{renderCardActions(snap, project, build, docsId)}</HStack>
       </div>
     </div>
   );

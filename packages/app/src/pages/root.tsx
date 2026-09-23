@@ -1,4 +1,4 @@
-import { Button, Card, Meta, SectionTitle } from "../ui/components.tsx";
+import { Button, Card, HStack, Meta, SectionTitle, VStack } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
@@ -29,15 +29,6 @@ const heroDesc = css`
   margin: 0 auto 1rem;
 `;
 
-/** Landing hero actions row. */
-const heroActions = css`
-  /* hero-actions */
-  display: flex;
-  gap: 0.5rem;
-  justify-content: center;
-  flex-wrap: wrap;
-`;
-
 /** Landing page introducing capture, diff, and review. */
 export function renderRootPage(): RenderedContent {
   return (
@@ -48,15 +39,15 @@ export function renderRootPage(): RenderedContent {
           Self-hosted visual testing for Storybook. Capture every story, diff against baselines, and
           review changes before they ship.
         </p>
-        <div class="stack">
-          <div class={heroActions}>
+        <VStack>
+          <HStack justify="center">
             <Button variant="primary" href="/projects">
               View projects
             </Button>
             <Button variant="secondary" href="/projects/new">
               Create project
             </Button>
-          </div>
+          </HStack>
           <Meta>
             Tip: use{" "}
             <code>
@@ -66,7 +57,7 @@ export function renderRootPage(): RenderedContent {
             to create a project and token for CI, or <code>npx storyshelf init</code> to write{" "}
             <code>.storybook/storyshelf.json</code>.
           </Meta>
-        </div>
+        </VStack>
       </div>
 
       <div class="grid grid--3 mt-1">

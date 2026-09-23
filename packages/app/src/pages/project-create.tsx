@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Field, PageHeader } from "../ui/components.tsx";
+import { Alert, Button, Card, Field, HStack, PageHeader } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
 /** Form state for the project creation page (values and validation errors). */
@@ -65,13 +65,15 @@ export function renderProjectCreatePage(state: ProjectCreateFormState = {}): Ren
               hint="Baselines fall back to this branch when no branch-specific baseline exists."
             />
 
-            <div class="row-actions mt-1">
-              <Button variant="primary" type="submit">
-                Create project
-              </Button>
-              <Button variant="secondary" href="/projects">
-                Cancel
-              </Button>
+            <div class="mt-1">
+              <HStack>
+                <Button variant="primary" type="submit">
+                  Create project
+                </Button>
+                <Button variant="secondary" href="/projects">
+                  Cancel
+                </Button>
+              </HStack>
             </div>
           </form>
         </Card>

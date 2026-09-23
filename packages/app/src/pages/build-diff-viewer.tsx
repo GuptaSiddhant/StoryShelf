@@ -2,7 +2,7 @@ import type { Build } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge, Button, Card, Meta, statusTone } from "../ui/components.tsx";
+import { Badge, Button, Card, HStack, Meta, VStack, statusTone } from "../ui/components.tsx";
 import {
   diffGrid,
   diffPane,
@@ -47,7 +47,7 @@ function SnapshotActions(
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, selected } = props;
   return (
-    <div class="row-actions">
+    <HStack>
       <form
         method="post"
         action={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${selected.id}/approve`}
@@ -82,7 +82,7 @@ function SnapshotActions(
           Reject
         </Button>
       </form>
-    </div>
+    </HStack>
   );
 }
 
@@ -230,14 +230,14 @@ export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<
             )}
           </p>
         </div>
-        <div class="row-actions">
+        <HStack>
           <ViewSwitch />
           {canReview && (selected.status === "new" || selected.status === "changed") ? (
             <SnapshotActions project={project} build={build} selected={selected} />
           ) : null}
-        </div>
+        </HStack>
       </div>
-      <div class="stack">
+      <VStack>
         <DiffPaneGrid
           project={project}
           build={build}
@@ -247,7 +247,7 @@ export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<
         <Meta>
           Keyboard: <kbd>←</kbd> <kbd>→</kbd> navigate · <kbd>a</kbd> approve · <kbd>r</kbd> reject
         </Meta>
-      </div>
+      </VStack>
     </Card>
   );
 }

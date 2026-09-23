@@ -130,12 +130,7 @@ const sectionTitleDanger = css`
   color: var(--status-rejected);
 `;
 
-const tableActionsRow = css`
-  /* table-actions-row */
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-`;
+/** Card or section heading (h2 by default, h3 for subsections). */
 
 /** Card container, padded by default, with an optional danger tone. */
 // eslint-disable-next-line promise-function-async -- JSX component return type
@@ -217,10 +212,4 @@ export const SectionTitle: FC<{
     return <h3 class={tone === "danger" ? sectionTitleDanger : sectionTitleH3}>{children}</h3>;
   }
   return <h2 class={sectionTitleH2}>{children}</h2>;
-};
-
-/** Inline action row for table cells (replaces spacer spans and inline forms). */
-// eslint-disable-next-line promise-function-async -- JSX component return type
-export const TableActions: FC<{ children?: unknown }> = ({ children }) => {
-  return <div class={tableActionsRow}>{children}</div>;
 };

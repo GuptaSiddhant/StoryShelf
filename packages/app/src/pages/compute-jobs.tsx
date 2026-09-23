@@ -13,10 +13,10 @@ import {
   Button,
   Card,
   EmptyState,
+  HStack,
   Meta,
   PageHeader,
   SectionTitle,
-  TableActions,
   statusTone,
 } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
@@ -158,7 +158,7 @@ export async function renderComputeJobsPage(
                     <Meta as="span">{new Date(build.createdAt).toLocaleString()}</Meta>
                   </td>
                   <td class="nowrap">
-                    <TableActions>
+                    <HStack wrap={false}>
                       <Button
                         variant="secondary"
                         size="sm"
@@ -178,7 +178,7 @@ export async function renderComputeJobsPage(
                           </Button>
                         </form>
                       ) : null}
-                    </TableActions>
+                    </HStack>
                     {queueByBuild.get(build.id)?.error ? (
                       <Meta as="div" tone="danger">
                         {queueByBuild.get(build.id)?.error}

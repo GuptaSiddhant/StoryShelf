@@ -13,6 +13,7 @@ import {
   Button,
   Card,
   EmptyState,
+  HStack,
   Meta,
   PageHeader,
   SectionTitle,
@@ -76,7 +77,7 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
             const info = countsBySlug.get(project.slug);
             return (
               <Card key={project.id}>
-                <div class="split">
+                <HStack justify="between" align="start" gap="md">
                   <div class="truncate min-w-0">
                     <SectionTitle>
                       <a href={`/projects/${project.slug}/builds`}>{project.name}</a>
@@ -105,15 +106,15 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
                       <Meta>No builds yet.</Meta>
                     )}
                   </div>
-                  <div class="row-actions">
+                  <HStack>
                     <Button variant="secondary" href={`/projects/${project.slug}/builds`}>
                       Builds {info?.count ? `(${info.count})` : ""}
                     </Button>
                     <Button variant="ghost" href={`/projects/${project.slug}/settings`}>
                       Settings
                     </Button>
-                  </div>
-                </div>
+                  </HStack>
+                </HStack>
               </Card>
             );
           })}

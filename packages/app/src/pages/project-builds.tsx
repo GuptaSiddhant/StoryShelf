@@ -14,10 +14,10 @@ import {
   Card,
   EmptyState,
   Field,
+  HStack,
   Meta,
   PageHeader,
   SelectField,
-  TableActions,
   statusTone,
 } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
@@ -67,36 +67,38 @@ export async function renderProjectBuildsPage(
       />
 
       <Card>
-        <form method="get" action={`/projects/${project.slug}/builds`} class="row-actions">
-          <SelectField
-            label="Status"
-            name="status"
-            layout="inline"
-            value={query.status ?? ""}
-            options={[
-              { value: "", label: "All" },
-              { value: "pending", label: "pending" },
-              { value: "reviewing", label: "reviewing" },
-              { value: "approved", label: "approved" },
-              { value: "rejected", label: "rejected" },
-              { value: "failed", label: "failed" },
-            ]}
-          />
-          <Field
-            label="Branch"
-            name="branch"
-            layout="inline"
-            value={query.branch ?? ""}
-            placeholder="main"
-          />
-          <Button variant="secondary" type="submit">
-            Filter
-          </Button>
-          {query.status || query.branch ? (
-            <Button variant="ghost" href={`/projects/${project.slug}/builds`}>
-              Clear
+        <form method="get" action={`/projects/${project.slug}/builds`}>
+          <HStack>
+            <SelectField
+              label="Status"
+              name="status"
+              layout="inline"
+              value={query.status ?? ""}
+              options={[
+                { value: "", label: "All" },
+                { value: "pending", label: "pending" },
+                { value: "reviewing", label: "reviewing" },
+                { value: "approved", label: "approved" },
+                { value: "rejected", label: "rejected" },
+                { value: "failed", label: "failed" },
+              ]}
+            />
+            <Field
+              label="Branch"
+              name="branch"
+              layout="inline"
+              value={query.branch ?? ""}
+              placeholder="main"
+            />
+            <Button variant="secondary" type="submit">
+              Filter
             </Button>
-          ) : null}
+            {query.status || query.branch ? (
+              <Button variant="ghost" href={`/projects/${project.slug}/builds`}>
+                Clear
+              </Button>
+            ) : null}
+          </HStack>
         </form>
       </Card>
 
@@ -149,7 +151,7 @@ export async function renderProjectBuildsPage(
                     <Meta as="span">{new Date(build.createdAt).toLocaleString()}</Meta>
                   </td>
                   <td class="nowrap">
-                    <TableActions>
+                    <HStack wrap={false}>
                       <Button
                         variant="secondary"
                         size="sm"
@@ -164,7 +166,7 @@ export async function renderProjectBuildsPage(
                       >
                         Review
                       </Button>
-                    </TableActions>
+                    </HStack>
                   </td>
                 </tr>
               ))}

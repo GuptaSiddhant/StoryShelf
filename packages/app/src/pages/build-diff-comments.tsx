@@ -2,7 +2,15 @@ import type { Build } from "@storyshelf/core/schema";
 import type { Comment } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge, Button, Card, Meta, SectionTitle, TextareaField } from "../ui/components.tsx";
+import {
+  Badge,
+  Button,
+  Card,
+  Meta,
+  SectionTitle,
+  TextareaField,
+  VStack,
+} from "../ui/components.tsx";
 import {
   reviewComment,
   reviewCommentActions,
@@ -71,21 +79,23 @@ function CommentForm(props: CommentFormProps): HtmlEscapedString | Promise<HtmlE
       action={`/api/v1/projects/${project.slug}/builds/${build.id}/comments`}
       hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/comments`}
       hx-target="body"
-      class="stack mt-1"
+      class="mt-1"
     >
-      <input type="hidden" name="snapshotId" value={selectedId} />
-      <TextareaField
-        label="Add comment"
-        name="body"
-        rows={3}
-        required
-        placeholder="Leave feedback on this snapshot…"
-      />
-      <div>
-        <Button variant="primary" type="submit">
-          Comment
-        </Button>
-      </div>
+      <VStack>
+        <input type="hidden" name="snapshotId" value={selectedId} />
+        <TextareaField
+          label="Add comment"
+          name="body"
+          rows={3}
+          required
+          placeholder="Leave feedback on this snapshot…"
+        />
+        <div>
+          <Button variant="primary" type="submit">
+            Comment
+          </Button>
+        </div>
+      </VStack>
     </form>
   );
 }
@@ -99,7 +109,7 @@ export function DiffComments(
   return (
     <Card>
       <SectionTitle level={3}>Comments</SectionTitle>
-      <div class="stack">
+      <VStack>
         {visible.map((comment): HtmlEscapedString | Promise<HtmlEscapedString> => (
           <CommentCard
             key={comment.id}
@@ -110,7 +120,7 @@ export function DiffComments(
           />
         ))}
         {visible.length === 0 ? <Meta>No comments on this snapshot.</Meta> : null}
-      </div>
+      </VStack>
 
       <CommentForm project={project} build={build} selectedId={selectedId} />
     </Card>

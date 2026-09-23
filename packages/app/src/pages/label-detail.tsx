@@ -14,9 +14,9 @@ import {
   Badge,
   Button,
   EmptyState,
+  HStack,
   Meta,
   PageHeader,
-  TableActions,
   statusTone,
 } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
@@ -131,7 +131,7 @@ export async function renderLabelDetailPage(
                       <Meta as="span">{new Date(build.createdAt).toLocaleString()}</Meta>
                     </td>
                     <td class="nowrap">
-                      <TableActions>
+                      <HStack wrap={false}>
                         <Button
                           variant="secondary"
                           size="sm"
@@ -150,7 +150,7 @@ export async function renderLabelDetailPage(
                             Open link
                           </Button>
                         ) : null}
-                      </TableActions>
+                      </HStack>
                     </td>
                   </tr>
                 );

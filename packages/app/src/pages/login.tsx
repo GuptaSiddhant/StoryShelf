@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Field, Meta, PageHeader } from "../ui/components.tsx";
+import { Alert, Button, Card, Field, Meta, PageHeader, VStack } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
 /** Form state for the sign-in page (SSO link and error message). */
@@ -36,11 +36,13 @@ export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
           </form>
 
           {state.ssoUrl ? (
-            <div class="stack mt-1">
-              <Meta center>or</Meta>
-              <Button variant="secondary" href={state.ssoUrl}>
-                Sign in with SSO
-              </Button>
+            <div class="mt-1">
+              <VStack>
+                <Meta center>or</Meta>
+                <Button variant="secondary" href={state.ssoUrl}>
+                  Sign in with SSO
+                </Button>
+              </VStack>
             </div>
           ) : null}
         </Card>

@@ -20,14 +20,15 @@ import {
   Button,
   Card,
   EmptyState,
+  HStack,
   Meta,
   PageHeader,
   SectionTitle,
   Stat,
   TextareaField,
+  VStack,
   statusTone,
 } from "../ui/components.tsx";
-import { css } from "../ui/css.ts";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import {
   reviewComment,
@@ -39,13 +40,6 @@ import {
   snapshotCardMeta,
   snapshotGrid,
 } from "../ui/styles/review.ts";
-
-const logRow = css`
-  /* log-row */
-  display: flex;
-  gap: 0.4rem;
-  align-items: baseline;
-`;
 
 /** Map a capture log level to its badge tone. */
 function logTone(level: string): "neutral" | "success" | "warning" | "danger" | "info" {
@@ -169,16 +163,18 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
                 </Meta>
               </summary>
               {attempt.error ? <Meta as="pre">{attempt.error}</Meta> : null}
-              <div class="stack mt-1">
-                {(attemptLogs.get(attempt.id) ?? []).map(
-                  (line): HtmlEscapedString | Promise<HtmlEscapedString> => (
-                    <div key={line.id} class={logRow}>
-                      <Badge tone={logTone(line.level)}>{line.level}</Badge>
-                      <span>{line.message}</span>
-                      {line.fields ? <Meta as="code">{line.fields}</Meta> : null}
-                    </div>
-                  ),
-                )}
+              <div class="mt-1">
+                <VStack>
+                  {(attemptLogs.get(attempt.id) ?? []).map(
+                    (line): HtmlEscapedString | Promise<HtmlEscapedString> => (
+                      <HStack key={line.id} align="baseline" wrap={false}>
+                        <Badge tone={logTone(line.level)}>{line.level}</Badge>
+                        <span>{line.message}</span>
+                        {line.fields ? <Meta as="code">{line.fields}</Meta> : null}
+                      </HStack>
+                    ),
+                  )}
+                </VStack>
               </div>
             </details>
           ))}
@@ -188,7 +184,7 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
       {canReview && (build.status === "reviewing" || build.status === "comparing") ? (
         <div class="mb-1">
           <Card>
-            <div class="row-actions">
+            <HStack>
               <Meta as="span">Bulk actions:</Meta>
               <form
                 method="post"
@@ -196,7 +192,7 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
                 hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/approve-all`}
                 hx-target="body"
               >
-                <Button variant="primary" type="submit">
+                <Button variant="primary" size="sm" type="submit">
                   Approve all
                 </Button>
               </form>
@@ -206,12 +202,12 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
                 hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/reject-all`}
                 hx-target="body"
               >
-                <Button variant="danger" type="submit">
+                <Button variant="danger" size="sm" type="submit">
                   Reject all
                 </Button>
               </form>
               <Meta as="span">Or review individually in the diff view.</Meta>
-            </div>
+            </HStack>
           </Card>
         </div>
       ) : null}
@@ -242,9 +238,10 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
                     : ""}
                   {snap.diffPixels === null ? "" : ` · ${snap.diffPixels} px`}
                 </Meta>
-                <div class="row-actions">
+                <HStack>
                   <Button
                     variant="secondary"
+                    size="sm"
                     href={`/projects/${project.slug}/builds/${build.id}/diff?snapshot=${snap.id}`}
                   >
                     Review
@@ -257,7 +254,7 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
                         hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${snap.id}/approve`}
                         hx-target="body"
                       >
-                        <Button variant="ghost" type="submit">
+                        <Button variant="ghost" size="sm" type="submit">
                           Approve
                         </Button>
                       </form>
@@ -267,13 +264,13 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
                         hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${snap.id}/reject`}
                         hx-target="body"
                       >
-                        <Button variant="ghost" type="submit">
+                        <Button variant="ghost" size="sm" type="submit">
                           Reject
                         </Button>
                       </form>
                     </>
                   ) : null}
-                </div>
+                </HStack>
               </div>
             </div>
           ))}
@@ -286,7 +283,7 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
           {comments.length === 0 ? (
             <Meta>No comments. Add one in the diff review page for a specific snapshot.</Meta>
           ) : null}
-          <div class="stack">
+          <VStack>
             {comments.map((comment): HtmlEscapedString | Promise<HtmlEscapedString> => (
               <div key={comment.id} class={reviewComment}>
                 <div class={reviewCommentHead}>
@@ -305,27 +302,29 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
                 <p class={reviewCommentBody}>{comment.body}</p>
               </div>
             ))}
-          </div>
+          </VStack>
 
           <form
             method="post"
             action={`/api/v1/projects/${project.slug}/builds/${build.id}/comments`}
             hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/comments`}
             hx-target="body"
-            class="stack mt-1 max-w-prose"
+            class="mt-1 max-w-prose"
           >
-            <TextareaField
-              label="Add build comment"
-              name="body"
-              rows={3}
-              required
-              placeholder="Leave a comment on this build…"
-            />
-            <div>
-              <Button variant="primary" type="submit">
-                Comment
-              </Button>
-            </div>
+            <VStack>
+              <TextareaField
+                label="Add build comment"
+                name="body"
+                rows={3}
+                required
+                placeholder="Leave a comment on this build…"
+              />
+              <div>
+                <Button variant="primary" type="submit">
+                  Comment
+                </Button>
+              </div>
+            </VStack>
           </form>
         </Card>
       </div>

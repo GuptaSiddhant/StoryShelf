@@ -1,6 +1,15 @@
 import type { Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Alert, Badge, Button, Card, Field, Meta, SectionTitle } from "../ui/components.tsx";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Field,
+  HStack,
+  Meta,
+  SectionTitle,
+} from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Webhook row as rendered in the webhooks settings tab. */
@@ -51,13 +60,13 @@ export function renderSettingsWebhooks(
                     {webhook.events.length === 0 ? (
                       <Meta as="span">all events</Meta>
                     ) : (
-                      <div class="row-actions">
+                      <HStack>
                         {webhook.events.map(
                           (event): HtmlEscapedString | Promise<HtmlEscapedString> => (
                             <Badge tone="neutral">{event}</Badge>
                           ),
                         )}
-                      </div>
+                      </HStack>
                     )}
                   </td>
                   <td>
@@ -69,7 +78,7 @@ export function renderSettingsWebhooks(
                         hx-target="body"
                       >
                         {csrfField()}
-                        <Button variant="ghost" type="submit">
+                        <Button variant="ghost" size="sm" type="submit">
                           Delete
                         </Button>
                       </form>

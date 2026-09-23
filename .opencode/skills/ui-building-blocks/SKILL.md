@@ -19,7 +19,7 @@ this — keep it green and lower its per-file style ceilings as you migrate.
 - **Pages** (`pages/*.tsx`) may import UI only from the facade
   (`../ui/components.tsx`: `Button`, `Tabs`, `Badge`, `Alert`, `EmptyState`,
   `Stat`, `Field`, `TextareaField`, `SelectField`, `CheckField`, `Card`,
-  `CardSection`, `PageHeader`, `SectionTitle`, `TableActions`, `Meta`) and
+  `CardSection`, `PageHeader`, `SectionTitle`, `Meta`, `HStack`, `VStack`) and
   the shell (`../ui/document.tsx`: `DocumentLayout`), plus shared
   cross-page style objects (`../ui/styles/review.ts`: diff viewer/nav,
   snapshot cards, comment threads) and `../ui/css.ts` (page-local one-off
@@ -36,14 +36,18 @@ this — keep it green and lower its per-file style ceilings as you migrate.
 - **No `style="…"` in pages.** If a layout recurs, add a block component
   (`Stack`, `Row`, `TableActions`, `SectionTitle`) to the facade; one-off
   spacing is a design smell, not an exception.
+- **Stack layout uses `HStack` / `VStack`, never utility divs or inline
+  flex.** `HStack` (gap sm/md/lg, align center/start/end/baseline,
+  justify start/center/end/between, wrap) and `VStack` (gap, align)
+  render plain divs with token-map values (props select from finite maps —
+  same trust as static CSS). Margins belong to flow context (`mt-1`/`mb-1`
+  wrappers), never to the stack. There is exactly one row primitive;
+  `TableActions` was folded into `HStack` and must not be reintroduced.
 - **Sanctioned utilities** (the only raw classes allowed in `pages/`):
-  layout flow (`grid`, `grid--2/3`, `stack`, `row-actions`, `split`,
-  `mt-1`, `mb-1`, `max-w-form`, `max-w-prose`, `max-w-cell`, `min-w-0`,
-  `table-wrap`, `table-gap`, `nowrap` on `td`), text
-  (`muted`, `mono`, `truncate`), shell (`content`, `login`). Everything
-  else must be a facade component.
-- **Table action cells** use `<td class="nowrap"><TableActions>` with
-  `size="sm"` buttons; delete spacer spans and `display:inline` forms.
+  spacing (`mt-1`, `mb-1`, `max-w-form`, `max-w-prose`, `max-w-cell`,
+  `min-w-0`), grids (`grid`, `grid--2/3`, `table-wrap`, `table-gap`,
+  `nowrap` on `td`), text (`muted`, `mono`, `truncate`), shell
+  (`content`, `login`). Everything else must be a facade component.
 - **Page-local one-offs** (landing hero, truncate widths beyond
   `max-w-cell`) use `css` from `../ui/css.ts` with a label comment.
   If a pattern appears twice, promote it to the facade instead.
