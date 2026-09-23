@@ -28,6 +28,8 @@ RUN --mount=type=cache,target=/root/.cache/nub,id=nub-cache \
     nub install --frozen-lockfile
 # Then copy pruned source for bundling (full) — overwrites package.json with full source
 COPY --from=pruner /app/out/full ./
+# Ensure demo seed file is present even if prune cache is stale (new file)
+COPY apps/fly-app/src/seed-demo.ts ./apps/fly-app/src/seed-demo.ts
 # Copy fixtures for demo seed — build static inside image so repo stays clean (fixtures/**/storybook-static is gitignored)
 COPY fixtures ./fixtures
 USER root
