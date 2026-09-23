@@ -10,6 +10,7 @@ COPY package.json nub.lock nub.jsonc turbo.json ./
 COPY config ./config
 COPY packages ./packages
 COPY apps ./apps
+COPY fixtures ./fixtures
 RUN nubx --yes turbo@2.11.2 prune fly-app --docker --out-dir out && mv out/json/pnpm-lock.yaml out/json/nub.lock
 
 FROM ghcr.io/nubjs/nub:0.8.1 AS builder
@@ -27,6 +28,9 @@ RUN --mount=type=cache,target=/root/.cache/nub,id=nub-cache \
     nub install --frozen-lockfile
 # Then copy pruned source for bundling (full) — overwrites package.json with full source
 COPY --from=pruner /app/out/full ./
+# Copy fixtures for demo seed — build static inside image so repo stays clean (fixtures/**/storybook-static is gitignored)
+COPY fixtures ./fixtures
+RUN npm i -g pnpm@9 && pnpm --dir fixtures/storybook-8 install --frozen-lockfile && pnpm --dir fixtures/storybook-8 run build-storybook
 # Bundle workspace @storyshelf/* into single mjs; keep native + npm deps external
 RUN nubx rolldown -c apps/fly-app/rolldown.config.ts
 
@@ -36,6 +40,7 @@ WORKDIR /app
 COPY --from=builder /app/apps/fly-app/dist ./dist
 COPY --from=builder /app/apps/fly-app/package.json ./package.json
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/fixtures ./fixtures
 # Vendored HTMX bundle. The app resolves it as `../assets/htmx.min.js` relative
 # to `import.meta.url`, which for the bundled `/app/dist/server.mjs` is
 # `/app/assets/htmx.min.js` — a path the bundler does not emit on its own.
