@@ -1,6 +1,6 @@
 import type { Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Alert, Badge, Button, Card, Field, Meta } from "../ui/components.tsx";
+import { Alert, Badge, Button, Card, Field, Meta, SectionTitle } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Webhook row as rendered in the webhooks settings tab. */
@@ -27,7 +27,7 @@ export function renderSettingsWebhooks(
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
 
       <Card>
-        <h2 style="margin:0 0 .3rem;">Webhooks</h2>
+        <SectionTitle>Webhooks</SectionTitle>
         <Meta>
           Notify external services when builds are created, updated, approved or rejected. Payloads
           are POSTed as JSON and signed with the webhook secret.
@@ -44,17 +44,14 @@ export function renderSettingsWebhooks(
             <tbody>
               {webhooks.map((webhook): HtmlEscapedString | Promise<HtmlEscapedString> => (
                 <tr key={webhook.id}>
-                  <td
-                    style="max-width:36ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
-                    title={webhook.url}
-                  >
+                  <td class="truncate max-w-cell" title={webhook.url}>
                     {webhook.url}
                   </td>
                   <td>
                     {webhook.events.length === 0 ? (
                       <Meta as="span">all events</Meta>
                     ) : (
-                      <div style="display:flex; gap:.25rem; flex-wrap:wrap;">
+                      <div class="row-actions">
                         {webhook.events.map(
                           (event): HtmlEscapedString | Promise<HtmlEscapedString> => (
                             <Badge tone="neutral">{event}</Badge>
@@ -88,7 +85,7 @@ export function renderSettingsWebhooks(
 
       {isAdmin ? (
         <Card>
-          <h3 style="margin:0 0 .5rem;">Create webhook</h3>
+          <SectionTitle level={3}>Create webhook</SectionTitle>
           <form
             method="post"
             action={`/projects/${project.slug}/settings/webhooks`}

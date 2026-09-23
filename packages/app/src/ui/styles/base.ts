@@ -20,6 +20,9 @@ function resetCss(): string {
 function utilityCss(): string {
   return `
     .row-actions { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+    .split { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; }
+    .min-w-0 { min-width: 0; }
+    .max-w-cell { max-width: 32ch; }
     .stack { display: grid; gap: .75rem; }
     .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .muted { color: var(--text-secondary); }

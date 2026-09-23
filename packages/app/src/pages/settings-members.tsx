@@ -1,7 +1,7 @@
 import type { Project } from "@storyshelf/core/schema";
 import type { ProjectGroupMapping } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge, Button, Card, Field, Meta, SelectField } from "../ui/components.tsx";
+import { Badge, Button, Card, Field, Meta, SectionTitle, SelectField } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Project member row as rendered in the members settings tab. */
@@ -23,7 +23,7 @@ export function renderSettingsMembers(
   return (
     <div class="grid max-w-form">
       <Card>
-        <h2 style="margin:0 0 .3rem;">Members</h2>
+        <SectionTitle>Members</SectionTitle>
         <Meta>Project members and their roles. Site admins have implicit admin access.</Meta>
         <div class="table-wrap table-gap">
           <table>
@@ -80,7 +80,7 @@ export function renderSettingsMembers(
 
       {isAdmin ? (
         <Card>
-          <h3 style="margin:0 0 .5rem;">Add member</h3>
+          <SectionTitle level={3}>Add member</SectionTitle>
           <form
             method="post"
             action={`/projects/${project.slug}/settings/members`}
@@ -108,7 +108,7 @@ export function renderSettingsMembers(
 
       <div class="mt-1">
         <Card>
-          <h3 style="margin:0 0 .3rem;">Identity-provider group mappings</h3>
+          <SectionTitle level={3}>Identity-provider group mappings</SectionTitle>
           <Meta>
             Map an IdP group (name or provider ID, exact match) to a project role. Members sync at
             next login; removing a mapping revokes synced grants but never manual ones. Wildcards
@@ -161,7 +161,7 @@ export function renderSettingsMembers(
       {isAdmin ? (
         <div class="mt-1">
           <Card>
-            <h3 style="margin:0 0 .5rem;">Add group mapping</h3>
+            <SectionTitle level={3}>Add group mapping</SectionTitle>
             <form
               method="post"
               action={`/projects/${project.slug}/settings/members/groups`}

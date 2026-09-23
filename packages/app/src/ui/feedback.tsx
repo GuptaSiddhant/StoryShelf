@@ -204,6 +204,12 @@ const metaDanger = css`
   color: var(--status-rejected);
 `;
 
+const metaCenter = css`
+  /* meta-center */
+  ${metaText}
+  text-align: center;
+`;
+
 type MetaAs = "p" | "span" | "div" | "code" | "pre";
 type MetaTone = "neutral" | "danger";
 
@@ -313,8 +319,9 @@ export const Meta: FC<{
   as?: MetaAs;
   mono?: boolean;
   tone?: MetaTone;
+  center?: boolean;
   children?: unknown;
-}> = ({ as = "p", mono = false, tone = "neutral", children }) => {
+}> = ({ as = "p", mono = false, tone = "neutral", center = false, children }) => {
   const cls =
     as === "pre"
       ? metaPre
@@ -322,9 +329,11 @@ export const Meta: FC<{
         ? metaCode
         : tone === "danger"
           ? metaDanger
-          : mono
-            ? metaMono
-            : metaText;
+          : center
+            ? metaCenter
+            : mono
+              ? metaMono
+              : metaText;
   if (as === "span") {
     return <span class={cls}>{children}</span>;
   }

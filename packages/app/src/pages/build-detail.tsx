@@ -22,10 +22,12 @@ import {
   EmptyState,
   Meta,
   PageHeader,
+  SectionTitle,
   Stat,
   TextareaField,
   statusTone,
 } from "../ui/components.tsx";
+import { css } from "../ui/css.ts";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import {
   reviewComment,
@@ -37,6 +39,13 @@ import {
   snapshotCardMeta,
   snapshotGrid,
 } from "../ui/styles/review.ts";
+
+const logRow = css`
+  /* log-row */
+  display: flex;
+  gap: 0.4rem;
+  align-items: baseline;
+`;
 
 /** Map a capture log level to its badge tone. */
 function logTone(level: string): "neutral" | "success" | "warning" | "danger" | "info" {
@@ -132,21 +141,23 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
         ]}
       />
 
-      <div class="grid grid--3" style="margin-bottom:1rem;">
-        <Card>
-          <Stat label="Snapshots" value={snapshots.length} />
-        </Card>
-        <Card>
-          <Stat label="Changed / new" value={build.changedCount} tone="warning" />
-        </Card>
-        <Card>
-          <Stat label="Approved / unchanged" value={build.approvedCount} tone="success" />
-        </Card>
+      <div class="mb-1">
+        <div class="grid grid--3">
+          <Card>
+            <Stat label="Snapshots" value={snapshots.length} />
+          </Card>
+          <Card>
+            <Stat label="Changed / new" value={build.changedCount} tone="warning" />
+          </Card>
+          <Card>
+            <Stat label="Approved / unchanged" value={build.approvedCount} tone="success" />
+          </Card>
+        </div>
       </div>
 
       {attempts.length > 0 ? (
         <Card>
-          <h2 style="margin:0 0 .5rem;">Capture attempts</h2>
+          <SectionTitle>Capture attempts</SectionTitle>
           {attempts.map((attempt, index): HtmlEscapedString | Promise<HtmlEscapedString> => (
             <details key={attempt.id} open={index === attempts.length - 1}>
               <summary>
@@ -158,10 +169,10 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
                 </Meta>
               </summary>
               {attempt.error ? <Meta as="pre">{attempt.error}</Meta> : null}
-              <div style="display:grid; gap:.25rem; margin-top:.5rem;">
+              <div class="stack mt-1">
                 {(attemptLogs.get(attempt.id) ?? []).map(
                   (line): HtmlEscapedString | Promise<HtmlEscapedString> => (
-                    <div key={line.id} style="display:flex; gap:.4rem; align-items:baseline;">
+                    <div key={line.id} class={logRow}>
                       <Badge tone={logTone(line.level)}>{line.level}</Badge>
                       <span>{line.message}</span>
                       {line.fields ? <Meta as="code">{line.fields}</Meta> : null}
@@ -221,13 +232,9 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
                 </span>
               </div>
               <div class={snapshotCardBody}>
-                <div style="font-weight:650; font-size:.95rem; line-height:1.2;">
-                  {snap.storyTitle}
-                  <span style="color:var(--text-secondary); font-weight:400;">
-                    {" "}
-                    / {snap.storyName}
-                  </span>
-                </div>
+                <SectionTitle level={3}>
+                  {snap.storyTitle} <Meta as="span">/ {snap.storyName}</Meta>
+                </SectionTitle>
                 <Meta as="div">
                   {snap.storyId}
                   {snap.diffRatio !== null && snap.diffRatio !== undefined
@@ -235,7 +242,7 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
                     : ""}
                   {snap.diffPixels === null ? "" : ` · ${snap.diffPixels} px`}
                 </Meta>
-                <div style="display:flex; gap:.4rem; flex-wrap:wrap; margin-top:.2rem;">
+                <div class="row-actions">
                   <Button
                     variant="secondary"
                     href={`/projects/${project.slug}/builds/${build.id}/diff?snapshot=${snap.id}`}
@@ -275,11 +282,11 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
 
       <div class="mt-1">
         <Card>
-          <h2 style="margin:0 0 .5rem;">Comments</h2>
+          <SectionTitle>Comments</SectionTitle>
           {comments.length === 0 ? (
             <Meta>No comments. Add one in the diff review page for a specific snapshot.</Meta>
           ) : null}
-          <div style="display:grid; gap:.6rem;">
+          <div class="stack">
             {comments.map((comment): HtmlEscapedString | Promise<HtmlEscapedString> => (
               <div key={comment.id} class={reviewComment}>
                 <div class={reviewCommentHead}>

@@ -8,6 +8,7 @@ import {
   Card,
   Field,
   Meta,
+  SectionTitle,
   SelectField,
   TextareaField,
 } from "../ui/components.tsx";
@@ -48,10 +49,7 @@ const StatusConfigRow: FC<{
   return (
     <tr key={config.id}>
       <td>{provider?.metadata.name ?? config.provider}</td>
-      <td
-        style="max-width:32ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
-        title={rendered}
-      >
+      <td class="truncate max-w-cell" title={rendered}>
         <code>{rendered}</code>
       </td>
       <td>
@@ -88,7 +86,7 @@ const StatusCreateCard: FC<{
 }> = ({ project, providers, formState }) => {
   return (
     <Card>
-      <h3 style="margin:0 0 .5rem;">Add git provider</h3>
+      <SectionTitle level={3}>Add git provider</SectionTitle>
       <form
         method="post"
         action={`/projects/${project.slug}/settings/status`}
@@ -153,7 +151,7 @@ export function renderSettingsStatus(
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
 
       <Card>
-        <h2 style="margin:0 0 .3rem;">Git status</h2>
+        <SectionTitle>Git status</SectionTitle>
         <Meta>
           Post commit statuses to a git provider so visual tests show up in your PR checks. Status
           is reported for each configured provider: pending while capturing, success on approval,

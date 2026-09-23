@@ -17,7 +17,17 @@ import {
   PageHeader,
   SectionTitle,
 } from "../ui/components.tsx";
+import { css } from "../ui/css.ts";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
+
+/** Next-steps list: muted with indented marker offset. */
+const projectSteps = css`
+  /* project-steps */
+  margin: 0.4rem 0 0;
+  padding-left: 1.2rem;
+  color: var(--text-secondary);
+`;
+
 /** Projects overview page: project cards with latest build plus next steps. */
 export async function renderProjectsPage(): Promise<RenderedContent> {
   const { db, user } = getStore();
@@ -66,11 +76,8 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
             const info = countsBySlug.get(project.slug);
             return (
               <Card key={project.id}>
-                <div
-                  class="row-actions"
-                  style="justify-content:space-between; align-items:flex-start; gap:1rem;"
-                >
-                  <div class="truncate" style="min-width:0;">
+                <div class="split">
+                  <div class="truncate min-w-0">
                     <SectionTitle>
                       <a href={`/projects/${project.slug}/builds`}>{project.name}</a>
                     </SectionTitle>
@@ -116,7 +123,7 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
       <div class="mt-1">
         <Card>
           <SectionTitle level={3}>Next steps</SectionTitle>
-          <ol class="muted" style="margin:.4rem 0 0; padding-left:1.2rem;">
+          <ol class={projectSteps}>
             <li>
               Create a project (or run{" "}
               <code>

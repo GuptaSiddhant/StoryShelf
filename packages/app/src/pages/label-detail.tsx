@@ -10,7 +10,15 @@ import {
 } from "@storyshelf/db-sqlite/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { getStore } from "../store.ts";
-import { Badge, Button, EmptyState, Meta, PageHeader, statusTone } from "../ui/components.tsx";
+import {
+  Badge,
+  Button,
+  EmptyState,
+  Meta,
+  PageHeader,
+  TableActions,
+  statusTone,
+} from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 /** Resolve a label type's `link_template` against a build, or return null. */
 export function resolveLabelLink(
@@ -106,7 +114,7 @@ export async function renderLabelDetailPage(
                 return (
                   <tr key={build.id}>
                     <td>
-                      <div style="font-weight:600;">{build.gitBranch}</div>
+                      <strong>{build.gitBranch}</strong>
                       <Meta as="div" mono>
                         {build.gitSha.slice(0, 7)}{" "}
                         {build.message ? `· ${build.message.slice(0, 60)}` : ""}
@@ -122,21 +130,27 @@ export async function renderLabelDetailPage(
                     <td>
                       <Meta as="span">{new Date(build.createdAt).toLocaleString()}</Meta>
                     </td>
-                    <td style="white-space:nowrap;">
-                      <Button
-                        variant="secondary"
-                        href={`/projects/${project.slug}/builds/${build.id}`}
-                      >
-                        View
-                      </Button>
-                      {link ? (
-                        <>
-                          <span style="margin-left:.35rem;" />
-                          <Button variant="ghost" href={link} target="_blank" rel="noreferrer">
+                    <td class="nowrap">
+                      <TableActions>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          href={`/projects/${project.slug}/builds/${build.id}`}
+                        >
+                          View
+                        </Button>
+                        {link ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            href={link}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
                             Open link
                           </Button>
-                        </>
-                      ) : null}
+                        ) : null}
+                      </TableActions>
                     </td>
                   </tr>
                 );
@@ -199,9 +213,7 @@ export async function renderLabelsPage(slug: string): Promise<RenderedContent | 
                     <Badge tone="neutral">{labelType.key}</Badge>
                   </td>
                   <td>{labelType.name}</td>
-                  <td style="max-width:32ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                    {labelType.linkTemplate ?? "—"}
-                  </td>
+                  <td class="truncate max-w-cell">{labelType.linkTemplate ?? "—"}</td>
                 </tr>
               ))}
             </tbody>

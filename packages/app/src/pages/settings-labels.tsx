@@ -1,7 +1,7 @@
 import type { LabelType } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge, Button, Card, Field, Meta } from "../ui/components.tsx";
+import { Badge, Button, Card, Field, Meta, SectionTitle } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Labels settings tab: label-type table plus the create-type form. */
@@ -13,7 +13,7 @@ export function renderSettingsLabels(
   return (
     <div class="grid max-w-form">
       <Card>
-        <h2 style="margin:0 0 .3rem;">Label types</h2>
+        <SectionTitle>Label types</SectionTitle>
         <Meta>
           Labels attach typed values to builds (e.g. pr=123, jira=ABC-123). Values link out via the
           template.
@@ -35,9 +35,7 @@ export function renderSettingsLabels(
                     <Badge tone="neutral">{labelType.key}</Badge>
                   </td>
                   <td>{labelType.name}</td>
-                  <td style="max-width:32ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                    {labelType.linkTemplate ?? "—"}
-                  </td>
+                  <td class="truncate max-w-cell">{labelType.linkTemplate ?? "—"}</td>
                   <td>
                     {isAdmin && labelType.key !== "persistent" && labelType.key !== "branch" ? (
                       <form
@@ -69,7 +67,7 @@ export function renderSettingsLabels(
 
       {isAdmin ? (
         <Card>
-          <h3 style="margin:0 0 .5rem;">Create label type</h3>
+          <SectionTitle level={3}>Create label type</SectionTitle>
           <form
             method="post"
             action={`/projects/${project.slug}/settings/labels`}

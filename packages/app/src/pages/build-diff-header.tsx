@@ -2,7 +2,7 @@ import type { Build } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge, Button, PageHeader, statusTone } from "../ui/components.tsx";
+import { Badge, Button, Meta, PageHeader, statusTone } from "../ui/components.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -58,9 +58,9 @@ export function DiffHeader(props: DiffHeaderProps): HtmlEscapedString | Promise<
       title={
         <>
           {build.gitBranch}{" "}
-          <span class="muted mono" style="font-weight:400;">
+          <Meta as="span" mono>
             · {build.gitSha.slice(0, 7)}
-          </span>
+          </Meta>
         </>
       }
       description={

@@ -1,20 +1,55 @@
-import { Button, Card, Meta } from "../ui/components.tsx";
+import { Button, Card, Meta, SectionTitle } from "../ui/components.tsx";
+import { css } from "../ui/css.ts";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
+
+/** Landing hero card: card surface with centered marketing padding. */
+const heroCard = css`
+  /* hero-card */
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 2rem 1.5rem;
+  text-align: center;
+`;
+
+/** Landing hero title. Centering comes from the card. */
+const heroTitle = css`
+  /* hero-title */
+  margin: 0 0 0.4rem;
+  font-size: 1.9rem;
+  letter-spacing: -0.02em;
+`;
+
+/** Landing hero description. Centering comes from the card. */
+const heroDesc = css`
+  /* hero-desc */
+  color: var(--text-secondary);
+  max-width: 60ch;
+  margin: 0 auto 1rem;
+`;
+
+/** Landing hero actions row. */
+const heroActions = css`
+  /* hero-actions */
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+`;
 
 /** Landing page introducing capture, diff, and review. */
 export function renderRootPage(): RenderedContent {
   return (
     <DocumentLayout title="Welcome" nav={{ active: "projects" }}>
-      <div class="card card--padded" style="text-align:center; padding:2rem 1.5rem;">
-        <h1 style="margin:0 0 .4rem; font-size:1.9rem; letter-spacing:-0.02em;">
-          Welcome to StoryShelf
-        </h1>
-        <p style="color:var(--text-secondary); max-width:60ch; margin:0 auto 1rem;">
+      <div class={heroCard}>
+        <h1 class={heroTitle}>Welcome to StoryShelf</h1>
+        <p class={heroDesc}>
           Self-hosted visual testing for Storybook. Capture every story, diff against baselines, and
           review changes before they ship.
         </p>
         <div class="stack">
-          <div style="display:flex; gap:.5rem; justify-content:center; flex-wrap:wrap;">
+          <div class={heroActions}>
             <Button variant="primary" href="/projects">
               View projects
             </Button>
@@ -34,23 +69,23 @@ export function renderRootPage(): RenderedContent {
         </div>
       </div>
 
-      <div class="grid grid--3" style="margin-top:1rem;">
+      <div class="grid grid--3 mt-1">
         <Card>
-          <h3 style="margin:0 0 .3rem;">Capture</h3>
+          <SectionTitle level={3}>Capture</SectionTitle>
           <Meta>
             Upload your Storybook build. Server renders stories with Playwright — deterministic, no
             repo cloning.
           </Meta>
         </Card>
         <Card>
-          <h3 style="margin:0 0 .3rem;">Diff</h3>
+          <SectionTitle level={3}>Diff</SectionTitle>
           <Meta>
             Pixel-perfect diff with pixelmatch. Configurable thresholds, overlay images stored on
             disk.
           </Meta>
         </Card>
         <Card>
-          <h3 style="margin:0 0 .3rem;">Review</h3>
+          <SectionTitle level={3}>Review</SectionTitle>
           <Meta>
             Per-branch baselines with fallback to default. Approve changes per-story or bulk.
           </Meta>

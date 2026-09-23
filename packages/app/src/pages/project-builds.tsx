@@ -17,6 +17,7 @@ import {
   Meta,
   PageHeader,
   SelectField,
+  TableActions,
   statusTone,
 } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
@@ -125,7 +126,7 @@ export async function renderProjectBuildsPage(
               {builds.map((build): HtmlEscapedString | Promise<HtmlEscapedString> => (
                 <tr key={build.id}>
                   <td>
-                    <div style="font-weight:600;">{build.gitBranch}</div>
+                    <strong>{build.gitBranch}</strong>
                     <Meta as="div">
                       {build.gitSha.slice(0, 7)}{" "}
                       {build.message ? `· ${build.message.slice(0, 60)}` : ""}
@@ -147,20 +148,23 @@ export async function renderProjectBuildsPage(
                   <td>
                     <Meta as="span">{new Date(build.createdAt).toLocaleString()}</Meta>
                   </td>
-                  <td style="white-space:nowrap;">
-                    <Button
-                      variant="secondary"
-                      href={`/projects/${project.slug}/builds/${build.id}`}
-                    >
-                      View
-                    </Button>
-                    <span style="margin-left:.35rem;" />
-                    <Button
-                      variant="ghost"
-                      href={`/projects/${project.slug}/builds/${build.id}/diff`}
-                    >
-                      Review
-                    </Button>
+                  <td class="nowrap">
+                    <TableActions>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        href={`/projects/${project.slug}/builds/${build.id}`}
+                      >
+                        View
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        href={`/projects/${project.slug}/builds/${build.id}/diff`}
+                      >
+                        Review
+                      </Button>
+                    </TableActions>
                   </td>
                 </tr>
               ))}

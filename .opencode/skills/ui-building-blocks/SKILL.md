@@ -19,11 +19,12 @@ this — keep it green and lower its per-file style ceilings as you migrate.
 - **Pages** (`pages/*.tsx`) may import UI only from the facade
   (`../ui/components.tsx`: `Button`, `Tabs`, `Badge`, `Alert`, `EmptyState`,
   `Stat`, `Field`, `TextareaField`, `SelectField`, `CheckField`, `Card`,
-  `CardSection`, `PageHeader`, `SectionTitle`, `Meta`) and
+  `CardSection`, `PageHeader`, `SectionTitle`, `TableActions`, `Meta`) and
   the shell (`../ui/document.tsx`: `DocumentLayout`), plus shared
   cross-page style objects (`../ui/styles/review.ts`: diff viewer/nav,
-  snapshot cards, comment threads). Never import a family
-  module (`buttons.tsx`, `feedback.tsx`, …) directly.
+  snapshot cards, comment threads) and `../ui/css.ts` (page-local one-off
+  styles only — last resort after facade, utilities, and restructuring).
+  Never import a family module (`buttons.tsx`, `feedback.tsx`, …) directly.
 - **Shared cross-page patterns are the one colocation exception.**
   `snapshot-card` (build detail + library) and `comment` (build detail +
   diff thread) are used by two pages each — they live once as labeled
@@ -36,12 +37,20 @@ this — keep it green and lower its per-file style ceilings as you migrate.
   (`Stack`, `Row`, `TableActions`, `SectionTitle`) to the facade; one-off
   spacing is a design smell, not an exception.
 - **Sanctioned utilities** (the only raw classes allowed in `pages/`):
-  layout flow (`grid`, `grid--2/3`, `stack`, `row-actions`, `mt-1`, `mb-1`,
-  `max-w-form`, `max-w-prose`, `table-wrap`, `table-gap`), text
+  layout flow (`grid`, `grid--2/3`, `stack`, `row-actions`, `split`,
+  `mt-1`, `mb-1`, `max-w-form`, `max-w-prose`, `max-w-cell`, `min-w-0`,
+  `table-wrap`, `table-gap`, `nowrap` on `td`), text
   (`muted`, `mono`, `truncate`), shell (`content`, `login`). Everything
   else must be a facade component.
-- **Documented exceptions** (in `ui/consistency.test.ts`, nowhere else):
-  the root landing hero keeps one raw `card` div (unique marketing style).
+- **Table action cells** use `<td class="nowrap"><TableActions>` with
+  `size="sm"` buttons; delete spacer spans and `display:inline` forms.
+- **Page-local one-offs** (landing hero, truncate widths beyond
+  `max-w-cell`) use `css` from `../ui/css.ts` with a label comment.
+  If a pattern appears twice, promote it to the facade instead.
+- **No documented exceptions.** The ratchet bans component classes,
+  non-facade UI imports, and every inline `style="..."` in `pages/` with
+  zero ceiling — the former root-hero exception was removed once the hero
+  moved to page-local hono/css.
 - **Inline/table/card actions use `size="sm"`** (32px). `md` (40px) is for
   standalone forms and page-header primary actions only.
 

@@ -9,4 +9,4 @@
 export { Button, Tabs } from "./buttons.tsx";
 export { Alert, Badge, EmptyState, Meta, Stat, statusTone } from "./feedback.tsx";
 export { CheckField, Field, SelectField, TextareaField } from "./forms.tsx";
-export { Card, CardSection, PageHeader, SectionTitle } from "./layout.tsx";
+export { Card, CardSection, PageHeader, SectionTitle, TableActions } from "./layout.tsx";

@@ -1,5 +1,5 @@
 import type { Project } from "@storyshelf/core/schema";
-import { Alert, Button, Card, Field, Meta, SelectField } from "../ui/components.tsx";
+import { Alert, Button, Card, Field, Meta, SectionTitle, SelectField } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Form state for the settings tabs (field errors and global error). */
@@ -20,7 +20,7 @@ export function renderSettingsGeneral(
     <div class="grid max-w-form">
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
       <Card>
-        <h2 style="margin:0 0 .5rem;">General</h2>
+        <SectionTitle>General</SectionTitle>
         <form
           method="post"
           action={`/projects/${project.slug}/settings`}
@@ -91,7 +91,9 @@ export function renderSettingsGeneral(
 
       {isAdmin ? (
         <Card tone="danger">
-          <h3 style="margin:0 0 .4rem; color: var(--status-rejected);">Danger zone</h3>
+          <SectionTitle level={3} tone="danger">
+            Danger zone
+          </SectionTitle>
           <Meta>
             Deleting a project removes all builds, snapshots, baselines and tokens. This cannot be
             undone.

@@ -124,6 +124,19 @@ const sectionTitleH3 = css`
   font-size: 0.95rem;
 `;
 
+const sectionTitleDanger = css`
+  /* section-title-danger */
+  ${sectionTitleH3}
+  color: var(--status-rejected);
+`;
+
+const tableActionsRow = css`
+  /* table-actions-row */
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+`;
+
 /** Card container, padded by default, with an optional danger tone. */
 // eslint-disable-next-line promise-function-async -- JSX component return type
 export const Card: FC<{
@@ -195,12 +208,19 @@ export const PageHeader: FC<{
 
 /** Card or section heading (h2 by default, h3 for subsections). */
 // eslint-disable-next-line promise-function-async -- JSX component return type
-export const SectionTitle: FC<{ level?: 2 | 3; children?: unknown }> = ({
-  level = 2,
-  children,
-}) => {
+export const SectionTitle: FC<{
+  level?: 2 | 3;
+  tone?: "neutral" | "danger";
+  children?: unknown;
+}> = ({ level = 2, tone = "neutral", children }) => {
   if (level === 3) {
-    return <h3 class={sectionTitleH3}>{children}</h3>;
+    return <h3 class={tone === "danger" ? sectionTitleDanger : sectionTitleH3}>{children}</h3>;
   }
   return <h2 class={sectionTitleH2}>{children}</h2>;
+};
+
+/** Inline action row for table cells (replaces spacer spans and inline forms). */
+// eslint-disable-next-line promise-function-async -- JSX component return type
+export const TableActions: FC<{ children?: unknown }> = ({ children }) => {
+  return <div class={tableActionsRow}>{children}</div>;
 };

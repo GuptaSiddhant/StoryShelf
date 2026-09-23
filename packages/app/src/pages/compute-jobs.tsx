@@ -16,6 +16,7 @@ import {
   Meta,
   PageHeader,
   SectionTitle,
+  TableActions,
   statusTone,
 } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
@@ -123,7 +124,7 @@ export async function renderComputeJobsPage(
       {renderActiveQueue(project.slug, queueView)}
 
       <Card>
-        <h2 style="margin:0 0 .3rem;">Recent builds</h2>
+        <SectionTitle>Recent builds</SectionTitle>
         <Meta>Capture history for {project.name}. Failed jobs can be retried.</Meta>
         <div class="table-wrap table-gap">
           <table>
@@ -140,7 +141,7 @@ export async function renderComputeJobsPage(
               {recentBuilds.map((build): HtmlEscapedString | Promise<HtmlEscapedString> => (
                 <tr key={build.id}>
                   <td>
-                    <div style="font-weight:600;">{build.gitBranch}</div>
+                    <strong>{build.gitBranch}</strong>
                     <Meta as="div" mono>
                       {build.gitSha.slice(0, 7)}
                     </Meta>
@@ -156,29 +157,28 @@ export async function renderComputeJobsPage(
                   <td>
                     <Meta as="span">{new Date(build.createdAt).toLocaleString()}</Meta>
                   </td>
-                  <td style="white-space:nowrap;">
-                    <Button
-                      variant="secondary"
-                      href={`/projects/${project.slug}/builds/${build.id}`}
-                    >
-                      View
-                    </Button>
-                    {canRetry && (build.status === "failed" || build.status === "pending") ? (
-                      <>
-                        <span style="margin-left:.35rem;" />
+                  <td class="nowrap">
+                    <TableActions>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        href={`/projects/${project.slug}/builds/${build.id}`}
+                      >
+                        View
+                      </Button>
+                      {canRetry && (build.status === "failed" || build.status === "pending") ? (
                         <form
                           method="post"
                           action={`/api/v1/projects/${project.slug}/builds/${build.id}/retry`}
                           hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/retry`}
                           hx-target="body"
-                          style="display:inline;"
                         >
-                          <Button variant="ghost" type="submit">
+                          <Button variant="ghost" size="sm" type="submit">
                             Retry
                           </Button>
                         </form>
-                      </>
-                    ) : null}
+                      ) : null}
+                    </TableActions>
                     {queueByBuild.get(build.id)?.error ? (
                       <Meta as="div" tone="danger">
                         {queueByBuild.get(build.id)?.error}

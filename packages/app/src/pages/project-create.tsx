@@ -65,7 +65,7 @@ export function renderProjectCreatePage(state: ProjectCreateFormState = {}): Ren
               hint="Baselines fall back to this branch when no branch-specific baseline exists."
             />
 
-            <div style="display:flex; gap:.5rem; margin-top:1rem;">
+            <div class="row-actions mt-1">
               <Button variant="primary" type="submit">
                 Create project
               </Button>

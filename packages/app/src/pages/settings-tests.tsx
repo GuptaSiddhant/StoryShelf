@@ -1,5 +1,5 @@
 import type { Project } from "@storyshelf/core/schema";
-import { Alert, Button, Card, CheckField, Field, Meta } from "../ui/components.tsx";
+import { Alert, Button, Card, CheckField, Field, Meta, SectionTitle } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Interaction-tests settings tab: play execution toggle and timeout. */
@@ -12,7 +12,7 @@ export function renderSettingsTests(
     <div class="grid max-w-form">
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
       <Card>
-        <h2 style="margin:0 0 .5rem;">Interaction tests</h2>
+        <SectionTitle>Interaction tests</SectionTitle>
         <Meta>
           When enabled, Storybook <code>play</code> functions run before each screenshot. Failures
           block the build unless the story is marked
@@ -58,7 +58,7 @@ export function renderSettingsTests(
         </form>
       </Card>
       <Card>
-        <h3 style="margin:0 0 .4rem;">How to mark stories</h3>
+        <SectionTitle level={3}>How to mark stories</SectionTitle>
         <Meta as="pre">
           {`// Disable snapshot entirely (skip capture + play)
 export const Hidden: Story = {

@@ -25,6 +25,7 @@ import {
   SectionTitle,
   SelectField,
 } from "../ui/components.tsx";
+import { css } from "../ui/css.ts";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import {
   diffPaneImg,
@@ -34,6 +35,14 @@ import {
   snapshotCardMeta,
   snapshotGrid,
 } from "../ui/styles/review.ts";
+
+/** Snapshot image with library height cap, extending the shared diff pane image. */
+const snapshotImg = css`
+  /* snapshot-img */
+  ${diffPaneImg}
+  max-height: 240px;
+  object-fit: contain;
+`;
 
 /** Library page: gallery grouped by title from latest build on selected branch. */
 export async function renderLibraryPage(
@@ -299,7 +308,7 @@ function renderTitleList(
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
   const titles = [...byTitle.keys()].toSorted((a, b) => a.localeCompare(b));
   return (
-    <div style="display:grid; gap:1.5rem;">
+    <div class="stack">
       {titles.map((title) =>
         renderTitleGroup(title, byTitle.get(title) ?? [], project, build, multi, docsByStory),
       )}
@@ -388,11 +397,10 @@ function renderSnapshotCard(
       </div>
       <div class={snapshotCardBody}>
         <img
-          class={diffPaneImg}
+          class={snapshotImg}
           src={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${snap.id}/image`}
           alt={`${snap.storyTitle} / ${snap.storyName}`}
           loading="lazy"
-          style="max-height:240px; object-fit:contain;"
         />
         <div class="row-actions">{renderCardActions(snap, project, build, docsId)}</div>
       </div>
