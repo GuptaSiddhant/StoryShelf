@@ -131,7 +131,13 @@ export async function seedDemo(options: {
 
     const adapter = new StorybookAdapter();
     const discovered = await adapter.discover(storybookDir);
-    const stories = discovered.filter((s) => !isDisabledStory(s));
+    const stories = discovered
+      .filter((s) => !isDisabledStory(s))
+      .map((s) =>
+        s.id === "components-button--blocking-failure"
+          ? { ...s, tags: [...(s.tags ?? []), "flaky-test"] }
+          : s,
+      );
     if (stories.length === 0) {
       log?.warn("seed demo: no stories discovered");
       return;
@@ -215,6 +221,18 @@ export async function seedDemo(options: {
         first.story.id,
         baselinePath,
         first.screenshot,
+      );
+    }
+
+    // Ensure preview iframe is available — copy fixture static into storage at storybookDir for this build
+    try {
+      const { persistStorybookStatics } = await import("@storyshelf/core/capture");
+      await persistStorybookStatics(storage, storybookDir, project.id, build.id);
+      log?.info({ storybookDir }, "seed demo statics persisted");
+    } catch (error) {
+      log?.warn(
+        { err: error as Error },
+        "seed demo statics persist failed — preview will stay Preparing until retry",
       );
     }
 

@@ -104,7 +104,7 @@ export function registerUiPages(app: ShelfRouter): void {
         gitDefaultBranch,
       });
       await new LabelModel(getStore().db, { builds, buildLabels, labelTypes }).seedFor(project.id);
-      return hxRedirect(c, `/projects/${project.slug}/builds`);
+      return hxRedirect(c, `/projects/${project.slug}/library`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to create project";
       return c.html(
@@ -116,6 +116,8 @@ export function registerUiPages(app: ShelfRouter): void {
       );
     }
   });
+
+  app.get("/projects/:slug", (c) => c.redirect(`/projects/${c.req.param("slug")}/library`, 302));
 
   app.get("/projects/:slug/builds", async (c) => {
     const html = await renderProjectBuildsPage(c.req.param("slug"), {

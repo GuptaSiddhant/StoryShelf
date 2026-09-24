@@ -18,9 +18,9 @@ Open `https://storyshelf.fly.dev` → enter `demo` at the login → browse. If a
 
 ## What’s seeded
 
-- Project `storybook-fixture` (slug `storybook-fixture`) from `fixtures/storybook-8` — 7 stories, viewports `desktop`/`mobile`.
-- A `reviewing` build with `changed` snapshots for the diff overlay demo.
-- The `viewer` account can open the build review (`/projects/storybook-fixture/builds/:buildId`) and the published Storybook (`/projects/storybook-fixture/storybook`), but **Approve/Reject** and **Settings** require admin.
+- Project `Demo Design System` (slug `demo-design-system`, `acme/design-system`) from `fixtures/storybook-8` — 7 stories, viewports `desktop`/`mobile`.
+- A `reviewing` build (`feature/new-button`) with `changed` snapshots for the diff overlay demo — real Playwright renders (both viewports).
+- The `viewer` account can open the build review (`/projects/demo-design-system/builds/:buildId`) and the published Storybook (`/projects/demo-design-system/storybook`), but **Approve/Reject** and **Settings** require admin.
 
 ![Build review — baseline, current, and diff overlay](/screenshots/build-review.png)
 
