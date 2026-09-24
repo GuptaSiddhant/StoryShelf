@@ -97,7 +97,7 @@ export function registerStorybook(app: ShelfRouter): void {
   });
 
   // Short link: renders the published Storybook's index.html directly (no StoryShelf shell).
-  // 26-char ULID → that exact build; any other id → project slug → latest published build. No fall-through on ULID.
+  // 26-char ULID → that exact build; any other id → project slug → latest build (published fallback). No fall-through on ULID.
   app.get("/_/:id", async (c) => {
     const id = c.req.param("id");
     const isUlid26 = id.length === 26 && /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/u.test(id);
@@ -116,6 +116,13 @@ export function registerStorybook(app: ShelfRouter): void {
         buildLabels,
         snapshots,
       }).latestPublished(project);
+      // Fallback to latest build if no published (e.g. demo on feature branch)
+      if (!build) {
+        const all = await new BuildModel(getStore().db, { builds, buildLabels, snapshots }).list(
+          project.id,
+        );
+        build = all[0] ?? null;
+      }
       if (!build) return c.notFound();
     }
     if (!(await canViewBuild(build, project))) return c.redirect("/auth/login", 302);
@@ -123,7 +130,13 @@ export function registerStorybook(app: ShelfRouter): void {
       return c.html(renderStorybookPreparingPage(project, build, project.slug), 200);
     }
     const path = posix.join(storybookDir(project.id, build.id), "index.html");
-    if (!(await getStore().storage.exists(path))) return c.notFound();
+    if (!(await getStore().storage.exists(path))) {
+      // index.html missing → redirect to build or project page (per spec)
+      return c.redirect(
+        isUlid26 ? `/projects/${project.slug}/builds/${build.id}` : `/projects/${project.slug}`,
+        302,
+      );
+    }
     const buffer = await getStore().storage.read(path);
     // Latest via slug should not be cached as aggressively as a frozen build.
     const cacheControl = isUlid26 ? "public, max-age=3600" : "public, max-age=60";
@@ -160,13 +173,27 @@ export function registerStorybook(app: ShelfRouter): void {
         buildLabels,
         snapshots,
       }).latestPublished(project);
+      if (!build) {
+        const all = await new BuildModel(getStore().db, { builds, buildLabels, snapshots }).list(
+          project.id,
+        );
+        build = all[0] ?? null;
+      }
       if (!build) return c.notFound();
     }
     if (!(await canViewBuild(build, project))) return c.redirect("/auth/login", 302);
     const segments = rest.split("/");
     if (segments.some((segment) => !isSafeSegment(segment))) return c.notFound();
     const path = posix.join(storybookDir(project.id, build.id), rest);
-    if (!(await getStore().storage.exists(path))) return c.notFound();
+    if (!(await getStore().storage.exists(path))) {
+      if (rest === "index.html") {
+        return c.redirect(
+          isUlid26 ? `/projects/${project.slug}/builds/${build.id}` : `/projects/${project.slug}`,
+          302,
+        );
+      }
+      return c.notFound();
+    }
     const buffer = await getStore().storage.read(path);
     return c.body(new Uint8Array(buffer), 200, {
       "content-type": contentTypeFor(rest),

@@ -433,9 +433,6 @@ function renderCardActions(
       >
         Review
       </Button>
-      <Button variant="ghost" size="sm" href={`/_/${build.id}`}>
-        View Storybook
-      </Button>
       <Button
         variant="ghost"
         href={`/projects/${project.slug}/storybook/build/${build.id}/?storyId=${encodeURIComponent(snap.storyId)}`}
