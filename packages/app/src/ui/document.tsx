@@ -1,3 +1,4 @@
+import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { FC } from "hono/jsx";
 import { getCsrfToken } from "../middleware/csrf.ts";
 import { getStore } from "../store.ts";
@@ -316,6 +317,7 @@ export const DocumentLayout: FC<{ title: string; nav?: NavConfig; children?: unk
 
 // eslint-disable-next-line promise-function-async -- JSX component return type
 const TopBar: FC<{ name: string; logo?: string; nav?: NavConfig }> = ({ name, logo, nav }) => {
+  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
   return (
     <header class={shellTopbar} role="banner">
       <div class="topbar__inner">
@@ -330,7 +332,7 @@ const TopBar: FC<{ name: string; logo?: string; nav?: NavConfig }> = ({ name, lo
           >
             <span aria-hidden="true">☰</span>
           </button>
-          <a class="brand" href="/">
+          <a class="brand" href={urls.projectsList()}>
             {logo ? (
               <img class="logo" src={logo} alt={name} width="28" height="28" />
             ) : (
@@ -345,9 +347,7 @@ const TopBar: FC<{ name: string; logo?: string; nav?: NavConfig }> = ({ name, lo
               <span class="project-crumb__sep" aria-hidden="true">
                 /
               </span>
-              <a href={`/projects/${nav.projectSlug}/library`}>
-                {nav.projectName ?? nav.projectSlug}
-              </a>
+              <a href={urls.library(nav.projectSlug)}>{nav.projectName ?? nav.projectSlug}</a>
             </nav>
           ) : null}
         </div>
@@ -412,12 +412,13 @@ const AuthMenu: FC = () => {
 
 // eslint-disable-next-line promise-function-async -- JSX component return type
 const Sidebar: FC<{ nav?: NavConfig }> = ({ nav }) => {
+  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
   return (
     <aside id="sidebar" class={shellSidebar} aria-label="Primary">
       <nav class="sidebar__nav">
         <a
           class={`sidebar__link ${nav?.active === "projects" ? "sidebar__link--active" : ""}`}
-          href="/projects"
+          href={urls.projects()}
           aria-current={nav?.active === "projects" ? "page" : undefined}
         >
           <span aria-hidden="true">▦</span> Projects
@@ -427,35 +428,35 @@ const Sidebar: FC<{ nav?: NavConfig }> = ({ nav }) => {
             <div class="sidebar__section">Project</div>
             <a
               class={`sidebar__link ${nav.active === "library" ? "sidebar__link--active" : ""}`}
-              href={`/projects/${nav.projectSlug}/library`}
+              href={urls.library(nav.projectSlug)}
               aria-current={nav.active === "library" ? "page" : undefined}
             >
               <span aria-hidden="true">▤</span> Library
             </a>
             <a
               class={`sidebar__link ${nav.active === "builds" ? "sidebar__link--active" : ""}`}
-              href={`/projects/${nav.projectSlug}/builds`}
+              href={urls.buildsList(nav.projectSlug)}
               aria-current={nav.active === "builds" ? "page" : undefined}
             >
               <span aria-hidden="true">◧</span> Builds
             </a>
             <a
               class={`sidebar__link ${nav.active === "jobs" ? "sidebar__link--active" : ""}`}
-              href={`/projects/${nav.projectSlug}/jobs`}
+              href={urls.jobs(nav.projectSlug)}
               aria-current={nav.active === "jobs" ? "page" : undefined}
             >
               <span aria-hidden="true">◫</span> Jobs
             </a>
             <a
               class={`sidebar__link ${nav.active === "labels" ? "sidebar__link--active" : ""}`}
-              href={`/projects/${nav.projectSlug}/labels`}
+              href={urls.labels(nav.projectSlug)}
               aria-current={nav.active === "labels" ? "page" : undefined}
             >
               <span aria-hidden="true">⌗</span> Labels
             </a>
             <a
               class={`sidebar__link ${nav.active === "settings" ? "sidebar__link--active" : ""}`}
-              href={`/projects/${nav.projectSlug}/settings`}
+              href={urls.settings(nav.projectSlug)}
               aria-current={nav.active === "settings" ? "page" : undefined}
             >
               <span aria-hidden="true">⚙</span> Settings

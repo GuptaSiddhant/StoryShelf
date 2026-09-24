@@ -4,6 +4,7 @@ import { CaptureLogModel } from "@storyshelf/core/models";
 import { CommentModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
 import { SnapshotModel } from "@storyshelf/core/models";
+import { createUrlBuilder } from "@storyshelf/core/urls";
 import {
   buildLabels,
   builds,
@@ -81,6 +82,7 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
     attemptLogs.set(attempt.id, await logs.listByAttempt(attempt.id));
   }
   const canReview = !getStore().authEnabled || Boolean(getStore().user);
+  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
 
   const grouped = new Map<string, typeof snapshots>();
   for (const snap of snapshots) {
@@ -113,10 +115,10 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
         }
         actions={
           <>
-            <Button variant="primary" href={`/projects/${project.slug}/builds/${build.id}/diff`}>
+            <Button variant="primary" href={urls.buildDiff(project.slug, build.id)}>
               Review diffs
             </Button>
-            <Button variant="ghost" size="sm" href={`/_/${build.id}`}>
+            <Button variant="ghost" size="sm" href={urls.short(build.id)}>
               View Storybook
             </Button>
             <form
@@ -132,8 +134,8 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
           </>
         }
         breadcrumbs={[
-          { label: "Projects", href: "/projects" },
-          { label: project.name, href: `/projects/${project.slug}/builds` },
+          { label: "Projects", href: urls.projects() },
+          { label: project.name, href: urls.library(project.slug) },
           { label: `${build.gitBranch} · ${build.gitSha.slice(0, 7)}` },
         ]}
       />
@@ -245,11 +247,11 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
                   <Button
                     variant="secondary"
                     size="sm"
-                    href={`/projects/${project.slug}/builds/${build.id}/diff?snapshot=${snap.id}`}
+                    href={urls.buildDiff(project.slug, build.id) + `?snapshot=${snap.id}`}
                   >
                     Review
                   </Button>
-                  <Button variant="ghost" size="sm" href={`/_/${build.id}`}>
+                  <Button variant="ghost" size="sm" href={urls.short(build.id)}>
                     View Storybook
                   </Button>
                   {canReview && (snap.status === "new" || snap.status === "changed") ? (

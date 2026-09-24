@@ -5,6 +5,7 @@ import { SnapshotModel } from "@storyshelf/core/models";
 import type { Build } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { Snapshot } from "@storyshelf/core/schema";
+import { createUrlBuilder } from "@storyshelf/core/urls";
 import { storybookDir } from "@storyshelf/core/utils";
 import {
   buildLabels,
@@ -190,6 +191,7 @@ function renderEmptyLibrary(project: Project): RenderedContent {
 }
 
 function renderEmptySnapshots(project: Project, build: Build): RenderedContent {
+  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
   return (
     <DocumentLayout
       title="Library"
@@ -207,7 +209,7 @@ function renderEmptySnapshots(project: Project, build: Build): RenderedContent {
         title="No stories in latest build"
         description="The latest build has no snapshots yet."
         action={
-          <Button variant="secondary" href={`/projects/${project.slug}/builds/${build.id}`}>
+          <Button variant="secondary" href={urls.build(project.slug, build.id)}>
             View build
           </Button>
         }
@@ -263,13 +265,14 @@ function renderLibraryHeader(
   storyCount: number,
   branches: string[],
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
   return (
     <PageHeader
       title="Library"
       description={
         <>
           {storyCount} stories · Latest build{" "}
-          <a href={`/projects/${project.slug}/builds/${build.id}`}>
+          <a href={urls.build(project.slug, build.id)}>
             {build.gitBranch} · {build.gitSha.slice(0, 7)}
           </a>{" "}
           · {new Date(build.createdAt).toLocaleString()} · {build.status}
@@ -277,7 +280,7 @@ function renderLibraryHeader(
       }
       actions={
         <HStack>
-          <Button variant="ghost" size="sm" href={`/_/${project.slug}`}>
+          <Button variant="ghost" size="sm" href={urls.short(project.slug)}>
             View Storybook
           </Button>
           {renderBranchPicker(project, build, branches)}
@@ -425,17 +428,18 @@ function renderCardActions(
   build: Build,
   docsId: string | undefined,
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
   return (
     <>
       <Button
         variant="secondary"
-        href={`/projects/${project.slug}/builds/${build.id}/diff?snapshot=${snap.id}`}
+        href={urls.buildDiff(project.slug, build.id) + `?snapshot=${snap.id}`}
       >
         Review
       </Button>
       <Button
         variant="ghost"
-        href={`/projects/${project.slug}/storybook/build/${build.id}/?storyId=${encodeURIComponent(snap.storyId)}`}
+        href={`${urls.storybookBuild(project.slug, build.id)}/?storyId=${encodeURIComponent(snap.storyId)}`}
         target="_blank"
         rel="noopener"
       >

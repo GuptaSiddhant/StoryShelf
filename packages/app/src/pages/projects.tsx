@@ -1,5 +1,6 @@
 import { BuildModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
+import { createUrlBuilder } from "@storyshelf/core/urls";
 import {
   buildLabels,
   builds as buildsTable,
@@ -31,7 +32,8 @@ const projectSteps = css`
 
 /** Projects overview page: project cards with latest build plus next steps. */
 export async function renderProjectsPage(): Promise<RenderedContent> {
-  const { db, user } = getStore();
+  const { db, user, config } = getStore();
+  const urls = createUrlBuilder("/", config.publishedBaseDomain);
   const projects = await new ProjectModel(db, { projects: projectsTable }).list();
   const canCreate = !user || user.role === "admin" || user.role === "member";
 
@@ -52,7 +54,7 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
         description="Each project is one Storybook. Create a project, then upload builds from CI."
         actions={
           canCreate ? (
-            <Button variant="primary" href="/projects/new">
+            <Button variant="primary" href={urls.projectsNew()}>
               New project
             </Button>
           ) : null
@@ -65,7 +67,7 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
           description="Create your first project to start visual testing. Projects are free and unlimited."
           action={
             canCreate ? (
-              <Button variant="primary" href="/projects/new">
+              <Button variant="primary" href={urls.projectsNew()}>
                 Create project
               </Button>
             ) : null
@@ -80,7 +82,7 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
                 <HStack justify="between" align="start" gap="md">
                   <div class="truncate min-w-0">
                     <SectionTitle>
-                      <a href={`/projects/${project.slug}/library`}>{project.name}</a>
+                      <a href={urls.library(project.slug)}>{project.name}</a>
                     </SectionTitle>
                     <Meta>
                       <code>{project.slug}</code>{" "}
@@ -107,13 +109,13 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
                     )}
                   </div>
                   <HStack>
-                    <Button variant="secondary" href={`/projects/${project.slug}/library`}>
+                    <Button variant="secondary" href={urls.library(project.slug)}>
                       Library
                     </Button>
-                    <Button variant="ghost" size="sm" href={`/_/${project.slug}`}>
+                    <Button variant="ghost" size="sm" href={urls.short(project.slug)}>
                       View Storybook
                     </Button>
-                    <Button variant="ghost" href={`/projects/${project.slug}/settings`}>
+                    <Button variant="ghost" href={urls.settings(project.slug)}>
                       Settings
                     </Button>
                   </HStack>

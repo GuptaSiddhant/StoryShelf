@@ -200,15 +200,28 @@ describe("storybook routes", () => {
     objects.set(`${storybookDir("p1", ulid)}/iframe.html`, Buffer.from("<html>preview</html>"));
     objects.set(`${storybookDir("p1", ulid)}/iframe.js`, Buffer.from("console.log('hi')"));
     const app = createShelfApp({ database: db, storage, logger: silentLogger });
-    const response = await app.request(`/_/${ulid}`);
+    const response = await app.request(`/_/${ulid}/`);
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/html");
     expect(await response.text()).toBe("<html>storybook</html>");
   });
 
+  it("short link redirects without trailing slash to canonical", async () => {
+    const ulid = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+    const { db } = makeDatabase();
+    const { storage, objects } = makeStorage();
+    await db.insert(schema.projects, mockProject());
+    await db.insert(schema.builds, mockBuild({ id: ulid, public: true }));
+    objects.set(`${storybookDir("p1", ulid)}/index.html`, Buffer.from("<html>storybook</html>"));
+    const app = createShelfApp({ database: db, storage, logger: silentLogger });
+    const response = await app.request(`/_/${ulid}`);
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe(`/_/${ulid}/`);
+  });
+
   it("short link renders index.html for a project slug (latest published)", async () => {
     const { app } = await seededApp();
-    const response = await app.request("/_/test-project");
+    const response = await app.request("/_/test-project/");
     expect(response.status).toBe(200);
     expect(await response.text()).toBe("<html>storybook</html>");
   });

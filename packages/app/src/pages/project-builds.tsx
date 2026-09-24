@@ -1,5 +1,6 @@
 import { BuildModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
+import { createUrlBuilder } from "@storyshelf/core/urls";
 import {
   buildLabels,
   builds as buildsTable,
@@ -39,6 +40,7 @@ export async function renderProjectBuildsPage(
     status: query.status as never,
     branch: query.branch,
   });
+  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
 
   return (
     <DocumentLayout
@@ -55,19 +57,19 @@ export async function renderProjectBuildsPage(
         }
         actions={
           <>
-            <Button variant="secondary" href={`/projects/${project.slug}/settings`}>
+            <Button variant="secondary" href={urls.settings(project.slug)}>
               Settings
             </Button>
-            <Button variant="ghost" href={`/projects/${project.slug}/builds`}>
+            <Button variant="ghost" href={urls.buildsList(project.slug)}>
               Refresh
             </Button>
           </>
         }
-        breadcrumbs={[{ label: "Projects", href: "/projects" }, { label: project.name }]}
+        breadcrumbs={[{ label: "Projects", href: urls.projects() }, { label: project.name }]}
       />
 
       <Card>
-        <form method="get" action={`/projects/${project.slug}/builds`}>
+        <form method="get" action={urls.buildsList(project.slug)}>
           <HStack>
             <SelectField
               label="Status"
@@ -94,7 +96,7 @@ export async function renderProjectBuildsPage(
               Filter
             </Button>
             {query.status || query.branch ? (
-              <Button variant="ghost" href={`/projects/${project.slug}/builds`}>
+              <Button variant="ghost" href={urls.buildsList(project.slug)}>
                 Clear
               </Button>
             ) : null}
@@ -155,18 +157,18 @@ export async function renderProjectBuildsPage(
                       <Button
                         variant="secondary"
                         size="sm"
-                        href={`/projects/${project.slug}/builds/${build.id}`}
+                        href={urls.build(project.slug, build.id)}
                       >
                         View
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
-                        href={`/projects/${project.slug}/builds/${build.id}/diff`}
+                        href={urls.buildDiff(project.slug, build.id)}
                       >
                         Review
                       </Button>
-                      <Button variant="ghost" size="sm" href={`/_/${build.id}`}>
+                      <Button variant="ghost" size="sm" href={urls.short(build.id)}>
                         View Storybook
                       </Button>
                     </HStack>
