@@ -116,6 +116,9 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
             <Button variant="primary" href={`/projects/${project.slug}/builds/${build.id}/diff`}>
               Review diffs
             </Button>
+            <Button variant="ghost" size="sm" href={`/_/${build.id}`}>
+              View Storybook
+            </Button>
             <form
               method="post"
               action={`/api/v1/projects/${project.slug}/builds/${build.id}/retry`}
@@ -245,6 +248,9 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
                     href={`/projects/${project.slug}/builds/${build.id}/diff?snapshot=${snap.id}`}
                   >
                     Review
+                  </Button>
+                  <Button variant="ghost" size="sm" href={`/_/${build.id}`}>
+                    View Storybook
                   </Button>
                   {canReview && (snap.status === "new" || snap.status === "changed") ? (
                     <>

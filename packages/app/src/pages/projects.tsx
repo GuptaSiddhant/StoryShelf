@@ -80,7 +80,7 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
                 <HStack justify="between" align="start" gap="md">
                   <div class="truncate min-w-0">
                     <SectionTitle>
-                      <a href={`/projects/${project.slug}/builds`}>{project.name}</a>
+                      <a href={`/projects/${project.slug}/library`}>{project.name}</a>
                     </SectionTitle>
                     <Meta>
                       <code>{project.slug}</code>{" "}
@@ -107,8 +107,11 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
                     )}
                   </div>
                   <HStack>
-                    <Button variant="secondary" href={`/projects/${project.slug}/builds`}>
-                      Builds {info?.count ? `(${info.count})` : ""}
+                    <Button variant="secondary" href={`/projects/${project.slug}/library`}>
+                      Library
+                    </Button>
+                    <Button variant="ghost" size="sm" href={`/_/${project.slug}`}>
+                      View Storybook
                     </Button>
                     <Button variant="ghost" href={`/projects/${project.slug}/settings`}>
                       Settings

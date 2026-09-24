@@ -345,7 +345,7 @@ const TopBar: FC<{ name: string; logo?: string; nav?: NavConfig }> = ({ name, lo
               <span class="project-crumb__sep" aria-hidden="true">
                 /
               </span>
-              <a href={`/projects/${nav.projectSlug}/builds`}>
+              <a href={`/projects/${nav.projectSlug}/library`}>
                 {nav.projectName ?? nav.projectSlug}
               </a>
             </nav>
@@ -426,6 +426,13 @@ const Sidebar: FC<{ nav?: NavConfig }> = ({ nav }) => {
           <>
             <div class="sidebar__section">Project</div>
             <a
+              class={`sidebar__link ${nav.active === "library" ? "sidebar__link--active" : ""}`}
+              href={`/projects/${nav.projectSlug}/library`}
+              aria-current={nav.active === "library" ? "page" : undefined}
+            >
+              <span aria-hidden="true">▤</span> Library
+            </a>
+            <a
               class={`sidebar__link ${nav.active === "builds" ? "sidebar__link--active" : ""}`}
               href={`/projects/${nav.projectSlug}/builds`}
               aria-current={nav.active === "builds" ? "page" : undefined}
@@ -445,13 +452,6 @@ const Sidebar: FC<{ nav?: NavConfig }> = ({ nav }) => {
               aria-current={nav.active === "labels" ? "page" : undefined}
             >
               <span aria-hidden="true">⌗</span> Labels
-            </a>
-            <a
-              class={`sidebar__link ${nav.active === "library" ? "sidebar__link--active" : ""}`}
-              href={`/projects/${nav.projectSlug}/library`}
-              aria-current={nav.active === "library" ? "page" : undefined}
-            >
-              <span aria-hidden="true">▤</span> Library
             </a>
             <a
               class={`sidebar__link ${nav.active === "settings" ? "sidebar__link--active" : ""}`}

@@ -275,7 +275,14 @@ function renderLibraryHeader(
           · {new Date(build.createdAt).toLocaleString()} · {build.status}
         </>
       }
-      actions={renderBranchPicker(project, build, branches)}
+      actions={
+        <HStack>
+          <Button variant="ghost" size="sm" href={`/_/${project.slug}`}>
+            View Storybook
+          </Button>
+          {renderBranchPicker(project, build, branches)}
+        </HStack>
+      }
     />
   );
 }
@@ -425,6 +432,9 @@ function renderCardActions(
         href={`/projects/${project.slug}/builds/${build.id}/diff?snapshot=${snap.id}`}
       >
         Review
+      </Button>
+      <Button variant="ghost" size="sm" href={`/_/${build.id}`}>
+        View Storybook
       </Button>
       <Button
         variant="ghost"

@@ -166,6 +166,9 @@ export async function renderProjectBuildsPage(
                       >
                         Review
                       </Button>
+                      <Button variant="ghost" size="sm" href={`/_/${build.id}`}>
+                        View Storybook
+                      </Button>
                     </HStack>
                   </td>
                 </tr>
