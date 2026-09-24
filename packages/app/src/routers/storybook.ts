@@ -46,6 +46,9 @@ async function staticsReady(projectId: string, buildId: string): Promise<boolean
 
 /** Register the published Storybook resolver and static-asset routes. */
 export function registerStorybook(app: ShelfRouter): void {
+  app.get("/_", (c) => c.redirect("/", 302));
+  app.get("/_/", (c) => c.redirect("/", 302));
+
   // Resolver: latest published build on the default branch.
   app.get("/projects/:slug/storybook", async (c) => {
     const slug = c.req.param("slug");
@@ -96,54 +99,19 @@ export function registerStorybook(app: ShelfRouter): void {
     return c.redirect(`/projects/${slug}/storybook/build/${buildId}/`, 302);
   });
 
-  // Short link: renders the published Storybook's index.html directly (no StoryShelf shell).
+  // Short link canonical is /_/:id/ with trailing slash (so relative ./sb-manager/... resolves).
   // 26-char ULID → that exact build; any other id → project slug → latest build (published fallback). No fall-through on ULID.
   app.get("/_/:id", async (c) => {
     const id = c.req.param("id");
     const isUlid26 = id.length === 26 && /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/u.test(id);
-    let project: Project | null = null;
-    let build: Build | null = null;
     if (isUlid26) {
-      build = await new BuildModel(getStore().db, { builds, buildLabels, snapshots }).get(id);
-      if (!build) return c.notFound();
-      project = await new ProjectModel(getStore().db, { projects }).get(build.projectId);
-      if (!project) return c.notFound();
+      const build = await new BuildModel(getStore().db, { builds, buildLabels, snapshots }).get(id);
+      if (!build) notFound();
     } else {
-      project = await new ProjectModel(getStore().db, { projects }).getBySlug(id);
-      if (!project) return c.notFound();
-      build = await new BuildModel(getStore().db, {
-        builds,
-        buildLabels,
-        snapshots,
-      }).latestPublished(project);
-      // Fallback to latest build if no published (e.g. demo on feature branch)
-      if (!build) {
-        const all = await new BuildModel(getStore().db, { builds, buildLabels, snapshots }).list(
-          project.id,
-        );
-        build = all[0] ?? null;
-      }
-      if (!build) return c.notFound();
+      const project = await new ProjectModel(getStore().db, { projects }).getBySlug(id);
+      if (!project) notFound();
     }
-    if (!(await canViewBuild(build, project))) return c.redirect("/auth/login", 302);
-    if (!(await staticsReady(project.id, build.id))) {
-      return c.html(renderStorybookPreparingPage(project, build, project.slug), 200);
-    }
-    const path = posix.join(storybookDir(project.id, build.id), "index.html");
-    if (!(await getStore().storage.exists(path))) {
-      // index.html missing → redirect to build or project page (per spec)
-      return c.redirect(
-        isUlid26 ? `/projects/${project.slug}/builds/${build.id}` : `/projects/${project.slug}`,
-        302,
-      );
-    }
-    const buffer = await getStore().storage.read(path);
-    // Latest via slug should not be cached as aggressively as a frozen build.
-    const cacheControl = isUlid26 ? "public, max-age=3600" : "public, max-age=60";
-    return c.body(new Uint8Array(buffer), 200, {
-      "content-type": "text/html; charset=utf-8",
-      "cache-control": cacheControl,
-    });
+    return c.redirect(`/_/${id}/`, 302);
   });
 
   app.get("/_/:id/*", async (c) => {
@@ -157,7 +125,6 @@ export function registerStorybook(app: ShelfRouter): void {
     } catch {
       return c.notFound();
     }
-    if (rest === "") return c.redirect(`/_/${id}`, 302);
     let project: Project | null = null;
     let build: Build | null = null;
     if (isUlid26) {
@@ -182,6 +149,24 @@ export function registerStorybook(app: ShelfRouter): void {
       if (!build) return c.notFound();
     }
     if (!(await canViewBuild(build, project))) return c.redirect("/auth/login", 302);
+    if (rest === "") {
+      if (!(await staticsReady(project.id, build.id))) {
+        return c.html(renderStorybookPreparingPage(project, build, project.slug), 200);
+      }
+      const path = posix.join(storybookDir(project.id, build.id), "index.html");
+      if (!(await getStore().storage.exists(path))) {
+        return c.redirect(
+          isUlid26 ? `/projects/${project.slug}/builds/${build.id}` : `/projects/${project.slug}`,
+          302,
+        );
+      }
+      const buffer = await getStore().storage.read(path);
+      const cacheControl = isUlid26 ? "public, max-age=3600" : "public, max-age=60";
+      return c.body(new Uint8Array(buffer), 200, {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": cacheControl,
+      });
+    }
     const segments = rest.split("/");
     if (segments.some((segment) => !isSafeSegment(segment))) return c.notFound();
     const path = posix.join(storybookDir(project.id, build.id), rest);
