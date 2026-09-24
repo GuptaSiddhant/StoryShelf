@@ -52,15 +52,14 @@ const app = createShelfApp({
 await app.lifecycle.setup();
 const logger = app.lifecycle.logger;
 
-// Always seed demo project — isolated to Demo Design System, other projects untouched. Serve irrespective of seed failure.
-try {
-  await seedDemo({ database, storage, captureRunner, logger });
-} catch (error) {
-  logger.error({ err: error }, "demo seed failed — serving irrespective");
-}
-
 const server = serve({ fetch: app.fetch, port }, () => {
   logger.info({ port, dataDir }, "StoryShelf fly server listening");
+});
+
+// Always seed demo project in background — isolated to Demo Design System, other projects untouched. Serve irrespective.
+// oxlint-disable-next-line unicorn/prefer-top-level-await -- background seed after serve, must not block health check
+seedDemo({ database, storage, captureRunner, logger }).catch((error) => {
+  logger.error({ err: error }, "demo seed failed — serving irrespective");
 });
 
 const shutdown = async (): Promise<void> => {
