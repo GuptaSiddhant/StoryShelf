@@ -33,7 +33,8 @@ export function authGate() {
       path.startsWith("/api/") ||
       path.startsWith("/auth/") ||
       path.startsWith("/assets/") ||
-      (path.startsWith("/projects/") && path.includes("/storybook"))
+      (path.startsWith("/projects/") && path.includes("/storybook")) ||
+      /^\/projects\/[^/]+\/?$/u.test(path)
     ) {
       await next();
       return;
