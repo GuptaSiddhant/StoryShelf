@@ -1,0 +1,110 @@
+name: Live Cloud Ancillary
+
+# Phase 4 live tests: Turso + Postgres + Redis + OAuth + GitHub + GitLab
+# against strictly real endpoints (no fakes, no stubs). No terraform scaffold
+# covers these — resources are long-lived and shared, isolation is per-run
+# (unique row ids/slugs, unique Redis keys, unique status contexts).
+#
+# Secrets per leg (each live suite additionally gates on its own env, so a
+# leg only exercises the providers whose secrets are present):
+# - db: TURSO_DATABASE_URL (+ optional TURSO_AUTH_TOKEN), DATABASE_URL
+# - queue: REDIS_URL
+# - auth: OIDC_ISSUER (+ OIDC_CLIENT_ID / OIDC_CLIENT_SECRET /
+#   OIDC_REDIRECT_URL, last three have test-safe fallbacks for discovery-only)
+# - git: LIVE_GH_TOKEN + LIVE_GH_OWNER / LIVE_GH_REPO / LIVE_GH_SHA;
+#   LIVE_GL_TOKEN + LIVE_GL_OWNER / LIVE_GL_REPO / LIVE_GL_SHA
+#   (+ optional LIVE_GL_HOST for self-managed GitLab)
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "15 4 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-cloud-ancillary
+  cancel-in-progress: true
+
+jobs:
+  live-ancillary:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [db, queue, auth, git]
+    env:
+      LIVE_CLOUD: "1"
+      TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+      TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      REDIS_URL: ${{ secrets.REDIS_URL }}
+      OIDC_ISSUER: ${{ secrets.OIDC_ISSUER }}
+      OIDC_CLIENT_ID: ${{ secrets.OIDC_CLIENT_ID }}
+      OIDC_CLIENT_SECRET: ${{ secrets.OIDC_CLIENT_SECRET }}
+      OIDC_REDIRECT_URL: ${{ secrets.OIDC_REDIRECT_URL }}
+      LIVE_GH_TOKEN: ${{ secrets.LIVE_GH_TOKEN }}
+      LIVE_GH_OWNER: ${{ secrets.LIVE_GH_OWNER }}
+      LIVE_GH_REPO: ${{ secrets.LIVE_GH_REPO }}
+      LIVE_GH_SHA: ${{ secrets.LIVE_GH_SHA }}
+      LIVE_GL_TOKEN: ${{ secrets.LIVE_GL_TOKEN }}
+      LIVE_GL_OWNER: ${{ secrets.LIVE_GL_OWNER }}
+      LIVE_GL_REPO: ${{ secrets.LIVE_GL_REPO }}
+      LIVE_GL_SHA: ${{ secrets.LIVE_GL_SHA }}
+      LIVE_GL_HOST: ${{ secrets.LIVE_GL_HOST }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Nub
+        uses: nubjs/setup-nub@v0
+
+      - name: Install dependencies
+        run: nub ci
+
+      - name: Fail fast on missing secrets
+        run: |
+          set -e
+          case "${{ matrix.suite }}" in
+            db)
+              if [ -z "$TURSO_DATABASE_URL" ] && [ -z "$DATABASE_URL" ]; then
+                echo "::error::db leg needs TURSO_DATABASE_URL and/or DATABASE_URL."
+                exit 1
+              fi
+              ;;
+            queue)
+              if [ -z "$REDIS_URL" ]; then
+                echo "::error::queue leg needs REDIS_URL."
+                exit 1
+              fi
+              ;;
+            auth)
+              if [ -z "$OIDC_ISSUER" ]; then
+                echo "::error::auth leg needs OIDC_ISSUER."
+                exit 1
+              fi
+              ;;
+            git)
+              if [ -z "$LIVE_GH_TOKEN" ] && [ -z "$LIVE_GL_TOKEN" ]; then
+                echo "::error::git leg needs LIVE_GH_TOKEN and/or LIVE_GL_TOKEN."
+                exit 1
+              fi
+              ;;
+          esac
+
+      - name: Run db suites (hermetic + live)
+        if: matrix.suite == 'db'
+        # --force: live results must never come from the turbo cache.
+        run: nubx turbo test --filter='@storyshelf/db-turso' --filter='@storyshelf/db-postgres' --force
+
+      - name: Run queue suite (hermetic + live)
+        if: matrix.suite == 'queue'
+        run: nubx turbo test --filter='@storyshelf/queue-redis' --force
+
+      - name: Run auth suite (hermetic + live)
+        if: matrix.suite == 'auth'
+        run: nubx turbo test --filter='@storyshelf/auth-oauth' --force
+
+      - name: Run git suites (hermetic + live)
+        if: matrix.suite == 'git'
+        run: nubx turbo test --filter='@storyshelf/git-github' --filter='@storyshelf/git-gitlab' --force

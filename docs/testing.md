@@ -58,6 +58,7 @@ run with `--force`. Nightly + manual dispatch per provider:
 - `.github/workflows/live-cloud-aws.yml` — S3 + SQS
 - `.github/workflows/live-cloud-azure.yml` — Blob + Storage Queues + Service Bus (matrix)
 - `.github/workflows/live-cloud-gcp.yml` — GCS + Pub/Sub
+- `.github/workflows/live-cloud-ancillary.yml` — Turso + Postgres + Redis + OAuth + GitHub + GitLab (matrix `db`/`queue`/`auth`/`git`; long-lived resources, no scaffold)
 
 Each workflow also validates its terraform scaffold generator (`fmt` +
 `init -backend=false` + `validate`, mirroring the CLI's
@@ -115,10 +116,30 @@ in CI).
 5. **Costs:** live suites are a handful of API calls; the spend is idle
    infrastructure (RDS, Cloud SQL, Service Bus namespace). Destroy promptly.
 
-### Phase 4 (ancillary, not yet wired)
+### Phase 4 (ancillary: `.github/workflows/live-cloud-ancillary.yml`)
 
-Turso (`TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN`), Postgres-generic
-(`DATABASE_URL`), Redis (`REDIS_URL`), OIDC (`OIDC_ISSUER/CLIENT_ID/SECRET`),
-GitHub (`repo:status` PAT + test repo), GitLab (`api` token + test project).
-Long-lived test resources + per-run prefix isolation; no scaffold covers
-these, so they stay manual until their live suites land.
+No terraform scaffold covers these — resources are long-lived and shared,
+isolation is per-run. Matrix legs: `db`, `queue`, `auth`, `git` (nightly +
+manual dispatch, `--force` so results never come from cache).
+
+| Suite | Resource to provision (one-time, manual) | Env |
+|---|---|---|
+| Turso | Turso database (`turso db create shelf-live-test`) | `TURSO_DATABASE_URL` (`libsql://…`), `TURSO_AUTH_TOKEN` |
+| Postgres | Any wire-compatible DB (Neon/Supabase free tier is enough; use a direct connection, not the pooler) | `DATABASE_URL` (`?sslmode=require` for managed) |
+| Redis | Upstash/ElastiCache/Memorystore (or local `redis://localhost:6379` for a smoke run) | `REDIS_URL` |
+| OAuth | OIDC app with a redirect URL (Auth0 free tenant; Keycloak/Entra/Okta/Cognito work too) — discovery-only, no interactive login | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_REDIRECT_URL` |
+| GitHub | Test repo + PAT with `repo:status`; reserve a throwaway SHA (statuses are immutable) | `LIVE_GH_TOKEN`, `LIVE_GH_OWNER`, `LIVE_GH_REPO`, `LIVE_GH_SHA` |
+| GitLab | Test project + token with `api` scope; reserve a throwaway SHA | `LIVE_GL_TOKEN`, `LIVE_GL_OWNER`, `LIVE_GL_REPO`, `LIVE_GL_SHA`, optional `LIVE_GL_HOST` |
+
+Isolation: unique row ids/slugs (DBs, removed afterwards), unique Redis
+keys (`shelf:live:<run>:<uuid>` — `{key}`, `{key}:processing`,
+`{key}:delayed`), unique status contexts (`storyshelf/live-<run-id>`).
+Suites gate on their own env (`skipIf`), so a leg exercises exactly the
+providers whose secrets are present; each leg fail-fasts when none of its
+secrets are set. Local run example:
+
+```sh
+export PATH="$HOME/.nub/bin:$PATH"
+LIVE_CLOUD=1 TURSO_DATABASE_URL=... TURSO_AUTH_TOKEN=... \
+  nubx turbo test --filter='@storyshelf/db-turso' --force
+```
