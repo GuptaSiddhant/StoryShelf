@@ -10,6 +10,7 @@ export interface UrlBuilder {
   storybookLabel(slug: string, key: string, value: string): string;
   storybookBuild(slug: string, buildId: string): string;
   settings(slug: string): string;
+  short(id: string): string;
 }
 
 /**
@@ -41,5 +42,6 @@ export function createUrlBuilder(baseUrl: string, publishedBaseDomain?: string):
         ? `https://${buildId}.${slug}.${publishedBaseDomain}`
         : `${root}/projects/${slug}/storybook/build/${buildId}`,
     settings: (slug) => `${root}/projects/${slug}/settings`,
+    short: (id) => `${root}/_/${id}`,
   };
 }

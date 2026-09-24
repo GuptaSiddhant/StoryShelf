@@ -96,6 +96,84 @@ export function registerStorybook(app: ShelfRouter): void {
     return c.redirect(`/projects/${slug}/storybook/build/${buildId}/`, 302);
   });
 
+  // Short link: renders the published Storybook's index.html directly (no StoryShelf shell).
+  // 26-char ULID → that exact build; any other id → project slug → latest published build. No fall-through on ULID.
+  app.get("/_/:id", async (c) => {
+    const id = c.req.param("id");
+    const isUlid26 = id.length === 26 && /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/u.test(id);
+    let project: Project | null = null;
+    let build: Build | null = null;
+    if (isUlid26) {
+      build = await new BuildModel(getStore().db, { builds, buildLabels, snapshots }).get(id);
+      if (!build) return c.notFound();
+      project = await new ProjectModel(getStore().db, { projects }).get(build.projectId);
+      if (!project) return c.notFound();
+    } else {
+      project = await new ProjectModel(getStore().db, { projects }).getBySlug(id);
+      if (!project) return c.notFound();
+      build = await new BuildModel(getStore().db, {
+        builds,
+        buildLabels,
+        snapshots,
+      }).latestPublished(project);
+      if (!build) return c.notFound();
+    }
+    if (!(await canViewBuild(build, project))) return c.redirect("/auth/login", 302);
+    if (!(await staticsReady(project.id, build.id))) {
+      return c.html(renderStorybookPreparingPage(project, build, project.slug), 200);
+    }
+    const path = posix.join(storybookDir(project.id, build.id), "index.html");
+    if (!(await getStore().storage.exists(path))) return c.notFound();
+    const buffer = await getStore().storage.read(path);
+    // Latest via slug should not be cached as aggressively as a frozen build.
+    const cacheControl = isUlid26 ? "public, max-age=3600" : "public, max-age=60";
+    return c.body(new Uint8Array(buffer), 200, {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": cacheControl,
+    });
+  });
+
+  app.get("/_/:id/*", async (c) => {
+    const id = c.req.param("id");
+    const isUlid26 = id.length === 26 && /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/u.test(id);
+    const base = `/_/${id}/`;
+    if (!c.req.path.startsWith(base)) return c.notFound();
+    let rest: string;
+    try {
+      rest = decodeURIComponent(c.req.path.slice(base.length));
+    } catch {
+      return c.notFound();
+    }
+    if (rest === "") return c.redirect(`/_/${id}`, 302);
+    let project: Project | null = null;
+    let build: Build | null = null;
+    if (isUlid26) {
+      build = await new BuildModel(getStore().db, { builds, buildLabels, snapshots }).get(id);
+      if (!build) return c.notFound();
+      project = await new ProjectModel(getStore().db, { projects }).get(build.projectId);
+      if (!project) return c.notFound();
+    } else {
+      project = await new ProjectModel(getStore().db, { projects }).getBySlug(id);
+      if (!project) return c.notFound();
+      build = await new BuildModel(getStore().db, {
+        builds,
+        buildLabels,
+        snapshots,
+      }).latestPublished(project);
+      if (!build) return c.notFound();
+    }
+    if (!(await canViewBuild(build, project))) return c.redirect("/auth/login", 302);
+    const segments = rest.split("/");
+    if (segments.some((segment) => !isSafeSegment(segment))) return c.notFound();
+    const path = posix.join(storybookDir(project.id, build.id), rest);
+    if (!(await getStore().storage.exists(path))) return c.notFound();
+    const buffer = await getStore().storage.read(path);
+    return c.body(new Uint8Array(buffer), 200, {
+      "content-type": contentTypeFor(rest),
+      "cache-control": "public, max-age=3600",
+    });
+  });
+
   // Canonical build route: serves the static Storybook and the landing page.
   app.get("/projects/:slug/storybook/build/:buildId/*", async (c) => {
     const slug = c.req.param("slug");

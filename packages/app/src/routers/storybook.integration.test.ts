@@ -189,4 +189,52 @@ describe("storybook routes", () => {
     expect(body).toContain("iframe.html?id=a--b");
     expect(body).not.toContain("viewMode=");
   });
+
+  it("short link renders index.html for a build ULID", async () => {
+    const ulid = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+    const { db } = makeDatabase();
+    const { storage, objects } = makeStorage();
+    await db.insert(schema.projects, mockProject());
+    await db.insert(schema.builds, mockBuild({ id: ulid, public: true }));
+    objects.set(`${storybookDir("p1", ulid)}/index.html`, Buffer.from("<html>storybook</html>"));
+    objects.set(`${storybookDir("p1", ulid)}/iframe.html`, Buffer.from("<html>preview</html>"));
+    objects.set(`${storybookDir("p1", ulid)}/iframe.js`, Buffer.from("console.log('hi')"));
+    const app = createShelfApp({ database: db, storage, logger: silentLogger });
+    const response = await app.request(`/_/${ulid}`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/html");
+    expect(await response.text()).toBe("<html>storybook</html>");
+  });
+
+  it("short link renders index.html for a project slug (latest published)", async () => {
+    const { app } = await seededApp();
+    const response = await app.request("/_/test-project");
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("<html>storybook</html>");
+  });
+
+  it("short link returns 404 for unknown build and slug", async () => {
+    const { app } = await seededApp();
+    const badUlid = "01ARZ3NDEKTSV4RRFFQ69G5FAV"; // valid 26-char ULID, not a build
+    const r1 = await app.request(`/_/${badUlid}`);
+    expect(r1.status).toBe(404);
+    const r2 = await app.request("/_/nope");
+    expect(r2.status).toBe(404);
+  });
+
+  it("short link serves static assets and rejects traversal", async () => {
+    const ulid = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+    const { db } = makeDatabase();
+    const { storage, objects } = makeStorage();
+    await db.insert(schema.projects, mockProject());
+    await db.insert(schema.builds, mockBuild({ id: ulid, public: true }));
+    objects.set(`${storybookDir("p1", ulid)}/index.html`, Buffer.from("<html>storybook</html>"));
+    objects.set(`${storybookDir("p1", ulid)}/iframe.html`, Buffer.from("<html>preview</html>"));
+    objects.set(`${storybookDir("p1", ulid)}/iframe.js`, Buffer.from("console.log('hi')"));
+    const app = createShelfApp({ database: db, storage, logger: silentLogger });
+    const js = await app.request(`/_/${ulid}/iframe.js`);
+    expect(js.status).toBe(200);
+    const bad = await app.request(`/_/${ulid}/../secrets.txt`);
+    expect(bad.status).toBe(404);
+  });
 });
