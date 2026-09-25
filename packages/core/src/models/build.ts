@@ -39,6 +39,10 @@ export class BuildModel {
       authorName: input.authorName,
       message: input.message,
       public: input.public ?? false,
+      affectedOnly: input.affectedOnly ?? true,
+      baselineSha: input.baselineSha ?? null,
+      changedFiles: serializePaths(input.changedFiles),
+      affectedImportPaths: serializePaths(input.affectedImportPaths),
       status: "pending",
       createdAt: now,
       updatedAt: now,
@@ -125,6 +129,27 @@ export class BuildModel {
     return await this.update(id, { status });
   }
 
+  /**
+   * Record the affected-capture computation for a build. Idempotent: the CLI
+   * posts this once after creating the build and before uploading the bundle.
+   */
+  async setAffected(id: string, input: AffectedComputation): Promise<Build> {
+    return (await this.db.update(this.tables.builds, id, {
+      baselineSha: input.baselineSha,
+      changedFiles: serializePaths(input.changedFiles),
+      affectedImportPaths: serializePaths(input.affectedImportPaths),
+      updatedAt: new Date().toISOString(),
+    })) as unknown as Build;
+  }
+
+  /**
+   * Parse a build's affected import paths. Returns `null` for full capture
+   * (no computation, or an unreadable payload) — callers render everything.
+   */
+  static affectedPaths(build: Pick<Build, "affectedImportPaths">): string[] | null {
+    return parsePaths(build.affectedImportPaths);
+  }
+
   async updateCounts(id: string): Promise<Build> {
     const rows = (await this.db.list(this.tables.snapshots, {
       where: eq(getTableColumns(this.tables.snapshots)["buildId"] as unknown as SQLWrapper, id),
@@ -178,6 +203,40 @@ export interface BuildCreateInput {
   authorName?: string;
   message?: string;
   public?: boolean;
+  affectedOnly?: boolean;
+  baselineSha?: string | null;
+  changedFiles?: string[] | null;
+  affectedImportPaths?: string[] | null;
+}
+
+/** Affected-capture computation posted after build creation. */
+export interface AffectedComputation {
+  baselineSha: string | null;
+  changedFiles: string[];
+  affectedImportPaths: string[] | null;
+}
+
+/** Serialize an optional path list to its JSON text form (or null). */
+function serializePaths(paths: string[] | null | undefined): string | null {
+  if (!paths) {
+    return null;
+  }
+  return JSON.stringify(paths);
+}
+
+/** Parse a JSON path list; null (full capture) on missing/invalid input. */
+function parsePaths(raw: string | null): string[] | null {
+  if (!raw) {
+    return null;
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.every((entry) => typeof entry === "string")
+      ? (parsed as string[])
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Filter options for listing builds. */

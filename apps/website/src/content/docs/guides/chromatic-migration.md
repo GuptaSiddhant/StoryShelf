@@ -54,6 +54,11 @@ Match Chromatic settings where applicable:
 
 ### StoryShelf CI (after):
 ```yaml
+- name: Checkout
+  uses: actions/checkout@v4
+  with:
+    fetch-depth: 0 # affected capture diffs against history
+
 - name: Build Storybook
   run: npx build-storybook -o storybook-static
 
@@ -102,7 +107,7 @@ StoryShelf reads both `chromatic:` and `storyshelf:` parameter keys. **`storyshe
 
 | Feature | Chromatic | StoryShelf | Impact |
 |---------|-----------|------------|--------|
-| **TurboSnap** | Yes (dependency graph) | No | 5-10× more snapshots on large Storybooks |
+| **TurboSnap** | Yes (dependency graph) | Yes — affected capture (on by default) | Similar skip rates on Vite Storybooks; needs `fetch-depth: 0` and `preview-stats.json` |
 | **Cross-browser** | Chrome, FF, Safari, Edge (branded, cloud) | Chromium / Firefox / WebKit, one per build | Set in project Settings → General or via API; baselines tracked per browser; no branded Safari/Edge |
 | **Modes/Globals** | Yes | No | Theme/locale matrices need workarounds |
 | **A11y testing** | Yes (aXe) | No | Separate aXe job needed |
@@ -145,7 +150,7 @@ Keep Chromatic running in parallel for 1-2 sprints:
 A: No public API. Baselines must be re-accepted on first StoryShelf run.
 
 **Q: Does StoryShelf support TurboSnap?**
-A: Not implemented. Every changed story captures a full snapshot.
+A: Yes, as affected capture — enabled by default with the same shape (ancestor → git diff → graph trace → selective render). Differences: Vite stats only, no per-snapshot billing (skipping saves CPU, not money), and unknown cases fail open to full renders. Replace `--only-changed` with nothing (it's the default); use `--full` to opt out.
 
 **Q: Can I test Safari/Firefox?**
 A: Yes — set the project's capture browser to `firefox` or `webkit` (Safari's engine) in Settings → General, or via `PATCH /api/v1/projects/:slug`. Each build captures one browser; baselines track the browser.

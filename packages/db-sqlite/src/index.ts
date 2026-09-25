@@ -28,7 +28,7 @@ export function createSqliteDatabase(path: string): DatabaseAdapter {
       kind: "sqlite",
       category: "database",
     },
-    tables: schema as unknown as DatabaseAdapter["tables"],
+    tables: schema,
     migrate: () => {
       runMigrations(sqlite);
     },

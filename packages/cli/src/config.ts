@@ -10,6 +10,7 @@ export interface StorybookConfig {
   buildCommand?: string;
   buildScriptName?: string;
   skip?: string;
+  affectedOnly?: boolean;
 }
 
 /** Parse an unknown value into a `StorybookConfig`, or return the reason it is invalid. */
@@ -22,11 +23,29 @@ function parseStorybookConfig(value: unknown): ParseResult {
   if (!slug.ok) {
     return slug;
   }
+  const parts = readConfigParts(record);
+  if (!parts.ok) {
+    return parts;
+  }
+  return checkCrossFieldRules(slug.slug, parts.values, parts.flags);
+}
+
+/** Optional string and boolean config sections. */
+type ConfigParts =
+  | { ok: true; values: Record<string, string>; flags: Record<string, boolean> }
+  | { ok: false; error: string };
+
+/** Read the optional string and boolean config sections. */
+function readConfigParts(record: Record<string, unknown>): ConfigParts {
   const optional = readOptionalStrings(record, OPTIONAL_CONFIG_KEYS);
   if (!optional.ok) {
     return optional;
   }
-  return checkCrossFieldRules(slug.slug, optional.values);
+  const flags = readOptionalBooleans(record, BOOLEAN_CONFIG_KEYS);
+  if (!flags.ok) {
+    return flags;
+  }
+  return { ok: true, values: optional.values, flags: flags.values };
 }
 
 /** Read the required slug field. */
@@ -49,6 +68,9 @@ const OPTIONAL_CONFIG_KEYS = [
   "skip",
 ] as const;
 
+/** Optional config keys with boolean values. */
+const BOOLEAN_CONFIG_KEYS = ["affectedOnly"] as const;
+
 type ParseResult = { ok: true; config: StorybookConfig } | { ok: false; error: string };
 
 /** Read optional non-empty string fields; any present-but-invalid field is an error. */
@@ -70,8 +92,31 @@ function readOptionalStrings(
   return { ok: true, values };
 }
 
+/** Read optional boolean fields; any present-but-invalid field is an error. */
+function readOptionalBooleans(
+  record: Record<string, unknown>,
+  keys: readonly string[],
+): { ok: true; values: Record<string, boolean> } | { ok: false; error: string } {
+  const values: Record<string, boolean> = {};
+  for (const key of keys) {
+    const raw = record[key];
+    if (raw === undefined) {
+      continue;
+    }
+    if (typeof raw !== "boolean") {
+      return { ok: false, error: `${key} must be a boolean` };
+    }
+    values[key] = raw;
+  }
+  return { ok: true, values };
+}
+
 /** Enforce url shape and the buildCommand/buildScriptName exclusion. */
-function checkCrossFieldRules(slug: string, values: Record<string, string>): ParseResult {
+function checkCrossFieldRules(
+  slug: string,
+  values: Record<string, string>,
+  flags: Record<string, boolean>,
+): ParseResult {
   const url = values["url"];
   if (url !== undefined && !isHttpUrl(url)) {
     return { ok: false, error: "url must be a valid http(s) URL" };
@@ -80,6 +125,7 @@ function checkCrossFieldRules(slug: string, values: Record<string, string>): Par
     return { ok: false, error: "buildCommand and buildScriptName are mutually exclusive" };
   }
   const { buildDir, buildCommand, buildScriptName, skip } = values;
+  const affectedOnly = flags["affectedOnly"];
   return {
     ok: true,
     config: {
@@ -89,6 +135,7 @@ function checkCrossFieldRules(slug: string, values: Record<string, string>): Par
       ...(buildCommand === undefined ? {} : { buildCommand }),
       ...(buildScriptName === undefined ? {} : { buildScriptName }),
       ...(skip === undefined ? {} : { skip }),
+      ...(affectedOnly === undefined ? {} : { affectedOnly }),
     },
   };
 }

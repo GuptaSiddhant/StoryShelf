@@ -39,6 +39,10 @@ describe("Label-driven build resolution", () => {
     changedCount: 0,
     approvedCount: 0,
     rejectedCount: 0,
+    affectedOnly: true,
+    baselineSha: null,
+    changedFiles: null,
+    affectedImportPaths: null,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
   };

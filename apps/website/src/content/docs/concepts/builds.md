@@ -38,10 +38,12 @@ Default-branch builds auto-approve and write baselines; feature-branch builds la
 | `pending` | Not yet rendered |
 | `new` | No baseline on this branch or default — needs accept |
 | `changed` | Diff ratio exceeds `maxDiffRatio` / pixel threshold |
-| `unchanged` | Within threshold — auto-approved |
+| `unchanged` | Within threshold — auto-approved (includes baseline-inherited stories) |
 | `approved` / `rejected` | Human decision |
 
 `storyId` is `components-button--primary` (unique), plus `storyName`, `storyTitle`, and `viewportName` (`desktop` default `1280×720`). `diffPixels` / `diffRatio` / `diffPath` are populated only when a baseline exists.
+
+With [affected capture](/concepts/affected-capture/), stories outside the change inherit their baseline without rendering: snapshots with `inherited: true` reuse the baseline screenshot and land `unchanged`. The build row records the computation (`affectedOnly`, `baselineSha`, `changedFiles`, `affectedImportPaths`; `null` paths mean a full render).
 
 ## Attempts & logs
 

@@ -142,6 +142,14 @@ function buildUploadCommand(): Command {
     .option("--message <message>", "commit message")
     .option("--author-email <email>", "author email")
     .option("--author-name <name>", "author name")
+    .option("--full", "disable affected capture (render every story)")
+    .option(
+      "--untraced <glob>",
+      "exclude matching files from affected tracing (repeatable)",
+      (value: string, previous: string[]) => [...previous, value],
+      [] as string[],
+    )
+    .option("--stats-file <path>", "bundler stats file (default <buildDir>/preview-stats.json)")
     .option(
       "--label <key=value>",
       "build label (repeatable: --label pr=123)",

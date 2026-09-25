@@ -15,6 +15,7 @@ import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 import { DEFAULT_VIEWPORTS, isDisabledStory, isFlakyStory } from "./adapter.ts";
 import type { Viewport } from "./adapter.ts";
+import { partitionAffectedStories } from "./affected.ts";
 import { persistCapture, type PipelineTables } from "./pipeline.ts";
 import { resolveViewports } from "./sizing.ts";
 import { extractStorybookToScratch, persistStorybookStatics } from "./statics.ts";
@@ -112,18 +113,45 @@ export async function executeCaptureJob(
     const viewports = resolveViewports(rawViewports, DEFAULT_VIEWPORTS, options.viewports);
     const browser = (project as unknown as { browser?: string }).browser as BrowserName | undefined;
 
-    const renderStart = performance.now();
-    const result = await options.runner.render({
-      buildId: build.id,
-      storybookDir: extractedDir,
+    const partition = await partitionAffectedStories({
+      db: options.db,
+      tables: options.tables,
+      projectId: project.id,
+      branch: build.gitBranch,
+      defaultBranch: project.gitDefaultBranch,
       stories,
       viewports,
-      logger,
-      executePlay: project.executePlay ?? false,
-      playTimeoutMs: project.playTimeoutMs ?? 10_000,
-      runA11y: project.runA11y ?? false,
-      browser: browser ?? "chromium",
+      affectedPaths: affectedPathsFor(build),
     });
+    logger?.info(
+      {
+        rendered: partition.render.length,
+        inherited: partition.inherited.length,
+        total: stories.length,
+      },
+      "affected capture partitioned",
+    );
+    await emitAttemptLog(input.recordLog, logger, "info", "affected capture partitioned", {
+      rendered: partition.render.length,
+      inherited: partition.inherited.length,
+      total: stories.length,
+    });
+
+    const renderStart = performance.now();
+    const result =
+      partition.render.length > 0
+        ? await options.runner.render({
+            buildId: build.id,
+            storybookDir: extractedDir,
+            stories: partition.render,
+            viewports,
+            logger,
+            executePlay: project.executePlay ?? false,
+            playTimeoutMs: project.playTimeoutMs ?? 10_000,
+            runA11y: project.runA11y ?? false,
+            browser: browser ?? "chromium",
+          })
+        : { captures: [], failures: [] };
     const renderDuration = performance.now() - renderStart;
     logger?.info(
       { durationMs: Math.round(renderDuration), storyCount: stories.length },
@@ -154,6 +182,7 @@ export async function executeCaptureJob(
         build,
         viewports,
         captures: result.captures,
+        inherited: partition.inherited,
         logger,
         recordLog: input.recordLog,
         secret: options.secret,
@@ -185,6 +214,17 @@ export async function executeCaptureJob(
     });
     throw error;
   }
+}
+
+/**
+ * Resolve the affected import paths for a build, or `null` for full capture
+ * (affected capture disabled, or no computation was posted).
+ */
+function affectedPathsFor(build: Build): string[] | null {
+  if (!build.affectedOnly) {
+    return null;
+  }
+  return BuildModel.affectedPaths(build);
 }
 
 async function loadTarget(

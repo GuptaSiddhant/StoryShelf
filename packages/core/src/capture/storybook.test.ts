@@ -190,4 +190,31 @@ describe("StorybookAdapter.discover", () => {
       "http://127.0.0.1:1234/iframe.html?id=a%20b%2Fc&viewMode=story",
     );
   });
+
+  it("loads the dependency graph from preview-stats.json", async () => {
+    const adapter = new StorybookAdapter();
+    const dir = await mkdtemp(join(tmpdir(), "storyshelf-storybook-"));
+    try {
+      await writeFile(
+        join(dir, "preview-stats.json"),
+        JSON.stringify({
+          modules: [{ id: "src/a.stories.tsx", importedIds: ["src/a.tsx"] }],
+        }),
+      );
+      const graph = await adapter.loadDependencyGraph(dir);
+      expect(graph?.importedBy["src/a.tsx"]).toEqual(["src/a.stories.tsx"]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("resolves null when no stats exist", async () => {
+    const adapter = new StorybookAdapter();
+    const dir = await mkdtemp(join(tmpdir(), "storyshelf-storybook-"));
+    try {
+      await expect(adapter.loadDependencyGraph(dir)).resolves.toBeNull();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });

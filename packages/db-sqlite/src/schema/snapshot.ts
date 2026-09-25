@@ -30,6 +30,7 @@ export const snapshots = sqliteTable(
     reviewedBy: text("reviewed_by"),
     reviewedAt: text("reviewed_at"),
     infraHash: text("infra_hash"),
+    inherited: integer("inherited", { mode: "boolean" }).notNull().default(false),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -60,6 +61,7 @@ export interface Snapshot {
   reviewedBy: string | null;
   reviewedAt: string | null;
   infraHash: string | null;
+  inherited: boolean;
   createdAt: string;
   updatedAt: string;
 }

@@ -49,6 +49,7 @@
     "prepublishOnly": "nub run build"
   },
   "dependencies": {
+    "@storyshelf/affected": "workspace:*",
     "archiver": "8.0.0",
     "commander": "^13.0.0",
     "hono": "catalog:",

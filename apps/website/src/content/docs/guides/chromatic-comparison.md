@@ -12,7 +12,7 @@ This page compares Chromatic (SaaS) and StoryShelf (self-hosted) factually. No r
 | **Pricing model** | Per-snapshot billing | Free (self-hosted, unlimited) |
 | **Hosting** | SaaS only (Chromatic cloud) | Self-hosted (your infrastructure) |
 | **Browsers** | Chrome, Firefox, Safari, Edge (branded, cloud) | Chromium (default), Firefox, WebKit via Playwright (per-project `browser`) |
-| **TurboSnap** | Yes (dependency graph) | Not implemented |
+| **TurboSnap** | Yes (dependency graph) | Yes — affected capture (dependency graph, on by default) |
 | **Modes / Globals** | Yes | Not implemented |
 | **Accessibility testing** | Yes | Not implemented |
 | **Interaction tests** | Yes (`play` functions) | Yes (`play` functions) |
@@ -61,14 +61,14 @@ Billed snapshots = visual snapshots + accessibility snapshots. TurboSnap copies 
 
 ### StoryShelf gaps (vs Chromatic)
 - **Cross-browser gaps** — Chromium (default), Firefox, and WebKit are selectable per project (Settings → General → Capture browser, or `PATCH /api/v1/projects/:slug` with `browser`); baselines track the browser. No branded Safari/Edge binaries; one browser per build.
-- **No TurboSnap** — Every changed story captures a full snapshot. No dependency-graph optimization.
+- **Vite-only tracing** — affected capture reads `preview-stats.json` (plus tolerant Webpack shapes). TurboSnap-equivalent skip rates on Vite Storybooks; custom builders without stats fall back to full renders.
 - **No Modes/Globals** — Cannot test stories under different themes, locales, or viewports via Storybook globals.
 - **No accessibility testing** — No aXe integration.
 - **No cloud parallelization** — Concurrency limited by your server resources (`captureConcurrency` config).
 - **No built-in flake detection** — Relies on explicit `flakyTest` parameter/tags.
 
 ### StoryShelf advantages (vs Chromatic)
-- **Unlimited snapshots** — No per-snapshot billing ever.
+- **Unlimited snapshots** — No per-snapshot billing ever (so skipping saves server CPU, not money — there is no 0.2× copy charge because there is nothing to bill).
 - **Full data control** — Your database, your storage, your network.
 - **No vendor lock-in** — MIT licensed, open source, standard APIs.
 - **Flexible SSO** — Any OIDC provider (Keycloak, Okta, Entra ID, Auth0, Cognito).
@@ -93,7 +93,7 @@ If migrating from Chromatic:
 **Choose Chromatic if:**
 - You want zero infrastructure maintenance
 - You need branded Safari/Edge binaries or multi-browser matrices in a single build
-- You rely on TurboSnap for large Storybooks
+- You rely on TurboSnap's Webpack tracing for a non-Vite builder
 - You need Modes/Globals for theme/locale matrices
 - You need built-in accessibility testing
 - Your team prefers SaaS over self-hosting

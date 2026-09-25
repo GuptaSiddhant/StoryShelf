@@ -36,6 +36,8 @@ export async function createBuildRecord(
     authorEmail: meta.authorEmail,
     authorName: meta.authorName,
     message: meta.message,
+    affectedOnly: meta.affectedOnly,
+    baselineSha: await resolveBaselineSha(db, project.id, meta.gitBranch, meta.gitSha),
   });
   if (meta.labels && meta.labels.length > 0) {
     await attachLabels(db, project.id, build.id, meta.labels);
@@ -228,6 +230,7 @@ export const buildCreateJsonSchema = z
     authorEmail: z.string().optional(),
     authorName: z.string().optional(),
     message: z.string().optional(),
+    affectedOnly: z.boolean().optional(),
     labels: z.array(z.object({ key: z.string().min(1), value: z.string() })).optional(),
   })
   .openapi("BuildCreate");
@@ -239,7 +242,19 @@ export interface BuildCreateMetadata {
   authorEmail?: string;
   authorName?: string;
   message?: string;
+  affectedOnly?: boolean;
   labels?: { key: string; value: string }[];
+}
+
+/** Latest prior commit on a branch with a build, or null for first builds. */
+async function resolveBaselineSha(
+  db: DatabaseAdapter,
+  projectId: string,
+  branch: string,
+  sha: string,
+): Promise<string | null> {
+  const builds = await new BuildModel(db).list(projectId, { branch });
+  return builds.find((build) => build.gitSha !== sha)?.gitSha ?? null;
 }
 
 /* oxlint-disable eslint/no-await-in-loop -- label attach is intentionally sequential */

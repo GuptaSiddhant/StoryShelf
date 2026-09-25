@@ -1,3 +1,4 @@
+import { isShallowRepo } from "@storyshelf/affected";
 import { access, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { createClient } from "../client.ts";
@@ -136,8 +137,30 @@ export async function runDoctor(options: DoctorOptions): Promise<void> {
   if (connection) {
     checks.push(await checkServer(connection));
   }
-  checks.push(await checkBuildOutput(cwd, resolveBuildInputs(options, cfg)));
+  checks.push(
+    await checkBuildOutput(cwd, resolveBuildInputs(options, cfg)),
+    await checkAffected(cwd, resolveBuildInputs(options, cfg).buildDir),
+  );
   reportChecks(checks);
+}
+
+/** Warn when affected capture would silently fall back to a full render. */
+async function checkAffected(cwd: string, buildDir: string): Promise<Check> {
+  if (isShallowRepo(cwd)) {
+    return {
+      status: "warn",
+      message: "Shallow clone detected — affected capture renders all stories (use fetch-depth: 0)",
+    };
+  }
+  try {
+    await access(resolve(cwd, buildDir, "preview-stats.json"));
+  } catch {
+    return {
+      status: "warn",
+      message: `No preview-stats.json in ${buildDir} — affected capture renders all stories`,
+    };
+  }
+  return { status: "pass", message: "Affected capture ready (history and stats available)" };
 }
 
 /** Resolve the connection, recording success or failure as a check. */

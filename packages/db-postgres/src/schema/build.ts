@@ -30,6 +30,10 @@ export const builds = pgTable(
     changedCount: integer("changed_count").notNull().default(0),
     approvedCount: integer("approved_count").notNull().default(0),
     rejectedCount: integer("rejected_count").notNull().default(0),
+    affectedOnly: boolean("affected_only").notNull().default(true),
+    baselineSha: text("baseline_sha"),
+    changedFiles: text("changed_files"),
+    affectedImportPaths: text("affected_import_paths"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull(),
   },
@@ -55,6 +59,10 @@ export interface Build {
   changedCount: number;
   approvedCount: number;
   rejectedCount: number;
+  affectedOnly: boolean;
+  baselineSha: string | null;
+  changedFiles: string | null;
+  affectedImportPaths: string | null;
   createdAt: string;
   updatedAt: string;
 }

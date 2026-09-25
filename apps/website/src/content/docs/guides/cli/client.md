@@ -85,7 +85,12 @@ storyshelf upload --token shelf_xxx --sha $GITHUB_SHA --branch main
 | `--message` | Build message |
 | `--author-name`, `--author-email` | Author attribution |
 | `--label key=value` | Attach a build label (repeatable) |
+| `--full` | Disable affected capture for this upload (render every story) |
+| `--untraced <glob>` | Exclude matching files from affected tracing (repeatable, e.g. `"**/*.generated.ts"`) |
+| `--stats-file <path>` | Bundler stats file (default `<buildDir>/preview-stats.json`) |
 | `--dry-run` | Validate/build but send no requests |
+
+Affected capture is on by default: the CLI traces `git diff baseline..HEAD` through the build's dependency graph, posts the affected set, and prints a summary (`Affected capture: rendering 3 stories (baseline abc1234)`). Anything it cannot prove unchanged renders anyway — see [Affected capture](/concepts/affected-capture/). `STORYSHELF_FULL=1` and `"affectedOnly": false` opt out the same way as `--full`.
 
 :::note
 The CLI does **not** run Playwright. It streams the zipped static build to the server; the server renders and diffs asynchronously (`202`).
@@ -100,6 +105,7 @@ storyshelf doctor
 # ✓ Connection: http://localhost:3000 / my-design-system (token present)
 # ✓ Server reachable
 # ! Build output missing — upload would run: npm run build-storybook -- --output-dir storybook-static
+# ✓ Affected capture ready (history and stats available)
 
 storyshelf whoami
 # Server: http://localhost:3000

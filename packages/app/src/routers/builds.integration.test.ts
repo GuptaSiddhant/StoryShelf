@@ -1,4 +1,4 @@
-import { LabelModel } from "@storyshelf/core/models";
+import { BuildModel, LabelModel } from "@storyshelf/core/models";
 import type { Build } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
@@ -21,6 +21,10 @@ const makeBuild = (id: string, gitBranch = "main"): Build => ({
   public: false,
   status: "approved",
   snapshotCount: 0,
+  affectedOnly: true,
+  baselineSha: null,
+  changedFiles: null,
+  affectedImportPaths: null,
   changedCount: 0,
   approvedCount: 0,
   rejectedCount: 0,
@@ -257,5 +261,84 @@ describe("streaming build upload (JSON + PUT)", () => {
       body: Buffer.from("way-too-long-payload"),
     });
     expect(response.status).toBe(413);
+  });
+});
+
+async function createAffectedBuild(
+  app: ReturnType<typeof createShelfApp>,
+  gitSha: string,
+): Promise<{ build: Build; uploadUrl: string; baselineSha: string | null }> {
+  const response = await app.request("/api/v1/projects/affected-project/builds", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ gitSha, gitBranch: "main" }),
+  });
+  expect(response.status).toBe(202);
+  return (await response.json()) as {
+    build: Build;
+    uploadUrl: string;
+    baselineSha: string | null;
+  };
+}
+
+describe("affected capture", () => {
+  const project: Project = {
+    id: "p1",
+    name: "Affected Project",
+    slug: "affected-project",
+    gitRepository: null,
+    gitDefaultBranch: "main",
+    pixelThreshold: 0.1,
+    maxDiffRatio: 0.01,
+    publicBranchRegex: null,
+    executePlay: false,
+    playTimeoutMs: 10_000,
+    storybookMeta: null,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  };
+
+  async function setupApp() {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    await db.insert(db.tables.projects, project);
+    const app = createShelfApp({ database: db, storage, logger: silentLogger });
+    return { db, app };
+  }
+
+  it("returns a null baseline for the first build on a branch", async () => {
+    const { app } = await setupApp();
+    const created = await createAffectedBuild(app, "sha-1");
+    expect(created.baselineSha).toBeNull();
+    expect(created.build.affectedOnly).toBe(true);
+  });
+
+  it("returns the prior commit as baseline for the next build", async () => {
+    const { app } = await setupApp();
+    await createAffectedBuild(app, "sha-1");
+    const second = await createAffectedBuild(app, "sha-2");
+    expect(second.baselineSha).toBe("sha-1");
+  });
+
+  it("records the affected computation for capture", async () => {
+    const { db, app } = await setupApp();
+    const created = await createAffectedBuild(app, "sha-1");
+    const response = await app.request(
+      `/api/v1/projects/affected-project/builds/${created.build.id}/affected`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          baselineSha: null,
+          changedFiles: ["src/a.tsx"],
+          affectedImportPaths: ["src/a.stories.tsx"],
+        }),
+      },
+    );
+    expect(response.status).toBe(200);
+    const updated = (await response.json()) as Build;
+    expect(updated.affectedImportPaths).toBe(JSON.stringify(["src/a.stories.tsx"]));
+    const stored = await new BuildModel(db).get(created.build.id);
+    expect(stored?.changedFiles).toBe(JSON.stringify(["src/a.tsx"]));
   });
 });

@@ -87,6 +87,7 @@ export default defineConfig({
             { label: "Projects", slug: "concepts/projects" },
             { label: "Builds & snapshots", slug: "concepts/builds" },
             { label: "Capture & viewports", slug: "concepts/capture" },
+            { label: "Affected capture", slug: "concepts/affected-capture" },
             { label: "Baselines & branches", slug: "concepts/baselines" },
             { label: "Labels", slug: "concepts/labels" },
             { label: "Retention & purge", slug: "concepts/retention" },
@@ -99,6 +100,7 @@ export default defineConfig({
           collapsed: true,
           items: [
             { label: "@storyshelf/core", slug: "packages/core" },
+            { label: "@storyshelf/affected", slug: "packages/affected" },
             { label: "@storyshelf/app", slug: "packages/app" },
             { label: "storyshelf", slug: "packages/cli" },
             { label: "@storyshelf/runner-playwright", slug: "packages/runner-playwright" },

@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # affected capture diffs against history; a depth of 1 forces full renders
       - name: Build Storybook
         run: npx build-storybook -o storybook-static
       - name: Upload to StoryShelf
@@ -30,6 +32,8 @@ jobs:
 
 ```yaml
 visual:
+  variables:
+    GIT_DEPTH: 0 # affected capture diffs against history; a shallow clone forces full renders
   script:
     - npx build-storybook -o storybook-static
     - npx storyshelf upload --url "$STORYSHELF_URL" --slug "$STORYSHELF_SLUG" --token "$STORYSHELF_TOKEN" --sha "$CI_COMMIT_SHA" --branch "$CI_COMMIT_REF_NAME"

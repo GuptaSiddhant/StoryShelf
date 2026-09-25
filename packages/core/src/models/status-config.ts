@@ -19,7 +19,7 @@ export class StatusConfigModel {
   constructor(
     private readonly db: DatabaseAdapter,
     tables?: StatusConfigTables,
-    secret?: string | undefined,
+    secret?: string,
   ) {
     this.tables = tables ?? { projectStatusConfigs: db.tables.projectStatusConfigs };
     this.secret = secret;

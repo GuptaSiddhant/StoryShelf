@@ -55,8 +55,9 @@ The barrel (`@storyshelf/core`) exports only the router and its types
 (`createShelfApp`, `ShelfOptions`, `ShelfConfig`, `UIConfig`, `ShelfApp`).
 Everything else lives under a subpath:
 
-- `executeCaptureJob({ buildId, reqId }, deps)` (`core/capture`) — the capture **orchestrator**: loads the build, marks it `capturing`, extracts the uploaded archive, discovers stories, delegates rendering to a pure `CaptureRunner`, and persists. Wired into the `Queue` when `capture` is supplied.
-- `persistCapture(context)` (`core/capture`) writes screenshots, diffs them against baselines, and finalizes a build from a renderer's captures.
+- `executeCaptureJob({ buildId, reqId }, deps)` (`core/capture`) — the capture **orchestrator**: loads the build, marks it `capturing`, extracts the uploaded archive, discovers stories, partitions them into render vs inherit sets ([affected capture](/concepts/affected-capture/)), delegates rendering to a pure `CaptureRunner`, and persists. Wired into the `Queue` when `capture` is supplied.
+- `persistCapture(context)` (`core/capture`) writes screenshots, diffs them against baselines, inherits unaffected stories (`inherited: true`), and finalizes a build from a renderer's captures.
+- `StorybookAdapter.loadDependencyGraph(sourceDir)` (`core/capture`) — optional `StorySourceAdapter` hook reading the build's `preview-stats.json` for affected tracing; sources without it render everything.
 - `diffImages(baseline, current, options)` (`core/diff`) performs the pixel-level comparison.
 - `InMemoryCaptureQueue` (`core/capture`) manages capture concurrency and job status.
 - `createUrlBuilder(baseUrl, publishedBaseDomain?)` (`core/urls`) builds application and published Storybook URLs.

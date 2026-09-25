@@ -33,11 +33,12 @@ Client config written to `.storybook/storyshelf.json`:
   "buildDir": "string (default: storybook-static)",
   "buildCommand": "string (optional, mutually exclusive with buildScriptName)",
   "buildScriptName": "string (default: build-storybook)",
-  "skip": "string (optional, glob pattern to skip upload)"
+  "skip": "string (optional, glob pattern to skip upload)",
+  "affectedOnly": "boolean (default: true, render only impacted stories)"
 }
 ```
 
-Validation: `zod` schema with `refine` for mutual exclusivity.
+Validation: `zod` schema with `refine` for mutual exclusivity. Upload flags `--full`, `--untraced`, and `--stats-file` tune [affected capture](/concepts/affected-capture/) per run.
 
 ## Programmatic use
 

@@ -43,6 +43,10 @@ CREATE TABLE IF NOT EXISTS builds (
   changed_count INTEGER NOT NULL DEFAULT 0,
   approved_count INTEGER NOT NULL DEFAULT 0,
   rejected_count INTEGER NOT NULL DEFAULT 0,
+  affected_only BOOLEAN NOT NULL DEFAULT true,
+  baseline_sha TEXT,
+  changed_files TEXT,
+  affected_import_paths TEXT,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );
@@ -68,6 +72,7 @@ CREATE TABLE IF NOT EXISTS snapshots (
   reviewed_by TEXT,
   reviewed_at TIMESTAMPTZ,
   infra_hash TEXT,
+  inherited BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );

@@ -1,4 +1,5 @@
 import AdmZip from "adm-zip";
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -207,3 +208,125 @@ function okJson(payload: unknown): Response {
     },
   } as Response;
 }
+
+describe("runUpload affected capture", () => {
+  function git(args: string[]): string {
+    return execFileSync("git", args, { cwd: dir, encoding: "utf8" }).trim();
+  }
+
+  function writeBuild(): void {
+    const buildDir = join(dir, "storybook-static");
+    mkdirSync(buildDir, { recursive: true });
+    writeFileSync(
+      join(buildDir, "index.json"),
+      JSON.stringify({
+        v: 5,
+        entries: {
+          a: { id: "a", importPath: "src/a.stories.tsx" },
+          b: { id: "b", importPath: "src/b.stories.tsx" },
+        },
+      }),
+    );
+    writeFileSync(
+      join(buildDir, "preview-stats.json"),
+      JSON.stringify({
+        modules: [
+          { id: "src/a.stories.tsx", importedIds: ["src/a.tsx"] },
+          { id: "src/b.stories.tsx", importedIds: ["src/b.tsx"] },
+        ],
+      }),
+    );
+    writeFileSync(join(buildDir, "iframe.html"), "<html></html>");
+  }
+
+  function commitAll(message: string): void {
+    git(["add", "."]);
+    git(["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "-m", message]);
+  }
+
+  interface SeenCall {
+    method: string;
+    url: string;
+    body?: unknown;
+  }
+
+  function stubFetch(created: unknown): { calls: SeenCall[] } {
+    const calls: SeenCall[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        await Promise.resolve();
+        const method = init?.method ?? "GET";
+        calls.push({ method, url });
+        if (method === "POST" && typeof init?.body === "string") {
+          calls[calls.length - 1]!.body = JSON.parse(init.body) as unknown;
+        }
+        if (method === "PUT") {
+          return okJson({ id: "b1" });
+        }
+        if (url.endsWith("/affected")) {
+          return okJson({ id: "b1" });
+        }
+        return okJson(created);
+      }),
+    );
+    return { calls };
+  }
+
+  it("posts a full-capture computation outside a git repository", async () => {
+    writeBuild();
+    const { calls } = stubFetch({
+      build: { id: "b1" },
+      uploadUrl: "/x",
+      baselineSha: "abc123",
+    });
+
+    await runUpload({ ...baseOptions(), buildDir: "storybook-static" });
+
+    expect(calls.map((call) => call.method)).toEqual(["POST", "POST", "PUT"]);
+    expect(calls[1]?.url).toContain("/builds/b1/affected");
+    const body = calls[1]?.body as { affectedImportPaths: string[] | null };
+    expect(body.affectedImportPaths).toBeNull();
+  });
+
+  it("posts the selective set for a git change", async () => {
+    git(["-c", "init.defaultBranch=main", "init"]);
+    mkdirSync(join(dir, "src"), { recursive: true });
+    writeFileSync(join(dir, "src", "a.tsx"), "v1");
+    writeFileSync(join(dir, "src", "b.tsx"), "v1");
+    writeBuild();
+    commitAll("base");
+    const base = git(["rev-parse", "HEAD"]);
+    writeFileSync(join(dir, "src", "a.tsx"), "v2");
+    commitAll("change a");
+    const head = git(["rev-parse", "HEAD"]);
+    const { calls } = stubFetch({
+      build: { id: "b1" },
+      uploadUrl: "/x",
+      baselineSha: base,
+    });
+
+    await runUpload({ ...baseOptions(), sha: head, buildDir: "storybook-static" });
+
+    const affected = calls.find((call) => call.url.endsWith("/affected"));
+    expect(affected?.method).toBe("POST");
+    expect(affected?.body).toMatchObject({
+      baselineSha: base,
+      affectedImportPaths: ["src/a.stories.tsx"],
+    });
+    expect(calls.some((call) => call.method === "PUT")).toBe(true);
+  });
+
+  it("skips the affected post when --full is set", async () => {
+    writeBuild();
+    const { calls } = stubFetch({
+      build: { id: "b1" },
+      uploadUrl: "/x",
+      baselineSha: "abc123",
+    });
+
+    await runUpload({ ...baseOptions(), buildDir: "storybook-static", full: true });
+
+    expect(calls.map((call) => call.method)).toEqual(["POST", "PUT"]);
+  });
+});

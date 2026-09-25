@@ -80,6 +80,27 @@ describe("loadStorybookConfig", () => {
     });
   });
 
+  it("loads the affectedOnly flag", async () => {
+    mkdirSync(join(dir, ".storybook"), { recursive: true });
+    writeFileSync(
+      join(dir, ".storybook", "storyshelf.json"),
+      JSON.stringify({ slug: "demo", affectedOnly: false }),
+    );
+    await expect(loadStorybookConfig(dir)).resolves.toEqual({
+      slug: "demo",
+      affectedOnly: false,
+    });
+  });
+
+  it("returns null for a non-boolean affectedOnly", async () => {
+    mkdirSync(join(dir, ".storybook"), { recursive: true });
+    writeFileSync(
+      join(dir, ".storybook", "storyshelf.json"),
+      JSON.stringify({ slug: "demo", affectedOnly: "yes" }),
+    );
+    await expect(loadStorybookConfig(dir)).resolves.toBeNull();
+  });
+
   it("returns null for invalid JSON", async () => {
     mkdirSync(join(dir, ".storybook"), { recursive: true });
     writeFileSync(join(dir, ".storybook", "storyshelf.json"), "{not json");

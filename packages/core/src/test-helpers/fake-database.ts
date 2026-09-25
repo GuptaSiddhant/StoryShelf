@@ -51,6 +51,10 @@ const builds = sqliteTable("builds", {
   changedCount: integer("changed_count").notNull().default(0),
   approvedCount: integer("approved_count").notNull().default(0),
   rejectedCount: integer("rejected_count").notNull().default(0),
+  affectedOnly: integer("affected_only", { mode: "boolean" }).notNull().default(true),
+  baselineSha: text("baseline_sha"),
+  changedFiles: text("changed_files"),
+  affectedImportPaths: text("affected_import_paths"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
@@ -104,6 +108,7 @@ const snapshots = sqliteTable("snapshots", {
   reviewedBy: text("reviewed_by"),
   reviewedAt: text("reviewed_at"),
   infraHash: text("infra_hash"),
+  inherited: integer("inherited", { mode: "boolean" }).notNull().default(false),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });

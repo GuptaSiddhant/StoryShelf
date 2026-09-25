@@ -16,6 +16,14 @@ export interface Build {
   changedCount: number;
   approvedCount: number;
   rejectedCount: number;
+  /** Affected capture enabled for this build (default true). */
+  affectedOnly: boolean;
+  /** Ancestor commit the affected set was computed against, if any. */
+  baselineSha: string | null;
+  /** JSON array of repo-relative changed files, if computed. */
+  changedFiles: string | null;
+  /** JSON array of affected story import paths; null means full capture. */
+  affectedImportPaths: string | null;
   createdAt: string;
   updatedAt: string;
 }

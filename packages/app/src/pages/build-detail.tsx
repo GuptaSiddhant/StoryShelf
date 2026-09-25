@@ -76,6 +76,8 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
     list.push(snap);
     grouped.set(key, list);
   }
+  const inheritedCount = snapshots.filter((snap) => snap.inherited).length;
+  const selective = build.affectedOnly && build.affectedImportPaths !== null;
 
   return (
     <DocumentLayout
@@ -87,6 +89,18 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
           <>
             {build.gitBranch} <Meta as="span">· {build.gitSha.slice(0, 7)}</Meta>{" "}
             <Badge tone={statusTone(build.status)}>{build.status}</Badge>
+            {selective ? (
+              <>
+                {" "}
+                <Badge tone="info">affected capture</Badge>
+              </>
+            ) : null}
+            {!build.affectedOnly ? (
+              <>
+                {" "}
+                <Badge tone="neutral">full capture</Badge>
+              </>
+            ) : null}
           </>
         }
         description={
@@ -96,6 +110,12 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
               ? `· ${build.authorName}${build.authorEmail ? ` <${build.authorEmail}>` : ""}`
               : ""}{" "}
             · {new Date(build.createdAt).toLocaleString()}
+            {selective ? (
+              <>
+                {" "}
+                · {snapshots.length - inheritedCount} rendered, {inheritedCount} inherited
+              </>
+            ) : null}
           </>
         }
         actions={
@@ -213,6 +233,12 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
             <div key={snap.id} class={snapshotCard}>
               <div class={snapshotCardHead}>
                 <Badge tone={statusTone(snap.status)}>{snap.status}</Badge>
+                {snap.inherited ? (
+                  <>
+                    {" "}
+                    <Badge tone="neutral">inherited</Badge>
+                  </>
+                ) : null}
                 <span class={snapshotCardMeta}>
                   {snap.viewportName} · {snap.viewportWidth}×{snap.viewportHeight}
                 </span>

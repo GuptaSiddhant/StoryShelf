@@ -170,6 +170,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@storyshelf/affected": "workspace:*",
     "drizzle-orm": "catalog:",
     "pino": "catalog:",
     "pixelmatch": "^7.1.0",

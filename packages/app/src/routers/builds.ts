@@ -76,7 +76,20 @@ export function registerBuilds(app: ShelfRouter): void {
     }
     const build = await createBuildRecord(project, parsed.data);
     const uploadUrl = `/api/v1/projects/${project.slug}/builds/${build.id}/zip`;
-    return c.json({ build, uploadUrl }, 202);
+    return c.json({ build, uploadUrl, baselineSha: build.baselineSha }, 202);
+  });
+
+  app.openapi(affectedRoute, async (c) => {
+    const { slug, buildId } = c.req.valid("param");
+    const project = await resolveAuthorizedProject(c, slug, ...DEVELOPER_ROLES);
+    const build = await buildForProject(project.id, buildId);
+    const { baselineSha, changedFiles, affectedImportPaths } = c.req.valid("json");
+    const updated = await new BuildModel(getStore().db).setAffected(build.id, {
+      baselineSha,
+      changedFiles,
+      affectedImportPaths,
+    });
+    return c.json(updated);
   });
 
   app.openapi(uploadZipRoute, async (c) => {
@@ -231,7 +244,7 @@ const listBuildsRoute = createRoute({
 });
 
 const buildCreatedSchema = z
-  .object({ build: buildSchema, uploadUrl: z.string() })
+  .object({ build: buildSchema, uploadUrl: z.string(), baselineSha: z.string().nullable() })
   .openapi("BuildCreated");
 
 const createBuildRoute = createRoute({
@@ -345,6 +358,29 @@ const manifestRoute = createRoute({
       content: { "application/json": { schema: z.object({ ok: z.boolean() }) } },
       description: "Manifest stored",
     },
+    ...notFoundResponse,
+  },
+});
+
+const affectedPayloadSchema = z.object({
+  baselineSha: z.string().nullable(),
+  changedFiles: z.array(z.string()).max(20_000),
+  affectedImportPaths: z.array(z.string()).max(20_000).nullable(),
+});
+const affectedRoute = createRoute({
+  method: "post",
+  path: "/api/v1/projects/{slug}/builds/{buildId}/affected",
+  request: {
+    params: z.object({ slug: z.string(), buildId: z.string() }),
+    body: { content: { "application/json": { schema: affectedPayloadSchema } } },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: buildSchema } },
+      description: "Affected set recorded",
+    },
+    ...badRequest,
+    ...forbiddenResponse,
     ...notFoundResponse,
   },
 });

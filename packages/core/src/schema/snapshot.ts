@@ -21,6 +21,8 @@ export interface Snapshot {
   reviewedBy: string | null;
   reviewedAt: string | null;
   infraHash: string | null;
+  /** True when inherited unchanged from the baseline without rendering. */
+  inherited: boolean;
   createdAt: string;
   updatedAt: string;
 }

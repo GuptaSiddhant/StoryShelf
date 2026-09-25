@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { hashFiles, walkFiles } from "./dedup.ts";
+import { hashFiles, walkFiles, type HashedFile } from "./dedup.ts";
 
 let dir: string;
 
@@ -41,9 +41,13 @@ describe("hashFiles", () => {
     const files = await walkFiles(dir, "static");
     const hashed = await hashFiles(dir, "static", files);
     const map = Object.fromEntries(hashed.map((h) => [h.rel, h]));
-    expect(map["a.txt"].hash).toBe(createHash("sha256").update(Buffer.from("hello")).digest("hex"));
-    expect(map["a.txt"].size).toBe(5);
-    expect(map["b.txt"].hash).toBe(createHash("sha256").update(Buffer.from("world")).digest("hex"));
+    expect(entry(map, "a.txt").hash).toBe(
+      createHash("sha256").update(Buffer.from("hello")).digest("hex"),
+    );
+    expect(entry(map, "a.txt").size).toBe(5);
+    expect(entry(map, "b.txt").hash).toBe(
+      createHash("sha256").update(Buffer.from("world")).digest("hex"),
+    );
   });
 
   it("produces stable hash for identical content", async () => {
@@ -52,6 +56,24 @@ describe("hashFiles", () => {
     writeFileSync(join(buildDir, "x.txt"), "same");
     const h1 = await hashFiles(dir, "static", ["x.txt"]);
     const h2 = await hashFiles(dir, "static", ["x.txt"]);
-    expect(h1[0].hash).toBe(h2[0].hash);
+    expect(entryByIndex(h1, 0).hash).toBe(entryByIndex(h2, 0).hash);
   });
 });
+
+/** Look up a hashed file by relative path, failing loudly when absent. */
+function entry(map: Record<string, HashedFile>, rel: string): HashedFile {
+  const found = map[rel];
+  if (!found) {
+    throw new Error(`missing hashed file: ${rel}`);
+  }
+  return found;
+}
+
+/** Look up a hashed file by index, failing loudly when absent. */
+function entryByIndex(hashed: HashedFile[], index: number): HashedFile {
+  const found = hashed[index];
+  if (!found) {
+    throw new Error(`missing hashed file at index ${index}`);
+  }
+  return found;
+}

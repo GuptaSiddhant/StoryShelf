@@ -43,6 +43,10 @@ CREATE TABLE IF NOT EXISTS builds (
   changed_count INTEGER NOT NULL DEFAULT 0,
   approved_count INTEGER NOT NULL DEFAULT 0,
   rejected_count INTEGER NOT NULL DEFAULT 0,
+  affected_only INTEGER NOT NULL DEFAULT 1,
+  baseline_sha TEXT,
+  changed_files TEXT,
+  affected_import_paths TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -98,6 +102,7 @@ CREATE TABLE IF NOT EXISTS snapshots (
   reviewed_by TEXT,
   reviewed_at TEXT,
   infra_hash TEXT,
+  inherited INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );

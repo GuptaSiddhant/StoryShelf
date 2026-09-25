@@ -101,7 +101,15 @@ const PROJECT_VIEWPORTS_ALTER = "ALTER TABLE projects ADD COLUMN IF NOT EXISTS v
 const PROJECT_AUTOMIGRATE_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS automigrate BOOLEAN NOT NULL DEFAULT false";
 const SNAPSHOT_INFRA_HASH_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS infra_hash TEXT";
+const SNAPSHOT_INHERITED_ALTER =
+  "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS inherited BOOLEAN NOT NULL DEFAULT false";
 const BASELINE_INFRA_HASH_ALTER = "ALTER TABLE baselines ADD COLUMN IF NOT EXISTS infra_hash TEXT";
+const BUILD_AFFECTED_ONLY_ALTER =
+  "ALTER TABLE builds ADD COLUMN IF NOT EXISTS affected_only BOOLEAN NOT NULL DEFAULT true";
+const BUILD_BASELINE_SHA_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS baseline_sha TEXT";
+const BUILD_CHANGED_FILES_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS changed_files TEXT";
+const BUILD_AFFECTED_PATHS_ALTER =
+  "ALTER TABLE builds ADD COLUMN IF NOT EXISTS affected_import_paths TEXT";
 const WEBHOOK_SECRET_ALTER =
   "ALTER TABLE webhooks ADD COLUMN IF NOT EXISTS secret_encrypted TEXT NOT NULL DEFAULT ''";
 const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN IF EXISTS secret";
@@ -115,7 +123,12 @@ async function migrateProjectExtras(client: ReturnType<typeof postgres>): Promis
   await execIgnore(client, PLAY_TIMEOUT_MS_ALTER);
   await execIgnore(client, PROJECT_AUTOMIGRATE_ALTER);
   await execIgnore(client, SNAPSHOT_INFRA_HASH_ALTER);
+  await execIgnore(client, SNAPSHOT_INHERITED_ALTER);
   await execIgnore(client, BASELINE_INFRA_HASH_ALTER);
+  await execIgnore(client, BUILD_AFFECTED_ONLY_ALTER);
+  await execIgnore(client, BUILD_BASELINE_SHA_ALTER);
+  await execIgnore(client, BUILD_CHANGED_FILES_ALTER);
+  await execIgnore(client, BUILD_AFFECTED_PATHS_ALTER);
 }
 
 async function runMigrations(client: ReturnType<typeof postgres>): Promise<void> {

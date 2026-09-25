@@ -829,7 +829,12 @@ See `docs/website.md`. The public site (`apps/website/`, Astro Starlight) hosts 
 
 ## Deliberately Deferred (v2)
 
-1. **TurboSnap / `--only-changed`** -- v1 re-renders every story on every build. Functionally correct (unchanged stories auto-approve), but server CPU scales linearly with story count. This is the top scaling limit.
+1. **Affected capture** -- builds declare `affectedOnly` (default true); the CLI traces
+   `git diff <baselineSha>..HEAD` through the Vite stats graph (`@storyshelf/affected`)
+   and posts `affectedImportPaths`, and the orchestrator renders only affected stories
+   while inheriting the rest unchanged from their baselines (new stories always render).
+   Any uncertainty (shallow clone, missing stats/history, global-file change) falls
+   back to a full render, and `--full` opts out per run.
 2. **Git-provider merge gate (GitHub App / GitLab)** -- rich check runs, per-snapshot annotations, and auto-reject on review rejection. v1 has the primitive (required commit status); the full integration is ADR 0010.
 3. **Remote capture runners** -- offload capture to a worker fleet (SQS/HTTP). The `CaptureRunner` interface anticipates this.
 4. **`parameters.chromatic` equivalents** -- `modes`/themes (args matrix). Per-story `delay`, `disableSnapshot`, `flakyTest`, `autoCrop`/sizing are implemented; `waitForReady` covers the basic "wait for data" case.

@@ -1,4 +1,5 @@
 /* oxlint-disable max-statements */
+import { computeAffected, type AffectedResult } from "@storyshelf/affected";
 import { ZipArchive } from "archiver";
 import { resolve } from "node:path";
 import * as picomatch from "picomatch";
@@ -56,6 +57,14 @@ export interface UploadOptions {
   authorName?: string;
   /** Build labels as `key=value` strings (repeatable). */
   label?: string[];
+  /** Disable affected capture and render every story. */
+  full?: boolean;
+  /** Explicit affected-capture opt-in/out (default on; `full` wins). */
+  affectedOnly?: boolean;
+  /** Files excluded from affected tracing (repeatable globs). */
+  untraced?: string[];
+  /** Bundler stats file for affected tracing (default `<buildDir>/preview-stats.json`). */
+  statsFile?: string;
   /** Validate everything but send no requests. */
   dryRun?: boolean;
   /** Working directory (defaults to process.cwd()). Test seam for fs access. */
@@ -76,6 +85,9 @@ interface CollectedUploadOptions {
   authorEmail?: string;
   authorName?: string;
   label?: string[];
+  affectedOnly: boolean;
+  untraced: string[];
+  statsFile?: string;
 }
 
 interface ResolvedUploadOptions extends CollectedUploadOptions {
@@ -117,7 +129,18 @@ function collectUploadOptions(
     authorEmail: options.authorEmail,
     authorName: options.authorName,
     label: options.label,
+    affectedOnly: resolveAffectedOnly(options, cfg),
+    untraced: options.untraced ?? [],
+    statsFile: options.statsFile,
   };
+}
+
+/** Affected capture is on by default; `--full` (or `STORYSHELF_FULL=1`) opts out. */
+function resolveAffectedOnly(options: UploadOptions, cfg: StorybookConfig | null): boolean {
+  if (options.full === true || envOf("STORYSHELF_FULL") === "1") {
+    return false;
+  }
+  return options.affectedOnly ?? cfg?.affectedOnly ?? true;
 }
 
 /** Throw on the first missing required upload option. */
@@ -201,14 +224,65 @@ async function buildAndPost(
     message: collected.message,
     authorEmail: collected.authorEmail,
     authorName: collected.authorName,
+    affectedOnly: collected.affectedOnly,
     labels: parseLabels(collected.label),
   });
+  await reportAffectedCapture(client, created, cwd, collected);
   // Try content-hash dedup: walk buildDir, hash files, check needed, batch upload or fallback to zip
   const useDedup = await tryDedupUpload(client, created, cwd, collected.buildDir);
   if (!useDedup) {
     await putZipStream(client, created, cwd, collected.buildDir);
   }
   printLine(`Build created: ${created.build.id}`);
+}
+
+/** Compute the affected set and post it, never failing the upload. */
+async function reportAffectedCapture(
+  client: ReturnType<typeof createClient>,
+  created: BuildCreated,
+  cwd: string,
+  collected: ResolvedUploadOptions,
+): Promise<void> {
+  if (!collected.affectedOnly) {
+    printLine("Full capture (--full): rendering all stories");
+    return;
+  }
+  if (!created.baselineSha) {
+    printLine("Full capture (no baseline build yet): rendering all stories");
+    return;
+  }
+  try {
+    const result = await computeAffected({
+      cwd,
+      buildDir: collected.buildDir,
+      baseSha: created.baselineSha,
+      headSha: collected.sha,
+      untraced: collected.untraced,
+      statsFile: collected.statsFile,
+    });
+    await client.projects.builds.postAffected(collected.slug, created.build.id, {
+      baselineSha: result.baselineSha,
+      changedFiles: result.changedFiles,
+      affectedImportPaths: result.affectedImportPaths,
+    });
+    printLine(describeAffected(result, created.baselineSha));
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    printLine(`Full capture (affected post failed: ${reason}): rendering all stories`);
+  }
+}
+
+/** Human-readable summary of an affected computation. */
+function describeAffected(result: AffectedResult, baselineSha: string): string {
+  if (result.affectedImportPaths === null) {
+    return `Full capture (${result.fullReason ?? "unknown reason"}): rendering all stories`;
+  }
+  const count = result.affectedImportPaths.length;
+  const short = baselineSha.slice(0, 7);
+  if (count === 0) {
+    return `Affected capture: no stories affected (baseline ${short})`;
+  }
+  return `Affected capture: rendering ${count} ${count === 1 ? "story" : "stories"} (baseline ${short})`;
 }
 
 // oxlint-disable eslint(no-unused-vars, require-await, max-statements) -- stub for dedup, will be wired

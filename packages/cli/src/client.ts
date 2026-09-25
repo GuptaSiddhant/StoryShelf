@@ -25,13 +25,22 @@ export interface BuildCreateInput {
   message?: string;
   authorEmail?: string;
   authorName?: string;
+  affectedOnly?: boolean;
   labels?: { key: string; value: string }[];
+}
+
+/** Affected-capture computation posted after build creation. */
+export interface AffectedInput {
+  baselineSha: string | null;
+  changedFiles: string[];
+  affectedImportPaths: string[] | null;
 }
 
 /** Build record plus the zip upload URL returned by JSON creation. */
 export interface BuildCreated {
   build: { id: string };
   uploadUrl: string;
+  baselineSha?: string | null;
 }
 
 interface Client {
@@ -51,6 +60,7 @@ interface Client {
     builds: {
       createJson: (slug: string, json: BuildCreateInput) => Promise<BuildCreated>;
       uploadZip: (uploadUrl: string, body: NodeJS.ReadableStream) => Promise<unknown>;
+      postAffected: (slug: string, buildId: string, json: AffectedInput) => Promise<unknown>;
       retry: (slug: string, buildId: string) => Promise<unknown>;
     };
     admin: {
@@ -126,6 +136,12 @@ function createBuildsApi(
         method: "POST",
         headers: requestHeaders("application/json"),
         body: JSON.stringify({}),
+      }),
+    postAffected: async (slug: string, buildId: string, json: AffectedInput) =>
+      await fetchJson(`${baseUrl}/api/v1/projects/${slug}/builds/${buildId}/affected`, {
+        method: "POST",
+        headers: requestHeaders("application/json"),
+        body: JSON.stringify(json),
       }),
   };
 }

@@ -1,3 +1,5 @@
+import type { DepGraph } from "@storyshelf/affected";
+
 /** A custom viewport registered on a story via `parameters.viewport`. */
 export interface StoryViewportDefinition {
   name?: string;
@@ -86,6 +88,13 @@ export interface StorySourceAdapter {
   discover(source: string): Promise<StoryEntry[]>;
   buildUrl(baseUrl: string, storyId: string): string;
   screenshotSelector?: string;
+  /**
+   * Optional hook loading the module dependency graph of an extracted build,
+   * enabling affected capture (render only stories downstream of a change).
+   * Absent (or resolving `null`) means the source cannot be traced, so the
+   * orchestrator renders every story.
+   */
+  loadDependencyGraph?(sourceDir: string): Promise<DepGraph | null>;
   /**
    * Optional hook invoked after navigation and before the screenshot sequence,
    * letting a custom source wait until it is ready to capture. The built-in

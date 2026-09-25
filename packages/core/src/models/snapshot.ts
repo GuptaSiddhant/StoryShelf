@@ -48,6 +48,7 @@ export class SnapshotModel {
       viewportHeight: input.viewportHeight,
       screenshotPath: input.screenshotPath,
       infraHash: input.infraHash ?? null,
+      inherited: input.inherited ?? false,
       status: "pending",
       createdAt: now,
       updatedAt: now,
@@ -103,4 +104,5 @@ export interface SnapshotCreateInput {
   viewportHeight: number;
   screenshotPath: string;
   infraHash?: string | null;
+  inherited?: boolean;
 }

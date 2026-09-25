@@ -25,7 +25,7 @@ export function createTursoDatabase(options: { url: string; authToken?: string }
       kind: "turso",
       category: "database",
     },
-    tables: schema as unknown as DatabaseAdapter["tables"],
+    tables: schema,
     migrate: async () => {
       await runMigrations(client);
     },

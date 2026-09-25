@@ -191,6 +191,33 @@ importers:
         specifier: ^12.0.0
         version: 12.0.0
 
+  packages/affected:
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.5.1
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.5.1)(jsdom@30.0.1)(vite@8.2.2(@types/node@26.5.1)(yaml@2.9.0))(vitest@4.1.11)
+      oxfmt:
+        specifier: 'catalog:'
+        version: 0.65.0
+      oxlint:
+        specifier: 'catalog:'
+        version: 1.82.0(oxlint-tsgolint@7.0.2001)
+      oxlint-tsgolint:
+        specifier: 'catalog:'
+        version: 7.0.2001
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.22.14(typescript@7.0.2)
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.5.1)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@8.2.2(@types/node@26.5.1)(yaml@2.9.0))
+
   packages/app:
     dependencies:
       '@hono/swagger-ui':
@@ -202,9 +229,6 @@ importers:
       '@storyshelf/core':
         specifier: workspace:*
         version: link:../core
-      '@storyshelf/db-sqlite':
-        specifier: workspace:*
-        version: link:../db-sqlite
       hono:
         specifier: 'catalog:'
         version: 4.13.7
@@ -307,6 +331,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@storyshelf/affected':
+        specifier: workspace:*
+        version: link:../affected
       archiver:
         specifier: 8.0.0
         version: 8.0.0
@@ -362,6 +389,9 @@ importers:
 
   packages/core:
     dependencies:
+      '@storyshelf/affected':
+        specifier: workspace:*
+        version: link:../affected
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.44.7(@libsql/client@0.15.15)(@opentelemetry/api@1.9.1)(postgres@3.4.9)
@@ -393,9 +423,6 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.5.1)(jsdom@30.0.1)(vite@8.2.2(@types/node@26.5.1)(yaml@2.9.0))(vitest@4.1.11)
-      adm-zip:
-        specifier: 0.6.0
-        version: 0.6.0
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0

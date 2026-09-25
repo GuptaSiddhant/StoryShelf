@@ -166,7 +166,23 @@ describe("executeCaptureJob", () => {
     });
     const zip = new AdmZip();
     zip.addFile("iframe.html", Buffer.from("<html>preview</html>"));
-    zip.addFile("index.json", Buffer.from(JSON.stringify({ v: 4, entries: {} })));
+    zip.addFile(
+      "index.json",
+      Buffer.from(
+        JSON.stringify({
+          v: 4,
+          entries: {
+            story: {
+              id: "story",
+              name: "Story",
+              title: "Title",
+              importPath: "./Story.stories.tsx",
+              type: "story",
+            },
+          },
+        }),
+      ),
+    );
     await storage.write(storybookZipPath(project.id, build.id), zip.toBuffer());
     const { runner } = fakeRunner({
       render: vi.fn(async () => {

@@ -42,6 +42,10 @@ const mockBuild: Build = {
   changedCount: 0,
   approvedCount: 0,
   rejectedCount: 0,
+  affectedOnly: true,
+  baselineSha: null,
+  changedFiles: null,
+  affectedImportPaths: null,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
 };
@@ -178,6 +182,53 @@ describe("persistCapture", () => {
     expect(rows).toEqual([]);
     const build = await ctx.db.get(builds, "b1");
     expect(build?.status).toBe("reviewing");
+  });
+
+  it("inherits unaffected stories from their baseline without rendering", async () => {
+    const { ctx } = await makeContext({ captures: [] });
+    await seedBaseline(ctx);
+    const baseline = await ctx.db.get(baselines, "bl1");
+    if (!baseline) {
+      throw new Error("baseline must exist");
+    }
+
+    await persistCapture({
+      ...ctx,
+      inherited: [{ story: storyOf("a"), viewport: DEFAULT_VIEWPORT, baseline }],
+    });
+
+    const rows = await ctx.db.list(snapshots);
+    expect(rows.map((row) => row.storyName)).toEqual(["a"]);
+    expect(rows.map((row) => row.status)).toEqual(["unchanged"]);
+    expect(rows.map((row) => row.inherited)).toEqual([true]);
+    expect(rows.map((row) => row.screenshotPath)).toEqual(["/baselines/bl1.png"]);
+    const build = await ctx.db.get(builds, "b1");
+    expect(build?.status).toBe("approved");
+  });
+
+  it("mixes rendered and inherited snapshots in one build", async () => {
+    const { ctx } = await makeContext({
+      captures: [captureFor(storyOf("b"), png(4, 4, [0, 255, 0]))],
+    });
+    await seedBaseline(ctx);
+    const baseline = await ctx.db.get(baselines, "bl1");
+    if (!baseline) {
+      throw new Error("baseline must exist");
+    }
+
+    await persistCapture({
+      ...ctx,
+      inherited: [{ story: storyOf("a"), viewport: DEFAULT_VIEWPORT, baseline }],
+    });
+
+    const rows = await ctx.db.list(snapshots);
+    const byStory = new Map(rows.map((row) => [row.storyName, row] as const));
+    expect(byStory.get("a")?.status).toBe("unchanged");
+    expect(byStory.get("b")?.status).toBe("approved");
+    expect(byStory.get("a")?.inherited).toBe(true);
+    const build = await ctx.db.get(builds, "b1");
+    expect(build?.status).toBe("approved");
+    expect(build?.snapshotCount).toBe(2);
   });
 
   it("uses the renderer's viewport dims for a story-only viewport not in the project list", async () => {

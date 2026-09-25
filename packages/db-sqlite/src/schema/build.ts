@@ -22,6 +22,10 @@ export const builds = sqliteTable(
     changedCount: integer("changed_count").notNull().default(0),
     approvedCount: integer("approved_count").notNull().default(0),
     rejectedCount: integer("rejected_count").notNull().default(0),
+    affectedOnly: integer("affected_only", { mode: "boolean" }).notNull().default(true),
+    baselineSha: text("baseline_sha"),
+    changedFiles: text("changed_files"),
+    affectedImportPaths: text("affected_import_paths"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -47,6 +51,10 @@ export interface Build {
   changedCount: number;
   approvedCount: number;
   rejectedCount: number;
+  affectedOnly: boolean;
+  baselineSha: string | null;
+  changedFiles: string | null;
+  affectedImportPaths: string | null;
   createdAt: string;
   updatedAt: string;
 }

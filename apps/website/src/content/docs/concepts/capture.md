@@ -3,7 +3,7 @@ title: Capture & viewports
 description: How StoryShelf renders stories — orchestrator, pure CaptureRunner, viewports, browsers, and diffing.
 ---
 
-Capture is server-side. The CLI uploads a zipped static Storybook; the server extracts it, serves it locally, and screenshots every story.
+Capture is server-side. The CLI uploads a zipped static Storybook; the server extracts it, serves it locally, and screenshots the stories impacted by the change — unaffected stories are inherited from their baselines (see [Affected capture](/concepts/affected-capture/)).
 
 ![Build review — capture output with three-up diff](/screenshots/build-review.png)
 
@@ -14,12 +14,13 @@ flowchart LR
     A[Upload zip] --> B[Extract to scratchDir]
     B --> C[Serve statically]
     C --> D[Discover stories]
-    D --> E[Playwright/Puppeteer render]
-    E --> F[Diff vs baseline]
-    F --> G[Persist snapshots]
+    D --> E[Partition affected]
+    E --> F[Playwright/Puppeteer render affected]
+    F --> G[Diff vs baseline]
+    G --> H[Persist snapshots + inherit rest]
 ```
 
-The **orchestrator** (`core/capture/orchestrator.ts`) owns loading, extraction (`scratchDir`), discovery (`StorySourceAdapter`), and persistence. The **CaptureRunner** is pure — it only returns PNG buffers:
+The **orchestrator** (`core/capture/orchestrator.ts`) owns loading, extraction (`scratchDir`), discovery (`StorySourceAdapter`), affected partitioning, and persistence. The **CaptureRunner** is pure — it only returns PNG buffers. Sources expose an optional `loadDependencyGraph` hook so the orchestrator can trace changes; sources without one render everything.
 
 ```ts
 interface CaptureRunner {
@@ -61,6 +62,7 @@ On serverless (Vercel, Lambda, Workers) the API enqueues `CaptureQueue.enqueue({
 
 ## Related
 
+- [Affected capture](/concepts/affected-capture/) — render only impacted stories
 - [Projects](/concepts/projects/) — slug, `git_default_branch`, thresholds
 - [Builds & snapshots](/concepts/builds/) — statuses
 - [Retention](/concepts/retention/) — what survives

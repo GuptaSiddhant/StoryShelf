@@ -14,6 +14,7 @@ import type { Project } from "../schema/project.ts";
 import type { BuildStatus } from "../types.ts";
 import { diffPath, screenshotPath } from "../utils/paths.ts";
 import type { Viewport } from "./adapter.ts";
+import type { InheritedStory } from "./affected.ts";
 import { infraHashFor, SIZING_DEFAULTS } from "./sizing.ts";
 
 /**
@@ -99,13 +100,77 @@ export async function persistCapture(
       );
     }
   }
-  await finalize(
-    ctx,
-    new Set(ctx.captures.map((c) => c.story.id)),
-    failedStoryIds,
-    flakyIds,
-    a11yIds,
+  for (const id of await persistInherited(ctx)) {
+    failedStoryIds.add(id);
+  }
+  await finalize(ctx, allStoryIds(ctx), failedStoryIds, flakyIds, a11yIds);
+}
+
+/** Persist one inherited snapshot; returns the story id on failure. */
+async function tryPersistInherited(
+  ctx: CaptureContext,
+  inherited: InheritedStory,
+): Promise<string | null> {
+  try {
+    await persistInheritedSnapshot(ctx, inherited);
+    return null;
+  } catch (error) {
+    ctx.logger?.error(
+      { storyId: inherited.story.id, viewport: inherited.viewport.name, err: error },
+      "inherit failed for story",
+    );
+    await emitAttemptLog(ctx.recordLog, ctx.logger, "error", "inherit failed for story", {
+      storyId: inherited.story.id,
+      viewport: inherited.viewport.name,
+    });
+    return inherited.story.id;
+  }
+}
+
+/** Persist inherited snapshots; a failure marks the story failed. */
+async function persistInherited(ctx: CaptureContext): Promise<ReadonlySet<string>> {
+  const outcomes = await Promise.all(
+    (ctx.inherited ?? []).map(async (inherited) => await tryPersistInherited(ctx, inherited)),
   );
+  return new Set(outcomes.filter((id): id is string => id !== null));
+}
+
+/** Create an unchanged snapshot reusing the baseline screenshot. */
+async function persistInheritedSnapshot(
+  ctx: CaptureContext,
+  inherited: InheritedStory,
+): Promise<void> {
+  const infraHash = infraHashFor(ctx.project.browser ?? "chromium", ctx.viewports, SIZING_DEFAULTS);
+  const snapshots = new SnapshotModel(ctx.db, ctx.tables);
+  const snapshot = await snapshots.create(ctx.project.id, ctx.build.id, {
+    storyId: inherited.story.id,
+    storyName: inherited.story.name,
+    storyTitle: inherited.story.title,
+    storyImportPath: inherited.story.importPath ?? "",
+    viewportName: inherited.viewport.name,
+    viewportWidth: inherited.viewport.width,
+    viewportHeight: inherited.viewport.height,
+    screenshotPath: inherited.baseline.screenshotPath,
+    infraHash,
+    inherited: true,
+  });
+  await snapshots.update(snapshot.id, {
+    status: "unchanged",
+    diffPixels: 0,
+    diffRatio: 0,
+    diffPassed: true,
+    diffPath: null,
+    infraHash,
+  });
+}
+
+/** Every story covered by a capture run, rendered or inherited. */
+function allStoryIds(ctx: CaptureContext): ReadonlySet<string> {
+  const ids = new Set(ctx.captures.map((capture) => capture.story.id));
+  for (const inherited of ctx.inherited ?? []) {
+    ids.add(inherited.story.id);
+  }
+  return ids;
 }
 
 /** Table handles required by the capture pipeline. */
@@ -127,6 +192,8 @@ export interface CaptureContext {
   viewports: Viewport[];
   /** Screenshot buffers produced by the capture renderer. */
   captures: RenderedSnapshot[];
+  /** Stories inheriting their baseline without rendering (affected capture). */
+  inherited?: InheritedStory[];
   /** Optional logger for capture diagnostics. */
   logger?: Logger;
   /** Optional per-attempt log recorder (mirrors logger lines into the DB). */

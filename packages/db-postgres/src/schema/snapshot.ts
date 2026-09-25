@@ -39,6 +39,7 @@ export const snapshots = pgTable(
     reviewedBy: text("reviewed_by"),
     reviewedAt: timestamp("reviewed_at", { withTimezone: true, mode: "string" }),
     infraHash: text("infra_hash"),
+    inherited: boolean("inherited").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull(),
   },
@@ -69,6 +70,7 @@ export interface Snapshot {
   reviewedBy: string | null;
   reviewedAt: string | null;
   infraHash: string | null;
+  inherited: boolean;
   createdAt: string;
   updatedAt: string;
 }

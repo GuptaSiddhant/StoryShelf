@@ -70,6 +70,10 @@ export const buildSchema = z
     changedCount: z.number(),
     approvedCount: z.number(),
     rejectedCount: z.number(),
+    affectedOnly: z.boolean(),
+    baselineSha: z.string().nullable(),
+    changedFiles: z.string().nullable(),
+    affectedImportPaths: z.string().nullable(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -96,6 +100,7 @@ export const snapshotSchema = z
     status: z.enum(SNAPSHOT_STATUSES),
     reviewedBy: z.string().nullable(),
     reviewedAt: z.string().nullable(),
+    inherited: z.boolean(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })

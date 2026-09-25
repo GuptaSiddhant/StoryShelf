@@ -1,3 +1,4 @@
+import { loadDepGraph, STATS_FILENAME, type DepGraph } from "@storyshelf/affected";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type {
@@ -132,6 +133,16 @@ export class StorybookAdapter implements StorySourceAdapter {
   // eslint-disable-next-line class-methods-use-this
   buildUrl(baseUrl: string, storyId: string): string {
     return `${baseUrl}/iframe.html?id=${encodeURIComponent(storyId)}&viewMode=story`;
+  }
+
+  /**
+   * Load the Vite stats dependency graph of an extracted build for affected
+   * capture. Resolves `null` when the build ships no usable stats, in which
+   * case the orchestrator renders every story.
+   */
+  // eslint-disable-next-line class-methods-use-this
+  async loadDependencyGraph(source: string): Promise<DepGraph | null> {
+    return await loadDepGraph(join(source, STATS_FILENAME));
   }
 
   // eslint-disable-next-line class-methods-use-this
