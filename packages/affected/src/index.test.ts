@@ -90,6 +90,6 @@ describe("computeAffected", () => {
       headSha: "b",
     });
     expect(result.affectedImportPaths).toBeNull();
-    expect(result.fullReason).toBe("shallow-clone");
+    expect(result.fullReason).toBe("not-a-git-repo");
   });
 });

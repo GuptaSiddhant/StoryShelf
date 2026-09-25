@@ -74,8 +74,8 @@ storyshelf upload --token shelf_xxx --sha $GITHUB_SHA --branch main
 | `--url` | Server URL (or file / `STORYSHELF_URL`) |
 | `--slug` | Project slug (or file / `STORYSHELF_SLUG`) |
 | `--token` | Project API token (`Authorization: Bearer`, or `STORYSHELF_TOKEN`) |
-| `--sha` | Git SHA (or `GITHUB_SHA`) |
-| `--branch` | Git branch (or `GITHUB_REF_NAME`) |
+| `--sha` | Git SHA (or `GITHUB_SHA`, else local git HEAD, else synthesized `local-*`) |
+| `--branch` | Git branch (or `GITHUB_REF_NAME`, else local git branch, else `local`) |
 | `--build-dir` / `-d` | Built Storybook directory (default `storybook-static`) |
 | `--config` / `-c` | Config file path (default `.storybook/storyshelf.json`) |
 | `--build-command` | Custom build command (mutually exclusive with `--build-script-name`) |

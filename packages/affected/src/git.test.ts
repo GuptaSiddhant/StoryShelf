@@ -3,7 +3,16 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { changedFiles, isShallowRepo } from "./git.ts";
+import {
+  changedFiles,
+  gitBranchName,
+  gitHeadSha,
+  gitRepoStatus,
+  isShallowRepo,
+  LOCAL_BRANCH,
+  LOCAL_SHA_PREFIX,
+  localSha,
+} from "./git.ts";
 
 let dir: string;
 
@@ -63,5 +72,51 @@ describe("changedFiles", () => {
 
   it("throws for unknown revisions", () => {
     expect(() => changedFiles(dir, "deadbee", "deadbee")).toThrow();
+  });
+});
+
+describe("gitHeadSha", () => {
+  it("returns HEAD in a repository", () => {
+    expect(gitHeadSha(dir)).toBe(git(["rev-parse", "HEAD"]));
+  });
+
+  it("returns null outside a repository", () => {
+    expect(gitHeadSha(tmpdir())).toBeNull();
+  });
+});
+
+describe("gitBranchName", () => {
+  it("returns the current branch", () => {
+    expect(gitBranchName(dir)).toBe("main");
+  });
+
+  it("returns null outside a repository", () => {
+    expect(gitBranchName(tmpdir())).toBeNull();
+  });
+
+  it("returns null on a detached HEAD", () => {
+    commitFile("a.ts", "a", "change a");
+    git(["checkout", "--detach", "HEAD"]);
+    expect(gitBranchName(dir)).toBeNull();
+  });
+});
+
+describe("localSha", () => {
+  it("generates unique prefixed identities", () => {
+    const first = localSha();
+    const second = localSha();
+    expect(first.startsWith(LOCAL_SHA_PREFIX)).toBe(true);
+    expect(first).not.toBe(second);
+    expect(LOCAL_BRANCH).toBe("local");
+  });
+});
+
+describe("gitRepoStatus", () => {
+  it("reports ok for a normal checkout", () => {
+    expect(gitRepoStatus(dir)).toBe("ok");
+  });
+
+  it("reports no-git outside a repository", () => {
+    expect(gitRepoStatus(tmpdir())).toBe("no-git");
   });
 });

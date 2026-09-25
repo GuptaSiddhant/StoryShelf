@@ -1,4 +1,4 @@
-import { changedFiles, isShallowRepo, MAX_CHANGED_FILES } from "./git.ts";
+import { changedFiles, gitRepoStatus, MAX_CHANGED_FILES } from "./git.ts";
 import { loadDepGraph, loadStoryImportPaths, statsPathFor } from "./stats.ts";
 import { traceAffected } from "./trace.ts";
 import type { AffectedInput, AffectedResult } from "./types.ts";
@@ -30,8 +30,9 @@ function selectiveResult(changed: string[], baselineSha: string, paths: string[]
 
 /** Guarded changed-file list, throwing a full-render reason when unusable. */
 function guardedChanged(input: AffectedInput): string[] {
-  if (isShallowRepo(input.cwd)) {
-    throw new Error("shallow-clone");
+  const repo = gitRepoStatus(input.cwd);
+  if (repo !== "ok") {
+    throw new Error(repo === "shallow" ? "shallow-clone" : "not-a-git-repo");
   }
   const changed = changedFiles(input.cwd, input.baseSha, input.headSha);
   if (changed.length > MAX_CHANGED_FILES) {
@@ -72,7 +73,18 @@ async function computeSelective(input: AffectedInput): Promise<AffectedResult> {
 }
 
 export type { AffectedInput, AffectedResult, DepGraph, StoryLike, TraceOptions } from "./types.ts";
-export { changedFiles, isShallowRepo, MAX_CHANGED_FILES } from "./git.ts";
+export {
+  changedFiles,
+  gitBranchName,
+  gitHeadSha,
+  gitRepoStatus,
+  isShallowRepo,
+  LOCAL_BRANCH,
+  LOCAL_SHA_PREFIX,
+  localSha,
+  MAX_CHANGED_FILES,
+} from "./git.ts";
+export type { GitRepoStatus } from "./git.ts";
 export {
   buildGraph,
   graphModulesFor,

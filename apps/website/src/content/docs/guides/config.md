@@ -54,7 +54,7 @@ flags (--url/--slug/--build-dir) > env (STORYSHELF_URL/SLUG/TOKEN, GITHUB_SHA/BR
 ```
 
 - `token` **never** stored in file — use `STORYSHELF_TOKEN` (project) or `STORYSHELF_ADMIN_TOKEN`/`ADMIN_TOKEN` (site-admin for `create`/`purge`).
-- `sha`/`branch` default to `GITHUB_SHA`/`GITHUB_REF_NAME` (`VERCEL_GIT_COMMIT_*`, `CI_COMMIT_*`).
+- `sha`/`branch` resolve per field as flags > env (`GITHUB_SHA`/`GITHUB_REF_NAME`, `VERCEL_GIT_COMMIT_*`, `CI_COMMIT_*`) > local git (`rev-parse HEAD`, current branch) > synthesized local identity (`local-<random>` on branch `local`). No git, no flags, no env still uploads — see [Affected capture](/concepts/affected-capture/).
 
 ## Monorepo
 

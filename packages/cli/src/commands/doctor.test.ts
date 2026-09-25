@@ -175,4 +175,28 @@ describe("runDoctor", () => {
     });
     expect(process.exitCode).toBe(1);
   });
+
+  it("warns about synthetic identity without git", async () => {
+    setupStorybook();
+    seedValidOutput();
+    mockFetch(() => ({ name: "Demo", slug: "demo" }));
+    const lines: string[] = [];
+    const write = process.stdout.write.bind(process.stdout);
+    process.stdout.write = ((chunk: string): boolean => {
+      lines.push(chunk);
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await runDoctor({
+        url: "https://shelf.example.com",
+        slug: "demo",
+        token: "ci-token",
+        cwd: dir,
+      });
+    } finally {
+      process.stdout.write = write;
+    }
+    expect(lines.some((line) => line.includes("No git repository"))).toBe(true);
+    expect(process.exitCode).toBeUndefined();
+  });
 });

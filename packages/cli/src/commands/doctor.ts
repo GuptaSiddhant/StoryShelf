@@ -1,4 +1,4 @@
-import { isShallowRepo } from "@storyshelf/affected";
+import { gitRepoStatus } from "@storyshelf/affected";
 import { access, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { createClient } from "../client.ts";
@@ -146,7 +146,15 @@ export async function runDoctor(options: DoctorOptions): Promise<void> {
 
 /** Warn when affected capture would silently fall back to a full render. */
 async function checkAffected(cwd: string, buildDir: string): Promise<Check> {
-  if (isShallowRepo(cwd)) {
+  const repo = gitRepoStatus(cwd);
+  if (repo === "no-git") {
+    return {
+      status: "warn",
+      message:
+        "No git repository — upload uses a synthetic local identity and affected capture renders all stories",
+    };
+  }
+  if (repo === "shallow") {
     return {
       status: "warn",
       message: "Shallow clone detected — affected capture renders all stories (use fetch-depth: 0)",

@@ -1,5 +1,12 @@
 /* oxlint-disable max-statements */
-import { computeAffected, type AffectedResult } from "@storyshelf/affected";
+import {
+  computeAffected,
+  gitBranchName,
+  gitHeadSha,
+  LOCAL_BRANCH,
+  localSha,
+  type AffectedResult,
+} from "@storyshelf/affected";
 import { ZipArchive } from "archiver";
 import { resolve } from "node:path";
 import * as picomatch from "picomatch";
@@ -16,7 +23,12 @@ import { assertBuildOutput, ensureBuildDir } from "./storybook-build.ts";
 export async function runUpload(options: UploadOptions): Promise<void> {
   const cwd = options.cwd ?? process.cwd();
   const cfg = await loadStorybookConfig(cwd, options.config);
-  const collected = collectUploadOptions(options, cfg);
+  const collected = collectUploadOptions(cwd, options, cfg);
+  if (collected.synthesized) {
+    printLine(
+      `No git identity — using local sha ${collected.sha} on branch "${collected.branch}" (pass --sha/--branch to override)`,
+    );
+  }
   if (shouldSkipUpload(collected.skip, collected.branch)) {
     printLine(`Skipped per config skip="${collected.skip}" for branch "${collected.branch}"`);
     return;
@@ -71,12 +83,48 @@ export interface UploadOptions {
   cwd?: string;
 }
 
+/** Git probe for identity auto-detection; injectable for tests. */
+export interface GitIdentityProbe {
+  headSha: (cwd: string) => string | null;
+  branchName: (cwd: string) => string | null;
+}
+
+const defaultProbe: GitIdentityProbe = { headSha: gitHeadSha, branchName: gitBranchName };
+
+/** Resolved sha/branch plus whether either was synthesized locally. */
+export interface ResolvedIdentity {
+  sha: string;
+  branch: string;
+  synthesized: boolean;
+}
+
+/**
+ * Resolve sha/branch per field: flags > env > local git > synthesized local
+ * identity. Synthesis always succeeds, so checkouts without git can upload
+ * with zero identity flags.
+ */
+export function resolveIdentity(
+  cwd: string,
+  options: Pick<UploadOptions, "sha" | "branch">,
+  probe: GitIdentityProbe = defaultProbe,
+): ResolvedIdentity {
+  const sha = options.sha ?? envOf("GITHUB_SHA", "VERCEL_GIT_COMMIT_SHA", "CI_COMMIT_SHA");
+  const branch =
+    options.branch ?? envOf("GITHUB_REF_NAME", "VERCEL_GIT_COMMIT_REF", "CI_COMMIT_REF_NAME");
+  return {
+    sha: sha ?? probe.headSha(cwd) ?? localSha(),
+    branch: branch ?? probe.branchName(cwd) ?? LOCAL_BRANCH,
+    synthesized: sha === undefined || branch === undefined,
+  };
+}
+
 interface CollectedUploadOptions {
   url?: string;
   slug?: string;
   token?: string;
-  sha?: string;
-  branch?: string;
+  sha: string;
+  branch: string;
+  synthesized: boolean;
   buildDir: string;
   buildCommand?: string;
   buildScriptName?: string;
@@ -111,16 +159,18 @@ function envOf(...names: string[]): string | undefined {
 
 /** Layer explicit options over env and the client config file. */
 function collectUploadOptions(
+  cwd: string,
   options: UploadOptions,
   cfg: StorybookConfig | null,
 ): CollectedUploadOptions {
+  const identity = resolveIdentity(cwd, options);
   return {
     url: options.url ?? cfg?.url ?? envOf("STORYSHELF_URL"),
     slug: options.slug ?? cfg?.slug ?? envOf("STORYSHELF_SLUG"),
     token: options.token ?? envOf("STORYSHELF_TOKEN", "SHELF_TOKEN"),
-    sha: options.sha ?? envOf("GITHUB_SHA", "VERCEL_GIT_COMMIT_SHA", "CI_COMMIT_SHA"),
-    branch:
-      options.branch ?? envOf("GITHUB_REF_NAME", "VERCEL_GIT_COMMIT_REF", "CI_COMMIT_REF_NAME"),
+    sha: identity.sha,
+    branch: identity.branch,
+    synthesized: identity.synthesized,
     buildDir: options.buildDir ?? cfg?.buildDir ?? "storybook-static",
     buildCommand: options.buildCommand ?? cfg?.buildCommand,
     buildScriptName: options.buildScriptName ?? cfg?.buildScriptName,
@@ -155,12 +205,6 @@ function assertUploadOptions(
   }
   if (!collected.token) {
     throw new Error("--token is required (or STORYSHELF_TOKEN env)");
-  }
-  if (!collected.sha) {
-    throw new Error("--sha is required (or GITHUB_SHA env)");
-  }
-  if (!collected.branch) {
-    throw new Error("--branch is required (or GITHUB_REF_NAME env)");
   }
 }
 

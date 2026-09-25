@@ -31,13 +31,32 @@ flowchart LR
 | `STORYSHELF_FULL=1` | Same, via env (useful for release pipelines) |
 | `"affectedOnly": false` in `.storybook/storyshelf.json` | Disable for the project (see [Configuration](/guides/config/)) |
 
+## Build identity: sha and branch without git
+
+`upload` resolves each field independently — **flags > env > local git > synthesized**:
+
+- `--sha` / `--branch` win when passed.
+- Otherwise the CI envs (`GITHUB_SHA`, `GITHUB_REF_NAME`, …).
+- Otherwise the local checkout (`git rev-parse HEAD`, current branch).
+- Otherwise a synthetic identity: `local-<random>` sha on the `local` branch.
+
+So a project with no git at all uploads with zero identity flags:
+
+```bash
+storyshelf upload --token $STORYSHELF_TOKEN
+# No git identity — using local sha local-a1b2c3d4e5f6 on branch "local" (pass --sha/--branch to override)
+```
+
+Synthetic shas are unique per upload (satisfying the build identity constraint) and chain baselines like real commits. The `local` branch keeps local experiments isolated — accepts never touch `main` baselines, and diffing still falls back to the default branch. The server skips git-provider status posts for `local-` shas (there is no commit to post to). Without git there is no history to diff, so these builds always render everything — see `not-a-git-repo` below.
+
 ## Full-render fallbacks
 
 Affected capture never fails an upload. When it cannot prove a story unchanged, it renders everything and prints the reason:
 
 | Reason | Meaning |
 |--------|---------|
-| `shallow-clone` | No git history (`actions/checkout` needs `fetch-depth: 0`) or not a repository |
+| `shallow-clone` | No git history (`actions/checkout` needs `fetch-depth: 0`) |
+| `not-a-git-repo` | No git repository — upload used a synthetic local identity |
 | `dependency-graph-unavailable` | No usable `preview-stats.json` in the built Storybook |
 | `story-index-unreadable` | No `index.json`/`stories.json` to map stories to files |
 | `global-file-changed` | A change touches `preview.*`, `manager.*`, `.storybook/main.*`, or a lockfile — these can affect every story |

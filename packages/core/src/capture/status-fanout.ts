@@ -1,3 +1,4 @@
+import { LOCAL_SHA_PREFIX } from "@storyshelf/affected";
 import type { Logger } from "pino";
 import { buildCommentMarkdown } from "../adapters/git-host/helpers.ts";
 import type { CheckStatus, GitHostProvider } from "../adapters/git-host/index.ts";
@@ -18,6 +19,13 @@ async function postStatusesForBuild(opts: {
   logger?: Logger;
 }): Promise<void> {
   if (opts.providers.length === 0) {
+    return;
+  }
+  if (opts.sha.startsWith(LOCAL_SHA_PREFIX)) {
+    opts.logger?.info(
+      { sha: opts.sha },
+      "skipping git provider status for synthetic local identity",
+    );
     return;
   }
   const model = new StatusConfigModel(opts.db, opts.tables, opts.secret);

@@ -26,6 +26,10 @@ import {
   traceAffected,        // graph + changed files + story files -> affected, or null for full
   selectAffectedStories,// stories + affected paths -> { render, inherit }
   changedFiles,         // git diff baseline..HEAD plus staged/untracked
+  gitHeadSha,           // local git HEAD, or null without git
+  gitBranchName,        // local git branch, or null without git
+  gitRepoStatus,        // "ok" | "shallow" | "no-git"
+  localSha,             // synthetic unique sha (LOCAL_SHA_PREFIX) for non-git checkouts
   loadDepGraph,         // preview-stats.json -> bidirectional DepGraph (null when unusable)
   loadStoryImportPaths, // index.json/stories.json -> story import paths
 } from "@storyshelf/affected";

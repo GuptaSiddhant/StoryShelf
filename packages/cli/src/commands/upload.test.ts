@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Readable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { runUpload } from "./upload.ts";
+import { runUpload, resolveIdentity, type GitIdentityProbe } from "./upload.ts";
 
 let dir: string;
 
@@ -33,6 +33,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -57,16 +58,6 @@ describe("runUpload validation", () => {
       field: "token",
       partial: { url: "u", slug: "s", sha: "s", branch: "b" },
       message: "--token is required",
-    },
-    {
-      field: "sha",
-      partial: { url: "u", slug: "s", token: "t", branch: "b" },
-      message: "--sha is required",
-    },
-    {
-      field: "branch",
-      partial: { url: "u", slug: "s", token: "t", sha: "s" },
-      message: "--branch is required",
     },
   ];
   for (const { field, partial, message } of cases) {
@@ -328,5 +319,64 @@ describe("runUpload affected capture", () => {
     await runUpload({ ...baseOptions(), buildDir: "storybook-static", full: true });
 
     expect(calls.map((call) => call.method)).toEqual(["POST", "PUT"]);
+  });
+
+  it("synthesizes a local identity outside a git repository", async () => {
+    writeBuild();
+    const { calls } = stubFetch({
+      build: { id: "b1" },
+      uploadUrl: "/x",
+      baselineSha: null,
+    });
+    const { sha: _sha, branch: _branch, ...rest } = baseOptions();
+
+    await runUpload({ ...rest, buildDir: "storybook-static" });
+
+    const created = calls[0]?.body as { gitSha: string; gitBranch: string };
+    expect(created.gitSha.startsWith("local-")).toBe(true);
+    expect(created.gitBranch).toBe("local");
+  });
+});
+
+describe("resolveIdentity", () => {
+  const nullProbe: GitIdentityProbe = {
+    headSha: () => null,
+    branchName: () => null,
+  };
+
+  it("prefers flags over everything", () => {
+    vi.stubEnv("GITHUB_SHA", "env-sha");
+    vi.stubEnv("GITHUB_REF_NAME", "env-branch");
+    const probe: GitIdentityProbe = {
+      headSha: () => "git-sha",
+      branchName: () => "git-branch",
+    };
+    expect(resolveIdentity(dir, { sha: "flag-sha", branch: "flag-branch" }, probe)).toEqual({
+      sha: "flag-sha",
+      branch: "flag-branch",
+      synthesized: false,
+    });
+  });
+
+  it("falls back to env, then git, then synthesis per field", () => {
+    vi.stubEnv("GITHUB_SHA", "env-sha");
+    const probe: GitIdentityProbe = {
+      headSha: () => "git-sha",
+      branchName: () => "git-branch",
+    };
+    expect(resolveIdentity(dir, {}, probe)).toEqual({
+      sha: "env-sha",
+      branch: "git-branch",
+      synthesized: true,
+    });
+  });
+
+  it("synthesizes a unique local identity without git", () => {
+    const first = resolveIdentity(dir, {}, nullProbe);
+    const second = resolveIdentity(dir, {}, nullProbe);
+    expect(first.sha.startsWith("local-")).toBe(true);
+    expect(first.branch).toBe("local");
+    expect(first.synthesized).toBe(true);
+    expect(first.sha).not.toBe(second.sha);
   });
 });
