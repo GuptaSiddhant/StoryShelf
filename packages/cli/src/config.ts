@@ -390,7 +390,7 @@ export function detectGitRepository(cwd: string = process.cwd()): string | null 
 }
 
 /**
- * Detect the default git branch, preferring `origin/HEAD` then `HEAD`.
+ * Detect the default branch, preferring `origin/HEAD` then `HEAD`.
  *
  * @param cwd - Project root
  * @returns Branch name (e.g. `main`) or `null` when not determinable

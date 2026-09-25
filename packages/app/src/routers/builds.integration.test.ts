@@ -313,7 +313,7 @@ describe("affected capture", () => {
     expect(created.build.affectedOnly).toBe(true);
   });
 
-  it("returns the prior commit as baseline for the next build", async () => {
+  it("returns the prior revision as baseline for the next build", async () => {
     const { app } = await setupApp();
     await createAffectedBuild(app, "sha-1");
     const second = await createAffectedBuild(app, "sha-2");

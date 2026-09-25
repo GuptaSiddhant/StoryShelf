@@ -40,7 +40,7 @@ Builds on the default branch auto-approve and become the baselines. Pushing to `
 
 ## Accepting changes on feature branches
 
-Accepting a change on a feature branch records a baseline **for that branch**, so the next commit doesn't re-flag the same change. Merging to `main` promotes the baselines on the next default-branch build.
+Accepting a change on a feature branch records a baseline **for that branch**, so the next upload doesn't re-flag the same change. Merging to `main` promotes the baselines on the next default-branch build.
 
 ```mermaid
 sequenceDiagram
@@ -52,7 +52,7 @@ sequenceDiagram
     SS-->>Dev: Snapshots show as "changed"
     Dev->>SS: Accept changed snapshots
     SS->>SS: Store branch baselines
-    Dev->>CI: Push new commit to feature-x
+    Dev->>CI: Push new revision to feature-x
     CI->>SS: Upload build
     SS-->>Dev: Same snapshots now "unchanged" (branch baseline)
     Dev->>CI: Merge to main
@@ -62,7 +62,7 @@ sequenceDiagram
 
 ## Persistent builds & release tags
 
-A build carrying the `persistent` label is never purged. The CLI attaches it automatically for commits with git tags, so release builds survive retention.
+A build carrying the `persistent` label is never purged. On git checkouts the CLI attaches it automatically for revisions with git tags, so release builds survive retention.
 
 ```bash
 # Tag a release → persistent label auto-attached

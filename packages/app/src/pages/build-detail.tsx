@@ -105,7 +105,7 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
         }
         description={
           <>
-            {build.message ?? "No commit message"}{" "}
+            {build.message ?? "No message"}{" "}
             {build.authorName
               ? `· ${build.authorName}${build.authorEmail ? ` <${build.authorEmail}>` : ""}`
               : ""}{" "}

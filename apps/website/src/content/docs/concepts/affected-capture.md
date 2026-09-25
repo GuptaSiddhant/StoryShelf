@@ -17,7 +17,7 @@ flowchart LR
     F --> G[Inherit the rest unchanged]
 ```
 
-1. **Ancestor.** `POST /api/v1/projects/:slug/builds` returns `baselineSha`: the latest prior commit on the same branch with a build (`null` for first builds).
+1. **Ancestor.** `POST /api/v1/projects/:slug/builds` returns `baselineSha`: the latest prior revision on the same branch with a build (`null` for first builds).
 2. **Changed files.** The CLI diffs `baselineSha..HEAD` (plus staged and untracked files) to get the repo-relative change list.
 3. **Trace.** The change list is traced through the bundler dependency graph (`preview-stats.json` in the built Storybook) down to story files. New stories — files with no baseline — always render regardless of the trace.
 4. **Record.** The CLI posts `{ baselineSha, changedFiles, affectedImportPaths }` to `POST …/builds/:id/affected` before uploading the bundle, so the computation is auditable on the build row.
@@ -44,10 +44,19 @@ So a project with no git at all uploads with zero identity flags:
 
 ```bash
 storyshelf upload --token $STORYSHELF_TOKEN
-# No git identity — using local sha local-a1b2c3d4e5f6 on branch "local" (pass --sha/--branch to override)
+# No git checkout detected — using synthetic identity sha=local-a1b2c3d4e5f6 branch="local" (pass --sha/--branch to override)
 ```
 
-Synthetic shas are unique per upload (satisfying the build identity constraint) and chain baselines like real commits. The `local` branch keeps local experiments isolated — accepts never touch `main` baselines, and diffing still falls back to the default branch. The server skips git-provider status posts for `local-` shas (there is no commit to post to). Without git there is no history to diff, so these builds always render everything — see `not-a-git-repo` below.
+Synthetic shas are unique per upload (satisfying the build identity constraint) and chain baselines like real revisions. The `local` branch keeps local experiments isolated — accepts never touch `main` baselines, and diffing still falls back to the default branch. The server skips git-provider status posts for `local-` shas (there is no commit to post to). Without git there is no history to diff, so these builds always render everything — see `not-a-git-repo` below.
+
+## Non-git workflows
+
+`sha` and `branch` are opaque strings — git is one source of them, not a requirement. Beyond synthetic identity, two patterns work without any git involvement:
+
+- **Environments as branches.** Pass `--branch staging` (or `prod`, `nightly`) to get an isolated baseline namespace per environment. Pair with `public_branch_regex` to publish per-environment Storybooks. Accepts on `staging` never affect `main` baselines.
+- **Checkout-less pipelines.** A pipeline that builds the Storybook without cloning (artifact-driven CI, design tools exporting static builds) uploads with explicit `--sha <run-id> --branch <env>` — or nothing at all, falling back to synthetic identity. Each unique sha chains baselines normally.
+
+What doesn't apply without git: provider status checks and the merge gate (there is no commit to post to — the server skips them), and traced selectivity (no history to diff, so builds render everything unless affected capture is otherwise fed).
 
 ## Full-render fallbacks
 
@@ -61,7 +70,7 @@ Affected capture never fails an upload. When it cannot prove a story unchanged, 
 | `story-index-unreadable` | No `index.json`/`stories.json` to map stories to files |
 | `global-file-changed` | A change touches `preview.*`, `manager.*`, `.storybook/main.*`, or a lockfile — these can affect every story |
 | `too-many-changed-files` | Change list exceeds 10,000 files (large merges, vendored drops) |
-| First build | No baseline commit exists yet (`baselineSha: null`) |
+| First build | No baseline revision exists yet (`baselineSha: null`) |
 
 Typical CLI output:
 

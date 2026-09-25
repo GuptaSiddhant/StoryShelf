@@ -26,7 +26,7 @@ export async function runUpload(options: UploadOptions): Promise<void> {
   const collected = collectUploadOptions(cwd, options, cfg);
   if (collected.synthesized) {
     printLine(
-      `No git identity — using local sha ${collected.sha} on branch "${collected.branch}" (pass --sha/--branch to override)`,
+      `No git checkout detected — using synthetic identity sha=${collected.sha} branch="${collected.branch}" (pass --sha/--branch to override)`,
     );
   }
   if (shouldSkipUpload(collected.skip, collected.branch)) {
@@ -45,9 +45,9 @@ export interface UploadOptions {
   slug?: string;
   /** CI token. */
   token?: string;
-  /** Git commit SHA. */
+  /** Revision SHA — a git commit or any unique build pointer. */
   sha?: string;
-  /** Git branch. */
+  /** Baseline namespace — a git branch, environment, or channel. */
   branch?: string;
   /** Built Storybook directory. Defaults to `storybook-static`. */
   buildDir?: string;

@@ -27,7 +27,9 @@ export async function createBuildRecord(
 ): Promise<Build> {
   const { db, config } = getStore();
   if (!meta.gitSha || !meta.gitBranch) {
-    throw new HTTPException(400, { message: "gitSha and gitBranch are required" });
+    throw new HTTPException(400, {
+      message: "gitSha and gitBranch are required (revision SHA and baseline namespace)",
+    });
   }
   const build = await new BuildModel(db).create(project.id, {
     gitSha: meta.gitSha,
@@ -246,7 +248,7 @@ export interface BuildCreateMetadata {
   labels?: { key: string; value: string }[];
 }
 
-/** Latest prior commit on a branch with a build, or null for first builds. */
+/** Latest prior revision on a branch with a build, or null for first builds. */
 async function resolveBaselineSha(
   db: DatabaseAdapter,
   projectId: string,

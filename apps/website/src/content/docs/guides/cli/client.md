@@ -74,8 +74,8 @@ storyshelf upload --token shelf_xxx --sha $GITHUB_SHA --branch main
 | `--url` | Server URL (or file / `STORYSHELF_URL`) |
 | `--slug` | Project slug (or file / `STORYSHELF_SLUG`) |
 | `--token` | Project API token (`Authorization: Bearer`, or `STORYSHELF_TOKEN`) |
-| `--sha` | Git SHA (or `GITHUB_SHA`, else local git HEAD, else synthesized `local-*`) |
-| `--branch` | Git branch (or `GITHUB_REF_NAME`, else local git branch, else `local`) |
+| `--sha` | Revision SHA (flag, CI env, local git HEAD, or synthesized `local-*`) |
+| `--branch` | Baseline namespace (flag, CI env, local git branch, or `local`) |
 | `--build-dir` / `-d` | Built Storybook directory (default `storybook-static`) |
 | `--config` / `-c` | Config file path (default `.storybook/storyshelf.json`) |
 | `--build-command` | Custom build command (mutually exclusive with `--build-script-name`) |
@@ -119,6 +119,6 @@ storyshelf retry --url http://localhost:3000 --slug my-design-system --build-id 
 storyshelf purge --url http://localhost:3000 --token $STORYSHELF_ADMIN_TOKEN
 ```
 
-`retry` re-runs capture without a new commit. `purge` triggers retention GC (normally scheduled).
+`retry` re-runs capture without a new revision. `purge` triggers retention GC (normally scheduled).
 
 See [Configuration](/guides/config/) for file/env precedence and [Labels](/concepts/labels/) for `persistent` tagging.
