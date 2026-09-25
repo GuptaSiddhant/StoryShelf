@@ -58,7 +58,6 @@
     "@hono/swagger-ui": "^0.6.1",
     "@hono/zod-openapi": "^1.1.5",
     "@storyshelf/core": "workspace:*",
-    "@storyshelf/db-sqlite": "workspace:*",
     "hono": "catalog:",
     "zod": "catalog:"
   },

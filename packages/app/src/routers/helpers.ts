@@ -6,7 +6,6 @@ import type { Project } from "@storyshelf/core/schema";
 import type { Token } from "@storyshelf/core/schema";
 import type { ProjectRole } from "@storyshelf/core/types";
 import { sha256, timingSafeEqualString } from "@storyshelf/core/utils";
-import { projectMembers, projects, tokens, users } from "@storyshelf/db-sqlite/schema";
 import type { Context, Next } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -47,7 +46,9 @@ export async function currentProjectRole(projectId: string): Promise<ProjectRole
   if (!user) {
     return null;
   }
-  return await new MemberModel(db, { projectMembers }).effectiveRole(user.role, projectId, user.id);
+  return await new MemberModel(db, {
+    projectMembers: getStore().db.tables.projectMembers,
+  }).effectiveRole(user.role, projectId, user.id);
 }
 
 /** Build middleware that requires one of the given project roles. */
@@ -68,7 +69,7 @@ export function requireRole(...roles: ProjectRole[]) {
 /** Look up a project by its URL slug, returning null when absent. */
 export async function findProjectBySlug(slug: string): Promise<Project | null> {
   const { db } = getStore();
-  return await new ProjectModel(db, { projects }).getBySlug(slug);
+  return await new ProjectModel(db, { projects: getStore().db.tables.projects }).getBySlug(slug);
 }
 
 async function resolveProjectByToken(
@@ -78,11 +79,15 @@ async function resolveProjectByToken(
   const authHeader = c.req.header("authorization");
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.slice("Bearer ".length);
-    const found = await new TokenModel(getStore().db, { tokens }).findByHash(sha256(token));
+    const found = await new TokenModel(getStore().db, {
+      tokens: getStore().db.tables.tokens,
+    }).findByHash(sha256(token));
     if (!found) {
       unauthorized();
     }
-    const project = await new ProjectModel(getStore().db, { projects }).get(found.projectId);
+    const project = await new ProjectModel(getStore().db, {
+      projects: getStore().db.tables.projects,
+    }).get(found.projectId);
     if (!project || project.slug !== slug) {
       forbidden();
     }
@@ -101,11 +106,13 @@ async function tokenProjectRole(token: Token, projectId: string): Promise<Projec
     return "viewer";
   }
   const { db } = getStore();
-  const user = await new UserModel(db, { users }).get(token.userId);
+  const user = await new UserModel(db, { users: getStore().db.tables.users }).get(token.userId);
   if (!user) {
     return null;
   }
-  return await new MemberModel(db, { projectMembers }).effectiveRole(user.role, projectId, user.id);
+  return await new MemberModel(db, {
+    projectMembers: getStore().db.tables.projectMembers,
+  }).effectiveRole(user.role, projectId, user.id);
 }
 
 /** Resolve a project by slug, honoring CLI bearer-token access. */

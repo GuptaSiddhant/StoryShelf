@@ -80,6 +80,7 @@ export function createDrizzlePgAdapter(
   const lifecycle: AdapterLifecycle = buildLifecycle(options);
   return {
     metadata: options.metadata,
+    tables: options.tables,
     lifecycle,
     insert: async <T extends Table>(
       table: T,

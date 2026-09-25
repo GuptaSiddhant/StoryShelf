@@ -1,6 +1,5 @@
 import { TokenModel } from "@storyshelf/core/models";
 import { randomToken } from "@storyshelf/core/utils";
-import { tokens } from "@storyshelf/db-sqlite/schema";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
@@ -26,7 +25,7 @@ async function handleCreateToken(c: Context): Promise<Response> {
     );
   }
   const token = randomToken("shelf_");
-  await new TokenModel(getStore().db, { tokens }).create(project.id, {
+  await new TokenModel(getStore().db, { tokens: getStore().db.tables.tokens }).create(project.id, {
     name: tokenName,
     hash: token.hash,
     userId: getStore().user?.id ?? null,
@@ -36,6 +35,8 @@ async function handleCreateToken(c: Context): Promise<Response> {
 
 async function handleDeleteToken(c: Context): Promise<Response> {
   const project = await findProject(c.req.param("slug") ?? "");
-  await new TokenModel(getStore().db, { tokens }).remove(c.req.param("tokenId") ?? "");
+  await new TokenModel(getStore().db, { tokens: getStore().db.tables.tokens }).remove(
+    c.req.param("tokenId") ?? "",
+  );
   return hxRedirect(c, `/projects/${project.slug}/settings/tokens`);
 }

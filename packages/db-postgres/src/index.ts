@@ -75,6 +75,7 @@ export function createPostgresDatabase(options: PostgresDatabaseOptions): Databa
       kind: "postgres",
       category: "database",
     },
+    tables: schema as unknown as DatabaseAdapter["tables"],
     migrate: async () => {
       await runMigrations(client);
     },

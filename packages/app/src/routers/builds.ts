@@ -2,7 +2,6 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { DEFAULT_MAX_UPLOAD_BYTES } from "@storyshelf/core/config";
 import { BuildModel } from "@storyshelf/core/models";
 import { storybookZipPath } from "@storyshelf/core/utils";
-import { buildLabels, builds as buildsTable, snapshots } from "@storyshelf/db-sqlite/schema";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
@@ -21,24 +20,21 @@ import {
 
 async function upsertContentRef(hash: string): Promise<void> {
   try {
-    const { contentRefs } = await import("@storyshelf/db-sqlite/schema");
+    const contentRefs = getStore().db.tables.contentRefs;
     const now = new Date().toISOString();
-    const existing = await getStore().db.get(contentRefs as never, hash);
+    const existing = await getStore().db.get(contentRefs, hash);
     if (existing) {
-      await getStore().db.update(contentRefs as never, hash, {
+      await getStore().db.update(contentRefs, hash, {
         refCount: (existing as { refCount: number }).refCount + 1,
         lastSeenAt: now,
-      } as never);
+      });
     } else {
-      await getStore().db.insert(
-        contentRefs as never,
-        {
-          hash,
-          refCount: 1,
-          lastSeenAt: now,
-          createdAt: now,
-        } as never,
-      );
+      await getStore().db.insert(contentRefs, {
+        hash,
+        refCount: 1,
+        lastSeenAt: now,
+        createdAt: now,
+      });
     }
   } catch {
     // ignore — content_refs may not exist on old DB
@@ -60,9 +56,9 @@ export function registerBuilds(app: ShelfRouter): void {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...VIEW_ROLES);
     const { status, branch, labelKey, labelValue } = c.req.valid("query");
     const builds = new BuildModel(getStore().db, {
-      builds: buildsTable,
-      buildLabels,
-      snapshots,
+      builds: getStore().db.tables.builds,
+      buildLabels: getStore().db.tables.buildLabels,
+      snapshots: getStore().db.tables.snapshots,
     }).list(project.id, {
       status,
       branch: branch ?? undefined,
@@ -170,24 +166,21 @@ export function registerBuilds(app: ShelfRouter): void {
     // Upsert content_refs for each hash
     for (const f of files) {
       try {
-        const { contentRefs } = await import("@storyshelf/db-sqlite/schema");
+        const contentRefs = getStore().db.tables.contentRefs;
         const now = new Date().toISOString();
-        const existing = await getStore().db.get(contentRefs as never, f.hash);
+        const existing = await getStore().db.get(contentRefs, f.hash);
         // oxlint-disable-next-line unicorn/no-if-else -- upsert is clearer as if/else
         if (!existing) {
-          await getStore().db.insert(
-            contentRefs as never,
-            {
-              hash: f.hash,
-              refCount: 1,
-              lastSeenAt: now,
-              createdAt: now,
-            } as never,
-          );
-        } else {
-          await getStore().db.update(contentRefs as never, f.hash, {
+          await getStore().db.insert(contentRefs, {
+            hash: f.hash,
+            refCount: 1,
             lastSeenAt: now,
-          } as never);
+            createdAt: now,
+          });
+        } else {
+          await getStore().db.update(contentRefs, f.hash, {
+            lastSeenAt: now,
+          });
         }
       } catch {
         // ignore — content_refs may not exist
@@ -210,9 +203,9 @@ export function registerBuilds(app: ShelfRouter): void {
     const project = await resolveAuthorizedProject(c, slug, ...DEVELOPER_ROLES);
     const build = await buildForProject(project.id, buildId);
     const updated = await new BuildModel(getStore().db, {
-      builds: buildsTable,
-      buildLabels,
-      snapshots,
+      builds: getStore().db.tables.builds,
+      buildLabels: getStore().db.tables.buildLabels,
+      snapshots: getStore().db.tables.snapshots,
     }).setStatus(build.id, "pending");
     await getStore().enqueueCapture?.(build.id, c.get("requestId"));
     return c.json(updated, 202);
@@ -222,9 +215,11 @@ export function registerBuilds(app: ShelfRouter): void {
     const { slug, buildId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...APPROVER_ROLES);
     const build = await buildForProject(project.id, buildId);
-    await new BuildModel(getStore().db, { builds: buildsTable, buildLabels, snapshots }).remove(
-      build.id,
-    );
+    await new BuildModel(getStore().db, {
+      builds: getStore().db.tables.builds,
+      buildLabels: getStore().db.tables.buildLabels,
+      snapshots: getStore().db.tables.snapshots,
+    }).remove(build.id);
     return c.body(null, 204);
   });
 

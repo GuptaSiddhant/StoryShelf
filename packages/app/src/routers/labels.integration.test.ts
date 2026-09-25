@@ -2,7 +2,6 @@ import { LabelModel } from "@storyshelf/core/models";
 import type { Build } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
-import { buildLabels, builds, labelTypes, schema } from "@storyshelf/db-sqlite/schema";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
@@ -46,8 +45,12 @@ describe("Label-driven build resolution", () => {
 
   it("creates and lists label types", async () => {
     const { db } = makeDatabase();
-    await db.insert(schema.projects, mockProject);
-    const labelModel = new LabelModel(db, { builds, buildLabels, labelTypes });
+    await db.insert(db.tables.projects, mockProject);
+    const labelModel = new LabelModel(db, {
+      builds: db.tables.builds,
+      buildLabels: db.tables.buildLabels,
+      labelTypes: db.tables.labelTypes,
+    });
 
     const labelType = await labelModel.createType("p1", {
       key: "custom",
@@ -66,9 +69,13 @@ describe("Label-driven build resolution", () => {
 
   it("attaches labels to builds", async () => {
     const { db } = makeDatabase();
-    await db.insert(schema.projects, mockProject);
-    await db.insert(schema.builds, mockBuild);
-    const labelModel = new LabelModel(db, { builds, buildLabels, labelTypes });
+    await db.insert(db.tables.projects, mockProject);
+    await db.insert(db.tables.builds, mockBuild);
+    const labelModel = new LabelModel(db, {
+      builds: db.tables.builds,
+      buildLabels: db.tables.buildLabels,
+      labelTypes: db.tables.labelTypes,
+    });
 
     const label = await labelModel.attach("p1", "b1", "branch", "main");
     expect(label.buildId).toBe("b1");
@@ -82,9 +89,13 @@ describe("Label-driven build resolution", () => {
 
   it("finds latest build by label", async () => {
     const { db } = makeDatabase();
-    await db.insert(schema.projects, mockProject);
-    await db.insert(schema.builds, mockBuild);
-    const labelModel = new LabelModel(db, { builds, buildLabels, labelTypes });
+    await db.insert(db.tables.projects, mockProject);
+    await db.insert(db.tables.builds, mockBuild);
+    const labelModel = new LabelModel(db, {
+      builds: db.tables.builds,
+      buildLabels: db.tables.buildLabels,
+      labelTypes: db.tables.labelTypes,
+    });
 
     await labelModel.attach("p1", "b1", "branch", "main");
 
@@ -94,8 +105,12 @@ describe("Label-driven build resolution", () => {
 
   it("returns null for non-existent label", async () => {
     const { db } = makeDatabase();
-    await db.insert(schema.projects, mockProject);
-    const labelModel = new LabelModel(db, { builds, buildLabels, labelTypes });
+    await db.insert(db.tables.projects, mockProject);
+    const labelModel = new LabelModel(db, {
+      builds: db.tables.builds,
+      buildLabels: db.tables.buildLabels,
+      labelTypes: db.tables.labelTypes,
+    });
 
     const latestBuildId = await labelModel.latestBuildId("p1", "branch", "nonexistent");
     expect(latestBuildId).toBeNull();
@@ -103,9 +118,13 @@ describe("Label-driven build resolution", () => {
 
   it("checks persistent label", async () => {
     const { db } = makeDatabase();
-    await db.insert(schema.projects, mockProject);
-    await db.insert(schema.builds, mockBuild);
-    const labelModel = new LabelModel(db, { builds, buildLabels, labelTypes });
+    await db.insert(db.tables.projects, mockProject);
+    await db.insert(db.tables.builds, mockBuild);
+    const labelModel = new LabelModel(db, {
+      builds: db.tables.builds,
+      buildLabels: db.tables.buildLabels,
+      labelTypes: db.tables.labelTypes,
+    });
 
     expect(await labelModel.hasPersistent("p1", "b1")).toBe(false);
 
@@ -116,8 +135,12 @@ describe("Label-driven build resolution", () => {
 
   it("removes custom label types", async () => {
     const { db } = makeDatabase();
-    await db.insert(schema.projects, mockProject);
-    const labelModel = new LabelModel(db, { builds, buildLabels, labelTypes });
+    await db.insert(db.tables.projects, mockProject);
+    const labelModel = new LabelModel(db, {
+      builds: db.tables.builds,
+      buildLabels: db.tables.buildLabels,
+      labelTypes: db.tables.labelTypes,
+    });
 
     await labelModel.createType("p1", { key: "custom", name: "Custom" });
     await labelModel.removeType("p1", "custom");
@@ -128,8 +151,12 @@ describe("Label-driven build resolution", () => {
 
   it("rejects removal of reserved label types", async () => {
     const { db } = makeDatabase();
-    await db.insert(schema.projects, mockProject);
-    const labelModel = new LabelModel(db, { builds, buildLabels, labelTypes });
+    await db.insert(db.tables.projects, mockProject);
+    const labelModel = new LabelModel(db, {
+      builds: db.tables.builds,
+      buildLabels: db.tables.buildLabels,
+      labelTypes: db.tables.labelTypes,
+    });
 
     await expect(labelModel.removeType("p1", "persistent")).rejects.toThrow(
       "Label type 'persistent' cannot be removed.",
@@ -157,8 +184,12 @@ describe("PATCH label-type endpoint", () => {
   it("updates a custom label type", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    await db.insert(schema.projects, localProject);
-    const labelModel = new LabelModel(db, { builds, buildLabels, labelTypes });
+    await db.insert(db.tables.projects, localProject);
+    const labelModel = new LabelModel(db, {
+      builds: db.tables.builds,
+      buildLabels: db.tables.buildLabels,
+      labelTypes: db.tables.labelTypes,
+    });
     await labelModel.createType("p1", {
       key: "custom",
       name: "Custom",
@@ -186,7 +217,7 @@ describe("PATCH label-type endpoint", () => {
   it("returns 404 when patching a non-existent label type", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    await db.insert(schema.projects, localProject);
+    await db.insert(db.tables.projects, localProject);
     const app = createShelfApp({ database: db, storage, logger: silentLogger });
     const response = await app.request("/api/v1/projects/test-project/label-types/missing", {
       method: "PATCH",
@@ -199,7 +230,7 @@ describe("PATCH label-type endpoint", () => {
   it("rejects patching a reserved label type", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    await db.insert(schema.projects, localProject);
+    await db.insert(db.tables.projects, localProject);
     const app = createShelfApp({ database: db, storage, logger: silentLogger });
     const response = await app.request("/api/v1/projects/test-project/label-types/persistent", {
       method: "PATCH",

@@ -1,7 +1,6 @@
 import { WebhookModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
 import { randomToken } from "@storyshelf/core/utils";
-import { webhooks } from "@storyshelf/db-sqlite/schema";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
@@ -67,7 +66,11 @@ async function createWebhookRecord(
   url: string,
   events: string[] | undefined,
 ): Promise<Response> {
-  const webhookModel = new WebhookModel(getStore().db, { webhooks }, getStore().config.secret);
+  const webhookModel = new WebhookModel(
+    getStore().db,
+    { webhooks: getStore().db.tables.webhooks },
+    getStore().config.secret,
+  );
   const secret = randomToken("whsec_").value;
   await webhookModel.create(project.id, { url, events, secret });
   return c.html((await renderSettingsPage(c, "webhooks", { secret })) ?? "", 201);
@@ -75,16 +78,18 @@ async function createWebhookRecord(
 
 async function handleDeleteWebhook(c: Context): Promise<Response> {
   const project = await findProject(c.req.param("slug") ?? "");
-  const webhook = await new WebhookModel(getStore().db, { webhooks }, getStore().config.secret).get(
-    project.id,
-    c.req.param("webhookId") ?? "",
-  );
+  const webhook = await new WebhookModel(
+    getStore().db,
+    { webhooks: getStore().db.tables.webhooks },
+    getStore().config.secret,
+  ).get(project.id, c.req.param("webhookId") ?? "");
   if (!webhook) {
     notFound("Webhook not found");
   }
-  await new WebhookModel(getStore().db, { webhooks }, getStore().config.secret).remove(
-    project.id,
-    webhook.id,
-  );
+  await new WebhookModel(
+    getStore().db,
+    { webhooks: getStore().db.tables.webhooks },
+    getStore().config.secret,
+  ).remove(project.id, webhook.id);
   return hxRedirect(c, `/projects/${project.slug}/settings/webhooks`);
 }

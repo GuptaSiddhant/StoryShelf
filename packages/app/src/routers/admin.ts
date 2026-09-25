@@ -2,12 +2,6 @@
 import { createRoute } from "@hono/zod-openapi";
 import { ProjectModel } from "@storyshelf/core/models";
 import { Retention } from "@storyshelf/core/retention";
-import {
-  baselines,
-  buildLabels,
-  builds,
-  projects as projectsTable,
-} from "@storyshelf/db-sqlite/schema";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
 import { requireSiteAdmin } from "./helpers.ts";
@@ -43,11 +37,17 @@ export function registerAdmin(app: ShelfRouter): void {
 
 // oxlint-disable-next-line typescript/promise-function-async
 async function purgeBuilds(ttlDays: number): Promise<number> {
-  const projects = await new ProjectModel(getStore().db, { projects: projectsTable }).list();
+  const projects = await new ProjectModel(getStore().db, {
+    projects: getStore().db.tables.projects,
+  }).list();
   const retention = new Retention(
     getStore().db,
     getStore().storage,
-    { builds, buildLabels, baselines },
+    {
+      builds: getStore().db.tables.builds,
+      buildLabels: getStore().db.tables.buildLabels,
+      baselines: getStore().db.tables.baselines,
+    },
     getStore().logger,
   );
   const results = await Promise.all(
@@ -62,11 +62,17 @@ async function purgeBranches(): Promise<{ removedBranches: number; removedBaseli
   if (branchTtl === null) {
     return { removedBranches: 0, removedBaselines: 0 };
   }
-  const projects = await new ProjectModel(getStore().db, { projects: projectsTable }).list();
+  const projects = await new ProjectModel(getStore().db, {
+    projects: getStore().db.tables.projects,
+  }).list();
   const retention = new Retention(
     getStore().db,
     getStore().storage,
-    { builds, buildLabels, baselines },
+    {
+      builds: getStore().db.tables.builds,
+      buildLabels: getStore().db.tables.buildLabels,
+      baselines: getStore().db.tables.baselines,
+    },
     getStore().logger,
   );
   const results = await Promise.all(

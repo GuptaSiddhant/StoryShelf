@@ -2,7 +2,6 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { WebhookModel } from "@storyshelf/core/models";
 import type { ProjectRole } from "@storyshelf/core/types";
 import { randomToken } from "@storyshelf/core/utils";
-import { webhooks as webhooksTable } from "@storyshelf/db-sqlite/schema";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
 import { resolveAuthorizedProject, notFound } from "./helpers.ts";
@@ -61,7 +60,7 @@ export function registerWebhooks(app: ShelfRouter): void {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
     const webhooks = await new WebhookModel(
       getStore().db,
-      { webhooks: webhooksTable },
+      { webhooks: getStore().db.tables.webhooks },
       getStore().config.secret,
     ).list(project.id);
     return c.json(
@@ -79,7 +78,7 @@ export function registerWebhooks(app: ShelfRouter): void {
     const secret = randomToken("whsec_").value;
     const webhook = await new WebhookModel(
       getStore().db,
-      { webhooks: webhooksTable },
+      { webhooks: getStore().db.tables.webhooks },
       getStore().config.secret,
     ).create(project.id, { ...body, secret });
     return c.json({ id: webhook.id, url: webhook.url, events: body.events ?? [], secret }, 201);
@@ -90,7 +89,7 @@ export function registerWebhooks(app: ShelfRouter): void {
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
     const webhook = await new WebhookModel(
       getStore().db,
-      { webhooks: webhooksTable },
+      { webhooks: getStore().db.tables.webhooks },
       getStore().config.secret,
     ).get(project.id, webhookId);
     if (!webhook) {
@@ -98,7 +97,7 @@ export function registerWebhooks(app: ShelfRouter): void {
     }
     await new WebhookModel(
       getStore().db,
-      { webhooks: webhooksTable },
+      { webhooks: getStore().db.tables.webhooks },
       getStore().config.secret,
     ).remove(project.id, webhook.id);
     return c.body(null, 204);

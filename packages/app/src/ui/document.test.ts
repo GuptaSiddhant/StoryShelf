@@ -1,7 +1,6 @@
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { BuildModel, ProjectModel, SnapshotModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
-import { buildLabels, builds, projects, snapshots } from "@storyshelf/db-sqlite/schema";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
 
@@ -35,12 +34,18 @@ describe("DocumentLayout stylesheet", () => {
   it("collects hono/css component styles into the storyshelf-css tag", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const project = await new ProjectModel(db, { projects }).create({ name: "Docs" });
-    const build = await new BuildModel(db, { builds, buildLabels, snapshots }).create(project.id, {
+    const project = await new ProjectModel(db, { projects: db.tables.projects }).create({
+      name: "Docs",
+    });
+    const build = await new BuildModel(db, {
+      builds: db.tables.builds,
+      buildLabels: db.tables.buildLabels,
+      snapshots: db.tables.snapshots,
+    }).create(project.id, {
       gitSha: "abc123",
       gitBranch: "main",
     });
-    await new SnapshotModel(db, { snapshots }).create(project.id, build.id, {
+    await new SnapshotModel(db, { snapshots: db.tables.snapshots }).create(project.id, build.id, {
       storyId: "button--primary",
       storyName: "Primary",
       storyTitle: "Button",

@@ -1,7 +1,6 @@
 import { BROWSER_NAMES } from "@storyshelf/core/adapter/capture-runner";
 import { ProjectModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
-import { projects } from "@storyshelf/db-sqlite/schema";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
@@ -73,16 +72,19 @@ async function persistGeneralUpdate(
   fields: GeneralFields,
 ): Promise<Response> {
   try {
-    await new ProjectModel(getStore().db, { projects }).update(project.id, {
-      name: fields.name,
-      gitRepository: fields.gitRepository ?? undefined,
-      gitDefaultBranch: fields.gitDefaultBranch ?? undefined,
-      pixelThreshold: fields.pixelThreshold ? Number(fields.pixelThreshold) : undefined,
-      maxDiffRatio: fields.maxDiffRatio ? Number(fields.maxDiffRatio) : undefined,
-      publicBranchRegex:
-        fields.publicBranchRegex === "" ? null : (fields.publicBranchRegex ?? undefined),
-      browser: fields.browser ?? undefined,
-    });
+    await new ProjectModel(getStore().db, { projects: getStore().db.tables.projects }).update(
+      project.id,
+      {
+        name: fields.name,
+        gitRepository: fields.gitRepository ?? undefined,
+        gitDefaultBranch: fields.gitDefaultBranch ?? undefined,
+        pixelThreshold: fields.pixelThreshold ? Number(fields.pixelThreshold) : undefined,
+        maxDiffRatio: fields.maxDiffRatio ? Number(fields.maxDiffRatio) : undefined,
+        publicBranchRegex:
+          fields.publicBranchRegex === "" ? null : (fields.publicBranchRegex ?? undefined),
+        browser: fields.browser ?? undefined,
+      },
+    );
     return hxRedirect(c, `/projects/${slug}/settings`);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to update";
@@ -133,10 +135,13 @@ async function persistTestsUpdate(
   playTimeoutMs: number | undefined,
 ): Promise<Response> {
   try {
-    await new ProjectModel(getStore().db, { projects }).update(project.id, {
-      executePlay,
-      playTimeoutMs: playTimeoutMs ?? undefined,
-    });
+    await new ProjectModel(getStore().db, { projects: getStore().db.tables.projects }).update(
+      project.id,
+      {
+        executePlay,
+        playTimeoutMs: playTimeoutMs ?? undefined,
+      },
+    );
     return hxRedirect(c, `/projects/${slug}/settings/tests`);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to update";
@@ -146,6 +151,8 @@ async function persistTestsUpdate(
 
 async function handleDeleteProject(c: Context): Promise<Response> {
   const project = await findProject(c.req.param("slug") ?? "");
-  await new ProjectModel(getStore().db, { projects }).remove(project.id);
+  await new ProjectModel(getStore().db, { projects: getStore().db.tables.projects }).remove(
+    project.id,
+  );
   return hxRedirect(c, "/projects");
 }

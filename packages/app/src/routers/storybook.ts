@@ -4,7 +4,6 @@ import { ProjectModel } from "@storyshelf/core/models";
 import type { Build } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import { isSafeSegment, mimeFor, storybookDir } from "@storyshelf/core/utils";
-import { buildLabels, builds, labelTypes, projects, snapshots } from "@storyshelf/db-sqlite/schema";
 import { posix } from "node:path";
 import type { ShelfRouter } from "../app-types.ts";
 import { renderStorybookPage, renderStorybookPreparingPage } from "../pages/storybook.tsx";
@@ -88,14 +87,16 @@ export function registerStorybook(app: ShelfRouter): void {
   // Resolver: latest published build on the default branch.
   app.get("/projects/:slug/storybook", async (c) => {
     const slug = c.req.param("slug");
-    const project = await new ProjectModel(getStore().db, { projects }).getBySlug(slug);
+    const project = await new ProjectModel(getStore().db, {
+      projects: getStore().db.tables.projects,
+    }).getBySlug(slug);
     if (!project) {
       notFound("Project not found");
     }
     const build = await new BuildModel(getStore().db, {
-      builds,
-      buildLabels,
-      snapshots,
+      builds: getStore().db.tables.builds,
+      buildLabels: getStore().db.tables.buildLabels,
+      snapshots: getStore().db.tables.snapshots,
     }).latestPublished(project);
     if (!build) {
       notFound("No published Storybook for this project");
@@ -114,21 +115,25 @@ export function registerStorybook(app: ShelfRouter): void {
       return c.notFound();
     }
     const value = c.req.param("value");
-    const project = await new ProjectModel(getStore().db, { projects }).getBySlug(slug);
+    const project = await new ProjectModel(getStore().db, {
+      projects: getStore().db.tables.projects,
+    }).getBySlug(slug);
     if (!project) {
       notFound("Project not found");
     }
     const buildId = await new LabelModel(getStore().db, {
-      builds,
-      buildLabels,
-      labelTypes,
+      builds: getStore().db.tables.builds,
+      buildLabels: getStore().db.tables.buildLabels,
+      labelTypes: getStore().db.tables.labelTypes,
     }).latestBuildId(project.id, key, value);
     if (!buildId) {
       notFound("No build carries that label");
     }
-    const build = await new BuildModel(getStore().db, { builds, buildLabels, snapshots }).get(
-      buildId,
-    );
+    const build = await new BuildModel(getStore().db, {
+      builds: getStore().db.tables.builds,
+      buildLabels: getStore().db.tables.buildLabels,
+      snapshots: getStore().db.tables.snapshots,
+    }).get(buildId);
     if (!build || !(await canViewBuild(build, project))) {
       return c.redirect("/auth/login", 302);
     }
@@ -141,10 +146,16 @@ export function registerStorybook(app: ShelfRouter): void {
     const id = c.req.param("id");
     const isUlid26 = id.length === 26 && /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/u.test(id);
     if (isUlid26) {
-      const build = await new BuildModel(getStore().db, { builds, buildLabels, snapshots }).get(id);
+      const build = await new BuildModel(getStore().db, {
+        builds: getStore().db.tables.builds,
+        buildLabels: getStore().db.tables.buildLabels,
+        snapshots: getStore().db.tables.snapshots,
+      }).get(id);
       if (!build) notFound();
     } else {
-      const project = await new ProjectModel(getStore().db, { projects }).getBySlug(id);
+      const project = await new ProjectModel(getStore().db, {
+        projects: getStore().db.tables.projects,
+      }).getBySlug(id);
       if (!project) notFound();
     }
     return c.redirect(`/_/${id}/`, 302);
@@ -164,22 +175,32 @@ export function registerStorybook(app: ShelfRouter): void {
     let project: Project | null = null;
     let build: Build | null = null;
     if (isUlid26) {
-      build = await new BuildModel(getStore().db, { builds, buildLabels, snapshots }).get(id);
+      build = await new BuildModel(getStore().db, {
+        builds: getStore().db.tables.builds,
+        buildLabels: getStore().db.tables.buildLabels,
+        snapshots: getStore().db.tables.snapshots,
+      }).get(id);
       if (!build) return c.notFound();
-      project = await new ProjectModel(getStore().db, { projects }).get(build.projectId);
+      project = await new ProjectModel(getStore().db, {
+        projects: getStore().db.tables.projects,
+      }).get(build.projectId);
       if (!project) return c.notFound();
     } else {
-      project = await new ProjectModel(getStore().db, { projects }).getBySlug(id);
+      project = await new ProjectModel(getStore().db, {
+        projects: getStore().db.tables.projects,
+      }).getBySlug(id);
       if (!project) return c.notFound();
       build = await new BuildModel(getStore().db, {
-        builds,
-        buildLabels,
-        snapshots,
+        builds: getStore().db.tables.builds,
+        buildLabels: getStore().db.tables.buildLabels,
+        snapshots: getStore().db.tables.snapshots,
       }).latestPublished(project);
       if (!build) {
-        const all = await new BuildModel(getStore().db, { builds, buildLabels, snapshots }).list(
-          project.id,
-        );
+        const all = await new BuildModel(getStore().db, {
+          builds: getStore().db.tables.builds,
+          buildLabels: getStore().db.tables.buildLabels,
+          snapshots: getStore().db.tables.snapshots,
+        }).list(project.id);
         build = all[0] ?? null;
       }
       if (!build) return c.notFound();
@@ -237,13 +258,17 @@ export function registerStorybook(app: ShelfRouter): void {
     } catch {
       return c.notFound();
     }
-    const project = await new ProjectModel(getStore().db, { projects }).getBySlug(slug);
+    const project = await new ProjectModel(getStore().db, {
+      projects: getStore().db.tables.projects,
+    }).getBySlug(slug);
     if (!project) {
       notFound("Project not found");
     }
-    const build = await new BuildModel(getStore().db, { builds, buildLabels, snapshots }).get(
-      buildId,
-    );
+    const build = await new BuildModel(getStore().db, {
+      builds: getStore().db.tables.builds,
+      buildLabels: getStore().db.tables.buildLabels,
+      snapshots: getStore().db.tables.snapshots,
+    }).get(buildId);
     if (!build || build.projectId !== project.id) {
       notFound("Build not found");
     }

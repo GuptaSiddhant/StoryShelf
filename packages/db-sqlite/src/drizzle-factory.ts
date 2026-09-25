@@ -24,6 +24,7 @@ export function createDrizzleAdapter(db: unknown, options: DrizzleAdapterOptions
   let closed = false;
   return {
     metadata: options.metadata,
+    tables: options.tables,
     lifecycle: {
       setup: async () => {
         await options.migrate();

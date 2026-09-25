@@ -3,7 +3,6 @@ import { BuildModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
 import { SnapshotModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
-import { buildLabels, builds, projects, snapshots } from "@storyshelf/db-sqlite/schema";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "./index.tsx";
 function makeApp(): ReturnType<typeof createShelfApp> {
@@ -43,29 +42,43 @@ describe("Capture pipeline integration", () => {
 
   it("creates and reviews a snapshot", async () => {
     const { db } = makeDatabase();
-    const project = await new ProjectModel(db, { projects }).create({
+    const project = await new ProjectModel(db, { projects: db.tables.projects }).create({
       name: "Snapshot Test",
       gitDefaultBranch: "main",
     });
-    const build = await new BuildModel(db, { builds, buildLabels, snapshots }).create(project.id, {
+    const build = await new BuildModel(db, {
+      builds: db.tables.builds,
+      buildLabels: db.tables.buildLabels,
+      snapshots: db.tables.snapshots,
+    }).create(project.id, {
       gitSha: "sha-abc",
       gitBranch: "main",
       isDefault: true,
     });
 
-    const snapshot = await new SnapshotModel(db, { snapshots }).create(project.id, build.id, {
-      storyId: "components-button--primary",
-      storyName: "Components/Button",
-      storyTitle: "Components/Button",
-      storyImportPath: "./Button.stories.tsx",
-      viewportName: "desktop",
-      viewportWidth: 800,
-      viewportHeight: 600,
-      screenshotPath: `/screenshots/${build.id}-test.png`,
-    });
+    const snapshot = await new SnapshotModel(db, { snapshots: db.tables.snapshots }).create(
+      project.id,
+      build.id,
+      {
+        storyId: "components-button--primary",
+        storyName: "Components/Button",
+        storyTitle: "Components/Button",
+        storyImportPath: "./Button.stories.tsx",
+        viewportName: "desktop",
+        viewportWidth: 800,
+        viewportHeight: 600,
+        screenshotPath: `/screenshots/${build.id}-test.png`,
+      },
+    );
 
-    await new SnapshotModel(db, { snapshots }).review(snapshot.id, "approved", "user-1");
-    const updatedSnapshot = await new SnapshotModel(db, { snapshots }).get(snapshot.id);
+    await new SnapshotModel(db, { snapshots: db.tables.snapshots }).review(
+      snapshot.id,
+      "approved",
+      "user-1",
+    );
+    const updatedSnapshot = await new SnapshotModel(db, { snapshots: db.tables.snapshots }).get(
+      snapshot.id,
+    );
     expect(updatedSnapshot?.status).toBe("approved");
   });
 

@@ -2,7 +2,6 @@ import { CaptureAttemptModel } from "@storyshelf/core/models";
 import { CaptureLogModel } from "@storyshelf/core/models";
 import type { Build, Project } from "@storyshelf/core/schema";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
-import { captureAttempts, captureLogs, schema } from "@storyshelf/db-sqlite/schema";
 import { pino } from "pino";
 import { describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "../index.tsx";
@@ -44,21 +43,21 @@ const build: Build = {
   updatedAt: "2026-01-01T00:00:00.000Z",
 };
 
-function attemptTables() {
-  return { captureAttempts: captureAttempts as unknown as never };
+function attemptTables(db: ReturnType<typeof makeDatabase>["db"]) {
+  return { captureAttempts: db.tables.captureAttempts };
 }
 
-function logTables() {
-  return { captureLogs: captureLogs as unknown as never };
+function logTables(db: ReturnType<typeof makeDatabase>["db"]) {
+  return { captureLogs: db.tables.captureLogs };
 }
 
 async function setupSeeded() {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
-  await db.insert(schema.projects, project);
-  await db.insert(schema.builds, build);
-  const attempts = new CaptureAttemptModel(db, attemptTables());
-  const logs = new CaptureLogModel(db, logTables());
+  await db.insert(db.tables.projects, project);
+  await db.insert(db.tables.builds, build);
+  const attempts = new CaptureAttemptModel(db, attemptTables(db));
+  const logs = new CaptureLogModel(db, logTables(db));
   const first = await attempts.startAttempt("p1", "b1", "req-1");
   await logs.append("p1", "b1", first.id, "info", "storybook extracted", { durationMs: 3 });
   await logs.append("p1", "b1", first.id, "error", "capture failed");
@@ -110,8 +109,8 @@ describe("retry re-queues capture", () => {
   it("resets to pending and enqueues the build", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    await db.insert(schema.projects, project);
-    await db.insert(schema.builds, { ...build, status: "failed" });
+    await db.insert(db.tables.projects, project);
+    await db.insert(db.tables.builds, { ...build, status: "failed" });
     const enqueue = vi.fn(async () => {});
     const queue = {
       metadata: {

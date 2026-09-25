@@ -1,5 +1,4 @@
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
-import { projects } from "@storyshelf/db-sqlite/schema";
 import { Writable } from "node:stream";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
@@ -27,7 +26,7 @@ async function seed() {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
   const now = new Date().toISOString();
-  await db.insert(projects, {
+  await db.insert(db.tables.projects, {
     id: "p1",
     name: "Viewer Project",
     slug: "viewer-project",

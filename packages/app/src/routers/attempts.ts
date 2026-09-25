@@ -2,10 +2,6 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { CaptureAttemptModel } from "@storyshelf/core/models";
 import { CaptureLogModel } from "@storyshelf/core/models";
 import type { Build, CaptureAttempt } from "@storyshelf/core/schema";
-import {
-  captureAttempts as captureAttemptsTable,
-  captureLogs as captureLogsTable,
-} from "@storyshelf/db-sqlite/schema";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
@@ -19,7 +15,7 @@ export function registerAttempts(app: ShelfRouter): void {
   app.openapi(listAttemptsRoute, async (c) => {
     const build = await scopedBuild(c, c.req.valid("param"));
     const attempts = await new CaptureAttemptModel(getStore().db, {
-      captureAttempts: captureAttemptsTable,
+      captureAttempts: getStore().db.tables.captureAttempts,
     }).listByBuild(build.id);
     return c.json(attempts);
   });
@@ -33,7 +29,7 @@ export function registerAttempts(app: ShelfRouter): void {
     const build = await scopedBuild(c, c.req.valid("param"));
     const attempt = await attemptForBuild(build, c.req.valid("param").attemptNo);
     const logs = await new CaptureLogModel(getStore().db, {
-      captureLogs: captureLogsTable,
+      captureLogs: getStore().db.tables.captureLogs,
     }).listByAttempt(attempt.id);
     return c.json(logs);
   });
@@ -98,7 +94,7 @@ async function scopedBuild(c: Context, params: { slug: string; buildId: string }
 /** Fetch an attempt scoped to its build, throwing 404 when it does not belong. */
 async function attemptForBuild(build: Build, attemptNo: number): Promise<CaptureAttempt> {
   const attempt = await new CaptureAttemptModel(getStore().db, {
-    captureAttempts: captureAttemptsTable,
+    captureAttempts: getStore().db.tables.captureAttempts,
   }).getByNo(build.id, attemptNo);
   if (!attempt) {
     notFound("Attempt not found");

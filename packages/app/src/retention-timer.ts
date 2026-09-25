@@ -5,12 +5,7 @@ import type { Logger } from "@storyshelf/core/logger";
 /* oxlint-disable typescript/promise-function-async -- interval helpers return promise factories */
 import { ProjectModel } from "@storyshelf/core/models";
 import { Retention } from "@storyshelf/core/retention";
-import {
-  baselines,
-  buildLabels,
-  builds,
-  projects as projectsTable,
-} from "@storyshelf/db-sqlite/schema";
+
 const DEFAULT_BRANCH_TTL_DAYS = 30;
 const DEFAULT_BRANCH_GC_INTERVAL_MS = 86_400_000;
 
@@ -57,8 +52,17 @@ function createBranchGcRunner(
 ): () => Promise<void> {
   return async (): Promise<void> => {
     try {
-      const projects = await new ProjectModel(db, { projects: projectsTable }).list();
-      const retention = new Retention(db, storage, { builds, buildLabels, baselines }, logger);
+      const projects = await new ProjectModel(db, { projects: db.tables.projects }).list();
+      const retention = new Retention(
+        db,
+        storage,
+        {
+          builds: db.tables.builds,
+          buildLabels: db.tables.buildLabels,
+          baselines: db.tables.baselines,
+        },
+        logger,
+      );
       const results = await Promise.all(
         projects.map((project) => retention.purgeStaleBranches(project, ttlDays)),
       );

@@ -2,7 +2,6 @@ import { MemberModel } from "@storyshelf/core/models";
 import { TokenModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { sha256 } from "@storyshelf/core/utils";
-import { projectMembers, projects, tokens, users } from "@storyshelf/db-sqlite/schema";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
@@ -38,7 +37,7 @@ async function seed() {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
   const now = new Date().toISOString();
-  await db.insert(projects, {
+  await db.insert(db.tables.projects, {
     id: "p1",
     name: "Token Project",
     slug: "token-project",
@@ -52,10 +51,14 @@ async function seed() {
       { ...admin, avatarUrl: null, lastLoginAt: null, createdAt: now },
       { ...dev, avatarUrl: null, lastLoginAt: null, createdAt: now },
     ].map(async (user) => {
-      await db.insert(users, user);
+      await db.insert(db.tables.users, user);
     }),
   );
-  await new MemberModel(db, { projectMembers }).set("p1", dev.id, "developer");
+  await new MemberModel(db, { projectMembers: db.tables.projectMembers }).set(
+    "p1",
+    dev.id,
+    "developer",
+  );
   const app = createShelfApp({
     database: db,
     storage,
@@ -72,7 +75,7 @@ async function mint(
   value: string,
   userId: string | null,
 ): Promise<void> {
-  await new TokenModel(db, { tokens }).create("p1", {
+  await new TokenModel(db, { tokens: db.tables.tokens }).create("p1", {
     name,
     hash: sha256(value),
     userId,
@@ -158,7 +161,7 @@ describe("bearer token permissions", () => {
       body: JSON.stringify({ name: "ci" }),
     });
     expect(created.status).toBe(201);
-    const listed = await new TokenModel(db, { tokens }).list("p1");
+    const listed = await new TokenModel(db, { tokens: db.tables.tokens }).list("p1");
     const row = listed.find((token) => token.name === "ci");
     expect(row?.userId).toBe(admin.id);
   });

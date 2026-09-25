@@ -12,15 +12,6 @@ import { SnapshotModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
 import type { Build, Snapshot } from "@storyshelf/core/schema";
 import { type ProjectRole, BUILD_STATUSES } from "@storyshelf/core/types";
-import {
-  baselines as baselinesTable,
-  buildLabels,
-  builds,
-  labelTypes,
-  projects,
-  snapshots as snapshotsTable,
-  webhooks,
-} from "@storyshelf/db-sqlite/schema";
 import { HTTPException } from "hono/http-exception";
 import { Readable, Transform } from "node:stream";
 import type { ReadableStream as NodeWebStream } from "node:stream/web";
@@ -38,23 +29,24 @@ export async function createBuildRecord(
   if (!meta.gitSha || !meta.gitBranch) {
     throw new HTTPException(400, { message: "gitSha and gitBranch are required" });
   }
-  const build = await new BuildModel(db, { builds, buildLabels, snapshots: snapshotsTable }).create(
-    project.id,
-    {
-      gitSha: meta.gitSha,
-      gitBranch: meta.gitBranch,
-      isDefault: meta.gitBranch === project.gitDefaultBranch,
-      authorEmail: meta.authorEmail,
-      authorName: meta.authorName,
-      message: meta.message,
-    },
-  );
+  const build = await new BuildModel(db, {
+    builds: getStore().db.tables.builds,
+    buildLabels: getStore().db.tables.buildLabels,
+    snapshots: getStore().db.tables.snapshots,
+  }).create(project.id, {
+    gitSha: meta.gitSha,
+    gitBranch: meta.gitBranch,
+    isDefault: meta.gitBranch === project.gitDefaultBranch,
+    authorEmail: meta.authorEmail,
+    authorName: meta.authorName,
+    message: meta.message,
+  });
   if (meta.labels && meta.labels.length > 0) {
     await attachLabels(db, project.id, build.id, meta.labels);
   }
   await emitWebhookEvent(
     db,
-    { webhooks },
+    { webhooks: getStore().db.tables.webhooks },
     project.id,
     "build:created",
     {
@@ -150,9 +142,9 @@ export const buildListQuery = z.object({
 /** Fetch a build scoped to its project, throwing 404 when it does not belong. */
 export async function buildForProject(projectId: string, buildId: string): Promise<Build> {
   const build = await new BuildModel(getStore().db, {
-    builds,
-    buildLabels,
-    snapshots: snapshotsTable,
+    builds: getStore().db.tables.builds,
+    buildLabels: getStore().db.tables.buildLabels,
+    snapshots: getStore().db.tables.snapshots,
   }).get(buildId);
   if (!build || build.projectId !== projectId) {
     notFound("Build not found");
@@ -165,9 +157,9 @@ export async function snapshotForBuild(
   build: { id: string },
   snapshotId: string,
 ): Promise<Snapshot> {
-  const snapshot = await new SnapshotModel(getStore().db, { snapshots: snapshotsTable }).get(
-    snapshotId,
-  );
+  const snapshot = await new SnapshotModel(getStore().db, {
+    snapshots: getStore().db.tables.snapshots,
+  }).get(snapshotId);
   if (!snapshot || snapshot.buildId !== build.id) {
     notFound("Snapshot not found");
   }
@@ -177,10 +169,14 @@ export async function snapshotForBuild(
 /** Recompute a build's counts and roll its status up from its snapshots. */
 export async function refreshBuild(buildId: string): Promise<void> {
   const { db, config } = getStore();
-  await new BuildModel(db, { builds, buildLabels, snapshots: snapshotsTable }).updateCounts(
-    buildId,
-  );
-  const snapshots = await new SnapshotModel(db, { snapshots: snapshotsTable }).listByBuild(buildId);
+  await new BuildModel(db, {
+    builds: getStore().db.tables.builds,
+    buildLabels: getStore().db.tables.buildLabels,
+    snapshots: getStore().db.tables.snapshots,
+  }).updateCounts(buildId);
+  const snapshots = await new SnapshotModel(db, {
+    snapshots: getStore().db.tables.snapshots,
+  }).listByBuild(buildId);
   const unresolved = snapshots.some((s) => s.status === "new" || s.status === "changed");
   let status: "reviewing" | "rejected" | "approved";
   if (unresolved) {
@@ -189,17 +185,20 @@ export async function refreshBuild(buildId: string): Promise<void> {
     const rejected = snapshots.some((s) => s.status === "rejected");
     status = rejected ? "rejected" : "approved";
   }
-  const build = await new BuildModel(db, { builds, buildLabels, snapshots: snapshotsTable }).get(
-    buildId,
-  );
+  const build = await new BuildModel(db, {
+    builds: getStore().db.tables.builds,
+    buildLabels: getStore().db.tables.buildLabels,
+    snapshots: getStore().db.tables.snapshots,
+  }).get(buildId);
   if (build) {
-    await new BuildModel(db, { builds, buildLabels, snapshots: snapshotsTable }).setStatus(
-      buildId,
-      status,
-    );
+    await new BuildModel(db, {
+      builds: getStore().db.tables.builds,
+      buildLabels: getStore().db.tables.buildLabels,
+      snapshots: getStore().db.tables.snapshots,
+    }).setStatus(buildId, status);
     await emitWebhookEvent(
       db,
-      { webhooks },
+      { webhooks: getStore().db.tables.webhooks },
       build.projectId,
       `build:${status}`,
       {
@@ -215,22 +214,26 @@ export async function refreshBuild(buildId: string): Promise<void> {
 /** Approve a snapshot, promote its screenshot to baseline, and refresh the build. */
 export async function approveSnapshot(snapshotId: string, userId: string | null): Promise<void> {
   const { db, config } = getStore();
-  const snapshots = new SnapshotModel(db, { snapshots: snapshotsTable });
+  const snapshots = new SnapshotModel(db, { snapshots: getStore().db.tables.snapshots });
   const snapshot = await snapshots.get(snapshotId);
   if (!snapshot) {
     notFound("Snapshot not found");
   }
-  const project = await new ProjectModel(db, { projects }).get(snapshot.projectId);
-  const build = await new BuildModel(db, { builds, buildLabels, snapshots: snapshotsTable }).get(
-    snapshot.buildId,
+  const project = await new ProjectModel(db, { projects: getStore().db.tables.projects }).get(
+    snapshot.projectId,
   );
+  const build = await new BuildModel(db, {
+    builds: getStore().db.tables.builds,
+    buildLabels: getStore().db.tables.buildLabels,
+    snapshots: getStore().db.tables.snapshots,
+  }).get(snapshot.buildId);
   if (!project || !build) {
     notFound("Project or build not found");
   }
   await snapshots.review(snapshotId, "approved", userId);
   const baselines = new BaselineModel(
     db,
-    { baselines: baselinesTable },
+    { baselines: getStore().db.tables.baselines },
     getStore().storage,
     config.secret,
   );
@@ -281,7 +284,11 @@ async function attachLabels(
   buildId: string,
   labels: { key: string; value: string }[],
 ): Promise<void> {
-  const models = new LabelModel(db, { builds, buildLabels, labelTypes });
+  const models = new LabelModel(db, {
+    builds: getStore().db.tables.builds,
+    buildLabels: getStore().db.tables.buildLabels,
+    labelTypes: getStore().db.tables.labelTypes,
+  });
   for (const { key, value } of labels) {
     const existing = await models.getType(projectId, key);
     if (!existing) {

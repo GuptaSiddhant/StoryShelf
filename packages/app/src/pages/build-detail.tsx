@@ -5,15 +5,6 @@ import { CommentModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
 import { SnapshotModel } from "@storyshelf/core/models";
 import { createUrlBuilder } from "@storyshelf/core/urls";
-import {
-  buildLabels,
-  builds,
-  captureAttempts,
-  captureLogs,
-  comments as commentsTable,
-  projects,
-  snapshots as snapshotsTable,
-} from "@storyshelf/db-sqlite/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { getStore } from "../store.ts";
 import {
@@ -58,24 +49,31 @@ function logTone(level: string): "neutral" | "success" | "warning" | "danger" | 
 /** Build overview page: snapshot grid, bulk actions, and build comments. */
 export async function renderBuildDetailPage(buildId: string): Promise<RenderedContent | null> {
   const { db } = getStore();
-  const build = await new BuildModel(db, { builds, buildLabels, snapshots: snapshotsTable }).get(
-    buildId,
-  );
+  const build = await new BuildModel(db, {
+    builds: getStore().db.tables.builds,
+    buildLabels: getStore().db.tables.buildLabels,
+    snapshots: getStore().db.tables.snapshots,
+  }).get(buildId);
   if (!build) {
     return null;
   }
-  const project = await new ProjectModel(db, { projects }).get(build.projectId);
+  const project = await new ProjectModel(db, { projects: getStore().db.tables.projects }).get(
+    build.projectId,
+  );
   if (!project) {
     return null;
   }
-  const snapshots = await new SnapshotModel(db, { snapshots: snapshotsTable }).listByBuild(
-    build.id,
-  );
-  const comments = await new CommentModel(db, { comments: commentsTable, projects }).listByBuild(
-    build.id,
-  );
-  const attempts = await new CaptureAttemptModel(db, { captureAttempts }).listByBuild(build.id);
-  const logs = new CaptureLogModel(db, { captureLogs });
+  const snapshots = await new SnapshotModel(db, {
+    snapshots: getStore().db.tables.snapshots,
+  }).listByBuild(build.id);
+  const comments = await new CommentModel(db, {
+    comments: getStore().db.tables.comments,
+    projects: getStore().db.tables.projects,
+  }).listByBuild(build.id);
+  const attempts = await new CaptureAttemptModel(db, {
+    captureAttempts: getStore().db.tables.captureAttempts,
+  }).listByBuild(build.id);
+  const logs = new CaptureLogModel(db, { captureLogs: getStore().db.tables.captureLogs });
   const attemptLogs = new Map<string, Awaited<ReturnType<typeof logs.listByAttempt>>>();
   /* oxlint-disable-next-line eslint/no-await-in-loop -- attempts are few; sequential reads keep code simple */
   for (const attempt of attempts) {

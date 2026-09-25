@@ -4,16 +4,6 @@ import { createDispatchJob, InMemoryCaptureQueue } from "@storyshelf/core/captur
 import type { CaptureJobOptions } from "@storyshelf/core/capture";
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
-import {
-  baselines,
-  buildLabels,
-  builds,
-  captureAttempts,
-  captureLogs,
-  projectStatusConfigs,
-  projects,
-  snapshots,
-} from "@storyshelf/db-sqlite/schema";
 
 /**
  * Wiring for the capture queue: the queue instance (if any) and a helper
@@ -59,7 +49,15 @@ export function setupCaptureQueue(
   }
   const jobOptions: CaptureJobOptions = {
     db: options.database,
-    tables: { projects, builds, buildLabels, snapshots, baselines, captureAttempts, captureLogs },
+    tables: {
+      projects: options.database.tables.projects,
+      builds: options.database.tables.builds,
+      buildLabels: options.database.tables.buildLabels,
+      snapshots: options.database.tables.snapshots,
+      baselines: options.database.tables.baselines,
+      captureAttempts: options.database.tables.captureAttempts,
+      captureLogs: options.database.tables.captureLogs,
+    },
     storage: options.storage,
     runner: options.captureRunner,
     scratchDir: config.scratchDir,
@@ -70,13 +68,13 @@ export function setupCaptureQueue(
   const runJob = createDispatchJob({
     db: options.database,
     tables: {
-      projects,
-      builds,
-      buildLabels,
-      snapshots,
-      projectStatusConfigs,
-      captureAttempts,
-      captureLogs,
+      projects: options.database.tables.projects,
+      builds: options.database.tables.builds,
+      buildLabels: options.database.tables.buildLabels,
+      snapshots: options.database.tables.snapshots,
+      projectStatusConfigs: options.database.tables.projectStatusConfigs,
+      captureAttempts: options.database.tables.captureAttempts,
+      captureLogs: options.database.tables.captureLogs,
     },
     jobOptions,
     gitHosts,

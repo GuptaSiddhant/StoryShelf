@@ -1,11 +1,5 @@
 import { SESSION_COOKIE, type AuthAdapter, type AuthUser } from "@storyshelf/core/adapter/auth";
 import { randomToken } from "@storyshelf/core/utils";
-import {
-  projectGroupMappings,
-  projectMembers,
-  projects,
-  users,
-} from "@storyshelf/db-sqlite/schema";
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
@@ -88,7 +82,12 @@ export function registerAuth(app: ShelfRouter, auth: AuthAdapter): void {
     }
     await syncLoginMemberships(
       getStore().db,
-      { users, projects, projectMembers, projectGroupMappings },
+      {
+        users: getStore().db.tables.users,
+        projects: getStore().db.tables.projects,
+        projectMembers: getStore().db.tables.projectMembers,
+        projectGroupMappings: getStore().db.tables.projectGroupMappings,
+      },
       user,
     );
     const token = await auth.createSession(user);

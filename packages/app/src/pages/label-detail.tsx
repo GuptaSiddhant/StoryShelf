@@ -1,13 +1,6 @@
 import { BuildModel } from "@storyshelf/core/models";
 import { LabelModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
-import {
-  buildLabels,
-  builds as buildsTable,
-  labelTypes as labelTypesTable,
-  projects as projectsTable,
-  snapshots,
-} from "@storyshelf/db-sqlite/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { getStore } from "../store.ts";
 import {
@@ -43,20 +36,23 @@ export async function renderLabelDetailPage(
   key: string,
   value: string,
 ): Promise<RenderedContent | null> {
-  const projects = await new ProjectModel(getStore().db, { projects: projectsTable }).list();
+  const projects = await new ProjectModel(getStore().db, {
+    projects: getStore().db.tables.projects,
+  }).list();
   const project = projects.find((item) => item.slug === slug);
   if (!project) {
     return null;
   }
   const [builds, labelType] = await Promise.all([
-    new BuildModel(getStore().db, { builds: buildsTable, buildLabels, snapshots }).list(
-      project.id,
-      { labelKey: key, labelValue: value },
-    ),
+    new BuildModel(getStore().db, {
+      builds: getStore().db.tables.builds,
+      buildLabels: getStore().db.tables.buildLabels,
+      snapshots: getStore().db.tables.snapshots,
+    }).list(project.id, { labelKey: key, labelValue: value }),
     new LabelModel(getStore().db, {
-      builds: buildsTable,
-      buildLabels,
-      labelTypes: labelTypesTable,
+      builds: getStore().db.tables.builds,
+      buildLabels: getStore().db.tables.buildLabels,
+      labelTypes: getStore().db.tables.labelTypes,
     }).getType(project.id, key),
   ]);
 
@@ -165,15 +161,17 @@ export async function renderLabelDetailPage(
 
 /** Label types overview page (architecture.md `GET /projects/:slug/labels`). */
 export async function renderLabelsPage(slug: string): Promise<RenderedContent | null> {
-  const projects = await new ProjectModel(getStore().db, { projects: projectsTable }).list();
+  const projects = await new ProjectModel(getStore().db, {
+    projects: getStore().db.tables.projects,
+  }).list();
   const project = projects.find((item) => item.slug === slug);
   if (!project) {
     return null;
   }
   const labelTypes = await new LabelModel(getStore().db, {
-    builds: buildsTable,
-    buildLabels,
-    labelTypes: labelTypesTable,
+    builds: getStore().db.tables.builds,
+    buildLabels: getStore().db.tables.buildLabels,
+    labelTypes: getStore().db.tables.labelTypes,
   }).listTypes(project.id);
 
   return (

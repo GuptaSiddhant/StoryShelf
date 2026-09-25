@@ -113,23 +113,25 @@ export class Retention {
     // Decrement content refs for this build's manifest
     for (const hash of manifestFiles) {
       try {
-        const { contentRefs } = await import("@storyshelf/db-sqlite/schema");
-        const existing = await this.db.get(contentRefs as never, hash);
+        const contentRefs = this.db.tables.contentRefs;
+        const existing = (await this.db.get(contentRefs, hash)) as unknown as {
+          refCount: number;
+        } | null;
         // oxlint-disable-next-line unicorn/prefer-ternary -- refCount check is clearer as if/else
         if (existing) {
-          const refCount = (existing as { refCount: number }).refCount;
+          const refCount = existing.refCount;
           // oxlint-disable-next-line unicorn/prefer-ternary -- grace logic is clearer as if/else
           if (refCount <= 1) {
             // Keep for 7-day grace: set refCount 0 and update lastSeenAt, don't delete yet
-            await this.db.update(contentRefs as never, hash, {
+            await this.db.update(contentRefs, hash, {
               refCount: 0,
               lastSeenAt: new Date().toISOString(),
-            } as never);
+            });
           } else {
-            await this.db.update(contentRefs as never, hash, {
+            await this.db.update(contentRefs, hash, {
               refCount: refCount - 1,
               lastSeenAt: new Date().toISOString(),
-            } as never);
+            });
           }
         }
       } catch {
@@ -138,9 +140,9 @@ export class Retention {
     }
     // GC stale content_refs with 7-day grace
     try {
-      const { contentRefs } = await import("@storyshelf/db-sqlite/schema");
+      const contentRefs = this.db.tables.contentRefs;
       const cutoff = new Date(Date.now() - 7 * 86_400_000).toISOString();
-      const all = (await this.db.list(contentRefs as never)) as unknown as {
+      const all = (await this.db.list(contentRefs)) as unknown as {
         hash: string;
         refCount: number;
         lastSeenAt: string;
@@ -150,7 +152,7 @@ export class Retention {
           await this.storage.delete(`content/${row.hash}`).catch(() => {
             // ignore storage delete failure
           });
-          await this.db.remove(contentRefs as never, row.hash);
+          await this.db.remove(contentRefs, row.hash);
         }
       }
     } catch {

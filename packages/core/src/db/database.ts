@@ -8,6 +8,9 @@
 import type { SQL } from "drizzle-orm";
 import type { Table } from "drizzle-orm";
 import type { Adapter, AdapterMetadata } from "../adapters/metadata.ts";
+import type { Tables } from "./tables.ts";
+
+export type { Tables };
 
 /** Options that narrow and page a list query. */
 export interface ListOptions {
@@ -23,6 +26,8 @@ export interface ListOptions {
 
 /** Database abstraction over Drizzle tables, agnostic of dialect and driver. */
 export interface DatabaseAdapter extends Adapter<{ readonly category: "database" }> {
+  /** Table handles for this adapter's dialect, enforced with type safety. */
+  readonly tables: Tables;
   /** Insert a row and return the inserted record. */
   insert<T extends Table>(table: T, values: T["$inferInsert"]): Promise<T["$inferSelect"]>;
   /** Update a row by id and return the updated record. */
@@ -46,6 +51,7 @@ export interface DatabaseAdapter extends Adapter<{ readonly category: "database"
 /** Driver-supplied identity plus lifecycle hooks. */
 export interface DrizzleAdapterOptions {
   metadata: AdapterMetadata & { readonly category: "database" };
+  tables: Tables;
   migrate: () => Promise<void> | void;
   close: () => Promise<void> | void;
   /** Cheap liveness probe (e.g. `SELECT 1`); omitted when the driver has none. */

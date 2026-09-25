@@ -4,6 +4,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Parse, type Entry } from "unzipper";
 import type { StorageAdapter } from "../adapters/storage.ts";
+import type { DatabaseAdapter } from "../db/database.ts";
 import { storybookDir, storybookZipPath } from "../utils/paths.ts";
 
 /**
@@ -76,7 +77,7 @@ export async function persistStorybookStatics(
   sourceDir: string,
   projectId: string,
   buildId: string,
-  db?: unknown,
+  db?: DatabaseAdapter,
 ): Promise<void> {
   const root = resolve(sourceDir);
   const destinationPrefix = storybookDir(projectId, buildId);
@@ -97,7 +98,7 @@ export async function persistStorybookStatics(
       // and maintain content_refs for GC
       await storage.write(`${destinationPrefix}/${rel}`, buffer);
       if (db) {
-        await upsertContentRef(db as never, hash);
+        await upsertContentRef(db, hash);
       }
     }),
   );
@@ -109,26 +110,18 @@ async function hashBuffer(buffer: Buffer): Promise<string> {
   return createHash("sha256").update(buffer).digest("hex");
 }
 
-async function upsertContentRef(db: never, hash: string): Promise<void> {
+async function upsertContentRef(db: DatabaseAdapter, hash: string): Promise<void> {
   try {
-    const { contentRefs } = await import("@storyshelf/db-sqlite/schema");
+    const contentRefs = db.tables.contentRefs;
     const now = new Date().toISOString();
-    // Try to get existing
-    const existing = await (
-      db as unknown as { get: (t: unknown, id: string) => Promise<unknown> }
-    ).get(contentRefs as never, hash);
+    const existing = (await db.get(contentRefs, hash)) as unknown as { refCount: number } | null;
     if (existing) {
-      await (
-        db as unknown as { update: (t: unknown, id: string, v: unknown) => Promise<unknown> }
-      ).update(contentRefs as never, hash, {
-        refCount: (existing as { refCount: number }).refCount + 1,
+      await db.update(contentRefs, hash, {
+        refCount: existing.refCount + 1,
         lastSeenAt: now,
-      } as never);
+      });
     } else {
-      await (db as unknown as { insert: (t: unknown, v: unknown) => Promise<unknown> }).insert(
-        contentRefs as never,
-        { hash, refCount: 1, lastSeenAt: now, createdAt: now } as never,
-      );
+      await db.insert(contentRefs, { hash, refCount: 1, lastSeenAt: now, createdAt: now });
     }
   } catch {
     // content_refs table may not exist yet (old DB) — ignore

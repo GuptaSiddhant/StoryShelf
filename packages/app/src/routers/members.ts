@@ -1,7 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { MemberModel, ProjectGroupMappingModel } from "@storyshelf/core/models";
 import type { ProjectRole } from "@storyshelf/core/types";
-import { projectGroupMappings, projectMembers } from "@storyshelf/db-sqlite/schema";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
@@ -118,18 +117,20 @@ const deleteGroupMappingRoute = createRoute({
 export function registerMembers(app: ShelfRouter): void {
   app.openapi(listMembersRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...VIEW_ROLES);
-    return c.json(await new MemberModel(getStore().db, { projectMembers }).list(project.id));
+    return c.json(
+      await new MemberModel(getStore().db, {
+        projectMembers: getStore().db.tables.projectMembers,
+      }).list(project.id),
+    );
   });
 
   app.openapi(setMemberRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
     const body = c.req.valid("json");
     return c.json(
-      await new MemberModel(getStore().db, { projectMembers }).set(
-        project.id,
-        body.userId,
-        body.role,
-      ),
+      await new MemberModel(getStore().db, {
+        projectMembers: getStore().db.tables.projectMembers,
+      }).set(project.id, body.userId, body.role),
       201,
     );
   });
@@ -139,14 +140,18 @@ export function registerMembers(app: ShelfRouter): void {
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
     const body = c.req.valid("json");
     return c.json(
-      await new MemberModel(getStore().db, { projectMembers }).set(project.id, userId, body.role),
+      await new MemberModel(getStore().db, {
+        projectMembers: getStore().db.tables.projectMembers,
+      }).set(project.id, userId, body.role),
     );
   });
 
   app.openapi(deleteMemberRoute, async (c) => {
     const { slug, userId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
-    await new MemberModel(getStore().db, { projectMembers }).remove(project.id, userId);
+    await new MemberModel(getStore().db, {
+      projectMembers: getStore().db.tables.projectMembers,
+    }).remove(project.id, userId);
     return c.body(null, 204);
   });
 
@@ -158,7 +163,9 @@ function registerGroupMappingRoutes(app: ShelfRouter): void {
   app.openapi(listGroupMappingsRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...VIEW_ROLES);
     return c.json(
-      await new ProjectGroupMappingModel(getStore().db, { projectGroupMappings }).list(project.id),
+      await new ProjectGroupMappingModel(getStore().db, {
+        projectGroupMappings: getStore().db.tables.projectGroupMappings,
+      }).list(project.id),
     );
   });
 
@@ -172,11 +179,9 @@ function registerGroupMappingRoutes(app: ShelfRouter): void {
       });
     }
     return c.json(
-      await new ProjectGroupMappingModel(getStore().db, { projectGroupMappings }).create(
-        project.id,
-        body.groupName,
-        body.role,
-      ),
+      await new ProjectGroupMappingModel(getStore().db, {
+        projectGroupMappings: getStore().db.tables.projectGroupMappings,
+      }).create(project.id, body.groupName, body.role),
       201,
     );
   });
@@ -184,10 +189,9 @@ function registerGroupMappingRoutes(app: ShelfRouter): void {
   app.openapi(deleteGroupMappingRoute, async (c) => {
     const { slug, mappingId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
-    await new ProjectGroupMappingModel(getStore().db, { projectGroupMappings }).remove(
-      project.id,
-      mappingId,
-    );
+    await new ProjectGroupMappingModel(getStore().db, {
+      projectGroupMappings: getStore().db.tables.projectGroupMappings,
+    }).remove(project.id, mappingId);
     return c.body(null, 204);
   });
 }

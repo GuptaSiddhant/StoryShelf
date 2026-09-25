@@ -1,6 +1,5 @@
 import { MemberModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
-import { projectMembers } from "@storyshelf/db-sqlite/schema";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
@@ -114,7 +113,10 @@ describe("admin token bootstrap", () => {
     });
     expect(response.status).toBe(201);
     const created = (await response.json()) as { id: string };
-    const member = await new MemberModel(db, { projectMembers }).get(created.id, admin.id);
+    const member = await new MemberModel(db, { projectMembers: db.tables.projectMembers }).get(
+      created.id,
+      admin.id,
+    );
     expect(member?.role).toBe("admin");
   });
 
@@ -130,7 +132,9 @@ describe("admin token bootstrap", () => {
     });
     expect(response.status).toBe(201);
     const created = (await response.json()) as { id: string };
-    const members = await new MemberModel(db, { projectMembers }).list(created.id);
+    const members = await new MemberModel(db, { projectMembers: db.tables.projectMembers }).list(
+      created.id,
+    );
     expect(members).toHaveLength(0);
   });
 });

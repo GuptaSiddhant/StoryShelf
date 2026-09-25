@@ -7,12 +7,6 @@ import type { Project } from "@storyshelf/core/schema";
 import type { Snapshot } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import { storybookDir } from "@storyshelf/core/utils";
-import {
-  buildLabels,
-  builds,
-  projects,
-  snapshots as snapshotsTable,
-} from "@storyshelf/db-sqlite/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { posix } from "node:path";
 import { getStore } from "../store.ts";
@@ -53,13 +47,15 @@ export async function renderLibraryPage(
   branch?: string,
 ): Promise<RenderedContent | null> {
   const { db, storage } = getStore();
-  const project = await new ProjectModel(db, { projects }).getBySlug(slug);
+  const project = await new ProjectModel(db, { projects: getStore().db.tables.projects }).getBySlug(
+    slug,
+  );
   if (!project) return null;
   const build = await getLibraryBuild(db, project, branch);
   if (!build) return renderEmptyLibrary(project);
-  const snapshots = await new SnapshotModel(db, { snapshots: snapshotsTable }).listByBuild(
-    build.id,
-  );
+  const snapshots = await new SnapshotModel(db, {
+    snapshots: getStore().db.tables.snapshots,
+  }).listByBuild(build.id);
   if (snapshots.length === 0) return renderEmptySnapshots(project, build);
   const branches = await distinctBranches(db, project.id);
   const docsByStory = await docsEntriesByStory(storage, project.id, build.id, snapshots);
@@ -71,7 +67,11 @@ async function getLibraryBuild(
   project: Project,
   branch?: string,
 ): Promise<Build | null> {
-  const buildModel = new BuildModel(db, { builds, buildLabels, snapshots: snapshotsTable });
+  const buildModel = new BuildModel(db, {
+    builds: getStore().db.tables.builds,
+    buildLabels: getStore().db.tables.buildLabels,
+    snapshots: getStore().db.tables.snapshots,
+  });
   const trimmed = branch?.trim();
   const target = trimmed === undefined || trimmed === "" ? project.gitDefaultBranch : trimmed;
   const byBranch = await buildModel.list(project.id, { branch: target });
@@ -89,9 +89,9 @@ async function distinctBranches(
   projectId: string,
 ): Promise<string[]> {
   const buildsList = await new BuildModel(db, {
-    builds,
-    buildLabels,
-    snapshots: snapshotsTable,
+    builds: getStore().db.tables.builds,
+    buildLabels: getStore().db.tables.buildLabels,
+    snapshots: getStore().db.tables.snapshots,
   }).list(projectId);
   return [...new Set(buildsList.map((b) => b.gitBranch))].toSorted((a, b) => a.localeCompare(b));
 }

@@ -103,6 +103,7 @@ function setup(canned?: CannedRows): { adapter: DatabaseAdapter; calls: string[]
       kind: "test",
       category: "database",
     },
+    tables: { widgets } as unknown as DatabaseAdapter["tables"],
     migrate: () => {},
     close: () => {},
   });

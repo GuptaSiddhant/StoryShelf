@@ -2,7 +2,6 @@ import type { Build } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { storybookDir } from "@storyshelf/core/utils";
-import { schema } from "@storyshelf/db-sqlite/schema";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
@@ -53,9 +52,9 @@ function mockBuild(overrides: Partial<Build> = {}): Build {
 async function seededLibraryApp(index: unknown): Promise<ReturnType<typeof createShelfApp>> {
   const { db } = makeDatabase();
   const { storage, objects } = makeStorage();
-  await db.insert(schema.projects, mockProject());
-  await db.insert(schema.builds, mockBuild());
-  await db.insert(schema.snapshots, {
+  await db.insert(db.tables.projects, mockProject());
+  await db.insert(db.tables.builds, mockBuild());
+  await db.insert(db.tables.snapshots, {
     id: "snap1",
     projectId: "p1",
     buildId: "b1",

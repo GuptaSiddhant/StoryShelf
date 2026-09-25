@@ -43,6 +43,10 @@ Global viewports live in `ShelfConfig.viewports` (or project settings). Per-stor
 
 Configure via server config or project patch. The queue then fans out `stories × viewports` renders at `captureConcurrency`.
 
+## Content-addressed storage
+
+Published Storybooks are deduplicated by content hash. `persistStorybookStatics` (`core/capture/statics.ts`) `sha256`s every file, writes once to `content/<hash>` (`storage.write(content/<hash>, buffer)` if missing), upserts `content_refs { hash, refCount, lastSeenAt }` via `db.tables.contentRefs` (type-safe `DatabaseAdapter.tables`, no `as never`), and writes a per-build `manifest.json` (`{ "assets/index.js": "abc..." }`). Serving prefers `manifest.json` → `content/<hash>` with `readWithManifestFallback`, falling back to the legacy per-build copy during migration. Uploads use the same dedup: `POST /dedup { hashes }` → `needed`, batch `POST /content` (multipart, `80%` bytes fallback `neededBytes/totalBytes > 0.8` → `PUT zip`), then `POST /manifest` — see [Publishing](/concepts/publishing/) and ADR 0020.
+
 ## Diffing
 
 `pixelmatch` + `pngjs` compare against the selected baseline (see [Baselines](/concepts/baselines/)). Per-pixel `pixelThreshold` (default 0.1) and per-snapshot `maxDiffRatio` (default 0.01) decide `changed` vs `unchanged`; per-story `parameters.diffThreshold` (or `chromatic.diffThreshold` with `storyshelf` winning) overrides. Overlay is stored at `diffs/{storyId}/{viewport}.png` — 50% dim + red heatmap.

@@ -24,6 +24,7 @@ timeline
 | What | Retention key | Survives? |
 |------|---------------|-----------|
 | Build metadata, screenshots, diff overlays | `purgeTtlDays` (default 30) | No — deleted together in one transaction |
+| Storybook `content/<hash>` (shared, `content_refs` `refCount`) | `content_refs` 7-day grace (`refCount 0` kept 7d) | Yes — shared, refCounted, GC’d after grace |
 | Branch baselines (`baselines/{branch}/**`) | `branchTtlDays` (default 30, `null` = disabled) | Until branch GC |
 | Default-branch baselines (`baselines/main/**`) | Never | Yes |
 | Builds bearing `persistent` label (git tags → `v1.2.3`) | Never | Yes, and their snapshots as baselines |

@@ -1,6 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { CommentModel } from "@storyshelf/core/models";
-import { comments, projects } from "@storyshelf/db-sqlite/schema";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
 import { VIEW_ROLES, DEVELOPER_ROLES, buildForProject } from "./builds.handlers.ts";
@@ -56,7 +55,10 @@ export function registerComments(app: ShelfRouter): void {
     const project = await resolveAuthorizedProject(c, slug, ...VIEW_ROLES);
     const build = await buildForProject(project.id, buildId);
     return c.json(
-      await new CommentModel(getStore().db, { comments, projects }).listByBuild(build.id),
+      await new CommentModel(getStore().db, {
+        comments: getStore().db.tables.comments,
+        projects: getStore().db.tables.projects,
+      }).listByBuild(build.id),
     );
   });
 
@@ -66,12 +68,10 @@ export function registerComments(app: ShelfRouter): void {
     const build = await buildForProject(project.id, buildId);
     const body = c.req.valid("json");
     const userId = getStore().user?.id ?? null;
-    const comment = await new CommentModel(getStore().db, { comments, projects }).create(
-      project.id,
-      build.id,
-      userId,
-      body,
-    );
+    const comment = await new CommentModel(getStore().db, {
+      comments: getStore().db.tables.comments,
+      projects: getStore().db.tables.projects,
+    }).create(project.id, build.id, userId, body);
     return c.json(comment, 201);
   });
 
@@ -79,9 +79,10 @@ export function registerComments(app: ShelfRouter): void {
     const { slug, buildId, commentId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...DEVELOPER_ROLES);
     const build = await buildForProject(project.id, buildId);
-    const comment = await new CommentModel(getStore().db, { comments, projects }).resolve(
-      commentId,
-    );
+    const comment = await new CommentModel(getStore().db, {
+      comments: getStore().db.tables.comments,
+      projects: getStore().db.tables.projects,
+    }).resolve(commentId);
     if (comment.buildId !== build.id) {
       throwNotFound("Comment not found");
     }

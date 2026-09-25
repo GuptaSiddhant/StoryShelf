@@ -2,7 +2,6 @@ import type { Build } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { storybookDir } from "@storyshelf/core/utils";
-import { schema } from "@storyshelf/db-sqlite/schema";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
@@ -53,8 +52,8 @@ function mockBuild(overrides: Partial<Build> = {}): Build {
 async function seededApp(): Promise<{ app: ReturnType<typeof createShelfApp> }> {
   const { db } = makeDatabase();
   const { storage, objects } = makeStorage();
-  await db.insert(schema.projects, mockProject());
-  await db.insert(schema.builds, mockBuild({ public: true }));
+  await db.insert(db.tables.projects, mockProject());
+  await db.insert(db.tables.builds, mockBuild({ public: true }));
 
   objects.set(`${storybookDir("p1", "b1")}/index.html`, Buffer.from("<html>storybook</html>"));
   objects.set(`${storybookDir("p1", "b1")}/iframe.html`, Buffer.from("<html>preview</html>"));
@@ -77,7 +76,7 @@ describe("storybook routes", () => {
   it("returns 404 when no published build exists", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    await db.insert(schema.projects, mockProject());
+    await db.insert(db.tables.projects, mockProject());
     const app = createShelfApp({ database: db, storage, logger: silentLogger });
     const response = await app.request("/projects/test-project/storybook");
     expect(response.status).toBe(404);
@@ -101,8 +100,8 @@ describe("storybook routes", () => {
   it("serves a preparing state when statics are not yet extracted", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    await db.insert(schema.projects, mockProject());
-    await db.insert(schema.builds, mockBuild({ public: true }));
+    await db.insert(db.tables.projects, mockProject());
+    await db.insert(db.tables.builds, mockBuild({ public: true }));
     const app = createShelfApp({ database: db, storage, logger: silentLogger });
     const response = await app.request("/projects/test-project/storybook/build/b1/");
     expect(response.status).toBe(200);
@@ -161,8 +160,8 @@ describe("storybook routes", () => {
   it("serves a non-public build when auth is disabled", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    await db.insert(schema.projects, mockProject());
-    await db.insert(schema.builds, mockBuild({ public: false }));
+    await db.insert(db.tables.projects, mockProject());
+    await db.insert(db.tables.builds, mockBuild({ public: false }));
     const app = createShelfApp({ database: db, storage, logger: silentLogger });
     const response = await app.request("/projects/test-project/storybook/build/b1/");
     expect(response.status).toBe(200);
@@ -194,8 +193,8 @@ describe("storybook routes", () => {
     const ulid = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
     const { db } = makeDatabase();
     const { storage, objects } = makeStorage();
-    await db.insert(schema.projects, mockProject());
-    await db.insert(schema.builds, mockBuild({ id: ulid, public: true }));
+    await db.insert(db.tables.projects, mockProject());
+    await db.insert(db.tables.builds, mockBuild({ id: ulid, public: true }));
     objects.set(`${storybookDir("p1", ulid)}/index.html`, Buffer.from("<html>storybook</html>"));
     objects.set(`${storybookDir("p1", ulid)}/iframe.html`, Buffer.from("<html>preview</html>"));
     objects.set(`${storybookDir("p1", ulid)}/iframe.js`, Buffer.from("console.log('hi')"));
@@ -210,8 +209,8 @@ describe("storybook routes", () => {
     const ulid = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
     const { db } = makeDatabase();
     const { storage, objects } = makeStorage();
-    await db.insert(schema.projects, mockProject());
-    await db.insert(schema.builds, mockBuild({ id: ulid, public: true }));
+    await db.insert(db.tables.projects, mockProject());
+    await db.insert(db.tables.builds, mockBuild({ id: ulid, public: true }));
     objects.set(`${storybookDir("p1", ulid)}/index.html`, Buffer.from("<html>storybook</html>"));
     const app = createShelfApp({ database: db, storage, logger: silentLogger });
     const response = await app.request(`/_/${ulid}`);
@@ -239,8 +238,8 @@ describe("storybook routes", () => {
     const ulid = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
     const { db } = makeDatabase();
     const { storage, objects } = makeStorage();
-    await db.insert(schema.projects, mockProject());
-    await db.insert(schema.builds, mockBuild({ id: ulid, public: true }));
+    await db.insert(db.tables.projects, mockProject());
+    await db.insert(db.tables.builds, mockBuild({ id: ulid, public: true }));
     objects.set(`${storybookDir("p1", ulid)}/index.html`, Buffer.from("<html>storybook</html>"));
     objects.set(`${storybookDir("p1", ulid)}/iframe.html`, Buffer.from("<html>preview</html>"));
     objects.set(`${storybookDir("p1", ulid)}/iframe.js`, Buffer.from("console.log('hi')"));

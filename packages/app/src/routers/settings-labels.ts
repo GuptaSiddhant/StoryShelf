@@ -1,5 +1,4 @@
 import { LabelModel } from "@storyshelf/core/models";
-import { buildLabels, builds, labelTypes } from "@storyshelf/db-sqlite/schema";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
@@ -38,7 +37,11 @@ async function persistLabelType(
   linkTemplate: string | undefined,
 ): Promise<Response> {
   try {
-    await new LabelModel(getStore().db, { builds, buildLabels, labelTypes }).createType(projectId, {
+    await new LabelModel(getStore().db, {
+      builds: getStore().db.tables.builds,
+      buildLabels: getStore().db.tables.buildLabels,
+      labelTypes: getStore().db.tables.labelTypes,
+    }).createType(projectId, {
       key,
       name: labelName,
       linkTemplate,
@@ -53,10 +56,11 @@ async function persistLabelType(
 async function handleDeleteLabelType(c: Context): Promise<Response> {
   const project = await findProject(c.req.param("slug") ?? "");
   try {
-    await new LabelModel(getStore().db, { builds, buildLabels, labelTypes }).removeType(
-      project.id,
-      c.req.param("key") ?? "",
-    );
+    await new LabelModel(getStore().db, {
+      builds: getStore().db.tables.builds,
+      buildLabels: getStore().db.tables.buildLabels,
+      labelTypes: getStore().db.tables.labelTypes,
+    }).removeType(project.id, c.req.param("key") ?? "");
   } catch {
     return c.html(
       (await renderSettingsPage(c, "labels", { globalError: "Cannot delete built-in label" })) ??

@@ -5,15 +5,6 @@ import { LabelModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
 import { SnapshotModel } from "@storyshelf/core/models";
 import type { ProjectRole } from "@storyshelf/core/types";
-import {
-  baselines as baselinesTable,
-  buildLabels,
-  builds,
-  comments as commentsTable,
-  labelTypes,
-  projects,
-  snapshots as snapshotsTable,
-} from "@storyshelf/db-sqlite/schema";
 import type { ShelfRouter } from "../app-types.ts";
 import { renderBuildDetailPage } from "../pages/build-detail.tsx";
 import { renderBuildDiffPage } from "../pages/build-diff.tsx";
@@ -98,12 +89,18 @@ export function registerUiPages(app: ShelfRouter): void {
       );
     }
     try {
-      const project = await new ProjectModel(getStore().db, { projects }).create({
+      const project = await new ProjectModel(getStore().db, {
+        projects: getStore().db.tables.projects,
+      }).create({
         name,
         gitRepository,
         gitDefaultBranch,
       });
-      await new LabelModel(getStore().db, { builds, buildLabels, labelTypes }).seedFor(project.id);
+      await new LabelModel(getStore().db, {
+        builds: getStore().db.tables.builds,
+        buildLabels: getStore().db.tables.buildLabels,
+        labelTypes: getStore().db.tables.labelTypes,
+      }).seedFor(project.id);
       return hxRedirect(c, `/projects/${project.slug}/library`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to create project";
@@ -140,7 +137,9 @@ export function registerUiPages(app: ShelfRouter): void {
 
   app.get("/projects/:slug/jobs", async (c) => {
     const slug = c.req.param("slug");
-    const project = await new ProjectModel(getStore().db, { projects }).getBySlug(slug);
+    const project = await new ProjectModel(getStore().db, {
+      projects: getStore().db.tables.projects,
+    }).getBySlug(slug);
     if (!project) {
       return c.notFound();
     }
@@ -160,28 +159,30 @@ export function registerUiPages(app: ShelfRouter): void {
     const slug = c.req.param("slug");
     const buildId = c.req.param("buildId");
     const snapshotId = c.req.query("snapshot");
-    const project = await new ProjectModel(getStore().db, { projects }).getBySlug(slug);
+    const project = await new ProjectModel(getStore().db, {
+      projects: getStore().db.tables.projects,
+    }).getBySlug(slug);
     if (!project) {
       return c.notFound();
     }
     const build = await new BuildModel(getStore().db, {
-      builds,
-      buildLabels,
-      snapshots: snapshotsTable,
+      builds: getStore().db.tables.builds,
+      buildLabels: getStore().db.tables.buildLabels,
+      snapshots: getStore().db.tables.snapshots,
     }).get(buildId);
     if (!build || build.projectId !== project.id) {
       return c.notFound();
     }
     const snapshots = await new SnapshotModel(getStore().db, {
-      snapshots: snapshotsTable,
+      snapshots: getStore().db.tables.snapshots,
     }).listByBuild(build.id);
     const comments = await new CommentModel(getStore().db, {
-      comments: commentsTable,
-      projects,
+      comments: getStore().db.tables.comments,
+      projects: getStore().db.tables.projects,
     }).listByBuild(build.id);
     const baselines = new BaselineModel(
       getStore().db,
-      { baselines: baselinesTable },
+      { baselines: getStore().db.tables.baselines },
       getStore().storage,
     );
     const hasBaselineEntries = await Promise.all(

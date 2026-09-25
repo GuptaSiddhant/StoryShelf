@@ -1,7 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { LabelModel } from "@storyshelf/core/models";
 import type { ProjectRole } from "@storyshelf/core/types";
-import { buildLabels, builds, labelTypes } from "@storyshelf/db-sqlite/schema";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
@@ -77,9 +76,11 @@ export function registerLabels(app: ShelfRouter): void {
   app.openapi(listLabelsRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...VIEW_ROLES);
     return c.json(
-      await new LabelModel(getStore().db, { builds, buildLabels, labelTypes }).listTypes(
-        project.id,
-      ),
+      await new LabelModel(getStore().db, {
+        builds: getStore().db.tables.builds,
+        buildLabels: getStore().db.tables.buildLabels,
+        labelTypes: getStore().db.tables.labelTypes,
+      }).listTypes(project.id),
     );
   });
 
@@ -87,10 +88,11 @@ export function registerLabels(app: ShelfRouter): void {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
     const body = c.req.valid("json");
     return c.json(
-      await new LabelModel(getStore().db, { builds, buildLabels, labelTypes }).createType(
-        project.id,
-        body,
-      ),
+      await new LabelModel(getStore().db, {
+        builds: getStore().db.tables.builds,
+        buildLabels: getStore().db.tables.buildLabels,
+        labelTypes: getStore().db.tables.labelTypes,
+      }).createType(project.id, body),
       201,
     );
   });
@@ -98,10 +100,11 @@ export function registerLabels(app: ShelfRouter): void {
   app.openapi(deleteLabelRoute, async (c) => {
     const { slug, key } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
-    await new LabelModel(getStore().db, { builds, buildLabels, labelTypes }).removeType(
-      project.id,
-      key,
-    );
+    await new LabelModel(getStore().db, {
+      builds: getStore().db.tables.builds,
+      buildLabels: getStore().db.tables.buildLabels,
+      labelTypes: getStore().db.tables.labelTypes,
+    }).removeType(project.id, key);
     return c.body(null, 204);
   });
 
@@ -111,9 +114,9 @@ export function registerLabels(app: ShelfRouter): void {
     const body = c.req.valid("json");
     try {
       const updated = await new LabelModel(getStore().db, {
-        builds,
-        buildLabels,
-        labelTypes,
+        builds: getStore().db.tables.builds,
+        buildLabels: getStore().db.tables.buildLabels,
+        labelTypes: getStore().db.tables.labelTypes,
       }).updateType(project.id, key, body);
       if (!updated) {
         throw new HTTPException(404, { message: "Label type not found" });

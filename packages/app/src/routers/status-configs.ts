@@ -1,7 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { StatusConfigModel } from "@storyshelf/core/models";
 import type { ProjectStatusConfig } from "@storyshelf/core/schema";
-import { projectStatusConfigs } from "@storyshelf/db-sqlite/schema";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
@@ -79,7 +78,7 @@ export function registerStatusConfigs(app: ShelfRouter): void {
     const project = await resolveAuthorizedProject(c, slug, "admin");
     const model = new StatusConfigModel(
       getStore().db,
-      { projectStatusConfigs },
+      { projectStatusConfigs: getStore().db.tables.projectStatusConfigs },
       getStore().config.secret,
     );
     const rows = await model.list(project.id);
@@ -101,7 +100,7 @@ export function registerStatusConfigs(app: ShelfRouter): void {
     }
     const model = new StatusConfigModel(
       getStore().db,
-      { projectStatusConfigs },
+      { projectStatusConfigs: getStore().db.tables.projectStatusConfigs },
       getStore().config.secret,
     );
     const row = await model.create(project.id, {
@@ -117,7 +116,7 @@ export function registerStatusConfigs(app: ShelfRouter): void {
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
     const model = new StatusConfigModel(
       getStore().db,
-      { projectStatusConfigs },
+      { projectStatusConfigs: getStore().db.tables.projectStatusConfigs },
       getStore().config.secret,
     );
     const existing = await model.get(project.id, id);

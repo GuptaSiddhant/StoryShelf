@@ -13,6 +13,7 @@ const fail = async (): Promise<never> => {
 function stubDatabase(): DatabaseAdapter {
   return {
     metadata: { name: "Stub DB", version: "0.0.0", kind: "stub", category: "database" },
+    tables: {} as unknown as DatabaseAdapter["tables"],
     insert: fail,
     update: fail,
     get: fail,
