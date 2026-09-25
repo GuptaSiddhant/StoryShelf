@@ -22,13 +22,14 @@ function publicFailures(
 
 /**
  * Block requests until adapter setup settles; answer 503 with the per-adapter
- * failures when setup failed. Health probes are exempt (they report setup
- * state themselves instead of being masked by the gate).
+ * failures when setup failed. Health probes and the admin System page are
+ * exempt (they report setup state themselves instead of being masked by
+ * the gate — both are site-admin-gated where it matters).
  */
 export function setupGate(getReady: () => Promise<AdapterSetupResult>) {
   // oxlint-disable-next-line typescript/no-invalid-void-type -- Hono middleware may not return Response
   return async (c: Context, next: Next): Promise<Response | void> => {
-    if (c.req.path === "/api/v1/health") {
+    if (c.req.path === "/api/v1/health" || c.req.path === "/admin") {
       await next();
       return;
     }

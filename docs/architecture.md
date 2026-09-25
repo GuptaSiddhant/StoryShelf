@@ -591,6 +591,7 @@ GET    /projects/:slug/storybook                          # published Storybook 
 GET    /projects/:slug/storybook/:key/:value              # published Storybook (`:value` wildcard, URL-encoded)
 GET    /projects/:slug/storybook/build/:buildId/...       # published Storybook (specific build; serves assets)
 GET    /projects/:slug/settings                           # members, label types, public access, tokens, webhooks
+GET    /admin                                             # site-admin System page (adapter inventory + in-depth health)
 ```
 
 ## Package Structure

@@ -18,6 +18,7 @@ import {
   storeScope,
 } from "./middleware/index.ts";
 import { setupGate, type MiddlewareWiring } from "./middleware/setup-gate.ts";
+import { registerAdminPages } from "./routers/admin-pages.ts";
 import { registerAdmin } from "./routers/admin.ts";
 import { registerAssets } from "./routers/assets.ts";
 import { registerAuth } from "./routers/auth.ts";
@@ -117,19 +118,20 @@ function registerApiRoutes(app: ShelfRouter, health: HealthDeps): void {
 }
 
 /** Register HTML pages, assets, and the optional auth flow. */
-function registerPageRoutes(app: ShelfRouter, options: ShelfOptions): void {
+function registerPageRoutes(app: ShelfRouter, options: ShelfOptions, health: HealthDeps): void {
   if (options.auth) {
     registerAuth(app, options.auth);
   }
   registerAssets(app);
   registerStorybook(app);
+  registerAdminPages(app, health);
   registerUiPages(app);
 }
 
 /** Register every API router, page set, and optional auth flow. */
 function registerAllRoutes(app: ShelfRouter, options: ShelfOptions, health: HealthDeps): void {
   registerApiRoutes(app, health);
-  registerPageRoutes(app, options);
+  registerPageRoutes(app, options, health);
 }
 
 /** Register the OpenAPI document and interactive docs page. */

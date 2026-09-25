@@ -413,6 +413,8 @@ const AuthMenu: FC = () => {
 // eslint-disable-next-line promise-function-async -- JSX component return type
 const Sidebar: FC<{ nav?: NavConfig }> = ({ nav }) => {
   const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const { user, authEnabled } = getStore();
+  const showAdmin = !authEnabled || user?.role === "admin";
   return (
     <aside id="sidebar" class={shellSidebar} aria-label="Primary">
       <nav class="sidebar__nav">
@@ -463,7 +465,7 @@ const Sidebar: FC<{ nav?: NavConfig }> = ({ nav }) => {
             </a>
           </>
         ) : null}
-        <div class="sidebar__section">Developer</div>
+        <div class="sidebar__section">Developer</div>{" "}
         <a
           class={`sidebar__link ${nav?.active === "api-docs" ? "sidebar__link--active" : ""}`}
           href="/api/v1/docs"
@@ -483,6 +485,18 @@ const Sidebar: FC<{ nav?: NavConfig }> = ({ nav }) => {
         >
           OpenAPI spec ↗
         </a>
+        {showAdmin ? (
+          <>
+            <div class="sidebar__section">Administration</div>
+            <a
+              class={`sidebar__link ${nav?.active === "admin" ? "sidebar__link--active" : ""}`}
+              href="/admin"
+              aria-current={nav?.active === "admin" ? "page" : undefined}
+            >
+              <span aria-hidden="true">◉</span> System
+            </a>
+          </>
+        ) : null}
       </nav>
     </aside>
   );
