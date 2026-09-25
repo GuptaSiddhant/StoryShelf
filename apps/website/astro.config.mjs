@@ -29,6 +29,7 @@ export default defineConfig({
               collapsed: true,
               items: [
                 { label: "CI setup", slug: "guides/ci" },
+                { label: "Without git", slug: "guides/without-git" },
                 { label: "Interaction testing", slug: "guides/interaction-testing" },
                 { label: "Review workflow", slug: "guides/review" },
               ],

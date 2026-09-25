@@ -33,30 +33,7 @@ flowchart LR
 
 ## Build identity: sha and branch without git
 
-`upload` resolves each field independently — **flags > env > local git > synthesized**:
-
-- `--sha` / `--branch` win when passed.
-- Otherwise the CI envs (`GITHUB_SHA`, `GITHUB_REF_NAME`, …).
-- Otherwise the local checkout (`git rev-parse HEAD`, current branch).
-- Otherwise a synthetic identity: `local-<random>` sha on the `local` branch.
-
-So a project with no git at all uploads with zero identity flags:
-
-```bash
-storyshelf upload --token $STORYSHELF_TOKEN
-# No git checkout detected — using synthetic identity sha=local-a1b2c3d4e5f6 branch="local" (pass --sha/--branch to override)
-```
-
-Synthetic shas are unique per upload (satisfying the build identity constraint) and chain baselines like real revisions. The `local` branch keeps local experiments isolated — accepts never touch `main` baselines, and diffing still falls back to the default branch. The server skips git-provider status posts for `local-` shas (there is no commit to post to). Without git there is no history to diff, so these builds always render everything — see `not-a-git-repo` below.
-
-## Non-git workflows
-
-`sha` and `branch` are opaque strings — git is one source of them, not a requirement. Beyond synthetic identity, two patterns work without any git involvement:
-
-- **Environments as branches.** Pass `--branch staging` (or `prod`, `nightly`) to get an isolated baseline namespace per environment. Pair with `public_branch_regex` to publish per-environment Storybooks. Accepts on `staging` never affect `main` baselines.
-- **Checkout-less pipelines.** A pipeline that builds the Storybook without cloning (artifact-driven CI, design tools exporting static builds) uploads with explicit `--sha <run-id> --branch <env>` — or nothing at all, falling back to synthetic identity. Each unique sha chains baselines normally.
-
-What doesn't apply without git: provider status checks and the merge gate (there is no commit to post to — the server skips them), and traced selectivity (no history to diff, so builds render everything unless affected capture is otherwise fed).
+`upload` resolves each field independently — **flags > env > local git > synthesized** (`local-<random>` sha on the `local` branch). A project with no git at all uploads with zero identity flags; those builds always render everything (`not-a-git-repo` below). The full story — synthetic identity, environments as branches, checkout-less pipelines — lives in [Uploading without git](/guides/without-git/).
 
 ## Full-render fallbacks
 
@@ -90,7 +67,13 @@ Full capture (shallow-clone): rendering all stories
 storyshelf upload --untraced "**/*.generated.ts" --untraced "**/mocks/**"
 ```
 
-Untraced files are dropped *before* tracing — stories reachable only through them are inherited. Stories reachable through another (traced) changed file still render.
+For project-wide exclusions that apply to every upload, commit them once in `.storybook/storyshelf.json` instead of repeating flags (see [Configuration](/guides/config/)):
+
+```json
+{ "slug": "my-design-system", "affected": { "untraced": ["**/*.generated.ts"] } }
+```
+
+Config and flag globs are combined (union, deduplicated). Untraced files are dropped *before* tracing — stories reachable only through them are inherited. Stories reachable through another (traced) changed file still render.
 
 **Custom stats file.** The graph is read from `<buildDir>/preview-stats.json` by default (emitted by the Vite builder). Override per run:
 
@@ -116,6 +99,7 @@ Same shape (ancestor → diff → graph trace → selective render), different e
 
 ## Related
 
+- [Uploading without git](/guides/without-git/) — synthetic identity and non-git workflows
 - [Capture & viewports](/concepts/capture/) — the render pipeline
 - [Builds & snapshots](/concepts/builds/) — the `inherited` flag
 - [Configuration](/guides/config/) — `affectedOnly` and precedence

@@ -11,6 +11,13 @@ export interface StorybookConfig {
   buildScriptName?: string;
   skip?: string;
   affectedOnly?: boolean;
+  affected?: AffectedConfig;
+}
+
+/** Affected-capture tuning in `.storybook/storyshelf.json`. */
+export interface AffectedConfig {
+  /** Glob patterns excluded from affected tracing (union with `--untraced`). */
+  untraced?: string[];
 }
 
 /** Parse an unknown value into a `StorybookConfig`, or return the reason it is invalid. */
@@ -27,15 +34,20 @@ function parseStorybookConfig(value: unknown): ParseResult {
   if (!parts.ok) {
     return parts;
   }
-  return checkCrossFieldRules(slug.slug, parts.values, parts.flags);
+  return checkCrossFieldRules(slug.slug, parts);
 }
 
-/** Optional string and boolean config sections. */
+/** Optional string, boolean, and affected config sections. */
 type ConfigParts =
-  | { ok: true; values: Record<string, string>; flags: Record<string, boolean> }
+  | {
+      ok: true;
+      values: Record<string, string>;
+      flags: Record<string, boolean>;
+      affected?: AffectedConfig;
+    }
   | { ok: false; error: string };
 
-/** Read the optional string and boolean config sections. */
+/** Read the optional string, boolean, and affected config sections. */
 function readConfigParts(record: Record<string, unknown>): ConfigParts {
   const optional = readOptionalStrings(record, OPTIONAL_CONFIG_KEYS);
   if (!optional.ok) {
@@ -45,7 +57,16 @@ function readConfigParts(record: Record<string, unknown>): ConfigParts {
   if (!flags.ok) {
     return flags;
   }
-  return { ok: true, values: optional.values, flags: flags.values };
+  const affected = readAffectedSection(record);
+  if (!affected.ok) {
+    return affected;
+  }
+  return {
+    ok: true,
+    values: optional.values,
+    flags: flags.values,
+    ...(affected.config === undefined ? {} : { affected: affected.config }),
+  };
 }
 
 /** Read the required slug field. */
@@ -111,21 +132,71 @@ function readOptionalBooleans(
   return { ok: true, values };
 }
 
+/** Read the optional `affected` section; any present-but-invalid value is an error. */
+function readAffectedSection(
+  record: Record<string, unknown>,
+): { ok: true; config?: AffectedConfig } | { ok: false; error: string } {
+  const raw = record["affected"];
+  if (raw === undefined) {
+    return { ok: true };
+  }
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    return { ok: false, error: "affected must be an object" };
+  }
+  return readUntracedList(raw as Record<string, unknown>);
+}
+
+/** Collect validated glob entries, or the reason the list is invalid. */
+function collectUntraced(
+  raw: unknown[],
+): { ok: true; untraced: string[] } | { ok: false; error: string } {
+  const untraced: string[] = [];
+  for (const entry of raw) {
+    if (typeof entry !== "string" || entry.length === 0) {
+      return { ok: false, error: "affected.untraced must be an array of non-empty strings" };
+    }
+    untraced.push(entry);
+  }
+  return { ok: true, untraced };
+}
+
+/** Read the `untraced` glob list inside the `affected` section. */
+function readUntracedList(
+  affected: Record<string, unknown>,
+): { ok: true; config: AffectedConfig } | { ok: false; error: string } {
+  const raw = affected["untraced"];
+  if (raw === undefined) {
+    return { ok: true, config: {} };
+  }
+  if (!Array.isArray(raw)) {
+    return { ok: false, error: "affected.untraced must be an array of non-empty strings" };
+  }
+  const collected = collectUntraced(raw);
+  if (!collected.ok) {
+    return collected;
+  }
+  return { ok: true, config: { untraced: collected.untraced } };
+}
+
 /** Enforce url shape and the buildCommand/buildScriptName exclusion. */
 function checkCrossFieldRules(
   slug: string,
-  values: Record<string, string>,
-  flags: Record<string, boolean>,
+  parts: {
+    values: Record<string, string>;
+    flags: Record<string, boolean>;
+    affected?: AffectedConfig;
+  },
 ): ParseResult {
-  const url = values["url"];
+  const url = parts.values["url"];
   if (url !== undefined && !isHttpUrl(url)) {
     return { ok: false, error: "url must be a valid http(s) URL" };
   }
-  if (values["buildCommand"] && values["buildScriptName"]) {
+  if (parts.values["buildCommand"] && parts.values["buildScriptName"]) {
     return { ok: false, error: "buildCommand and buildScriptName are mutually exclusive" };
   }
-  const { buildDir, buildCommand, buildScriptName, skip } = values;
-  const affectedOnly = flags["affectedOnly"];
+  const { buildDir, buildCommand, buildScriptName, skip } = parts.values;
+  const affectedOnly = parts.flags["affectedOnly"];
+  const affected = parts.affected;
   return {
     ok: true,
     config: {
@@ -136,6 +207,7 @@ function checkCrossFieldRules(
       ...(buildScriptName === undefined ? {} : { buildScriptName }),
       ...(skip === undefined ? {} : { skip }),
       ...(affectedOnly === undefined ? {} : { affectedOnly }),
+      ...(affected === undefined ? {} : { affected }),
     },
   };
 }

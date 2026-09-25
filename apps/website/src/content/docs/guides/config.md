@@ -17,7 +17,10 @@ Created by `storyshelf init` or `storyshelf create` (both fail if `.storybook/ma
   "buildCommand": "npm run build-storybook -- --output-dir storybook-static",
   "buildScriptName": "build-storybook",
   "skip": "main",
-  "affectedOnly": true
+  "affectedOnly": true,
+  "affected": {
+    "untraced": ["**/*.generated.ts"]
+  }
 }
 ```
 
@@ -30,6 +33,7 @@ Created by `storyshelf init` or `storyshelf create` (both fail if `.storybook/ma
 | `buildScriptName` | `--build-script-name` / `-b` | —                 | package script to run (default `build-storybook`)                                                                                     |
 | `skip`            | `--skip`                     | —                 | Glob to skip upload (e.g. `"main"`, `"release/*"`). `branch` matched via `picomatch`; when matched `upload` exits 0 without `POST` |
 | `affectedOnly`    | `--full` (opt-out)           | `STORYSHELF_FULL=1` (opt-out) | Render only impacted stories (default `true`). See [Affected capture](/concepts/affected-capture/)                     |
+| `affected`        | `--untraced` (union)         | —                 | `{ untraced: [...] }` — project-wide trace exclusions, combined with `--untraced` flags. See [Affected capture](/concepts/affected-capture/) |
 
 **Note:** `buildDir` default is Storybook's default `storybook-static` unless `buildDir` is set in file. `buildCommand` and `buildScriptName` are mutually exclusive (validated by `zod` `refine`).
 
@@ -54,7 +58,7 @@ flags (--url/--slug/--build-dir) > env (STORYSHELF_URL/SLUG/TOKEN, GITHUB_SHA/BR
 ```
 
 - `token` **never** stored in file — use `STORYSHELF_TOKEN` (project) or `STORYSHELF_ADMIN_TOKEN`/`ADMIN_TOKEN` (site-admin for `create`/`purge`).
-- `sha`/`branch` resolve per field as flags > env (`GITHUB_SHA`/`GITHUB_REF_NAME`, `VERCEL_GIT_COMMIT_*`, `CI_COMMIT_*`) > local git (`rev-parse HEAD`, current branch) > synthesized local identity (`local-<random>` on branch `local`). No git, no flags, no env still uploads — see [Affected capture](/concepts/affected-capture/). For gitless pipelines, pass explicit values per run (e.g. `--sha <run-id> --branch staging`); each unique sha chains baselines normally.
+- `sha`/`branch` resolve per field as flags > env (`GITHUB_SHA`/`GITHUB_REF_NAME`, `VERCEL_GIT_COMMIT_*`, `CI_COMMIT_*`) > local git (`rev-parse HEAD`, current branch) > synthesized local identity (`local-<random>` on branch `local`). No git, no flags, no env still uploads — see [Uploading without git](/guides/without-git/). For gitless pipelines, pass explicit values per run (e.g. `--sha <run-id> --branch staging`); each unique sha chains baselines normally.
 
 ## Monorepo
 

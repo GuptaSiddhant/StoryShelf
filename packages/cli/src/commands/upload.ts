@@ -180,9 +180,14 @@ function collectUploadOptions(
     authorName: options.authorName,
     label: options.label,
     affectedOnly: resolveAffectedOnly(options, cfg),
-    untraced: options.untraced ?? [],
+    untraced: mergeUntraced(cfg?.affected?.untraced, options.untraced),
     statsFile: options.statsFile,
   };
+}
+
+/** Combine config-file and flag untraced globs, deduplicated in order. */
+function mergeUntraced(configured: string[] | undefined, flagged: string[] | undefined): string[] {
+  return [...new Set([...(configured ?? []), ...(flagged ?? [])])];
 }
 
 /** Affected capture is on by default; `--full` (or `STORYSHELF_FULL=1`) opts out. */

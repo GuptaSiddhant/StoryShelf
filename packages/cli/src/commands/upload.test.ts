@@ -321,6 +321,46 @@ describe("runUpload affected capture", () => {
     expect(calls.map((call) => call.method)).toEqual(["POST", "PUT"]);
   });
 
+  it("merges config-file and flag untraced globs", async () => {
+    git(["-c", "init.defaultBranch=main", "init"]);
+    mkdirSync(join(dir, "src"), { recursive: true });
+    writeFileSync(join(dir, "src", "a.tsx"), "v1");
+    writeFileSync(join(dir, "src", "b.tsx"), "v1");
+    writeBuild();
+    mkdirSync(join(dir, ".storybook"), { recursive: true });
+    writeFileSync(
+      join(dir, ".storybook", "storyshelf.json"),
+      JSON.stringify({ slug: "demo", affected: { untraced: ["src/a.tsx"] } }),
+    );
+    commitAll("base");
+    const base = git(["rev-parse", "HEAD"]);
+    writeFileSync(join(dir, "src", "a.tsx"), "v2");
+    writeFileSync(join(dir, "src", "b.tsx"), "v2");
+    commitAll("change both");
+    const head = git(["rev-parse", "HEAD"]);
+    const { calls } = stubFetch({
+      build: { id: "b1" },
+      uploadUrl: "/x",
+      baselineSha: base,
+    });
+
+    await runUpload({
+      url: "https://shelf.example.com",
+      token: "ci-token",
+      sha: head,
+      buildDir: "storybook-static",
+      untraced: ["src/b.tsx"],
+      cwd: dir,
+    });
+
+    const affected = calls.find((call) => call.url.endsWith("/affected"));
+    expect(affected?.body).toMatchObject({
+      baselineSha: base,
+      changedFiles: ["src/a.tsx", "src/b.tsx"],
+      affectedImportPaths: [],
+    });
+  });
+
   it("synthesizes a local identity outside a git repository", async () => {
     writeBuild();
     const { calls } = stubFetch({
