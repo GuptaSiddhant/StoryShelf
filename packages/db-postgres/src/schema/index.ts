@@ -11,6 +11,7 @@ import type { AnyPgTable } from "drizzle-orm/pg-core";
 import { baselines as baselinesTable } from "./baseline.ts";
 import { builds as buildsTable } from "./build.ts";
 import { comments as commentsTable } from "./comment.ts";
+import { contentRefs as contentRefsTable } from "./content-refs.ts";
 import { buildLabels as buildLabelsTable, labelTypes as labelTypesTable } from "./label.ts";
 import { projectMembers as projectMembersTable } from "./member.ts";
 import { projectGroupMappings as projectGroupMappingsTable } from "./project-group-mapping.ts";
@@ -33,6 +34,7 @@ export { projectStatusConfigs } from "./status-config.ts";
 export { tokens } from "./token.ts";
 export { users } from "./user.ts";
 export { webhooks } from "./webhook.ts";
+export { contentRefs } from "./content-refs.ts";
 
 /** Build row as stored in the `builds` table. */
 export type { Build } from "./build.ts";
@@ -58,6 +60,8 @@ export type { User } from "./user.ts";
 export type { Webhook } from "./webhook.ts";
 /** Baseline row. */
 export type { Baseline } from "./baseline.ts";
+/** Content ref row for deduplicated assets. */
+export type { ContentRef } from "./content-refs.ts";
 
 /** Full Drizzle schema object passed to the database client. */
 export const schema: {
@@ -74,6 +78,7 @@ export const schema: {
   users: AnyPgTable;
   projectMembers: AnyPgTable;
   projectGroupMappings: AnyPgTable;
+  contentRefs: AnyPgTable;
 } = {
   projects: projectsTable,
   projectStatusConfigs: projectStatusConfigsTable,
@@ -88,6 +93,7 @@ export const schema: {
   users: usersTable,
   projectMembers: projectMembersTable,
   projectGroupMappings: projectGroupMappingsTable,
+  contentRefs: contentRefsTable,
 };
 
 /** The full database schema type. */

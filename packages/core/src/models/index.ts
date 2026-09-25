@@ -23,3 +23,4 @@ export { StatusConfigModel, type StatusConfigCreateInput } from "./status-config
 export { TokenModel } from "./token.ts";
 export { UserModel } from "./user.ts";
 export { WebhookModel, type WebhookCreateInput } from "./webhook.ts";
+export { ContentRefModel } from "./content-ref.ts";

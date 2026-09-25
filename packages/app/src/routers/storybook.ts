@@ -39,9 +39,45 @@ async function canViewBuild(
 
 /** Check whether a build's extracted statics are available for serving. */
 async function staticsReady(projectId: string, buildId: string): Promise<boolean> {
+  // New path: manifest.json indicates content-addressed storage; fallback to legacy iframe.html
+  if (
+    await getStore().storage.exists(posix.join(storybookDir(projectId, buildId), "manifest.json"))
+  ) {
+    return true;
+  }
   return await getStore().storage.exists(
     posix.join(storybookDir(projectId, buildId), "iframe.html"),
   );
+}
+
+async function readWithManifestFallback(
+  projectId: string,
+  buildId: string,
+  rel: string,
+): Promise<Buffer | null> {
+  // Try manifest indirection first (content-addressed)
+  try {
+    const manifestPath = posix.join(storybookDir(projectId, buildId), "manifest.json");
+    if (await getStore().storage.exists(manifestPath)) {
+      const manifestRaw = await getStore().storage.read(manifestPath);
+      const manifest = JSON.parse(manifestRaw.toString("utf8")) as Record<string, string>;
+      const hash = manifest[rel];
+      if (hash) {
+        const contentPath = `content/${hash}`;
+        if (await getStore().storage.exists(contentPath)) {
+          return await getStore().storage.read(contentPath);
+        }
+      }
+    }
+  } catch {
+    // ignore — manifest may not exist for old builds
+  }
+  // Fallback to legacy per-build path
+  const legacyPath = posix.join(storybookDir(projectId, buildId), rel);
+  if (await getStore().storage.exists(legacyPath)) {
+    return await getStore().storage.read(legacyPath);
+  }
+  return null;
 }
 
 /** Register the published Storybook resolver and static-asset routes. */
@@ -153,14 +189,13 @@ export function registerStorybook(app: ShelfRouter): void {
       if (!(await staticsReady(project.id, build.id))) {
         return c.html(renderStorybookPreparingPage(project, build, project.slug), 200);
       }
-      const path = posix.join(storybookDir(project.id, build.id), "index.html");
-      if (!(await getStore().storage.exists(path))) {
+      const buffer = await readWithManifestFallback(project.id, build.id, "index.html");
+      if (!buffer) {
         return c.redirect(
           isUlid26 ? `/projects/${project.slug}/builds/${build.id}` : `/projects/${project.slug}`,
           302,
         );
       }
-      const buffer = await getStore().storage.read(path);
       const cacheControl = isUlid26 ? "public, max-age=31536000, immutable" : "public, max-age=60";
       return c.body(new Uint8Array(buffer), 200, {
         "content-type": "text/html; charset=utf-8",
@@ -169,8 +204,8 @@ export function registerStorybook(app: ShelfRouter): void {
     }
     const segments = rest.split("/");
     if (segments.some((segment) => !isSafeSegment(segment))) return c.notFound();
-    const path = posix.join(storybookDir(project.id, build.id), rest);
-    if (!(await getStore().storage.exists(path))) {
+    const buffer = await readWithManifestFallback(project.id, build.id, rest);
+    if (!buffer) {
       if (rest === "index.html") {
         return c.redirect(
           isUlid26 ? `/projects/${project.slug}/builds/${build.id}` : `/projects/${project.slug}`,
@@ -179,7 +214,6 @@ export function registerStorybook(app: ShelfRouter): void {
       }
       return c.notFound();
     }
-    const buffer = await getStore().storage.read(path);
     const cacheControl = isUlid26 ? "public, max-age=31536000, immutable" : "public, max-age=3600";
     return c.body(new Uint8Array(buffer), 200, {
       "content-type": contentTypeFor(rest),
@@ -230,11 +264,8 @@ export function registerStorybook(app: ShelfRouter): void {
     if (segments.some((segment) => !isSafeSegment(segment))) {
       return c.notFound();
     }
-    const path = posix.join(storybookDir(project.id, build.id), rest);
-    if (!(await getStore().storage.exists(path))) {
-      return c.notFound();
-    }
-    const buffer = await getStore().storage.read(path);
+    const buffer = await readWithManifestFallback(project.id, build.id, rest);
+    if (!buffer) return c.notFound();
     return c.body(new Uint8Array(buffer), 200, {
       "content-type": contentTypeFor(rest),
       "cache-control": "public, max-age=31536000, immutable",

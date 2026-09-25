@@ -433,7 +433,7 @@ function renderCardActions(
     <>
       <Button
         variant="secondary"
-        href={urls.buildDiff(project.slug, build.id) + `?snapshot=${snap.id}`}
+        href={`${urls.buildDiff(project.slug, build.id)}?snapshot=${snap.id}`}
       >
         Review
       </Button>

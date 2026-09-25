@@ -247,7 +247,7 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
                   <Button
                     variant="secondary"
                     size="sm"
-                    href={urls.buildDiff(project.slug, build.id) + `?snapshot=${snap.id}`}
+                    href={`${urls.buildDiff(project.slug, build.id)}?snapshot=${snap.id}`}
                   >
                     Review
                   </Button>

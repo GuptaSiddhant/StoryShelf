@@ -163,4 +163,10 @@ CREATE TABLE IF NOT EXISTS project_group_mappings (
   created_at TIMESTAMPTZ NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS project_group_mappings_project_group_idx ON project_group_mappings (project_id, group_name);
+CREATE TABLE IF NOT EXISTS content_refs (
+  hash TEXT PRIMARY KEY,
+  ref_count INTEGER NOT NULL DEFAULT 1,
+  last_seen_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL
+);
 `;

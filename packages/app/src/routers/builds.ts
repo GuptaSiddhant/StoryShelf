@@ -18,6 +18,32 @@ import {
   persistInlineStatics,
   storeUploadStream,
 } from "./builds.handlers.ts";
+
+async function upsertContentRef(hash: string): Promise<void> {
+  try {
+    const { contentRefs } = await import("@storyshelf/db-sqlite/schema");
+    const now = new Date().toISOString();
+    const existing = await getStore().db.get(contentRefs as never, hash);
+    if (existing) {
+      await getStore().db.update(contentRefs as never, hash, {
+        refCount: (existing as { refCount: number }).refCount + 1,
+        lastSeenAt: now,
+      } as never);
+    } else {
+      await getStore().db.insert(
+        contentRefs as never,
+        {
+          hash,
+          refCount: 1,
+          lastSeenAt: now,
+          createdAt: now,
+        } as never,
+      );
+    }
+  } catch {
+    // ignore — content_refs may not exist on old DB
+  }
+}
 import { registerComments } from "./comments.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
 import {
@@ -86,6 +112,90 @@ export function registerBuilds(app: ShelfRouter): void {
       logger,
     );
     return c.json(build, 202);
+  });
+
+  app.openapi(dedupRoute, async (c) => {
+    const { slug, buildId } = c.req.valid("param");
+    const project = await resolveAuthorizedProject(c, slug, ...DEVELOPER_ROLES);
+    await buildForProject(project.id, buildId);
+    const { hashes } = c.req.valid("json");
+    const needed: string[] = [];
+    for (const hash of hashes) {
+      if (!(await getStore().storage.exists(`content/${hash}`))) {
+        needed.push(hash);
+      }
+    }
+    return c.json({ needed });
+  });
+
+  // oxlint-disable eslint(max-depth) -- dedup upload handler is intentionally nested for batch handling
+  app.openapi(contentUploadRoute, async (c) => {
+    const { slug, buildId } = c.req.valid("param");
+    const project = await resolveAuthorizedProject(c, slug, ...DEVELOPER_ROLES);
+    await buildForProject(project.id, buildId);
+    const contentType = c.req.header("content-type") ?? "";
+    if (contentType.includes("multipart/")) {
+      const form = await c.req.formData();
+      for (const [key, value] of form.entries()) {
+        if (value instanceof File) {
+          const hash = key;
+          const buffer = Buffer.from(await value.arrayBuffer());
+          await getStore().storage.write(`content/${hash}`, buffer);
+          await upsertContentRef(hash);
+        }
+      }
+    } else {
+      // Single content upload via PUT with hash header
+      const hash = c.req.header("x-content-hash") ?? "";
+      if (!hash) throw new HTTPException(400, { message: "Missing X-Content-Hash" });
+      const buffer = Buffer.from(await c.req.arrayBuffer());
+      await getStore().storage.write(`content/${hash}`, buffer);
+    }
+    return c.json({ ok: true });
+  });
+
+  app.openapi(manifestRoute, async (c) => {
+    const { slug, buildId } = c.req.valid("param");
+    const project = await resolveAuthorizedProject(c, slug, ...DEVELOPER_ROLES);
+    const build = await buildForProject(project.id, buildId);
+    const { files } = c.req.valid("json");
+    const manifest: Record<string, string> = {};
+    for (const f of files) {
+      manifest[f.rel] = f.hash;
+    }
+    await getStore().storage.write(
+      `${project.id}/builds/${build.id}/storybook/manifest.json`,
+      Buffer.from(JSON.stringify(manifest)),
+    );
+    // Upsert content_refs for each hash
+    for (const f of files) {
+      try {
+        const { contentRefs } = await import("@storyshelf/db-sqlite/schema");
+        const now = new Date().toISOString();
+        const existing = await getStore().db.get(contentRefs as never, f.hash);
+        // oxlint-disable-next-line unicorn/no-if-else -- upsert is clearer as if/else
+        if (!existing) {
+          await getStore().db.insert(
+            contentRefs as never,
+            {
+              hash: f.hash,
+              refCount: 1,
+              lastSeenAt: now,
+              createdAt: now,
+            } as never,
+          );
+        } else {
+          await getStore().db.update(contentRefs as never, f.hash, {
+            lastSeenAt: now,
+          } as never);
+        }
+      } catch {
+        // ignore — content_refs may not exist
+      }
+    }
+    const reqId = c.get("requestId");
+    await getStore().enqueueCapture?.(build.id, reqId);
+    return c.json({ ok: true });
   });
 
   app.openapi(getBuildRoute, async (c) => {
@@ -195,6 +305,63 @@ const uploadZipRoute = createRoute({
     },
     ...badRequest,
     ...forbiddenResponse,
+    ...notFoundResponse,
+  },
+});
+
+const dedupHashesSchema = z.object({ hashes: z.array(z.string()) });
+const dedupNeededSchema = z.object({ needed: z.array(z.string()) });
+const dedupRoute = createRoute({
+  method: "post",
+  path: "/api/v1/projects/{slug}/builds/{buildId}/dedup",
+  request: {
+    params: z.object({ slug: z.string(), buildId: z.string() }),
+    body: { content: { "application/json": { schema: dedupHashesSchema } } },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: dedupNeededSchema } },
+      description: "Hashes needed for upload",
+    },
+    ...notFoundResponse,
+  },
+});
+
+const contentUploadRoute = createRoute({
+  method: "post",
+  path: "/api/v1/projects/{slug}/builds/{buildId}/content",
+  request: {
+    params: z.object({ slug: z.string(), buildId: z.string() }),
+    body: { content: { "multipart/form-data": { schema: z.any() } } },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: z.object({ ok: z.boolean() }) } },
+      description: "Content uploaded",
+    },
+    ...notFoundResponse,
+  },
+});
+
+const manifestFileSchema = z.object({ rel: z.string(), hash: z.string(), size: z.number() });
+const manifestRoute = createRoute({
+  method: "post",
+  path: "/api/v1/projects/{slug}/builds/{buildId}/manifest",
+  request: {
+    params: z.object({ slug: z.string(), buildId: z.string() }),
+    body: {
+      content: {
+        "application/json": {
+          schema: z.object({ files: z.array(manifestFileSchema) }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: z.object({ ok: z.boolean() }) } },
+      description: "Manifest stored",
+    },
     ...notFoundResponse,
   },
 });

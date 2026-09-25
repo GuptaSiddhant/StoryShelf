@@ -93,12 +93,69 @@ export class Retention {
 
   private async deleteBuildFiles(projectId: string, buildId: string): Promise<number> {
     const prefix = `${projectId}/builds/${buildId}/`;
+    const manifestPath = `${prefix}storybook/manifest.json`;
+    let manifestFiles: string[] = [];
+    try {
+      if (await this.storage.exists(manifestPath)) {
+        const raw = await this.storage.read(manifestPath);
+        const manifest = JSON.parse(raw.toString("utf8")) as Record<string, string>;
+        manifestFiles = Object.values(manifest);
+      }
+    } catch {
+      // ignore — manifest may not exist for old builds
+    }
     const files = await this.storage.list(prefix);
     await Promise.all(
       files.map(async (file) => {
         await this.storage.delete(file);
       }),
     );
+    // Decrement content refs for this build's manifest
+    for (const hash of manifestFiles) {
+      try {
+        const { contentRefs } = await import("@storyshelf/db-sqlite/schema");
+        const existing = await this.db.get(contentRefs as never, hash);
+        // oxlint-disable-next-line unicorn/prefer-ternary -- refCount check is clearer as if/else
+        if (existing) {
+          const refCount = (existing as { refCount: number }).refCount;
+          // oxlint-disable-next-line unicorn/prefer-ternary -- grace logic is clearer as if/else
+          if (refCount <= 1) {
+            // Keep for 7-day grace: set refCount 0 and update lastSeenAt, don't delete yet
+            await this.db.update(contentRefs as never, hash, {
+              refCount: 0,
+              lastSeenAt: new Date().toISOString(),
+            } as never);
+          } else {
+            await this.db.update(contentRefs as never, hash, {
+              refCount: refCount - 1,
+              lastSeenAt: new Date().toISOString(),
+            } as never);
+          }
+        }
+      } catch {
+        // ignore — content_refs may not exist
+      }
+    }
+    // GC stale content_refs with 7-day grace
+    try {
+      const { contentRefs } = await import("@storyshelf/db-sqlite/schema");
+      const cutoff = new Date(Date.now() - 7 * 86_400_000).toISOString();
+      const all = (await this.db.list(contentRefs as never)) as unknown as {
+        hash: string;
+        refCount: number;
+        lastSeenAt: string;
+      }[];
+      for (const row of all) {
+        if (row.refCount === 0 && row.lastSeenAt < cutoff) {
+          await this.storage.delete(`content/${row.hash}`).catch(() => {
+            // ignore storage delete failure
+          });
+          await this.db.remove(contentRefs as never, row.hash);
+        }
+      }
+    } catch {
+      // ignore — content_refs may not exist
+    }
     return files.length;
   }
 

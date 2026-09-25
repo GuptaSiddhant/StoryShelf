@@ -61,26 +61,78 @@ async function awaitWrites(writes: Promise<void>[]): Promise<void> {
 /**
  * Persist an extracted Storybook directory to storage for published serving.
  *
+ * Uses content-addressed deduplication: each file is hashed and stored once
+ * under `content/<hash>`, with a per-build manifest at
+ * `${projectId}/builds/${buildId}/storybook/manifest.json`.
+ *
  * @param storage - Destination storage adapter.
  * @param sourceDir - Extracted Storybook directory.
  * @param projectId - Owning project id.
  * @param buildId - Build the files belong to.
+ * @param db - Optional database for content ref tracking (enables GC).
  */
 export async function persistStorybookStatics(
   storage: StorageAdapter,
   sourceDir: string,
   projectId: string,
   buildId: string,
+  db?: unknown,
 ): Promise<void> {
   const root = resolve(sourceDir);
   const destinationPrefix = storybookDir(projectId, buildId);
   const files = await walkFiles(root);
+  const manifest: Record<string, string> = {};
   await Promise.all(
     files.map(async (file) => {
       const rel = relative(root, file);
-      await storage.write(`${destinationPrefix}/${rel}`, await readFile(file));
+      const buffer = await readFile(file);
+      const hash = await hashBuffer(buffer);
+      const contentPath = `content/${hash}`;
+      manifest[rel] = hash;
+      // Only write if not already exists (dedup)
+      if (!(await storage.exists(contentPath))) {
+        await storage.write(contentPath, buffer);
+      }
+      // Also write to legacy per-build path for backward compat (can be removed after migration)
+      // and maintain content_refs for GC
+      await storage.write(`${destinationPrefix}/${rel}`, buffer);
+      if (db) {
+        await upsertContentRef(db as never, hash);
+      }
     }),
   );
+  await storage.write(`${destinationPrefix}/manifest.json`, Buffer.from(JSON.stringify(manifest)));
+}
+
+async function hashBuffer(buffer: Buffer): Promise<string> {
+  const { createHash } = await import("node:crypto");
+  return createHash("sha256").update(buffer).digest("hex");
+}
+
+async function upsertContentRef(db: never, hash: string): Promise<void> {
+  try {
+    const { contentRefs } = await import("@storyshelf/db-sqlite/schema");
+    const now = new Date().toISOString();
+    // Try to get existing
+    const existing = await (
+      db as unknown as { get: (t: unknown, id: string) => Promise<unknown> }
+    ).get(contentRefs as never, hash);
+    if (existing) {
+      await (
+        db as unknown as { update: (t: unknown, id: string, v: unknown) => Promise<unknown> }
+      ).update(contentRefs as never, hash, {
+        refCount: (existing as { refCount: number }).refCount + 1,
+        lastSeenAt: now,
+      } as never);
+    } else {
+      await (db as unknown as { insert: (t: unknown, v: unknown) => Promise<unknown> }).insert(
+        contentRefs as never,
+        { hash, refCount: 1, lastSeenAt: now, createdAt: now } as never,
+      );
+    }
+  } catch {
+    // content_refs table may not exist yet (old DB) — ignore
+  }
 }
 
 function blockedTarget(root: string, entryName: string): boolean {

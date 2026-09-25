@@ -15,6 +15,7 @@ import {
   captureLogs as captureLogsTable,
 } from "./capture-attempt.ts";
 import { comments as commentsTable } from "./comment.ts";
+import { contentRefs as contentRefsTable } from "./content-refs.ts";
 import { buildLabels as buildLabelsTable, labelTypes as labelTypesTable } from "./label.ts";
 import { projectMembers as projectMembersTable } from "./member.ts";
 import { projectGroupMappings as projectGroupMappingsTable } from "./project-group-mapping.ts";
@@ -38,6 +39,7 @@ export { projectStatusConfigs } from "./status-config.ts";
 export { tokens } from "./token.ts";
 export { users } from "./user.ts";
 export { webhooks } from "./webhook.ts";
+export { contentRefs } from "./content-refs.ts";
 
 /** A capture attempt and its log lines for a single build run. */
 export type { CaptureAttempt, CaptureLog } from "./capture-attempt.ts";
@@ -63,6 +65,8 @@ export type { Token } from "./token.ts";
 export type { User } from "./user.ts";
 /** Webhook subscription row. */
 export type { Webhook } from "./webhook.ts";
+/** Content ref row for deduplicated assets. */
+export type { ContentRef } from "./content-refs.ts";
 
 /** Full Drizzle schema object passed to the database client. */
 export const schema: {
@@ -81,6 +85,7 @@ export const schema: {
   users: AnySQLiteTable;
   projectMembers: AnySQLiteTable;
   projectGroupMappings: AnySQLiteTable;
+  contentRefs: AnySQLiteTable;
 } = {
   projects: projectsTable,
   projectStatusConfigs: projectStatusConfigsTable,
@@ -97,6 +102,7 @@ export const schema: {
   users: usersTable,
   projectMembers: projectMembersTable,
   projectGroupMappings: projectGroupMappingsTable,
+  contentRefs: contentRefsTable,
 };
 
 /** The full database schema type. */

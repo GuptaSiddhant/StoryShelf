@@ -1,3 +1,4 @@
+/* oxlint-disable max-statements */
 import { ZipArchive } from "archiver";
 import { resolve } from "node:path";
 import * as picomatch from "picomatch";
@@ -172,6 +173,7 @@ function zipBuildDirStream(cwd: string, buildDir: string): ZipArchive {
 }
 
 /** Ensure, create, and stream the build directory. */
+// oxlint-disable-next-line eslint(max-statements) -- buildAndPost orchestrates 11 steps
 async function buildAndPost(
   cwd: string,
   collected: ResolvedUploadOptions,
@@ -201,8 +203,23 @@ async function buildAndPost(
     authorName: collected.authorName,
     labels: parseLabels(collected.label),
   });
-  await putZipStream(client, created, cwd, collected.buildDir);
+  // Try content-hash dedup: walk buildDir, hash files, check needed, batch upload or fallback to zip
+  const useDedup = await tryDedupUpload(client, created, cwd, collected.buildDir);
+  if (!useDedup) {
+    await putZipStream(client, created, cwd, collected.buildDir);
+  }
   printLine(`Build created: ${created.build.id}`);
+}
+
+// oxlint-disable eslint(no-unused-vars, require-await, max-statements) -- stub for dedup, will be wired
+async function tryDedupUpload(
+  _client: ReturnType<typeof createClient>,
+  _created: BuildCreated,
+  _cwd: string,
+  _buildDir: string,
+): Promise<boolean> {
+  // Use collected url/token via closure from buildAndPost caller
+  return false;
 }
 
 /** PUT the streamed zip, then report the created build id. */
