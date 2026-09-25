@@ -161,7 +161,7 @@ export function registerStorybook(app: ShelfRouter): void {
         );
       }
       const buffer = await getStore().storage.read(path);
-      const cacheControl = isUlid26 ? "public, max-age=3600" : "public, max-age=60";
+      const cacheControl = isUlid26 ? "public, max-age=31536000, immutable" : "public, max-age=60";
       return c.body(new Uint8Array(buffer), 200, {
         "content-type": "text/html; charset=utf-8",
         "cache-control": cacheControl,
@@ -180,9 +180,10 @@ export function registerStorybook(app: ShelfRouter): void {
       return c.notFound();
     }
     const buffer = await getStore().storage.read(path);
+    const cacheControl = isUlid26 ? "public, max-age=31536000, immutable" : "public, max-age=3600";
     return c.body(new Uint8Array(buffer), 200, {
       "content-type": contentTypeFor(rest),
-      "cache-control": "public, max-age=3600",
+      "cache-control": cacheControl,
     });
   });
 
@@ -236,7 +237,7 @@ export function registerStorybook(app: ShelfRouter): void {
     const buffer = await getStore().storage.read(path);
     return c.body(new Uint8Array(buffer), 200, {
       "content-type": contentTypeFor(rest),
-      "cache-control": "public, max-age=3600",
+      "cache-control": "public, max-age=31536000, immutable",
     });
   });
 }
