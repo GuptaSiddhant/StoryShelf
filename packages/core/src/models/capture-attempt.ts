@@ -14,10 +14,13 @@ export interface CaptureAttemptTables {
 
 /** Data operations for capture attempts (one row per build run). */
 export class CaptureAttemptModel {
+  private readonly tables: CaptureAttemptTables;
   constructor(
     private readonly db: DatabaseAdapter,
-    private readonly tables: CaptureAttemptTables,
-  ) {}
+    tables?: CaptureAttemptTables,
+  ) {
+    this.tables = tables ?? { captureAttempts: db.tables.captureAttempts };
+  }
 
   async listByBuild(buildId: string): Promise<CaptureAttempt[]> {
     return (await this.db.list(this.tables.captureAttempts, {

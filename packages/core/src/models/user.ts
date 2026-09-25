@@ -11,14 +11,17 @@ export interface UserTables {
 
 /** Data operations for users. */
 export class UserModel {
+  private readonly tables: UserTables;
   /**
    * @param db - Database adapter.
    * @param tables - Table handles.
    */
   constructor(
     private readonly db: DatabaseAdapter,
-    private readonly tables: UserTables,
-  ) {}
+    tables?: UserTables,
+  ) {
+    this.tables = tables ?? { users: db.tables.users };
+  }
 
   /** Fetch a user by id, or null if not found (e.g. deleted after tokens were minted). */
   async get(id: string): Promise<User | null> {

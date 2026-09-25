@@ -13,14 +13,17 @@ export interface MemberTables {
 
 /** Data operations for project membership and roles. */
 export class MemberModel {
+  private readonly tables: MemberTables;
   /**
    * @param db - Database adapter.
    * @param tables - Table handles.
    */
   constructor(
     private readonly db: DatabaseAdapter,
-    private readonly tables: MemberTables,
-  ) {}
+    tables?: MemberTables,
+  ) {
+    this.tables = tables ?? { projectMembers: db.tables.projectMembers };
+  }
 
   /** List all members of a project. */
   async list(projectId: string): Promise<ProjectMember[]> {

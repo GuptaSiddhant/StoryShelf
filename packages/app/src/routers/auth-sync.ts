@@ -33,10 +33,10 @@ const ROLE_RANK: Record<ProjectRole, number> = {
  */
 export async function syncLoginMemberships(
   db: DatabaseAdapter,
-  tables: LoginSyncTables,
+  _tables: LoginSyncTables,
   user: AuthUser,
 ): Promise<void> {
-  await new UserModel(db, { users: tables.users }).upsert({
+  await new UserModel(db).upsert({
     id: user.id,
     email: user.email,
     name: user.name,
@@ -44,11 +44,9 @@ export async function syncLoginMemberships(
     role: user.role,
   });
   const groups = user.groups ?? [];
-  const projects = await new ProjectModel(db, { projects: tables.projects }).list();
-  const members = new MemberModel(db, { projectMembers: tables.projectMembers });
-  const mappings = new ProjectGroupMappingModel(db, {
-    projectGroupMappings: tables.projectGroupMappings,
-  });
+  const projects = await new ProjectModel(db).list();
+  const members = new MemberModel(db);
+  const mappings = new ProjectGroupMappingModel(db);
   await Promise.all(
     projects.map(
       // oxlint-disable-next-line typescript/promise-function-async -- returns the inner promise directly

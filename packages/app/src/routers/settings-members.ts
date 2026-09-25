@@ -22,17 +22,13 @@ export function registerMemberSettings(app: ShelfRouter): void {
         400,
       );
     }
-    await new MemberModel(getStore().db, {
-      projectMembers: getStore().db.tables.projectMembers,
-    }).set(project.id, userId, role as ProjectRole);
+    await new MemberModel(getStore().db).set(project.id, userId, role as ProjectRole);
     return hxRedirect(c, `/projects/${project.slug}/settings/members`);
   });
 
   app.post("/projects/:slug/settings/members/:userId/remove", async (c) => {
     const project = await findProject(c.req.param("slug") ?? "");
-    await new MemberModel(getStore().db, {
-      projectMembers: getStore().db.tables.projectMembers,
-    }).remove(project.id, c.req.param("userId") ?? "");
+    await new MemberModel(getStore().db).remove(project.id, c.req.param("userId") ?? "");
     return hxRedirect(c, `/projects/${project.slug}/settings/members`);
   });
 
@@ -53,17 +49,16 @@ function registerGroupMappingSettings(app: ShelfRouter): void {
         400,
       );
     }
-    await new ProjectGroupMappingModel(getStore().db, {
-      projectGroupMappings: getStore().db.tables.projectGroupMappings,
-    }).create(project.id, groupName, role);
+    await new ProjectGroupMappingModel(getStore().db).create(project.id, groupName, role);
     return hxRedirect(c, `/projects/${project.slug}/settings/members`);
   });
 
   app.post("/projects/:slug/settings/members/groups/:mappingId/remove", async (c) => {
     const project = await findProject(c.req.param("slug") ?? "");
-    await new ProjectGroupMappingModel(getStore().db, {
-      projectGroupMappings: getStore().db.tables.projectGroupMappings,
-    }).remove(project.id, c.req.param("mappingId") ?? "");
+    await new ProjectGroupMappingModel(getStore().db).remove(
+      project.id,
+      c.req.param("mappingId") ?? "",
+    );
     return hxRedirect(c, `/projects/${project.slug}/settings/members`);
   });
 }

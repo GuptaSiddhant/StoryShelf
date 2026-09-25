@@ -13,14 +13,17 @@ export interface SnapshotTables {
 
 /** Data operations for snapshot records. */
 export class SnapshotModel {
+  private readonly tables: SnapshotTables;
   /**
    * @param db - Database adapter.
    * @param tables - Table handles.
    */
   constructor(
     private readonly db: DatabaseAdapter,
-    private readonly tables: SnapshotTables,
-  ) {}
+    tables?: SnapshotTables,
+  ) {
+    this.tables = tables ?? { snapshots: db.tables.snapshots };
+  }
 
   /**
    * Create a snapshot for a story within a build.

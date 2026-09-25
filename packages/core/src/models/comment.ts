@@ -13,10 +13,16 @@ export interface CommentTables {
 
 /** Data operations for review comments. */
 export class CommentModel {
+  private readonly tables: CommentTables;
   constructor(
     private readonly db: DatabaseAdapter,
-    private readonly tables: CommentTables,
-  ) {}
+    tables?: CommentTables,
+  ) {
+    this.tables = tables ?? {
+      comments: db.tables.comments,
+      projects: db.tables.projects,
+    };
+  }
 
   async listByBuild(buildId: string): Promise<Comment[]> {
     return (await this.db.list(this.tables.comments, {

@@ -117,20 +117,14 @@ const deleteGroupMappingRoute = createRoute({
 export function registerMembers(app: ShelfRouter): void {
   app.openapi(listMembersRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...VIEW_ROLES);
-    return c.json(
-      await new MemberModel(getStore().db, {
-        projectMembers: getStore().db.tables.projectMembers,
-      }).list(project.id),
-    );
+    return c.json(await new MemberModel(getStore().db).list(project.id));
   });
 
   app.openapi(setMemberRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
     const body = c.req.valid("json");
     return c.json(
-      await new MemberModel(getStore().db, {
-        projectMembers: getStore().db.tables.projectMembers,
-      }).set(project.id, body.userId, body.role),
+      await new MemberModel(getStore().db).set(project.id, body.userId, body.role),
       201,
     );
   });
@@ -139,19 +133,13 @@ export function registerMembers(app: ShelfRouter): void {
     const { slug, userId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
     const body = c.req.valid("json");
-    return c.json(
-      await new MemberModel(getStore().db, {
-        projectMembers: getStore().db.tables.projectMembers,
-      }).set(project.id, userId, body.role),
-    );
+    return c.json(await new MemberModel(getStore().db).set(project.id, userId, body.role));
   });
 
   app.openapi(deleteMemberRoute, async (c) => {
     const { slug, userId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
-    await new MemberModel(getStore().db, {
-      projectMembers: getStore().db.tables.projectMembers,
-    }).remove(project.id, userId);
+    await new MemberModel(getStore().db).remove(project.id, userId);
     return c.body(null, 204);
   });
 
@@ -162,11 +150,7 @@ export function registerMembers(app: ShelfRouter): void {
 function registerGroupMappingRoutes(app: ShelfRouter): void {
   app.openapi(listGroupMappingsRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...VIEW_ROLES);
-    return c.json(
-      await new ProjectGroupMappingModel(getStore().db, {
-        projectGroupMappings: getStore().db.tables.projectGroupMappings,
-      }).list(project.id),
-    );
+    return c.json(await new ProjectGroupMappingModel(getStore().db).list(project.id));
   });
 
   app.openapi(createGroupMappingRoute, async (c) => {
@@ -179,9 +163,11 @@ function registerGroupMappingRoutes(app: ShelfRouter): void {
       });
     }
     return c.json(
-      await new ProjectGroupMappingModel(getStore().db, {
-        projectGroupMappings: getStore().db.tables.projectGroupMappings,
-      }).create(project.id, body.groupName, body.role),
+      await new ProjectGroupMappingModel(getStore().db).create(
+        project.id,
+        body.groupName,
+        body.role,
+      ),
       201,
     );
   });
@@ -189,9 +175,7 @@ function registerGroupMappingRoutes(app: ShelfRouter): void {
   app.openapi(deleteGroupMappingRoute, async (c) => {
     const { slug, mappingId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
-    await new ProjectGroupMappingModel(getStore().db, {
-      projectGroupMappings: getStore().db.tables.projectGroupMappings,
-    }).remove(project.id, mappingId);
+    await new ProjectGroupMappingModel(getStore().db).remove(project.id, mappingId);
     return c.body(null, 204);
   });
 }

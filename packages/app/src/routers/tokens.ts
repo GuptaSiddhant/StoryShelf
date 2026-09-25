@@ -58,9 +58,7 @@ const deleteTokenRoute = createRoute({
 export function registerTokens(app: ShelfRouter): void {
   app.openapi(listTokensRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
-    const tokens = await new TokenModel(getStore().db, {
-      tokens: getStore().db.tables.tokens,
-    }).list(project.id);
+    const tokens = await new TokenModel(getStore().db).list(project.id);
     return c.json(tokens.map(({ hash: _hash, ...rest }) => rest));
   });
 
@@ -68,28 +66,22 @@ export function registerTokens(app: ShelfRouter): void {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
     const body = c.req.valid("json");
     const token = randomToken("shelf_");
-    await new TokenModel(getStore().db, { tokens: getStore().db.tables.tokens }).create(
-      project.id,
-      {
-        name: body.name,
-        hash: token.hash,
-        userId: getStore().user?.id ?? null,
-      },
-    );
+    await new TokenModel(getStore().db).create(project.id, {
+      name: body.name,
+      hash: token.hash,
+      userId: getStore().user?.id ?? null,
+    });
     return c.json({ ...body, token: token.value }, 201);
   });
 
   app.openapi(deleteTokenRoute, async (c) => {
     const { slug, tokenId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
-    const found = await new TokenModel(getStore().db, { tokens: getStore().db.tables.tokens }).get(
-      project.id,
-      tokenId,
-    );
+    const found = await new TokenModel(getStore().db).get(project.id, tokenId);
     if (!found) {
       notFound("Token not found");
     }
-    await new TokenModel(getStore().db, { tokens: getStore().db.tables.tokens }).remove(found.id);
+    await new TokenModel(getStore().db).remove(found.id);
     return c.body(null, 204);
   });
 }

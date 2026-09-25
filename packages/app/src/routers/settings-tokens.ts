@@ -25,7 +25,7 @@ async function handleCreateToken(c: Context): Promise<Response> {
     );
   }
   const token = randomToken("shelf_");
-  await new TokenModel(getStore().db, { tokens: getStore().db.tables.tokens }).create(project.id, {
+  await new TokenModel(getStore().db).create(project.id, {
     name: tokenName,
     hash: token.hash,
     userId: getStore().user?.id ?? null,
@@ -35,8 +35,6 @@ async function handleCreateToken(c: Context): Promise<Response> {
 
 async function handleDeleteToken(c: Context): Promise<Response> {
   const project = await findProject(c.req.param("slug") ?? "");
-  await new TokenModel(getStore().db, { tokens: getStore().db.tables.tokens }).remove(
-    c.req.param("tokenId") ?? "",
-  );
+  await new TokenModel(getStore().db).remove(c.req.param("tokenId") ?? "");
   return hxRedirect(c, `/projects/${project.slug}/settings/tokens`);
 }

@@ -15,14 +15,21 @@ export interface LabelTables {
 
 /** Data operations for label types and build labels. */
 export class LabelModel {
+  private readonly tables: LabelTables;
   /**
    * @param db - Database adapter.
    * @param tables - Table handles.
    */
   constructor(
     private readonly db: DatabaseAdapter,
-    private readonly tables: LabelTables,
-  ) {}
+    tables?: LabelTables,
+  ) {
+    this.tables = tables ?? {
+      builds: db.tables.builds,
+      buildLabels: db.tables.buildLabels,
+      labelTypes: db.tables.labelTypes,
+    };
+  }
 
   /**
    * Seed the default label types for a project if missing.

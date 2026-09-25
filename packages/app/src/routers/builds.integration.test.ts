@@ -52,11 +52,7 @@ describe("build list label filter", () => {
     await db.insert(db.tables.builds, makeBuild("b1"));
     await db.insert(db.tables.builds, makeBuild("b2"));
 
-    const labelModel = new LabelModel(db, {
-      builds: db.tables.builds,
-      buildLabels: db.tables.buildLabels,
-      labelTypes: db.tables.labelTypes,
-    });
+    const labelModel = new LabelModel(db);
     await labelModel.attach("p1", "b1", "environment", "staging");
     await labelModel.attach("p1", "b2", "environment", "production");
 
@@ -94,11 +90,7 @@ describe("build list label filter", () => {
     await db.insert(db.tables.builds, makeBuild("b1", "main"));
     await db.insert(db.tables.builds, makeBuild("b2", "feature/x"));
 
-    const labelModel = new LabelModel(db, {
-      builds: db.tables.builds,
-      buildLabels: db.tables.buildLabels,
-      labelTypes: db.tables.labelTypes,
-    });
+    const labelModel = new LabelModel(db);
     await labelModel.attach("p1", "b1", "environment", "staging");
     await labelModel.attach("p1", "b2", "environment", "staging");
 
@@ -193,11 +185,7 @@ describe("streaming build upload (JSON + PUT)", () => {
       `/api/v1/projects/stream-project/builds/${created.build.id}/zip`,
     );
     expect(await storage.exists(storybookZipPath("p1", created.build.id))).toBe(false);
-    const labels = await new LabelModel(db, {
-      builds: db.tables.builds,
-      buildLabels: db.tables.buildLabels,
-      labelTypes: db.tables.labelTypes,
-    }).listForBuild(created.build.id);
+    const labels = await new LabelModel(db).listForBuild(created.build.id);
     expect(labels.map((label) => `${label.typeKey}=${label.value}`)).toEqual(["pr=7"]);
   });
 

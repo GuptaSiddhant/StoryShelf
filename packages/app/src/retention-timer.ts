@@ -52,7 +52,7 @@ function createBranchGcRunner(
 ): () => Promise<void> {
   return async (): Promise<void> => {
     try {
-      const projects = await new ProjectModel(db, { projects: db.tables.projects }).list();
+      const projects = await new ProjectModel(db).list();
       const retention = new Retention(
         db,
         storage,

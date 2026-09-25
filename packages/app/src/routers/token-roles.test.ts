@@ -54,11 +54,7 @@ async function seed() {
       await db.insert(db.tables.users, user);
     }),
   );
-  await new MemberModel(db, { projectMembers: db.tables.projectMembers }).set(
-    "p1",
-    dev.id,
-    "developer",
-  );
+  await new MemberModel(db).set("p1", dev.id, "developer");
   const app = createShelfApp({
     database: db,
     storage,
@@ -75,7 +71,7 @@ async function mint(
   value: string,
   userId: string | null,
 ): Promise<void> {
-  await new TokenModel(db, { tokens: db.tables.tokens }).create("p1", {
+  await new TokenModel(db).create("p1", {
     name,
     hash: sha256(value),
     userId,
@@ -161,7 +157,7 @@ describe("bearer token permissions", () => {
       body: JSON.stringify({ name: "ci" }),
     });
     expect(created.status).toBe(201);
-    const listed = await new TokenModel(db, { tokens: db.tables.tokens }).list("p1");
+    const listed = await new TokenModel(db).list("p1");
     const row = listed.find((token) => token.name === "ci");
     expect(row?.userId).toBe(admin.id);
   });

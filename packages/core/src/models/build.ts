@@ -15,10 +15,17 @@ export interface BuildTables {
 
 /** Data operations for build records. */
 export class BuildModel {
+  private readonly tables: BuildTables;
   constructor(
     private readonly db: DatabaseAdapter,
-    private readonly tables: BuildTables,
-  ) {}
+    tables?: BuildTables,
+  ) {
+    this.tables = tables ?? {
+      builds: db.tables.builds,
+      buildLabels: db.tables.buildLabels,
+      snapshots: db.tables.snapshots,
+    };
+  }
 
   async create(projectId: string, input: BuildCreateInput): Promise<Build> {
     const now = new Date().toISOString();

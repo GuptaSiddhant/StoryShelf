@@ -34,18 +34,14 @@ describe("DocumentLayout stylesheet", () => {
   it("collects hono/css component styles into the storyshelf-css tag", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const project = await new ProjectModel(db, { projects: db.tables.projects }).create({
+    const project = await new ProjectModel(db).create({
       name: "Docs",
     });
-    const build = await new BuildModel(db, {
-      builds: db.tables.builds,
-      buildLabels: db.tables.buildLabels,
-      snapshots: db.tables.snapshots,
-    }).create(project.id, {
+    const build = await new BuildModel(db).create(project.id, {
       gitSha: "abc123",
       gitBranch: "main",
     });
-    await new SnapshotModel(db, { snapshots: db.tables.snapshots }).create(project.id, build.id, {
+    await new SnapshotModel(db).create(project.id, build.id, {
       storyId: "button--primary",
       storyName: "Primary",
       storyTitle: "Button",

@@ -12,14 +12,17 @@ export interface ProjectTables {
 
 /** Data operations for project records. */
 export class ProjectModel {
+  private readonly tables: ProjectTables;
   /**
    * @param db - Database adapter.
    * @param tables - Table handles (injected by the database adapter).
    */
   constructor(
     private readonly db: DatabaseAdapter,
-    private readonly tables: ProjectTables,
-  ) {}
+    tables?: ProjectTables,
+  ) {
+    this.tables = tables ?? { projects: db.tables.projects };
+  }
 
   /**
    * Create a project with a unique slug.

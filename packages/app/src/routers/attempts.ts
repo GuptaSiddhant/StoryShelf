@@ -14,9 +14,7 @@ import { attemptLogSchema, attemptSchema } from "./schemas.ts";
 export function registerAttempts(app: ShelfRouter): void {
   app.openapi(listAttemptsRoute, async (c) => {
     const build = await scopedBuild(c, c.req.valid("param"));
-    const attempts = await new CaptureAttemptModel(getStore().db, {
-      captureAttempts: getStore().db.tables.captureAttempts,
-    }).listByBuild(build.id);
+    const attempts = await new CaptureAttemptModel(getStore().db).listByBuild(build.id);
     return c.json(attempts);
   });
 
@@ -28,9 +26,7 @@ export function registerAttempts(app: ShelfRouter): void {
   app.openapi(listAttemptLogsRoute, async (c) => {
     const build = await scopedBuild(c, c.req.valid("param"));
     const attempt = await attemptForBuild(build, c.req.valid("param").attemptNo);
-    const logs = await new CaptureLogModel(getStore().db, {
-      captureLogs: getStore().db.tables.captureLogs,
-    }).listByAttempt(attempt.id);
+    const logs = await new CaptureLogModel(getStore().db).listByAttempt(attempt.id);
     return c.json(logs);
   });
 }
@@ -93,9 +89,7 @@ async function scopedBuild(c: Context, params: { slug: string; buildId: string }
 
 /** Fetch an attempt scoped to its build, throwing 404 when it does not belong. */
 async function attemptForBuild(build: Build, attemptNo: number): Promise<CaptureAttempt> {
-  const attempt = await new CaptureAttemptModel(getStore().db, {
-    captureAttempts: getStore().db.tables.captureAttempts,
-  }).getByNo(build.id, attemptNo);
+  const attempt = await new CaptureAttemptModel(getStore().db).getByNo(build.id, attemptNo);
   if (!attempt) {
     notFound("Attempt not found");
   }

@@ -46,11 +46,7 @@ describe("Label-driven build resolution", () => {
   it("creates and lists label types", async () => {
     const { db } = makeDatabase();
     await db.insert(db.tables.projects, mockProject);
-    const labelModel = new LabelModel(db, {
-      builds: db.tables.builds,
-      buildLabels: db.tables.buildLabels,
-      labelTypes: db.tables.labelTypes,
-    });
+    const labelModel = new LabelModel(db);
 
     const labelType = await labelModel.createType("p1", {
       key: "custom",
@@ -71,11 +67,7 @@ describe("Label-driven build resolution", () => {
     const { db } = makeDatabase();
     await db.insert(db.tables.projects, mockProject);
     await db.insert(db.tables.builds, mockBuild);
-    const labelModel = new LabelModel(db, {
-      builds: db.tables.builds,
-      buildLabels: db.tables.buildLabels,
-      labelTypes: db.tables.labelTypes,
-    });
+    const labelModel = new LabelModel(db);
 
     const label = await labelModel.attach("p1", "b1", "branch", "main");
     expect(label.buildId).toBe("b1");
@@ -91,11 +83,7 @@ describe("Label-driven build resolution", () => {
     const { db } = makeDatabase();
     await db.insert(db.tables.projects, mockProject);
     await db.insert(db.tables.builds, mockBuild);
-    const labelModel = new LabelModel(db, {
-      builds: db.tables.builds,
-      buildLabels: db.tables.buildLabels,
-      labelTypes: db.tables.labelTypes,
-    });
+    const labelModel = new LabelModel(db);
 
     await labelModel.attach("p1", "b1", "branch", "main");
 
@@ -106,11 +94,7 @@ describe("Label-driven build resolution", () => {
   it("returns null for non-existent label", async () => {
     const { db } = makeDatabase();
     await db.insert(db.tables.projects, mockProject);
-    const labelModel = new LabelModel(db, {
-      builds: db.tables.builds,
-      buildLabels: db.tables.buildLabels,
-      labelTypes: db.tables.labelTypes,
-    });
+    const labelModel = new LabelModel(db);
 
     const latestBuildId = await labelModel.latestBuildId("p1", "branch", "nonexistent");
     expect(latestBuildId).toBeNull();
@@ -120,11 +104,7 @@ describe("Label-driven build resolution", () => {
     const { db } = makeDatabase();
     await db.insert(db.tables.projects, mockProject);
     await db.insert(db.tables.builds, mockBuild);
-    const labelModel = new LabelModel(db, {
-      builds: db.tables.builds,
-      buildLabels: db.tables.buildLabels,
-      labelTypes: db.tables.labelTypes,
-    });
+    const labelModel = new LabelModel(db);
 
     expect(await labelModel.hasPersistent("p1", "b1")).toBe(false);
 
@@ -136,11 +116,7 @@ describe("Label-driven build resolution", () => {
   it("removes custom label types", async () => {
     const { db } = makeDatabase();
     await db.insert(db.tables.projects, mockProject);
-    const labelModel = new LabelModel(db, {
-      builds: db.tables.builds,
-      buildLabels: db.tables.buildLabels,
-      labelTypes: db.tables.labelTypes,
-    });
+    const labelModel = new LabelModel(db);
 
     await labelModel.createType("p1", { key: "custom", name: "Custom" });
     await labelModel.removeType("p1", "custom");
@@ -152,11 +128,7 @@ describe("Label-driven build resolution", () => {
   it("rejects removal of reserved label types", async () => {
     const { db } = makeDatabase();
     await db.insert(db.tables.projects, mockProject);
-    const labelModel = new LabelModel(db, {
-      builds: db.tables.builds,
-      buildLabels: db.tables.buildLabels,
-      labelTypes: db.tables.labelTypes,
-    });
+    const labelModel = new LabelModel(db);
 
     await expect(labelModel.removeType("p1", "persistent")).rejects.toThrow(
       "Label type 'persistent' cannot be removed.",
@@ -185,11 +157,7 @@ describe("PATCH label-type endpoint", () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
     await db.insert(db.tables.projects, localProject);
-    const labelModel = new LabelModel(db, {
-      builds: db.tables.builds,
-      buildLabels: db.tables.buildLabels,
-      labelTypes: db.tables.labelTypes,
-    });
+    const labelModel = new LabelModel(db);
     await labelModel.createType("p1", {
       key: "custom",
       name: "Custom",

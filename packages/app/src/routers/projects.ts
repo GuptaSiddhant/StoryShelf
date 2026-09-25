@@ -100,25 +100,19 @@ const deleteProjectRoute = createRoute({
 export function registerProjects(app: ShelfRouter): void {
   app.openapi(listProjectsRoute, async (c) => {
     requireSessionUser();
-    const projects = new ProjectModel(getStore().db, { projects: getStore().db.tables.projects });
+    const projects = new ProjectModel(getStore().db);
     return c.json(await projects.list());
   });
 
   app.openapi(createProjectRoute, async (c) => {
     requireSiteAdmin(c);
     const body = c.req.valid("json");
-    const projects = new ProjectModel(getStore().db, { projects: getStore().db.tables.projects });
+    const projects = new ProjectModel(getStore().db);
     const project = await projects.create(body);
-    await new LabelModel(getStore().db, {
-      builds: getStore().db.tables.builds,
-      buildLabels: getStore().db.tables.buildLabels,
-      labelTypes: getStore().db.tables.labelTypes,
-    }).seedFor(project.id);
+    await new LabelModel(getStore().db).seedFor(project.id);
     const creator = getStore().user;
     if (creator) {
-      await new MemberModel(getStore().db, {
-        projectMembers: getStore().db.tables.projectMembers,
-      }).set(project.id, creator.id, "admin");
+      await new MemberModel(getStore().db).set(project.id, creator.id, "admin");
     }
     return c.json(project, 201);
   });
@@ -132,9 +126,7 @@ export function registerProjects(app: ShelfRouter): void {
   app.openapi(updateProjectRoute, async (c) => {
     const { slug } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
-    const updated = await new ProjectModel(getStore().db, {
-      projects: getStore().db.tables.projects,
-    }).update(project.id, c.req.valid("json"));
+    const updated = await new ProjectModel(getStore().db).update(project.id, c.req.valid("json"));
     return c.json(updated);
   });
 
@@ -142,9 +134,7 @@ export function registerProjects(app: ShelfRouter): void {
     requireSiteAdmin(c);
     const { slug } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...VIEW_ROLES);
-    await new ProjectModel(getStore().db, { projects: getStore().db.tables.projects }).remove(
-      project.id,
-    );
+    await new ProjectModel(getStore().db).remove(project.id);
     return c.body(null, 204);
   });
 }

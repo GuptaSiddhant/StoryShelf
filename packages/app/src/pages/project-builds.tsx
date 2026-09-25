@@ -21,18 +21,12 @@ export async function renderProjectBuildsPage(
   slug: string,
   query: { status?: string; branch?: string } = {},
 ): Promise<RenderedContent | null> {
-  const projects = await new ProjectModel(getStore().db, {
-    projects: getStore().db.tables.projects,
-  }).list();
+  const projects = await new ProjectModel(getStore().db).list();
   const project = projects.find((item) => item.slug === slug);
   if (!project) {
     return null;
   }
-  const builds = await new BuildModel(getStore().db, {
-    builds: getStore().db.tables.builds,
-    buildLabels: getStore().db.tables.buildLabels,
-    snapshots: getStore().db.tables.snapshots,
-  }).list(project.id, {
+  const builds = await new BuildModel(getStore().db).list(project.id, {
     status: query.status as unknown as import("@storyshelf/core/types").BuildStatus | undefined,
     branch: query.branch,
   });

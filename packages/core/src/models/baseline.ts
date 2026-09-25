@@ -17,13 +17,22 @@ export interface BaselineTables {
 
 /** Data operations for baseline screenshots. */
 export class BaselineModel {
+  private readonly tables: BaselineTables;
+  private readonly storage: StorageAdapter;
+  private readonly secret?: string;
+  private readonly webhookTables?: WebhookTables;
   constructor(
     private readonly db: DatabaseAdapter,
-    private readonly tables: BaselineTables,
-    private readonly storage: StorageAdapter,
-    private readonly secret?: string,
-    private readonly webhookTables?: WebhookTables,
-  ) {}
+    tables?: BaselineTables,
+    storage?: StorageAdapter,
+    secret?: string,
+    webhookTables?: WebhookTables,
+  ) {
+    this.tables = tables ?? { baselines: db.tables.baselines };
+    this.storage = storage as StorageAdapter;
+    this.secret = secret;
+    this.webhookTables = webhookTables;
+  }
 
   async getFor(
     projectId: string,

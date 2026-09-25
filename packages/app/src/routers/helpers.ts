@@ -46,9 +46,7 @@ export async function currentProjectRole(projectId: string): Promise<ProjectRole
   if (!user) {
     return null;
   }
-  return await new MemberModel(db, {
-    projectMembers: getStore().db.tables.projectMembers,
-  }).effectiveRole(user.role, projectId, user.id);
+  return await new MemberModel(db).effectiveRole(user.role, projectId, user.id);
 }
 
 /** Build middleware that requires one of the given project roles. */
@@ -69,7 +67,7 @@ export function requireRole(...roles: ProjectRole[]) {
 /** Look up a project by its URL slug, returning null when absent. */
 export async function findProjectBySlug(slug: string): Promise<Project | null> {
   const { db } = getStore();
-  return await new ProjectModel(db, { projects: getStore().db.tables.projects }).getBySlug(slug);
+  return await new ProjectModel(db).getBySlug(slug);
 }
 
 async function resolveProjectByToken(
@@ -79,15 +77,11 @@ async function resolveProjectByToken(
   const authHeader = c.req.header("authorization");
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.slice("Bearer ".length);
-    const found = await new TokenModel(getStore().db, {
-      tokens: getStore().db.tables.tokens,
-    }).findByHash(sha256(token));
+    const found = await new TokenModel(getStore().db).findByHash(sha256(token));
     if (!found) {
       unauthorized();
     }
-    const project = await new ProjectModel(getStore().db, {
-      projects: getStore().db.tables.projects,
-    }).get(found.projectId);
+    const project = await new ProjectModel(getStore().db).get(found.projectId);
     if (!project || project.slug !== slug) {
       forbidden();
     }
@@ -106,13 +100,11 @@ async function tokenProjectRole(token: Token, projectId: string): Promise<Projec
     return "viewer";
   }
   const { db } = getStore();
-  const user = await new UserModel(db, { users: getStore().db.tables.users }).get(token.userId);
+  const user = await new UserModel(db).get(token.userId);
   if (!user) {
     return null;
   }
-  return await new MemberModel(db, {
-    projectMembers: getStore().db.tables.projectMembers,
-  }).effectiveRole(user.role, projectId, user.id);
+  return await new MemberModel(db).effectiveRole(user.role, projectId, user.id);
 }
 
 /** Resolve a project by slug, honoring CLI bearer-token access. */

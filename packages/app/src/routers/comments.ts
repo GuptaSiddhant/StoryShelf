@@ -54,12 +54,7 @@ export function registerComments(app: ShelfRouter): void {
     const { slug, buildId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...VIEW_ROLES);
     const build = await buildForProject(project.id, buildId);
-    return c.json(
-      await new CommentModel(getStore().db, {
-        comments: getStore().db.tables.comments,
-        projects: getStore().db.tables.projects,
-      }).listByBuild(build.id),
-    );
+    return c.json(await new CommentModel(getStore().db).listByBuild(build.id));
   });
 
   app.openapi(createCommentRoute, async (c) => {
@@ -68,10 +63,12 @@ export function registerComments(app: ShelfRouter): void {
     const build = await buildForProject(project.id, buildId);
     const body = c.req.valid("json");
     const userId = getStore().user?.id ?? null;
-    const comment = await new CommentModel(getStore().db, {
-      comments: getStore().db.tables.comments,
-      projects: getStore().db.tables.projects,
-    }).create(project.id, build.id, userId, body);
+    const comment = await new CommentModel(getStore().db).create(
+      project.id,
+      build.id,
+      userId,
+      body,
+    );
     return c.json(comment, 201);
   });
 
@@ -79,10 +76,7 @@ export function registerComments(app: ShelfRouter): void {
     const { slug, buildId, commentId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...DEVELOPER_ROLES);
     const build = await buildForProject(project.id, buildId);
-    const comment = await new CommentModel(getStore().db, {
-      comments: getStore().db.tables.comments,
-      projects: getStore().db.tables.projects,
-    }).resolve(commentId);
+    const comment = await new CommentModel(getStore().db).resolve(commentId);
     if (comment.buildId !== build.id) {
       throwNotFound("Comment not found");
     }

@@ -28,16 +28,12 @@ const projectSteps = css`
 export async function renderProjectsPage(): Promise<RenderedContent> {
   const { db, user, config } = getStore();
   const urls = createUrlBuilder("/", config.publishedBaseDomain);
-  const projects = await new ProjectModel(db, { projects: getStore().db.tables.projects }).list();
+  const projects = await new ProjectModel(db).list();
   const canCreate = !user || user.role === "admin" || user.role === "member";
 
   const recentCounts = await Promise.all(
     projects.map(async (project) => {
-      const builds = await new BuildModel(db, {
-        builds: getStore().db.tables.builds,
-        buildLabels: getStore().db.tables.buildLabels,
-        snapshots: getStore().db.tables.snapshots,
-      }).list(project.id);
+      const builds = await new BuildModel(db).list(project.id);
       return { slug: project.slug, count: builds.length, latest: builds[0] ?? null };
     }),
   );

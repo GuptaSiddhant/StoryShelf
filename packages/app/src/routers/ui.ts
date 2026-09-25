@@ -89,18 +89,12 @@ export function registerUiPages(app: ShelfRouter): void {
       );
     }
     try {
-      const project = await new ProjectModel(getStore().db, {
-        projects: getStore().db.tables.projects,
-      }).create({
+      const project = await new ProjectModel(getStore().db).create({
         name,
         gitRepository,
         gitDefaultBranch,
       });
-      await new LabelModel(getStore().db, {
-        builds: getStore().db.tables.builds,
-        buildLabels: getStore().db.tables.buildLabels,
-        labelTypes: getStore().db.tables.labelTypes,
-      }).seedFor(project.id);
+      await new LabelModel(getStore().db).seedFor(project.id);
       return hxRedirect(c, `/projects/${project.slug}/library`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to create project";
@@ -137,9 +131,7 @@ export function registerUiPages(app: ShelfRouter): void {
 
   app.get("/projects/:slug/jobs", async (c) => {
     const slug = c.req.param("slug");
-    const project = await new ProjectModel(getStore().db, {
-      projects: getStore().db.tables.projects,
-    }).getBySlug(slug);
+    const project = await new ProjectModel(getStore().db).getBySlug(slug);
     if (!project) {
       return c.notFound();
     }
@@ -159,32 +151,17 @@ export function registerUiPages(app: ShelfRouter): void {
     const slug = c.req.param("slug");
     const buildId = c.req.param("buildId");
     const snapshotId = c.req.query("snapshot");
-    const project = await new ProjectModel(getStore().db, {
-      projects: getStore().db.tables.projects,
-    }).getBySlug(slug);
+    const project = await new ProjectModel(getStore().db).getBySlug(slug);
     if (!project) {
       return c.notFound();
     }
-    const build = await new BuildModel(getStore().db, {
-      builds: getStore().db.tables.builds,
-      buildLabels: getStore().db.tables.buildLabels,
-      snapshots: getStore().db.tables.snapshots,
-    }).get(buildId);
+    const build = await new BuildModel(getStore().db).get(buildId);
     if (!build || build.projectId !== project.id) {
       return c.notFound();
     }
-    const snapshots = await new SnapshotModel(getStore().db, {
-      snapshots: getStore().db.tables.snapshots,
-    }).listByBuild(build.id);
-    const comments = await new CommentModel(getStore().db, {
-      comments: getStore().db.tables.comments,
-      projects: getStore().db.tables.projects,
-    }).listByBuild(build.id);
-    const baselines = new BaselineModel(
-      getStore().db,
-      { baselines: getStore().db.tables.baselines },
-      getStore().storage,
-    );
+    const snapshots = await new SnapshotModel(getStore().db).listByBuild(build.id);
+    const comments = await new CommentModel(getStore().db).listByBuild(build.id);
+    const baselines = new BaselineModel(getStore().db, undefined, getStore().storage);
     const hasBaselineEntries = await Promise.all(
       snapshots.map(async (snapshot) => {
         const baseline = await baselines.resolve(

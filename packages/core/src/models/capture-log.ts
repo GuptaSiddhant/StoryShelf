@@ -12,10 +12,13 @@ export interface CaptureLogTables {
 
 /** Data operations for capture log lines (every line of an attempt). */
 export class CaptureLogModel {
+  private readonly tables: CaptureLogTables;
   constructor(
     private readonly db: DatabaseAdapter,
-    private readonly tables: CaptureLogTables,
-  ) {}
+    tables?: CaptureLogTables,
+  ) {
+    this.tables = tables ?? { captureLogs: db.tables.captureLogs };
+  }
 
   async listByAttempt(attemptId: string, limit?: number): Promise<CaptureLog[]> {
     return (await this.db.list(this.tables.captureLogs, {

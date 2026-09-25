@@ -37,9 +37,7 @@ export function registerAdmin(app: ShelfRouter): void {
 
 // oxlint-disable-next-line typescript/promise-function-async
 async function purgeBuilds(ttlDays: number): Promise<number> {
-  const projects = await new ProjectModel(getStore().db, {
-    projects: getStore().db.tables.projects,
-  }).list();
+  const projects = await new ProjectModel(getStore().db).list();
   const retention = new Retention(
     getStore().db,
     getStore().storage,
@@ -62,9 +60,7 @@ async function purgeBranches(): Promise<{ removedBranches: number; removedBaseli
   if (branchTtl === null) {
     return { removedBranches: 0, removedBaselines: 0 };
   }
-  const projects = await new ProjectModel(getStore().db, {
-    projects: getStore().db.tables.projects,
-  }).list();
+  const projects = await new ProjectModel(getStore().db).list();
   const retention = new Retention(
     getStore().db,
     getStore().storage,

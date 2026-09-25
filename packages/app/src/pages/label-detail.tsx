@@ -36,24 +36,14 @@ export async function renderLabelDetailPage(
   key: string,
   value: string,
 ): Promise<RenderedContent | null> {
-  const projects = await new ProjectModel(getStore().db, {
-    projects: getStore().db.tables.projects,
-  }).list();
+  const projects = await new ProjectModel(getStore().db).list();
   const project = projects.find((item) => item.slug === slug);
   if (!project) {
     return null;
   }
   const [builds, labelType] = await Promise.all([
-    new BuildModel(getStore().db, {
-      builds: getStore().db.tables.builds,
-      buildLabels: getStore().db.tables.buildLabels,
-      snapshots: getStore().db.tables.snapshots,
-    }).list(project.id, { labelKey: key, labelValue: value }),
-    new LabelModel(getStore().db, {
-      builds: getStore().db.tables.builds,
-      buildLabels: getStore().db.tables.buildLabels,
-      labelTypes: getStore().db.tables.labelTypes,
-    }).getType(project.id, key),
+    new BuildModel(getStore().db).list(project.id, { labelKey: key, labelValue: value }),
+    new LabelModel(getStore().db).getType(project.id, key),
   ]);
 
   return (
@@ -161,18 +151,12 @@ export async function renderLabelDetailPage(
 
 /** Label types overview page (architecture.md `GET /projects/:slug/labels`). */
 export async function renderLabelsPage(slug: string): Promise<RenderedContent | null> {
-  const projects = await new ProjectModel(getStore().db, {
-    projects: getStore().db.tables.projects,
-  }).list();
+  const projects = await new ProjectModel(getStore().db).list();
   const project = projects.find((item) => item.slug === slug);
   if (!project) {
     return null;
   }
-  const labelTypes = await new LabelModel(getStore().db, {
-    builds: getStore().db.tables.builds,
-    buildLabels: getStore().db.tables.buildLabels,
-    labelTypes: getStore().db.tables.labelTypes,
-  }).listTypes(project.id);
+  const labelTypes = await new LabelModel(getStore().db).listTypes(project.id);
 
   return (
     <DocumentLayout

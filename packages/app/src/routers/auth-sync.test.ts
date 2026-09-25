@@ -38,26 +38,24 @@ describe("syncLoginMemberships", () => {
     const { db } = makeDatabase();
     await seedProject(db);
     await syncLoginMemberships(db, tables(db), baseUser);
-    const stored = await new UserModel(db, { users: db.tables.users }).get("u1");
+    const stored = await new UserModel(db).get("u1");
     expect(stored?.email).toBe("u@example.com");
 
     await syncLoginMemberships(db, tables(db), { ...baseUser, name: "Renamed" });
-    const updated = await new UserModel(db, { users: db.tables.users }).get("u1");
+    const updated = await new UserModel(db).get("u1");
     expect(updated?.name).toBe("Renamed");
   });
 
   it("grants the highest matched role and records provenance", async () => {
     const { db } = makeDatabase();
     await seedProject(db);
-    const mappings = new ProjectGroupMappingModel(db, {
-      projectGroupMappings: db.tables.projectGroupMappings,
-    });
+    const mappings = new ProjectGroupMappingModel(db);
     await mappings.create("p1", "team-view", "viewer");
     await mappings.create("p1", "team-dev", "developer");
 
     await syncLoginMemberships(db, tables(db), { ...baseUser, groups: ["team-view", "team-dev"] });
 
-    const members = new MemberModel(db, { projectMembers: db.tables.projectMembers });
+    const members = new MemberModel(db);
     const member = await members.get("p1", "u1");
     expect(member?.role).toBe("developer");
     expect(member?.source).toBe("oidc:team-dev");
@@ -67,11 +65,9 @@ describe("syncLoginMemberships", () => {
     const { db } = makeDatabase();
     await seedProject(db);
     await seedProject(db, "p2");
-    const mappings = new ProjectGroupMappingModel(db, {
-      projectGroupMappings: db.tables.projectGroupMappings,
-    });
+    const mappings = new ProjectGroupMappingModel(db);
     await mappings.create("p1", "team-a", "developer");
-    const members = new MemberModel(db, { projectMembers: db.tables.projectMembers });
+    const members = new MemberModel(db);
     await members.set("p2", "u1", "viewer", "manual");
 
     await syncLoginMemberships(db, tables(db), { ...baseUser, groups: ["team-a"] });
@@ -86,7 +82,7 @@ describe("syncLoginMemberships", () => {
     const { db } = makeDatabase();
     await seedProject(db);
     await syncLoginMemberships(db, tables(db), { ...baseUser, groups: ["team-a"] });
-    const members = new MemberModel(db, { projectMembers: db.tables.projectMembers });
+    const members = new MemberModel(db);
     expect(await members.get("p1", "u1")).toBeNull();
   });
 });

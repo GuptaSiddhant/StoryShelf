@@ -82,18 +82,12 @@ export async function renderComputeJobsPage(
   queueView: QueueView[],
   canRetry: boolean,
 ): Promise<RenderedContent | null> {
-  const projects = await new ProjectModel(getStore().db, {
-    projects: getStore().db.tables.projects,
-  }).list();
+  const projects = await new ProjectModel(getStore().db).list();
   const project = projects.find((item) => item.slug === slug);
   if (!project) {
     return null;
   }
-  const builds = await new BuildModel(getStore().db, {
-    builds: getStore().db.tables.builds,
-    buildLabels: getStore().db.tables.buildLabels,
-    snapshots: getStore().db.tables.snapshots,
-  }).list(project.id);
+  const builds = await new BuildModel(getStore().db).list(project.id);
   const recentBuilds = builds.slice(0, 20);
   const queueByBuild = new Map(queueView.map((job) => [job.buildId, job]));
 

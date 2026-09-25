@@ -4,10 +4,13 @@ import type { ContentRef } from "../schema/content-ref.ts";
 
 /** Content refs for deduplicated Storybook assets. */
 export class ContentRefModel {
+  private readonly tables: { contentRefs: Table };
   constructor(
     private readonly db: DatabaseAdapter,
-    private readonly tables: { contentRefs: Table },
-  ) {}
+    tables?: { contentRefs: Table },
+  ) {
+    this.tables = tables ?? { contentRefs: db.tables.contentRefs };
+  }
 
   async get(hash: string): Promise<ContentRef | null> {
     return (await this.db.get(this.tables.contentRefs, hash)) as unknown as ContentRef | null;

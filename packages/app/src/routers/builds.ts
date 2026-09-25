@@ -55,11 +55,7 @@ export function registerBuilds(app: ShelfRouter): void {
   app.openapi(listBuildsRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...VIEW_ROLES);
     const { status, branch, labelKey, labelValue } = c.req.valid("query");
-    const builds = new BuildModel(getStore().db, {
-      builds: getStore().db.tables.builds,
-      buildLabels: getStore().db.tables.buildLabels,
-      snapshots: getStore().db.tables.snapshots,
-    }).list(project.id, {
+    const builds = new BuildModel(getStore().db).list(project.id, {
       status,
       branch: branch ?? undefined,
       labelKey: labelKey ?? undefined,
@@ -202,11 +198,7 @@ export function registerBuilds(app: ShelfRouter): void {
     const { slug, buildId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...DEVELOPER_ROLES);
     const build = await buildForProject(project.id, buildId);
-    const updated = await new BuildModel(getStore().db, {
-      builds: getStore().db.tables.builds,
-      buildLabels: getStore().db.tables.buildLabels,
-      snapshots: getStore().db.tables.snapshots,
-    }).setStatus(build.id, "pending");
+    const updated = await new BuildModel(getStore().db).setStatus(build.id, "pending");
     await getStore().enqueueCapture?.(build.id, c.get("requestId"));
     return c.json(updated, 202);
   });
@@ -215,11 +207,7 @@ export function registerBuilds(app: ShelfRouter): void {
     const { slug, buildId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...APPROVER_ROLES);
     const build = await buildForProject(project.id, buildId);
-    await new BuildModel(getStore().db, {
-      builds: getStore().db.tables.builds,
-      buildLabels: getStore().db.tables.buildLabels,
-      snapshots: getStore().db.tables.snapshots,
-    }).remove(build.id);
+    await new BuildModel(getStore().db).remove(build.id);
     return c.body(null, 204);
   });
 

@@ -113,10 +113,7 @@ describe("admin token bootstrap", () => {
     });
     expect(response.status).toBe(201);
     const created = (await response.json()) as { id: string };
-    const member = await new MemberModel(db, { projectMembers: db.tables.projectMembers }).get(
-      created.id,
-      admin.id,
-    );
+    const member = await new MemberModel(db).get(created.id, admin.id);
     expect(member?.role).toBe("admin");
   });
 
@@ -132,9 +129,7 @@ describe("admin token bootstrap", () => {
     });
     expect(response.status).toBe(201);
     const created = (await response.json()) as { id: string };
-    const members = await new MemberModel(db, { projectMembers: db.tables.projectMembers }).list(
-      created.id,
-    );
+    const members = await new MemberModel(db).list(created.id);
     expect(members).toHaveLength(0);
   });
 });

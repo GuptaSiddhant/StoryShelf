@@ -84,9 +84,7 @@ export function registerSnapshots(app: ShelfRouter): void {
     const { slug, buildId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...VIEW_ROLES);
     const build = await buildForProject(project.id, buildId);
-    const snapshots = new SnapshotModel(getStore().db, {
-      snapshots: getStore().db.tables.snapshots,
-    }).listByBuild(build.id);
+    const snapshots = new SnapshotModel(getStore().db).listByBuild(build.id);
     return c.json(await snapshots);
   });
 
@@ -106,11 +104,7 @@ export function registerSnapshots(app: ShelfRouter): void {
     const build = await buildForProject(project.id, buildId);
     const snapshot = await snapshotForBuild(build, snapshotId);
     const userId = getStore().user?.id ?? null;
-    await new SnapshotModel(getStore().db, { snapshots: getStore().db.tables.snapshots }).review(
-      snapshot.id,
-      "rejected",
-      userId,
-    );
+    await new SnapshotModel(getStore().db).review(snapshot.id, "rejected", userId);
     await refreshBuild(build.id);
     return c.json({ ok: true });
   });
@@ -119,9 +113,7 @@ export function registerSnapshots(app: ShelfRouter): void {
     const { slug, buildId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...APPROVER_ROLES);
     const build = await buildForProject(project.id, buildId);
-    const snapshots = await new SnapshotModel(getStore().db, {
-      snapshots: getStore().db.tables.snapshots,
-    }).listByBuild(build.id);
+    const snapshots = await new SnapshotModel(getStore().db).listByBuild(build.id);
     const userId = getStore().user?.id ?? null;
     await Promise.all(
       snapshots
@@ -137,17 +129,13 @@ export function registerSnapshots(app: ShelfRouter): void {
     const { slug, buildId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...APPROVER_ROLES);
     const build = await buildForProject(project.id, buildId);
-    const snapshots = await new SnapshotModel(getStore().db, {
-      snapshots: getStore().db.tables.snapshots,
-    }).listByBuild(build.id);
+    const snapshots = await new SnapshotModel(getStore().db).listByBuild(build.id);
     const userId = getStore().user?.id ?? null;
     await Promise.all(
       snapshots
         .filter((snapshot) => snapshot.status === "new" || snapshot.status === "changed")
         .map(async (snapshot) => {
-          await new SnapshotModel(getStore().db, {
-            snapshots: getStore().db.tables.snapshots,
-          }).review(snapshot.id, "rejected", userId);
+          await new SnapshotModel(getStore().db).review(snapshot.id, "rejected", userId);
         }),
     );
     await refreshBuild(build.id);

@@ -12,14 +12,17 @@ export interface TokenTables {
 
 /** Data operations for CI tokens. */
 export class TokenModel {
+  private readonly tables: TokenTables;
   /**
    * @param db - Database adapter.
    * @param tables - Table handles.
    */
   constructor(
     private readonly db: DatabaseAdapter,
-    private readonly tables: TokenTables,
-  ) {}
+    tables?: TokenTables,
+  ) {
+    this.tables = tables ?? { tokens: db.tables.tokens };
+  }
 
   /**
    * Create a token record storing its hash.

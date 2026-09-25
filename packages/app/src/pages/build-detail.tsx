@@ -49,31 +49,18 @@ function logTone(level: string): "neutral" | "success" | "warning" | "danger" | 
 /** Build overview page: snapshot grid, bulk actions, and build comments. */
 export async function renderBuildDetailPage(buildId: string): Promise<RenderedContent | null> {
   const { db } = getStore();
-  const build = await new BuildModel(db, {
-    builds: getStore().db.tables.builds,
-    buildLabels: getStore().db.tables.buildLabels,
-    snapshots: getStore().db.tables.snapshots,
-  }).get(buildId);
+  const build = await new BuildModel(db).get(buildId);
   if (!build) {
     return null;
   }
-  const project = await new ProjectModel(db, { projects: getStore().db.tables.projects }).get(
-    build.projectId,
-  );
+  const project = await new ProjectModel(db).get(build.projectId);
   if (!project) {
     return null;
   }
-  const snapshots = await new SnapshotModel(db, {
-    snapshots: getStore().db.tables.snapshots,
-  }).listByBuild(build.id);
-  const comments = await new CommentModel(db, {
-    comments: getStore().db.tables.comments,
-    projects: getStore().db.tables.projects,
-  }).listByBuild(build.id);
-  const attempts = await new CaptureAttemptModel(db, {
-    captureAttempts: getStore().db.tables.captureAttempts,
-  }).listByBuild(build.id);
-  const logs = new CaptureLogModel(db, { captureLogs: getStore().db.tables.captureLogs });
+  const snapshots = await new SnapshotModel(db).listByBuild(build.id);
+  const comments = await new CommentModel(db).listByBuild(build.id);
+  const attempts = await new CaptureAttemptModel(db).listByBuild(build.id);
+  const logs = new CaptureLogModel(db);
   const attemptLogs = new Map<string, Awaited<ReturnType<typeof logs.listByAttempt>>>();
   /* oxlint-disable-next-line eslint/no-await-in-loop -- attempts are few; sequential reads keep code simple */
   for (const attempt of attempts) {

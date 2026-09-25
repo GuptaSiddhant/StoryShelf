@@ -14,11 +14,16 @@ export interface StatusConfigTables {
 
 /** Data operations for per-project status provider configs. */
 export class StatusConfigModel {
+  private readonly tables: StatusConfigTables;
+  private readonly secret: string | undefined;
   constructor(
     private readonly db: DatabaseAdapter,
-    private readonly tables: StatusConfigTables,
-    private readonly secret: string | undefined,
-  ) {}
+    tables?: StatusConfigTables,
+    secret?: string | undefined,
+  ) {
+    this.tables = tables ?? { projectStatusConfigs: db.tables.projectStatusConfigs };
+    this.secret = secret;
+  }
 
   /** List all status configs for a project. */
   async list(projectId: string): Promise<ProjectStatusConfig[]> {

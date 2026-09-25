@@ -13,6 +13,8 @@ export interface WebhookTables {
 
 /** Data operations for webhook subscriptions. */
 export class WebhookModel {
+  private readonly tables: WebhookTables;
+  private readonly secret?: string;
   /**
    * @param db - Database adapter.
    * @param tables - Table handles.
@@ -20,9 +22,12 @@ export class WebhookModel {
    */
   constructor(
     private readonly db: DatabaseAdapter,
-    private readonly tables: WebhookTables,
-    private readonly secret?: string,
-  ) {}
+    tables?: WebhookTables,
+    secret?: string,
+  ) {
+    this.tables = tables ?? { webhooks: db.tables.webhooks };
+    this.secret = secret;
+  }
 
   /** List all webhooks for a project. */
   async list(projectId: string): Promise<Webhook[]> {

@@ -60,7 +60,7 @@ export function registerWebhooks(app: ShelfRouter): void {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
     const webhooks = await new WebhookModel(
       getStore().db,
-      { webhooks: getStore().db.tables.webhooks },
+      undefined,
       getStore().config.secret,
     ).list(project.id);
     return c.json(
@@ -78,7 +78,7 @@ export function registerWebhooks(app: ShelfRouter): void {
     const secret = randomToken("whsec_").value;
     const webhook = await new WebhookModel(
       getStore().db,
-      { webhooks: getStore().db.tables.webhooks },
+      undefined,
       getStore().config.secret,
     ).create(project.id, { ...body, secret });
     return c.json({ id: webhook.id, url: webhook.url, events: body.events ?? [], secret }, 201);
@@ -87,19 +87,17 @@ export function registerWebhooks(app: ShelfRouter): void {
   app.openapi(deleteWebhookRoute, async (c) => {
     const { slug, webhookId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
-    const webhook = await new WebhookModel(
-      getStore().db,
-      { webhooks: getStore().db.tables.webhooks },
-      getStore().config.secret,
-    ).get(project.id, webhookId);
+    const webhook = await new WebhookModel(getStore().db, undefined, getStore().config.secret).get(
+      project.id,
+      webhookId,
+    );
     if (!webhook) {
       notFound("Webhook not found");
     }
-    await new WebhookModel(
-      getStore().db,
-      { webhooks: getStore().db.tables.webhooks },
-      getStore().config.secret,
-    ).remove(project.id, webhook.id);
+    await new WebhookModel(getStore().db, undefined, getStore().config.secret).remove(
+      project.id,
+      webhook.id,
+    );
     return c.body(null, 204);
   });
 }
