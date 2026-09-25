@@ -18,9 +18,7 @@ Created by `storyshelf init` or `storyshelf create` (both fail if `.storybook/ma
   "buildScriptName": "build-storybook",
   "skip": "main",
   "affectedOnly": true,
-  "affected": {
-    "untraced": ["**/*.generated.ts"]
-  }
+  "untraced": ["**/*.generated.ts"]
 }
 ```
 
@@ -33,7 +31,7 @@ Created by `storyshelf init` or `storyshelf create` (both fail if `.storybook/ma
 | `buildScriptName` | `--build-script-name` / `-b` | —                 | package script to run (default `build-storybook`)                                                                                     |
 | `skip`            | `--skip`                     | —                 | Glob to skip upload (e.g. `"main"`, `"release/*"`). `branch` matched via `picomatch`; when matched `upload` exits 0 without `POST` |
 | `affectedOnly`    | `--full` (opt-out)           | `STORYSHELF_FULL=1` (opt-out) | Render only impacted stories (default `true`). See [Affected capture](/concepts/affected-capture/)                     |
-| `affected`        | `--untraced` (union)         | —                 | `{ untraced: [...] }` — project-wide trace exclusions, combined with `--untraced` flags. See [Affected capture](/concepts/affected-capture/) |
+| `untraced`          | `--untraced` (union)         | —                 | Trace exclusions, combined with `--untraced` flags. See [Affected capture](/concepts/affected-capture/) |
 
 **Note:** `buildDir` default is Storybook's default `storybook-static` unless `buildDir` is set in file. `buildCommand` and `buildScriptName` are mutually exclusive (validated by `zod` `refine`).
 
@@ -81,14 +79,23 @@ Each upload resolves `packagePath` (`relative(cwd, dirname(.storybook))`) and is
 
 ## Server config vs client config
 
-- **Client file** (`.storybook/storyshelf.json`): `slug`, `url`, `buildDir`, `buildCommand`, `buildScriptName`, `skip`, `affectedOnly` — per-Storybook, committed, non-secret.
+- **Client file** (`.storybook/storyshelf.json`): `slug`, `url`, `buildDir`, `buildCommand`, `buildScriptName`, `skip`, `affectedOnly`, `untraced` — per-Storybook, committed, non-secret.
 - **Server `ShelfConfig` / DB `projects`** (`core/src/config.ts:48`, `core/src/schema.ts:5`): `secret`, `captureConcurrency`, `scratchDir`, `purgeTtlDays`, `branchTtlDays`, `branchGcIntervalMs`, `maxUploadBytes`, `maxInlineUnzipSize`, `viewports`, `browser` (per-project capture engine: `chromium`/`firefox`/`webkit`/`chrome`), `pixel_threshold`, `storybook_meta` (`framework/addons/storiesGlobs/packagePath` auto-detected at `create`).
 
 Uploads at or under `maxInlineUnzipSize` bytes are extracted inline so the published Storybook preview is live on response; larger uploads wait for capture. Leave it unset (the default) to always wait for capture — required on diskless hosts.
 
 ## Validation
 
-File is validated with `storybookConfigSchema` (`cli/src/config.ts:7` `z.object({slug, url: z.url().optional(), buildDir?, buildCommand?, buildScriptName?, skip?}).refine(...)`). Manual edits that fail validation fall back to `null` (ignored) and `upload` will error missing `slug`/`url` with a helpful message.
+File is validated by the CLI's config parser (`cli/src/config.ts`): unknown keys are ignored, and any present-but-invalid field (`url` shape, `buildCommand`+`buildScriptName` together, non-boolean `affectedOnly`, malformed `untraced`) invalidates the whole file — `upload` then errors on the missing `slug`/`url` with a helpful message.
+
+## Editor support (`$schema`)
+
+`storyshelf init` stamps a `$schema` pointer into new configs for autocomplete, hover docs, and inline validation:
+
+- **Local install** (CLI on disk): a path relative to the config file, e.g. `"../../node_modules/storyshelf/schema/storyshelf-config.json"` — exact version match, works offline.
+- **Otherwise** (global install, `npx`): a versioned URL, e.g. `"https://unpkg.com/storyshelf@0.5.2/schema/storyshelf-config.json"` (unversioned `…/storyshelf/schema/…` when the version is unknown).
+
+`storyshelf create` and config merges preserve an existing stamp; `init` refreshes it. To add it to an existing file by hand, use either form above. The schema ships inside the CLI package, so it always describes the parser that enforces it.
 
 ## Examples
 

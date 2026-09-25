@@ -86,7 +86,7 @@ storyshelf upload --token shelf_xxx --sha $GITHUB_SHA --branch main
 | `--author-name`, `--author-email` | Author attribution |
 | `--label key=value` | Attach a build label (repeatable) |
 | `--full` | Disable affected capture for this upload (render every story) |
-| `--untraced <glob>` | Exclude matching files from affected tracing (repeatable, e.g. `"**/*.generated.ts"`; unions with `affected.untraced` in config) |
+| `--untraced <glob>` | Exclude matching files from affected tracing (repeatable, e.g. `"**/*.generated.ts"`; unions with `untraced` in config) |
 | `--stats-file <path>` | Bundler stats file (default `<buildDir>/preview-stats.json`) |
 | `--dry-run` | Validate/build but send no requests |
 

@@ -1,4 +1,5 @@
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -49,6 +50,16 @@ describe("runInit", () => {
       slug: "demo",
       url: "https://b.example.com",
     });
+  });
+
+  it("stamps a $schema reference into new configs", async () => {
+    setupStorybook();
+    await runInit({ url: "https://shelf.example.com", slug: "demo", cwd: dir });
+    const raw = JSON.parse(
+      await readFile(join(dir, ".storybook", "storyshelf.json"), "utf8"),
+    ) as Record<string, unknown>;
+    expect(typeof raw["$schema"]).toBe("string");
+    expect(String(raw["$schema"])).toContain("schema/storyshelf-config.json");
   });
 
   // NOTE: the missing-slug path prompts interactively and is not covered here.

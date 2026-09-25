@@ -189,7 +189,9 @@ async function persistInitConfig(
   configPath?: string,
 ): Promise<void> {
   try {
-    const written = await writeStorybookConfig(buildInitConfig(answers, slug), cwd, configPath);
+    const written = await writeStorybookConfig(buildInitConfig(answers, slug), cwd, configPath, {
+      stampSchema: true,
+    });
     printLine(`Wrote ${written}`);
     if (answers.detected) {
       printLine(`Detected ${answers.detected}`);

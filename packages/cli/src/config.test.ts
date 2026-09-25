@@ -101,46 +101,43 @@ describe("loadStorybookConfig", () => {
     await expect(loadStorybookConfig(dir)).resolves.toBeNull();
   });
 
-  it("loads the affected.untraced list", async () => {
+  it("loads the untraced list", async () => {
     mkdirSync(join(dir, ".storybook"), { recursive: true });
     writeFileSync(
       join(dir, ".storybook", "storyshelf.json"),
-      JSON.stringify({ slug: "demo", affected: { untraced: ["**/*.generated.ts"] } }),
+      JSON.stringify({ slug: "demo", untraced: ["**/*.generated.ts"] }),
     );
     await expect(loadStorybookConfig(dir)).resolves.toEqual({
       slug: "demo",
-      affected: { untraced: ["**/*.generated.ts"] },
+      untraced: ["**/*.generated.ts"],
     });
   });
 
-  it("loads an empty affected section", async () => {
+  it("returns null for a non-array untraced", async () => {
     mkdirSync(join(dir, ".storybook"), { recursive: true });
     writeFileSync(
       join(dir, ".storybook", "storyshelf.json"),
-      JSON.stringify({ slug: "demo", affected: {} }),
-    );
-    await expect(loadStorybookConfig(dir)).resolves.toEqual({
-      slug: "demo",
-      affected: {},
-    });
-  });
-
-  it("returns null for a non-object affected section", async () => {
-    mkdirSync(join(dir, ".storybook"), { recursive: true });
-    writeFileSync(
-      join(dir, ".storybook", "storyshelf.json"),
-      JSON.stringify({ slug: "demo", affected: ["**/*.ts"] }),
+      JSON.stringify({ slug: "demo", untraced: "**/*.ts" }),
     );
     await expect(loadStorybookConfig(dir)).resolves.toBeNull();
   });
 
-  it("returns null for a non-string affected.untraced entry", async () => {
+  it("returns null for a non-string untraced entry", async () => {
     mkdirSync(join(dir, ".storybook"), { recursive: true });
     writeFileSync(
       join(dir, ".storybook", "storyshelf.json"),
-      JSON.stringify({ slug: "demo", affected: { untraced: ["**/*.ts", 42] } }),
+      JSON.stringify({ slug: "demo", untraced: ["**/*.ts", 42] }),
     );
     await expect(loadStorybookConfig(dir)).resolves.toBeNull();
+  });
+
+  it("strips the legacy affected object", async () => {
+    mkdirSync(join(dir, ".storybook"), { recursive: true });
+    writeFileSync(
+      join(dir, ".storybook", "storyshelf.json"),
+      JSON.stringify({ slug: "demo", affected: { untraced: ["**/*.ts"] } }),
+    );
+    await expect(loadStorybookConfig(dir)).resolves.toEqual({ slug: "demo" });
   });
 
   it("returns null for invalid JSON", async () => {

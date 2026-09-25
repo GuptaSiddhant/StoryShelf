@@ -330,7 +330,7 @@ describe("runUpload affected capture", () => {
     mkdirSync(join(dir, ".storybook"), { recursive: true });
     writeFileSync(
       join(dir, ".storybook", "storyshelf.json"),
-      JSON.stringify({ slug: "demo", affected: { untraced: ["src/a.tsx"] } }),
+      JSON.stringify({ slug: "demo", untraced: ["src/a.tsx"] }),
     );
     commitAll("base");
     const base = git(["rev-parse", "HEAD"]);

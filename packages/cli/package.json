@@ -27,7 +27,8 @@
     "storyshelf": "dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "schema"
   ],
   "type": "module",
   "sideEffects": false,

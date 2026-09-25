@@ -1,6 +1,10 @@
 import { execSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
+
+declare const __PKG_VERSION__: string | undefined;
 
 /** Validated `.storybook/storyshelf.json` contents. */
 export interface StorybookConfig {
@@ -11,11 +15,6 @@ export interface StorybookConfig {
   buildScriptName?: string;
   skip?: string;
   affectedOnly?: boolean;
-  affected?: AffectedConfig;
-}
-
-/** Affected-capture tuning in `.storybook/storyshelf.json`. */
-export interface AffectedConfig {
   /** Glob patterns excluded from affected tracing (union with `--untraced`). */
   untraced?: string[];
 }
@@ -37,17 +36,17 @@ function parseStorybookConfig(value: unknown): ParseResult {
   return checkCrossFieldRules(slug.slug, parts);
 }
 
-/** Optional string, boolean, and affected config sections. */
+/** Optional string, boolean, and string-list config sections. */
 type ConfigParts =
   | {
       ok: true;
       values: Record<string, string>;
       flags: Record<string, boolean>;
-      affected?: AffectedConfig;
+      lists: Record<string, string[]>;
     }
   | { ok: false; error: string };
 
-/** Read the optional string, boolean, and affected config sections. */
+/** Read the optional string, boolean, and string-list config sections. */
 function readConfigParts(record: Record<string, unknown>): ConfigParts {
   const optional = readOptionalStrings(record, OPTIONAL_CONFIG_KEYS);
   if (!optional.ok) {
@@ -57,16 +56,11 @@ function readConfigParts(record: Record<string, unknown>): ConfigParts {
   if (!flags.ok) {
     return flags;
   }
-  const affected = readAffectedSection(record);
-  if (!affected.ok) {
-    return affected;
+  const lists = readOptionalStringArrays(record, STRING_ARRAY_CONFIG_KEYS);
+  if (!lists.ok) {
+    return lists;
   }
-  return {
-    ok: true,
-    values: optional.values,
-    flags: flags.values,
-    ...(affected.config === undefined ? {} : { affected: affected.config }),
-  };
+  return { ok: true, values: optional.values, flags: flags.values, lists: lists.values };
 }
 
 /** Read the required slug field. */
@@ -91,6 +85,9 @@ const OPTIONAL_CONFIG_KEYS = [
 
 /** Optional config keys with boolean values. */
 const BOOLEAN_CONFIG_KEYS = ["affectedOnly"] as const;
+
+/** Optional config keys with string-array values. */
+const STRING_ARRAY_CONFIG_KEYS = ["untraced"] as const;
 
 type ParseResult = { ok: true; config: StorybookConfig } | { ok: false; error: string };
 
@@ -132,50 +129,42 @@ function readOptionalBooleans(
   return { ok: true, values };
 }
 
-/** Read the optional `affected` section; any present-but-invalid value is an error. */
-function readAffectedSection(
+/** Read optional string-array fields; any present-but-invalid field is an error. */
+function readOptionalStringArrays(
   record: Record<string, unknown>,
-): { ok: true; config?: AffectedConfig } | { ok: false; error: string } {
-  const raw = record["affected"];
-  if (raw === undefined) {
-    return { ok: true };
+  keys: readonly string[],
+): { ok: true; values: Record<string, string[]> } | { ok: false; error: string } {
+  const values: Record<string, string[]> = {};
+  for (const key of keys) {
+    const raw = record[key];
+    if (raw === undefined) {
+      continue;
+    }
+    const collected = collectStringArray(key, raw);
+    if (!collected.ok) {
+      return collected;
+    }
+    values[key] = collected.values;
   }
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-    return { ok: false, error: "affected must be an object" };
-  }
-  return readUntracedList(raw as Record<string, unknown>);
+  return { ok: true, values };
 }
 
-/** Collect validated glob entries, or the reason the list is invalid. */
-function collectUntraced(
-  raw: unknown[],
-): { ok: true; untraced: string[] } | { ok: false; error: string } {
-  const untraced: string[] = [];
+/** Collect validated string entries, or the reason the list is invalid. */
+function collectStringArray(
+  key: string,
+  raw: unknown,
+): { ok: true; values: string[] } | { ok: false; error: string } {
+  if (!Array.isArray(raw)) {
+    return { ok: false, error: `${key} must be an array of non-empty strings` };
+  }
+  const values: string[] = [];
   for (const entry of raw) {
     if (typeof entry !== "string" || entry.length === 0) {
-      return { ok: false, error: "affected.untraced must be an array of non-empty strings" };
+      return { ok: false, error: `${key} must be an array of non-empty strings` };
     }
-    untraced.push(entry);
+    values.push(entry);
   }
-  return { ok: true, untraced };
-}
-
-/** Read the `untraced` glob list inside the `affected` section. */
-function readUntracedList(
-  affected: Record<string, unknown>,
-): { ok: true; config: AffectedConfig } | { ok: false; error: string } {
-  const raw = affected["untraced"];
-  if (raw === undefined) {
-    return { ok: true, config: {} };
-  }
-  if (!Array.isArray(raw)) {
-    return { ok: false, error: "affected.untraced must be an array of non-empty strings" };
-  }
-  const collected = collectUntraced(raw);
-  if (!collected.ok) {
-    return collected;
-  }
-  return { ok: true, config: { untraced: collected.untraced } };
+  return { ok: true, values };
 }
 
 /** Enforce url shape and the buildCommand/buildScriptName exclusion. */
@@ -184,7 +173,7 @@ function checkCrossFieldRules(
   parts: {
     values: Record<string, string>;
     flags: Record<string, boolean>;
-    affected?: AffectedConfig;
+    lists: Record<string, string[]>;
   },
 ): ParseResult {
   const url = parts.values["url"];
@@ -196,7 +185,7 @@ function checkCrossFieldRules(
   }
   const { buildDir, buildCommand, buildScriptName, skip } = parts.values;
   const affectedOnly = parts.flags["affectedOnly"];
-  const affected = parts.affected;
+  const untraced = parts.lists["untraced"];
   return {
     ok: true,
     config: {
@@ -207,7 +196,7 @@ function checkCrossFieldRules(
       ...(buildScriptName === undefined ? {} : { buildScriptName }),
       ...(skip === undefined ? {} : { skip }),
       ...(affectedOnly === undefined ? {} : { affectedOnly }),
-      ...(affected === undefined ? {} : { affected }),
+      ...(untraced === undefined ? {} : { untraced }),
     },
   };
 }
@@ -299,6 +288,67 @@ function mergeConfigs(existing: StorybookConfig | null, config: StorybookConfig)
   return existing ? { ...existing, ...config } : { ...config };
 }
 
+/** Base URL for version-pinned config schemas published with the CLI. */
+const SCHEMA_BASE_URL = "https://unpkg.com/storyshelf";
+/** Schema path within the published CLI package. */
+const SCHEMA_PACKAGE_PATH = "schema/storyshelf-config.json";
+
+/** Running CLI version, or undefined in dev/test without the build define. */
+function cliVersion(): string | undefined {
+  if (__PKG_VERSION__ === undefined || __PKG_VERSION__ === "" || __PKG_VERSION__ === "0.0.0") {
+    return undefined;
+  }
+  return __PKG_VERSION__;
+}
+
+/** Options for resolving the `$schema` value stamped into new configs. */
+export interface SchemaReferenceOptions {
+  /** Module URL to resolve the CLI install from (defaults to this module). */
+  moduleUrl?: string;
+  /** CLI version override (defaults to the running CLI version). */
+  version?: string;
+}
+
+/**
+ * Resolve the `$schema` value for a config file: a path relative to the
+ * config directory when the schema ships alongside this CLI on disk, else a
+ * versioned unpkg URL. Never throws — falls back to the unversioned URL.
+ *
+ * @param configDir - Directory that will contain the config file.
+ * @param options - Module URL and version overrides (test seams).
+ */
+export function schemaReference(configDir: string, options: SchemaReferenceOptions = {}): string {
+  const local = resolveLocalSchema(configDir, options.moduleUrl ?? import.meta.url);
+  if (local !== null) {
+    return local;
+  }
+  const version = options.version ?? cliVersion();
+  return version === undefined
+    ? `${SCHEMA_BASE_URL}/${SCHEMA_PACKAGE_PATH}`
+    : `${SCHEMA_BASE_URL}@${version}/${SCHEMA_PACKAGE_PATH}`;
+}
+
+/** Repo-relative path to the bundled schema, or null when not on disk. */
+function resolveLocalSchema(configDir: string, moduleUrl: string): string | null {
+  let schemaPath: string;
+  try {
+    schemaPath = fileURLToPath(new URL(`../${SCHEMA_PACKAGE_PATH}`, moduleUrl));
+  } catch {
+    return null;
+  }
+  if (!existsSync(schemaPath)) {
+    return null;
+  }
+  const rel = relative(configDir, schemaPath).split(sep).join("/");
+  return rel.startsWith(".") ? rel : `./${rel}`;
+}
+
+/** Write options for `writeStorybookConfig`. */
+export interface WriteConfigOptions {
+  /** Stamp a fresh `$schema` reference (used by init). */
+  stampSchema?: boolean;
+}
+
 /**
  * Persist a `StorybookConfig` to `.storybook/storyshelf.json`, merging with any
  * existing file so unrelated keys are preserved.
@@ -306,6 +356,8 @@ function mergeConfigs(existing: StorybookConfig | null, config: StorybookConfig)
  * @param config - Partial config to write (merged with existing)
  * @param cwd - Project root
  * @param customPath - Optional explicit path
+ * @param options - Set `stampSchema` to write a fresh `$schema` reference;
+ * otherwise a pre-existing `$schema` is preserved as-is
  * @returns Absolute path to the written file
  * @throws If the merged result fails validation
  */
@@ -313,18 +365,62 @@ export async function writeStorybookConfig(
   config: StorybookConfig,
   cwd: string = process.cwd(),
   customPath?: string,
+  options: WriteConfigOptions = {},
 ): Promise<string> {
   const full = customPath ? resolve(cwd, customPath) : resolve(cwd, CONFIG_RELATIVE);
   const dir = dirname(full);
   await mkdir(dir, { recursive: true });
-  const existing = await loadStorybookConfig(cwd, customPath);
-  const merged = mergeConfigs(existing, config);
+  const merged = mergeConfigs(await loadStorybookConfig(cwd, customPath), config);
   const result = parseStorybookConfig(merged);
   if (!result.ok) {
     throw new Error(`Invalid storybook config: ${result.error}`);
   }
-  await writeFile(full, `${JSON.stringify(result.config, null, 2)}\n`, "utf8");
+  await writeConfigFile(full, result.config, await resolveWriteSchema(full, dir, options));
   return full;
+}
+
+/** Resolve the `$schema` to write: fresh stamp or the existing value. */
+async function resolveWriteSchema(
+  full: string,
+  dir: string,
+  options: WriteConfigOptions,
+): Promise<string | undefined> {
+  if (options.stampSchema) {
+    return schemaReference(dir);
+  }
+  return await readExistingSchema(full);
+}
+
+/** Write a validated config with an optional leading `$schema`. */
+// oxlint-disable-next-line typescript/promise-function-async -- thin writeFile wrapper, no awaiting needed
+function writeConfigFile(
+  full: string,
+  config: StorybookConfig,
+  schema: string | undefined,
+): Promise<void> {
+  return writeFile(full, `${JSON.stringify(withSchema(config, schema), null, 2)}\n`, "utf8");
+}
+
+/** `$schema` carried from the existing file, if any. */
+async function readExistingSchema(configPath: string): Promise<string | undefined> {
+  try {
+    const raw: unknown = JSON.parse(await readFile(configPath, "utf8"));
+    if (typeof raw === "object" && raw !== null) {
+      const schema = (raw as Record<string, unknown>)["$schema"];
+      return typeof schema === "string" && schema.length > 0 ? schema : undefined;
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Prepend `$schema` to a validated config for writing. */
+function withSchema(
+  config: StorybookConfig,
+  schema: string | undefined,
+): StorybookConfig & { $schema?: string } {
+  return schema === undefined ? { ...config } : { $schema: schema, ...config };
 }
 
 /** Lightweight metadata extracted from `.storybook/main.*` for `storyshelf init`. */

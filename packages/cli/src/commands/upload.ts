@@ -180,7 +180,7 @@ function collectUploadOptions(
     authorName: options.authorName,
     label: options.label,
     affectedOnly: resolveAffectedOnly(options, cfg),
-    untraced: mergeUntraced(cfg?.affected?.untraced, options.untraced),
+    untraced: mergeUntraced(cfg?.untraced, options.untraced),
     statsFile: options.statsFile,
   };
 }

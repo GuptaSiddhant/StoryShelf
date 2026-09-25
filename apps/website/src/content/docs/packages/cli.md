@@ -34,7 +34,8 @@ Client config written to `.storybook/storyshelf.json`:
   "buildCommand": "string (optional, mutually exclusive with buildScriptName)",
   "buildScriptName": "string (default: build-storybook)",
   "skip": "string (optional, glob pattern to skip upload)",
-  "affectedOnly": "boolean (default: true, render only impacted stories)"
+  "affectedOnly": "boolean (default: true, render only impacted stories)",
+  "untraced": "string[] (optional, trace exclusions, union with --untraced)"
 }
 ```
 

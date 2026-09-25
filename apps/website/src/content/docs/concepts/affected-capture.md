@@ -70,7 +70,7 @@ storyshelf upload --untraced "**/*.generated.ts" --untraced "**/mocks/**"
 For project-wide exclusions that apply to every upload, commit them once in `.storybook/storyshelf.json` instead of repeating flags (see [Configuration](/guides/config/)):
 
 ```json
-{ "slug": "my-design-system", "affected": { "untraced": ["**/*.generated.ts"] } }
+{ "slug": "my-design-system", "untraced": ["**/*.generated.ts"] } }
 ```
 
 Config and flag globs are combined (union, deduplicated). Untraced files are dropped *before* tracing — stories reachable only through them are inherited. Stories reachable through another (traced) changed file still render.
