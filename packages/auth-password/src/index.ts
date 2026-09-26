@@ -99,3 +99,7 @@ function buildLifecycle(options: PasswordAuthOptions): PasswordAuth["lifecycle"]
     },
   };
 }
+
+export { createAccountAuth } from "./accounts.ts";
+export type { AccountAuth, AccountAuthOptions } from "./types.ts";
+export { hashPassword, isValidPassword, verifyPassword } from "./password-hash.ts";

@@ -179,8 +179,21 @@ CREATE TABLE IF NOT EXISTS users (
   avatar_url TEXT,
   role TEXT NOT NULL DEFAULT 'member',
   last_login_at TEXT,
+  created_at TEXT NOT NULL,
+  password_hash TEXT,
+  display_name_override TEXT,
+  auth_provider TEXT NOT NULL DEFAULT 'oidc',
+  disabled INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS user_invite_tokens (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at TEXT NOT NULL,
+  used_at TEXT,
   created_at TEXT NOT NULL
 );
+CREATE INDEX IF NOT EXISTS user_invite_tokens_user_id_idx ON user_invite_tokens (user_id);
 CREATE TABLE IF NOT EXISTS project_members (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,

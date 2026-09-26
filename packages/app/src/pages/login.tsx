@@ -16,6 +16,10 @@ export interface LoginPageState {
   error?: string;
   /** Whether to show the shared-password form. Defaults to true for backward compat. */
   passwordEnabled?: boolean;
+  /** Whether to show the local account (email+password) form. */
+  accountEnabled?: boolean;
+  /** Pre-filled email for the account form (e.g. after failed login). */
+  email?: string;
 }
 
 /** Resolve auth UI text with defaults. */
@@ -82,6 +86,30 @@ export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
             </Alert>
           ) : null}
 
+          {state.accountEnabled ? (
+            <form method="post" action="/auth/account/login" novalidate>
+              <Field
+                label="Email"
+                name="email"
+                type="email"
+                required
+                value={state.email}
+                autocomplete="email"
+              />
+              <Field
+                label={passwordLabel}
+                name="password"
+                type="password"
+                required
+                autocomplete="current-password"
+                placeholder={ui.passwordPlaceholder}
+              />
+              <Button variant="primary" type="submit">
+                {submitLabel}
+              </Button>
+            </form>
+          ) : null}
+
           {state.passwordEnabled === false ? null : (
             <form method="post" action="/auth/login" novalidate>
               <Field
@@ -89,7 +117,7 @@ export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
                 name="password"
                 type="password"
                 required
-                autofocus
+                autofocus={!state.accountEnabled}
                 autocomplete="current-password"
                 placeholder={ui.passwordPlaceholder}
               />

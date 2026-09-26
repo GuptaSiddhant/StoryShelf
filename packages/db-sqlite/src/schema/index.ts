@@ -23,6 +23,7 @@ import { projects as projectsTable } from "./project.ts";
 import { snapshots as snapshotsTable } from "./snapshot.ts";
 import { projectStatusConfigs as projectStatusConfigsTable } from "./status-config.ts";
 import { tokens as tokensTable } from "./token.ts";
+import { userInviteTokens as userInviteTokensTable } from "./user-invite.ts";
 import { users as usersTable } from "./user.ts";
 import { webhooks as webhooksTable } from "./webhook.ts";
 
@@ -38,6 +39,7 @@ export { snapshots } from "./snapshot.ts";
 export { projectStatusConfigs } from "./status-config.ts";
 export { tokens } from "./token.ts";
 export { users } from "./user.ts";
+export { userInviteTokens } from "./user-invite.ts";
 export { webhooks } from "./webhook.ts";
 export { contentRefs } from "./content-refs.ts";
 
@@ -63,6 +65,8 @@ export type { Snapshot } from "./snapshot.ts";
 export type { Token } from "./token.ts";
 /** User row for authenticated identities. */
 export type { User } from "./user.ts";
+/** One-time invite token for local accounts. */
+export type { UserInviteToken } from "./user-invite.ts";
 /** Webhook subscription row. */
 export type { Webhook } from "./webhook.ts";
 /** Content ref row for deduplicated assets. */
@@ -83,6 +87,7 @@ export const schema: {
   tokens: AnySQLiteTable;
   webhooks: AnySQLiteTable;
   users: AnySQLiteTable;
+  userInviteTokens: AnySQLiteTable;
   projectMembers: AnySQLiteTable;
   projectGroupMappings: AnySQLiteTable;
   contentRefs: AnySQLiteTable;
@@ -100,6 +105,7 @@ export const schema: {
   tokens: tokensTable,
   webhooks: webhooksTable,
   users: usersTable,
+  userInviteTokens: userInviteTokensTable,
   projectMembers: projectMembersTable,
   projectGroupMappings: projectGroupMappingsTable,
   contentRefs: contentRefsTable,

@@ -186,6 +186,19 @@ const users = sqliteTable("users", {
   role: text("role").notNull().default("member"),
   lastLoginAt: text("last_login_at"),
   createdAt: text("created_at").notNull(),
+  passwordHash: text("password_hash"),
+  displayNameOverride: text("display_name_override"),
+  authProvider: text("auth_provider").notNull().default("oidc"),
+  disabled: integer("disabled", { mode: "boolean" }).notNull().default(false),
+});
+
+const userInviteTokens = sqliteTable("user_invite_tokens", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  expiresAt: text("expires_at").notNull(),
+  usedAt: text("used_at"),
+  createdAt: text("created_at").notNull(),
 });
 
 const projectMembers = sqliteTable("project_members", {
@@ -226,6 +239,7 @@ const fakeSchema: Tables = {
   tokens,
   webhooks,
   users,
+  userInviteTokens,
   projectMembers,
   projectGroupMappings,
   contentRefs,

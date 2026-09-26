@@ -1,5 +1,5 @@
 import type { SiteRole } from "@storyshelf/core/types";
-import { sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 /** Narrow `users` table definition. */
 export const users = sqliteTable("users", {
@@ -10,6 +10,13 @@ export const users = sqliteTable("users", {
   role: text("role").$type<SiteRole>().notNull().default("member"),
   lastLoginAt: text("last_login_at"),
   createdAt: text("created_at").notNull(),
+  passwordHash: text("password_hash"),
+  displayNameOverride: text("display_name_override"),
+  authProvider: text("auth_provider")
+    .$type<"local" | "oidc" | "shared">()
+    .notNull()
+    .default("oidc"),
+  disabled: integer("disabled", { mode: "boolean" }).notNull().default(false),
 });
 
 /** A user row. */
@@ -21,4 +28,8 @@ export interface User {
   role: SiteRole;
   lastLoginAt: string | null;
   createdAt: string;
+  passwordHash: string | null;
+  displayNameOverride: string | null;
+  authProvider: "local" | "oidc" | "shared";
+  disabled: boolean;
 }

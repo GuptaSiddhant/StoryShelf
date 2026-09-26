@@ -15,6 +15,7 @@ export interface Tables {
   tokens: Table;
   webhooks: Table;
   users: Table;
+  userInviteTokens: Table;
   projectMembers: Table;
   projectGroupMappings: Table;
   contentRefs: Table;

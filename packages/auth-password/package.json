@@ -1,7 +1,7 @@
 {
   "name": "@storyshelf/auth-password",
   "version": "0.5.2",
-  "description": "Shared-password auth adapter for StoryShelf.",
+  "description": "Password auth adapters for StoryShelf (shared password + invite-only local accounts).",
   "keywords": [
     "auth",
     "self-hosted",
@@ -50,7 +50,8 @@
     "prepublishOnly": "nub run build"
   },
   "dependencies": {
-    "@storyshelf/core": "workspace:*"
+    "@storyshelf/core": "workspace:*",
+    "drizzle-orm": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
