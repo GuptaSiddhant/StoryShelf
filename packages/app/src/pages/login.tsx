@@ -1,3 +1,4 @@
+import { getStore } from "../store.ts";
 import { Alert, Button, Card, Field, Meta, PageHeader, VStack } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
@@ -17,13 +18,63 @@ export interface LoginPageState {
   passwordEnabled?: boolean;
 }
 
-/** Sign-in page with password form and optional SSO button. */
-export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
+/** Resolve auth UI text with defaults. */
+function authUi(): NonNullable<import("@storyshelf/core/config").UIConfig["auth"]> {
+  try {
+    return getStore().ui.auth ?? {};
+  } catch {
+    return {};
+  }
+}
+
+function ssoLabel(template: string | undefined, label: string): string {
+  const raw = template ?? "Sign in with {label}";
+  return raw.includes("{label}") ? raw.replaceAll("{label}", label) : `${raw} ${label}`;
+}
+
+function renderSso(
+  ssoUrl: string | undefined,
+  ssoProviders: SsoProviderLink[] | undefined,
+  template: string | undefined,
+): unknown {
+  if (!ssoUrl && (!ssoProviders || ssoProviders.length === 0)) {
+    return null;
+  }
   return (
-    <DocumentLayout title="Sign in">
+    <div class="mt-1">
+      <VStack>
+        <Meta center>or</Meta>
+        {ssoUrl ? (
+          <Button variant="secondary" href={ssoUrl}>
+            {ssoLabel(template, "SSO")}
+          </Button>
+        ) : null}
+        {(ssoProviders ?? []).map(
+          // oxlint-disable-next-line typescript/promise-function-async -- JSX map is sync
+          (provider) => (
+            <Button variant="secondary" href={provider.url} key={provider.id}>
+              {ssoLabel(template, provider.label)}
+            </Button>
+          ),
+        )}
+      </VStack>
+    </div>
+  );
+}
+
+/** Sign-in page with password form and optional SSO button. */
+// oxlint-disable-next-line eslint/max-lines-per-function -- page composes a few sections, still one concern
+export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
+  const ui = authUi();
+  const title = ui.title ?? "Sign in";
+  const subtitle = ui.subtitle;
+  const passwordLabel = ui.passwordLabel ?? "Password";
+  const submitLabel = ui.submitLabel ?? "Sign in";
+  return (
+    <DocumentLayout title={title}>
       <div class="login">
         <Card>
-          <PageHeader title="Sign in" />
+          <PageHeader title={title} description={subtitle} />
 
           {state.error ? (
             <Alert tone="danger" title="Could not sign in">
@@ -34,38 +85,31 @@ export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
           {state.passwordEnabled === false ? null : (
             <form method="post" action="/auth/login" novalidate>
               <Field
-                label="Password"
+                label={passwordLabel}
                 name="password"
                 type="password"
                 required
                 autofocus
                 autocomplete="current-password"
+                placeholder={ui.passwordPlaceholder}
               />
               <Button variant="primary" type="submit">
-                Sign in
+                {submitLabel}
               </Button>
             </form>
           )}
 
-          {state.ssoUrl || (state.ssoProviders && state.ssoProviders.length > 0) ? (
-            <div class="mt-1">
-              <VStack>
-                <Meta center>or</Meta>
-                {state.ssoUrl ? (
-                  <Button variant="secondary" href={state.ssoUrl}>
-                    Sign in with SSO
-                  </Button>
-                ) : null}
-                {(state.ssoProviders ?? []).map(
-                  // oxlint-disable-next-line typescript/promise-function-async -- JSX map is sync
-                  (provider) => (
-                    <Button variant="secondary" href={provider.url} key={provider.id}>
-                      Sign in with {provider.label}
-                    </Button>
-                  ),
-                )}
-              </VStack>
-            </div>
+          {ui.helpText ? (
+            <p class="login__help">
+              <Meta>{ui.helpText}</Meta>
+            </p>
+          ) : null}
+
+          {renderSso(state.ssoUrl, state.ssoProviders, ui.ssoLabelTemplate)}
+          {ui.footerText ? (
+            <p class="login__footer">
+              <Meta>{ui.footerText}</Meta>
+            </p>
           ) : null}
         </Card>
       </div>

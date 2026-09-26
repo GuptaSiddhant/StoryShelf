@@ -25,6 +25,29 @@ export interface BrandTheme {
   shadow?: string;
 }
 
+/** Text overrides for the auth (login) UI. */
+export interface AuthUiConfig {
+  /** Page title, default "Sign in". */
+  title?: string;
+  /** Optional subtitle under the title. */
+  subtitle?: string;
+  /** Password field label, default "Password". */
+  passwordLabel?: string;
+  /** Password field placeholder. */
+  passwordPlaceholder?: string;
+  /** Submit button label, default "Sign in". */
+  submitLabel?: string;
+  /**
+   * Template for SSO buttons, default "Sign in with {label}".
+   * Must contain "{label}" which is replaced with the provider label.
+   */
+  ssoLabelTemplate?: string;
+  /** Help text shown under the form. */
+  helpText?: string;
+  /** Footer text shown at the bottom of the card. */
+  footerText?: string;
+}
+
 /** Branding overrides for the server-rendered UI. */
 export interface UIConfig {
   name?: string;
@@ -32,6 +55,7 @@ export interface UIConfig {
   favicon?: string;
   lightTheme?: BrandTheme;
   darkTheme?: BrandTheme;
+  auth?: AuthUiConfig;
 }
 
 /** Default cap for a single Storybook zip upload (1 GiB). */
@@ -115,6 +139,17 @@ const adapterSnapshotSchema: z.ZodType<AdapterSnapshot> = z.object({
   category: z.enum(["database", "storage", "auth", "capture-runner", "capture-queue", "git-host"]),
 });
 
+const authUiConfigSchema: z.ZodType<AuthUiConfig> = z.object({
+  title: z.string().min(1).optional(),
+  subtitle: z.string().optional(),
+  passwordLabel: z.string().min(1).optional(),
+  passwordPlaceholder: z.string().optional(),
+  submitLabel: z.string().min(1).optional(),
+  ssoLabelTemplate: z.string().min(1).optional(),
+  helpText: z.string().optional(),
+  footerText: z.string().optional(),
+});
+
 /** Zod schema validating the shelf-level configuration. */
 export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
   .object({
@@ -143,6 +178,7 @@ export const uiConfigSchema: z.ZodType<UIConfig> = z
     favicon: z.string().url().optional(),
     lightTheme: brandThemeSchema.optional(),
     darkTheme: brandThemeSchema.optional(),
+    auth: authUiConfigSchema.optional(),
   })
   .strict();
 
