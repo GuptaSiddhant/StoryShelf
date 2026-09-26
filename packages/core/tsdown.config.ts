@@ -3,6 +3,7 @@ import { libConfig } from "../../config/tsdown.ts";
 export default libConfig({
   index: "./src/index.tsx",
   "adapter/metadata": "./src/adapters/metadata.ts",
+  "adapter/multi-auth": "./src/adapters/multi-auth.ts",
   "adapter/setup": "./src/adapters/setup.ts",
   "adapter/database": "./src/adapters/database.ts",
   "adapter/storage": "./src/adapters/storage.ts",

@@ -30,6 +30,14 @@ function addOptionalSnapshots(
   }
   if (options.auth) {
     snap["auth"] = options.auth.metadata;
+    const maybeMulti = options.auth as unknown as {
+      methods?: () => Array<{ id: string; adapter: { metadata: AdapterMetadata } }>;
+    };
+    if (typeof maybeMulti.methods === "function") {
+      for (const method of maybeMulti.methods()) {
+        snap[`auth:${method.id}`] = method.adapter.metadata;
+      }
+    }
   }
 }
 
