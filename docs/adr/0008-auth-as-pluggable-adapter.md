@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted. Extended by [ADR 0021](0021-composite-auth-and-local-accounts.md) (composite multi-auth, custom login text, invite-only local accounts, `/profile`, RP discovery).
 
 ## Context
 

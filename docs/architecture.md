@@ -163,11 +163,25 @@ webhooks (
 -- Users (created by auth adapter on login, optional if no auth configured)
 users (
   id                  text PRIMARY KEY,        -- from auth provider (e.g., GitHub user ID)
-  email               text NOT NULL UNIQUE,
-  name                text NOT NULL,
+  email               text NOT NULL UNIQUE,    -- identifier only for local accounts; deliverability never checked
+  name                text NOT NULL,           -- IdP value; display_name_override wins for rendering
   avatar_url          text,
   role                text NOT NULL DEFAULT 'member',  -- 'admin' (site-wide) | 'member' (access via project_members)
   last_login_at       text,
+  created_at          text NOT NULL,
+  password_hash       text,                    -- scrypt hash for local accounts, NULL for SSO/shared users
+  display_name_override text,                  -- user-edited name, survives OIDC refresh (ADR 0021)
+  auth_provider       text NOT NULL DEFAULT 'oidc',  -- 'local' | 'oidc' | 'shared'
+  disabled            integer NOT NULL DEFAULT 0     -- login rejected when true
+);
+
+-- Invite tokens for local accounts (one-time links, invite-only onboarding)
+user_invite_tokens (
+  id                  text PRIMARY KEY,
+  user_id             text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash          text NOT NULL UNIQUE,    -- sha256 of the one-time token (shown once, never stored)
+  expires_at          text NOT NULL,           -- default invite creation + 7 days
+  used_at             text,                    -- NULL until accepted (single use)
   created_at          text NOT NULL
 );
 
@@ -573,10 +587,20 @@ POST   /api/v1/projects/:projectId/builds/:buildId/unpublish
 # Admin
 POST   /api/v1/admin/purge                          # manual retention purge
 
-# Auth (session-based, web UI)
-GET    /auth/login                     # redirect to OAuth provider
-GET    /auth/callback                  # handle OAuth callback
+# Auth (session-based, web UI; multi-method via composite adapter, ADR 0021)
+GET    /auth/login                     # method list, or redirect for sole SSO method
+GET    /auth/login/:providerId         # start one SSO flow (per-method state cookie)
+POST   /auth/login                     # shared-password login
+POST   /auth/account/login             # local account login (email + password)
+GET    /auth/callback                  # handle OAuth callback (legacy alias iff one OIDC method)
+GET    /auth/callback/:providerId      # handle OAuth callback for one method
+GET    /auth/invites/:inviteId         # set-password form for an invite link (?token=…)
+POST   /auth/invites/:inviteId         # accept invite, set password, land on /profile
 POST   /auth/logout                    # destroy session
+
+# Relying-party helpers (public, auth-gate-exempt)
+GET    /.well-known/openid-configuration  # RP metadata: issuer, redirect_uris, providers (not an IdP)
+GET    /.well-known/change-password       # 302 to /profile
 
 # UI Pages
 GET    /                                                   # projects list
@@ -591,6 +615,9 @@ GET    /projects/:slug/storybook                          # published Storybook 
 GET    /projects/:slug/storybook/:key/:value              # published Storybook (`:value` wildcard, URL-encoded)
 GET    /projects/:slug/storybook/build/:buildId/...       # published Storybook (specific build; serves assets)
 GET    /projects/:slug/settings                           # members, label types, public access, tokens, webhooks
+GET    /profile                                           # personal page: name, password (local), memberships
+POST   /profile                                           # update display name override
+POST   /profile/password                                  # change local-account password
 GET    /admin                                             # site-admin System page (adapter inventory + in-depth health)
 ```
 
@@ -668,7 +695,9 @@ StoryShelf/
 
     auth-password/
       src/
-        index.ts          # AuthAdapter: shared password via env var
+        index.ts          # Password adapters: shared password + invite-only local accounts
+        accounts.ts       # createAccountAuth (email/password via one-time invite links)
+        password-hash.ts  # scrypt hashing (node:crypto, zero deps)
       package.json
 
     cli/
@@ -720,7 +749,7 @@ StoryShelf/
 | **Task runner** | turbo | Monorepo build orchestration. Same as StoryBooker |
 | **Package manager** | nub/nubx | Proven in StoryBooker. Monorepo-aware, works with turbo |
 | **CLI framework** | commander.js | Lightweight, well-typed, no magic |
-| **Auth** | Pluggable AuthAdapter. Built-in: OAuth/OIDC, shared password. No auth by default. | Enterprise teams plug in their IdP (Keycloak, Authentik, Okta, GitHub). CLI uses API tokens (separate from user auth). |
+| **Auth** | Pluggable AuthAdapter, composable via `createMultiAuth` (password + N OIDC). Built-in: OAuth/OIDC, shared password, invite-only local accounts. Custom login text via `UIConfig.auth`; personal `/profile`; RP helpers under `/.well-known/`. No auth by default. | Enterprise teams plug in their IdP (Keycloak, Authentik, Okta, GitHub). CLI uses API tokens (separate from user auth). See ADR 0021. |
 | **Schema validation** | zod | Runtime validation for API inputs. Drizzle uses it for schema |
 | **Date/time** | Built-in `Date` + ISO strings | No luxury date library needed |
 | **IDs** | ULID | Sortable, collision-resistant, URL-safe |
@@ -754,6 +783,8 @@ StoryShelf ships a **fixed, server-rendered UI** — `hono/jsx` + HTMX + `hono/c
 - **Layout & theming** live in `app/src/ui/` — a `DocumentLayout` (head, vendored HTMX, styles) plus a `BrandTheme` of light/dark color tokens.
 - **Theme:** follows the system (`prefers-color-scheme`) with a manual light/dark override, persisted in a cookie so the server renders the correct theme on first paint.
 - **Brand config** is passed as `ui: { name, logo, favicon, theme }` to `createShelfApp` (see `ShelfOptions`). Env vars (`SS_BRAND_NAME`, `SS_LOGO_URL`) supply defaults so self-hosters can rebrand with a `docker run`, no code.
+- **Auth UI text** lives in `ui.auth` (title, subtitle, password label/placeholder, submit label, `{label}` SSO template, help/footer) with `SS_AUTH_*` env defaults; the header user menu links to the personal `/profile` page (editable display name, local password change, memberships).
+- **Public base URL** (`config.publicBaseUrl`, `PUBLIC_BASE_URL`) pins the issuer in the `/.well-known/openid-configuration` relying-party helper; otherwise the request origin is used.
 - **HTMX is vendored locally** (no CDN), so air-gapped deployments work.
 - **Diff view (v1):** a simple three-up grid — baseline | current | diff overlay. A minimal vanilla-JS layer in `app/src/ui/document.tsx` (the inline `clientScript`) covers the theme toggle and keyboard approve/reject; the wipe slider and zoom are deferred to v2. The published-Storybook page is an `<iframe>` of Storybook's own static build.
 

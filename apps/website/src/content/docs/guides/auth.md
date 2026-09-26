@@ -3,7 +3,7 @@ title: Auth
 description: Secure your StoryShelf instance with OIDC/OAuth, a shared password, or none for trusted networks.
 ---
 
-Auth is a pluggable adapter. StoryShelf ships three modes: **none** (default, for trusted networks), **shared password** (for small teams), and **OIDC/OAuth** (for enterprises with an identity provider). You pick one when you configure the server.
+Auth is a pluggable adapter. StoryShelf ships four modes: **none** (default, for trusted networks), **shared password** (for small teams), **local accounts** (invite-only email/password, no IdP needed), and **OIDC/OAuth** (for enterprises with an identity provider). Modes compose: one install can offer the shared password alongside several OIDC providers (see [Multiple methods](#multiple-methods)).
 
 ## None (default)
 
@@ -52,6 +52,82 @@ OIDC_CLIENT_SECRET=your-client-secret
 ```
 
 Users are created on first login (from the provider's identity) and assigned project roles.
+
+## Multiple methods
+
+Combine methods with the composite adapter — e.g. shared password plus two OIDC providers:
+
+```ts
+import { createMultiAuth } from "@storyshelf/core/adapter/multi-auth";
+import { createOAuthAuth } from "@storyshelf/auth-oauth";
+import { createPasswordAuth } from "@storyshelf/auth-password";
+
+const auth = createMultiAuth({
+  secret: process.env.SECRET!,
+  methods: [
+    { id: "password", label: "Shared password", adapter: createPasswordAuth({ ... }) },
+    { id: "keycloak", label: "Keycloak", adapter: createOAuthAuth({ ... }) },
+    { id: "github", label: "GitHub", adapter: createOAuthAuth({ ... }) },
+  ],
+});
+```
+
+The login page lists every method; each OIDC provider gets its own `/auth/login/:id` start route and `/auth/callback/:id` callback with a per-method anti-CSRF state cookie. Sessions are signed once with the composite secret. Health reporting expands to `auth:<id>` per method.
+
+## Custom login text
+
+Reword the sign-in page without code via `ui.auth` (or `SS_AUTH_*` env vars on the dev/fly servers):
+
+```ts
+const app = createShelfApp({
+  ...,
+  ui: {
+    auth: {
+      title: "Welcome back",
+      subtitle: "Sign in to review visual changes",
+      ssoLabelTemplate: "Continue with {label}",
+      helpText: "Use your company SSO. Need access? Ask in #design-systems.",
+    },
+  },
+});
+```
+
+Available keys: `title`, `subtitle`, `passwordLabel`, `passwordPlaceholder`, `submitLabel`, `ssoLabelTemplate` (must contain `{label}`), `helpText`, `footerText`. Page structure stays fixed — layout control remains via brand config.
+
+## Local accounts (invite-only)
+
+For teams without an identity provider, `createAccountAuth` (in `@storyshelf/auth-password`) manages per-user email/password accounts. Admins invite an address; the user opens a one-time link and sets their own password:
+
+```ts
+import { createAccountAuth } from "@storyshelf/auth-password";
+
+const auth = createAccountAuth({ db, secret: process.env.SECRET! });
+const { inviteId, token } = await auth.issueInvite({
+  email: "ada@example.com",
+  name: "Ada",
+  role: "member",
+});
+// Relay one URL out-of-band: /auth/invites/<inviteId>?token=<token>
+```
+
+- Invite links are single-use, expire after 7 days, are stored hashed, and are superseded when re-issued — **re-invite is also the password-recovery flow**.
+- There are **no temporary passwords**: nothing to shoulder-surf in the admin UI.
+- Passwords are scrypt-hashed; login failures are generic ("Invalid credentials") to avoid user enumeration; disabled accounts are rejected on every request.
+
+:::note
+Local emails are **identifiers, not mailboxes**. Deliverability is never checked, so fictional or future addresses (`front-desk@internal`) work — but self-service email reset can never reach them. Recovery is always admin re-invite.
+:::
+
+## Profile
+
+Every logged-in user gets `/profile` (linked from the header menu): avatar, editable display name, email, site role, provider, groups, project memberships, and sign-out. Local accounts also change their password there. A user-edited display name survives OIDC refresh (`display_name_override`); shared-password logins get a stable `users` row so the page works for every session type.
+
+## Relying-party discovery
+
+StoryShelf is an OIDC **relying party**, not a provider. Two public helpers ease IdP registration:
+
+- `GET /.well-known/openid-configuration` — RP metadata (issuer, `code` flow, scopes, per-provider `redirect_uris`, provider list), explicitly labelled as such. Set `PUBLIC_BASE_URL` (or `config.publicBaseUrl`) so the issuer is stable; otherwise the request origin is used.
+- `GET /.well-known/change-password` — redirects to `/profile`.
 
 ### Team sync via identity-provider groups
 
