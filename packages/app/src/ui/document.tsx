@@ -392,14 +392,16 @@ const AuthMenu: FC = () => {
   }
   return (
     <div class="user-menu">
-      {user.avatarUrl ? (
-        <img class="user-menu__avatar" src={user.avatarUrl} alt="" width="28" height="28" />
-      ) : (
-        <span class="user-menu__avatar user-menu__avatar--fallback" aria-hidden="true">
-          {user.name.slice(0, 1).toUpperCase()}
-        </span>
-      )}
-      <span class="user-menu__name">{user.name}</span>
+      <a href="/profile" class="user-menu__link" aria-label="View profile">
+        {user.avatarUrl ? (
+          <img class="user-menu__avatar" src={user.avatarUrl} alt="" width="28" height="28" />
+        ) : (
+          <span class="user-menu__avatar user-menu__avatar--fallback" aria-hidden="true">
+            {user.name.slice(0, 1).toUpperCase()}
+          </span>
+        )}
+        <span class="user-menu__name">{user.name}</span>
+      </a>
       <span class={`user-menu__role user-menu__role--${user.role}`}>{user.role}</span>
       <form method="post" action="/auth/logout">
         <button class="user-menu__logout" type="submit">

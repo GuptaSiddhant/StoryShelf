@@ -9,6 +9,7 @@ import {
   type PasswordLoginAuth,
   type SsoLoginAuth,
 } from "@storyshelf/core/adapter/auth";
+import { UserModel } from "@storyshelf/core/models";
 import { randomToken } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
@@ -269,9 +270,25 @@ export function registerAuth(app: ShelfRouter, auth: AuthAdapter): void {
       if (target.providerId) {
         const user: AuthUser = { ...SHARED_USER, providerId: target.providerId };
         await target.adapter.login(password, user);
+        await new UserModel(getStore().db).upsert({
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          avatarUrl: user.avatarUrl ?? null,
+          role: user.role,
+          authProvider: "shared",
+        });
         c.header("set-cookie", sessionCookieHeader(await auth.createSession(user)));
       } else {
         const token = await target.adapter.login(password, SHARED_USER);
+        await new UserModel(getStore().db).upsert({
+          id: SHARED_USER.id,
+          email: SHARED_USER.email,
+          name: SHARED_USER.name,
+          avatarUrl: SHARED_USER.avatarUrl ?? null,
+          role: SHARED_USER.role,
+          authProvider: "shared",
+        });
         c.header("set-cookie", sessionCookieHeader(token));
       }
       return hxRedirect(c, "/");

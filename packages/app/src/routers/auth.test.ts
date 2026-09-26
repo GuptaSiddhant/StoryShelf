@@ -1,45 +1,9 @@
-import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
-import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
+import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
 
 const silentLogger = pino({ level: "silent" });
-
-const dbFail = async (): Promise<never> => {
-  return await Promise.reject(new Error("database not used in this test"));
-};
-
-const storageFail = async (): Promise<never> => {
-  return await Promise.reject(new Error("storage not used in this test"));
-};
-
-function stubDatabase(): DatabaseAdapter {
-  return {
-    metadata: { name: "Stub DB", version: "0.0.0", kind: "stub", category: "database" },
-    tables: {} as unknown as DatabaseAdapter["tables"],
-    insert: dbFail,
-    update: dbFail,
-    get: dbFail,
-    remove: dbFail,
-    list: dbFail,
-    count: dbFail,
-    all: dbFail,
-  };
-}
-
-function stubStorage(): StorageAdapter {
-  return {
-    metadata: { name: "Stub Storage", version: "0.0.0", kind: "stub", category: "storage" },
-    read: storageFail,
-    write: storageFail,
-    delete: storageFail,
-    exists: storageFail,
-    list: storageFail,
-    writeStream: storageFail,
-    readStream: storageFail,
-  };
-}
 
 const admin = { id: "user_1", email: "ada@example.com", name: "Ada", role: "admin" as const };
 
@@ -67,9 +31,11 @@ const passwordAuth = {
 };
 
 function app(): ReturnType<typeof createShelfApp> {
+  const { db } = makeDatabase();
+  const { storage } = makeStorage();
   return createShelfApp({
-    database: stubDatabase(),
-    storage: stubStorage(),
+    database: db,
+    storage,
     auth: passwordAuth,
     logger: silentLogger,
   });

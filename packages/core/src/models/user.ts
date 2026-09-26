@@ -35,7 +35,9 @@ export class UserModel {
   /**
    * Insert or update a user row from an authenticated identity (login sync).
    * Email, name, avatar, and site role refresh on every login; the row id
-   * (the provider `sub`) is stable.
+   * (the provider `sub`) is stable. Preserves `displayNameOverride` so a
+   * user-edited name survives IdP refresh; `passwordHash` and `disabled`
+   * are never clobbered by SSO sync.
    */
   async upsert(input: {
     id: string;
@@ -43,6 +45,7 @@ export class UserModel {
     name: string;
     avatarUrl?: string | null;
     role: User["role"];
+    authProvider?: User["authProvider"];
   }): Promise<User> {
     const now = new Date().toISOString();
     const existing = await this.get(input.id);
@@ -55,14 +58,27 @@ export class UserModel {
         role: input.role,
         lastLoginAt: now,
         createdAt: now,
+        passwordHash: null,
+        displayNameOverride: null,
+        authProvider: input.authProvider ?? "oidc",
+        disabled: false,
       })) as unknown as User;
     }
     return (await this.db.update(this.tables.users, existing.id, {
       email: input.email,
+      // Keep a user-edited display name: `name` stays the IdP value,
+      // `displayNameOverride` is the source of truth for rendering.
       name: input.name,
       avatarUrl: input.avatarUrl ?? null,
       role: input.role,
       lastLoginAt: now,
+    })) as unknown as User;
+  }
+
+  /** Update the display name override for a user (profile edit). */
+  async setDisplayNameOverride(id: string, displayName: string | null): Promise<User> {
+    return (await this.db.update(this.tables.users, id, {
+      displayNameOverride: displayName?.trim() ? displayName.trim() : null,
     })) as unknown as User;
   }
 }

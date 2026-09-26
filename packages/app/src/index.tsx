@@ -27,6 +27,7 @@ import { registerHealth, type HealthDeps } from "./routers/health.ts";
 import { registerLabels } from "./routers/labels.ts";
 import { registerMedia } from "./routers/media.ts";
 import { registerMembers } from "./routers/members.ts";
+import { registerProfile } from "./routers/profile.ts";
 import { registerProjects } from "./routers/projects.ts";
 import { registerStatusConfigs } from "./routers/status-configs.ts";
 import { registerStorybook } from "./routers/storybook.ts";
@@ -72,6 +73,7 @@ export function createShelfApp(options: ShelfOptions): ShelfApp {
 }
 
 /** Attach global middleware: ids, logging, init gate, limits, store scope, auth gate. */
+// oxlint-disable-next-line eslint/max-statements -- wiring is cohesive, one concern
 function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
   const { options, config, ui, logger, authEnabled, enqueueCapture, queue, gitHosts, getReady } =
     wiring;
@@ -85,6 +87,8 @@ function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
   app.use("/api/v1/tokens/*", rateLimit({ windowMs: 60_000, max: 10 }));
   app.use("/api/v1/webhooks/*", rateLimit({ windowMs: 60_000, max: 20 }));
   app.use("/projects/:slug/settings/*", csrf(config.secret));
+  app.use("/profile/*", csrf(config.secret));
+  app.use("/profile", csrf(config.secret));
   app.use(
     "*",
     storeScope({
@@ -122,6 +126,7 @@ function registerPageRoutes(app: ShelfRouter, options: ShelfOptions, health: Hea
   if (options.auth) {
     registerAuth(app, options.auth);
   }
+  registerProfile(app);
   registerAssets(app);
   registerStorybook(app);
   registerAdminPages(app, health);
