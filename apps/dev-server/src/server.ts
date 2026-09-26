@@ -83,7 +83,7 @@ const app = createShelfApp({
     authPassword && secret
       ? createPasswordAuth({ password: authPassword, viewerPassword: authViewerPassword, secret })
       : undefined,
-  ui: ui as never,
+  ui,
   config: {
     // `SECRET` signs auth sessions; `scratchDir` is where an uploaded
     // Storybook archive is extracted before Playwright renders it.
