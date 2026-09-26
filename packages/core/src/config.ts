@@ -87,6 +87,12 @@ export interface ShelfConfig {
    */
   adminToken?: string;
   publishedBaseDomain?: string;
+  /**
+   * Public base URL of this deployment (e.g. `https://shelf.example.com`).
+   * Used as the issuer in the `/.well-known/openid-configuration` relying-party
+   * helper document; falls back to the request origin when unset.
+   */
+  publicBaseUrl?: string;
   captureConcurrency?: number;
   scratchDir?: string;
   purgeTtlDays?: number;
@@ -156,6 +162,8 @@ export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
     secret: z.string().min(1).optional(),
     adminToken: z.string().min(1).optional(),
     publishedBaseDomain: z.string().optional(),
+    // oxlint-disable-next-line typescript/no-deprecated -- z.string().url() kept for zod v3 API compat
+    publicBaseUrl: z.string().url().optional(),
     captureConcurrency: z.number().int().positive().optional(),
     scratchDir: z.string().optional(),
     purgeTtlDays: z.number().int().positive().optional(),

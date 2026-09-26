@@ -34,6 +34,7 @@ import { registerStorybook } from "./routers/storybook.ts";
 import { registerTokens } from "./routers/tokens.ts";
 import { registerUiPages } from "./routers/ui.ts";
 import { registerWebhooks } from "./routers/webhooks.ts";
+import { registerWellKnown } from "./routers/well-known.ts";
 import { resolveRuntime } from "./runtime.ts";
 
 /**
@@ -125,6 +126,7 @@ function registerApiRoutes(app: ShelfRouter, health: HealthDeps): void {
 function registerPageRoutes(app: ShelfRouter, options: ShelfOptions, health: HealthDeps): void {
   if (options.auth) {
     registerAuth(app, options.auth);
+    registerWellKnown(app, options.auth);
   }
   registerProfile(app);
   registerAssets(app);

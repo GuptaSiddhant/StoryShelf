@@ -27,6 +27,7 @@ const secret = env["SECRET"];
 const authPassword = env["AUTH_PASSWORD"];
 const authViewerPassword = env["AUTH_VIEWER_PASSWORD"];
 const adminToken = env["STORYSHELF_ADMIN_TOKEN"] ?? env["ADMIN_TOKEN"];
+const publicBaseUrl = env["PUBLIC_BASE_URL"];
 
 function buildAuthUi(): Record<string, string> | undefined {
   const pairs: Array<[string, string | undefined]> = [
@@ -84,6 +85,7 @@ const app = createShelfApp({
   config: {
     secret,
     adminToken,
+    publicBaseUrl,
     scratchDir: dataDir,
   },
 });
