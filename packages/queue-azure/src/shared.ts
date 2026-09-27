@@ -5,6 +5,7 @@ export function serializeBody(job: CaptureJob): string {
   return JSON.stringify({
     buildId: job.buildId,
     reqId: job.reqId,
+    traceparent: job.traceparent,
     queuedAt: new Date().toISOString(),
     status: "queued",
   });
@@ -43,4 +44,6 @@ export interface QueuedBody {
   reqId?: string;
   queuedAt?: string;
   status?: string;
+  /** W3C traceparent continuing the enqueueing request's trace. */
+  traceparent?: string;
 }

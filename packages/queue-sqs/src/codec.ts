@@ -7,6 +7,7 @@ export function serializeEnqueueBody(job: CaptureJob): string {
   return JSON.stringify({
     buildId: job.buildId,
     reqId: job.reqId,
+    traceparent: job.traceparent,
     queuedAt: new Date().toISOString(),
     status: "queued",
   });

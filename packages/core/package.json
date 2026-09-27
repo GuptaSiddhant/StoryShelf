@@ -175,6 +175,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@opentelemetry/api": "catalog:",
     "@storyshelf/affected": "workspace:*",
     "drizzle-orm": "catalog:",
     "pino": "catalog:",

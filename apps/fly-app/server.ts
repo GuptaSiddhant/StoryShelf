@@ -1,7 +1,10 @@
 import { serve } from "@hono/node-server";
 import { createShelfApp } from "@storyshelf/app";
 import { createPasswordAuth } from "@storyshelf/auth-password";
+import { createShelfLogger } from "@storyshelf/core/logger";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
+import { otelLogMixin } from "@storyshelf/observability";
+import { initObservabilityFromEnv } from "@storyshelf/observability/node";
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
 import { createLocalStorage } from "@storyshelf/storage-local";
 /**
@@ -73,6 +76,10 @@ const database = createSqliteDatabase(`${dataDir}/shelf.db`);
 const storage = createLocalStorage(dataDir);
 const captureRunner = createPlaywrightCaptureRunner();
 
+// Observability first (noop unless OTEL_EXPORTER_OTLP_ENDPOINT is set).
+const observability = await initObservabilityFromEnv();
+const shelfLogger = createShelfLogger({ mixin: otelLogMixin });
+
 const app = createShelfApp({
   database,
   storage,
@@ -82,6 +89,8 @@ const app = createShelfApp({
       ? createPasswordAuth({ password: authPassword, viewerPassword: authViewerPassword, secret })
       : undefined,
   ui: ui as never,
+  logger: shelfLogger,
+  observability,
   config: {
     secret,
     adminToken,

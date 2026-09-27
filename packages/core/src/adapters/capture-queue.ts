@@ -18,6 +18,11 @@ export interface CaptureJob {
   buildId: string;
   /** Request id used to correlate the background job with the request that queued it. */
   reqId?: string;
+  /**
+   * W3C `traceparent` of the enqueueing request. Workers continue this trace
+   * instead of starting a root span; absent means start a new trace.
+   */
+  traceparent?: string;
 }
 
 /** A job polled from a queue with transport metadata. */

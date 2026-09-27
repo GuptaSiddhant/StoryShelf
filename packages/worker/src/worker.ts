@@ -197,7 +197,8 @@ export function createCaptureWorker(options: WorkerOptions): WorkerHandle {
     const execution = (async (): Promise<void> => {
       try {
         jobLogger?.info("worker picked up job");
-        await runJob({ buildId: job.buildId, reqId: job.reqId });
+        // traceparent rides along: executeCaptureJob continues the trace.
+        await runJob({ buildId: job.buildId, reqId: job.reqId, traceparent: job.traceparent });
         await doAck(job);
         jobLogger?.info("worker completed job");
       } catch (error) {

@@ -1,3 +1,11 @@
+import { context, propagation, trace } from "@opentelemetry/api";
+import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
+import { W3CTraceContextPropagator } from "@opentelemetry/core";
+import {
+  BasicTracerProvider,
+  InMemorySpanExporter,
+  SimpleSpanProcessor,
+} from "@opentelemetry/sdk-trace-base";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { describe, expect, it, vi } from "vitest";
@@ -142,5 +150,40 @@ describe("setupCaptureQueue", () => {
       makeLogger(),
     );
     expect(result.queue).not.toBeNull();
+  });
+
+  it("propagates the active traceparent on enqueue", async () => {
+    const exporter = new InMemorySpanExporter();
+    const provider = new BasicTracerProvider({
+      spanProcessors: [new SimpleSpanProcessor(exporter)],
+    });
+    trace.setGlobalTracerProvider(provider);
+    propagation.setGlobalPropagator(new W3CTraceContextPropagator());
+    const manager = new AsyncLocalStorageContextManager();
+    context.setGlobalContextManager(manager.enable());
+    try {
+      const { db } = makeDatabase();
+      const { storage } = makeStorage();
+      const queue = makeQueue();
+      const result = setupCaptureQueue(
+        { database: db as never, storage: storage as never, captureQueue: queue },
+        {},
+        [],
+        makeLogger(),
+      );
+      await trace.getTracer("test").startActiveSpan("test.enqueue", async () => {
+        await result.enqueueCapture?.("build-1", "req-1");
+      });
+      expect(queue.enqueue).toHaveBeenCalledWith({
+        buildId: "build-1",
+        reqId: "req-1",
+        traceparent: expect.stringMatching(/^00-/u),
+      });
+    } finally {
+      await provider.shutdown();
+      context.disable();
+      propagation.disable();
+      trace.disable();
+    }
   });
 });

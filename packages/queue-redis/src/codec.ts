@@ -10,6 +10,7 @@ export function buildRequeuePayload(body: QueuedBody): string {
   return JSON.stringify({
     buildId: body.buildId,
     reqId: body.reqId,
+    traceparent: body.traceparent,
     queuedAt: body.queuedAt ?? new Date().toISOString(),
     status: "queued",
     attempts: nextAttempts,
@@ -44,6 +45,7 @@ export async function extractPolledJob(
   return {
     buildId: body.buildId,
     reqId: body.reqId,
+    traceparent: body.traceparent,
     receipt: raw,
     attempts: typeof body.attempts === "number" ? body.attempts : 0,
     raw,

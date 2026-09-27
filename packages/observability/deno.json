@@ -1,0 +1,13 @@
+{
+  "$schema": "https://raw.githubusercontent.com/denoland/deno/refs/heads/main/cli/schemas/config-file.v1.json",
+  "name": "@storyshelf/observability",
+  "version": "0.5.2",
+  "exports": {
+    ".": "./src/index.ts",
+    "./node": "./src/node.ts"
+  },
+  "publish": {
+    "include": ["src", "README.md", "LICENSE"],
+    "exclude": ["**/*.test.ts", "**/*.test.tsx"]
+  }
+}

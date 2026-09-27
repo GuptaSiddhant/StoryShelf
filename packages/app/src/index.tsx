@@ -5,6 +5,11 @@
 import { swaggerUI } from "@hono/swagger-ui";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import type { ShelfOptions } from "@storyshelf/core/config";
+import {
+  createHttpMiddleware,
+  createInstrumentedDatabase,
+  createInstrumentedStorage,
+} from "@storyshelf/observability";
 import { requestId } from "hono/request-id";
 import type { ShelfApp, ShelfContext, ShelfRouter } from "./app-types.ts";
 import { setupCaptureQueue } from "./capture-setup.ts";
@@ -47,10 +52,18 @@ import { resolveRuntime } from "./runtime.ts";
 export function createShelfApp(options: ShelfOptions): ShelfApp {
   const app = new OpenAPIHono<{ Variables: ShelfContext }>() as ShelfApp;
   const runtime = resolveRuntime(options);
+  // Instrumented adapters for request/capture paths: transparent wrappers
+  // (identity, lifecycle, and tables delegate through; spans noop without
+  // an SDK). Lifecycle setup/health keep the raw adapters.
+  const scoped: ShelfOptions = {
+    ...options,
+    database: createInstrumentedDatabase(options.database),
+    storage: createInstrumentedStorage(options.storage),
+  };
   const cell: LifecycleCell = { ready: Promise.resolve({ ok: true, failures: [] }), settled: null };
   attachLifecycle(app, options, runtime, cell);
   const { queue, enqueueCapture } = setupCaptureQueue(
-    options,
+    scoped,
     runtime.config,
     runtime.gitHosts,
     runtime.logger,
@@ -59,7 +72,7 @@ export function createShelfApp(options: ShelfOptions): ShelfApp {
     ...runtime,
     queue,
     enqueueCapture,
-    options,
+    options: scoped,
     getReady: async () => await cell.ready,
   });
   registerAllRoutes(app, options, {
@@ -79,6 +92,13 @@ function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
   const { options, config, ui, logger, authEnabled, enqueueCapture, queue, gitHosts, getReady } =
     wiring;
   app.use("*", requestId());
+  // OTEL server spans (W3C extraction, route-template naming). Mounted right
+  // after requestId so `storyshelf.req_id` resolves; `enduser.id` resolves
+  // once storeScope runs downstream. Noop without an SDK.
+  app.use(
+    "*",
+    createHttpMiddleware({ serviceName: "storyshelf", serviceVersion: packageVersion() }),
+  );
   // Structured request logging. Uses a Hono-native middleware rather than
   // Pino-http, which expects a Node server response (`res.on`) incompatible
   // With Hono's Web `Request`/`Response` model.

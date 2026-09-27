@@ -10,10 +10,11 @@
   },
   "dependencies": {
     "@hono/node-server": "catalog:",
+    "@storyshelf/app": "workspace:*",
     "@storyshelf/auth-password": "workspace:*",
     "@storyshelf/core": "workspace:*",
     "@storyshelf/db-sqlite": "workspace:*",
-    "@storyshelf/app": "workspace:*",
+    "@storyshelf/observability": "workspace:*",
     "@storyshelf/runner-playwright": "workspace:*",
     "@storyshelf/storage-local": "workspace:*"
   },

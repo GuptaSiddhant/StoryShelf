@@ -47,6 +47,13 @@ describe("buildRequeuePayload", () => {
     expect(payload["attempts"]).toBe(1);
     expect(typeof payload["queuedAt"]).toBe("string");
   });
+
+  it("preserves the traceparent across requeues", () => {
+    const payload = JSON.parse(
+      buildRequeuePayload({ buildId: "b1", traceparent: "00-abc", attempts: 0 }),
+    ) as Record<string, unknown>;
+    expect(payload["traceparent"]).toBe("00-abc");
+  });
 });
 
 describe("extractPolledJob", () => {

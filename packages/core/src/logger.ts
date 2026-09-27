@@ -30,6 +30,7 @@ export function createShelfLogger(options: LoggerOptions = {}): Logger {
     {
       level: options.level ?? process.env["LOG_LEVEL"] ?? "info",
       base: { env: options.env ?? process.env["NODE_ENV"] },
+      mixin: options.mixin,
     },
     transport,
   );
@@ -54,4 +55,9 @@ export interface LoggerOptions {
   transports?: PinoTransport[];
   /** Deployment environment recorded in the `env` base field. Defaults to `NODE_ENV`. */
   env?: string;
+  /**
+   * Per-line mixin merged into every log record. Used for OTEL trace
+   * correlation (`otelLogMixin` from `@storyshelf/observability`).
+   */
+  mixin?: () => Record<string, unknown>;
 }

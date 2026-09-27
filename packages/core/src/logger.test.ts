@@ -54,4 +54,8 @@ describe("createShelfLogger", () => {
     const transports: PinoTransport[] = [{ target: "pino/file", options: { destination: 1 } }];
     expect(() => createShelfLogger({ transports })).not.toThrow();
   });
+
+  it("accepts a log-line mixin", () => {
+    expect(() => createShelfLogger({ mixin: () => ({ trace_id: "abc" }) })).not.toThrow();
+  });
 });

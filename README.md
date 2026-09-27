@@ -24,6 +24,7 @@ packages/
   cli/            storyshelf              — CLI client (server init, init, create, upload, purge, retry)
   runner-playwright/ @storyshelf/runner-playwright — Playwright capture runner
   runner-puppeteer/ @storyshelf/runner-puppeteer — Puppeteer capture runner
+  observability/  @storyshelf/observability — OpenTelemetry tracing/metrics/log-correlation
 apps/
   dev-server/     dev-server      — local dev server (from TS source via nub watch)
   website/        website         — public docs (Astro Starlight)

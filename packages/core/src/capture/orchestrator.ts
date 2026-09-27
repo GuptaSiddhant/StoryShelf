@@ -13,6 +13,7 @@ import type { CaptureLogTables } from "../models/capture-log.ts";
 import { ProjectModel, type ProjectTables } from "../models/project.ts";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
+import { parentContext, withSpan } from "../tracing.ts";
 import { DEFAULT_VIEWPORTS, isDisabledStory, isFlakyStory } from "./adapter.ts";
 import type { Viewport } from "./adapter.ts";
 import { partitionAffectedStories } from "./affected.ts";
@@ -52,6 +53,11 @@ export interface CaptureAttemptRef {
 export interface CaptureJobInput {
   buildId: string;
   reqId?: string;
+  /**
+   * W3C `traceparent` from the enqueueing request or queue payload.
+   * Continues the inbound trace instead of starting a root span.
+   */
+  traceparent?: string;
   /** Attempt row owning this run; when omitted no per-attempt logs are stored. */
   attempt?: CaptureAttemptRef;
   /** Recorder mirroring phase logs into the attempt's log history. */
@@ -59,6 +65,9 @@ export interface CaptureJobInput {
 }
 /**
  * Run the full capture for a build: extract, render, persist, and finalize.
+ *
+ * The run executes inside a `capture.job` span (continuing `input.traceparent`
+ * when present) with one child span per pipeline phase.
  *
  * @param input - Build id plus the originating request id.
  * @param options - Adapters, scratch dir, viewports, and logger.
@@ -70,6 +79,26 @@ export async function executeCaptureJob(
 ): Promise<{ storyCount: number; failedCount: number }> {
   const builds = new BuildModel(options.db, options.tables);
   const { build, project } = await loadTarget(options, input.buildId);
+  return await withSpan(
+    "capture.job",
+    async () => await runCapturePhases(input, options, builds, build, project),
+    {
+      "storyshelf.build_id": build.id,
+      ...(input.reqId ? { "storyshelf.req_id": input.reqId } : {}),
+      ...(input.attempt ? { "storyshelf.attempt_no": input.attempt.attemptNo } : {}),
+    },
+    parentContext(input.traceparent),
+  );
+}
+
+/** Execute the phase pipeline inside the `capture.job` span. */
+async function runCapturePhases(
+  input: CaptureJobInput,
+  options: CaptureJobOptions,
+  builds: BuildModel,
+  build: Build,
+  project: Project,
+): Promise<{ storyCount: number; failedCount: number }> {
   const logger = options.logger?.child({
     buildId: input.buildId,
     reqId: input.reqId,
@@ -81,12 +110,14 @@ export async function executeCaptureJob(
   let extractedDir: string | undefined;
   try {
     const extractStart = performance.now();
-    extractedDir = await extractStorybookToScratch(
-      options.storage,
-      options.scratchDir,
-      project.id,
-      build.id,
-    );
+    extractedDir = await withSpan("capture.extract", async () => {
+      return await extractStorybookToScratch(
+        options.storage,
+        options.scratchDir,
+        project.id,
+        build.id,
+      );
+    });
     const extractDuration = performance.now() - extractStart;
     logger?.info({ durationMs: Math.round(extractDuration) }, "storybook extracted");
     await emitAttemptLog(input.recordLog, logger, "info", "storybook extracted", {
@@ -95,8 +126,12 @@ export async function executeCaptureJob(
 
     // Persist the extracted statics to storage so the published Storybook
     // (`storybookDir`) can be served after the scratch dir is cleaned up.
+    // Copy to a const: closures below need the narrowed string type.
+    const storybookDir: string = extractedDir;
     const staticsStart = performance.now();
-    await persistStorybookStatics(options.storage, extractedDir, project.id, build.id);
+    await withSpan("capture.persist-statics", async () => {
+      await persistStorybookStatics(options.storage, storybookDir, project.id, build.id);
+    });
     logger?.info(
       { durationMs: Math.round(performance.now() - staticsStart) },
       "storybook statics persisted",
@@ -138,20 +173,26 @@ export async function executeCaptureJob(
     });
 
     const renderStart = performance.now();
-    const result =
-      partition.render.length > 0
-        ? await options.runner.render({
-            buildId: build.id,
-            storybookDir: extractedDir,
-            stories: partition.render,
-            viewports,
-            logger,
-            executePlay: project.executePlay ?? false,
-            playTimeoutMs: project.playTimeoutMs ?? 10_000,
-            runA11y: project.runA11y ?? false,
-            browser: browser ?? "chromium",
-          })
-        : { captures: [], failures: [] };
+    const result = await withSpan(
+      "capture.render",
+      async () => {
+        if (partition.render.length === 0) {
+          return { captures: [], failures: [] };
+        }
+        return await options.runner.render({
+          buildId: build.id,
+          storybookDir,
+          stories: partition.render,
+          viewports,
+          logger,
+          executePlay: project.executePlay ?? false,
+          playTimeoutMs: project.playTimeoutMs ?? 10_000,
+          runA11y: project.runA11y ?? false,
+          browser: browser ?? "chromium",
+        });
+      },
+      { "storyshelf.render_count": partition.render.length },
+    );
     const renderDuration = performance.now() - renderStart;
     logger?.info(
       { durationMs: Math.round(renderDuration), storyCount: stories.length },
@@ -173,24 +214,26 @@ export async function executeCaptureJob(
     }
 
     const persistStart = performance.now();
-    await persistCapture(
-      {
-        db: options.db,
-        tables: options.tables,
-        storage: options.storage,
-        project,
-        build,
-        viewports,
-        captures: result.captures,
-        inherited: partition.inherited,
-        logger,
-        recordLog: input.recordLog,
-        secret: options.secret,
-      },
-      blockingFailed,
-      flakyFailed,
-      a11yFailed,
-    );
+    await withSpan("capture.persist", async () => {
+      await persistCapture(
+        {
+          db: options.db,
+          tables: options.tables,
+          storage: options.storage,
+          project,
+          build,
+          viewports,
+          captures: result.captures,
+          inherited: partition.inherited,
+          logger,
+          recordLog: input.recordLog,
+          secret: options.secret,
+        },
+        blockingFailed,
+        flakyFailed,
+        a11yFailed,
+      );
+    });
     const persistDuration = performance.now() - persistStart;
     logger?.info({ durationMs: Math.round(persistDuration) }, "capture persisted");
     await emitAttemptLog(input.recordLog, logger, "info", "capture persisted", {

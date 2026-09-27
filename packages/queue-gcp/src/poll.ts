@@ -17,6 +17,7 @@ export async function pollPubSub(state: GcpPubSubState): Promise<PollableJob | n
   return {
     buildId: body.buildId,
     reqId: body.reqId,
+    traceparent: body.traceparent,
     receipt: pulled.ackId,
     attempts: Math.max(0, (pulled.deliveryAttempt ?? 1) - 1),
     raw: pulled.received,

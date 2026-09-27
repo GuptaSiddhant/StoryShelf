@@ -39,6 +39,7 @@ function buildPolledJob(msg: Message, body: QueuedBody): PollableJob {
   return {
     buildId: body.buildId ?? "",
     reqId: body.reqId,
+    traceparent: body.traceparent,
     receipt: msg.ReceiptHandle,
     attempts: attemptsFromCount(msg.Attributes?.["ApproximateReceiveCount"]),
     raw: msg,

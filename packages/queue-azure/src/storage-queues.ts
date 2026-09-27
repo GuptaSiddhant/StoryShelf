@@ -173,10 +173,16 @@ async function receiveSingle(
   }
 }
 
-function toStorageJob(msg: DequeuedMessageItem, buildId: string, reqId?: string): PollableJob {
+function toStorageJob(
+  msg: DequeuedMessageItem,
+  buildId: string,
+  reqId?: string,
+  traceparent?: string,
+): PollableJob {
   return {
     buildId,
     reqId,
+    traceparent,
     receipt: encodeReceipt(msg.messageId, msg.popReceipt),
     attempts: Math.max(0, (msg.dequeueCount ?? 1) - 1),
     raw: msg,
@@ -208,7 +214,7 @@ async function pollStorage(
     await discardMalformed(state.client, msg, state.logger);
     return null;
   }
-  return toStorageJob(msg, body.buildId, body.reqId);
+  return toStorageJob(msg, body.buildId, body.reqId, body.traceparent);
 }
 
 async function setupStorage(client: QueueClient): Promise<void> {

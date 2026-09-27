@@ -69,6 +69,8 @@ export interface DispatchDeps {
 export interface CaptureDispatchJob {
   buildId: string;
   reqId?: string;
+  /** W3C `traceparent` continuing the enqueueing request's trace. */
+  traceparent?: string;
 }
 
 interface JobContext {
@@ -257,6 +259,7 @@ async function runAndReport(ctx: JobContext, job: CaptureDispatchJob): Promise<v
       {
         buildId: job.buildId,
         reqId: job.reqId,
+        traceparent: job.traceparent,
         attempt: {
           id: ctx.attempt.id,
           attemptNo: ctx.attempt.attemptNo,
@@ -295,12 +298,18 @@ async function loadJobTarget(
   const builds = new BuildModel(deps.db, deps.tables);
   const build = await builds.get(job.buildId);
   if (!build) {
-    await executeCaptureJob({ buildId: job.buildId, reqId: job.reqId }, deps.jobOptions);
+    await executeCaptureJob(
+      { buildId: job.buildId, reqId: job.reqId, traceparent: job.traceparent },
+      deps.jobOptions,
+    );
     return null;
   }
   const project = await new ProjectModel(deps.db, deps.tables).get(build.projectId);
   if (!project) {
-    await executeCaptureJob({ buildId: job.buildId, reqId: job.reqId }, deps.jobOptions);
+    await executeCaptureJob(
+      { buildId: job.buildId, reqId: job.reqId, traceparent: job.traceparent },
+      deps.jobOptions,
+    );
     return null;
   }
   return { build, project };

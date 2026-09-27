@@ -231,4 +231,19 @@ export interface ShelfOptions {
   logger?: Logger;
   ui?: UIConfig;
   config?: ShelfConfig;
+  /**
+   * Externally-managed observability SDK handle (e.g. from
+   * `initObservabilityFromEnv`). Structural — core never imports the
+   * observability package. Flushed on `app.lifecycle.teardown()`.
+   */
+  observability?: ObservabilityHandle;
+}
+
+/**
+ * Shutdown hook for an externally-managed observability SDK.
+ * Structural so core stays dependency-free.
+ */
+export interface ObservabilityHandle {
+  /** Flush exporters and release SDK resources. Must be idempotent. */
+  shutdown(): Promise<void>;
 }

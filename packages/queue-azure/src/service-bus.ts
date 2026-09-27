@@ -184,18 +184,29 @@ async function serviceBusRecent(_limit: number): Promise<QueueEntry[]> {
   return [];
 }
 
+/** Copy optional string fields from a Service Bus body candidate. */
+function copyOptionalFields(
+  candidate: { reqId?: unknown; traceparent?: unknown },
+  queued: QueuedBody,
+): void {
+  if (typeof candidate.reqId === "string") {
+    queued.reqId = candidate.reqId;
+  }
+  if (typeof candidate.traceparent === "string") {
+    queued.traceparent = candidate.traceparent;
+  }
+}
+
 /** Normalize a Service Bus message body into a queued-body shape. */
 function toQueuedBody(body: unknown): QueuedBody {
   if (typeof body === "string") {
     return parseBody(body);
   }
   if (typeof body === "object" && body !== null) {
-    const candidate = body as { buildId?: unknown; reqId?: unknown };
+    const candidate = body as { buildId?: unknown; reqId?: unknown; traceparent?: unknown };
     if (typeof candidate.buildId === "string") {
       const queued: QueuedBody = { buildId: candidate.buildId };
-      if (typeof candidate.reqId === "string") {
-        queued.reqId = candidate.reqId;
-      }
+      copyOptionalFields(candidate, queued);
       return queued;
     }
   }
@@ -237,6 +248,7 @@ async function pollServiceBus(
   return {
     buildId: body.buildId,
     reqId: body.reqId,
+    traceparent: body.traceparent,
     receipt: typeof msg.messageId === "string" ? msg.messageId : undefined,
     attempts: Math.max(0, (msg.deliveryCount ?? 1) - 1),
     raw: msg,

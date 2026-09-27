@@ -21,6 +21,7 @@ export function buildCoreMethods(
       const payload = JSON.stringify({
         buildId: job.buildId,
         reqId: job.reqId,
+        traceparent: job.traceparent,
         queuedAt: new Date().toISOString(),
         status: "queued",
         attempts: 0,

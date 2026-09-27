@@ -1,0 +1,96 @@
+{
+  "name": "@storyshelf/observability",
+  "version": "0.5.2",
+  "description": "StoryShelf observability: OpenTelemetry tracing, metrics, and log correlation over @storyshelf/core adapters.",
+  "keywords": [
+    "metrics",
+    "observability",
+    "opentelemetry",
+    "self-hosted",
+    "storybook",
+    "tracing",
+    "visual-testing"
+  ],
+  "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
+  "bugs": {
+    "url": "https://github.com/GuptaSiddhant/StoryShelf/issues"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Siddhant Gupta",
+    "url": "https://guptasiddhant.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GuptaSiddhant/StoryShelf.git",
+    "directory": "packages/observability"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "default": "./dist/index.mjs"
+    },
+    "./node": {
+      "source": "./src/node.ts",
+      "default": "./dist/node.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.mjs",
+      "./node": "./dist/node.mjs",
+      "./package.json": "./package.json"
+    },
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown -w",
+    "fmt": "oxfmt ./src",
+    "lint": "oxlint --type-aware --type-check ./src",
+    "prepublishOnly": "nub run build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hono/otel": "catalog:",
+    "@opentelemetry/api": "catalog:",
+    "@opentelemetry/resources": "catalog:",
+    "@opentelemetry/sdk-metrics": "catalog:",
+    "@opentelemetry/sdk-node": "catalog:",
+    "@opentelemetry/semantic-conventions": "catalog:",
+    "@storyshelf/core": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "hono": "catalog:"
+  },
+  "devDependencies": {
+    "@opentelemetry/context-async-hooks": "catalog:",
+    "@opentelemetry/core": "catalog:",
+    "@opentelemetry/exporter-metrics-otlp-http": "catalog:",
+    "@opentelemetry/exporter-trace-otlp-http": "catalog:",
+    "@opentelemetry/sdk-trace-base": "catalog:",
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:",
+    "oxlint-tsgolint": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "jsr": {
+    "runtimeCompat": {
+      "node": true,
+      "deno": true,
+      "bun": true,
+      "workerd": false,
+      "browser": false
+    }
+  }
+}

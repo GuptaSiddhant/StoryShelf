@@ -44,6 +44,11 @@ There is no `tsdown-entry` key. Each `package.json` `exports` map carries `{ sou
   and may change without notice.
 - `Logger` canonical home is `core/logger` (the `core/types` re-export was
   removed in 0.2.0).
+- `@storyshelf/observability` root barrel is runtime-agnostic (`@opentelemetry/api`
+  only); the Node SDK lifecycle lives under `observability/node` and must never
+  be imported under Deno. `core` never imports `observability` (no-cycle rule,
+  ADR 0022 §5) — cross-package span/propagation helpers are intentionally
+  duplicated, not shared.
 
 ## Schema layout (0.2.0 target, R2)
 

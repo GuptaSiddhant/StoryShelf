@@ -14,6 +14,16 @@ describe("serializeEnqueueBody", () => {
     expect(body["status"]).toBe("queued");
     expect(typeof body["queuedAt"]).toBe("string");
   });
+
+  it("round-trips the traceparent", () => {
+    const raw = serializeEnqueueBody({
+      buildId: "build-1",
+      traceparent: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+    });
+    expect(parseBody(raw).traceparent).toBe(
+      "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+    );
+  });
 });
 
 describe("parseBody", () => {

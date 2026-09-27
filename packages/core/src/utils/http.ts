@@ -1,4 +1,5 @@
 import type { Logger } from "../logger.ts";
+import { injectTraceContext, withSpan } from "../tracing.ts";
 
 /**
  * Fetch JSON with timeout, retries, and structured errors.
@@ -105,18 +106,32 @@ async function requestWithRetry<T>(
   maxAttempts: number,
   timeoutMs: number,
 ): Promise<T> {
-  for (let attempt = 1; ; attempt += 1) {
-    try {
-      return await doFetch<T>(url, options, timeoutMs);
-    } catch (error) {
-      if (!shouldRetry(error, attempt, maxAttempts)) {
-        throw error;
+  return await withSpan(
+    "http.client",
+    async (span) => {
+      for (let attempt = 1; ; attempt += 1) {
+        try {
+          return await doFetch<T>(url, options, timeoutMs);
+        } catch (error) {
+          span.recordException(error instanceof Error ? error : String(error));
+          if (!shouldRetry(error, attempt, maxAttempts)) {
+            throw error;
+          }
+          span.setAttribute("http.retry.count", attempt);
+          await backoff(error, attempt, url, options.logger);
+        }
       }
-      await backoff(error, attempt, url, options.logger);
-    }
-  }
+    },
+    { "http.request.method": options.method ?? "GET", "url.full": redactUrl(url) },
+  );
 }
 /* oxlint-enable eslint/no-await-in-loop */
+
+/** Strip the query string (tokens, signatures) from a URL for span attributes. */
+function redactUrl(url: string): string {
+  const query = url.indexOf("?");
+  return query === -1 ? url : url.slice(0, query);
+}
 
 async function backoff(
   error: unknown,
@@ -145,6 +160,7 @@ function buildRequest(options: HttpRequestOptions): {
 
 async function doFetch<T>(url: string, options: HttpRequestOptions, timeoutMs: number): Promise<T> {
   const request = buildRequest(options);
+  injectTraceContext(request.headers);
   options.logger?.debug({ url, method: request.method }, "http request");
   const response = await fetch(url, {
     method: request.method,

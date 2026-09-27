@@ -89,6 +89,9 @@ function createLifecycle(
     teardown: async () => {
       timer?.stop();
       const result = await runAdapterTeardowns(collectTeardowns(options), ctx, logger);
+      await options.observability?.shutdown().catch((error: unknown) => {
+        logger.error({ err: error }, "observability shutdown failed");
+      });
       if (!result.ok) {
         throw new AdapterLifecycleError("teardown", result.failures);
       }

@@ -47,6 +47,7 @@ export default defineConfig({
               ],
             },
             { label: "Project settings", slug: "guides/project-settings" },
+            { label: "Observability", slug: "guides/observability" },
             {
               label: "API",
               collapsed: true,
@@ -120,6 +121,7 @@ export default defineConfig({
             { label: "@storyshelf/queue-sqs", slug: "packages/queue-sqs" },
             { label: "@storyshelf/queue-redis", slug: "packages/queue-redis" },
             { label: "@storyshelf/queue-azure", slug: "packages/queue-azure" },
+            { label: "@storyshelf/observability", slug: "packages/observability" },
             { label: "@storyshelf/worker", slug: "packages/worker" },
           ],
         },

@@ -5,6 +5,24 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 
 ## Unreleased
 
+**Observability: OpenTelemetry tracing, metrics, log correlation**
+- New `@storyshelf/observability` package (single owner of all OTEL deps):
+  env-driven SDK init (`initObservabilityFromEnv`, noop without
+  `OTEL_EXPORTER_OTLP_ENDPOINT`), `@hono/otel` request spans with
+  `storyshelf.req_id`/`enduser.id`, `db.*`/`storage.*` adapter wrappers,
+  capture metrics, W3C queue propagation, and a pino `trace_id`/`span_id`
+  mixin. Logs stay on stdout by design.
+- Core emits `http.client` and `capture.job` (+ extract/render/persist
+  phase) spans via `@opentelemetry/api`; queue payloads carry an optional
+  `traceparent` so remote workers continue the uploading request's trace.
+  `createShelfApp` mounts the middleware, serves instrumented adapters, and
+  flushes the SDK on teardown (new structural `ShelfOptions.observability`).
+- `storyshelf server init` (and worker) scaffolds include the wiring
+  preamble; `createShelfLogger` accepts a `mixin`. See
+  `docs/observability.md` and ADR 0022. No endpoint ⇒ behavior unchanged.
+  The word `telemetry` is reserved for a future opt-in usage-reporting
+  feature — this package never sends data to StoryShelf.
+
 **Auth: admin-token bootstrap, user-bound tokens**
 - New `ShelfConfig.adminToken` (`STORYSHELF_ADMIN_TOKEN`/`ADMIN_TOKEN` env):
   bearer grants site-admin API access before any user exists. Distinct from

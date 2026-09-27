@@ -1,9 +1,10 @@
 import type { CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
 import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import { createDispatchJob, InMemoryCaptureQueue } from "@storyshelf/core/capture";
-import type { CaptureJobOptions } from "@storyshelf/core/capture";
+import type { CaptureDispatchJob, CaptureJobOptions } from "@storyshelf/core/capture";
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
+import { captureMetrics, currentTraceparent } from "@storyshelf/observability";
 
 /**
  * Wiring for the capture queue: the queue instance (if any) and a helper
@@ -13,6 +14,30 @@ import type { Logger } from "@storyshelf/core/logger";
 export interface QueueWiring {
   queue: CaptureQueue | null;
   enqueueCapture: ((buildId: string, reqId?: string) => Promise<void>) | undefined;
+}
+
+/** Enqueue a build, continuing the active request trace when present. */
+async function enqueueJob(queue: CaptureQueue, buildId: string, reqId?: string): Promise<void> {
+  const traceparent = currentTraceparent();
+  await queue.enqueue({ buildId, reqId, ...(traceparent ? { traceparent } : {}) });
+}
+
+/** Wrap the dispatch job with duration + outcome metrics. */
+async function timedRunJob(
+  runJob: (job: CaptureDispatchJob) => Promise<void>,
+  job: CaptureDispatchJob,
+): Promise<void> {
+  const instruments = captureMetrics();
+  const start = performance.now();
+  try {
+    await runJob(job);
+  } catch (error) {
+    instruments.jobsFailed.add(1);
+    instruments.jobDuration.record(performance.now() - start);
+    throw error;
+  }
+  instruments.jobsCompleted.add(1);
+  instruments.jobDuration.record(performance.now() - start);
 }
 
 /** Assemble the capture queue and its enqueue hook. */
@@ -28,7 +53,7 @@ export function setupCaptureQueue(
   if (options.captureQueue) {
     const queue = options.captureQueue;
     const enqueueCapture = async (buildId: string, reqId?: string): Promise<void> => {
-      await queue.enqueue({ buildId, reqId });
+      await enqueueJob(queue, buildId, reqId);
     };
     if (!options.captureRunner) {
       return { queue: options.captureQueue, enqueueCapture };
@@ -86,10 +111,12 @@ export function setupCaptureQueue(
     new InMemoryCaptureQueue({
       concurrency: config.captureConcurrency ?? 2,
       logger,
-      runJob,
+      runJob: async (job: CaptureDispatchJob): Promise<void> => {
+        await timedRunJob(runJob, job);
+      },
     });
   const enqueueCapture = async (buildId: string, reqId?: string): Promise<void> => {
-    await captureQueue.enqueue({ buildId, reqId });
+    await enqueueJob(captureQueue, buildId, reqId);
   };
   return { queue: captureQueue, enqueueCapture };
 }

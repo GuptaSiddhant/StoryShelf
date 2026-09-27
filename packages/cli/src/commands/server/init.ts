@@ -168,6 +168,9 @@ function buildImports(answers: Answers): string[] {
   const imports = [
     `import { serve } from "@hono/node-server";`,
     `import { createShelfApp } from "@storyshelf/app";`,
+    `import { createShelfLogger } from "@storyshelf/core/logger";`,
+    `import { otelLogMixin } from "@storyshelf/observability";`,
+    `import { initObservabilityFromEnv } from "@storyshelf/observability/node";`,
     DB_IMPORT[answers.database],
     STORAGE_IMPORT[answers.storage],
   ];
@@ -245,7 +248,15 @@ function buildAdapterLines(answers: Answers): string[] {
 }
 
 function buildRouterLines(answers: Answers): string[] {
-  const lines = [`const app = createShelfApp({`, `  database,`, `  storage,`];
+  const lines = [
+    `// Observability (noop unless OTEL_EXPORTER_OTLP_ENDPOINT is set).`,
+    `const observability = await initObservabilityFromEnv();`,
+    `const shelfLogger = createShelfLogger({ mixin: otelLogMixin });`,
+    ``,
+    `const app = createShelfApp({`,
+    `  database,`,
+    `  storage,`,
+  ];
 
   if (isRemoteQueue(answers.queue)) {
     lines.push(`  captureQueue,`);
@@ -285,13 +296,21 @@ function buildRouterLines(answers: Answers): string[] {
 
   if (answers.queue === "memory") {
     lines.push(
+      `  logger: shelfLogger,`,
+      `  observability,`,
       `  config: {`,
       `    secret: process.env.SECRET,`,
       `    scratchDir: dataDir,`,
       `  },`,
     );
   } else {
-    lines.push(`  config: {`, `    secret: process.env.SECRET,`, `  },`);
+    lines.push(
+      `  logger: shelfLogger,`,
+      `  observability,`,
+      `  config: {`,
+      `    secret: process.env.SECRET,`,
+      `  },`,
+    );
   }
   lines.push(`});`, ``, `await app.lifecycle.setup();`, `const logger = app.lifecycle.logger;`);
 
@@ -365,9 +384,13 @@ function generateWorkerFile(answers: Answers): string {
   return [
     queueImport,
     `import { createCaptureWorker } from "@storyshelf/worker";`,
+    `import { initObservabilityFromEnv } from "@storyshelf/observability/node";`,
     `import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";`,
     DB_IMPORT[answers.database],
     STORAGE_IMPORT[answers.storage],
+    ``,
+    `// Observability (noop unless OTEL_EXPORTER_OTLP_ENDPOINT is set).`,
+    `const observability = await initObservabilityFromEnv();`,
     ``,
     `const dataDir = process.env.DATA_DIR || "./data";`,
     `const database = ${DB_INIT[answers.database]};`,
@@ -388,6 +411,7 @@ function generateWorkerFile(answers: Answers): string {
     ``,
     `const shutdown = async () => {`,
     `  await worker.stop();`,
+    `  await observability.shutdown();`,
     `};`,
     `process.on("SIGTERM", () => { shutdown().catch(() => {}); });`,
     `process.on("SIGINT", () => { shutdown().catch(() => {}); });`,
@@ -400,6 +424,7 @@ function buildDeps(answers: Answers): Record<string, string> {
     "@hono/node-server": "^1.17.0",
     "@storyshelf/core": __PKG_VERSION__ ?? "0.0.0",
     "@storyshelf/app": __PKG_VERSION__ ?? "0.0.0",
+    "@storyshelf/observability": __PKG_VERSION__ ?? "0.0.0",
     [DB_PACKAGE[answers.database]]: __PKG_VERSION__ ?? "0.0.0",
   };
 

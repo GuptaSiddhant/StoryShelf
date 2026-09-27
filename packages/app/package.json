@@ -58,10 +58,15 @@
     "@hono/swagger-ui": "^0.6.1",
     "@hono/zod-openapi": "^1.1.5",
     "@storyshelf/core": "workspace:*",
+    "@storyshelf/observability": "workspace:*",
     "hono": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@opentelemetry/api": "catalog:",
+    "@opentelemetry/context-async-hooks": "catalog:",
+    "@opentelemetry/core": "catalog:",
+    "@opentelemetry/sdk-trace-base": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "adm-zip": "catalog:",

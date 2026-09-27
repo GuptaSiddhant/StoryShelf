@@ -729,6 +729,19 @@ StoryShelf/
       src/
         index.ts          # SQS CaptureQueue (AWS SDK v3, SQS long-poll)
       package.json
+    observability/
+      src/
+        index.ts          # runtime-agnostic OTEL entrypoint (api only; Deno-safe)
+        node.ts           # Node SDK lifecycle (OTLP/HTTP exporters)
+        config.ts         # env resolution (OTEL_* standard, STORYSHELF_OTEL_* gaps)
+        tracing.ts        # withSpan helper
+        propagate.ts      # W3C traceparent helpers for queue payloads
+        middleware.ts     # @hono/otel wrapper (+ reqId/userId attributes)
+        instrument-db.ts  # DatabaseAdapter wrapper (db.* spans + metrics)
+        instrument-storage.ts # StorageAdapter wrapper (storage.* spans + metrics)
+        metrics.ts        # memoized instruments (capture/db/storage)
+        logs.ts           # pino mixin (trace_id/span_id correlation)
+      package.json        # single prod owner of all OTEL deps (see ADR 0022)
 ```
 
 ## Tech Stack

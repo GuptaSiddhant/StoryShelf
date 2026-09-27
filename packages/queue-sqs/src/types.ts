@@ -21,4 +21,6 @@ export interface QueuedBody {
   status?: string;
   queuedAt?: string;
   reqId?: string;
+  /** W3C traceparent continuing the enqueueing request's trace. */
+  traceparent?: string;
 }

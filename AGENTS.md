@@ -66,6 +66,7 @@ StoryShelf/
     git-gitlab/     @storyshelf/git-gitlab      -- GitLab commit statuses, MR comments, merge-gate helpers
     queue-sqs/      @storyshelf/queue-sqs       -- SQS-backed remote CaptureQueue (AWS SDK v3)
     queue-redis/    @storyshelf/queue-redis     -- Redis-backed remote CaptureQueue (ioredis)
+    observability/  @storyshelf/observability  -- OTEL tracing/metrics/log-correlation (single OTEL owner; see ADR 0022)
   apps/
     dev-server/     dev-server      -- Local dev server, runs from TS source via `nub run serve` (no build; Playwright capture + optional shared-password auth)
     website/        website         -- Public docs & marketing site (Astro Starlight)
@@ -158,6 +159,7 @@ This distinction matters for:
 | 0012 | Fixed Server-Rendered UI (header + sidebar, system theme, three-up diff) |
 | 0013 | Build Labels (project-defined types, search + link templates + stable URLs) |
 | 0014 | Pino as Core Logger (structured logs, transports via factory, request tracing) |
+| 0022 | OpenTelemetry Observability (traces/metrics via `@storyshelf/observability`, logs stay on stdout) |
 | 0015 | Pure Capture Renderer Adapter (capture adapters render only; server orchestrator owns loading/extraction/persistence) |
 | 0016 | Server Scaffolding Over Rigid Package (`storyshelf server init` generates the server; no universal server package) |
 | 0017 | Interaction Testing via Storybook `play` Function (executePlay, flaky/blocked/disabled semantics) |

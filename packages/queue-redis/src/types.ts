@@ -23,6 +23,8 @@ export interface QueuedBody {
   queuedAt?: string;
   reqId?: string;
   attempts?: number;
+  /** W3C traceparent continuing the enqueueing request's trace. */
+  traceparent?: string;
 }
 
 /** Shared per-queue runtime threaded through core and poll methods. */

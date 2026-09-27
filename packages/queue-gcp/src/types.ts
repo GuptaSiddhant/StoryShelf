@@ -41,6 +41,8 @@ export interface QueuedBody {
   reqId?: string;
   queuedAt?: string;
   status?: string;
+  /** W3C traceparent continuing the enqueueing request's trace. */
+  traceparent?: string;
 }
 
 /** A single synchronously-pulled message with its decoded body. */
