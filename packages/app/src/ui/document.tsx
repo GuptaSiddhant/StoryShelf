@@ -1,7 +1,8 @@
-import { createUrlBuilder } from "@storyshelf/core/urls";
+import { createUrlBuilder, safeImageUrl } from "@storyshelf/core/urls";
 import type { FC } from "hono/jsx";
 import { getCsrfToken } from "../middleware/csrf.ts";
 import { getStore } from "../store.ts";
+import { csrfField } from "./csrf-field.tsx";
 import { Style, css } from "./css.ts";
 import { baseStyle } from "./styles.ts";
 import { DARK_THEME, LIGHT_THEME } from "./theme.ts";
@@ -277,7 +278,7 @@ export const DocumentLayout: FC<{ title: string; nav?: NavConfig; children?: unk
   nav,
   children,
 }) => {
-  const { ui, config } = getStore();
+  const { ui, config, sessionId } = getStore();
   const name = ui.name ?? "StoryShelf";
   const light = ui.lightTheme ?? LIGHT_THEME;
   const dark = ui.darkTheme ?? DARK_THEME;
@@ -288,7 +289,7 @@ export const DocumentLayout: FC<{ title: string; nav?: NavConfig; children?: unk
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="color-scheme" content="light dark" />
-        <meta name="csrf-token" content={getCsrfToken(config.secret)} />
+        <meta name="csrf-token" content={getCsrfToken(config.secret, sessionId)} />
         {ui.favicon ? <link rel="icon" href={ui.favicon} /> : null}
         <title>
           {title} · {name}
@@ -390,11 +391,12 @@ const AuthMenu: FC = () => {
       </a>
     );
   }
+  const avatar = safeImageUrl(user.avatarUrl);
   return (
     <div class="user-menu">
       <a href="/profile" class="user-menu__link" aria-label="View profile">
-        {user.avatarUrl ? (
-          <img class="user-menu__avatar" src={user.avatarUrl} alt="" width="28" height="28" />
+        {avatar ? (
+          <img class="user-menu__avatar" src={avatar} alt="" width="28" height="28" />
         ) : (
           <span class="user-menu__avatar user-menu__avatar--fallback" aria-hidden="true">
             {user.name.slice(0, 1).toUpperCase()}
@@ -404,6 +406,7 @@ const AuthMenu: FC = () => {
       </a>
       <span class={`user-menu__role user-menu__role--${user.role}`}>{user.role}</span>
       <form method="post" action="/auth/logout">
+        {csrfField()}
         <button class="user-menu__logout" type="submit">
           Sign out
         </button>

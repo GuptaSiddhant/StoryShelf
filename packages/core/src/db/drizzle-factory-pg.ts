@@ -3,7 +3,7 @@ import type { SQLWrapper } from "drizzle-orm";
 import type { Table } from "drizzle-orm";
 import { eq, getTableColumns } from "drizzle-orm";
 import type { AdapterLifecycle } from "../adapters/metadata.ts";
-import type { DatabaseAdapter, DrizzleAdapterOptions, ListOptions } from "./database.ts";
+import type { DatabaseAdapter, DrizzleAdapterOptions, ListOptions, TxStore } from "./database.ts";
 import { applyListOptions, buildLifecycle } from "./drizzle-factory.ts";
 
 /** Chainable select surface of the Postgres Drizzle dialect (directly awaitable). */
@@ -29,6 +29,7 @@ interface DrizzlePgLike {
   delete(table: Table): { where(where: SQL): Promise<unknown> };
   $count(table: Table, where?: SQL): Promise<number>;
   execute<T>(query: SQL): Promise<T>;
+  transaction<R>(fn: (tx: unknown) => Promise<R>): Promise<R>;
 }
 
 function idColumn(table: Table): SQLWrapper {
@@ -113,5 +114,35 @@ export function createDrizzlePgAdapter(
     },
     count: async (table: Table, where?: SQL): Promise<number> => await drizzle.$count(table, where),
     all: async <T>(query: SQL): Promise<T[]> => await drizzle.execute<T[]>(query),
+    transact: async <R>(fn: (tx: TxStore) => Promise<R>): Promise<R> =>
+      await drizzle.transaction(async (tx) => await fn(buildTxStore(tx as DrizzlePgLike))),
   };
+}
+
+/** CRUD subset bound to a Postgres transaction handle. */
+function buildTxStore(drizzle: DrizzlePgLike): TxStore {
+  return {
+    insert: async (table, values) => await insertOne(drizzle, table, values as never),
+    update: async (table, id, values) => await updateOne(drizzle, table, id, values as never),
+    get: async (table, id) => await getOne(drizzle, table, id),
+    remove: async (table, id) => {
+      const where = eq(idColumn(table), id);
+      await drizzle.delete(table).where(where);
+    },
+    list: async (table, opts: ListOptions = {}) => {
+      const rows: unknown = await applyListOptions(drizzle.select().from(table), opts);
+      return rows as never[];
+    },
+    count: async (table, where) => await drizzle.$count(table, where),
+  };
+}
+
+async function getOne<T extends Table>(
+  drizzle: DrizzlePgLike,
+  table: T,
+  id: string,
+): Promise<T["$inferSelect"] | null> {
+  const where = eq(idColumn(table), id);
+  const rows = (await drizzle.select().from(table).where(where).limit(1)) as T["$inferSelect"][];
+  return rows[0] ?? null;
 }

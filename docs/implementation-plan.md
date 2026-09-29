@@ -25,10 +25,9 @@ Step-by-step build order. Each step is independently reviewable. Decisions made 
 - `@storyshelf/storage-local` — filesystem read/write/delete/exists/list.
 - `@storyshelf/storage-s3` — S3-compatible via AWS SDK v3.
 
-## Phase 3 — Auth adapters (parallel)
+## Phase 3 — Auth engine
 
-- `@storyshelf/auth-oauth` — OIDC authorization-code flow.
-- `@storyshelf/auth-password` — shared password + signed session cookie.
+- `@storyshelf/auth` — Better Auth engine ([better-auth.com](https://www.better-auth.com/docs)): local invite-only, social (GitHub/GitLab/Google/Microsoft/Cognito), enterprise SSO/SAML, passkeys. Single implementation — new methods are presets/plugins.
 
 ## Phase 4 — CLI
 

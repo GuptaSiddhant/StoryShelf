@@ -1,3 +1,5 @@
+import { SESSION_COOKIE } from "@storyshelf/core/types";
+import { timingSafeEqualString } from "@storyshelf/core/utils";
 import type { Context, Next } from "hono";
 import { createHash, randomBytes } from "node:crypto";
 
@@ -29,27 +31,39 @@ function verifyToken(secret: string, token: string, sessionId: string): boolean 
     .update(`${secret}:${sessionId}:${payloadTimestamp}`)
     .digest("hex")
     .slice(0, 16);
-  if (signature !== expectedSignature) {
+  if (!timingSafeEqualString(signature, expectedSignature)) {
     return false;
   }
   const timestamp = Number.parseInt(payloadTimestamp, 36);
   const age = Date.now() - timestamp;
-  return age > 0 && age < 24 * 60 * 60 * 1000;
+  // Same-millisecond tokens are fresh (>= 0), not from the future.
+  return age >= 0 && age < 24 * 60 * 60 * 1000;
 }
 
-function sessionIdFrom(c: Context): string {
-  return c.req.header("session-id") ?? DEFAULT_SESSION;
+/**
+ * Session id for CSRF binding: the raw session cookie value, or "default"
+ * for anonymous requests (login/invite forms have no session yet). A token
+ * minted for one session never validates for another.
+ */
+export function sessionIdFrom(c: Pick<Context, "req">): string {
+  const header = c.req.header("cookie") ?? "";
+  for (const part of header.split(";")) {
+    const eqIndex = part.indexOf("=");
+    if (eqIndex !== -1 && part.slice(0, eqIndex).trim() === SESSION_COOKIE) {
+      const value = part.slice(eqIndex + 1).trim();
+      if (value) {
+        return value;
+      }
+    }
+  }
+  return DEFAULT_SESSION;
 }
 
-/** Read a CSRF token from the request header, query string, or form body. */
+/** Read a CSRF token from the request header or form body (never the URL: query tokens leak via logs, history, and Referer). */
 async function tokenFromRequest(c: Context): Promise<string | undefined> {
   const header = c.req.header("x-csrf-token");
   if (header) {
     return header;
-  }
-  const query = c.req.query("csrf_token");
-  if (query) {
-    return query;
   }
   const contentType = c.req.header("content-type") ?? "";
   if (!contentType.includes("form")) {

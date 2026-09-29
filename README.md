@@ -15,8 +15,7 @@ packages/
   db-postgres/    @storyshelf/db-postgres    — Postgres database adapter (postgres.js + Drizzle)
   storage-local/  @storyshelf/storage-local — local filesystem storage
   storage-s3/     @storyshelf/storage-s3    — S3-compatible storage
-  auth-oauth/     @storyshelf/auth-oauth    — OIDC auth
-  auth-password/  @storyshelf/auth-password — shared-password auth
+  auth/         @storyshelf/auth        — Better Auth engine (local / social / SSO / passkeys)
   git-github/     @storyshelf/git-github    — GitHub commit status / merge gate / PR comments
   git-gitlab/     @storyshelf/git-gitlab    — GitLab commit statuses, MR comments, merge-gate helpers
   queue-sqs/      @storyshelf/queue-sqs     — AWS SQS capture job queue

@@ -1,4 +1,3 @@
-import type { AuthUser } from "@storyshelf/core/adapter/auth";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import {
   MemberModel,
@@ -6,6 +5,7 @@ import {
   ProjectModel,
   UserModel,
 } from "@storyshelf/core/models";
+import type { AuthUser } from "@storyshelf/core/types";
 import type { ProjectRole } from "@storyshelf/core/types";
 import type { Table } from "drizzle-orm";
 

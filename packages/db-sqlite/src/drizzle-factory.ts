@@ -8,8 +8,9 @@ import type {
   DatabaseAdapter,
   DrizzleAdapterOptions,
   ListOptions,
+  TxStore,
 } from "@storyshelf/core/adapter/database";
-import type { SQL } from "drizzle-orm";
+import type { SQL, Table } from "drizzle-orm";
 import { eq, getTableColumns } from "drizzle-orm";
 import type { AnySQLiteTable, SQLiteColumn } from "drizzle-orm/sqlite-core";
 
@@ -49,58 +50,112 @@ export function createDrizzleAdapter(db: unknown, options: DrizzleAdapterOptions
     insert: async <T extends AnySQLiteTable>(
       table: T,
       values: T["$inferInsert"],
-    ): Promise<T["$inferSelect"]> =>
-      (await drizzle.insert(table).values(values).returning().get()) as T["$inferSelect"],
+    ): Promise<T["$inferSelect"]> => await insertOne(drizzle, table, values),
     update: async <T extends AnySQLiteTable>(
       table: T,
       id: string,
       values: Partial<T["$inferInsert"]>,
-    ): Promise<T["$inferSelect"]> =>
-      (await drizzle
-        .update(table)
-        .set(values)
-        .where(eq(idOf(table), id))
-        .returning()
-        .get()) as T["$inferSelect"],
+    ): Promise<T["$inferSelect"]> => await updateOne(drizzle, table, id, values),
     get: async <T extends AnySQLiteTable>(
       table: T,
       id: string,
-    ): Promise<T["$inferSelect"] | null> =>
-      ((await drizzle
-        .select()
-        .from(table)
-        .where(eq(idOf(table), id))
-        .limit(1)
-        .get()) as T["$inferSelect"] | undefined) ?? null,
+    ): Promise<T["$inferSelect"] | null> => await getOne(drizzle, table, id),
     remove: async (table: AnySQLiteTable, id: string): Promise<void> => {
-      await drizzle
-        .delete(table)
-        .where(eq(idOf(table), id))
-        .run();
+      await removeOne(drizzle, table, id);
     },
     list: async <T extends AnySQLiteTable>(
       table: T,
       opts: ListOptions = {},
-    ): Promise<T["$inferSelect"][]> => {
-      let query = drizzle.select().from(table) as DrizzleSelectChain;
-      if (opts.where) {
-        query = query.where(opts.where);
-      }
-      if (opts.orderBy) {
-        query = query.orderBy(opts.orderBy);
-      }
-      if (opts.limit !== undefined) {
-        query = query.limit(opts.limit);
-      }
-      if (opts.offset !== undefined) {
-        query = query.offset(opts.offset);
-      }
-      const rows: unknown = await query.all();
-      return rows as T["$inferSelect"][];
-    },
+    ): Promise<T["$inferSelect"][]> => await listMany(drizzle, table, opts),
     count: async (table: AnySQLiteTable, where?: SQL): Promise<number> =>
       await drizzle.$count(table, where),
     all: async <T>(query: SQL): Promise<T[]> => await drizzle.all(query),
+    transact: async <R>(fn: (tx: TxStore) => Promise<R>): Promise<R> =>
+      await drizzle.transaction(async (tx) => await fn(buildTxStore(tx as DrizzleLike))),
+  };
+}
+
+async function insertOne<T extends Table>(
+  drizzle: DrizzleLike,
+  table: T,
+  values: T["$inferInsert"],
+): Promise<T["$inferSelect"]> {
+  return (await drizzle
+    .insert(table as AnySQLiteTable)
+    .values(values)
+    .returning()
+    .get()) as T["$inferSelect"];
+}
+
+async function updateOne<T extends Table>(
+  drizzle: DrizzleLike,
+  table: T,
+  id: string,
+  values: Partial<T["$inferInsert"]>,
+): Promise<T["$inferSelect"]> {
+  return (await drizzle
+    .update(table as AnySQLiteTable)
+    .set(values)
+    .where(eq(idOf(table as AnySQLiteTable), id))
+    .returning()
+    .get()) as T["$inferSelect"];
+}
+
+async function getOne<T extends Table>(
+  drizzle: DrizzleLike,
+  table: T,
+  id: string,
+): Promise<T["$inferSelect"] | null> {
+  return (
+    ((await drizzle
+      .select()
+      .from(table as AnySQLiteTable)
+      .where(eq(idOf(table as AnySQLiteTable), id))
+      .limit(1)
+      .get()) as T["$inferSelect"] | undefined) ?? null
+  );
+}
+
+async function removeOne(drizzle: DrizzleLike, table: Table, id: string): Promise<void> {
+  await drizzle
+    .delete(table as AnySQLiteTable)
+    .where(eq(idOf(table as AnySQLiteTable), id))
+    .run();
+}
+
+async function listMany<T extends Table>(
+  drizzle: DrizzleLike,
+  table: T,
+  opts: ListOptions = {},
+): Promise<T["$inferSelect"][]> {
+  let query = drizzle.select().from(table as AnySQLiteTable) as DrizzleSelectChain;
+  if (opts.where) {
+    query = query.where(opts.where);
+  }
+  if (opts.orderBy) {
+    query = query.orderBy(opts.orderBy);
+  }
+  if (opts.limit !== undefined) {
+    query = query.limit(opts.limit);
+  }
+  if (opts.offset !== undefined) {
+    query = query.offset(opts.offset);
+  }
+  const rows: unknown = await query.all();
+  return rows as T["$inferSelect"][];
+}
+
+/** CRUD subset bound to a transaction handle. */
+function buildTxStore(drizzle: DrizzleLike): TxStore {
+  return {
+    insert: async (table, values) => await insertOne(drizzle, table, values as never),
+    update: async (table, id, values) => await updateOne(drizzle, table, id, values as never),
+    get: async (table, id) => await getOne(drizzle, table, id),
+    remove: async (table, id) => {
+      await removeOne(drizzle, table, id);
+    },
+    list: async (table, opts) => await listMany(drizzle, table, opts),
+    count: async (table, where) => await drizzle.$count(table as AnySQLiteTable, where),
   };
 }
 
@@ -133,6 +188,7 @@ interface DrizzleLike {
   delete(table: AnySQLiteTable): { where(where: SQL): { run(): MaybePromise<unknown> } };
   $count(table: AnySQLiteTable, where?: SQL): MaybePromise<number>;
   all<T>(query: SQL): MaybePromise<T[]>;
+  transaction<R>(fn: (tx: unknown) => Promise<R>): Promise<R>;
 }
 
 function idOf(table: AnySQLiteTable): SQLiteColumn {

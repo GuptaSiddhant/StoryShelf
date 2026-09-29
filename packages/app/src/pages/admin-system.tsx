@@ -6,6 +6,7 @@ import {
   Button,
   Card,
   EmptyState,
+  HStack,
   Meta,
   PageHeader,
   SectionTitle,
@@ -20,6 +21,8 @@ export interface AdminSystemData {
   report: HealthReport;
   authEnabled: boolean;
   config: ShelfConfig;
+  /** Active login method labels (read-only badges; empty when auth is off). */
+  authMethods?: string[];
 }
 
 function healthTone(state: string): "success" | "info" | "danger" | "neutral" {
@@ -133,11 +136,12 @@ interface ServerFactsProps {
   report: HealthReport;
   authEnabled: boolean;
   config: ShelfConfig;
+  authMethods?: string[];
 }
 
 /** Non-secret server facts (never secret, admin token, or credentials). */
 function ServerFacts(props: ServerFactsProps): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { report, authEnabled, config } = props;
+  const { report, authEnabled, config, authMethods } = props;
   return (
     <Card>
       <SectionTitle>Server</SectionTitle>
@@ -154,6 +158,13 @@ function ServerFacts(props: ServerFactsProps): HtmlEscapedString | Promise<HtmlE
           ? "disabled"
           : `${formatOptional(config.branchTtlDays)} days`}
       </Meta>
+      {authMethods && authMethods.length > 0 ? (
+        <HStack>
+          {authMethods.map((method) => (
+            <Badge key={method}>{method}</Badge>
+          ))}
+        </HStack>
+      ) : null}
       <Meta>
         Scratch dir {formatOptional(config.scratchDir)} · Published domain{" "}
         {formatOptional(config.publishedBaseDomain)} · Max upload{" "}
@@ -165,7 +176,7 @@ function ServerFacts(props: ServerFactsProps): HtmlEscapedString | Promise<HtmlE
 
 /** Site-admin System page: adapter inventory with in-depth health. */
 export function renderAdminSystemPage(data: AdminSystemData): RenderedContent {
-  const { report, authEnabled, config } = data;
+  const { report, authEnabled, config, authMethods } = data;
   return (
     <DocumentLayout title="System" nav={{ active: "admin" }}>
       <PageHeader
@@ -184,7 +195,12 @@ export function renderAdminSystemPage(data: AdminSystemData): RenderedContent {
         }
         breadcrumbs={[{ label: "Projects", href: "/projects" }, { label: "System" }]}
       />
-      <ServerFacts report={report} authEnabled={authEnabled} config={config} />
+      <ServerFacts
+        report={report}
+        authEnabled={authEnabled}
+        config={config}
+        authMethods={authMethods}
+      />
       <div class="mt-1">
         <Card>
           <SectionTitle>Adapters</SectionTitle>

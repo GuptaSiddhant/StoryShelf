@@ -52,7 +52,6 @@ function pushAll(
   pushHook(entries, sources.storage, hook);
   pushHook(entries, sources.captureRunner, hook);
   pushHook(entries, sources.captureQueue, hook);
-  pushHook(entries, sources.auth, hook);
   for (const provider of sources.gitHosts ?? []) {
     pushHook(entries, provider, hook);
   }
@@ -88,7 +87,6 @@ export function bindAdapterLoggers(sources: AdapterSetupSources, logger: Logger)
     sources.storage,
     sources.captureRunner,
     sources.captureQueue,
-    sources.auth,
     ...(sources.gitHosts ?? []),
   ];
   for (const adapter of adapters) {

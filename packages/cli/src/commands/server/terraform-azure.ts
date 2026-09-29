@@ -442,7 +442,7 @@ function generateAzureEnvTable(queueBackend: AzureQueueBackend): string {
 ${queueRow}
 | \`queue_name\` | (baked into scaffold as \`"capture-jobs"\`) | \`queue-azure\` |
 | \`database_url\` | \`DATABASE_URL\` | \`db-postgres\` |
-| \`entra_application_id\` / \`entra_tenant_id\` | \`OIDC_CLIENT_ID\` / \`OIDC_ISSUER\` (\`https://login.microsoftonline.com/{tenant}/v2.0\`) | \`auth-oauth\` (generic OIDC) |
+| \`entra_application_id\` / \`entra_tenant_id\` | \`OIDC_CLIENT_ID\` / \`OIDC_ISSUER\` (\`https://login.microsoftonline.com/{tenant}/v2.0\`) | \`auth\` (keycloak recipe) |
 | Key Vault | \`SECRET\` / \`OIDC_CLIENT_SECRET\` / \`ADMIN_TOKEN\` | sessions / OIDC / bootstrap |
 `;
 }

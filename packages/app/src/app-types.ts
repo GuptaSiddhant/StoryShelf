@@ -1,5 +1,4 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
-import type { AuthUser } from "@storyshelf/core/adapter/auth";
 import type { CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
@@ -7,6 +6,7 @@ import type { AdapterSetupResult } from "@storyshelf/core/adapter/setup";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import type { ShelfConfig, UIConfig } from "@storyshelf/core/config";
 import { createShelfLogger, type Logger } from "@storyshelf/core/logger";
+import type { AuthUser } from "@storyshelf/core/types";
 
 /** Per-request shelf context (adapters, config, user, capture queue). */
 export interface ShelfContext {

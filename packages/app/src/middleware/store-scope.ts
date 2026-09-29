@@ -1,12 +1,13 @@
-import type { AuthUser } from "@storyshelf/core/adapter/auth";
 import type { CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import type { ShelfConfig, UIConfig } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
+import type { AuthUser } from "@storyshelf/core/types";
 import type { Context, Next } from "hono";
 import { runWithStore } from "../store.ts";
+import { sessionIdFrom } from "./csrf.ts";
 
 /** Dependencies scoped into the request store for router handlers. */
 export interface StoreScopeDeps {
@@ -37,6 +38,7 @@ export function storeScope(deps: StoreScopeDeps) {
         logger: deps.logger,
         user,
         authEnabled: deps.authEnabled,
+        sessionId: sessionIdFrom(c),
         enqueueCapture: deps.enqueueCapture,
         captureQueue: deps.captureQueue,
         gitHosts: deps.gitHosts,

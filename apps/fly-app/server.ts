@@ -1,6 +1,6 @@
 import { serve } from "@hono/node-server";
 import { createShelfApp } from "@storyshelf/app";
-import { createPasswordAuth } from "@storyshelf/auth-password";
+import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { otelLogMixin } from "@storyshelf/observability";
@@ -28,7 +28,7 @@ const dataDir = env["DATA_DIR"] ?? "/data";
 const port = Number(env["PORT"] ?? 3000);
 const secret = env["SECRET"];
 const authPassword = env["AUTH_PASSWORD"];
-const authViewerPassword = env["AUTH_VIEWER_PASSWORD"];
+const authEmail = env["AUTH_EMAIL"] ?? "admin@local";
 const adminToken = env["STORYSHELF_ADMIN_TOKEN"] ?? env["ADMIN_TOKEN"];
 const publicBaseUrl = env["PUBLIC_BASE_URL"];
 
@@ -86,7 +86,12 @@ const app = createShelfApp({
   captureRunner,
   auth:
     authPassword && secret
-      ? createPasswordAuth({ password: authPassword, viewerPassword: authViewerPassword, secret })
+      ? createShelfAuth({
+          db: database,
+          secret,
+          baseURL: publicBaseUrl ?? `http://localhost:${port}`,
+          passkeys: {},
+        }).adapter
       : undefined,
   ui: ui as never,
   logger: shelfLogger,
@@ -101,6 +106,11 @@ const app = createShelfApp({
 
 await app.lifecycle.setup();
 const logger = app.lifecycle.logger;
+
+if (authPassword && secret) {
+  await ensurePasswordAdmin(database, { email: authEmail, password: authPassword });
+  logger.info({ email: authEmail }, "Local admin login enabled from AUTH_PASSWORD");
+}
 
 const server = serve({ fetch: app.fetch, port }, () => {
   logger.info({ port, dataDir }, "StoryShelf fly server listening");

@@ -16,15 +16,16 @@ services:
     volumes:
       - storyshelf-data:/app/data
     environment:
-      - SECRET=change-me
+      - SECRET=$(openssl rand -hex 32)   # ≥ 32 chars
       - CAPTURE_CONCURRENCY=2
       - PURGE_TTL_DAYS=30
       - BRANCH_TTL_DAYS=30
       - BRANCH_GC_INTERVAL_MS=86400000
-      - OIDC_ISSUER=https://keycloak.example.com/realms/myteam
-      - OIDC_CLIENT_ID=storyshelf
-      - OIDC_CLIENT_SECRET=secret
-      # or shared password: AUTH_PASSWORD=change-me
+      # Auth — see /guides/auth/
+      # - AUTH_PASSWORD=a-long-admin-password   # ≥ 12 chars (local admin)
+      # - OIDC_ISSUER=https://keycloak.example.com/realms/myteam
+      # - OIDC_CLIENT_ID=storyshelf
+      # - OIDC_CLIENT_SECRET=secret
 volumes:
   storyshelf-data:
 ```
@@ -43,8 +44,8 @@ Then `https://<slug>.stories.example.com` serves the latest published Storybook,
 
 ## Auth
 
-- **OIDC** — plug into Keycloak, Authentik, Okta, GitHub, GitLab.
-- **Shared password** — `AUTH_PASSWORD` for small teams.
+- **Local accounts** — invite-only (`AUTH_PASSWORD` ≥ 12 bootstraps the first admin).
+- **Social / enterprise SSO / passkeys** — GitHub, Google, Entra, Keycloak, Okta, SAML, WebAuthn (see [Auth](/guides/auth/)).
 - **None** — for VPN-protected deployments.
 
 For cloud targets see [AWS](/guides/deployment/aws/), [Azure](/guides/deployment/azure/), and [GCP](/guides/deployment/gcp/). The [cloud assembly guide](/guides/deployment/cloud/) covers swapping each layer independently across Vercel, Cloudflare, Deno, Bun, and Lambda.

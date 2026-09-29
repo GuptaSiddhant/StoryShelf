@@ -1,6 +1,6 @@
 import type { SQL, Table } from "drizzle-orm";
 import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import type { DatabaseAdapter, ListOptions } from "../db/database.ts";
+import type { DatabaseAdapter, ListOptions, TxStore } from "../db/database.ts";
 import type { Tables } from "../db/tables.ts";
 import { orderRows, whereMatches } from "./sql-chunks.ts";
 
@@ -325,6 +325,35 @@ export function makeDatabase(): { db: DatabaseAdapter } {
     return matching.length;
   };
 
+  const transactRows = async <R>(fn: (tx: TxStore) => Promise<R>): Promise<R> => {
+    const snapshot = new Map<Table, Map<string, unknown>>();
+    for (const [table, rows] of store) {
+      snapshot.set(
+        table,
+        new Map([...rows].map(([id, row]) => [id, { ...(row as Record<string, unknown>) }])),
+      );
+    }
+    const tx: TxStore = {
+      insert: insertRow,
+      update: updateRow,
+      get: getRow,
+      remove: async (table, id) => {
+        rowsOf(table).delete(id);
+      },
+      list: listRows,
+      count: countRows,
+    };
+    try {
+      return await fn(tx);
+    } catch (error) {
+      store.clear();
+      for (const [table, rows] of snapshot) {
+        store.set(table, rows);
+      }
+      throw error;
+    }
+  };
+
   const db: DatabaseAdapter = {
     metadata: { name: "Fake Database", version: "0.0.0", kind: "memory", category: "database" },
     tables: fakeSchema,
@@ -336,6 +365,7 @@ export function makeDatabase(): { db: DatabaseAdapter } {
     },
     list: listRows,
     count: countRows,
+    transact: transactRows,
     all: async (_query: SQL) => {
       const results: Record<string, unknown>[] = [];
       for (const rows of store.values()) {

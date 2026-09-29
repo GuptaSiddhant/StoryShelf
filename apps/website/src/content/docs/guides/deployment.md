@@ -14,15 +14,16 @@ services:
     volumes:
       - storyshelf-data:/app/data
     environment:
-      - SECRET=change-me
+      - SECRET=$(openssl rand -hex 32)   # ≥ 32 chars
       - CAPTURE_CONCURRENCY=2
       - PURGE_TTL_DAYS=30
       - BRANCH_TTL_DAYS=30
       - BRANCH_GC_INTERVAL_MS=86400000
-      - OIDC_ISSUER=https://keycloak.example.com/realms/myteam
-      - OIDC_CLIENT_ID=storyshelf
-      - OIDC_CLIENT_SECRET=secret
-      # or shared password: AUTH_PASSWORD=change-me
+      # Auth (see /guides/auth/): local admin or SSO example
+      # - AUTH_PASSWORD=a-long-admin-password   # ≥ 12 chars (local admin, via invite flow)
+      # - OIDC_ISSUER=https://keycloak.example.com/realms/myteam
+      # - OIDC_CLIENT_ID=storyshelf
+      # - OIDC_CLIENT_SECRET=secret
 volumes:
   storyshelf-data:
 ```
@@ -39,8 +40,8 @@ Then `https://<slug>.stories.example.com` serves the latest published Storybook,
 
 ## Auth
 
-- **OIDC** — plug into Keycloak, Authentik, Okta, GitHub, GitLab.
-- **Shared password** — `AUTH_PASSWORD` for small teams.
+- **Local accounts** — invite-only email/password via the auth engine (`AUTH_PASSWORD` bootstraps the admin).
+- **Social / enterprise SSO** — GitHub, Google, Entra, Keycloak, Okta, Auth0, SAML (see [Auth](/guides/auth/)).
 - **None** — for VPN-protected deployments.
 
 ## Deployment targets — bring your own assembly
@@ -66,7 +67,7 @@ This generates `server.ts` + `package.json` with the correct imports and depende
 | Database | `@storyshelf/db-sqlite` | node:sqlite + Drizzle, WAL mode, single file |
 | Storage | `@storyshelf/storage-local` | Local filesystem, `--data-dir` |
 | Capture queue | `InMemoryCaptureQueue` (built-in) | Async, concurrency-limited, in-process |
-| Auth | `@storyshelf/auth-oauth` or `@storyshelf/auth-password` | OIDC or shared password |
+| Auth | `@storyshelf/auth` | Local accounts, social, SSO/SAML, passkeys |
 
 Swap the database layer for `@storyshelf/db-postgres` (Postgres via `postgres.js` + Drizzle, see [Postgres provider recipes](#postgres-provider-recipes) below) or `@storyshelf/db-turso` (Turso/libSQL) without changing the rest of the stack.
 

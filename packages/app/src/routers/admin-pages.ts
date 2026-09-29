@@ -1,3 +1,4 @@
+import type { Auth } from "@storyshelf/auth";
 import type { AdapterSetupResult, AdapterSetupSources } from "@storyshelf/core/adapter/setup";
 import type { ShelfRouter } from "../app-types.ts";
 import { renderAdminSystemPage } from "../pages/admin-system.tsx";
@@ -14,7 +15,7 @@ export interface AdminPageDeps {
 }
 
 /** Register the site-admin System page (adapter inventory + in-depth health). */
-export function registerAdminPages(app: ShelfRouter, deps: AdminPageDeps): void {
+export function registerAdminPages(app: ShelfRouter, deps: AdminPageDeps, auth?: Auth): void {
   app.get("/admin", async (c) => {
     requireSiteAdmin(c);
     const report = await collectHealthReport(
@@ -24,7 +25,8 @@ export function registerAdminPages(app: ShelfRouter, deps: AdminPageDeps): void 
       deps.version,
     );
     const { authEnabled, config } = getStore();
+    const authMethods = auth?.loginMethods().map((method) => method.label);
     c.header("Cache-Control", "no-store");
-    return c.html(renderAdminSystemPage({ report, authEnabled, config }));
+    return c.html(renderAdminSystemPage({ report, authEnabled, config, authMethods }));
   });
 }

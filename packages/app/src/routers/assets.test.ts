@@ -1,9 +1,9 @@
-import type { AuthAdapter } from "@storyshelf/core/adapter/auth";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
+import { stubAuth } from "../stub-auth.ts";
 
 const silentLogger = pino({ level: "silent" });
 
@@ -42,20 +42,7 @@ function stubStorage(): StorageAdapter {
   };
 }
 
-const noSessionAuth: AuthAdapter = {
-  metadata: { name: "Stub Auth", version: "0.0.0", kind: "stub", category: "auth" },
-  check: async (): Promise<null> => {
-    await Promise.resolve();
-    return null;
-  },
-  createSession: async (): Promise<string> => {
-    await Promise.resolve();
-    return "ok";
-  },
-  destroySession: async (): Promise<void> => {
-    await Promise.resolve();
-  },
-};
+const noSessionAuth = stubAuth(null);
 
 describe("static assets", () => {
   it("serves htmx.js with a JavaScript content type and immutable cache header", async () => {

@@ -1,24 +1,22 @@
 import { getStore } from "../store.ts";
 import { Alert, Button, Card, Field, Meta, PageHeader, VStack } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
+import { passkeyLoginScript } from "./passkey-ceremony.ts";
 
-/** One SSO button on the sign-in page. */
-export interface SsoProviderLink {
+/** One engine login widget (descriptor-driven). */
+export interface EngineMethodLink {
+  kind: "password" | "oauth" | "passkey" | "sso";
   id: string;
   label: string;
   url: string;
 }
 
-/** Form state for the sign-in page (SSO link(s) and error message). */
+/** Form state for the sign-in page (engine widgets and error message). */
 export interface LoginPageState {
-  ssoUrl?: string;
-  ssoProviders?: SsoProviderLink[];
   error?: string;
-  /** Whether to show the shared-password form. Defaults to true for backward compat. */
-  passwordEnabled?: boolean;
-  /** Whether to show the local account (email+password) form. */
-  accountEnabled?: boolean;
-  /** Pre-filled email for the account form (e.g. after failed login). */
+  /** Engine login widgets (descriptor-driven). */
+  engineMethods?: EngineMethodLink[];
+  /** Pre-filled email for the password form (e.g. after failed login). */
   email?: string;
 }
 
@@ -36,37 +34,7 @@ function ssoLabel(template: string | undefined, label: string): string {
   return raw.includes("{label}") ? raw.replaceAll("{label}", label) : `${raw} ${label}`;
 }
 
-function renderSso(
-  ssoUrl: string | undefined,
-  ssoProviders: SsoProviderLink[] | undefined,
-  template: string | undefined,
-): unknown {
-  if (!ssoUrl && (!ssoProviders || ssoProviders.length === 0)) {
-    return null;
-  }
-  return (
-    <div class="mt-1">
-      <VStack>
-        <Meta center>or</Meta>
-        {ssoUrl ? (
-          <Button variant="secondary" href={ssoUrl}>
-            {ssoLabel(template, "SSO")}
-          </Button>
-        ) : null}
-        {(ssoProviders ?? []).map(
-          // oxlint-disable-next-line typescript/promise-function-async -- JSX map is sync
-          (provider) => (
-            <Button variant="secondary" href={provider.url} key={provider.id}>
-              {ssoLabel(template, provider.label)}
-            </Button>
-          ),
-        )}
-      </VStack>
-    </div>
-  );
-}
-
-/** Sign-in page with password form and optional SSO button. */
+/** Sign-in page with engine login widgets. */
 // oxlint-disable-next-line eslint/max-lines-per-function -- page composes a few sections, still one concern
 export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
   const ui = authUi();
@@ -86,8 +54,8 @@ export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
             </Alert>
           ) : null}
 
-          {state.accountEnabled ? (
-            <form method="post" action="/auth/account/login" novalidate>
+          {state.engineMethods?.some((method) => method.kind === "password") ? (
+            <form method="post" action="/auth/engine/login" novalidate>
               <Field
                 label="Email"
                 name="email"
@@ -110,22 +78,31 @@ export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
             </form>
           ) : null}
 
-          {state.passwordEnabled === false ? null : (
-            <form method="post" action="/auth/login" novalidate>
-              <Field
-                label={passwordLabel}
-                name="password"
-                type="password"
-                required
-                autofocus={!state.accountEnabled}
-                autocomplete="current-password"
-                placeholder={ui.passwordPlaceholder}
-              />
-              <Button variant="primary" type="submit">
-                {submitLabel}
-              </Button>
-            </form>
-          )}
+          {state.engineMethods
+            ?.filter((method) => method.kind === "oauth" || method.kind === "sso")
+            .map(
+              // oxlint-disable-next-line typescript/promise-function-async -- JSX map is sync
+              (provider) => (
+                <Button variant="secondary" href={provider.url} key={provider.id}>
+                  {ssoLabel(ui.ssoLabelTemplate, provider.label)}
+                </Button>
+              ),
+            )}
+
+          {state.engineMethods?.some((method) => method.kind === "passkey") ? (
+            <div class="mt-1">
+              <VStack>
+                <Meta center>or</Meta>
+                <Button variant="secondary" type="button" data-passkey-login="true">
+                  Sign in with a passkey
+                </Button>
+                <p class="login__help" data-passkey-login-status="true" aria-live="polite">
+                  <Meta />
+                </p>
+              </VStack>
+              <script dangerouslySetInnerHTML={{ __html: passkeyLoginScript() }} />
+            </div>
+          ) : null}
 
           {ui.helpText ? (
             <p class="login__help">
@@ -133,7 +110,6 @@ export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
             </p>
           ) : null}
 
-          {renderSso(state.ssoUrl, state.ssoProviders, ui.ssoLabelTemplate)}
           {ui.footerText ? (
             <p class="login__footer">
               <Meta>{ui.footerText}</Meta>

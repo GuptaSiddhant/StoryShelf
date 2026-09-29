@@ -55,3 +55,22 @@ export function createUrlBuilder(baseUrl: string, publishedBaseDomain?: string):
     short: (id) => `${root}/_/${id}/`,
   };
 }
+
+/**
+ * Embeddable image URL check for IdP-supplied avatars: `https:` and
+ * app-relative paths only, so `javascript:`/`data:` payloads fall back.
+ */
+export function safeImageUrl(value: string | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+  if (value.startsWith("/") && !value.startsWith("//")) {
+    return value;
+  }
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" ? value : null;
+  } catch {
+    return null;
+  }
+}

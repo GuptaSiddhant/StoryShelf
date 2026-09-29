@@ -23,7 +23,7 @@ const app = createShelfApp({
   database, // DatabaseAdapter
   storage, // StorageAdapter
   captureRunner, // CaptureRunner (optional)
-  auth, // AuthAdapter (optional)
+  auth, // Auth from @storyshelf/auth (optional)
   gitHosts, // GitHostProvider[] (optional)
   logger, // pino Logger (optional; built internally if omitted)
   ui: { name: "My Shelf" }, // UIConfig (optional)
@@ -46,7 +46,7 @@ Assembles the router from the provided adapters. `ShelfOptions`:
 | `storage`       | `StorageAdapter`    | **Required.** Blob storage for screenshots, diffs, storybook archives.                   |
 | `captureRunner` | `CaptureRunner`     | Optional. Enables the async capture pipeline (pure renderer).                            |
 | `captureQueue`  | `CaptureQueue`      | Optional. Queue adapter; defaults to `InMemoryCaptureQueue`.                             |
-| `auth`          | `AuthAdapter`       | Optional. Enables auth and the login UI.                                                 |
+| `auth`          | `Auth` (`@storyshelf/auth`) | Optional. Enables auth and the login UI.                                     |
 | `gitHosts`      | `GitHostProvider[]` | Optional. Git-host adapters (GitHub/GitLab) for status checks, merge gates, PR comments. |
 | `logger`        | `Logger` (pino)     | Optional. Shared logger. Construct a fallback via `createShelfLogger()`.                 |
 | `ui`            | `UIConfig`          | Optional. UI branding.                                                                   |
@@ -87,7 +87,7 @@ All adapters are constructor-injected (no AsyncLocalStorage). See `docs/architec
 
 - `DatabaseAdapter` (`core/adapter/database`) — `insert`, `update`, `get`, `remove`, `list`, `count`, `all`, `migrate`, `close`. Also exports `ListOptions` and the `createDrizzleAdapter` factory.
 - `StorageAdapter` (`core/adapter/storage`) — `read`, `write`, `delete`, `exists`, `list(prefix)`.
-- `AuthAdapter` (`core/adapter/auth`) — `check(request)`, `createSession(user)`, `destroySession(sessionId)`, optional `handleCallback(callback)`. Also exports `AuthUser`, `AuthCallback`, and the shared `SESSION_COOKIE`.
+- `Auth` (`@storyshelf/auth`) — the shelf authentication singleton: `check(request)`, `handler` (mount at `/api/auth/*`), `loginMethods()`, invites, sessions, passkeys. `AuthUser` and the shared `SESSION_COOKIE` live in `core/types`.
 - `CaptureRunner` (`core/adapter/capture-runner`) — a **pure capture renderer**: `render(input) => RenderResult`, `cancel(buildId)`. Also exports `RenderedSnapshot`, `RenderResult`, `StoryEntry`, `StorySourceAdapter`, `Viewport`.
 - `CaptureQueue` (`core/adapter/capture-queue`) — `enqueue({ buildId, reqId? })`, plus `status`, `active`, `recent`. Also exports `CaptureJob`, `QueueEntry`, `JobStatus`.
 - `GitHostProvider` / `GitHostAdapter` (`core/adapter/git-host`) — set commit status checks, detect merges, and upsert PR comments. Real providers ship in `@storyshelf/git-github` and `@storyshelf/git-gitlab`. Also exports `CheckStatus`.

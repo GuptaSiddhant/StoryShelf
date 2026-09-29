@@ -56,7 +56,6 @@ function targetsOf(sources: AdapterSetupSources): ProbeTarget[] {
   pushTarget(targets, sources.storage);
   pushTarget(targets, sources.captureRunner);
   pushTarget(targets, sources.captureQueue);
-  pushTarget(targets, sources.auth);
   for (const provider of sources.gitHosts ?? []) {
     pushTarget(targets, provider);
   }

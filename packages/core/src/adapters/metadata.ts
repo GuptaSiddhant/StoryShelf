@@ -15,7 +15,6 @@ import type { Logger } from "../logger.ts";
 export type AdapterCategory =
   | "database"
   | "storage"
-  | "auth"
   | "capture-runner"
   | "capture-queue"
   | "git-host";

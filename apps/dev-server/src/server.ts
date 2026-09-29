@@ -1,6 +1,6 @@
 import { serve } from "@hono/node-server";
 import { createShelfApp } from "@storyshelf/app";
-import { createPasswordAuth } from "@storyshelf/auth-password";
+import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { otelLogMixin } from "@storyshelf/observability";
@@ -25,7 +25,7 @@ const dataDir = env["DATA_DIR"] ?? ".dev-data";
 const port = Number(env["PORT"] ?? 3000);
 const secret = env["SECRET"];
 const authPassword = env["AUTH_PASSWORD"];
-const authViewerPassword = env["AUTH_VIEWER_PASSWORD"];
+const authEmail = env["AUTH_EMAIL"] ?? "admin@local";
 const adminToken = env["STORYSHELF_ADMIN_TOKEN"] ?? env["ADMIN_TOKEN"];
 const publicBaseUrl = env["PUBLIC_BASE_URL"];
 
@@ -85,11 +85,18 @@ const app = createShelfApp({
   database,
   storage,
   captureRunner,
-  // Enable a shared-password login by setting AUTH_PASSWORD (and SECRET).
-  // Optional tiered demo: AUTH_VIEWER_PASSWORD → viewer role (read-only).
+  // Enable local-account login by setting AUTH_PASSWORD (and SECRET): the
+  // engine provisions an admin identity from the env on every boot.
+  // AUTH_PASSWORD must be at least 12 characters; AUTH_EMAIL overrides the
+  // admin address (defaults to admin@local). No viewer tier exists anymore.
   auth:
     authPassword && secret
-      ? createPasswordAuth({ password: authPassword, viewerPassword: authViewerPassword, secret })
+      ? createShelfAuth({
+          db: database,
+          secret,
+          baseURL: publicBaseUrl ?? `http://localhost:${port}`,
+          passkeys: {},
+        }).adapter
       : undefined,
   ui,
   logger: shelfLogger,
@@ -107,6 +114,11 @@ const app = createShelfApp({
 
 await app.lifecycle.setup();
 const logger = app.lifecycle.logger;
+
+if (authPassword && secret) {
+  await ensurePasswordAdmin(database, { email: authEmail, password: authPassword });
+  logger.info({ email: authEmail }, "Local admin login enabled from AUTH_PASSWORD");
+}
 
 const server = serve({ fetch: app.fetch, port }, () => {
   logger.info({ port, dataDir }, "StoryShelf dev server listening");

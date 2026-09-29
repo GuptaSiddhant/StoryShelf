@@ -3,7 +3,7 @@ import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
 import { getCsrfToken } from "../middleware/csrf.ts";
-import { hashProfilePassword, verifyProfilePassword } from "./profile-password.ts";
+import { stubAuth } from "../stub-auth.ts";
 
 const silentLogger = pino({ level: "silent" });
 const secret = "test-secret";
@@ -16,21 +16,12 @@ const accountUser = {
   providerId: "account",
 };
 
-const accountAuth = {
-  metadata: { name: "Stub Auth", version: "0.0.0", kind: "stub", category: "auth" as const },
-  check: async (request: Request): Promise<typeof accountUser | null> => {
-    await Promise.resolve();
+const accountAuth = stubAuth(null, {
+  check: async (request: Request) => {
     const cookie = request.headers.get("cookie") ?? "";
     return cookie.includes("storyshelf_session=ok") ? accountUser : null;
   },
-  createSession: async (): Promise<string> => {
-    await Promise.resolve();
-    return "ok";
-  },
-  destroySession: async (): Promise<void> => {
-    await Promise.resolve();
-  },
-};
+});
 
 async function seed() {
   const { db } = makeDatabase();
@@ -44,7 +35,7 @@ async function seed() {
     role: accountUser.role,
     lastLoginAt: now,
     createdAt: now,
-    passwordHash: await hashProfilePassword("oldpassword12"),
+    passwordHash: null,
     displayNameOverride: null,
     authProvider: "local",
     disabled: false,
@@ -84,7 +75,7 @@ function testApp(seeded: Seeded): ReturnType<typeof createShelfApp> {
 function postForm(path: string, form: FormData, app: ReturnType<typeof createShelfApp>) {
   return app.request(path, {
     method: "POST",
-    headers: { cookie: "storyshelf_session=ok", "x-csrf-token": getCsrfToken(secret) },
+    headers: { cookie: "storyshelf_session=ok", "x-csrf-token": getCsrfToken(secret, "ok") },
     body: form,
   });
 }
@@ -107,6 +98,26 @@ describe("profile page", () => {
     expect(html).toContain("Demo");
   });
 
+  it("refuses non-https avatar URLs", async () => {
+    const seeded = await seed();
+    const evil = { ...accountUser, avatarUrl: "javascript:alert(1)" };
+    const app = createShelfApp({
+      database: seeded.db,
+      storage: seeded.storage,
+      auth: stubAuth(null, {
+        check: async (request: Request) => {
+          const cookie = request.headers.get("cookie") ?? "";
+          return cookie.includes("storyshelf_session=ok") ? evil : null;
+        },
+      }),
+      logger: silentLogger,
+      config: { secret },
+    });
+    const html = await (await app.request("/profile", { headers: session })).text();
+    expect(html).not.toContain("javascript:");
+    expect(html).toContain("A</span>");
+  });
+
   it("updates the display name override", async () => {
     const seeded = await seed();
     const app = testApp(seeded);
@@ -122,30 +133,6 @@ describe("profile page", () => {
     const form = new FormData();
     form.set("displayName", "  ");
     const response = await postForm("/profile", form, testApp(await seed()));
-    expect(response.status).toBe(400);
-  });
-
-  it("changes the local account password", async () => {
-    const seeded = await seed();
-    const app = testApp(seeded);
-    const form = new FormData();
-    form.set("currentPassword", "oldpassword12");
-    form.set("newPassword", "newpassword34");
-    form.set("confirmPassword", "newpassword34");
-    const response = await postForm("/profile/password", form, app);
-    expect(response.status).toBe(200);
-    const row = (await seeded.db.get(seeded.db.tables.users, accountUser.id)) as unknown as {
-      passwordHash: string;
-    };
-    await expect(verifyProfilePassword("newpassword34", row.passwordHash)).resolves.toBe(true);
-  });
-
-  it("rejects a wrong current password", async () => {
-    const form = new FormData();
-    form.set("currentPassword", "wrongpassword");
-    form.set("newPassword", "newpassword34");
-    form.set("confirmPassword", "newpassword34");
-    const response = await postForm("/profile/password", form, testApp(await seed()));
     expect(response.status).toBe(400);
   });
 });

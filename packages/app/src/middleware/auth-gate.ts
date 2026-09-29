@@ -1,11 +1,12 @@
-import type { AuthAdapter, AuthUser } from "@storyshelf/core/adapter/auth";
+import type { Auth } from "@storyshelf/auth";
+import type { AuthUser } from "@storyshelf/core/types";
 import type { Context, Next } from "hono";
 import { getStore } from "../store.ts";
 
 /** Resolve the request user from the auth adapter (null when auth is off or a token is used). */
 export async function resolveRequestUser(
   c: Pick<Context, "req">,
-  auth?: AuthAdapter,
+  auth?: Auth,
 ): Promise<AuthUser | null> {
   if (!auth) {
     return null;

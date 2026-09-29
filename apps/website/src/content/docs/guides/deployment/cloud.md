@@ -9,12 +9,12 @@ StoryShelf is **cross-runtime**: the core router (`createShelfApp`) uses only We
 
 | Platform | Database | Storage | Capture queue | Auth | Server entry |
 |----------|----------|---------|---------------|------|--------------|
-| **Vercel** | `@storyshelf/db-turso` (Turso/libSQL) | `@storyshelf/storage-s3` (R2/S3) | Remote `CaptureQueue` (see below) | `@storyshelf/auth-oauth` | Hono + `@hono/vercel-edge` |
-| **Cloudflare Workers** | `@storyshelf/db-turso` | `@storyshelf/storage-s3` (R2) | Workers Queues `CaptureQueue` impl | `@storyshelf/auth-oauth` | Hono + Workers entry |
-| **Azure Functions** | `@storyshelf/db-turso` | `@storyshelf/storage-s3` (Azure Blob) | Azure Storage Queues `CaptureQueue` impl | `@storyshelf/auth-oauth` | Hono + Azure Functions handler |
-| **AWS Lambda** | `@storyshelf/db-turso` | `@storyshelf/storage-s3` (S3) | SQS `CaptureQueue` impl | `@storyshelf/auth-oauth` | Hono + Lambda handler |
-| **Deno Deploy** | `@storyshelf/db-turso` | `@storyshelf/storage-s3` (R2/S3) | Custom `CaptureQueue` (Deno KV / HTTP) | `@storyshelf/auth-oauth` | Hono + Deno entry |
-| **Bun** | `@storyshelf/db-sqlite` or `db-turso` | `storage-local` or `storage-s3` | `InMemoryCaptureQueue` | `@storyshelf/auth-oauth` | Hono + Bun.serve |
+| **Vercel** | `@storyshelf/db-turso` (Turso/libSQL) | `@storyshelf/storage-s3` (R2/S3) | Remote `CaptureQueue` (see below) | `@storyshelf/auth` | Hono + `@hono/vercel-edge` |
+| **Cloudflare Workers** | `@storyshelf/db-turso` | `@storyshelf/storage-s3` (R2) | Workers Queues `CaptureQueue` impl | `@storyshelf/auth` | Hono + Workers entry |
+| **Azure Functions** | `@storyshelf/db-turso` | `@storyshelf/storage-s3` (Azure Blob) | Azure Storage Queues `CaptureQueue` impl | `@storyshelf/auth` | Hono + Azure Functions handler |
+| **AWS Lambda** | `@storyshelf/db-turso` | `@storyshelf/storage-s3` (S3) | SQS `CaptureQueue` impl | `@storyshelf/auth` | Hono + Lambda handler |
+| **Deno Deploy** | `@storyshelf/db-turso` | `@storyshelf/storage-s3` (R2/S3) | Custom `CaptureQueue` (Deno KV / HTTP) | `@storyshelf/auth` | Hono + Deno entry |
+| **Bun** | `@storyshelf/db-sqlite` or `db-turso` | `storage-local` or `storage-s3` | `InMemoryCaptureQueue` | `@storyshelf/auth` | Hono + Bun.serve |
 
 ## Worker model (serverless)
 

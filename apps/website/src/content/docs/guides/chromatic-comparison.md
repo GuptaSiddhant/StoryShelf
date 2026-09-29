@@ -16,7 +16,7 @@ This page compares Chromatic (SaaS) and StoryShelf (self-hosted) factually. No r
 | **Modes / Globals** | Yes | Not implemented |
 | **Accessibility testing** | Yes | Not implemented |
 | **Interaction tests** | Yes (`play` functions) | Yes (`play` functions) |
-| **SSO / Enterprise** | Enterprise plan | OIDC/OAuth (any provider) |
+| **SSO / Enterprise** | Enterprise plan | Better Auth engine (OIDC/SAML via any IdP) |
 | **Vendor lock-in** | Yes (proprietary) | No (MIT, open source) |
 | **Data residency** | US / EU regions | Your choice (your infra) |
 | **Parallelization** | Automatic cloud | Manual (concurrency config) |
@@ -46,7 +46,7 @@ Billed snapshots = visual snapshots + accessibility snapshots. TurboSnap copies 
 | **Storage** | Chromatic cloud | Your S3-compatible or local filesystem |
 | **Database** | Chromatic managed | Your SQLite/Turso/Postgres |
 | **Queue** | Chromatic managed | In-memory / Redis / SQS (your choice) |
-| **Auth** | Chromatic accounts / SAML | OIDC/OAuth / shared password / none |
+| **Auth** | Chromatic accounts / SAML | Local / social / SSO / passkeys / none |
 
 ## Feature parity
 

@@ -24,6 +24,30 @@ export interface ListOptions {
   offset?: number;
 }
 
+/**
+ * Transactional CRUD subset available inside {@link DatabaseAdapter.transact}.
+ * Mirrors the adapter surface minus metadata, lifecycle, and raw `all`
+ * (opaque to transactions on some drivers).
+ */
+export interface TxStore {
+  /** Insert a row and return the inserted record. */
+  insert<T extends Table>(table: T, values: T["$inferInsert"]): Promise<T["$inferSelect"]>;
+  /** Update a row by id and return the updated record. */
+  update<T extends Table>(
+    table: T,
+    id: string,
+    values: Partial<T["$inferInsert"]>,
+  ): Promise<T["$inferSelect"]>;
+  /** Fetch a single row by id, or null if not found. */
+  get<T extends Table>(table: T, id: string): Promise<T["$inferSelect"] | null>;
+  /** Delete a row by id. */
+  remove(table: Table, id: string): Promise<void>;
+  /** List rows matching the given options. */
+  list<T extends Table>(table: T, opts?: ListOptions): Promise<T["$inferSelect"][]>;
+  /** Count rows matching an optional where condition. */
+  count(table: Table, where?: SQL): Promise<number>;
+}
+
 /** Database abstraction over Drizzle tables, agnostic of dialect and driver. */
 export interface DatabaseAdapter extends Adapter<{ readonly category: "database" }> {
   /** Table handles for this adapter's dialect, enforced with type safety. */
@@ -46,6 +70,12 @@ export interface DatabaseAdapter extends Adapter<{ readonly category: "database"
   count(table: Table, where?: SQL): Promise<number>;
   /** Run an arbitrary SQL query and return typed rows. */
   all<T>(query: SQL): Promise<T[]>;
+  /**
+   * Run `fn` inside a transaction when the driver supports one.
+   * Commits on resolve, rolls back on throw. Drivers without transaction
+   * support omit this; callers must use `?.` and accept sequential execution.
+   */
+  transact?<R>(fn: (tx: TxStore) => Promise<R>): Promise<R>;
 }
 
 /** Driver-supplied identity plus lifecycle hooks. */

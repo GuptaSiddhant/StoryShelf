@@ -5,16 +5,15 @@ import { sha256 } from "@storyshelf/core/utils";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
+import { stubAuth } from "../stub-auth.ts";
 
 const silentLogger = pino({ level: "silent" });
 
 const admin = { id: "user_1", email: "ada@example.com", name: "Ada", role: "admin" as const };
 const dev = { id: "dev_1", email: "dev@example.com", name: "Dev", role: "member" as const };
 
-const passwordAuth = {
-  metadata: { name: "Stub Auth", version: "0.0.0", kind: "stub", category: "auth" as const },
-  check: async (request: Request): Promise<typeof admin | typeof dev | null> => {
-    await Promise.resolve();
+const passwordAuth = stubAuth(null, {
+  check: async (request: Request) => {
     const cookie = request.headers.get("cookie") ?? "";
     if (cookie.includes("storyshelf_session=admin")) {
       return admin;
@@ -24,14 +23,7 @@ const passwordAuth = {
     }
     return null;
   },
-  createSession: async (): Promise<string> => {
-    await Promise.resolve();
-    return "ok";
-  },
-  destroySession: async (): Promise<void> => {
-    await Promise.resolve();
-  },
-};
+});
 
 async function seed() {
   const { db } = makeDatabase();

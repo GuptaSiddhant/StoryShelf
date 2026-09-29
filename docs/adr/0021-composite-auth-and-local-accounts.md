@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Extends ADR 0008 (auth as a pluggable adapter), which remains the base contract.
+Accepted. Superseded by [ADR 0023](0023-wholesale-auth-engine.md). Extends ADR 0008 (auth as a pluggable adapter), which remains the base contract.
 
 ## Context
 

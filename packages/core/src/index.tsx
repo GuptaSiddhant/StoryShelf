@@ -23,6 +23,7 @@ export {
   validateConfig,
   validateUiConfig,
 } from "./config.ts";
+export { brandPack, brandPacks, type BrandPack } from "./brand-packs.ts";
 export {
   createShelfLogger,
   type Logger,

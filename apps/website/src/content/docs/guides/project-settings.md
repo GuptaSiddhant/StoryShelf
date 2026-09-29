@@ -32,4 +32,4 @@ Per-project CI tokens (`Authorization: Bearer <token>`, `STORYSHELF_TOKEN`) are 
 - [Projects concept](/concepts/projects/) — one Storybook per project
 - [Roles & tokens](/concepts/roles/) — site vs project roles, token binding
 - [Labels](/concepts/labels/) — link templates & stable URLs
-- [Auth](/guides/auth/) — OIDC / shared password
+- [Auth](/guides/auth/) — local / social / SSO / passkeys

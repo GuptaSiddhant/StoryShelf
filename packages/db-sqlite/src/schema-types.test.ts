@@ -66,6 +66,10 @@ const DDL_TABLES = [
   "users",
   "project_members",
   "project_group_mappings",
+  "user",
+  "session",
+  "account",
+  "verification",
 ];
 
 const DDL_INDEXES = [
@@ -83,6 +87,10 @@ const DDL_INDEXES = [
   "build_labels_build_type_value_idx",
   "project_members_project_user_idx",
   "project_group_mappings_project_group_idx",
+  "session_token_idx",
+  "session_user_id_idx",
+  "account_user_id_idx",
+  "verification_identifier_idx",
 ];
 
 /**

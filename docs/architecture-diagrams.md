@@ -89,9 +89,8 @@ flowchart TB
         ss3["@storyshelf/storage-s3\nAWS S3 / R2 / MinIO"]
     end
 
-    subgraph AuthAdapters["Auth Adapters"]
-        aoauth["@storyshelf/auth-oauth\nOIDC"]
-        apw["@storyshelf/auth-password\nshared password"]
+    subgraph AuthAdapters["Auth Singleton"]
+        aengine["@storyshelf/auth\nengine (OIDC/SAML/passkeys)"]
     end
 
     subgraph CaptureAdapters["Capture Adapters"]
@@ -132,8 +131,7 @@ flowchart TB
     dbturso --> schema
     slocal --> adapters
     ss3 --> adapters
-    aoauth --> adapters
-    apw --> adapters
+    aengine --> adapters
     ghub --> adapters
     glab --> adapters
     devsrv --> hono
@@ -146,7 +144,7 @@ flowchart TB
     classDef app fill:#e6f4ea,stroke:#34a853;
     classDef fixture fill:#f3e8fd,stroke:#9c27b0,stroke-dasharray: 5 5;
     class Core,hono,mw,routes,pages,openapi,capture,diff,retention,models,schema,utils,adapters core;
-    class dbsqlite,dbturso,slocal,ss3,aoauth,apw,runner,qsqs,qmem,ghub,glab adapter;
+    class dbsqlite,dbturso,slocal,ss3,aengine,runner,qsqs,qmem,ghub,glab adapter;
     class devsrv,flyapp,website,cli app;
     class f8,f9,f10 fixture;
 ```
@@ -166,7 +164,7 @@ flowchart LR
         storage["storage: StorageAdapter"]
         runner2["captureRunner?: CaptureRunner"]
         queue["captureQueue?: CaptureQueue"]
-        auth["auth?: AuthAdapter"]
+        auth["auth?: Auth"]
         githosts["gitHosts?: GitHostProvider[]"]
         logger["logger?: Logger (pino)"]
         ui["ui?: UIConfig"]
@@ -839,16 +837,11 @@ flowchart TB
         N1["auth not configured → open API + UI"]
     end
 
-    subgraph Password["Shared Password — @storyshelf/auth-password"]
-        P1["AUTH_PASSWORD env var"]
-        P2["session cookie (HMAC with SECRET)"]
-    end
-
-    subgraph OAuth["OAuth/OIDC — @storyshelf/auth-oauth"]
-        O1["OIDC_ISSUER / CLIENT_ID / SECRET"]
-        O2["GET /auth/login → provider"]
-        O3["GET /auth/callback → create users row"]
-        O4["resolveRequestUser() per request"]
+    subgraph Engine["Better Auth engine — @storyshelf/auth<br/>https://www.better-auth.com/docs"]
+        E1["createShelfAuth({ db, secret, baseURL, social/oauth/sso/passkeys })"]
+        E2["descriptor login: password | oauth | sso | passkey"]
+        E3["/api/auth/* handler + invites + passkeys + sessions"]
+        E4["mirror into users, never demote roles"]
     end
 
     subgraph RBAC["RBAC — packages/core/src/schema/member.ts"]
@@ -859,12 +852,11 @@ flowchart TB
     end
 
     NoAuth -. opt .-> RBAC
-    Password --> RBAC
-    OAuth --> RBAC
+    Engine --> RBAC
 
     classDef auth fill:#e8f0fe,stroke:#4285f4;
     classDef rbac fill:#e6f4ea,stroke:#34a853;
-    class N1,P1,P2,O1,O2,O3,O4 auth;
+    class N1,E1,E2,E3,E4 auth;
     class R1,R2,R3,R4 rbac;
 ```
 

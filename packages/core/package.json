@@ -34,10 +34,6 @@
       "source": "./src/index.tsx",
       "default": "./dist/index.mjs"
     },
-    "./adapter/auth": {
-      "source": "./src/adapters/auth.ts",
-      "default": "./dist/adapter/auth.mjs"
-    },
     "./adapter/capture-queue": {
       "source": "./src/adapters/capture-queue.ts",
       "default": "./dist/adapter/capture-queue.mjs"
@@ -66,10 +62,6 @@
       "source": "./src/adapters/metadata.ts",
       "default": "./dist/adapter/metadata.mjs"
     },
-    "./adapter/multi-auth": {
-      "source": "./src/adapters/multi-auth.ts",
-      "default": "./dist/adapter/multi-auth.mjs"
-    },
     "./adapter/setup": {
       "source": "./src/adapters/setup.ts",
       "default": "./dist/adapter/setup.mjs"
@@ -81,6 +73,10 @@
     "./adapter/webhook-events": {
       "source": "./src/adapters/webhook-events.ts",
       "default": "./dist/adapter/webhook-events.mjs"
+    },
+    "./auth": {
+      "source": "./src/auth.ts",
+      "default": "./dist/auth.mjs"
     },
     "./capture": {
       "source": "./src/capture/index.ts",
@@ -135,7 +131,6 @@
   "publishConfig": {
     "exports": {
       ".": "./dist/index.mjs",
-      "./adapter/auth": "./dist/adapter/auth.mjs",
       "./adapter/capture-queue": "./dist/adapter/capture-queue.mjs",
       "./adapter/capture-runner": "./dist/adapter/capture-runner.mjs",
       "./adapter/database": "./dist/adapter/database.mjs",
@@ -143,10 +138,10 @@
       "./adapter/git-host/comments": "./dist/adapter/git-host/comments.mjs",
       "./adapter/git-host/helpers": "./dist/adapter/git-host/helpers.mjs",
       "./adapter/metadata": "./dist/adapter/metadata.mjs",
-      "./adapter/multi-auth": "./dist/adapter/multi-auth.mjs",
       "./adapter/setup": "./dist/adapter/setup.mjs",
       "./adapter/storage": "./dist/adapter/storage.mjs",
       "./adapter/webhook-events": "./dist/adapter/webhook-events.mjs",
+      "./auth": "./dist/auth.mjs",
       "./capture": "./dist/capture.mjs",
       "./config": "./dist/config.mjs",
       "./diff": "./dist/diff.mjs",

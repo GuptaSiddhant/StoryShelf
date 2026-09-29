@@ -174,4 +174,78 @@ CREATE TABLE IF NOT EXISTS content_refs (
   last_seen_at TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ NOT NULL
 );
+CREATE TABLE IF NOT EXISTS "user" (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE,
+  email_verified BOOLEAN NOT NULL DEFAULT false,
+  image TEXT,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+CREATE TABLE IF NOT EXISTS session (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+  token TEXT NOT NULL UNIQUE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  ip_address TEXT,
+  user_agent TEXT,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS session_token_idx ON session (token);
+CREATE INDEX IF NOT EXISTS session_user_id_idx ON session (user_id);
+CREATE TABLE IF NOT EXISTS account (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+  account_id TEXT NOT NULL,
+  provider_id TEXT NOT NULL,
+  access_token TEXT,
+  refresh_token TEXT,
+  id_token TEXT,
+  access_token_expires_at TIMESTAMPTZ,
+  refresh_token_expires_at TIMESTAMPTZ,
+  scope TEXT,
+  expires_at TIMESTAMPTZ,
+  password TEXT,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS account_user_id_idx ON account (user_id);
+CREATE TABLE IF NOT EXISTS verification (
+  id TEXT PRIMARY KEY,
+  identifier TEXT NOT NULL,
+  value TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS verification_identifier_idx ON verification (identifier);
+CREATE TABLE IF NOT EXISTS passkey (
+  id TEXT PRIMARY KEY,
+  name TEXT,
+  public_key TEXT NOT NULL,
+  user_id TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+  credential_id TEXT NOT NULL,
+  counter INTEGER NOT NULL,
+  device_type TEXT NOT NULL,
+  backed_up BOOLEAN NOT NULL DEFAULT false,
+  transports TEXT,
+  aaguid TEXT,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS passkey_user_id_idx ON passkey (user_id);
+CREATE INDEX IF NOT EXISTS passkey_credential_id_idx ON passkey (credential_id);
+CREATE TABLE IF NOT EXISTS "ssoProvider" (
+  id TEXT PRIMARY KEY,
+  issuer TEXT NOT NULL,
+  oidc_config TEXT,
+  saml_config TEXT,
+  user_id TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+  provider_id TEXT NOT NULL UNIQUE,
+  organization_id TEXT,
+  domain TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ssoprovider_domain_idx ON "ssoProvider" (domain);
 `;

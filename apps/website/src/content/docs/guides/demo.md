@@ -9,10 +9,10 @@ The public demo at **`https://storyshelf.fly.dev`** is a full StoryShelf server 
 
 ## Access
 
-The demo runs tiered shared-password auth (`@storyshelf/auth-password`):
+The demo runs env-driven local-account auth (`@storyshelf/auth`):
 
-- **Viewer:** password `demo` → site `viewer` (read all projects, diffs, and published Storybooks; cannot upload, approve, or manage). Share this with stakeholders.
-- **Admin:** `AUTH_PASSWORD` (private) → site `admin` (full control). Keep this with maintainers only.
+- **Viewer:** invite-only local accounts (see [Auth](/guides/auth/)) — browse projects, diffs, and published Storybooks; upload, approve, and settings require admin.
+- **Admin:** `AUTH_PASSWORD` (private) provisions the site `admin` on boot. Keep this with maintainers only.
 
 Open `https://storyshelf.fly.dev` → enter `demo` at the login → browse. If auth is disabled on a local fork (`AUTH_PASSWORD` unset), the UI is open without login (trusted-network mode — see [Auth](/guides/auth/)).
 
@@ -26,7 +26,7 @@ Open `https://storyshelf.fly.dev` → enter `demo` at the login → browse. If a
 
 ## Related
 
-- [Auth (tiered password)](/guides/auth/) — tiered `viewerPassword` setup
-- [Roles & tokens](/concepts/roles/) — viewer vs admin site roles
+- [Auth (local accounts)](/guides/auth/) — invite-only login setup
+- [Roles & tokens](/concepts/roles/) — member vs admin site roles
 - [Projects](/concepts/projects/) — one Storybook per project
-- Package: [@storyshelf/auth-password](/packages/auth-password/)
+- Package: [@storyshelf/auth](/packages/auth/)

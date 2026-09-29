@@ -35,6 +35,24 @@ describe("csrf", () => {
     expect(res.status).toBe(403);
   });
 
+  it("rejects a token minted for another session", async () => {
+    const token = getCsrfToken("test-secret", "session-a");
+    const res = await app("test-secret").request("/protected/page", {
+      method: "POST",
+      headers: { cookie: "storyshelf_session=session-b", "x-csrf-token": token },
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("accepts a token minted for the request session", async () => {
+    const token = getCsrfToken("test-secret", "session-a");
+    const res = await app("test-secret").request("/protected/page", {
+      method: "POST",
+      headers: { cookie: "storyshelf_session=session-a", "x-csrf-token": token },
+    });
+    expect(res.status).toBe(200);
+  });
+
   it("issues a token on safe methods", async () => {
     const res = await app("test-secret").request("/protected/page");
     expect(res.headers.get("x-csrf-token")).toBeTruthy();

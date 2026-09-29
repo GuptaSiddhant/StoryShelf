@@ -5,7 +5,6 @@
  * gates the first request on the shared result. All hooks must be
  * idempotent.
  */
-import type { AuthAdapter } from "./auth.ts";
 import type { CaptureQueue } from "./capture-queue.ts";
 import type { CaptureRunner } from "./capture-runner.ts";
 import type { DatabaseAdapter } from "./database.ts";
@@ -19,7 +18,6 @@ export interface AdapterSetupSources {
   storage: StorageAdapter;
   captureRunner?: CaptureRunner;
   captureQueue?: CaptureQueue;
-  auth?: AuthAdapter;
   gitHosts?: GitHostProvider[];
 }
 

@@ -160,19 +160,19 @@ webhooks (
   updated_at          text NOT NULL
 );
 
--- Users (created by auth adapter on login, optional if no auth configured)
+-- Users (created by auth engine on login, optional if no auth configured)
 users (
-  id                  text PRIMARY KEY,        -- from auth provider (e.g., GitHub user ID)
-  email               text NOT NULL UNIQUE,    -- identifier only for local accounts; deliverability never checked
-  name                text NOT NULL,           -- IdP value; display_name_override wins for rendering
+  id                  text PRIMARY KEY,        -- engine ULID (shared with Better Auth user.id)
+  email               text NOT NULL UNIQUE,    -- identifier; deliverability never checked for local accounts
+  name                text NOT NULL,           -- IdP/engine value; display_name_override wins for rendering
   avatar_url          text,
   role                text NOT NULL DEFAULT 'member',  -- 'admin' (site-wide) | 'member' (access via project_members)
   last_login_at       text,
   created_at          text NOT NULL,
-  password_hash       text,                    -- scrypt hash for local accounts, NULL for SSO/shared users
-  display_name_override text,                  -- user-edited name, survives OIDC refresh (ADR 0021)
-  auth_provider       text NOT NULL DEFAULT 'oidc',  -- 'local' | 'oidc' | 'shared'
-  disabled            integer NOT NULL DEFAULT 0     -- login rejected when true
+  password_hash       text,                    -- legacy scrypt (pre-engine local); engine locals use Better Auth credential rows
+  display_name_override text,                  -- user-edited name, survives IdP refresh
+  auth_provider       text NOT NULL DEFAULT 'local',  -- 'local' | 'oidc' (engine provider)
+  disabled            integer NOT NULL DEFAULT 0     -- login rejected when true; engine sessions revoked eagerly
 );
 
 -- Invite tokens for local accounts (one-time links, invite-only onboarding)
@@ -587,16 +587,14 @@ POST   /api/v1/projects/:projectId/builds/:buildId/unpublish
 # Admin
 POST   /api/v1/admin/purge                          # manual retention purge
 
-# Auth (session-based, web UI; multi-method via composite adapter, ADR 0021)
-GET    /auth/login                     # method list, or redirect for sole SSO method
-GET    /auth/login/:providerId         # start one SSO flow (per-method state cookie)
-POST   /auth/login                     # shared-password login
-POST   /auth/account/login             # local account login (email + password)
-GET    /auth/callback                  # handle OAuth callback (legacy alias iff one OIDC method)
-GET    /auth/callback/:providerId      # handle OAuth callback for one method
+# Auth (Better Auth engine, mounted at /api/auth/*; see https://www.better-auth.com/docs/integrations/hono)
+ALL    /api/auth/*                     # Better Auth handler (email+password, social, SSO, passkey, sessions)
+GET    /auth/login                     # descriptor-driven method list, or redirect for sole oauth/sso
+GET    /auth/engine/:providerId        # start one oauth/sso flow
+POST   /auth/engine/login              # local account login (email + password → engine)
 GET    /auth/invites/:inviteId         # set-password form for an invite link (?token=…)
-POST   /auth/invites/:inviteId         # accept invite, set password, land on /profile
-POST   /auth/logout                    # destroy session
+POST   /auth/invites/:inviteId         # accept invite, set credential, land on /profile
+POST   /auth/logout                    # destroy session (plus engine sign-out)
 
 # Relying-party helpers (public, auth-gate-exempt)
 GET    /.well-known/openid-configuration  # RP metadata: issuer, redirect_uris, providers (not an IdP)
@@ -688,16 +686,18 @@ StoryShelf/
         index.ts          # StorageAdapter for Azure Blob Storage (Azurite)
       package.json
 
-    auth-oauth/
+    auth/
       src/
-        index.ts          # AuthAdapter for OAuth/OIDC (GitHub, GitLab, Keycloak, etc.)
-      package.json
-
-    auth-password/
-      src/
-        index.ts          # Password adapters: shared password + invite-only local accounts
-        accounts.ts       # createAccountAuth (email/password via one-time invite links)
-        password-hash.ts  # scrypt hashing (node:crypto, zero deps)
+        index.ts          # Shelf auth engine: opaque Better Auth bridge, createShelfAuth, presets
+        engine.ts         # Better Auth instance + Auth singleton (sessions, mirror hook)
+        db-bridge.ts      # Better Auth DBAdapter over DatabaseAdapter (no dialect knowledge)
+        auth-tables.ts    # sqlite-core defs (user/session/account/verification/passkey/ssoProvider)
+        auth-tables-pg.ts # pg-core mirrors for Postgres
+        presets/          # social, enterprise OIDC, and SSO/SAML recipes
+        invites.ts        # invite-only local accounts on engine credentials
+        sessions.ts       # device-session inventory for /profile
+        passkeys.ts       # passkey inventory + local-credential flag
+        config.ts         # config-as-code: zod schemas, {env} refs, resolveSecrets
       package.json
 
     cli/
@@ -762,7 +762,7 @@ StoryShelf/
 | **Task runner** | turbo | Monorepo build orchestration. Same as StoryBooker |
 | **Package manager** | nub/nubx | Proven in StoryBooker. Monorepo-aware, works with turbo |
 | **CLI framework** | commander.js | Lightweight, well-typed, no magic |
-| **Auth** | Pluggable AuthAdapter, composable via `createMultiAuth` (password + N OIDC). Built-in: OAuth/OIDC, shared password, invite-only local accounts. Custom login text via `UIConfig.auth`; personal `/profile`; RP helpers under `/.well-known/`. No auth by default. | Enterprise teams plug in their IdP (Keycloak, Authentik, Okta, GitHub). CLI uses API tokens (separate from user auth). See ADR 0021. |
+| **Auth** | Better Auth engine (`@storyshelf/auth`, mounted at `/api/auth/*`): descriptor-driven login (password, social, SSO/SAML, passkey), invite-only local accounts, device/passkey management on `/profile`. Custom login text via `UIConfig.auth`; RP helpers under `/.well-known/`. No auth by default. | Enterprise teams plug in their IdP (Keycloak, Okta, Entra, SAML). CLI uses API tokens (separate from user auth). See ADR 0023. |
 | **Schema validation** | zod | Runtime validation for API inputs. Drizzle uses it for schema |
 | **Date/time** | Built-in `Date` + ISO strings | No luxury date library needed |
 | **IDs** | ULID | Sortable, collision-resistant, URL-safe |
@@ -785,7 +785,7 @@ StoryShelf/
 | `compute.jobs[]` nested in Project | No jobs table in v1 | Capture is a fixed pipeline |
 | `latestBuildId` on Project | `baselines` per branch | Baseline is per branch, not per project |
 | Dual-mode HTML/JSON routes | Separate `/api/v1` and `/` routes | Eliminates content-type sniffing bugs |
-| No auth (open API) | Pluggable AuthAdapter | Enterprise IdP integration. Default: none for local dev. |
+| No auth (open API) | Auth singleton (`@storyshelf/auth`) | Enterprise IdP integration. Default: none for local dev. |
 
 ## Server UI
 
@@ -840,12 +840,12 @@ services:
       - PURGE_INTERVAL_MINUTES=60
       # Published Storybook subdomains (optional — omit for path-based URLs only)
       # - PUBLISHED_BASE_DOMAIN=stories.example.com   # requires wildcard DNS + TLS
-      # Auth (optional — omit for no auth)
-      - OIDC_ISSUER=https://keycloak.example.com/realms/myteam
-      - OIDC_CLIENT_ID=storyshelf
-      - OIDC_CLIENT_SECRET=your-client-secret
-      # Or for shared password auth:
-      # - AUTH_PASSWORD=your-shared-password
+      # Auth (optional — omit for no auth; see /guides/auth/)
+      # - AUTH_PASSWORD=a-long-admin-password   # ≥ 12 chars (local admin)
+      # - OIDC_ISSUER=https://keycloak.example.com/realms/myteam
+      # - OIDC_CLIENT_ID=storyshelf
+      # - OIDC_CLIENT_SECRET=secret
+      # SECRET must be ≥ 32 chars (e.g. openssl rand -hex 32)
       # Bootstrap (optional — first site admin before any user exists):
       # - STORYSHELF_ADMIN_TOKEN=your-long-random-token  # or ADMIN_TOKEN
       #   `SECRET` signs sessions; `STORYSHELF_ADMIN_TOKEN` grants site-admin

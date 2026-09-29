@@ -446,7 +446,7 @@ function generateGcpEnvTable(): string {
 | \`gcs_bucket\` (+ \`GOOGLE_CLOUD_PROJECT\`) | \`GCS_BUCKET\` | \`storage-gcs\` |
 | \`pubsub_topic\` / \`pubsub_subscription\` | topic \`capture-jobs\` + subscription (baked into scaffold) | \`queue-gcp\` |
 | \`database_url\` | \`DATABASE_URL\` | \`db-postgres\` |
-| \`identity_tenant_id\` | \`OIDC_ISSUER\` (Google tenant) / \`OIDC_CLIENT_ID\` | \`auth-oauth\` (generic OIDC) |
+| \`identity_tenant_id\` | \`OIDC_ISSUER\` (tenant issuer URL) / \`OIDC_CLIENT_ID\` | \`auth\` (keycloak recipe) |
 | Secret Manager | \`SECRET\` / \`OIDC_CLIENT_SECRET\` / \`ADMIN_TOKEN\` | sessions / OIDC / bootstrap |
 `;
 }

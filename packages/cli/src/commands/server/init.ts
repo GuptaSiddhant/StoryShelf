@@ -119,8 +119,8 @@ const STORAGE_PACKAGE: Record<StorageChoice, string> = {
 
 const AUTH_PACKAGE: Record<AuthChoice, string | null> = {
   none: null,
-  password: "@storyshelf/auth-password",
-  oauth: "@storyshelf/auth-oauth",
+  password: "@storyshelf/auth",
+  oauth: "@storyshelf/auth",
 };
 
 const GIT_PACKAGE: Record<GitChoice, string | null> = {
@@ -196,12 +196,14 @@ function buildImports(answers: Answers): string[] {
   }
 
   if (answers.auth === "password") {
-    imports.push(`import { createPasswordAuth } from "${AUTH_PACKAGE[answers.auth]}";`);
+    imports.push(`import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";`);
   }
   if (answers.auth === "oauth") {
-    imports.push(`import { createOAuthAuth } from "@storyshelf/auth-oauth";`);
+    imports.push(`import { createShelfAuth } from "@storyshelf/auth";`);
     if (resolveDeployTarget(answers) === "aws") {
-      imports.push(`import { cognitoPreset } from "@storyshelf/auth-oauth/presets";`);
+      imports.push(`import { cognitoPreset } from "@storyshelf/auth";`);
+    } else {
+      imports.push(`import { keycloakPreset } from "@storyshelf/auth";`);
     }
   }
   if (answers.git !== "none") {
@@ -265,28 +267,41 @@ function buildRouterLines(answers: Answers): string[] {
   }
 
   if (answers.auth === "password") {
-    lines.push(`  auth: createPasswordAuth({ password: process.env.AUTH_PASSWORD! }),`);
+    lines.push(
+      `  auth: createShelfAuth({ db: database, secret: process.env.SECRET!, baseURL: process.env.PUBLIC_BASE_URL! }).adapter,`,
+    );
   }
   if (answers.auth === "oauth" && resolveDeployTarget(answers) === "aws") {
     lines.push(
-      `  auth: createOAuthAuth(cognitoPreset(process.env.COGNITO_REGION!, process.env.COGNITO_USER_POOL_ID!, {`,
-      `    clientId: process.env.OIDC_CLIENT_ID!,`,
-      `    clientSecret: process.env.OIDC_CLIENT_SECRET!,`,
+      `  auth: createShelfAuth({`,
+      `    db: database,`,
       `    secret: process.env.SECRET!,`,
-      `    redirectUrl: process.env.OIDC_REDIRECT_URL!,`,
-      `    adminGroups: (process.env.ADMIN_GROUPS ?? "shelf-admins").split(","),`,
-      `  })),`,
+      `    baseURL: process.env.PUBLIC_BASE_URL!,`,
+      `    social: [`,
+      `      cognitoPreset({`,
+      `        domain: process.env.COGNITO_DOMAIN!,`,
+      `        region: process.env.COGNITO_REGION!,`,
+      `        userPoolId: process.env.COGNITO_USER_POOL_ID!,`,
+      `        clientId: process.env.OIDC_CLIENT_ID!,`,
+      `        clientSecret: process.env.OIDC_CLIENT_SECRET,`,
+      `      }),`,
+      `    ],`,
+      `  }).adapter,`,
     );
   }
   if (answers.auth === "oauth" && resolveDeployTarget(answers) !== "aws") {
     lines.push(
-      `  auth: createOAuthAuth({`,
-      `    issuer: process.env.OIDC_ISSUER!,`,
-      `    clientId: process.env.OIDC_CLIENT_ID!,`,
-      `    clientSecret: process.env.OIDC_CLIENT_SECRET!,`,
+      `  auth: createShelfAuth({`,
+      `    db: database,`,
       `    secret: process.env.SECRET!,`,
-      `    redirectUrl: process.env.OIDC_REDIRECT_URL!,`,
-      `  }),`,
+      `    baseURL: process.env.PUBLIC_BASE_URL!,`,
+      `    oauth: [`,
+      `      keycloakPreset(process.env.OIDC_ISSUER!, {`,
+      `        clientId: process.env.OIDC_CLIENT_ID!,`,
+      `        clientSecret: process.env.OIDC_CLIENT_SECRET,`,
+      `      }),`,
+      `    ],`,
+      `  }).adapter,`,
     );
   }
   if (answers.git !== "none") {
@@ -313,6 +328,17 @@ function buildRouterLines(answers: Answers): string[] {
     );
   }
   lines.push(`});`, ``, `await app.lifecycle.setup();`, `const logger = app.lifecycle.logger;`);
+
+  if (answers.auth === "password") {
+    lines.push(
+      ``,
+      `// Provision the env-driven local admin (AUTH_PASSWORD, at least 12 chars).`,
+      `await ensurePasswordAdmin(database, {`,
+      `  email: process.env.AUTH_EMAIL ?? "admin@local",`,
+      `  password: process.env.AUTH_PASSWORD!,`,
+      `});`,
+    );
+  }
 
   return lines;
 }

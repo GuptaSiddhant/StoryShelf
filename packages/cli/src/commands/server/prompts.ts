@@ -87,7 +87,7 @@ export const INFRA_PROMPTS: Prompt[] = [
     message: "Which auth?",
     choices: [
       { title: "None", value: "none" },
-      { title: "Shared password", value: "password" },
+      { title: "Local accounts", value: "password" },
       { title: "OAuth/OIDC", value: "oauth" },
     ],
   },

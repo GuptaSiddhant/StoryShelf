@@ -457,7 +457,7 @@ terraform output -json   # or: npm run infra:outputs
 | \`s3_bucket\` | \`S3_BUCKET\` (+ \`AWS_REGION\`) | \`storage-s3\` |
 | \`queue_url\` | \`QUEUE_URL\` | \`queue-sqs\` |
 | \`db_endpoint\` | \`DATABASE_URL\` (\`?sslmode=require\`) | \`db-postgres\` |
-| \`user_pool_id\` / \`app_client_id\` | \`COGNITO_USER_POOL_ID\` / \`OIDC_CLIENT_ID\` | \`auth-oauth\` (cognito preset) |
+| \`user_pool_id\` / \`app_client_id\` | \`COGNITO_DOMAIN\` / \`COGNITO_REGION\` / \`COGNITO_USER_POOL_ID\` / \`OIDC_CLIENT_ID\` | \`auth\` (cognito social) |
 | Secrets Manager | \`SECRET\` / \`OIDC_CLIENT_SECRET\` / \`ADMIN_TOKEN\` | sessions / OIDC / bootstrap |
 
 \`\`\`sh

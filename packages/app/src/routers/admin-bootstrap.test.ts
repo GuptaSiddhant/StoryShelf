@@ -3,27 +3,19 @@ import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
+import { stubAuth } from "../stub-auth.ts";
 
 const silentLogger = pino({ level: "silent" });
 const ADMIN_TOKEN = "adm-bootstrap-123";
 
 const admin = { id: "user_1", email: "ada@example.com", name: "Ada", role: "admin" as const };
 
-const passwordAuth = {
-  metadata: { name: "Stub Auth", version: "0.0.0", kind: "stub", category: "auth" as const },
-  check: async (request: Request): Promise<typeof admin | null> => {
-    await Promise.resolve();
+const passwordAuth = stubAuth(null, {
+  check: async (request: Request) => {
     const cookie = request.headers.get("cookie") ?? "";
     return cookie.includes("storyshelf_session=ok") ? admin : null;
   },
-  createSession: async (): Promise<string> => {
-    await Promise.resolve();
-    return "ok";
-  },
-  destroySession: async (): Promise<void> => {
-    await Promise.resolve();
-  },
-};
+});
 
 function appWithToken() {
   const { db } = makeDatabase();

@@ -18,6 +18,7 @@ import {
   authGate,
   csrf,
   rateLimit,
+  rateLimitKey,
   requestLogging,
   resolveRequestUser,
   storeScope,
@@ -26,7 +27,7 @@ import { setupGate, type MiddlewareWiring } from "./middleware/setup-gate.ts";
 import { registerAdminPages } from "./routers/admin-pages.ts";
 import { registerAdmin } from "./routers/admin.ts";
 import { registerAssets } from "./routers/assets.ts";
-import { registerAuth } from "./routers/auth.ts";
+import { registerEngineAuth } from "./routers/auth.ts";
 import { registerBuilds } from "./routers/builds.ts";
 import { registerHealth, type HealthDeps } from "./routers/health.ts";
 import { registerLabels } from "./routers/labels.ts";
@@ -107,6 +108,16 @@ function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
   app.use("/api/v1/*", rateLimit({ windowMs: 60_000, max: 100 }));
   app.use("/api/v1/tokens/*", rateLimit({ windowMs: 60_000, max: 10 }));
   app.use("/api/v1/webhooks/*", rateLimit({ windowMs: 60_000, max: 20 }));
+  // Auth endpoints ride their own buckets (the shared store keys by IP, so
+  // prefix the key: login floods must not eat the API budget or vice versa).
+  // Budgets are abuse floors, not strict brute-force protection.
+  app.use("/auth/*", rateLimit({ windowMs: 60_000, max: 100, keyGenerator: rateLimitKey("auth") }));
+  app.use(
+    "/api/auth/*",
+    rateLimit({ windowMs: 60_000, max: 300, keyGenerator: rateLimitKey("engine") }),
+  );
+  app.use("/auth/logout", csrf(config.secret));
+  app.use("/auth/invites/*", csrf(config.secret));
   app.use("/projects/:slug/settings/*", csrf(config.secret));
   app.use("/profile/*", csrf(config.secret));
   app.use("/profile", csrf(config.secret));
@@ -142,16 +153,25 @@ function registerApiRoutes(app: ShelfRouter, health: HealthDeps): void {
   registerAdmin(app);
 }
 
+/** Register the auth flow: engine mount, relying-party documents, profile. */
+function registerAuthFlow(app: ShelfRouter, options: ShelfOptions): void {
+  // Auth-gated pages mount only with auth: authEnabled=false mounts zero
+  // auth routes. Static imports stay — true lazy loading would need an async
+  // createShelfApp, which the sync Hono assembly cannot do.
+  if (!options.auth) {
+    return;
+  }
+  registerEngineAuth(app, options.auth);
+  registerWellKnown(app, options.auth);
+  registerProfile(app, options.auth);
+}
+
 /** Register HTML pages, assets, and the optional auth flow. */
 function registerPageRoutes(app: ShelfRouter, options: ShelfOptions, health: HealthDeps): void {
-  if (options.auth) {
-    registerAuth(app, options.auth);
-    registerWellKnown(app, options.auth);
-  }
-  registerProfile(app);
+  registerAuthFlow(app, options);
   registerAssets(app);
   registerStorybook(app);
-  registerAdminPages(app, health);
+  registerAdminPages(app, health, options.auth);
   registerUiPages(app);
 }
 

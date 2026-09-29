@@ -5,6 +5,7 @@ import { getTableColumns, sql } from "drizzle-orm";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
 import { createSqliteDatabase } from "./index.ts";
 import { schema } from "./schema/index.ts";
@@ -19,6 +20,12 @@ async function initDb(db: DatabaseAdapter): Promise<void> {
 /** Run the adapter's teardown hook. */
 async function closeDb(db: DatabaseAdapter): Promise<void> {
   await db.lifecycle?.teardown();
+}
+
+/** Table names present in a volume (raw SQL: array rows, name first). */
+async function tableNames(db: DatabaseAdapter): Promise<Set<string>> {
+  const rows = await db.all<unknown[]>(sql`SELECT name FROM sqlite_master WHERE type = 'table'`);
+  return new Set(rows.map((row) => String(row[0])));
 }
 
 describe("createSqliteDatabase", () => {
@@ -224,5 +231,80 @@ describe("createSqliteDatabase", () => {
     expect(await db.get(schema.captureLogs, "l1")).toBeNull();
 
     await closeDb(db);
+  });
+
+  it("commits transact writes and returns the callback value", async () => {
+    const db = createSqliteDatabase(":memory:");
+    await initDb(db);
+
+    const now = new Date().toISOString();
+    const result = await db.transact?.(async (tx) => {
+      await tx.insert(schema.projects, {
+        id: "p1",
+        name: "Tx",
+        slug: "tx",
+        createdAt: now,
+        updatedAt: now,
+      });
+      return "done";
+    });
+    expect(result).toBe("done");
+    expect(await db.get(schema.projects, "p1")).not.toBeNull();
+
+    await closeDb(db);
+  });
+
+  it("rolls back transact writes when the callback throws", async () => {
+    const db = createSqliteDatabase(":memory:");
+    await initDb(db);
+
+    const now = new Date().toISOString();
+    await expect(
+      db.transact?.(async (tx) => {
+        await tx.insert(schema.projects, {
+          id: "p1",
+          name: "Doomed",
+          slug: "doomed",
+          createdAt: now,
+          updatedAt: now,
+        });
+        throw new Error("boom");
+      }),
+    ).rejects.toThrow("boom");
+    expect(await db.get(schema.projects, "p1")).toBeNull();
+
+    await closeDb(db);
+  });
+
+  it("creates auth tables on fresh and stale volumes", async () => {
+    const expected = ["user", "session", "account", "verification"] as const;
+
+    const fresh = createSqliteDatabase(":memory:");
+    await initDb(fresh);
+    const freshTables = await tableNames(fresh);
+    for (const table of expected) {
+      expect(freshTables.has(table), `fresh ${table}`).toBe(true);
+    }
+    await closeDb(fresh);
+
+    const dir = mkdtempSync(join(tmpdir(), "storyshelf-sqlite-auth-"));
+    try {
+      const seed = createSqliteDatabase(join(dir, "stale.db"));
+      await initDb(seed);
+      await seed.lifecycle?.teardown();
+      const raw = new DatabaseSync(join(dir, "stale.db"));
+      raw.exec("DROP TABLE session; DROP TABLE account;");
+      raw.close();
+
+      const db = createSqliteDatabase(join(dir, "stale.db"));
+      await initDb(db);
+      const tables = await tableNames(db);
+      for (const table of expected) {
+        expect(tables.has(table), `stale ${table}`).toBe(true);
+      }
+      await closeDb(db);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

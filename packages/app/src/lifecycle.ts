@@ -38,7 +38,12 @@ function kickSetup(
   logger: Logger,
   cell: LifecycleCell,
 ): void {
-  cell.ready = runAdapterSetups(collectSetups(options), ctx, logger);
+  // Auth is not an adapter: its one-shot boot validation runs first, then
+  // the adapter setups. A failing secret check fails readiness, like others.
+  cell.ready = (async (): Promise<AdapterSetupResult> => {
+    await options.auth?.setup?.();
+    return await runAdapterSetups(collectSetups(options), ctx, logger);
+  })();
   trackSettlement(cell, cell.ready);
 }
 

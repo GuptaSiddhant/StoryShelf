@@ -3,24 +3,16 @@ import { Writable } from "node:stream";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
+import { stubAuth } from "../stub-auth.ts";
 
 const viewer = { id: "viewer_1", email: "v@example.com", name: "V", role: "viewer" as const };
 
-const viewerAuth = {
-  metadata: { name: "Stub Auth", version: "0.0.0", kind: "stub", category: "auth" as const },
-  check: async (request: Request): Promise<typeof viewer | null> => {
-    await Promise.resolve();
+const viewerAuth = stubAuth(null, {
+  check: async (request: Request) => {
     const cookie = request.headers.get("cookie") ?? "";
     return cookie.includes("storyshelf_session=viewer") ? viewer : null;
   },
-  createSession: async (): Promise<string> => {
-    await Promise.resolve();
-    return "ok";
-  },
-  destroySession: async (): Promise<void> => {
-    await Promise.resolve();
-  },
-};
+});
 
 async function seed() {
   const { db } = makeDatabase();

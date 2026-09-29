@@ -363,7 +363,8 @@ describe("runServerInit", () => {
       process.chdir(cwd);
     }
     const code = readFileSync(join(dir, "server.ts"), "utf8");
-    expect(code).toContain("createOAuthAuth");
+    expect(code).toContain("createShelfAuth");
+    expect(code).toContain("keycloakPreset");
     expect(code).toContain("OIDC_ISSUER");
     expect(code).not.toContain("cognitoPreset");
     expect(existsSync(join(dir, "terraform"))).toBe(false);

@@ -2,16 +2,15 @@ import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
+import { stubAuth } from "../stub-auth.ts";
 
 const silentLogger = pino({ level: "silent" });
 
 const admin = { id: "user_1", email: "ada@example.com", name: "Ada", role: "admin" as const };
 const viewer = { id: "viewer_1", email: "v@example.com", name: "V", role: "viewer" as const };
 
-const stubAuth = {
-  metadata: { name: "Stub Auth", version: "0.0.0", kind: "stub", category: "auth" as const },
-  check: async (request: Request): Promise<typeof admin | typeof viewer | null> => {
-    await Promise.resolve();
+const groupAuth = stubAuth(null, {
+  check: async (request: Request) => {
     const cookie = request.headers.get("cookie") ?? "";
     if (cookie.includes("storyshelf_session=admin")) {
       return admin;
@@ -21,14 +20,7 @@ const stubAuth = {
     }
     return null;
   },
-  createSession: async (): Promise<string> => {
-    await Promise.resolve();
-    return "ok";
-  },
-  destroySession: async (): Promise<void> => {
-    await Promise.resolve();
-  },
-};
+});
 
 async function seed() {
   const { db } = makeDatabase();
@@ -46,7 +38,7 @@ async function seed() {
   const app = createShelfApp({
     database: db,
     storage,
-    auth: stubAuth,
+    auth: groupAuth,
     logger: silentLogger,
   });
   return { app, db };

@@ -1,4 +1,3 @@
-import type { AuthUser } from "@storyshelf/core/adapter/auth";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import { LabelModel } from "@storyshelf/core/models";
@@ -12,6 +11,7 @@ import type { LabelType } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { ProjectGroupMapping } from "@storyshelf/core/schema";
 import type { Token } from "@storyshelf/core/schema";
+import type { AuthUser } from "@storyshelf/core/types";
 import type { Context } from "hono";
 import {
   renderProjectSettingsPage,

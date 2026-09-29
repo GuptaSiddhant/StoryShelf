@@ -38,6 +38,34 @@ export const SITE_ROLES = ["admin", "member", "viewer"] as const;
 /** Site-wide role of a user. */
 export type SiteRole = (typeof SITE_ROLES)[number];
 
+/** Shared session cookie name used by auth (ADR 0008). */
+export const SESSION_COOKIE = "storyshelf_session";
+
+/** An authenticated user of the platform. */
+export interface AuthUser {
+  /** User ID. */
+  id: string;
+  /** User email. */
+  email: string;
+  /** Display name. */
+  name: string;
+  /** Optional avatar URL. */
+  avatarUrl?: string;
+  /** Site-wide role. */
+  role: SiteRole;
+  /**
+   * Identity-provider group memberships (names or IDs, provider-dependent).
+   * Populated when the provider exposes group claims; absent otherwise.
+   * Drives group-to-role mapping at login.
+   */
+  groups?: string[];
+  /**
+   * Login method that minted this identity.
+   * Matches an engine login method id; absent for single-method deployments.
+   */
+  providerId?: string;
+}
+
 /** All per-project membership roles. */
 export const PROJECT_ROLES = ["admin", "approver", "developer", "viewer"] as const;
 

@@ -3,40 +3,15 @@ import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
+import { stubAuth } from "../stub-auth.ts";
 
 const silentLogger = pino({ level: "silent" });
 
 const admin = { id: "user_1", email: "ada@example.com", name: "Ada", role: "admin" as const };
 
-const adminAuth = {
-  metadata: { name: "Stub Auth", version: "0.0.0", kind: "stub", category: "auth" as const },
-  check: async (): Promise<typeof admin> => {
-    await Promise.resolve();
-    return admin;
-  },
-  createSession: async (): Promise<string> => {
-    await Promise.resolve();
-    return "ok";
-  },
-  destroySession: async (): Promise<void> => {
-    await Promise.resolve();
-  },
-};
+const adminAuth = stubAuth(admin);
 
-const noSessionAuth = {
-  metadata: { name: "Stub Auth", version: "0.0.0", kind: "stub", category: "auth" as const },
-  check: async (): Promise<null> => {
-    await Promise.resolve();
-    return null;
-  },
-  createSession: async (): Promise<string> => {
-    await Promise.resolve();
-    return "ok";
-  },
-  destroySession: async (): Promise<void> => {
-    await Promise.resolve();
-  },
-};
+const noSessionAuth = stubAuth(null);
 
 function brokenLifecycle(message: string): {
   setup: () => Promise<void>;

@@ -13,7 +13,7 @@
   "dependencies": {
     "@hono/node-server": "catalog:",
     "@storyshelf/app": "workspace:*",
-    "@storyshelf/auth-password": "workspace:*",
+    "@storyshelf/auth": "workspace:*",
     "@storyshelf/core": "workspace:*",
     "@storyshelf/db-sqlite": "workspace:*",
     "@storyshelf/observability": "workspace:*",

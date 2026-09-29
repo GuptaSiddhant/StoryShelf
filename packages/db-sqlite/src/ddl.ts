@@ -217,6 +217,80 @@ CREATE TABLE IF NOT EXISTS content_refs (
   last_seen_at TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS user (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE,
+  email_verified INTEGER NOT NULL DEFAULT 0,
+  image TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS session (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+  token TEXT NOT NULL UNIQUE,
+  expires_at TEXT NOT NULL,
+  ip_address TEXT,
+  user_agent TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS session_token_idx ON session (token);
+CREATE INDEX IF NOT EXISTS session_user_id_idx ON session (user_id);
+CREATE TABLE IF NOT EXISTS account (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+  account_id TEXT NOT NULL,
+  provider_id TEXT NOT NULL,
+  access_token TEXT,
+  refresh_token TEXT,
+  id_token TEXT,
+  access_token_expires_at TEXT,
+  refresh_token_expires_at TEXT,
+  scope TEXT,
+  expires_at TEXT,
+  password TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS account_user_id_idx ON account (user_id);
+CREATE TABLE IF NOT EXISTS verification (
+  id TEXT PRIMARY KEY,
+  identifier TEXT NOT NULL,
+  value TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS verification_identifier_idx ON verification (identifier);
+CREATE TABLE IF NOT EXISTS passkey (
+  id TEXT PRIMARY KEY,
+  name TEXT,
+  public_key TEXT NOT NULL,
+  user_id TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+  credential_id TEXT NOT NULL,
+  counter INTEGER NOT NULL,
+  device_type TEXT NOT NULL,
+  backed_up INTEGER NOT NULL DEFAULT 0,
+  transports TEXT,
+  aaguid TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT
+);
+CREATE INDEX IF NOT EXISTS passkey_user_id_idx ON passkey (user_id);
+CREATE INDEX IF NOT EXISTS passkey_credential_id_idx ON passkey (credential_id);
+CREATE TABLE IF NOT EXISTS ssoProvider (
+  id TEXT PRIMARY KEY,
+  issuer TEXT NOT NULL,
+  oidc_config TEXT,
+  saml_config TEXT,
+  user_id TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+  provider_id TEXT NOT NULL UNIQUE,
+  organization_id TEXT,
+  domain TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ssoprovider_domain_idx ON ssoProvider (domain);
 `;
 
 const CONSTRAINT_PREFIX = /^(?:PRIMARY|FOREIGN|UNIQUE|CHECK|CONSTRAINT)\s/iu;
