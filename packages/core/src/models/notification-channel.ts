@@ -27,15 +27,15 @@ export class NotificationChannelModel {
   private readonly secret?: string;
   /**
    * @param db - Database adapter.
-   * @param tables - Table handles (required until all drivers extend `Tables`).
+   * @param tables - Table handles (defaults to the adapter's tables).
    * @param secret - Server secret for channel-secret encryption.
    */
   constructor(
     private readonly db: DatabaseAdapter,
-    tables: NotificationChannelTables,
+    tables?: NotificationChannelTables,
     secret?: string,
   ) {
-    this.tables = tables;
+    this.tables = tables ?? { notificationChannels: db.tables.notificationChannels };
     this.secret = secret;
   }
 

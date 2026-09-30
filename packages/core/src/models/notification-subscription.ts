@@ -22,13 +22,13 @@ export class NotificationSubscriptionModel {
   private readonly tables: NotificationSubscriptionTables;
   /**
    * @param db - Database adapter.
-   * @param tables - Table handles (required until all drivers extend `Tables`).
+   * @param tables - Table handles (defaults to the adapter's tables).
    */
   constructor(
     private readonly db: DatabaseAdapter,
-    tables: NotificationSubscriptionTables,
+    tables?: NotificationSubscriptionTables,
   ) {
-    this.tables = tables;
+    this.tables = tables ?? { notificationSubscriptions: db.tables.notificationSubscriptions };
   }
 
   /** Fetch a user's subscription for a project, or null (null = silent). */

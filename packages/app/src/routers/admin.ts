@@ -3,6 +3,7 @@ import { createRoute } from "@hono/zod-openapi";
 import { ProjectModel } from "@storyshelf/core/models";
 import { Retention } from "@storyshelf/core/retention";
 import type { ShelfRouter } from "../app-types.ts";
+import { notifySystem } from "../notify.ts";
 import { getStore } from "../store.ts";
 import { requireSiteAdmin } from "./helpers.ts";
 import { forbidden as forbiddenResponse, purgeInputSchema, purgeSchema } from "./schemas.ts";
@@ -27,6 +28,12 @@ export function registerAdmin(app: ShelfRouter): void {
     const ttlDays = body.ttlDays ?? getStore().config.purgeTtlDays ?? 30;
     const removedBuilds = await purgeBuilds(ttlDays);
     const branch = await purgeBranches();
+    await notifySystem("sys:purge-completed", {
+      removedBuilds,
+      removedBranches: branch.removedBranches,
+      removedBaselines: branch.removedBaselines,
+      ttlDays,
+    });
     return c.json({
       removedBuilds,
       removedBranches: branch.removedBranches,

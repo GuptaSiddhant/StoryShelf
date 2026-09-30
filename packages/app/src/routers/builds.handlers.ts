@@ -15,6 +15,7 @@ import { type ProjectRole, BUILD_STATUSES } from "@storyshelf/core/types";
 import { HTTPException } from "hono/http-exception";
 import { Readable, Transform } from "node:stream";
 import type { ReadableStream as NodeWebStream } from "node:stream/web";
+import { notifyProject } from "../notify.ts";
 import { getStore } from "../store.ts";
 import { notFound } from "./helpers.ts";
 /**
@@ -58,6 +59,19 @@ export async function createBuildRecord(
       message: meta.message,
     },
     config.secret,
+  );
+  await notifyProject(
+    project,
+    "build:created",
+    {
+      buildId: build.id,
+      gitSha: meta.gitSha,
+      gitBranch: meta.gitBranch,
+      authorEmail: meta.authorEmail,
+      authorName: meta.authorName,
+      message: meta.message,
+    },
+    `/builds/${build.id}`,
   );
   return build;
 }
@@ -188,6 +202,15 @@ export async function refreshBuild(buildId: string): Promise<void> {
       },
       config.secret,
     );
+    const project = await new ProjectModel(db).get(build.projectId);
+    if (project) {
+      await notifyProject(
+        project,
+        `build:${status}`,
+        { buildId, status, snapshotCount: snapshots.length },
+        `/builds/${buildId}`,
+      );
+    }
   }
 }
 
@@ -206,6 +229,12 @@ export async function approveSnapshot(snapshotId: string, userId: string | null)
   }
   await snapshots.review(snapshotId, "approved", userId);
   const baselines = new BaselineModel(db, undefined, getStore().storage, config.secret);
+  const prior = await baselines.getFor(
+    project.id,
+    snapshot.storyId,
+    snapshot.viewportName,
+    build.gitBranch,
+  );
   await baselines.upsert(
     project.id,
     snapshot.storyId,
@@ -213,6 +242,18 @@ export async function approveSnapshot(snapshotId: string, userId: string | null)
     build.gitBranch,
     snapshot.id,
     snapshot.screenshotPath,
+  );
+  await notifyProject(
+    project,
+    prior ? "baseline:updated" : "baseline:created",
+    {
+      storyId: snapshot.storyId,
+      viewport: snapshot.viewportName,
+      branch: build.gitBranch,
+      snapshotId: snapshot.id,
+      buildId: build.id,
+    },
+    `/builds/${build.id}`,
   );
   await refreshBuild(build.id);
 }

@@ -1,6 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { CommentModel } from "@storyshelf/core/models";
 import type { ShelfRouter } from "../app-types.ts";
+import { notifyProject } from "../notify.ts";
 import { getStore } from "../store.ts";
 import { VIEW_ROLES, DEVELOPER_ROLES, buildForProject } from "./builds.handlers.ts";
 import { resolveAuthorizedProject, notFound as throwNotFound } from "./helpers.ts";
@@ -68,6 +69,17 @@ export function registerComments(app: ShelfRouter): void {
       build.id,
       userId,
       body,
+    );
+    await notifyProject(
+      project,
+      "comment:created",
+      {
+        buildId: build.id,
+        commentId: comment.id,
+        snapshotId: comment.snapshotId,
+        body: comment.body.slice(0, 500),
+      },
+      `/builds/${build.id}`,
     );
     return c.json(comment, 201);
   });
