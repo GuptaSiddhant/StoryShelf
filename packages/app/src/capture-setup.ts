@@ -4,7 +4,9 @@ import { createDispatchJob, InMemoryCaptureQueue } from "@storyshelf/core/captur
 import type { CaptureDispatchJob, CaptureJobOptions } from "@storyshelf/core/capture";
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
+import { BuildModel } from "@storyshelf/core/models";
 import { captureMetrics, currentTraceparent } from "@storyshelf/observability";
+import { notifySystemWith } from "./notify.ts";
 
 /**
  * Wiring for the capture queue: the queue instance (if any) and a helper
@@ -38,6 +40,30 @@ async function timedRunJob(
   }
   instruments.jobsCompleted.add(1);
   instruments.jobDuration.record(performance.now() - start);
+}
+
+/** Alert admins when an in-process capture leaves its build failed. */
+async function notifyCaptureFailed(
+  options: ShelfOptions,
+  config: ShelfConfig,
+  logger: Logger,
+  buildId: string,
+): Promise<void> {
+  const build = await new BuildModel(options.database).get(buildId);
+  if (build?.status !== "failed") {
+    return;
+  }
+  await notifySystemWith(
+    {
+      db: options.database,
+      config,
+      ui: options.ui ?? {},
+      logger,
+      notifiers: options.notifiers ?? [],
+    },
+    "sys:capture-failed",
+    { buildId, projectId: build.projectId, gitBranch: build.gitBranch },
+  );
 }
 
 /** Assemble the capture queue and its enqueue hook. */
@@ -113,6 +139,9 @@ export function setupCaptureQueue(
       logger,
       runJob: async (job: CaptureDispatchJob): Promise<void> => {
         await timedRunJob(runJob, job);
+        // In-process completions only: remote-queue workers own their own
+        // alerting (the server never sees those outcomes).
+        await notifyCaptureFailed(options, config, logger, job.buildId);
       },
     });
   const enqueueCapture = async (buildId: string, reqId?: string): Promise<void> => {

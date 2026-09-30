@@ -114,6 +114,18 @@ export const authOptionsSchema = z
     // oxlint-disable-next-line typescript/no-deprecated -- z.string().url() kept for zod v3 API compat
     baseURL: z.string().url(),
     emailPassword: z.boolean().optional(),
+    emailSender: z
+      .custom<ShelfAuthOptions["emailSender"]>(
+        (value) => typeof value === "object" && value !== null,
+      )
+      .optional(),
+    fromEmail: z.string().min(1).optional(),
+    onAuthSystemEvent: z
+      .custom<ShelfAuthOptions["onAuthSystemEvent"]>((value) => typeof value === "function")
+      .optional(),
+    logger: z
+      .custom<ShelfAuthOptions["logger"]>((value) => typeof value === "object" && value !== null)
+      .optional(),
     social: z.array(socialSchema).optional(),
     oauth: z.array(oauthSchema).optional(),
     sso: z
@@ -224,13 +236,23 @@ async function resolveSecretValues(
 }
 
 /**
- * Secret-bearing subtrees: `db` (live adapter with circular drizzle handles)
- * and `plugins` (class instances) pass through by reference and are never
- * walked or cloned — refs only make sense in plain config data.
+ * Secret-bearing subtrees: `db` (live adapter with circular drizzle handles),
+ * `emailSender` (live transport), `logger` (pino instance), `onAuthSystemEvent`
+ * (host callback), and `plugins` (class instances) pass through by reference
+ * and are never walked or cloned — refs only make sense in plain config data.
  */
 function secretSubtrees(options: Omit<ShelfAuthOptions, "plugins">): Record<string, unknown> {
-  const { db: _db, ...rest } = options as Omit<ShelfAuthOptions, "plugins"> & {
+  const {
+    db: _db,
+    emailSender: _sender,
+    logger: _logger,
+    onAuthSystemEvent: _hook,
+    ...rest
+  } = options as Omit<ShelfAuthOptions, "plugins"> & {
     db: unknown;
+    emailSender: unknown;
+    logger: unknown;
+    onAuthSystemEvent: unknown;
   };
   return rest;
 }

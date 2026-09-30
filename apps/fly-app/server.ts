@@ -1,8 +1,10 @@
 import { serve } from "@hono/node-server";
-import { createShelfApp } from "@storyshelf/app";
+import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
+import { chatNotifiers } from "@storyshelf/notify-chat";
+import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/notify-email";
 import { otelLogMixin } from "@storyshelf/observability";
 import { initObservabilityFromEnv } from "@storyshelf/observability/node";
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
@@ -80,10 +82,18 @@ const captureRunner = createPlaywrightCaptureRunner();
 const observability = await initObservabilityFromEnv();
 const shelfLogger = createShelfLogger({ mixin: otelLogMixin });
 
+// Notifications: SMTP sender from SMTP_* env (undefined keeps invites
+// out-of-band); chat + email providers serve stored channels.
+const emailSender = smtpPresetFromEnv(env, shelfLogger);
+const emailNotifiers = emailSender
+  ? [createEmailNotifier(emailSender, { from: env["SMTP_FROM"] })]
+  : [];
+
 const app = createShelfApp({
   database,
   storage,
   captureRunner,
+  notifiers: [...chatNotifiers, ...emailNotifiers],
   auth:
     authPassword && secret
       ? createShelfAuth({
@@ -91,6 +101,10 @@ const app = createShelfApp({
           secret,
           baseURL: publicBaseUrl ?? `http://localhost:${port}`,
           passkeys: {},
+          emailSender,
+          fromEmail: env["SMTP_FROM"],
+          onAuthSystemEvent: createAuthSystemHook(),
+          logger: shelfLogger,
         }).adapter
       : undefined,
   ui: ui as never,
@@ -101,6 +115,7 @@ const app = createShelfApp({
     adminToken,
     publicBaseUrl,
     scratchDir: dataDir,
+    ...(env["SMTP_FROM"] ? { notifications: { fromEmail: env["SMTP_FROM"] } } : {}),
   },
 });
 

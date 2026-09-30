@@ -101,6 +101,8 @@ interface Answers {
   queue: QueueChoice;
   docker: boolean;
   includeWorker?: boolean;
+  /** Email + chat notification wiring. Absent in older mocked answers. */
+  notifications?: boolean;
   /** Deploy target. Absent in older mocked answers — derived from `docker`. */
   deployTarget?: DeployTarget;
   /** AWS-only follow-ups (asked when deployTarget is `aws`). */
@@ -234,6 +236,11 @@ const STORAGE_INIT: Record<StorageChoice, string> = {
   gcs: `createGcsStorage({ bucket: process.env.GCS_BUCKET! })`,
 };
 
+/** Whether the generated server wires notification providers. */
+function wantsNotifications(answers: Answers): boolean {
+  return answers.notifications ?? true;
+}
+
 function buildImports(answers: Answers): string[] {
   const imports = [
     `import { serve } from "@hono/node-server";`,
@@ -280,6 +287,15 @@ function buildImports(answers: Answers): string[] {
     const host = answers.git === "github" ? "gitHubHost" : "gitLabHost";
     imports.push(`import { ${host} } from "${GIT_PACKAGE[answers.git]}";`);
   }
+  if (wantsNotifications(answers)) {
+    imports.push(
+      `import { chatNotifiers } from "@storyshelf/notify-chat";`,
+      `import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/notify-email";`,
+    );
+    if (answers.auth !== "none") {
+      imports.push(`import { createAuthSystemHook } from "@storyshelf/app";`);
+    }
+  }
   if (answers.queue === "memory") {
     imports.push(`import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";`);
   }
@@ -317,6 +333,13 @@ function buildAdapterLines(answers: Answers): string[] {
   if (answers.queue === "memory") {
     lines.push(`const captureRunner = createPlaywrightCaptureRunner();`);
   }
+  if (wantsNotifications(answers)) {
+    lines.push(
+      `// Notifications: SMTP sender from SMTP_* env (undefined keeps invites out-of-band).`,
+      `const emailSender = smtpPresetFromEnv(process.env);`,
+      `const emailNotifiers = emailSender ? [createEmailNotifier(emailSender, { from: process.env.SMTP_FROM })] : [];`,
+    );
+  }
   return lines;
 }
 
@@ -337,9 +360,16 @@ function buildRouterLines(answers: Answers): string[] {
     lines.push(`  captureRunner,`);
   }
 
+  if (wantsNotifications(answers)) {
+    lines.push(`  notifiers: [...chatNotifiers, ...emailNotifiers],`);
+  }
+
   if (answers.auth === "password") {
+    const notifyArgs = wantsNotifications(answers)
+      ? `, emailSender, fromEmail: process.env.SMTP_FROM, onAuthSystemEvent: createAuthSystemHook()`
+      : ``;
     lines.push(
-      `  auth: createShelfAuth({ db: database, secret: process.env.SECRET!, baseURL: process.env.PUBLIC_BASE_URL! }).adapter,`,
+      `  auth: createShelfAuth({ db: database, secret: process.env.SECRET!, baseURL: process.env.PUBLIC_BASE_URL!${notifyArgs} }).adapter,`,
     );
   }
   if (answers.auth === "oauth" && resolveDeployTarget(answers) === "aws") {
@@ -348,6 +378,13 @@ function buildRouterLines(answers: Answers): string[] {
       `    db: database,`,
       `    secret: process.env.SECRET!,`,
       `    baseURL: process.env.PUBLIC_BASE_URL!,`,
+      ...(wantsNotifications(answers)
+        ? [
+            `    emailSender,`,
+            `    fromEmail: process.env.SMTP_FROM,`,
+            `    onAuthSystemEvent: createAuthSystemHook(),`,
+          ]
+        : []),
       `    social: [`,
       `      cognitoPreset({`,
       `        domain: process.env.COGNITO_DOMAIN!,`,
@@ -366,6 +403,13 @@ function buildRouterLines(answers: Answers): string[] {
       `    db: database,`,
       `    secret: process.env.SECRET!,`,
       `    baseURL: process.env.PUBLIC_BASE_URL!,`,
+      ...(wantsNotifications(answers)
+        ? [
+            `    emailSender,`,
+            `    fromEmail: process.env.SMTP_FROM,`,
+            `    onAuthSystemEvent: createAuthSystemHook(),`,
+          ]
+        : []),
       `    oauth: [`,
       `      keycloakPreset(process.env.OIDC_ISSUER!, {`,
       `        clientId: process.env.OIDC_CLIENT_ID!,`,
@@ -587,6 +631,10 @@ function buildDeps(answers: Answers): Record<string, string> {
   }
   if (answers.git !== "none") {
     deps[GIT_PACKAGE[answers.git] ?? ""] = __PKG_VERSION__ ?? "0.0.0";
+  }
+  if (wantsNotifications(answers)) {
+    deps["@storyshelf/notify-chat"] = __PKG_VERSION__ ?? "0.0.0";
+    deps["@storyshelf/notify-email"] = __PKG_VERSION__ ?? "0.0.0";
   }
   // Queue dep when sqs
   if (answers.queue !== "memory") {

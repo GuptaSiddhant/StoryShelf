@@ -480,4 +480,62 @@ describe("runServerInit", () => {
     expect(pkg.scripts["docker:down"]).toBeDefined();
     expect(pkg.scripts["infra:plan"]).toBeUndefined();
   });
+
+  it("wires notifications when enabled", async () => {
+    vi.mocked(prompts).mockResolvedValue({
+      name: "my-server",
+      dir: "./my-server",
+      database: "sqlite",
+      storage: "local",
+      auth: "password",
+      git: "none",
+      queue: "memory",
+      docker: false,
+      notifications: true,
+    });
+    const cwd = process.cwd();
+    process.chdir(tmpRoot);
+    try {
+      await runServerInit({});
+    } finally {
+      process.chdir(cwd);
+    }
+    const code = readFileSync(join(dir, "server.ts"), "utf8");
+    expect(code).toContain("chatNotifiers");
+    expect(code).toContain("smtpPresetFromEnv");
+    expect(code).toContain("onAuthSystemEvent: createAuthSystemHook()");
+    const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
+      dependencies: Record<string, string>;
+    };
+    expect(pkg.dependencies["@storyshelf/notify-chat"]).toBeDefined();
+    expect(pkg.dependencies["@storyshelf/notify-email"]).toBeDefined();
+  });
+
+  it("omits notifications when disabled", async () => {
+    vi.mocked(prompts).mockResolvedValue({
+      name: "my-server",
+      dir: "./my-server",
+      database: "sqlite",
+      storage: "local",
+      auth: "password",
+      git: "none",
+      queue: "memory",
+      docker: false,
+      notifications: false,
+    });
+    const cwd = process.cwd();
+    process.chdir(tmpRoot);
+    try {
+      await runServerInit({});
+    } finally {
+      process.chdir(cwd);
+    }
+    const code = readFileSync(join(dir, "server.ts"), "utf8");
+    expect(code).not.toContain("chatNotifiers");
+    expect(code).not.toContain("smtpPresetFromEnv");
+    const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
+      dependencies: Record<string, string>;
+    };
+    expect(pkg.dependencies["@storyshelf/notify-chat"]).toBeUndefined();
+  });
 });

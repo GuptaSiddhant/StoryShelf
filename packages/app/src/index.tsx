@@ -219,6 +219,7 @@ function packageVersion(): string {
  * under `core/schema`. Importing the barrel must never pull Node-only modules
  * into edge bundles beyond what Hono itself needs.
  */
+export { createAuthSystemHook } from "./notify.ts";
 export type {
   ShelfOptions,
   ShelfConfig,

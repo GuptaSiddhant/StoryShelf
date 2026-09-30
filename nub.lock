@@ -149,6 +149,12 @@ importers:
       '@storyshelf/db-sqlite':
         specifier: workspace:*
         version: link:../../packages/db-sqlite
+      '@storyshelf/notify-chat':
+        specifier: workspace:*
+        version: link:../../packages/notify-chat
+      '@storyshelf/notify-email':
+        specifier: workspace:*
+        version: link:../../packages/notify-email
       '@storyshelf/observability':
         specifier: workspace:*
         version: link:../../packages/observability
@@ -198,6 +204,12 @@ importers:
       '@storyshelf/db-sqlite':
         specifier: workspace:*
         version: link:../../packages/db-sqlite
+      '@storyshelf/notify-chat':
+        specifier: workspace:*
+        version: link:../../packages/notify-chat
+      '@storyshelf/notify-email':
+        specifier: workspace:*
+        version: link:../../packages/notify-email
       '@storyshelf/observability':
         specifier: workspace:*
         version: link:../../packages/observability

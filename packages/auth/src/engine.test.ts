@@ -34,6 +34,7 @@ async function testEngine(
   social = false,
   passkeys = false,
   sso = false,
+  extra: Partial<Parameters<typeof createShelfAuth>[0]> = {},
 ): Promise<{ db: DatabaseAdapter; shelf: ShelfAuth }> {
   const dir = mkdtempSync(join(tmpdir(), "storyshelf-auth-engine-"));
   dirs.push(dir);
@@ -46,6 +47,7 @@ async function testEngine(
     db,
     secret: "spike-secret-that-is-long-enough-123456",
     baseURL: "http://localhost:3000",
+    ...extra,
     ...(social ? { social: [githubPreset({ clientId: "shelf", clientSecret: "shh" })] } : {}),
     ...(passkeys ? { passkeys: {} } : {}),
     ...(sso
@@ -149,6 +151,31 @@ async function awaitMirror(db: DatabaseAdapter, id: string): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   throw new Error(`mirror row missing for ${id}`);
+}
+
+function recordingSender(sent: { to: string; subject: string }[]): {
+  sender: Parameters<typeof createShelfAuth>[0]["emailSender"];
+} {
+  const metadata = { name: "test", version: "0.0.0", kind: "test", category: "notifier" as const };
+  return {
+    sender: {
+      metadata,
+      send: async (message: { to: string; subject: string }): Promise<void> => {
+        sent.push({ to: message.to, subject: message.subject });
+      },
+    },
+  };
+}
+
+async function awaitHook(calls: unknown[][], event: string): Promise<void> {
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    if (calls.some((call) => call[0] === event)) {
+      return;
+    }
+    // oxlint-disable-next-line eslint/no-await-in-loop -- poll loop must be sequential
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`hook missing for ${event}`);
 }
 
 describe("createShelfAuth", () => {
@@ -542,5 +569,83 @@ describe("createShelfAuth", () => {
         ],
       }),
     ).toThrow(/shadows reserved engine path "\/sign-in\/email"/u);
+  });
+});
+
+describe("auth email sender", () => {
+  it("emails invite links best-effort and fires sys:invite-issued", async () => {
+    const sent: { to: string; subject: string }[] = [];
+    const hooks: unknown[][] = [];
+    const { sender } = recordingSender(sent);
+    const { shelf } = await testEngine(false, false, false, false, {
+      emailSender: sender,
+      fromEmail: "shelf@example.com",
+      onAuthSystemEvent: (...call: unknown[]): void => {
+        hooks.push(call);
+      },
+    });
+    const issued = await shelf.adapter.issueInvite({
+      email: "ada@example.com",
+      name: "Ada",
+      role: "member",
+    });
+    expect(issued.token).not.toBe("");
+    expect(sent).toEqual([{ to: "ada@example.com", subject: "Your StoryShelf invite" }]);
+    await awaitHook(hooks, "sys:invite-issued");
+    // The token stays usable out-of-band.
+    await shelf.adapter.acceptInvite({
+      inviteId: issued.inviteId,
+      token: issued.token,
+      password: "hunter2hunter2",
+    });
+  });
+
+  it("still returns invite tokens when the sender throws", async () => {
+    const { shelf } = await testEngine(false, false, false, false, {
+      emailSender: {
+        metadata: { name: "t", version: "0", kind: "t", category: "notifier" },
+        send: async (): Promise<void> => {
+          throw new Error("smtp down");
+        },
+      },
+    });
+    const issued = await shelf.adapter.issueInvite({
+      email: "ghost@example.com",
+      name: "Ghost",
+      role: "member",
+    });
+    expect(issued.token).not.toBe("");
+  });
+
+  it("survives hook failures on invite and user creation", async () => {
+    const hookCalls: unknown[][] = [];
+    const { shelf } = await testEngine(false, false, false, false, {
+      onAuthSystemEvent: (...call: unknown[]): void => {
+        hookCalls.push(call);
+        throw new Error("hook down");
+      },
+    });
+    const issued = await shelf.adapter.issueInvite({
+      email: "bob@example.com",
+      name: "Bob",
+      role: "member",
+    });
+    await shelf.adapter.acceptInvite({
+      inviteId: issued.inviteId,
+      token: issued.token,
+      password: "hunter2hunter2",
+    });
+    await awaitHook(hookCalls, "sys:user-created");
+  });
+
+  it("sends password-reset mail when a sender is configured", async () => {
+    const sent: { to: string; subject: string }[] = [];
+    const { sender } = recordingSender(sent);
+    const { shelf } = await testEngine(false, false, false, false, { emailSender: sender });
+    await inviteUser(shelf, "carol@example.com", "Carol");
+    sent.length = 0;
+    const reset = await post(shelf, "/request-password-reset", { email: "carol@example.com" });
+    expect(reset.status).toBe(200);
+    expect(sent).toEqual([{ to: "carol@example.com", subject: "Reset your StoryShelf password" }]);
   });
 });

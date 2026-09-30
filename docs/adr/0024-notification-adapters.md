@@ -21,3 +21,23 @@ Outbound communication is webhooks-only (`webhooks` table, signed JSON POST per 
 - Machine (`webhooks`) and human (notifiers) payloads stay decoupled; one topic catalog serves both.
 - `auth`-without-SMTP keeps working (out-of-band invite links); with `emailSender` wired, invites/resets share the notification transport and branding.
 - Per-user Slack DMs, phone numbers, custom templates, and durable outbox/retries are explicit non-goals for v1.
+
+## Auth mail addendum
+
+- `ShelfAuthOptions` accepts `emailSender` (the same transport instance
+  notification channels use — single `nodemailer` owner), `fromEmail`, a
+  `logger`, and one `onAuthSystemEvent(event, data)` hook for
+  `sys:user-created` / `sys:invite-issued`. The hook is best-effort
+  (failures logged, never break auth) and fires from both the mirror hook
+  (SSO/social first logins) and the invite-accept wrapper (direct
+  credential writes bypass Better Auth's `databaseHooks`).
+- Invites are best-effort email: the link sends when a sender is set, but
+  the token is always still returned (fictional addresses keep working).
+- Resets are both: `sendResetPassword` is wired when a sender is set (user
+  self-service); re-invite stays available to admins regardless.
+- `sys:auth-failed` fires on local-login credential failures only
+  (`POST /auth/engine/login` 401s — never 429/5xx noise, never secrets;
+  spray attempts can fan out, bounded by the `/auth/*` rate limit).
+- Background emitters (in-process capture completion, scheduled purge)
+  use explicit-deps variants (`notifySystemWith`) since no request scope
+  exists there; remote-queue workers own their own alerting.

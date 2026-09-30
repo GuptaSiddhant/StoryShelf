@@ -137,6 +137,12 @@ export const INFRA_PROMPTS: Prompt[] = [
     message: "Generate Docker files?",
     initial: true,
   },
+  {
+    type: "confirm",
+    name: "notifications",
+    message: "Enable email + chat notifications (Slack/Teams/email channels)?",
+    initial: true,
+  },
 ];
 
 export const WORKER_INFRA_PROMPTS: Prompt[] = [

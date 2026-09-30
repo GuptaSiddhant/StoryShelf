@@ -42,6 +42,16 @@ Site admins manage project-less channels (`POST /api/v1/admin/notification-chann
 
 One SMTP configuration serves notification channels and (optionally) auth mail: wire the same sender into `createShelfAuth({ emailSender })` and `notifiers`. Without it, invites stay out-of-band links (fictional addresses keep working; sends are best-effort and the token is still returned). Presets: `smtp` (default), `mailpit` (local dev), `log` (tests/unconfigured), HTTP APIs (`resend`-style via shared `httpJson`).
 
+| Env | Purpose | Default |
+|---|---|---|
+| `SMTP_HOST` | SMTP relay host (unset = no sender) | — |
+| `SMTP_PORT` | Relay port | `587` |
+| `SMTP_SECURE` | `1`/`true` for implicit TLS (465) | STARTTLS |
+| `SMTP_USER` / `SMTP_PASS` | Relay credentials | — |
+| `SMTP_FROM` | Sender address (`fromEmail`) | — |
+
+Password recovery is both: users can request a reset email when a sender is configured; admins can always re-invite (which also resets access). Failed local logins emit `sys:auth-failed` to admin channels (SSO failures excluded in v1).
+
 ## Related
 
 - [Webhooks](/guides/webhooks/) — signed machine events for custom receivers

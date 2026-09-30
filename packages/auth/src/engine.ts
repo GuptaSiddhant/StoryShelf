@@ -1,7 +1,9 @@
 import { passkey } from "@better-auth/passkey";
 import { sso, type SSOOptions } from "@better-auth/sso";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import type { EmailSender } from "@storyshelf/core/adapter/email-sender";
 import type { Auth, EngineLoginMethod } from "@storyshelf/core/auth";
+import type { Logger } from "@storyshelf/core/logger";
 import { UserModel } from "@storyshelf/core/models";
 /**
  * Shelf auth engine: Better Auth protocol plumbing behind the Auth singleton.
@@ -38,6 +40,25 @@ export interface ShelfAuthOptions {
   baseURL: string;
   /** Enable email/password login. Defaults to true. */
   emailPassword?: boolean;
+  /**
+   * Email transport shared with notification channels. When set, invite
+   * links are emailed best-effort and password-reset requests send mail;
+   * when unset, invites stay out-of-band links and resets stay re-invite.
+   */
+  emailSender?: EmailSender;
+  /** Sender address for auth mail (defaults to `storyshelf@<baseURL host>`). */
+  fromEmail?: string;
+  /**
+   * System-event hook for host-owned fan-out (e.g. `sys:user-created`,
+   * `sys:invite-issued` to admin channels). Best-effort: failures are
+   * logged and swallowed, never break auth flows.
+   */
+  onAuthSystemEvent?: (
+    event: "sys:user-created" | "sys:invite-issued",
+    data: Record<string, unknown>,
+  ) => unknown;
+  /** Host-owned logger for auth diagnostics (explicit override only). */
+  logger?: Logger;
   /** Native social providers (GitHub, Google, Entra, Cognito...), each one button. */
   social?: ShelfSocialProvider[];
   /** OAuth/OIDC providers, each rendered as one login button. Defaults to none. */
@@ -223,7 +244,11 @@ function toAuthUser(
   };
 }
 
-async function mirrorUser(db: DatabaseAdapter, created: unknown): Promise<void> {
+async function mirrorUser(
+  db: DatabaseAdapter,
+  created: unknown,
+  hooks: Pick<ShelfAuthOptions, "onAuthSystemEvent" | "logger">,
+): Promise<void> {
   const user = created as { id: string; email: string; name: string; image?: string | null };
   // Never demote: an engine row created for a staged invitee (admin role)
   // would otherwise overwrite the role with the default.
@@ -235,6 +260,18 @@ async function mirrorUser(db: DatabaseAdapter, created: unknown): Promise<void> 
     avatarUrl: user.image ?? null,
     role: existing?.role ?? "member",
   });
+  if (existing) {
+    return;
+  }
+  try {
+    await hooks.onAuthSystemEvent?.("sys:user-created", {
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+    });
+  } catch (error) {
+    hooks.logger?.warn({ err: error, userId: user.id }, "auth system hook failed");
+  }
 }
 
 function toOAuthConfig(provider: ShelfOAuthProvider): GenericOAuthConfig {
@@ -478,6 +515,28 @@ const SSO_MANAGEMENT_PATHS = [
   "/sso/verify-domain",
 ];
 
+/** Default sender address derived from the public base URL host. */
+function defaultFromEmail(baseURL: string): string {
+  try {
+    return `storyshelf@${new URL(baseURL).hostname}`;
+  } catch {
+    return "storyshelf@localhost";
+  }
+}
+
+/** Send one auth mail; throws so callers decide best-effort policy. */
+async function sendAuthMail(
+  options: Pick<ShelfAuthOptions, "emailSender" | "fromEmail" | "baseURL">,
+  message: { to: string; subject: string; text: string },
+): Promise<void> {
+  await options.emailSender?.send({
+    to: message.to,
+    subject: message.subject,
+    text: message.text,
+    from: options.fromEmail ?? defaultFromEmail(options.baseURL),
+  });
+}
+
 /**
  * Build the Better Auth instance with shelf-curated defaults: email/password,
  * DB sessions under our cookie name, no cookie cache (revocation and
@@ -501,6 +560,22 @@ function buildAuthInstance(options: ShelfAuthOptions, db: DatabaseAdapter): Shel
       // only credential origins are invite accept, env bootstrap, and SSO
       // provisioning (all write identities directly, never via sign-up).
       disableSignUp: true,
+      // User-requested resets work only when a sender is configured;
+      // admins can always re-invite regardless.
+      ...(options.emailSender
+        ? {
+            sendResetPassword: async (input: {
+              user: { email: string };
+              url: string;
+            }): Promise<void> => {
+              await sendAuthMail(options, {
+                to: input.user.email,
+                subject: "Reset your StoryShelf password",
+                text: `Reset your password here (single use): ${input.url}`,
+              });
+            },
+          }
+        : {}),
     },
     // Native socials are option bags per provider key; our preset-built
     // records match those shapes, so narrow past the generated union.
@@ -517,7 +592,7 @@ function buildAuthInstance(options: ShelfAuthOptions, db: DatabaseAdapter): Shel
       user: {
         create: {
           after: async (created: unknown): Promise<void> => {
-            await mirrorUser(db, created);
+            await mirrorUser(db, created, options);
           },
         },
       },
@@ -598,6 +673,68 @@ async function setUserDisabled(
   }
 }
 
+/** Send the invite link best-effort; the token is always still returned. */
+async function sendInviteMail(
+  options: ShelfAuthOptions,
+  email: string,
+  issued: { inviteId: string; token: string; expiresAt: string },
+): Promise<void> {
+  try {
+    await options.onAuthSystemEvent?.("sys:invite-issued", {
+      email,
+      inviteId: issued.inviteId,
+      expiresAt: issued.expiresAt,
+    });
+  } catch (error) {
+    options.logger?.warn({ err: error, email }, "auth system hook failed");
+  }
+  if (!options.emailSender) {
+    return;
+  }
+  const link = `${options.baseURL.replace(/\/+$/u, "")}/auth/invites/${issued.inviteId}?token=${issued.token}`;
+  try {
+    await sendAuthMail(options, {
+      to: email,
+      subject: "Your StoryShelf invite",
+      text: `Accept your invite here (expires ${issued.expiresAt}): ${link}`,
+    });
+  } catch (error) {
+    // Fictional/internal addresses never deliver: log and keep the token
+    // usable out-of-band.
+    options.logger?.warn({ err: error, email }, "invite email failed");
+  }
+}
+
+/** Invite lifecycle methods for the Auth singleton (best-effort mail). */
+function buildInviteMethods(
+  db: DatabaseAdapter,
+  options: ShelfAuthOptions,
+): Pick<Auth, "issueInvite" | "verifyInvite" | "acceptInvite"> {
+  return {
+    issueInvite: async (input) => {
+      const issued = await issueInvite(db, input);
+      await sendInviteMail(options, input.email, issued);
+      return issued;
+    },
+    verifyInvite: async (input) => await verifyInvite(db, input),
+    acceptInvite: async (input) => {
+      // Direct credential writes bypass Better Auth's databaseHooks, so the
+      // mirror hook never sees invite accepts: emit the creation here.
+      const user = await acceptInvite(db, input);
+      try {
+        await options.onAuthSystemEvent?.("sys:user-created", {
+          userId: user.id,
+          email: user.email,
+          name: user.name,
+        });
+      } catch (error) {
+        options.logger?.warn({ err: error, userId: user.id }, "auth system hook failed");
+      }
+      return { ...user, providerId: ENGINE_PROVIDER_ID };
+    },
+  };
+}
+
 /** Auth singleton: session reads, revocation, invites, and descriptors. */
 function buildAdapter(
   shelf: ShelfAuthInstance,
@@ -615,12 +752,7 @@ function buildAdapter(
         throw new Error("Shelf auth requires a secret of at least 32 characters");
       }
     },
-    issueInvite: async (input) => await issueInvite(db, input),
-    verifyInvite: async (input) => await verifyInvite(db, input),
-    acceptInvite: async (input) => {
-      const user = await acceptInvite(db, input);
-      return { ...user, providerId: ENGINE_PROVIDER_ID };
-    },
+    ...buildInviteMethods(db, options),
     passkeysEnabled: () => options.passkeys !== undefined,
     listSessions: async (userId) => await listUserSessions(db, userId),
     listPasskeys: async (userId) => await listUserPasskeys(db, userId),

@@ -58,6 +58,32 @@ export function mailpitPreset(
   });
 }
 
+/**
+ * SMTP sender from the environment (`SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`,
+ * `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`). Returns undefined unless
+ * `SMTP_HOST` is set, so unconfigured servers keep current behavior.
+ */
+export function smtpPresetFromEnv(
+  env: Record<string, string | undefined> = process.env,
+  logger?: Logger,
+): EmailSender | undefined {
+  const host = env["SMTP_HOST"];
+  const from = env["SMTP_FROM"];
+  if (!host || !from) {
+    return undefined;
+  }
+  const port = Number(env["SMTP_PORT"] ?? 587);
+  return smtpPreset({
+    host,
+    port: Number.isSafeInteger(port) && port > 0 ? port : 587,
+    secure: env["SMTP_SECURE"] === "1" || env["SMTP_SECURE"] === "true",
+    user: env["SMTP_USER"],
+    pass: env["SMTP_PASS"],
+    from,
+    logger,
+  });
+}
+
 /** Log-only preset for tests and unconfigured servers (no delivery). */
 export function logPreset(options: { logger?: Logger } = {}): EmailSender {
   let logger = options.logger?.child({ component: "notify-email-log" });

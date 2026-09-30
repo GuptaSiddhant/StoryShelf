@@ -5,6 +5,7 @@ import { SESSION_COOKIE } from "@storyshelf/core/types";
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
+import { notifySystem } from "../notify.ts";
 import { renderInviteInvalidPage, renderInvitePage } from "../pages/invite.tsx";
 import { renderLoginPage } from "../pages/login.tsx";
 import { getStore } from "../store.ts";
@@ -151,6 +152,10 @@ async function finishCredentialLogin(
     if (res.status >= 500) {
       return renderEngineLogin(c, engine, "Invalid credentials", email, 502);
     }
+    // Credential failures only (never rate-limit/upstream noise, never
+    // secrets): admins opted into sys:* see a login-attempt signal. Spray
+    // attempts can fan out here; the /auth/* rate-limit bucket bounds it.
+    await notifySystem("sys:auth-failed", { email });
     return renderEngineLogin(c, engine, "Invalid credentials", email, 401);
   }
   copySetCookies(c, res);
