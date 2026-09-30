@@ -33,6 +33,11 @@ import { registerHealth, type HealthDeps } from "./routers/health.ts";
 import { registerLabels } from "./routers/labels.ts";
 import { registerMedia } from "./routers/media.ts";
 import { registerMembers } from "./routers/members.ts";
+import {
+  registerNotificationChannels,
+  registerSystemChannels,
+} from "./routers/notification-channels.ts";
+import { registerNotificationSubscriptions } from "./routers/notification-subscriptions.ts";
 import { registerProfile } from "./routers/profile.ts";
 import { registerProjects } from "./routers/projects.ts";
 import { registerStatusConfigs } from "./routers/status-configs.ts";
@@ -104,6 +109,7 @@ function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
   app.use("*", requestLogging(logger));
   app.use("*", setupGate(getReady));
   mountGuards(app, config);
+  mountNotificationLimits(app);
   mountStoreScope(app, wiring);
   app.use("*", authGate());
 }
@@ -125,6 +131,19 @@ function mountGuards(app: ShelfRouter, config: ShelfConfig): void {
   app.use("/projects/:slug/settings/*", csrf(config.secret));
   app.use("/profile/*", csrf(config.secret));
   app.use("/profile", csrf(config.secret));
+}
+
+/** Abuse floors for notification management endpoints (own counters). */
+function mountNotificationLimits(app: ShelfRouter): void {
+  const channel = { windowMs: 60_000, max: 20, keyGenerator: rateLimitKey("notify-channels") };
+  const admin = { windowMs: 60_000, max: 20, keyGenerator: rateLimitKey("notify-admin") };
+  const subscription = { windowMs: 60_000, max: 30, keyGenerator: rateLimitKey("notify-subs") };
+  app.use("/api/v1/projects/:slug/notification-channels", rateLimit(channel));
+  app.use("/api/v1/projects/:slug/notification-channels/:channelId", rateLimit(channel));
+  app.use("/api/v1/projects/:slug/notifications", rateLimit(subscription));
+  app.use("/api/v1/projects/:slug/notifications/me", rateLimit(subscription));
+  app.use("/api/v1/admin/notification-channels", rateLimit(admin));
+  app.use("/api/v1/admin/notification-channels/:channelId", rateLimit(admin));
 }
 
 /** Mount the request-scoped store (db/storage/config/user/adapters). */
@@ -151,6 +170,15 @@ function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
 
 /** Register every JSON API router. */
 function registerApiRoutes(app: ShelfRouter, health: HealthDeps): void {
+  registerProjectRoutes(app);
+  registerNotificationRoutes(app);
+  registerStatusConfigs(app);
+  registerHealth(app, health);
+  registerAdmin(app);
+}
+
+/** Register the per-project resource routers. */
+function registerProjectRoutes(app: ShelfRouter): void {
   registerProjects(app);
   registerBuilds(app);
   registerLabels(app);
@@ -158,9 +186,13 @@ function registerApiRoutes(app: ShelfRouter, health: HealthDeps): void {
   registerMembers(app);
   registerTokens(app);
   registerWebhooks(app);
-  registerStatusConfigs(app);
-  registerHealth(app, health);
-  registerAdmin(app);
+}
+
+/** Register the notification channel and subscription routers. */
+function registerNotificationRoutes(app: ShelfRouter): void {
+  registerNotificationChannels(app);
+  registerNotificationSubscriptions(app);
+  registerSystemChannels(app);
 }
 
 /** Register the auth flow: engine mount, relying-party documents, profile. */

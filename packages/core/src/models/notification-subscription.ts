@@ -49,6 +49,13 @@ export class NotificationSubscriptionModel {
     })) as unknown as NotificationSubscriptionRow[];
   }
 
+  /** List all subscriptions for a user (profile overview). */
+  async listForUser(userId: string): Promise<NotificationSubscriptionRow[]> {
+    return (await this.db.list(this.tables.notificationSubscriptions, {
+      where: eq(this.column("userId"), userId),
+    })) as unknown as NotificationSubscriptionRow[];
+  }
+
   /** Create or replace a user's subscription for a project. */
   async upsert(
     projectId: string,

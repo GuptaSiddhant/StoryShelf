@@ -2,6 +2,8 @@ import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import { LabelModel } from "@storyshelf/core/models";
 import { MemberModel } from "@storyshelf/core/models";
+import { NotificationChannelModel } from "@storyshelf/core/models";
+import { NotificationSubscriptionModel } from "@storyshelf/core/models";
 import { ProjectGroupMappingModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
 import { StatusConfigModel } from "@storyshelf/core/models";
@@ -19,6 +21,10 @@ import {
   type SettingsTab,
 } from "../pages/project-settings.tsx";
 import type { SettingsMember } from "../pages/settings-members.tsx";
+import type {
+  SettingsMySubscription,
+  SettingsNotificationChannel,
+} from "../pages/settings-notifications.tsx";
 import type { SettingsStatusConfig } from "../pages/settings-status.tsx";
 import type { SettingsWebhook } from "../pages/settings-webhooks.tsx";
 import { getStore } from "../store.ts";
@@ -31,6 +37,9 @@ export interface SettingsData {
   members: SettingsMember[];
   groupMappings: ProjectGroupMapping[];
   webhooks: SettingsWebhook[];
+  notificationChannels: SettingsNotificationChannel[];
+  notifyProviders: string[];
+  mySubscription: SettingsMySubscription | null;
   statusConfigs: SettingsStatusConfig[];
   gitHosts: GitHostProvider[];
   isAdmin: boolean;
@@ -120,28 +129,100 @@ async function loadGroupMappings(
   return await new ProjectGroupMappingModel(db).list(projectId);
 }
 
+/** Channel summaries for the settings UI. */
+async function loadNotificationChannels(
+  db: DatabaseAdapter,
+  secret: string | undefined,
+  projectId: string,
+): Promise<SettingsNotificationChannel[]> {
+  const rows = await new NotificationChannelModel(db, undefined, secret).list(projectId);
+  return rows.map((row) => ({
+    id: row.id,
+    provider: row.provider,
+    config: NotificationChannelModel.configOf(row),
+    hasSecret: row.secretEncrypted !== null,
+    events: NotificationChannelModel.eventsOf(row),
+    enabled: row.enabled,
+  }));
+}
+
+/** The viewer's own subscription for the settings UI (null when opted out). */
+async function loadMySubscription(
+  db: DatabaseAdapter,
+  projectId: string,
+  userId: string | undefined,
+): Promise<SettingsMySubscription | null> {
+  if (!userId) {
+    return null;
+  }
+  const row = await new NotificationSubscriptionModel(db).getFor(projectId, userId);
+  if (!row) {
+    return null;
+  }
+  return {
+    events: NotificationSubscriptionModel.eventsOf(row),
+    via: NotificationSubscriptionModel.viaOf(row),
+    enabled: row.enabled,
+  };
+}
+
+/** Notification channels, providers, and my subscription for the UI. */
+async function loadNotificationSection(
+  db: DatabaseAdapter,
+  secret: string | undefined,
+  projectId: string,
+  userId: string | undefined,
+  notifiers: { metadata: { kind: string } }[],
+): Promise<{
+  notificationChannels: SettingsNotificationChannel[];
+  notifyProviders: string[];
+  mySubscription: SettingsMySubscription | null;
+}> {
+  const notificationChannels = await loadNotificationChannels(db, secret, projectId);
+  const mySubscription = await loadMySubscription(db, projectId, userId);
+  return {
+    notificationChannels,
+    notifyProviders: notifiers.map((candidate) => candidate.metadata.kind),
+    mySubscription,
+  };
+}
+
+/** Roster, tokens, webhooks, and status configs for the settings UI. */
+async function loadInventorySection(
+  db: DatabaseAdapter,
+  secret: string | undefined,
+  projectId: string,
+): Promise<{
+  labelTypes: LabelType[];
+  members: SettingsMember[];
+  groupMappings: ProjectGroupMapping[];
+  tokens: Omit<Token, "hash">[];
+  webhooks: SettingsWebhook[];
+  statusConfigs: SettingsStatusConfig[];
+}> {
+  const { labelTypes, members, groupMappings } = await loadMembersSection(db, projectId);
+  const tokens = await loadTokenSummaries(db, projectId);
+  const webhooks = await loadWebhookSummaries(db, projectId);
+  const statusConfigs = await loadStatusConfigSummaries(db, secret, projectId);
+  return { labelTypes, members, groupMappings, tokens, webhooks, statusConfigs };
+}
+
 async function loadSettingsData(slug: string): Promise<SettingsData | null> {
   const project = await new ProjectModel(getStore().db).getBySlug(slug);
   if (!project) {
     return null;
   }
-  const { db, config, user, authEnabled, gitHosts } = getStore();
-  const { labelTypes, members, groupMappings } = await loadMembersSection(db, project.id);
-  const tokens = await loadTokenSummaries(db, project.id);
-  const webhooks = await loadWebhookSummaries(db, project.id);
-  const statusConfigs = await loadStatusConfigSummaries(db, config.secret, project.id);
-  const isAdmin = isProjectAdmin(authEnabled, user, members);
-  return {
-    project,
-    labelTypes,
-    tokens,
-    members,
-    groupMappings,
-    webhooks,
-    statusConfigs,
-    gitHosts,
-    isAdmin,
-  };
+  const { db, config, user, authEnabled, gitHosts, notifiers } = getStore();
+  const inventory = await loadInventorySection(db, config.secret, project.id);
+  const notifications = await loadNotificationSection(
+    db,
+    config.secret,
+    project.id,
+    user?.id,
+    notifiers,
+  );
+  const isAdmin = isProjectAdmin(authEnabled, user, inventory.members);
+  return { project, ...inventory, ...notifications, gitHosts, isAdmin };
 }
 
 /** Render the project settings page for the given tab, optionally with form state. */
@@ -164,6 +245,9 @@ export async function renderSettingsPage(
       members: data.members,
       groupMappings: data.groupMappings,
       webhooks: data.webhooks,
+      notificationChannels: data.notificationChannels,
+      notifyProviders: data.notifyProviders,
+      mySubscription: data.mySubscription,
       statusConfigs: data.statusConfigs,
       gitHosts: data.gitHosts,
       isAdmin: data.isAdmin,

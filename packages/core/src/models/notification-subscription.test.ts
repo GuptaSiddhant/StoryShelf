@@ -36,4 +36,15 @@ describe("NotificationSubscriptionModel", () => {
     expect(await model(db).getFor("p1", "u1")).toBeNull();
     expect(await model(db).getFor("p2", "u1")).not.toBeNull();
   });
+
+  it("lists all subscriptions for a user", async () => {
+    const { db } = makeDatabase();
+    await model(db).upsert("p1", "u1", { via: ["email"] });
+    await model(db).upsert("p2", "u1", { via: ["email"] });
+    await model(db).upsert("p1", "u2", { via: ["email"] });
+    const rows = await model(db).listForUser("u1");
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row) => row.projectId)).toContain("p1");
+    expect(rows.map((row) => row.projectId)).toContain("p2");
+  });
 });

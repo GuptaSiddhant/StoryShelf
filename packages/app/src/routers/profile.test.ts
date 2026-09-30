@@ -135,4 +135,34 @@ describe("profile page", () => {
     const response = await postForm("/profile", form, testApp(await seed()));
     expect(response.status).toBe(400);
   });
+
+  it("toggles project email notifications from the profile page", async () => {
+    const seeded = await seed();
+    const app = testApp(seeded);
+    const page = await app.request("/profile", { headers: session });
+    expect(await page.text()).toContain("Notifications");
+
+    const enable = new FormData();
+    enable.set("slug", "demo");
+    enable.set("enabled", "1");
+    const saved = await postForm("/profile/notifications", enable, app);
+    expect(saved.status).not.toBe(400);
+    const enabled = await app.request("/profile", { headers: session });
+    expect(await enabled.text()).toContain("Email on");
+
+    const disable = new FormData();
+    disable.set("slug", "demo");
+    const removed = await postForm("/profile/notifications", disable, app);
+    expect(removed.status).not.toBe(400);
+    const off = await app.request("/profile", { headers: session });
+    expect(await off.text()).not.toContain("Email on");
+  });
+
+  it("rejects notification toggles for foreign projects", async () => {
+    const form = new FormData();
+    form.set("slug", "ghost");
+    form.set("enabled", "1");
+    const response = await postForm("/profile/notifications", form, testApp(await seed()));
+    expect(response.status).toBe(400);
+  });
 });

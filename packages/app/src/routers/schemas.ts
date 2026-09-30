@@ -313,6 +313,52 @@ export const statusConfigCreateSchema = z
   })
   .openapi("StatusConfigCreateInput");
 
+/** OpenAPI schema for a public notification channel (secret omitted). */
+export const notificationChannelSchema = z
+  .object({
+    id: z.string(),
+    projectId: z.string().nullable(),
+    provider: z.string(),
+    config: z.record(z.string(), z.unknown()),
+    hasSecret: z.boolean(),
+    events: z.array(z.string()),
+    enabled: z.boolean(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+  })
+  .openapi("NotificationChannel");
+
+/** OpenAPI schema for creating a notification channel. */
+export const notificationChannelCreateSchema = z
+  .object({
+    provider: z.string().min(1),
+    config: z.record(z.string(), z.unknown()),
+    secret: z.string().min(1).optional(),
+    events: z.array(z.string().min(1)).optional(),
+    enabled: z.boolean().optional(),
+  })
+  .openapi("NotificationChannelCreateInput");
+
+/** OpenAPI schema for a per-user notification subscription. */
+export const notificationSubscriptionSchema = z
+  .object({
+    projectId: z.string(),
+    userId: z.string(),
+    events: z.array(z.string()),
+    via: z.array(z.string()),
+    enabled: z.boolean(),
+  })
+  .openapi("NotificationSubscription");
+
+/** OpenAPI schema for setting your own notification subscription. */
+export const notificationSubscriptionPutSchema = z
+  .object({
+    events: z.array(z.string().min(1)).optional(),
+    via: z.array(z.string().min(1)).optional(),
+    enabled: z.boolean().optional(),
+  })
+  .openapi("NotificationSubscriptionPutInput");
+
 /** OpenAPI schema for a generic `{ ok: true }` acknowledgement. */
 export const okSchema = z.object({ ok: z.boolean() }).openapi("Ok");
 

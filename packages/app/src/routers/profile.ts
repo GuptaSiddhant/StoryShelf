@@ -1,6 +1,7 @@
 import type { Auth } from "@storyshelf/auth";
 import { MIN_PASSWORD_LENGTH, unsignedToken } from "@storyshelf/auth";
-import { UserModel } from "@storyshelf/core/models";
+import { NotificationSubscriptionModel, ProjectModel, UserModel } from "@storyshelf/core/models";
+import type { Project } from "@storyshelf/core/schema";
 import { SESSION_COOKIE, type AuthUser } from "@storyshelf/core/types";
 import { eq, getTableColumns } from "drizzle-orm";
 import type { Context } from "hono";
@@ -52,6 +53,7 @@ type ProfilePage = Parameters<typeof renderProfilePage>[0];
 async function loadProfileData(userId: string): Promise<{
   userRow: ProfileRow | null;
   memberships: ProfileMembership[];
+  subscribedSlugs: string[];
 }> {
   const { db } = getStore();
   const userRow = (await new UserModel(db).get(userId)) as unknown as ProfileRow | null;
@@ -77,7 +79,12 @@ async function loadProfileData(userId: string): Promise<{
         ]
       : [];
   });
-  return { userRow, memberships };
+  const subs = await new NotificationSubscriptionModel(db).listForUser(userId);
+  const subscribedIds = new Set(subs.filter((sub) => sub.enabled).map((sub) => sub.projectId));
+  const subscribedSlugs = [...byId.values()]
+    .filter((project) => subscribedIds.has(project.id))
+    .map((project) => project.slug);
+  return { userRow, memberships, subscribedSlugs };
 }
 
 function readSessionToken(c: Context): string {
@@ -125,12 +132,13 @@ async function profileView(
   auth: Auth,
   extra?: { error?: string; success?: string; local?: boolean; status?: 200 | 400 },
 ): Promise<Response> {
-  const { userRow, memberships } = await loadProfileData(user.id);
+  const { userRow, memberships, subscribedSlugs } = await loadProfileData(user.id);
   const security = await loadEngineSecurity(c, auth, user);
   const html = await renderProfilePage({
     user,
     dbUser: toDbUser(userRow),
     memberships,
+    subscribedSlugs,
     isLocal: extra?.local ?? security.hasPassword,
     security,
     error: extra?.error,
@@ -167,6 +175,53 @@ export function registerProfile(app: ShelfRouter, auth: Auth): void {
   registerPasswordRoute(app, auth);
   registerSessionRoutes(app, auth);
   registerPasskeyRoutes(app, auth);
+  registerNotificationsRoute(app, auth);
+}
+
+function registerNotificationsRoute(app: ShelfRouter, auth: Auth): void {
+  app.post("/profile/notifications", async (c) => {
+    const { user } = getStore();
+    if (!user) {
+      return c.redirect("/auth/login", 302);
+    }
+    return await saveProfileNotifications(c, user, auth);
+  });
+}
+
+/** Toggle the viewer's own email subscription for one member project. */
+async function saveProfileNotifications(c: Context, user: AuthUser, auth: Auth): Promise<Response> {
+  const form = await c.req.formData();
+  const project = await memberProject(field(form, "slug"), user.id);
+  if (!project) {
+    return profileView(c, user, auth, { error: "Unknown project", status: 400 });
+  }
+  await applyProfileToggle(project.id, user.id, field(form, "enabled") === "1");
+  return hxRedirect(c, "/profile");
+}
+
+/** Resolve a project the viewer belongs to (null otherwise). */
+async function memberProject(slug: string, userId: string): Promise<Project | null> {
+  const project = await new ProjectModel(getStore().db).getBySlug(slug);
+  if (!project) {
+    return null;
+  }
+  const { memberships } = await loadProfileData(userId);
+  const isMember = memberships.some((membership) => membership.projectSlug === slug);
+  return isMember ? project : null;
+}
+
+/** Enable (opt-in email) or disable (remove) a subscription. */
+async function applyProfileToggle(
+  projectId: string,
+  userId: string,
+  enable: boolean,
+): Promise<void> {
+  const model = new NotificationSubscriptionModel(getStore().db);
+  if (enable) {
+    await model.upsert(projectId, userId, { via: ["email"] });
+    return;
+  }
+  await model.remove(projectId, userId);
 }
 
 function registerPasswordRoute(app: ShelfRouter, auth: Auth): void {

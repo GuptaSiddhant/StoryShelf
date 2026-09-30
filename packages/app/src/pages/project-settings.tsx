@@ -8,6 +8,11 @@ import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import { renderSettingsGeneral } from "./settings-general.tsx";
 import { renderSettingsLabels } from "./settings-labels.tsx";
 import { renderSettingsMembers, type SettingsMember } from "./settings-members.tsx";
+import {
+  renderSettingsNotifications,
+  type SettingsMySubscription,
+  type SettingsNotificationChannel,
+} from "./settings-notifications.tsx";
 import { renderSettingsStatus, type SettingsStatusConfig } from "./settings-status.tsx";
 import { renderSettingsTests } from "./settings-tests.tsx";
 import { renderSettingsTokens } from "./settings-tokens.tsx";
@@ -20,6 +25,7 @@ export type SettingsTab =
   | "labels"
   | "tokens"
   | "webhooks"
+  | "notifications"
   | "members"
   | "status";
 
@@ -32,6 +38,9 @@ export interface ProjectSettingsData {
   members: SettingsMember[];
   groupMappings: ProjectGroupMapping[];
   webhooks: SettingsWebhook[];
+  notificationChannels: SettingsNotificationChannel[];
+  notifyProviders: string[];
+  mySubscription: SettingsMySubscription | null;
   statusConfigs: SettingsStatusConfig[];
   gitHosts: GitHostProvider[];
   isAdmin: boolean;
@@ -56,6 +65,7 @@ const TAB_LABELS: Record<SettingsTab, string> = {
   labels: "Labels",
   tokens: "Tokens",
   webhooks: "Webhooks",
+  notifications: "Notifications",
   members: "Members",
   status: "Git status",
 };
@@ -66,6 +76,7 @@ const SETTINGS_TABS: SettingsTab[] = [
   "labels",
   "tokens",
   "webhooks",
+  "notifications",
   "members",
   "status",
 ];
@@ -79,6 +90,15 @@ function renderActiveTab(data: ProjectSettingsData, formState?: SettingsFormStat
     return renderSettingsTokens(project, data.tokens, data.isAdmin, formState?.secret);
   if (activeTab === "webhooks")
     return renderSettingsWebhooks(project, data.webhooks, data.isAdmin, formState);
+  if (activeTab === "notifications")
+    return renderSettingsNotifications(
+      project,
+      data.notificationChannels,
+      data.notifyProviders,
+      data.mySubscription,
+      data.isAdmin,
+      formState,
+    );
   if (activeTab === "members")
     return renderSettingsMembers(project, data.members, data.groupMappings, data.isAdmin);
   if (activeTab === "status")

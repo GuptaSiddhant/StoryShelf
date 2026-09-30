@@ -27,6 +27,7 @@ export interface ProfilePageState {
     createdAt: string;
   };
   memberships: Array<{ projectName: string; projectSlug: string; role: string; source: string }>;
+  subscribedSlugs: string[];
   error?: string;
   success?: string;
   isLocal?: boolean;
@@ -255,7 +256,7 @@ const PasskeysSection: FC<{ security: SecurityState }> = ({ security }) => {
 /** Personal profile page (editable display name, password for local accounts). */
 // oxlint-disable-next-line eslint/max-lines-per-function -- profile page composes several sections, cohesive
 export function renderProfilePage(state: ProfilePageState): RenderedContent {
-  const { user, dbUser, memberships, error, success, isLocal, security } = state;
+  const { user, dbUser, memberships, subscribedSlugs, error, success, isLocal, security } = state;
   const avatar = safeImageUrl(user.avatarUrl);
   const displayName = dbUser?.displayNameOverride ?? user.name;
   const provider = dbUser?.authProvider ?? user.providerId ?? "oidc";
@@ -375,6 +376,52 @@ export function renderProfilePage(state: ProfilePageState): RenderedContent {
                     <td>{m.source}</td>
                   </tr>
                 ),
+              )}
+            </tbody>
+          </table>
+        )}
+      </Card>
+
+      <Card>
+        <PageHeader
+          title="Notifications"
+          description="Email alerts per project. Fine-tune topics in each project's settings."
+        />
+        {memberships.length === 0 ? (
+          <p class={profileMeta}>No project memberships.</p>
+        ) : (
+          <table class={membershipTable}>
+            <thead>
+              <tr>
+                <th>Project</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {memberships.map(
+                // oxlint-disable-next-line typescript/promise-function-async -- JSX map is sync
+                (m) => {
+                  const subscribed = subscribedSlugs.includes(m.projectSlug);
+                  return (
+                    <tr key={m.projectSlug}>
+                      <td>
+                        <a href={`/projects/${m.projectSlug}`}>{m.projectName}</a>
+                      </td>
+                      <td>{subscribed ? <Badge>Email on</Badge> : <Badge>Off</Badge>}</td>
+                      <td>
+                        <form method="post" action="/profile/notifications">
+                          {csrfField()}
+                          <input type="hidden" name="slug" value={m.projectSlug} />
+                          <input type="hidden" name="enabled" value={subscribed ? "" : "1"} />
+                          <Button variant="secondary" size="sm" type="submit">
+                            {subscribed ? "Disable" : "Enable"}
+                          </Button>
+                        </form>
+                      </td>
+                    </tr>
+                  );
+                },
               )}
             </tbody>
           </table>
