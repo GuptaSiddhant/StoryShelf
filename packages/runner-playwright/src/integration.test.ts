@@ -51,8 +51,10 @@ async function runFixtureCommand(command: string, args: readonly string[]): Prom
 }
 
 async function fixtureBuilt(): Promise<boolean> {
+  // Gate on iframe.html (what capture loads), not index.html — current
+  // Storybook builds emit no top-level index.html.
   try {
-    await access(join(FIXTURE_STATIC_DIR, "index.html"));
+    await access(join(FIXTURE_STATIC_DIR, "iframe.html"));
     return true;
   } catch {
     return false;
