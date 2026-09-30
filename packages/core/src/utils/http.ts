@@ -17,6 +17,25 @@ export async function httpJson<T>(url: string, options: HttpRequestOptions = {})
     options,
     options.retries ?? DEFAULT_RETRIES,
     options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    doFetchJson,
+  );
+}
+
+/**
+ * POST/PUT plain payloads (e.g. Slack/Teams webhook cards) with the same
+ * timeout, retry, and `Retry-After` semantics as {@link httpJson}.
+ *
+ * @param url - Absolute request URL.
+ * @param options - Method, headers, text body, timeout, retries, logger.
+ * @returns The raw response body text.
+ */
+export async function httpText(url: string, options: HttpTextOptions = {}): Promise<string> {
+  return await requestWithRetry<string>(
+    url,
+    options,
+    options.retries ?? DEFAULT_RETRIES,
+    options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    doFetchText,
   );
 }
 
@@ -49,6 +68,19 @@ export interface HttpRequestOptions {
 }
 
 const DEFAULT_TIMEOUT_MS = 30_000;
+
+/** Options for {@link httpText}. */
+export interface HttpTextOptions {
+  method?: string;
+  headers?: Record<string, string>;
+  /** Body serialized as JSON with a `content-type` header. */
+  json?: unknown;
+  /** Per-attempt timeout in milliseconds (default 30s). */
+  timeoutMs?: number;
+  /** Total attempts including the first (default 3). */
+  retries?: number;
+  logger?: Logger;
+}
 const DEFAULT_RETRIES = 3;
 const MAX_RETRY_AFTER_MS = 30_000;
 const BACKOFF_BASE_MS = 1000;
@@ -105,13 +137,14 @@ async function requestWithRetry<T>(
   options: HttpRequestOptions,
   maxAttempts: number,
   timeoutMs: number,
+  perform: (url: string, options: HttpRequestOptions, timeoutMs: number) => Promise<T>,
 ): Promise<T> {
   return await withSpan(
     "http.client",
     async (span) => {
       for (let attempt = 1; ; attempt += 1) {
         try {
-          return await doFetch<T>(url, options, timeoutMs);
+          return await perform(url, options, timeoutMs);
         } catch (error) {
           span.recordException(error instanceof Error ? error : String(error));
           if (!shouldRetry(error, attempt, maxAttempts)) {
@@ -158,7 +191,29 @@ function buildRequest(options: HttpRequestOptions): {
   return { headers, body, method: options.method ?? "GET" };
 }
 
-async function doFetch<T>(url: string, options: HttpRequestOptions, timeoutMs: number): Promise<T> {
+async function doFetchJson<T>(
+  url: string,
+  options: HttpRequestOptions,
+  timeoutMs: number,
+): Promise<T> {
+  const response = await doFetchResponse(url, options, timeoutMs);
+  return (await response.json()) as T;
+}
+
+async function doFetchText(
+  url: string,
+  options: HttpRequestOptions,
+  timeoutMs: number,
+): Promise<string> {
+  const response = await doFetchResponse(url, options, timeoutMs);
+  return await response.text();
+}
+
+async function doFetchResponse(
+  url: string,
+  options: HttpRequestOptions,
+  timeoutMs: number,
+): Promise<Response> {
   const request = buildRequest(options);
   injectTraceContext(request.headers);
   options.logger?.debug({ url, method: request.method }, "http request");
@@ -172,5 +227,5 @@ async function doFetch<T>(url: string, options: HttpRequestOptions, timeoutMs: n
     const text = await response.text();
     throw new HttpError(response.status, text.slice(0, MAX_BODY_SNIPPET), response.headers);
   }
-  return (await response.json()) as T;
+  return response;
 }

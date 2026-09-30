@@ -194,6 +194,7 @@
     "@types/pngjs": "catalog:",
     "@types/unzipper": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "adm-zip": "^0.6.1",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { HttpError, httpJson } from "./http.ts";
+import { HttpError, httpJson, httpText } from "./http.ts";
 
 function jsonResponse(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return Response.json(body, { status, headers });
@@ -104,6 +104,33 @@ describe("httpJson", () => {
     await expect(
       httpJson("https://example.com/api", { timeoutMs: 20, retries: 1 }),
     ).rejects.toThrow("aborted");
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+});
+
+describe("httpText", () => {
+  it("returns raw text for non-JSON webhook responses", async () => {
+    const fetchMock = vi.fn(async () => {
+      await Promise.resolve();
+      return new Response("ok", { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const body = await httpText("https://hooks.example.com/x", {
+      method: "POST",
+      json: { text: "hello" },
+    });
+    expect(body).toBe("ok");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("throws HttpError on non-2xx without swallowing the body", async () => {
+    const fetchMock = vi.fn(async () => {
+      await Promise.resolve();
+      return new Response("invalid_token", { status: 403 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const caught = await httpText("https://hooks.example.com/x").catch((error: unknown) => error);
+    expect(caught).toBeInstanceOf(HttpError);
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 });

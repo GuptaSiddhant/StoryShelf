@@ -33,8 +33,10 @@ export class NotificationSubscriptionModel {
 
   /** Fetch a user's subscription for a project, or null (null = silent). */
   async getFor(projectId: string, userId: string): Promise<NotificationSubscriptionRow | null> {
+    const projectScope = eq(this.column("projectId"), projectId);
+    const userScope = eq(this.column("userId"), userId);
     const rows = (await this.db.list(this.tables.notificationSubscriptions, {
-      where: and(eq(this.column("projectId"), projectId), eq(this.column("userId"), userId)),
+      where: and(projectScope, userScope),
       limit: 1,
     })) as unknown as NotificationSubscriptionRow[];
     return rows[0] ?? null;
