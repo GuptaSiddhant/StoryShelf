@@ -58,6 +58,10 @@ const DEQUEUED = (overrides: Partial<DequeuedMessageItem> = {}): DequeuedMessage
     ...overrides,
   }) as unknown as DequeuedMessageItem;
 
+function malformed(): DequeuedMessageItem[] {
+  return [DEQUEUED({ messageText: "not-json", messageId: "m-bad", popReceipt: "pr-bad" })];
+}
+
 describe("metadata and lifecycle", () => {
   it("has correct metadata", () => {
     const { client } = makeClient();
@@ -146,10 +150,6 @@ describe("poll", () => {
   });
 
   describe("host logger binding", () => {
-    const malformed = () => [
-      DEQUEUED({ messageText: "not-json", messageId: "m-bad", popReceipt: "pr-bad" }),
-    ];
-
     it("warns through the bound host logger", async () => {
       const { client } = makeClient({ receive: malformed });
       const queue = createAzureStorageQueuesQueue({ ...options, client });

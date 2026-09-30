@@ -88,19 +88,19 @@ describe("storyshelf-config.json parity", () => {
   });
 });
 
-describe("schemaReference", () => {
-  function fakeInstall(): { moduleUrl: string; configDir: string } {
-    const distFile = join(dir, "fake-cli", "dist", "config.js");
-    mkdirSync(join(dir, "fake-cli", "dist"), { recursive: true });
-    mkdirSync(join(dir, "fake-cli", "schema"), { recursive: true });
-    writeFileSync(distFile, "export {};\n");
-    writeFileSync(join(dir, "fake-cli", "schema", "storyshelf-config.json"), "{}\n");
-    mkdirSync(configRoot(), { recursive: true });
-    return { moduleUrl: pathToFileURL(distFile).href, configDir: configRoot() };
-  }
+function fakeInstall(target: string): { moduleUrl: string; configDir: string } {
+  const distFile = join(target, "fake-cli", "dist", "config.js");
+  mkdirSync(join(target, "fake-cli", "dist"), { recursive: true });
+  mkdirSync(join(target, "fake-cli", "schema"), { recursive: true });
+  writeFileSync(distFile, "export {};\n");
+  writeFileSync(join(target, "fake-cli", "schema", "storyshelf-config.json"), "{}\n");
+  mkdirSync(configRoot(), { recursive: true });
+  return { moduleUrl: pathToFileURL(distFile).href, configDir: configRoot() };
+}
 
-  it("prefers a path relative to the config directory", () => {
-    const { moduleUrl, configDir } = fakeInstall();
+describe("schemaReference", () => {
+  it("prefers a path relative to the config directory", async () => {
+    const { moduleUrl, configDir } = fakeInstall(dir);
     const expected = toPosix(
       relative(configDir, join(dir, "fake-cli", "schema", "storyshelf-config.json")),
     );
@@ -127,15 +127,15 @@ describe("schemaReference", () => {
   });
 });
 
-describe("writeStorybookConfig $schema handling", () => {
-  async function readRaw(): Promise<Record<string, unknown>> {
-    const raw = await readFile(join(dir, ".storybook", "storyshelf.json"), "utf8");
-    return JSON.parse(raw) as Record<string, unknown>;
-  }
+async function readRaw(target: string): Promise<Record<string, unknown>> {
+  const raw = await readFile(join(target, ".storybook", "storyshelf.json"), "utf8");
+  return JSON.parse(raw) as Record<string, unknown>;
+}
 
+describe("writeStorybookConfig $schema handling", () => {
   it("stamps $schema on request", async () => {
     await writeStorybookConfig({ slug: "demo" }, dir, undefined, { stampSchema: true });
-    const raw = await readRaw();
+    const raw = await readRaw(dir);
     expect(typeof raw["$schema"]).toBe("string");
     expect(String(raw["$schema"])).toContain("schema/storyshelf-config.json");
     await expect(loadStorybookConfig(dir)).resolves.toEqual({ slug: "demo" });
@@ -148,7 +148,7 @@ describe("writeStorybookConfig $schema handling", () => {
       JSON.stringify({ $schema: "https://example.com/schema.json", slug: "demo" }),
     );
     await writeStorybookConfig({ slug: "demo", url: "https://shelf.example.com" }, dir);
-    expect(await readRaw()).toMatchObject({
+    expect(await readRaw(dir)).toMatchObject({
       $schema: "https://example.com/schema.json",
       slug: "demo",
     });
@@ -156,6 +156,6 @@ describe("writeStorybookConfig $schema handling", () => {
 
   it("adds no $schema when absent and unstamped", async () => {
     await writeStorybookConfig({ slug: "demo" }, dir);
-    expect(await readRaw()).toEqual({ slug: "demo" });
+    expect(await readRaw(dir)).toEqual({ slug: "demo" });
   });
 });

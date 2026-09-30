@@ -148,6 +148,10 @@ const RECEIVED = (overrides: Partial<ServiceBusReceivedMessage> = {}): ServiceBu
     ...overrides,
   }) as unknown as ServiceBusReceivedMessage;
 
+function malformed(): ServiceBusReceivedMessage[] {
+  return [RECEIVED({ body: "not-json", messageId: "m-bad" })];
+}
+
 describe("poll", () => {
   it("returns null when no messages", async () => {
     const { receiver } = makeReceiver({ receive: () => [] });
@@ -181,8 +185,6 @@ describe("poll", () => {
   });
 
   describe("host logger binding", () => {
-    const malformed = () => [RECEIVED({ body: "not-json", messageId: "m-bad" })];
-
     it("warns through the bound host logger", async () => {
       const { receiver } = makeReceiver({ receive: malformed });
       const sender = makeSender([]);

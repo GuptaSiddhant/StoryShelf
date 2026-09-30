@@ -91,7 +91,9 @@ export function createDrizzleAdapter(db: unknown, options: DrizzleAdapterOptions
     update: async <T extends AnySQLiteTable>(
       table: T,
       id: string,
-      values: Partial<T["$inferInsert"]>,
+      // Homomorphic equivalent of Partial<T["$inferInsert"]>; written out so
+      // the type stays deferred instead of resolving to `{}` under generics.
+      values: { [K in keyof T["$inferInsert"]]?: T["$inferInsert"][K] },
     ): Promise<T["$inferSelect"]> => await updateOne(drizzle, table, id, values),
     get: async <T extends AnySQLiteTable>(
       table: T,

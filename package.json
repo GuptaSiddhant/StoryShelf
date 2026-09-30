@@ -82,7 +82,7 @@
   "devEngines": {
     "packageManager": {
       "name": "nub",
-      "version": "^0.7.5",
+      "version": "^0.9.5",
       "onFail": "ignore"
     },
     "runtime": {
@@ -91,7 +91,7 @@
       "onFail": "error"
     }
   },
-  "allowBuilds": {
+  "allowScripts": {
     "better-sqlite3": true
   }
 }

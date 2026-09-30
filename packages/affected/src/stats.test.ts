@@ -77,25 +77,25 @@ describe("loadDepGraph", () => {
   });
 });
 
-describe("loadStoryImportPaths", () => {
-  function writeIndex(name: string): void {
-    mkdirSync(join(dir, "static"), { recursive: true });
-    writeFileSync(
-      join(dir, "static", name),
-      JSON.stringify({
-        v: 5,
-        entries: {
-          a: { id: "a", importPath: "src/a.stories.tsx" },
-          b: { id: "b", importPath: "src/b.stories.tsx" },
-          docs: { id: "docs", importPath: "src/docs.mdx" },
-          noimport: { id: "noimport" },
-        },
-      }),
-    );
-  }
+function writeIndex(target: string, name: string): void {
+  mkdirSync(join(target, "static"), { recursive: true });
+  writeFileSync(
+    join(target, "static", name),
+    JSON.stringify({
+      v: 5,
+      entries: {
+        a: { id: "a", importPath: "src/a.stories.tsx" },
+        b: { id: "b", importPath: "src/b.stories.tsx" },
+        docs: { id: "docs", importPath: "src/docs.mdx" },
+        noimport: { id: "noimport" },
+      },
+    }),
+  );
+}
 
+describe("loadStoryImportPaths", () => {
   it("reads import paths from index.json", async () => {
-    writeIndex("index.json");
+    writeIndex(dir, "index.json");
     await expect(loadStoryImportPaths(dir, "static")).resolves.toEqual([
       "src/a.stories.tsx",
       "src/b.stories.tsx",
@@ -104,7 +104,7 @@ describe("loadStoryImportPaths", () => {
   });
 
   it("falls back to stories.json", async () => {
-    writeIndex("stories.json");
+    writeIndex(dir, "stories.json");
     await expect(loadStoryImportPaths(dir, "static")).resolves.toEqual([
       "src/a.stories.tsx",
       "src/b.stories.tsx",

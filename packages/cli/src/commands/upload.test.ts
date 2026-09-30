@@ -37,12 +37,13 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
+function throwsWithout(field: string, partial: Record<string, string>, message: string): void {
+  it(`throws without ${field}`, async () => {
+    await expect(runUpload({ ...partial, cwd: dir })).rejects.toThrow(message);
+  });
+}
+
 describe("runUpload validation", () => {
-  function throwsWithout(field: string, partial: Record<string, string>, message: string): void {
-    it(`throws without ${field}`, async () => {
-      await expect(runUpload({ ...partial, cwd: dir })).rejects.toThrow(message);
-    });
-  }
   const cases: { field: string; partial: Record<string, string>; message: string }[] = [
     {
       field: "url",
@@ -81,16 +82,16 @@ describe("runUpload validation", () => {
   });
 });
 
-describe("runUpload success", () => {
-  function writeFixture(): void {
-    const buildDir = join(dir, "storybook-static");
-    mkdirSync(buildDir, { recursive: true });
-    writeFileSync(join(buildDir, "index.json"), JSON.stringify({ v: 5, entries: {} }));
-    writeFileSync(join(buildDir, "iframe.html"), "<html></html>");
-  }
+function writeFixture(target: string): void {
+  const buildDir = join(target, "storybook-static");
+  mkdirSync(buildDir, { recursive: true });
+  writeFileSync(join(buildDir, "index.json"), JSON.stringify({ v: 5, entries: {} }));
+  writeFileSync(join(buildDir, "iframe.html"), "<html></html>");
+}
 
+describe("runUpload success", () => {
   it("posts JSON metadata then streams the zip with PUT", async () => {
-    writeFixture();
+    writeFixture(dir);
     const calls: { method: string; url: string; contentType: string | null }[] = [];
     let putBytes: Buffer = Buffer.alloc(0);
     vi.stubGlobal(
@@ -130,7 +131,7 @@ describe("runUpload success", () => {
   });
 
   it("throws on invalid --label flags", async () => {
-    writeFixture();
+    writeFixture(dir);
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => {
@@ -200,41 +201,41 @@ function okJson(payload: unknown): Response {
   } as Response;
 }
 
+function git(cwd: string, args: string[]): string {
+  return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
+}
+
+function writeBuild(target: string): void {
+  const buildDir = join(target, "storybook-static");
+  mkdirSync(buildDir, { recursive: true });
+  writeFileSync(
+    join(buildDir, "index.json"),
+    JSON.stringify({
+      v: 5,
+      entries: {
+        a: { id: "a", importPath: "src/a.stories.tsx" },
+        b: { id: "b", importPath: "src/b.stories.tsx" },
+      },
+    }),
+  );
+  writeFileSync(
+    join(buildDir, "preview-stats.json"),
+    JSON.stringify({
+      modules: [
+        { id: "src/a.stories.tsx", importedIds: ["src/a.tsx"] },
+        { id: "src/b.stories.tsx", importedIds: ["src/b.tsx"] },
+      ],
+    }),
+  );
+  writeFileSync(join(buildDir, "iframe.html"), "<html></html>");
+}
+
+function commitAll(cwd: string, message: string): void {
+  git(cwd, ["add", "."]);
+  git(cwd, ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "-m", message]);
+}
+
 describe("runUpload affected capture", () => {
-  function git(args: string[]): string {
-    return execFileSync("git", args, { cwd: dir, encoding: "utf8" }).trim();
-  }
-
-  function writeBuild(): void {
-    const buildDir = join(dir, "storybook-static");
-    mkdirSync(buildDir, { recursive: true });
-    writeFileSync(
-      join(buildDir, "index.json"),
-      JSON.stringify({
-        v: 5,
-        entries: {
-          a: { id: "a", importPath: "src/a.stories.tsx" },
-          b: { id: "b", importPath: "src/b.stories.tsx" },
-        },
-      }),
-    );
-    writeFileSync(
-      join(buildDir, "preview-stats.json"),
-      JSON.stringify({
-        modules: [
-          { id: "src/a.stories.tsx", importedIds: ["src/a.tsx"] },
-          { id: "src/b.stories.tsx", importedIds: ["src/b.tsx"] },
-        ],
-      }),
-    );
-    writeFileSync(join(buildDir, "iframe.html"), "<html></html>");
-  }
-
-  function commitAll(message: string): void {
-    git(["add", "."]);
-    git(["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "-m", message]);
-  }
-
   interface SeenCall {
     method: string;
     url: string;
@@ -265,7 +266,7 @@ describe("runUpload affected capture", () => {
   }
 
   it("posts a full-capture computation outside a git repository", async () => {
-    writeBuild();
+    writeBuild(dir);
     const { calls } = stubFetch({
       build: { id: "b1" },
       uploadUrl: "/x",
@@ -281,16 +282,16 @@ describe("runUpload affected capture", () => {
   });
 
   it("posts the selective set for a git change", async () => {
-    git(["-c", "init.defaultBranch=main", "init"]);
+    git(dir, ["-c", "init.defaultBranch=main", "init"]);
     mkdirSync(join(dir, "src"), { recursive: true });
     writeFileSync(join(dir, "src", "a.tsx"), "v1");
     writeFileSync(join(dir, "src", "b.tsx"), "v1");
-    writeBuild();
-    commitAll("base");
-    const base = git(["rev-parse", "HEAD"]);
+    writeBuild(dir);
+    commitAll(dir, "base");
+    const base = git(dir, ["rev-parse", "HEAD"]);
     writeFileSync(join(dir, "src", "a.tsx"), "v2");
-    commitAll("change a");
-    const head = git(["rev-parse", "HEAD"]);
+    commitAll(dir, "change a");
+    const head = git(dir, ["rev-parse", "HEAD"]);
     const { calls } = stubFetch({
       build: { id: "b1" },
       uploadUrl: "/x",
@@ -309,7 +310,7 @@ describe("runUpload affected capture", () => {
   });
 
   it("skips the affected post when --full is set", async () => {
-    writeBuild();
+    writeBuild(dir);
     const { calls } = stubFetch({
       build: { id: "b1" },
       uploadUrl: "/x",
@@ -322,22 +323,22 @@ describe("runUpload affected capture", () => {
   });
 
   it("merges config-file and flag untraced globs", async () => {
-    git(["-c", "init.defaultBranch=main", "init"]);
+    git(dir, ["-c", "init.defaultBranch=main", "init"]);
     mkdirSync(join(dir, "src"), { recursive: true });
     writeFileSync(join(dir, "src", "a.tsx"), "v1");
     writeFileSync(join(dir, "src", "b.tsx"), "v1");
-    writeBuild();
+    writeBuild(dir);
     mkdirSync(join(dir, ".storybook"), { recursive: true });
     writeFileSync(
       join(dir, ".storybook", "storyshelf.json"),
       JSON.stringify({ slug: "demo", untraced: ["src/a.tsx"] }),
     );
-    commitAll("base");
-    const base = git(["rev-parse", "HEAD"]);
+    commitAll(dir, "base");
+    const base = git(dir, ["rev-parse", "HEAD"]);
     writeFileSync(join(dir, "src", "a.tsx"), "v2");
     writeFileSync(join(dir, "src", "b.tsx"), "v2");
-    commitAll("change both");
-    const head = git(["rev-parse", "HEAD"]);
+    commitAll(dir, "change both");
+    const head = git(dir, ["rev-parse", "HEAD"]);
     const { calls } = stubFetch({
       build: { id: "b1" },
       uploadUrl: "/x",
@@ -362,7 +363,7 @@ describe("runUpload affected capture", () => {
   });
 
   it("synthesizes a local identity outside a git repository", async () => {
-    writeBuild();
+    writeBuild(dir);
     const { calls } = stubFetch({
       build: { id: "b1" },
       uploadUrl: "/x",

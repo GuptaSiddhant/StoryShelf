@@ -143,14 +143,16 @@ describe("createGcpPubSubQueue - poll", () => {
   });
 });
 
-describe("createGcpPubSubQueue - host logger binding", () => {
-  const malformed = () => [
+function malformed(): unknown[] {
+  return [
     RECEIVED({
       ackId: "ack-bad",
       message: { data: new TextEncoder().encode("not-json") },
     }),
   ];
+}
 
+describe("createGcpPubSubQueue - host logger binding", () => {
   it("warns through the bound host logger", async () => {
     const { subscriber } = makeSubscriber({ messages: malformed });
     const queue = createGcpPubSubQueue({ ...options, subscriber, publisher: makePublisher([]) });
