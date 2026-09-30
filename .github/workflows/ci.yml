@@ -93,9 +93,16 @@ jobs:
       - name: Build fixture Storybook
         run: pnpm --dir fixtures/${{ matrix.fixture }} run build-storybook
 
+      - name: Build workspace packages
+        # Replaces turbo's dependsOn ^build: the test step below bypasses
+        # turbo (step env does not survive `nubx turbo`), so build explicitly.
+        run: nub run build --filter='./packages/*'
+
       - name: Real-browser capture tests
         env:
-          FIXTURE_DIR: fixtures/${{ matrix.fixture }}
+          # Absolute: cwd-independent. Must flow via `nub run` — step env
+          # does not survive `nubx turbo`, which silently fell back to the
+          # default storybook-8 fixture in every matrix leg.
+          FIXTURE_DIR: ${{ github.workspace }}/fixtures/${{ matrix.fixture }}
           RUN_INTEGRATION: "1"
-        # --force: live results must never come from the turbo cache.
-        run: nubx turbo test:integration --filter='@storyshelf/runner-playwright' --force
+        run: nub run test:integration --filter='@storyshelf/runner-playwright'
