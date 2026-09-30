@@ -49,4 +49,4 @@ SECRET=$(openssl rand -hex 32)        # ≥ 32 characters
 3. User opens the link, sets a password (≥ 12), and is auto-signed-in to `/profile`.
 4. Expired or superseded links show “Invalid or expired invite”; generic “Invalid credentials” on login avoids enumeration. Re-invite to recover.
 
-See [Configuration](./configuration/) for `resolveAuthOptions` and `SECRET` handling, and [Auth concepts](../../concepts/auth/) for the engine vs shelf table split.
+See [Configuration](/guides/auth/configuration/) for `resolveAuthOptions` and `SECRET` handling, and [Auth concepts](/concepts/auth/) for the engine vs shelf table split.

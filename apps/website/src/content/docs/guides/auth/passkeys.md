@@ -23,6 +23,6 @@ Users enroll keys on `/profile` (register a 2nd key as backup) and sign in from 
 - **Secure context:** `localhost` or HTTPS; browsers require `isSecureContext` + `PublicKeyCredential`. The UI hides passkey buttons on plain-HTTP hosts.
 - **Origin stability:** RP ID defaults to the `baseURL` hostname; keep `PUBLIC_BASE_URL` stable when behind a reverse proxy.
 
-See also [session management](https://www.better-auth.com/docs/concepts/session-management) and [Profile](../../concepts/auth/).
+See also [session management](https://www.better-auth.com/docs/concepts/session-management) and [Auth concepts](/concepts/auth/).
 
-For other methods, see [Overview](./) and [Configuration](./configuration/).
+For other methods, see [Overview](/guides/auth/) and [Configuration](/guides/auth/configuration/).

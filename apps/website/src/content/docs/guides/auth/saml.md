@@ -42,6 +42,6 @@ samlPreset({
 })
 ```
 
-Same reconcile rules as [OIDC](./oidc/): exact match, site `admin` ↔ `member` on every sign-in, `sso:<group>` project grants, manual grants survive.
+Same reconcile rules as [OIDC](/guides/auth/oidc/): exact match, site `admin` ↔ `member` on every sign-in, `sso:<group>` project grants, manual grants survive.
 
-For OIDC discovery, see [OIDC](./oidc/); for secrets and precedence, see [Configuration](./configuration/).
+For OIDC discovery, see [OIDC](/guides/auth/oidc/); for secrets and precedence, see [Configuration](/guides/auth/configuration/).

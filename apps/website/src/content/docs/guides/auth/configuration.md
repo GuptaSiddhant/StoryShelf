@@ -48,4 +48,4 @@ Available keys: `title`, `subtitle`, `passwordLabel`, `passwordPlaceholder`, `su
 
 Every logged-in user gets `/profile`: avatar, editable display name, email, site role, provider, project memberships, and sign-out — plus **Devices** (per-device revoke, sign out others), **Passkeys** (list, delete, register), and password change for local accounts. A user-edited display name survives IdP refresh (`display_name_override`).
 
-See also [Auth concepts](../../concepts/auth/).
+See also [Auth concepts](/concepts/auth/).

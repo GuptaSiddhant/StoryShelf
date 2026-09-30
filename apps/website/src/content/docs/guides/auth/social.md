@@ -27,6 +27,6 @@ Available:
 - [`entraPreset`](https://www.better-auth.com/docs/reference/social-providers) (+ `tenantId` for Entra)
 - [`cognitoPreset`](https://www.better-auth.com/docs/reference/social-providers) (`domain` / `region` / `userPoolId`)
 
-Secrets stay out of code with `{env:NAME}` refs — see [Configuration](./configuration/). Each preset adds one `oauth` widget on `/auth/login` (sole method auto-redirects to the IdP).
+Secrets stay out of code with `{env:NAME}` refs — see [Configuration](/guides/auth/configuration/). Each preset adds one `oauth` widget on `/auth/login` (sole method auto-redirects to the IdP).
 
-Users link by email on first sign-in and keep existing shelf roles. For OIDC discovery and SAML, see [OIDC](./oidc/) and [SAML](./saml/).
+Users link by email on first sign-in and keep existing shelf roles. For OIDC discovery and SAML, see [OIDC](/guides/auth/oidc/) and [SAML](/guides/auth/saml/).
