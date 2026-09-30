@@ -99,10 +99,11 @@ jobs:
         run: nub run build --filter='./packages/*'
 
       - name: Real-browser capture tests
+        working-directory: packages/runner-playwright
         env:
           # Absolute: cwd-independent. Must flow via `nub run` — step env
           # does not survive `nubx turbo`, which silently fell back to the
           # default storybook-8 fixture in every matrix leg.
           FIXTURE_DIR: ${{ github.workspace }}/fixtures/${{ matrix.fixture }}
           RUN_INTEGRATION: "1"
-        run: nub run test:integration --filter='@storyshelf/runner-playwright'
+        run: nub run test:integration
