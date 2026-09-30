@@ -80,8 +80,7 @@ flowchart TB
     end
 
     subgraph DBadapters["Database Adapters"]
-        dbsqlite["@storyshelf/db-sqlite\nnode:sqlite + Drizzle"]
-        dbturso["@storyshelf/db-turso\n@libsql/client + Drizzle"]
+        dbsqlite["@storyshelf/db-sqlite\nnode:sqlite + Drizzle\n(presets: turso / better-sqlite3 / bun-sqlite / d1)"]
     end
 
     subgraph StoreAdapters["Storage Adapters"]
@@ -128,7 +127,6 @@ flowchart TB
     capture --> qmem
     capture -. alternative .-> qsqs
     dbsqlite --> schema
-    dbturso --> schema
     slocal --> adapters
     ss3 --> adapters
     aengine --> adapters
@@ -144,7 +142,7 @@ flowchart TB
     classDef app fill:#e6f4ea,stroke:#34a853;
     classDef fixture fill:#f3e8fd,stroke:#9c27b0,stroke-dasharray: 5 5;
     class Core,hono,mw,routes,pages,openapi,capture,diff,retention,models,schema,utils,adapters core;
-    class dbsqlite,dbturso,slocal,ss3,aengine,runner,qsqs,qmem,ghub,glab adapter;
+    class dbsqlite,slocal,ss3,aengine,runner,qsqs,qmem,ghub,glab adapter;
     class devsrv,flyapp,website,cli app;
     class f8,f9,f10 fixture;
 ```
@@ -792,7 +790,7 @@ No Docker socket mount, no repo cloning; capture runs via the image's own browse
 flowchart TB
     subgraph Cloud["Cloud Deployment"]
         Edge["Edge — Vercel / Cloudflare Workers<br/>Hono FetchHandler (Web Request/Response)"]
-        Turso["Turso — @libsql/client + Drizzle<br/>@storyshelf/db-turso"]
+        Turso["Turso — @libsql/client + Drizzle<br/>@storyshelf/db-sqlite/turso"]
         S3["S3 / R2 — @storyshelf/storage-s3"]
         QRemote["Remote Queue — SQS / Cloudflare Queues<br/>@storyshelf/queue-sqs"]
         Worker["Worker Fleet — polls queue<br/>executeCaptureJob() + @storyshelf/runner-playwright"]

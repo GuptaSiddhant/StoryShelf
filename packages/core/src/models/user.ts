@@ -1,7 +1,7 @@
 /** User lookups for token and membership resolution. */
 import { eq, getTableColumns } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
-import type { DatabaseAdapter } from "../db/database.ts";
+import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { User } from "../schema/user.ts";
 
 /** Tables required by {@link UserModel}. */

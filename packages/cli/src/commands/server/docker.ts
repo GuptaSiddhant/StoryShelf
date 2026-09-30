@@ -77,7 +77,7 @@ export function generateComposeYaml(database = "sqlite"): string {
     ...COMPOSE_BASE_LINES,
     "      # Add your env vars here:",
     "      # - AUTH_PASSWORD=your-password",
-    ...(database === "postgres" ? [] : COMPOSE_TURSO_LINES),
+    ...(database === "turso" ? COMPOSE_TURSO_LINES : []),
     ...(database === "postgres" ? COMPOSE_POSTGRES_LINES : []),
     ...COMPOSE_VOLUMES_LINES,
     ...(database === "postgres" ? COMPOSE_POSTGRES_VOLUMES_LINES : []),

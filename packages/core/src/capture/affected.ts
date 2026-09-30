@@ -1,5 +1,5 @@
 import { selectAffectedStories } from "@storyshelf/affected";
-import type { DatabaseAdapter } from "../db/database.ts";
+import type { DatabaseAdapter } from "../adapters/database.ts";
 import { BaselineModel, type BaselineTables } from "../models/baseline.ts";
 import type { Baseline } from "../schema/baseline.ts";
 import type { StoryEntry, Viewport } from "./adapter.ts";

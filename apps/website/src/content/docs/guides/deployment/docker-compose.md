@@ -30,7 +30,7 @@ volumes:
   storyshelf-data:
 ```
 
-Swap the database for `@storyshelf/db-postgres` or `@storyshelf/db-turso` without changing the rest of the stack.
+Swap the database for `@storyshelf/db-postgres` or `@storyshelf/db-sqlite/turso` without changing the rest of the stack.
 
 ## Published Storybook subdomains
 

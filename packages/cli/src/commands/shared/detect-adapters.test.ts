@@ -38,7 +38,7 @@ describe("detectInstalledAdapters", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("prefers turso over sqlite when both present", () => {
+  it("maps the legacy db-turso package to turso", () => {
     const dir = makeTmp();
     writeFileSync(
       join(dir, "package.json"),
@@ -47,6 +47,58 @@ describe("detectInstalledAdapters", () => {
       }),
     );
     expect(detectInstalledAdapters(dir).database).toBe("turso");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("detects turso via the libsql peer dep", () => {
+    const dir = makeTmp();
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({
+        dependencies: { "@storyshelf/db-sqlite": "0.3.2", "@libsql/client": "^0.15.0" },
+      }),
+    );
+    expect(detectInstalledAdapters(dir).database).toBe("turso");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("detects better-sqlite3 via the better-sqlite3 dep", () => {
+    const dir = makeTmp();
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({
+        dependencies: { "@storyshelf/db-sqlite": "0.3.2", "better-sqlite3": "^12.0.0" },
+      }),
+    );
+    expect(detectInstalledAdapters(dir).database).toBe("better-sqlite3");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("detects d1 via the server.ts subpath import", () => {
+    const dir = makeTmp();
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({ dependencies: { "@storyshelf/db-sqlite": "0.3.2" } }),
+    );
+    writeFileSync(
+      join(dir, "server.ts"),
+      'import { createD1Database } from "@storyshelf/db-sqlite/d1";',
+    );
+    expect(detectInstalledAdapters(dir).database).toBe("d1");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("detects bun-sqlite via the worker.ts subpath import", () => {
+    const dir = makeTmp();
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({ dependencies: { "@storyshelf/db-sqlite": "0.3.2" } }),
+    );
+    writeFileSync(
+      join(dir, "worker.ts"),
+      'import { createBunSqliteDatabase } from "@storyshelf/db-sqlite/bun-sqlite";',
+    );
+    expect(detectInstalledAdapters(dir).database).toBe("bun-sqlite");
     rmSync(dir, { recursive: true, force: true });
   });
 

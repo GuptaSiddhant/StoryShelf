@@ -41,9 +41,10 @@ describe("generateComposeYaml", () => {
     expect(yaml).toContain("storyshelf-data:");
   });
 
-  it("adds turso env for non-postgres", () => {
-    const yaml = generateComposeYaml("turso");
-    expect(yaml).toContain("TURSO_DATABASE_URL");
+  it("adds turso env only for turso", () => {
+    expect(generateComposeYaml("turso")).toContain("TURSO_DATABASE_URL");
+    expect(generateComposeYaml("sqlite")).not.toContain("TURSO_DATABASE_URL");
+    expect(generateComposeYaml("better-sqlite3")).not.toContain("TURSO_DATABASE_URL");
   });
 
   it("adds postgres service for postgres", () => {

@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { baselines } from "../../../db-sqlite/src/schema/index.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import type { StoryEntry } from "./adapter.ts";
 import { partitionAffectedStories } from "./affected.ts";
@@ -14,7 +13,7 @@ async function seedBaseline(
   db: ReturnType<typeof makeDatabase>["db"],
   storyId: string,
 ): Promise<void> {
-  await db.insert(baselines, {
+  await db.insert(db.tables.baselines, {
     id: `bl-${storyId}`,
     projectId: "p1",
     storyId,
@@ -34,7 +33,7 @@ function input(
 ) {
   return {
     db,
-    tables: { baselines },
+    tables: { baselines: db.tables.baselines },
     projectId: "p1",
     branch: "feature",
     defaultBranch: "main",

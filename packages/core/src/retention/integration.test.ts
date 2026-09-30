@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { baselines, buildLabels, builds } from "../../../db-sqlite/src/schema/index.ts";
+import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { Project } from "../schema/project.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { Retention } from "./purge.ts";
@@ -23,11 +23,11 @@ function makeProject(overrides: Partial<Project> = {}): Project {
   };
 }
 
-function retentionTables() {
+function retentionTables(db: DatabaseAdapter) {
   return {
-    builds,
-    buildLabels,
-    baselines,
+    builds: db.tables.builds,
+    buildLabels: db.tables.buildLabels,
+    baselines: db.tables.baselines,
   };
 }
 
@@ -38,7 +38,7 @@ async function createTestDb(
 
   await Promise.all(
     rows.map(async (row) => {
-      await db.insert(builds, row as unknown as typeof builds.$inferInsert);
+      await db.insert(db.tables.builds, row);
     }),
   );
 
@@ -106,13 +106,13 @@ describe("Retention purge integration", () => {
     ];
     const db = await createTestDb(rows);
 
-    const retention = new Retention(db, storage, retentionTables());
+    const retention = new Retention(db, storage, retentionTables(db));
     const result = await retention.purge(project, { ttlDays: 30, keepLatestPerBranch: true });
 
     expect(result.removedBuilds).toBe(2);
     expect(result.removedFiles).toBeGreaterThanOrEqual(0);
-    const survivors = await db.list(builds);
-    // oxlint-disable-next-line unicorn/no-array-sort, unicorn/no-useless-spread -- toSorted not available in type-aware lint lib
+    const survivors = await db.list(db.tables.builds);
+    // oxlint-disable-next-line unicorn/no-array-sort, unicorn/no-useless-spread, typescript/require-array-sort-compare -- toSorted not available in type-aware lint lib
     expect([...survivors.map((build) => build.id)].sort()).toEqual(["b1", "b3", "b5"]);
   });
 
@@ -144,7 +144,7 @@ describe("Retention purge integration", () => {
     const db = await createTestDb(rows);
     const project = makeProject({ id: "p2", name: "Full Purge Test", slug: "full-purge-test" });
 
-    const retention = new Retention(db, storage, retentionTables());
+    const retention = new Retention(db, storage, retentionTables(db));
     const result = await retention.purge(project, { ttlDays: 30, keepLatestPerBranch: false });
 
     expect(result.removedBuilds).toBe(2);
@@ -178,7 +178,7 @@ describe("Retention purge integration", () => {
     const db = await createTestDb(rows);
     const project = makeProject({ id: "p3", name: "Non-Terminal Test", slug: "non-terminal-test" });
 
-    const retention = new Retention(db, storage, retentionTables());
+    const retention = new Retention(db, storage, retentionTables(db));
     const result = await retention.purge(project, { ttlDays: 30, keepLatestPerBranch: true });
 
     expect(result.removedBuilds).toBe(0);

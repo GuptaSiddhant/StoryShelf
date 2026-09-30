@@ -1,7 +1,7 @@
 /** Project group-to-role mappings for OIDC team sync. */
 import { and, eq, getTableColumns } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
-import type { DatabaseAdapter } from "../db/database.ts";
+import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { ProjectGroupMapping } from "../schema/project-group-mapping.ts";
 import type { ProjectRole } from "../types.ts";
 import { ulid } from "../utils/ulid.ts";

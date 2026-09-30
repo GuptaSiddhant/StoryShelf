@@ -54,12 +54,12 @@ StoryShelf/
   packages/
     core/           @storyshelf/core           -- Adapter interfaces, models, capture pipeline, diff, retention (no HTTP)
     app/            @storyshelf/app         -- Hono app, API routes, server-rendered UI over core (see ADR 0018)
-    db-sqlite/      @storyshelf/db-sqlite      -- SQLite database adapter (node:sqlite + Drizzle)
-    db-turso/       @storyshelf/db-turso       -- Turso/libSQL database adapter (@libsql/client + Drizzle)
+    db-sqlite/      @storyshelf/db-sqlite      -- SQLite database adapters (node:sqlite default + turso/better-sqlite3/bun-sqlite/d1 presets via subpaths)
+    db-postgres/    @storyshelf/db-postgres     -- Postgres database adapters (postgres.js default + pg/neon/neon-http/vercel/pglite presets via subpaths)
+    db-mysql/       @storyshelf/db-mysql        -- MySQL/MariaDB database adapters (mysql2 default + planetscale/tidb presets via subpaths)
     storage-local/  @storyshelf/storage-local  -- Local filesystem storage adapter
     storage-s3/     @storyshelf/storage-s3     -- S3-compatible storage adapter (S3, R2, MinIO)
-    auth-oauth/     @storyshelf/auth-oauth     -- OAuth/OIDC auth adapter
-    auth-password/  @storyshelf/auth-password  -- Shared-password auth adapter
+    auth/           @storyshelf/auth            -- Better Auth engine (local accounts, OAuth/OIDC, SSO, passkeys; see ADR 0023)
     cli/            storyshelf              -- CLI client (commander; upload/init/create/server/retry/purge, no Playwright)
     runner-playwright/ @storyshelf/runner-playwright -- pure Playwright CaptureRenderer (server-side render; core orchestrator owns capture)
     git-github/     @storyshelf/git-github      -- GitHub status checks, PR comments, merge-gate helpers (@octokit)
@@ -122,7 +122,10 @@ This distinction matters for:
 ## Database options
 
 - **SQLite** (default, self-hosted): `@storyshelf/db-sqlite` — node:sqlite (zero-dependency builtin) + Drizzle ORM. Zero config. WAL mode.
-- **Turso** (serverless/cloud): `@storyshelf/db-turso` — @libsql/client + Drizzle ORM. Same schema, same queries, different driver. Works on Vercel, Cloudflare Workers, Lambda.
+- **SQLite presets** (same package, subpaths): `@storyshelf/db-sqlite/turso` (libSQL serverless: Turso/Vercel/Lambda, optional `@libsql/client` peer), `./better-sqlite3` (native, optional `better-sqlite3` peer), `./bun-sqlite` (Bun-only), `./d1` (Cloudflare D1 binding, no peer). Same schema, same queries, different driver.
+- **Postgres presets** (same package, subpaths): `@storyshelf/db-postgres` (postgres.js default) + `./pg` (node-postgres pooler-safe), `./neon`, `./neon-http`, `./vercel`, `./pglite` (embedded WASM). Same schema, same queries, different driver.
+- **MySQL presets** (same package, subpaths): `@storyshelf/db-mysql` (mysql2 default, MySQL/MariaDB) + `./planetscale`, `./tidb` (serverless MySQL). Same schema, same queries, different driver.
+- Retired packages are logged in `docs/deprecated.md` (run `npm deprecate` per published version when retiring).
 
 ## Storage options
 

@@ -26,6 +26,90 @@ afterEach(() => {
 });
 
 describe("runServerInit", () => {
+  it("scaffolds turso from the db-sqlite subpath with the libsql peer", async () => {
+    vi.mocked(prompts).mockResolvedValue({
+      name: "my-server",
+      dir: "./my-server",
+      database: "turso",
+      storage: "local",
+      auth: "none",
+      git: "none",
+      queue: "memory",
+      docker: false,
+    });
+
+    const cwd = process.cwd();
+    process.chdir(tmpRoot);
+    try {
+      await runServerInit({});
+    } finally {
+      process.chdir(cwd);
+    }
+
+    const code = readFileSync(join(dir, "server.ts"), "utf8");
+    expect(code).toContain('from "@storyshelf/db-sqlite/turso"');
+    expect(code).toContain("createTursoDatabase");
+    expect(code).not.toContain("@storyshelf/db-turso");
+    const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
+      dependencies: Record<string, string>;
+    };
+    expect(pkg.dependencies["@storyshelf/db-sqlite"]).toBeDefined();
+    expect(pkg.dependencies["@libsql/client"]).toBeDefined();
+  });
+
+  it("scaffolds d1 with a binding stub", async () => {
+    vi.mocked(prompts).mockResolvedValue({
+      name: "my-server",
+      dir: "./my-server",
+      database: "d1",
+      storage: "local",
+      auth: "none",
+      git: "none",
+      queue: "memory",
+      docker: false,
+    });
+
+    const cwd = process.cwd();
+    process.chdir(tmpRoot);
+    try {
+      await runServerInit({});
+    } finally {
+      process.chdir(cwd);
+    }
+
+    const code = readFileSync(join(dir, "server.ts"), "utf8");
+    expect(code).toContain('from "@storyshelf/db-sqlite/d1"');
+    expect(code).toContain("getD1Binding");
+  });
+
+  it("scaffolds better-sqlite3 with its peer dep", async () => {
+    vi.mocked(prompts).mockResolvedValue({
+      name: "my-server",
+      dir: "./my-server",
+      database: "better-sqlite3",
+      storage: "local",
+      auth: "none",
+      git: "none",
+      queue: "memory",
+      docker: false,
+    });
+
+    const cwd = process.cwd();
+    process.chdir(tmpRoot);
+    try {
+      await runServerInit({});
+    } finally {
+      process.chdir(cwd);
+    }
+
+    const code = readFileSync(join(dir, "server.ts"), "utf8");
+    expect(code).toContain("createBetterSqlite3Database");
+    const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
+      dependencies: Record<string, string>;
+    };
+    expect(pkg.dependencies["better-sqlite3"]).toBeDefined();
+  });
+
   it("scaffolds server.ts with in-memory queue", async () => {
     vi.mocked(prompts).mockResolvedValue({
       name: "my-server",

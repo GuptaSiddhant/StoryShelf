@@ -3,8 +3,8 @@ import { mkdir, readdir, readFile, rm } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Parse, type Entry } from "unzipper";
+import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
-import type { DatabaseAdapter } from "../db/database.ts";
 import { storybookDir, storybookZipPath } from "../utils/paths.ts";
 
 /**

@@ -54,7 +54,7 @@ There is no `tsdown-entry` key. Each `package.json` `exports` map carries `{ sou
 
 - `packages/core/src/schema/` — one module per entity, mirroring `packages/core/src/models/` 1:1 (`project.ts`, `build.ts`, `snapshot.ts`, `baseline.ts`, `comment.ts`, `label.ts`, `token.ts`, `webhook.ts`, `member.ts`, `user.ts`).
 - `packages/core/src/ddl.ts` — DDL derived from the entity modules (single derivation function), not a parallel hand-written copy.
-- `db-sqlite` / `db-turso` import the same schema from core (ADR 0002); they are driver shims over a shared factory (R3).
+- `@storyshelf/db-sqlite` owns the SQLite schema/DDL/shared factory; `./turso`, `./better-sqlite3`, `./bun-sqlite`, `./d1` are driver presets over it (R3).
 
 ## App convention (lives in `packages/app/src/`)
 

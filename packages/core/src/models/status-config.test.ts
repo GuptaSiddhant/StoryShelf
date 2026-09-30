@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { projectStatusConfigs } from "../../../db-sqlite/src/schema/index.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { StatusConfigModel } from "./status-config.ts";
 
@@ -9,7 +8,11 @@ function setup(): { db: ReturnType<typeof makeDatabase>["db"]; model: StatusConf
   const { db } = makeDatabase();
   return {
     db,
-    model: new StatusConfigModel(db, { projectStatusConfigs }, SECRET),
+    model: new StatusConfigModel(
+      db,
+      { projectStatusConfigs: db.tables.projectStatusConfigs },
+      SECRET,
+    ),
   };
 }
 

@@ -3,7 +3,7 @@ title: "@storyshelf/db-postgres"
 description: Postgres database adapter for StoryShelf via postgres.js and Drizzle ORM — self-hosted, RDS, Cloud SQL, Supabase, Neon, and Azure.
 ---
 
-`@storyshelf/db-postgres` connects StoryShelf to Postgres through `postgres.js` and Drizzle ORM. It implements the same `DatabaseAdapter` contract as [SQLite](../db-sqlite/) and [Turso](../db-turso/), so the rest of the application does not change when switching databases.
+`@storyshelf/db-postgres` connects StoryShelf to Postgres through `postgres.js` and Drizzle ORM. It implements the same `DatabaseAdapter` contract as [SQLite](../db-sqlite/) (including its presets), so the rest of the application does not change when switching databases.
 
 ## Install
 
@@ -76,4 +76,4 @@ This is also the hook for hermetic tests and for custom CA bundles that are load
 
 ## When to use it
 
-Choose Postgres when you need a managed relational database or already run Postgres for your team. It is a drop-in replacement for [SQLite](../db-sqlite/) and [Turso](../db-turso/); only the database construction changes. Pair it with [local storage](../storage-local/) for single-node deployments or [S3-compatible storage](../storage-s3/) when instances do not share a filesystem.
+Choose Postgres when you need a managed relational database or already run Postgres for your team. It is a drop-in replacement for [SQLite](../db-sqlite/) and its presets; only the database construction changes. Pair it with [local storage](../storage-local/) for single-node deployments or [S3-compatible storage](../storage-s3/) when instances do not share a filesystem.

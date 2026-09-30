@@ -1,21 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { captureAttempts, captureLogs } from "../../../db-sqlite/src/schema/index.ts";
+import type { DatabaseAdapter } from "../adapters/database.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { CaptureAttemptModel } from "./capture-attempt.ts";
 import { CaptureLogModel } from "./capture-log.ts";
 
-function attemptTables() {
-  return { captureAttempts: captureAttempts as unknown as never };
+function attemptTables(db: DatabaseAdapter) {
+  return { captureAttempts: db.tables.captureAttempts };
 }
 
-function logTables() {
-  return { captureLogs: captureLogs as unknown as never };
+function logTables(db: DatabaseAdapter) {
+  return { captureLogs: db.tables.captureLogs };
 }
 
 describe("CaptureAttemptModel", () => {
   it("numbers attempts sequentially per build", async () => {
     const { db } = makeDatabase();
-    const model = new CaptureAttemptModel(db, attemptTables());
+    const model = new CaptureAttemptModel(db, attemptTables(db));
     const first = await model.startAttempt("p1", "b1", "req-1");
     const second = await model.startAttempt("p1", "b1");
     expect(first.attemptNo).toBe(1);
@@ -26,7 +26,7 @@ describe("CaptureAttemptModel", () => {
 
   it("transitions queued -> running -> completed", async () => {
     const { db } = makeDatabase();
-    const model = new CaptureAttemptModel(db, attemptTables());
+    const model = new CaptureAttemptModel(db, attemptTables(db));
     const attempt = await model.startAttempt("p1", "b1");
     const running = await model.markRunning(attempt.id);
     expect(running.status).toBe("running");
@@ -42,7 +42,7 @@ describe("CaptureAttemptModel", () => {
 
   it("records the terminal error on failure", async () => {
     const { db } = makeDatabase();
-    const model = new CaptureAttemptModel(db, attemptTables());
+    const model = new CaptureAttemptModel(db, attemptTables(db));
     const attempt = await model.startAttempt("p1", "b1");
     const failed = await model.markFinished(attempt.id, "failed", "boom");
     expect(failed.status).toBe("failed");
@@ -51,7 +51,7 @@ describe("CaptureAttemptModel", () => {
 
   it("lists attempts in order and fetches by number", async () => {
     const { db } = makeDatabase();
-    const model = new CaptureAttemptModel(db, attemptTables());
+    const model = new CaptureAttemptModel(db, attemptTables(db));
     await model.startAttempt("p1", "b1");
     await model.startAttempt("p1", "b1");
     const rows = await model.listByBuild("b1");
@@ -64,8 +64,8 @@ describe("CaptureAttemptModel", () => {
 describe("CaptureLogModel", () => {
   it("appends sequenced lines and lists them in order", async () => {
     const { db } = makeDatabase();
-    const attempts = new CaptureAttemptModel(db, attemptTables());
-    const logs = new CaptureLogModel(db, logTables());
+    const attempts = new CaptureAttemptModel(db, attemptTables(db));
+    const logs = new CaptureLogModel(db, logTables(db));
     const attempt = await attempts.startAttempt("p1", "b1");
     await logs.append("p1", "b1", attempt.id, "info", "storybook extracted", { durationMs: 3 });
     await logs.append("p1", "b1", attempt.id, "error", "capture failed");

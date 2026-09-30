@@ -18,7 +18,7 @@ Step-by-step build order. Each step is independently reviewable. Decisions made 
 ## Phase 1 — Database adapters (parallel)
 
 - `@storyshelf/db-sqlite` — node:sqlite + Drizzle, WAL, migration runner.
-- `@storyshelf/db-turso` — @libsql/client + Drizzle, same schema.
+- `@storyshelf/db-sqlite/turso` — @libsql/client + Drizzle, same schema (subpath preset).
 
 ## Phase 2 — Storage adapters (parallel)
 

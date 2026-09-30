@@ -124,11 +124,11 @@ The core router is runtime-agnostic (Web `Request`/`Response`, `fetch`, `crypto`
 
 | Platform                                   | Database                 | Storage                          | Capture queue                   | Server entry               |
 | ------------------------------------------ | ------------------------ | -------------------------------- | ------------------------------- | -------------------------- |
-| **Vercel**                                 | `@storyshelf/db-turso`   | `@storyshelf/storage-s3` (R2/S3) | Remote `CaptureQueue` + worker  | Hono + `@hono/vercel-edge` |
-| **Cloudflare Workers**                     | `@storyshelf/db-turso`   | `@storyshelf/storage-s3` (R2)    | Workers Queues `CaptureQueue`   | Hono + Workers entry       |
-| **Azure Functions**                        | `@storyshelf/db-turso`   | `@storyshelf/storage-s3` (Blob)  | Azure Queues `CaptureQueue`     | Hono + Azure handler       |
-| **AWS Lambda**                             | `@storyshelf/db-turso`   | `@storyshelf/storage-s3`         | SQS `CaptureQueue`              | Hono + Lambda handler      |
-| **Deno Deploy**                            | `@storyshelf/db-turso`   | `@storyshelf/storage-s3`         | Custom `CaptureQueue` (Deno KV) | Hono + Deno entry          |
-| **Bun / Node (VPS, Fly, Railway, Render)** | `db-sqlite` / `db-turso` | `storage-local` / `storage-s3`   | `InMemoryCaptureQueue`          | `storyshelf-server serve`  |
+| **Vercel**                                 | `@storyshelf/db-sqlite/turso`   | `@storyshelf/storage-s3` (R2/S3) | Remote `CaptureQueue` + worker  | Hono + `@hono/vercel-edge` |
+| **Cloudflare Workers**                     | `@storyshelf/db-sqlite/turso`   | `@storyshelf/storage-s3` (R2)    | Workers Queues `CaptureQueue`   | Hono + Workers entry       |
+| **Azure Functions**                        | `@storyshelf/db-sqlite/turso`   | `@storyshelf/storage-s3` (Blob)  | Azure Queues `CaptureQueue`     | Hono + Azure handler       |
+| **AWS Lambda**                             | `@storyshelf/db-sqlite/turso`   | `@storyshelf/storage-s3`         | SQS `CaptureQueue`              | Hono + Lambda handler      |
+| **Deno Deploy**                            | `@storyshelf/db-sqlite/turso`   | `@storyshelf/storage-s3`         | Custom `CaptureQueue` (Deno KV) | Hono + Deno entry          |
+| **Bun / Node (VPS, Fly, Railway, Render)** | `db-sqlite` (+ `./bun-sqlite` on Bun) | `storage-local` / `storage-s3`   | `InMemoryCaptureQueue`          | `storyshelf-server serve`  |
 
 All clouds are equal — pick the adapters that match your infrastructure. See the **Deployment** guide for recipes including a minimal Turso + S3 + `InMemoryCaptureQueue` example.

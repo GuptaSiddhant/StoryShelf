@@ -6,7 +6,7 @@ description: OpenTelemetry tracing, metrics, and log correlation for StoryShelf.
 `@storyshelf/observability` is the single owner of StoryShelf's OpenTelemetry
 wiring. It exports traces and metrics to **your own** OTLP/HTTP collector and
 correlates pino log lines with the active trace. Without a configured
-endpoint it is a zero-overhead noop. See the [Observability guide](../guides/observability/)
+endpoint it is a zero-overhead noop. See the [Observability guide](/guides/observability/)
 for operations and [ADR 0022](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/0022-opentelemetry-observability.md)
 for the design decisions.
 

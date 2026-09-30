@@ -1,12 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { tokens } from "../../../db-sqlite/src/schema/index.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { TokenModel } from "./token.ts";
 
 describe("TokenModel", () => {
   it("creates a token for a project", async () => {
     const { db } = makeDatabase();
-    const model = new TokenModel(db, { tokens });
+    const model = new TokenModel(db, { tokens: db.tables.tokens });
     const token = await model.create("p1", {
       name: "deploy-token",
       hash: "abc123def456",
@@ -19,7 +18,7 @@ describe("TokenModel", () => {
 
   it("gets a token by id", async () => {
     const { db } = makeDatabase();
-    const model = new TokenModel(db, { tokens });
+    const model = new TokenModel(db, { tokens: db.tables.tokens });
     const token = await model.create("p1", {
       name: "api-key",
       hash: "token-hash-xyz",
@@ -33,7 +32,7 @@ describe("TokenModel", () => {
 
   it("lists tokens for a project", async () => {
     const { db } = makeDatabase();
-    const model = new TokenModel(db, { tokens });
+    const model = new TokenModel(db, { tokens: db.tables.tokens });
     await model.create("p1", { name: "token-1", hash: "hash-1" });
     await model.create("p1", { name: "token-2", hash: "hash-2" });
     const listed = await model.list("p1");
@@ -44,7 +43,7 @@ describe("TokenModel", () => {
 
   it("removes a token", async () => {
     const { db } = makeDatabase();
-    const model = new TokenModel(db, { tokens });
+    const model = new TokenModel(db, { tokens: db.tables.tokens });
     const token = await model.create("p1", { name: "temp-token", hash: "hash-temp" });
     await model.remove(token.id);
     const listed = await model.list("p1");
@@ -53,7 +52,7 @@ describe("TokenModel", () => {
 
   it("finds a token by hash", async () => {
     const { db } = makeDatabase();
-    const model = new TokenModel(db, { tokens });
+    const model = new TokenModel(db, { tokens: db.tables.tokens });
     const token = await model.create("p1", { name: "active-token", hash: "hash-active" });
     const found = await model.findByHash("hash-active");
     expect(found?.id).toBe(token.id);
@@ -61,7 +60,7 @@ describe("TokenModel", () => {
 
   it("stores a null userId when no owner is given", async () => {
     const { db } = makeDatabase();
-    const model = new TokenModel(db, { tokens });
+    const model = new TokenModel(db, { tokens: db.tables.tokens });
     const token = await model.create("p1", { name: "legacy-token", hash: "hash-legacy" });
     expect(token.userId).toBeNull();
   });

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { comments, projects } from "../../../db-sqlite/src/schema/index.ts";
-import type { DatabaseAdapter } from "../db/database.ts";
+import type { DatabaseAdapter } from "../adapters/database.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { CommentModel } from "./comment.ts";
 
@@ -22,7 +21,7 @@ const mockProject = {
 
 async function makeDbWithProject(): Promise<DatabaseAdapter> {
   const { db } = makeDatabase();
-  await db.insert(projects, {
+  await db.insert(db.tables.projects, {
     id: mockProject.id,
     name: mockProject.name,
     slug: mockProject.slug,
@@ -43,8 +42,8 @@ describe("CommentModel", () => {
   it("creates a comment on a build when project exists", async () => {
     const db = await makeDbWithProject();
     const model = new CommentModel(db, {
-      comments,
-      projects,
+      comments: db.tables.comments,
+      projects: db.tables.projects,
     });
     const comment = await model.create(mockProject.id, "b1", "user-123", {
       body: "Great component!",
@@ -60,8 +59,8 @@ describe("CommentModel", () => {
   it("throws when project does not exist", async () => {
     const { db } = makeDatabase();
     const model = new CommentModel(db, {
-      comments,
-      projects,
+      comments: db.tables.comments,
+      projects: db.tables.projects,
     });
     await expect(
       model.create("nonexistent-id", "b1", "user-123", { body: "comment" }),
@@ -71,8 +70,8 @@ describe("CommentModel", () => {
   it("lists comments by build", async () => {
     const db = await makeDbWithProject();
     const model = new CommentModel(db, {
-      comments,
-      projects,
+      comments: db.tables.comments,
+      projects: db.tables.projects,
     });
 
     await model.create(mockProject.id, "b1", "user-1", { body: "First comment" });
@@ -87,8 +86,8 @@ describe("CommentModel", () => {
   it("resolves a comment", async () => {
     const db = await makeDbWithProject();
     const model = new CommentModel(db, {
-      comments,
-      projects,
+      comments: db.tables.comments,
+      projects: db.tables.projects,
     });
 
     const comment = await model.create(mockProject.id, "b1", "user-1", {

@@ -109,7 +109,6 @@ export default defineConfig({
             { label: "@storyshelf/runner-puppeteer", slug: "packages/runner-puppeteer" },
             { label: "@storyshelf/db-postgres", slug: "packages/db-postgres" },
             { label: "@storyshelf/db-sqlite", slug: "packages/db-sqlite" },
-            { label: "@storyshelf/db-turso", slug: "packages/db-turso" },
             { label: "@storyshelf/storage-local", slug: "packages/storage-local" },
             { label: "@storyshelf/storage-s3", slug: "packages/storage-s3" },
             { label: "@storyshelf/storage-azure", slug: "packages/storage-azure" },

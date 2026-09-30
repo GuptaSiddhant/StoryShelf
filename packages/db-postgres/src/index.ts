@@ -1,8 +1,8 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
-import { createDrizzlePgAdapter } from "@storyshelf/core/adapter/database";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { DDL } from "./ddl.ts";
+import { createDrizzlePgAdapter } from "./drizzle-factory-pg.ts";
+import { runMigrations } from "./migrate.ts";
 import { schema } from "./schema/index.ts";
 
 declare const __PKG_VERSION__: string | undefined;
@@ -77,7 +77,7 @@ export function createPostgresDatabase(options: PostgresDatabaseOptions): Databa
     },
     tables: schema as unknown as DatabaseAdapter["tables"],
     migrate: async () => {
-      await runMigrations(client);
+      await runMigrations(async (sql: string) => await client.unsafe(sql));
     },
     close: async () => {
       await client.end();
@@ -86,84 +86,4 @@ export function createPostgresDatabase(options: PostgresDatabaseOptions): Databa
       await client.unsafe("SELECT 1");
     },
   });
-}
-
-const STORYBOOK_META_ALTER = "ALTER TABLE projects ADD COLUMN IF NOT EXISTS storybook_meta TEXT";
-const EXECUTE_PLAY_ALTER =
-  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS execute_play BOOLEAN NOT NULL DEFAULT false";
-const PLAY_TIMEOUT_MS_ALTER =
-  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS play_timeout_ms INTEGER NOT NULL DEFAULT 10000";
-const RUN_A11Y_ALTER =
-  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS run_a11y BOOLEAN NOT NULL DEFAULT false";
-const PROJECT_BROWSER_ALTER =
-  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS browser TEXT NOT NULL DEFAULT 'chromium'";
-const PROJECT_VIEWPORTS_ALTER = "ALTER TABLE projects ADD COLUMN IF NOT EXISTS viewports TEXT";
-const PROJECT_AUTOMIGRATE_ALTER =
-  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS automigrate BOOLEAN NOT NULL DEFAULT false";
-const SNAPSHOT_INFRA_HASH_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS infra_hash TEXT";
-const SNAPSHOT_INHERITED_ALTER =
-  "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS inherited BOOLEAN NOT NULL DEFAULT false";
-const BASELINE_INFRA_HASH_ALTER = "ALTER TABLE baselines ADD COLUMN IF NOT EXISTS infra_hash TEXT";
-const BUILD_AFFECTED_ONLY_ALTER =
-  "ALTER TABLE builds ADD COLUMN IF NOT EXISTS affected_only BOOLEAN NOT NULL DEFAULT true";
-const BUILD_BASELINE_SHA_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS baseline_sha TEXT";
-const BUILD_CHANGED_FILES_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS changed_files TEXT";
-const BUILD_AFFECTED_PATHS_ALTER =
-  "ALTER TABLE builds ADD COLUMN IF NOT EXISTS affected_import_paths TEXT";
-const WEBHOOK_SECRET_ALTER =
-  "ALTER TABLE webhooks ADD COLUMN IF NOT EXISTS secret_encrypted TEXT NOT NULL DEFAULT ''";
-const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN IF EXISTS secret";
-const TOKEN_USER_ALTER =
-  "ALTER TABLE tokens ADD COLUMN IF NOT EXISTS user_id TEXT REFERENCES users(id) ON DELETE CASCADE";
-const MEMBER_SOURCE_ALTER =
-  "ALTER TABLE project_members ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'manual'";
-
-async function migrateProjectExtras(client: ReturnType<typeof postgres>): Promise<void> {
-  await execIgnore(client, EXECUTE_PLAY_ALTER);
-  await execIgnore(client, PLAY_TIMEOUT_MS_ALTER);
-  await execIgnore(client, PROJECT_AUTOMIGRATE_ALTER);
-  await execIgnore(client, SNAPSHOT_INFRA_HASH_ALTER);
-  await execIgnore(client, SNAPSHOT_INHERITED_ALTER);
-  await execIgnore(client, BASELINE_INFRA_HASH_ALTER);
-  await execIgnore(client, BUILD_AFFECTED_ONLY_ALTER);
-  await execIgnore(client, BUILD_BASELINE_SHA_ALTER);
-  await execIgnore(client, BUILD_CHANGED_FILES_ALTER);
-  await execIgnore(client, BUILD_AFFECTED_PATHS_ALTER);
-}
-
-async function runMigrations(client: ReturnType<typeof postgres>): Promise<void> {
-  await client.unsafe(DDL);
-  await execIgnore(client, STORYBOOK_META_ALTER);
-  await execIgnore(client, RUN_A11Y_ALTER);
-  await execIgnore(client, PROJECT_BROWSER_ALTER);
-  await execIgnore(client, PROJECT_VIEWPORTS_ALTER);
-  await migrateProjectExtras(client);
-  await execIgnore(client, WEBHOOK_SECRET_ALTER);
-  await execIgnore(client, WEBHOOK_SECRET_DROP);
-  await execIgnore(client, TOKEN_USER_ALTER);
-  await execIgnore(client, MEMBER_SOURCE_ALTER);
-  await migrateCommentsTable(client);
-}
-
-async function execIgnore(client: ReturnType<typeof postgres>, sql: string): Promise<void> {
-  try {
-    await client.unsafe(sql);
-  } catch {
-    // idempotent — already migrated
-  }
-}
-
-async function migrateCommentsTable(client: ReturnType<typeof postgres>): Promise<void> {
-  try {
-    const rows = (await client.unsafe(
-      "SELECT is_nullable FROM information_schema.columns WHERE table_name='comments' AND column_name='user_id'",
-    )) as unknown as { is_nullable: string }[];
-    const isNullable = rows[0]?.is_nullable;
-    if (isNullable === "YES" || isNullable === undefined) {
-      return;
-    }
-    await client.unsafe("ALTER TABLE comments ALTER COLUMN user_id DROP NOT NULL");
-  } catch {
-    // already nullable or table missing — ignore
-  }
 }

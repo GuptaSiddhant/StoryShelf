@@ -659,11 +659,10 @@ StoryShelf/
     db-sqlite/
       src/
         index.ts          # DatabaseAdapter for SQLite (via node:sqlite + Drizzle)
-      package.json
-
-    db-turso/
-      src/
-        index.ts          # DatabaseAdapter for Turso/libSQL (via @libsql/client + Drizzle)
+        turso.ts          # Turso/libSQL preset (via @libsql/client + Drizzle)
+        better-sqlite3.ts # better-sqlite3 preset (native + Drizzle)
+        bun-sqlite.ts     # Bun preset (via bun:sqlite + Drizzle)
+        d1.ts             # Cloudflare D1 preset (via D1 binding + Drizzle)
       package.json
 
     storage-local/
@@ -750,7 +749,7 @@ StoryShelf/
 |---------|--------|-----------|
 | **Runtime** | Node.js 22+ | Playwright's best-supported runtime; LTS |
 | **HTTP framework** | Hono (OpenAPIHono) | Type-safe routes, OpenAPI spec generation, edge-compatible |
-| **Database** | SQLite via `node:sqlite` + Drizzle ORM (local). Turso/libSQL via `@libsql/client` + Drizzle (serverless). | Zero-config on VPS/Docker. Turso for Vercel/Cloudflare Workers. Same schema, same queries, different connection. |
+| **Database** | SQLite via `node:sqlite` + Drizzle ORM (local, default). Presets in the same package: Turso/libSQL via `@libsql/client` (serverless), better-sqlite3 (native), bun:sqlite (Bun), D1 binding (Workers). | Zero-config on VPS/Docker. Same schema, same queries, different driver. |
 | **Storage** | Local filesystem (default). S3-compatible (R2, MinIO, S3), GCS, Azure Blob as alternatives. | Local for Docker/VPS. S3/GCS/Azure for cloud. Same adapter interface, four implementations. |
 | **Screenshot capture** | Playwright (server-side) | Industry standard. Deterministic rendering in a pinned image. `toHaveScreenshot` battle-tested |
 | **Pixel diff** | pixelmatch + pngjs | Same libraries Playwright uses internally. Fast, reliable, widely adopted |

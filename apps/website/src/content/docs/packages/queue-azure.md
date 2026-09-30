@@ -85,7 +85,7 @@ Pair the queue with `@storyshelf/worker` and any database/storage pair:
 ```ts
 import { createAzureStorageQueuesQueue } from "@storyshelf/queue-azure/storage-queues";
 import { createCaptureWorker } from "@storyshelf/worker";
-import { createTursoDatabase } from "@storyshelf/db-turso";
+import { createTursoDatabase } from "@storyshelf/db-sqlite/turso";
 import { createAzureStorage } from "@storyshelf/storage-azure";
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
 

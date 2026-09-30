@@ -3,7 +3,7 @@ import { and, asc, eq, getTableColumns } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
 import type { Logger } from "pino";
 import type { JobStatus } from "../adapters/capture-queue.ts";
-import type { DatabaseAdapter } from "../db/database.ts";
+import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { CaptureAttempt, CaptureLogLevel } from "../schema/capture-attempt.ts";
 import { ulid } from "../utils/ulid.ts";
 

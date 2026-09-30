@@ -3,17 +3,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  baselines,
-  buildLabels,
-  builds,
-  captureAttempts,
-  captureLogs,
-  projects,
-  projectStatusConfigs,
-  snapshots,
-} from "../../../db-sqlite/src/schema/index.ts";
 import type { CaptureRunner } from "../adapters/capture-runner.ts";
+import type { DatabaseAdapter } from "../adapters/database.ts";
 import { createShelfLogger } from "../logger.ts";
 import { BuildModel } from "../models/build.ts";
 import { CaptureAttemptModel } from "../models/capture-attempt.ts";
@@ -23,16 +14,16 @@ import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { storybookZipPath } from "../utils/paths.ts";
 import { createDispatchJob, type DispatchDeps } from "./dispatch.ts";
 
-function tables() {
+function tables(db: DatabaseAdapter) {
   return {
-    projects: projects as unknown as never,
-    builds: builds as unknown as never,
-    buildLabels: buildLabels as unknown as never,
-    snapshots: snapshots as unknown as never,
-    baselines: baselines as unknown as never,
-    projectStatusConfigs: projectStatusConfigs as unknown as never,
-    captureAttempts: captureAttempts as unknown as never,
-    captureLogs: captureLogs as unknown as never,
+    projects: db.tables.projects,
+    builds: db.tables.builds,
+    buildLabels: db.tables.buildLabels,
+    snapshots: db.tables.snapshots,
+    baselines: db.tables.baselines,
+    projectStatusConfigs: db.tables.projectStatusConfigs,
+    captureAttempts: db.tables.captureAttempts,
+    captureLogs: db.tables.captureLogs,
   };
 }
 
@@ -99,8 +90,8 @@ afterEach(async () => {
 });
 
 async function seedBuild(db: ReturnType<typeof makeDatabase>["db"]) {
-  const project = await new ProjectModel(db, tables()).create({ name: "Dispatch" });
-  const build = await new BuildModel(db, tables()).create(project.id, {
+  const project = await new ProjectModel(db, tables(db)).create({ name: "Dispatch" });
+  const build = await new BuildModel(db, tables(db)).create(project.id, {
     gitSha: "sha-1",
     gitBranch: "feature/x",
   });
@@ -114,10 +105,10 @@ function depsFor(
 ): DispatchDeps {
   return {
     db,
-    tables: tables(),
+    tables: tables(db),
     jobOptions: {
       db,
-      tables: tables(),
+      tables: tables(db),
       storage,
       runner,
       scratchDir,
@@ -140,13 +131,13 @@ describe("createDispatchJob attempt history", () => {
     await runJob({ buildId: build.id, reqId: "req-1" });
     await runJob({ buildId: build.id, reqId: "req-2" });
 
-    const attempts = await new CaptureAttemptModel(db, tables()).listByBuild(build.id);
+    const attempts = await new CaptureAttemptModel(db, tables(db)).listByBuild(build.id);
     expect(attempts.map((row) => row.attemptNo)).toEqual([1, 2]);
     expect(attempts.every((row) => row.status === "completed")).toBe(true);
     expect(attempts[0]?.reqId).toBe("req-1");
     expect(attempts[0]?.storyCount).toBe(1);
 
-    const logs = new CaptureLogModel(db, tables());
+    const logs = new CaptureLogModel(db, tables(db));
     const first = await logs.listByAttempt(attempts[0]?.id ?? "");
     const second = await logs.listByAttempt(attempts[1]?.id ?? "");
     expect(first.length).toBeGreaterThan(0);
@@ -168,11 +159,11 @@ describe("createDispatchJob attempt history", () => {
 
     await expect(runJob({ buildId: build.id })).rejects.toThrow("renderer exploded");
 
-    const attempts = await new CaptureAttemptModel(db, tables()).listByBuild(build.id);
+    const attempts = await new CaptureAttemptModel(db, tables(db)).listByBuild(build.id);
     expect(attempts).toHaveLength(1);
     expect(attempts[0]?.status).toBe("failed");
     expect(attempts[0]?.error).toContain("renderer exploded");
-    const logs = await new CaptureLogModel(db, tables()).listByAttempt(attempts[0]?.id ?? "");
+    const logs = await new CaptureLogModel(db, tables(db)).listByAttempt(attempts[0]?.id ?? "");
     expect(logs.map((row) => row.message)).toContain("capture failed");
   });
 });

@@ -37,7 +37,21 @@ export interface ServerInitOptions {
   dir?: string;
 }
 
-type DatabaseChoice = "sqlite" | "turso" | "postgres";
+type DatabaseChoice =
+  | "sqlite"
+  | "turso"
+  | "better-sqlite3"
+  | "bun-sqlite"
+  | "d1"
+  | "postgres"
+  | "pg"
+  | "neon"
+  | "neon-http"
+  | "vercel"
+  | "pglite"
+  | "mysql"
+  | "planetscale"
+  | "tidb";
 type StorageChoice = "local" | "s3" | "azure" | "gcs";
 type AuthChoice = "none" | "password" | "oauth";
 type GitChoice = "none" | "github" | "gitlab";
@@ -55,6 +69,16 @@ const AZURE_STORAGE_QUEUE_SDK = "^12.31.0";
 const AZURE_SERVICE_BUS_SDK = "^7.9.5";
 /** Pub/Sub SDK pin (must match @storyshelf/queue-gcp peerDependencies). */
 const GCP_PUBSUB_SDK = "^6.1.0";
+/** DB peer SDK pins (must match db-* peerDependencies). */
+const LIBSQL_CLIENT_SDK = "^0.15.0";
+const BETTER_SQLITE3_SDK = "^12.0.0";
+const PG_SDK = "^8.0.0";
+const NEON_SDK = "^1.1.0";
+const VERCEL_POSTGRES_SDK = "^0.10.0";
+const PGLITE_SDK = "^0.5.8";
+const MYSQL2_SDK = "^3.9.0";
+const PLANETSCALE_SDK = "^1.19.0";
+const TIDBCLOUD_SDK = "^0.1.0";
 
 /** npm peer SDK for the chosen Azure queue backend. */
 function azureSdkDep(queue: "azure-storage-queues" | "azure-service-bus"): {
@@ -106,8 +130,19 @@ function resolveDeployTarget(answers: Answers): DeployTarget {
 
 const DB_PACKAGE: Record<DatabaseChoice, string> = {
   sqlite: "@storyshelf/db-sqlite",
-  turso: "@storyshelf/db-turso",
+  turso: "@storyshelf/db-sqlite",
+  "better-sqlite3": "@storyshelf/db-sqlite",
+  "bun-sqlite": "@storyshelf/db-sqlite",
+  d1: "@storyshelf/db-sqlite",
   postgres: "@storyshelf/db-postgres",
+  pg: "@storyshelf/db-postgres",
+  neon: "@storyshelf/db-postgres",
+  "neon-http": "@storyshelf/db-postgres",
+  vercel: "@storyshelf/db-postgres",
+  pglite: "@storyshelf/db-postgres",
+  mysql: "@storyshelf/db-mysql",
+  planetscale: "@storyshelf/db-mysql",
+  tidb: "@storyshelf/db-mysql",
 };
 
 const STORAGE_PACKAGE: Record<StorageChoice, string> = {
@@ -140,8 +175,19 @@ const QUEUE_PACKAGE: Record<QueueChoice, string | null> = {
 
 const DB_IMPORT: Record<DatabaseChoice, string> = {
   sqlite: `import { createSqliteDatabase } from "@storyshelf/db-sqlite";`,
-  turso: `import { createTursoDatabase } from "@storyshelf/db-turso";`,
+  turso: `import { createTursoDatabase } from "@storyshelf/db-sqlite/turso";`,
+  "better-sqlite3": `import { createBetterSqlite3Database } from "@storyshelf/db-sqlite/better-sqlite3";`,
+  "bun-sqlite": `import { createBunSqliteDatabase } from "@storyshelf/db-sqlite/bun-sqlite";`,
+  d1: `import { createD1Database } from "@storyshelf/db-sqlite/d1";`,
   postgres: `import { createPostgresDatabase } from "@storyshelf/db-postgres";`,
+  pg: `import { createPgDatabase } from "@storyshelf/db-postgres/pg";`,
+  neon: `import { createNeonDatabase } from "@storyshelf/db-postgres/neon";`,
+  "neon-http": `import { createNeonHttpDatabase } from "@storyshelf/db-postgres/neon-http";`,
+  vercel: `import { createVercelDatabase } from "@storyshelf/db-postgres/vercel";`,
+  pglite: `import { createPgliteDatabase } from "@storyshelf/db-postgres/pglite";`,
+  mysql: `import { createMysqlDatabase } from "@storyshelf/db-mysql";`,
+  planetscale: `import { createPlanetscaleDatabase } from "@storyshelf/db-mysql/planetscale";`,
+  tidb: `import { createTidbDatabase } from "@storyshelf/db-mysql/tidb";`,
 };
 
 const STORAGE_IMPORT: Record<StorageChoice, string> = {
@@ -154,8 +200,32 @@ const STORAGE_IMPORT: Record<StorageChoice, string> = {
 const DB_INIT: Record<DatabaseChoice, string> = {
   sqlite: `createSqliteDatabase(\`\${dataDir}/shelf.db\`)`,
   turso: `createTursoDatabase({ url: process.env.TURSO_DATABASE_URL!, authToken: process.env.TURSO_AUTH_TOKEN })`,
+  "better-sqlite3": `createBetterSqlite3Database({ path: \`\${dataDir}/shelf.db\` })`,
+  "bun-sqlite": `createBunSqliteDatabase({ path: \`\${dataDir}/shelf.db\` })`,
+  d1: `createD1Database({ client: getD1Binding() })`,
   postgres: `createPostgresDatabase({ url: process.env.DATABASE_URL! })`,
+  pg: `createPgDatabase({ url: process.env.DATABASE_URL! })`,
+  neon: `createNeonDatabase({ url: process.env.DATABASE_URL! })`,
+  "neon-http": `createNeonHttpDatabase({ url: process.env.DATABASE_URL! })`,
+  vercel: `createVercelDatabase()`,
+  pglite: `createPgliteDatabase()`,
+  mysql: `createMysqlDatabase({ url: process.env.DATABASE_URL! })`,
+  planetscale: `createPlanetscaleDatabase({ url: process.env.DATABASE_URL! })`,
+  tidb: `createTidbDatabase({ url: process.env.DATABASE_URL! })`,
 };
+
+/** Extra scaffolding before `const database = ...` (D1 binding stub). */
+function dbPrelude(database: DatabaseChoice): string[] {
+  if (database !== "d1") {
+    return [];
+  }
+  return [
+    `// TODO: provide your D1 binding (Cloudflare Workers: env.DB).`,
+    `function getD1Binding(): never {`,
+    `  throw new Error("Provide your D1 database binding (env.DB).");`,
+    `}`,
+  ];
+}
 
 const STORAGE_INIT: Record<StorageChoice, string> = {
   local: `createLocalStorage(dataDir)`,
@@ -219,6 +289,7 @@ function buildImports(answers: Answers): string[] {
 function buildAdapterLines(answers: Answers): string[] {
   const lines = [
     `// Adapters — swap these for your deployment`,
+    ...dbPrelude(answers.database),
     `const database = ${DB_INIT[answers.database]};`,
     `const storage = ${STORAGE_INIT[answers.storage]};`,
   ];
@@ -419,6 +490,7 @@ function generateWorkerFile(answers: Answers): string {
     `const observability = await initObservabilityFromEnv();`,
     ``,
     `const dataDir = process.env.DATA_DIR || "./data";`,
+    ...dbPrelude(answers.database),
     `const database = ${DB_INIT[answers.database]};`,
     `const storage = ${STORAGE_INIT[answers.storage]};`,
     queueInit,
@@ -453,6 +525,33 @@ function buildDeps(answers: Answers): Record<string, string> {
     "@storyshelf/observability": __PKG_VERSION__ ?? "0.0.0",
     [DB_PACKAGE[answers.database]]: __PKG_VERSION__ ?? "0.0.0",
   };
+  if (answers.database === "turso") {
+    deps["@libsql/client"] = LIBSQL_CLIENT_SDK;
+  }
+  if (answers.database === "better-sqlite3") {
+    deps["better-sqlite3"] = BETTER_SQLITE3_SDK;
+  }
+  if (answers.database === "pg") {
+    deps["pg"] = PG_SDK;
+  }
+  if (answers.database === "neon" || answers.database === "neon-http") {
+    deps["@neondatabase/serverless"] = NEON_SDK;
+  }
+  if (answers.database === "vercel") {
+    deps["@vercel/postgres"] = VERCEL_POSTGRES_SDK;
+  }
+  if (answers.database === "pglite") {
+    deps["@electric-sql/pglite"] = PGLITE_SDK;
+  }
+  if (answers.database === "mysql") {
+    deps["mysql2"] = MYSQL2_SDK;
+  }
+  if (answers.database === "planetscale") {
+    deps["@planetscale/database"] = PLANETSCALE_SDK;
+  }
+  if (answers.database === "tidb") {
+    deps["@tidbcloud/serverless"] = TIDBCLOUD_SDK;
+  }
 
   if (answers.storage !== "local") {
     deps[STORAGE_PACKAGE[answers.storage]] = __PKG_VERSION__ ?? "0.0.0";

@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { webhooks } from "../../../db-sqlite/src/schema/index.ts";
 import { WebhookModel } from "../models/webhook.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { hmacSha256 } from "../utils/hash.ts";
+import type { DatabaseAdapter } from "./database.ts";
 import { emitWebhookEvent } from "./webhook-events.ts";
 
 const TEST_SECRET = "test-server-secret";
 
-function webhookTables() {
-  return { webhooks };
+function webhookTables(db: DatabaseAdapter) {
+  return { webhooks: db.tables.webhooks };
 }
 
 describe("emitWebhookEvent", () => {
@@ -18,7 +18,7 @@ describe("emitWebhookEvent", () => {
 
   it("signs deliveries with the decrypted secret, not the ciphertext", async () => {
     const { db } = makeDatabase();
-    const model = new WebhookModel(db, webhookTables(), TEST_SECRET);
+    const model = new WebhookModel(db, webhookTables(db), TEST_SECRET);
     await model.create("p1", {
       url: "https://example.com/hook",
       secret: "whsec-plain",
@@ -41,7 +41,7 @@ describe("emitWebhookEvent", () => {
 
     await emitWebhookEvent(
       db,
-      webhookTables(),
+      webhookTables(db),
       "p1",
       "build:created",
       { buildId: "b1" },
@@ -55,7 +55,7 @@ describe("emitWebhookEvent", () => {
 
   it("skips webhooks whose secret cannot be decrypted", async () => {
     const { db } = makeDatabase();
-    const model = new WebhookModel(db, webhookTables(), TEST_SECRET);
+    const model = new WebhookModel(db, webhookTables(db), TEST_SECRET);
     await model.create("p1", {
       url: "https://example.com/hook",
       secret: "whsec-plain",
@@ -70,7 +70,7 @@ describe("emitWebhookEvent", () => {
 
     await emitWebhookEvent(
       db,
-      webhookTables(),
+      webhookTables(db),
       "p1",
       "build:created",
       { buildId: "b1" },
@@ -82,7 +82,7 @@ describe("emitWebhookEvent", () => {
 
   it("delivers only subscribed events", async () => {
     const { db } = makeDatabase();
-    const model = new WebhookModel(db, webhookTables(), TEST_SECRET);
+    const model = new WebhookModel(db, webhookTables(db), TEST_SECRET);
     await model.create("p1", {
       url: "https://example.com/hook",
       secret: "s",
@@ -97,7 +97,7 @@ describe("emitWebhookEvent", () => {
 
     await emitWebhookEvent(
       db,
-      webhookTables(),
+      webhookTables(db),
       "p1",
       "build:approved",
       { buildId: "b1" },

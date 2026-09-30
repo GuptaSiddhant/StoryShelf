@@ -1,8 +1,8 @@
 import { and, desc, eq, getTableColumns, inArray, lt } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
 import type { Logger } from "pino";
+import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
-import type { DatabaseAdapter } from "../db/database.ts";
 import { BaselineModel } from "../models/baseline.ts";
 import { BuildModel, type BuildTables } from "../models/build.ts";
 import { LabelModel, type LabelTables } from "../models/label.ts";

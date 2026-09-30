@@ -1,5 +1,5 @@
 import type { Table } from "drizzle-orm";
-import type { DatabaseAdapter } from "../db/database.ts";
+import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { ContentRef } from "../schema/content-ref.ts";
 
 /** Content refs for deduplicated Storybook assets. */

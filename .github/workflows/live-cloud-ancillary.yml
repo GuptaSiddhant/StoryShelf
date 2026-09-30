@@ -95,7 +95,7 @@ jobs:
       - name: Run db suites (hermetic + live)
         if: matrix.suite == 'db'
         # --force: live results must never come from the turbo cache.
-        run: nubx turbo test --filter='@storyshelf/db-turso' --filter='@storyshelf/db-postgres' --force
+        run: nubx turbo test --filter='@storyshelf/db-sqlite' --filter='@storyshelf/db-postgres' --force
 
       - name: Run queue suite (hermetic + live)
         if: matrix.suite == 'queue'

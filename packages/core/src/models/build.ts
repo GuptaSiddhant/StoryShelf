@@ -1,7 +1,7 @@
 /** Build records, status transitions, and publication helpers. */
 import { and, desc, eq, getTableColumns, inArray } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
-import type { DatabaseAdapter } from "../db/database.ts";
+import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { Build } from "../schema/build.ts";
 import type { BuildStatus } from "../types.ts";
 import { ulid } from "../utils/ulid.ts";

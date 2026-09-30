@@ -141,5 +141,5 @@ secrets are set. Local run example:
 ```sh
 export PATH="$HOME/.nub/bin:$PATH"
 LIVE_CLOUD=1 TURSO_DATABASE_URL=... TURSO_AUTH_TOKEN=... \
-  nubx turbo test --filter='@storyshelf/db-turso' --force
+  nubx turbo test --filter='@storyshelf/db-sqlite' --force
 ```

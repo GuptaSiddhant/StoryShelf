@@ -8,7 +8,7 @@
  *
  * ```ts
  * import { createCaptureWorker } from "@storyshelf/worker";
- * import { createTursoDatabase } from "@storyshelf/db-turso";
+ * import { createTursoDatabase } from "@storyshelf/db-sqlite/turso";
  * import { createS3Storage } from "@storyshelf/storage-s3";
  * import { createSqsCaptureQueue } from "@storyshelf/queue-sqs";
  * import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";

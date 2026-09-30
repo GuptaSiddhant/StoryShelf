@@ -1,7 +1,7 @@
 import { PNG } from "pngjs";
 import { describe, expect, it } from "vitest";
-import { baselines, buildLabels, builds, snapshots } from "../../../db-sqlite/src/schema/index.ts";
 import type { RenderedSnapshot } from "../adapters/capture-runner.ts";
+import type { Baseline } from "../schema/baseline.ts";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
@@ -80,14 +80,14 @@ async function makeContext(options: {
 }): Promise<{ ctx: CaptureContext; objects: Map<string, Buffer> }> {
   const { db } = makeDatabase();
   const { storage, objects } = makeStorage();
-  await db.insert(builds, mockBuild);
+  await db.insert(db.tables.builds, mockBuild);
   const ctx: CaptureContext = {
     db,
     tables: {
-      builds,
-      buildLabels,
-      snapshots,
-      baselines,
+      builds: db.tables.builds,
+      buildLabels: db.tables.buildLabels,
+      snapshots: db.tables.snapshots,
+      baselines: db.tables.baselines,
     },
     storage,
     project: mockProject,
@@ -100,7 +100,7 @@ async function makeContext(options: {
 
 async function seedBaseline(ctx: CaptureContext): Promise<void> {
   const path = "/baselines/bl1.png";
-  await ctx.db.insert(baselines, {
+  await ctx.db.insert(ctx.db.tables.baselines, {
     id: "bl1",
     projectId: ctx.project.id,
     storyId: "a",
@@ -122,10 +122,10 @@ describe("persistCapture", () => {
 
     await persistCapture(ctx, new Set(["a"]));
 
-    const rows = await ctx.db.list(snapshots);
+    const rows = await ctx.db.list(ctx.db.tables.snapshots);
     expect(rows.map((row) => row.storyName)).toEqual(["b"]);
     expect(rows.map((row) => row.status)).toEqual(["approved"]);
-    const build = await ctx.db.get(builds, "b1");
+    const build = await ctx.db.get(ctx.db.tables.builds, "b1");
     expect(build?.status).toBe("failed");
   });
 
@@ -134,8 +134,8 @@ describe("persistCapture", () => {
 
     await persistCapture(ctx, new Set(["a", "b"]));
 
-    expect(await ctx.db.list(snapshots)).toEqual([]);
-    const build = await ctx.db.get(builds, "b1");
+    expect(await ctx.db.list(ctx.db.tables.snapshots)).toEqual([]);
+    const build = await ctx.db.get(ctx.db.tables.builds, "b1");
     expect(build?.status).toBe("failed");
   });
 
@@ -149,10 +149,10 @@ describe("persistCapture", () => {
 
     await persistCapture(ctx);
 
-    const rows = await ctx.db.list(snapshots);
+    const rows = await ctx.db.list(ctx.db.tables.snapshots);
     expect(rows.map((row) => row.storyName)).toEqual(["a", "b"]);
     expect(rows.map((row) => row.status)).toEqual(["approved", "approved"]);
-    const build = await ctx.db.get(builds, "b1");
+    const build = await ctx.db.get(ctx.db.tables.builds, "b1");
     expect(build?.status).toBe("approved");
   });
 
@@ -164,12 +164,12 @@ describe("persistCapture", () => {
 
     await persistCapture(ctx);
 
-    const rows = await ctx.db.list(snapshots);
+    const rows = await ctx.db.list(ctx.db.tables.snapshots);
     expect(rows.map((row) => row.status)).toEqual(["changed"]);
     expect(rows.map((row) => row.diffPath)).toEqual([null]);
     const expectedDiff = diffPath(ctx.project.id, ctx.build.id, "a", DEFAULT_VIEWPORT.name);
     await expect(ctx.storage.exists(expectedDiff)).resolves.toBe(false);
-    const build = await ctx.db.get(builds, "b1");
+    const build = await ctx.db.get(ctx.db.tables.builds, "b1");
     expect(build?.status).toBe("reviewing");
   });
 
@@ -178,16 +178,19 @@ describe("persistCapture", () => {
 
     await persistCapture(ctx, new Set());
 
-    const rows = await ctx.db.list(snapshots);
+    const rows = await ctx.db.list(ctx.db.tables.snapshots);
     expect(rows).toEqual([]);
-    const build = await ctx.db.get(builds, "b1");
+    const build = await ctx.db.get(ctx.db.tables.builds, "b1");
     expect(build?.status).toBe("reviewing");
   });
 
   it("inherits unaffected stories from their baseline without rendering", async () => {
     const { ctx } = await makeContext({ captures: [] });
     await seedBaseline(ctx);
-    const baseline = await ctx.db.get(baselines, "bl1");
+    const baseline = (await ctx.db.get(
+      ctx.db.tables.baselines,
+      "bl1",
+    )) as unknown as Baseline | null;
     if (!baseline) {
       throw new Error("baseline must exist");
     }
@@ -197,12 +200,12 @@ describe("persistCapture", () => {
       inherited: [{ story: storyOf("a"), viewport: DEFAULT_VIEWPORT, baseline }],
     });
 
-    const rows = await ctx.db.list(snapshots);
+    const rows = await ctx.db.list(ctx.db.tables.snapshots);
     expect(rows.map((row) => row.storyName)).toEqual(["a"]);
     expect(rows.map((row) => row.status)).toEqual(["unchanged"]);
     expect(rows.map((row) => row.inherited)).toEqual([true]);
     expect(rows.map((row) => row.screenshotPath)).toEqual(["/baselines/bl1.png"]);
-    const build = await ctx.db.get(builds, "b1");
+    const build = await ctx.db.get(ctx.db.tables.builds, "b1");
     expect(build?.status).toBe("approved");
   });
 
@@ -211,7 +214,10 @@ describe("persistCapture", () => {
       captures: [captureFor(storyOf("b"), png(4, 4, [0, 255, 0]))],
     });
     await seedBaseline(ctx);
-    const baseline = await ctx.db.get(baselines, "bl1");
+    const baseline = (await ctx.db.get(
+      ctx.db.tables.baselines,
+      "bl1",
+    )) as unknown as Baseline | null;
     if (!baseline) {
       throw new Error("baseline must exist");
     }
@@ -221,12 +227,12 @@ describe("persistCapture", () => {
       inherited: [{ story: storyOf("a"), viewport: DEFAULT_VIEWPORT, baseline }],
     });
 
-    const rows = await ctx.db.list(snapshots);
+    const rows = await ctx.db.list(ctx.db.tables.snapshots);
     const byStory = new Map(rows.map((row) => [row.storyName, row] as const));
     expect(byStory.get("a")?.status).toBe("unchanged");
     expect(byStory.get("b")?.status).toBe("approved");
     expect(byStory.get("a")?.inherited).toBe(true);
-    const build = await ctx.db.get(builds, "b1");
+    const build = await ctx.db.get(ctx.db.tables.builds, "b1");
     expect(build?.status).toBe("approved");
     expect(build?.snapshotCount).toBe(2);
   });
@@ -246,7 +252,7 @@ describe("persistCapture", () => {
 
     await persistCapture(ctx);
 
-    const rows = await ctx.db.list(snapshots);
+    const rows = await ctx.db.list(ctx.db.tables.snapshots);
     const row = rows.find((snapshot) => snapshot.storyId === "a");
     expect(row?.viewportName).toBe("tablet");
     expect(row?.viewportWidth).toBe(834);

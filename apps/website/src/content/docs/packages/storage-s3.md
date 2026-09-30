@@ -37,4 +37,4 @@ The adapter implements `StorageAdapter`: `read`, `write`, `delete`, `exists`, an
 
 ## When to use it
 
-Choose S3 storage for cloud or multi-node deployments. It is a drop-in replacement for [local storage](../storage-local/), and pairs naturally with [Turso](../db-turso/) when the application is deployed without shared local disk.
+Choose S3 storage for cloud or multi-node deployments. It is a drop-in replacement for [local storage](../storage-local/), and pairs naturally with the [Turso preset](../db-sqlite/#presets-same-schema-different-driver) when the application is deployed without shared local disk.

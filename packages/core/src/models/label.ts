@@ -1,7 +1,7 @@
 /** Build labels and project label types. */
 import { and, desc, eq, getTableColumns } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
-import type { DatabaseAdapter } from "../db/database.ts";
+import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { BuildLabel, LabelType } from "../schema/label.ts";
 import { PERSISTENT_LABEL_KEY, RESERVED_LABEL_KEYS, SEEDED_LABEL_KEYS } from "../types.ts";
 import { ulid } from "../utils/ulid.ts";

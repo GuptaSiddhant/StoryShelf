@@ -3,7 +3,7 @@
  *
  * Core schema is now type-only — no runtime table definitions.
  * Table handles and the Drizzle schema object live in
- * `packages/db-sqlite` (and `packages/db-turso` reuses the same shape).
+ * `packages/db-sqlite` (shared by every `./*` preset subpath).
  * Row interfaces remain here for domain-layer typing.
  */
 

@@ -1,18 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { baselines, buildLabels, builds, projects } from "../../../db-sqlite/src/schema/index.ts";
+import type { DatabaseAdapter } from "../adapters/database.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { Retention } from "./purge.ts";
 
-function retentionTables() {
+function retentionTables(db: DatabaseAdapter) {
   return {
-    builds: builds as unknown as never,
-    buildLabels: buildLabels as unknown as never,
-    baselines: baselines as unknown as never,
+    builds: db.tables.builds,
+    buildLabels: db.tables.buildLabels,
+    baselines: db.tables.baselines,
   };
 }
 
-function baselineTables() {
-  return { baselines: baselines as unknown as never };
+function baselineTables(db: DatabaseAdapter) {
+  return { baselines: db.tables.baselines };
 }
 
 describe("Retention", () => {
@@ -37,7 +37,7 @@ describe("Retention", () => {
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
     };
-    await db.insert(projects, project);
+    await db.insert(db.tables.projects, project);
 
     // Insert builds: one old approved, one recent approved
     // Old build created 60 days ago
@@ -45,7 +45,7 @@ describe("Retention", () => {
     // Recent build created 1 day ago
     const recentDate = new Date(now.getTime() - 1 * 86_400_000).toISOString();
 
-    await db.insert(builds, {
+    await db.insert(db.tables.builds, {
       id: "b-old",
       projectId: "p1",
       gitSha: "sha-old",
@@ -59,7 +59,7 @@ describe("Retention", () => {
       createdAt: oldDate,
       updatedAt: oldDate,
     });
-    await db.insert(builds, {
+    await db.insert(db.tables.builds, {
       id: "b-recent",
       projectId: "p1",
       gitSha: "sha-recent",
@@ -74,12 +74,12 @@ describe("Retention", () => {
       updatedAt: recentDate,
     });
 
-    const retention = new Retention(db, storage, retentionTables());
+    const retention = new Retention(db, storage, retentionTables(db));
     const result = await retention.purge(project, { ttlDays: 30, keepLatestPerBranch: false });
 
     // B-old should be purged, b-recent should remain
     expect(result.removedBuilds).toBe(1);
-    const remaining = await db.list(builds);
+    const remaining = await db.list(db.tables.builds);
     expect(remaining.length).toBe(1);
     expect(remaining[0]?.id).toBe("b-recent");
   });
@@ -103,12 +103,12 @@ describe("Retention", () => {
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
     };
-    await db.insert(projects, project);
+    await db.insert(db.tables.projects, project);
 
     const oldDate = new Date(now.getTime() - 40 * 86_400_000).toISOString();
     const recentDate = new Date(now.getTime() - 5 * 86_400_000).toISOString();
 
-    await db.insert(builds, {
+    await db.insert(db.tables.builds, {
       id: "b-stale",
       projectId: "p1",
       gitSha: "sha-stale",
@@ -122,7 +122,7 @@ describe("Retention", () => {
       createdAt: oldDate,
       updatedAt: oldDate,
     });
-    await db.insert(builds, {
+    await db.insert(db.tables.builds, {
       id: "b-fresh",
       projectId: "p1",
       gitSha: "sha-fresh",
@@ -136,7 +136,7 @@ describe("Retention", () => {
       createdAt: recentDate,
       updatedAt: recentDate,
     });
-    await db.insert(builds, {
+    await db.insert(db.tables.builds, {
       id: "b-main",
       projectId: "p1",
       gitSha: "sha-main",
@@ -152,13 +152,13 @@ describe("Retention", () => {
     });
 
     const { BaselineModel } = await import("../models/baseline.ts");
-    const baselineModel = new BaselineModel(db, baselineTables(), storage);
+    const baselineModel = new BaselineModel(db, baselineTables(db), storage);
     await storage.write("src.png", Buffer.from([1]));
     await baselineModel.upsert("p1", "s1", "desktop", "feature/stale", "snap1", "src.png");
     await baselineModel.upsert("p1", "s1", "desktop", "feature/fresh", "snap2", "src.png");
     await baselineModel.upsert("p1", "s1", "desktop", "main", "snap3", "src.png");
 
-    const retention = new Retention(db, storage, retentionTables());
+    const retention = new Retention(db, storage, retentionTables(db));
     const result = await retention.purgeStaleBranches(project, 30);
     expect(result.removedBranches).toBe(1);
     expect(result.removedBaselines).toBe(1);
@@ -186,9 +186,9 @@ describe("Retention", () => {
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
     };
-    await db.insert(projects, project);
+    await db.insert(db.tables.projects, project);
     const oldDate = new Date(now.getTime() - 40 * 86_400_000).toISOString();
-    await db.insert(builds, {
+    await db.insert(db.tables.builds, {
       id: "b-main",
       projectId: "p1",
       gitSha: "sha-main",
@@ -203,10 +203,10 @@ describe("Retention", () => {
       updatedAt: oldDate,
     });
     const { BaselineModel } = await import("../models/baseline.ts");
-    const baselineModel = new BaselineModel(db, baselineTables(), storage);
+    const baselineModel = new BaselineModel(db, baselineTables(db), storage);
     await storage.write("src.png", Buffer.from([1]));
     await baselineModel.upsert("p1", "s1", "desktop", "main", "snap1", "src.png");
-    const retention = new Retention(db, storage, retentionTables());
+    const retention = new Retention(db, storage, retentionTables(db));
     const result = await retention.purgeStaleBranches(project, 30);
     expect(result.removedBranches).toBe(0);
     expect(result.removedBaselines).toBe(0);

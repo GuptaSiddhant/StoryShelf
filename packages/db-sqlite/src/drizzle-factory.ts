@@ -15,11 +15,48 @@ import { eq, getTableColumns } from "drizzle-orm";
 import type { AnySQLiteTable, SQLiteColumn } from "drizzle-orm/sqlite-core";
 
 /**
- * Build a {@link DatabaseAdapter} over any SQLite-compatible Drizzle
- * dialect. Sync results (node:sqlite) and promises (libSQL) are both
- * awaited, so drivers only supply connection setup, metadata, and the
- * driver-specific migrate/close.
+ * Wrap an adapter with manual BEGIN/COMMIT transactions for synchronous
+ * SQLite drivers (better-sqlite3, `bun:sqlite`), whose `transaction()`
+ * rejects async callbacks. Statements run on the adapter's own connection,
+ * so the open transaction covers them; rollback runs on throw.
+ *
+ * @param adapter - Adapter built by {@link createDrizzleAdapter}.
+ * @param exec - Synchronous statement runner on the same connection.
+ * @returns The adapter with `transact` replaced.
  */
+export function withManualTransactions(
+  adapter: DatabaseAdapter,
+  exec: (sql: string) => void,
+): DatabaseAdapter {
+  return {
+    ...adapter,
+    transact: async <R>(fn: (tx: TxStore) => Promise<R>): Promise<R> => {
+      const tx: TxStore = {
+        insert: async (table, values) => await adapter.insert(table, values),
+        update: async (table, id, values) => await adapter.update(table, id, values),
+        get: async (table, id) => await adapter.get(table, id),
+        remove: async (table, id) => {
+          await adapter.remove(table, id);
+        },
+        list: async (table, opts) => await adapter.list(table, opts),
+        count: async (table, where) => await adapter.count(table, where),
+      };
+      exec("BEGIN");
+      try {
+        const result = await fn(tx);
+        exec("COMMIT");
+        return result;
+      } catch (error) {
+        try {
+          exec("ROLLBACK");
+        } catch {
+          // already rolled back (e.g. constraint abort) — report the cause
+        }
+        throw error;
+      }
+    },
+  };
+}
 export function createDrizzleAdapter(db: unknown, options: DrizzleAdapterOptions): DatabaseAdapter {
   const drizzle = db as DrizzleLike;
   let closed = false;

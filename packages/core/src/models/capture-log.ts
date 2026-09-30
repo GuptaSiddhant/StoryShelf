@@ -1,7 +1,7 @@
 /** Capture log lines: every stored line of a capture attempt. */
 import { asc, eq, getTableColumns } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
-import type { DatabaseAdapter } from "../db/database.ts";
+import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { CaptureLog, CaptureLogLevel } from "../schema/capture-attempt.ts";
 import { ulid } from "../utils/ulid.ts";
 

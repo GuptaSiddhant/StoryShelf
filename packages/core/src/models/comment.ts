@@ -1,7 +1,7 @@
 /** Build and snapshot review comments. */
 import { eq, getTableColumns } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
-import type { DatabaseAdapter } from "../db/database.ts";
+import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { Comment } from "../schema/comment.ts";
 import { ulid } from "../utils/ulid.ts";
 

@@ -1,8 +1,8 @@
 import type { Logger } from "pino";
 import type { CaptureRunner } from "../adapters/capture-runner.ts";
 import type { BrowserName } from "../adapters/capture-runner.ts";
+import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
-import type { DatabaseAdapter } from "../db/database.ts";
 import { BuildModel, type BuildTables } from "../models/build.ts";
 import {
   emitAttemptLog,

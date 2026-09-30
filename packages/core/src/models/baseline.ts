@@ -2,9 +2,9 @@
 /** Per-branch baseline screenshots with default-branch fallback. */
 import { and, eq, getTableColumns } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
+import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { emitWebhookEvent } from "../adapters/webhook-events.ts";
-import type { DatabaseAdapter } from "../db/database.ts";
 import type { Baseline } from "../schema/baseline.ts";
 import { baselinePath } from "../utils/paths.ts";
 import { ulid } from "../utils/ulid.ts";

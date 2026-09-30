@@ -10,6 +10,10 @@
 import type { AnyPgTable } from "drizzle-orm/pg-core";
 import { baselines as baselinesTable } from "./baseline.ts";
 import { builds as buildsTable } from "./build.ts";
+import {
+  captureAttempts as captureAttemptsTable,
+  captureLogs as captureLogsTable,
+} from "./capture-attempt.ts";
 import { comments as commentsTable } from "./comment.ts";
 import { contentRefs as contentRefsTable } from "./content-refs.ts";
 import { buildLabels as buildLabelsTable, labelTypes as labelTypesTable } from "./label.ts";
@@ -19,10 +23,12 @@ import { projects as projectsTable } from "./project.ts";
 import { snapshots as snapshotsTable } from "./snapshot.ts";
 import { projectStatusConfigs as projectStatusConfigsTable } from "./status-config.ts";
 import { tokens as tokensTable } from "./token.ts";
+import { userInviteTokens as userInviteTokensTable } from "./user-invite.ts";
 import { users as usersTable } from "./user.ts";
 import { webhooks as webhooksTable } from "./webhook.ts";
 
 export { builds } from "./build.ts";
+export { captureAttempts, captureLogs } from "./capture-attempt.ts";
 export { baselines } from "./baseline.ts";
 export { comments } from "./comment.ts";
 export { buildLabels, labelTypes } from "./label.ts";
@@ -32,10 +38,13 @@ export { projects } from "./project.ts";
 export { snapshots } from "./snapshot.ts";
 export { projectStatusConfigs } from "./status-config.ts";
 export { tokens } from "./token.ts";
+export { userInviteTokens } from "./user-invite.ts";
 export { users } from "./user.ts";
 export { webhooks } from "./webhook.ts";
 export { contentRefs } from "./content-refs.ts";
 
+/** A capture attempt and its log lines for a single build run. */
+export type { CaptureAttempt, CaptureLog } from "./capture-attempt.ts";
 /** Build row as stored in the `builds` table. */
 export type { Build } from "./build.ts";
 /** Review comment row as stored in the `comments` table. */
@@ -54,6 +63,8 @@ export type { ProjectStatusConfig } from "./status-config.ts";
 export type { Snapshot } from "./snapshot.ts";
 /** CI token row (stores only the hash). */
 export type { Token } from "./token.ts";
+/** One-time invite token for local accounts. */
+export type { UserInviteToken } from "./user-invite.ts";
 /** User row for authenticated identities. */
 export type { User } from "./user.ts";
 /** Webhook subscription row. */
@@ -68,6 +79,8 @@ export const schema: {
   projects: AnyPgTable;
   projectStatusConfigs: AnyPgTable;
   builds: AnyPgTable;
+  captureAttempts: AnyPgTable;
+  captureLogs: AnyPgTable;
   snapshots: AnyPgTable;
   baselines: AnyPgTable;
   comments: AnyPgTable;
@@ -76,6 +89,7 @@ export const schema: {
   tokens: AnyPgTable;
   webhooks: AnyPgTable;
   users: AnyPgTable;
+  userInviteTokens: AnyPgTable;
   projectMembers: AnyPgTable;
   projectGroupMappings: AnyPgTable;
   contentRefs: AnyPgTable;
@@ -83,6 +97,8 @@ export const schema: {
   projects: projectsTable,
   projectStatusConfigs: projectStatusConfigsTable,
   builds: buildsTable,
+  captureAttempts: captureAttemptsTable,
+  captureLogs: captureLogsTable,
   snapshots: snapshotsTable,
   baselines: baselinesTable,
   comments: commentsTable,
@@ -91,6 +107,7 @@ export const schema: {
   tokens: tokensTable,
   webhooks: webhooksTable,
   users: usersTable,
+  userInviteTokens: userInviteTokensTable,
   projectMembers: projectMembersTable,
   projectGroupMappings: projectGroupMappingsTable,
   contentRefs: contentRefsTable,

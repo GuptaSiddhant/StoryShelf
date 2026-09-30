@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { projectStatusConfigs } from "../../../db-sqlite/src/schema/index.ts";
+import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { GitHostAdapter, GitHostProvider } from "../adapters/git-host/index.ts";
 import { StatusConfigModel } from "../models/status-config.ts";
 import type { Project } from "../schema/project.ts";
@@ -9,8 +9,8 @@ import { postStatusesForBuild } from "./status-fanout.ts";
 
 const SECRET = "test-secret-0123456789abcdef";
 
-function tables() {
-  return { projectStatusConfigs: projectStatusConfigs as unknown as never };
+function tables(db: DatabaseAdapter) {
+  return { projectStatusConfigs: db.tables.projectStatusConfigs };
 }
 
 function fakeProvider(setStatus: ReturnType<typeof vi.fn>): GitHostProvider {
@@ -44,7 +44,7 @@ async function setup(): Promise<{
   providers: GitHostProvider[];
 }> {
   const { db } = makeDatabase();
-  await new StatusConfigModel(db, tables(), SECRET).create(project.id, {
+  await new StatusConfigModel(db, tables(db), SECRET).create(project.id, {
     provider: "fake-git",
     config: {},
     token: "token",
@@ -62,7 +62,7 @@ function post(
 ) {
   return postStatusesForBuild({
     db,
-    tables: tables(),
+    tables: tables(db),
     project,
     sha,
     status: "success",

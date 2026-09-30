@@ -1,12 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { users } from "../../../db-sqlite/src/schema/index.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { UserModel } from "./user.ts";
 
 describe("UserModel", () => {
   it("inserts a new user on first upsert", async () => {
     const { db } = makeDatabase();
-    const model = new UserModel(db, { users });
+    const model = new UserModel(db, { users: db.tables.users });
     const user = await model.upsert({
       id: "u1",
       email: "u@example.com",
@@ -20,7 +19,7 @@ describe("UserModel", () => {
 
   it("refreshes profile fields and role on subsequent upserts", async () => {
     const { db } = makeDatabase();
-    const model = new UserModel(db, { users });
+    const model = new UserModel(db, { users: db.tables.users });
     await model.upsert({
       id: "u1",
       email: "old@example.com",
@@ -42,7 +41,7 @@ describe("UserModel", () => {
 
   it("returns null for unknown users", async () => {
     const { db } = makeDatabase();
-    const model = new UserModel(db, { users });
+    const model = new UserModel(db, { users: db.tables.users });
     await expect(model.get("missing")).resolves.toBeNull();
   });
 });

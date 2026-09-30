@@ -30,4 +30,25 @@ Migrations run inside the adapter's `lifecycle.init` — await them via `app.lif
 
 ## When to use it
 
-Use SQLite for a single-node deployment or local development. Pair it with [local storage](../storage-local/) for the simplest self-hosted setup. The schema and adapter contract are shared with [Turso](../db-turso/), so moving to a serverless database does not change the rest of the application.
+Use SQLite for a single-node deployment or local development. Pair it with [local storage](../storage-local/) for the simplest self-hosted setup.
+
+## Presets (same schema, different driver)
+
+| Subpath | Driver | Install | When |
+|---|---|---|---|
+| `@storyshelf/db-sqlite` (root) | `node:sqlite` builtin | — | Default. Single-node VPS/Docker. Zero config. |
+| `@storyshelf/db-sqlite/turso` | `@libsql/client` | `nub add @libsql/client` | Serverless (Turso cloud, Vercel, Lambda); `file:` URLs and embedded replicas work too. |
+| `@storyshelf/db-sqlite/better-sqlite3` | `better-sqlite3` | `nub add better-sqlite3` | Native sync driver. |
+| `@storyshelf/db-sqlite/bun-sqlite` | `bun:sqlite` builtin | — (Bun only) | Bun runtime. |
+| `@storyshelf/db-sqlite/d1` | D1 binding | — (Workers only) | Cloudflare Workers (`env.DB`). |
+
+```ts
+import { createTursoDatabase } from "@storyshelf/db-sqlite/turso";
+
+const database = createTursoDatabase({
+  url: process.env["TURSO_DATABASE_URL"],
+  authToken: process.env["TURSO_AUTH_TOKEN"],
+});
+```
+
+All presets accept an injected `client` instead of connection options (the caller then owns teardown). Driver peers are optional: install only your backend's client. The former `@storyshelf/db-turso` package is retired — see `docs/deprecated.md` in the repo.

@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { projectGroupMappings } from "../../../db-sqlite/src/schema/index.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { ProjectGroupMappingModel } from "./project-group-mapping.ts";
 
 describe("ProjectGroupMappingModel", () => {
   it("creates and lists mappings for a project", async () => {
     const { db } = makeDatabase();
-    const model = new ProjectGroupMappingModel(db, { projectGroupMappings });
+    const model = new ProjectGroupMappingModel(db, {
+      projectGroupMappings: db.tables.projectGroupMappings,
+    });
     const created = await model.create("p1", "team-design", "developer");
     expect(created.id).toBeDefined();
     expect(created.groupName).toBe("team-design");
@@ -19,7 +20,9 @@ describe("ProjectGroupMappingModel", () => {
 
   it("scopes listings to the project", async () => {
     const { db } = makeDatabase();
-    const model = new ProjectGroupMappingModel(db, { projectGroupMappings });
+    const model = new ProjectGroupMappingModel(db, {
+      projectGroupMappings: db.tables.projectGroupMappings,
+    });
     await model.create("p1", "team-a", "viewer");
     await model.create("p2", "team-b", "admin");
     expect(await model.list("p1")).toHaveLength(1);
@@ -28,7 +31,9 @@ describe("ProjectGroupMappingModel", () => {
 
   it("removes a mapping by id within the project only", async () => {
     const { db } = makeDatabase();
-    const model = new ProjectGroupMappingModel(db, { projectGroupMappings });
+    const model = new ProjectGroupMappingModel(db, {
+      projectGroupMappings: db.tables.projectGroupMappings,
+    });
     const created = await model.create("p1", "team-a", "viewer");
     await model.create("p1", "team-b", "admin");
     await model.remove("p1", created.id);

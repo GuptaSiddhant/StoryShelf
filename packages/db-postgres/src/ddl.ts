@@ -52,6 +52,36 @@ CREATE TABLE IF NOT EXISTS builds (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS builds_project_gitsha_idx ON builds (project_id, git_sha);
 CREATE INDEX IF NOT EXISTS builds_git_branch_idx ON builds (git_branch);
+CREATE TABLE IF NOT EXISTS capture_attempts (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  build_id TEXT NOT NULL REFERENCES builds(id) ON DELETE CASCADE,
+  attempt_no INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'queued',
+  error TEXT,
+  req_id TEXT,
+  story_count INTEGER NOT NULL DEFAULT 0,
+  failed_count INTEGER NOT NULL DEFAULT 0,
+  queued_at TIMESTAMPTZ NOT NULL,
+  started_at TIMESTAMPTZ,
+  finished_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS capture_attempts_build_no_idx ON capture_attempts (build_id, attempt_no);
+CREATE INDEX IF NOT EXISTS capture_attempts_build_id_idx ON capture_attempts (build_id);
+CREATE TABLE IF NOT EXISTS capture_logs (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  build_id TEXT NOT NULL REFERENCES builds(id) ON DELETE CASCADE,
+  attempt_id TEXT NOT NULL REFERENCES capture_attempts(id) ON DELETE CASCADE,
+  seq INTEGER NOT NULL,
+  level TEXT NOT NULL DEFAULT 'info',
+  message TEXT NOT NULL,
+  fields TEXT,
+  created_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS capture_logs_attempt_seq_idx ON capture_logs (attempt_id, seq);
 CREATE TABLE IF NOT EXISTS snapshots (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -92,6 +122,15 @@ CREATE TABLE IF NOT EXISTS baselines (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS baselines_project_story_viewport_branch_idx ON baselines (project_id, story_id, viewport_name, branch);
 CREATE INDEX IF NOT EXISTS baselines_project_story_idx ON baselines (project_id, story_id);
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  avatar_url TEXT,
+  role TEXT NOT NULL DEFAULT 'member',
+  last_login_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL
+);
 CREATE TABLE IF NOT EXISTS comments (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -142,13 +181,12 @@ CREATE TABLE IF NOT EXISTS webhooks (
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );
-CREATE TABLE IF NOT EXISTS users (
+CREATE TABLE IF NOT EXISTS user_invite_tokens (
   id TEXT PRIMARY KEY,
-  email TEXT NOT NULL UNIQUE,
-  name TEXT NOT NULL,
-  avatar_url TEXT,
-  role TEXT NOT NULL DEFAULT 'member',
-  last_login_at TIMESTAMPTZ,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL
 );
 CREATE TABLE IF NOT EXISTS project_members (

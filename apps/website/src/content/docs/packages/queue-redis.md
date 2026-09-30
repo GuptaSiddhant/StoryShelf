@@ -67,7 +67,7 @@ A separate worker process polls Redis and calls `executeCaptureJob` via `createC
 ```ts
 import { createRedisCaptureQueue } from "@storyshelf/queue-redis";
 import { createCaptureWorker } from "@storyshelf/worker";
-import { createTursoDatabase } from "@storyshelf/db-turso";
+import { createTursoDatabase } from "@storyshelf/db-sqlite/turso";
 import { createS3Storage } from "@storyshelf/storage-s3";
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
 
