@@ -28,9 +28,10 @@ async function seedSession(
   db: DatabaseAdapter,
   userId: string,
   expiresAt: string,
+  createdAt?: string,
 ): Promise<string> {
   const id = ulid();
-  const now = new Date().toISOString();
+  const now = createdAt ?? new Date().toISOString();
   await db.insert(baseAuthTables.session, {
     id,
     userId,
@@ -50,10 +51,23 @@ describe("listUserSessions", () => {
     const userId = ulid();
     await seedUser(db, userId);
     await seedUser(db, "other-user");
-    await seedSession(db, userId, new Date(Date.now() - 1000).toISOString());
-    const first = await seedSession(db, userId, new Date(Date.now() + 60_000).toISOString());
-    const second = await seedSession(db, userId, new Date(Date.now() + 60_000).toISOString());
-    await seedSession(db, "other-user", new Date(Date.now() + 60_000).toISOString());
+    // Distinct createdAt values: ulid() random bits make same-millisecond
+    // ids unordered, so "newest first" is only well-defined across timestamps.
+    const base = Date.now();
+    await seedSession(db, userId, new Date(base - 1000).toISOString());
+    const first = await seedSession(
+      db,
+      userId,
+      new Date(base + 60_000).toISOString(),
+      new Date(base).toISOString(),
+    );
+    const second = await seedSession(
+      db,
+      userId,
+      new Date(base + 60_000).toISOString(),
+      new Date(base + 1).toISOString(),
+    );
+    await seedSession(db, "other-user", new Date(base + 60_000).toISOString());
 
     const sessions = await listUserSessions(db, userId);
     expect(sessions.map((session) => session.id)).toEqual([second, first]);
