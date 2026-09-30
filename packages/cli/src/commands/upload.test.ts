@@ -363,6 +363,10 @@ describe("runUpload affected capture", () => {
   });
 
   it("synthesizes a local identity outside a git repository", async () => {
+    // Ambient CI env (e.g. GITHUB_SHA on Actions runners) would take
+    // precedence over synthesis — blank it so this tests the fallback.
+    vi.stubEnv("GITHUB_SHA", "");
+    vi.stubEnv("GITHUB_REF_NAME", "");
     writeBuild(dir);
     const { calls } = stubFetch({
       build: { id: "b1" },
@@ -401,6 +405,7 @@ describe("resolveIdentity", () => {
 
   it("falls back to env, then git, then synthesis per field", () => {
     vi.stubEnv("GITHUB_SHA", "env-sha");
+    vi.stubEnv("GITHUB_REF_NAME", "");
     const probe: GitIdentityProbe = {
       headSha: () => "git-sha",
       branchName: () => "git-branch",
@@ -413,6 +418,8 @@ describe("resolveIdentity", () => {
   });
 
   it("synthesizes a unique local identity without git", () => {
+    vi.stubEnv("GITHUB_SHA", "");
+    vi.stubEnv("GITHUB_REF_NAME", "");
     const first = resolveIdentity(dir, {}, nullProbe);
     const second = resolveIdentity(dir, {}, nullProbe);
     expect(first.sha.startsWith("local-")).toBe(true);
