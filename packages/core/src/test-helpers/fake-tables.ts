@@ -261,6 +261,28 @@ const projectGroupMappings = defineTable("project_group_mappings", {
   createdAt: "created_at",
 });
 
+const notificationChannels = defineTable("notification_channels", {
+  id: "id",
+  projectId: "project_id",
+  provider: "provider",
+  config: "config",
+  secretEncrypted: "secret_encrypted",
+  events: "events",
+  enabled: "enabled",
+  createdAt: "created_at",
+  updatedAt: "updated_at",
+});
+
+const notificationSubscriptions = defineTable("notification_subscriptions", {
+  id: "id",
+  projectId: "project_id",
+  userId: "user_id",
+  events: "events",
+  via: "via",
+  enabled: "enabled",
+  createdAt: "created_at",
+});
+
 const contentRefs = defineTable("content_refs", {
   hash: "hash",
   refCount: "ref_count",
@@ -286,5 +308,7 @@ export const fakeSchema: Tables = {
   userInviteTokens,
   projectMembers,
   projectGroupMappings,
+  notificationChannels,
+  notificationSubscriptions,
   contentRefs,
 };

@@ -4,7 +4,7 @@
  */
 import { swaggerUI } from "@hono/swagger-ui";
 import { OpenAPIHono } from "@hono/zod-openapi";
-import type { ShelfOptions } from "@storyshelf/core/config";
+import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import {
   createHttpMiddleware,
   createInstrumentedDatabase,
@@ -88,10 +88,8 @@ export function createShelfApp(options: ShelfOptions): ShelfApp {
 }
 
 /** Attach global middleware: ids, logging, init gate, limits, store scope, auth gate. */
-// oxlint-disable-next-line eslint/max-statements -- wiring is cohesive, one concern
 function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
-  const { options, config, ui, logger, authEnabled, enqueueCapture, queue, gitHosts, getReady } =
-    wiring;
+  const { config, logger, getReady } = wiring;
   app.use("*", requestId());
   // OTEL server spans (W3C extraction, route-template naming). Mounted right
   // after requestId so `storyshelf.req_id` resolves; `enduser.id` resolves
@@ -105,12 +103,18 @@ function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
   // With Hono's Web `Request`/`Response` model.
   app.use("*", requestLogging(logger));
   app.use("*", setupGate(getReady));
+  mountGuards(app, config);
+  mountStoreScope(app, wiring);
+  app.use("*", authGate());
+}
+
+/** Mount rate limits and CSRF guards (abuse floors, not strict protection). */
+function mountGuards(app: ShelfRouter, config: ShelfConfig): void {
   app.use("/api/v1/*", rateLimit({ windowMs: 60_000, max: 100 }));
   app.use("/api/v1/tokens/*", rateLimit({ windowMs: 60_000, max: 10 }));
   app.use("/api/v1/webhooks/*", rateLimit({ windowMs: 60_000, max: 20 }));
   // Auth endpoints ride their own buckets (the shared store keys by IP, so
   // prefix the key: login floods must not eat the API budget or vice versa).
-  // Budgets are abuse floors, not strict brute-force protection.
   app.use("/auth/*", rateLimit({ windowMs: 60_000, max: 100, keyGenerator: rateLimitKey("auth") }));
   app.use(
     "/api/auth/*",
@@ -121,6 +125,12 @@ function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
   app.use("/projects/:slug/settings/*", csrf(config.secret));
   app.use("/profile/*", csrf(config.secret));
   app.use("/profile", csrf(config.secret));
+}
+
+/** Mount the request-scoped store (db/storage/config/user/adapters). */
+function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
+  const { options, config, ui, logger, authEnabled, enqueueCapture, queue, gitHosts, notifiers } =
+    wiring;
   app.use(
     "*",
     storeScope({
@@ -133,10 +143,10 @@ function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
       enqueueCapture,
       captureQueue: queue,
       gitHosts,
+      notifiers,
       resolveUser: async (c) => await resolveRequestUser(c, options.auth),
     }),
   );
-  app.use("*", authGate());
 }
 
 /** Register every JSON API router. */
@@ -209,7 +219,13 @@ function packageVersion(): string {
  * under `core/schema`. Importing the barrel must never pull Node-only modules
  * into edge bundles beyond what Hono itself needs.
  */
-export type { ShelfOptions, ShelfConfig, UIConfig, BrandTheme } from "@storyshelf/core/config";
+export type {
+  ShelfOptions,
+  ShelfConfig,
+  UIConfig,
+  BrandTheme,
+  NotificationsConfig,
+} from "@storyshelf/core/config";
 export {
   createShelfLogger,
   type Logger,

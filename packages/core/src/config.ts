@@ -3,8 +3,10 @@ import { z } from "zod";
 import type { CaptureQueue } from "./adapters/capture-queue.ts";
 import type { CaptureRunner } from "./adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "./adapters/database.ts";
+import type { EmailSender } from "./adapters/email-sender.ts";
 import type { GitHostProvider } from "./adapters/git-host/index.ts";
 import type { AdapterCategory } from "./adapters/metadata.ts";
+import type { NotifierProvider } from "./adapters/notifier/provider.ts";
 import type { StorageAdapter } from "./adapters/storage.ts";
 import type { Auth } from "./auth.ts";
 
@@ -77,6 +79,13 @@ export interface AdapterSnapshot {
   category: AdapterCategory;
 }
 
+/** Site-wide notification defaults (brand + sender identity for admin alerts). */
+export interface NotificationsConfig {
+  fromEmail?: string;
+  fromName?: string;
+  footerText?: string;
+  slackUsername?: string;
+}
 /** Shelf-level configuration (validated by {@link shelfConfigSchema}). */
 export interface ShelfConfig {
   secret?: string;
@@ -108,6 +117,7 @@ export interface ShelfConfig {
   maxInlineUnzipSize?: number;
   viewports?: ShelfViewport[];
   adapters?: Record<string, AdapterSnapshot>;
+  notifications?: NotificationsConfig;
 }
 
 const viewportSchema: z.ZodType<ShelfViewport> = z.object({
@@ -142,7 +152,14 @@ const adapterSnapshotSchema: z.ZodType<AdapterSnapshot> = z.object({
   version: z.string(),
   description: z.string().optional(),
   kind: z.string(),
-  category: z.enum(["database", "storage", "capture-runner", "capture-queue", "git-host"]),
+  category: z.enum([
+    "database",
+    "storage",
+    "capture-runner",
+    "capture-queue",
+    "git-host",
+    "notifier",
+  ]),
 });
 
 const authUiConfigSchema: z.ZodType<AuthUiConfig> = z.object({
@@ -154,6 +171,13 @@ const authUiConfigSchema: z.ZodType<AuthUiConfig> = z.object({
   ssoLabelTemplate: z.string().min(1).optional(),
   helpText: z.string().optional(),
   footerText: z.string().optional(),
+});
+
+const notificationsConfigSchema: z.ZodType<NotificationsConfig> = z.object({
+  fromEmail: z.string().min(1).optional(),
+  fromName: z.string().min(1).optional(),
+  footerText: z.string().min(1).optional(),
+  slackUsername: z.string().min(1).optional(),
 });
 
 /** Zod schema validating the shelf-level configuration. */
@@ -173,6 +197,7 @@ export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
     maxInlineUnzipSize: z.number().int().positive().optional(),
     viewports: z.array(viewportSchema).min(1, "at least one viewport required").optional(),
     adapters: z.record(z.string(), adapterSnapshotSchema).optional(),
+    notifications: notificationsConfigSchema.optional(),
   })
   .strict();
 
@@ -228,6 +253,8 @@ export interface ShelfOptions {
   captureQueue?: CaptureQueue;
   auth?: Auth;
   gitHosts?: GitHostProvider[];
+  notifiers?: NotifierProvider[];
+  emailSender?: EmailSender;
   logger?: Logger;
   ui?: UIConfig;
   config?: ShelfConfig;

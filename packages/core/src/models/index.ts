@@ -16,6 +16,16 @@ export { BuildModel, isPublicBuild, type BuildCreateInput, type BuildListFilter 
 export { CommentModel, type CommentCreateInput } from "./comment.ts";
 export { LabelModel } from "./label.ts";
 export { MemberModel } from "./member.ts";
+export {
+  NotificationChannelModel,
+  type NotificationChannelCreateInput,
+  type NotificationChannelTables,
+} from "./notification-channel.ts";
+export {
+  NotificationSubscriptionModel,
+  type NotificationSubscriptionInput,
+  type NotificationSubscriptionTables,
+} from "./notification-subscription.ts";
 export { ProjectModel, type ProjectCreateInput } from "./project.ts";
 export { ProjectGroupMappingModel } from "./project-group-mapping.ts";
 export { SnapshotModel, type SnapshotCreateInput } from "./snapshot.ts";

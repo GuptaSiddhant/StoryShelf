@@ -17,7 +17,8 @@ export type AdapterCategory =
   | "storage"
   | "capture-runner"
   | "capture-queue"
-  | "git-host";
+  | "git-host"
+  | "notifier";
 
 /** Common adapter identity — every adapter instance exposes this. */
 export interface AdapterMetadata {

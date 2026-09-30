@@ -46,6 +46,10 @@
       "source": "./src/adapters/database.ts",
       "default": "./dist/adapter/database.mjs"
     },
+    "./adapter/email-sender": {
+      "source": "./src/adapters/email-sender.ts",
+      "default": "./dist/adapter/email-sender.mjs"
+    },
     "./adapter/git-host": {
       "source": "./src/adapters/git-host/index.ts",
       "default": "./dist/adapter/git-host.mjs"
@@ -61,6 +65,10 @@
     "./adapter/metadata": {
       "source": "./src/adapters/metadata.ts",
       "default": "./dist/adapter/metadata.mjs"
+    },
+    "./adapter/notifier": {
+      "source": "./src/adapters/notifier/index.ts",
+      "default": "./dist/adapter/notifier.mjs"
     },
     "./adapter/setup": {
       "source": "./src/adapters/setup.ts",
@@ -134,10 +142,12 @@
       "./adapter/capture-queue": "./dist/adapter/capture-queue.mjs",
       "./adapter/capture-runner": "./dist/adapter/capture-runner.mjs",
       "./adapter/database": "./dist/adapter/database.mjs",
+      "./adapter/email-sender": "./dist/adapter/email-sender.mjs",
       "./adapter/git-host": "./dist/adapter/git-host.mjs",
       "./adapter/git-host/comments": "./dist/adapter/git-host/comments.mjs",
       "./adapter/git-host/helpers": "./dist/adapter/git-host/helpers.mjs",
       "./adapter/metadata": "./dist/adapter/metadata.mjs",
+      "./adapter/notifier": "./dist/adapter/notifier.mjs",
       "./adapter/setup": "./dist/adapter/setup.mjs",
       "./adapter/storage": "./dist/adapter/storage.mjs",
       "./adapter/webhook-events": "./dist/adapter/webhook-events.mjs",

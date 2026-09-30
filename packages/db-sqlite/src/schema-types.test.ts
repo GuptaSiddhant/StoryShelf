@@ -12,6 +12,8 @@ import { buildLabels, labelTypes } from "./schema/label.ts";
 import type { BuildLabel, LabelType } from "./schema/label.ts";
 import { projectMembers } from "./schema/member.ts";
 import type { ProjectMember } from "./schema/member.ts";
+import { notificationChannels, notificationSubscriptions } from "./schema/notification.ts";
+import type { NotificationChannel, NotificationSubscription } from "./schema/notification.ts";
 import { projectGroupMappings } from "./schema/project-group-mapping.ts";
 import type { ProjectGroupMapping } from "./schema/project-group-mapping.ts";
 import { projects } from "./schema/project.ts";
@@ -45,6 +47,10 @@ it("row interfaces match drizzle inference exactly", () => {
   expectTypeOf<BuildLabel>().toEqualTypeOf<typeof buildLabels.$inferSelect>();
   expectTypeOf<Token>().toEqualTypeOf<typeof tokens.$inferSelect>();
   expectTypeOf<Webhook>().toEqualTypeOf<typeof webhooks.$inferSelect>();
+  expectTypeOf<NotificationChannel>().toEqualTypeOf<typeof notificationChannels.$inferSelect>();
+  expectTypeOf<NotificationSubscription>().toEqualTypeOf<
+    typeof notificationSubscriptions.$inferSelect
+  >();
   expectTypeOf<User>().toEqualTypeOf<typeof users.$inferSelect>();
   expectTypeOf<ProjectMember>().toEqualTypeOf<typeof projectMembers.$inferSelect>();
   expectTypeOf<ProjectGroupMapping>().toEqualTypeOf<typeof projectGroupMappings.$inferSelect>();
@@ -63,6 +69,8 @@ const DDL_TABLES = [
   "build_labels",
   "tokens",
   "webhooks",
+  "notification_channels",
+  "notification_subscriptions",
   "users",
   "project_members",
   "project_group_mappings",
@@ -87,6 +95,8 @@ const DDL_INDEXES = [
   "build_labels_build_type_value_idx",
   "project_members_project_user_idx",
   "project_group_mappings_project_group_idx",
+  "notification_channels_project_id_idx",
+  "notification_subscriptions_project_user_idx",
   "session_token_idx",
   "session_user_id_idx",
   "account_user_id_idx",

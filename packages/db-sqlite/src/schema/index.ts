@@ -18,6 +18,10 @@ import { comments as commentsTable } from "./comment.ts";
 import { contentRefs as contentRefsTable } from "./content-refs.ts";
 import { buildLabels as buildLabelsTable, labelTypes as labelTypesTable } from "./label.ts";
 import { projectMembers as projectMembersTable } from "./member.ts";
+import {
+  notificationChannels as notificationChannelsTable,
+  notificationSubscriptions as notificationSubscriptionsTable,
+} from "./notification.ts";
 import { projectGroupMappings as projectGroupMappingsTable } from "./project-group-mapping.ts";
 import { projects as projectsTable } from "./project.ts";
 import { snapshots as snapshotsTable } from "./snapshot.ts";
@@ -33,6 +37,7 @@ export { baselines } from "./baseline.ts";
 export { comments } from "./comment.ts";
 export { buildLabels, labelTypes } from "./label.ts";
 export { projectMembers } from "./member.ts";
+export { notificationChannels, notificationSubscriptions } from "./notification.ts";
 export { projectGroupMappings } from "./project-group-mapping.ts";
 export { projects } from "./project.ts";
 export { snapshots } from "./snapshot.ts";
@@ -69,6 +74,8 @@ export type { User } from "./user.ts";
 export type { UserInviteToken } from "./user-invite.ts";
 /** Webhook subscription row. */
 export type { Webhook } from "./webhook.ts";
+/** Notification channel and subscription rows. */
+export type { NotificationChannel, NotificationSubscription } from "./notification.ts";
 /** Content ref row for deduplicated assets. */
 export type { ContentRef } from "./content-refs.ts";
 
@@ -86,6 +93,8 @@ export const schema: {
   buildLabels: AnySQLiteTable;
   tokens: AnySQLiteTable;
   webhooks: AnySQLiteTable;
+  notificationChannels: AnySQLiteTable;
+  notificationSubscriptions: AnySQLiteTable;
   users: AnySQLiteTable;
   userInviteTokens: AnySQLiteTable;
   projectMembers: AnySQLiteTable;
@@ -104,6 +113,8 @@ export const schema: {
   buildLabels: buildLabelsTable,
   tokens: tokensTable,
   webhooks: webhooksTable,
+  notificationChannels: notificationChannelsTable,
+  notificationSubscriptions: notificationSubscriptionsTable,
   users: usersTable,
   userInviteTokens: userInviteTokensTable,
   projectMembers: projectMembersTable,

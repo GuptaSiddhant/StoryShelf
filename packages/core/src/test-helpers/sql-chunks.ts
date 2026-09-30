@@ -46,6 +46,12 @@ export function whereMatches(where: SQL, row: Record<string, unknown>, table: Ta
 
 function matchChunk(chunks: SqlChunk[], row: Record<string, unknown>, table: Table): boolean {
   const text = chunks.map((c) => textOf(c) ?? "").join("");
+  if (/is not null/iu.test(text)) {
+    return isNullMatches(chunks, row, table, true);
+  }
+  if (/is null/iu.test(text)) {
+    return isNullMatches(chunks, row, table, false);
+  }
   if (text.includes(" in ")) {
     return inArrayMatches(chunks, row, table);
   }
@@ -53,6 +59,27 @@ function matchChunk(chunks: SqlChunk[], row: Record<string, unknown>, table: Tab
     return ltMatches(chunks, row, table);
   }
   return eqMatches(chunks, row, table);
+}
+
+/** Match `is null` / `is not null` predicates (no value argument). */
+function isNullMatches(
+  chunks: SqlChunk[],
+  row: Record<string, unknown>,
+  table: Table,
+  negated: boolean,
+): boolean {
+  let columnName: string | undefined;
+  for (const chunk of chunks) {
+    if (typeof chunk.name === "string" && chunk.table !== undefined) {
+      columnName = chunk.name;
+    }
+  }
+  if (columnName === undefined) {
+    return false;
+  }
+  const cell = row[columnKey(table, columnName)];
+  const missing = cell === null || cell === undefined;
+  return negated ? !missing : missing;
 }
 
 function eqMatches(chunks: SqlChunk[], row: Record<string, unknown>, table: Table): boolean {

@@ -13,6 +13,8 @@ export default libConfig({
   "adapter/git-host/comments": "./src/adapters/git-host/comments.ts",
   "adapter/capture-queue": "./src/adapters/capture-queue.ts",
   "adapter/webhook-events": "./src/adapters/webhook-events.ts",
+  "adapter/notifier": "./src/adapters/notifier/index.ts",
+  "adapter/email-sender": "./src/adapters/email-sender.ts",
   logger: "./src/logger.ts",
   capture: "./src/capture/index.ts",
   config: "./src/config.ts",

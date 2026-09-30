@@ -1,6 +1,7 @@
 import type { CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
+import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import type { ShelfConfig, UIConfig } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
@@ -21,6 +22,7 @@ export interface Store {
   enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
   captureQueue?: CaptureQueue | null;
   gitHosts: GitHostProvider[];
+  notifiers: NotifierProvider[];
 }
 
 const storage = new AsyncLocalStorage<Store>();

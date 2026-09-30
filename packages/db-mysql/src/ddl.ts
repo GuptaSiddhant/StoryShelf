@@ -181,6 +181,28 @@ CREATE TABLE IF NOT EXISTS webhooks (
   created_at DATETIME(3) NOT NULL,
   updated_at DATETIME(3) NOT NULL
 );
+CREATE TABLE IF NOT EXISTS notification_channels (
+  id TEXT PRIMARY KEY,
+  project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
+  provider TEXT NOT NULL,
+  config TEXT NOT NULL,
+  secret_encrypted TEXT,
+  events TEXT,
+  enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at DATETIME(3) NOT NULL,
+  updated_at DATETIME(3) NOT NULL
+);
+CREATE INDEX notification_channels_project_id_idx ON notification_channels (project_id);
+CREATE TABLE IF NOT EXISTS notification_subscriptions (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  events TEXT,
+  via TEXT,
+  enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at DATETIME(3) NOT NULL
+);
+CREATE UNIQUE INDEX notification_subscriptions_project_user_idx ON notification_subscriptions (project_id, user_id);
 CREATE TABLE IF NOT EXISTS user_invite_tokens (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

@@ -24,6 +24,8 @@ export interface Tables {
   buildLabels: Table;
   tokens: Table;
   webhooks: Table;
+  notificationChannels: Table;
+  notificationSubscriptions: Table;
   users: Table;
   userInviteTokens: Table;
   projectMembers: Table;

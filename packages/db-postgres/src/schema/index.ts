@@ -18,6 +18,10 @@ import { comments as commentsTable } from "./comment.ts";
 import { contentRefs as contentRefsTable } from "./content-refs.ts";
 import { buildLabels as buildLabelsTable, labelTypes as labelTypesTable } from "./label.ts";
 import { projectMembers as projectMembersTable } from "./member.ts";
+import {
+  notificationChannels as notificationChannelsTable,
+  notificationSubscriptions as notificationSubscriptionsTable,
+} from "./notification.ts";
 import { projectGroupMappings as projectGroupMappingsTable } from "./project-group-mapping.ts";
 import { projects as projectsTable } from "./project.ts";
 import { snapshots as snapshotsTable } from "./snapshot.ts";
@@ -41,6 +45,7 @@ export { tokens } from "./token.ts";
 export { userInviteTokens } from "./user-invite.ts";
 export { users } from "./user.ts";
 export { webhooks } from "./webhook.ts";
+export { notificationChannels, notificationSubscriptions } from "./notification.ts";
 export { contentRefs } from "./content-refs.ts";
 
 /** A capture attempt and its log lines for a single build run. */
@@ -69,6 +74,8 @@ export type { UserInviteToken } from "./user-invite.ts";
 export type { User } from "./user.ts";
 /** Webhook subscription row. */
 export type { Webhook } from "./webhook.ts";
+/** Notification channel and subscription rows. */
+export type { NotificationChannel, NotificationSubscription } from "./notification.ts";
 /** Baseline row. */
 export type { Baseline } from "./baseline.ts";
 /** Content ref row for deduplicated assets. */
@@ -88,6 +95,8 @@ export const schema: {
   buildLabels: AnyPgTable;
   tokens: AnyPgTable;
   webhooks: AnyPgTable;
+  notificationChannels: AnyPgTable;
+  notificationSubscriptions: AnyPgTable;
   users: AnyPgTable;
   userInviteTokens: AnyPgTable;
   projectMembers: AnyPgTable;
@@ -106,6 +115,8 @@ export const schema: {
   buildLabels: buildLabelsTable,
   tokens: tokensTable,
   webhooks: webhooksTable,
+  notificationChannels: notificationChannelsTable,
+  notificationSubscriptions: notificationSubscriptionsTable,
   users: usersTable,
   userInviteTokens: userInviteTokensTable,
   projectMembers: projectMembersTable,
