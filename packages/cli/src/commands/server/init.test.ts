@@ -509,6 +509,7 @@ describe("runServerInit", () => {
     };
     expect(pkg.dependencies["@storyshelf/notify-chat"]).toBeDefined();
     expect(pkg.dependencies["@storyshelf/notify-email"]).toBeDefined();
+    expect(pkg.dependencies["nodemailer"]).toBeDefined();
   });
 
   it("omits notifications when disabled", async () => {

@@ -26,3 +26,25 @@ const app = createShelfApp({
 ```
 
 Presets: `smtpPreset` (corporate relay, Postfix, SES-over-SMTP), `mailpitPreset` (local dev, `localhost:1025`), `logPreset` (tests/unconfigured), `httpPreset` (Resend/Postmark-style JSON endpoint). See [Notifications](/guides/notifications/).
+
+## Install notes
+
+`smtpPreset` needs the optional `nodemailer` peer:
+
+```sh
+nub add nodemailer
+```
+
+Log and HTTP presets work without it.
+
+## Subpaths
+
+Each preset is importable on its own (root aggregates all):
+
+```ts
+import { smtpPreset, smtpPresetFromEnv } from "@storyshelf/notify-email/smtp";
+import { mailpitPreset } from "@storyshelf/notify-email/mailpit";
+import { logPreset } from "@storyshelf/notify-email/log";
+import { httpPreset } from "@storyshelf/notify-email/http";
+import { createEmailNotifier } from "@storyshelf/notify-email/email";
+```

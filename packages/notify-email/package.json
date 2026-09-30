@@ -34,11 +34,36 @@
       "source": "./src/index.ts",
       "default": "./dist/index.mjs"
     },
+    "./email": {
+      "source": "./src/email.ts",
+      "default": "./dist/email.mjs"
+    },
+    "./http": {
+      "source": "./src/http.ts",
+      "default": "./dist/http.mjs"
+    },
+    "./log": {
+      "source": "./src/log.ts",
+      "default": "./dist/log.mjs"
+    },
+    "./mailpit": {
+      "source": "./src/mailpit.ts",
+      "default": "./dist/mailpit.mjs"
+    },
+    "./smtp": {
+      "source": "./src/smtp.ts",
+      "default": "./dist/smtp.mjs"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
     "exports": {
       ".": "./dist/index.mjs",
+      "./email": "./dist/email.mjs",
+      "./http": "./dist/http.mjs",
+      "./log": "./dist/log.mjs",
+      "./mailpit": "./dist/mailpit.mjs",
+      "./smtp": "./dist/smtp.mjs",
       "./package.json": "./package.json"
     },
     "access": "public"
@@ -53,12 +78,20 @@
   },
   "dependencies": {
     "@storyshelf/core": "workspace:*",
-    "nodemailer": "^10.0.12",
     "zod": "catalog:"
+  },
+  "peerDependencies": {
+    "nodemailer": "^10.0.12"
+  },
+  "peerDependenciesMeta": {
+    "nodemailer": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "@types/nodemailer": "^8.0.2",
+    "nodemailer": "^10.0.12",
     "@vitest/coverage-v8": "catalog:",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",

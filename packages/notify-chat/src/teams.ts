@@ -3,6 +3,8 @@ import type { Logger } from "@storyshelf/core/logger";
 import { httpText } from "@storyshelf/core/utils";
 import { chatTogglesSchema, type ChatToggles } from "./types.ts";
 
+export type { ChatToggles };
+
 declare const __PKG_VERSION__: string | undefined;
 
 /** Validation schema for the Teams workflow-webhook config. */

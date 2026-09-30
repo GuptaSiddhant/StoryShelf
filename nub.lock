@@ -164,6 +164,9 @@ importers:
       '@storyshelf/storage-local':
         specifier: workspace:*
         version: link:../../packages/storage-local
+      nodemailer:
+        specifier: ^10.0.12
+        version: 10.0.12
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -219,6 +222,9 @@ importers:
       '@storyshelf/storage-local':
         specifier: workspace:*
         version: link:../../packages/storage-local
+      nodemailer:
+        specifier: ^10.0.12
+        version: 10.0.12
     devDependencies:
       rolldown:
         specifier: '*'
@@ -749,9 +755,6 @@ importers:
       '@storyshelf/core':
         specifier: workspace:*
         version: link:../core
-      nodemailer:
-        specifier: ^10.0.12
-        version: 10.0.12
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -765,6 +768,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.11(vitest@5.0.2(@opentelemetry/api@1.9.1)(@types/node@26.6.3)(jsdom@30.1.1)(vite@6.4.3(@types/node@26.6.3)(yaml@2.9.1)))
+      nodemailer:
+        specifier: ^10.0.12
+        version: 10.0.12
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0

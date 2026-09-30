@@ -17,4 +17,14 @@ import { chatNotifiers } from "@storyshelf/notify-chat";
 const app = createShelfApp({ database, storage, notifiers: chatNotifiers });
 ```
 
+## Subpaths
+
+Each provider is importable on its own (root aggregates all three):
+
+```ts
+import { slackWebhookNotifier } from "@storyshelf/notify-chat/slack";
+import { teamsWorkflowNotifier } from "@storyshelf/notify-chat/teams";
+import { logNotifier } from "@storyshelf/notify-chat/log";
+```
+
 Project admins then add channels (`slack-webhook`, `teams-workflow`, `log`) with an event filter and display toggles. Webhook URLs are channel secrets (AES-256-GCM at rest, decrypted in memory at send time). See [Notifications](/guides/notifications/).

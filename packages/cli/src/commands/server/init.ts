@@ -79,9 +79,12 @@ const PGLITE_SDK = "^0.5.8";
 const MYSQL2_SDK = "^3.9.0";
 const PLANETSCALE_SDK = "^1.19.0";
 const TIDBCLOUD_SDK = "^0.1.0";
+/** Email peer SDK pin (must match @storyshelf/notify-email peerDependencies). */
+const NODEMAILER_SDK = "^10.0.12";
 
-/** npm peer SDK for the chosen Azure queue backend. */
-function azureSdkDep(queue: "azure-storage-queues" | "azure-service-bus"): {
+/** npm peer SDK for the chosen Azure queue backend. */ function azureSdkDep(
+  queue: "azure-storage-queues" | "azure-service-bus",
+): {
   name: string;
   version: string;
 } {
@@ -635,6 +638,7 @@ function buildDeps(answers: Answers): Record<string, string> {
   if (wantsNotifications(answers)) {
     deps["@storyshelf/notify-chat"] = __PKG_VERSION__ ?? "0.0.0";
     deps["@storyshelf/notify-email"] = __PKG_VERSION__ ?? "0.0.0";
+    deps["nodemailer"] = NODEMAILER_SDK;
   }
   // Queue dep when sqs
   if (answers.queue !== "memory") {

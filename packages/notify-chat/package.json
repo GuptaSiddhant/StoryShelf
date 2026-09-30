@@ -34,11 +34,26 @@
       "source": "./src/index.ts",
       "default": "./dist/index.mjs"
     },
+    "./log": {
+      "source": "./src/log.ts",
+      "default": "./dist/log.mjs"
+    },
+    "./slack": {
+      "source": "./src/slack.ts",
+      "default": "./dist/slack.mjs"
+    },
+    "./teams": {
+      "source": "./src/teams.ts",
+      "default": "./dist/teams.mjs"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
     "exports": {
       ".": "./dist/index.mjs",
+      "./log": "./dist/log.mjs",
+      "./slack": "./dist/slack.mjs",
+      "./teams": "./dist/teams.mjs",
       "./package.json": "./package.json"
     },
     "access": "public"

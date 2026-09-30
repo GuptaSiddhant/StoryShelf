@@ -1,10 +1,13 @@
+import { createEmailNotifier } from "./email.ts";
 /**
  * Email notification transport: SMTP/Mailpit/log/HTTP presets plus the
  * `email` channel provider. One transport serves notification channels
  * and (optionally) auth mail — wire the same sender into both.
  */
-import { httpPreset, logPreset, mailpitPreset, smtpPreset, smtpPresetFromEnv } from "./client.ts";
-import { createEmailNotifier } from "./email.ts";
+import { httpPreset } from "./http.ts";
+import { logPreset } from "./log.ts";
+import { mailpitPreset } from "./mailpit.ts";
+import { smtpPreset, smtpPresetFromEnv } from "./smtp.ts";
 
 /** SMTP transport preset (corporate relay, Postfix, SES-over-SMTP). */
 export { smtpPreset };

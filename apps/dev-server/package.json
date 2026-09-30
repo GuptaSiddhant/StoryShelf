@@ -18,6 +18,7 @@
     "@storyshelf/db-sqlite": "workspace:*",
     "@storyshelf/notify-chat": "workspace:*",
     "@storyshelf/notify-email": "workspace:*",
+    "nodemailer": "^10.0.12",
     "@storyshelf/observability": "workspace:*",
     "@storyshelf/runner-playwright": "workspace:*",
     "@storyshelf/storage-local": "workspace:*"

@@ -3,7 +3,10 @@
   "name": "@storyshelf/notify-chat",
   "version": "0.5.2",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./slack": "./src/slack.ts",
+    "./teams": "./src/teams.ts",
+    "./log": "./src/log.ts"
   },
   "publish": {
     "include": ["src", "README.md", "LICENSE"],
