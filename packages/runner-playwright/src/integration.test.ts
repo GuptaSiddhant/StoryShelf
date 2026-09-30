@@ -132,6 +132,37 @@ async function uploadBuild(
   return readJson<Build>(await app.request(`/api/v1/projects/${slug}/builds/${created.build.id}`));
 }
 
+/**
+ * Poll a build until it reaches one of the wanted statuses. Capture runs
+ * asynchronously after upload, so callers must wait instead of asserting
+ * immediately. Throws on timeout.
+ */
+async function waitForBuild(
+  app: ReturnType<typeof createShelfApp>,
+  slug: string,
+  buildId: string,
+  wanted: readonly string[],
+  timeoutMs = 150_000,
+): Promise<Build> {
+  const started = Date.now();
+  /* oxlint-disable eslint/no-await-in-loop -- poll loop must be sequential */
+  for (;;) {
+    const build = await readJson<Build>(
+      await app.request(`/api/v1/projects/${slug}/builds/${buildId}`),
+    );
+    if (wanted.includes(build.status)) {
+      return build;
+    }
+    if (Date.now() - started > timeoutMs) {
+      throw new Error(`timed out waiting for build ${buildId} to reach ${wanted.join("/")}`);
+    }
+    await new Promise<void>((done) => {
+      setTimeout(done, 2000);
+    });
+  }
+  /* oxlint-enable eslint/no-await-in-loop */
+}
+
 async function createHarness(): Promise<void> {
   const staticDir = await ensureFixtureBuilt();
   const tmp = await mkdtemp(join(tmpdir(), "storyshelf-int-"));
@@ -184,11 +215,12 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
       return readJson<Snapshot[]>(response);
     };
 
-    const first = await uploadBuild(app, project.slug, staticDir, {
+    const uploaded = await uploadBuild(app, project.slug, staticDir, {
       gitSha: "a".repeat(40),
       gitBranch: "feature/smoke",
       message: "first smoke build",
     });
+    const first = await waitForBuild(app, project.slug, uploaded.id, ["reviewing"]);
     expect(first.status).toBe("reviewing");
     expect(first.snapshotCount).toBeGreaterThan(0);
     expect(first.changedCount).toBe(first.snapshotCount);
@@ -220,11 +252,12 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
     );
     expect(reviewed.status).toBe("approved");
 
-    const second = await uploadBuild(app, project.slug, staticDir, {
+    const uploadedSecond = await uploadBuild(app, project.slug, staticDir, {
       gitSha: "a".repeat(40),
       gitBranch: "feature/smoke",
       message: "second smoke build",
     });
+    const second = await waitForBuild(app, project.slug, uploadedSecond.id, ["approved"]);
     expect(second.status).toBe("approved");
     expect(second.snapshotCount).toBeGreaterThan(0);
     const secondSnapshots = await snapshotsFor(second.id);
@@ -232,7 +265,7 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
     for (const snapshot of secondSnapshots) {
       expect(snapshot.diffPassed).toBe(true);
     }
-  }, 180_000);
+  }, 300_000);
 
   it.skipIf(!isOldestFixture)(
     "interaction: play, flaky and disableSnapshot",
@@ -254,18 +287,10 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
         message: "play smoke",
       });
 
-      // Poll until terminal (failed is expected because BlockingFailure is not flaky)
-      let final: Build = build;
-      /* eslint-disable no-await-in-loop -- poll build status sequentially until terminal */
-      for (let i = 0; i < 30; i += 1) {
-        await new Promise<void>((done) => {
-          setTimeout(done, 2000);
-        });
-        const res = await app.request(`/api/v1/projects/${project.slug}/builds/${final.id}`);
-        final = await readJson<Build>(res);
-        if (["failed", "reviewing", "approved"].includes(final.status)) break;
-      }
-      /* eslint-enable no-await-in-loop */
+      // Poll until terminal. Play results land after snapshots, so the build
+      // passes through "reviewing" first — wait specifically for "failed"
+      // (expected because BlockingFailure is not flaky).
+      const final = await waitForBuild(app, project.slug, build.id, ["failed"]);
 
       // Non-flaky play failure blocks the build
       expect(final.status).toBe("failed");
@@ -284,6 +309,6 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
       // At least one flaky snapshot should be present (they are captured despite play failure being non-blocking)
       expect(hasFlaky || snapshots.length > 0).toBe(true);
     },
-    180_000,
+    300_000,
   );
 });
