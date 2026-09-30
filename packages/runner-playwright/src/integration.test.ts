@@ -100,6 +100,36 @@ async function readJson<TData>(response: Response): Promise<TData> {
   return (await response.json()) as TData;
 }
 
+/**
+ * Upload a build via the two-step protocol: create the build with JSON
+ * metadata, PUT the Storybook zip to the returned upload URL, then return
+ * the refreshed build record.
+ */
+async function uploadBuild(
+  app: ReturnType<typeof createShelfApp>,
+  slug: string,
+  staticDir: string,
+  meta: { gitSha: string; gitBranch: string; message: string },
+): Promise<Build> {
+  const zip = new AdmZip();
+  zip.addLocalFolder(staticDir);
+  const zipBuffer = new Uint8Array(zip.toBuffer());
+  const createResponse = await app.request(`/api/v1/projects/${slug}/builds`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(meta),
+  });
+  expect(createResponse.status).toBe(202);
+  const created = await readJson<{ build: Build; uploadUrl: string }>(createResponse);
+  const putResponse = await app.request(created.uploadUrl, {
+    method: "PUT",
+    headers: { "content-type": "application/zip" },
+    body: zipBuffer,
+  });
+  expect(putResponse.status).toBe(202);
+  return readJson<Build>(await app.request(`/api/v1/projects/${slug}/builds/${created.build.id}`));
+}
+
 async function createHarness(): Promise<void> {
   const staticDir = await ensureFixtureBuilt();
   const tmp = await mkdtemp(join(tmpdir(), "storyshelf-int-"));
@@ -145,25 +175,6 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
     expect(projectResponse.status).toBe(201);
     const project = await readJson<{ id: string; slug: string }>(projectResponse);
 
-    const upload = async (message: string): Promise<Build> => {
-      const zip = new AdmZip();
-      zip.addLocalFolder(staticDir);
-      const form = new FormData();
-      form.set("gitSha", "a".repeat(40));
-      form.set("gitBranch", "feature/smoke");
-      form.set("message", message);
-      const zipBuffer = zip.toBuffer();
-      const zipBlob = new Blob([new Uint8Array(zipBuffer)], { type: "application/zip" });
-      form.set("zip", zipBlob, "storybook.zip");
-      const response = await app.request(`/api/v1/projects/${project.slug}/builds`, {
-        method: "POST",
-        body: form,
-      });
-      expect(response.status).toBe(202);
-      const created = await readJson<Build>(response);
-      return created;
-    };
-
     const snapshotsFor = async (buildId: string): Promise<Snapshot[]> => {
       const response = await app.request(
         `/api/v1/projects/${project.slug}/builds/${buildId}/snapshots`,
@@ -171,7 +182,11 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
       return readJson<Snapshot[]>(response);
     };
 
-    const first = await upload("first smoke build");
+    const first = await uploadBuild(app, project.slug, staticDir, {
+      gitSha: "a".repeat(40),
+      gitBranch: "feature/smoke",
+      message: "first smoke build",
+    });
     expect(first.status).toBe("reviewing");
     expect(first.snapshotCount).toBeGreaterThan(0);
     expect(first.changedCount).toBe(first.snapshotCount);
@@ -203,7 +218,11 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
     );
     expect(reviewed.status).toBe("approved");
 
-    const second = await upload("second smoke build");
+    const second = await uploadBuild(app, project.slug, staticDir, {
+      gitSha: "a".repeat(40),
+      gitBranch: "feature/smoke",
+      message: "second smoke build",
+    });
     expect(second.status).toBe("approved");
     expect(second.snapshotCount).toBeGreaterThan(0);
     const secondSnapshots = await snapshotsFor(second.id);
@@ -227,20 +246,11 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
       expect(projectResponse.status).toBe(201);
       const project = await readJson<{ id: string; slug: string }>(projectResponse);
 
-      const zip = new AdmZip();
-      zip.addLocalFolder(staticDir);
-      const form = new FormData();
-      form.set("gitSha", "b".repeat(40));
-      form.set("gitBranch", "feature/play");
-      form.set("message", "play smoke");
-      const zipBlob = new Blob([new Uint8Array(zip.toBuffer())], { type: "application/zip" });
-      form.set("zip", zipBlob, "storybook.zip");
-      const response = await app.request(`/api/v1/projects/${project.slug}/builds`, {
-        method: "POST",
-        body: form,
+      const build = await uploadBuild(app, project.slug, staticDir, {
+        gitSha: "b".repeat(40),
+        gitBranch: "feature/play",
+        message: "play smoke",
       });
-      expect(response.status).toBe(202);
-      const build = await readJson<Build>(response);
 
       // Poll until terminal (failed is expected because BlockingFailure is not flaky)
       let final: Build = build;
