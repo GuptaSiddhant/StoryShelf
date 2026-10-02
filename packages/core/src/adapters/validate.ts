@@ -90,6 +90,41 @@ function queuePollReasons(record: Record<string, unknown>): string[] {
   return [`partial poll extension (present: ${present.join(",")}; need poll+ack+nack)`];
 }
 
+/** Whether a metadata schema looks like a zod schema (has parse). */
+function hasSchemaParse(provider: unknown): boolean {
+  const schema = asRecord(asRecord(provider)?.["metadata"])?.["schema"];
+  return typeof (schema as { parse?: unknown } | undefined)?.parse === "function";
+}
+
+/** Reasons a notifier provider lacks its descriptor shape. */
+function notifierReasons(provider: unknown): string[] {
+  const record = asRecord(provider);
+  if (!record) {
+    return ["notifier provider must be an object"];
+  }
+  const reasons = metadataReasons(record, "notifier");
+  if (typeof record["create"] !== "function") {
+    reasons.push("missing methods: create");
+  }
+  if (!hasSchemaParse(provider)) {
+    reasons.push("metadata.schema must be a zod schema");
+  }
+  return reasons;
+}
+
+/** Reasons an email sender lacks its transport shape. */
+function emailSenderReasons(sender: unknown): string[] {
+  const record = asRecord(sender);
+  if (!record) {
+    return ["email sender must be an object"];
+  }
+  const reasons = metadataReasons(record, "notifier");
+  if (typeof record["send"] !== "function") {
+    reasons.push("missing methods: send");
+  }
+  return reasons;
+}
+
 /** Reasons a git provider lacks its descriptor shape. */
 function gitReasons(provider: unknown): string[] {
   const record = asRecord(provider);
@@ -100,8 +135,7 @@ function gitReasons(provider: unknown): string[] {
   if (typeof record["create"] !== "function") {
     reasons.push("missing methods: create");
   }
-  const schema = asRecord(record["metadata"])?.["schema"];
-  if (typeof (schema as { parse?: unknown } | undefined)?.parse !== "function") {
+  if (!hasSchemaParse(provider)) {
     reasons.push("metadata.schema must be a zod schema");
   }
   return reasons;
@@ -154,16 +188,60 @@ export function validateAdapter(
   return reasons;
 }
 
-/** Validate one git provider, tagging reasons with its index. */
-function validateGitProvider(provider: unknown, index: number): string[] {
-  return gitReasons(provider).map((reason) => `gitHosts[${index}]: ${reason}`);
-}
-
 /** One slot check for source validation. */
 interface SlotCheck {
   adapter: unknown;
   category: string;
   slot: string;
+}
+
+/** Descriptor check for provider lists (git hosts, notifiers). */
+interface ProviderCheck {
+  provider: unknown;
+  index: number;
+  kinds: "git" | "notifier";
+}
+
+/** Failures for git-host or notifier provider lists. */
+function checkProviders(checks: ProviderCheck[]): AdapterSetupFailure[] {
+  const failures: AdapterSetupFailure[] = [];
+  for (const check of checks) {
+    const reasons =
+      check.kinds === "git" ? gitReasons(check.provider) : notifierReasons(check.provider);
+    if (reasons.length === 0) {
+      continue;
+    }
+    const slot = check.kinds === "git" ? `gitHosts[${check.index}]` : `notifiers[${check.index}]`;
+    const category = check.kinds === "git" ? "git-host" : "notifier";
+    const metadata = asRecord(asRecord(check.provider)?.["metadata"]);
+    failures.push({
+      category,
+      kind: stringField(metadata, "kind") ?? "unknown",
+      name: stringField(metadata, "name") ?? slot,
+      error: reasons.map((reason) => `${slot}: ${reason}`).join("; "),
+    });
+  }
+  return failures;
+}
+
+/** Failure for the email sender slot. */
+function checkEmailSender(sender: unknown): AdapterSetupFailure[] {
+  if (sender === undefined) {
+    return [];
+  }
+  const reasons = emailSenderReasons(sender);
+  if (reasons.length === 0) {
+    return [];
+  }
+  const metadata = asRecord(asRecord(sender)?.["metadata"]);
+  return [
+    {
+      category: "notifier",
+      kind: stringField(metadata, "kind") ?? "unknown",
+      name: stringField(metadata, "name") ?? "emailSender",
+      error: reasons.map((reason) => `emailSender: ${reason}`).join("; "),
+    },
+  ];
 }
 
 /** Failures for the core database/storage/runner/queue slots. */
@@ -179,25 +257,6 @@ function checkSlots(checks: SlotCheck[]): AdapterSetupFailure[] {
       category: check.category,
       kind: stringField(metadata, "kind") ?? "unknown",
       name: stringField(metadata, "name") ?? check.slot,
-      error: reasons.join("; "),
-    });
-  }
-  return failures;
-}
-
-/** Failures for git-host providers. */
-function checkGitHosts(providers: unknown[]): AdapterSetupFailure[] {
-  const failures: AdapterSetupFailure[] = [];
-  for (const [index, provider] of providers.entries()) {
-    const reasons = validateGitProvider(provider, index);
-    if (reasons.length === 0) {
-      continue;
-    }
-    const metadata = asRecord(asRecord(provider)?.["metadata"]);
-    failures.push({
-      category: "git-host",
-      kind: stringField(metadata, "kind") ?? "unknown",
-      name: stringField(metadata, "name") ?? `git[${index}]`,
       error: reasons.join("; "),
     });
   }
@@ -223,5 +282,21 @@ export function validateAdapterSources(sources: AdapterSetupSources): AdapterSet
   if (sources.captureQueue !== undefined) {
     checks.push({ adapter: sources.captureQueue, category: "capture-queue", slot: "captureQueue" });
   }
-  return [...checkSlots(checks), ...checkGitHosts(sources.gitHosts ?? [])];
+  const providers: ProviderCheck[] = [
+    ...(sources.gitHosts ?? []).map((provider, index) => ({
+      provider,
+      index,
+      kinds: "git" as const,
+    })),
+    ...(sources.notifiers ?? []).map((provider, index) => ({
+      provider,
+      index,
+      kinds: "notifier" as const,
+    })),
+  ];
+  return [
+    ...checkSlots(checks),
+    ...checkProviders(providers),
+    ...checkEmailSender(sources.emailSender),
+  ];
 }

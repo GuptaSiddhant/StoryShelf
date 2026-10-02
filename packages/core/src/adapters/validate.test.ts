@@ -145,4 +145,19 @@ describe("validateAdapterSources", () => {
     expect(failures).toHaveLength(1);
     expect(failures[0]?.category).toBe("git-host");
   });
+
+  it("validates notifier providers and email senders", () => {
+    const failures = validateAdapterSources({
+      database: database() as never,
+      storage: storage() as never,
+      notifiers: [
+        { metadata: { name: "N", version: "1", kind: "n", category: "notifier" } } as never,
+      ],
+      emailSender: {
+        metadata: { name: "S", version: "1", kind: "s", category: "notifier" },
+      } as never,
+    });
+    expect(failures).toHaveLength(2);
+    expect(failures.map((failure) => failure.category)).toEqual(["notifier", "notifier"]);
+  });
 });

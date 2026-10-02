@@ -8,8 +8,10 @@
 import type { CaptureQueue } from "./capture-queue.ts";
 import type { CaptureRunner } from "./capture-runner.ts";
 import type { DatabaseAdapter } from "./database.ts";
+import type { EmailSender } from "./email-sender.ts";
 import type { GitHostProvider } from "./git-host/index.ts";
 import type { AdapterSetupContext } from "./metadata.ts";
+import type { NotifierProvider } from "./notifier/provider.ts";
 import type { StorageAdapter } from "./storage.ts";
 
 /** Adapters that can take part in lifecycle runs. */
@@ -19,6 +21,8 @@ export interface AdapterSetupSources {
   captureRunner?: CaptureRunner;
   captureQueue?: CaptureQueue;
   gitHosts?: GitHostProvider[];
+  notifiers?: NotifierProvider[];
+  emailSender?: EmailSender;
 }
 
 /** One collected hook bound to its adapter identity. */

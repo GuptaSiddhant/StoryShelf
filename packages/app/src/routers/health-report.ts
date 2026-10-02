@@ -51,15 +51,23 @@ function pushTarget(targets: ProbeTarget[], adapter: ProbeTarget | undefined): v
   }
 }
 
+function pushAll(targets: ProbeTarget[], adapters: ReadonlyArray<ProbeTarget | undefined>): void {
+  for (const adapter of adapters) {
+    pushTarget(targets, adapter);
+  }
+}
+
 function targetsOf(sources: AdapterSetupSources): ProbeTarget[] {
   const targets: ProbeTarget[] = [];
-  pushTarget(targets, sources.database);
-  pushTarget(targets, sources.storage);
-  pushTarget(targets, sources.captureRunner);
-  pushTarget(targets, sources.captureQueue);
-  for (const provider of sources.gitHosts ?? []) {
-    pushTarget(targets, provider);
-  }
+  pushAll(targets, [
+    sources.database,
+    sources.storage,
+    sources.captureRunner,
+    sources.captureQueue,
+  ]);
+  pushAll(targets, sources.gitHosts ?? []);
+  pushAll(targets, sources.notifiers ?? []);
+  pushTarget(targets, sources.emailSender);
   return targets;
 }
 

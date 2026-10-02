@@ -56,6 +56,10 @@ function pushAll(
   for (const provider of sources.gitHosts ?? []) {
     pushHook(entries, provider, hook);
   }
+  for (const notifier of sources.notifiers ?? []) {
+    pushHook(entries, notifier, hook);
+  }
+  pushHook(entries, sources.emailSender, hook);
 }
 
 /** Collect every available `setup` hook in deterministic order. */
@@ -89,6 +93,8 @@ export function bindAdapterLoggers(sources: AdapterSetupSources, logger: Logger)
     sources.captureRunner,
     sources.captureQueue,
     ...(sources.gitHosts ?? []),
+    ...(sources.notifiers ?? []),
+    sources.emailSender,
   ];
   for (const adapter of adapters) {
     adapter?.setLogger?.(logger.child({ component: adapter.metadata.kind }));
