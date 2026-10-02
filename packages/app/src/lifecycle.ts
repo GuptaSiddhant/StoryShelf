@@ -6,6 +6,7 @@ import {
   collectTeardowns,
   runAdapterSetups,
   runAdapterTeardowns,
+  validateAdapterSources,
 } from "@storyshelf/core/adapter/setup";
 import type { AdapterSetupResult } from "@storyshelf/core/adapter/setup";
 import type { ShelfOptions } from "@storyshelf/core/config";
@@ -41,6 +42,11 @@ function kickSetup(
   // Auth is not an adapter: its one-shot boot validation runs first, then
   // the adapter setups. A failing secret check fails readiness, like others.
   cell.ready = (async (): Promise<AdapterSetupResult> => {
+    const invalid = validateAdapterSources(options);
+    if (invalid.length > 0) {
+      logger.error({ failures: invalid }, "adapter validation failed");
+      return { ok: false, failures: invalid };
+    }
     await options.auth?.setup?.();
     return await runAdapterSetups(collectSetups(options), ctx, logger);
   })();
@@ -70,6 +76,17 @@ function startBranchGcInterval(
   return startBranchGcTimer(options.database, options.storage, runtime.config, runtime.logger);
 }
 
+/** Validation failure result, settling the cell and throwing — null when valid. */
+function invalidSources(options: ShelfOptions, cell: LifecycleCell): AdapterSetupResult | null {
+  const invalid = validateAdapterSources(options);
+  if (invalid.length === 0) {
+    return null;
+  }
+  const result: AdapterSetupResult = { ok: false, failures: invalid };
+  cell.ready = Promise.resolve(result);
+  cell.settled = result;
+  return result;
+}
 /** Build the `app.lifecycle` namespace closing over one settlement cell. */
 function createLifecycle(
   options: ShelfOptions,
@@ -84,6 +101,10 @@ function createLifecycle(
     },
     logger,
     setup: async () => {
+      const blocked = invalidSources(options, cell);
+      if (blocked) {
+        throw new AdapterLifecycleError("setup", blocked.failures);
+      }
       const result = await runAdapterSetups(collectSetups(options), ctx, logger);
       cell.ready = Promise.resolve(result);
       cell.settled = result;

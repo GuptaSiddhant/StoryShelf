@@ -15,10 +15,30 @@ const storageFail = async (): Promise<never> => {
   return await Promise.reject(new Error("storage not used in this test"));
 };
 
+function stubTables(): DatabaseAdapter["tables"] {
+  const tables: Record<string, unknown> = {};
+  for (const key of [
+    "projects",
+    "builds",
+    "snapshots",
+    "baselines",
+    "comments",
+    "labelTypes",
+    "buildLabels",
+    "tokens",
+    "webhooks",
+    "users",
+    "projectMembers",
+  ]) {
+    tables[key] = {};
+  }
+  return tables as unknown as DatabaseAdapter["tables"];
+}
+
 function stubDatabase(): DatabaseAdapter {
   return {
     metadata: { name: "Stub DB", version: "0.0.0", kind: "stub", category: "database" },
-    tables: {} as unknown as DatabaseAdapter["tables"],
+    tables: stubTables(),
     insert: dbFail,
     update: dbFail,
     get: dbFail,

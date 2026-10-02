@@ -4,6 +4,7 @@
  */
 import { swaggerUI } from "@hono/swagger-ui";
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { AdapterLifecycleError, validateAdapterSources } from "@storyshelf/core/adapter/setup";
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import {
   createHttpMiddleware,
@@ -49,23 +50,28 @@ import { registerWellKnown } from "./routers/well-known.ts";
 import { resolveRuntime } from "./runtime.ts";
 
 /**
- * Create the StoryShelf Hono app with all API routes and HTML pages.
- *
- * Adapter `init` hooks kick off eagerly in the background (the constructor
- * stays synchronous). Await `app.lifecycle.setup()` before serving for
- * fail-fast startup, or let the first request gate on settlement.
+ * Fail fast on third-party adapters that cannot satisfy their slot.
+ * Throws before any route or lifecycle hook runs.
  */
-export function createShelfApp(options: ShelfOptions): ShelfApp {
-  const app = new OpenAPIHono<{ Variables: ShelfContext }>() as ShelfApp;
-  const runtime = resolveRuntime(options);
-  // Instrumented adapters for request/capture paths: transparent wrappers
-  // (identity, lifecycle, and tables delegate through; spans noop without
-  // an SDK). Lifecycle setup/health keep the raw adapters.
-  const scoped: ShelfOptions = {
+function throwOnInvalidAdapters(options: ShelfOptions): void {
+  const invalid = validateAdapterSources(options);
+  if (invalid.length > 0) {
+    throw new AdapterLifecycleError("setup", invalid);
+  }
+}
+
+/** Request/capture-path adapters with OTEL wrappers (lifecycle keeps raw ones). */
+function instrumentedOptions(options: ShelfOptions): ShelfOptions {
+  return {
     ...options,
     database: createInstrumentedDatabase(options.database),
     storage: createInstrumentedStorage(options.storage),
   };
+}
+
+/** Attach lifecycle, queue, middleware, routes, and docs to the app. */
+function assembleApp(app: ShelfApp, options: ShelfOptions, scoped: ShelfOptions): void {
+  const runtime = resolveRuntime(options);
   const cell: LifecycleCell = { ready: Promise.resolve({ ok: true, failures: [] }), settled: null };
   attachLifecycle(app, options, runtime, cell);
   const { queue, enqueueCapture } = setupCaptureQueue(
@@ -88,6 +94,19 @@ export function createShelfApp(options: ShelfOptions): ShelfApp {
     version: packageVersion(),
   });
   registerDocs(app);
+}
+
+/**
+ * Create the StoryShelf Hono app with all API routes and HTML pages.
+ *
+ * Adapter `init` hooks kick off eagerly in the background (the constructor
+ * stays synchronous). Await `app.lifecycle.setup()` before serving for
+ * fail-fast startup, or let the first request gate on settlement.
+ */
+export function createShelfApp(options: ShelfOptions): ShelfApp {
+  throwOnInvalidAdapters(options);
+  const app = new OpenAPIHono<{ Variables: ShelfContext }>() as ShelfApp;
+  assembleApp(app, options, instrumentedOptions(options));
 
   return app;
 }
