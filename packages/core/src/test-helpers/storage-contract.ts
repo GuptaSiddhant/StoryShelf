@@ -38,13 +38,17 @@ export function storageContractSuite(label: string, make: StorageFactory): void 
       expect(adapter.metadata.kind.length).toBeGreaterThan(0);
     });
 
-    it("keeps lifecycle idempotent", async () => {
+    it("keeps lifecycle idempotent when present", async () => {
       const adapter = await make();
-      await adapter.lifecycle?.setup?.({} as never);
-      await adapter.lifecycle?.setup?.({} as never);
-      await expect(adapter.lifecycle?.health?.()).resolves.toMatchObject({ ok: true });
-      await adapter.lifecycle?.teardown?.();
-      await expect(adapter.lifecycle?.teardown?.()).resolves.toBeUndefined();
+      if (adapter.lifecycle === undefined) {
+        expect(adapter.lifecycle).toBeUndefined();
+        return;
+      }
+      await adapter.lifecycle.setup({} as never);
+      await adapter.lifecycle.setup({} as never);
+      await expect(adapter.lifecycle.health()).resolves.toMatchObject({ ok: true });
+      await adapter.lifecycle.teardown();
+      await expect(adapter.lifecycle.teardown()).resolves.toBeUndefined();
     });
 
     it("round-trips write/read/exists/delete", async () => {

@@ -45,6 +45,17 @@ function database(): Record<string, unknown> {
   };
 }
 
+function queue(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    metadata: { name: "Q", version: "1.0.0", kind: "memory", category: "capture-queue" },
+    enqueue: async () => {},
+    status: async () => null,
+    active: async () => [],
+    recent: async () => [],
+    ...overrides,
+  };
+}
+
 describe("validateAdapter", () => {
   it("accepts a sound storage adapter", () => {
     expect(validateAdapter(storage(), "storage", "storage")).toEqual([]);
@@ -89,6 +100,18 @@ describe("validateAdapter", () => {
     const bad = database();
     bad.tables = { projects: {} };
     expect(validateAdapter(bad, "database", "database").join(";")).toContain("missing tables");
+  });
+
+  it("rejects a partial poll extension", () => {
+    const bad = queue({ poll: async () => null });
+    expect(validateAdapter(bad, "capture-queue", "captureQueue").join(";")).toContain(
+      "partial poll extension",
+    );
+  });
+
+  it("accepts a full poll extension", () => {
+    const full = queue({ poll: async () => null, ack: async () => {}, nack: async () => {} });
+    expect(validateAdapter(full, "capture-queue", "captureQueue")).toEqual([]);
   });
 });
 

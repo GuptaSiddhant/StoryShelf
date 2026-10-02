@@ -78,6 +78,18 @@ function tableReasons(adapter: Record<string, unknown>): string[] {
   return missing.length > 0 ? [`missing tables: ${missing.join(",")}`] : [];
 }
 
+/** Reasons a queue adapter has a partial poll extension. */
+function queuePollReasons(record: Record<string, unknown>): string[] {
+  const present = ["poll", "ack", "nack"].filter((method) => record[method] !== undefined);
+  if (present.length === 0 || present.length === 3) {
+    const mistyped = ["poll", "ack", "nack"].filter(
+      (method) => record[method] !== undefined && typeof record[method] !== "function",
+    );
+    return mistyped.map((method) => `queue poll extension "${method}" must be a function`);
+  }
+  return [`partial poll extension (present: ${present.join(",")}; need poll+ack+nack)`];
+}
+
 /** Reasons a git provider lacks its descriptor shape. */
 function gitReasons(provider: unknown): string[] {
   const record = asRecord(provider);
@@ -109,9 +121,12 @@ function slotMethods(category: string): string[] {
   return QUEUE_METHODS;
 }
 
-/** Table-map reasons for database adapters, none otherwise. */
-function slotTableReasons(record: Record<string, unknown>, category: string): string[] {
-  return category === "database" ? tableReasons(record) : [];
+/** Extra per-slot reasons (table map for databases, poll rule for queues). */
+function slotExtraReasons(record: Record<string, unknown>, category: string): string[] {
+  if (category === "database") {
+    return tableReasons(record);
+  }
+  return category === "capture-queue" ? queuePollReasons(record) : [];
 }
 
 /**
@@ -131,7 +146,7 @@ export function validateAdapter(
   const extra = [
     ...lifecycleReasons(record),
     ...methodReasons(record, slotMethods(expectedCategory)),
-    ...slotTableReasons(record, expectedCategory),
+    ...slotExtraReasons(record, expectedCategory),
   ];
   for (const reason of extra) {
     reasons.push(`${slot}: ${reason}`);

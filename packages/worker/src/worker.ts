@@ -76,6 +76,11 @@ export interface WorkerHandle {
   isRunning(): boolean;
 }
 
+/** Whether a polled job carries the minimum shape to execute. */
+function isValidJob(job: PollableJob): boolean {
+  return typeof job.buildId === "string" && job.buildId.length > 0;
+}
+
 export function createCaptureWorker(options: WorkerOptions): WorkerHandle {
   const config = resolveWorkerConfig(options.config);
   const tables: WorkerTables = options.tables ?? {
@@ -191,6 +196,16 @@ export function createCaptureWorker(options: WorkerOptions): WorkerHandle {
     return Math.min(30_000, config.backoffMs * 2 ** attempts);
   }
 
+  /** Drop a malformed job without retries so poison payloads never loop. */
+  async function dropPoisonJob(job: PollableJob): Promise<void> {
+    logger?.warn({ buildId: job.buildId, attempts: job.attempts }, "dropping malformed queue job");
+    try {
+      await doAck(job);
+    } catch (error) {
+      logger?.error({ err: error }, "failed to ack malformed job");
+    }
+  }
+
   async function processJob(job: PollableJob): Promise<void> {
     const jobLogger = logger?.child({ buildId: job.buildId, reqId: job.reqId });
     await acquire();
@@ -267,6 +282,10 @@ export function createCaptureWorker(options: WorkerOptions): WorkerHandle {
         continue;
       }
       // Check if we know this build already failed permanently? Attempts already handled in processJob.
+      if (!isValidJob(job)) {
+        await dropPoisonJob(job);
+        continue;
+      }
       await processJob(job);
     }
   }

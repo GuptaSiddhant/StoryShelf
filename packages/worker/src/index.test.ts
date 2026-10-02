@@ -108,6 +108,34 @@ describe("createCaptureWorker", () => {
     expect(queue.ack).toHaveBeenCalled();
   });
 
+  it("drops malformed jobs without retries", async () => {
+    const job = { buildId: "", attempts: 0, receipt: "r-poison" } as PollableJob;
+    const queue = createMockQueue([job]);
+    const { db, storage, runner } = createFakeAdapters();
+
+    const worker = createCaptureWorker({
+      queue: queue as unknown as import("@storyshelf/core/adapter/capture-queue").CaptureQueue,
+      db,
+      storage,
+      runner,
+      scratchDir: "/tmp",
+      config: { maxRetries: 2, waitTimeSeconds: 0, concurrency: 1 },
+    });
+
+    const startPromise = worker.start();
+    await new Promise<void>((resolve) => {
+      setTimeout(() => {
+        resolve();
+      }, 200);
+    });
+    await worker.stop();
+    await startPromise.catch(() => {});
+
+    expect(queue.ack).toHaveBeenCalledTimes(1);
+    expect(queue.nack).not.toHaveBeenCalled();
+    expect(runner.render).not.toHaveBeenCalled();
+  });
+
   it("nacks with requeue when attempts < maxRetries", async () => {
     const job: PollableJob = { buildId: "build-1", attempts: 0, receipt: "r1" };
     const queue = createMockQueue([job]);
