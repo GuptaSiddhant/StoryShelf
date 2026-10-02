@@ -20,6 +20,31 @@
 
 Each adapter against its interface: SQLite via `:memory:` (Turso via a local libSQL stub), storage-local via a temp dir, storage-s3 via a recorded/fake client, auth via the engine adapter over `:memory:` SQLite.
 
+#### 2a. Per-adapter testing requirements (mandatory)
+
+Every adapter package must satisfy this matrix. New adapters ship with all
+rows; existing adapters backfill on touch. The `adapter-layout` skill enforces
+the file placement (colocated `<module>.test.ts`, move cases with the code).
+
+| Requirement | Storage (`storage-*`) | Queue (`queue-*`) | DB (`db-*`) | Runner / git / auth / notify |
+|---|---|---|---|---|
+| `metadata` | `kind` + `category` asserted once per factory | same | same | same |
+| `lifecycle` all-or-nothing | `setup` creates root (idempotent x2), `health.ok` true then false after `rm -rf`, `teardown` x2 no-throw | `setup` probes remote (fake client records 1 call), `health` maps ok/fail, `teardown` no-op for injected client + destroys owned client x2 | `migrate` twice + `ping` ok, `close` x2 no-throw | same shape; runners assert browser launch/close |
+| Happy-path operations | `write/read/exists/delete/list` round-trip + recursive `list` + missing prefix `[]` | `enqueue` returns id + `poll/ack/nack` round-trip via fake transport | CRUD per table + unique-constraint + foreign-key violation | render/post/comment round-trip via fake transport |
+| Not-found / error mapping | `read`/`readStream` missing → throw; `writeStream` failure deletes partial | `ack` unknown id → throw; malformed body → `nack` without crash | missing row → `undefined`, not throw | HTTP 4xx mapped to typed error, 5xx retried per `httpJson` |
+| Safety | path-traversal (`../escape`) rejected on `read/write/list` | poison payload never blocks `poll` loop; delay clamps honored | SQL injection via values rejected (params, never concat) | webhook HMAC verified before mutation |
+| Streams / codec where applicable | `writeStream/readStream` byte-identical + partial cleanup on failure | `codec` serialize/parse round-trip + version-mismatch throw | N/A (or bulk-import performance smoke) | runner screenshot bytes equal fixture hash |
+| Live (`*.live.test.ts`, `LIVE_CLOUD=1` gated) | real bucket round-trip with `live/<run-id>/` prefix | real enqueue/poll/ack with per-run ids | real migrate + CRUD, teardown drops test rows | real API against throwaway repo/SHA |
+
+Rules:
+
+- Fake the transport, never the adapter: inject fake S3/SQS/Redis/pg clients,
+  temp dirs, or `:memory:` DBs. No network in `nub run test`.
+- Idempotency is asserted, not assumed: run `setup`, `teardown`, `migrate`,
+  and `enqueue`-retry twice.
+- Indirect coverage allowed only for pure mappers (e.g. `git-github`
+  `mapper.ts` precedent); everything else has a direct colocated suite.
+
 ### 3. Integration (vitest, CI-always)
 
 `createShelfApp({ database, storage, capture: <fake> })` drives the full `upload → capture → diff → review → approve` flow over HTTP. Capture is a fake runner here (a real one needs a browser).

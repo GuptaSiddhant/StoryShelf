@@ -19,11 +19,13 @@ import {
   generateWorkerDockerfile,
 } from "./docker.ts";
 import {
-  INFRA_PROMPTS,
+  ADVANCED_ADAPTERS_PROMPT,
+  DEPLOY_TARGET_PROMPT,
   PROJECT_PROMPTS,
   AWS_INFRA_PROMPTS,
   AZURE_INFRA_PROMPTS,
   GCP_INFRA_PROMPTS,
+  localInfraPrompts,
 } from "./prompts.ts";
 import { generateAwsTerraformFiles } from "./terraform-aws.ts";
 import { generateAzureTerraformFiles } from "./terraform-azure.ts";
@@ -108,6 +110,8 @@ interface Answers {
   notifications?: boolean;
   /** Deploy target. Absent in older mocked answers — derived from `docker`. */
   deployTarget?: DeployTarget;
+  /** Curated-path opt-in: show the full adapter matrix on local/docker. */
+  advancedAdapters?: boolean;
   /** AWS-only follow-ups (asked when deployTarget is `aws`). */
   awsRegion?: string;
   dbEngine?: "rds" | "dsql";
@@ -895,29 +899,54 @@ export async function runServerInit(_options: ServerInitOptions): Promise<void> 
   // Try to autofill from existing package.json (standalone worker dir or re-init)
   const cwdPkg = detectInstalledAdapters(process.cwd());
 
-  const infraWithInitial = INFRA_PROMPTS.map((prompt) => {
-    if (prompt.type !== "select") {
-      return prompt;
-    }
-    const detected = cwdPkg[prompt.name as keyof typeof cwdPkg] as string | undefined;
-    const initial = promptInitial(prompt.choices, detected);
-    if (initial !== undefined) {
-      return { ...prompt, initial };
-    }
-    return prompt;
-  });
+  // Phase 1 (curated path): project + deploy target first. Legacy single-call
+  // mocks return the full answer object here — merge progressively so those
+  // tests keep passing while interactive users get filtered phase-2 prompts.
+  const phase1 =
+    ((await prompts([...PROJECT_PROMPTS, DEPLOY_TARGET_PROMPT])) as Record<string, unknown>) ?? {};
 
-  const responses = (await prompts([...PROJECT_PROMPTS, ...infraWithInitial])) as Record<
-    string,
-    unknown
-  >;
-
-  if (!responses["name"] || !responses["dir"]) {
+  if (!phase1["name"] || !phase1["dir"]) {
     printError("Cancelled.");
     return;
   }
 
-  const answers = responses as unknown as Answers;
+  const answers = { ...phase1 } as unknown as Answers;
+  const target = resolveDeployTarget(answers);
+
+  // Local/docker path: advanced toggle, then curated (4 DBs) or full matrix.
+  if (target === "local" || target === "docker") {
+    const advPhase =
+      ((await prompts(ADVANCED_ADAPTERS_PROMPT as never)) as Record<string, unknown>) ?? {};
+    const advanced =
+      (answers.advancedAdapters as boolean | undefined) ??
+      (advPhase["advancedAdapters"] as boolean | undefined) ??
+      false;
+    answers.advancedAdapters = advanced;
+
+    const localPrompts = localInfraPrompts(advanced).map((prompt) => {
+      if (prompt.type !== "select") {
+        return prompt;
+      }
+      // Prefer an already-provided (legacy mock) or detected value as initial.
+      const legacy = answers[prompt.name as keyof Answers] as string | undefined;
+      const detected = cwdPkg[prompt.name as keyof typeof cwdPkg] as string | undefined;
+      const initial = promptInitial(prompt.choices, legacy ?? detected);
+      if (initial !== undefined) {
+        return { ...prompt, initial };
+      }
+      return prompt;
+    });
+
+    const phase2 = ((await prompts(localPrompts as never)) as Record<string, unknown>) ?? {};
+    Object.assign(answers, phase2);
+    answers.advancedAdapters = advanced;
+    answers.deployTarget ??= target;
+  } else {
+    // Cloud targets pin the enterprise reference stack — no adapter menu.
+    // Merge any legacy single-call mock values first, then force the stack.
+    const legacyInfra = { ...phase1 };
+    Object.assign(answers, legacyInfra);
+  }
   // Default queue to memory if not answered (prompts initial unset)
   if (!answers.queue) {
     answers.queue = "memory";
@@ -931,7 +960,7 @@ export async function runServerInit(_options: ServerInitOptions): Promise<void> 
     answers.queue = "sqs";
     answers.includeWorker = true;
     answers.docker = true;
-    const awsAnswers = (await prompts(AWS_INFRA_PROMPTS)) as Record<string, unknown>;
+    const awsAnswers = ((await prompts(AWS_INFRA_PROMPTS)) as Record<string, unknown>) ?? {};
     answers.awsRegion = (awsAnswers["awsRegion"] as string | undefined) ?? "us-east-1";
     answers.dbEngine = (awsAnswers["dbEngine"] as "rds" | "dsql" | undefined) ?? "rds";
     answers.domainName = (awsAnswers["domainName"] as string | undefined) ?? undefined;
@@ -946,7 +975,7 @@ export async function runServerInit(_options: ServerInitOptions): Promise<void> 
     answers.storage = "azure";
     answers.includeWorker = true;
     answers.docker = true;
-    const azureAnswers = (await prompts(AZURE_INFRA_PROMPTS)) as Record<string, unknown>;
+    const azureAnswers = ((await prompts(AZURE_INFRA_PROMPTS)) as Record<string, unknown>) ?? {};
     answers.azureLocation = (azureAnswers["azureLocation"] as string | undefined) ?? "eastus";
     const backend = azureAnswers["azureQueueBackend"] as
       | "storage-queues"
@@ -968,7 +997,7 @@ export async function runServerInit(_options: ServerInitOptions): Promise<void> 
     answers.queue = "gcp-pubsub";
     answers.includeWorker = true;
     answers.docker = true;
-    const gcpAnswers = (await prompts(GCP_INFRA_PROMPTS)) as Record<string, unknown>;
+    const gcpAnswers = ((await prompts(GCP_INFRA_PROMPTS)) as Record<string, unknown>) ?? {};
     answers.gcpProjectId = (gcpAnswers["gcpProjectId"] as string | undefined) ?? undefined;
     answers.gcpLocation = (gcpAnswers["gcpLocation"] as string | undefined) ?? "us-central1";
     answers.domainName = (gcpAnswers["domainName"] as string | undefined) ?? undefined;
@@ -982,12 +1011,13 @@ export async function runServerInit(_options: ServerInitOptions): Promise<void> 
     resolveDeployTarget(answers) !== "gcp" &&
     isRemoteQueue(answers.queue)
   ) {
-    const workerAnswer = (await prompts({
-      type: "confirm",
-      name: "includeWorker",
-      message: "Generate worker service alongside server?",
-      initial: true,
-    } as never)) as Record<string, unknown>;
+    const workerAnswer =
+      ((await prompts({
+        type: "confirm",
+        name: "includeWorker",
+        message: "Generate worker service alongside server?",
+        initial: true,
+      } as never)) as Record<string, unknown>) ?? {};
     const includeWorkerValue = workerAnswer["includeWorker"] as boolean | undefined;
     answers.includeWorker = includeWorkerValue ?? true;
   }

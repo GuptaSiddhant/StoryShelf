@@ -88,4 +88,29 @@ describe("createLocalStorage", () => {
     await expect(storage.writeStream("s/partial.bin", failing)).rejects.toThrow("boom");
     expect(await storage.exists("s/partial.bin")).toBe(false);
   });
+
+  it("exposes local storage metadata", () => {
+    const storage = createLocalStorage(dir);
+    expect(storage.metadata.kind).toBe("local");
+    expect(storage.metadata.category).toBe("storage");
+  });
+
+  it("lifecycle setup is idempotent and health reflects root presence", async () => {
+    const storage = createLocalStorage(dir);
+    await storage.lifecycle?.setup?.({} as never);
+    await storage.lifecycle?.setup?.({} as never);
+    await expect(storage.lifecycle?.health?.()).resolves.toEqual({ ok: true });
+
+    await rm(dir, { recursive: true, force: true });
+    await expect(storage.lifecycle?.health?.()).resolves.toEqual({ ok: false });
+
+    await storage.lifecycle?.setup?.({} as never);
+    await expect(storage.lifecycle?.health?.()).resolves.toEqual({ ok: true });
+  });
+
+  it("lifecycle teardown is a repeatable no-op", async () => {
+    const storage = createLocalStorage(dir);
+    await storage.lifecycle?.teardown?.();
+    await expect(storage.lifecycle?.teardown?.()).resolves.toBeUndefined();
+  });
 });

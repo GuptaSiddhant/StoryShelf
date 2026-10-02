@@ -143,18 +143,22 @@ describe("runServerInit", () => {
   });
 
   it("scaffolds server with SQS queue and colocated worker", async () => {
-    // First prompts call returns main answers with queue=sqs, second returns includeWorker=true
+    // Phased flow: phase-1 answers, advanced toggle, phase-2 adapters, worker confirm
+    const main = {
+      name: "my-server",
+      dir: "./my-server",
+      deployTarget: "docker",
+      database: "turso",
+      storage: "s3",
+      auth: "none",
+      git: "none",
+      queue: "sqs",
+      docker: false,
+    };
     vi.mocked(prompts)
-      .mockResolvedValueOnce({
-        name: "my-server",
-        dir: "./my-server",
-        database: "turso",
-        storage: "s3",
-        auth: "none",
-        git: "none",
-        queue: "sqs",
-        docker: false,
-      })
+      .mockResolvedValueOnce({ ...main })
+      .mockResolvedValueOnce({ advancedAdapters: true })
+      .mockResolvedValueOnce({ ...main })
       .mockResolvedValueOnce({ includeWorker: true });
 
     const cwd = process.cwd();
@@ -183,17 +187,21 @@ describe("runServerInit", () => {
   });
 
   it("scaffolds SQS server without worker when declined", async () => {
+    const main = {
+      name: "my-server",
+      dir: "./my-server",
+      deployTarget: "docker",
+      database: "sqlite",
+      storage: "local",
+      auth: "none",
+      git: "none",
+      queue: "sqs",
+      docker: false,
+    };
     vi.mocked(prompts)
-      .mockResolvedValueOnce({
-        name: "my-server",
-        dir: "./my-server",
-        database: "sqlite",
-        storage: "local",
-        auth: "none",
-        git: "none",
-        queue: "sqs",
-        docker: false,
-      })
+      .mockResolvedValueOnce({ ...main })
+      .mockResolvedValueOnce({ advancedAdapters: false })
+      .mockResolvedValueOnce({ ...main })
       .mockResolvedValueOnce({ includeWorker: false });
 
     const cwd = process.cwd();
@@ -209,17 +217,21 @@ describe("runServerInit", () => {
   });
 
   it("generates slim Dockerfile and worker compose when with worker and docker", async () => {
+    const main = {
+      name: "my-server",
+      dir: "./my-server",
+      deployTarget: "docker",
+      database: "postgres",
+      storage: "local",
+      auth: "none",
+      git: "none",
+      queue: "sqs",
+      docker: true,
+    };
     vi.mocked(prompts)
-      .mockResolvedValueOnce({
-        name: "my-server",
-        dir: "./my-server",
-        database: "postgres",
-        storage: "local",
-        auth: "none",
-        git: "none",
-        queue: "sqs",
-        docker: true,
-      })
+      .mockResolvedValueOnce({ ...main })
+      .mockResolvedValueOnce({ advancedAdapters: false })
+      .mockResolvedValueOnce({ ...main })
       .mockResolvedValueOnce({ includeWorker: true });
 
     const cwd = process.cwd();
@@ -538,5 +550,74 @@ describe("runServerInit", () => {
       dependencies: Record<string, string>;
     };
     expect(pkg.dependencies["@storyshelf/notify-chat"]).toBeUndefined();
+  });
+
+  it("asks deploy target first, then curated adapters on local", async () => {
+    const phase1 = { name: "my-server", dir: "./my-server", deployTarget: "local" };
+    const adapters = {
+      database: "sqlite",
+      storage: "local",
+      auth: "none",
+      git: "none",
+      queue: "memory",
+      docker: false,
+      notifications: false,
+    };
+    vi.mocked(prompts)
+      .mockResolvedValueOnce({ ...phase1 })
+      .mockResolvedValueOnce({ advancedAdapters: false })
+      .mockResolvedValueOnce({ ...adapters });
+
+    const cwd = process.cwd();
+    process.chdir(tmpRoot);
+    try {
+      await runServerInit({});
+    } finally {
+      process.chdir(cwd);
+    }
+
+    // Phase 2 database menu is the curated 4, not the full 14.
+    const phase2Call = vi.mocked(prompts).mock.calls[2]?.[0] as Array<{ choices?: unknown[] }>;
+    const dbPrompt = phase2Call.find((p) => (p as { name?: string }).name === "database") as {
+      choices: unknown[];
+    };
+    expect(dbPrompt.choices).toHaveLength(4);
+
+    const code = readFileSync(join(dir, "server.ts"), "utf8");
+    expect(code).toContain("createSqliteDatabase");
+  });
+
+  it("shows the full matrix when advanced adapters is on", async () => {
+    const phase1 = { name: "my-server", dir: "./my-server", deployTarget: "local" };
+    const adapters = {
+      database: "turso",
+      storage: "local",
+      auth: "none",
+      git: "none",
+      queue: "memory",
+      docker: false,
+      notifications: false,
+    };
+    vi.mocked(prompts)
+      .mockResolvedValueOnce({ ...phase1 })
+      .mockResolvedValueOnce({ advancedAdapters: true })
+      .mockResolvedValueOnce({ ...adapters });
+
+    const cwd = process.cwd();
+    process.chdir(tmpRoot);
+    try {
+      await runServerInit({});
+    } finally {
+      process.chdir(cwd);
+    }
+
+    const phase2Call = vi.mocked(prompts).mock.calls[2]?.[0] as Array<{ choices?: unknown[] }>;
+    const dbPrompt = phase2Call.find((p) => (p as { name?: string }).name === "database") as {
+      choices: unknown[];
+    };
+    expect(dbPrompt.choices).toHaveLength(14);
+
+    const code = readFileSync(join(dir, "server.ts"), "utf8");
+    expect(code).toContain("createTursoDatabase");
   });
 });
