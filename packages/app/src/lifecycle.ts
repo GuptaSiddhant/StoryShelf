@@ -6,7 +6,7 @@ import {
   collectTeardowns,
   runAdapterSetups,
   runAdapterTeardowns,
-  validateAdapterSources,
+  validateBootAssembly,
 } from "@storyshelf/core/adapter/setup";
 import type { AdapterSetupResult } from "@storyshelf/core/adapter/setup";
 import type { ShelfOptions } from "@storyshelf/core/config";
@@ -43,7 +43,7 @@ function kickSetup(
   // Auth is not an adapter: its one-shot boot validation runs first, then
   // the adapter setups. A failing secret check fails readiness, like others.
   cell.ready = (async (): Promise<AdapterSetupResult> => {
-    const invalid = validateAdapterSources(options);
+    const invalid = validateBootAssembly(options);
     if (invalid.length > 0) {
       logger.error({ failures: invalid }, "adapter validation failed");
       return { ok: false, failures: invalid };
@@ -58,6 +58,29 @@ function kickSetup(
   trackSettlement(cell, cell.ready);
 }
 
+/** Login method count, or null when the engine throws during introspection. */
+function loginMethodCount(auth: NonNullable<ShelfOptions["auth"]>): number | null {
+  try {
+    return auth.loginMethods().length;
+  } catch {
+    return null;
+  }
+}
+
+/** Log which auth mode the server boots with (open servers stay visible). */
+function logAuthMode(options: ShelfOptions, logger: Logger): void {
+  if (!options.auth) {
+    logger.info("auth disabled (local default; every route is open)");
+    return;
+  }
+  const methods = loginMethodCount(options.auth);
+  if (methods === null) {
+    logger.warn("auth loginMethods() threw during boot logging");
+    return;
+  }
+  logger.info({ loginMethods: methods }, "auth enabled");
+}
+
 /** Kick eager setup and attach the `app.lifecycle` namespace (single run). */
 export function attachLifecycle(
   app: ShelfRouter,
@@ -67,6 +90,7 @@ export function attachLifecycle(
 ): void {
   const setupCtx: AdapterSetupContext = { config: runtime.config, logger: runtime.logger };
   bindAdapterLoggers(options, runtime.logger);
+  logAuthMode(options, runtime.logger);
   kickSetup(options, setupCtx, runtime.logger, cell);
   const timer = startBranchGcInterval(options, runtime);
   Object.assign(app, {
@@ -98,7 +122,7 @@ async function runAuthSetup(options: ShelfOptions): Promise<AdapterSetupResult |
 }
 /** Validation failure settled on the cell — null when the assembly is sound. */
 function invalidSources(options: ShelfOptions, cell: LifecycleCell): AdapterSetupResult | null {
-  const invalid = validateAdapterSources(options);
+  const invalid = validateBootAssembly(options);
   if (invalid.length === 0) {
     return null;
   }

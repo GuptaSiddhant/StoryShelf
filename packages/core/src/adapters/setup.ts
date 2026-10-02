@@ -80,4 +80,9 @@ export {
 } from "./setup-runner.ts";
 
 /** Boot-time shape validation for third-party adapters. */
-export { validateAdapter, validateAdapterSources } from "./validate.ts";
+export {
+  validateAdapter,
+  validateAdapterSources,
+  validateAuth,
+  validateBootAssembly,
+} from "./validate.ts";

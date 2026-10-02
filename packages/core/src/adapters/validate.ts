@@ -7,6 +7,7 @@
  * the lifecycle runner returns failures without executing hooks.
  */
 import { z } from "zod";
+import type { Auth } from "../auth.ts";
 import { REQUIRED_TABLE_KEYS } from "./database.ts";
 import type { AdapterSetupFailure, AdapterSetupSources } from "./setup.ts";
 
@@ -188,6 +189,78 @@ export function validateAdapter(
   return reasons;
 }
 
+/** Auth surface methods every engine must expose. */
+const AUTH_METHODS = [
+  "handler",
+  "loginMethods",
+  "setup",
+  "issueInvite",
+  "verifyInvite",
+  "acceptInvite",
+  "passkeysEnabled",
+  "listSessions",
+  "listPasskeys",
+  "hasPassword",
+  "setDisabled",
+  "check",
+  "createSession",
+  "destroySession",
+];
+
+/** Reasons a method-id list is unusable (blank or duplicate ids). */
+function methodIdReasons(ids: string[]): string[] {
+  const reasons: string[] = [];
+  if (ids.some((id) => id.length === 0)) {
+    reasons.push("login method with blank id");
+  }
+  if (new Set(ids).size !== ids.length) {
+    reasons.push("duplicate login method ids");
+  }
+  return reasons;
+}
+
+/** Reasons login method descriptors are unusable (duplicate/blank ids). */
+function loginMethodReasons(auth: Auth): string[] {
+  let ids: string[];
+  try {
+    ids = auth.loginMethods().map((method) => method.id);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return [`loginMethods() threw: ${message}`];
+  }
+  return methodIdReasons(ids);
+}
+
+/**
+ * Validate the auth engine shape (auth is optional — undefined is valid).
+ * Returns human-readable reasons, empty when sound.
+ */
+export function validateAuth(auth?: unknown): string[] {
+  if (auth === undefined) {
+    return [];
+  }
+  const record = asRecord(auth);
+  if (!record) {
+    return ["auth must be an object"];
+  }
+  const reasons = methodReasons(record, AUTH_METHODS).map((reason) => `auth: ${reason}`);
+  if (reasons.length === 0) {
+    for (const reason of loginMethodReasons(auth as Auth)) {
+      reasons.push(`auth: ${reason}`);
+    }
+  }
+  return reasons;
+}
+
+/** Failure entry for an invalid auth engine. */
+function checkAuth(auth: unknown): AdapterSetupFailure[] {
+  const reasons = validateAuth(auth);
+  if (reasons.length === 0) {
+    return [];
+  }
+  return [{ category: "auth", kind: "auth", name: "auth", error: reasons.join("; ") }];
+}
+
 /** One slot check for source validation. */
 interface SlotCheck {
   adapter: unknown;
@@ -299,4 +372,15 @@ export function validateAdapterSources(sources: AdapterSetupSources): AdapterSet
     ...checkProviders(providers),
     ...checkEmailSender(sources.emailSender),
   ];
+}
+
+/**
+ * Validate a full boot assembly: adapters plus the optional auth engine.
+ * App assembly calls this — `ShelfOptions` carries `auth` alongside the
+ * adapter slots, and an invalid engine fails boot like any adapter.
+ */
+export function validateBootAssembly(
+  sources: AdapterSetupSources & { auth?: unknown },
+): AdapterSetupFailure[] {
+  return [...validateAdapterSources(sources), ...checkAuth(sources.auth)];
 }

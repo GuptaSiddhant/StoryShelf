@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateAdapter, validateAdapterSources } from "./validate.ts";
+import { validateAdapter, validateAdapterSources, validateAuth } from "./validate.ts";
 
 function storage(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -159,5 +159,58 @@ describe("validateAdapterSources", () => {
     });
     expect(failures).toHaveLength(2);
     expect(failures.map((failure) => failure.category)).toEqual(["notifier", "notifier"]);
+  });
+});
+
+function engine(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    handler: () => new Response(),
+    loginMethods: () => [{ kind: "password", id: "local", label: "Local" }],
+    setup: async () => {},
+    issueInvite: async () => ({}),
+    verifyInvite: async () => ({}),
+    acceptInvite: async () => ({}),
+    passkeysEnabled: () => false,
+    listSessions: async () => [],
+    listPasskeys: async () => [],
+    hasPassword: async () => false,
+    setDisabled: async () => {},
+    check: async () => null,
+    createSession: async () => "",
+    destroySession: async () => {},
+    ...overrides,
+  };
+}
+
+describe("validateAuth", () => {
+  it("accepts missing auth (it is optional)", () => {
+    expect(validateAuth()).toEqual([]);
+  });
+
+  it("accepts a sound engine", () => {
+    expect(validateAuth(engine())).toEqual([]);
+  });
+
+  it("rejects missing methods", () => {
+    expect(validateAuth(engine({ check: "nope" })).join(";")).toContain("missing methods: check");
+  });
+
+  it("rejects duplicate login method ids", () => {
+    const dup = engine({
+      loginMethods: () => [
+        { kind: "oauth", id: "sso", label: "A" },
+        { kind: "oauth", id: "sso", label: "B" },
+      ],
+    });
+    expect(validateAuth(dup).join(";")).toContain("duplicate login method ids");
+  });
+
+  it("reports loginMethods() throws", () => {
+    const broken = engine({
+      loginMethods: () => {
+        throw new Error("engine down");
+      },
+    });
+    expect(validateAuth(broken).join(";")).toContain("loginMethods() threw");
   });
 });

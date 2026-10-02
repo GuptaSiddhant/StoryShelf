@@ -4,7 +4,7 @@
  */
 import { swaggerUI } from "@hono/swagger-ui";
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { AdapterLifecycleError, validateAdapterSources } from "@storyshelf/core/adapter/setup";
+import { AdapterLifecycleError, validateBootAssembly } from "@storyshelf/core/adapter/setup";
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import {
   createHttpMiddleware,
@@ -54,7 +54,7 @@ import { resolveRuntime } from "./runtime.ts";
  * Throws before any route or lifecycle hook runs.
  */
 function throwOnInvalidAdapters(options: ShelfOptions): void {
-  const invalid = validateAdapterSources(options);
+  const invalid = validateBootAssembly(options);
   if (invalid.length > 0) {
     throw new AdapterLifecycleError("setup", invalid);
   }

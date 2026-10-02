@@ -8,6 +8,10 @@ import type { ServerRuntime } from "./runtime.ts";
 
 const silentLogger = pino({ level: "silent" });
 
+async function throwingSetup(): Promise<void> {
+  throw new Error("bad secret");
+}
+
 function fakeAdapter(kind: string, setLogger?: (logger: unknown) => void) {
   return {
     metadata: { name: kind, version: "0.0.0", kind, category: "capture-queue" },
@@ -76,9 +80,20 @@ describe("attachLifecycle", () => {
       database: db,
       storage,
       auth: {
-        setup: async (): Promise<void> => {
-          throw new Error("bad secret");
-        },
+        handler: () => new Response(),
+        loginMethods: () => [{ kind: "password", id: "local", label: "Local" }],
+        setup: throwingSetup,
+        issueInvite: async () => ({}),
+        verifyInvite: async () => ({}),
+        acceptInvite: async () => ({}),
+        passkeysEnabled: () => false,
+        listSessions: async () => [],
+        listPasskeys: async () => [],
+        hasPassword: async () => false,
+        setDisabled: async () => {},
+        check: async () => null,
+        createSession: async () => "",
+        destroySession: async () => {},
       },
     } as unknown as ShelfOptions;
     const runtime = {
