@@ -1,6 +1,7 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import { createShelfLogger } from "@storyshelf/core/logger";
+import { stubTables } from "@storyshelf/core/test-helpers";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { createShelfApp } from "../src/index.tsx";
@@ -12,6 +13,7 @@ const unreachable = (): Promise<never> => {
 /** Adapters that throw if touched — route registration alone yields the spec. */
 const stubDatabase: DatabaseAdapter = {
   metadata: { name: "Stub DB", version: "0.0.0", kind: "stub", category: "database" },
+  tables: stubTables(),
   insert: unreachable,
   update: unreachable,
   get: unreachable,

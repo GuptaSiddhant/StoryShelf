@@ -1,5 +1,6 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
+import { stubTables } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
@@ -9,26 +10,6 @@ const silentLogger = pino({ level: "silent" });
 const fail = async (): Promise<never> => {
   return await Promise.reject(new Error("not used in this test"));
 };
-
-function stubTables(): DatabaseAdapter["tables"] {
-  const tables: Record<string, unknown> = {};
-  for (const key of [
-    "projects",
-    "builds",
-    "snapshots",
-    "baselines",
-    "comments",
-    "labelTypes",
-    "buildLabels",
-    "tokens",
-    "webhooks",
-    "users",
-    "projectMembers",
-  ]) {
-    tables[key] = {};
-  }
-  return tables as unknown as DatabaseAdapter["tables"];
-}
 
 function stubDatabase(): DatabaseAdapter {
   return {

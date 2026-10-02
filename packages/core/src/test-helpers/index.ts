@@ -7,7 +7,7 @@
 export { createTestBuild, createTestProject } from "./create-project.ts";
 export { databaseContractSuite, REQUIRED_TABLES } from "./database-contract.ts";
 export { gitContractSuite } from "./git-contract.ts";
-export { makeDatabase, makeStorage, type FakeStorage } from "./fake-adapters.ts";
+export { makeDatabase, makeStorage, stubTables, type FakeStorage } from "./fake-adapters.ts";
 export { notifierContractSuite } from "./notifier-contract.ts";
 export { queueContractSuite } from "./queue-contract.ts";
 export { runnerContractSuite } from "./runner-contract.ts";
