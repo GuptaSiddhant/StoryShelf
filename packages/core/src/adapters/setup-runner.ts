@@ -98,6 +98,31 @@ function messageOf(reason: unknown): string {
   return reason instanceof Error ? reason.message : String(reason);
 }
 
+/** Budgets that trigger slow-hook warnings (observe only, never abort). */
+const SLOW_SETUP_MS = 10_000;
+const SLOW_TEARDOWN_MS = 5_000;
+
+/** Run one hook with start/done logging and a slow-hook warning. */
+async function runHook(
+  entry: HookEntry,
+  ctx: AdapterSetupContext,
+  logger: Logger,
+  slowMs: number,
+): Promise<void> {
+  const { category, kind, name } = entry;
+  const started = Date.now();
+  logger.info({ category, kind, name }, "adapter hook start");
+  try {
+    await entry.run(ctx);
+  } finally {
+    const durationMs = Date.now() - started;
+    logger.info({ category, kind, name, durationMs }, "adapter hook done");
+    if (durationMs > slowMs) {
+      logger.warn({ category, kind, name, durationMs, slowMs }, "slow adapter hook");
+    }
+  }
+}
+
 function toFailure(entry: HookEntry, reason: unknown): AdapterSetupFailure {
   return { category: entry.category, kind: entry.kind, name: entry.name, error: messageOf(reason) };
 }
@@ -123,18 +148,41 @@ function toResult(
   return { ok: failures.length === 0, failures };
 }
 
+/** One run of collected hooks with start/done logging and hung visibility. */
+async function runHooks(
+  entries: HookEntry[],
+  ctx: AdapterSetupContext,
+  logger: Logger,
+  verb: string,
+  slowMs: number,
+): Promise<AdapterSetupResult> {
+  let settled = false;
+  const timer = setTimeout(() => {
+    if (!settled) {
+      logger.warn({ count: entries.length, slowMs }, `adapters ${verb} still running`);
+    }
+  }, slowMs);
+  timer.unref?.();
+  try {
+    const outcomes = await Promise.allSettled(
+      entries.map(async (entry) => {
+        await runHook(entry, ctx, logger, slowMs);
+      }),
+    );
+    return toResult(entries, outcomes, logger, verb);
+  } finally {
+    settled = true;
+    clearTimeout(timer);
+  }
+}
+
 /** Run setup hooks concurrently; failures are collected, never thrown. */
 export async function runAdapterSetups(
   entries: HookEntry[],
   ctx: AdapterSetupContext,
   logger: Logger,
 ): Promise<AdapterSetupResult> {
-  const outcomes = await Promise.allSettled(
-    entries.map(async (entry) => {
-      await entry.run(ctx);
-    }),
-  );
-  return toResult(entries, outcomes, logger, "setup");
+  return await runHooks(entries, ctx, logger, "setup", SLOW_SETUP_MS);
 }
 
 /** Run teardown hooks concurrently; failures are collected, never thrown. */
@@ -143,10 +191,5 @@ export async function runAdapterTeardowns(
   ctx: AdapterSetupContext,
   logger: Logger,
 ): Promise<AdapterSetupResult> {
-  const outcomes = await Promise.allSettled(
-    entries.map(async (entry) => {
-      await entry.run(ctx);
-    }),
-  );
-  return toResult(entries, outcomes, logger, "teardown");
+  return await runHooks(entries, ctx, logger, "teardown", SLOW_TEARDOWN_MS);
 }

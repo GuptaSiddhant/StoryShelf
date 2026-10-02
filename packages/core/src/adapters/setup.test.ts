@@ -130,6 +130,31 @@ describe("adapter lifecycle runner", () => {
     const result = await runAdapterSetups(collectSetups({ database, storage }), ctx, silentLogger);
     expect(result.failures[0]?.error).toBe("plain string failure");
   });
+
+  it("logs per-hook start and done with duration", async () => {
+    const info = vi.fn();
+    const logger = { info, warn: vi.fn(), error: vi.fn() } as never;
+    const entries = [
+      {
+        category: "storage",
+        kind: "local",
+        name: "Local",
+        run: async (): Promise<void> => {
+          await Promise.resolve();
+        },
+      },
+    ];
+    const result = await runAdapterSetups(entries, ctx, logger);
+    expect(result.ok).toBe(true);
+    expect(info).toHaveBeenCalledWith(
+      { category: "storage", kind: "local", name: "Local" },
+      "adapter hook start",
+    );
+    const done = info.mock.calls.find((call) => call[1] === "adapter hook done")?.[0] as
+      | { durationMs?: unknown }
+      | undefined;
+    expect(typeof done?.durationMs).toBe("number");
+  });
 });
 
 describe("bindAdapterLoggers", () => {

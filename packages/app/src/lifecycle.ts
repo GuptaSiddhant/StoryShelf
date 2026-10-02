@@ -47,7 +47,11 @@ function kickSetup(
       logger.error({ failures: invalid }, "adapter validation failed");
       return { ok: false, failures: invalid };
     }
-    await options.auth?.setup?.();
+    const authFailed = await runAuthSetup(options);
+    if (authFailed) {
+      logger.error({ failures: authFailed.failures }, "auth setup failed");
+      return authFailed;
+    }
     return await runAdapterSetups(collectSetups(options), ctx, logger);
   })();
   trackSettlement(cell, cell.ready);
@@ -76,7 +80,20 @@ function startBranchGcInterval(
   return startBranchGcTimer(options.database, options.storage, runtime.config, runtime.logger);
 }
 
-/** Validation failure result, settling the cell and throwing — null when valid. */
+/** Run auth boot validation, returning a failure result instead of throwing. */
+async function runAuthSetup(options: ShelfOptions): Promise<AdapterSetupResult | null> {
+  try {
+    await options.auth?.setup?.();
+    return null;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      ok: false,
+      failures: [{ category: "auth", kind: "auth", name: "auth", error: message }],
+    };
+  }
+}
+/** Validation failure settled on the cell — null when the assembly is sound. */
 function invalidSources(options: ShelfOptions, cell: LifecycleCell): AdapterSetupResult | null {
   const invalid = validateAdapterSources(options);
   if (invalid.length === 0) {

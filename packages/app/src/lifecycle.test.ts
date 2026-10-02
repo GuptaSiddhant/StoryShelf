@@ -1,5 +1,5 @@
 import type { ShelfOptions } from "@storyshelf/core/config";
-import { makeDatabase } from "@storyshelf/core/test-helpers";
+import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
 import { describe, expect, it, vi } from "vitest";
 import type { ShelfRouter } from "./app-types.ts";
@@ -67,5 +67,31 @@ describe("attachLifecycle", () => {
     expect(result.failures[0]?.category).toBe("storage");
     const lifecycle = (app as unknown as { lifecycle: { setup(): Promise<void> } }).lifecycle;
     await expect(lifecycle.setup()).rejects.toThrow("Adapter setup failed");
+  });
+
+  it("preserves the auth setup cause in readiness failures", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const options = {
+      database: db,
+      storage,
+      auth: {
+        setup: async (): Promise<void> => {
+          throw new Error("bad secret");
+        },
+      },
+    } as unknown as ShelfOptions;
+    const runtime = {
+      config: { branchTtlDays: null },
+      logger: silentLogger,
+    } as unknown as ServerRuntime;
+    const cell: LifecycleCell = {
+      ready: Promise.resolve({ ok: true, failures: [] }),
+      settled: null,
+    };
+    attachLifecycle({} as ShelfRouter, options, runtime, cell);
+    const result = await cell.ready;
+    expect(result.ok).toBe(false);
+    expect(result.failures[0]).toMatchObject({ category: "auth", error: "bad secret" });
   });
 });
