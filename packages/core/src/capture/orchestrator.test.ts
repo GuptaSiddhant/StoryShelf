@@ -153,6 +153,36 @@ describe("executeCaptureJob", () => {
     expect(updatedBuild?.status).toBe("failed");
   });
 
+  it("cancels the runner and fails the build when render times out", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const project = await new ProjectModel(db, tables(db)).create({ name: "Orchestrator" });
+    const build = await new BuildModel(db, tables(db)).create(project.id, {
+      gitSha: "sha-abc",
+      gitBranch: "main",
+    });
+    await storage.write(storybookZipPath(project.id, build.id), zipWithIndex());
+    const cancel = vi.fn(async () => {
+      await Promise.resolve();
+    });
+    const hanging = new Promise<RenderResult>(() => {});
+    const { runner } = fakeRunner({
+      render: vi.fn(async () => await hanging),
+      cancel,
+    });
+
+    await expect(
+      executeCaptureJob(
+        { buildId: build.id },
+        { db, tables: tables(db), storage, runner, scratchDir, renderTimeoutMs: 50 },
+      ),
+    ).rejects.toThrow("timed out");
+
+    expect(cancel).toHaveBeenCalledWith(build.id);
+    const timedOut = await db.get(db.tables.builds, build.id);
+    expect(timedOut?.status).toBe("failed");
+  });
+
   it("persists statics before render so preview survives render failure", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
