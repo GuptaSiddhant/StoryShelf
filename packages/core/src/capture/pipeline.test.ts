@@ -77,10 +77,12 @@ function captureFor(story: StoryEntry, screenshot: Buffer): RenderedSnapshot {
 
 async function makeContext(options: {
   captures: RenderedSnapshot[];
+  isDefault?: boolean;
 }): Promise<{ ctx: CaptureContext; objects: Map<string, Buffer> }> {
   const { db } = makeDatabase();
   const { storage, objects } = makeStorage();
-  await db.insert(db.tables.builds, mockBuild);
+  const build: Build = { ...mockBuild, isDefault: options.isDefault ?? true };
+  await db.insert(db.tables.builds, build);
   const ctx: CaptureContext = {
     db,
     tables: {
@@ -91,7 +93,7 @@ async function makeContext(options: {
     },
     storage,
     project: mockProject,
-    build: mockBuild,
+    build,
     viewports: [DEFAULT_VIEWPORT],
     captures: options.captures,
   };
@@ -159,6 +161,7 @@ describe("persistCapture", () => {
   it("fails the diff without writing an overlay when only the size changed", async () => {
     const { ctx } = await makeContext({
       captures: [captureFor(storyOf("a"), png(4, 3, [0, 255, 0]))],
+      isDefault: false,
     });
     await seedBaseline(ctx);
 
@@ -173,8 +176,52 @@ describe("persistCapture", () => {
     expect(build?.status).toBe("reviewing");
   });
 
-  it("keeps build in reviewing status when no captures occur", async () => {
+  it("auto-approves changed snapshots on the default branch and re-baselines", async () => {
+    const { ctx } = await makeContext({
+      captures: [captureFor(storyOf("a"), png(4, 4, [0, 255, 0]))],
+    });
+    await seedBaseline(ctx);
+
+    await persistCapture(ctx);
+
+    const rows = await ctx.db.list(ctx.db.tables.snapshots);
+    expect(rows.map((row) => row.status)).toEqual(["approved"]);
+    expect(rows.map((row) => row.diffPassed)).toEqual([false]);
+    const build = await ctx.db.get(ctx.db.tables.builds, "b1");
+    expect(build?.status).toBe("approved");
+    const baselines = await ctx.db.list(ctx.db.tables.baselines);
+    expect(baselines).toHaveLength(1);
+    expect(baselines[0]?.snapshotId).toBe(rows[0]?.id);
+  });
+
+  it("keeps changed snapshots in review on a feature branch", async () => {
+    const { ctx } = await makeContext({
+      captures: [captureFor(storyOf("a"), png(4, 4, [0, 255, 0]))],
+      isDefault: false,
+    });
+    await seedBaseline(ctx);
+
+    await persistCapture(ctx);
+
+    const rows = await ctx.db.list(ctx.db.tables.snapshots);
+    expect(rows.map((row) => row.status)).toEqual(["changed"]);
+    const build = await ctx.db.get(ctx.db.tables.builds, "b1");
+    expect(build?.status).toBe("reviewing");
+    const baselines = await ctx.db.list(ctx.db.tables.baselines);
+    expect(baselines[0]?.snapshotId).toBe("snap1");
+  });
+
+  it("approves a default-branch build with no captures", async () => {
     const { ctx } = await makeContext({ captures: [] });
+
+    await persistCapture(ctx, new Set());
+
+    const build = await ctx.db.get(ctx.db.tables.builds, "b1");
+    expect(build?.status).toBe("approved");
+  });
+
+  it("keeps a feature-branch build in reviewing status when no captures occur", async () => {
+    const { ctx } = await makeContext({ captures: [], isDefault: false });
 
     await persistCapture(ctx, new Set());
 

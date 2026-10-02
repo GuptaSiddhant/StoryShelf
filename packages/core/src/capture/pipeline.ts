@@ -11,7 +11,7 @@ import { SnapshotModel, type SnapshotTables } from "../models/snapshot.ts";
 import type { Baseline } from "../schema/baseline.ts";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
-import type { BuildStatus } from "../types.ts";
+import type { BuildStatus, SnapshotStatus } from "../types.ts";
 import { diffPath, screenshotPath } from "../utils/paths.ts";
 import type { Viewport } from "./adapter.ts";
 import type { InheritedStory } from "./affected.ts";
@@ -315,7 +315,7 @@ async function createWithBaseline(
     baseline.infraHash !== null &&
     baseline.infraHash !== infraHash;
 
-  const status = shouldAutomigrate ? "unchanged" : result.passed ? "unchanged" : "changed";
+  const status = shouldAutomigrate ? "unchanged" : diffStatus(result.passed, ctx.build.isDefault);
   const diff = diffPath(ctx.project.id, ctx.build.id, capture.story.id, capture.viewportName);
   const passed = shouldAutomigrate ? true : result.passed;
   const pixels = shouldAutomigrate ? 0 : result.diffPixels;
@@ -331,18 +331,53 @@ async function createWithBaseline(
     diffPassed: passed,
     infraHash,
   });
-  if (shouldAutomigrate && ctx.build.isDefault) {
-    const baselines = new BaselineModel(ctx.db, ctx.tables, ctx.storage, ctx.secret);
-    await baselines.upsert(
-      ctx.project.id,
-      capture.story.id,
-      capture.viewportName,
-      ctx.build.gitBranch,
-      snapshot.id,
-      screenshot,
-      infraHash,
-    );
+  if (ctx.build.isDefault && (shouldAutomigrate || !passed)) {
+    await upsertDefaultBaseline(ctx, snapshot.id, capture, screenshot, infraHash);
   }
+}
+
+/** Default-branch builds are authoritative: the captured screenshot becomes the baseline. */
+async function upsertDefaultBaseline(
+  ctx: CaptureContext,
+  snapshotId: string,
+  capture: RenderedSnapshot,
+  screenshot: string,
+  infraHash: string,
+): Promise<void> {
+  const baselines = new BaselineModel(ctx.db, ctx.tables, ctx.storage, ctx.secret);
+  await baselines.upsert(
+    ctx.project.id,
+    capture.story.id,
+    capture.viewportName,
+    ctx.build.gitBranch,
+    snapshotId,
+    screenshot,
+    infraHash,
+  );
+}
+
+/** Snapshot status after diffing: default-branch changes are auto-approved, not queued for review. */
+function diffStatus(passed: boolean, isDefault: boolean): SnapshotStatus {
+  if (passed) {
+    return "unchanged";
+  }
+  return isDefault ? "approved" : "changed";
+}
+
+/** A failed capture fails the build; default-branch builds otherwise auto-approve. */
+function finalBuildStatus(
+  isDefault: boolean,
+  failedCount: number,
+  hasCaptures: boolean,
+  build: { changedCount: number },
+): BuildStatus {
+  if (failedCount > 0) {
+    return "failed";
+  }
+  if (isDefault || (hasCaptures && build.changedCount === 0)) {
+    return "approved";
+  }
+  return "reviewing";
 }
 
 async function finalize(
@@ -355,12 +390,7 @@ async function finalize(
   const builds = new BuildModel(ctx.db, ctx.tables);
   const build = await builds.updateCounts(ctx.build.id);
   const hasCaptures = storyIds.size > 0;
-  let status: BuildStatus = "reviewing";
-  if (failedStoryIds.size > 0) {
-    status = "failed";
-  } else if (hasCaptures && build.changedCount === 0) {
-    status = "approved";
-  }
+  const status = finalBuildStatus(ctx.build.isDefault, failedStoryIds.size, hasCaptures, build);
   // Flaky and a11y failures do not block: log warning if any failed non-blocking
   if (flakyFailedStoryIds.size > 0 && failedStoryIds.size === 0) {
     ctx.logger?.warn(
