@@ -11,6 +11,7 @@ import {
 import type { AdapterSetupResult } from "@storyshelf/core/adapter/setup";
 import type { ShelfOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
+import { sanitizeErrorText } from "@storyshelf/core/utils";
 import type { ShelfRouter, ShelfLifecycle } from "./app-types.ts";
 import { startBranchGcTimer } from "./retention-timer.ts";
 import type { ServerRuntime } from "./runtime.ts";
@@ -89,7 +90,9 @@ async function runAuthSetup(options: ShelfOptions): Promise<AdapterSetupResult |
     const message = error instanceof Error ? error.message : String(error);
     return {
       ok: false,
-      failures: [{ category: "auth", kind: "auth", name: "auth", error: message }],
+      failures: [
+        { category: "auth", kind: "auth", name: "auth", error: sanitizeErrorText(message, 500) },
+      ],
     };
   }
 }

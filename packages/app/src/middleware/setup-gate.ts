@@ -1,5 +1,6 @@
 import type { AdapterSetupResult } from "@storyshelf/core/adapter/setup";
 import type { ShelfOptions } from "@storyshelf/core/config";
+import { sanitizeErrorText } from "@storyshelf/core/utils";
 import type { Context, Next } from "hono";
 import type { QueueWiring } from "../capture-setup.ts";
 import type { ServerRuntime } from "../runtime.ts";
@@ -9,14 +10,14 @@ export interface MiddlewareWiring extends ServerRuntime, QueueWiring {
   getReady: () => Promise<AdapterSetupResult>;
 }
 
-/** Failures safe to expose on the setup gate's 503 (no secrets). */
+/** Failures safe to expose on the setup gate's 503 (redacted, no secrets). */
 function publicFailures(
   result: AdapterSetupResult,
 ): { category: string; kind: string; error: string }[] {
   return result.failures.map((failure) => ({
     category: failure.category,
     kind: failure.kind,
-    error: failure.error,
+    error: sanitizeErrorText(failure.error, 500),
   }));
 }
 

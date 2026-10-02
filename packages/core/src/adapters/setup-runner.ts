@@ -1,4 +1,5 @@
 import type { Logger } from "pino";
+import { sanitizeErrorText } from "../utils/redact.ts";
 import type { AdapterLifecycle, AdapterMetadata, AdapterSetupContext } from "./metadata.ts";
 import type {
   AdapterSetupFailure,
@@ -95,7 +96,8 @@ export function bindAdapterLoggers(sources: AdapterSetupSources, logger: Logger)
 }
 
 function messageOf(reason: unknown): string {
-  return reason instanceof Error ? reason.message : String(reason);
+  const text = reason instanceof Error ? reason.message : String(reason);
+  return sanitizeErrorText(text, 500);
 }
 
 /** Budgets that trigger slow-hook warnings (observe only, never abort). */

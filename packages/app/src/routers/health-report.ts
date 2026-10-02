@@ -12,6 +12,7 @@ import type {
  * and secret-free (details are truncated, never raw config).
  */
 import type { AdapterSetupResult, AdapterSetupSources } from "@storyshelf/core/adapter/setup";
+import { sanitizeErrorText } from "@storyshelf/core/utils";
 
 export type AdapterState = "ok" | "starting" | "failed";
 
@@ -63,7 +64,7 @@ function targetsOf(sources: AdapterSetupSources): ProbeTarget[] {
 }
 
 function sanitize(detail: string): string {
-  return detail.length > DETAIL_MAX_LENGTH ? detail.slice(0, DETAIL_MAX_LENGTH) : detail;
+  return sanitizeErrorText(detail, DETAIL_MAX_LENGTH);
 }
 
 function messageOf(reason: unknown): string {
