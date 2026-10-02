@@ -69,15 +69,29 @@ async function seededApp(): Promise<{ app: ReturnType<typeof createShelfApp> }> 
   return { app };
 }
 
+async function slugApp(builds: Partial<Build>[]) {
+  const { db } = makeDatabase();
+  const { storage, objects } = makeStorage();
+  await db.insert(db.tables.projects, mockProject());
+  await Promise.all(builds.map((build) => db.insert(db.tables.builds, mockBuild(build))));
+  for (const build of builds) {
+    const dir = storybookDir("p1", build.id ?? "b1");
+    objects.set(`${dir}/index.html`, Buffer.from(`<html>${build.id}</html>`));
+    objects.set(`${dir}/iframe.html`, Buffer.from("<html>preview</html>"));
+  }
+  const app = createShelfApp({ database: db, storage, logger: silentLogger });
+  return { app };
+}
+
 describe("storybook routes", () => {
-  it("resolves the default Published Storybook to the latest public build", async () => {
+  it("resolves the project Storybook to the latest approved default-branch build", async () => {
     const { app } = await seededApp();
     const response = await app.request("/projects/test-project/storybook");
     expect(response.status).toBe(302);
     expect(response.headers.get("location")).toBe("/projects/test-project/storybook/build/b1/");
   });
 
-  it("returns 404 when no published build exists", async () => {
+  it("returns 404 when no approved default-branch build exists", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
     await db.insert(db.tables.projects, mockProject());
@@ -222,11 +236,54 @@ describe("storybook routes", () => {
     expect(response.headers.get("location")).toBe(`/_/${ulid}/`);
   });
 
-  it("short link renders index.html for a project slug (latest published)", async () => {
+  it("short link renders index.html for a project slug (latest approved default build)", async () => {
     const { app } = await seededApp();
     const response = await app.request("/_/test-project/");
     expect(response.status).toBe(200);
     expect(await response.text()).toBe("<html>storybook</html>");
+  });
+
+  it("slug link ignores a newer approved feature-branch build", async () => {
+    const { app } = await slugApp([
+      { id: "main1", public: true, createdAt: "2026-01-01T00:00:00.000Z" },
+      {
+        id: "feat1",
+        gitBranch: "feature/x",
+        isDefault: false,
+        public: true,
+        createdAt: "2026-02-01T00:00:00.000Z",
+      },
+    ]);
+    const response = await app.request("/_/test-project/");
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("<html>main1</html>");
+  });
+
+  it("slug link skips unapproved default-branch builds", async () => {
+    const { app } = await slugApp([
+      { id: "ok1", public: true, createdAt: "2026-01-01T00:00:00.000Z" },
+      { id: "bad1", public: true, status: "failed", createdAt: "2026-02-01T00:00:00.000Z" },
+      { id: "rev1", public: true, status: "reviewing", createdAt: "2026-03-01T00:00:00.000Z" },
+    ]);
+    const response = await app.request("/_/test-project/");
+    expect(await response.text()).toBe("<html>ok1</html>");
+  });
+
+  it("slug link returns 404 when only feature or unapproved builds exist", async () => {
+    const { app } = await slugApp([
+      { id: "feat1", gitBranch: "feature/x", isDefault: false, public: true },
+      { id: "rev1", public: true, status: "reviewing", createdAt: "2026-03-01T00:00:00.000Z" },
+    ]);
+    expect((await app.request("/_/test-project/")).status).toBe(404);
+  });
+
+  it("build-id link serves a failed or unreviewed build when it is visible", async () => {
+    const { app } = await slugApp([
+      { id: "01ARZ3NDEKTSV4RRFFQ69G5FAV", public: true, status: "failed", gitBranch: "feature/x" },
+    ]);
+    const response = await app.request("/_/01ARZ3NDEKTSV4RRFFQ69G5FAV/");
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("<html>01ARZ3NDEKTSV4RRFFQ69G5FAV</html>");
   });
 
   it("short link returns 404 for unknown build and slug", async () => {

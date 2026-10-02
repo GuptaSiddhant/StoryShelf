@@ -101,18 +101,22 @@ export class BuildModel {
     })) as unknown as Build[];
   }
 
-  /** Return the most recent build intended for publishing, if any. */
-  async latestPublished(project: {
+  /**
+   * Return the build a project-slug Storybook link resolves to: the most recent
+   * `approved` build on the project's default branch. Approved builds on other
+   * branches never qualify (their PR can still be dismissed), and neither do
+   * pending, failed, or unreviewed default-branch builds. Visibility (public or
+   * authenticated) is checked separately by the caller.
+   */
+  async latestApprovedDefault(project: {
     id: string;
-    publicBranchRegex: string | null;
+    gitDefaultBranch: string;
   }): Promise<Build | null> {
-    const rows = await this.list(project.id);
-    for (const build of rows) {
-      if (isPublicBuild(project, build)) {
-        return build;
-      }
-    }
-    return null;
+    const rows = await this.list(project.id, {
+      branch: project.gitDefaultBranch,
+      status: "approved",
+    });
+    return rows[0] ?? null;
   }
 
   async update(
