@@ -1,5 +1,6 @@
 import type { SQL, Table } from "drizzle-orm";
 import type { DatabaseAdapter, ListOptions, TxStore } from "../adapters/database.ts";
+import { clampListLimit } from "../adapters/database.ts";
 import { fakeSchema } from "./fake-tables.ts";
 import { orderRows, whereMatches } from "./sql-chunks.ts";
 
@@ -73,7 +74,7 @@ export function makeDatabase(): { db: DatabaseAdapter } {
       current = orderRows(current, opts.orderBy, table);
     }
     if (opts.limit !== undefined) {
-      current = current.slice(0, opts.limit);
+      current = current.slice(0, clampListLimit(opts.limit));
     }
     return current as T["$inferSelect"][];
   };

@@ -47,6 +47,11 @@ function zipWithIndex(): Buffer {
   return zip.toBuffer();
 }
 
+function pngBytes(): Buffer {
+  const header = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  return Buffer.concat([header, Buffer.alloc(100)]);
+}
+
 function fakeRunner(overrides: Partial<CaptureRunner> = {}): {
   runner: CaptureRunner;
   render: ReturnType<typeof vi.fn>;
@@ -62,7 +67,7 @@ function fakeRunner(overrides: Partial<CaptureRunner> = {}): {
           type: "story",
         },
         viewportName: "desktop",
-        screenshot: Buffer.from([0, 1, 2]),
+        screenshot: pngBytes(),
       },
     ],
     failures: [],

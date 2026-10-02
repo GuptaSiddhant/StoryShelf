@@ -60,6 +60,7 @@ function fakeRunner(render: CaptureRunner["render"]): CaptureRunner {
 function successRender(): CaptureRunner["render"] {
   return vi.fn(async () => {
     await Promise.resolve();
+    const header = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
     return {
       captures: [
         {
@@ -71,7 +72,7 @@ function successRender(): CaptureRunner["render"] {
             type: "story" as const,
           },
           viewportName: "desktop",
-          screenshot: Buffer.from([0, 1, 2]),
+          screenshot: Buffer.concat([header, Buffer.alloc(100)]),
         },
       ],
       failures: [],

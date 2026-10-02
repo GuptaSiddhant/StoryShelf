@@ -15,6 +15,7 @@ import type { BuildStatus } from "../types.ts";
 import { diffPath, screenshotPath } from "../utils/paths.ts";
 import type { Viewport } from "./adapter.ts";
 import type { InheritedStory } from "./affected.ts";
+import { assertScreenshotBuffer } from "./guards.ts";
 import { infraHashFor, SIZING_DEFAULTS } from "./sizing.ts";
 
 /**
@@ -207,6 +208,7 @@ function viewportByName(ctx: CaptureContext, name: string): Viewport {
 }
 
 async function persistSnapshot(ctx: CaptureContext, capture: RenderedSnapshot): Promise<void> {
+  assertScreenshotBuffer(capture.screenshot);
   const viewport = capture.viewport ?? viewportByName(ctx, capture.viewportName);
   const screenshot = screenshotPath(
     ctx.project.id,

@@ -7,6 +7,7 @@
  * the lifecycle runner returns failures without executing hooks.
  */
 import { z } from "zod";
+import { REQUIRED_TABLE_KEYS } from "./database.ts";
 import type { AdapterSetupFailure, AdapterSetupSources } from "./setup.ts";
 
 const metadataSchema = z.object({
@@ -17,20 +18,6 @@ const metadataSchema = z.object({
 });
 
 const DATABASE_METHODS = ["insert", "update", "get", "remove", "list", "count", "all"];
-
-const DATABASE_TABLES = [
-  "projects",
-  "builds",
-  "snapshots",
-  "baselines",
-  "comments",
-  "labelTypes",
-  "buildLabels",
-  "tokens",
-  "webhooks",
-  "users",
-  "projectMembers",
-];
 
 const STORAGE_METHODS = ["read", "write", "delete", "exists", "list", "writeStream", "readStream"];
 
@@ -87,7 +74,7 @@ function tableReasons(adapter: Record<string, unknown>): string[] {
   if (!tables) {
     return ["missing tables map"];
   }
-  const missing = DATABASE_TABLES.filter((table) => tables[table] === undefined);
+  const missing = REQUIRED_TABLE_KEYS.filter((table) => tables[table] === undefined);
   return missing.length > 0 ? [`missing tables: ${missing.join(",")}`] : [];
 }
 

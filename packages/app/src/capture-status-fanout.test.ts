@@ -47,7 +47,10 @@ function fakeRunner(overrides: Partial<CaptureRunner> = {}): {
           type: "story",
         },
         viewportName: "desktop",
-        screenshot: Buffer.from([0, 1, 2]),
+        screenshot: Buffer.concat([
+          Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+          Buffer.alloc(100),
+        ]),
       },
     ],
     failures: [],

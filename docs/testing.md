@@ -40,6 +40,12 @@ Rules:
 
 - Fake the transport, never the adapter: inject fake S3/SQS/Redis/pg clients,
   temp dirs, or `:memory:` DBs. No network in `nub run test`.
+- Prove conformance with the published suites: `storageContractSuite` /
+  `databaseContractSuite` from `@storyshelf/core/test-helpers` (one line in
+  the package's own test file; queue/runner/git suites follow in later phases).
+- Core validates untrusted input at the boundary: storage path segments
+  (`paths.ts`), screenshot bytes (`capture/guards.ts`: PNG magic + 25 MiB cap),
+  list limits (`clampListLimit`, max 1000).
 - Idempotency is asserted, not assumed: run `setup`, `teardown`, `migrate`,
   and `enqueue`-retry twice.
 - Indirect coverage allowed only for pure mappers (e.g. `git-github`

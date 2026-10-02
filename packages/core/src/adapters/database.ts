@@ -33,6 +33,35 @@ export interface Tables {
   contentRefs: Table;
 }
 
+/** Table keys every DatabaseAdapter must expose (contract + validation share this). */
+export const REQUIRED_TABLE_KEYS = [
+  "projects",
+  "builds",
+  "snapshots",
+  "baselines",
+  "comments",
+  "labelTypes",
+  "buildLabels",
+  "tokens",
+  "webhooks",
+  "users",
+  "projectMembers",
+];
+
+/** Largest page any adapter serves in one list call. */
+export const MAX_LIST_LIMIT = 1000;
+
+/** Clamp a list limit into [1, MAX_LIST_LIMIT]; undefined stays undefined. */
+export function clampListLimit(limit?: number): number | undefined {
+  if (limit === undefined) {
+    return undefined;
+  }
+  if (!Number.isFinite(limit)) {
+    return MAX_LIST_LIMIT;
+  }
+  return Math.min(Math.max(Math.floor(limit), 1), MAX_LIST_LIMIT);
+}
+
 /** Options that narrow and page a list query. */
 export interface ListOptions {
   /** SQL WHERE condition. */
