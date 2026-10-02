@@ -75,6 +75,38 @@ async function seededLibraryApp(index: unknown): Promise<ReturnType<typeof creat
   return createShelfApp({ database: db, storage, logger: silentLogger });
 }
 
+async function twoBranchLibraryApp(): Promise<ReturnType<typeof createShelfApp>> {
+  const { db } = makeDatabase();
+  const { storage } = makeStorage();
+  await db.insert(db.tables.projects, mockProject());
+  const builds = [
+    mockBuild({ id: "bmain" }),
+    mockBuild({
+      id: "bfeat",
+      gitBranch: "feature/x",
+      isDefault: false,
+      createdAt: "2026-02-01T00:00:00.000Z",
+    }),
+  ];
+  await Promise.all(builds.map((build) => db.insert(db.tables.builds, build)));
+  await Promise.all(
+    builds.map((build) =>
+      db.insert(db.tables.snapshots, {
+        id: `snap-${build.id}`,
+        projectId: "p1",
+        buildId: build.id,
+        storyId: "components-button--primary",
+        storyName: "Primary",
+        storyTitle: "Components/Button",
+        screenshotPath: `p1/builds/${build.id}/screenshots/s/desktop.png`,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      }),
+    ),
+  );
+  return createShelfApp({ database: db, storage, logger: silentLogger });
+}
+
 const indexWithDocs = {
   v: 5,
   entries: {
@@ -106,6 +138,21 @@ const indexWithoutDocs = {
 };
 
 describe("library routes", () => {
+  it("links View Storybook to the latest build of the default branch by default", async () => {
+    const app = await twoBranchLibraryApp();
+    const body = await (await app.request("/projects/test-project/library")).text();
+    expect(body).toContain('href="/_/bmain/"');
+    expect(body).not.toContain('href="/_/bfeat/"');
+  });
+
+  it("links View Storybook to the latest build of the selected branch", async () => {
+    const app = await twoBranchLibraryApp();
+    const response = await app.request("/projects/test-project/library?branch=feature%2Fx");
+    const body = await response.text();
+    expect(body).toContain('href="/_/bfeat/"');
+    expect(body).not.toContain('href="/_/test-project/"');
+  });
+
   it("renders a Docs link when the build index has a docs entry for the story", async () => {
     const app = await seededLibraryApp(indexWithDocs);
     const response = await app.request("/projects/test-project/library");
