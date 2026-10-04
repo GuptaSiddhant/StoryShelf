@@ -39,6 +39,14 @@ const TOKEN_USER_ALTER =
   "ALTER TABLE tokens ADD COLUMN IF NOT EXISTS user_id TEXT REFERENCES users(id) ON DELETE CASCADE";
 const MEMBER_SOURCE_ALTER =
   "ALTER TABLE project_members ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'manual'";
+/**
+ * Re-runs share `(project_id, git_sha)` by design (ULID build ids), so the
+ * lookup index must not be unique. Existing databases created it UNIQUE —
+ * drop (MySQL syntax, no IF EXISTS) and recreate it plain.
+ */
+const BUILDS_GITSHA_DEDUP = "DROP INDEX builds_project_gitsha_idx ON builds";
+const BUILDS_GITSHA_INDEX =
+  "CREATE INDEX builds_project_gitsha_idx ON builds (project_id, git_sha)";
 
 async function migrateProjectExtras(run: MigrationRunner): Promise<void> {
   await execIgnore(run, EXECUTE_PLAY_ALTER);
@@ -70,6 +78,8 @@ async function migrateCoreColumns(run: MigrationRunner): Promise<void> {
   await execIgnore(run, WEBHOOK_SECRET_DROP);
   await execIgnore(run, TOKEN_USER_ALTER);
   await execIgnore(run, MEMBER_SOURCE_ALTER);
+  await execIgnore(run, BUILDS_GITSHA_DEDUP);
+  await execIgnore(run, BUILDS_GITSHA_INDEX);
 }
 
 async function execIgnore(run: MigrationRunner, sql: string): Promise<void> {

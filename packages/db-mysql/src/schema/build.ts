@@ -1,13 +1,5 @@
 import type { BuildStatus } from "@storyshelf/core/types";
-import {
-  boolean,
-  index,
-  int,
-  mysqlTable,
-  text,
-  datetime,
-  uniqueIndex,
-} from "drizzle-orm/mysql-core";
+import { boolean, index, int, mysqlTable, text, datetime } from "drizzle-orm/mysql-core";
 import { projects } from "./project.ts";
 
 /** Narrow `builds` table definition. */
@@ -38,7 +30,7 @@ export const builds = mysqlTable(
     updatedAt: datetime("updated_at", { mode: "string", fsp: 3 }).notNull(),
   },
   (t) => [
-    uniqueIndex("builds_project_gitsha_idx").on(t.projectId, t.gitSha),
+    index("builds_project_gitsha_idx").on(t.projectId, t.gitSha),
     index("builds_git_branch_idx").on(t.gitBranch),
   ],
 );

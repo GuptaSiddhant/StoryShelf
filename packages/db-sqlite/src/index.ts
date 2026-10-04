@@ -43,6 +43,15 @@ export function createSqliteDatabase(path: string): DatabaseAdapter {
 
 const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN secret";
 
+/**
+ * Re-runs share `(project_id, git_sha)` by design (ULID build ids), so the
+ * lookup index must not be unique. Existing databases created it UNIQUE —
+ * drop and recreate it plain.
+ */
+const BUILDS_GITSHA_DEDUP = "DROP INDEX IF EXISTS builds_project_gitsha_idx";
+const BUILDS_GITSHA_INDEX =
+  "CREATE INDEX IF NOT EXISTS builds_project_gitsha_idx ON builds (project_id, git_sha)";
+
 type ProxyMethod = "run" | "all" | "values" | "get";
 
 /**
@@ -140,9 +149,20 @@ function runMigrations(sqlite: DatabaseSync): void {
   } catch {
     // already migrated — ignore
   }
+  migrateBuildsGitShaIndex(sqlite);
   try {
     migrateCommentsTable(sqlite);
   } catch {
     execIgnore(sqlite, "PRAGMA foreign_keys = ON");
+  }
+}
+
+/** Downgrade a legacy UNIQUE project/sha index to a plain lookup index. */
+function migrateBuildsGitShaIndex(sqlite: DatabaseSync): void {
+  try {
+    sqlite.exec(BUILDS_GITSHA_DEDUP);
+    sqlite.exec(BUILDS_GITSHA_INDEX);
+  } catch {
+    // already migrated — ignore
   }
 }

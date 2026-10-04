@@ -233,6 +233,47 @@ describe("createSqliteDatabase", () => {
     await closeDb(db);
   });
 
+  it("allows re-runs sharing project and git sha (ULID build ids)", async () => {
+    const db = createSqliteDatabase(":memory:");
+    await initDb(db);
+    const now = new Date().toISOString();
+    await db.insert(schema.projects, {
+      id: "p1",
+      name: "Demo",
+      slug: "demo",
+      createdAt: now,
+      updatedAt: now,
+    });
+    await db.insert(schema.builds, {
+      id: "b1",
+      projectId: "p1",
+      gitSha: "sha",
+      gitBranch: "feature/smoke",
+      createdAt: now,
+      updatedAt: now,
+    });
+    await db.insert(schema.builds, {
+      id: "b2",
+      projectId: "p1",
+      gitSha: "sha",
+      gitBranch: "feature/smoke",
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    expect(await db.get(schema.builds, "b1")).not.toBeNull();
+    expect(await db.get(schema.builds, "b2")).not.toBeNull();
+
+    const indexSql = await db.all<[string]>(
+      sql`SELECT sql FROM sqlite_master WHERE name = 'builds_project_gitsha_idx'`,
+    );
+    const definition = indexSql[0]?.[0] ?? "";
+    expect(definition).toContain("CREATE INDEX");
+    expect(definition).not.toContain("UNIQUE");
+
+    await closeDb(db);
+  });
+
   it("commits transact writes and returns the callback value", async () => {
     const db = createSqliteDatabase(":memory:");
     await initDb(db);

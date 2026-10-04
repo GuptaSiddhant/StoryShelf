@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS builds (
   created_at DATETIME(3) NOT NULL,
   updated_at DATETIME(3) NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS builds_project_gitsha_idx ON builds (project_id, git_sha);
+CREATE INDEX IF NOT EXISTS builds_project_gitsha_idx ON builds (project_id, git_sha);
 CREATE INDEX IF NOT EXISTS builds_git_branch_idx ON builds (git_branch);
 CREATE TABLE IF NOT EXISTS capture_attempts (
   id TEXT PRIMARY KEY,

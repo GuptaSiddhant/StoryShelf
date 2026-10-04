@@ -1,5 +1,5 @@
 import type { BuildStatus } from "@storyshelf/core/types";
-import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { projects } from "./project.ts";
 
 /** Narrow `builds` table definition. */
@@ -30,7 +30,7 @@ export const builds = sqliteTable(
     updatedAt: text("updated_at").notNull(),
   },
   (t) => [
-    uniqueIndex("builds_project_gitsha_idx").on(t.projectId, t.gitSha),
+    index("builds_project_gitsha_idx").on(t.projectId, t.gitSha),
     index("builds_git_branch_idx").on(t.gitBranch),
   ],
 );

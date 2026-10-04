@@ -1,13 +1,5 @@
 import type { BuildStatus } from "@storyshelf/core/types";
-import {
-  boolean,
-  index,
-  integer,
-  pgTable,
-  text,
-  timestamp,
-  uniqueIndex,
-} from "drizzle-orm/pg-core";
+import { boolean, index, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { projects } from "./project.ts";
 
 /** Narrow `builds` table definition. */
@@ -38,7 +30,7 @@ export const builds = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull(),
   },
   (t) => [
-    uniqueIndex("builds_project_gitsha_idx").on(t.projectId, t.gitSha),
+    index("builds_project_gitsha_idx").on(t.projectId, t.gitSha),
     index("builds_git_branch_idx").on(t.gitBranch),
   ],
 );

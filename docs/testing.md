@@ -20,6 +20,15 @@
 
 Each adapter against its interface: SQLite via `:memory:` (Turso via a local libSQL stub), storage-local via a temp dir, storage-s3 via a recorded/fake client, auth via the engine adapter over `:memory:` SQLite.
 
+> Known environment limitation: `@libsql/client` (native binding ≤ 0.5.29)
+> segfaults at process teardown on current Node majors — even on a bare
+> `createClient({ url: "file:…" })` + `SELECT 1`. The Turso tests themselves
+> pass; the vitest worker then dies with `SIGSEGV`, failing the file. This
+> is upstream (`tursodatabase/libsql-client-ts` native instability), not a
+> repo regression: it reproduces on a pristine checkout with one client and
+> no test framework involved. If `db-sqlite` goes red with a worker
+> `SIGSEGV` in `turso.test.ts`, check the native binding first.
+
 #### 2a. Per-adapter testing requirements (mandatory)
 
 Every adapter package must satisfy this matrix. New adapters ship with all

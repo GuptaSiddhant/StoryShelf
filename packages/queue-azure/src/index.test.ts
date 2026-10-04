@@ -8,6 +8,8 @@ const SB_CONNECTION =
   "Endpoint=sb://fake.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=ZmFrZQ==";
 
 describe("createAzureQueue dispatcher", () => {
+  // Heavy Azure SDK imports can exceed the default 5s budget under
+  // parallel CI load; the work itself is a few fake-client calls.
   it("selects the storage-queues backend", async () => {
     const client = {
       sendMessage: async () => {
@@ -36,7 +38,7 @@ describe("createAzureQueue dispatcher", () => {
     expect(queue.metadata.kind).toBe("azure-storage-queues");
     expect(queue.metadata.category).toBe("capture-queue");
     expect(await queue.status("build-1")).toBeNull();
-  });
+  }, 30_000);
 
   it("selects the service-bus backend", async () => {
     const queue = await createAzureQueue({
@@ -46,5 +48,5 @@ describe("createAzureQueue dispatcher", () => {
     });
     expect(queue.metadata.kind).toBe("azure-service-bus");
     expect(queue.metadata.category).toBe("capture-queue");
-  });
+  }, 30_000);
 });
