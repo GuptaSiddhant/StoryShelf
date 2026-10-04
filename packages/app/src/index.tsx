@@ -24,6 +24,7 @@ import {
   resolveRequestUser,
   storeScope,
 } from "./middleware/index.ts";
+import { serverTiming } from "./middleware/server-timing.ts";
 import { setupGate, type MiddlewareWiring } from "./middleware/setup-gate.ts";
 import { registerAdminPages } from "./routers/admin-pages.ts";
 import { registerAdmin } from "./routers/admin.ts";
@@ -74,6 +75,9 @@ function assembleApp(app: ShelfApp, options: ShelfOptions, scoped: ShelfOptions)
   const runtime = resolveRuntime(options);
   const cell: LifecycleCell = { ready: Promise.resolve({ ok: true, failures: [] }), settled: null };
   attachLifecycle(app, options, runtime, cell);
+  if (runtime.config.serverTiming === true) {
+    app.use("*", serverTiming(true));
+  }
   const { queue, enqueueCapture } = setupCaptureQueue(
     scoped,
     runtime.config,

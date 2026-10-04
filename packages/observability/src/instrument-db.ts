@@ -8,6 +8,7 @@
  */
 import type { DatabaseAdapter, ListOptions, Tables } from "@storyshelf/core/adapter/database";
 import type { Logger } from "@storyshelf/core/logger";
+import { addTiming } from "@storyshelf/core/utils";
 import { getTableName, type SQL, type Table } from "drizzle-orm";
 import { dbMetrics } from "./metrics.ts";
 import { withSpan } from "./tracing.ts";
@@ -83,7 +84,9 @@ async function track<T>(operation: string, table: Table, fn: () => Promise<T>): 
   try {
     return await withSpan(operation, fn, { "db.table": tableName });
   } finally {
-    dbMetrics().operationDuration.record(performance.now() - start, {
+    const durationMs = performance.now() - start;
+    addTiming("db", durationMs);
+    dbMetrics().operationDuration.record(durationMs, {
       "db.operation": operation,
       "db.table": tableName,
     });
@@ -96,7 +99,9 @@ async function trackQuery<T>(operation: string, fn: () => Promise<T>): Promise<T
   try {
     return await withSpan(operation, fn);
   } finally {
-    dbMetrics().operationDuration.record(performance.now() - start, {
+    const durationMs = performance.now() - start;
+    addTiming("db", durationMs);
+    dbMetrics().operationDuration.record(durationMs, {
       "db.operation": operation,
     });
   }

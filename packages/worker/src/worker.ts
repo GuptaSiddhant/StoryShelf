@@ -10,6 +10,7 @@ import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import { createDispatchJob } from "@storyshelf/core/capture";
 import type { CaptureJobOptions, DispatchDeps } from "@storyshelf/core/capture";
 import { createShelfLogger, type Logger } from "@storyshelf/core/logger";
+import { roundedTimings, runWithTimings } from "@storyshelf/core/utils";
 import {
   baselines,
   buildLabels,
@@ -213,7 +214,10 @@ export function createCaptureWorker(options: WorkerOptions): WorkerHandle {
       try {
         jobLogger?.info("worker picked up job");
         // traceparent rides along: executeCaptureJob continues the trace.
-        await runJob({ buildId: job.buildId, reqId: job.reqId, traceparent: job.traceparent });
+        const { timings } = await runWithTimings(async () => {
+          await runJob({ buildId: job.buildId, reqId: job.reqId, traceparent: job.traceparent });
+        });
+        jobLogger?.info({ timings: roundedTimings(timings) }, "worker job timings");
         await doAck(job);
         jobLogger?.info("worker completed job");
       } catch (error) {

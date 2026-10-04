@@ -8,6 +8,7 @@
  */
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import type { Logger } from "@storyshelf/core/logger";
+import { addTiming } from "@storyshelf/core/utils";
 import type { Buffer } from "node:buffer";
 import type { Readable } from "node:stream";
 import { storageMetrics } from "./metrics.ts";
@@ -79,7 +80,9 @@ async function track<T>(operation: string, path: string, fn: () => Promise<T>): 
   try {
     return await withSpan(operation, fn, { "storage.path": path });
   } finally {
-    storageMetrics().operationDuration.record(performance.now() - start, {
+    const durationMs = performance.now() - start;
+    addTiming("storage", durationMs);
+    storageMetrics().operationDuration.record(durationMs, {
       "storage.operation": operation,
     });
   }
