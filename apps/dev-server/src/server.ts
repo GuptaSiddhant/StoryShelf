@@ -119,10 +119,12 @@ const app = createShelfApp({
     // `SECRET` signs auth sessions; `scratchDir` is where an uploaded
     // Storybook archive is extracted before Playwright renders it.
     // `STORYSHELF_ADMIN_TOKEN` bootstraps site-admin API access.
+    // `serverTiming` emits Server-Timing response headers (total + db/storage).
     secret,
     adminToken,
     publicBaseUrl,
     scratchDir: dataDir,
+    serverTiming: true,
     ...(env["SMTP_FROM"] ? { notifications: { fromEmail: env["SMTP_FROM"] } } : {}),
   },
 });

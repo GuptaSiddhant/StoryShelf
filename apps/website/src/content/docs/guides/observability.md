@@ -53,6 +53,31 @@ hosts, webhooks, OIDC). Span names never contain IDs or paths.
 **Logs:** stdout JSON unchanged, plus `trace_id`/`span_id` on every line
 inside a span, so logs join with traces in your backend.
 
+## Server-Timing response headers
+
+Traces need a collector; `Server-Timing` headers need only a browser. Set
+`serverTiming: true` in `ShelfConfig` to opt in (off by default — omit it in
+production if you prefer no timing headers):
+
+```ts
+const app = createShelfApp({
+  database,
+  storage,
+  config: { scratchDir: dataDir, serverTiming: true },
+});
+```
+
+Every response then carries e.g.
+`Server-Timing: total;dur=42.1, db;dur=12.5, storage;dur=3.2` —
+`total` matches the `http.server` span, `db`/`storage` are roll-ups of the
+adapter calls in that request (per-operation detail stays in traces). No
+OpenTelemetry SDK is required; with one configured, the names line up with
+the `db.*` / `storage.*` span families on purpose.
+
+Background capture work never appears in the header (there is no response
+to attach it to). Per-build timing breakdowns live in the attempt log
+history instead (`GET /api/v1/projects/:id/builds/:buildId/attempts/:attemptNo/logs`).
+
 For the full reference (span/metric catalogs, sampling, Deno, troubleshooting),
 see `docs/observability.md` in the repository and
 [ADR 0022](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/0022-opentelemetry-observability.md).

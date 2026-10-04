@@ -115,6 +115,8 @@ const app = createShelfApp({
     adminToken,
     publicBaseUrl,
     scratchDir: dataDir,
+    // Emit Server-Timing response headers (total + db/storage roll-ups).
+    serverTiming: true,
     ...(env["SMTP_FROM"] ? { notifications: { fromEmail: env["SMTP_FROM"] } } : {}),
   },
 });
