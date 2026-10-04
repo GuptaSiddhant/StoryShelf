@@ -111,6 +111,11 @@ export interface ShelfConfig {
   branchGcIntervalMs?: number;
   maxUploadBytes?: number;
   /**
+   * Emit `Server-Timing` response headers (total + db/storage roll-ups).
+   * Opt-in, off by default — some deployments prefer no timing headers.
+   */
+  serverTiming?: boolean;
+  /**
    * Max zip size (bytes) eligible for inline statics extraction at upload.
    * Unset (or 0) disables inline extraction — statics land via capture.
    */
@@ -194,6 +199,7 @@ export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
     branchTtlDays: z.number().int().positive().nullable().optional(),
     branchGcIntervalMs: z.number().int().positive().optional(),
     maxUploadBytes: z.number().int().positive().optional(),
+    serverTiming: z.boolean().optional(),
     maxInlineUnzipSize: z.number().int().positive().optional(),
     viewports: z.array(viewportSchema).min(1, "at least one viewport required").optional(),
     adapters: z.record(z.string(), adapterSnapshotSchema).optional(),
