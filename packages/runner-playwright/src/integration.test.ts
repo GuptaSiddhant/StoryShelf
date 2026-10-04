@@ -259,12 +259,19 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
     });
     const second = await waitForBuild(app, project.slug, uploadedSecond.id, ["approved"]);
     expect(second.status).toBe("approved");
-    expect(second.snapshotCount).toBeGreaterThan(0);
-    const secondSnapshots = await snapshotsFor(second.id);
-    expect(secondSnapshots.length).toBe(second.snapshotCount);
-    for (const snapshot of secondSnapshots) {
-      expect(snapshot.diffPassed).toBe(true);
-    }
+    // Same commit already approved on this branch: capture is skipped, so no
+    // snapshots are produced. The skip is recorded in the attempt log.
+    expect(second.snapshotCount).toBe(0);
+    const attempts = await readJson<Array<{ attemptNo: number }>>(
+      await app.request(`/api/v1/projects/${project.slug}/builds/${second.id}/attempts`),
+    );
+    expect(attempts.length).toBeGreaterThan(0);
+    const logs = await readJson<Array<{ message: string }>>(
+      await app.request(
+        `/api/v1/projects/${project.slug}/builds/${second.id}/attempts/${attempts[0]?.attemptNo}/logs`,
+      ),
+    );
+    expect(logs.some((line) => line.message.includes("duplicate sha already approved"))).toBe(true);
   }, 300_000);
 
   it.skipIf(!isOldestFixture)(
