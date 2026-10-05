@@ -110,6 +110,18 @@ Or approve everything at once:
 curl -sS -X POST $STORYSHELF_URL/api/v1/projects/my-app/builds/<buildId>/approve-all
 ```
 
+If the baseline changed after the diff was computed (for example a merge to the default branch re-baselined
+the story), approving returns `409` with `code: "baseline_changed"` rather than overwriting a baseline you did
+not review. Recompute the diffs against the current baselines from the stored screenshots (no re-render;
+builds are never recaptured automatically):
+
+```sh
+curl -sS -X POST $STORYSHELF_URL/api/v1/projects/my-app/builds/<buildId>/rediff
+```
+
+or approve anyway with `?force=true` on the `approve` / `approve-all` endpoint. `approve-all` skips snapshots
+with a changed baseline and lists their ids in `skipped`.
+
 Raw PNGs are served per snapshot — image, pixel-diff overlay, and baseline:
 
 ```sh

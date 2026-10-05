@@ -13,3 +13,10 @@ export function hxRedirect(c: Context, url: string): Response {
   }
   return c.redirect(url, 302);
 }
+
+/** Ask HTMX to reload the current page (review forms post with `hx-target="body"`). */
+export function hxRefresh(c: Context): void {
+  if (isHxRequest(c)) {
+    c.header("HX-Refresh", "true");
+  }
+}

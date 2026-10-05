@@ -4,13 +4,7 @@ import { SnapshotModel } from "@storyshelf/core/models";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
-import {
-  findDriftedSnapshots,
-  isBaselineChanged,
-  isHtmxRequest,
-  isOpenSnapshot,
-  refreshHtmx,
-} from "./baseline-guard.ts";
+import { findDriftedSnapshots, isBaselineChanged, isOpenSnapshot } from "./baseline-guard.ts";
 import {
   VIEW_ROLES,
   APPROVER_ROLES,
@@ -20,6 +14,7 @@ import {
   buildForProject,
 } from "./builds.handlers.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
+import { hxRefresh, isHxRequest } from "./htmx.ts";
 import {
   snapshotSchema,
   okSchema,
@@ -149,14 +144,14 @@ export function registerSnapshots(app: ShelfRouter): void {
     try {
       await approveSnapshot(snapshotId, userId, { force: force === "true" });
     } catch (error) {
-      if (!isHtmxRequest(c) || !isBaselineChanged(error)) {
+      if (!isHxRequest(c) || !isBaselineChanged(error)) {
         throw error;
       }
       // The review page recomputes staleness on load and offers re-diff / approve anyway.
       c.header("HX-Redirect", `/projects/${slug}/builds/${buildId}/diff?snapshot=${snapshotId}`);
       return c.json({ ok: true }, 200);
     }
-    refreshHtmx(c);
+    hxRefresh(c);
     return c.json({ ok: true }, 200);
   });
 
@@ -168,7 +163,7 @@ export function registerSnapshots(app: ShelfRouter): void {
     const userId = getStore().user?.id ?? null;
     await new SnapshotModel(getStore().db).review(snapshot.id, "rejected", userId);
     await refreshBuild(build.id);
-    refreshHtmx(c);
+    hxRefresh(c);
     return c.json({ ok: true });
   });
 
@@ -188,7 +183,7 @@ export function registerSnapshots(app: ShelfRouter): void {
           await approveSnapshot(snapshot.id, userId, { force: forced });
         }),
     );
-    refreshHtmx(c);
+    hxRefresh(c);
     return c.json({ ok: true, skipped: [...drifted.keys()] });
   });
 
@@ -207,7 +202,7 @@ export function registerSnapshots(app: ShelfRouter): void {
     const { db, storage, logger } = getStore();
     const result = await rediffBuild({ db, storage, logger }, project, build);
     await refreshBuild(build.id);
-    refreshHtmx(c);
+    hxRefresh(c);
     return c.json({ ok: true, ...result }, 200);
   });
 
@@ -225,7 +220,7 @@ export function registerSnapshots(app: ShelfRouter): void {
         }),
     );
     await refreshBuild(build.id);
-    refreshHtmx(c);
+    hxRefresh(c);
     return c.json({ ok: true });
   });
 }

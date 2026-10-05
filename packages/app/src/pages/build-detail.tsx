@@ -6,6 +6,7 @@ import { ProjectModel } from "@storyshelf/core/models";
 import { SnapshotModel } from "@storyshelf/core/models";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
+import { loadBaselineView } from "../routers/baseline-guard.ts";
 import { getStore } from "../store.ts";
 import {
   Badge,
@@ -32,6 +33,7 @@ import {
   snapshotCardMeta,
   snapshotGrid,
 } from "../ui/styles/review.ts";
+import { StaleBaselineNotice } from "./build-diff-stale.tsx";
 
 /** Map a capture log level to its badge tone. */
 function logTone(level: string): "neutral" | "success" | "warning" | "danger" | "info" {
@@ -67,6 +69,8 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
     attemptLogs.set(attempt.id, await logs.listByAttempt(attempt.id));
   }
   const canReview = !getStore().authEnabled || Boolean(getStore().user);
+  const { drifted } = await loadBaselineView(project, build, snapshots);
+  const staleCount = Object.keys(drifted).length;
   const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
 
   const grouped = new Map<string, typeof snapshots>();
@@ -144,6 +148,15 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
           { label: `${build.gitBranch} · ${build.gitSha.slice(0, 7)}` },
         ]}
       />
+
+      {staleCount > 0 ? (
+        <StaleBaselineNotice
+          project={project}
+          build={build}
+          staleCount={staleCount}
+          canReview={canReview}
+        />
+      ) : null}
 
       <div class="mb-1">
         <div class="grid grid--3">

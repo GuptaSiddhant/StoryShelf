@@ -6,7 +6,6 @@ import {
   type BaselineStatus,
 } from "@storyshelf/core/models";
 import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
-import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { getStore } from "../store.ts";
 
@@ -93,19 +92,49 @@ export async function assertBaselineCurrent(
   throw baselineChanged(snapshot.id, status);
 }
 
-/** True for requests issued by htmx (the review forms). */
-export function isHtmxRequest(c: Context): boolean {
-  return c.req.header("hx-request") === "true";
-}
-
-/** htmx review forms: refresh the page instead of swapping the JSON body into the document. */
-export function refreshHtmx(c: Context): void {
-  if (isHtmxRequest(c)) {
-    c.header("HX-Refresh", "true");
-  }
-}
-
 /** True when `error` is the 409 raised by {@link baselineChanged}. */
 export function isBaselineChanged(error: unknown): boolean {
   return error instanceof HTTPException && error.status === 409;
+}
+
+/** Per-snapshot baseline facts the review pages need. */
+export interface BaselineView {
+  /** Snapshot ids that have a baseline to compare against. */
+  hasBaseline: Record<string, boolean>;
+  /** Open snapshots whose recorded baseline no longer matches the current one. */
+  drifted: Record<string, "stale" | "removed">;
+}
+
+/** Resolve each snapshot's current baseline once and derive presence plus drift. */
+export async function loadBaselineView(
+  project: Pick<Project, "id" | "gitDefaultBranch">,
+  build: Pick<Build, "gitBranch" | "isDefault">,
+  snapshots: Snapshot[],
+): Promise<BaselineView> {
+  const baselines = new BaselineModel(getStore().db);
+  const entries = await Promise.all(
+    snapshots.map(async (snapshot) => {
+      const current = await baselines.resolve(
+        project.id,
+        snapshot.storyId,
+        snapshot.viewportName,
+        build.gitBranch,
+        project.gitDefaultBranch,
+      );
+      return { snapshot, current };
+    }),
+  );
+  const view: BaselineView = { hasBaseline: {}, drifted: {} };
+  for (const { snapshot, current } of entries) {
+    view.hasBaseline[snapshot.id] = Boolean(current);
+    const status = baselineStatus(snapshot, current);
+    if (
+      !build.isDefault &&
+      isOpenSnapshot(snapshot) &&
+      (status === "stale" || status === "removed")
+    ) {
+      view.drifted[snapshot.id] = status;
+    }
+  }
+  return view;
 }

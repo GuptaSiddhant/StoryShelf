@@ -14,6 +14,7 @@ import {
   reviewBarTitle,
   viewSwitch,
 } from "../ui/styles/review.ts";
+import { StaleSnapshotNotice } from "./build-diff-stale.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -24,6 +25,8 @@ export interface DiffViewerProps {
   selected: Snapshot;
   canReview: boolean;
   hasBaseline: Record<string, boolean>;
+  /** Set when the baseline changed after this snapshot's diff was computed. */
+  drifted?: "stale" | "removed";
 }
 
 function imageUrl(
@@ -39,31 +42,39 @@ interface SnapshotActionsProps {
   project: Project;
   build: Build;
   selected: Snapshot;
+  drifted: boolean;
 }
 
 /** Approve/reject buttons for a reviewable snapshot. */
 function SnapshotActions(
   props: SnapshotActionsProps,
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { project, build, selected } = props;
+  const { project, build, selected, drifted } = props;
+  const approveUrl = `/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${selected.id}/approve${drifted ? "?force=true" : ""}`;
   return (
     <HStack>
-      <form
-        method="post"
-        action={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${selected.id}/approve`}
-        hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${selected.id}/approve`}
-        hx-target="body"
-      >
-        <Button
-          variant="primary"
-          size="sm"
-          type="submit"
-          data-approve
-          accesskey="a"
-          title="Approve (a)"
-        >
-          Approve
-        </Button>
+      <form method="post" action={approveUrl} hx-post={approveUrl} hx-target="body">
+        {drifted ? (
+          <Button
+            variant="secondary"
+            size="sm"
+            type="submit"
+            title="The baseline changed after this diff; replace it with this screenshot"
+          >
+            Approve anyway
+          </Button>
+        ) : (
+          <Button
+            variant="primary"
+            size="sm"
+            type="submit"
+            data-approve
+            accesskey="a"
+            title="Approve (a)"
+          >
+            Approve
+          </Button>
+        )}
       </form>
       <form
         method="post"
@@ -212,7 +223,7 @@ function DiffPaneGrid(props: DiffPaneGridProps): HtmlEscapedString | Promise<Htm
 
 /** Baseline | current | diff panes with approve/reject actions. */
 export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { project, build, selected, canReview, hasBaseline } = props;
+  const { project, build, selected, canReview, hasBaseline, drifted } = props;
   return (
     <Card>
       <div class={reviewBar}>
@@ -233,11 +244,17 @@ export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<
         <HStack>
           <ViewSwitch />
           {canReview && (selected.status === "new" || selected.status === "changed") ? (
-            <SnapshotActions project={project} build={build} selected={selected} />
+            <SnapshotActions
+              project={project}
+              build={build}
+              selected={selected}
+              drifted={drifted !== undefined}
+            />
           ) : null}
         </HStack>
       </div>
       <VStack>
+        {drifted ? <StaleSnapshotNotice status={drifted} /> : null}
         <DiffPaneGrid
           project={project}
           build={build}

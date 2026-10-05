@@ -1,6 +1,6 @@
 # Plan: Handling baseline changes between diff and approval
 
-Status: phases 1-3 implemented (API, data model, guard, re-diff); phases 4-5 (UI, docs) pending.
+Status: implemented (data model, guard, re-diff, UI, docs).
 Scope: `@storyshelf/core`, `@storyshelf/app`, `db-sqlite`, `db-postgres`, `db-mysql`.
 
 Implementation notes (deviations from the design below)
@@ -12,6 +12,8 @@ Implementation notes (deviations from the design below)
 - `baseline_version` uses the sentinel `"none"` for "no baseline at diff time" so legacy rows (NULL)
   stay distinguishable from new stories.
 - Re-diff refuses default-branch builds (400) and builds that are not `reviewing`/`approved`/`rejected` (409).
+- UI: a warning notice on the review and build pages (manual-recapture message, Re-diff and Retry capture
+  actions) and, per snapshot, "Approve anyway" in place of Approve (no keyboard shortcut for the forced path).
 - Known gap: re-diff calls `refreshBuild`, which re-emits `build:<status>` webhooks/notifications even
   when the status did not change.
 

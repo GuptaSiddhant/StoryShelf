@@ -320,3 +320,82 @@ describe("re-diff after a baseline change", () => {
     expect(response.headers.get("hx-refresh")).toBe("true");
   });
 });
+
+async function page(app: ReturnType<typeof createShelfApp>, path: string): Promise<string> {
+  const response = await app.request(path);
+  expect(response.status).toBe(200);
+  return await response.text();
+}
+
+const REVIEW = "/projects/test-project/builds/f1/diff?snapshot=sf1";
+
+describe("review pages for changed baselines", () => {
+  it("explains the stale diff, states recapture is manual, and offers re-diff and retry", async () => {
+    const { app, db } = await setup();
+    await moveMainBaseline(db);
+
+    const body = await page(app, REVIEW);
+
+    expect(body).toContain("Baseline changed since this build was captured");
+    expect(body).toContain("Builds are not recaptured automatically");
+    expect(body).toContain(`${BASE}/f1/rediff`);
+    expect(body).toContain(`${BASE}/f1/retry`);
+    expect(body).toContain("This diff is out of date");
+  });
+
+  it("swaps Approve for Approve anyway on a stale snapshot, without the keyboard shortcut", async () => {
+    const { app, db } = await setup();
+    await moveMainBaseline(db);
+
+    const body = await page(app, REVIEW);
+
+    expect(body).toContain("Approve anyway");
+    expect(body).toContain(`${BASE}/f1/snapshots/sf1/approve?force=true`);
+    expect(body).not.toContain(`data-approve="true"`);
+  });
+
+  it("shows the plain Approve and no notice when the baseline is current", async () => {
+    const { app } = await setup();
+
+    const body = await page(app, REVIEW);
+
+    expect(body).not.toContain("Baseline changed since this build was captured");
+    expect(body).not.toContain("Approve anyway");
+    expect(body).toContain(`data-approve="true"`);
+  });
+
+  it("shows no notice for legacy snapshots without baseline tracking", async () => {
+    const { app, db } = await setup({ baselineId: null, baselineVersion: null });
+    await moveMainBaseline(db);
+
+    expect(await page(app, REVIEW)).not.toContain("Baseline changed since this build");
+  });
+
+  it("clears the notice once the build is re-diffed", async () => {
+    const { app, db, objects } = await setup();
+    objects.set("baselines/main/a.png", solidPng(GREEN));
+    objects.set("shots/f1/a.png", solidPng(GREEN));
+    await moveMainBaseline(db);
+    await post(app, "f1/rediff");
+
+    expect(await page(app, REVIEW)).not.toContain("Baseline changed since this build");
+  });
+
+  it("surfaces the same notice on the build overview", async () => {
+    const { app, db } = await setup();
+    await moveMainBaseline(db);
+
+    const body = await page(app, "/projects/test-project/builds/f1");
+
+    expect(body).toContain("Baseline changed since this build was captured");
+    expect(body).toContain("Re-diff against current baselines");
+  });
+
+  it("never shows the notice on a default-branch build", async () => {
+    const { app, db } = await setup();
+    await db.update(db.tables.builds, "f1", { gitBranch: "main", isDefault: true });
+    await moveMainBaseline(db);
+
+    expect(await page(app, REVIEW)).not.toContain("Baseline changed since this build");
+  });
+});
