@@ -61,7 +61,7 @@ Statuses are posted under the context `storyshelf/{project-slug}` (e.g. `storysh
 
 ## Merge gate
 
-Mark StoryShelf's status check as required in GitHub branch protection so PRs can't merge until visual review is approved. The check name is the context shown above.
+Mark StoryShelf's status check as required in GitHub branch protection so PRs can't merge until visual review is approved. The check name is the context shown above. Step-by-step: [Merge gate setup](/guides/merge-gate/).
 
 ## Direct use
 

@@ -33,7 +33,7 @@ Wire the outputs into env (`terraform output -json` / `npm run infra:outputs`): 
 
 See the generated `terraform/README.md` for the CI test profile (unique project prefix per run, documented destroy).
 
-Pair with [@storyshelf/storage-gcs](/packages/storage-gcs/) and a Pub/Sub-aware queue.
+Pair with [@storyshelf/storage-gcs](/packages/storage-gcs/) and [@storyshelf/queue-gcp](/packages/queue-gcp/).
 
 ## Related
 

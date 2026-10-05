@@ -306,7 +306,7 @@ Capture is CPU/IO-heavy and long-running (minutes to tens of minutes). It must n
 - An in-process queue with a **configurable concurrency** (`--capture-concurrency`, default `2`) runs captures.
 - A build stuck in `capturing` across a server restart is detected and re-queued (or marked `failed`).
 
-> **Note on Architecture:** The `CaptureQueue` interface is fully asynchronous — `enqueue`, `status`, `active` and `recent` all return `Promise<T>` — so the same contract backs both the in-process `InMemoryCaptureQueue` (Node long-lived server) and remote backends (SQS, Cloudflare Queues, Azure Storage Queues) where execution is left to a separately-assembled worker that polls the queue and runs `executeCaptureJob`.
+> **Note on Architecture:** The `CaptureQueue` interface is fully asynchronous — `enqueue`, `status`, `active` and `recent` all return `Promise<T>` — so the same contract backs both the in-process `InMemoryCaptureQueue` (Node long-lived server) and remote backends (SQS, Cloudflare Queues, Azure Storage Queues) where execution is left to a separately-assembled worker that polls the queue and runs `executeCaptureJob`. For deploying, scaling, and operating those workers, see the website guide `apps/website/src/content/docs/guides/deployment/remote-workers.md` (published at `/guides/deployment/remote-workers/`).
 
 ### Story Source Adapter
 

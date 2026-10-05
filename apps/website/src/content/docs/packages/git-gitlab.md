@@ -61,7 +61,7 @@ Statuses are posted under the context `storyshelf/{project-slug}` (e.g. `storysh
 
 ## Merge gate
 
-Mark StoryShelf's status as required in GitLab's protected branch settings or merge request approval rules so MRs can't merge until visual review is approved.
+Mark StoryShelf's status as required in GitLab's protected branch settings or merge request approval rules so MRs can't merge until visual review is approved. Step-by-step: [Merge gate setup](/guides/merge-gate/).
 
 ## Direct use
 
