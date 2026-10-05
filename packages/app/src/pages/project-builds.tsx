@@ -1,36 +1,116 @@
-import { BuildModel } from "@storyshelf/core/models";
-import { ProjectModel } from "@storyshelf/core/models";
+import { BuildModel, ProjectModel } from "@storyshelf/core/models";
+import type { Build, Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
-import type { HtmlEscapedString } from "hono/utils/html";
 import { getStore } from "../store.ts";
 import {
   Badge,
   Button,
-  Card,
   EmptyState,
-  Field,
   HStack,
-  Meta,
   PageHeader,
+  Segmented,
   SelectField,
-  statusTone,
+  VStack,
 } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
+import { BuildsTable } from "./project-builds-table.tsx";
+
+/* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
+
+const STATUSES = ["reviewing", "approved", "rejected", "failed", "pending"] as const;
+
+/** Current list filters (from the query string). */
+interface BuildFilters {
+  status?: string;
+  branch?: string;
+}
+
+function listHref(base: string, filters: BuildFilters): string {
+  const params = new URLSearchParams();
+  if (filters.status) {
+    params.set("status", filters.status);
+  }
+  if (filters.branch) {
+    params.set("branch", filters.branch);
+  }
+  const query = params.toString();
+  return query ? `${base}?${query}` : base;
+}
+
+function matches(build: Build, filters: BuildFilters): boolean {
+  return (
+    (!filters.status || build.status === filters.status) &&
+    (!filters.branch || build.gitBranch === filters.branch)
+  );
+}
+
+/** Status chips (with counts) plus a branch select that applies instantly. */
+function BuildsToolbar(props: {
+  project: Project;
+  all: Build[];
+  filters: BuildFilters;
+  base: string;
+}): ReturnType<typeof HStack> {
+  const { all, filters, base } = props;
+  const branches = [...new Set(all.map((build) => build.gitBranch))].toSorted();
+  const inBranch = all.filter((build) => !filters.branch || build.gitBranch === filters.branch);
+  const count = (status: string): number =>
+    inBranch.filter((build) => build.status === status).length;
+  const items = [
+    { label: `All ${inBranch.length}`, value: "", status: undefined },
+    ...STATUSES.filter((status) => count(status) > 0 || filters.status === status).map(
+      (status) => ({ label: `${status} ${count(status)}`, value: status, status }),
+    ),
+  ];
+  return (
+    <HStack justify="between">
+      <Segmented
+        label="Filter by status"
+        items={items.map((item) => ({
+          label: item.label,
+          value: item.value,
+          href: listHref(base, { ...filters, status: item.status }),
+          active: (filters.status ?? "") === item.value,
+        }))}
+      />
+      <form
+        method="get"
+        action={base}
+        hx-get={base}
+        hx-trigger="change"
+        hx-target="body"
+        hx-push-url="true"
+      >
+        {filters.status ? <input type="hidden" name="status" value={filters.status} /> : null}
+        <SelectField
+          label="Branch"
+          name="branch"
+          layout="inline"
+          value={filters.branch ?? ""}
+          options={[
+            { value: "", label: "All branches" },
+            ...branches.map((branch) => ({ value: branch, label: branch })),
+          ]}
+        />
+      </form>
+    </HStack>
+  );
+}
+
 /** Project builds page: filterable build history for one project. */
 export async function renderProjectBuildsPage(
   slug: string,
-  query: { status?: string; branch?: string } = {},
+  query: BuildFilters = {},
 ): Promise<RenderedContent | null> {
   const projects = await new ProjectModel(getStore().db).list();
   const project = projects.find((item) => item.slug === slug);
   if (!project) {
     return null;
   }
-  const builds = await new BuildModel(getStore().db).list(project.id, {
-    status: query.status as unknown as import("@storyshelf/core/types").BuildStatus | undefined,
-    branch: query.branch,
-  });
+  const all = await new BuildModel(getStore().db).list(project.id);
+  const builds = all.filter((build) => matches(build, query));
   const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const filtered = Boolean(query.status ?? query.branch);
 
   return (
     <DocumentLayout
@@ -38,137 +118,46 @@ export async function renderProjectBuildsPage(
       nav={{ active: "builds", projectSlug: project.slug, projectName: project.name }}
     >
       <PageHeader
-        title={project.name}
+        title="Builds"
         description={
           <>
-            <code>{project.slug}</code> {project.gitRepository ? `· ${project.gitRepository}` : ""}{" "}
-            · <Badge tone="neutral">{project.gitDefaultBranch}</Badge>
+            {project.gitRepository ?? project.slug} · default branch{" "}
+            <Badge tone="neutral">{project.gitDefaultBranch}</Badge>
           </>
         }
         actions={
-          <>
-            <Button variant="secondary" href={urls.settings(project.slug)}>
-              Settings
-            </Button>
-            <Button variant="ghost" href={urls.buildsList(project.slug)}>
-              Refresh
-            </Button>
-          </>
+          <Button variant="secondary" icon="settings" href={urls.settings(project.slug)}>
+            Settings
+          </Button>
         }
-        breadcrumbs={[{ label: "Projects", href: urls.projects() }, { label: project.name }]}
       />
-
-      <Card>
-        <form method="get" action={urls.buildsList(project.slug)}>
-          <HStack>
-            <SelectField
-              label="Status"
-              name="status"
-              layout="inline"
-              value={query.status ?? ""}
-              options={[
-                { value: "", label: "All" },
-                { value: "pending", label: "pending" },
-                { value: "reviewing", label: "reviewing" },
-                { value: "approved", label: "approved" },
-                { value: "rejected", label: "rejected" },
-                { value: "failed", label: "failed" },
-              ]}
-            />
-            <Field
-              label="Branch"
-              name="branch"
-              layout="inline"
-              value={query.branch ?? ""}
-              placeholder="main"
-            />
-            <Button variant="secondary" type="submit">
-              Filter
-            </Button>
-            {query.status || query.branch ? (
-              <Button variant="ghost" href={urls.buildsList(project.slug)}>
-                Clear
-              </Button>
-            ) : null}
-          </HStack>
-        </form>
-      </Card>
-
-      {builds.length === 0 ? (
-        <EmptyState
-          title="No builds"
-          description={
-            query.status || query.branch
-              ? "No builds match the current filter."
-              : "Upload your first build with the CLI. Builds appear here once uploaded."
-          }
+      <VStack>
+        <BuildsToolbar
+          project={project}
+          all={all}
+          filters={query}
+          base={urls.buildsList(project.slug)}
         />
-      ) : (
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Branch / SHA</th>
-                <th>Status</th>
-                <th>Snapshots</th>
-                <th>Author</th>
-                <th>Created</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {builds.map((build): HtmlEscapedString | Promise<HtmlEscapedString> => (
-                <tr key={build.id}>
-                  <td>
-                    <strong>{build.gitBranch}</strong>
-                    <Meta as="div">
-                      {build.gitSha.slice(0, 7)}{" "}
-                      {build.message ? `· ${build.message.slice(0, 60)}` : ""}
-                    </Meta>
-                  </td>
-                  <td>
-                    <Badge tone={statusTone(build.status)}>{build.status}</Badge>
-                  </td>
-                  <td>
-                    <Meta as="span">
-                      {build.changedCount} changed · {build.approvedCount} approved ·{" "}
-                      {build.snapshotCount} total
-                    </Meta>
-                  </td>
-                  <td>
-                    <div>{build.authorName ?? "—"}</div>
-                    <Meta as="div">{build.authorEmail ?? ""}</Meta>
-                  </td>
-                  <td>
-                    <Meta as="span">{new Date(build.createdAt).toLocaleString()}</Meta>
-                  </td>
-                  <td class="nowrap">
-                    <HStack wrap={false}>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        href={urls.build(project.slug, build.id)}
-                      >
-                        View
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        href={urls.buildDiff(project.slug, build.id)}
-                      >
-                        Review
-                      </Button>
-                      <Button variant="ghost" size="sm" href={urls.short(build.id)}>
-                        View Storybook
-                      </Button>
-                    </HStack>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+        {builds.length === 0 ? (
+          <EmptyState
+            title="No builds"
+            description={
+              filtered
+                ? "No builds match the current filter."
+                : "Upload your first build with the CLI. Builds appear here once uploaded."
+            }
+            action={
+              filtered ? (
+                <Button variant="secondary" href={urls.buildsList(project.slug)}>
+                  Clear filters
+                </Button>
+              ) : null
+            }
+          />
+        ) : (
+          <BuildsTable project={project} builds={builds} />
+        )}
+      </VStack>
     </DocumentLayout>
   );
 }

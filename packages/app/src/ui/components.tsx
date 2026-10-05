@@ -5,7 +5,7 @@
  * `feedback.tsx` (Badge, statusTone, Alert, EmptyState, Stat), `forms.tsx`
  * (Field, TextareaField, SelectField), `layout.tsx` (Card, PageHeader),
  * `stacks.tsx` (HStack, VStack), plus `icons/icon.tsx` (Icon), `avatar.tsx`,
- * `compare-stage.tsx`, `progress.tsx`, `kbd.tsx`, `segmented.tsx`, `table.tsx`, `thumbnail.tsx`, `dropdown.tsx`.
+ * `compare-stage.tsx`, `progress.tsx`, `code-block.tsx`, `filter-input.tsx`, `time.tsx`, `kbd.tsx`, `segmented.tsx`, `table.tsx`, `thumbnail.tsx`, `dropdown.tsx`.
  * Import from here; the family modules are
  * an organizational detail.
  */
@@ -24,3 +24,6 @@ export { Table } from "./table.tsx";
 export { Thumbnail } from "./thumbnail.tsx";
 export { CompareStage, type CompareStageProps } from "./compare-stage.tsx";
 export { Progress } from "./progress.tsx";
+export { CodeBlock } from "./code-block.tsx";
+export { FilterInput } from "./filter-input.tsx";
+export { RelativeTime, formatRelative } from "./time.tsx";

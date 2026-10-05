@@ -7,13 +7,16 @@ import {
   AvatarGroup,
   Badge,
   Button,
+  CodeBlock,
   CompareStage,
   Dropdown,
   DropdownDivider,
   DropdownItem,
+  FilterInput,
   Icon,
   Kbd,
   Progress,
+  RelativeTime,
   Segmented,
   Table,
   Thumbnail,
@@ -255,5 +258,35 @@ describe("CompareStage", () => {
     );
     expect(html).toContain("no baseline yet");
     expect(html).toContain('alt="Diff for X"');
+  });
+});
+
+describe("RelativeTime", () => {
+  it("renders a machine-readable <time> with the exact timestamp on hover", async () => {
+    const html = await render(<RelativeTime value="2020-01-02T03:04:05.000Z" />);
+    expect(html).toContain('datetime="2020-01-02T03:04:05.000Z"');
+    expect(html).toContain("title=");
+    expect(html).toContain("2020-01-02");
+  });
+
+  it("does not throw on invalid input", async () => {
+    const html = await render(<RelativeTime value="not a date" />);
+    expect(html).toContain("unknown");
+  });
+});
+
+describe("CodeBlock and FilterInput", () => {
+  it("exposes the snippet through a copy button", async () => {
+    const html = await render(<CodeBlock code="npx storyshelf upload" />);
+    expect(html).toContain("<code>npx storyshelf upload</code>");
+    expect(html).toContain('data-copy="npx storyshelf upload"');
+    expect(html).toContain("#i-copy");
+  });
+
+  it("renders a labeled search input the shell script can find", async () => {
+    const html = await render(<FilterInput label="Filter projects" />);
+    expect(html).toContain("data-filter-input");
+    expect(html).toContain('aria-label="Filter projects"');
+    expect(html).toContain('type="search"');
   });
 });

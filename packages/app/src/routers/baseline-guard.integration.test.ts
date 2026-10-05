@@ -91,11 +91,17 @@ async function setup(snapshotTracking: Tracking = CURRENT_TRACKING) {
   return { app, db, objects };
 }
 
-async function post(app: ReturnType<typeof createShelfApp>, path: string, htmx = false) {
-  return await app.request(`${BASE}/${path}`, {
-    method: "POST",
-    headers: htmx ? { "hx-request": "true" } : {},
-  });
+async function post(
+  app: ReturnType<typeof createShelfApp>,
+  path: string,
+  htmx = false,
+  from?: string,
+) {
+  const headers: Record<string, string> = htmx ? { "hx-request": "true" } : {};
+  if (from) {
+    headers["hx-current-url"] = `http://localhost${from}`;
+  }
+  return await app.request(`${BASE}/${path}`, { method: "POST", headers });
 }
 
 async function moveMainBaseline(db: Awaited<ReturnType<typeof setup>>["db"]) {
@@ -252,7 +258,12 @@ describe("approval guard for changed baselines", () => {
         updatedAt: T1,
       });
 
-      const response = await post(app, `f1/snapshots/sf1/${action}`, true);
+      const response = await post(
+        app,
+        `f1/snapshots/sf1/${action}`,
+        true,
+        "/projects/test-project/builds/f1/diff?snapshot=sf1",
+      );
 
       expect(response.headers.get("hx-redirect")).toBe(
         "/projects/test-project/builds/f1/diff?snapshot=sf-next",
@@ -316,6 +327,35 @@ describe("re-diff after a baseline change", () => {
     });
     expect((await new SnapshotModel(db).get("sf1"))?.status).toBe("unchanged");
     expect((await db.get(db.tables.builds, "f1"))?.["status"]).toBe("approved");
+  });
+
+  it("only refreshes (no advance) when the decision comes from outside the review page", async () => {
+    const { app, db } = await setup();
+    await db.insert(db.tables.snapshots, {
+      id: "sf-other",
+      projectId: "p1",
+      buildId: "f1",
+      storyId: "other",
+      storyName: "Other",
+      storyTitle: "T",
+      viewportName: "desktop",
+      screenshotPath: "shots/f1/a.png",
+      status: "new",
+      baselineId: null,
+      baselineVersion: "none",
+      createdAt: T1,
+      updatedAt: T1,
+    });
+
+    const response = await post(
+      app,
+      "f1/snapshots/sf1/approve",
+      true,
+      "/projects/test-project/builds/f1",
+    );
+
+    expect(response.headers.get("hx-refresh")).toBe("true");
+    expect(response.headers.get("hx-redirect")).toBeNull();
   });
 
   it("lets the reviewer approve again after re-diffing against the new baseline", async () => {

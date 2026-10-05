@@ -19,6 +19,7 @@ import {
   SectionTitle,
   Stat,
   TextareaField,
+  Thumbnail,
   VStack,
   statusTone,
 } from "../ui/components.tsx";
@@ -214,6 +215,8 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
                 action={`/api/v1/projects/${project.slug}/builds/${build.id}/approve-all`}
                 hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/approve-all`}
                 hx-target="body"
+                hx-confirm="Approve all remaining changes?"
+                data-toast="Approved all remaining changes"
               >
                 <Button variant="primary" size="sm" type="submit">
                   Approve all
@@ -224,6 +227,9 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
                 action={`/api/v1/projects/${project.slug}/builds/${build.id}/reject-all`}
                 hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/reject-all`}
                 hx-target="body"
+                hx-confirm="Reject all remaining changes?"
+                data-toast="Rejected all remaining changes"
+                data-toast-tone="warning"
               >
                 <Button variant="danger" size="sm" type="submit">
                   Reject all
@@ -257,6 +263,12 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
                 </span>
               </div>
               <div class={snapshotCardBody}>
+                <a href={`${urls.buildDiff(project.slug, build.id)}?snapshot=${snap.id}`}>
+                  <Thumbnail
+                    src={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${snap.id}/image`}
+                    alt={`${snap.storyTitle} / ${snap.storyName}`}
+                  />
+                </a>
                 <SectionTitle level={3}>
                   {snap.storyTitle} <Meta as="span">/ {snap.storyName}</Meta>
                 </SectionTitle>
@@ -265,7 +277,9 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
                   {snap.diffRatio !== null && snap.diffRatio !== undefined
                     ? ` · diff ${(snap.diffRatio * 100).toFixed(2)}%`
                     : ""}
-                  {snap.diffPixels === null ? "" : ` · ${snap.diffPixels} px`}
+                  {snap.diffPixels === null || snap.diffPixels === undefined
+                    ? ""
+                    : ` · ${snap.diffPixels} px`}
                 </Meta>
                 <HStack>
                   <Button
@@ -285,6 +299,7 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
                         action={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${snap.id}/approve`}
                         hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${snap.id}/approve`}
                         hx-target="body"
+                        data-toast={`Approved ${snap.storyName}`}
                       >
                         <Button variant="ghost" size="sm" type="submit">
                           Approve
@@ -295,6 +310,8 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
                         action={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${snap.id}/reject`}
                         hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${snap.id}/reject`}
                         hx-target="body"
+                        data-toast={`Rejected ${snap.storyName}`}
+                        data-toast-tone="warning"
                       >
                         <Button variant="ghost" size="sm" type="submit">
                           Reject

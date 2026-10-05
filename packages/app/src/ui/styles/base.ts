@@ -13,12 +13,14 @@ function resetCss(): string {
     a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: var(--radius-sm); }
     code, kbd, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85em; }
     kbd { display: inline-block; padding: .1rem .35rem; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: var(--radius-sm); background: var(--surface-muted); color: var(--text-secondary); font-size: .75rem; line-height: 1.2; }
+    [hidden] { display: none !important; }
     .skip-link { position: absolute; left: -9999px; top: auto; width: 1px; height: 1px; overflow: hidden; }
     .skip-link:focus { left: 1rem; top: 1rem; width: auto; height: auto; background: var(--surface-card); color: var(--text-primary); padding: .5rem .75rem; border-radius: var(--radius-sm); box-shadow: var(--shadow); z-index: 100; }`;
 }
 
 function utilityCss(): string {
   return `
+    .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
     .min-w-0 { min-width: 0; }
     .max-w-cell { max-width: 32ch; }
     .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
