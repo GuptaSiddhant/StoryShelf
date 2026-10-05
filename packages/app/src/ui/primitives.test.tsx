@@ -7,11 +7,13 @@ import {
   AvatarGroup,
   Badge,
   Button,
+  CompareStage,
   Dropdown,
   DropdownDivider,
   DropdownItem,
   Icon,
   Kbd,
+  Progress,
   Segmented,
   Table,
   Thumbnail,
@@ -193,5 +195,65 @@ describe("Table, Thumbnail, Kbd", () => {
   it("renders one chip per key", async () => {
     const html = await render(<Kbd keys={["g", "b"]} />);
     expect(html.match(/<kbd/gu)?.length).toBe(2);
+  });
+});
+
+describe("Progress", () => {
+  it("exposes a determinate progressbar and clamps to the max", async () => {
+    const half = await render(<Progress value={1} max={4} label="Review" />);
+    expect(half).toContain('role="progressbar"');
+    expect(half).toContain('aria-valuenow="1"');
+    expect(half).toContain("width:25%");
+    const over = await render(<Progress value={9} max={4} label="Review" />);
+    expect(over).toContain('aria-valuenow="4"');
+    expect(over).toContain("width:100%");
+  });
+
+  it("renders an empty bar (not NaN) when there is nothing to do", async () => {
+    const html = await render(<Progress value={0} max={0} label="Review" />);
+    expect(html).toContain("width:0%");
+    expect(html).not.toContain("NaN");
+  });
+});
+
+describe("CompareStage", () => {
+  const stage = (
+    <CompareStage
+      baselineSrc="/b.png"
+      currentSrc="/c.png"
+      diffSrc={null}
+      subject="Button / Primary"
+      diffEmpty="No diff yet"
+    />
+  );
+
+  it("starts side by side, fit, with all three panes and mode/zoom controls", async () => {
+    const html = await render(stage);
+    expect(html).toContain('data-view="split"');
+    expect(html).toContain('data-zoom="fit"');
+    for (const pane of ["baseline", "current", "diff"]) {
+      expect(html).toContain(`data-pane="${pane}"`);
+    }
+    for (const mode of ["split", "swipe", "onion", "diff", "flip"]) {
+      expect(html).toContain(`data-view-value="${mode}"`);
+    }
+    expect(html).toContain("data-compare-swipe");
+    expect(html).toContain("data-compare-onion");
+  });
+
+  it("describes images for assistive tech and shows an empty state without a diff", async () => {
+    const html = await render(stage);
+    expect(html).toContain('alt="Baseline for Button / Primary"');
+    expect(html).toContain('alt="Current for Button / Primary"');
+    expect(html).toContain("No diff yet");
+    expect(html).not.toContain('alt="Diff for');
+  });
+
+  it("falls back to a first-capture message when there is no baseline", async () => {
+    const html = await render(
+      <CompareStage baselineSrc={null} currentSrc="/c.png" diffSrc="/d.png" subject="X" />,
+    );
+    expect(html).toContain("no baseline yet");
+    expect(html).toContain('alt="Diff for X"');
   });
 });

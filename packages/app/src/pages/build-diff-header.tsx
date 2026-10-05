@@ -1,12 +1,20 @@
-import type { Build } from "@storyshelf/core/schema";
-import type { Project } from "@storyshelf/core/schema";
-import type { Snapshot } from "@storyshelf/core/schema";
+import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge, Button, Meta, PageHeader, statusTone } from "../ui/components.tsx";
+import { Avatar, Badge, Button, Meta, Progress, statusTone } from "../ui/components.tsx";
+import {
+  headerActions,
+  headerMain,
+  headerMeta,
+  headerProgress,
+  headerSide,
+  headerTitle,
+  reviewHeader,
+} from "../ui/styles/review-layout.ts";
+import { reviewProgress } from "./build-diff-model.ts";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
-/** Header + stats props for the diff review page. */
+/** Header props for the diff review page. */
 export interface DiffHeaderProps {
   project: Project;
   build: Build;
@@ -15,32 +23,41 @@ export interface DiffHeaderProps {
   canReview: boolean;
 }
 
-interface ReviewActionsProps {
+interface BulkProps {
   project: Project;
   build: Build;
   pendingCount: number;
 }
 
-/** Approve-all / reject-all bulk review actions. */
-function ReviewActions(props: ReviewActionsProps): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { project, build, pendingCount } = props;
+/** Approve-all / reject-all bulk actions (each asks for confirmation). */
+function BulkActions({
+  project,
+  build,
+  pendingCount,
+}: BulkProps): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const base = `/api/v1/projects/${project.slug}/builds/${build.id}`;
   return (
     <>
       <form
         method="post"
-        action={`/api/v1/projects/${project.slug}/builds/${build.id}/approve-all`}
-        hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/approve-all`}
+        action={`${base}/approve-all`}
+        hx-post={`${base}/approve-all`}
         hx-target="body"
+        hx-confirm={`Approve all ${pendingCount} remaining changes?`}
+        data-toast={`Approved ${pendingCount} ${pendingCount === 1 ? "change" : "changes"}`}
       >
-        <Button variant="primary" size="sm" type="submit">
+        <Button variant="primary" size="sm" type="submit" icon="check">
           Approve all ({pendingCount})
         </Button>
       </form>
       <form
         method="post"
-        action={`/api/v1/projects/${project.slug}/builds/${build.id}/reject-all`}
-        hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/reject-all`}
+        action={`${base}/reject-all`}
+        hx-post={`${base}/reject-all`}
         hx-target="body"
+        hx-confirm={`Reject all ${pendingCount} remaining changes?`}
+        data-toast={`Rejected ${pendingCount} ${pendingCount === 1 ? "change" : "changes"}`}
+        data-toast-tone="warning"
       >
         <Button variant="secondary" size="sm" type="submit">
           Reject all
@@ -50,32 +67,66 @@ function ReviewActions(props: ReviewActionsProps): HtmlEscapedString | Promise<H
   );
 }
 
-/** Page header with breadcrumbs, review actions, and snapshot stats. */
+function HeaderTitle({ build }: { build: Build }): HtmlEscapedString | Promise<HtmlEscapedString> {
+  return (
+    <>
+      <h1 class={headerTitle}>
+        <span>{build.gitBranch}</span>
+        <Meta as="span" mono>
+          {build.gitSha.slice(0, 7)}
+        </Meta>
+        <Badge tone={statusTone(build.status)} icon>
+          {build.status}
+        </Badge>
+      </h1>
+      <p class={headerMeta}>
+        {build.authorName ? <Avatar name={build.authorName} size="sm" /> : null}
+        {build.authorName ? <span>{build.authorName}</span> : null}
+        <span>{build.message ?? "No message"}</span>
+      </p>
+    </>
+  );
+}
+
+function HeaderProgress({
+  snapshots,
+}: {
+  snapshots: Snapshot[];
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const progress = reviewProgress(snapshots);
+  return (
+    <div class={headerProgress}>
+      <span>
+        {progress.reviewable === 0
+          ? "No changes to review"
+          : `${progress.done} of ${progress.reviewable} reviewed`}
+      </span>
+      <Progress value={progress.done} max={progress.reviewable} label="Review progress" />
+    </div>
+  );
+}
+
+/** Compact build summary with review progress and bulk actions. */
 export function DiffHeader(props: DiffHeaderProps): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, snapshots, pendingCount, canReview } = props;
   return (
-    <PageHeader
-      title={
-        <>
-          {build.gitBranch}{" "}
-          <Meta as="span" mono>
-            · {build.gitSha.slice(0, 7)}
-          </Meta>
-        </>
-      }
-      description={
-        <>
-          {build.message ?? "No message"} {build.authorName ? `· ${build.authorName}` : ""} ·{" "}
-          <Badge tone={statusTone(build.status)}>{build.status}</Badge>
-        </>
-      }
-      meta={
-        <>
-          {snapshots.length} snapshots · {pendingCount} need review · {build.approvedCount} approved
-        </>
-      }
-      actions={
-        <>
+    <header class={reviewHeader}>
+      <div class={headerMain}>
+        <div>
+          <Button
+            variant="ghost"
+            size="sm"
+            icon="chevron-left"
+            href={`/projects/${project.slug}/builds`}
+          >
+            Builds
+          </Button>
+        </div>
+        <HeaderTitle build={build} />
+      </div>
+      <div class={headerSide}>
+        <HeaderProgress snapshots={snapshots} />
+        <div class={headerActions}>
           <Button
             variant="secondary"
             size="sm"
@@ -84,16 +135,10 @@ export function DiffHeader(props: DiffHeaderProps): HtmlEscapedString | Promise<
             Build overview
           </Button>
           {canReview && pendingCount > 0 ? (
-            <ReviewActions project={project} build={build} pendingCount={pendingCount} />
+            <BulkActions project={project} build={build} pendingCount={pendingCount} />
           ) : null}
-        </>
-      }
-      breadcrumbs={[
-        { label: "Projects", href: "/projects" },
-        { label: project.name, href: `/projects/${project.slug}/builds` },
-        { label: `Build ${build.gitBranch}`, href: `/projects/${project.slug}/builds/${build.id}` },
-        { label: "Review" },
-      ]}
-    />
+        </div>
+      </div>
+    </header>
   );
 }
