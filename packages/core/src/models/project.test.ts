@@ -28,6 +28,26 @@ describe("ProjectModel", () => {
     expect(project.gitDefaultBranch).toBe("develop");
   });
 
+  it("persists the opt-in play settings given at creation", async () => {
+    const { db } = makeDatabase();
+    const model = new ProjectModel(db, { projects: db.tables.projects });
+    const project = await model.create({
+      name: "Play Project",
+      executePlay: true,
+      playTimeoutMs: 5000,
+    });
+    expect(project.executePlay).toBe(true);
+    expect(project.playTimeoutMs).toBe(5000);
+    expect((await model.get(project.id))?.executePlay).toBe(true);
+  });
+
+  it("leaves play settings to their column defaults when omitted", async () => {
+    const { db } = makeDatabase();
+    const model = new ProjectModel(db, { projects: db.tables.projects });
+    const project = await model.create({ name: "Plain Project" });
+    expect(project.executePlay).not.toBe(true);
+  });
+
   it("gets a project by id", async () => {
     const { db } = makeDatabase();
     const model = new ProjectModel(db, { projects: db.tables.projects });
