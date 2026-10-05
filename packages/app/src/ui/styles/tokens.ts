@@ -19,7 +19,6 @@ interface Fallbacks {
   muted: string;
   subtle: string;
   sidebar: string;
-  topbar: string;
   shadow: string;
   shadow2: string;
   shadow3: string;
@@ -32,7 +31,6 @@ const LIGHT_FALLBACK: Fallbacks = {
   muted: "#f4f4f5",
   subtle: "#fafafa",
   sidebar: "#ffffff",
-  topbar: "#ffffff",
   shadow: "0 1px 2px rgba(0,0,0,.04)",
   shadow2: "0 4px 12px rgba(0,0,0,.08)",
   shadow3: "0 12px 32px rgba(0,0,0,.14)",
@@ -44,7 +42,6 @@ const DARK_FALLBACK: Fallbacks = {
   muted: "#27272a",
   subtle: "#18181b",
   sidebar: "#111113",
-  topbar: "#0f172a",
   shadow: "0 1px 2px rgba(0,0,0,.3)",
   shadow2: "0 4px 12px rgba(0,0,0,.4)",
   shadow3: "0 12px 32px rgba(0,0,0,.55)",
@@ -114,7 +111,6 @@ function brandVars(theme: BrandTheme, fb: Fallbacks): string {
       --status-approved: ${theme.status.approved};
       --status-new: ${theme.status.new};
       --status-rejected: ${theme.status.rejected};
-      --topbar-bg: ${theme.topbarBg ?? fb.topbar};
       --sidebar-bg: ${theme.sidebarBg ?? fb.sidebar};`;
 }
 

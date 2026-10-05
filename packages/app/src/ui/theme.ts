@@ -9,6 +9,7 @@ export interface BrandTheme {
   borderSubtle?: string;
   status: { approved: string; new: string; rejected: string };
   sidebarBg?: string;
+  /** @deprecated No longer used: the top bar is neutral. Accepted so existing configs still parse. */
   topbarBg?: string;
   radius?: string;
   radiusSm?: string;
@@ -26,7 +27,6 @@ export const LIGHT_THEME: BrandTheme = {
   borderSubtle: "#f4f4f5",
   status: { approved: "#16a34a", new: "#d97706", rejected: "#dc2626" },
   sidebarBg: "#ffffff",
-  topbarBg: "#1d5fcf",
   radius: "0.5rem",
   radiusSm: "0.375rem",
   shadow: "0 1px 2px rgba(0,0,0,.04)",
@@ -43,7 +43,6 @@ export const DARK_THEME: BrandTheme = {
   borderSubtle: "#1e1e22",
   status: { approved: "#22c55e", new: "#f59e0b", rejected: "#ef4444" },
   sidebarBg: "#111113",
-  topbarBg: "#0f172a",
   radius: "0.5rem",
   radiusSm: "0.375rem",
   shadow: "0 1px 2px rgba(0,0,0,.3)",

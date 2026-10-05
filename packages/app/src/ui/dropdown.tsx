@@ -93,13 +93,17 @@ const dropdownDivider = css`
 export const Dropdown: FC<{
   label: unknown;
   align?: "start" | "end";
+  /** Accessible name when the label is only an icon or avatar. */
+  ariaLabel?: string;
+  /** Hide the trailing chevron (icon-only triggers). */
+  iconOnly?: boolean;
   children?: unknown;
-}> = ({ label, align = "start", children }) => {
+}> = ({ label, align = "start", ariaLabel, iconOnly = false, children }) => {
   return (
     <details class={dropdownRoot} data-dropdown>
-      <summary class={dropdownTrigger}>
+      <summary class={dropdownTrigger} aria-label={ariaLabel}>
         {label}
-        <Icon name="chevron-down" size="sm" />
+        {iconOnly ? null : <Icon name="chevron-down" size="sm" />}
       </summary>
       <div class={align === "end" ? dropdownMenuEnd : dropdownMenu} role="menu">
         {children}

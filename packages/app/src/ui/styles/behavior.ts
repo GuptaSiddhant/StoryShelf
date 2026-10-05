@@ -34,6 +34,8 @@ function dataCss(): string {
 /** Truly global chrome rules (depend on ancestors outside any one subtree). */
 function chromeCss(): string {
   return `
-    [data-theme="light"] [data-theme-icon="light"], [data-theme="dark"] [data-theme-icon="dark"], [data-theme="system"] [data-theme-icon="system"] { display: inline; }
+    @media (min-width: 881px) { html[data-sidebar="rail"] { --sidebar-width: 68px; } }
+    [data-theme-icon] { display: none; }
+    [data-theme="light"] [data-theme-icon="light"], [data-theme="dark"] [data-theme-icon="dark"], [data-theme="system"] [data-theme-icon="system"] { display: inline-flex; }
     [data-theme="dark"] [data-pane] img { background: repeating-conic-gradient(#27272a 0% 25%, #18181b 0% 50%) 0 0 / 16px 16px; }`;
 }
