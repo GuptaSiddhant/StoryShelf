@@ -32,6 +32,8 @@ const reencryptSchema = z.object({
 const reencryptRoute = createRoute({
   method: "post",
   path: "/api/v1/admin/credentials/reencrypt",
+  tags: ["Admin"],
+  summary: "Re-encrypt stored credentials with the current secret",
   responses: {
     200: {
       content: { "application/json": { schema: reencryptSchema } },
