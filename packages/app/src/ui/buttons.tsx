@@ -1,5 +1,7 @@
 import type { FC } from "hono/jsx";
 import { css } from "./css.ts";
+import { Icon } from "./icons/icon.tsx";
+import type { IconName } from "./icons/paths.ts";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -10,10 +12,10 @@ const btnBase = css`
   /* btn */
   appearance: none;
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   padding: 0.55rem 0.9rem;
   font-weight: 600;
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   cursor: pointer;
   text-decoration: none;
   display: inline-flex;
@@ -23,9 +25,13 @@ const btnBase = css`
   line-height: 1.2;
   min-height: 40px;
   transition:
-    background 120ms ease,
-    border-color 120ms ease,
-    filter 120ms ease;
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    filter var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
+  &:active:not(:disabled) {
+    transform: translateY(1px);
+  }
   &:disabled {
     opacity: 0.55;
     cursor: not-allowed;
@@ -38,6 +44,7 @@ const btnPrimary = css`
   background: var(--accent);
   color: var(--accent-contrast);
   border-color: var(--accent);
+  box-shadow: var(--shadow);
   &:hover {
     filter: brightness(1.06);
     text-decoration: none;
@@ -177,20 +184,37 @@ export const Button: FC<{
   type?: "button" | "submit" | "reset";
   href?: string;
   disabled?: boolean;
+  /** Leading icon from the sprite. */
+  icon?: IconName;
   children?: unknown;
   [key: string]: unknown;
-}> = ({ variant = "primary", size = "md", type = "button", href, disabled, children, ...rest }) => {
+}> = ({
+  variant = "primary",
+  size = "md",
+  type = "button",
+  href,
+  disabled,
+  icon,
+  children,
+  ...rest
+}) => {
   const cls = btnClasses[variant][size];
+  const content = (
+    <>
+      {icon ? <Icon name={icon} size={size === "sm" ? "sm" : "md"} /> : null}
+      {children}
+    </>
+  );
   if (href) {
     return (
       <a class={cls} href={href} aria-disabled={disabled ? "true" : undefined} {...rest}>
-        {children}
+        {content}
       </a>
     );
   }
   return (
     <button class={cls} type={type} disabled={disabled} {...rest}>
-      {children}
+      {content}
     </button>
   );
 };
