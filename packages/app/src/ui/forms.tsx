@@ -10,6 +10,8 @@ const fieldWrap = css`
   /* field */
   display: grid;
   gap: var(--space-1);
+  /* Don't stretch rows when a neighbouring field is taller (hint text). */
+  align-content: start;
   margin-bottom: var(--space-4);
 `;
 

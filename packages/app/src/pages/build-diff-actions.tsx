@@ -20,40 +20,53 @@ function snapshotBase(project: Project, build: Build, snapshot: Snapshot): strin
   return `/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${snapshot.id}`;
 }
 
-/** Approve/reject for a reviewable snapshot; both advance to the next open one. */
-function DecisionButtons(props: {
-  project: Project;
-  build: Build;
-  selected: Snapshot;
-  drifted: boolean;
-}): HtmlEscapedString | Promise<HtmlEscapedString> {
+type DecisionProps = { project: Project; build: Build; selected: Snapshot; drifted: boolean };
+
+/** Approve (or "Approve anyway" when the baseline moved) as its own form. */
+function ApproveForm(props: DecisionProps): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, selected, drifted } = props;
+  const url = `${snapshotBase(project, build, selected)}/approve${drifted ? "?force=true" : ""}`;
+  return (
+    <form
+      method="post"
+      action={url}
+      hx-post={url}
+      hx-target="body"
+      data-toast={`Approved ${selected.storyName}`}
+    >
+      {drifted ? (
+        <Button
+          variant="secondary"
+          size="sm"
+          type="submit"
+          icon="check"
+          title="The baseline changed after this diff; replace it with this screenshot"
+        >
+          Approve anyway
+        </Button>
+      ) : (
+        <Button
+          variant="primary"
+          size="sm"
+          type="submit"
+          icon="check"
+          data-approve
+          title="Approve (a)"
+        >
+          Approve
+        </Button>
+      )}
+    </form>
+  );
+}
+
+/** Approve/reject for a reviewable snapshot; both advance to the next open one. */
+function DecisionButtons(props: DecisionProps): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const { project, build, selected } = props;
   const base = snapshotBase(project, build, selected);
-  const approveUrl = `${base}/approve${drifted ? "?force=true" : ""}`;
   return (
     <div class={actionGroup}>
-      <form
-        method="post"
-        action={approveUrl}
-        hx-post={approveUrl}
-        hx-target="body"
-        data-toast={`Approved ${selected.storyName}`}
-      >
-        {drifted ? (
-          <Button
-            variant="secondary"
-            type="submit"
-            icon="check"
-            title="The baseline changed after this diff; replace it with this screenshot"
-          >
-            Approve anyway
-          </Button>
-        ) : (
-          <Button variant="primary" type="submit" icon="check" data-approve title="Approve (a)">
-            Approve
-          </Button>
-        )}
-      </form>
+      <ApproveForm {...props} />
       <form
         method="post"
         action={`${base}/reject`}
@@ -62,7 +75,7 @@ function DecisionButtons(props: {
         data-toast={`Rejected ${selected.storyName}`}
         data-toast-tone="warning"
       >
-        <Button variant="danger" type="submit" icon="x" data-reject title="Reject (r)">
+        <Button variant="danger" size="sm" type="submit" icon="x" data-reject title="Reject (r)">
           Reject
         </Button>
       </form>

@@ -21,7 +21,7 @@ const segmentedItem = css`
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  min-height: 28px;
+  min-height: 34px;
   padding: 0.2rem 0.7rem;
   border: 0;
   border-radius: var(--radius-sm);

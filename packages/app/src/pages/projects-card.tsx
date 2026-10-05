@@ -25,7 +25,9 @@ const thumbStrip = css`
 
 const cardBody = css`
   /* project-body */
+  flex: 1;
   display: grid;
+  align-content: start;
   gap: var(--space-2);
   padding: var(--space-4);
 `;
@@ -160,7 +162,7 @@ export function ProjectCard(props: {
   const { project, latest, previews, pending } = summary;
   return (
     <Card
-      padded={false}
+      fill
       data-filter-item
       data-filter-text={`${project.name} ${project.slug} ${project.gitRepository ?? ""}`}
     >

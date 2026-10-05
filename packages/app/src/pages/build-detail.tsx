@@ -133,7 +133,7 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
             <Button variant="primary" href={urls.buildDiff(project.slug, build.id)}>
               Review diffs
             </Button>
-            <Button variant="ghost" size="sm" href={urls.short(build.id)}>
+            <Button variant="ghost" href={urls.short(build.id)}>
               View Storybook
             </Button>
             <form

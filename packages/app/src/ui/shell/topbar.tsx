@@ -39,6 +39,11 @@ const shellTopbar = css`
   .topbar__menu {
     display: none;
   }
+  .topbar__menu button {
+    min-width: 36px;
+    min-height: 36px;
+    padding: 0 0.5rem;
+  }
   .topbar__left nav {
     min-width: 0;
   }
