@@ -3,6 +3,7 @@ import { assetManifest } from "../asset-manifest.ts";
 import { getCsrfToken } from "../middleware/csrf.ts";
 import { getStore } from "../store.ts";
 import { Style, css } from "./css.ts";
+import { BareShell } from "./shell/bare.tsx";
 import { bootScript } from "./shell/boot-script.ts";
 import { clientScript } from "./shell/client-script.ts";
 import type { NavConfig } from "./shell/nav.ts";
@@ -16,8 +17,11 @@ import { DARK_THEME, LIGHT_THEME } from "./theme.ts";
 /** Rendered HTML content returned by page components. */
 export type RenderedContent = string | Promise<string>;
 
-/** Page width: `default` is a readable column, `wide` uses the full viewport. */
-type PageLayout = "default" | "wide";
+/**
+ * Page frame: `default` is a readable column, `wide` uses the full viewport,
+ * `bare` drops the app chrome (sign-in, invites).
+ */
+type PageLayout = "default" | "wide" | "bare";
 
 const shellRoot = css`
   /* shell */
@@ -95,20 +99,28 @@ export const DocumentLayout: FC<{
         <a class="skip-link" href="#main-content">
           Skip to content
         </a>
-        <div class={shellRoot}>
-          <Sidebar nav={nav} name={name} logo={ui.logo} />
-          <div>
-            <TopBar nav={nav} />
-            <main
-              id="main-content"
-              class={layout === "wide" ? shellContentWide : shellContent}
-              tabindex={-1}
-            >
-              {children}
-            </main>
-          </div>
-        </div>
-        <div class={shellBackdrop} data-sidebar-backdrop hidden />
+        {layout === "bare" ? (
+          <BareShell name={name} logo={ui.logo}>
+            {children}
+          </BareShell>
+        ) : (
+          <>
+            <div class={shellRoot}>
+              <Sidebar nav={nav} name={name} logo={ui.logo} />
+              <div>
+                <TopBar nav={nav} />
+                <main
+                  id="main-content"
+                  class={layout === "wide" ? shellContentWide : shellContent}
+                  tabindex={-1}
+                >
+                  {children}
+                </main>
+              </div>
+            </div>
+            <div class={shellBackdrop} data-sidebar-backdrop hidden />
+          </>
+        )}
         <ToastRegion />
         <script src={assetManifest.htmx.href} />
         <script dangerouslySetInnerHTML={{ __html: clientScript() }} />

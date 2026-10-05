@@ -3,7 +3,8 @@ import type { LabelType } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { ProjectGroupMapping } from "@storyshelf/core/schema";
 import type { Token } from "@storyshelf/core/schema";
-import { PageHeader, Tabs } from "../ui/components.tsx";
+import { PageHeader, SubNavLayout } from "../ui/components.tsx";
+import type { IconName } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import { renderSettingsGeneral } from "./settings-general.tsx";
 import { renderSettingsLabels } from "./settings-labels.tsx";
@@ -70,6 +71,17 @@ const TAB_LABELS: Record<SettingsTab, string> = {
   status: "Git status",
 };
 
+const TAB_ICONS: Record<SettingsTab, IconName> = {
+  general: "settings",
+  tests: "activity",
+  labels: "tag",
+  tokens: "key",
+  webhooks: "webhook",
+  notifications: "bell",
+  members: "users",
+  status: "git-branch",
+};
+
 const SETTINGS_TABS: SettingsTab[] = [
   "general",
   "tests",
@@ -129,16 +141,17 @@ export function renderProjectSettingsPage(
         ]}
       />
 
-      <Tabs
+      <SubNavLayout
         label="Settings sections"
-        tabs={SETTINGS_TABS.map((tab) => ({
+        items={SETTINGS_TABS.map((tab) => ({
           label: TAB_LABELS[tab],
           href: tabHref(project, tab),
+          icon: TAB_ICONS[tab],
           active: activeTab === tab,
         }))}
-      />
-
-      {renderActiveTab(data, formState)}
+      >
+        {renderActiveTab(data, formState)}
+      </SubNavLayout>
     </DocumentLayout>
   );
 }

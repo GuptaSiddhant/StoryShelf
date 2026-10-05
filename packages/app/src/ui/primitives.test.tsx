@@ -18,6 +18,7 @@ import {
   Progress,
   RelativeTime,
   Segmented,
+  SubNavLayout,
   Table,
   Thumbnail,
 } from "./components.tsx";
@@ -288,5 +289,27 @@ describe("CodeBlock and FilterInput", () => {
     expect(html).toContain("data-filter-input");
     expect(html).toContain('aria-label="Filter projects"');
     expect(html).toContain('type="search"');
+  });
+});
+
+describe("SubNavLayout", () => {
+  it("renders a labeled nav with icons, marks the active page, and wraps content", async () => {
+    const html = await render(
+      <SubNavLayout
+        label="Settings sections"
+        items={[
+          { label: "General", href: "/s", icon: "settings", active: true },
+          { label: "Tokens", href: "/s/tokens", icon: "key" },
+        ]}
+      >
+        <p>Body</p>
+      </SubNavLayout>,
+    );
+    expect(html).toContain('aria-label="Settings sections"');
+    expect(html).toContain('aria-current="page"');
+    expect(html.match(/aria-current="page"/gu)?.length).toBe(1);
+    expect(html).toContain("#i-settings");
+    expect(html).toContain("#i-key");
+    expect(html).toContain("<p>Body</p>");
   });
 });

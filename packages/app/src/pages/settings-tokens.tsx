@@ -1,7 +1,7 @@
 import type { Project } from "@storyshelf/core/schema";
 import type { Token } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Alert, Button, Card, Field, Meta, SectionTitle } from "../ui/components.tsx";
+import { Alert, Button, Card, Field, Meta, SectionTitle, Table } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Tokens settings tab: project CLI tokens plus the create-token form. */
@@ -21,7 +21,7 @@ export function renderSettingsTokens(
       <Card>
         <SectionTitle>API tokens</SectionTitle>
         <Meta>Tokens are used by the CLI to upload builds. They are scoped to this project.</Meta>
-        <div class="table-wrap table-gap">
+        <Table>
           <table>
             <thead>
               <tr>
@@ -58,7 +58,7 @@ export function renderSettingsTokens(
               ))}
             </tbody>
           </table>
-        </div>
+        </Table>
         {tokens.length === 0 ? <Meta>No tokens yet. Create one for CI.</Meta> : null}
       </Card>
 

@@ -92,6 +92,14 @@ describe("engine auth routes", () => {
     expect(html).toContain("/auth/engine/acme-saml");
   });
 
+  it("renders sign-in without the app sidebar or admin links", async () => {
+    const { db, shelf } = await testEngine();
+    const html = await (await testApp(db, shelf).request("/auth/login")).text();
+    expect(html).toContain("bare__brand");
+    expect(html).not.toContain('aria-label="Primary"');
+    expect(html).not.toContain("/admin");
+  });
+
   it("signs in with email and password through the engine", async () => {
     const { db, shelf } = await testEngine();
     const app = testApp(db, shelf);
@@ -267,7 +275,9 @@ describe("engine auth routes", () => {
 
     const page = await app.request(`/auth/invites/${issued.inviteId}?token=${issued.token}`);
     expect(page.status).toBe(200);
-    expect(await page.text()).toContain("lead@example.com");
+    const inviteHtml = await page.text();
+    expect(inviteHtml).toContain("lead@example.com");
+    expect(inviteHtml).toContain("bare__brand");
 
     const form = new FormData();
     form.set("token", issued.token);

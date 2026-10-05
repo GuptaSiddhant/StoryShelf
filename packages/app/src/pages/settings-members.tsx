@@ -1,7 +1,16 @@
 import type { Project } from "@storyshelf/core/schema";
 import type { ProjectGroupMapping } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge, Button, Card, Field, Meta, SectionTitle, SelectField } from "../ui/components.tsx";
+import {
+  Badge,
+  Button,
+  Card,
+  Field,
+  Meta,
+  SectionTitle,
+  SelectField,
+  Table,
+} from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Project member row as rendered in the members settings tab. */
@@ -25,7 +34,7 @@ export function renderSettingsMembers(
       <Card>
         <SectionTitle>Members</SectionTitle>
         <Meta>Project members and their roles. Site admins have implicit admin access.</Meta>
-        <div class="table-wrap table-gap">
+        <Table>
           <table>
             <thead>
               <tr>
@@ -74,7 +83,7 @@ export function renderSettingsMembers(
               ))}
             </tbody>
           </table>
-        </div>
+        </Table>
         {members.length === 0 ? <Meta>No members yet.</Meta> : null}
       </Card>
 
@@ -114,7 +123,7 @@ export function renderSettingsMembers(
             next login; removing a mapping revokes synced grants but never manual ones. Wildcards
             are not expanded.
           </Meta>
-          <div class="table-wrap table-gap">
+          <Table>
             <table>
               <thead>
                 <tr>
@@ -153,7 +162,7 @@ export function renderSettingsMembers(
                 ))}
               </tbody>
             </table>
-          </div>
+          </Table>
           {groupMappings.length === 0 ? <Meta>No group mappings yet.</Meta> : null}
         </Card>
       </div>

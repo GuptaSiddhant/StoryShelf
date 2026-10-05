@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Field, PageHeader } from "../ui/components.tsx";
+import { Alert, Button, Card, Field, PageHeader, VStack } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
@@ -13,9 +13,9 @@ export interface InvitePageState {
 /** Set-password page for invite acceptance (no auth required). */
 export function renderInvitePage(state: InvitePageState): RenderedContent {
   return (
-    <DocumentLayout title="Set password">
-      <div class="login">
-        <Card>
+    <DocumentLayout title="Set password" layout="bare">
+      <Card>
+        <VStack gap="lg">
           <PageHeader
             title="Set your password"
             description={state.email ? `for ${state.email}` : undefined}
@@ -26,38 +26,40 @@ export function renderInvitePage(state: InvitePageState): RenderedContent {
             </Alert>
           ) : null}
           <form method="post" action={`/auth/invites/${state.inviteId}`} novalidate>
-            <input type="hidden" name="token" value={state.token} />
-            {csrfField()}
-            <Field
-              label="New password"
-              name="password"
-              type="password"
-              required
-              autofocus
-              autocomplete="new-password"
-            />
-            <Field
-              label="Confirm password"
-              name="confirm"
-              type="password"
-              required
-              autocomplete="new-password"
-            />
-            <Button variant="primary" type="submit">
-              Set password and sign in
-            </Button>
+            <VStack>
+              <input type="hidden" name="token" value={state.token} />
+              {csrfField()}
+              <Field
+                label="New password"
+                name="password"
+                type="password"
+                required
+                autofocus
+                autocomplete="new-password"
+              />
+              <Field
+                label="Confirm password"
+                name="confirm"
+                type="password"
+                required
+                autocomplete="new-password"
+              />
+              <Button variant="primary" type="submit">
+                Set password and sign in
+              </Button>
+            </VStack>
           </form>
-        </Card>
-      </div>
+        </VStack>
+      </Card>
     </DocumentLayout>
   );
 }
 
 export function renderInviteInvalidPage(error: string): RenderedContent {
   return (
-    <DocumentLayout title="Invite">
-      <div class="login">
-        <Card>
+    <DocumentLayout title="Invite" layout="bare">
+      <Card>
+        <VStack gap="lg">
           <PageHeader title="Invite" />
           <Alert tone="danger" title="Invalid invite">
             {error}
@@ -65,8 +67,8 @@ export function renderInviteInvalidPage(error: string): RenderedContent {
           <p>
             <a href="/auth/login">Back to sign in</a>
           </p>
-        </Card>
-      </div>
+        </VStack>
+      </Card>
     </DocumentLayout>
   );
 }
