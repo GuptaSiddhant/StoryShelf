@@ -5,7 +5,7 @@
  * `feedback.tsx` (Badge, statusTone, Alert, EmptyState, Stat), `forms.tsx`
  * (Field, TextareaField, SelectField), `layout.tsx` (Card, PageHeader),
  * `stacks.tsx` (HStack, VStack), plus `icons/icon.tsx` (Icon), `avatar.tsx`,
- * `kbd.tsx`, `segmented.tsx`, `table.tsx`, `thumbnail.tsx`, `dropdown.tsx`.
+ * `compare-stage.tsx`, `progress.tsx`, `kbd.tsx`, `segmented.tsx`, `table.tsx`, `thumbnail.tsx`, `dropdown.tsx`.
  * Import from here; the family modules are
  * an organizational detail.
  */
@@ -22,3 +22,5 @@ export { Kbd } from "./kbd.tsx";
 export { Segmented, type SegmentedItem } from "./segmented.tsx";
 export { Table } from "./table.tsx";
 export { Thumbnail } from "./thumbnail.tsx";
+export { CompareStage, type CompareStageProps } from "./compare-stage.tsx";
+export { Progress } from "./progress.tsx";

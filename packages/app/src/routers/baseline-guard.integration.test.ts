@@ -231,6 +231,35 @@ describe("approval guard for changed baselines", () => {
     const response = await post(app, "f1/snapshots/sf1/reject", true);
     expect(response.headers.get("hx-refresh")).toBe("true");
   });
+
+  it.each(["approve", "reject"])(
+    "sends htmx to the next open snapshot after %s",
+    async (action) => {
+      const { app, db } = await setup();
+      await db.insert(db.tables.snapshots, {
+        id: "sf-next",
+        projectId: "p1",
+        buildId: "f1",
+        storyId: "next",
+        storyName: "Next",
+        storyTitle: "T",
+        viewportName: "desktop",
+        screenshotPath: "shots/f1/a.png",
+        status: "new",
+        baselineId: null,
+        baselineVersion: "none",
+        createdAt: T1,
+        updatedAt: T1,
+      });
+
+      const response = await post(app, `f1/snapshots/sf1/${action}`, true);
+
+      expect(response.headers.get("hx-redirect")).toBe(
+        "/projects/test-project/builds/f1/diff?snapshot=sf-next",
+      );
+      expect(response.headers.get("hx-refresh")).toBeNull();
+    },
+  );
 });
 
 function chunk(type: string, data: Buffer): Buffer {

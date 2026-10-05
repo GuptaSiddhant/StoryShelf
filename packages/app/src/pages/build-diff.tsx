@@ -5,10 +5,12 @@ import type { Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { EmptyState } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
-import { reviewLayout, reviewMain } from "../ui/styles/review.ts";
+import { canvasColumn, workspace } from "../ui/styles/review-layout.ts";
+import { DiffActionBar } from "./build-diff-actions.tsx";
 import { DiffComments } from "./build-diff-comments.tsx";
 import { DiffHeader } from "./build-diff-header.tsx";
 import { DiffNav } from "./build-diff-nav.tsx";
+import { ShortcutsDialog } from "./build-diff-shortcuts.tsx";
 import { StaleBaselineNotice } from "./build-diff-stale.tsx";
 import { DiffViewer } from "./build-diff-viewer.tsx";
 
@@ -44,16 +46,15 @@ function DiffReviewGrid(
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, snapshots, comments, selected, canReview, hasBaseline, drifted } = props;
   return (
-    <div class={reviewLayout}>
+    <div class={workspace}>
       <DiffNav project={project} build={build} snapshots={snapshots} selectedId={selected?.id} />
-      <div class={reviewMain}>
+      <div class={canvasColumn}>
         {selected ? (
           <>
             <DiffViewer
               project={project}
               build={build}
               selected={selected}
-              canReview={canReview}
               hasBaseline={hasBaseline}
               drifted={drifted[selected.id]}
             />
@@ -63,6 +64,14 @@ function DiffReviewGrid(
               selectedId={selected.id}
               comments={comments}
               canReview={canReview}
+            />
+            <DiffActionBar
+              project={project}
+              build={build}
+              snapshots={snapshots}
+              selected={selected}
+              canReview={canReview}
+              drifted={drifted[selected.id] !== undefined}
             />
           </>
         ) : (
@@ -86,6 +95,7 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
     <DocumentLayout
       title={`Review · ${build.gitBranch}`}
       nav={{ active: "builds", projectSlug: project.slug, projectName: project.name }}
+      layout="wide"
     >
       <DiffHeader
         project={project}
@@ -121,6 +131,7 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
           drifted={drifted}
         />
       )}
+      <ShortcutsDialog />
     </DocumentLayout>
   );
 }

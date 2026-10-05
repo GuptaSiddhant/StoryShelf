@@ -1,19 +1,46 @@
-import type { Build } from "@storyshelf/core/schema";
-import type { Project } from "@storyshelf/core/schema";
-import type { Snapshot } from "@storyshelf/core/schema";
+import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge, Card, Meta, statusTone } from "../ui/components.tsx";
+import { Segmented, Thumbnail, statusTone } from "../ui/components.tsx";
+import { css } from "../ui/css.ts";
 import {
-  reviewNav,
-  reviewNavHead,
-  reviewNavList,
-  snapshotNav,
-  snapshotNavActive,
-  snapshotNavMeta,
-  snapshotNavTitle,
-} from "../ui/styles/review.ts";
+  filmBody,
+  filmItem,
+  filmItemActive,
+  filmStatus,
+  filmSub,
+  filmTitle,
+  filmstrip,
+  filmstripHead,
+  filmstripList,
+  statusDots,
+} from "../ui/styles/review-layout.ts";
+import {
+  diffPercent,
+  reviewProgress,
+  snapshotImageUrl,
+  snapshotPageUrl,
+} from "./build-diff-model.ts";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
+
+/**
+ * The list filters purely in CSS off `data-filter`, so it works before the
+ * review script runs. The selected snapshot always stays visible.
+ */
+const filteredList = css`
+  /* filmstrip-filtered */
+  ${filmstripList}
+  &[data-filter="review"]
+    [data-status]:not([data-status="new"]):not([data-status="changed"]):not([aria-current="true"]) {
+    display: none;
+  }
+  &[data-filter="done"]
+    [data-status]:not([data-status="approved"]):not([data-status="rejected"]):not(
+      [aria-current="true"]
+    ) {
+    display: none;
+  }
+`;
 
 /** Snapshot navigator props for the diff review page. */
 export interface DiffNavProps {
@@ -23,44 +50,76 @@ export interface DiffNavProps {
   selectedId?: string;
 }
 
-/** Left-rail snapshot list with per-story status and diff ratios. */
+function FilmItem(props: {
+  project: Project;
+  build: Build;
+  snap: Snapshot;
+  active: boolean;
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const { project, build, snap, active } = props;
+  const url = snapshotPageUrl(project, build, snap.id);
+  const percent = diffPercent(snap);
+  return (
+    <a
+      href={url}
+      class={active ? filmItemActive : filmItem}
+      data-snapshot-link
+      data-snapshot-id={snap.id}
+      data-status={snap.status}
+      aria-current={active ? "true" : undefined}
+      hx-get={url}
+      hx-target="body"
+      hx-push-url="true"
+    >
+      <Thumbnail src={snapshotImageUrl(project, build, snap, "image")} alt="" placeholder="…" />
+      <span class={filmBody}>
+        <span class={filmTitle} title={`${snap.storyTitle} / ${snap.storyName}`}>
+          {snap.storyName}
+        </span>
+        <span class={filmSub}>{snap.storyTitle}</span>
+        <span class={filmStatus}>
+          <span class={statusDots[statusTone(snap.status)]} aria-hidden="true" />
+          {snap.status}
+          {percent ? ` · ${percent}` : ""}
+        </span>
+      </span>
+    </a>
+  );
+}
+
+/** Left filmstrip: filter chips plus a thumbnail per snapshot. */
 export function DiffNav(props: DiffNavProps): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, snapshots, selectedId } = props;
+  const progress = reviewProgress(snapshots);
+  const filter = progress.pending > 0 ? "review" : "all";
   return (
-    <div class={reviewNav}>
-      <Card padded={false}>
-        <div class={reviewNavHead}>
-          <strong>Snapshots</strong>
-          <Meta as="span">{snapshots.length} total</Meta>
-        </div>
-        <div data-diff-nav data-current={selectedId} class={reviewNavList}>
-          {snapshots.map((snap): HtmlEscapedString | Promise<HtmlEscapedString> => (
-            <a
-              key={snap.id}
-              href={`/projects/${project.slug}/builds/${build.id}/diff?snapshot=${snap.id}`}
-              data-snapshot-link
-              data-snapshot-id={snap.id}
-              class={selectedId === snap.id ? snapshotNavActive : snapshotNav}
-              hx-get={`/projects/${project.slug}/builds/${build.id}/diff?snapshot=${snap.id}`}
-              hx-target="body"
-              hx-push-url="true"
-            >
-              <span class={snapshotNavTitle}>
-                <Badge tone={statusTone(snap.status)}>{snap.status}</Badge>
-                <span class="truncate">
-                  {snap.storyTitle} / {snap.storyName}
-                </span>
-              </span>
-              <span class={snapshotNavMeta}>
-                {snap.viewportName} · {snap.viewportWidth}×{snap.viewportHeight}
-                {snap.diffRatio !== null && snap.diffRatio !== undefined
-                  ? ` · ${(snap.diffRatio * 100).toFixed(1)}%`
-                  : ""}
-              </span>
-            </a>
-          ))}
-        </div>
-      </Card>
-    </div>
+    <aside class={filmstrip} aria-label="Snapshots">
+      <div class={filmstripHead}>
+        <Segmented
+          label="Filter snapshots"
+          data-filter-switch
+          items={[
+            {
+              label: `Needs review ${progress.pending}`,
+              value: "review",
+              active: filter === "review",
+            },
+            { label: `All ${snapshots.length}`, value: "all", active: filter === "all" },
+            { label: `Done ${progress.done}`, value: "done" },
+          ]}
+        />
+      </div>
+      <div data-diff-nav data-current={selectedId} data-filter={filter} class={filteredList}>
+        {snapshots.map((snap): HtmlEscapedString | Promise<HtmlEscapedString> => (
+          <FilmItem
+            key={snap.id}
+            project={project}
+            build={build}
+            snap={snap}
+            active={selectedId === snap.id}
+          />
+        ))}
+      </div>
+    </aside>
   );
 }

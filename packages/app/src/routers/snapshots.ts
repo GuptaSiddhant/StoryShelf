@@ -15,6 +15,7 @@ import {
 } from "./builds.handlers.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
 import { hxRefresh, isHxRequest } from "./htmx.ts";
+import { hxAdvance } from "./review-next.ts";
 import {
   snapshotSchema,
   okSchema,
@@ -151,7 +152,7 @@ export function registerSnapshots(app: ShelfRouter): void {
       c.header("HX-Redirect", `/projects/${slug}/builds/${buildId}/diff?snapshot=${snapshotId}`);
       return c.json({ ok: true }, 200);
     }
-    hxRefresh(c);
+    await hxAdvance(c, { slug, buildId, snapshotId });
     return c.json({ ok: true }, 200);
   });
 
@@ -163,7 +164,7 @@ export function registerSnapshots(app: ShelfRouter): void {
     const userId = getStore().user?.id ?? null;
     await new SnapshotModel(getStore().db).review(snapshot.id, "rejected", userId);
     await refreshBuild(build.id);
-    hxRefresh(c);
+    await hxAdvance(c, { slug, buildId, snapshotId });
     return c.json({ ok: true });
   });
 

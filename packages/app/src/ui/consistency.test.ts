@@ -36,7 +36,7 @@ describe("ui-building-blocks contract", () => {
 
   it("imports UI only through the facade, the document shell, shared review styles, and page-local css", async () => {
     const directImport =
-      /from\s+"\.\.\/ui\/(?!components\.tsx|document\.tsx|csrf-field\.tsx|css\.ts|styles\/review\.ts)[^"]+"/u;
+      /from\s+"\.\.\/ui\/(?!components\.tsx|document\.tsx|csrf-field\.tsx|css\.ts|styles\/review(?:-[a-z]+)?\.ts)[^"]+"/u;
     const offenders = (await pageSources()).filter(({ source }) => directImport.test(source));
     expect(offenders.map(({ file }) => file)).toEqual([]);
   });

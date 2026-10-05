@@ -36,6 +36,38 @@ describe("shell scripts", () => {
     }
   });
 
+  it("is idempotent: re-execution after a body swap only re-runs inits", () => {
+    const source = clientScript();
+    expect(source).toContain("if(window.__ssInit){ window.__ssInit(); return; }");
+    // Document-level listeners must live in the once-only closure, not in inits.
+    expect(source.match(/window\.__ssInit=/gu)?.length).toBe(1);
+  });
+
+  it("queues toasts across navigations and reports failed requests", () => {
+    const source = clientScript();
+    for (const hook of [
+      "data-toast",
+      "sessionStorage",
+      "htmx:beforeRequest",
+      "htmx:responseError",
+    ]) {
+      expect(source).toContain(hook);
+    }
+  });
+
+  it("review shortcuts ignore modified keys and text inputs", () => {
+    const source = clientScript();
+    expect(source).toContain("e.metaKey||e.ctrlKey||e.altKey||typing(e.target)");
+    for (const hook of [
+      "[data-snap-next]",
+      "[data-snap-prev]",
+      "[data-approve]",
+      "[data-reject]",
+    ]) {
+      expect(source).toContain(hook);
+    }
+  });
+
   it("builds toasts with textContent, never innerHTML", () => {
     expect(clientScript()).not.toContain("innerHTML");
   });

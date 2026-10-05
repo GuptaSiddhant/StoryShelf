@@ -1,270 +1,63 @@
-import type { Build } from "@storyshelf/core/schema";
-import type { Project } from "@storyshelf/core/schema";
-import type { Snapshot } from "@storyshelf/core/schema";
+import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge, Button, Card, HStack, Meta, VStack, statusTone } from "../ui/components.tsx";
-import {
-  diffGrid,
-  diffPane,
-  diffPaneImg,
-  diffPaneLabel,
-  diffPlaceholder,
-  reviewBar,
-  reviewBarMeta,
-  reviewBarTitle,
-  viewSwitch,
-} from "../ui/styles/review.ts";
+import { Badge, CompareStage, VStack, statusTone } from "../ui/components.tsx";
+import { viewerHead, viewerMeta, viewerTitle } from "../ui/styles/review-layout.ts";
+import { diffPercent, snapshotImageUrl } from "./build-diff-model.ts";
 import { StaleSnapshotNotice } from "./build-diff-stale.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
-/** Three-up viewer props for the selected snapshot. */
+/** Viewer props for the selected snapshot. */
 export interface DiffViewerProps {
   project: Project;
   build: Build;
   selected: Snapshot;
-  canReview: boolean;
   hasBaseline: Record<string, boolean>;
   /** Set when the baseline changed after this snapshot's diff was computed. */
   drifted?: "stale" | "removed";
 }
 
-function imageUrl(
-  project: Project,
-  build: Build,
-  snapshot: Snapshot,
-  kind: "image" | "diff" | "baseline",
-): string {
-  return `/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${snapshot.id}/${kind}`;
+/** Why a snapshot has no diff image, phrased for the empty pane. */
+function diffEmptyText(status: string): string {
+  return status === "unchanged" || status === "approved"
+    ? "No diff — within threshold"
+    : "No diff yet";
 }
 
-interface SnapshotActionsProps {
-  project: Project;
-  build: Build;
-  selected: Snapshot;
-  drifted: boolean;
-}
-
-/** Approve/reject buttons for a reviewable snapshot. */
-function SnapshotActions(
-  props: SnapshotActionsProps,
-): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { project, build, selected, drifted } = props;
-  const approveUrl = `/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${selected.id}/approve${drifted ? "?force=true" : ""}`;
-  return (
-    <HStack>
-      <form method="post" action={approveUrl} hx-post={approveUrl} hx-target="body">
-        {drifted ? (
-          <Button
-            variant="secondary"
-            size="sm"
-            type="submit"
-            title="The baseline changed after this diff; replace it with this screenshot"
-          >
-            Approve anyway
-          </Button>
-        ) : (
-          <Button
-            variant="primary"
-            size="sm"
-            type="submit"
-            data-approve
-            accesskey="a"
-            title="Approve (a)"
-          >
-            Approve
-          </Button>
-        )}
-      </form>
-      <form
-        method="post"
-        action={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${selected.id}/reject`}
-        hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${selected.id}/reject`}
-        hx-target="body"
-      >
-        <Button
-          variant="danger"
-          size="sm"
-          type="submit"
-          data-reject
-          accesskey="r"
-          title="Reject (r)"
-        >
-          Reject
-        </Button>
-      </form>
-    </HStack>
-  );
-}
-
-interface DiffPaneGridProps {
-  project: Project;
-  build: Build;
-  selected: Snapshot;
-  hasBaseline: Record<string, boolean>;
-}
-
-interface SinglePaneProps {
-  project: Project;
-  build: Build;
-  selected: Snapshot;
-}
-
-/** Baseline image pane (or a first-capture placeholder). */
-function BaselinePane(
-  props: SinglePaneProps & { hasBaseline: Record<string, boolean> },
-): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { project, build, selected, hasBaseline } = props;
-  return (
-    <div class={diffPane} data-pane="baseline">
-      <div class={diffPaneLabel}>
-        <span>Baseline</span>
-      </div>
-      {hasBaseline[selected.id] ? (
-        <img
-          class={diffPaneImg}
-          src={imageUrl(project, build, selected, "baseline")}
-          alt={`Baseline for ${selected.storyTitle} / ${selected.storyName}`}
-          loading="lazy"
-          decoding="async"
-        />
-      ) : (
-        <div class={diffPlaceholder}>
-          <div>
-            <div>New story — no baseline yet</div>
-            <Meta as="div">First capture; approve to set the baseline.</Meta>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** Current screenshot pane. */
-function CurrentPane(props: SinglePaneProps): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { project, build, selected } = props;
-  return (
-    <div class={diffPane} data-pane="current">
-      <div class={diffPaneLabel}>
-        <span>Current</span>
-      </div>
-      <img
-        class={diffPaneImg}
-        src={imageUrl(project, build, selected, "image")}
-        alt={`Current for ${selected.storyTitle} / ${selected.storyName}`}
-        loading="lazy"
-        decoding="async"
-      />
-    </div>
-  );
-}
-
-/** Diff overlay pane (or a within-threshold note). */
-function DiffPane(props: SinglePaneProps): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { project, build, selected } = props;
-  return (
-    <div class={diffPane} data-pane="diff">
-      <div class={diffPaneLabel}>
-        <span>Diff</span>
-        {selected.diffRatio === null ? null : (
-          <span class="mono">{(selected.diffRatio * 100).toFixed(1)}%</span>
-        )}
-      </div>
-      {selected.diffPath ? (
-        <img
-          class={diffPaneImg}
-          src={imageUrl(project, build, selected, "diff")}
-          alt={`Diff for ${selected.storyTitle} / ${selected.storyName}`}
-          loading="lazy"
-          decoding="async"
-        />
-      ) : (
-        <div class={diffPlaceholder}>
-          {selected.status === "unchanged" || selected.status === "approved"
-            ? "No diff — within threshold"
-            : "No diff yet"}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** View-mode segmented control (split / single pane). */
-function ViewSwitch(): HtmlEscapedString | Promise<HtmlEscapedString> {
-  return (
-    <div class={viewSwitch} role="group" aria-label="Diff view" data-view-switch>
-      <button type="button" data-view-value="split" aria-pressed="true">
-        Split
-      </button>
-      <button type="button" data-view-value="baseline" aria-pressed="false">
-        Baseline
-      </button>
-      <button type="button" data-view-value="current" aria-pressed="false">
-        Current
-      </button>
-      <button type="button" data-view-value="diff" aria-pressed="false">
-        Diff
-      </button>
-    </div>
-  );
-}
-
-/** Baseline | current | diff image panes. */
-function DiffPaneGrid(props: DiffPaneGridProps): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { project, build, selected, hasBaseline } = props;
-  return (
-    <div class={diffGrid} data-view="split">
-      <BaselinePane project={project} build={build} selected={selected} hasBaseline={hasBaseline} />
-      <CurrentPane project={project} build={build} selected={selected} />
-      <DiffPane project={project} build={build} selected={selected} />
-    </div>
-  );
-}
-
-/** Baseline | current | diff panes with approve/reject actions. */
+/** Story heading plus the comparison stage for the selected snapshot. */
 export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { project, build, selected, canReview, hasBaseline, drifted } = props;
+  const { project, build, selected, hasBaseline, drifted } = props;
+  const percent = diffPercent(selected);
   return (
-    <Card>
-      <div class={reviewBar}>
-        <div>
-          <h2 class={reviewBarTitle}>
-            {selected.storyTitle} — {selected.storyName}
-          </h2>
-          <p class={reviewBarMeta}>
-            <span>
-              {selected.viewportName} · {selected.viewportWidth}×{selected.viewportHeight}
-            </span>
-            <Badge tone={statusTone(selected.status)}>{selected.status}</Badge>
-            {selected.diffPixels === null ? null : (
-              <span class="mono">{selected.diffPixels} px</span>
-            )}
-          </p>
-        </div>
-        <HStack>
-          <ViewSwitch />
-          {canReview && (selected.status === "new" || selected.status === "changed") ? (
-            <SnapshotActions
-              project={project}
-              build={build}
-              selected={selected}
-              drifted={drifted !== undefined}
-            />
-          ) : null}
-        </HStack>
+    <VStack>
+      <div class={viewerHead}>
+        <h2 class={viewerTitle}>
+          {selected.storyTitle} / {selected.storyName}
+        </h2>
+        <p class={viewerMeta}>
+          <Badge tone={statusTone(selected.status)} icon>
+            {selected.status}
+          </Badge>
+          <span>
+            {selected.viewportName} · {selected.viewportWidth}×{selected.viewportHeight}
+          </span>
+          {selected.diffPixels === null || selected.diffPixels === undefined ? null : (
+            <span class="mono">{selected.diffPixels} px</span>
+          )}
+          {percent ? <span class="mono">{percent}</span> : null}
+        </p>
       </div>
-      <VStack>
-        {drifted ? <StaleSnapshotNotice status={drifted} /> : null}
-        <DiffPaneGrid
-          project={project}
-          build={build}
-          selected={selected}
-          hasBaseline={hasBaseline}
-        />
-        <Meta>
-          Keyboard: <kbd>←</kbd> <kbd>→</kbd> navigate · <kbd>a</kbd> approve · <kbd>r</kbd> reject
-        </Meta>
-      </VStack>
-    </Card>
+      {drifted ? <StaleSnapshotNotice status={drifted} /> : null}
+      <CompareStage
+        baselineSrc={
+          hasBaseline[selected.id] ? snapshotImageUrl(project, build, selected, "baseline") : null
+        }
+        currentSrc={snapshotImageUrl(project, build, selected, "image")}
+        diffSrc={selected.diffPath ? snapshotImageUrl(project, build, selected, "diff") : null}
+        subject={`${selected.storyTitle} / ${selected.storyName}`}
+        diffEmpty={diffEmptyText(selected.status)}
+        diffMeta={percent ?? undefined}
+      />
+    </VStack>
   );
 }

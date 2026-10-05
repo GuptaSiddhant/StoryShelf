@@ -76,8 +76,8 @@ const shellTopbar = css`
 const toastRegion = css`
   /* toast-region */
   position: fixed;
+  top: calc(var(--topbar-height) + var(--space-3));
   right: var(--space-4);
-  bottom: var(--space-4);
   z-index: 80;
   display: flex;
   flex-direction: column;
@@ -115,7 +115,7 @@ const toastRegion = css`
   @keyframes toast-in {
     from {
       opacity: 0;
-      transform: translateY(8px);
+      transform: translateY(-8px);
     }
   }
 `;
