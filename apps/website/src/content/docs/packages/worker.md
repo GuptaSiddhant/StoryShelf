@@ -63,6 +63,8 @@ interface WorkerOptions {
 }
 ```
 
+**Idle backoff.** Queues that long-poll (SQS, Redis, Service Bus) block inside `poll()`. Queues that return immediately when empty (GCP Pub/Sub synchronous pull, Azure Storage Queues) would otherwise be polled in a tight loop, so after any empty poll that returns in under a second the worker sleeps 250ms, doubling per consecutive empty poll up to 5s. Receiving a job resets the backoff, and `stop()` interrupts the sleep.
+
 The worker resolves `PollableJob` via the queue's `poll/ack/nack`, then calls the same `executeCaptureJob` / `createDispatchJob` path as the in-process orchestrator — build loading, Storybook extraction to `scratchDir`, story discovery, `runner.render(...)`, diff + persist, status fanout. Baselines remain browser-aware (`infraHashFor(browser, viewports, defaults)`).
 
 ## When to use it

@@ -2,6 +2,7 @@ import type { PollableJob } from "@storyshelf/core/adapter/capture-queue";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_WORKER_CONFIG, resolveWorkerConfig } from "./config.ts";
+import { idleDelayMs, isFastEmptyPoll, MIN_BLOCKING_POLL_MS } from "./idle.ts";
 import { createCaptureWorker } from "./index.ts";
 
 function createMockQueue(jobs: PollableJob[]) {
@@ -498,5 +499,96 @@ describe("createCaptureWorker", () => {
       bindings?: () => Record<string, unknown>;
     };
     expect(bound.bindings?.()).toMatchObject({ component: "mock" });
+  });
+});
+
+describe("idle backoff", () => {
+  it("computes a doubling delay capped at 5s", () => {
+    expect(idleDelayMs(1)).toBe(250);
+    expect(idleDelayMs(2)).toBe(500);
+    expect(idleDelayMs(3)).toBe(1000);
+    expect(idleDelayMs(10)).toBe(5000);
+    expect(idleDelayMs(0)).toBe(250);
+  });
+
+  it("treats only sub-minimum empty polls as non-blocking", () => {
+    expect(isFastEmptyPoll(0)).toBe(true);
+    expect(isFastEmptyPoll(MIN_BLOCKING_POLL_MS - 1)).toBe(true);
+    expect(isFastEmptyPoll(MIN_BLOCKING_POLL_MS)).toBe(false);
+  });
+
+  it("does not busy-poll a queue that returns null immediately", async () => {
+    const queue = createMockQueue([]);
+    const { db, storage, runner } = createFakeAdapters();
+    const worker = createCaptureWorker({
+      queue: queue as unknown as import("@storyshelf/core/adapter/capture-queue").CaptureQueue,
+      db,
+      storage,
+      runner,
+      scratchDir: "/tmp",
+      config: { waitTimeSeconds: 20, concurrency: 1 },
+    });
+
+    const startPromise = worker.start();
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 1000);
+    });
+    await worker.stop();
+    await startPromise.catch(() => {});
+
+    // 250 + 500 ms sleeps in ~1s: a handful of polls, not thousands.
+    expect(queue.poll.mock.calls.length).toBeGreaterThan(1);
+    expect(queue.poll.mock.calls.length).toBeLessThan(6);
+  });
+
+  it("stops promptly while sleeping in a long backoff", async () => {
+    const queue = createMockQueue([]);
+    const { db, storage, runner } = createFakeAdapters();
+    const worker = createCaptureWorker({
+      queue: queue as unknown as import("@storyshelf/core/adapter/capture-queue").CaptureQueue,
+      db,
+      storage,
+      runner,
+      scratchDir: "/tmp",
+      config: { waitTimeSeconds: 20, concurrency: 1 },
+    });
+
+    const startPromise = worker.start();
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 100);
+    });
+    const began = Date.now();
+    await worker.stop();
+    await startPromise.catch(() => {});
+    expect(Date.now() - began).toBeLessThan(200);
+  });
+
+  it("adds no extra sleep for queues that block in poll()", async () => {
+    let calls = 0;
+    const poll = vi.fn(async () => {
+      calls += 1;
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 1100);
+      });
+      return null;
+    });
+    const queue = { ...createMockQueue([]), poll };
+    const { db, storage, runner } = createFakeAdapters();
+    const worker = createCaptureWorker({
+      queue: queue as unknown as import("@storyshelf/core/adapter/capture-queue").CaptureQueue,
+      db,
+      storage,
+      runner,
+      scratchDir: "/tmp",
+      config: { waitTimeSeconds: 20, concurrency: 1 },
+    });
+    const startPromise = worker.start();
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 2400);
+    });
+    await worker.stop();
+    await startPromise.catch(() => {});
+    // Back-to-back polls with no extra sleep: 1100ms each.
+    expect(calls).toBe(3);
   });
 });

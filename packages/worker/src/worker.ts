@@ -22,6 +22,7 @@ import {
   snapshots,
 } from "@storyshelf/db-sqlite/schema";
 import { resolveWorkerConfig, type WorkerConfig } from "./config.ts";
+import { idleDelayMs, isFastEmptyPoll } from "./idle.ts";
 
 /** Table handles required by the worker (orchestrator + dispatch). */
 export type WorkerTables = {
@@ -255,37 +256,50 @@ export function createCaptureWorker(options: WorkerOptions): WorkerHandle {
     inFlight.add(tracked);
   }
 
+  let wakeIdle: (() => void) | null = null;
+
+  /** Interruptible sleep so `stop()` never waits out a backoff. */
+  async function idleSleep(ms: number): Promise<void> {
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(done, ms);
+      function done(): void {
+        clearTimeout(timer);
+        wakeIdle = null;
+        resolve();
+      }
+      wakeIdle = done;
+    });
+  }
+
+  /** Poll once; undefined means the poll failed (already logged and backed off). */
+  async function pollOnce(waitMs: number): Promise<PollableJob | null | undefined> {
+    try {
+      return await doPoll({ waitMs });
+    } catch (error) {
+      logger?.error({ err: error }, "poll failed");
+      await idleSleep(1000);
+      return undefined;
+    }
+  }
+
   async function loop(): Promise<void> {
     const waitMs = config.waitTimeSeconds * 1000;
+    let emptyStreak = 0;
     while (running) {
-      let job: PollableJob | null = null;
-      try {
-        job = await doPoll({ waitMs });
-      } catch (error) {
-        logger?.error({ err: error }, "poll failed");
-        // Backoff on poll error
-        await new Promise<void>((resolve) => {
-          setTimeout(() => {
-            resolve();
-          }, 1000);
-        });
+      const startedAt = Date.now();
+      const job = await pollOnce(waitMs);
+      if (job === undefined || !running) {
         continue;
       }
-      if (!running) {
-        break;
-      }
       if (!job) {
-        // No job: brief pause to avoid tight loop when waitMs=0
-        if (waitMs === 0) {
-          await new Promise<void>((resolve) => {
-            setTimeout(() => {
-              resolve();
-            }, 500);
-          });
+        // Queues without long-poll return instantly; back off instead of spinning.
+        emptyStreak = isFastEmptyPoll(Date.now() - startedAt) ? emptyStreak + 1 : 0;
+        if (emptyStreak > 0) {
+          await idleSleep(idleDelayMs(emptyStreak));
         }
         continue;
       }
-      // Check if we know this build already failed permanently? Attempts already handled in processJob.
+      emptyStreak = 0;
       if (!isValidJob(job)) {
         await dropPoisonJob(job);
         continue;
@@ -322,6 +336,7 @@ export function createCaptureWorker(options: WorkerOptions): WorkerHandle {
         return;
       }
       running = false;
+      wakeIdle?.();
       if (stopResolve) {
         stopResolve();
         stopResolve = null;
