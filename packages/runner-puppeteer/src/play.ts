@@ -3,93 +3,61 @@
 import type { Page } from "puppeteer-core";
 import { messageOf } from "./browser.ts";
 
+/** Arguments serialized into the page for {@link inPagePlay}. */
+export interface PlayArgs {
+  storyId: string;
+  timeoutMs: number;
+}
+
 /** Execute the story's play function with a timeout race. */
 export async function runPlay(page: Page, storyId: string, timeoutMs: number): Promise<void> {
   try {
-    await evaluatePlay(page, storyId, timeoutMs);
+    await page.evaluate(inPagePlay, { storyId, timeoutMs });
   } catch (error) {
     throw new Error(`play failed: ${messageOf(error)}`, { cause: error });
   }
 }
 
-async function evaluatePlay(page: Page, storyId: string, timeoutMs: number): Promise<void> {
-  await page.evaluate(
-    async ({ storyId: sid, timeoutMs: tms }: { storyId: string; timeoutMs: number }) => {
-      const win = globalThis as unknown as {
-        __STORYBOOK_PREVIEW__?: {
-          executePlay?: (id: string) => Promise<void>;
-          storyStore?: { fromId?: (id: string) => { play?: () => Promise<void> } };
-          channel?: { on: (e: string, cb: (err: unknown) => void) => void };
-        };
-      };
-      // oxlint-disable-next-line typescript/dot-notation -- __STORYBOOK_PREVIEW__ is a Storybook global
-      const preview = win["__STORYBOOK_PREVIEW__"];
-      if (!preview) return;
-      let playError: unknown = null;
-      hookChannel(preview, (err) => {
-        playError = err;
-      });
-      await invokePlay(preview, sid, tms);
-      if (playError) throw playError;
-    },
-    { storyId, timeoutMs },
-  );
-}
-
-function hookChannel(
-  preview: { channel?: { on: (e: string, cb: (err: unknown) => void) => void } },
-  handler: (err: unknown) => void,
-): void {
-  try {
-    preview.channel?.on("playFunctionThrewException", handler);
-  } catch {
-    // Channel hookup is best-effort; play still runs without it.
-  }
-}
-
-async function invokePlay(
-  preview: {
+/**
+ * Runs inside the browser. Playwright serializes only this function's source, so it must not
+ * reference anything from this module (helpers, imports): split it up and the page throws
+ * `ReferenceError`. `play.test.ts` evaluates it in a scope without module bindings to guard that.
+ */
+// oxlint-disable-next-line eslint/max-statements -- must stay one self-contained function (see above)
+export async function inPagePlay({ storyId, timeoutMs }: PlayArgs): Promise<void> {
+  type Preview = {
     executePlay?: (id: string) => Promise<void>;
     storyStore?: { fromId?: (id: string) => { play?: (ctx: unknown) => Promise<void> } };
-  },
-  storyId: string,
-  timeoutMs: number,
-): Promise<void> {
-  if (preview.executePlay) {
-    await raceWithTimeout(preview.executePlay(storyId), timeoutMs);
-    return;
+    channel?: { on: (event: string, cb: (err: unknown) => void) => void };
+  };
+  const preview = (globalThis as unknown as Record<string, Preview | undefined>)[
+    "__STORYBOOK_PREVIEW__"
+  ];
+  if (!preview) return;
+  let playError: unknown = null;
+  try {
+    // Best-effort: play still runs without the channel hookup.
+    preview.channel?.on("playFunctionThrewException", (err) => {
+      playError = err;
+    });
+  } catch {
+    // ignore
   }
-  await tryStoryStorePlay(preview, storyId, timeoutMs);
-}
-
-async function tryStoryStorePlay(
-  preview: { storyStore?: { fromId?: (id: string) => { play?: (ctx: unknown) => Promise<void> } } },
-  storyId: string,
-  timeoutMs: number,
-): Promise<void> {
-  // oxlint-disable-next-line typescript/no-unnecessary-type-assertion -- structural storyStore narrowing
-  const loaded = preview.storyStore?.fromId?.(storyId) as unknown as
-    | {
-        play?: (ctx: unknown) => Promise<void>;
-      }
-    | undefined;
-  if (!loaded?.play) return;
-  await raceWithTimeout(
-    loaded.play({ canvasElement: globalThis.document.querySelector("#storybook-root") }),
-    timeoutMs,
-  );
-}
-
-async function raceWithTimeout(work: Promise<void>, timeoutMs: number): Promise<void> {
-  await Promise.race([work, timeoutPromise(timeoutMs)]);
-}
-
-async function timeoutPromise(timeoutMs: number): Promise<never> {
-  return await new Promise<never>((unusedResolve, reject) => {
-    // oxlint-disable-next-line eslint/no-void, eslint/no-unused-vars -- resolve is unused by design
-    void unusedResolve;
-    setTimeout(() => {
+  const canvasElement = globalThis.document?.querySelector("#storybook-root");
+  const work = preview.executePlay
+    ? preview.executePlay(storyId)
+    : preview.storyStore?.fromId?.(storyId)?.play?.({ canvasElement });
+  if (!work) return;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
       reject(new Error(`play timeout after ${timeoutMs}ms`));
     }, timeoutMs);
   });
+  try {
+    await Promise.race([work, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+  if (playError) throw playError;
 }
