@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { findAsset } from "./asset-paths.ts";
 import { contentHash, iconSprite, iconSpriteHash, iconSpriteHref } from "./ui/icons/sprite.ts";
 
 /**
@@ -7,10 +7,7 @@ import { contentHash, iconSprite, iconSpriteHash, iconSpriteHref } from "./ui/ic
  * hash may be cached forever (`immutable`): changing the file changes the
  * URL. Loaded synchronously once so the page shell can reference the URLs.
  */
-const htmxSource = readFileSync(
-  fileURLToPath(new URL("assets/htmx.min.js", import.meta.url)),
-  "utf8",
-);
+const htmxSource = readFileSync(findAsset("htmx.min.js", import.meta.url), "utf8");
 const htmxHash = contentHash(htmxSource);
 
 export const assetManifest = {
