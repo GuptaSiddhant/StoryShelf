@@ -79,6 +79,10 @@ this — keep it green and lower its per-file style ceilings as you migrate.
   `--status-*-bg|-border|-fg`) and use `--text-secondary` (not
   `--text-muted`, which is for decoration/placeholders) for small text.
   `styles.test.ts` enforces WCAG AA for the default themes.
+- **Breadcrumbs belong to the shell, not `PageHeader`.** Pass `nav.trail`
+  (`{ label, href? }[]`) to `DocumentLayout`; the top bar renders
+  `[project picker] / [section] / …trail`, and the last item is the current
+  page. Account, theme and collapse live in the sidebar footer.
 - **Chrome lives in `ui/shell/`** (`sidebar`, `topbar`, `bare`, boot and
   client scripts). `DocumentLayout` takes `layout="default" | "wide" |
   "bare"` (`bare` = sign-in/invite, no app chrome).

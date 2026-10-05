@@ -14,6 +14,9 @@ import { DARK_THEME, LIGHT_THEME } from "./theme.ts";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
+/** Active section, project, and breadcrumb trail passed to the shell. */
+export type { NavConfig };
+
 /** Rendered HTML content returned by page components. */
 export type RenderedContent = string | Promise<string>;
 

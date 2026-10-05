@@ -50,7 +50,12 @@ export async function renderLabelDetailPage(
   return (
     <DocumentLayout
       title={`${key}: ${value}`}
-      nav={{ active: "labels", projectSlug: project.slug, projectName: project.name }}
+      nav={{
+        active: "labels",
+        projectSlug: project.slug,
+        projectName: project.name,
+        trail: [{ label: `${labelType ? labelType.name : key}: ${value}` }],
+      }}
     >
       <PageHeader
         title={
@@ -69,11 +74,6 @@ export async function renderLabelDetailPage(
             All labels
           </Button>
         }
-        breadcrumbs={[
-          { label: "Projects", href: "/projects" },
-          { label: project.name, href: `/projects/${project.slug}/builds` },
-          { label: `${labelType ? labelType.name : key}: ${value}` },
-        ]}
       />
 
       {builds.length === 0 ? (
@@ -169,11 +169,6 @@ export async function renderLabelsPage(slug: string): Promise<RenderedContent | 
       <PageHeader
         title="Labels"
         description="Typed labels attach values to builds and link out to external systems."
-        breadcrumbs={[
-          { label: "Projects", href: "/projects" },
-          { label: project.name, href: `/projects/${project.slug}/builds` },
-          { label: "Labels" },
-        ]}
       />
 
       {labelTypes.length === 0 ? (

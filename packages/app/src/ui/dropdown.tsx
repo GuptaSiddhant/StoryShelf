@@ -11,6 +11,13 @@ const dropdownRoot = css`
   display: inline-block;
 `;
 
+const dropdownRootBlock = css`
+  /* dropdown-block */
+  ${dropdownRoot}
+  display: block;
+  width: 100%;
+`;
+
 const dropdownTrigger = css`
   /* dropdown-trigger */
   list-style: none;
@@ -34,6 +41,20 @@ const dropdownTrigger = css`
   }
 `;
 
+const dropdownTriggerGhost = css`
+  /* dropdown-trigger-ghost */
+  ${dropdownTrigger}
+  min-height: 34px;
+  width: 100%;
+  justify-content: space-between;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  &:hover {
+    background: var(--surface-muted);
+  }
+`;
+
 const dropdownMenu = css`
   /* dropdown-menu */
   position: absolute;
@@ -54,6 +75,25 @@ const dropdownMenuEnd = css`
   left: auto;
   right: 0;
 `;
+
+const dropdownMenuAbove = css`
+  /* dropdown-menu-above */
+  ${dropdownMenu}
+  top: auto;
+  bottom: calc(100% + 4px);
+`;
+
+const dropdownMenuAboveEnd = css`
+  /* dropdown-menu-above-end */
+  ${dropdownMenuEnd}
+  top: auto;
+  bottom: calc(100% + 4px);
+`;
+
+const menuClasses = {
+  below: { start: dropdownMenu, end: dropdownMenuEnd },
+  above: { start: dropdownMenuAbove, end: dropdownMenuAboveEnd },
+};
 
 const dropdownItem = css`
   /* dropdown-item */
@@ -97,15 +137,29 @@ export const Dropdown: FC<{
   ariaLabel?: string;
   /** Hide the trailing chevron (icon-only triggers). */
   iconOnly?: boolean;
+  /** Open upward (menus anchored at the bottom of the screen). */
+  placement?: "below" | "above";
+  /** Full-width, borderless trigger (sidebar rows). */
+  block?: boolean;
   children?: unknown;
-}> = ({ label, align = "start", ariaLabel, iconOnly = false, children }) => {
+}> = ({
+  label,
+  align = "start",
+  ariaLabel,
+  iconOnly = false,
+  placement = "below",
+  block = false,
+  children,
+}) => {
   return (
-    <details class={dropdownRoot} data-dropdown>
-      <summary class={dropdownTrigger} aria-label={ariaLabel}>
+    <details class={block ? dropdownRootBlock : dropdownRoot} data-dropdown>
+      <summary class={block ? dropdownTriggerGhost : dropdownTrigger} aria-label={ariaLabel}>
         {label}
-        {iconOnly ? null : <Icon name="chevron-down" size="sm" />}
+        {iconOnly ? null : (
+          <Icon name={placement === "above" ? "chevron-up" : "chevron-down"} size="sm" />
+        )}
       </summary>
-      <div class={align === "end" ? dropdownMenuEnd : dropdownMenu} role="menu">
+      <div class={menuClasses[placement][align]} role="menu">
         {children}
       </div>
     </details>

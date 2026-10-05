@@ -103,4 +103,12 @@ describe("review workspace page", () => {
     const { html } = await reviewPage();
     expect(html).toContain("ss-shell-content-wide-");
   });
+
+  it("shows Builds / build / Review in the breadcrumb", async () => {
+    const { html } = await reviewPage();
+    const topbar = html.slice(html.indexOf('role="banner"'), html.indexOf("</header>"));
+    expect(topbar).toContain(">Builds</a>");
+    expect(topbar).toContain("feature/x · abc1234");
+    expect(topbar).toContain('aria-current="page">Review<');
+  });
 });

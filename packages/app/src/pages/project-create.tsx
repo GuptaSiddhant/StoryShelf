@@ -13,11 +13,13 @@ export function renderProjectCreatePage(state: ProjectCreateFormState = {}): Ren
   const values = state.values ?? {};
   const errors = state.errors ?? {};
   return (
-    <DocumentLayout title="New project" nav={{ active: "projects" }}>
+    <DocumentLayout
+      title="New project"
+      nav={{ active: "projects", trail: [{ label: "New project" }] }}
+    >
       <PageHeader
         title="Create project"
         description="A project corresponds to one Storybook. You can have multiple projects per repository."
-        breadcrumbs={[{ label: "Projects", href: "/projects" }, { label: "New project" }]}
       />
 
       {state.globalError ? (

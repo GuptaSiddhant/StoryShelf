@@ -23,8 +23,10 @@ panes.
    `topbarBg` is deprecated (parsed, ignored). Default text colors meet WCAG AA, and
    status badge text is derived toward the primary text color so tinted pills stay legible.
 2. **Shell:** full-height icon sidebar (collapsible to a rail, cookie-persisted and applied
-   in `<head>` to avoid a flash; off-canvas drawer on phones), a slim top bar with project
-   switcher, theme menu and account menu, a toast region, and a `bare` layout for sign-in.
+   in `<head>` to avoid a flash; off-canvas drawer on phones) whose footer holds the account,
+   theme and collapse controls; a slim top bar that is the project picker plus breadcrumbs
+   (derived from `nav`, with an optional `trail`); a toast region; and a `bare` layout for
+   sign-in.
 3. **Icons:** typed TS data → one SVG sprite served from the router at a content-hashed,
    `immutable` URL with ETag/304 (`/assets/icons-<hash>.svg`); `<Icon>` references it with
    `<use>`. The same content-hash scheme now serves HTMX (the previous unversioned

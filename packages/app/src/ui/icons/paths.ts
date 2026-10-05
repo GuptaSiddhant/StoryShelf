@@ -8,6 +8,7 @@ export const ICON_PATHS = {
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
   plus: '<path d="M5 12h14M12 5v14"/>',
   "chevron-down": '<path d="m6 9 6 6 6-6"/>',
+  "chevron-up": '<path d="m18 15-6-6-6 6"/>',
   "chevron-right": '<path d="m9 18 6-6-6-6"/>',
   "chevron-left": '<path d="m15 18-6-6 6-6"/>',
   "chevrons-left": '<path d="m11 17-5-5 5-5M18 17l-5-5 5-5"/>',

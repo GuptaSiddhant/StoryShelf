@@ -65,3 +65,31 @@ describe("app shell", () => {
     expect(html).not.toContain("user-menu__logout");
   });
 });
+
+describe("top bar and sidebar footer", () => {
+  it("puts account, theme, and collapse in the sidebar footer, not the top bar", async () => {
+    const html = await page("/projects");
+    const sidebar = html.slice(html.indexOf('<aside id="sidebar"'), html.indexOf("</aside>"));
+    const topbar = html.slice(html.indexOf('role="banner"'), html.indexOf("</header>"));
+    expect(sidebar).toContain("data-theme-set");
+    expect(sidebar).toContain("data-sidebar-collapse");
+    expect(sidebar).toContain('aria-label="Collapse or expand sidebar"');
+    expect(topbar).not.toContain("data-theme-set");
+  });
+
+  it("shows project picker plus breadcrumbs in the top bar", async () => {
+    const html = await page("/projects/alpha/builds", twoProjects);
+    const topbar = html.slice(html.indexOf('role="banner"'), html.indexOf("</header>"));
+    expect(topbar).toContain('aria-label="Project: Alpha"');
+    expect(topbar).toContain('aria-label="Breadcrumb"');
+    expect(topbar).toContain('aria-current="page">Builds<');
+  });
+
+  it("reads 'All projects' on global pages and shows the page on admin", async () => {
+    const projects = await page("/projects");
+    const admin = await page("/admin");
+    expect(projects).toContain('aria-label="Project: All projects"');
+    expect(projects).not.toContain('aria-label="Breadcrumb"');
+    expect(admin).toContain('aria-current="page">System<');
+  });
+});

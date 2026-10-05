@@ -87,7 +87,12 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
   return (
     <DocumentLayout
       title={`Build ${build.gitBranch}`}
-      nav={{ active: "builds", projectSlug: project.slug, projectName: project.name }}
+      nav={{
+        active: "builds",
+        projectSlug: project.slug,
+        projectName: project.name,
+        trail: [{ label: `${build.gitBranch} · ${build.gitSha.slice(0, 7)}` }],
+      }}
     >
       <PageHeader
         title={
@@ -143,11 +148,6 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
             </form>
           </>
         }
-        breadcrumbs={[
-          { label: "Projects", href: urls.projects() },
-          { label: project.name, href: urls.library(project.slug) },
-          { label: `${build.gitBranch} · ${build.gitSha.slice(0, 7)}` },
-        ]}
       />
 
       {staleCount > 0 ? (

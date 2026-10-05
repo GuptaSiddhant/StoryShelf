@@ -95,7 +95,7 @@ export async function renderComputeJobsPage(
   return (
     <DocumentLayout
       title={`${project.name} · Compute jobs`}
-      nav={{ active: "builds", projectSlug: project.slug, projectName: project.name }}
+      nav={{ active: "jobs", projectSlug: project.slug, projectName: project.name }}
     >
       <PageHeader
         title="Compute jobs"
@@ -105,11 +105,6 @@ export async function renderComputeJobsPage(
             Back to builds
           </Button>
         }
-        breadcrumbs={[
-          { label: "Projects", href: "/projects" },
-          { label: project.name, href: `/projects/${project.slug}/builds` },
-          { label: "Compute jobs" },
-        ]}
       />
 
       {renderActiveQueue(project.slug, queueView)}

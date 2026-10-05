@@ -85,31 +85,6 @@ const pageHeaderActions = css`
   align-items: center;
 `;
 
-const crumbsNav = css`
-  /* breadcrumbs */
-  & ol {
-    list-style: none;
-    padding: 0;
-    margin: 0 0 0.5rem;
-    display: flex;
-    gap: 0.4rem;
-    flex-wrap: wrap;
-    color: var(--text-secondary);
-    font-size: 0.82rem;
-  }
-  & li + li::before {
-    content: "/";
-    margin-right: 0.4rem;
-    color: var(--text-muted);
-  }
-  & a {
-    color: var(--text-secondary);
-  }
-  & a:hover {
-    color: var(--text-primary);
-  }
-`;
-
 const sectionTitleH2 = css`
   /* section-title */
   margin: 0 0 0.5rem;
@@ -163,32 +138,16 @@ export const CardSection: FC<{ divider?: boolean; children?: unknown }> = ({
   return <div class={divider ? cardSectionDivider : cardSection}>{children}</div>;
 };
 
-/** Page header with breadcrumbs, title, description, meta line, and actions. */
+/** Page header with title, description, meta line, and actions (breadcrumbs live in the top bar). */
 // eslint-disable-next-line promise-function-async -- JSX component return type
 export const PageHeader: FC<{
   title: unknown;
   description?: unknown;
   meta?: unknown;
   actions?: unknown;
-  breadcrumbs?: { label: string; href?: string }[];
-}> = ({ title, description, meta, actions, breadcrumbs }) => {
+}> = ({ title, description, meta, actions }) => {
   return (
     <div class={pageHeader}>
-      {breadcrumbs && breadcrumbs.length > 0 ? (
-        <nav class={crumbsNav} aria-label="Breadcrumb">
-          <ol>
-            {breadcrumbs.map((crumb, index) => (
-              <li key={String(index)}>
-                {crumb.href ? (
-                  <a href={crumb.href}>{crumb.label}</a>
-                ) : (
-                  <span aria-current="page">{crumb.label}</span>
-                )}
-              </li>
-            ))}
-          </ol>
-        </nav>
-      ) : null}
       <div class={pageHeaderRow}>
         <div>
           <h1 class={pageHeaderTitle}>{title}</h1>
