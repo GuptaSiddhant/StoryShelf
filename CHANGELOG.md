@@ -63,6 +63,35 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 - `@storyshelf/app` ships the `hono/jsx` import map so JSX rendering resolves on
   deno/JSR consumers.
 
+## 0.5.2 — Docs, screenshots, cloud targets (2026-09-23)
+
+**Cloud deploy targets**
+- `storyshelf server init` gained AWS, Azure, and GCP Terraform reference stacks.
+- New adapters: `@storyshelf/storage-azure`, `@storyshelf/storage-gcs`,
+  `@storyshelf/queue-azure` (Storage Queues + Service Bus), plus GCP Pub/Sub.
+- Opt-in live-cloud test suites and CI workflows for AWS, Azure, and GCP.
+
+**Capture & UI**
+- Per-project capture browser switch; selectable Playwright or Puppeteer runner.
+- Per-story viewports from the Storybook viewport config; runtime preview
+  fallback for story parameters; `waitForReady` hook honoured.
+- Per-attempt build log history with retry support; host-owned runtime loggers
+  via `Adapter.setLogger`.
+- New library gallery with branch picker and per-story deep links.
+- Refreshed UI theme; stylesheet served unescaped so fonts and selectors survive.
+
+**Auth**
+- Tiered shared passwords (admin/viewer) for the demo deployment.
+
+**Docs**
+- Core concepts section, grouped guides, Chromatic comparison and migration
+  guides, screenshots across the site, `storyshelf.js.org` as canonical domain.
+
+## 0.5.1 — Pre-launch UX polish (2026-09-15)
+
+- Fixes from the pre-launch UX audit; clearer sidebar Developer section.
+- Publish fixes: real semver for `catalog:` specs, bundled `LICENSE` for JSR.
+
 ## 0.5.0 — Rename to `app`, per-project browsers (2026-09-06)
 
 **Breaking rename**

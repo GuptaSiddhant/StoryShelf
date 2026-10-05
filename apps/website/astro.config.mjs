@@ -2,14 +2,29 @@ import starlight from "@astrojs/starlight";
 import mermaid from "astro-mermaid";
 import { defineConfig } from "astro/config";
 
+const SITE = "https://storyshelf.js.org";
+const OG_IMAGE = `${SITE}/og-image.png`;
+const OG_ALT = "StoryShelf build review: baseline, current, and diff overlay";
+
 export default defineConfig({
-  site: "https://storyshelf.js.org",
+  site: SITE,
   base: process.env.BASE_PATH || "/",
   integrations: [
     mermaid({ autoTheme: true }),
     starlight({
       title: "StoryShelf",
       plugins: [],
+      // Starlight emits og:title/description/url/type and the sitemap per page;
+      // these add the social image and card type it does not set.
+      head: [
+        { tag: "meta", attrs: { property: "og:image", content: OG_IMAGE } },
+        { tag: "meta", attrs: { property: "og:image:width", content: "1200" } },
+        { tag: "meta", attrs: { property: "og:image:height", content: "630" } },
+        { tag: "meta", attrs: { property: "og:image:alt", content: OG_ALT } },
+        { tag: "meta", attrs: { name: "twitter:card", content: "summary_large_image" } },
+        { tag: "meta", attrs: { name: "twitter:image", content: OG_IMAGE } },
+        { tag: "meta", attrs: { name: "twitter:image:alt", content: OG_ALT } },
+      ],
       description: "Self-hosted visual testing for Storybook.",
       social: [
         {

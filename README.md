@@ -1,8 +1,37 @@
 # StoryShelf
 
+[![npm](https://img.shields.io/npm/v/storyshelf?label=storyshelf)](https://www.npmjs.com/package/storyshelf)
+[![CI](https://github.com/GuptaSiddhant/StoryShelf/actions/workflows/ci.yml/badge.svg)](https://github.com/GuptaSiddhant/StoryShelf/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/github/license/GuptaSiddhant/StoryShelf)](LICENSE)
+
 Self-hosted visual testing platform for Storybook. Run visual regression tests in CI, review pixel-level diffs in a web UI, and approve changes before they ship.
 
 **Self-hosted Chromatic alternative. Storybook-native. Unlimited snapshots.**
+
+[**Live demo**](https://storyshelf.fly.dev) · [**Documentation**](https://storyshelf.js.org) · [Getting started](https://storyshelf.js.org/guides/getting-started/)
+
+![Build review: baseline, current, and diff overlay](apps/website/public/screenshots/build-review.png)
+
+## Features
+
+- **Unlimited snapshots.** MIT-licensed; you pay for your own infrastructure, not per snapshot.
+- **Per-branch baselines** with fallback to the default branch, auto-approved on `main`.
+- **Published Storybook.** Share the latest build of each project at a stable URL.
+- **One `docker run` to self-host**, or Terraform stacks for AWS, Azure, and GCP. Bring your own database, storage, and queue.
+- **Server-side capture.** Upload your built Storybook; Playwright (Chromium, Firefox, WebKit) or Puppeteer renders it, including `play` functions.
+- **Review workflow.** Approve or reject, threaded comments, and GitHub/GitLab merge-gate status checks.
+
+## StoryShelf vs Chromatic
+
+| | Chromatic (SaaS) | StoryShelf (self-hosted) |
+|---|---|---|
+| **Pricing** | 5k snapshots free, then $179/mo per 35k | MIT, unlimited; infrastructure cost only |
+| **Hosting** | Chromatic cloud only | Your infrastructure |
+| **Data residency** | US / EU regions | Your database and storage |
+| **Interaction tests** | `play` functions | `play` functions |
+| **Lock-in** | Proprietary | Open source, standard `/api/v1` |
+
+Full breakdown: [Chromatic comparison](https://storyshelf.js.org/guides/chromatic-comparison/) · [Migration guide](https://storyshelf.js.org/guides/chromatic-migration/).
 
 ## Layout
 
@@ -36,8 +65,10 @@ docs/                                       — architecture, ADRs, testing, web
 
 ## Commands
 
+This repo uses **nub / nubx** (not npm, yarn, or pnpm); the lockfile is `nub.lock`. If `node` or `nubx` is not found, run `export PATH="$HOME/.nub/bin:$PATH"`.
+
 ```sh
-nub install                      # install workspace deps
+nub ci                           # install workspace deps
 nub run build                    # turbo build all packages
 nub run test                     # turbo test
 nub run verify                   # build + lint + test
@@ -57,3 +88,11 @@ npm start                        # start the server
 - Each package ships a `README.md` covering its use case, install, API, and an example.
 - `apps/website/` hosts the public docs site (Astro Starlight): getting-started, CI, deployment, auth, and concept guides.
 - `docs/architecture.md` is the full architecture spec; `docs/adr/` records design decisions; `docs/implementation-plan.md` is the build order.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the toolchain, verify, and worktree flow. Report vulnerabilities privately per [SECURITY.md](SECURITY.md). Participation is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## License
+
+[MIT](LICENSE)
