@@ -40,7 +40,9 @@ describe("project settings layout", () => {
 
   it("renders tables through the shared Table surface", async () => {
     const pages = await Promise.all(
-      ["tokens", "labels", "webhooks"].map((tab) => get(`/projects/docs/settings/${tab}`)),
+      ["tokens", "labels", "webhooks"].map(
+        async (tab) => await get(`/projects/docs/settings/${tab}`),
+      ),
     );
     for (const html of pages) {
       expect(html).not.toContain("table-wrap");
