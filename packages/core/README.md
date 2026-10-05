@@ -75,7 +75,7 @@ interface ShelfConfig {
 interface UIConfig {
   name?: string;
   logo?: string;
-  favicon?: string;
+  favicon?: string; // deprecated: ignored, the app serves its own mark
   lightTheme?: BrandTheme;
   darkTheme?: BrandTheme;
 }

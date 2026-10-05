@@ -116,3 +116,28 @@ describe("icon sprite", () => {
     expect((await makeApp().request("/assets/icons-evil.svg")).status).toBe(404);
   });
 });
+
+describe("brand mark", () => {
+  it("serves the mark as immutable SVG with an ETag", async () => {
+    const response = await makeApp().request(assetManifest.mark.href);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("image/svg+xml");
+    expect(response.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+    expect(response.headers.get("etag")).toBe(`"${assetManifest.mark.hash}"`);
+    expect(await response.text()).toContain("<svg");
+  });
+
+  it("serves the current mark for a stale hash without caching it", async () => {
+    const response = await makeApp().request("/assets/mark-0123456789.svg");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+  });
+
+  it("404s for non-hash filenames", async () => {
+    expect((await makeApp().request("/assets/mark-evil.svg")).status).toBe(404);
+  });
+
+  it("is reachable without a session", async () => {
+    expect((await makeApp(noSessionAuth).request(assetManifest.mark.href)).status).toBe(200);
+  });
+});

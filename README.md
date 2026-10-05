@@ -1,3 +1,5 @@
+<img src="apps/website/public/favicon.svg" alt="" width="72" height="72" />
+
 # StoryShelf
 
 [![npm](https://img.shields.io/npm/v/storyshelf?label=storyshelf)](https://www.npmjs.com/package/storyshelf)

@@ -54,6 +54,10 @@ export interface AuthUiConfig {
 export interface UIConfig {
   name?: string;
   logo?: string;
+  /**
+   * @deprecated Ignored. The favicon is the product's own mark, served by the
+   * app itself; set `logo` to rebrand the sidebar instead.
+   */
   favicon?: string;
   lightTheme?: BrandTheme;
   darkTheme?: BrandTheme;
@@ -213,6 +217,8 @@ export const uiConfigSchema: z.ZodType<UIConfig> = z
     name: z.string().optional(),
     // oxlint-disable-next-line typescript/no-deprecated -- z.string().url() kept for zod v3 API compat
     logo: z.string().url().optional(),
+    // Accepted but ignored (see UIConfig.favicon) so existing configs keep
+    // validating under .strict().
     // oxlint-disable-next-line typescript/no-deprecated -- z.string().url() kept for zod v3 API compat
     favicon: z.string().url().optional(),
     lightTheme: brandThemeSchema.optional(),
