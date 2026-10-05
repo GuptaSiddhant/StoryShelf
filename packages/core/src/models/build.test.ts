@@ -136,58 +136,52 @@ describe("isPublicBuild", () => {
   });
 });
 
-describe("BuildModel latestPublished", () => {
-  it("returns the most recent public build", async () => {
-    const { db } = makeDatabase();
-    const model = new BuildModel(db, buildTables(db));
-    const project = await new ProjectModel(db, projectTables(db)).create({
-      name: "Test",
-      gitRepository: "owner/repo",
-    });
-    const pr = { publicBranchRegex: null, executePlay: false, playTimeoutMs: 10_000 };
-    await model.create(project.id, { gitSha: "abc", gitBranch: "main" });
-    const publicBuild = await model.create(project.id, {
-      gitSha: "def",
-      gitBranch: "main",
-      public: true,
-    });
-    const published = await model.latestPublished(project);
-    expect(published?.id).toBe(publicBuild.id);
-    expect(pr).toBeDefined();
+async function setupApprovedDefault() {
+  const { db } = makeDatabase();
+  const model = new BuildModel(db, buildTables(db));
+  const project = await new ProjectModel(db, projectTables(db)).create({
+    name: "Test",
+    gitRepository: "owner/repo",
+  });
+  return { model, project };
+}
+
+describe("BuildModel latestApprovedDefault", () => {
+  it("returns the most recent approved build on the default branch", async () => {
+    const { model, project } = await setupApprovedDefault();
+    const older = await model.create(project.id, { gitSha: "a", gitBranch: "main" });
+    await model.update(older.id, { status: "approved" });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const newer = await model.create(project.id, { gitSha: "b", gitBranch: "main" });
+    await model.update(newer.id, { status: "approved" });
+    expect((await model.latestApprovedDefault(project))?.id).toBe(newer.id);
   });
 
-  it("returns the most recent build whose branch matches the project regex", async () => {
-    const { db } = makeDatabase();
-    const model = new BuildModel(db, buildTables(db));
-    await db.insert(db.tables.projects, {
-      id: "p1",
-      name: "Test",
-      slug: "test",
-      gitRepository: "owner/repo",
-      gitDefaultBranch: "main",
-      pixelThreshold: 0.1,
-      maxDiffRatio: 0.01,
-      publicBranchRegex: "^main$",
-      storybookMeta: null,
-      createdAt: "2026-01-01T00:00:00.000Z",
-      updatedAt: "2026-01-01T00:00:00.000Z",
-    });
-    await model.create("p1", { gitSha: "abc", gitBranch: "feature/x" });
-    const mainBuild = await model.create("p1", { gitSha: "def", gitBranch: "main" });
-    const project = { id: "p1", publicBranchRegex: "^main$" };
-    const published = await model.latestPublished(project);
-    expect(published?.id).toBe(mainBuild.id);
+  it("ignores approved builds on other branches", async () => {
+    const { model, project } = await setupApprovedDefault();
+    const main = await model.create(project.id, { gitSha: "a", gitBranch: "main" });
+    await model.update(main.id, { status: "approved" });
+    const feature = await model.create(project.id, { gitSha: "b", gitBranch: "feature/x" });
+    await model.update(feature.id, { status: "approved" });
+    expect((await model.latestApprovedDefault(project))?.id).toBe(main.id);
   });
 
-  it("returns null when no build is public", async () => {
-    const { db } = makeDatabase();
-    const model = new BuildModel(db, buildTables(db));
-    const project = await new ProjectModel(db, projectTables(db)).create({
-      name: "Test",
-      gitRepository: "owner/repo",
-    });
-    await model.create(project.id, { gitSha: "abc", gitBranch: "feature/x" });
-    const published = await model.latestPublished(project);
-    expect(published).toBeNull();
+  it("ignores unapproved default-branch builds", async () => {
+    const { model, project } = await setupApprovedDefault();
+    const approved = await model.create(project.id, { gitSha: "a", gitBranch: "main" });
+    await model.update(approved.id, { status: "approved" });
+    const failed = await model.create(project.id, { gitSha: "f", gitBranch: "main" });
+    const reviewing = await model.create(project.id, { gitSha: "r", gitBranch: "main" });
+    await model.create(project.id, { gitSha: "p", gitBranch: "main" });
+    await model.update(failed.id, { status: "failed" });
+    await model.update(reviewing.id, { status: "reviewing" });
+    expect((await model.latestApprovedDefault(project))?.id).toBe(approved.id);
+  });
+
+  it("returns null when the default branch has no approved build", async () => {
+    const { model, project } = await setupApprovedDefault();
+    const feature = await model.create(project.id, { gitSha: "a", gitBranch: "feature/x" });
+    await model.update(feature.id, { status: "approved" });
+    expect(await model.latestApprovedDefault(project)).toBeNull();
   });
 });

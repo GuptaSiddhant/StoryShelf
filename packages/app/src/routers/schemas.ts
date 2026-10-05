@@ -362,6 +362,31 @@ export const notificationSubscriptionPutSchema = z
 /** OpenAPI schema for a generic `{ ok: true }` acknowledgement. */
 export const okSchema = z.object({ ok: z.boolean() }).openapi("Ok");
 
+/** Bulk approve result: ids skipped because their baseline changed after the diff. */
+export const approveAllResultSchema = z
+  .object({ ok: z.boolean(), skipped: z.array(z.string()) })
+  .openapi("ApproveAllResult");
+
+/** Result of re-diffing a build against the baselines that apply now. */
+export const rediffResultSchema = z
+  .object({
+    ok: z.boolean(),
+    rediffed: z.number().int(),
+    statusChanged: z.number().int(),
+    missingScreenshots: z.array(z.string()),
+  })
+  .openapi("RediffResult");
+
+/** 409 returned when approving a snapshot whose baseline changed after the diff. */
+export const baselineChangedSchema = z
+  .object({
+    code: z.literal("baseline_changed"),
+    message: z.string(),
+    snapshotId: z.string(),
+    baselineStatus: z.enum(["stale", "removed"]),
+  })
+  .openapi("BaselineChanged");
+
 /** OpenAPI schema for an error response message. */
 export const errorSchema = z.object({ message: z.string() }).openapi("Error");
 

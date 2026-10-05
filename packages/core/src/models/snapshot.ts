@@ -49,6 +49,8 @@ export class SnapshotModel {
       screenshotPath: input.screenshotPath,
       infraHash: input.infraHash ?? null,
       inherited: input.inherited ?? false,
+      baselineId: input.baselineId ?? null,
+      baselineVersion: input.baselineVersion ?? null,
       status: "pending",
       createdAt: now,
       updatedAt: now,
@@ -105,4 +107,6 @@ export interface SnapshotCreateInput {
   screenshotPath: string;
   infraHash?: string | null;
   inherited?: boolean;
+  baselineId?: string | null;
+  baselineVersion?: string | null;
 }

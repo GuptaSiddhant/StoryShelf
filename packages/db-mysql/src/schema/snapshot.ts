@@ -40,6 +40,8 @@ export const snapshots = mysqlTable(
     reviewedAt: datetime("reviewed_at", { mode: "string", fsp: 3 }),
     infraHash: text("infra_hash"),
     inherited: boolean("inherited").notNull().default(false),
+    baselineId: text("baseline_id"),
+    baselineVersion: text("baseline_version"),
     createdAt: datetime("created_at", { mode: "string", fsp: 3 }).notNull(),
     updatedAt: datetime("updated_at", { mode: "string", fsp: 3 }).notNull(),
   },
@@ -71,6 +73,8 @@ export interface Snapshot {
   reviewedAt: string | null;
   infraHash: string | null;
   inherited: boolean;
+  baselineId: string | null;
+  baselineVersion: string | null;
   createdAt: string;
   updatedAt: string;
 }

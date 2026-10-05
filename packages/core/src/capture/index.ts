@@ -24,6 +24,12 @@ export {
   type CaptureJobOptions,
 } from "./orchestrator.ts";
 export { persistCapture, type CaptureContext } from "./pipeline.ts";
+export {
+  rediffBuild,
+  REDIFFABLE_BUILD_STATUSES,
+  type RediffDeps,
+  type RediffResult,
+} from "./rediff.ts";
 export { InMemoryCaptureQueue, type InMemoryCaptureQueueOptions } from "./queue.ts";
 export type { PollableCaptureQueue, PollableJob } from "../adapters/capture-queue.ts";
 export {

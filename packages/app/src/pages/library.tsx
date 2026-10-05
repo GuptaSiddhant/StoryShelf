@@ -268,7 +268,7 @@ function renderLibraryHeader(
       }
       actions={
         <HStack>
-          <Button variant="ghost" size="sm" href={urls.short(project.slug)}>
+          <Button variant="ghost" size="sm" href={urls.short(build.id)}>
             View Storybook
           </Button>
           {renderBranchPicker(project, build, branches)}

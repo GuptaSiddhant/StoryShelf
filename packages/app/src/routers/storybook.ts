@@ -84,16 +84,16 @@ export function registerStorybook(app: ShelfRouter): void {
   app.get("/_", (c) => c.redirect("/", 302));
   app.get("/_/", (c) => c.redirect("/", 302));
 
-  // Resolver: latest published build on the default branch.
+  // Resolver: latest approved build on the default branch (never feature branches).
   app.get("/projects/:slug/storybook", async (c) => {
     const slug = c.req.param("slug");
     const project = await new ProjectModel(getStore().db).getBySlug(slug);
     if (!project) {
       notFound("Project not found");
     }
-    const build = await new BuildModel(getStore().db).latestPublished(project);
+    const build = await new BuildModel(getStore().db).latestApprovedDefault(project);
     if (!build) {
-      notFound("No published Storybook for this project");
+      notFound("No approved build on the default branch yet");
     }
     if (!(await canViewBuild(build, project))) {
       return c.redirect("/auth/login", 302);
@@ -125,7 +125,9 @@ export function registerStorybook(app: ShelfRouter): void {
   });
 
   // Short link canonical is /_/:id/ with trailing slash (so relative ./sb-manager/... resolves).
-  // 26-char ULID → that exact build; any other id → project slug → latest build (published fallback). No fall-through on ULID.
+  // 26-char ULID → that exact build, whatever its status (visibility check only).
+  // Any other id → project slug → latest approved build on the default branch, else 404
+  // (no fallback to feature-branch or unreviewed builds). No fall-through on ULID.
   app.get("/_/:id", async (c) => {
     const id = c.req.param("id");
     const isUlid26 = id.length === 26 && /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/u.test(id);
@@ -160,11 +162,7 @@ export function registerStorybook(app: ShelfRouter): void {
     } else {
       project = await new ProjectModel(getStore().db).getBySlug(id);
       if (!project) return c.notFound();
-      build = await new BuildModel(getStore().db).latestPublished(project);
-      if (!build) {
-        const all = await new BuildModel(getStore().db).list(project.id);
-        build = all[0] ?? null;
-      }
+      build = await new BuildModel(getStore().db).latestApprovedDefault(project);
       if (!build) return c.notFound();
     }
     if (!(await canViewBuild(build, project))) return c.redirect("/auth/login", 302);

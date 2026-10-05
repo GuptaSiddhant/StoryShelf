@@ -1,4 +1,3 @@
-import { BaselineModel } from "@storyshelf/core/models";
 import { BuildModel } from "@storyshelf/core/models";
 import { CommentModel } from "@storyshelf/core/models";
 import { LabelModel } from "@storyshelf/core/models";
@@ -16,6 +15,7 @@ import { renderProjectCreatePage } from "../pages/project-create.tsx";
 import { renderProjectsPage } from "../pages/projects.tsx";
 import { renderRootPage } from "../pages/root.tsx";
 import { getStore } from "../store.ts";
+import { loadBaselineView } from "./baseline-guard.ts";
 import { currentProjectRole } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
 import { registerSettingsPages } from "./settings.ts";
@@ -161,20 +161,7 @@ export function registerUiPages(app: ShelfRouter): void {
     }
     const snapshots = await new SnapshotModel(getStore().db).listByBuild(build.id);
     const comments = await new CommentModel(getStore().db).listByBuild(build.id);
-    const baselines = new BaselineModel(getStore().db, undefined, getStore().storage);
-    const hasBaselineEntries = await Promise.all(
-      snapshots.map(async (snapshot) => {
-        const baseline = await baselines.resolve(
-          project.id,
-          snapshot.storyId,
-          snapshot.viewportName,
-          build.gitBranch,
-          project.gitDefaultBranch,
-        );
-        return [snapshot.id, Boolean(baseline)] as const;
-      }),
-    );
-    const hasBaseline = Object.fromEntries(hasBaselineEntries);
+    const { hasBaseline, drifted } = await loadBaselineView(project, build, snapshots);
     const { user, authEnabled } = getStore();
     const canReview = !authEnabled || Boolean(user);
     return c.html(
@@ -186,6 +173,7 @@ export function registerUiPages(app: ShelfRouter): void {
         selectedId: snapshotId,
         canReview,
         hasBaseline,
+        drifted,
       }),
     );
   });

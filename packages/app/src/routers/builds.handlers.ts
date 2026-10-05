@@ -17,6 +17,7 @@ import { Readable, Transform } from "node:stream";
 import type { ReadableStream as NodeWebStream } from "node:stream/web";
 import { notifyProject } from "../notify.ts";
 import { getStore } from "../store.ts";
+import { assertBaselineCurrent } from "./baseline-guard.ts";
 import { notFound } from "./helpers.ts";
 /**
  * Create a build record with labels and the `build:created` webhook.
@@ -214,8 +215,15 @@ export async function refreshBuild(buildId: string): Promise<void> {
   }
 }
 
-/** Approve a snapshot, promote its screenshot to baseline, and refresh the build. */
-export async function approveSnapshot(snapshotId: string, userId: string | null): Promise<void> {
+/**
+ * Approve a snapshot, promote its screenshot to baseline, and refresh the build.
+ * Refuses with 409 when the baseline changed since the diff, unless `force` is set.
+ */
+export async function approveSnapshot(
+  snapshotId: string,
+  userId: string | null,
+  options: { force?: boolean } = {},
+): Promise<void> {
   const { db, config } = getStore();
   const snapshots = new SnapshotModel(db);
   const snapshot = await snapshots.get(snapshotId);
@@ -227,6 +235,7 @@ export async function approveSnapshot(snapshotId: string, userId: string | null)
   if (!project || !build) {
     notFound("Project or build not found");
   }
+  await assertBaselineCurrent(project, build, snapshot, options.force ?? false);
   await snapshots.review(snapshotId, "approved", userId);
   const baselines = new BaselineModel(db, undefined, getStore().storage, config.secret);
   const prior = await baselines.getFor(

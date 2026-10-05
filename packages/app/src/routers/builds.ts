@@ -42,6 +42,7 @@ async function upsertContentRef(hash: string): Promise<void> {
 }
 import { registerComments } from "./comments.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
+import { hxRefresh } from "./htmx.ts";
 import {
   badRequest,
   buildSchema,
@@ -213,6 +214,7 @@ export function registerBuilds(app: ShelfRouter): void {
     const build = await buildForProject(project.id, buildId);
     const updated = await new BuildModel(getStore().db).setStatus(build.id, "pending");
     await getStore().enqueueCapture?.(build.id, c.get("requestId"));
+    hxRefresh(c);
     return c.json(updated, 202);
   });
 

@@ -9,6 +9,7 @@ import { reviewLayout, reviewMain } from "../ui/styles/review.ts";
 import { DiffComments } from "./build-diff-comments.tsx";
 import { DiffHeader } from "./build-diff-header.tsx";
 import { DiffNav } from "./build-diff-nav.tsx";
+import { StaleBaselineNotice } from "./build-diff-stale.tsx";
 import { DiffViewer } from "./build-diff-viewer.tsx";
 
 /** Data required to render the three-up build diff review page. */
@@ -20,6 +21,8 @@ export interface BuildDiffData {
   selectedId?: string;
   canReview: boolean;
   hasBaseline: Record<string, boolean>;
+  /** Open snapshots whose baseline changed after their diff was computed. */
+  drifted: Record<string, "stale" | "removed">;
 }
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
@@ -32,13 +35,14 @@ interface DiffReviewGridProps {
   selected?: Snapshot;
   canReview: boolean;
   hasBaseline: Record<string, boolean>;
+  drifted: Record<string, "stale" | "removed">;
 }
 
 /** Snapshot nav plus the viewer/comments column for the selected snapshot. */
 function DiffReviewGrid(
   props: DiffReviewGridProps,
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { project, build, snapshots, comments, selected, canReview, hasBaseline } = props;
+  const { project, build, snapshots, comments, selected, canReview, hasBaseline, drifted } = props;
   return (
     <div class={reviewLayout}>
       <DiffNav project={project} build={build} snapshots={snapshots} selectedId={selected?.id} />
@@ -51,6 +55,7 @@ function DiffReviewGrid(
               selected={selected}
               canReview={canReview}
               hasBaseline={hasBaseline}
+              drifted={drifted[selected.id]}
             />
             <DiffComments
               project={project}
@@ -70,7 +75,7 @@ function DiffReviewGrid(
 
 /** Three-up diff review page: baseline, current, and diff with keyboard review. */
 export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
-  const { project, build, snapshots, comments, selectedId, canReview, hasBaseline } = data;
+  const { project, build, snapshots, comments, selectedId, canReview, hasBaseline, drifted } = data;
   const selected =
     snapshots.find((s) => s.id === selectedId) ??
     snapshots.find((s) => s.status === "changed" || s.status === "new") ??
@@ -90,6 +95,15 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
         canReview={canReview}
       />
 
+      {Object.keys(drifted).length > 0 ? (
+        <StaleBaselineNotice
+          project={project}
+          build={build}
+          staleCount={Object.keys(drifted).length}
+          canReview={canReview}
+        />
+      ) : null}
+
       {snapshots.length === 0 ? (
         <EmptyState
           title="No snapshots"
@@ -104,6 +118,7 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
           selected={selected}
           canReview={canReview}
           hasBaseline={hasBaseline}
+          drifted={drifted}
         />
       )}
     </DocumentLayout>

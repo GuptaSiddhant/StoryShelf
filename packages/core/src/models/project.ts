@@ -40,6 +40,8 @@ export class ProjectModel {
       gitRepository: input.gitRepository,
       gitDefaultBranch: input.gitDefaultBranch ?? "main",
       storybookMeta: input.storybookMeta ? JSON.stringify(input.storybookMeta) : null,
+      ...(input.executePlay === undefined ? {} : { executePlay: input.executePlay }),
+      ...(input.playTimeoutMs === undefined ? {} : { playTimeoutMs: input.playTimeoutMs }),
       createdAt: now,
       updatedAt: now,
     })) as unknown as Project;
@@ -115,4 +117,8 @@ export interface ProjectCreateInput {
   gitRepository?: string;
   gitDefaultBranch?: string;
   storybookMeta?: unknown;
+  /** Run Storybook `play` functions during capture (opt-in; default false). */
+  executePlay?: boolean;
+  /** Per-story play timeout in milliseconds (column default applies when omitted). */
+  playTimeoutMs?: number;
 }

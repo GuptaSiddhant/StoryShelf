@@ -120,6 +120,33 @@ describe("createSqliteDatabase", () => {
     await closeDb(db);
   });
 
+  it("back-fills baseline tracking columns on a stale snapshots table", async () => {
+    const db = createSqliteDatabase(":memory:");
+    await db.all(sql`
+      CREATE TABLE snapshots (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        build_id TEXT NOT NULL,
+        story_id TEXT NOT NULL,
+        story_name TEXT NOT NULL,
+        story_title TEXT NOT NULL,
+        viewport_name TEXT NOT NULL DEFAULT 'desktop',
+        screenshot_path TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    `);
+    await initDb(db);
+
+    const rows = await db.all<unknown[]>(sql`PRAGMA table_info(snapshots)`);
+    const present = new Set(rows.map((row) => String(row[1])));
+    expect(present.has("baseline_id")).toBe(true);
+    expect(present.has("baseline_version")).toBe(true);
+
+    await closeDb(db);
+  });
+
   it("back-fills a stale volume with every current projects column", async () => {
     const db = createSqliteDatabase(":memory:");
     // Simulate the oldest deployed volume: only the pre-ADR-0017 columns exist.

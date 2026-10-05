@@ -152,6 +152,8 @@ const snapshots = defineTable("snapshots", {
   reviewedAt: "reviewed_at",
   infraHash: "infra_hash",
   inherited: "inherited",
+  baselineId: "baseline_id",
+  baselineVersion: "baseline_version",
   createdAt: "created_at",
   updatedAt: "updated_at",
 });

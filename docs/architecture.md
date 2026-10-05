@@ -85,6 +85,8 @@ snapshots (
   reviewed_at         text,
   created_at          text NOT NULL,
   updated_at          text NOT NULL,
+  baseline_id         text,                    -- baseline row the diff was computed against (NULL: none, or legacy row)
+  baseline_version    text,                    -- that baseline's updated_at at diff time; 'none' = story had no baseline; NULL = legacy
   UNIQUE(build_id, story_id, viewport_name)
 );
 
@@ -403,6 +405,31 @@ This is what "per-branch acceptance with fallback to default" means: accepting a
 5. **Reviewer rejects** -- snapshot `rejected`; no baseline change
 6. **All changed stories resolved** -- build status `approved` or `rejected`
 7. **Merge to default** -- the next default-branch build re-captures and auto-approves, re-baselining the project
+
+### Baseline changes after a diff
+
+A snapshot's diff is frozen at capture time, but baselines move (a merge to the default branch
+re-baselines; another build on the same branch may be approved first). Each snapshot therefore records
+`baseline_id` + `baseline_version` (the baseline's `updated_at`), and the app compares them with the
+baseline that applies *now* (own branch, else default):
+
+| Status | Meaning |
+|---|---|
+| `current` | Same baseline the diff used |
+| `stale` | A different or updated baseline now applies (or a new story gained one) |
+| `removed` | The baseline the diff used no longer exists |
+| `unknown` | Legacy row without tracking; never blocks review |
+
+- **Approval guard.** Approving a `stale`/`removed` snapshot returns `409 baseline_changed` instead of
+  overwriting a baseline the reviewer did not see; `?force=true` overrides it (logged). Bulk approve skips
+  such snapshots and returns their ids in `skipped`. The check runs immediately before the baseline write
+  but is not atomic (the database adapter updates by id only).
+- **Recapture is manual.** Nothing re-renders or re-diffs when a baseline changes. The review and build
+  pages show a notice ("Baseline changed since this build was captured") with two choices:
+  **Re-diff** (`POST /api/v1/projects/{slug}/builds/{id}/rediff`) recomputes undecided snapshots from the
+  stored screenshots without rendering, and **Retry capture** re-renders every story.
+- Re-diff skips approved/rejected snapshots (decisions), inherited snapshots (never rendered), and
+  default-branch builds (authoritative); the build roll-up is refreshed afterwards.
 
 ### Review Comments
 

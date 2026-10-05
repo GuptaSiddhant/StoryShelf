@@ -23,6 +23,10 @@ export interface Snapshot {
   infraHash: string | null;
   /** True when inherited unchanged from the baseline without rendering. */
   inherited: boolean;
+  /** Baseline row the diff was computed against (null: no baseline, or legacy row). */
+  baselineId: string | null;
+  /** That baseline's `updatedAt` at diff time; compared on approval to detect drift. */
+  baselineVersion: string | null;
   createdAt: string;
   updatedAt: string;
 }
