@@ -56,6 +56,10 @@ Published Storybooks are deduplicated by content hash. `persistStorybookStatics`
 
 When **Enable interaction tests (play)** is on (per-project), the runner does `waitForSelector(#storybook-root, attached)` → `waitForTimeout(delay ?? 500)` → `page.evaluate(executePlay)` with `playTimeoutMs` before the screenshot. A throwing `play` maps to `failed` (blocking) or warning (flaky) — see [Interaction testing guide](/guides/interaction-testing/).
 
+## Restarts during a capture
+
+With the in-process queue, a server restart can interrupt a build that is `capturing`. On startup StoryShelf requeues each such build **once**: the interrupted attempt is recorded as failed (`Interrupted by server restart`) and the build returns to `pending`. If that run is interrupted too, the build is marked `failed` and its git status reports failure, so a crash loop never repeats captures. The Compute jobs page flags interrupted builds and lets you retry them. Remote queues are not affected: the queue redelivers the message after its visibility timeout.
+
 ## Remote capture
 
 On serverless (Vercel, Lambda, Workers) the API enqueues `CaptureQueue.enqueue({ buildId })` and a separate `@storyshelf/worker` polls (`SQS`, `Redis`, `Azure`) and runs the same orchestrator — see [Cloud assembly](/guides/deployment/cloud/).

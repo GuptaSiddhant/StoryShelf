@@ -304,7 +304,7 @@ Capture is CPU/IO-heavy and long-running (minutes to tens of minutes). It must n
 
 - `POST /builds` stores the zip and returns **202 Accepted** immediately.
 - An in-process queue with a **configurable concurrency** (`--capture-concurrency`, default `2`) runs captures.
-- A build stuck in `capturing` across a server restart is detected and re-queued (or marked `failed`).
+- A build stuck in `capturing` across a server restart is requeued **once** at boot (in-process queue only; remote queues redeliver). The interrupted attempt is closed as failed with `Interrupted by server restart`; if the run before it was also interrupted, the build is marked `failed` and a failure git status is posted, so a crash loop cannot repeat captures. See `core/src/capture/recovery.ts`.
 
 > **Note on Architecture:** The `CaptureQueue` interface is fully asynchronous — `enqueue`, `status`, `active` and `recent` all return `Promise<T>` — so the same contract backs both the in-process `InMemoryCaptureQueue` (Node long-lived server) and remote backends (SQS, Cloudflare Queues, Azure Storage Queues) where execution is left to a separately-assembled worker that polls the queue and runs `executeCaptureJob`. For deploying, scaling, and operating those workers, see the website guide `apps/website/src/content/docs/guides/deployment/remote-workers.md` (published at `/guides/deployment/remote-workers/`).
 

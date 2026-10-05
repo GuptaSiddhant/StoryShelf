@@ -30,6 +30,12 @@ export {
   type RediffDeps,
   type RediffResult,
 } from "./rediff.ts";
+export {
+  INTERRUPTED_ERROR,
+  recoverStuckCaptures,
+  type RecoveryDeps,
+  type RecoveryResult,
+} from "./recovery.ts";
 export { InMemoryCaptureQueue, type InMemoryCaptureQueueOptions } from "./queue.ts";
 export type { PollableCaptureQueue, PollableJob } from "../adapters/capture-queue.ts";
 export {
