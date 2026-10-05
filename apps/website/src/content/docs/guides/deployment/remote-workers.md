@@ -1,9 +1,9 @@
 ---
 title: Remote capture workers
-description: Run capture on separate workers behind an SQS queue — deployment, scaling, failure modes, and monitoring.
+description: Run capture on separate workers behind SQS, Redis, Azure, or GCP queues — deployment, scaling, failure modes, and monitoring.
 ---
 
-By default the server captures in-process. For horizontally scaled or serverless deployments you can move capture to separate **workers** that pull jobs from a queue. This guide covers the SQS setup; the worker is the same for the other queues ([Redis](/packages/queue-redis/), [Azure](/packages/queue-azure/)).
+By default the server captures in-process. For horizontally scaled or serverless deployments you can move capture to separate **workers** that pull jobs from a queue. The guide uses SQS as the worked example. The worker is the same for every queue, and [Other queues](#other-queues) covers what differs for Redis, Azure, and GCP Pub/Sub.
 
 ## How it fits together
 
@@ -100,8 +100,75 @@ The worker logs structured JSON through pino, with `buildId` and `reqId` on each
 
 `reqId` ties worker lines to the upload request that enqueued the build, and the `traceparent` in the message continues the trace when [OpenTelemetry](/guides/observability/) is configured. Also alert on any message in the DLQ.
 
+## Other queues
+
+Every queue implements the same contract (`enqueue` on the server; `poll`/`ack`/`nack` for the worker), so the worker code, concurrency math, and monitoring above apply unchanged. What differs is how each backend handles in-flight jobs, retries, and poison messages.
+
+| | SQS | Redis | Azure Storage Queues | Azure Service Bus | GCP Pub/Sub |
+|---|---|---|---|---|---|
+| **Package** | `queue-sqs` | `queue-redis` | `queue-azure` | `queue-azure` | `queue-gcp` |
+| **Idle poll** | Long-poll (20s) | Blocking `BLMOVE` (5s) | Immediate return | Waits up to 30s | Immediate return |
+| **Retry delay (`nack`)** | Honored | Honored | Honored | **Not honored** (immediate) | Honored |
+| **Dead-letter queue** | Redrive policy | **None** | **None** | Built in (`maxDeliveryCount`) | Dead-letter policy |
+| **Crash recovery** | Visibility timeout | **Manual** | Visibility timeout | Lock expiry | Ack deadline |
+| **Attempts counted from** | Receive count | Counter in the payload | Dequeue count | Delivery count | Delivery attempt |
+| **Scaffold** | AWS stack | Docker Compose | Azure stack | Azure stack | GCP stack |
+
+### Redis
+
+Best for self-hosted Docker Compose, with no cloud dependency. Server and workers share one Redis instance (6.2+ for `BLMOVE`).
+
+```ts
+// server and worker
+const queue = createRedisCaptureQueue({ url: process.env.REDIS_URL! });
+```
+
+Keys: `shelf:queue` (waiting), `shelf:queue:processing` (in flight), `shelf:queue:delayed` (retry backoff). Set `key` to run several StoryShelf environments on one Redis.
+
+- **A crashed worker's job stays in `…:processing`.** The adapter doesn't reclaim it, because Redis has no visibility timeout. After an OOM or hard kill, check that list. Move the entry back to the main list (for example with `LMOVE`), or **Retry** the build from the UI. Graceful `SIGTERM` shutdown is much more important here than on SQS.
+- **There is no dead-letter queue.** After the last retry the worker drops the job and logs `capture permanently failed`.
+- **Retries wait in the delayed set** and are promoted by whichever worker polls next, so at least one worker must keep running.
+- Make Redis durable (AOF persistence) if you can't afford to lose queued jobs on a restart. Builds are recoverable with **Retry** either way.
+
+### Azure
+
+`@storyshelf/queue-azure` has two backends. Pick with `storyshelf server init` (Azure target), or construct one directly:
+
+```ts
+import { createAzureServiceBusQueue, createAzureStorageQueuesQueue } from "@storyshelf/queue-azure";
+
+createAzureServiceBusQueue({ queueName: "capture-jobs", connectionString: process.env.AZURE_SERVICE_BUS_CONNECTION! });
+createAzureStorageQueuesQueue({ queueName: "capture-jobs", connectionString: process.env.AZURE_STORAGE_CONNECTION! });
+```
+
+**Service Bus** (recommended for production):
+- Messages are peek-locked. Past the queue's `maxDeliveryCount` (3 in the Terraform stack) Service Bus moves the message to the built-in dead-letter sub-queue.
+- **`nack` retries immediately.** There is no per-message delay, so the worker's exponential backoff does not apply. Three quick attempts can burn through a transient outage before it recovers.
+- **The lock must outlast the capture.** The adapter doesn't renew locks and the Terraform stack leaves the queue's default lock duration. Set `lock_duration` on the queue to longer than your slowest capture (Azure's maximum is 5 minutes). Otherwise the message reappears while the first worker is still rendering.
+
+**Storage Queues** (cheapest, simplest):
+- `visibilityTimeout` is the lock, 300 seconds by default (option on `createAzureStorageQueuesQueue`).
+- There is no dead-letter queue and no long-poll. A job that crashes its worker every time keeps coming back, so alert on repeated `capture failed, requeued` lines for the same `buildId`. If you need dead-lettering, use Service Bus.
+- With no long-poll, an idle worker issues requests continuously, and each is a billable storage transaction.
+
+### GCP Pub/Sub
+
+`@storyshelf/queue-gcp` uses a **pull subscription** with synchronous pull, one message at a time:
+
+```ts
+import { createGcpPubSubQueue } from "@storyshelf/queue-gcp";
+
+createGcpPubSubQueue({ topic: "capture-jobs", subscription: "capture-jobs-worker", projectId: process.env.GOOGLE_CLOUD_PROJECT! });
+```
+
+- The subscription's **ack deadline** is the visibility timeout (300 seconds in the Terraform stack). Keep it longer than your slowest capture, as with SQS.
+- Poison messages are dead-lettered by the subscription's dead-letter policy (`max_delivery_attempts` is 5 in the stack). The attempt count only appears when a dead-letter policy is set, so don't skip it.
+- Pull returns immediately when the queue is empty, so an idle worker polls continuously.
+- The subscription name in the code must match the one Terraform creates. The scaffolded worker default is `capture-jobs-worker`, while the stack's subscription resource is named `capture-jobs`, so set `subscription` to whichever you actually deployed.
+- Grant the worker's service account Pub/Sub subscriber and the server's publisher roles after `terraform apply`.
+
 ## Related
 
-- [`@storyshelf/queue-sqs`](/packages/queue-sqs/) · [`@storyshelf/worker`](/packages/worker/)
-- [AWS deployment](/guides/deployment/aws/) · [Deployment overview](/guides/deployment/)
+- [`@storyshelf/queue-sqs`](/packages/queue-sqs/) · [`queue-redis`](/packages/queue-redis/) · [`queue-azure`](/packages/queue-azure/) · [`@storyshelf/worker`](/packages/worker/)
+- [AWS](/guides/deployment/aws/) · [Azure](/guides/deployment/azure/) · [GCP](/guides/deployment/gcp/) · [Deployment overview](/guides/deployment/)
 - [Capture & viewports](/concepts/capture/)
