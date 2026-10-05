@@ -56,8 +56,8 @@
     "puppeteer-core": "^24.0.0"
   },
   "devDependencies": {
-    "@storyshelf/db-sqlite": "workspace:*",
     "@storyshelf/app": "workspace:*",
+    "@storyshelf/db-sqlite": "workspace:*",
     "@storyshelf/storage-local": "workspace:*",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",

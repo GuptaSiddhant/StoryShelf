@@ -4,10 +4,10 @@
   "description": "Chat notification providers for StoryShelf (Slack and Teams incoming webhooks).",
   "keywords": [
     "notifications",
-    "slack",
-    "teams",
     "self-hosted",
-    "storybook"
+    "slack",
+    "storybook",
+    "teams"
   ],
   "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
   "bugs": {

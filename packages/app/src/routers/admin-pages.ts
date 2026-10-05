@@ -1,10 +1,13 @@
 import type { Auth } from "@storyshelf/auth";
 import type { AdapterSetupResult, AdapterSetupSources } from "@storyshelf/core/adapter/setup";
 import type { ShelfRouter } from "../app-types.ts";
+import { loadCredentialProbe, reencryptWithCurrent } from "../credentials.ts";
 import { renderAdminSystemPage } from "../pages/admin-system.tsx";
 import { getStore } from "../store.ts";
+import { flash } from "./flash.ts";
 import { collectHealthReport } from "./health-report.ts";
 import { requireSiteAdmin } from "./helpers.ts";
+import { hxRedirect } from "./htmx.ts";
 
 /** Dependencies for the admin System page (same probing inputs as deep health). */
 export interface AdminPageDeps {
@@ -18,15 +21,34 @@ export interface AdminPageDeps {
 export function registerAdminPages(app: ShelfRouter, deps: AdminPageDeps, auth?: Auth): void {
   app.get("/admin", async (c) => {
     requireSiteAdmin(c);
+    const { authEnabled, config, db } = getStore();
+    const credentials = await loadCredentialProbe(db, config);
     const report = await collectHealthReport(
       deps.sources,
       deps.getSettled(),
       deps.bootTimeMs,
       deps.version,
+      credentials,
     );
-    const { authEnabled, config } = getStore();
     const authMethods = auth?.loginMethods().map((method) => method.label);
     c.header("Cache-Control", "no-store");
-    return c.html(renderAdminSystemPage({ report, authEnabled, config, authMethods }));
+    return c.html(renderAdminSystemPage({ report, authEnabled, config, authMethods, credentials }));
   });
+
+  app.post("/admin/credentials/reencrypt", async (c) => {
+    requireSiteAdmin(c);
+    const { db, config } = getStore();
+    if (!config.previousSecret) {
+      flash(c, "No previous secret is configured", "warning");
+      return hxRedirect(c, "/admin");
+    }
+    const result = await reencryptWithCurrent(db, config);
+    flash(c, reencryptMessage(result), result.failed > 0 ? "warning" : "success");
+    return hxRedirect(c, "/admin");
+  });
+}
+
+function reencryptMessage(result: { reencrypted: number; failed: number }): string {
+  const base = `Re-encrypted ${result.reencrypted} credential(s)`;
+  return result.failed > 0 ? `${base}; ${result.failed} failed — see server logs` : base;
 }

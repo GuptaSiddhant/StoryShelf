@@ -15,6 +15,7 @@ import {
 import { requestId } from "hono/request-id";
 import type { ShelfApp, ShelfContext, ShelfRouter } from "./app-types.ts";
 import { setupCaptureQueue } from "./capture-setup.ts";
+import { checkCredentialsAfterSetup } from "./credentials.ts";
 import { attachLifecycle, type LifecycleCell } from "./lifecycle.ts";
 import {
   authGate,
@@ -91,6 +92,17 @@ function recoverAfterSetup(
     });
 }
 
+/** Boot-time checks that run once adapters are ready: stuck-capture recovery and credential state. */
+function runAfterSetup(
+  cell: LifecycleCell,
+  scoped: ShelfOptions,
+  runtime: ReturnType<typeof resolveRuntime>,
+  recoverStuck: (() => Promise<unknown>) | undefined,
+): void {
+  recoverAfterSetup(cell, recoverStuck, runtime.logger);
+  checkCredentialsAfterSetup(cell, scoped.database, runtime.config, runtime.logger);
+}
+
 /** Attach lifecycle, queue, middleware, routes, and docs to the app. */
 function assembleApp(app: ShelfApp, options: ShelfOptions, scoped: ShelfOptions): void {
   const runtime = resolveRuntime(options);
@@ -105,7 +117,7 @@ function assembleApp(app: ShelfApp, options: ShelfOptions, scoped: ShelfOptions)
     runtime.gitHosts,
     runtime.logger,
   );
-  recoverAfterSetup(cell, recoverStuck, runtime.logger);
+  runAfterSetup(cell, scoped, runtime, recoverStuck);
   wireMiddleware(app, {
     ...runtime,
     queue,
@@ -136,6 +148,16 @@ export function createShelfApp(options: ShelfOptions): ShelfApp {
 
   return app;
 }
+
+/** Cookie-authenticated write paths guarded by CSRF tokens. */
+const CSRF_PATHS = [
+  "/auth/logout",
+  "/auth/invites/*",
+  "/projects/:slug/settings/*",
+  "/profile/*",
+  "/profile",
+  "/admin/credentials/*",
+] as const;
 
 /** Attach global middleware: ids, logging, init gate, limits, store scope, auth gate. */
 function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
@@ -171,11 +193,9 @@ function mountGuards(app: ShelfRouter, config: ShelfConfig): void {
     "/api/auth/*",
     rateLimit({ windowMs: 60_000, max: 300, keyGenerator: rateLimitKey("engine") }),
   );
-  app.use("/auth/logout", csrf(config.secret));
-  app.use("/auth/invites/*", csrf(config.secret));
-  app.use("/projects/:slug/settings/*", csrf(config.secret));
-  app.use("/profile/*", csrf(config.secret));
-  app.use("/profile", csrf(config.secret));
+  for (const path of CSRF_PATHS) {
+    app.use(path, csrf(config.secret));
+  }
 }
 
 /** Abuse floors for notification management endpoints (own counters). */

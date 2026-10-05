@@ -40,3 +40,10 @@ export { TokenModel } from "./token.ts";
 export { UserModel } from "./user.ts";
 export { WebhookModel, type WebhookCreateInput } from "./webhook.ts";
 export { ContentRefModel } from "./content-ref.ts";
+export {
+  probeCredentials,
+  reencryptCredentials,
+  type CredentialProbe,
+  type ReencryptResult,
+  type UnreadableCredential,
+} from "./credentials.ts";

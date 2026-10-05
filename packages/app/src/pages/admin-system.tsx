@@ -1,7 +1,9 @@
 import type { ShelfConfig } from "@storyshelf/core/config";
+import type { CredentialProbe } from "@storyshelf/core/models";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { HealthReport } from "../routers/health-report.ts";
 import {
+  Alert,
   Badge,
   Button,
   Card,
@@ -13,6 +15,7 @@ import {
   Stat,
   Table,
 } from "../ui/components.tsx";
+import { csrfField } from "../ui/csrf-field.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
@@ -24,6 +27,8 @@ export interface AdminSystemData {
   config: ShelfConfig;
   /** Active login method labels (read-only badges; empty when auth is off). */
   authMethods?: string[];
+  /** Stored-credential state; null/undefined when no secret is configured. */
+  credentials?: CredentialProbe | null;
 }
 
 function healthTone(state: string): "success" | "info" | "danger" | "neutral" {
@@ -177,9 +182,57 @@ function ServerFacts(props: ServerFactsProps): HtmlEscapedString | Promise<HtmlE
   );
 }
 
+/** Credential encryption state with the admin-only re-encrypt action. */
+function CredentialsCard(props: {
+  probe: CredentialProbe;
+  config: ShelfConfig;
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const { probe, config } = props;
+  const rotating = Boolean(config.previousSecret);
+  return (
+    <Card>
+      <SectionTitle>Stored credentials</SectionTitle>
+      <Meta>
+        Webhook secrets, git tokens and notification secrets are encrypted with the server secret.
+      </Meta>
+      <div class="grid grid--3">
+        <Stat label="Current secret" value={String(probe.current)} />
+        <Stat label="Previous secret" value={String(probe.previous)} />
+        <Stat label="Unreadable" value={String(probe.unreadable.length)} />
+      </div>
+      {probe.unreadable.length > 0 ? (
+        <Alert tone="danger" title="Some credentials cannot be decrypted">
+          No configured secret matches {probe.unreadable.length} stored credential(s) (
+          {[...new Set(probe.unreadable.map((row) => row.source))].join(", ")}). Check that SECRET
+          and SECRET_PREVIOUS are correct, or recreate them.
+        </Alert>
+      ) : null}
+      {rotating && probe.previous > 0 ? (
+        <form
+          method="post"
+          action="/admin/credentials/reencrypt"
+          hx-post="/admin/credentials/reencrypt"
+          hx-target="body"
+        >
+          {csrfField()}
+          <Button type="submit" variant="secondary" size="sm">
+            Re-encrypt with current secret
+          </Button>
+        </form>
+      ) : (
+        <Meta>
+          {rotating
+            ? "All credentials use the current secret. Remove SECRET_PREVIOUS."
+            : "To rotate, set SECRET to the new value and SECRET_PREVIOUS to the old one."}
+        </Meta>
+      )}
+    </Card>
+  );
+}
+
 /** Site-admin System page: adapter inventory with in-depth health. */
 export function renderAdminSystemPage(data: AdminSystemData): RenderedContent {
-  const { report, authEnabled, config, authMethods } = data;
+  const { report, authEnabled, config, authMethods, credentials } = data;
   return (
     <DocumentLayout title="System" nav={{ active: "admin" }}>
       <PageHeader
@@ -203,6 +256,11 @@ export function renderAdminSystemPage(data: AdminSystemData): RenderedContent {
         config={config}
         authMethods={authMethods}
       />
+      {credentials ? (
+        <div class="mt-1">
+          <CredentialsCard probe={credentials} config={config} />
+        </div>
+      ) : null}
       <div class="mt-1">
         <Card>
           <SectionTitle>Adapters</SectionTitle>

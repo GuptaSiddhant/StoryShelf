@@ -6,8 +6,8 @@
     "azure",
     "queue",
     "self-hosted",
-    "storage-queues",
     "service-bus",
+    "storage-queues",
     "storybook"
   ],
   "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
@@ -62,18 +62,6 @@
     "test": "vitest run",
     "prepublishOnly": "nub run build"
   },
-  "peerDependencies": {
-    "@azure/storage-queue": "^12.31.0",
-    "@azure/service-bus": "^7.9.5"
-  },
-  "peerDependenciesMeta": {
-    "@azure/storage-queue": {
-      "optional": true
-    },
-    "@azure/service-bus": {
-      "optional": true
-    }
-  },
   "dependencies": {
     "@storyshelf/core": "workspace:*"
   },
@@ -88,6 +76,18 @@
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@azure/service-bus": "^7.9.5",
+    "@azure/storage-queue": "^12.31.0"
+  },
+  "peerDependenciesMeta": {
+    "@azure/storage-queue": {
+      "optional": true
+    },
+    "@azure/service-bus": {
+      "optional": true
+    }
   },
   "jsr": {
     "runtimeCompat": {

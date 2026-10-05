@@ -1,8 +1,9 @@
 /* oxlint-disable typescript/promise-function-async -- admin helpers are async by design */
-import { createRoute } from "@hono/zod-openapi";
+import { createRoute, z } from "@hono/zod-openapi";
 import { ProjectModel } from "@storyshelf/core/models";
 import { Retention } from "@storyshelf/core/retention";
 import type { ShelfRouter } from "../app-types.ts";
+import { reencryptWithCurrent } from "../credentials.ts";
 import { notifySystem } from "../notify.ts";
 import { getStore } from "../store.ts";
 import { requireSiteAdmin } from "./helpers.ts";
@@ -22,8 +23,47 @@ const purgeRoute = createRoute({
   },
 });
 
-/** Register the site-admin retention purge endpoint. */
+const reencryptSchema = z.object({
+  reencrypted: z.number().int(),
+  failed: z.number().int(),
+  unreadable: z.number().int(),
+});
+
+const reencryptRoute = createRoute({
+  method: "post",
+  path: "/api/v1/admin/credentials/reencrypt",
+  responses: {
+    200: {
+      content: { "application/json": { schema: reencryptSchema } },
+      description: "Credentials re-encrypted with the current secret",
+    },
+    409: {
+      content: { "application/json": { schema: z.object({ error: z.string() }) } },
+      description: "No previousSecret configured",
+    },
+    ...forbiddenResponse,
+  },
+});
+
+/** Register the site-admin endpoints: retention purge and credential re-encryption. */
 export function registerAdmin(app: ShelfRouter): void {
+  app.openapi(reencryptRoute, async (c) => {
+    requireSiteAdmin(c);
+    const { db, config } = getStore();
+    if (!config.previousSecret) {
+      return c.json({ error: "No previousSecret is configured; nothing to re-encrypt" }, 409);
+    }
+    const result = await reencryptWithCurrent(db, config);
+    return c.json(
+      {
+        reencrypted: result.reencrypted,
+        failed: result.failed,
+        unreadable: result.unreadable.length,
+      },
+      200,
+    );
+  });
+
   app.openapi(purgeRoute, async (c) => {
     requireSiteAdmin(c);
     const body = c.req.valid("json");

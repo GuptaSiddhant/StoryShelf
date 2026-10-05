@@ -121,6 +121,9 @@ const app = createShelfApp({
     // `STORYSHELF_ADMIN_TOKEN` bootstraps site-admin API access.
     // `serverTiming` emits Server-Timing response headers (total + db/storage).
     secret,
+    // Rotation: keep the old SECRET here until stored credentials are re-encrypted.
+    previousSecret: env["SECRET_PREVIOUS"] === "" ? undefined : env["SECRET_PREVIOUS"],
+    migrateCredentialsOnBoot: env["SECRET_MIGRATE"] === "true",
     adminToken,
     publicBaseUrl,
     scratchDir: dataDir,

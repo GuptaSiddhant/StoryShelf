@@ -3,6 +3,7 @@ import { NotificationChannelModel } from "@storyshelf/core/models";
 import type { NotificationChannelRow } from "@storyshelf/core/schema";
 import type { ProjectRole } from "@storyshelf/core/types";
 import type { ShelfRouter } from "../app-types.ts";
+import { credentialKeys } from "../credential-keys.ts";
 import { getStore } from "../store.ts";
 import { notFound, requireSiteAdmin, resolveAuthorizedProject } from "./helpers.ts";
 import {
@@ -111,7 +112,7 @@ export function registerNotificationChannels(app: ShelfRouter): void {
     const rows = await new NotificationChannelModel(
       getStore().db,
       undefined,
-      getStore().config.secret,
+      credentialKeys(getStore().config),
     ).list(project.id);
     return c.json(rows.map((row) => toPublic(row)));
   });
@@ -126,7 +127,7 @@ export function registerNotificationChannels(app: ShelfRouter): void {
     const row = await new NotificationChannelModel(
       getStore().db,
       undefined,
-      getStore().config.secret,
+      credentialKeys(getStore().config),
     ).create({ projectId: project.id, ...body });
     return c.json(toPublic(row), 201);
   });
@@ -134,7 +135,11 @@ export function registerNotificationChannels(app: ShelfRouter): void {
   app.openapi(deleteChannelRoute, async (c) => {
     const { slug, channelId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
-    const model = new NotificationChannelModel(getStore().db, undefined, getStore().config.secret);
+    const model = new NotificationChannelModel(
+      getStore().db,
+      undefined,
+      credentialKeys(getStore().config),
+    );
     const existing = await model.get(channelId);
     if (existing?.projectId !== project.id) {
       notFound("Notification channel not found");
@@ -199,7 +204,7 @@ export function registerSystemChannels(app: ShelfRouter): void {
     const rows = await new NotificationChannelModel(
       getStore().db,
       undefined,
-      getStore().config.secret,
+      credentialKeys(getStore().config),
     ).listSystem();
     return c.json(rows.map((row) => toPublic(row)));
   });
@@ -214,7 +219,7 @@ export function registerSystemChannels(app: ShelfRouter): void {
     const row = await new NotificationChannelModel(
       getStore().db,
       undefined,
-      getStore().config.secret,
+      credentialKeys(getStore().config),
     ).create({ projectId: null, ...body });
     return c.json(toPublic(row), 201);
   });
@@ -222,7 +227,11 @@ export function registerSystemChannels(app: ShelfRouter): void {
   app.openapi(deleteSystemRoute, async (c) => {
     requireSiteAdmin(c);
     const { channelId } = c.req.valid("param");
-    const model = new NotificationChannelModel(getStore().db, undefined, getStore().config.secret);
+    const model = new NotificationChannelModel(
+      getStore().db,
+      undefined,
+      credentialKeys(getStore().config),
+    );
     const existing = await model.get(channelId);
     if (existing?.projectId !== null) {
       notFound("Notification channel not found");

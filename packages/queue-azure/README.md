@@ -75,12 +75,12 @@ const queue = await createAzureQueue({
 
 ```ts
 interface AzureStorageQueuesQueueOptions {
-  queueName: string;         // required Storage queue name
-  connectionString: string;  // required Storage account connection string
-  client?: QueueClient;      // injected client (tests)
+  queueName: string; // required Storage queue name
+  connectionString: string; // required Storage account connection string
+  client?: QueueClient; // injected client (tests)
   logger?: Logger;
   visibilityTimeout?: number; // seconds, default 300
-  waitMs?: number;            // poll HTTP timeout, default 20_000
+  waitMs?: number; // poll HTTP timeout, default 20_000
 }
 ```
 
@@ -90,14 +90,14 @@ Storage Queues has no long-polling: `poll` returns as soon as a message is (or i
 
 ```ts
 interface AzureServiceBusQueueOptions {
-  queueName: string;         // required Service Bus queue name
-  connectionString: string;  // required connection string
+  queueName: string; // required Service Bus queue name
+  connectionString: string; // required connection string
   client?: ServiceBusClient; // injected client (tests)
   sender?: Sender;
   receiver?: ServiceBusReceiver;
   adminClient?: ServiceBusAdministrationClient;
   logger?: Logger;
-  waitMs?: number;            // receive maxWaitTimeInMs, default 30_000
+  waitMs?: number; // receive maxWaitTimeInMs, default 30_000
 }
 ```
 

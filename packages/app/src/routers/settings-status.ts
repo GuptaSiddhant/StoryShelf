@@ -3,6 +3,7 @@ import { StatusConfigModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
+import { credentialKeys } from "../credential-keys.ts";
 import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
 import { hxRedirect } from "./htmx.ts";
@@ -101,7 +102,7 @@ async function persistStatusConfig(
   config: unknown,
 ): Promise<Response> {
   const { db, config: shelfConfig } = getStore();
-  await new StatusConfigModel(db, undefined, shelfConfig.secret).create(project.id, {
+  await new StatusConfigModel(db, undefined, credentialKeys(shelfConfig)).create(project.id, {
     provider: provider.metadata.kind,
     config,
     token,
@@ -122,7 +123,7 @@ function parseJsonConfig(raw: string): unknown {
 async function handleDeleteStatus(c: Context): Promise<Response> {
   const project = await findProject(c.req.param("slug") ?? "");
   const { db, config: shelfConfig } = getStore();
-  await new StatusConfigModel(db, undefined, shelfConfig.secret).remove(
+  await new StatusConfigModel(db, undefined, credentialKeys(shelfConfig)).remove(
     project.id,
     c.req.param("id") ?? "",
   );

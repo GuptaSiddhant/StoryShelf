@@ -52,14 +52,6 @@
     "test": "vitest run",
     "prepublishOnly": "nub run build"
   },
-  "peerDependencies": {
-    "@google-cloud/pubsub": "^6.1.0"
-  },
-  "peerDependenciesMeta": {
-    "@google-cloud/pubsub": {
-      "optional": true
-    }
-  },
   "dependencies": {
     "@storyshelf/core": "workspace:*"
   },
@@ -73,6 +65,14 @@
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@google-cloud/pubsub": "^6.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@google-cloud/pubsub": {
+      "optional": true
+    }
   },
   "jsr": {
     "runtimeCompat": {

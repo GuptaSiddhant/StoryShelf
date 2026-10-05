@@ -22,8 +22,8 @@ import { createShelfApp } from "@storyshelf/app";
 
 const storage = createGcsStorage({
   bucket: "my-shelf",
-  prefix: "storyshelf",           // optional
-  projectId: "my-gcp-project",    // optional, defaults to ADC
+  prefix: "storyshelf", // optional
+  projectId: "my-gcp-project", // optional, defaults to ADC
 });
 
 const app = createShelfApp({ database, storage });
@@ -54,13 +54,13 @@ const storage = createGcsStorage({ bucket: "my-shelf", client });
 
 ```ts
 interface GcsStorageOptions {
-  bucket: string;          // required GCS bucket name
-  prefix?: string;         // optional key prefix, defaults to ""
-  client?: Storage;        // optional pre-configured @google-cloud/storage client
-  projectId?: string;      // optional GCP project id
-  keyFilename?: string;    // optional path to service-account JSON
-  credentials?: object;    // optional service-account credentials object
-  apiEndpoint?: string;    // optional custom endpoint (emulator)
+  bucket: string; // required GCS bucket name
+  prefix?: string; // optional key prefix, defaults to ""
+  client?: Storage; // optional pre-configured @google-cloud/storage client
+  projectId?: string; // optional GCP project id
+  keyFilename?: string; // optional path to service-account JSON
+  credentials?: object; // optional service-account credentials object
+  apiEndpoint?: string; // optional custom endpoint (emulator)
 }
 ```
 

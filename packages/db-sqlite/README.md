@@ -38,13 +38,13 @@ The returned adapter implements every method of the `DatabaseAdapter` interface 
 
 ## Presets (same schema, different driver)
 
-| Subpath | Driver | Install | When |
-|---|---|---|---|
-| `@storyshelf/db-sqlite` (root) | `node:sqlite` builtin | — | Default. Single-node VPS/Docker. Zero config. |
-| `@storyshelf/db-sqlite/turso` | `@libsql/client` | `nub add @libsql/client` | Serverless (Turso cloud, Vercel, Lambda); `file:` URLs and embedded replicas work too. |
-| `@storyshelf/db-sqlite/better-sqlite3` | `better-sqlite3` | `nub add better-sqlite3` | Native sync driver (needs `allowBuilds` for the postinstall). |
-| `@storyshelf/db-sqlite/bun-sqlite` | `bun:sqlite` builtin | — (Bun only) | Bun runtime. |
-| `@storyshelf/db-sqlite/d1` | D1 binding | — (Workers only) | Cloudflare Workers (`env.DB`). |
+| Subpath                                | Driver                | Install                  | When                                                                                   |
+| -------------------------------------- | --------------------- | ------------------------ | -------------------------------------------------------------------------------------- |
+| `@storyshelf/db-sqlite` (root)         | `node:sqlite` builtin | —                        | Default. Single-node VPS/Docker. Zero config.                                          |
+| `@storyshelf/db-sqlite/turso`          | `@libsql/client`      | `nub add @libsql/client` | Serverless (Turso cloud, Vercel, Lambda); `file:` URLs and embedded replicas work too. |
+| `@storyshelf/db-sqlite/better-sqlite3` | `better-sqlite3`      | `nub add better-sqlite3` | Native sync driver (needs `allowBuilds` for the postinstall).                          |
+| `@storyshelf/db-sqlite/bun-sqlite`     | `bun:sqlite` builtin  | — (Bun only)             | Bun runtime.                                                                           |
+| `@storyshelf/db-sqlite/d1`             | D1 binding            | — (Workers only)         | Cloudflare Workers (`env.DB`).                                                         |
 
 ```ts
 import { createTursoDatabase } from "@storyshelf/db-sqlite/turso";

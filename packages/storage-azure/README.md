@@ -53,7 +53,8 @@ Azurite (local emulator):
 ```ts
 const storage = createAzureStorage({
   container: "storyshelf",
-  connectionString: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;",
+  connectionString:
+    "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;",
 });
 ```
 
@@ -63,14 +64,14 @@ const storage = createAzureStorage({
 
 ```ts
 interface AzureStorageOptions {
-  container: string;          // required container name
-  prefix?: string;            // optional blob prefix, defaults to ""
-  client?: ContainerClient;   // optional pre-configured container client
-  connectionString?: string;  // optional Azure connection string
-  accountName?: string;       // optional storage account name
-  accountKey?: string;        // optional storage account key
-  accountUrl?: string;        // optional blob service URL (e.g. https://myaccount.blob.core.windows.net)
-  sasToken?: string;          // optional SAS token (without leading ? OK)
+  container: string; // required container name
+  prefix?: string; // optional blob prefix, defaults to ""
+  client?: ContainerClient; // optional pre-configured container client
+  connectionString?: string; // optional Azure connection string
+  accountName?: string; // optional storage account name
+  accountKey?: string; // optional storage account key
+  accountUrl?: string; // optional blob service URL (e.g. https://myaccount.blob.core.windows.net)
+  sasToken?: string; // optional SAS token (without leading ? OK)
 }
 ```
 

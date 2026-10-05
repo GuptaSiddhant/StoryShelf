@@ -21,7 +21,8 @@ import { gitHubHost } from "@storyshelf/git-github";
 import { createShelfApp } from "@storyshelf/app";
 
 const app = createShelfApp({
-  database, storage,
+  database,
+  storage,
   // ...adapters...
   gitHosts: [gitHubHost],
 });
@@ -39,8 +40,8 @@ The project config is validated against `githubConfigSchema`:
 
 ```ts
 interface GitHubProjectConfig {
-  owner: string;   // GitHub owner (user or org)
-  repo: string;    // repository name
+  owner: string; // GitHub owner (user or org)
+  repo: string; // repository name
 }
 ```
 

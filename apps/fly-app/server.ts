@@ -115,6 +115,9 @@ const app = createShelfApp({
   observability,
   config: {
     secret,
+    // Rotation: keep the old SECRET here until stored credentials are re-encrypted.
+    previousSecret: env["SECRET_PREVIOUS"] === "" ? undefined : env["SECRET_PREVIOUS"],
+    migrateCredentialsOnBoot: env["SECRET_MIGRATE"] === "true",
     adminToken,
     publicBaseUrl,
     scratchDir: dataDir,

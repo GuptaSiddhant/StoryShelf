@@ -111,6 +111,7 @@ export default defineConfig({
                 { label: "GCP", slug: "guides/deployment/gcp" },
                 { label: "Cloud assembly", slug: "guides/deployment/cloud" },
                 { label: "Observability", slug: "guides/observability" },
+                { label: "Secret rotation", slug: "guides/deployment/secret-rotation" },
               ],
             },
             {

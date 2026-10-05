@@ -3,10 +3,10 @@
   "version": "0.5.2",
   "description": "Email notification transport for StoryShelf (SMTP, Mailpit, log, HTTP APIs).",
   "keywords": [
-    "notifications",
     "email",
-    "smtp",
+    "notifications",
     "self-hosted",
+    "smtp",
     "storybook"
   ],
   "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
@@ -80,6 +80,18 @@
     "@storyshelf/core": "workspace:*",
     "zod": "catalog:"
   },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/nodemailer": "^8.0.2",
+    "@vitest/coverage-v8": "catalog:",
+    "nodemailer": "^10.0.12",
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:",
+    "oxlint-tsgolint": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
   "peerDependencies": {
     "nodemailer": "^10.0.12"
   },
@@ -87,18 +99,6 @@
     "nodemailer": {
       "optional": true
     }
-  },
-  "devDependencies": {
-    "@types/node": "catalog:",
-    "@types/nodemailer": "^8.0.2",
-    "nodemailer": "^10.0.12",
-    "@vitest/coverage-v8": "catalog:",
-    "oxfmt": "catalog:",
-    "oxlint": "catalog:",
-    "oxlint-tsgolint": "catalog:",
-    "tsdown": "catalog:",
-    "typescript": "catalog:",
-    "vitest": "catalog:"
   },
   "jsr": {
     "runtimeCompat": {

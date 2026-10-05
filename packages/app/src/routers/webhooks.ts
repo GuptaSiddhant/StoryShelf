@@ -3,6 +3,7 @@ import { WebhookModel } from "@storyshelf/core/models";
 import type { ProjectRole } from "@storyshelf/core/types";
 import { randomToken } from "@storyshelf/core/utils";
 import type { ShelfRouter } from "../app-types.ts";
+import { credentialKeys } from "../credential-keys.ts";
 import { getStore } from "../store.ts";
 import { resolveAuthorizedProject, notFound } from "./helpers.ts";
 import {
@@ -67,7 +68,7 @@ export function registerWebhooks(app: ShelfRouter): void {
     const webhooks = await new WebhookModel(
       getStore().db,
       undefined,
-      getStore().config.secret,
+      credentialKeys(getStore().config),
     ).list(project.id);
     return c.json(
       webhooks.map((webhook) => ({
@@ -85,7 +86,7 @@ export function registerWebhooks(app: ShelfRouter): void {
     const webhook = await new WebhookModel(
       getStore().db,
       undefined,
-      getStore().config.secret,
+      credentialKeys(getStore().config),
     ).create(project.id, { ...body, secret });
     return c.json({ id: webhook.id, url: webhook.url, events: body.events ?? [], secret }, 201);
   });
@@ -93,14 +94,15 @@ export function registerWebhooks(app: ShelfRouter): void {
   app.openapi(deleteWebhookRoute, async (c) => {
     const { slug, webhookId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
-    const webhook = await new WebhookModel(getStore().db, undefined, getStore().config.secret).get(
-      project.id,
-      webhookId,
-    );
+    const webhook = await new WebhookModel(
+      getStore().db,
+      undefined,
+      credentialKeys(getStore().config),
+    ).get(project.id, webhookId);
     if (!webhook) {
       notFound("Webhook not found");
     }
-    await new WebhookModel(getStore().db, undefined, getStore().config.secret).remove(
+    await new WebhookModel(getStore().db, undefined, credentialKeys(getStore().config)).remove(
       project.id,
       webhook.id,
     );

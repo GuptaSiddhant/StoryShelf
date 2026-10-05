@@ -15,6 +15,7 @@ import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 import { BuildModel } from "@storyshelf/core/models";
 import { captureMetrics, currentTraceparent } from "@storyshelf/observability";
+import { credentialKeys } from "./credential-keys.ts";
 import { notifySystemWith } from "./notify.ts";
 
 /**
@@ -128,7 +129,7 @@ export function setupCaptureQueue(
     scratchDir: config.scratchDir,
     viewports: config.viewports,
     logger,
-    secret: config.secret,
+    secret: credentialKeys(config),
   };
   const dispatchDeps: DispatchDeps = {
     db: options.database,
@@ -143,7 +144,7 @@ export function setupCaptureQueue(
     },
     jobOptions,
     gitHosts,
-    secret: config.secret,
+    secret: credentialKeys(config),
     logger,
   };
   const runJob = createDispatchJob(dispatchDeps);

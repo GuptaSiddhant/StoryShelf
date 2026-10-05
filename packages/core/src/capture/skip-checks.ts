@@ -4,6 +4,7 @@ import type { Logger } from "../logger.ts";
 import { BuildModel, type BuildTables } from "../models/build.ts";
 import { StatusConfigModel, type StatusConfigTables } from "../models/status-config.ts";
 import type { ProjectStatusConfig } from "../schema/status-config.ts";
+import type { SecretInput } from "../utils/encrypt.ts";
 
 /** Skip capture when another approved build already covers the same commit. */
 export async function hasApprovedBuildForSha(
@@ -22,7 +23,7 @@ export interface MergeCheck {
   providers: GitHostProvider[];
   sha: string;
   branch: string;
-  secret: string | undefined;
+  secret: SecretInput;
   db: DatabaseAdapter;
   tables: StatusConfigTables;
   projectId: string;

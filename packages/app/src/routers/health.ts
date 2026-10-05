@@ -9,6 +9,8 @@
  */
 import type { AdapterSetupResult, AdapterSetupSources } from "@storyshelf/core/adapter/setup";
 import type { ShelfRouter } from "../app-types.ts";
+import { loadCredentialProbe } from "../credentials.ts";
+import { getStore } from "../store.ts";
 import { collectHealthReport, type AdapterState } from "./health-report.ts";
 import { requireSiteAdmin } from "./helpers.ts";
 
@@ -57,11 +59,13 @@ export function registerHealth(app: ShelfRouter, deps: HealthDeps): void {
 
   app.post("/api/v1/health", async (c) => {
     requireSiteAdmin(c);
+    const { db, config } = getStore();
     const report = await collectHealthReport(
       deps.sources,
       deps.getSettled(),
       deps.bootTimeMs,
       deps.version,
+      await loadCredentialProbe(db, config),
     );
     const adapters: AdapterReport[] = report.adapters.map((adapter) => {
       const entry: AdapterReport = {
