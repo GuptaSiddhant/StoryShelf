@@ -16,6 +16,7 @@ const ADMIN_ROLES: readonly ProjectRole[] = ["admin"];
 
 const listWebhooksRoute = createRoute({
   method: "get",
+  tags: ["Webhooks"],
   path: "/api/v1/projects/{slug}/webhooks",
   request: { params: z.object({ slug: z.string() }) },
   responses: {
@@ -30,6 +31,7 @@ const listWebhooksRoute = createRoute({
 
 const createWebhookRoute = createRoute({
   method: "post",
+  tags: ["Webhooks"],
   path: "/api/v1/projects/{slug}/webhooks",
   request: {
     params: z.object({ slug: z.string() }),
@@ -46,6 +48,7 @@ const createWebhookRoute = createRoute({
 
 const deleteWebhookRoute = createRoute({
   method: "delete",
+  tags: ["Webhooks"],
   path: "/api/v1/projects/{slug}/webhooks/{webhookId}",
   request: { params: z.object({ slug: z.string(), webhookId: z.string() }) },
   responses: {

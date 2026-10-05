@@ -16,6 +16,7 @@ const ADMIN_ROLES: readonly ProjectRole[] = ["admin"];
 
 const listTokensRoute = createRoute({
   method: "get",
+  tags: ["Tokens"],
   path: "/api/v1/projects/{slug}/tokens",
   request: { params: z.object({ slug: z.string() }) },
   responses: {
@@ -30,6 +31,7 @@ const listTokensRoute = createRoute({
 
 const createTokenRoute = createRoute({
   method: "post",
+  tags: ["Tokens"],
   path: "/api/v1/projects/{slug}/tokens",
   request: {
     params: z.object({ slug: z.string() }),
@@ -46,6 +48,7 @@ const createTokenRoute = createRoute({
 
 const deleteTokenRoute = createRoute({
   method: "delete",
+  tags: ["Tokens"],
   path: "/api/v1/projects/{slug}/tokens/{tokenId}",
   request: { params: z.object({ slug: z.string(), tokenId: z.string() }) },
   responses: {

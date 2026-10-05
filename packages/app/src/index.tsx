@@ -278,6 +278,33 @@ function registerDocs(app: ShelfRouter): void {
         "REST API for the StoryShelf visual testing platform. JSON endpoints live under /api/v1; HTML pages are served at /.",
       version: "1.0.0",
     },
+    tags: [
+      {
+        name: "Projects",
+        description: "Create and manage projects (one project is one Storybook).",
+      },
+      {
+        name: "Builds",
+        description: "Upload Storybook builds, inspect capture attempts, retry, and delete.",
+      },
+      {
+        name: "Review",
+        description: "Approve or reject snapshots, bulk actions, re-diff, and review comments.",
+      },
+      { name: "Labels", description: "Typed build labels and their link templates." },
+      {
+        name: "Members",
+        description: "Project members, roles, and identity-provider group mappings.",
+      },
+      { name: "Tokens", description: "API tokens used by the CLI and CI." },
+      { name: "Webhooks", description: "Signed webhook deliveries for build events." },
+      {
+        name: "Notifications",
+        description: "Email and chat notification channels and subscriptions.",
+      },
+      { name: "Git status", description: "Commit-status integrations for GitHub and GitLab." },
+      { name: "Admin", description: "Site-wide administration." },
+    ],
   });
   app.get("/api/v1/docs", swaggerUI({ url: "/api/v1/openapi.json" }));
 }

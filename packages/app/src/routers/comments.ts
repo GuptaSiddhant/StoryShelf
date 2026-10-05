@@ -10,6 +10,7 @@ import { hxRefresh } from "./htmx.ts";
 import { commentSchema, commentCreateSchema, notFound, unauthorized } from "./schemas.ts";
 const listCommentsRoute = createRoute({
   method: "get",
+  tags: ["Review"],
   path: "/api/v1/projects/{slug}/builds/{buildId}/comments",
   request: { params: z.object({ slug: z.string(), buildId: z.string() }) },
   responses: {
@@ -24,6 +25,7 @@ const listCommentsRoute = createRoute({
 
 const createCommentRoute = createRoute({
   method: "post",
+  tags: ["Review"],
   path: "/api/v1/projects/{slug}/builds/{buildId}/comments",
   request: {
     params: z.object({ slug: z.string(), buildId: z.string() }),
@@ -40,6 +42,7 @@ const createCommentRoute = createRoute({
 
 const resolveCommentRoute = createRoute({
   method: "post",
+  tags: ["Review"],
   path: "/api/v1/projects/{slug}/builds/{buildId}/comments/{commentId}/resolve",
   request: { params: z.object({ slug: z.string(), buildId: z.string(), commentId: z.string() }) },
   responses: {

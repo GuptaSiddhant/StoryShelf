@@ -17,6 +17,7 @@ const ADMIN_ROLES: readonly ProjectRole[] = ["admin"];
 
 const listLabelsRoute = createRoute({
   method: "get",
+  tags: ["Labels"],
   path: "/api/v1/projects/{slug}/label-types",
   request: { params: z.object({ slug: z.string() }) },
   responses: {
@@ -31,6 +32,7 @@ const listLabelsRoute = createRoute({
 
 const createLabelRoute = createRoute({
   method: "post",
+  tags: ["Labels"],
   path: "/api/v1/projects/{slug}/label-types",
   request: {
     params: z.object({ slug: z.string() }),
@@ -47,6 +49,7 @@ const createLabelRoute = createRoute({
 
 const deleteLabelRoute = createRoute({
   method: "delete",
+  tags: ["Labels"],
   path: "/api/v1/projects/{slug}/label-types/{key}",
   request: { params: z.object({ slug: z.string(), key: z.string() }) },
   responses: {
@@ -57,6 +60,7 @@ const deleteLabelRoute = createRoute({
 
 const updateLabelRoute = createRoute({
   method: "patch",
+  tags: ["Labels"],
   path: "/api/v1/projects/{slug}/label-types/{key}",
   request: {
     params: z.object({ slug: z.string(), key: z.string() }),
