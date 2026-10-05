@@ -5,6 +5,10 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 
 ## Unreleased
 
+**Review page: draggable wipe handle and pixel-level zoom** (#40)
+- The Swipe comparison now has a draggable handle on the divider (mouse, touch and pen); the slider below stays as the keyboard/screen-reader control and stays in sync.
+- Zoom gains a 400% level, and zoomed-in screenshots render with `image-rendering: pixelated` so individual pixels are visible. `+`/`-` step the zoom; `f` still cycles.
+
 **UI redesign: shell, review workspace, icon sprite** (ADR 0025)
 - New app shell: full-height icon sidebar (collapsible rail, mobile drawer),
   slim neutral top bar with project switcher, theme menu, account menu and

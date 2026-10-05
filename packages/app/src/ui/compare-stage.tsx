@@ -92,6 +92,16 @@ const stageRoot = css`
     max-width: none;
     zoom: 2;
   }
+  &[data-zoom="400"] .stage__img {
+    width: auto;
+    max-width: none;
+    zoom: 4;
+  }
+  /* Zoomed in, show real pixels instead of a smoothed blur. */
+  &[data-zoom="200"] .stage__img,
+  &[data-zoom="400"] .stage__img {
+    image-rendering: pixelated;
+  }
   &[data-view="diff"] .stage__grid,
   &[data-view="flip"] .stage__grid,
   &[data-view="swipe"] .stage__grid,
@@ -127,6 +137,7 @@ const stageRoot = css`
     background: transparent;
   }
   &[data-view="swipe"] .stage__divider {
+    position: relative;
     display: block;
     z-index: 3;
     justify-self: start;
@@ -135,6 +146,28 @@ const stageRoot = css`
     margin-left: var(--swipe, 50%);
     background: var(--accent);
     pointer-events: none;
+  }
+  /* The only part of the divider that takes pointer input: drag it to wipe. */
+  .stage__knob {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    transform: translate(-50%, -50%);
+    background: var(--accent);
+    color: var(--accent-contrast);
+    border: 2px solid var(--surface-card);
+    border-radius: var(--radius-pill);
+    box-shadow: var(--shadow-2);
+    font-size: var(--text-lg);
+    line-height: 1;
+    cursor: ew-resize;
+    pointer-events: auto;
+    touch-action: none;
+    user-select: none;
   }
   &[data-view="flip"] .stage__grid {
     cursor: pointer;
@@ -157,6 +190,7 @@ const ZOOMS = [
   { label: "Fit", value: "fit" },
   { label: "100%", value: "100" },
   { label: "200%", value: "200" },
+  { label: "400%", value: "400" },
 ];
 
 function withActive(
@@ -262,7 +296,11 @@ export const CompareStage: FC<CompareStageProps> = ({
           empty={diffEmpty}
           meta={diffMeta}
         />
-        <span class="stage__divider" aria-hidden="true" />
+        <span class="stage__divider" aria-hidden="true">
+          <span class="stage__knob" data-compare-knob>
+            ↔
+          </span>
+        </span>
       </div>
       <RangeControls />
     </div>

@@ -10,10 +10,10 @@ Every build lands in `reviewing` once diffing finishes (default-branch builds au
 The review page is a workspace:
 
 - **Filmstrip** (left): a thumbnail per snapshot with its status and diff size, filterable to *Needs review*, *All* or *Done*. The header shows how many changes you have reviewed.
-- **Comparison** (centre): *Side by side*, *Swipe* (drag a divider), *Onion skin* (blend baseline and current), *Diff* (the overlay alone) and *Flip* (toggle between baseline and current), with *Fit / 100% / 200%* zoom. Panes scroll together, and your mode and zoom are remembered.
+- **Comparison** (centre): *Side by side*, *Swipe* (drag the round handle on the divider, or use the slider beneath), *Onion skin* (blend baseline and current), *Diff* (the overlay alone) and *Flip* (toggle between baseline and current), with *Fit / 100% / 200% / 400%* zoom — zoomed-in images are drawn as crisp pixels so you can inspect individual changed pixels. Panes scroll together, and your mode and zoom are remembered.
 - **Action bar** (pinned at the bottom): previous/next, **Approve** and **Reject**. Deciding a snapshot moves you straight to the next one that still needs review.
 
-Keyboard: `j`/`k` (or `→`/`←`) move between snapshots, `a` approves, `r` rejects, `1`–`5` pick a comparison mode, `f` cycles zoom, `t` flips baseline/current, and `?` lists them all. **Approve all** and **Reject all** in the header ask for confirmation first.
+Keyboard: `j`/`k` (or `→`/`←`) move between snapshots, `a` approves, `r` rejects, `1`–`5` pick a comparison mode, `f` cycles zoom, `+`/`-` zoom in and out, `t` flips baseline/current, and `?` lists them all. **Approve all** and **Reject all** in the header ask for confirmation first.
 
 ## Approve / reject
 

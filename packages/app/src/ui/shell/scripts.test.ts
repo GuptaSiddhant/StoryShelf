@@ -76,6 +76,21 @@ describe("shell scripts", () => {
     expect(source).toContain("status===400||status===409||status===422");
   });
 
+  it("drags the wipe handle with pointer capture and zooms with +/- up to 400%", () => {
+    const source = clientScript();
+    for (const hook of [
+      "data-compare-knob",
+      "setPointerCapture",
+      "pointermove",
+      "pointercancel",
+      "'fit','100','200','400'",
+      "key==='+'||key==='='",
+      "key==='-'||key==='_'",
+    ]) {
+      expect(source).toContain(hook);
+    }
+  });
+
   it("builds toasts with textContent, never innerHTML", () => {
     expect(clientScript()).not.toContain("innerHTML");
   });
