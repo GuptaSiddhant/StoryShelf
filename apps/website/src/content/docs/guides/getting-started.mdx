@@ -1,0 +1,83 @@
+---
+title: Getting started
+description: Install StoryShelf, create a project, and review your first Storybook build in about ten minutes.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import { PackageManagers } from 'starlight-package-managers';
+import Screenshot from '../../../components/Screenshot.astro';
+
+StoryShelf is a self-hosted visual testing platform for Storybook. You run one server, point your CI at it, and review pixel diffs in the browser.
+
+<Screenshot name="projects-list" alt="The projects overview: a card per project with its latest build and review backlog" caption="What you will end up with: a project per Storybook, and what still needs review." />
+
+You need a Storybook with a `.storybook/main.*` file, and Node.js on the machine that will run the server.
+
+## 1. Scaffold a server
+
+Use the CLI to scaffold a new server project:
+
+<PackageManagers type="dlx" pkg="storyshelf" args="server init" />
+
+It asks for a project name and directory, then which database (SQLite by default), storage (local filesystem by default), auth (none by default), and git provider (GitHub, GitLab, or none). It generates `server.ts` and a `package.json` with the matching adapters.
+
+## 2. Start the server
+
+```sh
+cd my-storyshelf
+npm install
+npm start
+```
+
+The server listens on `http://localhost:3000`.
+
+## 3. Initialize Storybook and create a project
+
+Initialize the client config and create a project. Creating a project needs a site-admin token when auth is enabled.
+
+Write `.storybook/storyshelf.json` (prompts for anything you leave out):
+
+<PackageManagers type="dlx" pkg="storyshelf" args="init --url http://localhost:3000 --slug my-design-system" />
+
+Or create the project on the server and write the config in one step:
+
+<PackageManagers type="dlx" pkg="storyshelf" args={'create --url http://localhost:3000 --name "My Design System" --token $STORYSHELF_ADMIN_TOKEN'} />
+
+`create` prints the project slug and a CI token, and writes `.storybook/storyshelf.json`.
+
+<Aside type="caution">
+Keep the CI token secret: set it as `STORYSHELF_TOKEN` in your CI environment. `create` and `init` fail if `.storybook/main.*` is not found.
+</Aside>
+
+## 4. Upload a build from CI
+
+With `.storybook/storyshelf.json` present, `upload` flags can be omitted, and running `storyshelf` with no command defaults to `upload`:
+
+<PackageManagers type="dlx" pkg="storyshelf" args={'upload --token shelf_xxx --sha "$GITHUB_SHA" --branch "$GITHUB_REF_NAME"'} />
+
+Or, when the config file and environment are in place, simply:
+
+<PackageManagers type="dlx" pkg="storyshelf" />
+
+Explicit flags always work too:
+
+<PackageManagers type="dlx" pkg="storyshelf" args={'upload --url http://localhost:3000 --slug my-design-system --token shelf_xxx --sha "$GITHUB_SHA" --branch "$GITHUB_REF_NAME"'} />
+
+StoryShelf renders every story server-side and diffs it against the branch baseline. Without `.storybook/storyshelf.json`, running `storyshelf` just shows help pointing you to `init`.
+
+For a complete pipeline, see [CI setup](/guides/ci/).
+
+## 5. Review
+
+Open the project in your browser. A build that needs attention shows **N to review** on its project card; open it, and choose **Review diffs** for the review workspace: a filmstrip of changed stories, baseline, current and diff side by side (or swiped, blended or flipped), and **Approve** / **Reject** with the keyboard.
+
+<Screenshot name="diff-review" alt="The review workspace: snapshot filmstrip, baseline | current | diff comparison, and the action bar" caption="The review workspace. Approving a change moves you straight to the next one." />
+
+When every change is decided, the build's status check goes green and you can merge.
+
+## Next steps
+
+- [Review workflow](/guides/review/): comparison modes, shortcuts, and bulk actions.
+- [CI setup](/guides/ci/) and the [merge gate](/guides/merge-gate/): make the check required.
+- [Project settings](/guides/project-settings/): thresholds, viewports, labels, members and tokens.
+- [Deployment](/guides/deployment/): take the server beyond localhost.

@@ -1,0 +1,207 @@
+/*
+ * StoryShelf docs theme: the app's design tokens mapped onto Starlight's.
+ * Source of truth is packages/app/src/ui/theme.ts (zinc neutrals, #1d5fcf
+ * accent, 0.5rem radius, system font). Keep them in step.
+ */
+
+:root {
+  --sl-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+  --sl-font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --ss-radius: 0.5rem;
+  --ss-radius-lg: 0.75rem;
+  --ss-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+  --ss-shadow-lg: 0 12px 32px rgb(0 0 0 / 0.14);
+}
+
+/* Dark (Starlight's default) */
+:root {
+  --sl-color-white: #fafafa;
+  --sl-color-gray-1: #e4e4e7;
+  --sl-color-gray-2: #c9c9d1;
+  --sl-color-gray-3: #a1a1aa;
+  --sl-color-gray-4: #71717a;
+  --sl-color-gray-5: #3f3f46;
+  --sl-color-gray-6: #27272a;
+  --sl-color-gray-7: #18181b;
+  --sl-color-black: #09090b;
+
+  --sl-color-accent-low: #12254a;
+  --sl-color-accent: #2e6be0;
+  --sl-color-accent-high: #8db4ff;
+
+  --sl-color-bg-nav: #111113;
+  --sl-color-bg-sidebar: #111113;
+  --sl-color-hairline-light: #27272a;
+  --sl-color-hairline: #1e1e22;
+  --sl-color-hairline-shade: #09090b;
+}
+
+:root[data-theme="light"] {
+  --sl-color-white: #09090b;
+  --sl-color-gray-1: #18181b;
+  --sl-color-gray-2: #27272a;
+  --sl-color-gray-3: #52525b;
+  --sl-color-gray-4: #6a6a73;
+  --sl-color-gray-5: #d4d4d8;
+  --sl-color-gray-6: #e4e4e7;
+  --sl-color-gray-7: #f4f4f5;
+  --sl-color-black: #ffffff;
+
+  --sl-color-accent-low: #e6effc;
+  --sl-color-accent: #1d5fcf;
+  --sl-color-accent-high: #174ca6;
+
+  --sl-color-bg-nav: #fafafa;
+  --sl-color-bg-sidebar: #fafafa;
+  --sl-color-hairline-light: #e4e4e7;
+  --sl-color-hairline: #e4e4e7;
+  --sl-color-hairline-shade: #d4d4d8;
+}
+
+/* Header: brand mark + wordmark in the page text colour (the accent is for actions) */
+.site-title {
+  color: var(--sl-color-white);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.site-title img {
+  border-radius: 0.4rem;
+}
+
+/* Headings: tighter, heavier, like the app */
+.sl-markdown-content :is(h1, h2, h3, h4) {
+  letter-spacing: -0.02em;
+}
+h1#_top,
+.sl-container h1 {
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+/* Buttons and chips use the app's 8px radius instead of pills */
+.sl-link-button {
+  border-radius: var(--ss-radius);
+  font-weight: 600;
+}
+
+/* Cards */
+.sl-markdown-content .card,
+.sl-markdown-content .sl-link-card {
+  border-radius: var(--ss-radius-lg);
+  box-shadow: var(--ss-shadow);
+}
+.sl-markdown-content .sl-link-card:hover {
+  border-color: var(--sl-color-accent);
+}
+
+/* Tables: contained, hairline rows, readable header */
+.sl-markdown-content table {
+  border-collapse: separate;
+  border-spacing: 0;
+  display: block;
+  overflow-x: auto;
+  border: 1px solid var(--sl-color-hairline);
+  border-radius: var(--ss-radius-lg);
+}
+.sl-markdown-content :is(th, td) {
+  border: 0;
+  border-bottom: 1px solid var(--sl-color-hairline);
+}
+.sl-markdown-content tr:last-child td {
+  border-bottom: 0;
+}
+.sl-markdown-content th {
+  background: var(--sl-color-gray-7);
+  font-size: var(--sl-text-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Inline code and code blocks follow the app radius */
+:root {
+  --ec-brdRad: var(--ss-radius);
+}
+.sl-markdown-content :not(pre) > code {
+  border-radius: 0.3rem;
+}
+
+/* Asides */
+.starlight-aside {
+  border-radius: var(--ss-radius);
+}
+
+/* Sidebar: active item reads as in the app (accent text on a tint) */
+.sidebar-content a[aria-current="page"] {
+  border-radius: var(--ss-radius);
+  font-weight: 600;
+}
+.sidebar-content a {
+  border-radius: var(--ss-radius);
+}
+
+/* --- Screenshots (see src/components/Screenshot.astro) ----------------- */
+.screenshot {
+  margin: 1.5rem 0;
+}
+.screenshot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--sl-color-hairline);
+  border-radius: var(--ss-radius-lg);
+  box-shadow: var(--ss-shadow-lg);
+  background: var(--sl-color-gray-7);
+}
+.screenshot figcaption {
+  margin-top: 0.6rem;
+  color: var(--sl-color-gray-3);
+  font-size: var(--sl-text-sm);
+  text-align: center;
+}
+.screenshot .dark-only {
+  display: none;
+}
+:root[data-theme="dark"] .screenshot .light-only {
+  display: none;
+}
+:root[data-theme="dark"] .screenshot .dark-only {
+  display: block;
+}
+
+/* --- Homepage hero: text on top, the real UI full width below --------- */
+@media (min-width: 50rem) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3rem;
+    padding-block: 3rem 1rem;
+  }
+  .hero .sl-flex {
+    max-width: 44rem;
+  }
+  .hero h1 {
+    font-size: clamp(2.4rem, 4.2vw, 3.4rem);
+    line-height: 1.08;
+  }
+  .hero > img,
+  .hero > picture,
+  .hero > .hero-html {
+    justify-self: stretch;
+    width: 100%;
+    max-width: 100%;
+    object-fit: contain;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: var(--ss-radius-lg);
+    box-shadow: var(--ss-shadow-lg);
+  }
+  .hero > img {
+    height: auto;
+  }
+}
+/* On phones a shrunken UI is unreadable; the zoomable gallery below shows it. */
+@media (max-width: 49.99rem) {
+  .hero > img,
+  .hero > picture {
+    display: none;
+  }
+}

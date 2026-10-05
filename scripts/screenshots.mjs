@@ -1,27 +1,23 @@
 // oxlint-disable-next-line unicorn/no-abusive-eslint-disable
 /* oxlint-disable */
 /**
- * Regenerates the docs-site screenshots in apps/website/public/screenshots.
+ * Regenerates the docs-site images.
  *
- *   nub scripts/screenshots.mjs [app] [site] [--skip-build]
+ *   nub scripts/screenshots.mjs [app] [og]
  *
- *   app    projects-list / build-review / diff-review: boots the real app in
- *          memory with seeded demo data and photographs it.
- *   site   home-hero: builds the docs site and photographs its homepage.
- *   (none) both, in that order. The homepage embeds the app screenshots, so
- *          they must be refreshed *before* the site is built.
- *
- *   --skip-build  reuse an existing apps/website/dist for the `site` step.
+ *   app   Boots the real app in memory with seeded demo data and photographs
+ *         it in light and dark -> apps/website/src/assets/screenshots/
+ *         (<name>-light.png / <name>-dark.png, optimised by Astro at build).
+ *   og    Renders the social-card image -> apps/website/public/og-image.png
+ *         (uses the app screenshots, so it needs `app` to have run once).
+ *   (none) both, in that order.
  *
  * Needs Playwright's Chromium (`npx playwright-core install chromium`).
  */
 import { serve } from "@hono/node-server";
-import { spawnSync } from "node:child_process";
-import { mkdirSync } from "node:fs";
-import { readFile } from "node:fs/promises";
-import { createServer } from "node:http";
+import { mkdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { dirname, extname, join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
 // Workspace packages are imported from source by path: the repo root does not
@@ -33,9 +29,9 @@ import { makeDatabase, makeStorage } from "../packages/core/src/test-helpers/ind
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const websiteDir = join(root, "apps/website");
-const distDir = join(websiteDir, "dist");
-const outDir = join(websiteDir, "public/screenshots");
-mkdirSync(outDir, { recursive: true });
+const shotsDir = join(websiteDir, "src/assets/screenshots");
+const ogPath = join(websiteDir, "public/og-image.png");
+mkdirSync(shotsDir, { recursive: true });
 
 // Mock "component screenshots" so the docs show a believable review, not blank images.
 const require = createRequire(import.meta.url);
@@ -166,40 +162,30 @@ async function captureApp() {
   const port = typeof addr === "object" && addr ? addr.port : 3457;
   const base = `http://localhost:${port}`;
 
+  const slug = project.slug;
+  const pages = [
+    { name: "projects-list", path: "/projects", viewport: { width: 1280, height: 780 } },
+    { name: "build-review", path: `/projects/${slug}/builds/${build.id}`, viewport: { width: 1280, height: 860 } },
+    { name: "diff-review", path: `/projects/${slug}/builds/${build.id}/diff`, viewport: { width: 1440, height: 900 } },
+    { name: "library", path: `/projects/${slug}/library?branch=feature/new-button`, viewport: { width: 1280, height: 860 } },
+    { name: "project-settings", path: `/projects/${slug}/settings/tokens`, viewport: { width: 1280, height: 780 } },
+  ];
   const browser = await chromium.launch();
   try {
-    // Projects list
-    let page = await browser.newPage({
-      viewport: { width: 1280, height: 720 },
-      deviceScaleFactor: 2,
-    });
-    await page.goto(`${base}/projects`, { waitUntil: "networkidle" });
-    await page.waitForTimeout(800);
-    await page.screenshot({ path: join(outDir, "projects-list.png"), fullPage: true });
-    console.log("✓ projects-list.png");
-    await page.close();
-
-    // Build detail (snapshot cards + bulk actions)
-    page = await browser.newPage({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 2 });
-    await page.goto(`${base}/projects/${project.slug}/builds/${build.id}`, {
-      waitUntil: "networkidle",
-    });
-    await page.waitForTimeout(1200);
-    await page.screenshot({ path: join(outDir, "build-review.png"), fullPage: true });
-    console.log("✓ build-review.png");
-    await page.close();
-
-    // Diff review (sticky review bar + baseline | current | diff viewer)
-    page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 2 });
-    await page.goto(`${base}/projects/${project.slug}/builds/${build.id}/diff`, {
-      waitUntil: "networkidle",
-    });
-    await page.waitForTimeout(1200);
-    await page.screenshot({ path: join(outDir, "diff-review.png"), fullPage: false });
-    console.log("✓ diff-review.png");
-    await page.close();
-
-    console.log("App screenshots done ->", outDir);
+    for (const scheme of ["light", "dark"]) {
+      const context = await browser.newContext({ colorScheme: scheme, deviceScaleFactor: 1.5 });
+      for (const { name, path, viewport } of pages) {
+        const page = await context.newPage();
+        await page.setViewportSize(viewport);
+        await page.goto(base + path, { waitUntil: "networkidle" });
+        await page.waitForTimeout(900);
+        await page.screenshot({ path: join(shotsDir, `${name}-${scheme}.png`) });
+        console.log(`✓ ${name}-${scheme}.png`);
+        await page.close();
+      }
+      await context.close();
+    }
+    console.log("App screenshots done ->", shotsDir);
   } finally {
     await browser.close();
     await new Promise((r) => server.close(r));
@@ -207,92 +193,48 @@ async function captureApp() {
   }
 }
 
+const dataUrl = (file) => `data:image/png;base64,${readFileSync(file).toString("base64")}`;
 
-/** Build the docs site (embeds the app screenshots, so run after `app`). */
-function buildWebsite() {
-  console.log("Building the docs site…");
-  const result = spawnSync("nub", ["run", "--filter", "website", "build"], {
-    cwd: root,
-    stdio: "inherit",
-  });
-  if (result.status !== 0) {
-    throw new Error("Website build failed");
-  }
-}
-
-const TYPES = {
-  ".html": "text/html",
-  ".css": "text/css",
-  ".js": "text/javascript",
-  ".mjs": "text/javascript",
-  ".json": "application/json",
-  ".png": "image/png",
-  ".svg": "image/svg+xml",
-  ".woff2": "font/woff2",
-  ".woff": "font/woff",
-};
-
-// file:// leaves the built assets unstyled (root-absolute hrefs never
-// resolve), so serve dist/ over loopback instead.
-function serveDist() {
-  const server = createServer(async (req, res) => {
-    try {
-      const path = new URL(req.url ?? "/", "http://127.0.0.1").pathname;
-      const file = join(distDir, path.endsWith("/") ? `${path}index.html` : path);
-      const body = await readFile(file);
-      res.writeHead(200, { "content-type": TYPES[extname(file)] ?? "application/octet-stream" });
-      res.end(body);
-    } catch {
-      res.writeHead(404);
-      res.end("not found");
-    }
-  });
-  return new Promise((resolve) => {
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      resolve({ server, port: typeof address === "object" && address ? address.port : 0 });
-    });
-  });
-}
-
-
-/** Photograph the built docs homepage. */
-async function captureSite() {
-  const { server, port } = await serveDist();
+/** Social card (1200x630): brand, tagline, and the review workspace. */
+async function captureOg() {
+  const shot = dataUrl(join(shotsDir, "diff-review-dark.png"));
+  const html = `<!doctype html><html><body style="margin:0;width:1200px;height:630px;overflow:hidden;position:relative;
+    background:radial-gradient(900px 500px at 85% 0%,#12254a,transparent 70%),#09090b;color:#fafafa;
+    font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif">
+    <div style="position:absolute;left:72px;top:72px;width:480px">
+      <div style="display:flex;align-items:center;gap:16px">
+        <svg width="56" height="56" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="8" fill="#1d5fcf"/>
+          <g transform="translate(7 7)" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m9 .5 8.5 4.25L9 9 .5 4.75z"/><path d="m.5 13 8.5 4.25L17.5 13"/><path d="m.5 8.9 8.5 4.25 8.5-4.25"/></g></svg>
+        <div style="font-size:44px;font-weight:700;letter-spacing:-0.02em">StoryShelf</div>
+      </div>
+      <div style="margin-top:44px;font-size:52px;line-height:1.1;font-weight:700;letter-spacing:-0.03em">
+        Visual testing for Storybook, on your own infrastructure.</div>
+      <div style="margin-top:28px;font-size:26px;color:#a1a1aa">Self-hosted. Unlimited snapshots.</div>
+    </div>
+    <img src="${shot}" style="position:absolute;left:600px;top:150px;width:900px;border-radius:14px;
+      border:1px solid #27272a;box-shadow:0 30px 80px rgba(0,0,0,.6)"/>
+  </body></html>`;
   const browser = await chromium.launch();
   try {
-    const page = await browser.newPage({
-      viewport: { width: 1280, height: 800 },
-      deviceScaleFactor: 2,
-    });
-    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: "networkidle" });
-    await page.waitForTimeout(800);
-    await page.screenshot({ path: join(outDir, "home-hero.png") });
-    console.log("✓ home-hero.png");
-    await page.close();
-    console.log("Homepage screenshots done ->", outDir);
+    const page = await browser.newPage({ viewport: { width: 1200, height: 630 } });
+    await page.setContent(html, { waitUntil: "load" });
+    await page.screenshot({ path: ogPath });
+    console.log("✓ og-image.png");
   } finally {
     await browser.close();
-    await new Promise((resolve) => server.close(resolve));
   }
 }
 
 const args = process.argv.slice(2);
-const steps = args.filter((arg) => arg === "app" || arg === "site");
-const unknown = args.filter((arg) => !["app", "site", "--skip-build"].includes(arg));
+const unknown = args.filter((arg) => arg !== "app" && arg !== "og");
 if (unknown.length > 0) {
-  console.error(`Unknown argument(s): ${unknown.join(", ")}\nUsage: nub scripts/screenshots.mjs [app] [site] [--skip-build]`);
+  console.error(`Unknown argument(s): ${unknown.join(", ")}\nUsage: nub scripts/screenshots.mjs [app] [og]`);
   process.exit(1);
 }
-const runApp = steps.length === 0 || steps.includes("app");
-const runSite = steps.length === 0 || steps.includes("site");
-
-if (runApp) {
+if (args.length === 0 || args.includes("app")) {
   await captureApp();
 }
-if (runSite) {
-  if (!args.includes("--skip-build")) {
-    buildWebsite();
-  }
-  await captureSite();
+if (args.length === 0 || args.includes("og")) {
+  await captureOg();
 }

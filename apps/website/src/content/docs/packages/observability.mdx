@@ -1,0 +1,65 @@
+---
+title: "@storyshelf/observability"
+description: OpenTelemetry tracing, metrics, and log correlation for StoryShelf.
+---
+
+import { PackageManagers } from 'starlight-package-managers';
+
+`@storyshelf/observability` is the single owner of StoryShelf's OpenTelemetry
+wiring. It exports traces and metrics to **your own** OTLP/HTTP collector and
+correlates pino log lines with the active trace. Without a configured
+endpoint it is a zero-overhead noop. See the [Observability guide](/guides/observability/)
+for operations and [ADR 0022](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/0022-opentelemetry-observability.md)
+for the design decisions.
+
+## Install
+
+<PackageManagers pkg="@storyshelf/observability" />
+
+[![JSR](https://jsr.io/badges/@storyshelf/observability)](https://jsr.io/@storyshelf/observability) [![JSR Score](https://jsr.io/badges/@storyshelf/observability/score)](https://jsr.io/@storyshelf/observability)
+
+- [npm package](https://www.npmjs.com/package/@storyshelf/observability) — install tarballs and version history.
+- [JSR package](https://jsr.io/@storyshelf/observability) — TypeScript-first registry page.
+- [Public API reference](https://jsr.io/@storyshelf/observability/doc) — generated docs for every export; start here to learn the API.
+- [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/observability) — package directory on `main`.
+
+## Server wiring
+
+```ts
+import { otelLogMixin } from "@storyshelf/observability";
+import { initObservabilityFromEnv } from "@storyshelf/observability/node";
+
+// Noop unless OTEL_EXPORTER_OTLP_ENDPOINT is set. Call before createShelfApp.
+const observability = await initObservabilityFromEnv();
+
+const app = createShelfApp({
+  database,
+  storage,
+  captureRunner,
+  logger: createShelfLogger({ mixin: otelLogMixin }),
+  observability,
+  config: { scratchDir: dataDir },
+});
+
+await app.lifecycle.setup();
+// on SIGTERM: await app.lifecycle.teardown(); (flushes the SDK)
+```
+
+`storyshelf server init` scaffolds exactly this preamble (plus the worker
+equivalent). Two entrypoints by design: the root is `@opentelemetry/api`
+only (cross-runtime, Deno-safe); `./node` holds the Node SDK lifecycle and
+must never be imported under Deno (`OTEL_DENO=true` uses Deno's native OTEL
+instead).
+
+## What it exports
+
+- `initObservabilityFromEnv`, `resolveObservabilityConfig` (`./node` / config) — env-driven SDK lifecycle.
+- `createHttpMiddleware` — `@hono/otel` server spans plus `storyshelf.req_id` / `enduser.id` (mounted by `createShelfApp`).
+- `createInstrumentedDatabase` / `createInstrumentedStorage` — transparent `db.*` / `storage.*` span + metric wrappers (identity, lifecycle, and tables delegate through).
+- `withSpan`, `currentTraceparent`, `injectTraceContext`, `parentContext` — span and W3C propagation helpers.
+- `captureMetrics`, `dbMetrics`, `storageMetrics` — memoized instruments (`capture.job.duration`, `capture.jobs.completed/failed`, operation durations).
+- `otelLogMixin` — pino mixin injecting `trace_id`/`span_id` (logs stay on stdout; no OTLP log exporter by design).
+
+Core (`@storyshelf/core`) uses `@opentelemetry/api` directly for pipeline
+spans (`capture.job`, phase spans, `http.client`) and never imports this
+package — that one-way boundary is load-bearing (see ADR 0022 §5).

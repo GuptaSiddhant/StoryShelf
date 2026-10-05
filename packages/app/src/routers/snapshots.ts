@@ -30,6 +30,7 @@ import {
 const listSnapshotsRoute = createRoute({
   method: "get",
   tags: ["Review"],
+  summary: "List snapshots",
   path: "/api/v1/projects/{slug}/builds/{buildId}/snapshots",
   request: { params: z.object({ slug: z.string(), buildId: z.string() }) },
   responses: {
@@ -45,6 +46,7 @@ const listSnapshotsRoute = createRoute({
 const approveSnapshotRoute = createRoute({
   method: "post",
   tags: ["Review"],
+  summary: "Approve a snapshot",
   path: "/api/v1/projects/{slug}/builds/{buildId}/snapshots/{snapshotId}/approve",
   request: {
     params: z.object({ slug: z.string(), buildId: z.string(), snapshotId: z.string() }),
@@ -67,6 +69,7 @@ const approveSnapshotRoute = createRoute({
 const rejectSnapshotRoute = createRoute({
   method: "post",
   tags: ["Review"],
+  summary: "Reject a snapshot",
   path: "/api/v1/projects/{slug}/builds/{buildId}/snapshots/{snapshotId}/reject",
   request: { params: z.object({ slug: z.string(), buildId: z.string(), snapshotId: z.string() }) },
   responses: {
@@ -81,6 +84,7 @@ const rejectSnapshotRoute = createRoute({
 const approveAllRoute = createRoute({
   method: "post",
   tags: ["Review"],
+  summary: "Approve all open snapshots",
   path: "/api/v1/projects/{slug}/builds/{buildId}/approve-all",
   request: {
     params: z.object({ slug: z.string(), buildId: z.string() }),
@@ -98,6 +102,7 @@ const approveAllRoute = createRoute({
 const rediffRoute = createRoute({
   method: "post",
   tags: ["Review"],
+  summary: "Re-diff against current baselines",
   path: "/api/v1/projects/{slug}/builds/{buildId}/rediff",
   request: { params: z.object({ slug: z.string(), buildId: z.string() }) },
   responses: {
@@ -121,6 +126,7 @@ const rediffRoute = createRoute({
 const rejectAllRoute = createRoute({
   method: "post",
   tags: ["Review"],
+  summary: "Reject all open snapshots",
   path: "/api/v1/projects/{slug}/builds/{buildId}/reject-all",
   request: { params: z.object({ slug: z.string(), buildId: z.string() }) },
   responses: {

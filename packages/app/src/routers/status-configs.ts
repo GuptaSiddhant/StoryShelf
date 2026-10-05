@@ -10,6 +10,7 @@ const ADMIN_ROLES = ["admin"] as const;
 const listRoute = createRoute({
   method: "get",
   tags: ["Git status"],
+  summary: "List status configs",
   path: "/api/v1/projects/{slug}/status-configs",
   request: { params: z.object({ slug: z.string() }) },
   responses: {
@@ -25,6 +26,7 @@ const listRoute = createRoute({
 const createRouteDef = createRoute({
   method: "post",
   tags: ["Git status"],
+  summary: "Create a status config",
   path: "/api/v1/projects/{slug}/status-configs",
   request: {
     params: z.object({ slug: z.string() }),
@@ -46,6 +48,7 @@ const createRouteDef = createRoute({
 const deleteRoute = createRoute({
   method: "delete",
   tags: ["Git status"],
+  summary: "Delete a status config",
   path: "/api/v1/projects/{slug}/status-configs/{id}",
   request: { params: z.object({ slug: z.string(), id: z.string() }) },
   responses: {

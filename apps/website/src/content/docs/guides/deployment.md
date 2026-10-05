@@ -69,7 +69,7 @@ This generates `server.ts` + `package.json` with the correct imports and depende
 | Capture queue | `InMemoryCaptureQueue` (built-in) | Async, concurrency-limited, in-process |
 | Auth | `@storyshelf/auth` | Local accounts, social, SSO/SAML, passkeys |
 
-Swap the database layer for `@storyshelf/db-postgres` (Postgres via `postgres.js` + Drizzle, see [Postgres provider recipes](#postgres-provider-recipes) below) or `@storyshelf/db-sqlite/turso` (Turso/libSQL) without changing the rest of the stack.
+Swap the database layer for `@storyshelf/db-postgres` (Postgres via `postgres.js` + Drizzle, see [Postgres provider recipes](/packages/db-postgres/#provider-recipes)) or `@storyshelf/db-sqlite/turso` (Turso/libSQL) without changing the rest of the stack.
 
 One `npm start` (or `fly deploy`, `railway up`, `render.com`, etc.) and you're running.
 

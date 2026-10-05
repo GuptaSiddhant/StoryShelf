@@ -30,6 +30,7 @@ function requireSessionUser(): void {
 const listProjectsRoute = createRoute({
   method: "get",
   tags: ["Projects"],
+  summary: "List projects",
   path: "/api/v1/projects",
   responses: {
     200: {
@@ -43,6 +44,7 @@ const listProjectsRoute = createRoute({
 const createProjectRoute = createRoute({
   method: "post",
   tags: ["Projects"],
+  summary: "Create a project",
   path: "/api/v1/projects",
   request: { body: { content: { "application/json": { schema: projectCreateSchema } } } },
   responses: {
@@ -59,6 +61,7 @@ const createProjectRoute = createRoute({
 const getProjectRoute = createRoute({
   method: "get",
   tags: ["Projects"],
+  summary: "Get a project",
   path: "/api/v1/projects/{slug}",
   request: { params: z.object({ slug: z.string() }) },
   responses: {
@@ -74,6 +77,7 @@ const getProjectRoute = createRoute({
 const updateProjectRoute = createRoute({
   method: "patch",
   tags: ["Projects"],
+  summary: "Update a project",
   path: "/api/v1/projects/{slug}",
   request: {
     params: z.object({ slug: z.string() }),
@@ -92,6 +96,7 @@ const updateProjectRoute = createRoute({
 const deleteProjectRoute = createRoute({
   method: "delete",
   tags: ["Projects"],
+  summary: "Delete a project",
   path: "/api/v1/projects/{slug}",
   request: { params: z.object({ slug: z.string() }) },
   responses: {

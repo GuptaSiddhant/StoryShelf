@@ -42,6 +42,7 @@ const attemptParams = z.object({
 const listAttemptsRoute = createRoute({
   method: "get",
   tags: ["Builds"],
+  summary: "List capture attempts",
   path: "/api/v1/projects/{slug}/builds/{buildId}/attempts",
   request: { params: buildParams },
   responses: {
@@ -57,6 +58,7 @@ const listAttemptsRoute = createRoute({
 const getAttemptRoute = createRoute({
   method: "get",
   tags: ["Builds"],
+  summary: "Get a capture attempt",
   path: "/api/v1/projects/{slug}/builds/{buildId}/attempts/{attemptNo}",
   request: { params: attemptParams },
   responses: {
@@ -72,6 +74,7 @@ const getAttemptRoute = createRoute({
 const listAttemptLogsRoute = createRoute({
   method: "get",
   tags: ["Builds"],
+  summary: "Get capture attempt logs",
   path: "/api/v1/projects/{slug}/builds/{buildId}/attempts/{attemptNo}/logs",
   request: { params: attemptParams },
   responses: {

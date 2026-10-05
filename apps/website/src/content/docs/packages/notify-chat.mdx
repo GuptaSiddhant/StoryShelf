@@ -1,0 +1,48 @@
+---
+title: "@storyshelf/notify-chat"
+description: Slack and Teams notification providers for StoryShelf — formatted build and admin alerts over incoming webhooks.
+---
+
+import { PackageManagers } from 'starlight-package-managers';
+
+`@storyshelf/notify-chat` sends formatted build and admin alerts to chat over Slack and Microsoft Teams incoming webhooks, plus a log provider for tests and local development. It has no runtime dependencies: every send goes through `@storyshelf/core/utils` (`httpText`), which adds a timeout and retries with `Retry-After`.
+
+## Install
+
+<PackageManagers pkg="@storyshelf/notify-chat" />
+
+- [npm package](https://www.npmjs.com/package/@storyshelf/notify-chat) — install tarballs and version history.
+- [Source on GitHub](https://github.com/GuptaSiddhant/StoryShelf/tree/main/packages/notify-chat) — package directory on `main`.
+
+## Configure
+
+Pass the providers to `createShelfApp`:
+
+```ts
+import { createShelfApp } from "@storyshelf/app";
+import { chatNotifiers } from "@storyshelf/notify-chat";
+
+const app = createShelfApp({ database, storage, notifiers: chatNotifiers });
+```
+
+`chatNotifiers` aggregates all three providers. To wire only some, import them individually:
+
+```ts
+import { slackWebhookNotifier } from "@storyshelf/notify-chat/slack";
+import { teamsWorkflowNotifier } from "@storyshelf/notify-chat/teams";
+import { logNotifier } from "@storyshelf/notify-chat/log";
+```
+
+## Providers
+
+| Provider kind | Posts to | Use for |
+|---|---|---|
+| `slack-webhook` | A Slack incoming webhook URL | Build and admin alerts in a Slack channel |
+| `teams-workflow` | A Teams workflow (webhook) URL | The same, in Microsoft Teams |
+| `log` | The server log | Tests and local development |
+
+## Channels
+
+Providers only make a kind *available*. Project admins then add **channels** of that kind — in **Settings → Notifications** or via the API — each with an event filter and display toggles. A webhook URL is a channel secret: it is encrypted at rest (AES-256-GCM) and decrypted in memory only when a message is sent.
+
+See [Notifications](/guides/notifications/) for channels, subscriptions, and the events you can subscribe to.

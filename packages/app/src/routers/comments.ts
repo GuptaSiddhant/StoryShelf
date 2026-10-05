@@ -11,6 +11,7 @@ import { commentSchema, commentCreateSchema, notFound, unauthorized } from "./sc
 const listCommentsRoute = createRoute({
   method: "get",
   tags: ["Review"],
+  summary: "List comments",
   path: "/api/v1/projects/{slug}/builds/{buildId}/comments",
   request: { params: z.object({ slug: z.string(), buildId: z.string() }) },
   responses: {
@@ -26,6 +27,7 @@ const listCommentsRoute = createRoute({
 const createCommentRoute = createRoute({
   method: "post",
   tags: ["Review"],
+  summary: "Add a comment",
   path: "/api/v1/projects/{slug}/builds/{buildId}/comments",
   request: {
     params: z.object({ slug: z.string(), buildId: z.string() }),
@@ -43,6 +45,7 @@ const createCommentRoute = createRoute({
 const resolveCommentRoute = createRoute({
   method: "post",
   tags: ["Review"],
+  summary: "Resolve a comment",
   path: "/api/v1/projects/{slug}/builds/{buildId}/comments/{commentId}/resolve",
   request: { params: z.object({ slug: z.string(), buildId: z.string(), commentId: z.string() }) },
   responses: {

@@ -64,10 +64,10 @@ describe("OpenAPI spec", () => {
     expect(doc.paths["/api/v1/admin/purge"]).toBeDefined();
   });
 
-  it("tags every operation with a declared tag so the API reference can group them", async () => {
+  it("tags and summarises every operation so the API reference can group and label them", async () => {
     const doc = (await (await app().request("/api/v1/openapi.json")).json()) as {
       tags: { name: string; description: string }[];
-      paths: Record<string, Record<string, { tags?: string[] }>>;
+      paths: Record<string, Record<string, { tags?: string[]; summary?: string }>>;
     };
     const declared = new Set(doc.tags.map((tag) => tag.name));
     expect(declared.size).toBeGreaterThanOrEqual(8);
@@ -78,7 +78,9 @@ describe("OpenAPI spec", () => {
     for (const [path, operations] of Object.entries(doc.paths)) {
       for (const [method, operation] of Object.entries(operations)) {
         const tags = operation.tags ?? [];
-        if (tags.length === 0 || tags.some((tag) => !declared.has(tag))) {
+        // A summary is the label in the docs sidebar and Swagger; paths alone repeat per method.
+        const hasSummary = (operation.summary ?? "").length > 3;
+        if (tags.length === 0 || tags.some((tag) => !declared.has(tag)) || !hasSummary) {
           untagged.push(`${method.toUpperCase()} ${path}`);
         }
       }

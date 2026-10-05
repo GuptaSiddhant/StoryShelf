@@ -36,6 +36,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # full history so "last updated" dates are accurate
       - name: Setup Nub
         uses: nubjs/setup-nub@v0
       - name: Setup Pages

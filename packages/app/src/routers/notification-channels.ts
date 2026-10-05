@@ -57,6 +57,7 @@ function validateChannelInput(
 const listChannelsRoute = createRoute({
   method: "get",
   tags: ["Notifications"],
+  summary: "List notification channels",
   path: "/api/v1/projects/{slug}/notification-channels",
   request: { params: z.object({ slug: z.string() }) },
   responses: {
@@ -72,6 +73,7 @@ const listChannelsRoute = createRoute({
 const createChannelRoute = createRoute({
   method: "post",
   tags: ["Notifications"],
+  summary: "Create a notification channel",
   path: "/api/v1/projects/{slug}/notification-channels",
   request: {
     params: z.object({ slug: z.string() }),
@@ -93,6 +95,7 @@ const createChannelRoute = createRoute({
 const deleteChannelRoute = createRoute({
   method: "delete",
   tags: ["Notifications"],
+  summary: "Delete a notification channel",
   path: "/api/v1/projects/{slug}/notification-channels/{channelId}",
   request: { params: z.object({ slug: z.string(), channelId: z.string() }) },
   responses: {
@@ -144,6 +147,7 @@ export function registerNotificationChannels(app: ShelfRouter): void {
 const listSystemRoute = createRoute({
   method: "get",
   tags: ["Notifications"],
+  summary: "List site-wide channels",
   path: "/api/v1/admin/notification-channels",
   request: {},
   responses: {
@@ -158,6 +162,7 @@ const listSystemRoute = createRoute({
 const createSystemRoute = createRoute({
   method: "post",
   tags: ["Notifications"],
+  summary: "Create a site-wide channel",
   path: "/api/v1/admin/notification-channels",
   request: {
     body: { content: { "application/json": { schema: notificationChannelCreateSchema } } },
@@ -178,6 +183,7 @@ const createSystemRoute = createRoute({
 const deleteSystemRoute = createRoute({
   method: "delete",
   tags: ["Notifications"],
+  summary: "Delete a site-wide channel",
   path: "/api/v1/admin/notification-channels/{channelId}",
   request: { params: z.object({ channelId: z.string() }) },
   responses: {
