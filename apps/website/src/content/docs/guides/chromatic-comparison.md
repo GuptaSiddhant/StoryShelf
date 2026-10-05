@@ -14,7 +14,7 @@ This page compares Chromatic (SaaS) and StoryShelf (self-hosted) factually. No r
 | **Browsers** | Chrome, Firefox, Safari, Edge (branded, cloud) | Chromium (default), Firefox, WebKit via Playwright (per-project `browser`) |
 | **TurboSnap** | Yes (dependency graph) | Yes — affected capture (dependency graph, on by default) |
 | **Modes / Globals** | Yes | Not implemented |
-| **Accessibility testing** | Yes | Not implemented |
+| **Accessibility testing** | Yes (aXe) | Basic built-in checks (opt-in), no aXe |
 | **Interaction tests** | Yes (`play` functions) | Yes (`play` functions) |
 | **SSO / Enterprise** | Enterprise plan | Better Auth engine (OIDC/SAML via any IdP) |
 | **Vendor lock-in** | Yes (proprietary) | No (MIT, open source) |
@@ -53,7 +53,7 @@ Billed snapshots = visual snapshots + accessibility snapshots. TurboSnap copies 
 ### Parity
 - Visual regression testing via pixel diff (pixelmatch)
 - Storybook `play` function execution
-- Per-story controls: `disableSnapshot`, `flakyTest`, `delay`, `diffThreshold`
+- Per-story controls: `disableSnapshot`, `flakyTest`, `delay`, `diffThreshold`, `pauseAnimationAtEnd`
 - Git provider status checks (GitHub, GitLab)
 - PR/MR comments with diff links
 - Branch-aware baselines
@@ -63,7 +63,7 @@ Billed snapshots = visual snapshots + accessibility snapshots. TurboSnap copies 
 - **Cross-browser gaps** — Chromium (default), Firefox, and WebKit are selectable per project (Settings → General → Capture browser, or `PATCH /api/v1/projects/:slug` with `browser`); baselines track the browser. No branded Safari/Edge binaries; one browser per build.
 - **Vite-only tracing** — affected capture reads `preview-stats.json` (plus tolerant Webpack shapes). TurboSnap-equivalent skip rates on Vite Storybooks; custom builders without stats fall back to full renders.
 - **No Modes/Globals** — Cannot test stories under different themes, locales, or viewports via Storybook globals.
-- **No accessibility testing** — No aXe integration.
+- **Limited accessibility testing** — Opt-in per project (`runA11y`); lightweight checks for missing `alt`, button/input labels and link `href`, reported as story failures. No aXe integration, so no WCAG rule coverage.
 - **No cloud parallelization** — Concurrency limited by your server resources (`captureConcurrency` config).
 - **No built-in flake detection** — Relies on explicit `flakyTest` parameter/tags.
 
@@ -95,7 +95,7 @@ If migrating from Chromatic:
 - You need branded Safari/Edge binaries or multi-browser matrices in a single build
 - You rely on TurboSnap's Webpack tracing for a non-Vite builder
 - You need Modes/Globals for theme/locale matrices
-- You need built-in accessibility testing
+- You need full aXe-level accessibility testing
 - Your team prefers SaaS over self-hosting
 
 **Choose StoryShelf if:**

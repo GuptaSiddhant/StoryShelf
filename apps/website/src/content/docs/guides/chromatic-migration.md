@@ -110,7 +110,7 @@ StoryShelf reads both `chromatic:` and `storyshelf:` parameter keys. **`storyshe
 | **TurboSnap** | Yes (dependency graph) | Yes — affected capture (on by default) | Similar skip rates on Vite Storybooks; needs `fetch-depth: 0` and `preview-stats.json` |
 | **Cross-browser** | Chrome, FF, Safari, Edge (branded, cloud) | Chromium / Firefox / WebKit, one per build | Set in project Settings → General or via API; baselines tracked per browser; no branded Safari/Edge |
 | **Modes/Globals** | Yes | No | Theme/locale matrices need workarounds |
-| **A11y testing** | Yes (aXe) | No | Separate aXe job needed |
+| **A11y testing** | Yes (aXe) | Basic opt-in checks only | Separate aXe job needed for full WCAG coverage |
 | **Cloud parallelization** | Automatic | Manual (`captureConcurrency`) | Limited by your server CPU/memory |
 | **Baseline export** | UI only | API + UI | Cannot bulk-import Chromatic baselines |
 | **Flake detection** | Auto-detect | Explicit `flakyTest` | Manual marking required |
