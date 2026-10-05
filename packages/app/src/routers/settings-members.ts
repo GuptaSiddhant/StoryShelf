@@ -2,6 +2,7 @@ import { MemberModel, ProjectGroupMappingModel } from "@storyshelf/core/models";
 import type { ProjectRole } from "@storyshelf/core/types";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
+import { flash } from "./flash.ts";
 import { hxRedirect } from "./htmx.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
 /** Project member settings (assign roles, remove members). */
@@ -23,12 +24,14 @@ export function registerMemberSettings(app: ShelfRouter): void {
       );
     }
     await new MemberModel(getStore().db).set(project.id, userId, role as ProjectRole);
+    flash(c, "Member saved");
     return hxRedirect(c, `/projects/${project.slug}/settings/members`);
   });
 
   app.post("/projects/:slug/settings/members/:userId/remove", async (c) => {
     const project = await findProject(c.req.param("slug") ?? "");
     await new MemberModel(getStore().db).remove(project.id, c.req.param("userId") ?? "");
+    flash(c, "Member removed");
     return hxRedirect(c, `/projects/${project.slug}/settings/members`);
   });
 
@@ -50,6 +53,7 @@ function registerGroupMappingSettings(app: ShelfRouter): void {
       );
     }
     await new ProjectGroupMappingModel(getStore().db).create(project.id, groupName, role);
+    flash(c, "Group mapping added");
     return hxRedirect(c, `/projects/${project.slug}/settings/members`);
   });
 
@@ -59,6 +63,7 @@ function registerGroupMappingSettings(app: ShelfRouter): void {
       project.id,
       c.req.param("mappingId") ?? "",
     );
+    flash(c, "Group mapping removed");
     return hxRedirect(c, `/projects/${project.slug}/settings/members`);
   });
 }

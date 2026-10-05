@@ -2,10 +2,12 @@ import type { Project } from "@storyshelf/core/schema";
 import type { ProjectGroupMapping } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import {
+  Alert,
   Badge,
   Button,
   Card,
   Field,
+  FormActions,
   Meta,
   SectionTitle,
   SelectField,
@@ -28,9 +30,11 @@ export function renderSettingsMembers(
   members: SettingsMember[],
   groupMappings: ProjectGroupMapping[],
   isAdmin: boolean,
+  formState?: { globalError?: string },
 ): unknown {
   return (
     <div class="grid max-w-form">
+      {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
       <Card>
         <SectionTitle>Members</SectionTitle>
         <Meta>Project members and their roles. Site admins have implicit admin access.</Meta>
@@ -73,6 +77,7 @@ export function renderSettingsMembers(
                         action={`/projects/${project.slug}/settings/members/${member.userId}/remove`}
                         hx-post={`/projects/${project.slug}/settings/members/${member.userId}/remove`}
                         hx-target="body"
+                        hx-confirm="Remove this member from the project?"
                       >
                         {csrfField()}
                         <Button variant="ghost" type="submit">
@@ -110,9 +115,11 @@ export function renderSettingsMembers(
                 { value: "admin", label: "admin" },
               ]}
             />
-            <Button variant="primary" type="submit">
-              Add member
-            </Button>
+            <FormActions>
+              <Button variant="primary" type="submit" icon="plus">
+                Add member
+              </Button>
+            </FormActions>
           </form>
         </Card>
       ) : null}
@@ -154,6 +161,7 @@ export function renderSettingsMembers(
                           action={`/projects/${project.slug}/settings/members/groups/${mapping.id}/remove`}
                           hx-post={`/projects/${project.slug}/settings/members/groups/${mapping.id}/remove`}
                           hx-target="body"
+                          hx-confirm="Remove this group mapping?"
                         >
                           {csrfField()}
                           <Button variant="ghost" type="submit">
@@ -198,9 +206,11 @@ export function renderSettingsMembers(
                   { value: "admin", label: "admin" },
                 ]}
               />
-              <Button variant="primary" type="submit">
-                Add mapping
-              </Button>
+              <FormActions>
+                <Button variant="primary" type="submit" icon="plus">
+                  Add mapping
+                </Button>
+              </FormActions>
             </form>
           </Card>
         </div>

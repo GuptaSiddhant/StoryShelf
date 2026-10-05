@@ -7,6 +7,7 @@ import {
   Card,
   CheckField,
   Field,
+  FormActions,
   HStack,
   Meta,
   SectionTitle,
@@ -89,9 +90,11 @@ const MyNotificationsCard: FC<{
         <p>
           <Meta as="span">No boxes ticked means all topics.</Meta>
         </p>
-        <Button variant="primary" type="submit">
-          Save my preferences
-        </Button>
+        <FormActions>
+          <Button variant="primary" type="submit" icon="check">
+            Save my preferences
+          </Button>
+        </FormActions>
       </form>
     </Card>
   );
@@ -135,6 +138,7 @@ const ChannelRow: FC<{ project: Project; channel: SettingsNotificationChannel }>
         action={`/projects/${project.slug}/settings/notifications/${channel.id}/delete`}
         hx-post={`/projects/${project.slug}/settings/notifications/${channel.id}/delete`}
         hx-target="body"
+        hx-confirm="Remove this notification channel?"
       >
         {csrfField()}
         <Button variant="ghost" size="sm" type="submit">
@@ -164,7 +168,9 @@ const ChannelsCard: FC<{
             <th>Provider</th>
             <th>Target</th>
             <th>Events</th>
-            <th>{isAdmin ? "" : null}</th>
+            <th>
+              <span class="visually-hidden">Actions</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -239,9 +245,11 @@ const CreateChannelCard: FC<{
           { value: "verbose", label: "Verbose" },
         ]}
       />
-      <Button variant="primary" type="submit">
-        Add channel
-      </Button>
+      <FormActions>
+        <Button variant="primary" type="submit" icon="plus">
+          Add channel
+        </Button>
+      </FormActions>
     </form>
   </Card>
 );

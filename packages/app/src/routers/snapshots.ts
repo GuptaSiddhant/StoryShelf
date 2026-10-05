@@ -13,6 +13,7 @@ import {
   approveSnapshot,
   buildForProject,
 } from "./builds.handlers.ts";
+import { flashHx } from "./flash.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
 import { hxRefresh, isHxRequest } from "./htmx.ts";
 import { hxAdvance } from "./review-next.ts";
@@ -204,6 +205,7 @@ export function registerSnapshots(app: ShelfRouter): void {
     const result = await rediffBuild({ db, storage, logger }, project, build);
     await refreshBuild(build.id);
     hxRefresh(c);
+    flashHx(c, "Re-diffed against current baselines");
     return c.json({ ok: true, ...result }, 200);
   });
 

@@ -23,6 +23,12 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 - Icons are served as one SVG sprite at a content-hashed, immutable URL;
   htmx moves to a content-hashed URL too (the unversioned URL stays but now
   revalidates instead of being cached for a year).
+- Forms: refreshed field styling and focus states, pending spinner on submit,
+  confirmations on destructive actions, and success toasts after settings,
+  project, profile, token, webhook, member and comment actions (server-set
+  flash cookie). Validation errors now actually show: HTMX ignored the 400
+  pages, and the tokens/labels/members/status tabs never rendered
+  `globalError`. Comment forms no longer swap raw JSON into the page.
 - Fixes: review keyboard shortcuts no longer fire on Cmd/Ctrl+R; the
   diff view switch matched a renamed class; document-level listeners were
   re-registered on every HTMX body swap.

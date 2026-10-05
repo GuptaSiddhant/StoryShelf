@@ -1,5 +1,14 @@
 import type { Project } from "@storyshelf/core/schema";
-import { Alert, Button, Card, Field, Meta, SectionTitle, SelectField } from "../ui/components.tsx";
+import {
+  Alert,
+  Button,
+  Card,
+  Field,
+  FormActions,
+  Meta,
+  SectionTitle,
+  SelectField,
+} from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Form state for the settings tabs (field errors and global error). */
@@ -80,9 +89,11 @@ export function renderSettingsGeneral(
             hint="Branches matching this regex are publicly viewable."
           />
           {isAdmin ? (
-            <Button variant="primary" type="submit">
-              Save changes
-            </Button>
+            <FormActions>
+              <Button variant="primary" type="submit" icon="check">
+                Save changes
+              </Button>
+            </FormActions>
           ) : (
             <Meta>You need admin access to edit settings.</Meta>
           )}

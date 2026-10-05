@@ -67,7 +67,7 @@ export function renderProjectCreatePage(state: ProjectCreateFormState = {}): Ren
 
             <div class="mt-1">
               <HStack>
-                <Button variant="primary" type="submit">
+                <Button variant="primary" type="submit" icon="plus">
                   Create project
                 </Button>
                 <Button variant="secondary" href="/projects">

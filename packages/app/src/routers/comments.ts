@@ -4,7 +4,9 @@ import type { ShelfRouter } from "../app-types.ts";
 import { notifyProject } from "../notify.ts";
 import { getStore } from "../store.ts";
 import { VIEW_ROLES, DEVELOPER_ROLES, buildForProject } from "./builds.handlers.ts";
+import { flashHx } from "./flash.ts";
 import { resolveAuthorizedProject, notFound as throwNotFound } from "./helpers.ts";
+import { hxRefresh } from "./htmx.ts";
 import { commentSchema, commentCreateSchema, notFound, unauthorized } from "./schemas.ts";
 const listCommentsRoute = createRoute({
   method: "get",
@@ -81,6 +83,8 @@ export function registerComments(app: ShelfRouter): void {
       },
       `/builds/${build.id}`,
     );
+    hxRefresh(c);
+    flashHx(c, "Comment added");
     return c.json(comment, 201);
   });
 
@@ -92,6 +96,8 @@ export function registerComments(app: ShelfRouter): void {
     if (comment.buildId !== build.id) {
       throwNotFound("Comment not found");
     }
+    hxRefresh(c);
+    flashHx(c, "Comment resolved");
     return c.json(comment);
   });
 }

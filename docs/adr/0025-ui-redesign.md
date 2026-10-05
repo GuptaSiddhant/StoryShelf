@@ -35,8 +35,11 @@ panes.
    snapshot — server-side via `HX-Redirect`, only for decisions made on the review page
    (`HX-Current-URL`), so API and build-overview behavior are unchanged.
 5. **Client script is idempotent.** HTMX `body` swaps re-execute inline scripts; document-level
-   listeners bind once (`window.__ssInit`) and per-render wiring re-runs. Toasts for
-   navigating responses are queued in `sessionStorage` (`data-toast`).
+   listeners bind once (`window.__ssInit`) and per-render wiring re-runs. Success toasts are
+   server-decided: handlers call `flash()`, which sets a short-lived cookie the shell turns
+   into a toast on the next render (HTMX redirect, swap, or plain post). Review actions keep an
+   optimistic client toast (`data-toast`). Validation responses (400/409/422) are swapped by
+   the shell, along with their collected stylesheet.
 6. **Constraints kept:** no client framework, no UI adapter, system font stack, facade-only
    pages enforced by the ratchet test. The command palette was deferred.
 

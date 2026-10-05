@@ -1,5 +1,14 @@
 import type { Project } from "@storyshelf/core/schema";
-import { Alert, Button, Card, CheckField, Field, Meta, SectionTitle } from "../ui/components.tsx";
+import {
+  Alert,
+  Button,
+  Card,
+  CheckField,
+  Field,
+  FormActions,
+  Meta,
+  SectionTitle,
+} from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Interaction-tests settings tab: play execution toggle and timeout. */
@@ -49,9 +58,11 @@ export function renderSettingsTests(
             hint="Timeout for each play function (1000–30000 ms, default 10000)."
           />
           {isAdmin ? (
-            <Button variant="primary" type="submit">
-              Save changes
-            </Button>
+            <FormActions>
+              <Button variant="primary" type="submit" icon="check">
+                Save changes
+              </Button>
+            </FormActions>
           ) : (
             <Meta>You need admin access to edit settings.</Meta>
           )}

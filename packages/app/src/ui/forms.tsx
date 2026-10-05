@@ -1,5 +1,6 @@
 import type { FC } from "hono/jsx";
 import { css } from "./css.ts";
+import { Icon } from "./icons/icon.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -8,8 +9,8 @@ type FieldLayout = "stack" | "inline";
 const fieldWrap = css`
   /* field */
   display: grid;
-  gap: 0.35rem;
-  margin-bottom: 0.875rem;
+  gap: var(--space-1);
+  margin-bottom: var(--space-4);
 `;
 
 const fieldWrapInline = css`
@@ -17,34 +18,50 @@ const fieldWrapInline = css`
   ${fieldWrap}
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
   margin-bottom: 0;
 `;
 
 const fieldLabel = css`
   /* field-label */
+  color: var(--text-primary);
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
+  & span[aria-hidden] {
+    color: var(--status-rejected);
+  }
 `;
 
 const fieldInput = css`
   /* field-input */
   width: 100%;
-  padding: 0.55rem 0.65rem;
-  border-radius: var(--radius-sm);
+  min-height: 40px;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius);
   border: 1px solid var(--border);
   background: var(--surface-card);
   color: var(--text-primary);
   font: inherit;
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   box-shadow: var(--shadow);
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
   &::placeholder {
     color: var(--text-muted);
   }
+  &:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--text-secondary) 45%, var(--border));
+  }
   &:focus {
-    outline: 2px solid var(--ring);
-    outline-offset: 0;
+    outline: none;
     border-color: var(--ring);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 25%, transparent);
+  }
+  &:disabled {
+    background: var(--surface-muted);
+    color: var(--text-secondary);
+    cursor: not-allowed;
   }
 `;
 
@@ -53,8 +70,8 @@ const fieldInputError = css`
   ${fieldInput}
   border-color: var(--status-rejected);
   &:focus {
-    outline-color: var(--status-rejected);
     border-color: var(--status-rejected);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--status-rejected) 25%, transparent);
   }
 `;
 
@@ -62,30 +79,65 @@ const fieldTextarea = css`
   /* field-textarea */
   ${fieldInput}
   resize: vertical;
-  min-height: 5rem;
+  min-height: 5.5rem;
+  line-height: var(--leading-normal);
 `;
 
 const fieldTextareaError = css`
   /* field-textarea-error */
   ${fieldInputError}
   resize: vertical;
-  min-height: 5rem;
+  min-height: 5.5rem;
+  line-height: var(--leading-normal);
 `;
 
 const fieldHint = css`
   /* field-hint */
   margin: 0;
   color: var(--text-secondary);
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
 `;
 
 const fieldError = css`
   /* field-error */
+  display: flex;
+  gap: var(--space-1);
+  align-items: flex-start;
   margin: 0;
-  color: var(--status-rejected);
-  font-size: 0.82rem;
+  color: var(--status-rejected-fg);
+  font-size: var(--text-sm);
   font-weight: 600;
 `;
+
+const formActions = css`
+  /* form-actions */
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  margin-top: var(--space-4);
+`;
+
+const formActionsEnd = css`
+  /* form-actions-end */
+  ${formActions}
+  justify-content: flex-end;
+`;
+
+const formActionsSplit = css`
+  /* form-actions-split */
+  ${formActions}
+  justify-content: space-between;
+`;
+
+/** Row of form buttons: primary action first; `align="end"` right-aligns, `"split"` spreads. */
+export const FormActions: FC<{ align?: "start" | "end" | "split"; children?: unknown }> = ({
+  align = "start",
+  children,
+}) => {
+  const cls = align === "end" ? formActionsEnd : align === "split" ? formActionsSplit : formActions;
+  return <div class={cls}>{children}</div>;
+};
 
 function fieldDescribedBy(
   name: string,
@@ -110,7 +162,8 @@ const FieldAssistant: FC<{ name: string; error: string | undefined; hint: string
   if (error) {
     return (
       <p class={fieldError} id={`${name}-error`} role="alert">
-        {error}
+        <Icon name="x-circle" size="sm" />
+        <span>{error}</span>
       </p>
     );
   }
@@ -193,10 +246,10 @@ export const Field: FC<{
 const checkLabel = css`
   /* check-label */
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-2);
   align-items: center;
-  font-weight: 600;
-  font-size: 0.85rem;
+  font-weight: 500;
+  font-size: var(--text-base);
   cursor: pointer;
 `;
 

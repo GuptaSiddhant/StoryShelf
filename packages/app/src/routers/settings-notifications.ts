@@ -3,6 +3,7 @@ import type { Project } from "@storyshelf/core/schema";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
+import { flash } from "./flash.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
 
 /** Notifications settings (channels plus my preferences). */
@@ -85,6 +86,7 @@ async function createChannelRecord(
     return await targetError(c, parsed.error.message);
   }
   await persistChannel(project, provider, target, parsed.data, form);
+  flash(c, "Notification channel added");
   return c.html((await renderSettingsPage(c, "notifications")) ?? "", 201);
 }
 
@@ -127,6 +129,7 @@ async function handleDeleteChannel(c: Context): Promise<Response> {
     );
   }
   await model.remove(channel.id);
+  flash(c, "Notification channel removed");
   return c.html((await renderSettingsPage(c, "notifications")) ?? "");
 }
 
@@ -135,6 +138,7 @@ async function handleSaveMine(c: Context): Promise<Response> {
   const user = getStore().user;
   if (user) {
     await saveSubscription(project, user.id, await c.req.formData());
+    flash(c, "Notification preferences saved");
     return c.html((await renderSettingsPage(c, "notifications")) ?? "");
   }
   return c.html(
