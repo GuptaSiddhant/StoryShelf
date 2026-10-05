@@ -1,18 +1,16 @@
 import { ProjectModel } from "@storyshelf/core/models";
-import { createUrlBuilder, safeImageUrl } from "@storyshelf/core/urls";
+import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { FC } from "hono/jsx";
 import { getStore } from "../../store.ts";
-import { Avatar } from "../avatar.tsx";
 import { Button } from "../buttons.tsx";
-import { csrfField } from "../csrf-field.tsx";
 import { css } from "../css.ts";
 import { Dropdown, DropdownDivider, DropdownItem } from "../dropdown.tsx";
 import { Icon } from "../icons/icon.tsx";
-import type { NavConfig } from "./nav.ts";
+import { breadcrumbs, type NavConfig, type NavCrumb } from "./nav.ts";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
-/** Slim, translucent bar above the page content (no brand color flood). */
+/** Slim, translucent bar: project picker plus breadcrumbs (account lives in the sidebar). */
 const shellTopbar = css`
   /* shell-topbar */
   position: sticky;
@@ -30,35 +28,57 @@ const shellTopbar = css`
     height: 100%;
     padding: 0 var(--space-6);
   }
-  .topbar__left,
-  .topbar__right {
+  .topbar__left {
     display: flex;
     align-items: center;
     gap: var(--space-2);
     min-width: 0;
+    flex: 1;
+    overflow: visible;
   }
   .topbar__menu {
     display: none;
   }
-  .topbar__user-name {
-    max-width: 14ch;
+  .topbar__left nav {
+    min-width: 0;
+  }
+  .topbar__picker {
     overflow: hidden;
+    max-width: 26ch;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .topbar__user-meta {
-    padding: 0.4rem 0.6rem 0.5rem;
+  .crumbs {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
     color: var(--text-secondary);
-    font-size: var(--text-sm);
-    line-height: 1.3;
-  }
-  .topbar__user-meta strong {
-    display: block;
-    color: var(--text-primary);
     font-size: var(--text-base);
   }
-  .topbar__logout {
-    margin: 0;
+  .crumbs li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+  .crumbs li::before {
+    content: "›";
+    color: var(--text-muted);
+  }
+  .crumbs a {
+    overflow: hidden;
+    max-width: 28ch;
+    color: var(--text-secondary);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .crumbs a:hover {
+    color: var(--text-primary);
+    text-decoration: none;
   }
   @media (max-width: 880px) {
     & .topbar__inner {
@@ -67,8 +87,22 @@ const shellTopbar = css`
     & .topbar__menu {
       display: inline-flex;
     }
-    & .topbar__user-name {
+    & .crumbs li:not(:last-child) {
       display: none;
+    }
+    & .topbar__picker {
+      display: none;
+    }
+    & .topbar__left summary {
+      min-width: 36px;
+      justify-content: center;
+      padding: 0.25rem 0.5rem;
+    }
+    & .topbar__pick[data-single] summary > svg:last-child {
+      display: none;
+    }
+    & .crumbs a {
+      max-width: 22ch;
     }
   }
 `;
@@ -120,139 +154,84 @@ const toastRegion = css`
   }
 `;
 
-interface SwitcherProject {
+interface PickerProject {
   slug: string;
   name: string;
 }
 
-async function listProjects(): Promise<SwitcherProject[]> {
+async function listProjects(): Promise<PickerProject[]> {
   try {
     const projects = await new ProjectModel(getStore().db).list();
     return projects.map((project) => ({ slug: project.slug, name: project.name }));
   } catch {
-    // The switcher is a convenience; never fail a page render over it.
+    // The picker is a convenience; never fail a page render over it.
     return [];
   }
 }
 
-/** Dropdown to jump between projects; falls back to the current one if listing fails. */
-const ProjectSwitcher: FC<{ nav: NavConfig }> = async ({ nav }) => {
+/** Dropdown to jump between projects; on global pages it reads "All projects". */
+const ProjectPicker: FC<{ nav?: NavConfig }> = async ({ nav }) => {
   const { user, config } = getStore();
   const urls = createUrlBuilder("/", config.publishedBaseDomain);
   const projects = await listProjects();
   const canCreate = !user || user.role === "admin" || user.role === "member";
-  const label = nav.projectName ?? nav.projectSlug ?? "Project";
+  const current = nav?.projectSlug;
+  const label = current ? (nav?.projectName ?? current) : "All projects";
   return (
-    <Dropdown
-      ariaLabel={`Project: ${label}`}
-      label={
-        <>
-          <Icon name="folder" size="sm" />
-          <span>{label}</span>
-        </>
-      }
-    >
-      {projects.map((project) => (
-        <DropdownItem
-          key={project.slug}
-          href={urls.library(project.slug)}
-          current={project.slug === nav.projectSlug}
-        >
-          {project.name}
-        </DropdownItem>
-      ))}
-      {projects.length > 0 ? <DropdownDivider /> : null}
-      <DropdownItem href={urls.projects()} icon="folder">
-        All projects
-      </DropdownItem>
-      {canCreate ? (
-        <DropdownItem href={urls.projectsNew()} icon="plus">
-          New project
-        </DropdownItem>
-      ) : null}
-    </Dropdown>
-  );
-};
-
-/** Light / Dark / System menu; the trigger shows the active mode's icon. */
-const ThemeMenu: FC = () => {
-  return (
-    <span class="topbar__theme">
+    <span class="topbar__pick" data-single={projects.length <= 1 ? "true" : undefined}>
       <Dropdown
-        align="end"
-        iconOnly
-        ariaLabel="Theme"
+        ariaLabel={`Project: ${label}`}
         label={
           <>
-            <span data-theme-icon="light">
-              <Icon name="sun" />
-            </span>
-            <span data-theme-icon="dark">
-              <Icon name="moon" />
-            </span>
-            <span data-theme-icon="system">
-              <Icon name="monitor" />
-            </span>
+            <Icon name="folder" size="sm" />
+            <span class="topbar__picker">{label}</span>
           </>
         }
       >
-        <DropdownItem icon="sun" data-theme-set="light">
-          Light
+        {projects.map((project) => (
+          <DropdownItem
+            key={project.slug}
+            href={urls.library(project.slug)}
+            current={project.slug === current}
+          >
+            {project.name}
+          </DropdownItem>
+        ))}
+        {projects.length > 0 ? <DropdownDivider /> : null}
+        <DropdownItem href={urls.projects()} icon="folder" current={!current}>
+          All projects
         </DropdownItem>
-        <DropdownItem icon="moon" data-theme-set="dark">
-          Dark
-        </DropdownItem>
-        <DropdownItem icon="monitor" data-theme-set="system">
-          System
-        </DropdownItem>
+        {canCreate ? (
+          <DropdownItem href={urls.projectsNew()} icon="plus">
+            New project
+          </DropdownItem>
+        ) : null}
       </Dropdown>
     </span>
   );
 };
 
-const UserMenu: FC = () => {
-  const { user, authEnabled } = getStore();
-  if (!authEnabled) {
+/** Ancestor trail after the picker; the page itself is named by its heading. */
+const Crumbs: FC<{ crumbs: NavCrumb[] }> = ({ crumbs }) => {
+  if (crumbs.length === 0) {
     return null;
   }
-  if (!user) {
-    return (
-      <Button href="/auth/login" size="sm">
-        Sign in
-      </Button>
-    );
-  }
   return (
-    <Dropdown
-      align="end"
-      ariaLabel="Account"
-      label={
-        <>
-          <Avatar name={user.name} src={safeImageUrl(user.avatarUrl)} size="sm" />
-          <span class="topbar__user-name">{user.name}</span>
-        </>
-      }
-    >
-      <div class="topbar__user-meta">
-        <strong>{user.name}</strong>
-        {user.role}
-      </div>
-      <DropdownDivider />
-      <DropdownItem href="/profile" icon="user">
-        Profile
-      </DropdownItem>
-      <form class="topbar__logout" method="post" action="/auth/logout">
-        {csrfField()}
-        <DropdownItem type="submit" icon="log-out">
-          Sign out
-        </DropdownItem>
-      </form>
-    </Dropdown>
+    <nav aria-label="Breadcrumb">
+      <ol class="crumbs">
+        {crumbs.map((crumb) => (
+          <li key={crumb.href}>
+            <a href={crumb.href}>{crumb.label}</a>
+          </li>
+        ))}
+      </ol>
+    </nav>
   );
 };
 
-/** Top bar: mobile menu button, project switcher, theme menu, and account menu. */
+/** Top bar: mobile menu button, project picker, and breadcrumbs. */
 export const TopBar: FC<{ nav?: NavConfig }> = ({ nav }) => {
+  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
   return (
     <header class={shellTopbar} role="banner">
       <div class="topbar__inner">
@@ -267,18 +246,15 @@ export const TopBar: FC<{ nav?: NavConfig }> = ({ nav }) => {
               data-sidebar-toggle
             />
           </span>
-          {nav?.projectSlug ? <ProjectSwitcher nav={nav} /> : null}
-        </div>
-        <div class="topbar__right">
-          <ThemeMenu />
-          <UserMenu />
+          <ProjectPicker nav={nav} />
+          <Crumbs crumbs={breadcrumbs(nav, urls)} />
         </div>
       </div>
     </header>
   );
 };
 
-/** Live region the client script appends toasts to (see `toast.ts`). */
+/** Live region the client script appends toasts to. */
 export const ToastRegion: FC = () => {
   return <div class={toastRegion} data-toast-region aria-live="polite" aria-atomic="false" />;
 };

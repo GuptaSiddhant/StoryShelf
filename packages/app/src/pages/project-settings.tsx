@@ -140,18 +140,18 @@ export function renderProjectSettingsPage(
   return (
     <DocumentLayout
       title={`${project.name} · Settings`}
-      nav={{ active: "settings", projectSlug: project.slug, projectName: project.name }}
+      nav={{
+        active: "settings",
+        projectSlug: project.slug,
+        projectName: project.name,
+        trail: activeTab === "general" ? [] : [{ label: TAB_LABELS[activeTab] }],
+      }}
     >
       <PageHeader
         title="Project settings"
         description={
           <>Manage general settings, labels, tokens, webhooks and members for {project.name}.</>
         }
-        breadcrumbs={[
-          { label: "Projects", href: "/projects" },
-          { label: project.name, href: `/projects/${project.slug}/builds` },
-          { label: "Settings" },
-        ]}
       />
 
       <SubNavLayout

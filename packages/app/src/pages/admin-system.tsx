@@ -196,7 +196,6 @@ export function renderAdminSystemPage(data: AdminSystemData): RenderedContent {
             Recheck
           </Button>
         }
-        breadcrumbs={[{ label: "Projects", href: "/projects" }, { label: "System" }]}
       />
       <ServerFacts
         report={report}

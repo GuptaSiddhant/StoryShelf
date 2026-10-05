@@ -5,6 +5,14 @@ export interface NavConfig {
   active?: string;
   projectSlug?: string;
   projectName?: string;
+  /** Levels below the section, ending with the current page (e.g. a build, then "Review"). */
+  trail?: NavCrumb[];
+}
+
+/** One breadcrumb level; the last trail item is the current page (it needs no `href`). */
+export interface NavCrumb {
+  label: string;
+  href?: string;
 }
 
 /** One sidebar entry. */
@@ -55,4 +63,31 @@ export function developerNavItems(): NavItem[] {
 /** Administration entries (admins only). */
 export function adminNavItems(): NavItem[] {
   return [{ key: "admin", label: "System", href: "/admin", icon: "server" }];
+}
+
+/**
+ * Breadcrumbs after the project picker: the *ancestors* of the current page.
+ * The page itself is named by its heading, so it is never repeated here —
+ * the section plus `nav.trail` describe where the page is, and the last item
+ * (the current page) is dropped. Every returned crumb links somewhere, and
+ * the last one is the page's parent.
+ */
+export function breadcrumbs(nav: NavConfig | undefined, urls: NavUrls): NavCrumb[] {
+  const section = sectionCrumb(nav, urls);
+  const path = section ? [section, ...(nav?.trail ?? [])] : [...(nav?.trail ?? [])];
+  return path.slice(0, -1).filter((crumb) => crumb.href !== undefined);
+}
+
+function sectionCrumb(nav: NavConfig | undefined, urls: NavUrls): NavCrumb | null {
+  const slug = nav?.projectSlug;
+  const table: Record<string, NavCrumb | undefined> = {
+    library: slug ? { label: "Library", href: urls.library(slug) } : undefined,
+    builds: slug ? { label: "Builds", href: urls.buildsList(slug) } : undefined,
+    jobs: slug ? { label: "Jobs", href: urls.jobs(slug) } : undefined,
+    labels: slug ? { label: "Labels", href: urls.labels(slug) } : undefined,
+    settings: slug ? { label: "Settings", href: urls.settings(slug) } : undefined,
+    admin: { label: "System", href: "/admin" },
+    profile: { label: "Profile", href: "/profile" },
+  };
+  return table[nav?.active ?? ""] ?? null;
 }

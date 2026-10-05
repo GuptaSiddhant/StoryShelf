@@ -3,6 +3,7 @@ import type { FC } from "hono/jsx";
 import { getStore } from "../../store.ts";
 import { css } from "../css.ts";
 import { Icon } from "../icons/icon.tsx";
+import { ThemeMenu, UserMenu } from "./account.tsx";
 import {
   adminNavItems,
   developerNavItems,
@@ -28,8 +29,6 @@ const shellSidebar = css`
   padding: var(--space-3) var(--space-2);
   background: var(--sidebar-bg);
   border-right: 1px solid var(--border);
-  overflow-y: auto;
-  overflow-x: hidden;
   .sidebar__brand {
     display: flex;
     align-items: center;
@@ -65,6 +64,9 @@ const shellSidebar = css`
     flex-direction: column;
     gap: 2px;
     flex: 1;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
   .sidebar__section {
     margin: var(--space-4) 0 var(--space-1);
@@ -114,16 +116,29 @@ const shellSidebar = css`
     opacity: 0.6;
   }
   .sidebar__footer {
-    display: flex;
+    display: grid;
+    gap: var(--space-1);
     padding-top: var(--space-2);
     border-top: 1px solid var(--border-subtle);
+  }
+  .sidebar__tools {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+  }
+  .sidebar__tools > details {
+    flex: none;
+    width: auto;
+  }
+  .sidebar__tools .sidebar__collapse {
+    flex: 1;
+    width: auto;
   }
   .sidebar__collapse {
     appearance: none;
     display: flex;
     align-items: center;
     gap: 0.65rem;
-    width: 100%;
     min-height: 36px;
     padding: 0.4rem var(--space-3);
     border: 0;
@@ -153,6 +168,15 @@ const shellSidebar = css`
     html[data-sidebar="rail"] & .sidebar__collapse svg {
       transform: rotate(180deg);
     }
+    html[data-sidebar="rail"] & .sidebar__footer summary {
+      justify-content: center;
+    }
+    html[data-sidebar="rail"] & .sidebar__footer summary > svg:last-child {
+      display: none;
+    }
+    html[data-sidebar="rail"] & .sidebar__tools {
+      flex-direction: column;
+    }
   }
   @media (max-width: 880px) {
     & {
@@ -168,7 +192,7 @@ const shellSidebar = css`
     &.sidebar--open {
       transform: translateX(0);
     }
-    & .sidebar__footer {
+    & .sidebar__collapse {
       display: none;
     }
   }
@@ -260,10 +284,20 @@ export const Sidebar: FC<{ nav?: NavConfig; name: string; logo?: string }> = ({
         ) : null}
       </nav>
       <div class="sidebar__footer">
-        <button class="sidebar__collapse" type="button" data-sidebar-collapse>
-          <Icon name="chevrons-left" />
-          <span class="sidebar__label">Collapse</span>
-        </button>
+        <UserMenu />
+        <div class="sidebar__tools">
+          <ThemeMenu />
+          <button
+            class="sidebar__collapse"
+            type="button"
+            data-sidebar-collapse
+            aria-label="Collapse or expand sidebar"
+            title="Collapse or expand sidebar"
+          >
+            <Icon name="chevrons-left" />
+            <span class="sidebar__label">Collapse</span>
+          </button>
+        </div>
       </div>
     </aside>
   );

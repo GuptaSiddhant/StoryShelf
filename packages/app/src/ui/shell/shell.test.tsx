@@ -65,3 +65,53 @@ describe("app shell", () => {
     expect(html).not.toContain("user-menu__logout");
   });
 });
+
+/** The rendered top bar markup. */
+function bar(html: string): string {
+  return html.slice(html.indexOf('role="banner"'), html.indexOf("</header>"));
+}
+
+describe("top bar and sidebar footer", () => {
+  it("puts account, theme, and collapse in the sidebar footer, not the top bar", async () => {
+    const html = await page("/projects");
+    const sidebar = html.slice(html.indexOf('<aside id="sidebar"'), html.indexOf("</aside>"));
+    const topbar = html.slice(html.indexOf('role="banner"'), html.indexOf("</header>"));
+    expect(sidebar).toContain("data-theme-set");
+    expect(sidebar).toContain("data-sidebar-collapse");
+    expect(sidebar).toContain('aria-label="Collapse or expand sidebar"');
+    expect(topbar).not.toContain("data-theme-set");
+  });
+
+  it("shows the project picker and the page's ancestors, not the page itself", async () => {
+    const section = await page("/projects/alpha/builds", twoProjects);
+    const deeper = await page("/projects/alpha/settings/tokens", twoProjects);
+    expect(bar(section)).toContain('aria-label="Project: Alpha"');
+    expect(bar(section)).not.toContain('aria-label="Breadcrumb"');
+    expect(bar(deeper)).toContain('aria-label="Breadcrumb"');
+    expect(bar(deeper)).toContain(">Settings</a>");
+    expect(bar(deeper)).not.toContain("Tokens");
+  });
+
+  it("labels the picker for assistive tech even though phones show only its icon", async () => {
+    const html = await page("/projects/alpha/builds", twoProjects);
+    expect(bar(html)).toContain('aria-label="Project: Alpha"');
+    expect(bar(html)).toContain('class="topbar__picker"');
+  });
+
+  it("keeps the picker chevron on phones when there are several projects, drops it for one", async () => {
+    const many = await page("/projects/alpha/builds", twoProjects);
+    const one = await page("/projects/solo/builds", async (db) => {
+      await new ProjectModel(db).create({ name: "Solo" });
+    });
+    expect(bar(many)).not.toContain("data-single");
+    expect(bar(one)).toContain('data-single="true"');
+  });
+
+  it("reads 'All projects' on global pages with no breadcrumb", async () => {
+    const projects = await page("/projects");
+    const admin = await page("/admin");
+    expect(projects).toContain('aria-label="Project: All projects"');
+    expect(projects).not.toContain('aria-label="Breadcrumb"');
+    expect(admin).not.toContain('aria-label="Breadcrumb"');
+  });
+});

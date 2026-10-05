@@ -4,7 +4,7 @@ import type { Project } from "@storyshelf/core/schema";
 import type { Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { EmptyState } from "../ui/components.tsx";
-import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
+import { DocumentLayout, type NavConfig, type RenderedContent } from "../ui/document.tsx";
 import { canvasColumn, workspace } from "../ui/styles/review-layout.ts";
 import { DiffActionBar } from "./build-diff-actions.tsx";
 import { DiffComments } from "./build-diff-comments.tsx";
@@ -82,6 +82,22 @@ function DiffReviewGrid(
   );
 }
 
+/** Sidebar/breadcrumb context for the review page: Builds / <build> / Review. */
+function reviewNav(project: Project, build: Build): NavConfig {
+  return {
+    active: "builds",
+    projectSlug: project.slug,
+    projectName: project.name,
+    trail: [
+      {
+        label: `${build.gitBranch} · ${build.gitSha.slice(0, 7)}`,
+        href: `/projects/${project.slug}/builds/${build.id}`,
+      },
+      { label: "Review" },
+    ],
+  };
+}
+
 /** Three-up diff review page: baseline, current, and diff with keyboard review. */
 export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
   const { project, build, snapshots, comments, selectedId, canReview, hasBaseline, drifted } = data;
@@ -94,7 +110,7 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
   return (
     <DocumentLayout
       title={`Review · ${build.gitBranch}`}
-      nav={{ active: "builds", projectSlug: project.slug, projectName: project.name }}
+      nav={reviewNav(project, build)}
       layout="wide"
     >
       <DiffHeader

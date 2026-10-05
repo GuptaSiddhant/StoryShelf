@@ -112,16 +112,6 @@ export function DiffHeader(props: DiffHeaderProps): HtmlEscapedString | Promise<
   return (
     <header class={reviewHeader}>
       <div class={headerMain}>
-        <div>
-          <Button
-            variant="ghost"
-            size="sm"
-            icon="chevron-left"
-            href={`/projects/${project.slug}/builds`}
-          >
-            Builds
-          </Button>
-        </div>
         <HeaderTitle build={build} />
       </div>
       <div class={headerSide}>

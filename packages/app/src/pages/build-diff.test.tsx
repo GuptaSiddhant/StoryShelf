@@ -104,3 +104,22 @@ describe("review workspace page", () => {
     expect(html).toContain("ss-shell-content-wide-");
   });
 });
+
+describe("review page breadcrumb", () => {
+  it("lists Builds and the build (ancestors), not Review itself", async () => {
+    const { html } = await reviewPage();
+    const topbar = html.slice(html.indexOf('role="banner"'), html.indexOf("</header>"));
+    expect(topbar).toContain(">Builds</a>");
+    expect(topbar).toContain("feature/x · abc1234");
+    expect(topbar).not.toContain(">Review<");
+  });
+
+  it("has no duplicate back-to-builds link in the header (the breadcrumb is the way back)", async () => {
+    const { html } = await reviewPage();
+    const header = html.slice(
+      html.indexOf("<main"),
+      html.indexOf("</header>", html.indexOf("<main")),
+    );
+    expect(header).not.toContain(">Builds<");
+  });
+});
