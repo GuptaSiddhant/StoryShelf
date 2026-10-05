@@ -1,11 +1,12 @@
-/**
- * StoryShelf app: compose database, storage, capture, auth, and git-host
- * adapters into a complete self-hosted visual-testing Hono app.
- */
 import { swaggerUI } from "@hono/swagger-ui";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { AdapterLifecycleError, validateBootAssembly } from "@storyshelf/core/adapter/setup";
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
+/**
+ * StoryShelf app: compose database, storage, capture, auth, and git-host
+ * adapters into a complete self-hosted visual-testing Hono app.
+ */
+import type { Logger } from "@storyshelf/core/logger";
 import {
   createHttpMiddleware,
   createInstrumentedDatabase,
@@ -70,6 +71,26 @@ function instrumentedOptions(options: ShelfOptions): ShelfOptions {
   };
 }
 
+/** Once adapters are ready, requeue-once or fail builds a restart left `capturing`. */
+function recoverAfterSetup(
+  cell: LifecycleCell,
+  recoverStuck: (() => Promise<unknown>) | undefined,
+  logger: Logger,
+): void {
+  if (!recoverStuck) {
+    return;
+  }
+  cell.ready
+    .then(async (setup) => {
+      if (setup.ok) {
+        await recoverStuck();
+      }
+    })
+    .catch((error: unknown) => {
+      logger.error({ err: error }, "stuck capture recovery failed");
+    });
+}
+
 /** Attach lifecycle, queue, middleware, routes, and docs to the app. */
 function assembleApp(app: ShelfApp, options: ShelfOptions, scoped: ShelfOptions): void {
   const runtime = resolveRuntime(options);
@@ -78,12 +99,13 @@ function assembleApp(app: ShelfApp, options: ShelfOptions, scoped: ShelfOptions)
   if (runtime.config.serverTiming === true) {
     app.use("*", serverTiming(true));
   }
-  const { queue, enqueueCapture } = setupCaptureQueue(
+  const { queue, enqueueCapture, recoverStuck } = setupCaptureQueue(
     scoped,
     runtime.config,
     runtime.gitHosts,
     runtime.logger,
   );
+  recoverAfterSetup(cell, recoverStuck, runtime.logger);
   wireMiddleware(app, {
     ...runtime,
     queue,

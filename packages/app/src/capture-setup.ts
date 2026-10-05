@@ -1,7 +1,16 @@
 import type { CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
 import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
-import { createDispatchJob, InMemoryCaptureQueue } from "@storyshelf/core/capture";
-import type { CaptureDispatchJob, CaptureJobOptions } from "@storyshelf/core/capture";
+import {
+  createDispatchJob,
+  InMemoryCaptureQueue,
+  recoverStuckCaptures,
+} from "@storyshelf/core/capture";
+import type {
+  CaptureDispatchJob,
+  CaptureJobOptions,
+  DispatchDeps,
+  RecoveryResult,
+} from "@storyshelf/core/capture";
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 import { BuildModel } from "@storyshelf/core/models";
@@ -16,6 +25,11 @@ import { notifySystemWith } from "./notify.ts";
 export interface QueueWiring {
   queue: CaptureQueue | null;
   enqueueCapture: ((buildId: string, reqId?: string) => Promise<void>) | undefined;
+  /**
+   * Boot sweep for builds a restart left in `capturing` (requeue once, else fail).
+   * Only set for the in-process queue; remote queues redeliver on their own.
+   */
+  recoverStuck?: () => Promise<RecoveryResult>;
 }
 
 /** Enqueue a build, continuing the active request trace when present. */
@@ -116,7 +130,7 @@ export function setupCaptureQueue(
     logger,
     secret: config.secret,
   };
-  const runJob = createDispatchJob({
+  const dispatchDeps: DispatchDeps = {
     db: options.database,
     tables: {
       projects: options.database.tables.projects,
@@ -131,7 +145,8 @@ export function setupCaptureQueue(
     gitHosts,
     secret: config.secret,
     logger,
-  });
+  };
+  const runJob = createDispatchJob(dispatchDeps);
   const captureQueue =
     options.captureQueue ??
     new InMemoryCaptureQueue({
@@ -147,5 +162,12 @@ export function setupCaptureQueue(
   const enqueueCapture = async (buildId: string, reqId?: string): Promise<void> => {
     await enqueueJob(captureQueue, buildId, reqId);
   };
-  return { queue: captureQueue, enqueueCapture };
+  const recoverStuck = async (): Promise<RecoveryResult> =>
+    await recoverStuckCaptures({
+      deps: dispatchDeps,
+      enqueue: async (buildId) => {
+        await enqueueCapture(buildId);
+      },
+    });
+  return { queue: captureQueue, enqueueCapture, recoverStuck };
 }

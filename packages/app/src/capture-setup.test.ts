@@ -7,6 +7,7 @@ import {
   SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
 import { createShelfLogger } from "@storyshelf/core/logger";
+import { BuildModel, ProjectModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { describe, expect, it, vi } from "vitest";
 import { setupCaptureQueue } from "./capture-setup.ts";
@@ -185,5 +186,43 @@ describe("setupCaptureQueue", () => {
       propagation.disable();
       trace.disable();
     }
+  });
+
+  it("exposes a stuck-build sweep only for the in-process queue", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const inProcess = setupCaptureQueue(
+      { database: db as never, storage: storage as never, captureRunner: makeRunner() },
+      { scratchDir: "/tmp" },
+      [],
+      makeLogger(),
+    );
+    const remote = setupCaptureQueue(
+      { database: db as never, storage: storage as never, captureQueue: makeQueue() },
+      {},
+      [],
+      makeLogger(),
+    );
+    expect(inProcess.recoverStuck).toBeDefined();
+    expect(remote.recoverStuck).toBeUndefined();
+  });
+
+  it("requeues a build left capturing by a restart", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const project = await new ProjectModel(db as never).create({ name: "Stuck" });
+    const builds = new BuildModel(db as never);
+    const build = await builds.create(project.id, { gitSha: "sha", gitBranch: "feature/x" });
+    await builds.setStatus(build.id, "capturing");
+    const { recoverStuck } = setupCaptureQueue(
+      { database: db as never, storage: storage as never, captureRunner: makeRunner() },
+      { scratchDir: "/tmp" },
+      [],
+      makeLogger(),
+    );
+
+    const result = await recoverStuck?.();
+
+    expect(result).toEqual({ requeued: [build.id], failed: [] });
   });
 });
