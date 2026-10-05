@@ -155,6 +155,38 @@ function toastPart(): string {
     document.addEventListener('htmx:sendError',failed);`;
 }
 
+/** Copy buttons: `data-copy` holds the text; confirm with a toast. */
+function copyPart(): string {
+  return `
+    document.addEventListener('click',function(e){
+      var btn=e.target instanceof Element ? e.target.closest('[data-copy]') : null;
+      if(!btn||!navigator.clipboard) return;
+      navigator.clipboard.writeText(btn.getAttribute('data-copy')||'').then(function(){
+        toast({message:'Copied to clipboard',tone:'success'});
+      },function(){
+        toast({message:'Could not copy',tone:'danger'});
+      });
+    });`;
+}
+
+/** Client-side list filtering for `[data-filter-input]` boxes. */
+function filterPart(): string {
+  return `
+    document.addEventListener('input',function(e){
+      var input=e.target instanceof Element ? e.target.closest('[data-filter-input]') : null;
+      if(!input) return;
+      var scope=input.closest('[data-filter-scope]')||document;
+      var query=input.value.trim().toLowerCase();
+      var shown=0;
+      scope.querySelectorAll('[data-filter-item]').forEach(function(item){
+        var match=!query||(item.getAttribute('data-filter-text')||'').toLowerCase().indexOf(query)>-1;
+        item.hidden=!match;
+        if(match) shown++;
+      });
+      scope.querySelectorAll('[data-filter-empty]').forEach(function(el){ el.hidden=shown>0; });
+    });`;
+}
+
 /** Keep keyboard focus sensible after HTMX swaps. */
 function focusPart(): string {
   return `
@@ -175,6 +207,8 @@ export function clientScript(): string {
     sidebarPart(),
     dropdownPart(),
     toastPart(),
+    copyPart(),
+    filterPart(),
     focusPart(),
     reviewScript(),
   ];

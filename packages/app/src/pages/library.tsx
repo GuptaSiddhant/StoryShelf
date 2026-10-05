@@ -11,16 +11,19 @@ import type { HtmlEscapedString } from "hono/utils/html";
 import { posix } from "node:path";
 import { getStore } from "../store.ts";
 import {
+  Badge,
   Button,
   Card,
   CardSection,
   EmptyState,
+  FilterInput,
   HStack,
   Meta,
   PageHeader,
   SectionTitle,
   SelectField,
   VStack,
+  statusTone,
 } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
@@ -243,6 +246,9 @@ function renderLibraryGrid(
         </Card>
       ) : null}
       {renderTitleList(byTitle, project, build, multi, docsByStory)}
+      <div data-filter-empty hidden>
+        <Meta center>No stories match your filter.</Meta>
+      </div>
     </DocumentLayout>
   );
 }
@@ -268,7 +274,8 @@ function renderLibraryHeader(
       }
       actions={
         <HStack>
-          <Button variant="ghost" size="sm" href={urls.short(build.id)}>
+          <FilterInput label="Filter stories" placeholder="Filter stories…" />
+          <Button variant="ghost" size="sm" icon="external-link" href={urls.short(build.id)}>
             View Storybook
           </Button>
           {renderBranchPicker(project, build, branches)}
@@ -329,7 +336,12 @@ function renderTitleGroup(
   const byViewport = groupByViewport(group);
   const vNames = [...byViewport.keys()].toSorted();
   return (
-    <Card key={title} padded={false}>
+    <Card
+      key={title}
+      padded={false}
+      data-filter-item
+      data-filter-text={`${title} ${group.map((snap) => snap.storyName).join(" ")}`}
+    >
       <CardSection divider>
         <SectionTitle>{title}</SectionTitle>
         <Meta as="span">{group.length} stories</Meta>
@@ -390,11 +402,17 @@ function renderSnapshotCard(
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
   const docsId = docsByStory.get(snap.storyId);
   return (
-    <div key={snap.id} class={snapshotCard}>
+    <div
+      key={snap.id}
+      class={snapshotCard}
+      data-filter-item
+      data-filter-text={`${snap.storyTitle} ${snap.storyName}`}
+    >
       <div class={snapshotCardHead}>
         <strong>{snap.storyName}</strong>
         <span class={snapshotCardMeta}>
-          {snap.viewportWidth}×{snap.viewportHeight}
+          <Badge tone={statusTone(snap.status)}>{snap.status}</Badge> {snap.viewportWidth}×
+          {snap.viewportHeight}
         </span>
       </div>
       <div class={snapshotCardBody}>
@@ -421,26 +439,32 @@ function renderCardActions(
     <>
       <Button
         variant="secondary"
+        size="sm"
+        icon="columns"
         href={`${urls.buildDiff(project.slug, build.id)}?snapshot=${snap.id}`}
       >
         Review
       </Button>
       <Button
         variant="ghost"
+        size="sm"
+        icon="external-link"
         href={`${urls.storybookBuild(project.slug, build.id)}/?storyId=${encodeURIComponent(snap.storyId)}`}
         target="_blank"
         rel="noopener"
       >
-        Preview ↗
+        Preview
       </Button>
       {docsId ? (
         <Button
           variant="ghost"
+          size="sm"
+          icon="book"
           href={`/projects/${project.slug}/storybook/build/${build.id}/?storyId=${encodeURIComponent(docsId)}&viewMode=docs`}
           target="_blank"
           rel="noopener"
         >
-          Docs ↗
+          Docs
         </Button>
       ) : null}
     </>
