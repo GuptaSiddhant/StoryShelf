@@ -1,22 +1,44 @@
 // oxlint-disable-next-line unicorn/no-abusive-eslint-disable
 /* oxlint-disable */
+/**
+ * Regenerates the docs-site screenshots in apps/website/public/screenshots.
+ *
+ *   nub scripts/screenshots.mjs [app] [site] [--skip-build]
+ *
+ *   app    projects-list / build-review / diff-review: boots the real app in
+ *          memory with seeded demo data and photographs it.
+ *   site   home-hero: builds the docs site and photographs its homepage.
+ *   (none) both, in that order. The homepage embeds the app screenshots, so
+ *          they must be refreshed *before* the site is built.
+ *
+ *   --skip-build  reuse an existing apps/website/dist for the `site` step.
+ *
+ * Needs Playwright's Chromium (`npx playwright-core install chromium`).
+ */
 import { serve } from "@hono/node-server";
-import { createShelfLogger } from "@storyshelf/core/logger";
-import { ProjectModel, BuildModel, SnapshotModel, BaselineModel } from "@storyshelf/core/models";
-import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
+import { spawnSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { readFile } from "node:fs/promises";
+import { createServer } from "node:http";
 import { createRequire } from "node:module";
+import { dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
-import { createShelfApp } from "../src/index.tsx";
+// Workspace packages are imported from source by path: the repo root does not
+// have them in node_modules (they are per-package workspace links).
+import { createShelfApp } from "../packages/app/src/index.tsx";
+import { createShelfLogger } from "../packages/core/src/logger.ts";
+import { BaselineModel, BuildModel, ProjectModel, SnapshotModel } from "../packages/core/src/models/index.ts";
+import { makeDatabase, makeStorage } from "../packages/core/src/test-helpers/index.ts";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const outDir = join(__dirname, "../../../apps/website/public/screenshots");
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const websiteDir = join(root, "apps/website");
+const distDir = join(websiteDir, "dist");
+const outDir = join(websiteDir, "public/screenshots");
 mkdirSync(outDir, { recursive: true });
 
 // Mock "component screenshots" so the docs show a believable review, not blank images.
-const require = createRequire(new URL("../../core/package.json", import.meta.url));
+const require = createRequire(import.meta.url);
 const { PNG } = require("pngjs");
 
 function mockPng(variant) {
@@ -45,7 +67,7 @@ function diffPng() {
   return PNG.sync.write(png);
 }
 
-async function main() {
+async function captureApp() {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
 
@@ -185,4 +207,92 @@ async function main() {
   }
 }
 
-await main();
+
+/** Build the docs site (embeds the app screenshots, so run after `app`). */
+function buildWebsite() {
+  console.log("Building the docs site…");
+  const result = spawnSync("nub", ["run", "--filter", "website", "build"], {
+    cwd: root,
+    stdio: "inherit",
+  });
+  if (result.status !== 0) {
+    throw new Error("Website build failed");
+  }
+}
+
+const TYPES = {
+  ".html": "text/html",
+  ".css": "text/css",
+  ".js": "text/javascript",
+  ".mjs": "text/javascript",
+  ".json": "application/json",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".woff2": "font/woff2",
+  ".woff": "font/woff",
+};
+
+// file:// leaves the built assets unstyled (root-absolute hrefs never
+// resolve), so serve dist/ over loopback instead.
+function serveDist() {
+  const server = createServer(async (req, res) => {
+    try {
+      const path = new URL(req.url ?? "/", "http://127.0.0.1").pathname;
+      const file = join(distDir, path.endsWith("/") ? `${path}index.html` : path);
+      const body = await readFile(file);
+      res.writeHead(200, { "content-type": TYPES[extname(file)] ?? "application/octet-stream" });
+      res.end(body);
+    } catch {
+      res.writeHead(404);
+      res.end("not found");
+    }
+  });
+  return new Promise((resolve) => {
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      resolve({ server, port: typeof address === "object" && address ? address.port : 0 });
+    });
+  });
+}
+
+
+/** Photograph the built docs homepage. */
+async function captureSite() {
+  const { server, port } = await serveDist();
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({
+      viewport: { width: 1280, height: 800 },
+      deviceScaleFactor: 2,
+    });
+    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: "networkidle" });
+    await page.waitForTimeout(800);
+    await page.screenshot({ path: join(outDir, "home-hero.png") });
+    console.log("✓ home-hero.png");
+    await page.close();
+    console.log("Homepage screenshots done ->", outDir);
+  } finally {
+    await browser.close();
+    await new Promise((resolve) => server.close(resolve));
+  }
+}
+
+const args = process.argv.slice(2);
+const steps = args.filter((arg) => arg === "app" || arg === "site");
+const unknown = args.filter((arg) => !["app", "site", "--skip-build"].includes(arg));
+if (unknown.length > 0) {
+  console.error(`Unknown argument(s): ${unknown.join(", ")}\nUsage: nub scripts/screenshots.mjs [app] [site] [--skip-build]`);
+  process.exit(1);
+}
+const runApp = steps.length === 0 || steps.includes("app");
+const runSite = steps.length === 0 || steps.includes("site");
+
+if (runApp) {
+  await captureApp();
+}
+if (runSite) {
+  if (!args.includes("--skip-build")) {
+    buildWebsite();
+  }
+  await captureSite();
+}

@@ -63,6 +63,9 @@
     "clean:cache": "node ./scripts/clean.mjs --cache-only",
     "web:build": "nub run --filter website build",
     "web:dev": "nub run --filter website dev",
+    "screenshots": "nub ./scripts/screenshots.mjs",
+    "screenshots:app": "nub ./scripts/screenshots.mjs app",
+    "screenshots:site": "nub ./scripts/screenshots.mjs site",
     "release": "nub ./scripts/release.mjs",
     "release:dry": "nub ./scripts/release.mjs --dry-run",
     "trust": "node ./scripts/npm-trust-all.mjs"
