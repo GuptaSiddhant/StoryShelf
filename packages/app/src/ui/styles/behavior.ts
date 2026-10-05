@@ -18,7 +18,6 @@ function htmxCss(): string {
 
 function dataCss(): string {
   return `
-    .table-wrap { overflow: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-card); }
     table { width: 100%; border-collapse: collapse; font-size: .875rem; }
     th, td { text-align: left; padding: .6rem .75rem; border-bottom: 1px solid var(--border-subtle); vertical-align: top; }
     th { background: var(--surface-subtle); font-weight: 600; color: var(--text-secondary); font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; }

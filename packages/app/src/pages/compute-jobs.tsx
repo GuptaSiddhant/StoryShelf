@@ -11,6 +11,7 @@ import {
   Meta,
   PageHeader,
   SectionTitle,
+  Table,
   statusTone,
 } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
@@ -37,7 +38,7 @@ export function renderActiveQueue(slug: string, queueView: QueueView[]): Rendere
       {queueView.length === 0 ? (
         <Meta>No captures are currently queued or running.</Meta>
       ) : (
-        <div class="table-wrap">
+        <Table>
           <table>
             <thead>
               <tr>
@@ -70,7 +71,7 @@ export function renderActiveQueue(slug: string, queueView: QueueView[]): Rendere
               ))}
             </tbody>
           </table>
-        </div>
+        </Table>
       )}
     </Card>
   );
@@ -116,7 +117,7 @@ export async function renderComputeJobsPage(
       <Card>
         <SectionTitle>Recent builds</SectionTitle>
         <Meta>Capture history for {project.name}. Failed jobs can be retried.</Meta>
-        <div class="table-wrap table-gap">
+        <Table>
           <table>
             <thead>
               <tr>
@@ -179,7 +180,7 @@ export async function renderComputeJobsPage(
               ))}
             </tbody>
           </table>
-        </div>
+        </Table>
         {recentBuilds.length === 0 ? <EmptyState description="No builds yet." /> : null}
       </Card>
     </DocumentLayout>

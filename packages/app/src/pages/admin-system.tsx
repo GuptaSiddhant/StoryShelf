@@ -11,6 +11,7 @@ import {
   PageHeader,
   SectionTitle,
   Stat,
+  Table,
 } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 
@@ -86,7 +87,9 @@ function AdapterRow(props: {
         </Meta>
       </td>
       <td>
-        <Badge tone={healthTone(adapter.state)}>{adapter.state}</Badge>
+        <Badge tone={healthTone(adapter.state)} icon>
+          {adapter.state}
+        </Badge>
       </td>
       <td class="nowrap">
         <Meta as="span">{formatLatency(adapter.latencyMs)}</Meta>
@@ -109,7 +112,7 @@ function AdapterTable(props: AdapterTableProps): HtmlEscapedString | Promise<Htm
     return <EmptyState description="No adapters wired." />;
   }
   return (
-    <div class="table-wrap table-gap">
+    <Table>
       <table>
         <thead>
           <tr>
@@ -128,7 +131,7 @@ function AdapterTable(props: AdapterTableProps): HtmlEscapedString | Promise<Htm
           ))}
         </tbody>
       </table>
-    </div>
+    </Table>
   );
 }
 

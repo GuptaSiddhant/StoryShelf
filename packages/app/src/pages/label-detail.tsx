@@ -10,6 +10,7 @@ import {
   HStack,
   Meta,
   PageHeader,
+  Table,
   statusTone,
 } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
@@ -81,7 +82,7 @@ export async function renderLabelDetailPage(
           description={`No build currently bears the label ${key}: ${value}.`}
         />
       ) : (
-        <div class="table-wrap">
+        <Table>
           <table>
             <thead>
               <tr>
@@ -143,7 +144,7 @@ export async function renderLabelDetailPage(
               })}
             </tbody>
           </table>
-        </div>
+        </Table>
       )}
     </DocumentLayout>
   );
@@ -179,7 +180,7 @@ export async function renderLabelsPage(slug: string): Promise<RenderedContent | 
           description="No label types are configured for this project."
         />
       ) : (
-        <div class="table-wrap">
+        <Table>
           <table>
             <thead>
               <tr>
@@ -200,7 +201,7 @@ export async function renderLabelsPage(slug: string): Promise<RenderedContent | 
               ))}
             </tbody>
           </table>
-        </div>
+        </Table>
       )}
     </DocumentLayout>
   );

@@ -11,6 +11,7 @@ import {
   Meta,
   SectionTitle,
   SelectField,
+  Table,
 } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
@@ -156,7 +157,7 @@ const ChannelsCard: FC<{
       Project admins route build events to Slack, Teams, or email. Secrets are stored encrypted and
       decrypted only in memory at send time.
     </Meta>
-    <div class="table-wrap table-gap">
+    <Table>
       <table>
         <thead>
           <tr>
@@ -189,7 +190,7 @@ const ChannelsCard: FC<{
           )}
         </tbody>
       </table>
-    </div>
+    </Table>
     {channels.length === 0 ? <Meta>No channels configured.</Meta> : null}
   </Card>
 );

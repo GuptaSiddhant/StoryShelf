@@ -26,8 +26,6 @@ function utilityCss(): string {
     .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .muted { color: var(--text-secondary); }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-    .login { max-width: 360px; margin: 3rem auto; }
-    .login button { width: 100%; margin-top: 1rem; }
     .max-w-form { max-width: 880px; }
     .max-w-prose { max-width: 640px; }
     .table-gap { margin-top: .75rem; }

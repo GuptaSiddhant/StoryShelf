@@ -10,6 +10,7 @@ import {
   Meta,
   SectionTitle,
   SelectField,
+  Table,
   TextareaField,
 } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
@@ -157,7 +158,7 @@ export function renderSettingsStatus(
           is reported for each configured provider: pending while capturing, success on approval,
           failure on rejection or capture errors.
         </Meta>
-        <div class="table-wrap table-gap">
+        <Table>
           <table>
             <thead>
               <tr>
@@ -180,7 +181,7 @@ export function renderSettingsStatus(
               ))}
             </tbody>
           </table>
-        </div>
+        </Table>
         {statusConfigs.length === 0 ? (
           <Meta>No git providers configured for this project.</Meta>
         ) : null}

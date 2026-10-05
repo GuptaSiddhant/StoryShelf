@@ -9,6 +9,7 @@ import {
   HStack,
   Meta,
   SectionTitle,
+  Table,
 } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
@@ -41,7 +42,7 @@ export function renderSettingsWebhooks(
           Notify external services when builds are created, updated, approved or rejected. Payloads
           are POSTed as JSON and signed with the webhook secret.
         </Meta>
-        <div class="table-wrap table-gap">
+        <Table>
           <table>
             <thead>
               <tr>
@@ -88,7 +89,7 @@ export function renderSettingsWebhooks(
               ))}
             </tbody>
           </table>
-        </div>
+        </Table>
         {webhooks.length === 0 ? <Meta>No webhooks configured.</Meta> : null}
       </Card>
 

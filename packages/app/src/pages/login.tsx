@@ -43,9 +43,9 @@ export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
   const passwordLabel = ui.passwordLabel ?? "Password";
   const submitLabel = ui.submitLabel ?? "Sign in";
   return (
-    <DocumentLayout title={title}>
-      <div class="login">
-        <Card>
+    <DocumentLayout title={title} layout="bare">
+      <Card>
+        <VStack gap="lg">
           <PageHeader title={title} description={subtitle} />
 
           {state.error ? (
@@ -56,25 +56,27 @@ export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
 
           {state.engineMethods?.some((method) => method.kind === "password") ? (
             <form method="post" action="/auth/engine/login" novalidate>
-              <Field
-                label="Email"
-                name="email"
-                type="email"
-                required
-                value={state.email}
-                autocomplete="email"
-              />
-              <Field
-                label={passwordLabel}
-                name="password"
-                type="password"
-                required
-                autocomplete="current-password"
-                placeholder={ui.passwordPlaceholder}
-              />
-              <Button variant="primary" type="submit">
-                {submitLabel}
-              </Button>
+              <VStack>
+                <Field
+                  label="Email"
+                  name="email"
+                  type="email"
+                  required
+                  value={state.email}
+                  autocomplete="email"
+                />
+                <Field
+                  label={passwordLabel}
+                  name="password"
+                  type="password"
+                  required
+                  autocomplete="current-password"
+                  placeholder={ui.passwordPlaceholder}
+                />
+                <Button variant="primary" type="submit">
+                  {submitLabel}
+                </Button>
+              </VStack>
             </form>
           ) : null}
 
@@ -115,8 +117,8 @@ export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
               <Meta>{ui.footerText}</Meta>
             </p>
           ) : null}
-        </Card>
-      </div>
+        </VStack>
+      </Card>
     </DocumentLayout>
   );
 }
