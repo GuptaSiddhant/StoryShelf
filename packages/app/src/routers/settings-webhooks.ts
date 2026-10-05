@@ -4,6 +4,7 @@ import { randomToken } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
+import { flash } from "./flash.ts";
 import { notFound } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
@@ -69,6 +70,7 @@ async function createWebhookRecord(
   const webhookModel = new WebhookModel(getStore().db, undefined, getStore().config.secret);
   const secret = randomToken("whsec_").value;
   await webhookModel.create(project.id, { url, events, secret });
+  flash(c, "Webhook created — copy the signing secret now");
   return c.html((await renderSettingsPage(c, "webhooks", { secret })) ?? "", 201);
 }
 
@@ -85,5 +87,6 @@ async function handleDeleteWebhook(c: Context): Promise<Response> {
     project.id,
     webhook.id,
   );
+  flash(c, "Webhook deleted");
   return hxRedirect(c, `/projects/${project.slug}/settings/webhooks`);
 }

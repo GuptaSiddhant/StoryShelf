@@ -30,7 +30,6 @@ export interface ProfilePageState {
   memberships: Array<{ projectName: string; projectSlug: string; role: string; source: string }>;
   subscribedSlugs: string[];
   error?: string;
-  success?: string;
   isLocal?: boolean;
   security?: {
     sessions: Array<{
@@ -118,7 +117,11 @@ const PasskeyTable: FC<{ passkeys: PasskeyState[] }> = ({ passkeys }) => {
                 <td>
                   <HStack>
                     {key.backedUp ? <Badge>Synced</Badge> : null}
-                    <form method="post" action={`/profile/passkeys/${key.id}/delete`}>
+                    <form
+                      method="post"
+                      action={`/profile/passkeys/${key.id}/delete`}
+                      data-confirm="Remove this passkey?"
+                    >
                       <Button variant="secondary" size="sm" type="submit">
                         Remove
                       </Button>
@@ -151,7 +154,11 @@ const SessionRow: FC<{ session: SessionInfo }> = ({ session }) => {
         {session.current ? (
           <Badge>This device</Badge>
         ) : (
-          <form method="post" action="/profile/sessions/revoke">
+          <form
+            method="post"
+            action="/profile/sessions/revoke"
+            data-confirm="Sign this device out?"
+          >
             <input type="hidden" name="sessionId" value={session.id} />
             <Button variant="secondary" size="sm" type="submit">
               Revoke
@@ -185,7 +192,11 @@ const SessionsSection: FC<{ security: SecurityState }> = ({ security }) => {
         </table>
       </Table>
       {security.sessions.length > 1 ? (
-        <form method="post" action="/profile/sessions/revoke-others">
+        <form
+          method="post"
+          action="/profile/sessions/revoke-others"
+          data-confirm="Sign out all other devices?"
+        >
           <Button variant="secondary" size="sm" type="submit">
             Sign out other devices
           </Button>
@@ -227,7 +238,7 @@ const PasskeysSection: FC<{ security: SecurityState }> = ({ security }) => {
 /** Personal profile page (editable display name, password for local accounts). */
 // oxlint-disable-next-line eslint/max-lines-per-function -- profile page composes several sections, cohesive
 export function renderProfilePage(state: ProfilePageState): RenderedContent {
-  const { user, dbUser, memberships, subscribedSlugs, error, success, isLocal, security } = state;
+  const { user, dbUser, memberships, subscribedSlugs, error, isLocal, security } = state;
   const avatar = safeImageUrl(user.avatarUrl);
   const displayName = dbUser?.displayNameOverride ?? user.name;
   const provider = dbUser?.authProvider ?? user.providerId ?? "oidc";
@@ -237,11 +248,6 @@ export function renderProfilePage(state: ProfilePageState): RenderedContent {
       {error ? (
         <Alert tone="danger" title="Could not save">
           {error}
-        </Alert>
-      ) : null}
-      {success ? (
-        <Alert tone="success" title={success}>
-          {success}
         </Alert>
       ) : null}
 

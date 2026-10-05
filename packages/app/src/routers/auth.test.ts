@@ -77,6 +77,12 @@ function sessionOf(response: Response): string {
   return header.split(";")[0] ?? "";
 }
 
+/** The toast message queued by the response's flash cookie, if any. */
+function flashOf(response: Response): string | undefined {
+  const raw = /storyshelf_flash=([^;]+)/u.exec(response.headers.get("set-cookie") ?? "")?.[1];
+  return raw ? (JSON.parse(decodeURIComponent(raw)) as { message: string }).message : undefined;
+}
+
 describe("engine auth routes", () => {
   it("renders the descriptor-driven login page", async () => {
     const { db, shelf } = await testEngine();
@@ -442,7 +448,7 @@ describe("engine profile page", () => {
     form.set("confirmPassword", "rotated-pass-34");
     const changed = await profileForm(app, "/profile/password", cookie, form);
     expect(changed.status).toBe(200);
-    expect(await changed.text()).toContain("Password changed");
+    expect(flashOf(changed)).toBe("Password changed");
 
     await loginCookie(app, "bob@example.com", "rotated-pass-34");
   });
@@ -475,7 +481,7 @@ describe("engine profile page", () => {
       new FormData(),
     );
     expect(revoked.status).toBe(200);
-    expect(await revoked.text()).toContain("other devices");
+    expect(flashOf(revoked)).toContain("other devices");
 
     const alive = await app.request("/profile", { headers: { cookie: first } });
     expect(alive.status).toBe(200);
@@ -498,7 +504,7 @@ describe("engine profile page", () => {
     form.set("sessionId", target?.id ?? "");
     const revoked = await profileForm(app, "/profile/sessions/revoke", first, form);
     expect(revoked.status).toBe(200);
-    expect(await revoked.text()).toContain("Session revoked");
+    expect(flashOf(revoked)).toBe("Session revoked");
 
     const dead = await app.request("/profile", { headers: { cookie: second } });
     expect(dead.status).toBe(302);

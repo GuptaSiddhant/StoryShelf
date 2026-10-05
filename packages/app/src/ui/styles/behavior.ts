@@ -12,6 +12,8 @@ function htmxCss(): string {
     .htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }
     button.htmx-request, form.htmx-request button, [hx-post].htmx-request { pointer-events: none; opacity: .7; }
     form.htmx-request { opacity: .9; }
+    form.htmx-request button[type="submit"]::after { content: ""; width: .85em; height: .85em; margin-left: .4rem; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: ss-spin .7s linear infinite; }
+    @keyframes ss-spin { to { transform: rotate(360deg); } }
     .skeleton { position: relative; overflow: hidden; background: var(--surface-muted); border-radius: var(--radius-sm); min-height: 1rem; }
     .skeleton::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent); animation: skeleton 1.4s infinite; }
     [data-theme="dark"] .skeleton::after { background: linear-gradient(90deg, transparent, rgba(255,255,255,.08), transparent); }

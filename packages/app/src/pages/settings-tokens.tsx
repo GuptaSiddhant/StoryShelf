@@ -1,7 +1,16 @@
 import type { Project } from "@storyshelf/core/schema";
 import type { Token } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Alert, Button, Card, Field, Meta, SectionTitle, Table } from "../ui/components.tsx";
+import {
+  Alert,
+  Button,
+  Card,
+  Field,
+  FormActions,
+  Meta,
+  SectionTitle,
+  Table,
+} from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Tokens settings tab: project CLI tokens plus the create-token form. */
@@ -9,15 +18,16 @@ export function renderSettingsTokens(
   project: Project,
   tokens: Omit<Token, "hash">[],
   isAdmin: boolean,
-  secret?: string,
+  formState?: { globalError?: string; secret?: string },
 ): unknown {
   return (
     <div class="grid max-w-form">
-      {secret ? (
+      {formState?.secret ? (
         <Alert tone="success" title="Token created">
-          Copy now — shown once: <code>{secret}</code>
+          Copy now — shown once: <code>{formState.secret}</code>
         </Alert>
       ) : null}
+      {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
       <Card>
         <SectionTitle>API tokens</SectionTitle>
         <Meta>Tokens are used by the CLI to upload builds. They are scoped to this project.</Meta>
@@ -48,6 +58,7 @@ export function renderSettingsTokens(
                         action={`/projects/${project.slug}/settings/tokens/${token.id}/delete`}
                         hx-post={`/projects/${project.slug}/settings/tokens/${token.id}/delete`}
                         hx-target="body"
+                        hx-confirm="Delete this token? CI jobs using it will stop working."
                       >
                         {csrfField()}
                         <Button variant="ghost" type="submit">
@@ -75,9 +86,11 @@ export function renderSettingsTokens(
           >
             {csrfField()}
             <Field label="Name" name="tokenName" required placeholder="ci" />
-            <Button variant="primary" type="submit">
-              Create token
-            </Button>
+            <FormActions>
+              <Button variant="primary" type="submit" icon="plus">
+                Create token
+              </Button>
+            </FormActions>
           </form>
           <Meta>Token value is shown once after creation. Store it securely.</Meta>
         </Card>

@@ -97,9 +97,10 @@ function renderActiveTab(data: ProjectSettingsData, formState?: SettingsFormStat
   const { project, activeTab } = data;
   if (activeTab === "general") return renderSettingsGeneral(project, formState, data.isAdmin);
   if (activeTab === "tests") return renderSettingsTests(project, data.isAdmin, formState);
-  if (activeTab === "labels") return renderSettingsLabels(project, data.labelTypes, data.isAdmin);
+  if (activeTab === "labels")
+    return renderSettingsLabels(project, data.labelTypes, data.isAdmin, formState);
   if (activeTab === "tokens")
-    return renderSettingsTokens(project, data.tokens, data.isAdmin, formState?.secret);
+    return renderSettingsTokens(project, data.tokens, data.isAdmin, formState);
   if (activeTab === "webhooks")
     return renderSettingsWebhooks(project, data.webhooks, data.isAdmin, formState);
   if (activeTab === "notifications")
@@ -112,9 +113,21 @@ function renderActiveTab(data: ProjectSettingsData, formState?: SettingsFormStat
       formState,
     );
   if (activeTab === "members")
-    return renderSettingsMembers(project, data.members, data.groupMappings, data.isAdmin);
+    return renderSettingsMembers(
+      project,
+      data.members,
+      data.groupMappings,
+      data.isAdmin,
+      formState,
+    );
   if (activeTab === "status")
-    return renderSettingsStatus(project, data.statusConfigs, data.gitHosts, data.isAdmin);
+    return renderSettingsStatus(
+      project,
+      data.statusConfigs,
+      data.gitHosts,
+      data.isAdmin,
+      formState,
+    );
   return null;
 }
 

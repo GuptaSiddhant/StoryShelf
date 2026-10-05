@@ -6,6 +6,7 @@ import {
   Button,
   Card,
   Field,
+  FormActions,
   HStack,
   Meta,
   SectionTitle,
@@ -79,6 +80,7 @@ export function renderSettingsWebhooks(
                         action={`/projects/${project.slug}/settings/webhooks/${webhook.id}/delete`}
                         hx-post={`/projects/${project.slug}/settings/webhooks/${webhook.id}/delete`}
                         hx-target="body"
+                        hx-confirm="Delete this webhook?"
                       >
                         {csrfField()}
                         <Button variant="ghost" size="sm" type="submit">
@@ -119,9 +121,11 @@ export function renderSettingsWebhooks(
               placeholder="build.created, build.approved, snapshot.reviewed"
               hint="Comma-separated. Leave blank to receive all events."
             />
-            <Button variant="primary" type="submit">
-              Add webhook
-            </Button>
+            <FormActions>
+              <Button variant="primary" type="submit" icon="plus">
+                Add webhook
+              </Button>
+            </FormActions>
           </form>
         </Card>
       ) : null}

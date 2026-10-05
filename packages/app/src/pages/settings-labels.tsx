@@ -1,7 +1,17 @@
 import type { LabelType } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge, Button, Card, Field, Meta, SectionTitle, Table } from "../ui/components.tsx";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Field,
+  FormActions,
+  Meta,
+  SectionTitle,
+  Table,
+} from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
 /** Labels settings tab: label-type table plus the create-type form. */
@@ -9,9 +19,11 @@ export function renderSettingsLabels(
   project: Project,
   labelTypes: LabelType[],
   isAdmin: boolean,
+  formState?: { globalError?: string },
 ): unknown {
   return (
     <div class="grid max-w-form">
+      {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
       <Card>
         <SectionTitle>Label types</SectionTitle>
         <Meta>
@@ -45,6 +57,7 @@ export function renderSettingsLabels(
                         action={`/projects/${project.slug}/settings/labels/${labelType.key}/delete`}
                         hx-post={`/projects/${project.slug}/settings/labels/${labelType.key}/delete`}
                         hx-target="body"
+                        hx-confirm="Delete this label type?"
                       >
                         {csrfField()}
                         <Button
@@ -94,9 +107,11 @@ export function renderSettingsLabels(
               placeholder="https://jira.example.com/browse/{value}"
               hint="Use {value} placeholder. Optional."
             />
-            <Button variant="primary" type="submit">
-              Add label type
-            </Button>
+            <FormActions>
+              <Button variant="primary" type="submit" icon="plus">
+                Add label type
+              </Button>
+            </FormActions>
           </form>
         </Card>
       ) : null}

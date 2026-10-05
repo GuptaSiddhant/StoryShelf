@@ -2,6 +2,7 @@ import { LabelModel } from "@storyshelf/core/models";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
+import { flash } from "./flash.ts";
 import { hxRedirect } from "./htmx.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
 /** Label-type settings (create custom types, delete removable ones). */
@@ -42,6 +43,7 @@ async function persistLabelType(
       name: labelName,
       linkTemplate,
     });
+    flash(c, "Label type added");
     return hxRedirect(c, `/projects/${projectSlug}/settings/labels`);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to create label";
@@ -60,5 +62,6 @@ async function handleDeleteLabelType(c: Context): Promise<Response> {
       400,
     );
   }
+  flash(c, "Label type deleted");
   return hxRedirect(c, `/projects/${project.slug}/settings/labels`);
 }

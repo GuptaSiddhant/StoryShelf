@@ -29,7 +29,6 @@ describe("shell scripts", () => {
       "data-sidebar-toggle",
       "details[data-dropdown]",
       "data-toast-region",
-      "showToast",
       "x-csrf-token",
     ]) {
       expect(source).toContain(hook);
@@ -66,6 +65,15 @@ describe("shell scripts", () => {
     ]) {
       expect(source).toContain(hook);
     }
+  });
+
+  it("adopts the response stylesheet on body swaps and swaps validation errors", () => {
+    const source = clientScript();
+    expect(source).toContain("storyshelf-css");
+    // Escapes must survive the template literal: the emitted regex is /([\s\S]*?)<\/style>/.
+    expect(source).toContain(String.raw`([\s\S]*?)<\/style>/`);
+    expect(source).toContain("e.detail.shouldSwap=true");
+    expect(source).toContain("status===400||status===409||status===422");
   });
 
   it("builds toasts with textContent, never innerHTML", () => {

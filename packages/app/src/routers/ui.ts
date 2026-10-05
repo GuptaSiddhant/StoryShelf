@@ -16,6 +16,7 @@ import { renderProjectsPage } from "../pages/projects.tsx";
 import { renderRootPage } from "../pages/root.tsx";
 import { getStore } from "../store.ts";
 import { loadBaselineView } from "./baseline-guard.ts";
+import { flash } from "./flash.ts";
 import { currentProjectRole } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
 import { registerSettingsPages } from "./settings.ts";
@@ -95,6 +96,7 @@ export function registerUiPages(app: ShelfRouter): void {
         gitDefaultBranch,
       });
       await new LabelModel(getStore().db).seedFor(project.id);
+      flash(c, `Created ${project.name}`);
       return hxRedirect(c, `/projects/${project.slug}/library`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to create project";

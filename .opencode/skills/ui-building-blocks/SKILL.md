@@ -87,10 +87,21 @@ this — keep it green and lower its per-file style ceilings as you migrate.
   bind `document` listeners once (look elements up lazily), and put
   per-render wiring in `inits`. Never add `document.addEventListener` at
   the top level of a re-executed script.
-- **Toasts:** put `data-toast="…"` (+ optional `data-toast-tone`) on a
-  form that triggers a navigating HTMX response; the message survives the
-  reload via sessionStorage. For non-navigating responses use
-  `toastHeaders()` (`HX-Trigger-After-Swap`).
+- **Toasts come from the server.** On a successful mutation call
+  `flash(c, "Saved")` (`routers/flash.ts`; `flashHx` for `/api/v1` routes so
+  JSON clients get no cookie) *before* the redirect/response — never on
+  validation failure. It sets a 60 s `storyshelf_flash` cookie that the
+  shell script shows as a toast and clears, so it works for HTMX redirects,
+  in-place swaps, and plain form posts. `data-toast`/`data-toast-tone` on a
+  form is the *optimistic* client variant, used only by review actions where
+  an instant message matters more than server confirmation.
+- **Forms.** Use `Field`/`TextareaField`/`SelectField`/`CheckField`,
+  `FormActions` for the button row, `hx-confirm` (HTMX) or `data-confirm`
+  (plain post) on destructive actions. Validation failures return the
+  re-rendered page with status 400/409/422: the shell swaps these (HTMX
+  normally ignores 4xx) and adopts the response's collected stylesheet, so
+  new classes on the error page are styled. Every tab must render
+  `formState.globalError`, or its errors are invisible.
 
 ## Styling with hono/css (via `ui/css.ts`, never `hono/css` directly)
 

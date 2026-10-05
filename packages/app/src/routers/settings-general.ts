@@ -4,6 +4,7 @@ import type { Project } from "@storyshelf/core/schema";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
+import { flash } from "./flash.ts";
 import { hxRedirect } from "./htmx.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
 /** General project settings (name, repo, thresholds) and danger-zone delete. */
@@ -82,6 +83,7 @@ async function persistGeneralUpdate(
         fields.publicBranchRegex === "" ? null : (fields.publicBranchRegex ?? undefined),
       browser: fields.browser ?? undefined,
     });
+    flash(c, "Project settings saved");
     return hxRedirect(c, `/projects/${slug}/settings`);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to update";
@@ -136,6 +138,7 @@ async function persistTestsUpdate(
       executePlay,
       playTimeoutMs: playTimeoutMs ?? undefined,
     });
+    flash(c, "Test settings saved");
     return hxRedirect(c, `/projects/${slug}/settings/tests`);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to update";
@@ -146,5 +149,6 @@ async function persistTestsUpdate(
 async function handleDeleteProject(c: Context): Promise<Response> {
   const project = await findProject(c.req.param("slug") ?? "");
   await new ProjectModel(getStore().db).remove(project.id);
+  flash(c, `Deleted ${project.name}`);
   return hxRedirect(c, "/projects");
 }

@@ -136,7 +136,7 @@ function toastPart(): string {
     var TOAST_KEY='ss_toast';
     function queueToast(detail){ try{ sessionStorage.setItem(TOAST_KEY,JSON.stringify(detail)); }catch(_){} }
     function clearToast(){ try{ sessionStorage.removeItem(TOAST_KEY); }catch(_){} }
-    function flushToast(){
+    function flushQueued(){
       try{
         var raw=sessionStorage.getItem(TOAST_KEY);
         if(!raw) return;
@@ -144,8 +144,14 @@ function toastPart(): string {
         toast(JSON.parse(raw));
       }catch(_){}
     }
+    function flushFlash(){
+      var raw=shell.readCookie('storyshelf_flash');
+      if(!raw) return;
+      document.cookie='storyshelf_flash=; Path=/; Max-Age=0; SameSite=Lax';
+      try{ toast(JSON.parse(raw)); }catch(_){}
+    }
+    function flushToast(){ flushQueued(); flushFlash(); }
     inits.push(flushToast);
-    document.addEventListener('showToast',function(e){ toast(e.detail); });
     document.addEventListener('htmx:beforeRequest',function(e){
       var form=e.detail && e.detail.elt && e.detail.elt.closest ? e.detail.elt.closest('[data-toast]') : null;
       if(form){ queueToast({message:form.getAttribute('data-toast'),tone:form.getAttribute('data-toast-tone')||'success'}); }
@@ -153,6 +159,32 @@ function toastPart(): string {
     function failed(){ clearToast(); toast({message:'Something went wrong. Please try again.',tone:'danger'}); }
     document.addEventListener('htmx:responseError',failed);
     document.addEventListener('htmx:sendError',failed);`;
+}
+
+/**
+ * Forms and body swaps. HTMX does not swap 4xx responses, but this app answers validation
+ * failures with the re-rendered page (400/409/422) so field errors show.
+ * \`data-confirm\` asks before submitting plain (non-HTMX) forms.
+ */
+function formPart(): string {
+  return `
+    document.addEventListener('htmx:beforeSwap',function(e){
+      // A body swap only replaces <body>, so classes first used by the new page
+      // would be unstyled: adopt the stylesheet the server collected for it.
+      var match=/<style id="storyshelf-css">([\\s\\S]*?)<\\/style>/.exec(e.detail.serverResponse||'');
+      var sheet=document.getElementById('storyshelf-css');
+      if(match&&sheet&&e.detail.target===document.body){ sheet.textContent=match[1]; }
+      var status=e.detail.xhr ? e.detail.xhr.status : 0;
+      if(status===400||status===409||status===422){
+        e.detail.shouldSwap=true;
+        e.detail.isError=false;
+        clearToast();
+      }
+    });
+    document.addEventListener('submit',function(e){
+      var form=e.target instanceof Element ? e.target.closest('form[data-confirm]') : null;
+      if(form&&!window.confirm(form.getAttribute('data-confirm')||'Are you sure?')){ e.preventDefault(); }
+    });`;
 }
 
 /** Copy buttons: `data-copy` holds the text; confirm with a toast. */
@@ -219,6 +251,7 @@ export function clientScript(): string {
     sidebarPart(),
     dropdownPart(),
     toastPart(),
+    formPart(),
     copyPart(),
     filterPart(),
     loadingPart(),

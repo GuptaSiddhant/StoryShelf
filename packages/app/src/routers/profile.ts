@@ -9,6 +9,7 @@ import type { ShelfRouter } from "../app-types.ts";
 import { renderProfilePage } from "../pages/profile.tsx";
 import { getStore } from "../store.ts";
 import { forwardToEngine } from "./auth.ts";
+import { flash } from "./flash.ts";
 import { hxRedirect } from "./htmx.ts";
 
 /** User columns needed to render the profile page. */
@@ -142,8 +143,10 @@ async function profileView(
     isLocal: extra?.local ?? security.hasPassword,
     security,
     error: extra?.error,
-    success: extra?.success,
   });
+  if (extra?.success) {
+    flash(c, extra.success);
+  }
   // Device tokens render into the page (per-device revoke forms): never store.
   c.header("Cache-Control", "no-store");
   return c.html(html, extra?.status ?? 200);
@@ -169,6 +172,7 @@ export function registerProfile(app: ShelfRouter, auth: Auth): void {
       return profileView(c, user, auth, { error: "Display name is required", status: 400 });
     }
     await new UserModel(getStore().db).setDisplayNameOverride(user.id, displayName);
+    flash(c, "Profile updated");
     return hxRedirect(c, "/profile");
   });
 
@@ -196,6 +200,7 @@ async function saveProfileNotifications(c: Context, user: AuthUser, auth: Auth):
     return profileView(c, user, auth, { error: "Unknown project", status: 400 });
   }
   await applyProfileToggle(project.id, user.id, field(form, "enabled") === "1");
+  flash(c, "Notification preference saved");
   return hxRedirect(c, "/profile");
 }
 

@@ -4,6 +4,7 @@ import type { Project } from "@storyshelf/core/schema";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
+import { flash } from "./flash.ts";
 import { hxRedirect } from "./htmx.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
 /** Merge-gate status-config settings (provider configs + tokens, delete). */
@@ -105,6 +106,7 @@ async function persistStatusConfig(
     config,
     token,
   });
+  flash(c, "Git status config added");
   return hxRedirect(c, `/projects/${project.slug}/settings/status`);
 }
 
@@ -124,5 +126,6 @@ async function handleDeleteStatus(c: Context): Promise<Response> {
     project.id,
     c.req.param("id") ?? "",
   );
+  flash(c, "Git status config removed");
   return hxRedirect(c, `/projects/${project.slug}/settings/status`);
 }

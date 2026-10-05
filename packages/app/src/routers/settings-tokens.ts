@@ -3,6 +3,7 @@ import { randomToken } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
+import { flash } from "./flash.ts";
 import { hxRedirect } from "./htmx.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
 /** CI token settings (create with one-time display, delete). */
@@ -30,11 +31,13 @@ async function handleCreateToken(c: Context): Promise<Response> {
     hash: token.hash,
     userId: getStore().user?.id ?? null,
   });
+  flash(c, "Token created — copy it now, it is shown once");
   return c.html((await renderSettingsPage(c, "tokens", { secret: token.value })) ?? "");
 }
 
 async function handleDeleteToken(c: Context): Promise<Response> {
   const project = await findProject(c.req.param("slug") ?? "");
   await new TokenModel(getStore().db).remove(c.req.param("tokenId") ?? "");
+  flash(c, "Token deleted");
   return hxRedirect(c, `/projects/${project.slug}/settings/tokens`);
 }

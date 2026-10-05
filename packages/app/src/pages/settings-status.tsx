@@ -7,6 +7,7 @@ import {
   Button,
   Card,
   Field,
+  FormActions,
   Meta,
   SectionTitle,
   SelectField,
@@ -68,6 +69,7 @@ const StatusConfigRow: FC<{
             action={`/projects/${project.slug}/settings/status/${config.id}/delete`}
             hx-post={`/projects/${project.slug}/settings/status/${config.id}/delete`}
             hx-target="body"
+            hx-confirm="Remove this git status config?"
           >
             {csrfField()}
             <Button variant="ghost" type="submit">
@@ -118,9 +120,11 @@ const StatusCreateCard: FC<{
           error={formState?.errors?.["config"]}
           hint="JSON configuration for the provider. See the provider documentation for its fields."
         />
-        <Button variant="primary" type="submit">
-          Add git provider
-        </Button>
+        <FormActions>
+          <Button variant="primary" type="submit" icon="plus">
+            Add git provider
+          </Button>
+        </FormActions>
       </form>
     </Card>
   );
