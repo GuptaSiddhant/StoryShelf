@@ -25,7 +25,9 @@ export function renderSettingsLabels(
                 <th>Key</th>
                 <th>Name</th>
                 <th>Template</th>
-                <th></th>
+                <th>
+                  <span class="visually-hidden">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody>

@@ -48,7 +48,9 @@ export function renderSettingsWebhooks(
               <tr>
                 <th>URL</th>
                 <th>Events</th>
-                <th></th>
+                <th>
+                  <span class="visually-hidden">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody>

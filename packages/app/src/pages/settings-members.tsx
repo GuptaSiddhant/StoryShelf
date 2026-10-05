@@ -41,7 +41,9 @@ export function renderSettingsMembers(
                 <th>User</th>
                 <th>Role</th>
                 <th>Since</th>
-                <th></th>
+                <th>
+                  <span class="visually-hidden">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -129,7 +131,9 @@ export function renderSettingsMembers(
                 <tr>
                   <th>Group</th>
                   <th>Role</th>
-                  <th></th>
+                  <th>
+                    <span class="visually-hidden">Actions</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>

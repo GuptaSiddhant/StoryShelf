@@ -28,7 +28,9 @@ export function renderSettingsTokens(
                 <th>Name</th>
                 <th>Created</th>
                 <th>Last used</th>
-                <th></th>
+                <th>
+                  <span class="visually-hidden">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody>

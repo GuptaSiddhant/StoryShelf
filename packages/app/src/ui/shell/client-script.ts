@@ -187,6 +187,18 @@ function filterPart(): string {
     });`;
 }
 
+/** Thin top progress bar while an HTMX request (e.g. snapshot navigation) is in flight. */
+function loadingPart(): string {
+  return `
+    var pending=0;
+    function setLoading(delta){
+      pending=Math.max(0,pending+delta);
+      document.documentElement.classList.toggle('ss-loading',pending>0);
+    }
+    document.addEventListener('htmx:beforeRequest',function(){ setLoading(1); });
+    document.addEventListener('htmx:afterRequest',function(){ setLoading(-1); });`;
+}
+
 /** Keep keyboard focus sensible after HTMX swaps. */
 function focusPart(): string {
   return `
@@ -209,6 +221,7 @@ export function clientScript(): string {
     toastPart(),
     copyPart(),
     filterPart(),
+    loadingPart(),
     focusPart(),
     reviewScript(),
   ];

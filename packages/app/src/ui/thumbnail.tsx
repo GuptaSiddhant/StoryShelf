@@ -26,7 +26,7 @@ const thumbEmpty = css`
   ${thumbFrame}
   display: grid;
   place-items: center;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: var(--text-xs);
 `;
 

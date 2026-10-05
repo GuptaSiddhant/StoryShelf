@@ -9,6 +9,7 @@ import {
   Field,
   HStack,
   PageHeader,
+  Table,
   VStack,
 } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
@@ -87,46 +88,6 @@ const profileMeta = css`
   font-size: 0.85rem;
 `;
 
-const membershipTable = css`
-  /* profile-memberships */
-  width: 100%;
-  border-collapse: collapse;
-  & th,
-  & td {
-    text-align: left;
-    padding: 0.5rem 0.625rem;
-    border-bottom: 1px solid var(--border);
-    font-size: 0.9rem;
-  }
-  & th {
-    color: var(--text-secondary);
-    font-weight: 600;
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-`;
-
-const securityTable = css`
-  /* profile-security */
-  width: 100%;
-  border-collapse: collapse;
-  & th,
-  & td {
-    text-align: left;
-    padding: 0.5rem 0.625rem;
-    border-bottom: 1px solid var(--border);
-    font-size: 0.9rem;
-  }
-  & th {
-    color: var(--text-secondary);
-    font-weight: 600;
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-`;
-
 /* eslint-disable promise-function-async -- JSX components return HtmlEscapedString */
 
 type SecurityState = NonNullable<ProfilePageState["security"]>;
@@ -135,39 +96,70 @@ type PasskeyState = SecurityState["passkeys"][number];
 /** Registered passkey rows with per-key remove actions. */
 const PasskeyTable: FC<{ passkeys: PasskeyState[] }> = ({ passkeys }) => {
   return (
-    <table class={securityTable}>
-      <thead>
-        <tr>
-          <th>Key</th>
-          <th>Added</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {passkeys.map(
-          // oxlint-disable-next-line typescript/promise-function-async -- JSX map is sync
-          (key) => (
-            <tr key={key.id}>
-              <td>
-                <div>{key.name ?? "Unnamed key"}</div>
-                <div class={profileMeta}>{key.deviceType}</div>
-              </td>
-              <td>{new Date(key.createdAt).toLocaleDateString()}</td>
-              <td>
-                <HStack>
-                  {key.backedUp ? <Badge>Synced</Badge> : null}
-                  <form method="post" action={`/profile/passkeys/${key.id}/delete`}>
-                    <Button variant="secondary" size="sm" type="submit">
-                      Remove
-                    </Button>
-                  </form>
-                </HStack>
-              </td>
-            </tr>
-          ),
+    <Table dense>
+      <table>
+        <thead>
+          <tr>
+            <th>Key</th>
+            <th>Added</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {passkeys.map(
+            // oxlint-disable-next-line typescript/promise-function-async -- JSX map is sync
+            (key) => (
+              <tr key={key.id}>
+                <td>
+                  <div>{key.name ?? "Unnamed key"}</div>
+                  <div class={profileMeta}>{key.deviceType}</div>
+                </td>
+                <td>{new Date(key.createdAt).toLocaleDateString()}</td>
+                <td>
+                  <HStack>
+                    {key.backedUp ? <Badge>Synced</Badge> : null}
+                    <form method="post" action={`/profile/passkeys/${key.id}/delete`}>
+                      <Button variant="secondary" size="sm" type="submit">
+                        Remove
+                      </Button>
+                    </form>
+                  </HStack>
+                </td>
+              </tr>
+            ),
+          )}
+        </tbody>
+      </table>
+    </Table>
+  );
+};
+
+type SessionInfo = SecurityState["sessions"][number];
+
+/** One signed-in device with its revoke action. */
+const SessionRow: FC<{ session: SessionInfo }> = ({ session }) => {
+  return (
+    <tr>
+      <td>
+        <div class="truncate">{session.userAgent ?? "Unknown device"}</div>
+        <div class={profileMeta}>
+          <span class="mono">{session.ipAddress ?? "—"}</span>
+        </div>
+      </td>
+      <td>{new Date(session.createdAt).toLocaleString()}</td>
+      <td>
+        {session.current ? (
+          <Badge>This device</Badge>
+        ) : (
+          <form method="post" action="/profile/sessions/revoke">
+            <input type="hidden" name="sessionId" value={session.id} />
+            <Button variant="secondary" size="sm" type="submit">
+              Revoke
+            </Button>
+          </form>
         )}
-      </tbody>
-    </table>
+      </td>
+    </tr>
   );
 };
 
@@ -176,43 +168,22 @@ const SessionsSection: FC<{ security: SecurityState }> = ({ security }) => {
   return (
     <Card>
       <PageHeader title="Devices" description="Where you are signed in" />
-      <table class={securityTable}>
-        <thead>
-          <tr>
-            <th>Device</th>
-            <th>Signed in</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {security.sessions.map(
-            // oxlint-disable-next-line typescript/promise-function-async -- JSX map is sync
-            (session) => (
-              <tr key={session.id}>
-                <td>
-                  <div class="truncate">{session.userAgent ?? "Unknown device"}</div>
-                  <div class={profileMeta}>
-                    <span class="mono">{session.ipAddress ?? "—"}</span>
-                  </div>
-                </td>
-                <td>{new Date(session.createdAt).toLocaleString()}</td>
-                <td>
-                  {session.current ? (
-                    <Badge>This device</Badge>
-                  ) : (
-                    <form method="post" action="/profile/sessions/revoke">
-                      <input type="hidden" name="sessionId" value={session.id} />
-                      <Button variant="secondary" size="sm" type="submit">
-                        Revoke
-                      </Button>
-                    </form>
-                  )}
-                </td>
-              </tr>
-            ),
-          )}
-        </tbody>
-      </table>
+      <Table dense>
+        <table>
+          <thead>
+            <tr>
+              <th>Device</th>
+              <th>Signed in</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {security.sessions.map((session) => (
+              <SessionRow key={session.id} session={session} />
+            ))}
+          </tbody>
+        </table>
+      </Table>
       {security.sessions.length > 1 ? (
         <form method="post" action="/profile/sessions/revoke-others">
           <Button variant="secondary" size="sm" type="submit">
@@ -354,31 +325,33 @@ export function renderProfilePage(state: ProfilePageState): RenderedContent {
         {memberships.length === 0 ? (
           <p class={profileMeta}>No project memberships.</p>
         ) : (
-          <table class={membershipTable}>
-            <thead>
-              <tr>
-                <th>Project</th>
-                <th>Role</th>
-                <th>Source</th>
-              </tr>
-            </thead>
-            <tbody>
-              {memberships.map(
-                // oxlint-disable-next-line typescript/promise-function-async -- JSX map is sync
-                (m) => (
-                  <tr key={m.projectSlug}>
-                    <td>
-                      <a href={`/projects/${m.projectSlug}`}>{m.projectName}</a>
-                    </td>
-                    <td>
-                      <Badge>{m.role}</Badge>
-                    </td>
-                    <td>{m.source}</td>
-                  </tr>
-                ),
-              )}
-            </tbody>
-          </table>
+          <Table dense>
+            <table>
+              <thead>
+                <tr>
+                  <th>Project</th>
+                  <th>Role</th>
+                  <th>Source</th>
+                </tr>
+              </thead>
+              <tbody>
+                {memberships.map(
+                  // oxlint-disable-next-line typescript/promise-function-async -- JSX map is sync
+                  (m) => (
+                    <tr key={m.projectSlug}>
+                      <td>
+                        <a href={`/projects/${m.projectSlug}`}>{m.projectName}</a>
+                      </td>
+                      <td>
+                        <Badge>{m.role}</Badge>
+                      </td>
+                      <td>{m.source}</td>
+                    </tr>
+                  ),
+                )}
+              </tbody>
+            </table>
+          </Table>
         )}
       </Card>
 
@@ -390,41 +363,45 @@ export function renderProfilePage(state: ProfilePageState): RenderedContent {
         {memberships.length === 0 ? (
           <p class={profileMeta}>No project memberships.</p>
         ) : (
-          <table class={membershipTable}>
-            <thead>
-              <tr>
-                <th>Project</th>
-                <th>Status</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {memberships.map(
-                // oxlint-disable-next-line typescript/promise-function-async -- JSX map is sync
-                (m) => {
-                  const subscribed = subscribedSlugs.includes(m.projectSlug);
-                  return (
-                    <tr key={m.projectSlug}>
-                      <td>
-                        <a href={`/projects/${m.projectSlug}`}>{m.projectName}</a>
-                      </td>
-                      <td>{subscribed ? <Badge>Email on</Badge> : <Badge>Off</Badge>}</td>
-                      <td>
-                        <form method="post" action="/profile/notifications">
-                          {csrfField()}
-                          <input type="hidden" name="slug" value={m.projectSlug} />
-                          <input type="hidden" name="enabled" value={subscribed ? "" : "1"} />
-                          <Button variant="secondary" size="sm" type="submit">
-                            {subscribed ? "Disable" : "Enable"}
-                          </Button>
-                        </form>
-                      </td>
-                    </tr>
-                  );
-                },
-              )}
-            </tbody>
-          </table>
+          <Table dense>
+            <table>
+              <thead>
+                <tr>
+                  <th>Project</th>
+                  <th>Status</th>
+                  <th>
+                    <span class="visually-hidden">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {memberships.map(
+                  // oxlint-disable-next-line typescript/promise-function-async -- JSX map is sync
+                  (m) => {
+                    const subscribed = subscribedSlugs.includes(m.projectSlug);
+                    return (
+                      <tr key={m.projectSlug}>
+                        <td>
+                          <a href={`/projects/${m.projectSlug}`}>{m.projectName}</a>
+                        </td>
+                        <td>{subscribed ? <Badge>Email on</Badge> : <Badge>Off</Badge>}</td>
+                        <td>
+                          <form method="post" action="/profile/notifications">
+                            {csrfField()}
+                            <input type="hidden" name="slug" value={m.projectSlug} />
+                            <input type="hidden" name="enabled" value={subscribed ? "" : "1"} />
+                            <Button variant="secondary" size="sm" type="submit">
+                              {subscribed ? "Disable" : "Enable"}
+                            </Button>
+                          </form>
+                        </td>
+                      </tr>
+                    );
+                  },
+                )}
+              </tbody>
+            </table>
+          </Table>
         )}
       </Card>
 
