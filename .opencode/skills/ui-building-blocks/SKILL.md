@@ -87,6 +87,7 @@ this — keep it green and lower its per-file style ceilings as you migrate.
 - **Chrome lives in `ui/shell/`** (`sidebar`, `topbar`, `bare`, boot and
   client scripts). `DocumentLayout` takes `layout="default" | "wide" |
   "bare"` (`bare` = sign-in/invite, no app chrome).
+- **Review comparison:** swipe has a draggable `[data-compare-knob]` (pointer events + capture) mirrored into the `[data-compare-swipe]` range; zoom levels live in `ZOOMS` (`review-script.ts`) and `compare-stage.tsx` — keep them in sync, and keep zoomed images `image-rendering: pixelated`.
 - **The client script runs once per document.** HTMX `body` swaps re-execute
   inline scripts, so `ui/shell/client-script.ts` guards on `window.__ssInit`:
   bind `document` listeners once (look elements up lazily), and put

@@ -246,6 +246,15 @@ describe("CompareStage", () => {
     expect(html).toContain("data-compare-onion");
   });
 
+  it("offers up to 400% zoom with a draggable wipe handle", async () => {
+    const html = await render(stage);
+    expect(html).toContain('data-view-value="400"');
+    expect(html).toContain("data-compare-knob");
+    // Pixel-level inspection: zoomed images are not smoothed.
+    expect(html).toMatch(/image-rendering:pixelated/u);
+    expect(html).toMatch(/zoom:4/u);
+  });
+
   it("describes images for assistive tech and shows an empty state without a diff", async () => {
     const html = await render(stage);
     expect(html).toContain('alt="Baseline for Button / Primary"');

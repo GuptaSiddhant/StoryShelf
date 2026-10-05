@@ -4,14 +4,16 @@
  * shell's once-only closure (`inits`, `shell` are in scope).
  */
 export function reviewScript(): string {
-  return [stateHelpers(), stageSetup(), clickControls(), keyboardShortcuts()].join("\n");
+  return [stateHelpers(), stageSetup(), wipeDrag(), clickControls(), keyboardShortcuts()].join(
+    "\n",
+  );
 }
 
 /** Mode/zoom state on the stage root, remembered across snapshots. */
 function stateHelpers(): string {
   return `
     var MODES=['split','swipe','onion','diff','flip'];
-    var ZOOMS=['fit','100','200'];
+    var ZOOMS=['fit','100','200','400'];
     function remember(key,value){ try{ localStorage.setItem(key,value); }catch(_){} }
     function recall(key){ try{ return localStorage.getItem(key); }catch(_){ return null; } }
     function press(group,value){
@@ -36,6 +38,11 @@ function stateHelpers(): string {
     function nextZoom(stage){
       var cur=stage.getAttribute('data-zoom')||'fit';
       setZoom(stage,ZOOMS[(ZOOMS.indexOf(cur)+1)%ZOOMS.length],true);
+    }
+    function stepZoom(stage,delta){
+      var cur=ZOOMS.indexOf(stage.getAttribute('data-zoom')||'fit');
+      var next=Math.max(0,Math.min(ZOOMS.length-1,cur+delta));
+      setZoom(stage,ZOOMS[next],true);
     }`;
 }
 
@@ -75,6 +82,46 @@ function stageSetup(): string {
       syncScroll(stage);
     }
     inits.push(function(){ document.querySelectorAll('[data-compare]').forEach(initStage); });`;
+}
+
+/**
+ * Drag the wipe handle to move the swipe divider. Uses pointer capture so the
+ * drag keeps working when the pointer leaves the handle, and mirrors the value
+ * into the (accessible) range slider.
+ */
+function wipeDrag(): string {
+  return `
+    function wipePercent(stage,clientX){
+      var pane=stage.querySelector('.stage__pane[data-pane="current"]');
+      if(!pane) return 50;
+      var rect=pane.getBoundingClientRect();
+      return Math.max(0,Math.min(100,(clientX-rect.left)/rect.width*100));
+    }
+    function setWipe(stage,percent){
+      stage.style.setProperty('--swipe',percent+'%');
+      var range=stage.querySelector('[data-compare-swipe]');
+      if(range){ range.value=String(Math.round(percent)); }
+    }
+    function bindKnob(stage){
+      var knob=stage.querySelector('[data-compare-knob]');
+      if(!knob||knob.getAttribute('data-bound')) return;
+      knob.setAttribute('data-bound','1');
+      knob.addEventListener('pointerdown',function(e){
+        e.preventDefault();
+        knob.setPointerCapture(e.pointerId);
+        setWipe(stage,wipePercent(stage,e.clientX));
+        function move(ev){ setWipe(stage,wipePercent(stage,ev.clientX)); }
+        function stop(){
+          knob.removeEventListener('pointermove',move);
+          knob.removeEventListener('pointerup',stop);
+          knob.removeEventListener('pointercancel',stop);
+        }
+        knob.addEventListener('pointermove',move);
+        knob.addEventListener('pointerup',stop);
+        knob.addEventListener('pointercancel',stop);
+      });
+    }
+    inits.push(function(){ document.querySelectorAll('[data-compare]').forEach(bindKnob); });`;
 }
 
 /** Delegated clicks: mode/zoom/filter segments and the shortcuts button. */
@@ -123,6 +170,8 @@ function keyboardShortcuts(): string {
       if(key==='r'||key==='R') return press1('[data-reject]');
       if(key>='1'&&key<='5'){ setMode(stage,MODES[Number(key)-1],true); return true; }
       if(key==='f'){ nextZoom(stage); return true; }
+      if(key==='+'||key==='='){ stepZoom(stage,1); return true; }
+      if(key==='-'||key==='_'){ stepZoom(stage,-1); return true; }
       if(key==='t'){
         if(stage.getAttribute('data-view')==='flip'){ flip(stage); } else { setMode(stage,'flip',true); }
         return true;
