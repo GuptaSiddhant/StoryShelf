@@ -9,18 +9,25 @@ export interface DiffThresholds {
   maxDiffRatio: number;
 }
 
-/** Read two stored PNGs and diff them with the project's thresholds. */
+/** Per-story `diffThreshold` when it is a finite number in 0..1; otherwise the project threshold. */
+export function resolvePixelThreshold(projectThreshold: number, override?: number): number {
+  const valid = typeof override === "number" && Number.isFinite(override);
+  return valid && override >= 0 && override <= 1 ? override : projectThreshold;
+}
+
+/** Read two stored PNGs and diff them with the project's thresholds (optionally a per-story pixel threshold). */
 export async function diffStoredScreenshots(
   storage: StorageAdapter,
   project: DiffThresholds,
   baselinePath: string,
   currentPath: string,
+  diffThreshold?: number,
 ): Promise<DiffResult> {
   const current = await storage.read(currentPath);
   const previous = await storage.read(baselinePath);
   return diffImages(previous, current, {
     ...DEFAULT_DIFF_OPTIONS,
-    pixelThreshold: project.pixelThreshold,
+    pixelThreshold: resolvePixelThreshold(project.pixelThreshold, diffThreshold),
     maxDiffRatio: project.maxDiffRatio,
   });
 }

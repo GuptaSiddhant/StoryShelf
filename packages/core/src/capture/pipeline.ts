@@ -292,6 +292,7 @@ async function createWithBaseline(
     ctx.project,
     baseline.screenshotPath,
     screenshot,
+    capture.story.parameters?.diffThreshold,
   );
 
   const infraHash = infraHashFor(ctx.project.browser ?? "chromium", ctx.viewports, SIZING_DEFAULTS);

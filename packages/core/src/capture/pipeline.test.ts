@@ -211,6 +211,65 @@ describe("persistCapture", () => {
     expect(baselines[0]?.snapshotId).toBe("snap1");
   });
 
+  it("relaxes the pixel threshold for a story with a diffThreshold override", async () => {
+    const relaxed: StoryEntry = { ...storyOf("a"), parameters: { diffThreshold: 1 } };
+    const { ctx } = await makeContext({
+      captures: [captureFor(relaxed, png(4, 4, [0, 255, 0]))],
+      isDefault: false,
+    });
+    await seedBaseline(ctx);
+
+    await persistCapture(ctx);
+
+    const [row] = await ctx.db.list(ctx.db.tables.snapshots);
+    expect(row?.status).toBe("unchanged");
+    expect(row?.diffPassed).toBe(true);
+  });
+
+  it("applies diffThreshold to its own snapshot only", async () => {
+    const relaxed: StoryEntry = { ...storyOf("a"), parameters: { diffThreshold: 1 } };
+    const { ctx } = await makeContext({
+      captures: [
+        captureFor(relaxed, png(4, 4, [0, 255, 0])),
+        captureFor(storyOf("c"), png(4, 4, [0, 255, 0])),
+      ],
+      isDefault: false,
+    });
+    await seedBaseline(ctx);
+    await ctx.db.insert(ctx.db.tables.baselines, {
+      id: "bl2",
+      projectId: ctx.project.id,
+      storyId: "c",
+      viewportName: DEFAULT_VIEWPORT.name,
+      branch: ctx.build.gitBranch,
+      snapshotId: "snap2",
+      screenshotPath: "/baselines/bl1.png",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    await persistCapture(ctx);
+
+    const rows = await ctx.db.list(ctx.db.tables.snapshots);
+    const byStory = new Map(rows.map((row) => [row.storyName, row.status]));
+    expect(byStory.get("a")).toBe("unchanged");
+    expect(byStory.get("c")).toBe("changed");
+  });
+
+  it("ignores an out-of-range diffThreshold and uses the project threshold", async () => {
+    const invalid: StoryEntry = { ...storyOf("a"), parameters: { diffThreshold: 5 } };
+    const { ctx } = await makeContext({
+      captures: [captureFor(invalid, png(4, 4, [0, 255, 0]))],
+      isDefault: false,
+    });
+    await seedBaseline(ctx);
+
+    await persistCapture(ctx);
+
+    const [row] = await ctx.db.list(ctx.db.tables.snapshots);
+    expect(row?.status).toBe("changed");
+  });
+
   it("approves a default-branch build with no captures", async () => {
     const { ctx } = await makeContext({ captures: [] });
 
