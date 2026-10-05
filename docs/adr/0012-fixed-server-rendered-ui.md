@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted. Layout and theming details refined by [ADR 0025](0025-ui-redesign.md).
 
 ## Context
 

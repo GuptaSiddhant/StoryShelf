@@ -33,21 +33,21 @@ const badgeTones: Record<BadgeTone, Promise<string>> = {
     /* badge-success */
     ${badgeBase}
     background: var(--status-approved-bg);
-    color: var(--status-approved);
+    color: var(--status-approved-fg);
     border-color: var(--status-approved-border);
   `,
   warning: css`
     /* badge-warning */
     ${badgeBase}
     background: var(--status-new-bg);
-    color: var(--status-new);
+    color: var(--status-new-fg);
     border-color: var(--status-new-border);
   `,
   danger: css`
     /* badge-danger */
     ${badgeBase}
     background: var(--status-rejected-bg);
-    color: var(--status-rejected);
+    color: var(--status-rejected-fg);
     border-color: var(--status-rejected-border);
   `,
   info: css`

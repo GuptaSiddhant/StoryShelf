@@ -46,7 +46,7 @@ export const BareShell: FC<{ name: string; logo?: string; children?: unknown }> 
 }) => {
   const safeLogo = safeImageUrl(logo);
   return (
-    <div class={bareRoot}>
+    <main id="main-content" class={bareRoot} tabindex={-1}>
       <div class="bare__brand">
         {safeLogo ? (
           <img src={safeLogo} alt="" width="34" height="34" />
@@ -57,9 +57,7 @@ export const BareShell: FC<{ name: string; logo?: string; children?: unknown }> 
         )}
         <span>{name}</span>
       </div>
-      <main id="main-content" class="bare__body" tabindex={-1}>
-        {children}
-      </main>
-    </div>
+      <div class="bare__body">{children}</div>
+    </main>
   );
 };

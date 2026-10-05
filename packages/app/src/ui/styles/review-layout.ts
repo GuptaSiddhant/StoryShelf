@@ -122,7 +122,7 @@ export const filmstrip = css`
   @media (max-width: 1024px) {
     & {
       position: static;
-      max-height: 320px;
+      max-height: none;
     }
   }
 `;
@@ -139,6 +139,13 @@ export const filmstripList = css`
   /* filmstrip-list */
   overflow: auto;
   overscroll-behavior: contain;
+  @media (max-width: 1024px) {
+    & {
+      display: flex;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+  }
 `;
 
 export const filmItem = css`
@@ -157,6 +164,16 @@ export const filmItem = css`
     background: var(--surface-subtle);
     text-decoration: none;
   }
+  @media (max-width: 1024px) {
+    & {
+      flex: none;
+      width: 240px;
+      border-bottom: 0;
+      border-left: 0;
+      border-right: 1px solid var(--border-subtle);
+      border-top: 3px solid transparent;
+    }
+  }
 `;
 
 export const filmItemActive = css`
@@ -166,6 +183,12 @@ export const filmItemActive = css`
   border-left-color: var(--accent);
   &:hover {
     background: var(--accent-subtle);
+  }
+  @media (max-width: 1024px) {
+    & {
+      border-left-color: transparent;
+      border-top-color: var(--accent);
+    }
   }
 `;
 
@@ -308,7 +331,7 @@ export const actionHints = css`
   display: flex;
   gap: var(--space-2);
   align-items: center;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: var(--text-xs);
   @media (max-width: 720px) {
     & {

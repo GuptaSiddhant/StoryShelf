@@ -19,17 +19,23 @@ this — keep it green and lower its per-file style ceilings as you migrate.
 - **Pages** (`pages/*.tsx`) may import UI only from the facade
   (`../ui/components.tsx`: `Button`, `Tabs`, `Badge`, `Alert`, `EmptyState`,
   `Stat`, `Field`, `TextareaField`, `SelectField`, `CheckField`, `Card`,
-  `CardSection`, `PageHeader`, `SectionTitle`, `Meta`, `HStack`, `VStack`) and
-  the shell (`../ui/document.tsx`: `DocumentLayout`), plus shared
-  cross-page style objects (`../ui/styles/review.ts`: diff viewer/nav,
-  snapshot cards, comment threads) and `../ui/css.ts` (page-local one-off
-  styles only — last resort after facade, utilities, and restructuring).
+  `CardSection`, `PageHeader`, `SectionTitle`, `Meta`, `HStack`, `VStack`,
+  `Icon`, `Avatar`, `Kbd`, `Segmented`, `SubNavLayout`, `Table`,
+  `Thumbnail`, `Dropdown`, `Progress`, `CompareStage`, `CodeBlock`,
+  `FilterInput`, `RelativeTime`) and the shell (`../ui/document.tsx`:
+  `DocumentLayout`), plus shared cross-page style objects
+  (`../ui/styles/review.ts`: snapshot cards, comment threads;
+  `../ui/styles/review-layout.ts`: review workspace layout) and
+  `../ui/css.ts` (page-local one-off styles only — last resort after
+  facade, utilities, and restructuring).
   Never import a family module (`buttons.tsx`, `feedback.tsx`, …) directly.
 - **Shared cross-page patterns are the one colocation exception.**
   `snapshot-card` (build detail + library) and `comment` (build detail +
   diff thread) are used by two pages each — they live once as labeled
-  hono/css objects in `ui/styles/review.ts`, imported by class object
-  (never by string name). Single-page patterns colocate in their file.
+  hono/css objects in `ui/styles/review.ts`; the review workspace's
+  header/filmstrip/action bar live in `ui/styles/review-layout.ts`. Import
+  by class object (never by string name). Single-page patterns colocate in
+  their file. The ratchet allows `styles/review(-[a-z]+)?.ts`.
 - **No raw classes in pages:** `class="btn…"`, `class="tabs…"`,
   `tabs__link`, hand-rolled `page-header`/`card`/`empty` markup are banned —
   use the facade component with `variant`/`size`/`tone` props instead.
@@ -45,9 +51,10 @@ this — keep it green and lower its per-file style ceilings as you migrate.
   `TableActions` was folded into `HStack` and must not be reintroduced.
 - **Sanctioned utilities** (the only raw classes allowed in `pages/`):
   spacing (`mt-1`, `mb-1`, `max-w-form`, `max-w-prose`, `max-w-cell`,
-  `min-w-0`), grids (`grid`, `grid--2/3`, `table-wrap`, `table-gap`,
-  `nowrap` on `td`), text (`muted`, `mono`, `truncate`), shell
-  (`content`, `login`). Everything else must be a facade component.
+  `min-w-0`), grids (`grid`, `grid--2/3`, `nowrap` on `td`), text (`muted`,
+  `mono`, `truncate`, `visually-hidden` for screen-reader-only labels).
+  Tables go through `<Table>` (`table-wrap` and `login` are ratchet-banned).
+  Everything else must be a facade component.
 - **Page-local one-offs** (landing hero, truncate widths beyond
   `max-w-cell`) use `css` from `../ui/css.ts` with a label comment.
   If a pattern appears twice, promote it to the facade instead.
@@ -57,6 +64,33 @@ this — keep it green and lower its per-file style ceilings as you migrate.
   moved to page-local hono/css.
 - **Inline/table/card actions use `size="sm"`** (32px). `md` (40px) is for
   standalone forms and page-header primary actions only.
+
+## Icons, tokens, and the shell
+
+- **Icons are sprite-backed.** Add the SVG body to `ui/icons/paths.ts`
+  (24×24, stroke-based, inherits `currentColor`); `IconName` and the sprite
+  update automatically. Render with `<Icon name="…" />` (decorative by
+  default, pass `label` when it is the only content). The sprite is served
+  at `/assets/icons-<hash>.svg` (immutable, ETag/304) — URLs come from
+  `asset-manifest.ts`; never hand-write them.
+- **Colors come from tokens, never literals.** Brand accent/status colors
+  are customer-configurable, so derive tints with the shared tokens
+  (`--accent-subtle`, `--accent-wash`, `--accent-border`, `--accent-fg`,
+  `--status-*-bg|-border|-fg`) and use `--text-secondary` (not
+  `--text-muted`, which is for decoration/placeholders) for small text.
+  `styles.test.ts` enforces WCAG AA for the default themes.
+- **Chrome lives in `ui/shell/`** (`sidebar`, `topbar`, `bare`, boot and
+  client scripts). `DocumentLayout` takes `layout="default" | "wide" |
+  "bare"` (`bare` = sign-in/invite, no app chrome).
+- **The client script runs once per document.** HTMX `body` swaps re-execute
+  inline scripts, so `ui/shell/client-script.ts` guards on `window.__ssInit`:
+  bind `document` listeners once (look elements up lazily), and put
+  per-render wiring in `inits`. Never add `document.addEventListener` at
+  the top level of a re-executed script.
+- **Toasts:** put `data-toast="…"` (+ optional `data-toast-tone`) on a
+  form that triggers a navigating HTMX response; the message survives the
+  reload via sessionStorage. For non-navigating responses use
+  `toastHeaders()` (`HX-Trigger-After-Swap`).
 
 ## Styling with hono/css (via `ui/css.ts`, never `hono/css` directly)
 
@@ -102,5 +136,8 @@ mounted in `DocumentLayout` right after the token `<style>` tag) with
 3. `nub run test` — includes `ui/consistency.test.ts` (ratchet) and
    `ui/document.test.ts` (unescaped stylesheet + style collection)
 4. `nub run build`
-5. `nub packages/app/scripts/screenshots.mjs` (from repo root) when visuals
-   change; eyeball the PNGs before committing
+5. Run the app against seeded data and look at it (light + dark, 375px and
+   desktop). Optionally audit with axe-core — the redesign shipped with zero
+   violations across the main pages in both themes.
+6. `nub packages/app/scripts/screenshots.mjs` (from repo root) when docs
+   screenshots need refreshing; eyeball the PNGs before committing

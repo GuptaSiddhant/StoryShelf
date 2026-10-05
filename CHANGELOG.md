@@ -5,6 +5,28 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 
 ## Unreleased
 
+**UI redesign: shell, review workspace, icon sprite** (ADR 0025)
+- New app shell: full-height icon sidebar (collapsible rail, mobile drawer),
+  slim neutral top bar with project switcher, theme menu, account menu and
+  toasts. The customer accent now tints (brand mark, active nav, primary
+  actions, derived `color-mix` washes) instead of flooding the top bar;
+  `BrandTheme.topbarBg` is deprecated (still accepted, ignored). Default
+  text colors now meet WCAG AA.
+- Review page is a workspace: thumbnail filmstrip with filters, review
+  progress, side-by-side / swipe / onion-skin / diff / flip comparison with
+  zoom and synced scroll, a sticky action bar, a `?` shortcuts dialog, and
+  auto-advance to the next open snapshot after approve/reject (HTMX, review
+  page only). Bulk approve/reject now ask for confirmation.
+- Projects overview cards (previews, "to review" pill, filter), builds list
+  (status chips with counts, branch select, table), library story filter,
+  settings sub-navigation, and a chrome-free sign-in/invite layout.
+- Icons are served as one SVG sprite at a content-hashed, immutable URL;
+  htmx moves to a content-hashed URL too (the unversioned URL stays but now
+  revalidates instead of being cached for a year).
+- Fixes: review keyboard shortcuts no longer fire on Cmd/Ctrl+R; the
+  diff view switch matched a renamed class; document-level listeners were
+  re-registered on every HTMX body swap.
+
 **Observability: OpenTelemetry tracing, metrics, log correlation**
 - New `@storyshelf/observability` package (single owner of all OTEL deps):
   env-driven SDK init (`initObservabilityFromEnv`, noop without

@@ -269,7 +269,7 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
                     alt={`${snap.storyTitle} / ${snap.storyName}`}
                   />
                 </a>
-                <SectionTitle level={3}>
+                <SectionTitle>
                   {snap.storyTitle} <Meta as="span">/ {snap.storyName}</Meta>
                 </SectionTitle>
                 <Meta as="div">

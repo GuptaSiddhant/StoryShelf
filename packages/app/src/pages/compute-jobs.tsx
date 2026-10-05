@@ -125,7 +125,9 @@ export async function renderComputeJobsPage(
                 <th>Status</th>
                 <th>Snapshots</th>
                 <th>Created</th>
-                <th></th>
+                <th>
+                  <span class="visually-hidden">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody>

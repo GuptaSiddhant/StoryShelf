@@ -121,9 +121,9 @@ const btnGhostSm = css`
 const btnDanger = css`
   /* btn-danger */
   ${btnBase}
-  background: var(--status-rejected);
+  background: color-mix(in srgb, var(--status-rejected) 82%, #000);
   color: #fff;
-  border-color: var(--status-rejected);
+  border-color: color-mix(in srgb, var(--status-rejected) 82%, #000);
   &:hover {
     filter: brightness(1.06);
     text-decoration: none;

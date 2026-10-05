@@ -5,6 +5,9 @@ export function behaviorCss(): string {
 
 function htmxCss(): string {
   return `
+    html.ss-loading::before { content: ""; position: fixed; top: 0; left: 0; z-index: 90; height: 2px; width: 100%; background: var(--accent); transform-origin: left; animation: ss-load 1.2s var(--ease) infinite; }
+    @keyframes ss-load { 0% { transform: scaleX(0); } 70% { transform: scaleX(0.85); } 100% { transform: scaleX(1); opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; } }
     .htmx-indicator { opacity: 0; transition: opacity 150ms ease; }
     .htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }
     button.htmx-request, form.htmx-request button, [hx-post].htmx-request { pointer-events: none; opacity: .7; }
@@ -18,12 +21,6 @@ function htmxCss(): string {
 
 function dataCss(): string {
   return `
-    table { width: 100%; border-collapse: collapse; font-size: .875rem; }
-    th, td { text-align: left; padding: .6rem .75rem; border-bottom: 1px solid var(--border-subtle); vertical-align: top; }
-    th { background: var(--surface-subtle); font-weight: 600; color: var(--text-secondary); font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; }
-    tbody tr:hover { background: var(--surface-subtle); }
-    tr:last-child td { border-bottom: 0; }
-    td.nowrap { white-space: nowrap; }
     .grid { display: grid; gap: 1rem; }
     .grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }

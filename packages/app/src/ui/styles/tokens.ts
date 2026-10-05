@@ -130,6 +130,10 @@ function derivedVars(fb: Fallbacks): string {
       --accent-border: ${mix("--accent", "30%", "--border")};
       --accent-fg: ${mix("--accent", "88%", "--text-primary")};
       --status-info: var(--accent);
+      --status-approved-fg: ${mix("--status-approved", "60%", "--text-primary")};
+      --status-new-fg: ${mix("--status-new", "60%", "--text-primary")};
+      --status-rejected-fg: ${mix("--status-rejected", "60%", "--text-primary")};
+      --status-info-fg: var(--accent-fg);
       --status-approved-bg: ${mix("--status-approved", fb.tint, "--surface-card")};
       --status-new-bg: ${mix("--status-new", fb.tint, "--surface-card")};
       --status-rejected-bg: ${mix("--status-rejected", fb.tint, "--surface-card")};

@@ -103,6 +103,27 @@ describe("baseStyle", () => {
     }
   });
 
+  it("keeps default secondary and muted text readable (WCAG AA) on every surface", () => {
+    for (const theme of [LIGHT_THEME, DARK_THEME]) {
+      const surfaces = [theme.surface.base, theme.surface.card, theme.surface.muted ?? ""];
+      for (const surface of surfaces.filter(Boolean)) {
+        expect(contrast(theme.text.secondary, surface)).toBeGreaterThanOrEqual(4.5);
+      }
+      expect(contrast(theme.text.muted ?? "", theme.surface.card)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("derives readable foreground tokens for status badges", () => {
+    const css = baseStyle(LIGHT_THEME, DARK_THEME);
+    for (const status of ["approved", "new", "rejected", "info"]) {
+      expect(css).toContain(`--status-${status}-fg:`);
+    }
+    // Amber text mixed toward the primary text color stays readable on its own tint.
+    const fg = mix(LIGHT_THEME.status.new, 0.6, LIGHT_THEME.text.primary);
+    const bg = mix(LIGHT_THEME.status.new, 0.1, LIGHT_THEME.surface.card);
+    expect(contrast(fg, bg)).toBeGreaterThanOrEqual(4.5);
+  });
+
   it("keeps default accent text readable (WCAG AA) on cards in both themes", () => {
     for (const theme of [LIGHT_THEME, DARK_THEME]) {
       const fg = mix(theme.accent, 0.88, theme.text.primary);

@@ -69,7 +69,7 @@ const shellSidebar = css`
   .sidebar__section {
     margin: var(--space-4) 0 var(--space-1);
     padding: 0 var(--space-3);
-    color: var(--text-muted);
+    color: var(--text-secondary);
     font-size: 0.68rem;
     font-weight: 600;
     letter-spacing: 0.08em;
@@ -129,7 +129,7 @@ const shellSidebar = css`
     border: 0;
     border-radius: var(--radius);
     background: transparent;
-    color: var(--text-muted);
+    color: var(--text-secondary);
     font: inherit;
     font-size: var(--text-sm);
     cursor: pointer;

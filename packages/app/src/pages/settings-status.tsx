@@ -166,7 +166,9 @@ export function renderSettingsStatus(
                 <th>Config</th>
                 <th>Token</th>
                 <th>Created</th>
-                <th></th>
+                <th>
+                  <span class="visually-hidden">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody>
