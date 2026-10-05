@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "StoryShelf client config",
+  "description": ".storybook/storyshelf.json — per-Storybook client configuration for the storyshelf CLI. Unknown keys are ignored.",
+  "type": "object",
+  "required": ["slug"],
+  "additionalProperties": true,
+  "properties": {
+    "$schema": {
+      "description": "JSON Schema location for editor support. Stamped automatically by `storyshelf init`.",
+      "type": "string"
+    },
+    "slug": {
+      "description": "Project slug (required).",
+      "type": "string",
+      "minLength": 1
+    },
+    "url": {
+      "description": "Server base URL.",
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https?://"
+    },
+    "buildDir": {
+      "description": "Built Storybook directory (default storybook-static).",
+      "type": "string",
+      "minLength": 1
+    },
+    "buildCommand": {
+      "description": "Custom build command. Mutually exclusive with buildScriptName.",
+      "type": "string",
+      "minLength": 1
+    },
+    "buildScriptName": {
+      "description": "Package script to build Storybook (default build-storybook). Mutually exclusive with buildCommand.",
+      "type": "string",
+      "minLength": 1
+    },
+    "skip": {
+      "description": "Glob to skip upload for matching branches.",
+      "type": "string",
+      "minLength": 1
+    },
+    "affectedOnly": {
+      "description": "Render only impacted stories (default true).",
+      "type": "boolean"
+    },
+    "untraced": {
+      "description": "Glob patterns excluded from affected tracing (union with --untraced).",
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "not": {
+    "description": "buildCommand and buildScriptName are mutually exclusive.",
+    "required": ["buildCommand", "buildScriptName"]
+  }
+}

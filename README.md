@@ -8,20 +8,29 @@ Self-hosted visual testing platform for Storybook. Run visual regression tests i
 
 ```
 packages/
-  core/           @storyshelf/core          — Hono router, models, capture pipeline, diff, retention
-  db-sqlite/      @storyshelf/db-sqlite      — SQLite database adapter (better-sqlite3 + Drizzle)
-  db-turso/       @storyshelf/db-turso       — Turso/libSQL database adapter
+  core/           @storyshelf/core          — Adapter interfaces, models, capture pipeline, diff, retention (no HTTP)
+  app/            @storyshelf/app           — Hono app, API routes, server-rendered UI over core
+  db-sqlite/      @storyshelf/db-sqlite      — SQLite database adapters (node:sqlite default + turso/better-sqlite3/bun-sqlite/d1 presets)
+  db-postgres/    @storyshelf/db-postgres    — Postgres database adapter (postgres.js + Drizzle)
   storage-local/  @storyshelf/storage-local — local filesystem storage
   storage-s3/     @storyshelf/storage-s3    — S3-compatible storage
-  auth-oauth/     @storyshelf/auth-oauth    — OIDC auth
-  auth-password/  @storyshelf/auth-password — shared-password auth
-  cli/            @storyshelf/cli           — CLI client (upload, init, purge, retry)
+  auth/         @storyshelf/auth        — Better Auth engine (local / social / SSO / passkeys)
+  git-github/     @storyshelf/git-github    — GitHub commit status / merge gate / PR comments
+  git-gitlab/     @storyshelf/git-gitlab    — GitLab commit statuses, MR comments, merge-gate helpers
+  queue-sqs/      @storyshelf/queue-sqs     — AWS SQS capture job queue
+  queue-redis/    @storyshelf/queue-redis   — Redis capture job queue (ioredis)
+  cli/            storyshelf              — CLI client (server init, init, create, upload, purge, retry)
   runner-playwright/ @storyshelf/runner-playwright — Playwright capture runner
-  node-server/    @storyshelf/node-server   — Node self-hosted server (storyshelf-server serve + capture)
-website/                                    — public docs (Astro Starlight)
-examples/
-  storybook/                                — deterministic capture fixture
-  fly-app/                                  — fly.io demo
+  runner-puppeteer/ @storyshelf/runner-puppeteer — Puppeteer capture runner
+  observability/  @storyshelf/observability — OpenTelemetry tracing/metrics/log-correlation
+apps/
+  dev-server/     dev-server      — local dev server (from TS source via nub watch)
+  website/        website         — public docs (Astro Starlight)
+  fly-app/        fly-app         — Fly demo (local adapters, workspace deps, multi-stage cached Dockerfile; deploys on tag via fly.yml)
+fixtures/
+  storybook-8/    storybook-fixture -- SB 8.6 Vite React (default, 7 stories; own pnpm install)
+  storybook-9/    storybook-fixture -- SB 9 Vite React
+  storybook-10/   storybook-fixture -- SB 10 ESM + CSF-Next (filters subtype:'test')
 docs/                                       — architecture, ADRs, testing, website plan
 ```
 
@@ -29,16 +38,22 @@ docs/                                       — architecture, ADRs, testing, web
 
 ```sh
 nub install                      # install workspace deps
-nub run serve                    # dev server from TS source, hot-restarts on any change
 nub run build                    # turbo build all packages
 nub run test                     # turbo test
 nub run verify                   # build + lint + test
 ```
 
-`nub run serve` runs the server from source (`nub watch ./packages/node-server/src/index.ts serve --data-dir .dev-data`). It needs no build step: the `development` exports condition (via `nub.jsonc` + tsconfig `customConditions`) resolves workspace packages to their TypeScript source, and `nub watch` restarts the server whenever any file in the import graph changes.
+## Getting started
+
+```sh
+npx storyshelf server init  # scaffold a server project
+cd my-storyshelf
+npm install
+npm start                        # start the server
+```
 
 ## Documentation
 
 - Each package ships a `README.md` covering its use case, install, API, and an example.
-- `website/` hosts the public docs site (Astro Starlight): getting-started, CI, deployment, auth, and concept guides.
+- `apps/website/` hosts the public docs site (Astro Starlight): getting-started, CI, deployment, auth, and concept guides.
 - `docs/architecture.md` is the full architecture spec; `docs/adr/` records design decisions; `docs/implementation-plan.md` is the build order.

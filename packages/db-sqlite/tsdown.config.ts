@@ -1,12 +1,12 @@
-import { defineConfig } from "tsdown";
+import { libConfig } from "../../config/tsdown.ts";
 
-export default defineConfig({
-  dts: true,
-  entry: { index: "./src/index.ts" },
-  platform: "node",
-  target: "node22",
-  treeshake: true,
-  cjsDefault: false,
-  deps: { neverBundle: true },
-  clean: true,
+export default libConfig({
+  index: "./src/index.ts",
+  turso: "./src/turso.ts",
+  "better-sqlite3": "./src/better-sqlite3.ts",
+  "bun-sqlite": "./src/bun-sqlite.ts",
+  d1: "./src/d1.ts",
+  "drizzle-factory": "./src/drizzle-factory.ts",
+  ddl: "./src/ddl.ts",
+  schema: "./src/schema/index.ts",
 });

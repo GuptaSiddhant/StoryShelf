@@ -34,23 +34,24 @@ For a snapshot of `(story, viewport)` on branch `B`:
 
 ### 2. Retention & purge
 
-**Never purged:** `baselines/**` files and `baselines` rows (all branches), and builds bearing a `persistent` label (see ADR 0013).
+**Never purged:** default-branch `baselines/**` files/rows and builds bearing a `persistent` label (see ADR 0013). Feature-branch baselines are purged via branch GC below.
 
 **Purged:**
 - Builds in a terminal review state (`approved`/`rejected`) older than `purge_ttl` (default 30 days).
 - Old builds of a branch: retain the most recent build per branch (it backs the PR status link); purge older ones past TTL.
 - Builds in non-terminal states are never purged (a `reviewing` build must not vanish before review).
+- **Stale branch baselines:** branches whose latest build is older than `branchTtlDays` (default 30, `null` = disabled) are GC'd — deletes `baselines/{branch}/**` files and `baselines` rows for that branch (default branch never GC'd).
 
-Purge deletes storage files (`builds/{buildId}/`) and database rows (`builds`, `snapshots`) together.
+Purge deletes storage files (`builds/{buildId}/` or `baselines/{branch}/**`) and database rows (`builds`, `snapshots`, or `baselines`) together.
 
 ### 3. Orphaned baselines
 
-A story renamed or removed from Storybook leaves a stale baseline. On each default-branch build, diff `index.json` against `baselines` and delete baselines whose `story_id` no longer exists.
+A story renamed or removed from Storybook leaves a stale baseline. On each default-branch build, diff `index.json` against `baselines` and delete baselines whose `story_id` no longer exists (now also deletes the storage file).
 
 ### 4. Trigger
 
-- **Scheduled**: in-server timer (`--purge-interval`, default hourly).
-- **Manual**: `storyshelf purge` CLI command or `POST /api/v1/admin/purge`.
+- **Scheduled**: in-server timers — build purge (`--purge-interval`, default hourly) and branch GC (`branchTtlDays` 30 + `branchGcIntervalMs` 24h daily interval clock via `retention-timer.ts`, staggered 1h).
+- **Manual**: `storyshelf purge` CLI command or `POST /api/v1/admin/purge` (now runs both build purge and branch GC; returns `{removedBuilds,removedBranches,removedBaselines}`).
 
 ## Consequences
 
@@ -62,5 +63,6 @@ A story renamed or removed from Storybook leaves a stale baseline. On each defau
 
 **Negative:**
 - Feature-branch baselines can diverge from default; a `git pull` after main moves under a story re-flags it (correct, but surprising the first time)
-- Per-branch baseline rows grow with branch count; orphan GC mitigates story churn but branch churn needs its own GC in v2
 - "Auto-approve default" means a regression pushed straight to default is baselined silently — an accepted consequence of the model, with a future "require approval on default changes" escape hatch if needed
+
+**Branch churn bounded:** stale feature branches are GC'd after `branchTtlDays` (30d default, daily sweep via `Retention.purgeStaleBranches` + `retention-timer.ts`); default branch is never GC'd.

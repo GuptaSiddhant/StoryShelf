@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted. Extended by [ADR 0021](0021-composite-auth-and-local-accounts.md) (composite multi-auth, custom login text, invite-only local accounts, `/profile`, RP discovery). Protocol ownership moved wholesale to Better Auth by [ADR 0023](0023-wholesale-auth-engine.md) (engine implementation of this pluggable contract; legacy adapters deleted).
 
 ## Context
 
@@ -80,7 +80,7 @@ app.post("/auth/logout", ...);    // destroy session
 
 ### Auth route mounting
 
-The `createShelfRouter` factory mounts auth routes based on the configured adapter:
+The `createShelfApp` factory mounts auth routes based on the configured adapter:
 
 ```typescript
 if (options.auth) {

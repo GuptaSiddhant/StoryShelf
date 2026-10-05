@@ -1,0 +1,113 @@
+{
+  "name": "@storyshelf/db-mysql",
+  "version": "0.5.2",
+  "description": "MySQL/MariaDB database adapter for StoryShelf (mysql2 + Drizzle, PlanetScale/TiDB compatible).",
+  "keywords": [
+    "database",
+    "drizzle",
+    "mysql",
+    "mariadb",
+    "storybook"
+  ],
+  "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
+  "bugs": {
+    "url": "https://github.com/GuptaSiddhant/StoryShelf/issues"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Siddhant Gupta",
+    "url": "https://guptasiddhant.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GuptaSiddhant/StoryShelf.git",
+    "directory": "packages/db-mysql"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "default": "./dist/index.mjs"
+    },
+    "./ddl": {
+      "source": "./src/ddl.ts",
+      "default": "./dist/ddl.mjs"
+    },
+    "./planetscale": {
+      "source": "./src/planetscale.ts",
+      "default": "./dist/planetscale.mjs"
+    },
+    "./schema": {
+      "source": "./src/schema/index.ts",
+      "default": "./dist/schema.mjs"
+    },
+    "./tidb": {
+      "source": "./src/tidb.ts",
+      "default": "./dist/tidb.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.mjs",
+      "./ddl": "./dist/ddl.mjs",
+      "./planetscale": "./dist/planetscale.mjs",
+      "./schema": "./dist/schema.mjs",
+      "./tidb": "./dist/tidb.mjs",
+      "./package.json": "./package.json"
+    },
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown -w",
+    "fmt": "oxfmt ./src",
+    "lint": "oxlint --type-aware --type-check ./src",
+    "test": "vitest run",
+    "prepublishOnly": "nub run build"
+  },
+  "dependencies": {
+    "@storyshelf/core": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "mysql2": "^3.9.0"
+  },
+  "peerDependencies": {
+    "@planetscale/database": "^1.19.0",
+    "@tidbcloud/serverless": "^0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@planetscale/database": {
+      "optional": true
+    },
+    "@tidbcloud/serverless": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@planetscale/database": "^1.19.0",
+    "@tidbcloud/serverless": "^0.1.0",
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "mysql2": "^3.9.0",
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:",
+    "oxlint-tsgolint": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "jsr": {
+    "runtimeCompat": {
+      "node": true,
+      "deno": true,
+      "browser": false,
+      "workerd": false,
+      "bun": true
+    }
+  }
+}

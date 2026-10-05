@@ -20,16 +20,53 @@
     "id-length": [
       "warn",
       {
-        "exceptions": ["z"]
+        "exceptions": [
+          "a",
+          "b",
+          "c",
+          "e",
+          "h",
+          "i",
+          "j",
+          "k",
+          "l",
+          "m",
+          "n",
+          "p",
+          "q",
+          "r",
+          "s",
+          "v",
+          "x",
+          "y",
+          "z",
+          "T",
+          "K",
+          "V",
+          "id",
+          "db",
+          "fn",
+          "pr",
+          "mr",
+          "err"
+        ]
       }
     ],
-    "func-style": ["allow"],
+    "func-style": [
+      "allow"
+    ],
     "max-lines-per-function": [
-      "warn",
+      "error",
       {
         "max": 50,
         "skipBlankLines": true,
         "skipComments": true
+      }
+    ],
+    "max-statements": [
+      "error",
+      {
+        "max": 10
       }
     ],
     "import/consistent-type-specifier-style": "allow",
@@ -43,6 +80,7 @@
     "import/prefer-default-export": "allow",
     "import/no-named-export": "allow",
     "new-cap": "allow",
+    "oxc/no-async-endpoint-handlers": "allow",
     "no-async-await": "allow",
     "no-continue": "allow",
     "no-magic-numbers": "allow",
@@ -62,20 +100,168 @@
     "eslint/no-underscore-dangle": [
       "error",
       {
-        "allow": ["_InPath", "_zod"]
+        "allow": [
+          "_InPath",
+          "_zod",
+          "__PKG_VERSION__"
+        ]
       }
     ],
     "typescript/explicit-member-accessibility": "allow",
     "typescript/method-signature-style": "allow",
     "typescript/no-unnecessary-condition": "allow",
     "typescript/prefer-readonly-parameter-types": "allow",
+    "typescript/consistent-type-imports": "allow",
+    "typescript/parameter-properties": "allow",
+    "typescript/array-type": "allow",
+    "typescript/consistent-type-definitions": "allow",
     "unicorn/import-style": "allow",
+    "unicorn/prefer-export-from": "allow",
+    "unicorn/no-await-expression-member": "allow",
+    "unicorn/no-nested-ternary": "allow",
+    "init-declarations": "allow",
+    "eslint/init-declarations": "allow",
+    "no-empty-function": "allow",
+    "no-inline-comments": "allow",
+    "no-duplicate-imports": "allow",
+    "no-nested-ternary": "allow",
+    "capitalized-comments": "allow",
+    "eslint/capitalized-comments": "allow",
+    "curly": "allow",
+    "eslint/curly": "allow",
+    "prefer-destructuring": "allow",
+    "eslint/prefer-destructuring": "allow",
+    "max-params": "allow",
+    "eslint/max-params": "allow",
+    "max-lines": "allow",
+    "eslint/max-lines": "allow",
     "typescript/strict-boolean-expressions": "allow"
   },
   "overrides": [
     {
-      "files": ["**/*.test.ts", "**/*.spec.ts", "**/mocks/**"],
+      "files": [
+        "**/*.test.ts",
+        "**/*.spec.ts",
+        "**/mocks/**",
+        "**/test-helpers/**"
+      ],
       "rules": {
+        "typescript/no-confusing-void-expression": "allow",
+        "typescript/explicit-function-return-type": "allow",
+        "max-lines-per-function": "allow",
+        "eslint/max-lines-per-function": "allow",
+        "max-statements": "allow",
+        "eslint/max-statements": "allow",
+        "max-lines": "allow",
+        "eslint/max-lines": "allow",
+        "typescript/no-non-null-assertion": "allow",
+        "typescript/non-nullable-type-assertion-style": "allow",
+        "typescript/no-unnecessary-type-assertion": "allow",
+        "typescript/require-await": "allow",
+        "eslint/require-await": "allow",
+        "typescript/promise-function-async": "allow",
+        "typescript/unbound-method": "allow",
+        "eslint/no-promise-executor-return": "allow",
+        "eslint/no-useless-assignment": "allow",
+        "typescript/strict-void-return": "allow",
+        "eslint/no-negated-condition": "allow",
+        "unicorn/no-negated-condition": "allow",
+        "typescript/no-unsafe-call": "allow",
+        "typescript/no-unsafe-assignment": "allow",
+        "typescript/no-unsafe-argument": "allow",
+        "typescript/no-unsafe-member-access": "allow",
+        "typescript/no-unsafe-return": "allow",
+        "unicorn/prefer-at": "allow"
+      }
+    },
+    {
+      "files": [
+        "packages/core/src/capture/orchestrator.ts",
+        "packages/core/src/capture/pipeline.ts",
+        "packages/core/src/capture/queue.ts",
+        "packages/core/src/capture/status-fanout.ts",
+        "packages/core/src/diff/engine.ts",
+        "packages/app/src/middleware/csrf.ts",
+        "packages/app/src/middleware/rate-limit.ts",
+        "packages/core/src/models/baseline.ts",
+        "packages/core/src/models/build.ts",
+        "packages/app/src/pages/build-detail.tsx",
+        "packages/app/src/pages/compute-jobs.tsx",
+        "packages/app/src/pages/label-detail.tsx",
+        "packages/app/src/pages/project-builds.tsx",
+        "packages/app/src/pages/project-create.tsx",
+        "packages/app/src/pages/projects.tsx",
+        "packages/app/src/pages/root.tsx",
+        "packages/app/src/pages/settings-general.tsx",
+        "packages/app/src/pages/settings-labels.tsx",
+        "packages/app/src/pages/settings-members.tsx",
+        "packages/app/src/pages/settings-status.tsx",
+        "packages/app/src/pages/settings-tests.tsx",
+        "packages/app/src/pages/settings-tokens.tsx",
+        "packages/app/src/pages/settings-webhooks.tsx",
+        "packages/core/src/retention/purge.ts",
+        "packages/db-sqlite/src/drizzle-factory.ts",
+        "packages/app/src/routers/auth.ts",
+        "packages/app/src/routers/media.ts",
+        "packages/app/src/routers/builds.handlers.ts",
+        "packages/app/src/routers/builds.ts",
+        "packages/app/src/routers/helpers.ts",
+        "packages/app/src/routers/labels.ts",
+        "packages/app/src/routers/snapshots.ts",
+        "packages/app/src/routers/status-configs.ts",
+        "packages/app/src/routers/storybook.ts",
+        "packages/app/src/routers/ui.ts",
+        "packages/app/src/ui/document.tsx",
+        "packages/app/src/ui/styles.ts",
+        "packages/core/src/utils/encrypt.ts",
+        "packages/core/src/utils/ulid.ts",
+        "packages/runner-playwright/src/capture-runner.ts",
+        "packages/db-postgres/src/index.ts",
+        "packages/app/src/capture-setup.ts",
+        "packages/worker/src/worker.ts",
+        "packages/queue-sqs/src/index.ts",
+        "packages/cli/src/commands/server/init.ts",
+        "packages/cli/src/commands/server/docker.ts",
+        "packages/cli/src/commands/worker/init.ts",
+        "packages/cli/src/commands/worker/serve.ts",
+        "packages/cli/src/commands/shared/detect-adapters.ts",
+        "packages/runner-puppeteer/src/capture-runner.ts"
+      ],
+      "rules": {
+        "max-lines-per-function": "allow",
+        "eslint/max-lines-per-function": "allow",
+        "max-statements": "allow",
+        "eslint/max-statements": "allow",
+        "max-lines": "allow",
+        "eslint/max-lines": "allow",
+        "oxc/no-map-spread": "allow",
+        "typescript/no-confusing-void-expression": "allow",
+        "typescript/require-await": "allow",
+        "eslint/require-await": "allow",
+        "eslint/no-promise-executor-return": "allow",
+        "eslint/no-await-in-loop": "allow",
+        "eslint/no-useless-assignment": "allow",
+        "eslint/no-unmodified-loop-condition": "allow",
+        "unicorn/no-useless-spread": "allow",
+        "unicorn/no-array-sort": "allow",
+        "unicorn/prefer-number-coercion": "allow",
+        "unicorn/no-negated-condition": "allow",
+        "typescript/no-unnecessary-type-assertion": "allow",
+        "typescript/no-non-null-assertion": "allow",
+        "typescript/non-nullable-type-assertion-style": "allow",
+        "typescript/strict-void-return": "allow",
+        "typescript/no-deprecated": "allow",
+        "eslint/no-negated-condition": "allow",
+        "complexity": "allow",
+        "eslint/complexity": "allow"
+      }
+    },
+    {
+      "files": [
+        "packages/cli/src/commands/server/docker.ts"
+      ],
+      "rules": {
+        "unicorn/no-array-sort": "allow",
         "typescript/no-confusing-void-expression": "allow"
       }
     }

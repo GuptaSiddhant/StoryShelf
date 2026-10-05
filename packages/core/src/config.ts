@@ -1,79 +1,282 @@
 import type { Logger } from "pino";
-
-import type { AuthAdapter } from "./adapters/auth.ts";
+import { z } from "zod";
 import type { CaptureQueue } from "./adapters/capture-queue.ts";
 import type { CaptureRunner } from "./adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "./adapters/database.ts";
-import type { StatusProvider } from "./adapters/status.ts";
+import type { EmailSender } from "./adapters/email-sender.ts";
+import type { GitHostProvider } from "./adapters/git-host/index.ts";
+import type { AdapterCategory } from "./adapters/metadata.ts";
+import type { NotifierProvider } from "./adapters/notifier/provider.ts";
 import type { StorageAdapter } from "./adapters/storage.ts";
-import type { Viewport } from "./capture/adapter.ts";
+import type { Auth } from "./auth.ts";
 
-/** Branding colors used to theme the web UI. */
+/** Brand color theme for the server-rendered UI. */
 export interface BrandTheme {
-  /** Accent color. */
   accent: string;
-  /** Surface colors. */
-  surface: { base: string; card: string };
-  /** Text colors. */
-  text: { primary: string; secondary: string };
-  /** Border color. */
+  accentContrast?: string;
+  ring?: string;
+  surface: { base: string; card: string; muted?: string; subtle?: string };
+  text: { primary: string; secondary: string; muted?: string };
   border: string;
-  /** Status-specific colors. */
+  borderSubtle?: string;
   status: { approved: string; new: string; rejected: string };
+  sidebarBg?: string;
+  topbarBg?: string;
+  radius?: string;
+  radiusSm?: string;
+  shadow?: string;
 }
 
-/** Branding and theme configuration for the web UI. */
-export interface UIConfig {
-  /** Brand name shown in the UI. */
-  name?: string;
-  /** URL to a logo image. */
-  logo?: string;
-  /** URL to a favicon. */
-  favicon?: string;
-  /** Theme used in light mode. */
-  lightTheme?: BrandTheme;
-  /** Theme used in dark mode. */
-  darkTheme?: BrandTheme;
-}
-
-/** Runtime configuration passed to the shelf router. */
-export interface ShelfConfig {
-  /** Session signing secret. */
-  secret?: string;
-  /** Domain used for published Storybook URLs. */
-  publishedBaseDomain?: string;
-  /** Number of concurrent capture jobs. */
-  captureConcurrency?: number;
-  /** Base directory for extracting uploaded Storybook archives during capture. */
-  scratchDir?: string;
-  /** Days after which builds are purged. */
-  purgeTtlDays?: number;
-  /** Viewports at which stories are captured. */
-  viewports?: Viewport[];
-}
-
-/** Options used to construct a shelf router. */
-export interface ShelfOptions {
-  /** Database adapter. */
-  database: DatabaseAdapter;
-  /** Storage adapter. */
-  storage: StorageAdapter;
-  /** Capture runner for asynchronous builds. */
-  captureRunner?: CaptureRunner;
+/** Text overrides for the auth (login) UI. */
+export interface AuthUiConfig {
+  /** Page title, default "Sign in". */
+  title?: string;
+  /** Optional subtitle under the title. */
+  subtitle?: string;
+  /** Password field label, default "Password". */
+  passwordLabel?: string;
+  /** Password field placeholder. */
+  passwordPlaceholder?: string;
+  /** Submit button label, default "Sign in". */
+  submitLabel?: string;
   /**
-   * Capture queue. Defaults to an in-process queue on long-lived hosts; supply
-   * a remote queue (SQS, Workers Queues, Azure Storage Queues) with a separate
-   * worker to run capture on serverless runtimes.
+   * Template for SSO buttons, default "Sign in with {label}".
+   * Must contain "{label}" which is replaced with the provider label.
    */
+  ssoLabelTemplate?: string;
+  /** Help text shown under the form. */
+  helpText?: string;
+  /** Footer text shown at the bottom of the card. */
+  footerText?: string;
+}
+
+/** Branding overrides for the server-rendered UI. */
+export interface UIConfig {
+  name?: string;
+  logo?: string;
+  favicon?: string;
+  lightTheme?: BrandTheme;
+  darkTheme?: BrandTheme;
+  auth?: AuthUiConfig;
+}
+
+/** Default cap for a single Storybook zip upload (1 GiB). */
+export const DEFAULT_MAX_UPLOAD_BYTES = 1024 * 1024 * 1024;
+
+/** A viewport in which stories are captured. */
+export interface ShelfViewport {
+  name: string;
+  width: number;
+  height: number;
+}
+
+/** Metadata snapshot of a configured adapter. */
+export interface AdapterSnapshot {
+  name: string;
+  version: string;
+  description?: string;
+  kind: string;
+  category: AdapterCategory;
+}
+
+/** Site-wide notification defaults (brand + sender identity for admin alerts). */
+export interface NotificationsConfig {
+  fromEmail?: string;
+  fromName?: string;
+  footerText?: string;
+  slackUsername?: string;
+}
+/** Shelf-level configuration (validated by {@link shelfConfigSchema}). */
+export interface ShelfConfig {
+  secret?: string;
+  /**
+   * Bootstrap site-admin bearer token (`STORYSHELF_ADMIN_TOKEN`/`ADMIN_TOKEN`).
+   * Grants site-admin API access when no admin user exists yet; never
+   * mint sessions from it. Distinct from `secret` (session signing).
+   */
+  adminToken?: string;
+  publishedBaseDomain?: string;
+  /**
+   * Public base URL of this deployment (e.g. `https://shelf.example.com`).
+   * Used as the issuer in the `/.well-known/openid-configuration` relying-party
+   * helper document; falls back to the request origin when unset.
+   */
+  publicBaseUrl?: string;
+  captureConcurrency?: number;
+  scratchDir?: string;
+  purgeTtlDays?: number;
+  /** Branch baseline TTL, days; null disables branch GC (default 30). */
+  branchTtlDays?: number | null;
+  /** Branch GC interval, ms; daily sweep via interval clock (default 86_400_000). */
+  branchGcIntervalMs?: number;
+  maxUploadBytes?: number;
+  /**
+   * Emit `Server-Timing` response headers (total + db/storage roll-ups).
+   * Opt-in, off by default — some deployments prefer no timing headers.
+   */
+  serverTiming?: boolean;
+  /**
+   * Max zip size (bytes) eligible for inline statics extraction at upload.
+   * Unset (or 0) disables inline extraction — statics land via capture.
+   */
+  maxInlineUnzipSize?: number;
+  viewports?: ShelfViewport[];
+  adapters?: Record<string, AdapterSnapshot>;
+  notifications?: NotificationsConfig;
+}
+
+const viewportSchema: z.ZodType<ShelfViewport> = z.object({
+  name: z.string().min(1),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+});
+
+const brandThemeSchema: z.ZodType<BrandTheme> = z.object({
+  accent: z.string(),
+  accentContrast: z.string().optional(),
+  ring: z.string().optional(),
+  surface: z.object({
+    base: z.string(),
+    card: z.string(),
+    muted: z.string().optional(),
+    subtle: z.string().optional(),
+  }),
+  text: z.object({ primary: z.string(), secondary: z.string(), muted: z.string().optional() }),
+  border: z.string(),
+  borderSubtle: z.string().optional(),
+  status: z.object({ approved: z.string(), new: z.string(), rejected: z.string() }),
+  sidebarBg: z.string().optional(),
+  topbarBg: z.string().optional(),
+  radius: z.string().optional(),
+  radiusSm: z.string().optional(),
+  shadow: z.string().optional(),
+});
+
+const adapterSnapshotSchema: z.ZodType<AdapterSnapshot> = z.object({
+  name: z.string(),
+  version: z.string(),
+  description: z.string().optional(),
+  kind: z.string(),
+  category: z.enum([
+    "database",
+    "storage",
+    "capture-runner",
+    "capture-queue",
+    "git-host",
+    "notifier",
+  ]),
+});
+
+const authUiConfigSchema: z.ZodType<AuthUiConfig> = z.object({
+  title: z.string().min(1).optional(),
+  subtitle: z.string().optional(),
+  passwordLabel: z.string().min(1).optional(),
+  passwordPlaceholder: z.string().optional(),
+  submitLabel: z.string().min(1).optional(),
+  ssoLabelTemplate: z.string().min(1).optional(),
+  helpText: z.string().optional(),
+  footerText: z.string().optional(),
+});
+
+const notificationsConfigSchema: z.ZodType<NotificationsConfig> = z.object({
+  fromEmail: z.string().min(1).optional(),
+  fromName: z.string().min(1).optional(),
+  footerText: z.string().min(1).optional(),
+  slackUsername: z.string().min(1).optional(),
+});
+
+/** Zod schema validating the shelf-level configuration. */
+export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
+  .object({
+    secret: z.string().min(1).optional(),
+    adminToken: z.string().min(1).optional(),
+    publishedBaseDomain: z.string().optional(),
+    // oxlint-disable-next-line typescript/no-deprecated -- z.string().url() kept for zod v3 API compat
+    publicBaseUrl: z.string().url().optional(),
+    captureConcurrency: z.number().int().positive().optional(),
+    scratchDir: z.string().optional(),
+    purgeTtlDays: z.number().int().positive().optional(),
+    branchTtlDays: z.number().int().positive().nullable().optional(),
+    branchGcIntervalMs: z.number().int().positive().optional(),
+    maxUploadBytes: z.number().int().positive().optional(),
+    serverTiming: z.boolean().optional(),
+    maxInlineUnzipSize: z.number().int().positive().optional(),
+    viewports: z.array(viewportSchema).min(1, "at least one viewport required").optional(),
+    adapters: z.record(z.string(), adapterSnapshotSchema).optional(),
+    notifications: notificationsConfigSchema.optional(),
+  })
+  .strict();
+
+/** Zod schema validating the UI branding configuration. */
+export const uiConfigSchema: z.ZodType<UIConfig> = z
+  .object({
+    name: z.string().optional(),
+    // oxlint-disable-next-line typescript/no-deprecated -- z.string().url() kept for zod v3 API compat
+    logo: z.string().url().optional(),
+    // oxlint-disable-next-line typescript/no-deprecated -- z.string().url() kept for zod v3 API compat
+    favicon: z.string().url().optional(),
+    lightTheme: brandThemeSchema.optional(),
+    darkTheme: brandThemeSchema.optional(),
+    auth: authUiConfigSchema.optional(),
+  })
+  .strict();
+
+/**
+ * Parse and validate a raw shelf-level configuration object.
+ *
+ * @param config - Unvalidated configuration record.
+ * @returns The validated shelf configuration.
+ */
+export function validateConfig(config: Record<string, unknown>): ShelfConfig {
+  const result = shelfConfigSchema.safeParse(config);
+  if (!result.success) {
+    const issues = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+    throw new Error(`Invalid ShelfConfig: ${issues}`);
+  }
+  return result.data;
+}
+
+/**
+ * Parse and validate a raw UI branding configuration object.
+ *
+ * @param config - Unvalidated UI configuration record.
+ * @returns The validated UI configuration.
+ */
+export function validateUiConfig(config: Record<string, unknown>): UIConfig {
+  const result = uiConfigSchema.safeParse(config);
+  if (!result.success) {
+    const issues = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+    throw new Error(`Invalid UIConfig: ${issues}`);
+  }
+  return result.data;
+}
+
+/** Adapter and configuration options for creating the shelf router. */
+export interface ShelfOptions {
+  database: DatabaseAdapter;
+  storage: StorageAdapter;
+  captureRunner?: CaptureRunner;
   captureQueue?: CaptureQueue;
-  /** Authentication adapter. */
-  auth?: AuthAdapter;
-  /** Git provider status providers (array — one per integration, fanout per build). */
-  statusProviders?: StatusProvider[];
-  /** Logger override. If omitted, a pino logger is constructed internally. */
+  auth?: Auth;
+  gitHosts?: GitHostProvider[];
+  notifiers?: NotifierProvider[];
+  emailSender?: EmailSender;
   logger?: Logger;
-  /** UI branding configuration. */
   ui?: UIConfig;
-  /** Runtime configuration. */
   config?: ShelfConfig;
+  /**
+   * Externally-managed observability SDK handle (e.g. from
+   * `initObservabilityFromEnv`). Structural — core never imports the
+   * observability package. Flushed on `app.lifecycle.teardown()`.
+   */
+  observability?: ObservabilityHandle;
+}
+
+/**
+ * Shutdown hook for an externally-managed observability SDK.
+ * Structural so core stays dependency-free.
+ */
+export interface ObservabilityHandle {
+  /** Flush exporters and release SDK resources. Must be idempotent. */
+  shutdown(): Promise<void>;
 }

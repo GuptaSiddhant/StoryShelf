@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-
 import { slugify, ulid } from "./ulid.ts";
 
 describe("ulid", () => {

@@ -1,0 +1,109 @@
+name: CI
+
+# P0-3: first merge gate. verify-smoke runs on every PR; the real-browser
+# fixture matrix is gated behind it so hermetic failures fail fast.
+on:
+  pull_request:
+  push:
+    branches: ["main"]
+  schedule:
+    # Nightly drift check (Storybook/pnpm/Playwright move fast).
+    - cron: "30 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-smoke:
+    name: Verify + smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Nub
+        uses: nubjs/setup-nub@v0
+
+      - name: Install dependencies
+        run: nub ci
+
+      - name: Verify (build + lint + test)
+        run: nubx turbo verify --force
+
+      - name: App smoke test (boot once, curl health/API/HTML/htmx)
+        run: bash scripts/smoke.sh
+
+      - name: Check website links
+        # dist/ is already built by website#verify (dependsOn build) above.
+        working-directory: apps/website
+        run: nub run check:links
+
+  fixture-matrix:
+    name: Fixtures (${{ matrix.fixture }})
+    needs: verify-smoke
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        fixture: [storybook-8, storybook-9, storybook-10]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Nub
+        uses: nubjs/setup-nub@v0
+
+      - name: Setup pnpm
+        # Fixtures are independent pnpm installs, not nub workspaces.
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install dependencies
+        run: nub ci
+
+      - name: Get pnpm store path
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-store-${{ matrix.fixture }}-${{ hashFiles(format('fixtures/{0}/pnpm-lock.yaml', matrix.fixture)) }}
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-1.63.0-chromium-${{ runner.os }}
+
+      - name: Install Playwright chromium
+        # runner-playwright deps on playwright-core (no bundled browser).
+        run: npx -y playwright@1.63.0 install --with-deps chromium
+
+      - name: Install fixture
+        run: pnpm --dir fixtures/${{ matrix.fixture }} install --frozen-lockfile
+
+      - name: Build fixture Storybook
+        run: pnpm --dir fixtures/${{ matrix.fixture }} run build-storybook
+
+      - name: Build workspace packages
+        # Replaces turbo's dependsOn ^build: the test step below bypasses
+        # turbo (step env does not survive `nubx turbo`), so build explicitly.
+        run: nub run build --filter='./packages/*'
+
+      - name: Real-browser capture tests
+        working-directory: packages/runner-playwright
+        env:
+          # Absolute: cwd-independent. Must flow via `nub run` — step env
+          # does not survive `nubx turbo`, which silently fell back to the
+          # default storybook-8 fixture in every matrix leg.
+          FIXTURE_DIR: ${{ github.workspace }}/fixtures/${{ matrix.fixture }}
+          RUN_INTEGRATION: "1"
+        run: nub run test:integration

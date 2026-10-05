@@ -1,0 +1,16 @@
+{
+  "$schema": "https://raw.githubusercontent.com/denoland/deno/refs/heads/main/cli/schemas/config-file.v1.json",
+  "name": "@storyshelf/db-mysql",
+  "version": "0.5.2",
+  "exports": {
+    ".": "./src/index.ts",
+    "./ddl": "./src/ddl.ts",
+    "./planetscale": "./src/planetscale.ts",
+    "./tidb": "./src/tidb.ts",
+    "./schema": "./src/schema/index.ts"
+  },
+  "publish": {
+    "include": ["src", "README.md", "LICENSE"],
+    "exclude": ["**/*.test.ts", "**/*.test.tsx", "**/test-helpers"]
+  }
+}

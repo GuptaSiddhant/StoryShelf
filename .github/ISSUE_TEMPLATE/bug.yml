@@ -1,0 +1,27 @@
+name: Bug report
+description: Something isn't working.
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: Expected vs actual behavior, with steps to reproduce.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Version/commit, package, adapter (sqlite/turso, local/s3), fixture if relevant.
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Structured log excerpt if available (pino).
+      render: shell
+    validations:
+      required: false

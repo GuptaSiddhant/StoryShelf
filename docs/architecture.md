@@ -1,5 +1,7 @@
 # StoryShelf Architecture
 
+> **Visual companion:** [`architecture-diagrams.md`](./architecture-diagrams.md) — 18 Mermaid diagrams (system context, containers, capture pipeline, baseline resolution, ER model, storage, deployment, etc.) derived from this spec.
+
 ## What StoryShelf Is
 
 A self-hosted visual testing platform for Storybook. Run visual regression tests in CI, review pixel-level diffs in a web UI, and approve changes before they ship. No per-snapshot billing. No vendor lock-in.
@@ -10,7 +12,7 @@ A self-hosted visual testing platform for Storybook. Run visual regression tests
 
 ```
 Developer pushes code
-  → CI runs: npx @storyshelf/cli upload --token=xxx
+  → CI runs: npx storyshelf upload --token=xxx
   → CLI builds Storybook (if needed), zips the static build
   → CLI uploads the zip + metadata (sha, branch, message, author) to StoryShelf server
   → Server creates a build, stores the zip, and enqueues capture (async, returns 202)
@@ -83,6 +85,8 @@ snapshots (
   reviewed_at         text,
   created_at          text NOT NULL,
   updated_at          text NOT NULL,
+  baseline_id         text,                    -- baseline row the diff was computed against (NULL: none, or legacy row)
+  baseline_version    text,                    -- that baseline's updated_at at diff time; 'none' = story had no baseline; NULL = legacy
   UNIQUE(build_id, story_id, viewport_name)
 );
 
@@ -106,7 +110,7 @@ comments (
   project_id          text NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   build_id            text NOT NULL REFERENCES builds(id) ON DELETE CASCADE,
   snapshot_id         text REFERENCES snapshots(id) ON DELETE CASCADE,  -- NULL = build-level comment
-  user_id             text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id             text REFERENCES users(id) ON DELETE CASCADE,        -- NULL = anonymous (no auth)
   body                text NOT NULL,
   parent_id           text REFERENCES comments(id) ON DELETE CASCADE,   -- NULL = top-level, else reply
   resolved            boolean NOT NULL DEFAULT false,                   -- feedback addressed
@@ -152,20 +156,34 @@ webhooks (
   id                  text PRIMARY KEY,
   project_id          text NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   url                 text NOT NULL,
-  secret              text NOT NULL,           -- HMAC secret, encrypted at rest
+  secret_encrypted    text NOT NULL,           -- HMAC secret, AES-256-GCM with server SECRET
   events              text,                    -- JSON array or NULL for all
   created_at          text NOT NULL,
   updated_at          text NOT NULL
 );
 
--- Users (created by auth adapter on login, optional if no auth configured)
+-- Users (created by auth engine on login, optional if no auth configured)
 users (
-  id                  text PRIMARY KEY,        -- from auth provider (e.g., GitHub user ID)
-  email               text NOT NULL UNIQUE,
-  name                text NOT NULL,
+  id                  text PRIMARY KEY,        -- engine ULID (shared with Better Auth user.id)
+  email               text NOT NULL UNIQUE,    -- identifier; deliverability never checked for local accounts
+  name                text NOT NULL,           -- IdP/engine value; display_name_override wins for rendering
   avatar_url          text,
   role                text NOT NULL DEFAULT 'member',  -- 'admin' (site-wide) | 'member' (access via project_members)
   last_login_at       text,
+  created_at          text NOT NULL,
+  password_hash       text,                    -- legacy scrypt (pre-engine local); engine locals use Better Auth credential rows
+  display_name_override text,                  -- user-edited name, survives IdP refresh
+  auth_provider       text NOT NULL DEFAULT 'local',  -- 'local' | 'oidc' (engine provider)
+  disabled            integer NOT NULL DEFAULT 0     -- login rejected when true; engine sessions revoked eagerly
+);
+
+-- Invite tokens for local accounts (one-time links, invite-only onboarding)
+user_invite_tokens (
+  id                  text PRIMARY KEY,
+  user_id             text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash          text NOT NULL UNIQUE,    -- sha256 of the one-time token (shown once, never stored)
+  expires_at          text NOT NULL,           -- default invite creation + 7 days
+  used_at             text,                    -- NULL until accepted (single use)
   created_at          text NOT NULL
 );
 
@@ -215,12 +233,12 @@ data/                                    # --data-dir flag (default: ./data)
           static/
     baselines/
       {branch}/
-        {storyId}/{viewport}.png         # canonical approved screenshot (NEVER TTL'd)
+        {storyId}/{viewport}.png         # canonical approved screenshot (default branch NEVER TTL'd; feature branches TTL'd via branchTtlDays 30d daily GC)
 ```
 
 **Design decisions:**
 - **Local filesystem is the default.** One `docker run` to self-host. No cloud accounts needed.
-- **S3-compatible storage is an alternative.** MinIO for self-hosted S3. Cloudflare R2, AWS S3, DigitalOcean Spaces for cloud. Same adapter interface, two implementations.
+- **Cloud adapters are drop-in alternatives.** S3-compatible (R2, MinIO, AWS S3, Spaces), Google Cloud Storage (GCS + emulator), and Azure Blob Storage (Azurite) — same `StorageAdapter` interface, four implementations.
 - **No "container" abstraction.** Just paths. Storage adapter is `read/write/delete/exists/list` over a flat path namespace.
 - **Baselines stored separately from builds, under their own branch.** Baselines are the "truth" — builds are transient, baselines persist.
 
@@ -240,6 +258,16 @@ CI machine / local dev                  StoryShelf server
                                         8. orchestrator: diff against baselines, persist snapshots
                                         9. orchestrator: update build/snapshot statuses
 ```
+
+### Adapter Identity & Lifecycle
+
+Every adapter extends the shared `Adapter<Extra>` base (`core/adapter/metadata`): mandatory `metadata: { name, version, description?, kind, category }` plus an optional `lifecycle` sub-object. `lifecycle` is all or nothing — an adapter either omits it or implements all three hooks (`setup`, `teardown`, `health`). `category` (`database | storage | auth | capture-runner | capture-queue | git-host`) names the concern so metadata reads standalone; `kind` stays an open string (`sqlite`, `local`, `s3`, …) for third-party implementations. All hooks must be idempotent.
+
+`createShelfApp` kicks every `lifecycle.setup` eagerly via `Promise.allSettled` and exposes `app.lifecycle { ready, setup(), teardown() }`: `await app.lifecycle.setup()` before serving for fail-fast startup (database migrations run here — there is no top-level `migrate()`), otherwise the first request gates on settlement (503 with per-adapter failures); `await app.lifecycle.teardown()` on `SIGTERM`/`SIGINT`.
+
+### Health
+
+Two-tier, both ungated by init: `GET /api/v1/health` is open liveness (`{ status: "ok", uptimeSecs, version }`, no adapter I/O — the Fly/Docker probe path); `POST /api/v1/health` is site-admin deep readiness (`{ status, adapters: [{ category, kind, name, state, latencyMs?, detail? }] }`, 200 or 503, error text sanitized).
 
 ### Capture Renderer (pure adapter)
 
@@ -266,7 +294,7 @@ interface CaptureRunner {
 
 ### Capture Orchestrator
 
-Because renderers are pure, the server-side **orchestrator** owns everything else (`capture/orchestrator.ts`): it loads the build/project, marks the build `capturing`, extracts the uploaded archive to a scratch dir (with path-traversal protection), discovers stories, delegates rendering to the pure `CaptureRunner`, then persists snapshots/diffs/baselines (see `capture/pipeline.ts`) and finalizes the build. The orchestrator is wired into the queue by `createShelfRouter` and requires a `ShelfConfig.scratchDir`.
+Because renderers are pure, the server-side **orchestrator** owns everything else (`capture/orchestrator.ts`): it loads the build/project, marks the build `capturing`, extracts the uploaded archive to a scratch dir (with path-traversal protection), discovers stories, delegates rendering to the pure `CaptureRunner`, then persists snapshots/diffs/baselines (see `capture/pipeline.ts`) and finalizes the build. The orchestrator is wired into the queue by `createShelfApp` and requires a `ShelfConfig.scratchDir`.
 
 One local renderer in v1 — `@storyshelf/runner-playwright` (the server already has Playwright via the base image). The interface is kept thin so v2 can add a **remote** runner (offload capture to a worker fleet via a queue) without changing the pipeline or orchestration — a future `@storyshelf/runner-remote` implements the same pure `CaptureRunner` interface and plugs in at the `serve` assembly point the same way.
 
@@ -278,9 +306,14 @@ Capture is CPU/IO-heavy and long-running (minutes to tens of minutes). It must n
 - An in-process queue with a **configurable concurrency** (`--capture-concurrency`, default `2`) runs captures.
 - A build stuck in `capturing` across a server restart is detected and re-queued (or marked `failed`).
 
-> **Note on Architecture:** The `CaptureQueue` interface is currently synchronous (`status`/`active`/`recent` return values directly), which is well-suited for in-process queues but creates an impedance mismatch with asynchronous backends like SQS (which require `Promise<T>` for these operations). This is a known architectural debt that will require an interface update or a local database-backed status cache to bridge the async/sync gap in a future version.
+> **Note on Architecture:** The `CaptureQueue` interface is fully asynchronous — `enqueue`, `status`, `active` and `recent` all return `Promise<T>` — so the same contract backs both the in-process `InMemoryCaptureQueue` (Node long-lived server) and remote backends (SQS, Cloudflare Queues, Azure Storage Queues) where execution is left to a separately-assembled worker that polls the queue and runs `executeCaptureJob`.
 
 ### Story Source Adapter
+
+> Want to understand what happens *inside* the Storybook StoryShelf captures — the iframe, the
+> channel/postMessage protocol, `#storybook-root`, `play` functions, and the index files `discover()`
+> reads? See [`storybook-internals.md`](./storybook-internals.md), a study guide mapping Storybook's
+> internals to this interface and chapter 10 for what the capture pipeline could do next.
 
 ```typescript
 interface StorySourceAdapter {
@@ -373,6 +406,31 @@ This is what "per-branch acceptance with fallback to default" means: accepting a
 6. **All changed stories resolved** -- build status `approved` or `rejected`
 7. **Merge to default** -- the next default-branch build re-captures and auto-approves, re-baselining the project
 
+### Baseline changes after a diff
+
+A snapshot's diff is frozen at capture time, but baselines move (a merge to the default branch
+re-baselines; another build on the same branch may be approved first). Each snapshot therefore records
+`baseline_id` + `baseline_version` (the baseline's `updated_at`), and the app compares them with the
+baseline that applies *now* (own branch, else default):
+
+| Status | Meaning |
+|---|---|
+| `current` | Same baseline the diff used |
+| `stale` | A different or updated baseline now applies (or a new story gained one) |
+| `removed` | The baseline the diff used no longer exists |
+| `unknown` | Legacy row without tracking; never blocks review |
+
+- **Approval guard.** Approving a `stale`/`removed` snapshot returns `409 baseline_changed` instead of
+  overwriting a baseline the reviewer did not see; `?force=true` overrides it (logged). Bulk approve skips
+  such snapshots and returns their ids in `skipped`. The check runs immediately before the baseline write
+  but is not atomic (the database adapter updates by id only).
+- **Recapture is manual.** Nothing re-renders or re-diffs when a baseline changes. The review and build
+  pages show a notice ("Baseline changed since this build was captured") with two choices:
+  **Re-diff** (`POST /api/v1/projects/{slug}/builds/{id}/rediff`) recomputes undecided snapshots from the
+  stored screenshots without rendering, and **Retry capture** re-renders every story.
+- Re-diff skips approved/rejected snapshots (decisions), inherited snapshots (never rendered), and
+  default-branch builds (authoritative); the build roll-up is refreshed afterwards.
+
 ### Review Comments
 
 Reviewers and developers can leave **threaded comments** on any snapshot (or on the build as a whole), and mark threads **resolved** once addressed. A comment on an unresolved snapshot keeps it in `changed` until the author pushes a fix and it is re-approved — this is the "request changes" flow. Comments persist on the build until the build is purged.
@@ -428,25 +486,25 @@ Screenshots accumulate fast. Everything below the **baseline** is transient; the
 
 ### What is never purged
 
-- `baselines/**` files and `baselines` rows (all branches)
-- Builds bearing a `persistent` label (release/tag builds) and their storage files
+- Default-branch `baselines/**` files/rows (feature branches TTL'd — see below) and builds bearing a `persistent` label (release/tag builds) and their storage files
 
 ### What is purged
 
 - **Builds in a terminal review state** (`approved`/`rejected`) older than `purge_ttl` (default 30 days).
 - **Old builds of a branch**: retain the most recent build per branch (it is the branch's "current" state and powers the PR status link); purge older ones past TTL.
 - Builds stuck in non-terminal states are **not** purged (a `reviewing` build must not vanish before review).
+- **Stale branch baselines:** branches whose latest build is older than `branchTtlDays` (default 30, `null` = disabled) are GC'd — deletes `baselines/{branch}/**` files and `baselines` rows for that branch (default branch never GC'd).
 
-Purge removes **both** storage files (`builds/{buildId}/`) and database rows (`builds`, `snapshots`) in one transaction.
+Purge removes **both** storage files (`builds/{buildId}/` or `baselines/{branch}/**`) and database rows (`builds`, `snapshots`, or `baselines`) in one transaction.
 
 ### Orphaned baselines
 
-When a story is renamed or removed from Storybook, its baseline is never touched by normal builds. On each **default-branch** build, diff `index.json` against the `baselines` table and delete baselines whose `story_id` no longer exists.
+When a story is renamed or removed from Storybook, its baseline is never touched by normal builds. On each **default-branch** build, diff `index.json` against the `baselines` table and delete baselines whose `story_id` no longer exists (now also deletes the storage file).
 
 ### Trigger
 
-- **Scheduled**: an in-server timer driven by `--purge-interval` (default hourly).
-- **Manual**: `storyshelf purge` CLI command or `POST /api/v1/admin/purge` (admin).
+- **Scheduled**: in-server timers — build purge (`--purge-interval`, default hourly) and branch GC (`branchTtlDays` 30 + `branchGcIntervalMs` 24h daily interval clock via `retention-timer.ts`, staggered 1h).
+- **Manual**: `storyshelf purge` CLI command or `POST /api/v1/admin/purge` (admin; now runs both build purge and branch GC and returns `{removedBuilds,removedBranches,removedBaselines}`).
 
 ## Published Storybook
 
@@ -515,6 +573,11 @@ DELETE /api/v1/projects/:projectId/builds/:buildId
 # Snapshots (read-only API, mutations via review endpoints)
 GET    /api/v1/projects/:projectId/builds/:buildId/snapshots
 
+# Attempts (per-build capture history; one row per run, same build ID)
+GET    /api/v1/projects/:projectId/builds/:buildId/attempts
+GET    /api/v1/projects/:projectId/builds/:buildId/attempts/:attemptNo
+GET    /api/v1/projects/:projectId/builds/:buildId/attempts/:attemptNo/logs
+
 # Review
 POST   /api/v1/projects/:projectId/builds/:buildId/snapshots/:snapshotId/approve
 POST   /api/v1/projects/:projectId/builds/:buildId/snapshots/:snapshotId/reject
@@ -551,10 +614,18 @@ POST   /api/v1/projects/:projectId/builds/:buildId/unpublish
 # Admin
 POST   /api/v1/admin/purge                          # manual retention purge
 
-# Auth (session-based, web UI)
-GET    /auth/login                     # redirect to OAuth provider
-GET    /auth/callback                  # handle OAuth callback
-POST   /auth/logout                    # destroy session
+# Auth (Better Auth engine, mounted at /api/auth/*; see https://www.better-auth.com/docs/integrations/hono)
+ALL    /api/auth/*                     # Better Auth handler (email+password, social, SSO, passkey, sessions)
+GET    /auth/login                     # descriptor-driven method list, or redirect for sole oauth/sso
+GET    /auth/engine/:providerId        # start one oauth/sso flow
+POST   /auth/engine/login              # local account login (email + password → engine)
+GET    /auth/invites/:inviteId         # set-password form for an invite link (?token=…)
+POST   /auth/invites/:inviteId         # accept invite, set credential, land on /profile
+POST   /auth/logout                    # destroy session (plus engine sign-out)
+
+# Relying-party helpers (public, auth-gate-exempt)
+GET    /.well-known/openid-configuration  # RP metadata: issuer, redirect_uris, providers (not an IdP)
+GET    /.well-known/change-password       # 302 to /profile
 
 # UI Pages
 GET    /                                                   # projects list
@@ -569,6 +640,10 @@ GET    /projects/:slug/storybook                          # published Storybook 
 GET    /projects/:slug/storybook/:key/:value              # published Storybook (`:value` wildcard, URL-encoded)
 GET    /projects/:slug/storybook/build/:buildId/...       # published Storybook (specific build; serves assets)
 GET    /projects/:slug/settings                           # members, label types, public access, tokens, webhooks
+GET    /profile                                           # personal page: name, password (local), memberships
+POST   /profile                                           # update display name override
+POST   /profile/password                                  # change local-account password
+GET    /admin                                             # site-admin System page (adapter inventory + in-depth health)
 ```
 
 ## Package Structure
@@ -576,99 +651,45 @@ GET    /projects/:slug/settings                           # members, label types
 ```
 StoryShelf/
   packages/
-    core/
+    core/                 # domain only — no HTTP (see ADR 0018)
       src/
-        models/           # schema + business logic
-          project.ts
-          build.ts
-          snapshot.ts
-          baseline.ts
-          member.ts
-          comment.ts
-          label.ts
-          token.ts
-          webhook.ts
-        models/           # schema + business logic
-          project.ts
-          build.ts
-          snapshot.ts
-          baseline.ts
-          member.ts
-          comment.ts
-          label.ts
-          token.ts
-          webhook.ts
-        routers/          # API + UI routes
-          projects.ts
-          builds.ts
-          labels.ts
-          media.ts        # serve screenshots, diffs, baselines
-          members.ts
-          tokens.ts
-          webhooks.ts
-          admin.ts
-          settings.ts     # /projects/:slug/settings* HTML pages + form handlers
-          ui.ts           # /projects... HTML pages (list, detail, diff, jobs)
-          auth.ts         # /auth/* session flow
-          htmx.ts         # HX-request helpers
-          helpers.ts      # json/authorization/role helpers
-          assets.ts       # static assets (vendored HTMX)
-        pages/            # UI page components (server-rendered JSX)
-          projects.tsx
-          project-create.tsx
-          project-builds.tsx
-          project-details.tsx
-          build-detail.tsx    # build overview (snapshot cards + comments)
-          build-diff.tsx      # the three-up diff review page
-          compute-jobs.tsx    # capture queue + build history
-          login.tsx
-          settings-general.tsx
-          settings-labels.tsx
-          settings-members.tsx
-          settings-tokens.tsx
-          settings-webhooks.tsx
-          root.tsx
-        adapters/         # interfaces only
-          database.ts
-          storage.ts
-          auth.ts
-          status.ts       # GitHub/GitLab status checks
-          capture-runner.ts
-          logger.ts
-        capture/          # server-side capture pipeline
-          adapter.ts      # StorySourceAdapter interface
-          storybook.ts    # Storybook adapter (index.json discovery)
-          pipeline.ts     # render -> screenshot -> store -> diff
-          queue.ts        # in-process queue + concurrency
-        diff/             # visual diff engine
-          engine.ts       # pixelmatch + overlay generation
-          options.ts      # DiffOptions, DiffResult types
-        retention/        # purge
-          purge.ts        # TTL + per-branch retention + orphan GC
-        ui/               # fixed server-rendered UI (hono/jsx + HTMX + hono/css)
-          document.tsx    # DocumentLayout: head, vendored HTMX, styles
-          theme.ts        # light/dark color tokens (BrandTheme)
-          components.tsx  # reusable UI components (Button, Badge, Card, ...)
-          styles.ts       # base CSS (light/dark/system)
-        assets/           # vendored static assets
-          htmx.min.js     # HTMX served locally (no CDN)
+        adapters/         # interfaces only (+ lifecycle runner, webhook sender)
+        models/           # business logic (constructor-injected over DatabaseAdapter)
+        schema/           # Drizzle tables + row types (narrow handles via `core/schema`)
+        capture/          # orchestrator, pipeline, queues, storybook discovery
+        retention/        # purge (build TTL + per-branch keep-latest + orphan GC + branch GC via purgeStaleBranches)
+        diff/             # visual diff engine (pixelmatch + overlay)
+        config.ts         # ShelfOptions/ShelfConfig/UIConfig + validation
+        logger.ts         # pino factory (`core/logger`)
         urls.ts           # type-safe URL builder
-        store.ts          # AsyncLocalStorage context
-        config.ts         # RouterConfig (ShelfOptions)
-        schema.ts         # Drizzle schema (all entities)
         types.ts          # status/role enums
         ddl.ts            # raw SQL DDL
-        index.tsx         # createShelfRouter entry point
-      package.json
+        utils/            # hash/encrypt/ulid/paths (`core/utils`)
+        test-helpers/     # in-memory fakes (`core/test-helpers`)
+        index.tsx         # domain-only barrel (config/logger/types surface)
+      package.json        # subpaths: adapter/*, capture, config, ddl, diff,
+                          # logger, models, paths, retention, schema, types,
+                          # urls, utils, test-helpers
+    app/                  # HTTP app over core (see ADR 0018)
+      src/
+        index.tsx         # createShelfApp entry point (ShelfApp/ShelfRouter)
+        routers/          # API + UI routes (incl. health, OpenAPI)
+        pages/            # UI page components (server-rendered JSX)
+        ui/               # DocumentLayout, theme, components, styles
+        middleware/       # request id/logging/gate/rate-limit/scope/auth
+        store.ts          # AsyncLocalStorage request context
+        assets/           # vendored HTMX (served locally, no CDN)
+      scripts/
+        generate-openapi.ts  # OpenAPI snapshot for the website prebuild
+      package.json        # single `index` entry
 
     db-sqlite/
       src/
-        index.ts          # DatabaseAdapter for SQLite (via better-sqlite3 + Drizzle)
-      package.json
-
-    db-turso/
-      src/
-        index.ts          # DatabaseAdapter for Turso/libSQL (via @libsql/client + Drizzle)
+        index.ts          # DatabaseAdapter for SQLite (via node:sqlite + Drizzle)
+        turso.ts          # Turso/libSQL preset (via @libsql/client + Drizzle)
+        better-sqlite3.ts # better-sqlite3 preset (native + Drizzle)
+        bun-sqlite.ts     # Bun preset (via bun:sqlite + Drizzle)
+        d1.ts             # Cloudflare D1 preset (via D1 binding + Drizzle)
       package.json
 
     storage-local/
@@ -681,31 +702,41 @@ StoryShelf/
         index.ts          # StorageAdapter for S3-compatible (AWS S3, R2, MinIO)
       package.json
 
-    auth-oauth/
+    storage-gcs/
       src/
-        index.ts          # AuthAdapter for OAuth/OIDC (GitHub, GitLab, Keycloak, etc.)
+        index.ts          # StorageAdapter for Google Cloud Storage (GCS + emulator)
       package.json
 
-    auth-password/
+    storage-azure/
       src/
-        index.ts          # AuthAdapter: shared password via env var
+        index.ts          # StorageAdapter for Azure Blob Storage (Azurite)
+      package.json
+
+    auth/
+      src/
+        index.ts          # Shelf auth engine: opaque Better Auth bridge, createShelfAuth, presets
+        engine.ts         # Better Auth instance + Auth singleton (sessions, mirror hook)
+        db-bridge.ts      # Better Auth DBAdapter over DatabaseAdapter (no dialect knowledge)
+        auth-tables.ts    # sqlite-core defs (user/session/account/verification/passkey/ssoProvider)
+        auth-tables-pg.ts # pg-core mirrors for Postgres
+        presets/          # social, enterprise OIDC, and SSO/SAML recipes
+        invites.ts        # invite-only local accounts on engine credentials
+        sessions.ts       # device-session inventory for /profile
+        passkeys.ts       # passkey inventory + local-credential flag
+        config.ts         # config-as-code: zod schemas, {env} refs, resolveSecrets
       package.json
 
     cli/
       src/
-        index.ts          # CLI client entry (commander: upload/init/retry/purge, no Playwright)
+        index.ts          # CLI client entry (commander: upload/init/create/server/purge/retry, no Playwright)
+        config.ts         # .storybook/storyshelf.json load/write + .storybook/main.* guard
         commands/
-          upload.ts       # storyshelf upload (build Storybook -> zip -> upload; git tags -> persistent label)
+          upload.ts       # storyshelf upload (build Storybook -> zip -> upload; git tags -> persistent label; defaults to upload)
           retry.ts        # storyshelf retry (re-run capture for a build)
-          init.ts         # storyshelf init (create project, generate token)
+          init.ts         # storyshelf init (write .storybook/storyshelf.json, prompts, fails if no main.*)
+          create/         # storyshelf create (create project + token with admin token, writes config, fails if no main.*)
           purge.ts        # storyshelf purge (manual retention purge)
-      package.json
-
-    node-server/
-      src/
-        index.ts          # server entry (commander: `serve`, the default command)
-        commands/
-          serve.ts        # storyshelf-server serve (assemble router + adapters + runner, listen)
+          server/init.ts  # storyshelf server init (scaffold server project; prompts infra)
       package.json
 
     runner-playwright/
@@ -715,6 +746,28 @@ StoryShelf/
         static-server.ts  # local HTTP server for the extracted Storybook during capture
         viewport.ts       # default viewports
       package.json
+
+    queue-redis/
+      src/
+        index.ts          # Redis CaptureQueue (ioredis, BLMOVE, delayed ZSET)
+      package.json
+    queue-sqs/
+      src/
+        index.ts          # SQS CaptureQueue (AWS SDK v3, SQS long-poll)
+      package.json
+    observability/
+      src/
+        index.ts          # runtime-agnostic OTEL entrypoint (api only; Deno-safe)
+        node.ts           # Node SDK lifecycle (OTLP/HTTP exporters)
+        config.ts         # env resolution (OTEL_* standard, STORYSHELF_OTEL_* gaps)
+        tracing.ts        # withSpan helper
+        propagate.ts      # W3C traceparent helpers for queue payloads
+        middleware.ts     # @hono/otel wrapper (+ reqId/userId attributes)
+        instrument-db.ts  # DatabaseAdapter wrapper (db.* spans + metrics)
+        instrument-storage.ts # StorageAdapter wrapper (storage.* spans + metrics)
+        metrics.ts        # memoized instruments (capture/db/storage)
+        logs.ts           # pino mixin (trace_id/span_id correlation)
+      package.json        # single prod owner of all OTEL deps (see ADR 0022)
 ```
 
 ## Tech Stack
@@ -723,8 +776,8 @@ StoryShelf/
 |---------|--------|-----------|
 | **Runtime** | Node.js 22+ | Playwright's best-supported runtime; LTS |
 | **HTTP framework** | Hono (OpenAPIHono) | Type-safe routes, OpenAPI spec generation, edge-compatible |
-| **Database** | SQLite via `better-sqlite3` + Drizzle ORM (local). Turso/libSQL via `@libsql/client` + Drizzle (serverless). | Zero-config on VPS/Docker. Turso for Vercel/Cloudflare Workers. Same schema, same queries, different connection. |
-| **Storage** | Local filesystem (default). S3-compatible (R2, MinIO, S3) as alternative. | Local for Docker/VPS. S3 for cloud. Same adapter interface, two implementations. |
+| **Database** | SQLite via `node:sqlite` + Drizzle ORM (local, default). Presets in the same package: Turso/libSQL via `@libsql/client` (serverless), better-sqlite3 (native), bun:sqlite (Bun), D1 binding (Workers). | Zero-config on VPS/Docker. Same schema, same queries, different driver. |
+| **Storage** | Local filesystem (default). S3-compatible (R2, MinIO, S3), GCS, Azure Blob as alternatives. | Local for Docker/VPS. S3/GCS/Azure for cloud. Same adapter interface, four implementations. |
 | **Screenshot capture** | Playwright (server-side) | Industry standard. Deterministic rendering in a pinned image. `toHaveScreenshot` battle-tested |
 | **Pixel diff** | pixelmatch + pngjs | Same libraries Playwright uses internally. Fast, reliable, widely adopted |
 | **Server UI** | hono/jsx + HTMX + hono/css | Server-rendered, fixed UI with brand theming; no client framework or build step |
@@ -735,7 +788,7 @@ StoryShelf/
 | **Task runner** | turbo | Monorepo build orchestration. Same as StoryBooker |
 | **Package manager** | nub/nubx | Proven in StoryBooker. Monorepo-aware, works with turbo |
 | **CLI framework** | commander.js | Lightweight, well-typed, no magic |
-| **Auth** | Pluggable AuthAdapter. Built-in: OAuth/OIDC, shared password. No auth by default. | Enterprise teams plug in their IdP (Keycloak, Authentik, Okta, GitHub). CLI uses API tokens (separate from user auth). |
+| **Auth** | Better Auth engine (`@storyshelf/auth`, mounted at `/api/auth/*`): descriptor-driven login (password, social, SSO/SAML, passkey), invite-only local accounts, device/passkey management on `/profile`. Custom login text via `UIConfig.auth`; RP helpers under `/.well-known/`. No auth by default. | Enterprise teams plug in their IdP (Keycloak, Okta, Entra, SAML). CLI uses API tokens (separate from user auth). See ADR 0023. |
 | **Schema validation** | zod | Runtime validation for API inputs. Drizzle uses it for schema |
 | **Date/time** | Built-in `Date` + ISO strings | No luxury date library needed |
 | **IDs** | ULID | Sortable, collision-resistant, URL-safe |
@@ -758,26 +811,28 @@ StoryShelf/
 | `compute.jobs[]` nested in Project | No jobs table in v1 | Capture is a fixed pipeline |
 | `latestBuildId` on Project | `baselines` per branch | Baseline is per branch, not per project |
 | Dual-mode HTML/JSON routes | Separate `/api/v1` and `/` routes | Eliminates content-type sniffing bugs |
-| No auth (open API) | Pluggable AuthAdapter | Enterprise IdP integration. Default: none for local dev. |
+| No auth (open API) | Auth singleton (`@storyshelf/auth`) | Enterprise IdP integration. Default: none for local dev. |
 
 ## Server UI
 
 StoryShelf ships a **fixed, server-rendered UI** — `hono/jsx` + HTMX + `hono/css`. No client framework, no UI build step, no pluggable-UI adapter. Custom interfaces are built against `/api/v1` (the same contract the CLI uses, so it cannot be a second-class citizen). See ADR 0012.
 
 - **Layout:** a branded top **header** (logo + name + accent, project context, theme toggle, user menu) plus a neutral left **sidebar** (Builds, Storybook, Settings). The content area is monochrome and image-first.
-- **Pages** live in `core/src/pages/*.tsx` and render directly from models (no API/UI contract duplication).
-- **Layout & theming** live in `core/src/ui/` — a `DocumentLayout` (head, vendored HTMX, styles) plus a `BrandTheme` of light/dark color tokens.
+- **Pages** live in `app/src/pages/*.tsx` and render directly from models (no API/UI contract duplication).
+- **Layout & theming** live in `app/src/ui/` — a `DocumentLayout` (head, vendored HTMX, styles) plus a `BrandTheme` of light/dark color tokens.
 - **Theme:** follows the system (`prefers-color-scheme`) with a manual light/dark override, persisted in a cookie so the server renders the correct theme on first paint.
-- **Brand config** is passed as `ui: { name, logo, favicon, theme }` to `createShelfRouter` (see `ShelfOptions`). Env vars (`SS_BRAND_NAME`, `SS_LOGO_URL`) supply defaults so self-hosters can rebrand with a `docker run`, no code.
+- **Brand config** is passed as `ui: { name, logo, favicon, theme }` to `createShelfApp` (see `ShelfOptions`). Env vars (`SS_BRAND_NAME`, `SS_LOGO_URL`) supply defaults so self-hosters can rebrand with a `docker run`, no code.
+- **Auth UI text** lives in `ui.auth` (title, subtitle, password label/placeholder, submit label, `{label}` SSO template, help/footer) with `SS_AUTH_*` env defaults; the header user menu links to the personal `/profile` page (editable display name, local password change, memberships).
+- **Public base URL** (`config.publicBaseUrl`, `PUBLIC_BASE_URL`) pins the issuer in the `/.well-known/openid-configuration` relying-party helper; otherwise the request origin is used.
 - **HTMX is vendored locally** (no CDN), so air-gapped deployments work.
-- **Diff view (v1):** a simple three-up grid — baseline | current | diff overlay. A minimal vanilla-JS layer in `core/src/ui/document.tsx` (the inline `clientScript`) covers the theme toggle and keyboard approve/reject; the wipe slider and zoom are deferred to v2. The published-Storybook page is an `<iframe>` of Storybook's own static build.
+- **Diff view (v1):** a simple three-up grid — baseline | current | diff overlay. A minimal vanilla-JS layer in `app/src/ui/document.tsx` (the inline `clientScript`) covers the theme toggle and keyboard approve/reject; the wipe slider and zoom are deferred to v2. The published-Storybook page is an `<iframe>` of Storybook's own static build.
 
 ## Deployment
 
 ### Docker (recommended)
 
 ```dockerfile
-FROM mcr.microsoft.com/playwright:v1.52.0-noble
+FROM mcr.microsoft.com/playwright:v1.63.0-noble
 # Playwright image includes Chromium, Firefox, WebKit + system deps
 
 WORKDIR /app
@@ -789,7 +844,7 @@ RUN nubx nub run build
 EXPOSE 3000
 VOLUME /app/data
 
-CMD ["node", "packages/node-server/dist/index.js", "serve", "--port", "3000", "--data-dir", "/app/data"]
+CMD ["node", "--experimental-transform-types", "server.ts"]
 ```
 
 ```yaml
@@ -806,15 +861,21 @@ services:
       # Capture + retention
       - CAPTURE_CONCURRENCY=2
       - PURGE_TTL_DAYS=30
+      - BRANCH_TTL_DAYS=30
+      - BRANCH_GC_INTERVAL_MS=86400000
       - PURGE_INTERVAL_MINUTES=60
       # Published Storybook subdomains (optional — omit for path-based URLs only)
       # - PUBLISHED_BASE_DOMAIN=stories.example.com   # requires wildcard DNS + TLS
-      # Auth (optional — omit for no auth)
-      - OIDC_ISSUER=https://keycloak.example.com/realms/myteam
-      - OIDC_CLIENT_ID=storyshelf
-      - OIDC_CLIENT_SECRET=your-client-secret
-      # Or for shared password auth:
-      # - AUTH_PASSWORD=your-shared-password
+      # Auth (optional — omit for no auth; see /guides/auth/)
+      # - AUTH_PASSWORD=a-long-admin-password   # ≥ 12 chars (local admin)
+      # - OIDC_ISSUER=https://keycloak.example.com/realms/myteam
+      # - OIDC_CLIENT_ID=storyshelf
+      # - OIDC_CLIENT_SECRET=secret
+      # SECRET must be ≥ 32 chars (e.g. openssl rand -hex 32)
+      # Bootstrap (optional — first site admin before any user exists):
+      # - STORYSHELF_ADMIN_TOKEN=your-long-random-token  # or ADMIN_TOKEN
+      #   `SECRET` signs sessions; `STORYSHELF_ADMIN_TOKEN` grants site-admin
+      #   API access (project creation, purge). Never the same value.
 
 volumes:
   storyshelf-data:
@@ -831,18 +892,23 @@ nubx nub run dev          # starts Hono dev server
 
 ## Testing
 
-See `docs/testing.md`. Unit, adapter-contract, and integration tests run on every CI (`nub run test`, vitest, hermetic — no browser). The capture pipeline is browser-gated: a separate `nub run test:integration` suite runs real Playwright against the committed Storybook fixture in `examples/storybook`.
+See `docs/testing.md`. Unit, adapter-contract, and integration tests run on every CI (`nub run test`, vitest, hermetic — no browser). The capture pipeline is browser-gated: a separate `nub run test:integration` suite runs real Playwright against the committed Storybook fixture in `fixtures/storybook-8`.
 
 ## Website, Docs & Examples
 
-See `docs/website.md`. The public site (`website/`, Astro Starlight) hosts guides plus an auto-generated API reference from the Hono OpenAPI spec. `examples/storybook` is the deterministic capture fixture; `examples/fly-app` deploys StoryShelf to fly.io as a public demo.
+See `docs/website.md`. The public site (`apps/website/`, Astro Starlight) hosts guides plus an auto-generated API reference from the Hono OpenAPI spec. `fixtures/storybook-8` is the deterministic capture fixture; `examples/fly-app` deploys StoryShelf to fly.io as a public demo.
 
 ## Deliberately Deferred (v2)
 
-1. **TurboSnap / `--only-changed`** -- v1 re-renders every story on every build. Functionally correct (unchanged stories auto-approve), but server CPU scales linearly with story count. This is the top scaling limit.
+1. **Affected capture** -- builds declare `affectedOnly` (default true); the CLI traces
+   `git diff <baselineSha>..HEAD` through the Vite stats graph (`@storyshelf/affected`)
+   and posts `affectedImportPaths`, and the orchestrator renders only affected stories
+   while inheriting the rest unchanged from their baselines (new stories always render).
+   Any uncertainty (shallow clone, missing stats/history, global-file change) falls
+   back to a full render, and `--full` opts out per run.
 2. **Git-provider merge gate (GitHub App / GitLab)** -- rich check runs, per-snapshot annotations, and auto-reject on review rejection. v1 has the primitive (required commit status); the full integration is ADR 0010.
 3. **Remote capture runners** -- offload capture to a worker fleet (SQS/HTTP). The `CaptureRunner` interface anticipates this.
-4. **`parameters.chromatic` equivalents** -- `modes`/themes, per-story `delay`, `disableSnapshot`. `waitForReady` covers the basic "wait for data" case only.
+4. **`parameters.chromatic` equivalents** -- `modes`/themes (args matrix). Per-story `delay`, `disableSnapshot`, `flakyTest`, `autoCrop`/sizing are implemented; `waitForReady` covers the basic "wait for data" case.
 5. **Ladle / Histoire / custom pages** -- the `StorySourceAdapter` interface anticipates them.
-6. **Per-story `delay` / viewport presets per project** -- global viewport defaults only in v1.
+6. **Per-story viewport presets** -- a story's Storybook `defaultViewport` is captured **in addition to** the project's global list (union, deduped by name; issue #82), including inline `parameters.viewport.viewports`. Global defaults remain the project-level surface.
 7. **Linked projects / design-system propagation** -- when a design-system project approves a change, re-diff dependent projects against the new baseline. Not urgent; modeled as a future dependency edge between projects.

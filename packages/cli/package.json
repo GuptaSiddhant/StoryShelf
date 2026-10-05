@@ -1,35 +1,75 @@
 {
-  "name": "@storyshelf/cli",
-  "version": "0.1.0",
-  "type": "module",
+  "name": "storyshelf",
+  "version": "0.5.2",
   "description": "StoryShelf CLI: create projects, upload builds, purge, and retry from CI.",
-  "license": "MIT",
-  "bin": {
-    "storyshelf": "./dist/index.js"
+  "keywords": [
+    "ci",
+    "cli",
+    "self-hosted",
+    "storybook",
+    "visual-testing"
+  ],
+  "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
+  "bugs": {
+    "url": "https://github.com/GuptaSiddhant/StoryShelf/issues"
   },
+  "license": "MIT",
+  "author": {
+    "name": "Siddhant Gupta",
+    "url": "https://guptasiddhant.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GuptaSiddhant/StoryShelf.git",
+    "directory": "packages/cli"
+  },
+  "bin": {
+    "storyshelf": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "schema"
+  ],
+  "type": "module",
   "sideEffects": false,
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown -w",
-    "fmt": "oxfmt -c ../../.oxfmtrc.json ./src",
+    "fmt": "oxfmt ./src",
     "lint": "oxlint --type-aware --type-check ./src",
     "start": "nub --watch ./dist/index.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepublishOnly": "nub run build"
   },
   "dependencies": {
-    "adm-zip": "^0.6.0",
+    "@storyshelf/affected": "workspace:*",
+    "archiver": "8.0.0",
     "commander": "^13.0.0",
-    "hono": "^4.11.0"
+    "hono": "catalog:",
+    "picomatch": "^4.0.2",
+    "prompts": "^2.4.2"
   },
   "devDependencies": {
+    "@storyshelf/core": "workspace:*",
     "@types/node": "catalog:",
+    "@types/picomatch": "catalog:",
+    "@types/prompts": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "adm-zip": "catalog:",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:",
-    "@storyshelf/core": "workspace:*"
-  }
+    "vitest": "catalog:"
+  },
+  "jsr": false
 }

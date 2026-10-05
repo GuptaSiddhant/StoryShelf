@@ -32,6 +32,8 @@ interface StorySourceAdapter {
 }
 ```
 
+Implemented in `packages/core/src/capture/adapter.ts` (feature #80): the built-in Storybook adapter leaves `waitForReady` undefined but does set `screenshotSelector = "#storybook-root"`, so capture waits via `waitForSelector`; custom sources can supply `waitForReady` and their own selector (or none).
+
 ### Addition roadmap
 
 | Explorer | When | Effort | Why |

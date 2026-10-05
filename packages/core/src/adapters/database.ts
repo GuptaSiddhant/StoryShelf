@@ -1,5 +1,66 @@
+/**
+ * Database adapter interface: query builders over explicitly typed tables.
+ *
+ * Canonical home of the database contract — {@link DatabaseAdapter},
+ * {@link Tables}, {@link TxStore}, {@link ListOptions}, and
+ * {@link DrizzleAdapterOptions}. Driver machinery lives in the database
+ * packages (`@storyshelf/db-sqlite`, `@storyshelf/db-postgres`).
+ */
 import type { SQL } from "drizzle-orm";
-import type { AnySQLiteTable } from "drizzle-orm/sqlite-core";
+import type { Table } from "drizzle-orm";
+import type { Adapter, AdapterMetadata } from "./metadata.ts";
+
+/** Type-safe table map enforced on every DatabaseAdapter. */
+export interface Tables {
+  projects: Table;
+  projectStatusConfigs: Table;
+  builds: Table;
+  captureAttempts: Table;
+  captureLogs: Table;
+  snapshots: Table;
+  baselines: Table;
+  comments: Table;
+  labelTypes: Table;
+  buildLabels: Table;
+  tokens: Table;
+  webhooks: Table;
+  notificationChannels: Table;
+  notificationSubscriptions: Table;
+  users: Table;
+  userInviteTokens: Table;
+  projectMembers: Table;
+  projectGroupMappings: Table;
+  contentRefs: Table;
+}
+
+/** Table keys every DatabaseAdapter must expose (contract + validation share this). */
+export const REQUIRED_TABLE_KEYS = [
+  "projects",
+  "builds",
+  "snapshots",
+  "baselines",
+  "comments",
+  "labelTypes",
+  "buildLabels",
+  "tokens",
+  "webhooks",
+  "users",
+  "projectMembers",
+];
+
+/** Largest page any adapter serves in one list call. */
+export const MAX_LIST_LIMIT = 1000;
+
+/** Clamp a list limit into [1, MAX_LIST_LIMIT]; undefined stays undefined. */
+export function clampListLimit(limit?: number): number | undefined {
+  if (limit === undefined) {
+    return undefined;
+  }
+  if (!Number.isFinite(limit)) {
+    return MAX_LIST_LIMIT;
+  }
+  return Math.min(Math.max(Math.floor(limit), 1), MAX_LIST_LIMIT);
+}
 
 /** Options that narrow and page a list query. */
 export interface ListOptions {
@@ -13,28 +74,66 @@ export interface ListOptions {
   offset?: number;
 }
 
-/** Database abstraction over Drizzle tables, agnostic of the underlying driver. */
-export interface DatabaseAdapter {
+/**
+ * Transactional CRUD subset available inside {@link DatabaseAdapter.transact}.
+ * Mirrors the adapter surface minus metadata, lifecycle, and raw `all`
+ * (opaque to transactions on some drivers).
+ */
+export interface TxStore {
   /** Insert a row and return the inserted record. */
-  insert<T extends AnySQLiteTable>(table: T, values: T["$inferInsert"]): Promise<T["$inferSelect"]>;
+  insert<T extends Table>(table: T, values: T["$inferInsert"]): Promise<T["$inferSelect"]>;
   /** Update a row by id and return the updated record. */
-  update<T extends AnySQLiteTable>(
+  update<T extends Table>(
     table: T,
     id: string,
     values: Partial<T["$inferInsert"]>,
   ): Promise<T["$inferSelect"]>;
   /** Fetch a single row by id, or null if not found. */
-  get<T extends AnySQLiteTable>(table: T, id: string): Promise<T["$inferSelect"] | null>;
+  get<T extends Table>(table: T, id: string): Promise<T["$inferSelect"] | null>;
   /** Delete a row by id. */
-  remove(table: AnySQLiteTable, id: string): Promise<void>;
+  remove(table: Table, id: string): Promise<void>;
   /** List rows matching the given options. */
-  list<T extends AnySQLiteTable>(table: T, opts?: ListOptions): Promise<T["$inferSelect"][]>;
+  list<T extends Table>(table: T, opts?: ListOptions): Promise<T["$inferSelect"][]>;
   /** Count rows matching an optional where condition. */
-  count(table: AnySQLiteTable, where?: SQL): Promise<number>;
+  count(table: Table, where?: SQL): Promise<number>;
+}
+
+/** Database abstraction over Drizzle tables, agnostic of dialect and driver. */
+export interface DatabaseAdapter extends Adapter<{ readonly category: "database" }> {
+  /** Table handles for this adapter's dialect, enforced with type safety. */
+  readonly tables: Tables;
+  /** Insert a row and return the inserted record. */
+  insert<T extends Table>(table: T, values: T["$inferInsert"]): Promise<T["$inferSelect"]>;
+  /** Update a row by id and return the updated record. */
+  update<T extends Table>(
+    table: T,
+    id: string,
+    values: Partial<T["$inferInsert"]>,
+  ): Promise<T["$inferSelect"]>;
+  /** Fetch a single row by id, or null if not found. */
+  get<T extends Table>(table: T, id: string): Promise<T["$inferSelect"] | null>;
+  /** Delete a row by id. */
+  remove(table: Table, id: string): Promise<void>;
+  /** List rows matching the given options. */
+  list<T extends Table>(table: T, opts?: ListOptions): Promise<T["$inferSelect"][]>;
+  /** Count rows matching an optional where condition. */
+  count(table: Table, where?: SQL): Promise<number>;
   /** Run an arbitrary SQL query and return typed rows. */
   all<T>(query: SQL): Promise<T[]>;
-  /** Apply any pending schema migrations. */
-  migrate(): Promise<void>;
-  /** Close the underlying database connection. */
-  close(): Promise<void>;
+  /**
+   * Run `fn` inside a transaction when the driver supports one.
+   * Commits on resolve, rolls back on throw. Drivers without transaction
+   * support omit this; callers must use `?.` and accept sequential execution.
+   */
+  transact?<R>(fn: (tx: TxStore) => Promise<R>): Promise<R>;
+}
+
+/** Driver-supplied identity plus lifecycle hooks. */
+export interface DrizzleAdapterOptions {
+  metadata: AdapterMetadata & { readonly category: "database" };
+  tables: Tables;
+  migrate: () => Promise<void> | void;
+  close: () => Promise<void> | void;
+  /** Cheap liveness probe (e.g. `SELECT 1`); omitted when the driver has none. */
+  ping?: () => Promise<void> | void;
 }

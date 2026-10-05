@@ -1,184 +1,79 @@
-import {
-  DeleteMessageCommand,
-  ReceiveMessageCommand,
-  SendMessageCommand,
-  SQSClient,
-} from "@aws-sdk/client-sqs";
-
+/**
+ * SQS-backed capture queue adapter (AWS cloud deployments).
+ *
+ * Composition root: wires client resolution, lifecycle probes, enqueue,
+ * and worker polling into a `PollableCaptureQueue`. Per-concern logic
+ * lives in its own module.
+ */
 import type {
   CaptureJob,
-  CaptureQueue,
-  JobStatus,
+  PollableCaptureQueue,
+  PollableJob,
   QueueEntry,
-} from "@storyshelf/core";
+} from "@storyshelf/core/adapter/capture-queue";
+import type { Logger } from "@storyshelf/core/logger";
+import { resolveSqsContext } from "./client.ts";
+import { buildSqsLifecycle } from "./lifecycle.ts";
+import { enqueueJob, queueActive, queueRecent, queueStatus } from "./operations.ts";
+import { ackJob, nackJob, pollJob } from "./poll.ts";
+import type { SqsCaptureQueueOptions } from "./types.ts";
 
-import type { Logger } from "pino";
-
-/** Options for configuring an SQS-backed CaptureQueue. */
-export interface SqsCaptureQueueOptions {
-  /** SQS queue URL. */
-  queueUrl: string;
-  /** Optional pre-configured SQSClient. */
-  client?: SQSClient;
-  /** Optional logger for queue diagnostics. */
-  logger?: Logger;
-}
-
-interface QueuedBody {
-  buildId?: string;
-  status?: JobStatus;
-  queuedAt?: string;
-  startedAt?: string;
-  finishedAt?: string;
-  error?: string;
-  reqId?: string;
-}
-
-function parseBody(raw: string): QueuedBody {
-  return JSON.parse(raw) as QueuedBody;
-}
-
-function hasQueuedOrRunningStatus(body: QueuedBody): boolean {
-  const status = body.status ?? "queued";
-  return ["queued", "running"].includes(status);
-}
-
-function mapQueueEntry(raw: { Body?: string }): QueueEntry {
-  const body = parseBody(raw.Body ?? "{}");
-  return {
-    buildId: body.buildId ?? "unknown",
-    status: body.status ?? "queued",
-    queuedAt: body.queuedAt ?? new Date().toISOString(),
-  };
-}
+declare const __PKG_VERSION__: string | undefined;
 
 /**
- * Create an SQS-backed `CaptureQueue`.
+ * Create an SQS-backed `CaptureQueue` with worker polling.
  *
- * Jobs are submitted via `SendMessage` and retrieved via `ReceiveMessage`;
- * messages are deleted after reading to prevent re-processing.
+ * Server side uses `enqueue` only; `status`/`active`/`recent` are no-ops
+ * that return empty results (the builds table is the source of truth for remote
+ * queues). Workers poll via `poll`/`ack`/`nack` which use SQS long-poll,
+ * visibility timeout, and retry counting via `ApproximateReceiveCount`.
+ *
  * A separately-assembled worker polls the queue and calls
  * `executeCaptureJob` from `@storyshelf/core`.
  *
  * @param options - SQS queue URL and optional client configuration.
- * @returns A `CaptureQueue` satisfying the core interface.
+ * @returns A `PollableCaptureQueue` satisfying the core interface.
  */
-/* oxlint-disable max-lines-per-function */
-export function createSqsCaptureQueue(
-  options: SqsCaptureQueueOptions,
-): CaptureQueue {
-  const client = options.client ?? new SQSClient({});
+export function createSqsCaptureQueue(options: SqsCaptureQueueOptions): PollableCaptureQueue {
+  const { ctx, ownsClient } = resolveSqsContext(options);
 
   return {
-    /**
-     * Submit a build for capture. Resolves once the message is sent to SQS.
-     *
-     * The actual capture execution happens in a separate worker that
-     * polls the queue and calls `executeCaptureJob`.
-     */
+    metadata: {
+      name: "SQS Queue",
+      version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
+      description: "SQS-backed capture queue",
+      kind: "sqs",
+      category: "capture-queue",
+    },
+    setLogger(bound: Logger): void {
+      ctx.logger ??= bound;
+    },
+    lifecycle: buildSqsLifecycle(ctx, ownsClient),
     async enqueue(job: CaptureJob): Promise<void> {
-      await client.send(
-        new SendMessageCommand({
-          QueueUrl: options.queueUrl,
-          MessageBody: JSON.stringify({
-            buildId: job.buildId,
-            reqId: job.reqId,
-          }),
-          MessageAttributes: {
-            buildId: {
-              DataType: "String",
-              StringValue: job.buildId,
-            },
-            status: {
-              DataType: "String",
-              StringValue: "queued",
-            },
-          },
-        }),
-      );
+      await enqueueJob(ctx, job);
     },
-
-    /**
-     * Return the current status entry for a build, or null if untracked.
-     *
-     * Polls the SQS queue for a message matching the buildId. If found,
-     * the message is deleted so it is not re-processed.
-     */
     async status(buildId: string): Promise<QueueEntry | null> {
-      const resp = await client.send(
-        new ReceiveMessageCommand({
-          QueueUrl: options.queueUrl,
-          MaxNumberOfMessages: 1,
-          MessageAttributeNames: ["All"],
-        }),
-      );
-
-      const messages = resp.Messages ?? [];
-      if (messages.length === 0) {
-        return null;
-      }
-
-      const [msg] = messages;
-      if (!msg?.Body) {
-        return null;
-      }
-
-      const body = parseBody(msg.Body);
-
-      await client.send(
-        new DeleteMessageCommand({
-          QueueUrl: options.queueUrl,
-          ReceiptHandle: msg.ReceiptHandle,
-        }),
-      );
-
-      return {
-        buildId: body.buildId ?? buildId,
-        status: body.status ?? "queued",
-        queuedAt: body.queuedAt ?? new Date().toISOString(),
-        startedAt: body.startedAt,
-        finishedAt: body.finishedAt,
-        error: body.error,
-      };
+      return await queueStatus(ctx, buildId);
     },
-
-    /**
-     * Return queue entries that are queued or running, newest first.
-     *
-     * Short poll for up to 10 messages. Filters by status.
-     */
     async active(): Promise<QueueEntry[]> {
-      const resp = await client.send(
-        new ReceiveMessageCommand({
-          QueueUrl: options.queueUrl,
-          MaxNumberOfMessages: 10,
-          MessageAttributeNames: ["All"],
-        }),
-      );
-
-      return (resp.Messages ?? [])
-        .filter((message) => message.Body?.length && hasQueuedOrRunningStatus(parseBody(message.Body)))
-        .map((msg) => mapQueueEntry(msg))
-        .toSorted((left, right) => right.queuedAt.localeCompare(left.queuedAt));
+      return await queueActive(ctx);
     },
-
-    /**
-     * Return the most recent queue entries, newest first.
-     *
-     * Short poll for up to `limit` messages, sorted by queuedAt descending.
-     */
     async recent(limit: number): Promise<QueueEntry[]> {
-      const resp = await client.send(
-        new ReceiveMessageCommand({
-          QueueUrl: options.queueUrl,
-          MaxNumberOfMessages: limit,
-          MessageAttributeNames: ["All"],
-        }),
-      );
-
-      return (resp.Messages ?? [])
-        .map((msg) => mapQueueEntry(msg))
-        .toSorted((left, right) => right.queuedAt.localeCompare(left.queuedAt));
+      return await queueRecent(ctx, limit);
+    },
+    async poll(pollOptions?: { waitMs?: number }): Promise<PollableJob | null> {
+      return await pollJob(ctx, pollOptions);
+    },
+    async ack(job: PollableJob): Promise<void> {
+      await ackJob(ctx, job);
+    },
+    async nack(
+      job: PollableJob,
+      nackOptions?: { requeue?: boolean; delayMs?: number },
+    ): Promise<void> {
+      await nackJob(ctx, job, nackOptions);
     },
   };
 }
+
+export type { SqsCaptureQueueOptions } from "./types.ts";

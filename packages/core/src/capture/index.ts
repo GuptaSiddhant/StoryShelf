@@ -1,0 +1,50 @@
+/**
+ * Server-side capture runtime: story discovery, rendering orchestration,
+ * persistence, and the in-process queue.
+ *
+ * Pure renderers implement `CaptureRunner` (see `core/adapter/capture-runner`);
+ * everything here drives them. Remote workers reuse `executeCaptureJob`
+ * against any `CaptureQueue` backend.
+ */
+export {
+  DEFAULT_VIEWPORTS,
+  isDisabledStory,
+  isFlakyStory,
+  type StoryEntry,
+  type StoryParameters,
+  type StorySourceAdapter,
+  type StoryViewportConfig,
+  type StoryViewportDefinition,
+  type Viewport,
+} from "./adapter.ts";
+export {
+  executeCaptureJob,
+  type CaptureAttemptRef,
+  type CaptureJobInput,
+  type CaptureJobOptions,
+} from "./orchestrator.ts";
+export { persistCapture, type CaptureContext } from "./pipeline.ts";
+export {
+  rediffBuild,
+  REDIFFABLE_BUILD_STATUSES,
+  type RediffDeps,
+  type RediffResult,
+} from "./rediff.ts";
+export { InMemoryCaptureQueue, type InMemoryCaptureQueueOptions } from "./queue.ts";
+export type { PollableCaptureQueue, PollableJob } from "../adapters/capture-queue.ts";
+export {
+  STORYBOOK_BUILTIN_VIEWPORTS,
+  StorybookAdapter,
+  mergeParameters,
+  resolveStoryViewports,
+} from "./storybook.ts";
+export { createDispatchJob, type CaptureDispatchJob, type DispatchDeps } from "./dispatch.ts";
+export { extractStorybookToScratch, persistStorybookStatics } from "./statics.ts";
+export {
+  getScreenshotPlan,
+  resolveViewports as resolveCaptureViewports,
+  SIZING_DEFAULTS,
+  type BoundingBox,
+  type ScreenshotPlan,
+  type SizingOptions,
+} from "./sizing.ts";

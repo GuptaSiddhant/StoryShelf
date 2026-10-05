@@ -1,31 +1,124 @@
+import { loadDepGraph, STATS_FILENAME, type DepGraph } from "@storyshelf/affected";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-
-import type { StoryEntry, StorySourceAdapter } from "./adapter.ts";
+import type {
+  StoryEntry,
+  StoryParameters,
+  StorySourceAdapter,
+  StoryViewportConfig,
+  StoryViewportDefinition,
+  Viewport,
+} from "./adapter.ts";
 
 interface StorybookIndex {
   v: number;
-  entries: Record<string, { id: string; name: string; title: string; importPath?: string; tags?: string[]; type: string }>;
+  entries: Record<
+    string,
+    {
+      id: string;
+      name: string;
+      title: string;
+      importPath?: string;
+      tags?: string[];
+      type: string;
+      subtype?: string;
+      parameters?: StorybookParameters;
+    }
+  >;
+}
+
+/** Story parameters as serialized by the Storybook index. */
+interface StorybookParameters {
+  chromatic?: StoryParameters;
+  storyshelf?: StoryParameters;
+  viewport?: StoryViewportConfig;
+}
+
+/** Merge the `chromatic` and `storyshelf` parameter layers (`storyshelf` wins). */
+export function mergeParameters(entry: {
+  parameters?: StorybookParameters;
+}): StoryParameters | undefined {
+  const merged: StoryParameters = {
+    ...entry.parameters?.chromatic,
+    ...entry.parameters?.storyshelf,
+  };
+  if (entry.parameters?.viewport) merged.viewport = entry.parameters.viewport;
+  return Object.keys(merged).length > 0 ? merged : undefined;
 }
 
 /**
- * StorySourceAdapter that discovers stories from a built Storybook's
- * `index.json`/`stories.json` and renders them via its iframe URL.
+ * The Storybook `MINIMAL_VIEWPORTS` snapshot used to resolve a story's
+ * `defaultViewport` name at capture time. Dimensions are the documented
+ * stable set; inline `parameters.viewport.viewports` always win over these.
  */
+export const STORYBOOK_BUILTIN_VIEWPORTS: Readonly<Record<string, Viewport>> = {
+  mobile1: { name: "mobile1", width: 320, height: 568 },
+  mobile2: { name: "mobile2", width: 414, height: 896 },
+  tablet: { name: "tablet", width: 834, height: 1112 },
+  desktop: { name: "desktop", width: 1024, height: 1280 },
+};
+
+/**
+ * Resolve the viewports a story should be captured at: the project's global
+ * list plus the story's Storybook default viewport (union), deduplicated by
+ * name. An unresolvable or duplicate default contributes nothing extra.
+ */
+export function resolveStoryViewports(
+  entry: Pick<StoryEntry, "parameters">,
+  globalViewports: Viewport[],
+): Viewport[] {
+  const resolved = storyViewport(entry);
+  if (resolved && !globalViewports.some((v) => v.name === resolved.name)) {
+    return [...globalViewports, resolved];
+  }
+  return [...globalViewports];
+}
+
+function storyViewport(entry: Pick<StoryEntry, "parameters">): Viewport | undefined {
+  const config = entry.parameters?.viewport;
+  const name = config?.defaultViewport;
+  const inline = name ? config?.viewports?.[name] : undefined;
+  const resolved =
+    name && inline
+      ? viewportFromInline(name, inline)
+      : name
+        ? STORYBOOK_BUILTIN_VIEWPORTS[name]
+        : undefined;
+  return resolved;
+}
+
+function viewportFromInline(
+  defaultName: string,
+  inline: StoryViewportDefinition,
+): Viewport | undefined {
+  const dims = viewportDims(inline.styles);
+  return dims ? { name: inline.name ?? defaultName, ...dims } : undefined;
+}
+
+function viewportDims(
+  styles: StoryViewportDefinition["styles"] | undefined,
+): { width: number; height: number } | undefined {
+  const width = pxOf(styles?.width);
+  const height = pxOf(styles?.height);
+  return width !== undefined && height !== undefined ? { width, height } : undefined;
+}
+
+function pxOf(value: string | number | undefined): number | undefined {
+  if (typeof value === "number") return Math.round(value);
+  const bare = typeof value === "string" ? value.trim() : "";
+  const match = /^(\d+(?:\.\d+)?)px$/u.exec(bare);
+  return match ? Number(match[1]) : undefined;
+}
+
+/** Discovers stories from a built Storybook via its index file. */
 export class StorybookAdapter implements StorySourceAdapter {
   readonly name = "storybook";
   readonly screenshotSelector = "#storybook-root";
 
-  /**
-   * Discover all story entries from a built Storybook directory.
-   *
-   * @param source - Directory containing the built Storybook.
-   * @returns The discovered story entries (docs pages are excluded).
-   */
   async discover(source: string): Promise<StoryEntry[]> {
     const index = await this.readIndex(source);
     return Object.values(index.entries)
-      .filter((entry) => entry.type !== "docs")
+      .filter((entry) => entry.type !== "docs" && entry.subtype !== "test")
       .map((entry) => ({
         id: entry.id,
         title: entry.title,
@@ -33,26 +126,28 @@ export class StorybookAdapter implements StorySourceAdapter {
         importPath: entry.importPath,
         tags: entry.tags,
         type: entry.type === "docs" ? "docs" : "story",
+        parameters: mergeParameters(entry),
       }));
   }
 
-  /**
-   * Build the iframe URL used to render a given story.
-   *
-   * @param baseUrl - Base URL of the built Storybook.
-   * @param storyId - Story ID to render.
-   * @returns The story's iframe URL.
-   */
-  // Function buildUrl is a pure helper bound by the StorySourceAdapter interface.
   // eslint-disable-next-line class-methods-use-this
   buildUrl(baseUrl: string, storyId: string): string {
     return `${baseUrl}/iframe.html?id=${encodeURIComponent(storyId)}&viewMode=story`;
   }
 
-  // Private helper; invoked via `this` from discover.
+  /**
+   * Load the Vite stats dependency graph of an extracted build for affected
+   * capture. Resolves `null` when the build ships no usable stats, in which
+   * case the orchestrator renders every story.
+   */
+  // eslint-disable-next-line class-methods-use-this
+  async loadDependencyGraph(source: string): Promise<DepGraph | null> {
+    return await loadDepGraph(join(source, STATS_FILENAME));
+  }
+
   // eslint-disable-next-line class-methods-use-this
   private async readIndex(source: string): Promise<StorybookIndex> {
-    const candidates = ["index.json", "stories.json"];
+    const candidates: string[] = ["stories.json", "index.json"];
     const results = await Promise.all(
       candidates.map(async (name) => {
         try {

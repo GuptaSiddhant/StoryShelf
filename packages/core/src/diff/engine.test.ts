@@ -1,10 +1,13 @@
-import { describe, expect, it } from "vitest";
 import { PNG } from "pngjs";
-
+import { describe, expect, it } from "vitest";
 import { diffImages } from "./engine.ts";
 import { DEFAULT_DIFF_OPTIONS } from "./options.ts";
 
-function png(width: number, height: number, fill: (x: number, y: number) => [number, number, number]): Buffer {
+function png(
+  width: number,
+  height: number,
+  fill: (x: number, y: number) => [number, number, number],
+): Buffer {
   const image = new PNG({ width, height });
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
@@ -19,7 +22,10 @@ function png(width: number, height: number, fill: (x: number, y: number) => [num
   return PNG.sync.write(image);
 }
 
-const solid = (rgb: [number, number, number]) => (_x: number, _y: number): [number, number, number] => rgb;
+const solid =
+  (rgb: [number, number, number]) =>
+  (_x: number, _y: number): [number, number, number] =>
+    rgb;
 
 describe("diffImages", () => {
   it("reports zero diff for identical images", () => {

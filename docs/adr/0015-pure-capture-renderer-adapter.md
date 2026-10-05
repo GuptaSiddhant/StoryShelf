@@ -49,7 +49,7 @@ The renderer owns only rendering concerns: launching the browser, serving the ex
 
 ### 3. Wiring
 
-`createShelfRouter` builds the orchestrator internally when `capture` is supplied and requires `ShelfConfig.scratchDir` (it throws at construction if missing). The queue runs `executeCaptureJob` instead of `capture.run`. The server (`serve.ts`) constructs the pure runner `createPlaywrightCaptureRunner()` and passes `dataDir` as `scratchDir`.
+`createShelfApp` builds the orchestrator internally when `capture` is supplied and requires `ShelfConfig.scratchDir` (it throws at construction if missing). The queue runs `executeCaptureJob` instead of `capture.run`. The server (`serve.ts`) constructs the pure runner `createPlaywrightCaptureRunner()` and passes `dataDir` as `scratchDir`.
 
 ## Consequences
 

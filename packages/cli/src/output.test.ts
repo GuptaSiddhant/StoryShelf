@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-
 import { createSpinner, spinnerFrames } from "./output.ts";
 
 afterEach(() => {
@@ -19,7 +18,9 @@ describe("spinnerFrames", () => {
   it("exports a shared indeterminate frame set", () => {
     expect(Array.isArray(spinnerFrames)).toBe(true);
     expect(spinnerFrames.length).toBeGreaterThan(0);
-    expect(spinnerFrames.every((frame) => typeof frame === "string" && frame.length > 0)).toBe(true);
+    expect(spinnerFrames.every((frame) => typeof frame === "string" && frame.length > 0)).toBe(
+      true,
+    );
   });
 });
 
@@ -32,7 +33,9 @@ describe("createSpinner", () => {
     });
     spinner.stop("Upload complete");
 
-    const animations = writes.filter((chunk) => chunk.startsWith("\r") && chunk.includes("Uploading"));
+    const animations = writes.filter(
+      (chunk) => chunk.startsWith("\r") && chunk.includes("Uploading"),
+    );
     expect(animations.length).toBeGreaterThan(0);
     expect(writes.at(-1)).toBe("\rUpload complete\n");
     expect(animations.some((chunk) => chunk.includes("%"))).toBe(false);

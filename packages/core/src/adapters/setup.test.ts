@@ -1,0 +1,194 @@
+import { pino } from "pino";
+import { describe, expect, it, vi } from "vitest";
+import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
+import {
+  AdapterLifecycleError,
+  bindAdapterLoggers,
+  collectSetups,
+  collectTeardowns,
+  runAdapterSetups,
+  runAdapterTeardowns,
+} from "./setup.ts";
+
+const silentLogger = pino({ level: "silent" });
+const ctx = { config: {}, logger: silentLogger };
+
+function fakeAdapter(kind: string, setLogger?: (logger: unknown) => void) {
+  return {
+    metadata: { name: kind, version: "0.0.0", kind, category: "capture-queue" },
+    ...(setLogger ? { setLogger } : {}),
+  };
+}
+
+describe("adapter lifecycle runner", () => {
+  it("collects no hooks from adapters without lifecycle", () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    expect(collectSetups({ database: db, storage })).toEqual([]);
+    expect(collectTeardowns({ database: db, storage })).toEqual([]);
+  });
+
+  it("runs setup hooks to ok when all pass", async () => {
+    const { storage } = makeStorage();
+    const database = {
+      ...makeDatabase().db,
+      lifecycle: {
+        setup: async (): Promise<void> => {
+          await Promise.resolve();
+        },
+        teardown: async (): Promise<void> => {
+          await Promise.resolve();
+        },
+        health: async () => ({ ok: true }),
+      },
+    };
+    const result = await runAdapterSetups(collectSetups({ database, storage }), ctx, silentLogger);
+    expect(result.ok).toBe(true);
+    expect(result.failures).toEqual([]);
+  });
+
+  it("collects failures across adapters without starving the rest", async () => {
+    const { storage } = makeStorage();
+    const seen: string[] = [];
+    const database = {
+      ...makeDatabase().db,
+      lifecycle: {
+        setup: async (): Promise<void> => {
+          await Promise.resolve();
+          throw new Error("db down");
+        },
+        teardown: async (): Promise<void> => {
+          await Promise.resolve();
+        },
+        health: async () => ({ ok: true }),
+      },
+    };
+    const entries = collectSetups({ database, storage });
+    entries.push({
+      category: "storage",
+      kind: "memory",
+      name: "Second",
+      run: async () => {
+        await Promise.resolve();
+        seen.push("second");
+      },
+    });
+    const result = await runAdapterSetups(entries, ctx, silentLogger);
+    expect(seen).toEqual(["second"]);
+    expect(result.ok).toBe(false);
+    expect(result.failures).toHaveLength(1);
+    expect(result.failures[0]).toMatchObject({
+      category: "database",
+      kind: "memory",
+      error: "db down",
+    });
+    expect(new AdapterLifecycleError("setup", result.failures).message).toContain(
+      "database/memory",
+    );
+  });
+
+  it("runs teardown hooks and reports teardown failures", async () => {
+    const { storage } = makeStorage();
+    const database = {
+      ...makeDatabase().db,
+      lifecycle: {
+        setup: async (): Promise<void> => {
+          await Promise.resolve();
+        },
+        teardown: async (): Promise<void> => {
+          await Promise.resolve();
+          throw new Error("stuck handle");
+        },
+        health: async () => ({ ok: true }),
+      },
+    };
+    const result = await runAdapterTeardowns(
+      collectTeardowns({ database, storage }),
+      ctx,
+      silentLogger,
+    );
+    expect(result.ok).toBe(false);
+    expect(new AdapterLifecycleError("teardown", result.failures).message).toContain("database");
+  });
+
+  it("stringifies non-Error rejections", async () => {
+    const { storage } = makeStorage();
+    const database = {
+      ...makeDatabase().db,
+      lifecycle: {
+        setup: async (): Promise<void> => {
+          await Promise.resolve();
+          // oxlint-disable-next-line no-throw-literal -- exercises non-Error rejection handling
+          throw "plain string failure";
+        },
+        teardown: async (): Promise<void> => {
+          await Promise.resolve();
+        },
+        health: async () => ({ ok: true }),
+      },
+    };
+    const result = await runAdapterSetups(collectSetups({ database, storage }), ctx, silentLogger);
+    expect(result.failures[0]?.error).toBe("plain string failure");
+  });
+
+  it("logs per-hook start and done with duration", async () => {
+    const info = vi.fn();
+    const logger = { info, warn: vi.fn(), error: vi.fn() } as never;
+    const entries = [
+      {
+        category: "storage",
+        kind: "local",
+        name: "Local",
+        run: async (): Promise<void> => {
+          await Promise.resolve();
+        },
+      },
+    ];
+    const result = await runAdapterSetups(entries, ctx, logger);
+    expect(result.ok).toBe(true);
+    expect(info).toHaveBeenCalledWith(
+      { category: "storage", kind: "local", name: "Local" },
+      "adapter hook start",
+    );
+    const done = info.mock.calls.find((call) => call[1] === "adapter hook done")?.[0] as
+      | { durationMs?: unknown }
+      | undefined;
+    expect(typeof done?.durationMs).toBe("number");
+  });
+});
+
+describe("bindAdapterLoggers", () => {
+  it("binds scoped children on adapters that accept a logger", () => {
+    const child = vi.fn(() => silentLogger);
+    const parent = { child } as unknown as typeof silentLogger;
+    const setLoggerDb = vi.fn();
+    const setLoggerQueue = vi.fn();
+    bindAdapterLoggers(
+      {
+        database: fakeAdapter("postgres", setLoggerDb),
+        storage: fakeAdapter("local"),
+        captureQueue: fakeAdapter("sqs", setLoggerQueue),
+      } as never,
+      parent,
+    );
+    expect(child).toHaveBeenCalledTimes(2);
+    expect(child).toHaveBeenCalledWith({ component: "postgres" });
+    expect(child).toHaveBeenCalledWith({ component: "sqs" });
+    expect(setLoggerDb).toHaveBeenCalledOnce();
+    expect(setLoggerQueue).toHaveBeenCalledOnce();
+    expect(setLoggerDb.mock.calls[0]?.[0]).toBe(silentLogger);
+  });
+
+  it("binds nothing when no adapter accepts a logger", () => {
+    const child = vi.fn(() => silentLogger);
+    const parent = { child } as unknown as typeof silentLogger;
+    bindAdapterLoggers(
+      {
+        database: fakeAdapter("postgres"),
+        storage: fakeAdapter("local"),
+      } as never,
+      parent,
+    );
+    expect(child).not.toHaveBeenCalled();
+  });
+});

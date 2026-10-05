@@ -1,0 +1,88 @@
+name: Live Cloud AWS
+
+# Phase 1 live tests: S3 + SQS against strictly real AWS (no fakes, no emulators).
+# Bucket/queue are pre-provisioned (manually or via `terraform apply` from
+# `storyshelf server init --target aws`); this workflow only consumes
+# `terraform output -json` values as secrets and never creates infrastructure.
+# Full scaffold-apply/destroy in CI arrives with the E2E issue (needs a
+# non-interactive `server init`, which does not exist yet).
+#
+# Required repository secrets:
+# - AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (or an assumed IAM role)
+# - AWS_REGION (e.g. us-east-1)
+# - LIVE_S3_BUCKET (terraform output: s3_bucket)
+# - LIVE_SQS_QUEUE_URL (terraform output: queue_url)
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-cloud-aws
+  cancel-in-progress: true
+
+jobs:
+  # The scaffold generator stays valid: fmt-clean and `terraform validate`-clean.
+  # Uses the same gate as packages/cli/.../terraform-aws.integration.test.ts
+  # (skips when no terraform binary — here we install one, so it always runs).
+  scaffold-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.x"
+          terraform_wrapper: false
+
+      - name: Setup Nub
+        uses: nubjs/setup-nub@v0
+
+      - name: Install dependencies
+        run: nub ci
+
+      - name: Validate generated AWS stack
+        run: nub run test --filter='./packages/cli'
+        env:
+          CI: "true"
+
+  # Real S3 + SQS suites. Hermetic tests in the same packages also run
+  # (they must stay green); live files skip without LIVE_CLOUD=1.
+  live-s3-sqs:
+    runs-on: ubuntu-latest
+    needs: [scaffold-validate]
+    env:
+      LIVE_CLOUD: "1"
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      S3_BUCKET: ${{ secrets.LIVE_S3_BUCKET }}
+      QUEUE_URL: ${{ secrets.LIVE_SQS_QUEUE_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Nub
+        uses: nubjs/setup-nub@v0
+
+      - name: Install dependencies
+        run: nub ci
+
+      - name: Fail fast on missing secrets
+        run: |
+          set -e
+          for v in AWS_REGION AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY S3_BUCKET QUEUE_URL; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Missing required secret (or env): $v. See workflow header."
+              exit 1
+            fi
+          done
+
+      - name: Run S3 + SQS suites (hermetic + live)
+        # --force: live results must never come from the turbo cache.
+        run: nubx turbo test --filter='@storyshelf/storage-s3' --filter='@storyshelf/queue-sqs' --force

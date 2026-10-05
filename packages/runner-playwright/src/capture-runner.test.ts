@@ -1,21 +1,27 @@
+import type { StoryEntry, Viewport } from "@storyshelf/core/adapter/capture-runner";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import type { StoryEntry, Viewport } from "@storyshelf/core";
-
-import { createPlaywrightCaptureRunner } from "./capture-runner.ts";
+import {
+  createPlaywrightCaptureRunner,
+  createRuntimeParamsState,
+  runtimeParametersForStory,
+} from "./capture-runner.ts";
 
 const playwright = vi.hoisted(() => {
   let closed = false;
   const pendingGotos: ((error: Error) => void)[] = [];
   let lastBrowser: typeof browser | null = null;
-  const page = {
+  let hangNextGoto = true;
+  let extractResult: unknown;
+  const makePage = () => ({
     goto: async (): Promise<void> => {
       if (closed) {
         throw new Error("Browser closed by cancel");
+      }
+      if (!hangNextGoto) {
+        return;
       }
       await new Promise<void>((_resolve, reject) => {
         pendingGotos.push(reject);
@@ -25,6 +31,19 @@ const playwright = vi.hoisted(() => {
       await Promise.resolve();
       return null;
     },
+    waitForTimeout: async (): Promise<void> => {
+      await Promise.resolve();
+    },
+    evaluate: async (): Promise<unknown> => {
+      await Promise.resolve();
+      return extractResult;
+    },
+    locator: (): { boundingBox: () => Promise<null> } => ({
+      boundingBox: async (): Promise<null> => {
+        await Promise.resolve();
+        return null;
+      },
+    }),
     screenshot: async (): Promise<Buffer> => {
       await Promise.resolve();
       return Buffer.from([0]);
@@ -32,12 +51,12 @@ const playwright = vi.hoisted(() => {
     close: async (): Promise<void> => {
       await Promise.resolve();
     },
-  };
+  });
   const browser = {
     closed: false,
-    newPage: async (): Promise<typeof page> => {
+    newPage: async (): Promise<ReturnType<typeof makePage>> => {
       await Promise.resolve();
-      return page;
+      return makePage();
     },
     close: async (): Promise<void> => {
       browser.closed = true;
@@ -60,10 +79,16 @@ const playwright = vi.hoisted(() => {
       },
     },
     lastBrowser: (): typeof browser | null => lastBrowser,
+    configureHang: (hang: boolean): void => {
+      hangNextGoto = hang;
+    },
+    setExtractResult: (map: unknown): void => {
+      extractResult = map;
+    },
   };
 });
 
-vi.mock("playwright", () => ({ chromium: playwright.chromium }));
+vi.mock("playwright-core", () => ({ chromium: playwright.chromium }));
 
 const STORIES: StoryEntry[] = [
   {
@@ -77,8 +102,8 @@ const STORIES: StoryEntry[] = [
 
 const VIEWPORTS: Viewport[] = [{ name: "desktop", width: 1280, height: 720 }];
 
-let tmp: string;
-let storybookDir: string;
+let tmp = "";
+let storybookDir = "";
 
 beforeEach(async () => {
   tmp = await mkdtemp(join(tmpdir(), "storyshelf-render-"));
@@ -94,7 +119,13 @@ afterEach(async () => {
 describe("createPlaywrightCaptureRunner.render", () => {
   it("reports a story as failed when the in-flight browser is cancelled", async () => {
     const runner = createPlaywrightCaptureRunner();
-    const renderPromise = runner.render({ buildId: "build-1", storybookDir, stories: STORIES, viewports: VIEWPORTS });
+    playwright.configureHang(true);
+    const renderPromise = runner.render({
+      buildId: "build-1",
+      storybookDir,
+      stories: STORIES,
+      viewports: VIEWPORTS,
+    });
 
     await new Promise((resolve) => {
       setTimeout(resolve, 20);
@@ -113,4 +144,116 @@ describe("createPlaywrightCaptureRunner.render", () => {
     const runner = createPlaywrightCaptureRunner();
     await expect(runner.cancel("does-not-exist")).resolves.toBeUndefined();
   });
+
+  it("awaits the adapter's waitForReady hook after navigation", async () => {
+    const waitForReady = vi.fn(async (): Promise<void> => {
+      await Promise.resolve();
+    });
+    const adapter = {
+      name: "fake",
+      discover: async (): Promise<StoryEntry[]> => [],
+      buildUrl: (): string => "/",
+      waitForReady,
+    };
+    const runner = createPlaywrightCaptureRunner();
+    playwright.configureHang(false);
+    const result = await runner.render({
+      buildId: "build-1",
+      storybookDir,
+      stories: STORIES,
+      viewports: VIEWPORTS,
+      adapter,
+    });
+
+    expect(result.captures).toHaveLength(1);
+    expect(waitForReady).toHaveBeenCalledTimes(1);
+  }, 30_000);
+
+  it("enriches parameters from the runtime preview once per run", async () => {
+    const runtime = createRuntimeParamsState();
+    let evaluateCalls = 0;
+    const page = {
+      evaluate: async (): Promise<unknown> => {
+        evaluateCalls += 1;
+        return {
+          "components-button--primary": {
+            parameters: { chromatic: { delay: 250 }, storyshelf: { diffThreshold: 0.2 } },
+          },
+        };
+      },
+    };
+    const params = await runtimeParametersForStory(runtime, page, "components-button--primary");
+    await runtimeParametersForStory(runtime, page, "components-button--primary");
+
+    expect(params).toEqual({ delay: 250, diffThreshold: 0.2 });
+    expect(evaluateCalls).toBe(1);
+  });
+
+  it("falls back to runtime parameters when the index carries none", async () => {
+    playwright.setExtractResult({
+      "components-button--primary": {
+        parameters: { chromatic: { delay: 250 }, storyshelf: { diffThreshold: 0.2 } },
+      },
+    });
+    const adapter = {
+      name: "fake",
+      discover: async (): Promise<StoryEntry[]> => [],
+      buildUrl: (): string => "/",
+    };
+    const runner = createPlaywrightCaptureRunner();
+    playwright.configureHang(false);
+    const result = await runner.render({
+      buildId: "build-1",
+      storybookDir,
+      stories: STORIES,
+      viewports: VIEWPORTS,
+      adapter,
+    });
+
+    expect(result.captures).toHaveLength(1);
+    expect(result.captures[0]?.story.parameters).toEqual({ delay: 250, diffThreshold: 0.2 });
+  }, 30_000);
+
+  it("captures at the story's default viewport in addition to the global list", async () => {
+    const story: StoryEntry = {
+      id: "components-button--primary",
+      title: "Components/Button",
+      name: "Primary",
+      type: "story",
+      parameters: { viewport: { defaultViewport: "tablet" } },
+    };
+    const runner = createPlaywrightCaptureRunner();
+    playwright.configureHang(false);
+    const result = await runner.render({
+      buildId: "build-1",
+      storybookDir,
+      stories: [story],
+      viewports: VIEWPORTS,
+    });
+
+    expect(result.captures).toHaveLength(2);
+    expect(result.captures.map((c) => c.viewportName)).toEqual(["desktop", "tablet"]);
+    expect(result.captures[1]?.viewport).toEqual({ name: "tablet", width: 834, height: 1112 });
+  }, 30_000);
+
+  it("does not duplicate a story default that matches a global viewport name", async () => {
+    const story: StoryEntry = {
+      id: "components-button--primary",
+      title: "Components/Button",
+      name: "Primary",
+      type: "story",
+      parameters: { viewport: { defaultViewport: "desktop" } },
+    };
+    const runner = createPlaywrightCaptureRunner();
+    playwright.configureHang(false);
+    const result = await runner.render({
+      buildId: "build-1",
+      storybookDir,
+      stories: [story],
+      viewports: VIEWPORTS,
+    });
+
+    expect(result.captures).toHaveLength(1);
+    expect(result.captures.map((c) => c.viewportName)).toEqual(["desktop"]);
+  }, 30_000);
 });

@@ -1,16 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 
 /**
- * Derive a 32-byte AES-256 key from the server secret.
- *
- * Reuses the existing `sha256` pattern (`utils/hash.ts`) so key derivation
- * is consistent with token hashing and session HMAC.
- */
-function deriveKey(secret: string): Buffer {
-  return createHash("sha256").update(secret).digest();
-}
-
-/**
  * Encrypt a plaintext secret for storage.
  *
  * Format: `base64url(iv):base64url(authTag):base64url(ciphertext)` (12B IV).
@@ -30,7 +20,13 @@ export function encrypt(secret: string | undefined, plaintext: string): string {
 }
 
 /**
- * Decrypt a value produced by `encrypt`.
+ * Decrypt a value produced by {@link encrypt}.
+ *
+ * @param secret - Server secret used to derive the AES-256 key; must match
+ * the secret used for encryption or decryption fails.
+ * @param ciphertext - Encrypted payload in `iv:tag:ciphertext` (base64url) format.
+ * @returns The original plaintext secret.
+ * @throws If `secret` is missing or the payload is malformed or tampered with.
  */
 export function decrypt(secret: string | undefined, ciphertext: string): string {
   if (!secret) {
@@ -48,4 +44,14 @@ export function decrypt(secret: string | undefined, ciphertext: string): string 
   decipher.setAuthTag(tag);
   const dec = Buffer.concat([decipher.update(enc), decipher.final()]);
   return dec.toString("utf8");
+}
+
+/**
+ * Derive a 32-byte AES-256 key from the server secret.
+ *
+ * Reuses the existing `sha256` pattern (`utils/hash.ts`) so key derivation
+ * is consistent with token hashing and session HMAC.
+ */
+function deriveKey(secret: string): Buffer {
+  return createHash("sha256").update(secret).digest();
 }

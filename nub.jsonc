@@ -1,8 +1,23 @@
 {
   "$schema": "https://nubjs.com/schema/latest.json",
-  "conditions": ["development"],
+  "conditions": ["source"],
   "install": {
-    "linker": {"strategy" :"isolated", },
-    "publicHoist": ["@types/*"]
+    "linker": { "strategy": "isolated" },
+    "publicHoist": [
+      "@types/*",
+      "@hono/*",
+      "hono",
+      "pino",
+      "drizzle-orm",
+      "zod",
+      "pixelmatch",
+      "pngjs",
+      "adm-zip",
+      "unzipper",
+      "playwright-core",
+      "puppeteer-core",
+      "postgres",
+      "yaml",
+    ],
   },
 }

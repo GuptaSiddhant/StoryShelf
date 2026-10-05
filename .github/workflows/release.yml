@@ -1,0 +1,158 @@
+name: Release
+
+# Tag-push only: `nub ./scripts/release.mjs <bump>` commits and tags v<version>,
+# `git push --follow-tags` triggers this workflow for trusted (OIDC) publish.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+      - "v*.*.*-*"
+  workflow_dispatch:
+
+permissions:
+  contents: write # for GitHub Release creation
+  id-token: write # for Sigstore provenance + npm trusted publishing + JSR OIDC publishing
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  # Version gate: single source of truth. Both publishers depend on this job
+  # (not on each other), so a bad tag/tree fails fast before either registry
+  # is touched — while npm and JSR still never block each other.
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.guard.outputs.version }}
+      dist_tag: ${{ steps.guard.outputs.dist_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Guard tag and fixed versions
+        id: guard
+        run: node scripts/release-validate.mjs "${{ github.ref_name }}"
+
+  # npm publish. Depends on validate, independent of JSR: a failure here
+  # never blocks publish-jsr, and is never blocked by it.
+  publish-npm:
+    runs-on: ubuntu-latest
+    needs: [validate]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Nub
+        uses: nubjs/setup-nub@v0
+
+      - name: Check npm version for OIDC
+        # Before install: no project-state dependency, fails fast on a bad
+        # toolchain. After Setup Nub so the tested npm is the publishing one.
+        run: node scripts/check-npm-oidc.mjs
+
+      - name: Install dependencies
+        run: nub ci
+
+      - name: Build packages
+        # Not strictly required — prepublishOnly runs build — but fail-fast before provenance.
+        run: nub run build --filter='./packages/*'
+
+      - name: Rewrite workspace protocol for npm manifest
+        # Plain npm publish ships dependencies verbatim, so workspace:*
+        # must become caret ranges. Repo files keep workspace:*; only this
+        # CI working tree is rewritten.
+        run: node scripts/rewrite-workspace-protocol.mjs
+
+      - name: Publish to npm (trusted / provenance)
+        # OIDC trusted publishing: npm exchanges the workflow OIDC token
+        # automatically — no NODE_AUTH_TOKEN. Requires a trusted publisher
+        # configured per package on npmjs.com (one-time).
+        run: node scripts/publish-npm.mjs "${{ needs.validate.outputs.version }}" "${{ needs.validate.outputs.dist_tag }}"
+
+  # GitHub Release. Runs only after a successful npm publish (same semantics
+  # as when these steps lived at the tail of publish-npm); JSR outcome can't
+  # affect it. Needs no toolchain — just git history and the tag.
+  github-release:
+    runs-on: ubuntu-latest
+    needs: [validate, publish-npm]
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Generate release notes from git log
+        id: log
+        run: |
+          set -e
+          TAG="${RELEASE_TAG}"
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+          echo "prev=$PREV_TAG current=$TAG"
+          if [ -z "$PREV_TAG" ]; then
+            LOG=$(git log --pretty='- %s (%h)' --no-merges)
+          else
+            LOG=$(git log "$PREV_TAG..HEAD" --pretty='- %s (%h)' --no-merges)
+          fi
+          {
+            echo "## $TAG"
+            echo ""
+            echo "$LOG"
+          } > /tmp/release-body.md
+          cat /tmp/release-body.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          body_path: /tmp/release-body.md
+          generate_release_notes: false
+
+  # JSR publish. Depends on validate, independent of npm: `continue-on-error`
+  # means a failure here never fails the workflow or blocks publish-npm.
+  publish-jsr:
+    runs-on: ubuntu-latest
+    needs: [validate]
+    continue-on-error: true
+    permissions:
+      contents: read
+      id-token: write # OIDC — JSR authenticates publish + attaches provenance, no token
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Nub
+        uses: nubjs/setup-nub@v0
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.6.7
+
+      - name: Install dependencies
+        run: nub ci
+
+      - name: Build packages (regenerates deno.json with current version)
+        run: nub run build --filter='./packages/*'
+
+      - name: "Rewrite workspace protocol for JSR manifest"
+        # Same rewrite as the npm job; --allow-dirty tolerates it at publish.
+        run: node scripts/rewrite-workspace-protocol.mjs
+
+      - name: "Publish to JSR (dependency order: core first)"
+        # deno publish directly (no npx jsr wrapper): the wrapper re-downloads
+        # itself and its deno binary per package (~5 min each). Pinned deno
+        # via Setup Deno above makes every package publish in seconds.
+        run: node scripts/publish-jsr.mjs

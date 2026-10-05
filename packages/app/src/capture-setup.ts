@@ -1,0 +1,151 @@
+import type { CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
+import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
+import { createDispatchJob, InMemoryCaptureQueue } from "@storyshelf/core/capture";
+import type { CaptureDispatchJob, CaptureJobOptions } from "@storyshelf/core/capture";
+import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
+import type { Logger } from "@storyshelf/core/logger";
+import { BuildModel } from "@storyshelf/core/models";
+import { captureMetrics, currentTraceparent } from "@storyshelf/observability";
+import { notifySystemWith } from "./notify.ts";
+
+/**
+ * Wiring for the capture queue: the queue instance (if any) and a helper
+ * to enqueue a build for rendering. When no `captureRunner` is configured
+ * both are null/undefined and builds remain `pending` until a runner is added.
+ */
+export interface QueueWiring {
+  queue: CaptureQueue | null;
+  enqueueCapture: ((buildId: string, reqId?: string) => Promise<void>) | undefined;
+}
+
+/** Enqueue a build, continuing the active request trace when present. */
+async function enqueueJob(queue: CaptureQueue, buildId: string, reqId?: string): Promise<void> {
+  const traceparent = currentTraceparent();
+  await queue.enqueue({ buildId, reqId, ...(traceparent ? { traceparent } : {}) });
+}
+
+/** Wrap the dispatch job with duration + outcome metrics. */
+async function timedRunJob(
+  runJob: (job: CaptureDispatchJob) => Promise<void>,
+  job: CaptureDispatchJob,
+): Promise<void> {
+  const instruments = captureMetrics();
+  const start = performance.now();
+  try {
+    await runJob(job);
+  } catch (error) {
+    instruments.jobsFailed.add(1);
+    instruments.jobDuration.record(performance.now() - start);
+    throw error;
+  }
+  instruments.jobsCompleted.add(1);
+  instruments.jobDuration.record(performance.now() - start);
+}
+
+/** Alert admins when an in-process capture leaves its build failed. */
+async function notifyCaptureFailed(
+  options: ShelfOptions,
+  config: ShelfConfig,
+  logger: Logger,
+  buildId: string,
+): Promise<void> {
+  const build = await new BuildModel(options.database).get(buildId);
+  if (build?.status !== "failed") {
+    return;
+  }
+  await notifySystemWith(
+    {
+      db: options.database,
+      config,
+      ui: options.ui ?? {},
+      logger,
+      notifiers: options.notifiers ?? [],
+    },
+    "sys:capture-failed",
+    { buildId, projectId: build.projectId, gitBranch: build.gitBranch },
+  );
+}
+
+/** Assemble the capture queue and its enqueue hook. */
+export function setupCaptureQueue(
+  options: ShelfOptions,
+  config: ShelfConfig,
+  gitHosts: GitHostProvider[],
+  logger: Logger,
+): QueueWiring {
+  if (!options.captureQueue && !options.captureRunner) {
+    return { queue: null, enqueueCapture: undefined };
+  }
+  if (options.captureQueue) {
+    const queue = options.captureQueue;
+    const enqueueCapture = async (buildId: string, reqId?: string): Promise<void> => {
+      await enqueueJob(queue, buildId, reqId);
+    };
+    if (!options.captureRunner) {
+      return { queue: options.captureQueue, enqueueCapture };
+    }
+    // Both queue and runner supplied: runner is ignored server-side for remote queues;
+    // enqueue goes to the supplied queue and capture is handled by an external worker.
+    if (!config.scratchDir) {
+      return { queue: options.captureQueue, enqueueCapture };
+    }
+    // If scratchDir is set with both, still prefer the supplied queue; no in-memory queue needed.
+    return { queue: options.captureQueue, enqueueCapture };
+  }
+  if (!options.captureRunner) {
+    return { queue: null, enqueueCapture: undefined };
+  }
+  if (!config.scratchDir) {
+    throw new Error("captureRunner is enabled but ShelfConfig.scratchDir is not set");
+  }
+  const jobOptions: CaptureJobOptions = {
+    db: options.database,
+    tables: {
+      projects: options.database.tables.projects,
+      builds: options.database.tables.builds,
+      buildLabels: options.database.tables.buildLabels,
+      snapshots: options.database.tables.snapshots,
+      baselines: options.database.tables.baselines,
+      captureAttempts: options.database.tables.captureAttempts,
+      captureLogs: options.database.tables.captureLogs,
+    },
+    storage: options.storage,
+    runner: options.captureRunner,
+    scratchDir: config.scratchDir,
+    viewports: config.viewports,
+    logger,
+    secret: config.secret,
+  };
+  const runJob = createDispatchJob({
+    db: options.database,
+    tables: {
+      projects: options.database.tables.projects,
+      builds: options.database.tables.builds,
+      buildLabels: options.database.tables.buildLabels,
+      snapshots: options.database.tables.snapshots,
+      projectStatusConfigs: options.database.tables.projectStatusConfigs,
+      captureAttempts: options.database.tables.captureAttempts,
+      captureLogs: options.database.tables.captureLogs,
+    },
+    jobOptions,
+    gitHosts,
+    secret: config.secret,
+    logger,
+  });
+  const captureQueue =
+    options.captureQueue ??
+    new InMemoryCaptureQueue({
+      concurrency: config.captureConcurrency ?? 2,
+      logger,
+      runJob: async (job: CaptureDispatchJob): Promise<void> => {
+        await timedRunJob(runJob, job);
+        // In-process completions only: remote-queue workers own their own
+        // alerting (the server never sees those outcomes).
+        await notifyCaptureFailed(options, config, logger, job.buildId);
+      },
+    });
+  const enqueueCapture = async (buildId: string, reqId?: string): Promise<void> => {
+    await enqueueJob(captureQueue, buildId, reqId);
+  };
+  return { queue: captureQueue, enqueueCapture };
+}

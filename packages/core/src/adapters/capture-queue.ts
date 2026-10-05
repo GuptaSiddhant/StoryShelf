@@ -1,7 +1,9 @@
-/** Lifecycle status of a capture job, tracked by the capture queue. */
+import type { Adapter } from "./metadata.ts";
+
+/** Lifecycle status of a queued capture job. */
 export type JobStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
 
-/** A snapshot of a capture job's status, for the queue/status UI. */
+/** Observable state of a single capture queue entry. */
 export interface QueueEntry {
   buildId: string;
   status: JobStatus;
@@ -16,6 +18,21 @@ export interface CaptureJob {
   buildId: string;
   /** Request id used to correlate the background job with the request that queued it. */
   reqId?: string;
+  /**
+   * W3C `traceparent` of the enqueueing request. Workers continue this trace
+   * instead of starting a root span; absent means start a new trace.
+   */
+  traceparent?: string;
+}
+
+/** A job polled from a queue with transport metadata. */
+export interface PollableJob extends CaptureJob {
+  /** Transport receipt handle (SQS, Redis pop token, etc.). */
+  receipt?: string;
+  /** Number of delivery attempts already made (0 = first delivery). */
+  attempts?: number;
+  /** Raw transport message for debugging. */
+  raw?: unknown;
 }
 
 /**
@@ -33,7 +50,7 @@ export interface CaptureJob {
  *
  * `status`/`active`/`recent` back the live queue view regardless of transport.
  */
-export interface CaptureQueue {
+export interface CaptureQueue extends Adapter<{ readonly category: "capture-queue" }> {
   /** Submit a build for capture. Resolves once the build is queued. */
   enqueue(job: CaptureJob): Promise<void>;
   /** Return the current status entry for a build, or null if untracked. */
@@ -42,4 +59,14 @@ export interface CaptureQueue {
   active(): Promise<QueueEntry[]>;
   /** The most recent queue entries, newest first. */
   recent(limit: number): Promise<QueueEntry[]>;
+}
+
+/** Extension for queues that support worker-side polling. */
+export interface PollableCaptureQueue extends CaptureQueue {
+  /** Poll for a single job; returns null if none available within waitMs. */
+  poll(options?: { waitMs?: number }): Promise<PollableJob | null>;
+  /** Acknowledge successful processing of a polled job. */
+  ack(job: PollableJob): Promise<void>;
+  /** Negatively acknowledge; requeue with optional delay when possible. */
+  nack(job: PollableJob, options?: { requeue?: boolean; delayMs?: number }): Promise<void>;
 }

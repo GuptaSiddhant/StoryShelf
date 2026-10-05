@@ -1,0 +1,146 @@
+import { BuildModel } from "@storyshelf/core/models";
+import { ProjectModel } from "@storyshelf/core/models";
+import { createUrlBuilder } from "@storyshelf/core/urls";
+import type { HtmlEscapedString } from "hono/utils/html";
+import { getStore } from "../store.ts";
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  HStack,
+  Meta,
+  PageHeader,
+  SectionTitle,
+} from "../ui/components.tsx";
+import { css } from "../ui/css.ts";
+import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
+
+/** Next-steps list: muted with indented marker offset. */
+const projectSteps = css`
+  /* project-steps */
+  margin: 0.4rem 0 0;
+  padding-left: 1.2rem;
+  color: var(--text-secondary);
+`;
+
+/** Projects overview page: project cards with latest build plus next steps. */
+export async function renderProjectsPage(): Promise<RenderedContent> {
+  const { db, user, config } = getStore();
+  const urls = createUrlBuilder("/", config.publishedBaseDomain);
+  const projects = await new ProjectModel(db).list();
+  const canCreate = !user || user.role === "admin" || user.role === "member";
+
+  const recentCounts = await Promise.all(
+    projects.map(async (project) => {
+      const builds = await new BuildModel(db).list(project.id);
+      return { slug: project.slug, count: builds.length, latest: builds[0] ?? null };
+    }),
+  );
+  const countsBySlug = new Map(recentCounts.map((entry) => [entry.slug, entry]));
+
+  return (
+    <DocumentLayout title="Projects" nav={{ active: "projects" }}>
+      <PageHeader
+        title="Projects"
+        description="Each project is one Storybook. Create a project, then upload builds from CI."
+        actions={
+          canCreate ? (
+            <Button variant="primary" href={urls.projectsNew()}>
+              New project
+            </Button>
+          ) : null
+        }
+      />
+
+      {projects.length === 0 ? (
+        <EmptyState
+          title="No projects yet"
+          description="Create your first project to start visual testing. Projects are free and unlimited."
+          action={
+            canCreate ? (
+              <Button variant="primary" href={urls.projectsNew()}>
+                Create project
+              </Button>
+            ) : null
+          }
+        />
+      ) : (
+        <div class="grid">
+          {projects.map((project): HtmlEscapedString | Promise<HtmlEscapedString> => {
+            const info = countsBySlug.get(project.slug);
+            return (
+              <Card key={project.id}>
+                <HStack justify="between" align="start" gap="md">
+                  <div class="truncate min-w-0">
+                    <SectionTitle>
+                      <a href={urls.library(project.slug)}>{project.name}</a>
+                    </SectionTitle>
+                    <Meta>
+                      <code>{project.slug}</code>{" "}
+                      {project.gitRepository ? `· ${project.gitRepository}` : ""} · default{" "}
+                      <Badge tone="neutral">{project.gitDefaultBranch}</Badge>
+                    </Meta>
+                    {info?.latest ? (
+                      <Meta>
+                        Latest: {info.latest.gitBranch} · {info.latest.gitSha.slice(0, 7)} ·{" "}
+                        <Badge
+                          tone={
+                            info.latest.status === "approved"
+                              ? "success"
+                              : info.latest.status === "reviewing"
+                                ? "warning"
+                                : "neutral"
+                          }
+                        >
+                          {info.latest.status}
+                        </Badge>
+                      </Meta>
+                    ) : (
+                      <Meta>No builds yet.</Meta>
+                    )}
+                  </div>
+                  <HStack>
+                    <Button variant="secondary" href={urls.library(project.slug)}>
+                      Library
+                    </Button>
+                    <Button variant="ghost" size="sm" href={urls.short(project.slug)}>
+                      View Storybook
+                    </Button>
+                    <Button variant="ghost" href={urls.settings(project.slug)}>
+                      Settings
+                    </Button>
+                  </HStack>
+                </HStack>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      <div class="mt-1">
+        <Card>
+          <SectionTitle level={3}>Next steps</SectionTitle>
+          <ol class={projectSteps}>
+            <li>
+              Create a project (or run{" "}
+              <code>
+                npx storyshelf create --url http://localhost:3000 --name "My Storybook" --token
+                $STORYSHELF_ADMIN_TOKEN
+              </code>
+              , or <code>init --url --slug</code> to write <code>.storybook/storyshelf.json</code>)
+            </li>
+            <li>
+              Generate a token in <strong>Settings → Tokens</strong> and set{" "}
+              <code>STORYSHELF_TOKEN</code> in CI.
+            </li>
+            <li>
+              Upload: <code>npx storyshelf upload</code> (or <code>npx storyshelf</code> defaults to
+              upload when config exists)
+            </li>
+          </ol>
+        </Card>
+      </div>
+    </DocumentLayout>
+  );
+}

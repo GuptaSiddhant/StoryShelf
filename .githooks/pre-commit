@@ -1,0 +1,48 @@
+#!/usr/bin/env sh
+set -e
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+# 1. Block whitespace errors (trailing whitespace, conflict markers) before they land.
+git diff --cached --check || {
+  echo "error: staged changes contain whitespace errors (trailing whitespace or conflict markers)." >&2
+  echo "       Run \`nub run fmt\` and re-stage, or fix manually." >&2
+  exit 1
+}
+
+BIN="$ROOT/node_modules/.bin"
+CODE_GLOB='*.ts *.tsx *.js *.jsx *.mjs *.cjs'
+JSON_GLOB='*.json'
+
+# oxfmt also formats JSON; oxlint runs on code files only.
+format_files="$(git diff --cached --name-only --diff-filter=ACMR -z -- $CODE_GLOB $JSON_GLOB | tr -d '\0' | wc -c)"
+lint_files="$(git diff --cached --name-only --diff-filter=ACMR -z -- $CODE_GLOB | tr -d '\0' | wc -c)"
+
+# 2. Formatting gate.
+if [ "$format_files" -gt 0 ]; then
+  if [ ! -x "$BIN/oxfmt" ]; then
+    echo "error: oxfmt not installed. Run \`nub ci\` first." >&2
+    exit 1
+  fi
+  git diff --cached --name-only --diff-filter=ACMR -z -- $CODE_GLOB $JSON_GLOB |
+    xargs -0 "$BIN/oxfmt" --check || {
+    echo "error: staged files are not oxfmt-formatted. Run \`nub run fmt\` and re-stage." >&2
+    exit 1
+  }
+fi
+
+# 3. Fast lint gate (non-type-aware: the type-aware pass runs in CI via `nub run lint`).
+if [ "$lint_files" -gt 0 ]; then
+  if [ ! -x "$BIN/oxlint" ]; then
+    echo "error: oxlint not installed. Run \`nub ci\` first." >&2
+    exit 1
+  fi
+  git diff --cached --name-only --diff-filter=ACMR -z -- $CODE_GLOB |
+    xargs -0 "$BIN/oxlint" || {
+    echo "error: staged files failed lint. Run \`nub run lint\` and fix the issues." >&2
+    exit 1
+  }
+fi
+
+exit 0

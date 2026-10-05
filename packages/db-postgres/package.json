@@ -1,0 +1,136 @@
+{
+  "name": "@storyshelf/db-postgres",
+  "version": "0.5.2",
+  "description": "Postgres database adapter for StoryShelf (postgres.js + Drizzle, RDS/Cloud SQL/Supabase/Neon compatible).",
+  "keywords": [
+    "database",
+    "drizzle",
+    "postgres",
+    "storybook"
+  ],
+  "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
+  "bugs": {
+    "url": "https://github.com/GuptaSiddhant/StoryShelf/issues"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Siddhant Gupta",
+    "url": "https://guptasiddhant.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GuptaSiddhant/StoryShelf.git",
+    "directory": "packages/db-postgres"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "default": "./dist/index.mjs"
+    },
+    "./ddl": {
+      "source": "./src/ddl.ts",
+      "default": "./dist/ddl.mjs"
+    },
+    "./neon": {
+      "source": "./src/neon.ts",
+      "default": "./dist/neon.mjs"
+    },
+    "./neon-http": {
+      "source": "./src/neon-http.ts",
+      "default": "./dist/neon-http.mjs"
+    },
+    "./pg": {
+      "source": "./src/pg.ts",
+      "default": "./dist/pg.mjs"
+    },
+    "./pglite": {
+      "source": "./src/pglite.ts",
+      "default": "./dist/pglite.mjs"
+    },
+    "./schema": {
+      "source": "./src/schema/index.ts",
+      "default": "./dist/schema.mjs"
+    },
+    "./vercel": {
+      "source": "./src/vercel.ts",
+      "default": "./dist/vercel.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.mjs",
+      "./ddl": "./dist/ddl.mjs",
+      "./neon": "./dist/neon.mjs",
+      "./neon-http": "./dist/neon-http.mjs",
+      "./pg": "./dist/pg.mjs",
+      "./pglite": "./dist/pglite.mjs",
+      "./schema": "./dist/schema.mjs",
+      "./vercel": "./dist/vercel.mjs",
+      "./package.json": "./package.json"
+    },
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown -w",
+    "fmt": "oxfmt ./src",
+    "lint": "oxlint --type-aware --type-check ./src",
+    "test": "vitest run",
+    "prepublishOnly": "nub run build"
+  },
+  "dependencies": {
+    "@storyshelf/core": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "postgres": "^3.4.0"
+  },
+  "peerDependencies": {
+    "pg": "^8.0.0",
+    "@neondatabase/serverless": "^1.1.0",
+    "@vercel/postgres": "^0.10.0",
+    "@electric-sql/pglite": "^0.5.8"
+  },
+  "peerDependenciesMeta": {
+    "pg": {
+      "optional": true
+    },
+    "@neondatabase/serverless": {
+      "optional": true
+    },
+    "@vercel/postgres": {
+      "optional": true
+    },
+    "@electric-sql/pglite": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@neondatabase/serverless": "^1.1.0",
+    "@types/node": "catalog:",
+    "@vercel/postgres": "^0.10.0",
+    "@vitest/coverage-v8": "catalog:",
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:",
+    "oxlint-tsgolint": "catalog:",
+    "pg": "^8.0.0",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "jsr": {
+    "runtimeCompat": {
+      "node": true,
+      "deno": true,
+      "browser": false,
+      "workerd": false,
+      "bun": true
+    }
+  }
+}

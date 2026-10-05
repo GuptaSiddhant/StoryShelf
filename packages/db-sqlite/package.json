@@ -1,26 +1,112 @@
 {
   "name": "@storyshelf/db-sqlite",
-  "version": "0.1.0",
-  "type": "module",
-  "description": "SQLite database adapter for StoryShelf (better-sqlite3 + Drizzle).",
+  "version": "0.5.2",
+  "description": "SQLite database adapter for StoryShelf (node:sqlite + Drizzle).",
+  "keywords": [
+    "database",
+    "drizzle",
+    "self-hosted",
+    "sqlite",
+    "storybook"
+  ],
+  "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
+  "bugs": {
+    "url": "https://github.com/GuptaSiddhant/StoryShelf/issues"
+  },
   "license": "MIT",
+  "author": {
+    "name": "Siddhant Gupta",
+    "url": "https://guptasiddhant.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GuptaSiddhant/StoryShelf.git",
+    "directory": "packages/db-sqlite"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "sideEffects": false,
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "default": "./dist/index.mjs"
+    },
+    "./better-sqlite3": {
+      "source": "./src/better-sqlite3.ts",
+      "default": "./dist/better-sqlite3.mjs"
+    },
+    "./bun-sqlite": {
+      "source": "./src/bun-sqlite.ts",
+      "default": "./dist/bun-sqlite.mjs"
+    },
+    "./d1": {
+      "source": "./src/d1.ts",
+      "default": "./dist/d1.mjs"
+    },
+    "./ddl": {
+      "source": "./src/ddl.ts",
+      "default": "./dist/ddl.mjs"
+    },
+    "./drizzle-factory": {
+      "source": "./src/drizzle-factory.ts",
+      "default": "./dist/drizzle-factory.mjs"
+    },
+    "./schema": {
+      "source": "./src/schema/index.ts",
+      "default": "./dist/schema.mjs"
+    },
+    "./turso": {
+      "source": "./src/turso.ts",
+      "default": "./dist/turso.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.mjs",
+      "./better-sqlite3": "./dist/better-sqlite3.mjs",
+      "./bun-sqlite": "./dist/bun-sqlite.mjs",
+      "./d1": "./dist/d1.mjs",
+      "./ddl": "./dist/ddl.mjs",
+      "./drizzle-factory": "./dist/drizzle-factory.mjs",
+      "./schema": "./dist/schema.mjs",
+      "./turso": "./dist/turso.mjs",
+      "./package.json": "./package.json"
+    },
+    "access": "public"
+  },
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown -w",
-    "fmt": "oxfmt -c ../../.oxfmtrc.json ./src",
+    "fmt": "oxfmt ./src",
     "lint": "oxlint --type-aware --type-check ./src",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepublishOnly": "nub run build"
   },
   "dependencies": {
     "@storyshelf/core": "workspace:*",
-    "better-sqlite3": "^12.4.1",
-    "drizzle-orm": "^0.44.0"
+    "drizzle-orm": "catalog:"
+  },
+  "peerDependencies": {
+    "@libsql/client": "^0.18.0",
+    "better-sqlite3": "^12.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@libsql/client": {
+      "optional": true
+    },
+    "better-sqlite3": {
+      "optional": true
+    }
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
+    "@libsql/client": "^0.18.0",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "better-sqlite3": "^12.0.0",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
@@ -28,9 +114,13 @@
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
-  "types": "./dist/index.d.mts",
-  "exports": {
-    ".": "./dist/index.mjs",
-    "./package.json": "./package.json"
+  "jsr": {
+    "runtimeCompat": {
+      "node": true,
+      "deno": true,
+      "browser": false,
+      "workerd": false,
+      "bun": true
+    }
   }
 }

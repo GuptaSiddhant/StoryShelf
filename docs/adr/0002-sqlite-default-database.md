@@ -72,6 +72,16 @@ Drizzle supports all three with the same schema definitions. The adapter interfa
 - Turso free tier: 500 databases, 5GB storage, 500M reads/month (sufficient for most teams)
 - Turso write latency: 15-50ms vs SQLite's 0.05ms (acceptable for review workflows, not for high-throughput writes)
 
+## Amendment (2026-09-05): better-sqlite3 → node:sqlite
+
+The SQLite driver moved from `better-sqlite3` to the `node:sqlite` builtin
+(`DatabaseSync`) via `drizzle-orm/sqlite-proxy` (stable drizzle 0.44.x ships no
+native `node:sqlite` driver). `createSqliteDatabase(path)` signature,
+WAL mode, and the shared schema are unchanged; zero native dependencies remain.
+The code samples above show the original driver and are kept for history —
+see `packages/db-sqlite/src/index.ts` for the current wiring. Native
+`drizzle-orm/node-sqlite` (v1 beta line) will replace the proxy shim once GA.
+
 ## Why Not PostgreSQL
 
 PostgreSQL is the right choice for multi-tenant SaaS. StoryShelf is a single-tenant self-hosted tool. SQLite has zero operational overhead: no server to manage, no credentials to rotate, no connection pooling to tune. The entire database is a file.

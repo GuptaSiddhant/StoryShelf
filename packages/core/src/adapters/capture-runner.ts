@@ -1,8 +1,12 @@
+/**
+ * Capture-runner adapter interface: render story screenshots for a build.
+ */
 import type { Logger } from "pino";
-
-import type { StoryEntry, Viewport } from "../capture/adapter.ts";
+import type { StoryEntry, StorySourceAdapter, Viewport } from "../capture/adapter.ts";
+import type { Adapter } from "./metadata.ts";
 
 export type { JobStatus } from "./capture-queue.ts";
+export type { StoryEntry, StorySourceAdapter, Viewport } from "../capture/adapter.ts";
 
 /** A screenshot produced by a capture renderer. */
 export interface RenderedSnapshot {
@@ -10,6 +14,8 @@ export interface RenderedSnapshot {
   story: StoryEntry;
   /** Viewport name the screenshot was captured at. */
   viewportName: string;
+  /** Exact viewport dimensions captured at; falls back to the project list lookup in the pipeline. */
+  viewport?: Viewport;
   /** PNG screenshot bytes. */
   screenshot: Buffer;
 }
@@ -43,7 +49,15 @@ export interface RenderResult {
  * orchestrator's job (see `capture/orchestrator.ts`), keeping every adapter
  * implementation free of server concerns.
  */
-export interface CaptureRunner {
+export type BrowserName = "chromium" | "firefox" | "webkit" | "chrome";
+
+/** Browser names accepted for capture rendering (Chromium default). */
+export const BROWSER_NAMES = ["chromium", "firefox", "webkit", "chrome"] as const;
+
+export interface CaptureRunner extends Adapter<{
+  readonly category: "capture-runner";
+  readonly supportedBrowsers?: readonly BrowserName[];
+}> {
   /**
    * Render configured viewports for the given stories of an extracted
    * Storybook and return the screenshot buffers.
@@ -61,6 +75,20 @@ export interface CaptureRunner {
     viewports: Viewport[];
     /** Optional logger for render-time diagnostics. */
     logger?: Logger;
+    /** Whether to execute Storybook play functions before screenshot. */
+    executePlay?: boolean;
+    /** Timeout for play function execution in ms. */
+    playTimeoutMs?: number;
+    /** Whether to run a11y checks (axe) before screenshot; annotated as non-blocking. */
+    runA11y?: boolean;
+    /** Browser to use for rendering (chromium default). */
+    browser?: BrowserName;
+    /**
+     * Test/extension seam: override the story source adapter (defaults to
+     * `StorybookAdapter`). Only the renderer uses it; discovery stays the
+     * orchestrator's job.
+     */
+    adapter?: StorySourceAdapter;
   }): Promise<RenderResult>;
 
   /** Cancel a pending or in-flight render for a build. */

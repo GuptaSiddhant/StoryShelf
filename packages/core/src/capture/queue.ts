@@ -1,31 +1,24 @@
 import type { Logger } from "pino";
-
 import type { CaptureJob, CaptureQueue, QueueEntry } from "../adapters/capture-queue.ts";
 
-/* oxlint-disable typescript/require-await -- queue view reads are synchronous, but the CaptureQueue contract is async */
+declare const __PKG_VERSION__: string | undefined;
 
+/** Options for the in-process capture queue. */
 export interface InMemoryCaptureQueueOptions {
-  /** Maximum number of capture jobs that may run concurrently. */
   concurrency: number;
-  /** Executes a single capture job. In-process on a long-lived host. */
   runJob: (job: CaptureJob) => Promise<void>;
-  /** Optional logger for queue state transitions. */
   logger?: Logger;
 }
-
-/**
- * The default, in-process `CaptureQueue`.
- *
- * Runs capture jobs in the same process on a long-lived host (Node). `enqueue`
- * resolves once the job is tracked; the job itself runs asynchronously, bounded
- * by `concurrency`. Failed jobs are recorded on their queue entry and logged
- * rather than thrown, because `enqueue` has already returned to the caller.
- *
- * Serverless deployments substitute a remote `CaptureQueue` (e.g. SQS, Workers
- * Queues, Azure Storage Queues) whose `enqueue` pushes to the external queue;
- * a separately-assembled worker then runs `executeCaptureJob`.
- */
+/** In-process capture queue with bounded concurrency. */
 export class InMemoryCaptureQueue implements CaptureQueue {
+  readonly metadata = {
+    name: "In-Memory Queue",
+    version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
+    description: "In-process capture queue",
+    kind: "memory",
+    category: "capture-queue",
+  } as const;
+
   private readonly entries = new Map<string, QueueEntry>();
   private running = 0;
   private readonly waiting: (() => void)[] = [];
@@ -41,17 +34,23 @@ export class InMemoryCaptureQueue implements CaptureQueue {
   }
 
   async status(buildId: string): Promise<QueueEntry | null> {
-    return this.entries.get(buildId) ?? null;
+    return await Promise.resolve(this.entries.get(buildId) ?? null);
   }
 
   async active(): Promise<QueueEntry[]> {
-    return [...this.entries.values()]
-      .filter((entry) => entry.status === "queued" || entry.status === "running")
-      .toSorted((a, b) => a.queuedAt.localeCompare(b.queuedAt));
+    return await Promise.resolve(
+      [...this.entries.values()]
+        .filter((entry) => entry.status === "queued" || entry.status === "running")
+        .toSorted((a, b) => a.queuedAt.localeCompare(b.queuedAt)),
+    );
   }
 
   async recent(limit: number): Promise<QueueEntry[]> {
-    return [...this.entries.values()].toSorted((a, b) => b.queuedAt.localeCompare(a.queuedAt)).slice(0, limit);
+    return await Promise.resolve(
+      [...this.entries.values()]
+        .toSorted((a, b) => b.queuedAt.localeCompare(a.queuedAt))
+        .slice(0, limit),
+    );
   }
 
   private async process(job: CaptureJob, entry: QueueEntry): Promise<void> {

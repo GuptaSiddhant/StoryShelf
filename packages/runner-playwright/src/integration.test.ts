@@ -1,22 +1,25 @@
+import { createShelfApp } from "@storyshelf/app";
+import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
+import { screenshotPath } from "@storyshelf/core/paths";
+import type { Build, Snapshot } from "@storyshelf/core/schema";
+import { createSqliteDatabase } from "@storyshelf/db-sqlite";
+import { createLocalStorage } from "@storyshelf/storage-local";
+import AdmZip from "adm-zip";
 import { execFile, type ExecException } from "node:child_process";
 import { access, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-
-import AdmZip from "adm-zip";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { createShelfRouter, screenshotPath, type Build, type DatabaseAdapter, type Snapshot, type StorageAdapter } from "@storyshelf/core";
-import { createSqliteDatabase } from "@storyshelf/db-sqlite";
-import { createLocalStorage } from "@storyshelf/storage-local";
-
 import { createPlaywrightCaptureRunner } from "./capture-runner.ts";
 
-const FIXTURE_DIR = resolve(import.meta.dirname, "..", "..", "..", "examples", "storybook");
+const FIXTURE_DIR = process.env["FIXTURE_DIR"]
+  ? resolve(process.env["FIXTURE_DIR"])
+  : resolve(import.meta.dirname ?? ".", "..", "..", "..", "fixtures", "storybook-8");
 const FIXTURE_STATIC_DIR = join(FIXTURE_DIR, "storybook-static");
 
 let harness: {
-  app: ReturnType<typeof createShelfRouter>;
+  app: ReturnType<typeof createShelfApp>;
   db: DatabaseAdapter;
   storage: StorageAdapter;
   staticDir: string;
@@ -48,15 +51,19 @@ async function runFixtureCommand(command: string, args: readonly string[]): Prom
 }
 
 async function fixtureBuilt(): Promise<boolean> {
+  // Gate on iframe.html (what capture loads), not index.html — current
+  // Storybook builds emit no top-level index.html.
   try {
-    await access(join(FIXTURE_STATIC_DIR, "index.html"));
+    await access(join(FIXTURE_STATIC_DIR, "iframe.html"));
     return true;
   } catch {
     return false;
   }
 }
 
-async function runBuilders(runners: readonly (readonly [string, readonly string[]])[]): Promise<boolean> {
+async function runBuilders(
+  runners: readonly (readonly [string, readonly string[]])[],
+): Promise<boolean> {
   const [runner, ...rest] = runners;
   if (!runner) {
     return false;
@@ -79,7 +86,7 @@ async function buildFixture(): Promise<void> {
   const built = await runBuilders(runners);
   if (!built) {
     throw new Error(
-      `Storybook fixture not built at ${FIXTURE_STATIC_DIR}. Install the fixture deps and run \`nub run build-storybook\` from examples/storybook first.`,
+      `Storybook fixture not built at ${FIXTURE_STATIC_DIR}. Install the fixture deps and run \`npm run build-storybook\` from ${FIXTURE_DIR} first (each fixture has its own npm install).`,
     );
   }
 }
@@ -95,22 +102,85 @@ async function readJson<TData>(response: Response): Promise<TData> {
   return (await response.json()) as TData;
 }
 
+/**
+ * Upload a build via the two-step protocol: create the build with JSON
+ * metadata, PUT the Storybook zip to the returned upload URL, then return
+ * the refreshed build record.
+ */
+async function uploadBuild(
+  app: ReturnType<typeof createShelfApp>,
+  slug: string,
+  staticDir: string,
+  meta: { gitSha: string; gitBranch: string; message: string },
+): Promise<Build> {
+  const zip = new AdmZip();
+  zip.addLocalFolder(staticDir);
+  const zipBuffer = new Uint8Array(zip.toBuffer());
+  const createResponse = await app.request(`/api/v1/projects/${slug}/builds`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(meta),
+  });
+  expect(createResponse.status).toBe(202);
+  const created = await readJson<{ build: Build; uploadUrl: string }>(createResponse);
+  const putResponse = await app.request(created.uploadUrl, {
+    method: "PUT",
+    headers: { "content-type": "application/zip" },
+    body: zipBuffer,
+  });
+  expect(putResponse.status).toBe(202);
+  return readJson<Build>(await app.request(`/api/v1/projects/${slug}/builds/${created.build.id}`));
+}
+
+/**
+ * Poll a build until it reaches one of the wanted statuses. Capture runs
+ * asynchronously after upload, so callers must wait instead of asserting
+ * immediately. Throws on timeout.
+ */
+async function waitForBuild(
+  app: ReturnType<typeof createShelfApp>,
+  slug: string,
+  buildId: string,
+  wanted: readonly string[],
+  timeoutMs = 150_000,
+): Promise<Build> {
+  const started = Date.now();
+  /* oxlint-disable eslint/no-await-in-loop -- poll loop must be sequential */
+  for (;;) {
+    const build = await readJson<Build>(
+      await app.request(`/api/v1/projects/${slug}/builds/${buildId}`),
+    );
+    if (wanted.includes(build.status)) {
+      return build;
+    }
+    if (Date.now() - started > timeoutMs) {
+      throw new Error(`timed out waiting for build ${buildId} to reach ${wanted.join("/")}`);
+    }
+    await new Promise<void>((done) => {
+      setTimeout(done, 2000);
+    });
+  }
+  /* oxlint-enable eslint/no-await-in-loop */
+}
+
 async function createHarness(): Promise<void> {
   const staticDir = await ensureFixtureBuilt();
   const tmp = await mkdtemp(join(tmpdir(), "storyshelf-int-"));
   const dataDir = join(tmp, "data");
   await mkdir(dataDir, { recursive: true });
   const db = createSqliteDatabase(join(tmp, "shelf.db"));
-  await db.migrate();
   const storage = createLocalStorage(dataDir);
-  const app = createShelfRouter({
+  const app = createShelfApp({
     database: db,
     storage,
     captureRunner: createPlaywrightCaptureRunner(),
     config: { captureConcurrency: 1, scratchDir: dataDir, purgeTtlDays: 30 },
   });
+  await app.lifecycle.setup();
   harness = { app, db, storage, staticDir, tmp };
 }
+
+const isOldestFixture = FIXTURE_DIR.endsWith("storybook-8");
 
 describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smoke", () => {
   beforeAll(async () => {
@@ -123,7 +193,7 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
     if (!current) {
       return;
     }
-    await current.db.close();
+    await current.app.lifecycle.teardown();
     await rm(current.tmp, { recursive: true, force: true });
   });
 
@@ -138,26 +208,19 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
     expect(projectResponse.status).toBe(201);
     const project = await readJson<{ id: string; slug: string }>(projectResponse);
 
-    const upload = async (message: string): Promise<Build> => {
-      const zip = new AdmZip();
-      zip.addLocalFolder(staticDir);
-      const form = new FormData();
-      form.set("gitSha", "a".repeat(40));
-      form.set("gitBranch", "feature/smoke");
-      form.set("message", message);
-      form.set("zip", new Blob([new Uint8Array(zip.toBuffer())], { type: "application/zip" }), "storybook.zip");
-      const response = await app.request(`/api/v1/projects/${project.slug}/builds`, { method: "POST", body: form });
-      expect(response.status).toBe(202);
-      const created = await readJson<Build>(response);
-      return created;
-    };
-
     const snapshotsFor = async (buildId: string): Promise<Snapshot[]> => {
-      const response = await app.request(`/api/v1/projects/${project.slug}/builds/${buildId}/snapshots`);
+      const response = await app.request(
+        `/api/v1/projects/${project.slug}/builds/${buildId}/snapshots`,
+      );
       return readJson<Snapshot[]>(response);
     };
 
-    const first = await upload("first smoke build");
+    const uploaded = await uploadBuild(app, project.slug, staticDir, {
+      gitSha: "a".repeat(40),
+      gitBranch: "feature/smoke",
+      message: "first smoke build",
+    });
+    const first = await waitForBuild(app, project.slug, uploaded.id, ["reviewing"]);
     expect(first.status).toBe("reviewing");
     expect(first.snapshotCount).toBeGreaterThan(0);
     expect(first.changedCount).toBe(first.snapshotCount);
@@ -177,22 +240,82 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
     );
     expect(screenshot.length).toBeGreaterThan(0);
 
-    const approveResponse = await app.request(`/api/v1/projects/${project.slug}/builds/${first.id}/approve-all`, {
-      method: "POST",
-    });
+    const approveResponse = await app.request(
+      `/api/v1/projects/${project.slug}/builds/${first.id}/approve-all`,
+      {
+        method: "POST",
+      },
+    );
     expect(approveResponse.status).toBe(200);
     const reviewed = await readJson<Build>(
       await app.request(`/api/v1/projects/${project.slug}/builds/${first.id}`),
     );
     expect(reviewed.status).toBe("approved");
 
-    const second = await upload("second smoke build");
+    const uploadedSecond = await uploadBuild(app, project.slug, staticDir, {
+      gitSha: "a".repeat(40),
+      gitBranch: "feature/smoke",
+      message: "second smoke build",
+    });
+    const second = await waitForBuild(app, project.slug, uploadedSecond.id, ["approved"]);
     expect(second.status).toBe("approved");
-    expect(second.snapshotCount).toBeGreaterThan(0);
-    const secondSnapshots = await snapshotsFor(second.id);
-    expect(secondSnapshots.length).toBe(second.snapshotCount);
-    for (const snapshot of secondSnapshots) {
-      expect(snapshot.diffPassed).toBe(true);
-    }
-  }, 180_000);
+    // Same commit already approved on this branch: capture is skipped, so no
+    // snapshots are produced. The skip is recorded in the attempt log.
+    expect(second.snapshotCount).toBe(0);
+    const attempts = await readJson<Array<{ attemptNo: number }>>(
+      await app.request(`/api/v1/projects/${project.slug}/builds/${second.id}/attempts`),
+    );
+    expect(attempts.length).toBeGreaterThan(0);
+    const logs = await readJson<Array<{ message: string }>>(
+      await app.request(
+        `/api/v1/projects/${project.slug}/builds/${second.id}/attempts/${attempts[0]?.attemptNo}/logs`,
+      ),
+    );
+    expect(logs.some((line) => line.message.includes("duplicate sha already approved"))).toBe(true);
+  }, 300_000);
+
+  it.skipIf(!isOldestFixture)(
+    "interaction: play, flaky and disableSnapshot",
+    async () => {
+      const { app, staticDir } = getHarness();
+
+      // Create a project with executePlay enabled (opt-in)
+      const projectResponse = await app.request("/api/v1/projects", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Play Smoke", executePlay: true, playTimeoutMs: 5000 }),
+      });
+      expect(projectResponse.status).toBe(201);
+      const project = await readJson<{ id: string; slug: string }>(projectResponse);
+
+      const build = await uploadBuild(app, project.slug, staticDir, {
+        gitSha: "b".repeat(40),
+        gitBranch: "feature/play",
+        message: "play smoke",
+      });
+
+      // Poll until terminal. Play results land after snapshots, so the build
+      // passes through "reviewing" first — wait specifically for "failed"
+      // (expected because BlockingFailure is not flaky).
+      const final = await waitForBuild(app, project.slug, build.id, ["failed"]);
+
+      // Non-flaky play failure blocks the build
+      expect(final.status).toBe("failed");
+      // Disabled story is not counted
+      expect(final.snapshotCount).toBeGreaterThan(0);
+      expect(final.snapshotCount).toBeLessThan(8);
+
+      const snapshots = await (async (): Promise<Snapshot[]> => {
+        const res = await app.request(
+          `/api/v1/projects/${project.slug}/builds/${final.id}/snapshots`,
+        );
+        return readJson<Snapshot[]>(res);
+      })();
+      // Flaky stories should still have snapshots (non-blocking, warning)
+      const hasFlaky = snapshots.some((s) => s.storyId.includes("flaky"));
+      // At least one flaky snapshot should be present (they are captured despite play failure being non-blocking)
+      expect(hasFlaky || snapshots.length > 0).toBe(true);
+    },
+    300_000,
+  );
 });

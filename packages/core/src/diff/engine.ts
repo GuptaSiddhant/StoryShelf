@@ -1,15 +1,14 @@
 import pixelmatch from "pixelmatch";
 import { PNG } from "pngjs";
-
 import type { DiffOptions, DiffResult } from "./options.ts";
 
 /**
- * Compare a baseline and a current PNG screenshot, producing a DiffResult.
+ * Compare baseline and current screenshots, returning pass/fail and a diff image.
  *
- * @param baseline - The baseline PNG image bytes.
- * @param current - The current PNG image bytes.
- * @param options - Diff comparison options.
- * @returns The comparison result, including a diff overlay when applicable.
+ * @param baseline - Baseline PNG buffer.
+ * @param current - Current capture PNG buffer.
+ * @param options - Pixel threshold and ratio limits.
+ * @returns The diff result with pixel counts and an optional overlay image.
  */
 export function diffImages(baseline: Buffer, current: Buffer, options: DiffOptions): DiffResult {
   const baselinePng = PNG.sync.read(baseline);
@@ -18,7 +17,8 @@ export function diffImages(baseline: Buffer, current: Buffer, options: DiffOptio
   const baselineDimensions = { width: baselinePng.width, height: baselinePng.height };
   const currentDimensions = { width: currentPng.width, height: currentPng.height };
   const sizeChanged =
-    baselineDimensions.width !== currentDimensions.width || baselineDimensions.height !== currentDimensions.height;
+    baselineDimensions.width !== currentDimensions.width ||
+    baselineDimensions.height !== currentDimensions.height;
 
   if (sizeChanged) {
     if (options.failOnSizeChange) {
@@ -57,8 +57,8 @@ export function diffImages(baseline: Buffer, current: Buffer, options: DiffOptio
     };
   }
 
-  const width = baselineDimensions.width;
-  const height = baselineDimensions.height;
+  const { width } = baselineDimensions;
+  const { height } = baselineDimensions;
   const overlap = compareRegions(baselinePng.data, currentPng.data, width, height, options);
   const diffRatio = overlap.diffPixels / (width * height);
   return {
@@ -72,7 +72,6 @@ export function diffImages(baseline: Buffer, current: Buffer, options: DiffOptio
   };
 }
 
-/** Crop an RGBA buffer to the top-left `width` by `height` region. */
 function cropRgba(source: Buffer, sourceWidth: number, width: number, height: number): Buffer {
   const cropped = Buffer.alloc(width * height * 4);
   const rowBytes = width * 4;
@@ -83,16 +82,6 @@ function cropRgba(source: Buffer, sourceWidth: number, width: number, height: nu
   return cropped;
 }
 
-/**
- * Compare two equally sized RGBA buffers and generate a diff overlay.
- *
- * @param baselineData - Baseline image data.
- * @param currentData - Current image data, same size as the baseline.
- * @param width - Image width in pixels.
- * @param height - Image height in pixels.
- * @param options - Diff comparison options.
- * @returns The differing pixel count and the diff overlay PNG bytes.
- */
 function compareRegions(
   baselineData: Buffer,
   currentData: Buffer,

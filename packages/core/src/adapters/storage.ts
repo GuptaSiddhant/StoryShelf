@@ -1,5 +1,12 @@
+/**
+ * Storage adapter interface: binary objects for screenshots, diffs, and archives.
+ */
+import type { Buffer } from "node:buffer";
+import type { Readable } from "node:stream";
+import type { Adapter } from "./metadata.ts";
+
 /** Blob storage abstraction for screenshots, diffs and Storybook archives. */
-export interface StorageAdapter {
+export interface StorageAdapter extends Adapter<{ readonly category: "storage" }> {
   /** Read the bytes stored at `path`. */
   read(path: string): Promise<Buffer>;
   /** Write `data` to `path`, creating parent directories as needed. */
@@ -10,4 +17,14 @@ export interface StorageAdapter {
   exists(path: string): Promise<boolean>;
   /** List object paths under the given key prefix. */
   list(prefix: string): Promise<string[]>;
+  /**
+   * Stream `stream` to `path`, creating parent directories as needed.
+   * Resolves when the stream is fully consumed and persisted.
+   */
+  writeStream(path: string, stream: Readable): Promise<void>;
+  /**
+   * Open a stream for the bytes stored at `path`.
+   * Rejects when no object exists at `path`.
+   */
+  readStream(path: string): Promise<Readable>;
 }
