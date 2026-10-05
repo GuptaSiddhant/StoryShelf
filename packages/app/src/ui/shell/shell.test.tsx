@@ -98,6 +98,15 @@ describe("top bar and sidebar footer", () => {
     expect(bar(html)).toContain('class="topbar__picker"');
   });
 
+  it("keeps the picker chevron on phones when there are several projects, drops it for one", async () => {
+    const many = await page("/projects/alpha/builds", twoProjects);
+    const one = await page("/projects/solo/builds", async (db) => {
+      await new ProjectModel(db).create({ name: "Solo" });
+    });
+    expect(bar(many)).not.toContain("data-single");
+    expect(bar(one)).toContain('data-single="true"');
+  });
+
   it("reads 'All projects' on global pages with no breadcrumb", async () => {
     const projects = await page("/projects");
     const admin = await page("/admin");

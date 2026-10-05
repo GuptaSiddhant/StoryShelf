@@ -90,9 +90,6 @@ const shellTopbar = css`
     & .crumbs li:not(:last-child) {
       display: none;
     }
-    & .crumbs li:last-child::before {
-      content: "‹";
-    }
     & .topbar__picker {
       display: none;
     }
@@ -101,7 +98,7 @@ const shellTopbar = css`
       justify-content: center;
       padding: 0.25rem 0.5rem;
     }
-    & .topbar__left summary > svg:last-child {
+    & .topbar__pick[data-single] summary > svg:last-child {
       display: none;
     }
     & .crumbs a {
@@ -181,34 +178,36 @@ const ProjectPicker: FC<{ nav?: NavConfig }> = async ({ nav }) => {
   const current = nav?.projectSlug;
   const label = current ? (nav?.projectName ?? current) : "All projects";
   return (
-    <Dropdown
-      ariaLabel={`Project: ${label}`}
-      label={
-        <>
-          <Icon name="folder" size="sm" />
-          <span class="topbar__picker">{label}</span>
-        </>
-      }
-    >
-      {projects.map((project) => (
-        <DropdownItem
-          key={project.slug}
-          href={urls.library(project.slug)}
-          current={project.slug === current}
-        >
-          {project.name}
+    <span class="topbar__pick" data-single={projects.length <= 1 ? "true" : undefined}>
+      <Dropdown
+        ariaLabel={`Project: ${label}`}
+        label={
+          <>
+            <Icon name="folder" size="sm" />
+            <span class="topbar__picker">{label}</span>
+          </>
+        }
+      >
+        {projects.map((project) => (
+          <DropdownItem
+            key={project.slug}
+            href={urls.library(project.slug)}
+            current={project.slug === current}
+          >
+            {project.name}
+          </DropdownItem>
+        ))}
+        {projects.length > 0 ? <DropdownDivider /> : null}
+        <DropdownItem href={urls.projects()} icon="folder" current={!current}>
+          All projects
         </DropdownItem>
-      ))}
-      {projects.length > 0 ? <DropdownDivider /> : null}
-      <DropdownItem href={urls.projects()} icon="folder" current={!current}>
-        All projects
-      </DropdownItem>
-      {canCreate ? (
-        <DropdownItem href={urls.projectsNew()} icon="plus">
-          New project
-        </DropdownItem>
-      ) : null}
-    </Dropdown>
+        {canCreate ? (
+          <DropdownItem href={urls.projectsNew()} icon="plus">
+            New project
+          </DropdownItem>
+        ) : null}
+      </Dropdown>
+    </span>
   );
 };
 
