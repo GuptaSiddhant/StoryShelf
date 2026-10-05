@@ -129,6 +129,7 @@ export default defineConfig({
             { label: "@storyshelf/queue-sqs", slug: "packages/queue-sqs" },
             { label: "@storyshelf/queue-redis", slug: "packages/queue-redis" },
             { label: "@storyshelf/queue-azure", slug: "packages/queue-azure" },
+            { label: "@storyshelf/queue-gcp", slug: "packages/queue-gcp" },
             { label: "@storyshelf/observability", slug: "packages/observability" },
             { label: "@storyshelf/worker", slug: "packages/worker" },
           ],

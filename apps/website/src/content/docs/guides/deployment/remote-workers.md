@@ -153,7 +153,7 @@ createAzureStorageQueuesQueue({ queueName: "capture-jobs", connectionString: pro
 
 ### GCP Pub/Sub
 
-`@storyshelf/queue-gcp` uses a **pull subscription** with synchronous pull, one message at a time:
+[`@storyshelf/queue-gcp`](/packages/queue-gcp/) uses a **pull subscription** with synchronous pull, one message at a time:
 
 ```ts
 import { createGcpPubSubQueue } from "@storyshelf/queue-gcp";
@@ -169,6 +169,6 @@ createGcpPubSubQueue({ topic: "capture-jobs", subscription: "capture-jobs-worker
 
 ## Related
 
-- [`@storyshelf/queue-sqs`](/packages/queue-sqs/) · [`queue-redis`](/packages/queue-redis/) · [`queue-azure`](/packages/queue-azure/) · [`@storyshelf/worker`](/packages/worker/)
+- [`@storyshelf/queue-sqs`](/packages/queue-sqs/) · [`queue-redis`](/packages/queue-redis/) · [`queue-azure`](/packages/queue-azure/) · [`queue-gcp`](/packages/queue-gcp/) · [`@storyshelf/worker`](/packages/worker/)
 - [AWS](/guides/deployment/aws/) · [Azure](/guides/deployment/azure/) · [GCP](/guides/deployment/gcp/) · [Deployment overview](/guides/deployment/)
 - [Capture & viewports](/concepts/capture/)
