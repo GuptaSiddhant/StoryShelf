@@ -1,7 +1,8 @@
 name: CI
 
-# P0-3: first merge gate. verify-smoke runs on every PR; the real-browser
-# fixture matrix is gated behind it so hermetic failures fail fast.
+# verify-smoke and the real-browser fixture matrix run in parallel: they are
+# independent, and gating the matrix behind verify-smoke only added its
+# duration to the critical path.
 on:
   pull_request:
   push:
@@ -45,7 +46,6 @@ jobs:
 
   fixture-matrix:
     name: Fixtures (${{ matrix.fixture }})
-    needs: verify-smoke
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -84,8 +84,17 @@ jobs:
           key: playwright-1.63.0-chromium-${{ runner.os }}
 
       - name: Install Playwright chromium
-        # runner-playwright deps on playwright-core (no bundled browser).
-        run: npx -y playwright@1.63.0 install --with-deps chromium
+        # runner-playwright deps on playwright-core (no bundled browser). The
+        # pinned workspace CLI avoids an npx download, and the browser comes
+        # from the cache above. System libraries are installed (apt, ~15s) only
+        # when chromium cannot launch, since the runner image usually has them.
+        working-directory: packages/runner-playwright
+        run: |
+          nubx playwright-core install chromium
+          if ! node --input-type=module -e "const { chromium } = await import('playwright-core'); await (await chromium.launch()).close()"; then
+            echo "chromium failed to launch; installing system dependencies"
+            nubx playwright-core install-deps chromium
+          fi
 
       - name: Install fixture
         run: pnpm --dir fixtures/${{ matrix.fixture }} install --frozen-lockfile
@@ -96,7 +105,8 @@ jobs:
       - name: Build workspace packages
         # Replaces turbo's dependsOn ^build: the test step below bypasses
         # turbo (step env does not survive `nubx turbo`), so build explicitly.
-        run: nub run build --filter='./packages/*'
+        # Only runner-playwright and its dependency closure (9 of 24 packages).
+        run: nubx turbo build --filter='@storyshelf/runner-playwright...'
 
       - name: Real-browser capture tests
         working-directory: packages/runner-playwright
