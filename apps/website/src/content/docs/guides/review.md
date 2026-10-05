@@ -5,9 +5,15 @@ description: Approve, reject, comment, and retry — the build review flow that 
 
 Every build lands in `reviewing` once diffing finishes (default-branch builds auto-approve). Review is per-snapshot; the build gate is the merge gate.
 
-![Diff review — snapshot navigator, baseline | current | diff viewer, and comment thread](/screenshots/diff-review.png)
+![Diff review — snapshot filmstrip, baseline | current | diff comparison, and the action bar](/screenshots/diff-review.png)
 
-The review bar stays pinned while scrolling, with the snapshot title, status, and Approve/Reject actions. The `Split | Baseline | Current | Diff` switcher focuses a single pane for large screenshots; keyboard shortcuts (`←`/`→` navigate, `a` approve, `r` reject) work throughout.
+The review page is a workspace:
+
+- **Filmstrip** (left): a thumbnail per snapshot with its status and diff size, filterable to *Needs review*, *All* or *Done*. The header shows how many changes you have reviewed.
+- **Comparison** (centre): *Side by side*, *Swipe* (drag a divider), *Onion skin* (blend baseline and current), *Diff* (the overlay alone) and *Flip* (toggle between baseline and current), with *Fit / 100% / 200%* zoom. Panes scroll together, and your mode and zoom are remembered.
+- **Action bar** (pinned at the bottom): previous/next, **Approve** and **Reject**. Deciding a snapshot moves you straight to the next one that still needs review.
+
+Keyboard: `j`/`k` (or `→`/`←`) move between snapshots, `a` approves, `r` rejects, `1`–`5` pick a comparison mode, `f` cycles zoom, `t` flips baseline/current, and `?` lists them all. **Approve all** and **Reject all** in the header ask for confirmation first.
 
 ## Approve / reject
 

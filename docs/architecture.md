@@ -817,15 +817,15 @@ StoryShelf/
 
 StoryShelf ships a **fixed, server-rendered UI** — `hono/jsx` + HTMX + `hono/css`. No client framework, no UI build step, no pluggable-UI adapter. Custom interfaces are built against `/api/v1` (the same contract the CLI uses, so it cannot be a second-class citizen). See ADR 0012 and ADR 0025 (shell, review workspace, derived brand tokens).
 
-- **Layout:** a branded top **header** (logo + name + accent, project context, theme toggle, user menu) plus a neutral left **sidebar** (Builds, Storybook, Settings). The content area is monochrome and image-first.
+- **Layout:** a full-height icon **sidebar** (brand, project/developer/admin navigation; footer with the account, theme and collapse controls; collapses to a rail, drawer on phones) plus a slim neutral **top bar** (project picker and the page's ancestor breadcrumbs). The customer accent appears only in small places (brand mark, active nav, primary actions, derived tints). The content area is image-first.
 - **Pages** live in `app/src/pages/*.tsx` and render directly from models (no API/UI contract duplication).
 - **Layout & theming** live in `app/src/ui/` — a `DocumentLayout` (head, vendored HTMX, styles) plus a `BrandTheme` of light/dark color tokens.
 - **Theme:** follows the system (`prefers-color-scheme`) with a manual light/dark override, persisted in a cookie so the server renders the correct theme on first paint.
 - **Brand config** is passed as `ui: { name, logo, favicon, theme }` to `createShelfApp` (see `ShelfOptions`). Env vars (`SS_BRAND_NAME`, `SS_LOGO_URL`) supply defaults so self-hosters can rebrand with a `docker run`, no code.
-- **Auth UI text** lives in `ui.auth` (title, subtitle, password label/placeholder, submit label, `{label}` SSO template, help/footer) with `SS_AUTH_*` env defaults; the header user menu links to the personal `/profile` page (editable display name, local password change, memberships).
+- **Auth UI text** lives in `ui.auth` (title, subtitle, password label/placeholder, submit label, `{label}` SSO template, help/footer) with `SS_AUTH_*` env defaults; the sidebar account menu links to the personal `/profile` page (editable display name, local password change, memberships).
 - **Public base URL** (`config.publicBaseUrl`, `PUBLIC_BASE_URL`) pins the issuer in the `/.well-known/openid-configuration` relying-party helper; otherwise the request origin is used.
 - **HTMX is vendored locally** (no CDN), so air-gapped deployments work.
-- **Diff view (v1):** a simple three-up grid — baseline | current | diff overlay. A minimal vanilla-JS layer in `app/src/ui/document.tsx` (the inline `clientScript`) covers the theme toggle and keyboard approve/reject; the wipe slider and zoom are deferred to v2. The published-Storybook page is an `<iframe>` of Storybook's own static build.
+- **Review workspace:** a snapshot filmstrip with filters and progress, and a comparison stage with side-by-side, swipe, onion-skin, diff and flip modes plus zoom; a sticky action bar approves/rejects and auto-advances to the next open snapshot (keyboard: `j`/`k`, `a`/`r`, `1`–`5`, `f`, `t`, `?`). A small vanilla-JS layer (`app/src/ui/shell/*-script.ts`, idempotent across HTMX body swaps) covers the shell and review behaviour. The published-Storybook page is an `<iframe>` of Storybook's own static build.
 
 ## Deployment
 
