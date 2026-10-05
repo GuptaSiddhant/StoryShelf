@@ -11,6 +11,14 @@ const cardBase = css`
   box-shadow: var(--shadow);
 `;
 
+const cardColumn = css`
+  /* card-column */
+  ${cardBase}
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+`;
+
 const cardPadded = css`
   /* card-padded */
   ${cardBase}
@@ -63,6 +71,11 @@ const pageHeaderDesc = css`
   color: var(--text-secondary);
   font-size: 0.9rem;
   max-width: 65ch;
+  /* Links inside running text must not rely on colour alone. */
+  & a {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
 `;
 
 const pageHeaderMeta = css`
@@ -113,8 +126,17 @@ export const Card: FC<{
   children?: unknown;
   padded?: boolean;
   tone?: "neutral" | "danger";
+  /** Flex column filling its grid cell, so a footer can sit at the bottom of equal-height cards. */
+  fill?: boolean;
   [key: string]: unknown;
-}> = ({ children, padded = true, tone = "neutral", ...rest }) => {
+}> = ({ children, padded = true, tone = "neutral", fill = false, ...rest }) => {
+  if (fill) {
+    return (
+      <div class={cardColumn} {...rest}>
+        {children}
+      </div>
+    );
+  }
   if (!padded) {
     return (
       <div class={cardBase} {...rest}>

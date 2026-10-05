@@ -64,4 +64,21 @@ describe("DocumentLayout stylesheet", () => {
     ];
     expect(collected ?? "").toContain("ss-btn-");
   });
+
+  it("declares a doctype so browsers use standards mode (not quirks)", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const app = createShelfApp({
+      database: db,
+      storage,
+      logger: createShelfLogger({ level: "silent" }),
+    });
+    const pages = await Promise.all(
+      ["/projects", "/projects/new"].map(async (path) => await (await app.request(path)).text()),
+    );
+    for (const html of pages) {
+      expect(html.startsWith("<!DOCTYPE html>")).toBe(true);
+      expect(html.match(/<!DOCTYPE/giu)?.length).toBe(1);
+    }
+  });
 });

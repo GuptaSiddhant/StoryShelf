@@ -23,6 +23,9 @@ const btnBase = css`
   justify-content: center;
   gap: 0.4rem;
   line-height: 1.2;
+  /* Top-aligned so a button in a <form> (a block with a line box) is exactly
+     as tall as the button instead of picking up a baseline strut. */
+  vertical-align: top;
   min-height: 40px;
   transition:
     background var(--dur-fast) var(--ease),

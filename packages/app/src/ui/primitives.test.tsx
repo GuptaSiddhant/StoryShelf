@@ -7,6 +7,7 @@ import {
   AvatarGroup,
   Badge,
   Button,
+  Card,
   CodeBlock,
   CompareStage,
   Dropdown,
@@ -311,5 +312,18 @@ describe("SubNavLayout", () => {
     expect(html).toContain("#i-settings");
     expect(html).toContain("#i-key");
     expect(html).toContain("<p>Body</p>");
+  });
+});
+
+describe("alignment guards", () => {
+  it("top-aligns buttons so a button inside a form is not taller than its siblings", async () => {
+    const html = await render(<Button>Go</Button>);
+    expect(html).toMatch(/vertical-align:top/u);
+  });
+
+  it("lets a card fill its grid cell as a flex column", async () => {
+    const html = await render(<Card fill>Body</Card>);
+    expect(html).toContain("ss-card-column-");
+    expect(html).toMatch(/flex-direction:column/u);
   });
 });

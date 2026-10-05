@@ -1,3 +1,4 @@
+import { raw } from "hono/html";
 import type { FC } from "hono/jsx";
 import { assetManifest } from "../asset-manifest.ts";
 import { getCsrfToken } from "../middleware/csrf.ts";
@@ -84,50 +85,54 @@ export const DocumentLayout: FC<{
   const dark = ui.darkTheme ?? DARK_THEME;
 
   return (
-    <html lang="en" data-theme="system">
-      <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="color-scheme" content="light dark" />
-        <meta name="csrf-token" content={getCsrfToken(config.secret, sessionId)} />
-        {ui.favicon ? <link rel="icon" href={ui.favicon} /> : null}
-        <title>
-          {title} · {name}
-        </title>
-        <style dangerouslySetInnerHTML={{ __html: baseStyle(light, dark) }} />
-        <Style />
-        <script dangerouslySetInnerHTML={{ __html: bootScript() }} />
-      </head>
-      <body>
-        <a class="skip-link" href="#main-content">
-          Skip to content
-        </a>
-        {layout === "bare" ? (
-          <BareShell name={name} logo={ui.logo}>
-            {children}
-          </BareShell>
-        ) : (
-          <>
-            <div class={shellRoot}>
-              <Sidebar nav={nav} name={name} logo={ui.logo} />
-              <div>
-                <TopBar nav={nav} />
-                <main
-                  id="main-content"
-                  class={layout === "wide" ? shellContentWide : shellContent}
-                  tabindex={-1}
-                >
-                  {children}
-                </main>
+    <>
+      {/* Without a doctype browsers use quirks mode (form margins, line-box struts, …). */}
+      {raw("<!DOCTYPE html>")}
+      <html lang="en" data-theme="system">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <meta name="color-scheme" content="light dark" />
+          <meta name="csrf-token" content={getCsrfToken(config.secret, sessionId)} />
+          {ui.favicon ? <link rel="icon" href={ui.favicon} /> : null}
+          <title>
+            {title} · {name}
+          </title>
+          <style dangerouslySetInnerHTML={{ __html: baseStyle(light, dark) }} />
+          <Style />
+          <script dangerouslySetInnerHTML={{ __html: bootScript() }} />
+        </head>
+        <body>
+          <a class="skip-link" href="#main-content">
+            Skip to content
+          </a>
+          {layout === "bare" ? (
+            <BareShell name={name} logo={ui.logo}>
+              {children}
+            </BareShell>
+          ) : (
+            <>
+              <div class={shellRoot}>
+                <Sidebar nav={nav} name={name} logo={ui.logo} />
+                <div>
+                  <TopBar nav={nav} />
+                  <main
+                    id="main-content"
+                    class={layout === "wide" ? shellContentWide : shellContent}
+                    tabindex={-1}
+                  >
+                    {children}
+                  </main>
+                </div>
               </div>
-            </div>
-            <div class={shellBackdrop} data-sidebar-backdrop hidden />
-          </>
-        )}
-        <ToastRegion />
-        <script src={assetManifest.htmx.href} />
-        <script dangerouslySetInnerHTML={{ __html: clientScript() }} />
-      </body>
-    </html>
+              <div class={shellBackdrop} data-sidebar-backdrop hidden />
+            </>
+          )}
+          <ToastRegion />
+          <script src={assetManifest.htmx.href} />
+          <script dangerouslySetInnerHTML={{ __html: clientScript() }} />
+        </body>
+      </html>
+    </>
   );
 };

@@ -102,6 +102,7 @@ export const headerActions = css`
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+  align-items: center;
   justify-content: flex-end;
 `;
 

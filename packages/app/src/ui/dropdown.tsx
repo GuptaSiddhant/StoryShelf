@@ -9,6 +9,7 @@ const dropdownRoot = css`
   /* dropdown */
   position: relative;
   display: inline-block;
+  vertical-align: top;
 `;
 
 const dropdownRootBlock = css`
