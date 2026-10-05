@@ -134,6 +134,35 @@ const PasskeyTable: FC<{ passkeys: PasskeyState[] }> = ({ passkeys }) => {
   );
 };
 
+type SessionInfo = SecurityState["sessions"][number];
+
+/** One signed-in device with its revoke action. */
+const SessionRow: FC<{ session: SessionInfo }> = ({ session }) => {
+  return (
+    <tr>
+      <td>
+        <div class="truncate">{session.userAgent ?? "Unknown device"}</div>
+        <div class={profileMeta}>
+          <span class="mono">{session.ipAddress ?? "—"}</span>
+        </div>
+      </td>
+      <td>{new Date(session.createdAt).toLocaleString()}</td>
+      <td>
+        {session.current ? (
+          <Badge>This device</Badge>
+        ) : (
+          <form method="post" action="/profile/sessions/revoke">
+            <input type="hidden" name="sessionId" value={session.id} />
+            <Button variant="secondary" size="sm" type="submit">
+              Revoke
+            </Button>
+          </form>
+        )}
+      </td>
+    </tr>
+  );
+};
+
 /** Active device sessions with per-device revoke and sign-out-others. */
 const SessionsSection: FC<{ security: SecurityState }> = ({ security }) => {
   return (
@@ -149,32 +178,9 @@ const SessionsSection: FC<{ security: SecurityState }> = ({ security }) => {
             </tr>
           </thead>
           <tbody>
-            {security.sessions.map(
-              // oxlint-disable-next-line typescript/promise-function-async -- JSX map is sync
-              (session) => (
-                <tr key={session.id}>
-                  <td>
-                    <div class="truncate">{session.userAgent ?? "Unknown device"}</div>
-                    <div class={profileMeta}>
-                      <span class="mono">{session.ipAddress ?? "—"}</span>
-                    </div>
-                  </td>
-                  <td>{new Date(session.createdAt).toLocaleString()}</td>
-                  <td>
-                    {session.current ? (
-                      <Badge>This device</Badge>
-                    ) : (
-                      <form method="post" action="/profile/sessions/revoke">
-                        <input type="hidden" name="sessionId" value={session.id} />
-                        <Button variant="secondary" size="sm" type="submit">
-                          Revoke
-                        </Button>
-                      </form>
-                    )}
-                  </td>
-                </tr>
-              ),
-            )}
+            {security.sessions.map((session) => (
+              <SessionRow key={session.id} session={session} />
+            ))}
           </tbody>
         </table>
       </Table>
