@@ -92,6 +92,12 @@ describe("top bar and sidebar footer", () => {
     expect(bar(deeper)).not.toContain("Tokens");
   });
 
+  it("labels the picker for assistive tech even though phones show only its icon", async () => {
+    const html = await page("/projects/alpha/builds", twoProjects);
+    expect(bar(html)).toContain('aria-label="Project: Alpha"');
+    expect(bar(html)).toContain('class="topbar__picker"');
+  });
+
   it("reads 'All projects' on global pages with no breadcrumb", async () => {
     const projects = await page("/projects");
     const admin = await page("/admin");

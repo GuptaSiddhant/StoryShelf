@@ -93,11 +93,19 @@ const shellTopbar = css`
     & .crumbs li:last-child::before {
       content: "‹";
     }
-    & .crumbs a {
-      max-width: 100%;
-    }
     & .topbar__picker {
-      max-width: 14ch;
+      display: none;
+    }
+    & .topbar__left summary {
+      min-width: 36px;
+      justify-content: center;
+      padding: 0.25rem 0.5rem;
+    }
+    & .topbar__left summary > svg:last-child {
+      display: none;
+    }
+    & .crumbs a {
+      max-width: 22ch;
     }
   }
 `;

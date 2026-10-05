@@ -83,7 +83,7 @@ this — keep it green and lower its per-file style ceilings as you migrate.
   (`{ label, href? }[]`) to `DocumentLayout`, ending with the current
   page. The top bar renders `[project picker] › ancestors…` and *drops* the
   current page — its heading names it, so never show a title in both places
-  (on phones only the parent shows, as `‹ Parent`). Account, theme and collapse live in the sidebar footer.
+  (on phones only the parent shows, as `‹ Parent`, and the project picker shrinks to its icon). Account, theme and collapse live in the sidebar footer.
 - **Chrome lives in `ui/shell/`** (`sidebar`, `topbar`, `bare`, boot and
   client scripts). `DocumentLayout` takes `layout="default" | "wide" |
   "bare"` (`bare` = sign-in/invite, no app chrome).
