@@ -1,3 +1,6 @@
+// Must load first: tsyringe (via @peculiar/x509 in passkey auth) throws at import without it, and the
+// bundler does not preserve the transitive side-effect import.
+import "reflect-metadata";
 import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
