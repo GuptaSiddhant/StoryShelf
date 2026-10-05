@@ -25,6 +25,10 @@ const PROJECT_AUTOMIGRATE_ALTER =
 const SNAPSHOT_INFRA_HASH_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS infra_hash TEXT";
 const SNAPSHOT_INHERITED_ALTER =
   "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS inherited BOOLEAN NOT NULL DEFAULT false";
+const SNAPSHOT_BASELINE_ID_ALTER =
+  "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS baseline_id TEXT";
+const SNAPSHOT_BASELINE_VERSION_ALTER =
+  "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS baseline_version TEXT";
 const BASELINE_INFRA_HASH_ALTER = "ALTER TABLE baselines ADD COLUMN IF NOT EXISTS infra_hash TEXT";
 const BUILD_AFFECTED_ONLY_ALTER =
   "ALTER TABLE builds ADD COLUMN IF NOT EXISTS affected_only BOOLEAN NOT NULL DEFAULT true";
@@ -48,12 +52,18 @@ const BUILDS_GITSHA_DEDUP = "DROP INDEX builds_project_gitsha_idx ON builds";
 const BUILDS_GITSHA_INDEX =
   "CREATE INDEX builds_project_gitsha_idx ON builds (project_id, git_sha)";
 
+async function migrateSnapshotColumns(run: MigrationRunner): Promise<void> {
+  await execIgnore(run, SNAPSHOT_INFRA_HASH_ALTER);
+  await execIgnore(run, SNAPSHOT_INHERITED_ALTER);
+  await execIgnore(run, SNAPSHOT_BASELINE_ID_ALTER);
+  await execIgnore(run, SNAPSHOT_BASELINE_VERSION_ALTER);
+}
+
 async function migrateProjectExtras(run: MigrationRunner): Promise<void> {
   await execIgnore(run, EXECUTE_PLAY_ALTER);
   await execIgnore(run, PLAY_TIMEOUT_MS_ALTER);
   await execIgnore(run, PROJECT_AUTOMIGRATE_ALTER);
-  await execIgnore(run, SNAPSHOT_INFRA_HASH_ALTER);
-  await execIgnore(run, SNAPSHOT_INHERITED_ALTER);
+  await migrateSnapshotColumns(run);
   await execIgnore(run, BASELINE_INFRA_HASH_ALTER);
   await execIgnore(run, BUILD_AFFECTED_ONLY_ALTER);
   await execIgnore(run, BUILD_BASELINE_SHA_ALTER);

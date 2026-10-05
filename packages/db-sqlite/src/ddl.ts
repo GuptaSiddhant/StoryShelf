@@ -103,6 +103,8 @@ CREATE TABLE IF NOT EXISTS snapshots (
   reviewed_at TEXT,
   infra_hash TEXT,
   inherited INTEGER NOT NULL DEFAULT 0,
+  baseline_id TEXT,
+  baseline_version TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );

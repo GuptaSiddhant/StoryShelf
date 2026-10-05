@@ -103,6 +103,8 @@ CREATE TABLE IF NOT EXISTS snapshots (
   reviewed_at TIMESTAMPTZ,
   infra_hash TEXT,
   inherited BOOLEAN NOT NULL DEFAULT false,
+  baseline_id TEXT,
+  baseline_version TEXT,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );

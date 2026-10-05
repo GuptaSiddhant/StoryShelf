@@ -220,6 +220,32 @@ describe("persistCapture", () => {
     expect(build?.status).toBe("approved");
   });
 
+  it("records the baseline a snapshot was diffed against", async () => {
+    const { ctx } = await makeContext({
+      captures: [captureFor(storyOf("a"), png(4, 4, [0, 255, 0]))],
+      isDefault: false,
+    });
+    await seedBaseline(ctx);
+
+    await persistCapture(ctx);
+
+    const [row] = await ctx.db.list(ctx.db.tables.snapshots);
+    expect(row?.baselineId).toBe("bl1");
+    expect(row?.baselineVersion).toBe("2026-01-01T00:00:00.000Z");
+  });
+
+  it("marks snapshots of stories without a baseline as diffed against none", async () => {
+    const { ctx } = await makeContext({
+      captures: [captureFor(storyOf("a"), png(4, 4, [0, 255, 0]))],
+    });
+
+    await persistCapture(ctx);
+
+    const [row] = await ctx.db.list(ctx.db.tables.snapshots);
+    expect(row?.baselineId).toBeNull();
+    expect(row?.baselineVersion).toBe("none");
+  });
+
   it("keeps a feature-branch build in reviewing status when no captures occur", async () => {
     const { ctx } = await makeContext({ captures: [], isDefault: false });
 

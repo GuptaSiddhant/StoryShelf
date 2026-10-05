@@ -40,6 +40,8 @@ export const snapshots = pgTable(
     reviewedAt: timestamp("reviewed_at", { withTimezone: true, mode: "string" }),
     infraHash: text("infra_hash"),
     inherited: boolean("inherited").notNull().default(false),
+    baselineId: text("baseline_id"),
+    baselineVersion: text("baseline_version"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull(),
   },
@@ -71,6 +73,8 @@ export interface Snapshot {
   reviewedAt: string | null;
   infraHash: string | null;
   inherited: boolean;
+  baselineId: string | null;
+  baselineVersion: string | null;
   createdAt: string;
   updatedAt: string;
 }

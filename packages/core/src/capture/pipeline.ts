@@ -2,8 +2,7 @@ import type { Logger } from "pino";
 import type { RenderedSnapshot } from "../adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
-import { diffImages } from "../diff/engine.ts";
-import { DEFAULT_DIFF_OPTIONS } from "../diff/options.ts";
+import { NO_BASELINE } from "../models/baseline-status.ts";
 import { BaselineModel, type BaselineTables } from "../models/baseline.ts";
 import { BuildModel, type BuildTables } from "../models/build.ts";
 import { emitAttemptLog, type AttemptLogRecorder } from "../models/capture-attempt.ts";
@@ -15,6 +14,7 @@ import type { BuildStatus, SnapshotStatus } from "../types.ts";
 import { diffPath, screenshotPath } from "../utils/paths.ts";
 import type { Viewport } from "./adapter.ts";
 import type { InheritedStory } from "./affected.ts";
+import { diffStoredScreenshots, writeDiffOverlay } from "./diff-record.ts";
 import { assertScreenshotBuffer } from "./guards.ts";
 import { infraHashFor, SIZING_DEFAULTS } from "./sizing.ts";
 
@@ -154,6 +154,8 @@ async function persistInheritedSnapshot(
     screenshotPath: inherited.baseline.screenshotPath,
     infraHash,
     inherited: true,
+    baselineId: inherited.baseline.id,
+    baselineVersion: inherited.baseline.updatedAt,
   });
   await snapshots.update(snapshot.id, {
     status: "unchanged",
@@ -260,6 +262,7 @@ async function createWithoutBaseline(
     viewportHeight: viewport.height,
     screenshotPath: screenshot,
     infraHash,
+    baselineVersion: NO_BASELINE,
   });
   await snapshots.setStatus(snapshot.id, status);
 
@@ -284,14 +287,12 @@ async function createWithBaseline(
   screenshot: string,
   baseline: Baseline,
 ): Promise<void> {
-  const current = await ctx.storage.read(screenshot);
-  const previous = await ctx.storage.read(baseline.screenshotPath);
-  const options = {
-    ...DEFAULT_DIFF_OPTIONS,
-    pixelThreshold: ctx.project.pixelThreshold,
-    maxDiffRatio: ctx.project.maxDiffRatio,
-  };
-  const result = diffImages(previous, current, options);
+  const result = await diffStoredScreenshots(
+    ctx.storage,
+    ctx.project,
+    baseline.screenshotPath,
+    screenshot,
+  );
 
   const infraHash = infraHashFor(ctx.project.browser ?? "chromium", ctx.viewports, SIZING_DEFAULTS);
   const snapshots = new SnapshotModel(ctx.db, ctx.tables);
@@ -305,6 +306,8 @@ async function createWithBaseline(
     viewportHeight: viewport.height,
     screenshotPath: screenshot,
     infraHash,
+    baselineId: baseline.id,
+    baselineVersion: baseline.updatedAt,
   });
 
   // Automigrate: infra-induced size change with project.automigrate enabled
@@ -320,12 +323,10 @@ async function createWithBaseline(
   const passed = shouldAutomigrate ? true : result.passed;
   const pixels = shouldAutomigrate ? 0 : result.diffPixels;
   const ratio = shouldAutomigrate ? 0 : result.diffRatio;
-  if (!passed && result.diffImage) {
-    await ctx.storage.write(diff, result.diffImage);
-  }
+  const overlay = await writeDiffOverlay(ctx.storage, diff, result, passed);
   await snapshots.update(snapshot.id, {
     status,
-    diffPath: !passed && result.diffImage ? diff : null,
+    diffPath: overlay,
     diffPixels: pixels,
     diffRatio: ratio,
     diffPassed: passed,
@@ -357,7 +358,7 @@ async function upsertDefaultBaseline(
 }
 
 /** Snapshot status after diffing: default-branch changes are auto-approved, not queued for review. */
-function diffStatus(passed: boolean, isDefault: boolean): SnapshotStatus {
+export function diffStatus(passed: boolean, isDefault: boolean): SnapshotStatus {
   if (passed) {
     return "unchanged";
   }

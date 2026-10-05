@@ -6,6 +6,12 @@
  */
 export { BaselineModel } from "./baseline.ts";
 export {
+  baselineStatus,
+  isBaselineDrifted,
+  NO_BASELINE,
+  type BaselineStatus,
+} from "./baseline-status.ts";
+export {
   CaptureAttemptModel,
   emitAttemptLog,
   type AttemptLogRecorder,
