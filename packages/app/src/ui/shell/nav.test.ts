@@ -10,42 +10,48 @@ const urls: NavUrls = {
   settings: (slug) => `/p/${slug}/settings`,
 };
 
-describe("breadcrumbs", () => {
-  it("is empty on the projects overview", () => {
+describe("breadcrumbs (ancestors of the current page only)", () => {
+  it("is empty when the page is itself the section or has no section", () => {
     expect(breadcrumbs({ active: "projects" }, urls)).toEqual([]);
     expect(breadcrumbs(undefined, urls)).toEqual([]);
+    expect(breadcrumbs({ active: "builds", projectSlug: "docs" }, urls)).toEqual([]);
+    expect(breadcrumbs({ active: "admin" }, urls)).toEqual([]);
+    expect(breadcrumbs({ active: "profile" }, urls)).toEqual([]);
   });
 
-  it("shows only the current section (no link) when the page does not go deeper", () => {
-    expect(breadcrumbs({ active: "builds", projectSlug: "docs" }, urls)).toEqual([
-      { label: "Builds" },
-    ]);
+  it("lists the section as the parent of a deeper page", () => {
+    expect(
+      breadcrumbs({ active: "settings", projectSlug: "docs", trail: [{ label: "Tokens" }] }, urls),
+    ).toEqual([{ label: "Settings", href: "/p/docs/settings" }]);
   });
 
-  it("links the section and marks the last trail item as current", () => {
-    const crumbs = breadcrumbs(
-      {
-        active: "builds",
-        projectSlug: "docs",
-        trail: [{ label: "main · abc1234", href: "/p/docs/builds/b1" }, { label: "Review" }],
-      },
-      urls,
-    );
-    expect(crumbs).toEqual([
+  it("includes intermediate levels but not the current page", () => {
+    expect(
+      breadcrumbs(
+        {
+          active: "builds",
+          projectSlug: "docs",
+          trail: [{ label: "main · abc1234", href: "/p/docs/builds/b1" }, { label: "Review" }],
+        },
+        urls,
+      ),
+    ).toEqual([
       { label: "Builds", href: "/p/docs/builds" },
       { label: "main · abc1234", href: "/p/docs/builds/b1" },
-      { label: "Review" },
     ]);
   });
 
-  it("strips the href from a trailing trail item so it reads as the current page", () => {
-    expect(
-      breadcrumbs({ active: "projects", trail: [{ label: "New project", href: "/x" }] }, urls),
-    ).toEqual([{ label: "New project" }]);
+  it("drops a trailing trail item on pages without a section (new project)", () => {
+    expect(breadcrumbs({ active: "projects", trail: [{ label: "New project" }] }, urls)).toEqual(
+      [],
+    );
   });
 
-  it("knows the global sections", () => {
-    expect(breadcrumbs({ active: "admin" }, urls)).toEqual([{ label: "System" }]);
-    expect(breadcrumbs({ active: "profile" }, urls)).toEqual([{ label: "Profile" }]);
+  it("never returns a crumb without a link", () => {
+    const crumbs = breadcrumbs(
+      { active: "labels", projectSlug: "docs", trail: [{ label: "pr: 12" }] },
+      urls,
+    );
+    expect(crumbs.every((crumb) => crumb.href !== undefined)).toBe(true);
   });
 });

@@ -17,8 +17,9 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
   zoom and synced scroll, a sticky action bar, a `?` shortcuts dialog, and
   auto-advance to the next open snapshot after approve/reject (HTMX, review
   page only). Bulk approve/reject now ask for confirmation.
-- The top bar is now a project picker plus breadcrumbs (Builds / main · abc1234 /
-  Review); the account menu, theme menu and sidebar collapse moved to the
+- The top bar is now a project picker plus breadcrumbs of the page's ancestors
+  (`Builds › main · abc1234` on the review page; the current page is named by
+  its heading, and phones show just `‹ Parent`); the account menu, theme menu and sidebar collapse moved to the
   sidebar footer. `PageHeader` no longer takes `breadcrumbs`; pages pass
   `nav.trail` instead.
 - Projects overview cards (previews, "to review" pill, filter), builds list

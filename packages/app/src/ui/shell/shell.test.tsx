@@ -66,6 +66,11 @@ describe("app shell", () => {
   });
 });
 
+/** The rendered top bar markup. */
+function bar(html: string): string {
+  return html.slice(html.indexOf('role="banner"'), html.indexOf("</header>"));
+}
+
 describe("top bar and sidebar footer", () => {
   it("puts account, theme, and collapse in the sidebar footer, not the top bar", async () => {
     const html = await page("/projects");
@@ -77,19 +82,21 @@ describe("top bar and sidebar footer", () => {
     expect(topbar).not.toContain("data-theme-set");
   });
 
-  it("shows project picker plus breadcrumbs in the top bar", async () => {
-    const html = await page("/projects/alpha/builds", twoProjects);
-    const topbar = html.slice(html.indexOf('role="banner"'), html.indexOf("</header>"));
-    expect(topbar).toContain('aria-label="Project: Alpha"');
-    expect(topbar).toContain('aria-label="Breadcrumb"');
-    expect(topbar).toContain('aria-current="page">Builds<');
+  it("shows the project picker and the page's ancestors, not the page itself", async () => {
+    const section = await page("/projects/alpha/builds", twoProjects);
+    const deeper = await page("/projects/alpha/settings/tokens", twoProjects);
+    expect(bar(section)).toContain('aria-label="Project: Alpha"');
+    expect(bar(section)).not.toContain('aria-label="Breadcrumb"');
+    expect(bar(deeper)).toContain('aria-label="Breadcrumb"');
+    expect(bar(deeper)).toContain(">Settings</a>");
+    expect(bar(deeper)).not.toContain("Tokens");
   });
 
-  it("reads 'All projects' on global pages and shows the page on admin", async () => {
+  it("reads 'All projects' on global pages with no breadcrumb", async () => {
     const projects = await page("/projects");
     const admin = await page("/admin");
     expect(projects).toContain('aria-label="Project: All projects"');
     expect(projects).not.toContain('aria-label="Breadcrumb"');
-    expect(admin).toContain('aria-current="page">System<');
+    expect(admin).not.toContain('aria-label="Breadcrumb"');
   });
 });

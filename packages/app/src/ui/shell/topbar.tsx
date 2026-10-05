@@ -33,9 +33,20 @@ const shellTopbar = css`
     align-items: center;
     gap: var(--space-2);
     min-width: 0;
+    flex: 1;
+    overflow: visible;
   }
   .topbar__menu {
     display: none;
+  }
+  .topbar__left nav {
+    min-width: 0;
+  }
+  .topbar__picker {
+    overflow: hidden;
+    max-width: 26ch;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .crumbs {
     display: flex;
@@ -54,24 +65,20 @@ const shellTopbar = css`
     gap: var(--space-1);
     min-width: 0;
   }
-  .crumbs li + li::before {
-    content: "/";
+  .crumbs li::before {
+    content: "›";
     color: var(--text-muted);
   }
   .crumbs a {
+    overflow: hidden;
+    max-width: 28ch;
     color: var(--text-secondary);
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
   .crumbs a:hover {
     color: var(--text-primary);
     text-decoration: none;
-  }
-  .crumbs [aria-current="page"] {
-    overflow: hidden;
-    color: var(--text-primary);
-    font-weight: 600;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
   @media (max-width: 880px) {
     & .topbar__inner {
@@ -84,7 +91,13 @@ const shellTopbar = css`
       display: none;
     }
     & .crumbs li:last-child::before {
-      content: none;
+      content: "‹";
+    }
+    & .crumbs a {
+      max-width: 100%;
+    }
+    & .topbar__picker {
+      max-width: 14ch;
     }
   }
 `;
@@ -165,7 +178,7 @@ const ProjectPicker: FC<{ nav?: NavConfig }> = async ({ nav }) => {
       label={
         <>
           <Icon name="folder" size="sm" />
-          <span>{label}</span>
+          <span class="topbar__picker">{label}</span>
         </>
       }
     >
@@ -191,7 +204,7 @@ const ProjectPicker: FC<{ nav?: NavConfig }> = async ({ nav }) => {
   );
 };
 
-/** Breadcrumb trail after the picker; the last item is the current page. */
+/** Ancestor trail after the picker; the page itself is named by its heading. */
 const Crumbs: FC<{ crumbs: NavCrumb[] }> = ({ crumbs }) => {
   if (crumbs.length === 0) {
     return null;
@@ -199,13 +212,9 @@ const Crumbs: FC<{ crumbs: NavCrumb[] }> = ({ crumbs }) => {
   return (
     <nav aria-label="Breadcrumb">
       <ol class="crumbs">
-        {crumbs.map((crumb, index) => (
-          <li key={String(index)}>
-            {crumb.href ? (
-              <a href={crumb.href}>{crumb.label}</a>
-            ) : (
-              <span aria-current="page">{crumb.label}</span>
-            )}
+        {crumbs.map((crumb) => (
+          <li key={crumb.href}>
+            <a href={crumb.href}>{crumb.label}</a>
           </li>
         ))}
       </ol>

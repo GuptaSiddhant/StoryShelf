@@ -5,11 +5,11 @@ export interface NavConfig {
   active?: string;
   projectSlug?: string;
   projectName?: string;
-  /** Deeper breadcrumb levels below the section (e.g. a build, then "Review"). */
+  /** Levels below the section, ending with the current page (e.g. a build, then "Review"). */
   trail?: NavCrumb[];
 }
 
-/** One breadcrumb level; the last has no `href` and marks the current page. */
+/** One breadcrumb level; the last trail item is the current page (it needs no `href`). */
 export interface NavCrumb {
   label: string;
   href?: string;
@@ -66,17 +66,16 @@ export function adminNavItems(): NavItem[] {
 }
 
 /**
- * Breadcrumbs after the project picker: the active section (a link when the
- * page goes deeper) followed by the page's own `trail`. The final crumb is
- * always rendered as the current page.
+ * Breadcrumbs after the project picker: the *ancestors* of the current page.
+ * The page itself is named by its heading, so it is never repeated here —
+ * the section plus `nav.trail` describe where the page is, and the last item
+ * (the current page) is dropped. Every returned crumb links somewhere, and
+ * the last one is the page's parent.
  */
 export function breadcrumbs(nav: NavConfig | undefined, urls: NavUrls): NavCrumb[] {
-  const trail = nav?.trail ?? [];
   const section = sectionCrumb(nav, urls);
-  const crumbs = section ? [section, ...trail] : [...trail];
-  return crumbs.map((crumb, index) =>
-    index === crumbs.length - 1 ? { label: crumb.label } : crumb,
-  );
+  const path = section ? [section, ...(nav?.trail ?? [])] : [...(nav?.trail ?? [])];
+  return path.slice(0, -1).filter((crumb) => crumb.href !== undefined);
 }
 
 function sectionCrumb(nav: NavConfig | undefined, urls: NavUrls): NavCrumb | null {

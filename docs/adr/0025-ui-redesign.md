@@ -25,7 +25,7 @@ panes.
 2. **Shell:** full-height icon sidebar (collapsible to a rail, cookie-persisted and applied
    in `<head>` to avoid a flash; off-canvas drawer on phones) whose footer holds the account,
    theme and collapse controls; a slim top bar that is the project picker plus breadcrumbs
-   (derived from `nav`, with an optional `trail`); a toast region; and a `bare` layout for
+   (ancestors of the current page, derived from `nav`; the page's own heading is not repeated); a toast region; and a `bare` layout for
    sign-in.
 3. **Icons:** typed TS data → one SVG sprite served from the router at a content-hashed,
    `immutable` URL with ETag/304 (`/assets/icons-<hash>.svg`); `<Icon>` references it with
