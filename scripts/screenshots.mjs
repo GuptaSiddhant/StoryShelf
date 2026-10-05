@@ -24,13 +24,19 @@ import { chromium } from "playwright-core";
 // have them in node_modules (they are per-package workspace links).
 import { createShelfApp } from "../packages/app/src/index.tsx";
 import { createShelfLogger } from "../packages/core/src/logger.ts";
-import { BaselineModel, BuildModel, ProjectModel, SnapshotModel } from "../packages/core/src/models/index.ts";
+import {
+  BaselineModel,
+  BuildModel,
+  ProjectModel,
+  SnapshotModel,
+} from "../packages/core/src/models/index.ts";
 import { makeDatabase, makeStorage } from "../packages/core/src/test-helpers/index.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const websiteDir = join(root, "apps/website");
 const shotsDir = join(websiteDir, "src/assets/screenshots");
 const ogPath = join(websiteDir, "public/og-image.png");
+const logoPath = join(websiteDir, "src/assets/logo.svg");
 mkdirSync(shotsDir, { recursive: true });
 
 // Mock "component screenshots" so the docs show a believable review, not blank images.
@@ -45,7 +51,13 @@ function mockPng(variant) {
       const card = x > 60 && x < 580 && y > 60 && y < 340;
       const btn = x > 90 && x < 210 + variant * 18 && y > 280 && y < 320;
       const title = card && y > 100 && y < 112 && x > 90 && x < 360;
-      const [r, g, b] = title ? [40, 44, 60] : btn ? [79, 70, 229] : card ? [255, 255, 255] : [238, 240, 246];
+      const [r, g, b] = title
+        ? [40, 44, 60]
+        : btn
+          ? [79, 70, 229]
+          : card
+            ? [255, 255, 255]
+            : [238, 240, 246];
       png.data.set([r, g, b, 255], i);
     }
   }
@@ -165,10 +177,26 @@ async function captureApp() {
   const slug = project.slug;
   const pages = [
     { name: "projects-list", path: "/projects", viewport: { width: 1280, height: 780 } },
-    { name: "build-review", path: `/projects/${slug}/builds/${build.id}`, viewport: { width: 1280, height: 860 } },
-    { name: "diff-review", path: `/projects/${slug}/builds/${build.id}/diff`, viewport: { width: 1440, height: 900 } },
-    { name: "library", path: `/projects/${slug}/library?branch=feature/new-button`, viewport: { width: 1280, height: 860 } },
-    { name: "project-settings", path: `/projects/${slug}/settings/tokens`, viewport: { width: 1280, height: 780 } },
+    {
+      name: "build-review",
+      path: `/projects/${slug}/builds/${build.id}`,
+      viewport: { width: 1280, height: 860 },
+    },
+    {
+      name: "diff-review",
+      path: `/projects/${slug}/builds/${build.id}/diff`,
+      viewport: { width: 1440, height: 900 },
+    },
+    {
+      name: "library",
+      path: `/projects/${slug}/library?branch=feature/new-button`,
+      viewport: { width: 1280, height: 860 },
+    },
+    {
+      name: "project-settings",
+      path: `/projects/${slug}/settings/tokens`,
+      viewport: { width: 1280, height: 780 },
+    },
   ];
   const browser = await chromium.launch();
   try {
@@ -198,14 +226,15 @@ const dataUrl = (file) => `data:image/png;base64,${readFileSync(file).toString("
 /** Social card (1200x630): brand, tagline, and the review workspace. */
 async function captureOg() {
   const shot = dataUrl(join(shotsDir, "diff-review-dark.png"));
+  // Read the mark rather than inlining a copy, so the card cannot drift from
+  // the site's logo.
+  const logo = `data:image/svg+xml;base64,${readFileSync(logoPath).toString("base64")}`;
   const html = `<!doctype html><html><body style="margin:0;width:1200px;height:630px;overflow:hidden;position:relative;
     background:radial-gradient(900px 500px at 85% 0%,#12254a,transparent 70%),#09090b;color:#fafafa;
     font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif">
     <div style="position:absolute;left:72px;top:72px;width:480px">
       <div style="display:flex;align-items:center;gap:16px">
-        <svg width="56" height="56" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="8" fill="#1d5fcf"/>
-          <g transform="translate(7 7)" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="m9 .5 8.5 4.25L9 9 .5 4.75z"/><path d="m.5 13 8.5 4.25L17.5 13"/><path d="m.5 8.9 8.5 4.25 8.5-4.25"/></g></svg>
+        <img src="${logo}" width="56" height="56" alt=""/>
         <div style="font-size:44px;font-weight:700;letter-spacing:-0.02em">StoryShelf</div>
       </div>
       <div style="margin-top:44px;font-size:52px;line-height:1.1;font-weight:700;letter-spacing:-0.03em">
@@ -229,7 +258,9 @@ async function captureOg() {
 const args = process.argv.slice(2);
 const unknown = args.filter((arg) => arg !== "app" && arg !== "og");
 if (unknown.length > 0) {
-  console.error(`Unknown argument(s): ${unknown.join(", ")}\nUsage: nub scripts/screenshots.mjs [app] [og]`);
+  console.error(
+    `Unknown argument(s): ${unknown.join(", ")}\nUsage: nub scripts/screenshots.mjs [app] [og]`,
+  );
   process.exit(1);
 }
 if (args.length === 0 || args.includes("app")) {

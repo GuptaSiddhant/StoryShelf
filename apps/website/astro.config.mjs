@@ -32,9 +32,24 @@ export default defineConfig({
       editLink: { baseUrl: `${REPO}/edit/main/apps/website/` },
       lastUpdated: true,
       social: [{ label: "GitHub", href: REPO, icon: "github" }],
-      // Starlight emits og:title/description/url/type and the sitemap per page;
-      // these add the social image and card type it does not set.
+      // Starlight emits og:title/description/url/type, the sitemap and the SVG
+      // favicon itself; these add the raster icon fallbacks (Safari, older
+      // browsers, home screens) plus the social image and card type.
       head: [
+        { tag: "link", attrs: { rel: "icon", href: "/favicon.ico", sizes: "32x32" } },
+        {
+          tag: "link",
+          attrs: { rel: "icon", type: "image/png", sizes: "16x16", href: "/favicon-16.png" },
+        },
+        {
+          tag: "link",
+          attrs: { rel: "icon", type: "image/png", sizes: "32x32", href: "/favicon-32.png" },
+        },
+        {
+          tag: "link",
+          attrs: { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png" },
+        },
+        { tag: "meta", attrs: { name: "theme-color", content: "#1d5fcf" } },
         {
           // Tables that scroll sideways on narrow screens must be keyboard-focusable.
           tag: "script",

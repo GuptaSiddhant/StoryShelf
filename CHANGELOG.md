@@ -5,6 +5,18 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 
 ## Unreleased
 
+**Brand mark: logo, favicon and social assets**
+- New StoryShelf mark (a bookshelf whose three shelves and books form an `S`).
+  Ships as `app/src/assets/mark.svg`, served content-hashed under `/assets/`.
+- The app now **always** links its own favicon so a StoryShelf tab is
+  recognisable. `UIConfig.favicon` is **deprecated and ignored** (still accepted
+  by the schema so existing configs keep validating); `SS_FAVICON_URL` is no
+  longer read by the dev-server or Fly app. Rebranding uses `ui.logo`, which
+  stays overridable and now defaults to the mark instead of a generic icon.
+- Website ships the full icon set: `favicon.svg`, `favicon.ico`, 16/32px PNGs,
+  a 180px apple-touch-icon, a Starlight header logo, and a redesigned
+  1200x630 `og-image.png` (previously a cropped screenshot).
+
 **Review page: draggable wipe handle and pixel-level zoom** (#40)
 - The Swipe comparison now has a draggable handle on the divider (mouse, touch and pen); the slider below stays as the keyboard/screen-reader control and stays in sync.
 - Zoom gains a 400% level, and zoomed-in screenshots render with `image-rendering: pixelated` so individual pixels are visible. `+`/`-` step the zoom; `f` still cycles.

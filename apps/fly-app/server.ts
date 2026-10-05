@@ -60,16 +60,14 @@ function buildAuthUi(): Record<string, string> | undefined {
 function buildUi(): Record<string, unknown> | undefined {
   const name = env["SS_BRAND_NAME"];
   const logo = env["SS_LOGO_URL"];
-  const favicon = env["SS_FAVICON_URL"];
   const auth = buildAuthUi();
-  const hasBrand = Boolean(name ?? logo ?? favicon);
+  const hasBrand = Boolean(name ?? logo);
   if (!hasBrand && !auth) {
     return undefined;
   }
   return {
     ...(name ? { name } : {}),
     ...(logo ? { logo } : {}),
-    ...(favicon ? { favicon } : {}),
     ...(auth ? { auth } : {}),
   };
 }

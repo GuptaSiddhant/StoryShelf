@@ -81,6 +81,7 @@ export const DocumentLayout: FC<{
 }> = ({ title, nav, layout = "default", children }) => {
   const { ui, config, sessionId } = getStore();
   const name = ui.name ?? "StoryShelf";
+  const logo = ui.logo ?? assetManifest.mark.href;
   const light = ui.lightTheme ?? LIGHT_THEME;
   const dark = ui.darkTheme ?? DARK_THEME;
 
@@ -94,7 +95,9 @@ export const DocumentLayout: FC<{
           <meta name="viewport" content="width=device-width, initial-scale=1" />
           <meta name="color-scheme" content="light dark" />
           <meta name="csrf-token" content={getCsrfToken(config.secret, sessionId)} />
-          {ui.favicon ? <link rel="icon" href={ui.favicon} /> : null}
+          {/* Favicon is the product's own mark, not brandable: it identifies
+              StoryShelf in the tab strip. `ui.logo` stays overridable. */}
+          <link rel="icon" type="image/svg+xml" href={assetManifest.mark.href} />
           <title>
             {title} · {name}
           </title>
@@ -107,13 +110,13 @@ export const DocumentLayout: FC<{
             Skip to content
           </a>
           {layout === "bare" ? (
-            <BareShell name={name} logo={ui.logo}>
+            <BareShell name={name} logo={logo}>
               {children}
             </BareShell>
           ) : (
             <>
               <div class={shellRoot}>
-                <Sidebar nav={nav} name={name} logo={ui.logo} />
+                <Sidebar nav={nav} name={name} logo={logo} />
                 <div>
                   <TopBar nav={nav} />
                   <main

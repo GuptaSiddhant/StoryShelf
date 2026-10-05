@@ -10,7 +10,15 @@ import { contentHash, iconSprite, iconSpriteHash, iconSpriteHref } from "./ui/ic
 const htmxSource = readFileSync(findAsset("htmx.min.js", import.meta.url), "utf8");
 const htmxHash = contentHash(htmxSource);
 
+/**
+ * The StoryShelf brand mark. Serves as the enforced favicon and as the default
+ * sidebar logo when `ui.logo` is not set.
+ */
+const markSource = readFileSync(findAsset("mark.svg", import.meta.url), "utf8");
+const markHash = contentHash(markSource);
+
 export const assetManifest = {
   htmx: { source: htmxSource, hash: htmxHash, href: `/assets/htmx-${htmxHash}.js` },
   icons: { source: iconSprite, hash: iconSpriteHash, href: iconSpriteHref },
+  mark: { source: markSource, hash: markHash, href: `/assets/mark-${markHash}.svg` },
 } as const;

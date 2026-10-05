@@ -7,13 +7,18 @@ import { createShelfApp } from "../../index.tsx";
 
 type Db = ReturnType<typeof makeDatabase>["db"];
 
-async function page(path: string, seed?: (db: Db) => Promise<void>): Promise<string> {
+async function page(
+  path: string,
+  seed?: (db: Db) => Promise<void>,
+  ui?: Record<string, unknown>,
+): Promise<string> {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
   await seed?.(db);
   const app = createShelfApp({
     database: db,
     storage,
+    ...(ui ? { ui } : {}),
     logger: createShelfLogger({ level: "silent" }),
   });
   return await (await app.request(path)).text();
@@ -63,6 +68,32 @@ describe("app shell", () => {
     const html = await page("/projects");
     expect(html).not.toContain('topbar__theme" type="button"');
     expect(html).not.toContain("user-menu__logout");
+  });
+});
+
+describe("brand mark", () => {
+  it("links the bundled mark as the favicon", async () => {
+    const html = await page("/projects");
+    expect(html).toContain(
+      `<link rel="icon" type="image/svg+xml" href="${assetManifest.mark.href}"/>`,
+    );
+  });
+
+  it("keeps the enforced favicon even when ui.favicon is supplied", async () => {
+    const html = await page("/projects", undefined, { favicon: "https://acme.test/brand.ico" });
+    expect(html).toContain(`href="${assetManifest.mark.href}"`);
+    expect(html).not.toContain("brand.ico");
+  });
+
+  it("falls back to the mark as the sidebar logo", async () => {
+    const html = await page("/projects");
+    expect(html).toContain(`<img class="sidebar__logo" src="${assetManifest.mark.href}"`);
+  });
+
+  it("lets ui.logo override the sidebar logo", async () => {
+    const html = await page("/projects", undefined, { logo: "https://acme.test/logo.svg" });
+    expect(html).toContain('src="https://acme.test/logo.svg"');
+    expect(html).not.toContain(`<img class="sidebar__logo" src="${assetManifest.mark.href}"`);
   });
 });
 

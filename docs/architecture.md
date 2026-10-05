@@ -821,7 +821,7 @@ StoryShelf ships a **fixed, server-rendered UI** — `hono/jsx` + HTMX + `hono/c
 - **Pages** live in `app/src/pages/*.tsx` and render directly from models (no API/UI contract duplication).
 - **Layout & theming** live in `app/src/ui/` — a `DocumentLayout` (head, vendored HTMX, styles) plus a `BrandTheme` of light/dark color tokens.
 - **Theme:** follows the system (`prefers-color-scheme`) with a manual light/dark override, persisted in a cookie so the server renders the correct theme on first paint.
-- **Brand config** is passed as `ui: { name, logo, favicon, theme }` to `createShelfApp` (see `ShelfOptions`). Env vars (`SS_BRAND_NAME`, `SS_LOGO_URL`) supply defaults so self-hosters can rebrand with a `docker run`, no code.
+- **Brand config** is passed as `ui: { name, logo, theme }` to `createShelfApp` (see `ShelfOptions`). Env vars (`SS_BRAND_NAME`, `SS_LOGO_URL`) supply defaults so self-hosters can rebrand with a `docker run`, no code. The **favicon is not brandable**: the app always serves its own mark (`app/src/assets/mark.svg`, content-hashed under `/assets/`) so a StoryShelf tab is recognisable; `ui.favicon` is accepted for config compatibility but ignored. `ui.logo` defaults to the same mark.
 - **Auth UI text** lives in `ui.auth` (title, subtitle, password label/placeholder, submit label, `{label}` SSO template, help/footer) with `SS_AUTH_*` env defaults; the sidebar account menu links to the personal `/profile` page (editable display name, local password change, memberships).
 - **Public base URL** (`config.publicBaseUrl`, `PUBLIC_BASE_URL`) pins the issuer in the `/.well-known/openid-configuration` relying-party helper; otherwise the request origin is used.
 - **HTMX is vendored locally** (no CDN), so air-gapped deployments work.
