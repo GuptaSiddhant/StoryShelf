@@ -4,72 +4,43 @@ import type { Page } from "playwright-core";
 
 /** Run lightweight a11y checks inside the page context. */
 export async function checkA11y(page: Page): Promise<string[]> {
-  return await evaluateA11y(page);
+  return await page.evaluate(inPageA11y);
 }
 
-async function evaluateA11y(page: Page): Promise<string[]> {
-  const raw: unknown = await page.evaluate(() => collectViolations());
-  // oxlint-disable-next-line typescript/no-unnecessary-type-assertion -- narrowing unknown to string[]
-  return raw as string[];
-}
-
-function collectViolations(): string[] {
-  // oxlint-disable-next-line typescript/no-unnecessary-type-assertion -- document global narrowing
-  const doc = globalThis.document as unknown as Document;
+/**
+ * Runs inside the browser. Playwright/Puppeteer serialize only this function's source, so it must
+ * not reference anything from this module (helpers, imports): split it up and the page throws
+ * `ReferenceError`. `a11y.test.ts` evaluates it in a scope without module bindings to guard that.
+ */
+// oxlint-disable-next-line eslint/max-statements, eslint/max-lines-per-function, eslint/complexity -- must stay one self-contained function (see above)
+export function inPageA11y(): string[] {
+  const doc = globalThis.document;
   const violations: string[] = [];
-  const root = doc.querySelector("#storybook-root");
+  const root = doc?.querySelector("#storybook-root");
   if (!root) return violations;
-  pushImageViolations(root, violations);
-  pushButtonViolations(root, violations);
-  pushLinkViolations(root, violations);
-  pushInputViolations(root, doc, violations);
-  return violations.slice(0, 10);
-}
-
-function pushImageViolations(root: Element, out: string[]): void {
   for (const img of root.querySelectorAll("img:not([alt])")) {
-    out.push(`img missing alt: ${img.outerHTML.slice(0, 120)}`);
+    violations.push(`img missing alt: ${img.outerHTML.slice(0, 120)}`);
   }
-}
-
-function pushButtonViolations(root: Element, out: string[]): void {
   for (const btn of root.querySelectorAll("button")) {
-    // oxlint-disable-next-line typescript/no-unnecessary-type-assertion -- narrow to HTMLButtonElement
-    const hasLabel = hasButtonLabel(btn as unknown as HTMLButtonElement);
-    if (!hasLabel) out.push(`button missing label: ${btn.outerHTML.slice(0, 120)}`);
+    const labelled =
+      btn.hasAttribute("aria-label") ||
+      btn.hasAttribute("aria-labelledby") ||
+      (btn.textContent ?? "").trim() !== "";
+    if (!labelled) violations.push(`button missing label: ${btn.outerHTML.slice(0, 120)}`);
   }
-}
-
-function hasButtonLabel(btn: HTMLButtonElement): boolean {
-  return (
-    btn.hasAttribute("aria-label") ||
-    btn.hasAttribute("aria-labelledby") ||
-    (btn.textContent ?? "").trim() !== ""
-  );
-}
-
-function pushLinkViolations(root: Element, out: string[]): void {
   for (const anchor of root.querySelectorAll("a")) {
-    if (!anchor.hasAttribute("href")) {
-      out.push(`a missing href: ${anchor.outerHTML.slice(0, 120)}`);
-    }
+    if (!anchor.hasAttribute("href"))
+      violations.push(`a missing href: ${anchor.outerHTML.slice(0, 120)}`);
   }
-}
-
-function pushInputViolations(root: Element, doc: Document, out: string[]): void {
   for (const input of root.querySelectorAll("input, select, textarea")) {
-    // oxlint-disable-next-line typescript/no-unnecessary-type-assertion -- narrow to HTMLInputElement
-    const el = input as unknown as HTMLInputElement;
-    if (needsInputLabel(el, doc)) out.push(`input missing label: ${el.outerHTML.slice(0, 120)}`);
+    const el = input as HTMLInputElement;
+    const labelled =
+      el.type === "hidden" ||
+      el.hasAttribute("aria-label") ||
+      el.hasAttribute("aria-labelledby") ||
+      el.id === "" ||
+      Boolean(doc.querySelector(`label[for="${el.id}"]`));
+    if (!labelled) violations.push(`input missing label: ${el.outerHTML.slice(0, 120)}`);
   }
-}
-
-function needsInputLabel(el: HTMLInputElement, doc: Document): boolean {
-  if (el.type === "hidden") return false;
-  const hasLabel =
-    el.hasAttribute("aria-label") ||
-    el.hasAttribute("aria-labelledby") ||
-    Boolean(doc.querySelector(`label[for="${el.id}"]`)) ||
-    el.id === "";
-  return !hasLabel;
+  return violations.slice(0, 10);
 }
