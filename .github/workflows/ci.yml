@@ -44,6 +44,14 @@ jobs:
         working-directory: apps/website
         run: nub run check:links
 
+      - name: Install Chromium for the docs accessibility check
+        working-directory: apps/website
+        run: nubx playwright-core install --with-deps chromium
+
+      - name: Check website accessibility (axe, light/dark/mobile)
+        working-directory: apps/website
+        run: nub run check:a11y
+
   fixture-matrix:
     name: Fixtures (${{ matrix.fixture }})
     runs-on: ubuntu-latest

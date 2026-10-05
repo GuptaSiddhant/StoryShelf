@@ -43,6 +43,8 @@ function currentUserId(): string {
 
 const getSubscriptionRoute = createRoute({
   method: "get",
+  tags: ["Notifications"],
+  summary: "Get my notification subscription",
   path: "/api/v1/projects/{slug}/notifications/me",
   request: { params: z.object({ slug: z.string() }) },
   responses: {
@@ -57,6 +59,8 @@ const getSubscriptionRoute = createRoute({
 
 const putSubscriptionRoute = createRoute({
   method: "put",
+  tags: ["Notifications"],
+  summary: "Save my notification subscription",
   path: "/api/v1/projects/{slug}/notifications/me",
   request: {
     params: z.object({ slug: z.string() }),
@@ -74,6 +78,8 @@ const putSubscriptionRoute = createRoute({
 
 const deleteSubscriptionRoute = createRoute({
   method: "delete",
+  tags: ["Notifications"],
+  summary: "Remove my notification subscription",
   path: "/api/v1/projects/{slug}/notifications/me",
   request: { params: z.object({ slug: z.string() }) },
   responses: {
@@ -85,6 +91,8 @@ const deleteSubscriptionRoute = createRoute({
 
 const listSubscriptionsRoute = createRoute({
   method: "get",
+  tags: ["Notifications"],
+  summary: "List notification subscriptions",
   path: "/api/v1/projects/{slug}/notifications",
   request: { params: z.object({ slug: z.string() }) },
   responses: {

@@ -156,5 +156,6 @@ mounted in `DocumentLayout` right after the token `<style>` tag) with
 5. Run the app against seeded data and look at it (light + dark, 375px and
    desktop). Optionally audit with axe-core — the redesign shipped with zero
    violations across the main pages in both themes.
-6. `nub packages/app/scripts/screenshots.mjs` (from repo root) when docs
-   screenshots need refreshing; eyeball the PNGs before committing
+6. `nub run screenshots` (repo root; `screenshots:app` / `screenshots:og` for
+   one half) when docs screenshots (light + dark, in `apps/website/src/assets/screenshots`) need refreshing; eyeball the PNGs before
+   committing

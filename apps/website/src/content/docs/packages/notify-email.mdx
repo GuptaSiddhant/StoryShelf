@@ -1,0 +1,58 @@
+---
+title: "@storyshelf/notify-email"
+description: Email transport for StoryShelf notifications and authentication mail — SMTP, Mailpit, HTTP, and log presets.
+---
+
+import { PackageManagers } from 'starlight-package-managers';
+
+`@storyshelf/notify-email` is the email transport for StoryShelf. One sender serves notification channels and, optionally, authentication mail such as invites and password resets. It is the only package that owns `nodemailer`.
+
+## Install
+
+<PackageManagers pkg="@storyshelf/notify-email" />
+
+The SMTP preset needs the optional `nodemailer` peer; the log and HTTP presets do not:
+
+<PackageManagers pkg="nodemailer" />
+
+- [npm package](https://www.npmjs.com/package/@storyshelf/notify-email) — install tarballs and version history.
+- [Source on GitHub](https://github.com/GuptaSiddhant/StoryShelf/tree/main/packages/notify-email) — package directory on `main`.
+
+## Configure
+
+```ts
+import { createShelfApp } from "@storyshelf/app";
+import { createShelfAuth } from "@storyshelf/auth";
+import { createEmailNotifier, smtpPreset } from "@storyshelf/notify-email";
+
+const sender = smtpPreset({ host: "mail.example.com", port: 587, from: "shelf@example.com" });
+
+const app = createShelfApp({
+  database,
+  storage,
+  notifiers: [createEmailNotifier(sender, { from: "shelf@example.com" })],
+  // Optional: invites and password resets share the same transport.
+  // auth: createShelfAuth({ db, secret, baseURL, emailSender: sender }),
+});
+```
+
+## Presets
+
+| Preset | Use for |
+|---|---|
+| `smtpPreset` | A corporate relay, Postfix, or SES over SMTP. `smtpPresetFromEnv` reads the settings from environment variables. |
+| `mailpitPreset` | Local development against Mailpit (`localhost:1025`). |
+| `httpPreset` | A Resend- or Postmark-style JSON HTTP endpoint. |
+| `logPreset` | Tests and unconfigured setups — messages are written to the log. |
+
+Each preset is importable on its own:
+
+```ts
+import { smtpPreset, smtpPresetFromEnv } from "@storyshelf/notify-email/smtp";
+import { mailpitPreset } from "@storyshelf/notify-email/mailpit";
+import { httpPreset } from "@storyshelf/notify-email/http";
+import { logPreset } from "@storyshelf/notify-email/log";
+import { createEmailNotifier } from "@storyshelf/notify-email/email";
+```
+
+See [Notifications](/guides/notifications/) for how email channels, subscriptions, and auth mail fit together.

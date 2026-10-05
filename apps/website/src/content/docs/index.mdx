@@ -1,9 +1,14 @@
 ---
 title: StoryShelf
-description: Self-hosted visual testing for Storybook.
+description: Self-hosted visual testing for Storybook. Capture every story, review pixel diffs, and approve changes before they ship.
 template: splash
 hero:
-  tagline: Self-hosted Chromatic alternative. Storybook-native. Unlimited snapshots.
+  title: Visual testing for Storybook, on your own infrastructure.
+  tagline: Capture every story, diff it against its baseline, and review changes before they ship. Self-hosted, unlimited snapshots, no vendor lock-in.
+  image:
+    alt: The StoryShelf review workspace showing a snapshot filmstrip and baseline, current and diff panes
+    dark: ../../assets/screenshots/diff-review-dark.png
+    light: ../../assets/screenshots/diff-review-light.png
   actions:
     - text: Get started
       link: ./guides/getting-started/
@@ -18,54 +23,66 @@ hero:
       variant: minimal
 ---
 
-import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Card, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+import { PackageManagers } from 'starlight-package-managers';
+import Screenshot from '../../components/Screenshot.astro';
 
-Run visual regression tests in CI, review pixel diffs in a web UI, and approve changes before they ship — on your own infrastructure. No per-snapshot billing, no vendor lock-in.
+## Up and running in three steps
 
-![Build review — baseline, current, and diff overlay](/screenshots/build-review.png)
+<Steps>
 
-<CardGrid stagger>
-  <Card title="Projects" icon="puzzle">
-    One project = one Storybook. Tokens, members, and branch-aware baselines per slug — many Storybooks per repo.
+1. **Scaffold a server**
+
+   <PackageManagers type="dlx" pkg="storyshelf" args="server init" />
+
+2. **Upload a Storybook build from CI**
+
+   <PackageManagers type="dlx" pkg="storyshelf" args="upload" />
+
+3. **Review the diffs in your browser** and approve or reject each change, or gate merges on the result.
+
+</Steps>
+
+Full walkthrough: [Getting started](./guides/getting-started/).
+
+## What you get
+
+<CardGrid>
+  <Card title="A real review workspace" icon="approve-check">
+    Filmstrip of changed stories, side-by-side, swipe, onion-skin and flip comparison, pixel-level zoom, and keyboard-driven approve/reject that jumps to the next change.
   </Card>
-  <Card title="Baselines" icon="approve-check">
-    Per-branch with default fallback. Accept once per branch, auto-approve on `main`, persistent tags never purged.
+  <Card title="Branch-aware baselines" icon="puzzle">
+    Baselines per branch with fallback to the default branch. Approve once, auto-approve on `main`, and keep long-lived branches with `persistent` labels.
   </Card>
-  <Card title="Capture" icon="rocket">
-    Server-side Playwright or lightweight Puppeteer. Chromium/Firefox/WebKit per project, viewports & sizing aware.
+  <Card title="Server-side capture" icon="rocket">
+    Upload your built Storybook; the server renders every story with Playwright (Chromium, Firefox, WebKit) or lightweight Puppeteer. Affected-only capture keeps CI fast.
   </Card>
   <Card title="Published Storybook" icon="open-book">
-    Share the latest build at `/storybook` or `*.stories.example.com` — path or subdomain, public-branch gated.
+    Share the latest build at `/storybook` or a per-project subdomain, gated to public branches.
   </Card>
-  <Card title="Labels" icon="tag">
-    Typed build labels (`pr`, `jira`, `figma`) with link templates and stable `/labels/pr/42` URLs.
+  <Card title="Merge gate and notifications" icon="comment">
+    Commit statuses for GitHub and GitLab, threaded comments, and Slack, Teams or email alerts when a build needs review.
   </Card>
   <Card title="Self-host anywhere" icon="cloud">
-    Docker Compose locally or AWS/Azure/GCP Terraform stacks. Bring your own database, storage, and queue.
-  </Card>
-  <Card title="Review workflow" icon="comment">
-    Approve/reject, threaded comments, retry flaky captures, and merge-gate status checks — `storyshelf/my-app`.
-  </Card>
-  <Card title="Retention & purge" icon="trash">
-    Builds purge after 30d; default-branch baselines live forever. Branch GC after 30d — tag with `persistent` to keep.
+    Docker Compose locally, or Terraform stacks for AWS, Azure and GCP. Bring your own database, storage and queue.
   </Card>
 </CardGrid>
 
-## Quick links
+## See it
 
-<CardGrid stagger>
+<Screenshot name="projects-list" alt="The projects overview: a card per project with its latest build and review backlog" caption="Every Storybook at a glance, with what still needs review." />
+
+<Screenshot name="build-review" alt="A build's overview: snapshot stats, bulk actions, and a card per snapshot" caption="A build: stats, bulk actions, and a thumbnail for every snapshot." />
+
+<Screenshot name="library" alt="The story library: every story from a branch's latest build, with Review and Preview links" caption="The story library, grouped by component, ready to preview or review." />
+
+## Keep exploring
+
+<CardGrid>
   <LinkCard title="Getting started" href="./guides/getting-started/" description="Scaffold a server, create a project, upload your first build." />
-  <LinkCard title="Live Demo" href="./guides/demo/" description="Try storyshelf.fly.dev — viewer password demo, admin private. Seeded fixtures." />
-  <LinkCard title="CI setup" href="./guides/ci/" description="GitHub Actions & GitLab CI, plus the required status check." />
-  <LinkCard title="Interaction testing" href="./guides/interaction-testing/" description="Run play functions, mark flaky tests, tune per-story delay." />
-  <LinkCard title="Deployment" href="./guides/deployment/" description="Docker Compose locally or AWS/Azure/GCP Terraform stacks." />
-  <LinkCard title="CLI — Client & Server" href="./guides/cli/" description="storyshelf upload/init/create and server init/serve." />
-  <LinkCard title="REST API & OpenAPI" href="./guides/api/" description="Versioned /api/v1 with live Swagger at /api/v1/docs." />
-  <LinkCard title="Chromatic comparison" href="./guides/chromatic-comparison/" description="Honest pricing, TurboSnap, and migration notes vs Chromatic." />
-  <LinkCard title="Core Concepts" href="./concepts/projects/" description="Projects, baselines, labels, builds, capture, retention — the mental model." />
+  <LinkCard title="Core concepts" href="./concepts/projects/" description="Projects, baselines, labels, builds, capture and retention: the mental model." />
+  <LinkCard title="API reference" href="/api/" description="Every /api/v1 endpoint, grouped and searchable." />
 </CardGrid>
-
-![Projects list — your Storybooks at a glance](/screenshots/projects-list.png)
 
 ## Chromatic comparison at a glance
 

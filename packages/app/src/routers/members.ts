@@ -19,6 +19,8 @@ const ADMIN_ROLES: readonly ProjectRole[] = ["admin"];
 
 const listMembersRoute = createRoute({
   method: "get",
+  tags: ["Members"],
+  summary: "List members",
   path: "/api/v1/projects/{slug}/members",
   request: { params: z.object({ slug: z.string() }) },
   responses: {
@@ -33,6 +35,8 @@ const listMembersRoute = createRoute({
 
 const setMemberRoute = createRoute({
   method: "post",
+  tags: ["Members"],
+  summary: "Add or update a member",
   path: "/api/v1/projects/{slug}/members",
   request: {
     params: z.object({ slug: z.string() }),
@@ -49,6 +53,8 @@ const setMemberRoute = createRoute({
 
 const updateMemberRoute = createRoute({
   method: "patch",
+  tags: ["Members"],
+  summary: "Change a member's role",
   path: "/api/v1/projects/{slug}/members/{userId}",
   request: {
     params: z.object({ slug: z.string(), userId: z.string() }),
@@ -65,6 +71,8 @@ const updateMemberRoute = createRoute({
 
 const deleteMemberRoute = createRoute({
   method: "delete",
+  tags: ["Members"],
+  summary: "Remove a member",
   path: "/api/v1/projects/{slug}/members/{userId}",
   request: { params: z.object({ slug: z.string(), userId: z.string() }) },
   responses: {
@@ -75,6 +83,8 @@ const deleteMemberRoute = createRoute({
 
 const listGroupMappingsRoute = createRoute({
   method: "get",
+  tags: ["Members"],
+  summary: "List group mappings",
   path: "/api/v1/projects/{slug}/group-mappings",
   request: { params: z.object({ slug: z.string() }) },
   responses: {
@@ -89,6 +99,8 @@ const listGroupMappingsRoute = createRoute({
 
 const createGroupMappingRoute = createRoute({
   method: "post",
+  tags: ["Members"],
+  summary: "Create a group mapping",
   path: "/api/v1/projects/{slug}/group-mappings",
   request: {
     params: z.object({ slug: z.string() }),
@@ -105,6 +117,8 @@ const createGroupMappingRoute = createRoute({
 
 const deleteGroupMappingRoute = createRoute({
   method: "delete",
+  tags: ["Members"],
+  summary: "Remove a group mapping",
   path: "/api/v1/projects/{slug}/group-mappings/{mappingId}",
   request: { params: z.object({ slug: z.string(), mappingId: z.string() }) },
   responses: {

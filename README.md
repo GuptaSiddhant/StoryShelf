@@ -10,7 +10,7 @@ Self-hosted visual testing platform for Storybook. Run visual regression tests i
 
 [**Live demo**](https://storyshelf.fly.dev) · [**Documentation**](https://storyshelf.js.org) · [Getting started](https://storyshelf.js.org/guides/getting-started/)
 
-![Build review: baseline, current, and diff overlay](apps/website/public/screenshots/build-review.png)
+![Build review: baseline, current, and diff overlay](apps/website/src/assets/screenshots/build-review-light.png)
 
 ## Features
 

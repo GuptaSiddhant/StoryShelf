@@ -9,6 +9,8 @@ import { requireSiteAdmin } from "./helpers.ts";
 import { forbidden as forbiddenResponse, purgeInputSchema, purgeSchema } from "./schemas.ts";
 const purgeRoute = createRoute({
   method: "post",
+  tags: ["Admin"],
+  summary: "Run the retention purge",
   path: "/api/v1/admin/purge",
   request: { body: { content: { "application/json": { schema: purgeInputSchema } } } },
   responses: {

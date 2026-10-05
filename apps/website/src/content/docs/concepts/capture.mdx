@@ -1,0 +1,75 @@
+---
+title: Capture & viewports
+description: How StoryShelf renders stories — orchestrator, pure CaptureRunner, viewports, browsers, and diffing.
+---
+
+import Screenshot from '../../../components/Screenshot.astro';
+
+Capture is server-side. The CLI uploads a zipped static Storybook; the server extracts it, serves it locally, and screenshots the stories impacted by the change — unaffected stories are inherited from their baselines (see [Affected capture](/concepts/affected-capture/)).
+
+<Screenshot name="build-review" alt="A build's overview: snapshot stats, bulk actions, and a card per snapshot" />
+
+## Pipeline
+
+```mermaid
+flowchart LR
+    A[Upload zip] --> B[Extract to scratchDir]
+    B --> C[Serve statically]
+    C --> D[Discover stories]
+    D --> E[Partition affected]
+    E --> F[Playwright/Puppeteer render affected]
+    F --> G[Diff vs baseline]
+    G --> H[Persist snapshots + inherit rest]
+```
+
+The **orchestrator** (`core/capture/orchestrator.ts`) owns loading, extraction (`scratchDir`), discovery (`StorySourceAdapter`), affected partitioning, and persistence. The **CaptureRunner** is pure — it only returns PNG buffers. Sources expose an optional `loadDependencyGraph` hook so the orchestrator can trace changes; sources without one render everything.
+
+```ts
+interface CaptureRunner {
+  render(input: { buildId, storybookDir, stories, viewports, browser?, executePlay?, playTimeoutMs? }): Promise<RenderResult>;
+  cancel(buildId): Promise<void>;
+}
+```
+
+Two runners ship — switch with one import:
+
+| Runner | Package | Engines |
+|--------|---------|---------|
+| Playwright | `@storyshelf/runner-playwright` | `chromium` (default), `firefox`, `webkit`, `chrome` |
+| Puppeteer | `@storyshelf/runner-puppeteer` | `chromium`/`chrome` only, `chrome-headless-shell` — smaller image |
+
+Per-project engine lives in **Settings → General → Capture browser** or `PATCH /api/v1/projects/:slug { browser }`. Every snapshot records `infraHash = hash(browser + viewports + sizing defaults)` so baselines are browser-aware — switching browsers starts a fresh baseline.
+
+## Viewports & sizing
+
+Global viewports live in `ShelfConfig.viewports` (or project settings). Per-story `parameters.viewport` adds to the union (deduped by name). The runner auto-crops small components (≈60% whitespace) with 16px padding and clamp (`minWidth`/`maxWidth` etc.), and falls back to `fullPage` on overflow — see `core/capture/sizing.ts`.
+
+Configure via server config or project patch. The queue then fans out `stories × viewports` renders at `captureConcurrency`.
+
+## Content-addressed storage
+
+Published Storybooks are deduplicated by content hash. `persistStorybookStatics` (`core/capture/statics.ts`) `sha256`s every file, writes once to `content/<hash>` (`storage.write(content/<hash>, buffer)` if missing), upserts `content_refs { hash, refCount, lastSeenAt }` via `db.tables.contentRefs` (type-safe `DatabaseAdapter.tables`, no `as never`), and writes a per-build `manifest.json` (`{ "assets/index.js": "abc..." }`). Serving prefers `manifest.json` → `content/<hash>` with `readWithManifestFallback`, falling back to the legacy per-build copy during migration. Uploads use the same dedup: `POST /dedup { hashes }` → `needed`, batch `POST /content` (multipart, `80%` bytes fallback `neededBytes/totalBytes > 0.8` → `PUT zip`), then `POST /manifest` — see [Publishing](/concepts/publishing/) and ADR 0020.
+
+## Diffing
+
+`pixelmatch` + `pngjs` compare against the selected baseline (see [Baselines](/concepts/baselines/)). Per-pixel `pixelThreshold` (default 0.1) and per-snapshot `maxDiffRatio` (default 0.01) decide `changed` vs `unchanged`; per-story `parameters.diffThreshold` (or `chromatic.diffThreshold` with `storyshelf` winning) overrides. Overlay is stored at `diffs/{storyId}/{viewport}.png` — 50% dim + red heatmap.
+
+## Interaction testing hook
+
+When **Enable interaction tests (play)** is on (per-project), the runner does `waitForSelector(#storybook-root, attached)` → `waitForTimeout(delay ?? 500)` → `page.evaluate(executePlay)` with `playTimeoutMs` before the screenshot. A throwing `play` maps to `failed` (blocking) or warning (flaky) — see [Interaction testing guide](/guides/interaction-testing/).
+
+## Restarts during a capture
+
+With the in-process queue, a server restart can interrupt a build that is `capturing`. On startup StoryShelf requeues each such build **once**: the interrupted attempt is recorded as failed (`Interrupted by server restart`) and the build returns to `pending`. If that run is interrupted too, the build is marked `failed` and its git status reports failure, so a crash loop never repeats captures. The Compute jobs page flags interrupted builds and lets you retry them. Remote queues are not affected: the queue redelivers the message after its visibility timeout.
+
+## Remote capture
+
+On serverless (Vercel, Lambda, Workers) the API enqueues `CaptureQueue.enqueue({ buildId })` and a separate `@storyshelf/worker` polls (`SQS`, `Redis`, `Azure`) and runs the same orchestrator — see [Cloud assembly](/guides/deployment/cloud/).
+
+## Related
+
+- [Affected capture](/concepts/affected-capture/) — render only impacted stories
+- [Projects](/concepts/projects/) — slug, `git_default_branch`, thresholds
+- [Builds & snapshots](/concepts/builds/) — statuses
+- [Retention](/concepts/retention/) — what survives
+- Packages: [runner-playwright](/packages/runner-playwright/), [runner-puppeteer](/packages/runner-puppeteer/), [worker](/packages/worker/)

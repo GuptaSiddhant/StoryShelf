@@ -235,6 +235,8 @@ export function registerBuilds(app: ShelfRouter): void {
 
 const listBuildsRoute = createRoute({
   method: "get",
+  tags: ["Builds"],
+  summary: "List builds",
   path: "/api/v1/projects/{slug}/builds",
   request: { params: z.object({ slug: z.string() }), query: buildListQuery },
   responses: {
@@ -253,6 +255,8 @@ const buildCreatedSchema = z
 
 const createBuildRoute = createRoute({
   method: "post",
+  tags: ["Builds"],
+  summary: "Create a build",
   path: "/api/v1/projects/{slug}/builds",
   request: {
     params: z.object({ slug: z.string() }),
@@ -279,6 +283,8 @@ const createBuildRoute = createRoute({
 
 const uploadZipRoute = createRoute({
   method: "put",
+  tags: ["Builds"],
+  summary: "Upload the Storybook zip",
   path: "/api/v1/projects/{slug}/builds/{buildId}/zip",
   request: {
     params: z.object({ slug: z.string(), buildId: z.string() }),
@@ -313,6 +319,8 @@ const dedupHashesSchema = z.object({ hashes: z.array(z.string()) });
 const dedupNeededSchema = z.object({ needed: z.array(z.string()) });
 const dedupRoute = createRoute({
   method: "post",
+  tags: ["Builds"],
+  summary: "Check which files need uploading",
   path: "/api/v1/projects/{slug}/builds/{buildId}/dedup",
   request: {
     params: z.object({ slug: z.string(), buildId: z.string() }),
@@ -329,6 +337,8 @@ const dedupRoute = createRoute({
 
 const contentUploadRoute = createRoute({
   method: "post",
+  tags: ["Builds"],
+  summary: "Upload build content",
   path: "/api/v1/projects/{slug}/builds/{buildId}/content",
   request: {
     params: z.object({ slug: z.string(), buildId: z.string() }),
@@ -346,6 +356,8 @@ const contentUploadRoute = createRoute({
 const manifestFileSchema = z.object({ rel: z.string(), hash: z.string(), size: z.number() });
 const manifestRoute = createRoute({
   method: "post",
+  tags: ["Builds"],
+  summary: "Store the build manifest",
   path: "/api/v1/projects/{slug}/builds/{buildId}/manifest",
   request: {
     params: z.object({ slug: z.string(), buildId: z.string() }),
@@ -373,6 +385,8 @@ const affectedPayloadSchema = z.object({
 });
 const affectedRoute = createRoute({
   method: "post",
+  tags: ["Builds"],
+  summary: "Record the affected stories",
   path: "/api/v1/projects/{slug}/builds/{buildId}/affected",
   request: {
     params: z.object({ slug: z.string(), buildId: z.string() }),
@@ -391,6 +405,8 @@ const affectedRoute = createRoute({
 
 const getBuildRoute = createRoute({
   method: "get",
+  tags: ["Builds"],
+  summary: "Get a build",
   path: "/api/v1/projects/{slug}/builds/{buildId}",
   request: { params: z.object({ slug: z.string(), buildId: z.string() }) },
   responses: {
@@ -402,6 +418,8 @@ const getBuildRoute = createRoute({
 
 const retryBuildRoute = createRoute({
   method: "post",
+  tags: ["Builds"],
+  summary: "Retry capture",
   path: "/api/v1/projects/{slug}/builds/{buildId}/retry",
   request: { params: z.object({ slug: z.string(), buildId: z.string() }) },
   responses: {
@@ -415,6 +433,8 @@ const retryBuildRoute = createRoute({
 
 const deleteBuildRoute = createRoute({
   method: "delete",
+  tags: ["Builds"],
+  summary: "Delete a build",
   path: "/api/v1/projects/{slug}/builds/{buildId}",
   request: { params: z.object({ slug: z.string(), buildId: z.string() }) },
   responses: {
