@@ -90,11 +90,25 @@
     "drizzle-orm": "catalog:",
     "postgres": "^3.4.0"
   },
-  "peerDependencies": {
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@neondatabase/serverless": "^1.1.0",
+    "@types/node": "catalog:",
+    "@vercel/postgres": "^0.10.0",
+    "@vitest/coverage-v8": "catalog:",
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:",
+    "oxlint-tsgolint": "catalog:",
     "pg": "^8.0.0",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@neondatabase/serverless": "^1.1.0",
     "@vercel/postgres": "^0.10.0",
-    "@electric-sql/pglite": "^0.5.8"
+    "pg": "^8.0.0"
   },
   "peerDependenciesMeta": {
     "pg": {
@@ -109,20 +123,6 @@
     "@electric-sql/pglite": {
       "optional": true
     }
-  },
-  "devDependencies": {
-    "@electric-sql/pglite": "^0.5.8",
-    "@neondatabase/serverless": "^1.1.0",
-    "@types/node": "catalog:",
-    "@vercel/postgres": "^0.10.0",
-    "@vitest/coverage-v8": "catalog:",
-    "oxfmt": "catalog:",
-    "oxlint": "catalog:",
-    "oxlint-tsgolint": "catalog:",
-    "pg": "^8.0.0",
-    "tsdown": "catalog:",
-    "typescript": "catalog:",
-    "vitest": "catalog:"
   },
   "jsr": {
     "runtimeCompat": {

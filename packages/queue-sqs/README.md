@@ -25,7 +25,8 @@ const queue = createSqsCaptureQueue({
 });
 
 const app = createShelfApp({
-  database, storage,
+  database,
+  storage,
   captureRunner: myRenderer,
   captureQueue: queue,
 });
@@ -37,9 +38,9 @@ const app = createShelfApp({
 
 ```ts
 interface SqsCaptureQueueOptions {
-  queueUrl: string;           // required SQS queue URL
-  client?: SqsClient;         // optional pre-configured client
-  logger?: Logger;            // optional pino logger
+  queueUrl: string; // required SQS queue URL
+  client?: SqsClient; // optional pre-configured client
+  logger?: Logger; // optional pino logger
 }
 ```
 

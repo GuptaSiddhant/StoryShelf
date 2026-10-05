@@ -24,7 +24,7 @@ const storage = createS3Storage({
   bucket: "my-shelf",
   prefix: "storyshelf",
   endpoint: process.env.S3_ENDPOINT, // optional, e.g. for MinIO/R2
-  region: "us-east-1",               // optional
+  region: "us-east-1", // optional
 });
 
 const app = createShelfApp({ database, storage });
@@ -36,10 +36,10 @@ const app = createShelfApp({ database, storage });
 
 ```ts
 interface S3StorageOptions {
-  bucket: string;      // required bucket name
-  prefix?: string;     // optional key prefix, defaults to ""
-  endpoint?: string;   // optional custom endpoint (MinIO, R2, etc.)
-  region?: string;     // optional region, defaults to "us-east-1"
+  bucket: string; // required bucket name
+  prefix?: string; // optional key prefix, defaults to ""
+  endpoint?: string; // optional custom endpoint (MinIO, R2, etc.)
+  region?: string; // optional region, defaults to "us-east-1"
 }
 ```
 

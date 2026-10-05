@@ -63,12 +63,12 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@storyshelf/auth": "workspace:*",
-    "@storyshelf/db-sqlite": "workspace:*",
     "@opentelemetry/api": "catalog:",
     "@opentelemetry/context-async-hooks": "catalog:",
     "@opentelemetry/core": "catalog:",
     "@opentelemetry/sdk-trace-base": "catalog:",
+    "@storyshelf/auth": "workspace:*",
+    "@storyshelf/db-sqlite": "workspace:*",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "adm-zip": "catalog:",

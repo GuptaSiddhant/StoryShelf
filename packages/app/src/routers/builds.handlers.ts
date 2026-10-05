@@ -15,6 +15,7 @@ import { type ProjectRole, BUILD_STATUSES } from "@storyshelf/core/types";
 import { HTTPException } from "hono/http-exception";
 import { Readable, Transform } from "node:stream";
 import type { ReadableStream as NodeWebStream } from "node:stream/web";
+import { credentialKeys } from "../credential-keys.ts";
 import { notifyProject } from "../notify.ts";
 import { getStore } from "../store.ts";
 import { assertBaselineCurrent } from "./baseline-guard.ts";
@@ -59,7 +60,7 @@ export async function createBuildRecord(
       authorName: meta.authorName,
       message: meta.message,
     },
-    config.secret,
+    credentialKeys(config),
   );
   await notifyProject(
     project,
@@ -201,7 +202,7 @@ export async function refreshBuild(buildId: string): Promise<void> {
         status,
         snapshotCount: snapshots.length,
       },
-      config.secret,
+      credentialKeys(config),
     );
     const project = await new ProjectModel(db).get(build.projectId);
     if (project) {
@@ -237,7 +238,7 @@ export async function approveSnapshot(
   }
   await assertBaselineCurrent(project, build, snapshot, options.force ?? false);
   await snapshots.review(snapshotId, "approved", userId);
-  const baselines = new BaselineModel(db, undefined, getStore().storage, config.secret);
+  const baselines = new BaselineModel(db, undefined, getStore().storage, credentialKeys(config));
   const prior = await baselines.getFor(
     project.id,
     snapshot.storyId,

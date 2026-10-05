@@ -437,6 +437,9 @@ function buildRouterLines(answers: Answers): string[] {
       `  observability,`,
       `  config: {`,
       `    secret: process.env.SECRET,`,
+      `    // Rotation: keep the old SECRET here until credentials are re-encrypted.`,
+      `    previousSecret: process.env.SECRET_PREVIOUS || undefined,`,
+      `    migrateCredentialsOnBoot: process.env.SECRET_MIGRATE === "true",`,
       `    scratchDir: dataDir,`,
       `  },`,
     );
@@ -446,6 +449,9 @@ function buildRouterLines(answers: Answers): string[] {
       `  observability,`,
       `  config: {`,
       `    secret: process.env.SECRET,`,
+      `    // Rotation: keep the old SECRET here until credentials are re-encrypted.`,
+      `    previousSecret: process.env.SECRET_PREVIOUS || undefined,`,
+      `    migrateCredentialsOnBoot: process.env.SECRET_MIGRATE === "true",`,
       `  },`,
     );
   }

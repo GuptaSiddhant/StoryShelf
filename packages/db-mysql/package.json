@@ -5,8 +5,8 @@
   "keywords": [
     "database",
     "drizzle",
-    "mysql",
     "mariadb",
+    "mysql",
     "storybook"
   ],
   "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
@@ -76,18 +76,6 @@
     "drizzle-orm": "catalog:",
     "mysql2": "^3.9.0"
   },
-  "peerDependencies": {
-    "@planetscale/database": "^1.19.0",
-    "@tidbcloud/serverless": "^0.1.0"
-  },
-  "peerDependenciesMeta": {
-    "@planetscale/database": {
-      "optional": true
-    },
-    "@tidbcloud/serverless": {
-      "optional": true
-    }
-  },
   "devDependencies": {
     "@planetscale/database": "^1.19.0",
     "@tidbcloud/serverless": "^0.1.0",
@@ -100,6 +88,18 @@
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@planetscale/database": "^1.19.0",
+    "@tidbcloud/serverless": "^0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@planetscale/database": {
+      "optional": true
+    },
+    "@tidbcloud/serverless": {
+      "optional": true
+    }
   },
   "jsr": {
     "runtimeCompat": {

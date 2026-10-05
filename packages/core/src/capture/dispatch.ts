@@ -14,6 +14,7 @@ import type { StatusConfigTables } from "../models/status-config.ts";
 import type { Build } from "../schema/build.ts";
 import type { CaptureAttempt } from "../schema/capture-attempt.ts";
 import type { Project } from "../schema/project.ts";
+import type { SecretInput } from "../utils/encrypt.ts";
 import { executeCaptureJob, type CaptureJobOptions } from "./orchestrator.ts";
 import { hasApprovedBuildForSha, isAlreadyMerged } from "./skip-checks.ts";
 import { postStatusesForBuild } from "./status-fanout.ts";
@@ -61,7 +62,7 @@ export interface DispatchDeps {
   tables: DispatchTables;
   jobOptions: CaptureJobOptions;
   gitHosts: GitHostProvider[];
-  secret: string | undefined;
+  secret: SecretInput;
   logger: Logger;
 }
 

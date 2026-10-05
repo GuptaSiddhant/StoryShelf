@@ -94,6 +94,18 @@ export interface NotificationsConfig {
 export interface ShelfConfig {
   secret?: string;
   /**
+   * The secret `secret` replaced. Used only to decrypt stored credentials
+   * (webhook, git-token, and notification secrets) written before a rotation;
+   * new writes always use `secret`. Remove once credentials are re-encrypted.
+   */
+  previousSecret?: string;
+  /**
+   * Re-encrypt credentials still under `previousSecret` at boot. Default false:
+   * site admins can run it from the System page instead. No effect without
+   * `previousSecret`.
+   */
+  migrateCredentialsOnBoot?: boolean;
+  /**
    * Bootstrap site-admin bearer token (`STORYSHELF_ADMIN_TOKEN`/`ADMIN_TOKEN`).
    * Grants site-admin API access when no admin user exists yet; never
    * mint sessions from it. Distinct from `secret` (session signing).
@@ -193,6 +205,8 @@ const notificationsConfigSchema: z.ZodType<NotificationsConfig> = z.object({
 export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
   .object({
     secret: z.string().min(1).optional(),
+    previousSecret: z.string().min(1).optional(),
+    migrateCredentialsOnBoot: z.boolean().optional(),
     adminToken: z.string().min(1).optional(),
     publishedBaseDomain: z.string().optional(),
     // oxlint-disable-next-line typescript/no-deprecated -- z.string().url() kept for zod v3 API compat
@@ -209,7 +223,23 @@ export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
     adapters: z.record(z.string(), adapterSnapshotSchema).optional(),
     notifications: notificationsConfigSchema.optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((config, ctx) => {
+    if (config.previousSecret !== undefined && config.secret === undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["previousSecret"],
+        message: "previousSecret requires secret",
+      });
+    }
+    if (config.previousSecret !== undefined && config.previousSecret === config.secret) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["previousSecret"],
+        message: "previousSecret must differ from secret",
+      });
+    }
+  });
 
 /** Zod schema validating the UI branding configuration. */
 export const uiConfigSchema: z.ZodType<UIConfig> = z

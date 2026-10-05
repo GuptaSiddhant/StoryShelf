@@ -12,6 +12,7 @@ import type {
  * and secret-free (details are truncated, never raw config).
  */
 import type { AdapterSetupResult, AdapterSetupSources } from "@storyshelf/core/adapter/setup";
+import type { CredentialProbe } from "@storyshelf/core/models";
 import { sanitizeErrorText } from "@storyshelf/core/utils";
 
 export type AdapterState = "ok" | "starting" | "failed";
@@ -198,6 +199,26 @@ function overallStatus(reports: AdapterReportFull[]): HealthReport["status"] {
   return "ok";
 }
 
+/** Pseudo-adapter entry reporting whether stored credentials decrypt with the configured secret. */
+function credentialsEntry(probe: CredentialProbe): AdapterReportFull {
+  const unreadable = probe.unreadable.length;
+  let detail: string | undefined;
+  if (unreadable > 0) {
+    detail = `${unreadable} stored credential(s) cannot be decrypted; check SECRET and SECRET_PREVIOUS`;
+  } else if (probe.previous > 0) {
+    detail = `${probe.previous} credential(s) still encrypted with the previous secret; re-encrypt from the System page`;
+  }
+  return {
+    category: "credentials",
+    kind: "secret",
+    name: "Credential encryption",
+    version: "-",
+    hasLifecycle: false,
+    state: unreadable > 0 ? "failed" : "ok",
+    ...(detail === undefined ? {} : { detail }),
+  };
+}
+
 /**
  * Probe every wired adapter and assemble the full health report.
  *
@@ -205,18 +226,23 @@ function overallStatus(reports: AdapterReportFull[]): HealthReport["status"] {
  * @param settled - Setup settlement (null while the eager run is in flight).
  * @param bootTimeMs - Process boot timestamp for uptime.
  * @param version - Server version for the report header.
+ * @param credentials - Stored-credential probe (omit when no secret is configured).
  */
 export async function collectHealthReport(
   sources: AdapterSetupSources,
   settled: AdapterSetupResult | null,
   bootTimeMs: number,
   version: string,
+  credentials?: CredentialProbe | null,
 ): Promise<HealthReport> {
   const setupErrors = collectSetupErrors(settled);
   const targets = targetsOf(sources);
   const adapters = await Promise.all(
     targets.map(async (target) => await probeTarget(target, setupErrors, settled === null)),
   );
+  if (credentials) {
+    adapters.push(credentialsEntry(credentials));
+  }
   return {
     status: overallStatus(adapters),
     uptimeSecs: Math.floor((Date.now() - bootTimeMs) / 1000),

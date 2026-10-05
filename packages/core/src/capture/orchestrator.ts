@@ -14,6 +14,7 @@ import { ProjectModel, type ProjectTables } from "../models/project.ts";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 import { parentContext, withSpan } from "../tracing.ts";
+import type { SecretInput } from "../utils/encrypt.ts";
 import { roundedTimings, runWithTimings, timed } from "../utils/timing.ts";
 import { DEFAULT_VIEWPORTS, isDisabledStory, isFlakyStory } from "./adapter.ts";
 import type { Viewport } from "./adapter.ts";
@@ -40,7 +41,7 @@ export interface CaptureJobOptions {
   viewports?: Viewport[];
   logger?: Logger;
   /** Server secret for decrypting webhook secrets at send time. */
-  secret?: string | undefined;
+  secret?: SecretInput;
   /** Render budget override (tests use a short fuse). */
   renderTimeoutMs?: number | undefined;
 }

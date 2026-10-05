@@ -3,11 +3,11 @@
   "version": "0.5.2",
   "description": "Affected capture for StoryShelf: dependency-graph tracing that selects the stories impacted by a change.",
   "keywords": [
-    "storybook",
-    "visual-testing",
     "affected",
+    "dependency-graph",
     "selective",
-    "dependency-graph"
+    "storybook",
+    "visual-testing"
   ],
   "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
   "bugs": {

@@ -22,6 +22,7 @@ import {
 import type { NotificationSubscriptionRow } from "@storyshelf/core/schema";
 import type { NotificationChannelRow } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
+import { credentialKeys } from "./credential-keys.ts";
 import { getStore } from "./store.ts";
 
 /** Explicit dependencies for background fan-out (no request scope). */
@@ -90,7 +91,7 @@ async function loadChannels(
   deps: Pick<NotifyDeps, "db" | "config">,
   projectId: string | null,
 ): Promise<NotificationChannel[]> {
-  const model = new NotificationChannelModel(deps.db, undefined, deps.config.secret);
+  const model = new NotificationChannelModel(deps.db, undefined, credentialKeys(deps.config));
   const rows = projectId === null ? await model.listSystem() : await model.list(projectId);
   return rows.filter((row) => row.enabled).flatMap((row) => toView(row, model) ?? []);
 }

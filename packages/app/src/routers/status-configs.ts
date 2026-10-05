@@ -2,6 +2,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { StatusConfigModel } from "@storyshelf/core/models";
 import type { ProjectStatusConfig } from "@storyshelf/core/schema";
 import type { ShelfRouter } from "../app-types.ts";
+import { credentialKeys } from "../credential-keys.ts";
 import { getStore } from "../store.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
 import { notFound, statusConfigCreateSchema, statusConfigSchema, unauthorized } from "./schemas.ts";
@@ -82,7 +83,11 @@ export function registerStatusConfigs(app: ShelfRouter): void {
   app.openapi(listRoute, async (c) => {
     const { slug } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, "admin");
-    const model = new StatusConfigModel(getStore().db, undefined, getStore().config.secret);
+    const model = new StatusConfigModel(
+      getStore().db,
+      undefined,
+      credentialKeys(getStore().config),
+    );
     const rows = await model.list(project.id);
     return c.json(rows.map((row) => toPublic(row)));
   });
@@ -100,7 +105,11 @@ export function registerStatusConfigs(app: ShelfRouter): void {
     if (!parsed.success) {
       return c.json({ message: parsed.error.message }, 400);
     }
-    const model = new StatusConfigModel(getStore().db, undefined, getStore().config.secret);
+    const model = new StatusConfigModel(
+      getStore().db,
+      undefined,
+      credentialKeys(getStore().config),
+    );
     const row = await model.create(project.id, {
       provider: body.provider,
       config: parsed.data,
@@ -112,7 +121,11 @@ export function registerStatusConfigs(app: ShelfRouter): void {
   app.openapi(deleteRoute, async (c) => {
     const { slug, id } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
-    const model = new StatusConfigModel(getStore().db, undefined, getStore().config.secret);
+    const model = new StatusConfigModel(
+      getStore().db,
+      undefined,
+      credentialKeys(getStore().config),
+    );
     const existing = await model.get(project.id, id);
     if (!existing) {
       return c.json({ message: "Status config not found" }, 404);

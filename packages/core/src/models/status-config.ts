@@ -4,7 +4,7 @@ import { eq, getTableColumns } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { ProjectStatusConfig } from "../schema/status-config.ts";
-import { decrypt, encrypt } from "../utils/encrypt.ts";
+import { decryptCredential, encrypt, type SecretInput } from "../utils/encrypt.ts";
 import { ulid } from "../utils/ulid.ts";
 
 /** Tables required by {@link StatusConfigModel}. */
@@ -15,11 +15,11 @@ export interface StatusConfigTables {
 /** Data operations for per-project status provider configs. */
 export class StatusConfigModel {
   private readonly tables: StatusConfigTables;
-  private readonly secret: string | undefined;
+  private readonly secret: SecretInput;
   constructor(
     private readonly db: DatabaseAdapter,
     tables?: StatusConfigTables,
-    secret?: string,
+    secret?: SecretInput,
   ) {
     this.tables = tables ?? { projectStatusConfigs: db.tables.projectStatusConfigs };
     this.secret = secret;
@@ -50,7 +50,7 @@ export class StatusConfigModel {
 
   /** Decrypt the token for a stored row. */
   decryptToken(row: ProjectStatusConfig): string {
-    return decrypt(this.secret, row.tokenEncrypted);
+    return decryptCredential(this.secret, row.tokenEncrypted);
   }
 
   /** Parse the JSON config column. */

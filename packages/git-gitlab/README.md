@@ -21,7 +21,8 @@ import { gitLabHost } from "@storyshelf/git-gitlab";
 import { createShelfApp } from "@storyshelf/app";
 
 const app = createShelfApp({
-  database, storage,
+  database,
+  storage,
   // ...adapters...
   gitHosts: [gitLabHost],
 });
@@ -39,9 +40,9 @@ The project config is validated against `gitlabConfigSchema`:
 
 ```ts
 interface GitLabProjectConfig {
-  owner: string;   // GitLab owner (user or group)
-  repo: string;    // repository / project name
-  host?: string;   // optional self-hosted GitLab base URL (defaults to gitlab.com)
+  owner: string; // GitLab owner (user or group)
+  repo: string; // repository / project name
+  host?: string; // optional self-hosted GitLab base URL (defaults to gitlab.com)
 }
 ```
 

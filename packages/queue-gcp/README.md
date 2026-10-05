@@ -45,10 +45,10 @@ workload identity, or a service-account key file via `keyFilename`).
 
 ```ts
 interface GcpPubSubQueueOptions {
-  topic: string;        // required Pub/Sub topic short name
+  topic: string; // required Pub/Sub topic short name
   subscription: string; // required pull subscription short name
-  projectId: string;    // required GCP project ID
-  publisher?: PublisherClient;  // injected client (tests)
+  projectId: string; // required GCP project ID
+  publisher?: PublisherClient; // injected client (tests)
   subscriber?: SubscriberClient; // injected client (tests)
   logger?: Logger;
   apiEndpoint?: string; // custom endpoint (Pub/Sub emulator host)

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { reencryptCredentials } from "../models/credentials.ts";
 import { WebhookModel } from "../models/webhook.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { hmacSha256 } from "../utils/hash.ts";
@@ -105,5 +106,31 @@ describe("emitWebhookEvent", () => {
     );
 
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps delivering across a secret rotation, before and after re-encryption", async () => {
+    const { db } = makeDatabase();
+    await new WebhookModel(db, webhookTables(db), "old-secret").create("p1", {
+      url: "https://example.com/hook",
+      secret: "whsec-rotated",
+      events: [],
+    });
+    const signatures: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: { headers: Record<string, string>; body: string }) => {
+        await Promise.resolve();
+        signatures.push(init.headers["X-StoryShelf-Signature"] ?? "");
+        return new Response("{}", { status: 200 });
+      }),
+    );
+    const keys = { current: "new-secret", previous: "old-secret" };
+
+    await emitWebhookEvent(db, webhookTables(db), "p1", "build:created", {}, keys);
+    await reencryptCredentials(db, keys);
+    await emitWebhookEvent(db, webhookTables(db), "p1", "build:created", {}, "new-secret");
+
+    expect(signatures).toHaveLength(2);
+    expect(signatures.every((signature) => signature.length === 64)).toBe(true);
   });
 });

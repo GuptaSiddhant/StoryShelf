@@ -2,6 +2,7 @@ import { NotificationChannelModel, NotificationSubscriptionModel } from "@storys
 import type { Project } from "@storyshelf/core/schema";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
+import { credentialKeys } from "../credential-keys.ts";
 import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
@@ -107,7 +108,11 @@ async function persistChannel(
   config: unknown,
   form: FormData,
 ): Promise<void> {
-  await new NotificationChannelModel(getStore().db, undefined, getStore().config.secret).create({
+  await new NotificationChannelModel(
+    getStore().db,
+    undefined,
+    credentialKeys(getStore().config),
+  ).create({
     projectId: project.id,
     provider,
     config: config as Record<string, unknown>,
@@ -118,7 +123,11 @@ async function persistChannel(
 
 async function handleDeleteChannel(c: Context): Promise<Response> {
   const project = await findProject(c.req.param("slug") ?? "");
-  const model = new NotificationChannelModel(getStore().db, undefined, getStore().config.secret);
+  const model = new NotificationChannelModel(
+    getStore().db,
+    undefined,
+    credentialKeys(getStore().config),
+  );
   const channel = await model.get(c.req.param("channelId") ?? "");
   if (!channel || channel.projectId !== project.id) {
     return c.html(

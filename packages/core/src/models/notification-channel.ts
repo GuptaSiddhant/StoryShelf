@@ -3,7 +3,7 @@ import { eq, getTableColumns, isNull } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { NotificationChannelRow } from "../schema/notification.ts";
-import { decrypt, encrypt } from "../utils/encrypt.ts";
+import { decryptCredential, encrypt, type SecretInput } from "../utils/encrypt.ts";
 import { ulid } from "../utils/ulid.ts";
 
 /** Tables required by {@link NotificationChannelModel}. */
@@ -24,7 +24,7 @@ export interface NotificationChannelCreateInput {
 /** Data operations for notification channels. */
 export class NotificationChannelModel {
   private readonly tables: NotificationChannelTables;
-  private readonly secret?: string;
+  private readonly secret?: SecretInput;
   /**
    * @param db - Database adapter.
    * @param tables - Table handles (defaults to the adapter's tables).
@@ -33,7 +33,7 @@ export class NotificationChannelModel {
   constructor(
     private readonly db: DatabaseAdapter,
     tables?: NotificationChannelTables,
-    secret?: string,
+    secret?: SecretInput,
   ) {
     this.tables = tables ?? { notificationChannels: db.tables.notificationChannels };
     this.secret = secret;
@@ -88,7 +88,7 @@ export class NotificationChannelModel {
     if (!row.secretEncrypted) {
       throw new Error("Channel has no secret");
     }
-    return decrypt(this.secret, row.secretEncrypted);
+    return decryptCredential(this.secret, row.secretEncrypted);
   }
 
   /** Decode the JSON-serialized event list of a channel. */

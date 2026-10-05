@@ -14,7 +14,9 @@ import type { Project } from "@storyshelf/core/schema";
 import type { ProjectGroupMapping } from "@storyshelf/core/schema";
 import type { Token } from "@storyshelf/core/schema";
 import type { AuthUser } from "@storyshelf/core/types";
+import type { SecretInput } from "@storyshelf/core/utils";
 import type { Context } from "hono";
+import { credentialKeys } from "../credential-keys.ts";
 import {
   renderProjectSettingsPage,
   type SettingsFormState,
@@ -70,7 +72,7 @@ async function loadWebhookSummaries(
 /** Status-config summaries for the settings UI. */
 async function loadStatusConfigSummaries(
   db: DatabaseAdapter,
-  secret: string | undefined,
+  secret: SecretInput,
   projectId: string,
 ): Promise<SettingsStatusConfig[]> {
   const statusConfigsDb = await new StatusConfigModel(db, undefined, secret).list(projectId);
@@ -132,7 +134,7 @@ async function loadGroupMappings(
 /** Channel summaries for the settings UI. */
 async function loadNotificationChannels(
   db: DatabaseAdapter,
-  secret: string | undefined,
+  secret: SecretInput,
   projectId: string,
 ): Promise<SettingsNotificationChannel[]> {
   const rows = await new NotificationChannelModel(db, undefined, secret).list(projectId);
@@ -169,7 +171,7 @@ async function loadMySubscription(
 /** Notification channels, providers, and my subscription for the UI. */
 async function loadNotificationSection(
   db: DatabaseAdapter,
-  secret: string | undefined,
+  secret: SecretInput,
   projectId: string,
   userId: string | undefined,
   notifiers: { metadata: { kind: string } }[],
@@ -190,7 +192,7 @@ async function loadNotificationSection(
 /** Roster, tokens, webhooks, and status configs for the settings UI. */
 async function loadInventorySection(
   db: DatabaseAdapter,
-  secret: string | undefined,
+  secret: SecretInput,
   projectId: string,
 ): Promise<{
   labelTypes: LabelType[];
@@ -213,10 +215,10 @@ async function loadSettingsData(slug: string): Promise<SettingsData | null> {
     return null;
   }
   const { db, config, user, authEnabled, gitHosts, notifiers } = getStore();
-  const inventory = await loadInventorySection(db, config.secret, project.id);
+  const inventory = await loadInventorySection(db, credentialKeys(config), project.id);
   const notifications = await loadNotificationSection(
     db,
-    config.secret,
+    credentialKeys(config),
     project.id,
     user?.id,
     notifiers,

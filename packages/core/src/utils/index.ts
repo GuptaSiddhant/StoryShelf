@@ -3,7 +3,16 @@
  *
  * Imported through `@storyshelf/core/utils`.
  */
-export { decrypt, encrypt } from "./encrypt.ts";
+export {
+  decrypt,
+  decryptCredential,
+  decryptWithKey,
+  encrypt,
+  UndecryptableCredentialError,
+  type KeyUsed,
+  type SecretInput,
+  type SecretKeys,
+} from "./encrypt.ts";
 export { hmacSha256, randomToken, sha256, timingSafeEqualString } from "./hash.ts";
 export { HttpError } from "./http.ts";
 export type { HttpRequestOptions, HttpTextOptions } from "./http.ts";

@@ -11,6 +11,7 @@ import type { Baseline } from "../schema/baseline.ts";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 import type { BuildStatus, SnapshotStatus } from "../types.ts";
+import type { SecretInput } from "../utils/encrypt.ts";
 import { diffPath, screenshotPath } from "../utils/paths.ts";
 import type { Viewport } from "./adapter.ts";
 import type { InheritedStory } from "./affected.ts";
@@ -202,7 +203,7 @@ export interface CaptureContext {
   /** Optional per-attempt log recorder (mirrors logger lines into the DB). */
   recordLog?: AttemptLogRecorder;
   /** Server secret for decrypting webhook secrets at send time. */
-  secret?: string | undefined;
+  secret?: SecretInput;
 }
 
 function viewportByName(ctx: CaptureContext, name: string): Viewport {

@@ -1,6 +1,7 @@
 import type { Logger } from "pino";
 import { WebhookModel, type WebhookTables } from "../models/webhook.ts";
 import type { Webhook } from "../schema/webhook.ts";
+import type { SecretInput } from "../utils/encrypt.ts";
 import { hmacSha256 } from "../utils/hash.ts";
 import type { DatabaseAdapter } from "./database.ts";
 
@@ -24,7 +25,7 @@ export async function emitWebhookEvent(
   projectId: string,
   event: string,
   data: Record<string, unknown>,
-  secret: string | undefined,
+  secret: SecretInput,
   logger?: Logger,
 ): Promise<void> {
   const webhookModel = new WebhookModel(db, tables, secret);

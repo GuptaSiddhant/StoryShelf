@@ -90,18 +90,6 @@
     "@storyshelf/core": "workspace:*",
     "drizzle-orm": "catalog:"
   },
-  "peerDependencies": {
-    "@libsql/client": "^0.18.0",
-    "better-sqlite3": "^12.0.0"
-  },
-  "peerDependenciesMeta": {
-    "@libsql/client": {
-      "optional": true
-    },
-    "better-sqlite3": {
-      "optional": true
-    }
-  },
   "devDependencies": {
     "@libsql/client": "^0.18.0",
     "@types/node": "catalog:",
@@ -113,6 +101,18 @@
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@libsql/client": "^0.18.0",
+    "better-sqlite3": "^12.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@libsql/client": {
+      "optional": true
+    },
+    "better-sqlite3": {
+      "optional": true
+    }
   },
   "jsr": {
     "runtimeCompat": {

@@ -6,6 +6,7 @@ import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { emitWebhookEvent } from "../adapters/webhook-events.ts";
 import type { Baseline } from "../schema/baseline.ts";
+import type { SecretInput } from "../utils/encrypt.ts";
 import { baselinePath } from "../utils/paths.ts";
 import { ulid } from "../utils/ulid.ts";
 import type { WebhookTables } from "./webhook.ts";
@@ -19,13 +20,13 @@ export interface BaselineTables {
 export class BaselineModel {
   private readonly tables: BaselineTables;
   private readonly storage: StorageAdapter;
-  private readonly secret?: string;
+  private readonly secret?: SecretInput;
   private readonly webhookTables?: WebhookTables;
   constructor(
     private readonly db: DatabaseAdapter,
     tables?: BaselineTables,
     storage?: StorageAdapter,
-    secret?: string,
+    secret?: SecretInput,
     webhookTables?: WebhookTables,
   ) {
     this.tables = tables ?? { baselines: db.tables.baselines };

@@ -3,7 +3,7 @@ import { eq, getTableColumns } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { Webhook } from "../schema/webhook.ts";
-import { decrypt, encrypt } from "../utils/encrypt.ts";
+import { decryptCredential, encrypt, type SecretInput } from "../utils/encrypt.ts";
 import { ulid } from "../utils/ulid.ts";
 
 /** Tables required by {@link WebhookModel}. */
@@ -14,7 +14,7 @@ export interface WebhookTables {
 /** Data operations for webhook subscriptions. */
 export class WebhookModel {
   private readonly tables: WebhookTables;
-  private readonly secret?: string;
+  private readonly secret?: SecretInput;
   /**
    * @param db - Database adapter.
    * @param tables - Table handles.
@@ -23,7 +23,7 @@ export class WebhookModel {
   constructor(
     private readonly db: DatabaseAdapter,
     tables?: WebhookTables,
-    secret?: string,
+    secret?: SecretInput,
   ) {
     this.tables = tables ?? { webhooks: db.tables.webhooks };
     this.secret = secret;
@@ -61,7 +61,7 @@ export class WebhookModel {
 
   /** Decrypt the secret for a stored row (in memory only, at send time). */
   decryptSecret(row: Webhook): string {
-    return decrypt(this.secret, row.secretEncrypted);
+    return decryptCredential(this.secret, row.secretEncrypted);
   }
 
   /** Fetch a webhook by id scoped to a project, or null if not found. */

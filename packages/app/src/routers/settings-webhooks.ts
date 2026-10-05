@@ -3,6 +3,7 @@ import type { Project } from "@storyshelf/core/schema";
 import { randomToken } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
+import { credentialKeys } from "../credential-keys.ts";
 import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
 import { notFound } from "./helpers.ts";
@@ -67,7 +68,11 @@ async function createWebhookRecord(
   url: string,
   events: string[] | undefined,
 ): Promise<Response> {
-  const webhookModel = new WebhookModel(getStore().db, undefined, getStore().config.secret);
+  const webhookModel = new WebhookModel(
+    getStore().db,
+    undefined,
+    credentialKeys(getStore().config),
+  );
   const secret = randomToken("whsec_").value;
   await webhookModel.create(project.id, { url, events, secret });
   flash(c, "Webhook created — copy the signing secret now");
@@ -76,14 +81,15 @@ async function createWebhookRecord(
 
 async function handleDeleteWebhook(c: Context): Promise<Response> {
   const project = await findProject(c.req.param("slug") ?? "");
-  const webhook = await new WebhookModel(getStore().db, undefined, getStore().config.secret).get(
-    project.id,
-    c.req.param("webhookId") ?? "",
-  );
+  const webhook = await new WebhookModel(
+    getStore().db,
+    undefined,
+    credentialKeys(getStore().config),
+  ).get(project.id, c.req.param("webhookId") ?? "");
   if (!webhook) {
     notFound("Webhook not found");
   }
-  await new WebhookModel(getStore().db, undefined, getStore().config.secret).remove(
+  await new WebhookModel(getStore().db, undefined, credentialKeys(getStore().config)).remove(
     project.id,
     webhook.id,
   );

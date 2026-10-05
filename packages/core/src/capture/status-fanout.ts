@@ -5,6 +5,7 @@ import { buildCommentMarkdown } from "../adapters/git-host/helpers.ts";
 import type { CheckStatus, GitHostProvider } from "../adapters/git-host/index.ts";
 import { StatusConfigModel, type StatusConfigTables } from "../models/status-config.ts";
 import type { Project } from "../schema/project.ts";
+import type { SecretInput } from "../utils/encrypt.ts";
 
 /** Post build check statuses (and review comments) to every configured git provider. */
 async function postStatusesForBuild(opts: {
@@ -15,7 +16,7 @@ async function postStatusesForBuild(opts: {
   status: CheckStatus;
   url: string;
   providers: GitHostProvider[];
-  secret: string | undefined;
+  secret: SecretInput;
   logger?: Logger;
 }): Promise<void> {
   if (opts.providers.length === 0) {

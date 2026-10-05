@@ -28,7 +28,8 @@ const queue = createRedisCaptureQueue({
 });
 
 const app = createShelfApp({
-  database, storage,
+  database,
+  storage,
   captureRunner: myRenderer,
   captureQueue: queue,
 });
@@ -48,10 +49,10 @@ const queue = createRedisCaptureQueue({ client });
 
 ```ts
 interface RedisCaptureQueueOptions {
-  client?: Redis;           // pre-configured ioredis client
-  url?: string;             // redis:// URL, used when client not supplied
-  key?: string;             // queue key, default "shelf:queue"
-  logger?: Logger;          // optional pino logger
+  client?: Redis; // pre-configured ioredis client
+  url?: string; // redis:// URL, used when client not supplied
+  key?: string; // queue key, default "shelf:queue"
+  logger?: Logger; // optional pino logger
   waitTimeSeconds?: number; // BLMOVE timeout, default 5
 }
 ```
