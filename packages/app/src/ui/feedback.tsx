@@ -1,5 +1,7 @@
 import type { FC } from "hono/jsx";
 import { css } from "./css.ts";
+import { Icon } from "./icons/icon.tsx";
+import type { IconName } from "./icons/paths.ts";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -11,11 +13,11 @@ const badgeBase = css`
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  padding: 0.15rem 0.55rem;
-  border-radius: 999px;
-  font-size: 0.72rem;
+  padding: 0.1rem 0.55rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
   font-weight: 600;
-  letter-spacing: 0.02em;
+  line-height: 1.5;
   border: 1px solid var(--border);
   background: var(--surface-muted);
   color: var(--text-secondary);
@@ -30,40 +32,52 @@ const badgeTones: Record<BadgeTone, Promise<string>> = {
   success: css`
     /* badge-success */
     ${badgeBase}
-    background: color-mix(in srgb, var(--status-approved) 12%, var(--surface-card));
+    background: var(--status-approved-bg);
     color: var(--status-approved);
-    border-color: color-mix(in srgb, var(--status-approved) 32%, var(--border));
+    border-color: var(--status-approved-border);
   `,
   warning: css`
     /* badge-warning */
     ${badgeBase}
-    background: color-mix(in srgb, var(--status-new) 12%, var(--surface-card));
+    background: var(--status-new-bg);
     color: var(--status-new);
-    border-color: color-mix(in srgb, var(--status-new) 32%, var(--border));
+    border-color: var(--status-new-border);
   `,
   danger: css`
     /* badge-danger */
     ${badgeBase}
-    background: color-mix(in srgb, var(--status-rejected) 12%, var(--surface-card));
+    background: var(--status-rejected-bg);
     color: var(--status-rejected);
-    border-color: color-mix(in srgb, var(--status-rejected) 32%, var(--border));
+    border-color: var(--status-rejected-border);
   `,
   info: css`
     /* badge-info */
     ${badgeBase}
-    background: color-mix(in srgb, var(--accent) 9%, var(--surface-card));
-    color: var(--accent);
-    border-color: color-mix(in srgb, var(--accent) 28%, var(--border));
+    background: var(--status-info-bg);
+    color: var(--accent-fg);
+    border-color: var(--status-info-border);
   `,
+};
+
+/** Status glyph per tone so state never relies on color alone. */
+const toneIcons: Record<BadgeTone, IconName> = {
+  neutral: "info",
+  success: "check-circle",
+  warning: "alert-triangle",
+  danger: "x-circle",
+  info: "info",
 };
 
 const alertBase = css`
   /* alert */
-  border-radius: var(--radius-sm);
-  padding: 0.7rem 0.8rem;
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  border-radius: var(--radius);
+  padding: 0.75rem 0.9rem;
   border: 1px solid var(--border);
   background: var(--surface-card);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
 `;
 
 const alertTones: Record<BadgeTone, Promise<string>> = {
@@ -74,26 +88,54 @@ const alertTones: Record<BadgeTone, Promise<string>> = {
   info: css`
     /* alert-info */
     ${alertBase}
-    border-color: color-mix(in srgb, var(--accent) 25%, var(--border));
-    background: color-mix(in srgb, var(--accent) 6%, var(--surface-card));
+    border-color: var(--status-info-border);
+    background: var(--status-info-bg);
   `,
   success: css`
     /* alert-success */
     ${alertBase}
-    border-color: color-mix(in srgb, var(--status-approved) 25%, var(--border));
-    background: color-mix(in srgb, var(--status-approved) 6%, var(--surface-card));
+    border-color: var(--status-approved-border);
+    background: var(--status-approved-bg);
   `,
   warning: css`
     /* alert-warning */
     ${alertBase}
-    border-color: color-mix(in srgb, var(--status-new) 25%, var(--border));
-    background: color-mix(in srgb, var(--status-new) 6%, var(--surface-card));
+    border-color: var(--status-new-border);
+    background: var(--status-new-bg);
   `,
   danger: css`
     /* alert-danger */
     ${alertBase}
-    border-color: color-mix(in srgb, var(--status-rejected) 25%, var(--border));
-    background: color-mix(in srgb, var(--status-rejected) 6%, var(--surface-card));
+    border-color: var(--status-rejected-border);
+    background: var(--status-rejected-bg);
+  `,
+};
+
+const alertIconTones: Record<BadgeTone, Promise<string>> = {
+  neutral: css`
+    /* alert-icon-neutral */
+    margin-top: 0.1rem;
+    color: var(--text-secondary);
+  `,
+  info: css`
+    /* alert-icon-info */
+    margin-top: 0.1rem;
+    color: var(--accent-fg);
+  `,
+  success: css`
+    /* alert-icon-success */
+    margin-top: 0.1rem;
+    color: var(--status-approved);
+  `,
+  warning: css`
+    /* alert-icon-warning */
+    margin-top: 0.1rem;
+    color: var(--status-new);
+  `,
+  danger: css`
+    /* alert-icon-danger */
+    margin-top: 0.1rem;
+    color: var(--status-rejected);
   `,
 };
 
@@ -215,11 +257,17 @@ type MetaTone = "neutral" | "danger";
 
 /** Small status pill with a color tone. */
 // eslint-disable-next-line promise-function-async -- JSX component return type
-export const Badge: FC<{ tone?: BadgeTone; children?: unknown }> = ({
+export const Badge: FC<{ tone?: BadgeTone; icon?: boolean; children?: unknown }> = ({
   tone = "neutral",
+  icon = false,
   children,
 }) => {
-  return <span class={badgeTones[tone]}>{children}</span>;
+  return (
+    <span class={badgeTones[tone]}>
+      {icon ? <Icon name={toneIcons[tone]} size="sm" /> : null}
+      {children}
+    </span>
+  );
 };
 
 /** Map a build or snapshot status string to its badge tone. */
@@ -270,8 +318,13 @@ export const Alert: FC<{ tone?: BadgeTone; title?: string; children?: unknown }>
 }) => {
   return (
     <div class={alertTones[tone]} role="alert">
-      {title ? <strong class={alertTitle}>{title}</strong> : null}
-      <div>{children}</div>
+      <span class={alertIconTones[tone]}>
+        <Icon name={toneIcons[tone]} />
+      </span>
+      <div>
+        {title ? <strong class={alertTitle}>{title}</strong> : null}
+        <div>{children}</div>
+      </div>
     </div>
   );
 };

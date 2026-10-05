@@ -1,5 +1,6 @@
 import { createUrlBuilder, safeImageUrl } from "@storyshelf/core/urls";
 import type { FC } from "hono/jsx";
+import { assetManifest } from "../asset-manifest.ts";
 import { getCsrfToken } from "../middleware/csrf.ts";
 import { getStore } from "../store.ts";
 import { csrfField } from "./csrf-field.tsx";
@@ -309,7 +310,7 @@ export const DocumentLayout: FC<{ title: string; nav?: NavConfig; children?: unk
             {children}
           </main>
         </div>
-        <script src="/assets/htmx.js" />
+        <script src={assetManifest.htmx.href} />
         <script dangerouslySetInnerHTML={{ __html: clientScript() }} />
       </body>
     </html>

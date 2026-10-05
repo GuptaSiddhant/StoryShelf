@@ -68,4 +68,72 @@ describe("baseStyle", () => {
     expect(css).toContain("--ring");
     expect(css).toContain("--radius");
   });
+
+  it("emits theme-independent scales once", () => {
+    const css = baseStyle(LIGHT_THEME, DARK_THEME);
+    for (const token of ["--text-sm", "--space-4", "--radius-pill", "--font-sans"]) {
+      expect(css.split(`${token}:`).length - 1).toBe(1);
+    }
+  });
+
+  it("derives accent and status tints from the brand colors", () => {
+    const css = baseStyle(
+      { ...LIGHT_THEME, accent: "#ff0000" },
+      { ...DARK_THEME, accent: "#00ff00" },
+    );
+    for (const token of [
+      "--accent-subtle",
+      "--accent-wash",
+      "--accent-border",
+      "--accent-fg",
+      "--status-approved-bg",
+      "--status-rejected-border",
+      "--status-info-bg",
+    ]) {
+      expect(css).toContain(`${token}: color-mix(`);
+    }
+    expect(css).not.toContain("#ff0000 8%");
+  });
+
+  it("keeps the system dark block in sync with the explicit dark block", () => {
+    const css = baseStyle(LIGHT_THEME, DARK_THEME);
+    const system = css.slice(css.indexOf('[data-theme="system"]'));
+    for (const token of ["--radius:", "--shadow:", "--shadow-2:", "--accent-subtle:"]) {
+      expect(system).toContain(token);
+    }
+  });
+
+  it("keeps default accent text readable (WCAG AA) on cards in both themes", () => {
+    for (const theme of [LIGHT_THEME, DARK_THEME]) {
+      const fg = mix(theme.accent, 0.88, theme.text.primary);
+      expect(contrast(fg, theme.surface.card)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
 });
+
+function channels(hex: string): [number, number, number] {
+  const [red, green, blue] = [1, 3, 5].map((at) => Number.parseInt(hex.slice(at, at + 2), 16));
+  return [red ?? 0, green ?? 0, blue ?? 0];
+}
+
+function mix(a: string, share: number, b: string): string {
+  const [ca, cb] = [channels(a), channels(b)];
+  const out = ca.map((v, i) => Math.round(v * share + (cb[i] ?? 0) * (1 - share)));
+  return `#${out.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+}
+
+function luminance(hex: string): number {
+  const [red, green, blue] = channels(hex).map((v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  }) as [number, number, number];
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+}
+
+function contrast(a: string, b: string): number {
+  const [hi, lo] = [luminance(a), luminance(b)].toSorted((first, second) => second - first) as [
+    number,
+    number,
+  ];
+  return (hi + 0.05) / (lo + 0.05);
+}
