@@ -68,3 +68,5 @@ The worker resolves `PollableJob` via the queue's `poll/ack/nack`, then calls th
 ## When to use it
 
 Use a remote worker when the app host shouldn't run Playwright itself — AWS Lambda / Fargate, Cloud Run / GKE, Azure Container Apps / AKS, or any horizontally-scaled deploy where capture belongs on a separate long-lived process. For single-host Docker Compose or local dev, the server's in-process `InMemoryCaptureQueue` (no worker) is sufficient.
+
+See [Remote capture workers](/guides/deployment/remote-workers/) for deployment, scaling, and failure modes.

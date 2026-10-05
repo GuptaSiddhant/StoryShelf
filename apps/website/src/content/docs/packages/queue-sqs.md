@@ -69,3 +69,5 @@ while (true) {
 ## When to use it
 
 Use `queue-sqs` on platforms without a long-lived Node process — AWS Lambda, ECS/Fargate with a dedicated worker, or any AWS-hosted stack where capture should run in a decoupled worker rather than in-process. For a simple single-host deployment, the default `InMemoryCaptureQueue` is sufficient and needs no extra infrastructure.
+
+See [Remote capture workers](/guides/deployment/remote-workers/) for deployment, scaling, and failure modes.

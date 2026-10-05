@@ -32,6 +32,7 @@ export default defineConfig({
                 { label: "Without git", slug: "guides/without-git" },
                 { label: "Interaction testing", slug: "guides/interaction-testing" },
                 { label: "Review workflow", slug: "guides/review" },
+                { label: "Merge gate", slug: "guides/merge-gate" },
               ],
             },
             {
@@ -40,6 +41,7 @@ export default defineConfig({
               items: [
                 { label: "Overview", slug: "guides/deployment" },
                 { label: "Docker Compose", slug: "guides/deployment/docker-compose" },
+                { label: "Remote workers", slug: "guides/deployment/remote-workers" },
                 { label: "AWS", slug: "guides/deployment/aws" },
                 { label: "Azure", slug: "guides/deployment/azure" },
                 { label: "GCP", slug: "guides/deployment/gcp" },
