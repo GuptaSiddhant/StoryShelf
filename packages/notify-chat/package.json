@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/notify-chat",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Chat notification providers for StoryShelf (Slack and Teams incoming webhooks).",
   "keywords": [
     "notifications",

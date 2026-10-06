@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/notify-email",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Email notification transport for StoryShelf (SMTP, Mailpit, log, HTTP APIs).",
   "keywords": [
     "email",
