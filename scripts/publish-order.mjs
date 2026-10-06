@@ -16,7 +16,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const { dirname } = import.meta;
-const packagesDir = join(dirname, "..", "packages");
+export const packagesDir = join(dirname, "..", "packages");
 
 export const PUBLISH_SCOPE = "@storyshelf";
 
