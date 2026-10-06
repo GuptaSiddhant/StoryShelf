@@ -3,7 +3,86 @@
 All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 `scripts/release.mjs` (every workspace package shares one version).
 
-## Unreleased
+## 0.6.0 — Better Auth, notifications, affected capture, UI redesign (2026-10-06)
+
+The first release where **all 24 packages are published to both npm and JSR**,
+with provenance, from CI. Highlights since 0.5.x: the Better Auth engine,
+notifications, affected capture, OpenTelemetry observability, the redesigned UI,
+and the sqlite/postgres/mysql adapter preset families.
+
+**Affected capture** (`@storyshelf/affected`)
+- New package: git diff + Storybook stats-graph tracing (with `untraced`
+  globs) selects the stories a change can reach. The capture pipeline renders
+  only those and **inherits the rest unchanged from baselines**; new stories
+  always render.
+- The server records the affected computation per build and returns
+  `baselineSha`; the UI shows affected/full badges and inherited snapshots; the
+  CLI prints an affected summary (`--full` opts out) and `doctor` checks
+  readiness. Checkouts without git get an auto-generated local identity.
+- **Breaking (days-old key):** `affected.untraced` is now the top-level
+  `untraced` in `storyshelf.json`. `storyshelf init` stamps a `$schema` for
+  editor completion.
+
+**Auth engine: Better Auth** (ADR 0023)
+- `@storyshelf/auth` is now a Better Auth engine: password + OIDC presets,
+  invite-only local accounts, profile and sessions, passkeys, SAML/SSO, and
+  IdP group sync. Config-as-code, boot validation and mode logging.
+- The shared-password tiers are gone; use local accounts or an IdP.
+- Composite multi-auth with per-provider state, customisable login UI via
+  `UIConfig.auth`, public relying-party discovery and change-password
+  well-known routes, and a personal profile page with a display-name override.
+
+**Notifications** (ADR 0024)
+- New notifier adapter family: `@storyshelf/notify-chat` (Slack, Teams, log)
+  and `@storyshelf/notify-email` (SMTP, Mailpit, HTTP, log; `nodemailer` is an
+  optional peer). Per-provider subpaths keep installs small.
+- Channels and per-user subscriptions (new `notification_channels` and
+  `notification_subscriptions` tables), fan-out for builds, comments and purge,
+  reset emails, and `sys:*` admin alerts. Settings and profile UI included.
+- **Action required after upgrade:** run DB migrations for the new tables.
+
+**Database presets**
+- `@storyshelf/db-turso` is folded into `@storyshelf/db-sqlite` (deprecated):
+  presets `turso`, `better-sqlite3`, `bun-sqlite`, `d1`.
+- Postgres presets (`pg`, `neon`, `neon-http`, `vercel`, `pglite`) and MySQL
+  presets (`mysql2` default, `planetscale`, `tidb`, new `@storyshelf/db-mysql`),
+  with shared schema/DDL. All 14 choices appear in `server init`.
+- The core DB contract moved to `@storyshelf/core/adapter/database`.
+  `@libsql/client` 0.18; Node >= 24 is now accepted.
+
+**Storage and capture**
+- Content-hash dedup of Storybook assets (`content/<hash>` + per-build
+  manifest, `content_refs` table, 7-day GC grace), with `dedup`/`content`/
+  `manifest` API endpoints. **Action required:** run DB migrations.
+- Builds interrupted by a restart are requeued once, then failed. Per-story
+  `diffThreshold` is honoured. The orchestrator enforces a render timeout and
+  caps per-failure error text. PNG magic and a 25 MiB cap are checked before
+  storage writes. Workers back off when polling queues that do not long-poll.
+- Fixes: Storybook link resolution, default-branch approval, baseline-change
+  handling, the in-page a11y check, and a non-unique builds `(project, sha)`
+  index.
+
+**Operations**
+- Site-admin **System** page with adapter inventory, live health and safe
+  server config; boot-time validation of adapter implementations fails fast.
+- Server secret rotation for encrypted credentials (#107).
+- Opt-in `Server-Timing` headers (`serverTiming`) and per-phase capture timings.
+- Library is the default project landing page, with "View Storybook" short
+  links (`/_/<slug>` or `/_/<buildId>`) across projects, library and builds.
+- Adapter errors, health and the merge gate redact secrets.
+
+**Publishing and packaging**
+- Every package is published to npm (trusted publishing + provenance) and JSR
+  from `release.yml`. The JSR job skips versions that already exist, so it is
+  safe to re-run.
+- New subpaths `@storyshelf/core/orm`, `/orm/pg-core` and `/orm/sqlite-core`
+  re-export Drizzle. `@storyshelf/core` is the single owner of `drizzle-orm`;
+  `auth` and `app` no longer declare it.
+- New first-time publishes: `affected`, `app`, `auth`, `db-mysql`,
+  `db-postgres`, `notify-chat`, `notify-email`, `observability`, `queue-azure`,
+  `queue-gcp`, `queue-redis`, `runner-puppeteer`, `storage-azure`,
+  `storage-gcs`, `worker` (npm). LICENSE and README added where missing.
+
 
 **Brand mark: logo, favicon and social assets**
 - New StoryShelf mark (a bookshelf whose three shelves and books form an `S`).
@@ -111,6 +190,26 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 **JSR**
 - `@storyshelf/app` ships the `hono/jsx` import map so JSX rendering resolves on
   deno/JSR consumers.
+
+## 0.5.5 — Publish pipeline fixes (2026-10-06)
+
+- `@storyshelf/core/orm` subpaths; `auth` and `app` drop their own
+  `drizzle-orm` dependency (fixes the JSR resolution failure for `app`).
+- The JSR publish job skips versions already on JSR.
+
+## 0.5.4 — First CI release with provenance (2026-10-06)
+
+- First release published by `release.yml` with npm trusted publishing: all
+  24 packages with provenance. JSR stopped at `@storyshelf/app` (undeclared
+  `drizzle-orm`); fixed in 0.5.5.
+- `scripts/npm-trust-all.mjs` is idempotent and verifies state.
+
+## 0.5.3 — All packages on npm and JSR (2026-10-06)
+
+- Every package published to npm for the first time (published locally,
+  without provenance); JSR packages created and linked to the repo.
+- `@storyshelf/affected` gets a build config so its `deno.json` is generated;
+  LICENSE and README added to the packages that lacked them.
 
 ## 0.5.2 — Docs, screenshots, cloud targets (2026-09-23)
 

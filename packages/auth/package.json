@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/auth",
-  "version": "0.5.5",
+  "version": "0.6.0",
   "description": "Better Auth engine for StoryShelf: opaque DBAdapter bridge, shelf factory, and auth presets.",
   "keywords": [
     "auth",

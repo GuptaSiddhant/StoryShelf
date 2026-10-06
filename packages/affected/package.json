@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/affected",
-  "version": "0.5.5",
+  "version": "0.6.0",
   "description": "Affected capture for StoryShelf: dependency-graph tracing that selects the stories impacted by a change.",
   "keywords": [
     "affected",

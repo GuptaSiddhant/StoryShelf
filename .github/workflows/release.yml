@@ -92,30 +92,36 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Generate release notes from git log
+      - name: Generate release notes
         id: log
+        # CHANGELOG.md is the source of truth (minor releases roll up the previous
+        # minor line); fall back to the git log when the tag has no section.
         run: |
           set -e
           TAG="${RELEASE_TAG}"
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
-          echo "prev=$PREV_TAG current=$TAG"
-          if [ -z "$PREV_TAG" ]; then
-            LOG=$(git log --pretty='- %s (%h)' --no-merges)
+          if node scripts/release-notes.mjs "$TAG" > release-body.md; then
+            echo "notes from CHANGELOG.md"
           else
-            LOG=$(git log "$PREV_TAG..HEAD" --pretty='- %s (%h)' --no-merges)
+            PREV_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+            echo "no changelog section; git log fallback prev=$PREV_TAG current=$TAG"
+            if [ -z "$PREV_TAG" ]; then
+              LOG=$(git log --pretty='- %s (%h)' --no-merges)
+            else
+              LOG=$(git log "$PREV_TAG..HEAD" --pretty='- %s (%h)' --no-merges)
+            fi
+            {
+              echo "## $TAG"
+              echo ""
+              echo "$LOG"
+            } > release-body.md
           fi
-          {
-            echo "## $TAG"
-            echo ""
-            echo "$LOG"
-          } > /tmp/release-body.md
-          cat /tmp/release-body.md
+          cat release-body.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          body_path: /tmp/release-body.md
+          body_path: release-body.md
           generate_release_notes: false
 
   # JSR publish. Depends on validate, independent of npm: `continue-on-error`
