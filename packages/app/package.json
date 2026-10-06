@@ -59,6 +59,7 @@
     "@hono/zod-openapi": "^1.1.5",
     "@storyshelf/core": "workspace:*",
     "@storyshelf/observability": "workspace:*",
+    "drizzle-orm": "catalog:",
     "hono": "catalog:",
     "zod": "catalog:"
   },

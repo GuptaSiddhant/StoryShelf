@@ -314,6 +314,9 @@ importers:
       '@storyshelf/observability':
         specifier: workspace:*
         version: link:../observability
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.44.7(@electric-sql/pglite@0.5.8)(@libsql/client@0.18.0)(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@planetscale/database@1.20.2)(@tidbcloud/serverless@0.1.1)(@types/pg@8.11.6)(@vercel/postgres@0.10.0)(better-sqlite3@12.11.1)(kysely@0.29.6)(mysql2@3.24.4(@types/node@26.6.3))(pg@8.23.0)(postgres@3.4.9)
       hono:
         specifier: 'catalog:'
         version: 4.13.11
