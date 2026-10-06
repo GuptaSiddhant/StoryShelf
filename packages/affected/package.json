@@ -11,8 +11,7 @@
   ],
   "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
   "bugs": {
-    "url": "git+https://github.com/GuptaSiddhant/StoryShelf.git",
-    "directory": "packages/affected"
+    "url": "https://github.com/GuptaSiddhant/StoryShelf/issues"
   },
   "license": "MIT",
   "author": {
