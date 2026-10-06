@@ -35,13 +35,14 @@ describe("findAsset", () => {
     );
   });
 
-  it("matches where the Fly Dockerfile copies the bundle's htmx (a missing file crashes boot)", () => {
+  it("matches where the Fly Dockerfile copies the vendored assets (a missing file crashes boot)", () => {
     const dockerfile = readFileSync(
       new URL("../../../apps/fly-app/Dockerfile", import.meta.url),
       "utf8",
     );
-    // Bundled server is /app/dist/server.mjs, so findAsset looks in /app/assets.
-    expect(dockerfile).toContain("packages/app/src/assets/htmx.min.js ./assets/htmx.min.js");
+    // Bundled server is /app/dist/server.mjs, so findAsset looks in /app/assets. The whole
+    // directory is copied so new assets (htmx.min.js, mark.svg, ...) can't be forgotten.
+    expect(dockerfile).toContain("packages/app/src/assets ./assets\n");
     expect(dockerfile).toContain('CMD ["node", "dist/server.mjs"]');
   });
 });
