@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/db-mysql",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "MySQL/MariaDB database adapter for StoryShelf (mysql2 + Drizzle, PlanetScale/TiDB compatible).",
   "keywords": [
     "database",
