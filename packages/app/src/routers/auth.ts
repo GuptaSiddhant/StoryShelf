@@ -96,7 +96,7 @@ async function renderEngineLogin(
   engine: Auth,
   error?: string,
   email?: string,
-  status?: 200 | 401 | 429 | 500 | 502,
+  status?: 200 | 400 | 401 | 429 | 500 | 502,
 ): Promise<Response> {
   return c.html(
     await renderLoginPage({
@@ -151,6 +151,9 @@ async function finishCredentialLogin(
     }
     if (res.status >= 500) {
       return renderEngineLogin(c, engine, "Invalid credentials", email, 502);
+    }
+    if (res.status === 400) {
+      return renderEngineLogin(c, engine, "Enter a valid email address", email, 400);
     }
     // Credential failures only (never rate-limit/upstream noise, never
     // secrets): admins opted into sys:* see a login-attempt signal. Spray
@@ -321,6 +324,9 @@ export function registerEngineAuth(app: ShelfRouter, engine: Auth): void {
     }
     return await renderEngineLogin(c, engine);
   });
+
+  // A failed POST leaves the browser on this URL; a reload must not 404.
+  app.get("/auth/engine/login", (c) => c.redirect("/auth/login"));
 
   app.post("/auth/engine/login", async (c) => await handleEngineLogin(c, engine));
 

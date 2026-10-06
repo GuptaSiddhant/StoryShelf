@@ -97,7 +97,7 @@ Verify: affected suites; old packages' tests migrated or removed deliberately.
 - Shared-password tier is gone (no `createPasswordAuth`, no viewer tier,
   no `AUTH_VIEWER_PASSWORD`). Dev/demo servers provision an env-driven
   admin via `ensurePasswordAdmin` (`AUTH_PASSWORD` ≥ 12 chars, `AUTH_EMAIL`
-  overrides `admin@local`).
+  overrides `admin@example.com`).
 - Local password hashes are incompatible (scrypt → Better Auth): existing
   local users must be re-invited; OAuth users keep working (engine links by
   email on next sign-in).

@@ -32,7 +32,7 @@ keeps users, memberships, invites, and UI. See ADR 0023.
 |---|---|
 | `AUTH_PASSWORD` (shared login, any length) | `AUTH_PASSWORD` (local admin bootstrap, **≥ 12 chars**) |
 | `AUTH_VIEWER_PASSWORD` | Removed (no viewer tier) |
-| — | `AUTH_EMAIL` (admin address, default `admin@local`) |
+| — | `AUTH_EMAIL` (admin address, default `admin@example.com`) |
 | `SECRET` | `SECRET` (unchanged, still required with auth) |
 | `OIDC_ISSUER` / `OIDC_REDIRECT_URL` | Recipe-specific (e.g. `OIDC_ISSUER` = realm URL for `keycloakPreset`; `COGNITO_DOMAIN`/`COGNITO_REGION`/`COGNITO_USER_POOL_ID` for `cognitoPreset`) |
 
@@ -69,7 +69,7 @@ const shelf = createShelfAuth({
   passkeys: {},
 });
 await ensurePasswordAdmin(database, {
-  email: process.env.AUTH_EMAIL ?? "admin@local",
+  email: process.env.AUTH_EMAIL ?? "admin@example.com",
   password: process.env.AUTH_PASSWORD!,
 });
 const app = createShelfApp({ database, storage, auth: shelf.adapter });

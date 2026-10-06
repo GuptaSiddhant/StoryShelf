@@ -12,6 +12,9 @@ import { eq } from "@storyshelf/core/orm";
 import { ulid } from "@storyshelf/core/utils";
 import { ensureEngineIdentity, MIN_PASSWORD_LENGTH, tableColumn } from "./invites.ts";
 
+/** Matches what Better Auth accepts at sign-in: the domain needs a dot. */
+const ENGINE_EMAIL = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/u;
+
 /** Input for {@link ensurePasswordAdmin}. */
 export interface PasswordAdminInput {
   email: string;
@@ -55,6 +58,10 @@ export async function ensurePasswordAdmin(
   input: PasswordAdminInput,
 ): Promise<void> {
   const email = input.email.trim().toLowerCase();
+  if (!ENGINE_EMAIL.test(email)) {
+    // The engine rejects dotless domains (e.g. admin@local) at sign-in, so the account could never log in.
+    throw new Error(`AUTH_EMAIL "${email}" is not a valid email address (domain needs a dot)`);
+  }
   if (input.password.length < MIN_PASSWORD_LENGTH) {
     throw new Error("Password must be at least 12 characters");
   }

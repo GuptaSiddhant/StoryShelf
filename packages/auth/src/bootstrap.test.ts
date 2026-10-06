@@ -39,7 +39,10 @@ async function testDb(): Promise<DatabaseAdapter> {
 
 async function shelfAdmin(db: DatabaseAdapter): Promise<Record<string, unknown> | null> {
   const rows = (await db.list(db.tables.users, {
-    where: eq(getTableColumns(db.tables.users)["email"] as unknown as SQLWrapper, "admin@local"),
+    where: eq(
+      getTableColumns(db.tables.users)["email"] as unknown as SQLWrapper,
+      "admin@example.com",
+    ),
     limit: 1,
   })) as unknown as Record<string, unknown>[];
   return rows[0] ?? null;
@@ -48,7 +51,7 @@ async function shelfAdmin(db: DatabaseAdapter): Promise<Record<string, unknown> 
 describe("ensurePasswordAdmin", () => {
   it("provisions the admin identity with a verifiable engine credential", async () => {
     const db = await testDb();
-    await ensurePasswordAdmin(db, { email: "admin@local", password: "dev-password-12" });
+    await ensurePasswordAdmin(db, { email: "admin@example.com", password: "dev-password-12" });
     const admin = await shelfAdmin(db);
     expect(admin?.["role"]).toBe("admin");
 
@@ -66,8 +69,8 @@ describe("ensurePasswordAdmin", () => {
 
   it("refreshes the credential on repeat boots and rejects short passwords", async () => {
     const db = await testDb();
-    await ensurePasswordAdmin(db, { email: "admin@local", password: "dev-password-12" });
-    await ensurePasswordAdmin(db, { email: "admin@local", password: "rotated-pass-34" });
+    await ensurePasswordAdmin(db, { email: "admin@example.com", password: "dev-password-12" });
+    await ensurePasswordAdmin(db, { email: "admin@example.com", password: "rotated-pass-34" });
     const admin = await shelfAdmin(db);
     const accounts = (await db.list(baseAuthTables.account, {
       where: eq(
@@ -80,7 +83,14 @@ describe("ensurePasswordAdmin", () => {
       verifyPassword({ hash: String(credential?.["password"]), password: "rotated-pass-34" }),
     ).resolves.toBe(true);
     await expect(
-      ensurePasswordAdmin(db, { email: "admin@local", password: "short" }),
+      ensurePasswordAdmin(db, { email: "admin@example.com", password: "short" }),
     ).rejects.toThrow(/at least 12/u);
+  });
+
+  it("rejects emails the engine cannot sign in (dotless domain)", async () => {
+    const db = await testDb();
+    await expect(
+      ensurePasswordAdmin(db, { email: "admin@local", password: "dev-password-12" }),
+    ).rejects.toThrow(/not a valid email/u);
   });
 });

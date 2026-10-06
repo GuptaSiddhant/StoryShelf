@@ -141,6 +141,31 @@ describe("engine auth routes", () => {
     expect(await response.text()).toContain("Invalid credentials");
   });
 
+  it("reports an unusable email address instead of invalid credentials", async () => {
+    const { db, shelf } = await testEngine();
+    const app = testApp(db, shelf);
+
+    const form = new FormData();
+    form.set("email", "admin@local");
+    form.set("password", "whatever-password-12");
+    const response = await app.request("/auth/engine/login", {
+      method: "POST",
+      headers: { origin: BASE_URL },
+      body: form,
+    });
+    expect(response.status).toBe(400);
+    expect(await response.text()).toContain("Enter a valid email address");
+  });
+
+  it("redirects a GET of the login action back to the login page", async () => {
+    const { db, shelf } = await testEngine();
+    const app = testApp(db, shelf);
+
+    const response = await app.request("/auth/engine/login");
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe("/auth/login");
+  });
+
   it("starts the Keycloak flow offline and rejects unknown providers", async () => {
     const { db, shelf } = await testEngine();
     const app = testApp(db, shelf);

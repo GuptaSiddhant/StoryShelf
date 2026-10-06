@@ -462,7 +462,7 @@ function buildRouterLines(answers: Answers): string[] {
       ``,
       `// Provision the env-driven local admin (AUTH_PASSWORD, at least 12 chars).`,
       `await ensurePasswordAdmin(database, {`,
-      `  email: process.env.AUTH_EMAIL ?? "admin@local",`,
+      `  email: process.env.AUTH_EMAIL ?? "admin@example.com",`,
       `  password: process.env.AUTH_PASSWORD!,`,
       `});`,
     );

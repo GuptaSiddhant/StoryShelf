@@ -27,7 +27,7 @@ const dataDir = env["DATA_DIR"] ?? ".dev-data";
 const port = Number(env["PORT"] ?? 3000);
 const secret = env["SECRET"];
 const authPassword = env["AUTH_PASSWORD"];
-const authEmail = env["AUTH_EMAIL"] ?? "admin@local";
+const authEmail = env["AUTH_EMAIL"] ?? "admin@example.com";
 const adminToken = env["STORYSHELF_ADMIN_TOKEN"] ?? env["ADMIN_TOKEN"];
 const publicBaseUrl = env["PUBLIC_BASE_URL"];
 
@@ -96,7 +96,7 @@ const app = createShelfApp({
   // Enable local-account login by setting AUTH_PASSWORD (and SECRET): the
   // engine provisions an admin identity from the env on every boot.
   // AUTH_PASSWORD must be at least 12 characters; AUTH_EMAIL overrides the
-  // admin address (defaults to admin@local). No viewer tier exists anymore.
+  // admin address (defaults to admin@example.com). No viewer tier exists anymore.
   auth:
     authPassword && secret
       ? createShelfAuth({

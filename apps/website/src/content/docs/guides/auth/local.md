@@ -38,7 +38,7 @@ Local emails are **identifiers, not mailboxes**. Deliverability is never checked
 
 ```bash
 AUTH_PASSWORD=a-long-admin-password   # at least 12 characters
-AUTH_EMAIL=admin@local                # optional, defaults to admin@local
+AUTH_EMAIL=admin@example.com                # optional, defaults to admin@example.com
 SECRET=$(openssl rand -hex 32)        # ≥ 32 characters
 ```
 
