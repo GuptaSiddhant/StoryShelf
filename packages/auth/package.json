@@ -55,7 +55,6 @@
     "@better-auth/sso": "1.7.6",
     "@storyshelf/core": "workspace:*",
     "better-auth": "1.7.6",
-    "drizzle-orm": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

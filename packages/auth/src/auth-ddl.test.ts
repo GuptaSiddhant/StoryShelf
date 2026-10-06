@@ -1,5 +1,5 @@
+import { getTableColumns, type Table } from "@storyshelf/core/orm";
 import { DDL, tableColumns } from "@storyshelf/db-sqlite/ddl";
-import { getTableColumns, type Table } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { baseAuthTables } from "./auth-tables.ts";
 

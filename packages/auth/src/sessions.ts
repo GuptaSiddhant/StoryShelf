@@ -7,7 +7,7 @@
  * `/revoke-other-sessions` keeps the caller), never raw deletes.
  */
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
-import { eq } from "drizzle-orm";
+import { eq } from "@storyshelf/core/orm";
 import { baseAuthTables } from "./auth-tables.ts";
 import { tableColumn } from "./invites.ts";
 

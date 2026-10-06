@@ -1,5 +1,5 @@
+import { getTableColumns, type Table } from "@storyshelf/core/orm";
 import { DDL } from "@storyshelf/db-postgres/ddl";
-import { getTableColumns, type Table } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { baseAuthDateFieldsPg, baseAuthTablesPg } from "./auth-tables-pg.ts";
 

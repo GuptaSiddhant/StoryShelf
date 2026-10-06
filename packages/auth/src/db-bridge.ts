@@ -1,4 +1,6 @@
 import type { DatabaseAdapter, ListOptions, TxStore } from "@storyshelf/core/adapter/database";
+import type { SQL, Table } from "@storyshelf/core/orm";
+import { getTableColumns } from "@storyshelf/core/orm";
 import { ulid } from "@storyshelf/core/utils";
 /**
  * Opaque Better Auth database bridge over the shelf DatabaseAdapter.
@@ -10,8 +12,6 @@ import { ulid } from "@storyshelf/core/utils";
  * drivers all work untouched, present and future.
  */
 import type { DBAdapterInstance, DBTransactionAdapter, Where } from "better-auth";
-import type { SQL, Table } from "drizzle-orm";
-import { getTableColumns } from "drizzle-orm";
 import { applySelect, toDriverRow, toModelRow } from "./db-values.ts";
 import { buildCondition, buildOrderBy } from "./db-where.ts";
 

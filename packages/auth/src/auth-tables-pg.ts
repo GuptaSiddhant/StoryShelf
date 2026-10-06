@@ -6,7 +6,7 @@
  * ISO strings, booleans ride native `boolean`. The bridge consumes either
  * dialect through the shared {@link AuthBridgeSchema} registry.
  */
-import { boolean, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, integer, pgTable, text, timestamp } from "@storyshelf/core/orm/pg-core";
 
 /** Narrow `user` table definition (Better Auth base model). */
 export const authUserPg = pgTable("user", {

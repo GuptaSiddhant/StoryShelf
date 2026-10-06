@@ -7,7 +7,7 @@
  * DDL for drivers is vendored separately (see E3); these defs are the source
  * of truth the DDL must match (the strict schema checker enforces it).
  */
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, sqliteTable, text } from "@storyshelf/core/orm/sqlite-core";
 
 /** Narrow `user` table definition (Better Auth base model). */
 export const authUser = sqliteTable("user", {

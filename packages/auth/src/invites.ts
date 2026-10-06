@@ -1,4 +1,6 @@
 import type { DatabaseAdapter, TxStore } from "@storyshelf/core/adapter/database";
+import { eq, getTableColumns, sql } from "@storyshelf/core/orm";
+import type { SQL, Table } from "@storyshelf/core/orm";
 /**
  * Invite-only local accounts on the engine: our tables own the invite,
  * Better Auth owns the credential.
@@ -14,8 +16,6 @@ import type { DatabaseAdapter, TxStore } from "@storyshelf/core/adapter/database
 import type { AuthUser } from "@storyshelf/core/types";
 import { randomToken, sha256, timingSafeEqualString, ulid } from "@storyshelf/core/utils";
 import { hashPassword } from "better-auth/crypto";
-import { eq, getTableColumns, sql } from "drizzle-orm";
-import type { SQL, Table } from "drizzle-orm";
 import { baseAuthTables } from "./auth-tables.ts";
 
 const DEFAULT_INVITE_MS = 7 * 24 * 60 * 60 * 1000;

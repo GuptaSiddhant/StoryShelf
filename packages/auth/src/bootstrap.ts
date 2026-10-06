@@ -8,8 +8,8 @@
  * use the invite flow instead.
  */
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import { eq } from "@storyshelf/core/orm";
 import { ulid } from "@storyshelf/core/utils";
-import { eq } from "drizzle-orm";
 import { ensureEngineIdentity, MIN_PASSWORD_LENGTH, tableColumn } from "./invites.ts";
 
 /** Input for {@link ensurePasswordAdmin}. */

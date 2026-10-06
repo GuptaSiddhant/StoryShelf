@@ -1,9 +1,9 @@
 import type { Auth } from "@storyshelf/auth";
 import { MIN_PASSWORD_LENGTH, unsignedToken } from "@storyshelf/auth";
 import { NotificationSubscriptionModel, ProjectModel, UserModel } from "@storyshelf/core/models";
+import { eq, getTableColumns } from "@storyshelf/core/orm";
 import type { Project } from "@storyshelf/core/schema";
 import { SESSION_COOKIE, type AuthUser } from "@storyshelf/core/types";
-import { eq, getTableColumns } from "drizzle-orm";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { renderProfilePage } from "../pages/profile.tsx";

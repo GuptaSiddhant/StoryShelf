@@ -8,7 +8,7 @@
  * deletion is ownership-scoped server-side.
  */
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
-import { eq } from "drizzle-orm";
+import { eq } from "@storyshelf/core/orm";
 import { baseAuthTables } from "./auth-tables.ts";
 import { tableColumn } from "./invites.ts";
 

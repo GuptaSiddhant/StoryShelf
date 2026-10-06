@@ -5,9 +5,9 @@ import {
   ProjectModel,
   UserModel,
 } from "@storyshelf/core/models";
+import type { Table } from "@storyshelf/core/orm";
 import type { AuthUser } from "@storyshelf/core/types";
 import type { ProjectRole } from "@storyshelf/core/types";
-import type { Table } from "drizzle-orm";
 
 /** Tables required to sync a login. */
 export interface LoginSyncTables {

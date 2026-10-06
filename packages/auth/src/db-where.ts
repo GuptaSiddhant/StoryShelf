@@ -1,13 +1,4 @@
-/**
- * Better Auth Where[] to drizzle conditions.
- *
- * Operators covered: eq, ne, lt, lte, gt, gte, in, not_in, contains,
- * starts_with, ends_with. Connectors AND/OR (default AND). Case-insensitive
- * mode lowers both sides (portable across sqlite and Postgres). Unknown
- * fields fail fast — silent ignores would corrupt auth lookups.
- */
-import type { Where } from "better-auth";
-import type { SQL, Table } from "drizzle-orm";
+import type { SQL, Table } from "@storyshelf/core/orm";
 import {
   and,
   asc,
@@ -23,7 +14,16 @@ import {
   not,
   or,
   sql,
-} from "drizzle-orm";
+} from "@storyshelf/core/orm";
+/**
+ * Better Auth Where[] to drizzle conditions.
+ *
+ * Operators covered: eq, ne, lt, lte, gt, gte, in, not_in, contains,
+ * starts_with, ends_with. Connectors AND/OR (default AND). Case-insensitive
+ * mode lowers both sides (portable across sqlite and Postgres). Unknown
+ * fields fail fast — silent ignores would corrupt auth lookups.
+ */
+import type { Where } from "better-auth";
 
 function columnOf(table: Table, field: string): SQL {
   const column = getTableColumns(table)[field] as SQL | undefined;

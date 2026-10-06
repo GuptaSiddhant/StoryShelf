@@ -106,6 +106,18 @@
       "source": "./src/models/index.ts",
       "default": "./dist/models.mjs"
     },
+    "./orm": {
+      "source": "./src/orm/index.ts",
+      "default": "./dist/orm.mjs"
+    },
+    "./orm/pg-core": {
+      "source": "./src/orm/pg-core.ts",
+      "default": "./dist/orm/pg-core.mjs"
+    },
+    "./orm/sqlite-core": {
+      "source": "./src/orm/sqlite-core.ts",
+      "default": "./dist/orm/sqlite-core.mjs"
+    },
     "./paths": {
       "source": "./src/utils/paths.ts",
       "default": "./dist/paths.mjs"
@@ -157,6 +169,9 @@
       "./diff": "./dist/diff.mjs",
       "./logger": "./dist/logger.mjs",
       "./models": "./dist/models.mjs",
+      "./orm": "./dist/orm.mjs",
+      "./orm/pg-core": "./dist/orm/pg-core.mjs",
+      "./orm/sqlite-core": "./dist/orm/sqlite-core.mjs",
       "./paths": "./dist/paths.mjs",
       "./retention": "./dist/retention.mjs",
       "./schema": "./dist/schema.mjs",
