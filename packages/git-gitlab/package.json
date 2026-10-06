@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/git-gitlab",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "GitLab commit status adapter for StoryShelf.",
   "keywords": [
     "ci",

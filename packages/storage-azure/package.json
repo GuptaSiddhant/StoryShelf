@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/storage-azure",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "Azure Blob Storage adapter for StoryShelf.",
   "keywords": [
     "azure",

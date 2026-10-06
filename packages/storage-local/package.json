@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/storage-local",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "Local filesystem storage adapter for StoryShelf.",
   "keywords": [
     "filesystem",
