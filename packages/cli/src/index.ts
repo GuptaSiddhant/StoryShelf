@@ -1,5 +1,4 @@
 import { Command } from "commander";
-import { pathToFileURL } from "node:url";
 import { runBuild, type BuildOptions } from "./commands/build.ts";
 import type { ConnectionOptions } from "./commands/connection.ts";
 import { runCreate, type CreateOptions } from "./commands/create.ts";
@@ -14,6 +13,7 @@ import { runUpload, type UploadOptions } from "./commands/upload.ts";
 import { runWhoami } from "./commands/whoami.ts";
 import { runWorkerInit, type WorkerInitOptions } from "./commands/worker/init.ts";
 import { runWorkerServe, type WorkerServeOptions } from "./commands/worker/serve.ts";
+import { isMainModule } from "./is-main.ts";
 
 /**
  * Build the StoryShelf CLI program with all subcommands registered.
@@ -203,7 +203,7 @@ function buildRetryCommand(): Command {
     .action(run<RetryOptions>(runRetry));
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isMainModule(import.meta.url, process.argv[1])) {
   const program = createProgram();
   // Default: `storyshelf` with no args -> upload if config exists, else help to init
   if (process.argv.length <= 2) {
