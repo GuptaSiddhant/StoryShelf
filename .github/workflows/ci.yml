@@ -63,6 +63,15 @@ jobs:
         if: ${{ !cancelled() }}
         run: bash scripts/smoke.sh
 
+      - name: Built-artifact smoke (CLI via .bin symlink, scaffolded server boots)
+        # The CLI and every package are built by the verify step. Scaffolds a
+        # server, type-checks it, boots it and checks it serves and shuts down.
+        if: ${{ !cancelled() }}
+        working-directory: packages/cli
+        env:
+          RUN_SMOKE: "1"
+        run: nubx vitest run src/smoke.integration.test.ts
+
       - name: Check website links
         # dist/ is already built by website#verify (dependsOn build) above.
         if: ${{ !cancelled() }}

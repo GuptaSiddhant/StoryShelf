@@ -14,6 +14,17 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 - Dropped the unused `hono` dependency from the CLI, so `npx storyshelf`
   installs less.
 
+**First-run and release safety**
+- `@storyshelf/db-sqlite` creates the database file's directory (all file-based
+  presets), so a fresh scaffold or an empty Docker volume boots instead of
+  failing with `unable to open database file`.
+- CI now smoke-tests the built artifacts: the CLI launched through a `.bin`
+  symlink (as `npx` does), and a freshly scaffolded server that type-checks,
+  boots, serves HTML and vendored assets, and shuts down cleanly. The two
+  regressions that shipped in 0.6.0 and 0.6.1 would have failed it.
+- The npm publish job skips versions that are already published, so a partly
+  failed release can be re-run (the JSR job already did this).
+
 **`storyshelf server init` scaffold**
 - Entry code now lives in `src/index.ts` (and `src/worker.ts`) so you can split
   logic into more files; `tsconfig.json`, `@types/node` and a `typecheck` script
