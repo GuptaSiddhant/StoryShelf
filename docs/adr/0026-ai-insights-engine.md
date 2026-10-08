@@ -113,7 +113,7 @@ Story names, play/a11y logs, comments and branch names are attacker-influenced a
 
 ### 11. Testing and scope
 
-- **Testing.** Hermetic tests use the AI SDK's mock language model (no network); the redaction, evidence-limit, effective-vision, budget-sum and dedupe logic are pure and unit-tested; a gated `test:integration` suite runs against a local Ollama. The OTEL leak test (§8) is mandatory.
+- **Testing.** Hermetic tests use the AI SDK's mock language model (no network); the redaction, evidence-limit, effective-vision, budget-sum and dedupe logic are pure and unit-tested; no live-model or Ollama integration test in v1 (deferred). The OTEL leak test (§8) is mandatory.
 - **UI.** v1 adds (a) an insight panel on the build review page (verdict, summary, per-snapshot notes, regenerate button for approver/admin), (b) a read-only `ai_profile` row plus a site-admin control in project settings, and (c) a site-admin usage page (tokens by day/profile). All use the `ui/components.tsx` facades and pass `consistency.test.ts`.
 - **Out of scope for v1.** The MCP tools `get_build_insight`/`get_project_health` (no MCP server exists in the repo; a follow-up ADR defines the server and these tools), scheduled health runs, trend-history table, fix suggestions, and model-callable tools (insights are single-shot over fixed evidence so cost and the `inputHash` stay deterministic).
 
