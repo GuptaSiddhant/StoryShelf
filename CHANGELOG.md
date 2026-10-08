@@ -22,6 +22,11 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
   symlink (as `npx` does), and a freshly scaffolded server that type-checks,
   boots, serves HTML and vendored assets, and shuts down cleanly. The two
   regressions that shipped in 0.6.0 and 0.6.1 would have failed it.
+- Generated projects (`npm start`, `dev`, `worker`, the Docker `CMD`) and
+  `storyshelf server serve` / `worker serve` no longer pass
+  `--experimental-transform-types`, which Node 26 rejects (`bad option`). Node 24
+  and later strip types without a flag, so entries run with plain `node`; the
+  generated `package.json` declares `engines.node >= 24`.
 - The npm publish job skips versions that are already published, so a partly
   failed release can be re-run (the JSR job already did this).
 

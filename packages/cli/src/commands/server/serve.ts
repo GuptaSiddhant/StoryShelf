@@ -64,9 +64,9 @@ export async function resolveServerFile(dir: string): Promise<string> {
   );
 }
 
-/** Node flags for an entry file (TypeScript needs the transform flag). */
+/** Node runs the entry directly: Node 24+ strips TypeScript types without a flag. */
 function nodeArgs(file: string): string[] {
-  return file.endsWith(".ts") ? ["--experimental-transform-types", file] : [file];
+  return [file];
 }
 
 /** Signal relay handle: stop detaching, relayed reports whether a relay fired. */

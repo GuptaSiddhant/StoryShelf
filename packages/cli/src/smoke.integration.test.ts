@@ -46,11 +46,16 @@ function freePort(): Promise<number> {
   });
 }
 
-async function waitForOk(url: string, child: ChildProcess, timeoutMs: number): Promise<Response> {
+async function waitForOk(
+  url: string,
+  child: ChildProcess,
+  timeoutMs: number,
+  readLog: () => string,
+): Promise<Response> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (child.exitCode !== null) {
-      throw new Error(`server exited early with code ${child.exitCode}`);
+      throw new Error(`server exited early with code ${child.exitCode}\n${readLog()}`);
     }
     try {
       // oxlint-disable-next-line no-await-in-loop -- poll until the server answers
@@ -131,7 +136,7 @@ describe.skipIf(!enabled)("scaffolded server project", () => {
 
   it("boots, serves HTML and vendored assets, and shuts down cleanly", async () => {
     const port = await freePort();
-    server = spawn(process.execPath, ["--experimental-transform-types", "src/index.ts"], {
+    server = spawn(process.execPath, ["src/index.ts"], {
       cwd: dir,
       env: {
         ...process.env,
@@ -144,7 +149,7 @@ describe.skipIf(!enabled)("scaffolded server project", () => {
     server.stdout?.on("data", (chunk: Buffer) => (log += chunk.toString()));
     server.stderr?.on("data", (chunk: Buffer) => (log += chunk.toString()));
 
-    const home = await waitForOk(`http://127.0.0.1:${port}/`, server, 30_000);
+    const home = await waitForOk(`http://127.0.0.1:${port}/`, server, 30_000, () => log);
     expect(home.status).toBe(200);
     const htmx = await fetch(`http://127.0.0.1:${port}/assets/htmx.js`);
     expect(htmx.status).toBe(200);

@@ -79,7 +79,7 @@ describe("runWorkerServe", () => {
     await runWorkerServe({ dir }, { spawnProcess: spawn });
     expect(calls).toHaveLength(1);
     expect(calls[0]?.command).toBe(process.execPath);
-    expect(calls[0]?.args).toEqual(["--experimental-transform-types", join(dir, "worker.ts")]);
+    expect(calls[0]?.args).toEqual([join(dir, "worker.ts")]);
     expect(calls[0]?.options.cwd).toBe(dir);
   });
 

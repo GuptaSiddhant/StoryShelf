@@ -18,9 +18,7 @@ describe("generateDockerfile", () => {
   });
 
   it("runs the TypeScript entry directly, like npm start", () => {
-    expect(generateDockerfile()).toContain(
-      'CMD ["node", "--experimental-transform-types", "src/index.ts"]',
-    );
+    expect(generateDockerfile()).toContain('CMD ["node", "src/index.ts"]');
   });
 
   it("does not bundle: no esbuild, no dist output", () => {
@@ -60,7 +58,7 @@ describe("generateWorkerDockerfile", () => {
   it("runs src/worker.ts on the Playwright base", () => {
     const dockerfile = generateWorkerDockerfile();
     expect(dockerfile).toContain("mcr.microsoft.com/playwright");
-    expect(dockerfile).toContain('CMD ["node", "--experimental-transform-types", "src/worker.ts"]');
+    expect(dockerfile).toContain('CMD ["node", "src/worker.ts"]');
     expect(dockerfile).not.toContain("EXPOSE");
   });
 });
