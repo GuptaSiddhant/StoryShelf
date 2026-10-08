@@ -844,7 +844,7 @@ RUN nubx nub run build
 EXPOSE 3000
 VOLUME /app/data
 
-CMD ["node", "--experimental-transform-types", "server.ts"]
+CMD ["node", "server.ts"]
 ```
 
 ```yaml
