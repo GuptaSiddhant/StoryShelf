@@ -21,13 +21,7 @@ export interface EngineSessionInfo {
   expiresAt: string;
 }
 
-/**
- * Raw session token from a possibly-signed cookie value (`token.signature`).
- * Single shared parser: cookies, CSRF binding, and table lookups must agree.
- */
-export function unsignedToken(value: string): string {
-  return value.split(".")[0] ?? "";
-}
+export { unsignedToken } from "@storyshelf/core/auth";
 
 /** Delete every session row for a user (eager revocation on disable). */
 export async function deleteUserSessions(db: DatabaseAdapter, userId: string): Promise<number> {

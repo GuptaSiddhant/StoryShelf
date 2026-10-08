@@ -12,6 +12,9 @@ export interface WorkerServeOptions {
 }
 
 const WORKER_CANDIDATES = [
+  "src/worker.ts",
+  "src/worker.js",
+  "src/worker.mjs",
   "worker.ts",
   "worker.js",
   "worker.mjs",

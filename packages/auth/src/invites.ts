@@ -1,6 +1,4 @@
 import type { DatabaseAdapter, TxStore } from "@storyshelf/core/adapter/database";
-import { eq, getTableColumns, sql } from "@storyshelf/core/orm";
-import type { SQL, Table } from "@storyshelf/core/orm";
 /**
  * Invite-only local accounts on the engine: our tables own the invite,
  * Better Auth owns the credential.
@@ -13,6 +11,9 @@ import type { SQL, Table } from "@storyshelf/core/orm";
  * design. Passwords use Better Auth's own hasher so engine sign-in verifies
  * them without format translation.
  */
+import { MIN_PASSWORD_LENGTH } from "@storyshelf/core/auth";
+import { eq, getTableColumns, sql } from "@storyshelf/core/orm";
+import type { SQL, Table } from "@storyshelf/core/orm";
 import type { AuthUser } from "@storyshelf/core/types";
 import { randomToken, sha256, timingSafeEqualString, ulid } from "@storyshelf/core/utils";
 import { hashPassword } from "better-auth/crypto";
@@ -21,8 +22,7 @@ import { baseAuthTables } from "./auth-tables.ts";
 const DEFAULT_INVITE_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_INVITE_MS = 365 * 24 * 60 * 60 * 1000;
 
-/** Minimum password length for local accounts (matches legacy policy). */
-export const MIN_PASSWORD_LENGTH = 12;
+export { MIN_PASSWORD_LENGTH };
 
 /** Input for {@link issueInvite}. */
 export interface IssueInviteInput {
