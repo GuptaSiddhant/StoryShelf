@@ -171,7 +171,7 @@ function detectMysqlFlavor(
 
 function readGeneratedSources(dir: string): string {
   let sources = "";
-  for (const file of ["server.ts", "worker.ts"]) {
+  for (const file of ["src/index.ts", "src/worker.ts", "server.ts", "worker.ts"]) {
     try {
       sources += readFileSync(join(dir, file), "utf8");
     } catch {

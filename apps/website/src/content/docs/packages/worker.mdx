@@ -41,7 +41,7 @@ await worker.start();
 // on SIGTERM: await worker.stop();
 ```
 
-Or scaffold it with `storyshelf server init` / `storyshelf worker init` — the CLI detects the chosen queue/storage adapters and writes a `worker.ts` wired to them, plus `docker-compose` when Redis/local is selected.
+Or scaffold it with `storyshelf server init` / `storyshelf worker init` — the CLI detects the chosen queue/storage adapters and writes a `src/worker.ts` wired to them, plus `docker-compose` when Redis/local is selected.
 
 ## Options
 

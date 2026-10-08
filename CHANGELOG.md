@@ -3,6 +3,45 @@
 All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 `scripts/release.mjs` (every workspace package shares one version).
 
+## Unreleased
+
+**`storyshelf server init` scaffold**
+- Entry code now lives in `src/index.ts` (and `src/worker.ts`) so you can split
+  logic into more files; `tsconfig.json`, `@types/node` and a `typecheck` script
+  are generated so the editor resolves types. `storyshelf server serve` /
+  `worker serve` find `src/` first and still run the older root layout.
+- Leaner output: notifications and OpenTelemetry wiring are opt-in (the prompts
+  now default to no), imports from the same module are merged, and unused
+  variables and dependencies are no longer emitted.
+- Docker: `compose.yaml` is only generated when the stack has more than one
+  service (Postgres or a worker); a single container gets `docker:build` and
+  `docker:run` scripts instead.
+- Fixes: the generated Docker images could not run. They bundled the server
+  with esbuild into one ESM file, which crashes at startup (`Dynamic require of
+  "util" is not supported` from a CommonJS dependency) and cannot find the
+  vendored assets `@storyshelf/app` reads from disk; the `CMD` also pointed at
+  a path the bundle was never copied to, and the build copied a `playwright`
+  package that is never installed. Images now install production dependencies
+  and run `src/index.ts` directly with Node (as `npm start` does), on a
+  Playwright image pinned to the `playwright-core` version. With a worker, the
+  compose worker service was written inside the `volumes:` block (invalid) and
+  had no `DATABASE_URL`.
+- **Heads-up:** the generated server file moved from `server.ts` to
+  `src/index.ts`; existing projects keep working and are not rewritten.
+
+**Packaging**
+- `@storyshelf/app` no longer imports `@storyshelf/auth`, so a server that opted
+  out of auth bundles and installs without it (it failed to resolve before). The
+  shared `Auth` contract plus `MIN_PASSWORD_LENGTH` and `unsignedToken` come
+  from `@storyshelf/core/auth`; `@storyshelf/auth` re-exports them.
+
+## 0.6.1 — CLI and auth fixes (2026-10-06)
+
+- **CLI:** `npx storyshelf` (and any bin launched through a `.bin` symlink) now
+  runs; it exited silently with no output because the entrypoint check did not
+  resolve symlinks.
+- **Auth:** the env-driven admin login works with a valid default email.
+
 ## 0.6.0 — Better Auth, notifications, affected capture, UI redesign (2026-10-06)
 
 The first release where **all 24 packages are published to both npm and JSR**,

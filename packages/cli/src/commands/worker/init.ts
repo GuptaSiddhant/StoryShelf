@@ -8,6 +8,12 @@ import { printError, printLine } from "../../output.ts";
 import { generateDockerignore, generateWorkerDockerfile } from "../server/docker.ts";
 import { PROJECT_PROMPTS, WORKER_INFRA_PROMPTS } from "../server/prompts.ts";
 import { detectInstalledAdapters } from "../shared/detect-adapters.ts";
+import {
+  generateTsconfig,
+  SCAFFOLD_DEV_DEPENDENCIES,
+  WORKER_ENTRY,
+  writeScaffoldFile,
+} from "../shared/scaffold.ts";
 
 export interface WorkerInitOptions {
   dir?: string;
@@ -210,9 +216,11 @@ function generateWorker(answers: Answers): string {
     ``,
     `await worker.start();`,
     ``,
-    `const shutdown = async () => { await worker.stop(); };`,
-    `process.on("SIGTERM", () => { shutdown().catch(() => {}); });`,
-    `process.on("SIGINT", () => { shutdown().catch(() => {}); });`,
+    `for (const signal of ["SIGINT", "SIGTERM"] as const) {`,
+    `  process.once(signal, () => {`,
+    `    void worker.stop();`,
+    `  });`,
+    `}`,
     ``,
   ].join("\n");
 }
@@ -278,20 +286,22 @@ function generatePackageJson(answers: Answers): string {
     private: true,
     description: "StoryShelf capture worker (remote queue).",
     scripts: {
-      start: "node --experimental-transform-types worker.ts",
-      dev: "node --experimental-transform-types --watch worker.ts",
+      start: `node --experimental-transform-types ${WORKER_ENTRY}`,
+      dev: `node --experimental-transform-types --watch ${WORKER_ENTRY}`,
+      typecheck: "tsc",
     },
     dependencies: buildDeps(answers),
-    devDependencies: { typescript: "^7.0.2" },
+    devDependencies: SCAFFOLD_DEV_DEPENDENCIES,
   };
   return JSON.stringify(pkg, null, 2);
 }
 
 async function writeFiles(outDir: string, answers: Answers): Promise<void> {
-  await writeFile(join(outDir, "worker.ts"), generateWorker(answers));
-  printLine(`Created worker.ts`);
+  await writeScaffoldFile(outDir, WORKER_ENTRY, generateWorker(answers));
+  printLine(`Created ${WORKER_ENTRY}`);
   await writeFile(join(outDir, "package.json"), generatePackageJson(answers));
-  printLine(`Created package.json`);
+  await writeFile(join(outDir, "tsconfig.json"), generateTsconfig());
+  printLine(`Created package.json, tsconfig.json`);
   if (answers.docker) {
     await writeFile(join(outDir, "Dockerfile"), generateWorkerDockerfile());
     await writeFile(join(outDir, ".dockerignore"), generateDockerignore());

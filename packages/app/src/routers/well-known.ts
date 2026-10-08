@@ -1,4 +1,4 @@
-import type { Auth } from "@storyshelf/auth";
+import type { Auth } from "@storyshelf/core/auth";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";

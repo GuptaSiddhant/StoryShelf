@@ -60,7 +60,7 @@ storyshelf server init
 # ? Which git provider? None
 ```
 
-This generates `server.ts` + `package.json` with the correct imports and dependencies.
+This generates `src/index.ts`, `package.json` and `tsconfig.json` with the correct imports and dependencies.
 
 | Layer | Package | Notes |
 |-------|---------|-------|

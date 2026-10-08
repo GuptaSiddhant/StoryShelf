@@ -5,7 +5,7 @@ import { TERRAFORM_REQUIRED_VERSION } from "./terraform-aws.ts";
  *
  * Pure string builders — no runtime dependencies. Emitted by
  * `storyshelf server init` when the deploy target is `azure`, alongside the
- * standard `server.ts` / `worker.ts` / `package.json` files.
+ * standard `src/index.ts` / `src/worker.ts` / `package.json` files.
  *
  * Reference stack: Container Apps (app + worker) + Azure Blob Storage
  * (storybook bundles) + Storage Queues or Service Bus (capture queue,

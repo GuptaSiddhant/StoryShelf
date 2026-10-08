@@ -1,5 +1,5 @@
-import type { Auth } from "@storyshelf/auth";
-import { MIN_PASSWORD_LENGTH, unsignedToken } from "@storyshelf/auth";
+import type { Auth } from "@storyshelf/core/auth";
+import { MIN_PASSWORD_LENGTH, unsignedToken } from "@storyshelf/core/auth";
 import { NotificationSubscriptionModel, ProjectModel, UserModel } from "@storyshelf/core/models";
 import { eq, getTableColumns } from "@storyshelf/core/orm";
 import type { Project } from "@storyshelf/core/schema";

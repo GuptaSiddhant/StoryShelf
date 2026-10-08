@@ -5,7 +5,7 @@ import { TERRAFORM_REQUIRED_VERSION } from "./terraform-aws.ts";
  *
  * Pure string builders — no runtime dependencies. Emitted by
  * `storyshelf server init` when the deploy target is `gcp`, alongside the
- * standard `server.ts` / `worker.ts` / `package.json` files.
+ * standard `src/index.ts` / `src/worker.ts` / `package.json` files.
  *
  * Reference stack: Cloud Run (app + worker) + GCS bucket (storybook
  * bundles) + Pub/Sub topic + pull subscription with dead-lettering +
