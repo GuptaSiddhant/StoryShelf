@@ -5,6 +5,15 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 
 ## Unreleased
 
+**CLI startup**
+- Command modules and their dependencies (the zip library, prompts) now load only
+  when that command runs, so `storyshelf -h`, `whoami` and the rest start in
+  about 10 ms over bare Node instead of about 55 ms.
+- `storyshelf --version` reports the real package version (it was hardcoded to
+  `0.2.0`).
+- Dropped the unused `hono` dependency from the CLI, so `npx storyshelf`
+  installs less.
+
 **`storyshelf server init` scaffold**
 - Entry code now lives in `src/index.ts` (and `src/worker.ts`) so you can split
   logic into more files; `tsconfig.json`, `@types/node` and a `typecheck` script
