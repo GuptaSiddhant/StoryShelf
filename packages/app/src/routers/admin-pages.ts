@@ -1,4 +1,4 @@
-import type { Auth } from "@storyshelf/auth";
+import type { Auth } from "@storyshelf/core/auth";
 import type { AdapterSetupResult, AdapterSetupSources } from "@storyshelf/core/adapter/setup";
 import type { ShelfRouter } from "../app-types.ts";
 import { loadCredentialProbe, reencryptWithCurrent } from "../credentials.ts";

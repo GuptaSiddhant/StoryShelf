@@ -1,4 +1,4 @@
-import type { Auth } from "@storyshelf/auth";
+import type { Auth } from "@storyshelf/core/auth";
 import type { AuthUser } from "@storyshelf/core/types";
 
 /* oxlint-disable typescript/promise-function-async -- stub returns pre-resolved promises */

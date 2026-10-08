@@ -1,5 +1,5 @@
-import type { Auth, EngineLoginMethod } from "@storyshelf/auth";
-import { MIN_PASSWORD_LENGTH } from "@storyshelf/auth";
+import type { Auth, EngineLoginMethod } from "@storyshelf/core/auth";
+import { MIN_PASSWORD_LENGTH } from "@storyshelf/core/auth";
 import { UserModel } from "@storyshelf/core/models";
 import { SESSION_COOKIE } from "@storyshelf/core/types";
 import type { Context } from "hono";
