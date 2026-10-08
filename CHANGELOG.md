@@ -20,6 +20,23 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
   say Node 24 instead of 22 or 20.
 - The slim server image is pinned to `node:24-alpine` instead of the floating
   `node:lts-alpine`.
+  
+**First-run and release safety**
+- `@storyshelf/db-sqlite` creates the database file's directory (all file-based
+  presets), so a fresh scaffold or an empty Docker volume boots instead of
+  failing with `unable to open database file`.
+- CI now smoke-tests the built artifacts: the CLI launched through a `.bin`
+  symlink (as `npx` does), and a freshly scaffolded server that type-checks,
+  boots, serves HTML and vendored assets, and shuts down cleanly. The two
+  regressions that shipped in 0.6.0 and 0.6.1 would have failed it. It runs on
+  the default Node and again on Node 24, the minimum supported version.
+- Generated projects (`npm start`, `dev`, `worker`, the Docker `CMD`) and
+  `storyshelf server serve` / `worker serve` no longer pass
+  `--experimental-transform-types`, which Node 26 rejects (`bad option`). Node 24
+  and later strip types without a flag, so entries run with plain `node`; the
+  generated `package.json` declares `engines.node >= 24`.
+- The npm publish job skips versions that are already published, so a partly
+  failed release can be re-run (the JSR job already did this).
 
 **`storyshelf server init` scaffold**
 - Entry code now lives in `src/index.ts` (and `src/worker.ts`) so you can split

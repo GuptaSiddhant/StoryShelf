@@ -16,7 +16,7 @@ function imageLines(baseImage: string, entry: string, exposePort: boolean): stri
     "COPY src/ ./src/",
     ...(exposePort ? ["EXPOSE 3000", "ENV PORT=3000"] : []),
     "ENV DATA_DIR=/data",
-    `CMD ["node", "--experimental-transform-types", "${entry}"]`,
+    `CMD ["node", "${entry}"]`,
   ];
 }
 

@@ -552,6 +552,20 @@ describe("runServerInit", () => {
     expect(existsSync(join(dir, "server.ts"))).toBe(false);
   });
 
+  it("runs entries with plain node (no experimental flag) and requires Node 24+", async () => {
+    await scaffold({ includeWorker: true, queue: "sqs", database: "postgres", storage: "s3" });
+    const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
+      scripts: Record<string, string>;
+      engines: Record<string, string>;
+    };
+    expect(pkg.scripts["start"]).toBe("node src/index.ts");
+    expect(pkg.scripts["dev"]).toBe("node --watch src/index.ts");
+    expect(pkg.scripts["worker"]).toBe("node src/worker.ts");
+    // Node 26 rejects --experimental-transform-types; Node 24+ strips types unflagged.
+    expect(JSON.stringify(pkg.scripts)).not.toContain("experimental");
+    expect(pkg.engines["node"]).toBe(">=24");
+  });
+
   it("keeps the default output lean: no notifications, no observability", async () => {
     await scaffold({});
     const code = readFileSync(join(dir, "src", "index.ts"), "utf8");
