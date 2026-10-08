@@ -3,7 +3,17 @@
 All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 `scripts/release.mjs` (every workspace package shares one version).
 
-## Unreleased
+## 0.6.2 — Lean scaffold, working Docker images, Node 24 (2026-10-08)
+
+A fix-focused release. `storyshelf server init` now generates a smaller
+`src/`-based project with a `tsconfig.json`, and its Docker images actually
+start; `npx storyshelf` starts faster and reports the right version; and a
+server that opts out of auth no longer fails to bundle.
+
+**Upgrading:** Node 24 is now the minimum supported version (every package
+declares `engines.node >=24`, and generated projects require it). Existing
+scaffolded projects keep working and are not rewritten; regenerate to get the
+new layout and fixed Dockerfiles.
 
 **CLI startup**
 - Command modules and their dependencies (the zip library, prompts) now load only
@@ -20,7 +30,7 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
   say Node 24 instead of 22 or 20.
 - The slim server image is pinned to `node:24-alpine` instead of the floating
   `node:lts-alpine`.
-  
+
 **First-run and release safety**
 - `@storyshelf/db-sqlite` creates the database file's directory (all file-based
   presets), so a fresh scaffold or an empty Docker volume boots instead of
