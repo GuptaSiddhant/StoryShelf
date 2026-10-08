@@ -5,6 +5,13 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 
 ## Unreleased
 
+**Node 24 is the minimum**
+- Every published package declares `engines.node >=24` (none did before), the
+  release check fails if one does not, and the docs, README and CI example now
+  say Node 24 instead of 22 or 20.
+- The slim server image is pinned to `node:24-alpine` instead of the floating
+  `node:lts-alpine`.
+
 **`storyshelf server init` scaffold**
 - Entry code now lives in `src/index.ts` (and `src/worker.ts`) so you can split
   logic into more files; `tsconfig.json`, `@types/node` and a `typecheck` script

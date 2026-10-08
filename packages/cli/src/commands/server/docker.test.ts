@@ -50,7 +50,7 @@ describe("generateDockerfile", () => {
 describe("generateSlimServerDockerfile", () => {
   it("runs src/index.ts on plain node without a browser", () => {
     const dockerfile = generateSlimServerDockerfile();
-    expect(dockerfile).toContain("FROM node:lts-alpine");
+    expect(dockerfile).toContain("FROM node:24-alpine");
     expect(dockerfile).not.toContain("playwright");
     expect(dockerfile).toContain('"src/index.ts"');
   });
