@@ -3,7 +3,7 @@ import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
 import { describe, expect, it, vi } from "vitest";
 import type { ShelfRouter } from "./app-types.ts";
-import { attachLifecycle, type LifecycleCell } from "./lifecycle.ts";
+import { attachLifecycle, trackBackground, type LifecycleCell } from "./lifecycle.ts";
 import type { ServerRuntime } from "./runtime.ts";
 
 const silentLogger = pino({ level: "silent" });
@@ -108,5 +108,68 @@ describe("attachLifecycle", () => {
     const result = await cell.ready;
     expect(result.ok).toBe(false);
     expect(result.failures[0]).toMatchObject({ category: "auth", error: "bad secret" });
+  });
+});
+
+function boot(torn: string[]) {
+  const closing = (name: string) => ({
+    ...fakeAdapter(name),
+    lifecycle: {
+      setup: async (): Promise<void> => {},
+      teardown: async (): Promise<void> => {
+        torn.push(name);
+      },
+      health: async () => ({ ok: true }),
+    },
+  });
+  const options = {
+    database: closing("db"),
+    storage: closing("storage"),
+  } as unknown as ShelfOptions;
+  const runtime = {
+    config: { branchTtlDays: null },
+    logger: silentLogger,
+  } as unknown as ServerRuntime;
+  const cell: LifecycleCell = {
+    ready: Promise.resolve({ ok: true, failures: [] }),
+    settled: null,
+  };
+  const app = {} as ShelfRouter;
+  attachLifecycle(app, options, runtime, cell);
+  const lifecycle = (app as unknown as { lifecycle: { teardown(): Promise<void> } }).lifecycle;
+  return { cell, lifecycle };
+}
+
+describe("teardown and background boot tasks", () => {
+  it("waits for tracked boot tasks before closing adapters", async () => {
+    const order: string[] = [];
+    const { cell, lifecycle } = boot(order);
+    const recovery = Promise.withResolvers<null>();
+    trackBackground(cell, recovery.promise);
+    const done = lifecycle.teardown();
+    await Promise.resolve();
+    expect(order).toEqual([]);
+    order.push("recovery done");
+    recovery.resolve(null);
+    await done;
+    expect(order[0]).toBe("recovery done");
+    expect(order).toContain("db");
+  });
+
+  it("does not let a failed boot task block shutdown", async () => {
+    const order: string[] = [];
+    const { cell, lifecycle } = boot(order);
+    trackBackground(cell, Promise.reject(new Error("recovery blew up")));
+    await lifecycle.teardown();
+    expect(order).toContain("db");
+  });
+
+  it("stops waiting for a hung boot task after the drain timeout", async () => {
+    const order: string[] = [];
+    const { cell, lifecycle } = boot(order);
+    cell.drainMs = 20;
+    trackBackground(cell, new Promise(() => {}));
+    await lifecycle.teardown();
+    expect(order).toContain("db");
   });
 });

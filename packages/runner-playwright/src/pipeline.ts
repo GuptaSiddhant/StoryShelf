@@ -9,7 +9,6 @@ import type {
 } from "@storyshelf/core/adapter/capture-runner";
 import { StorybookAdapter, resolveStoryViewports } from "@storyshelf/core/capture";
 import type { Browser } from "playwright-core";
-import { chromium, firefox, webkit } from "playwright-core";
 import { messageOf, safeCloseBrowser, safeCloseServer } from "./browser.ts";
 import { createRuntimeParamsState } from "./runtime-params.ts";
 import { captureScreenshot } from "./screenshot.ts";
@@ -46,10 +45,16 @@ async function runWithBrowser(
   }
 }
 
+/**
+ * Playwright is loaded on first render, not at import: it costs ~150 ms and tens
+ * of MB, which a server that only serves reviews (or hands renders to a remote
+ * worker) should not pay at boot.
+ */
 async function launchBrowser(name: BrowserName): Promise<Browser> {
-  if (name === "firefox") return await firefox.launch();
-  if (name === "webkit") return await webkit.launch();
-  return await chromium.launch();
+  const playwright = await import("playwright-core");
+  if (name === "firefox") return await playwright.firefox.launch();
+  if (name === "webkit") return await playwright.webkit.launch();
+  return await playwright.chromium.launch();
 }
 
 function buildContext(

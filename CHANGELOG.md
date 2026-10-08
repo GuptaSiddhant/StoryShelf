@@ -5,6 +5,15 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 
 ## Unreleased
 
+**CLI startup**
+- Command modules and their dependencies (the zip library, prompts) now load only
+  when that command runs, so `storyshelf -h`, `whoami` and the rest start in
+  about 10 ms over bare Node instead of about 55 ms.
+- `storyshelf --version` reports the real package version (it was hardcoded to
+  `0.2.0`).
+- Dropped the unused `hono` dependency from the CLI, so `npx storyshelf`
+  installs less.
+
 **Node 24 is the minimum**
 - Every published package declares `engines.node >=24` (none did before), the
   release check fails if one does not, and the docs, README and CI example now
@@ -41,6 +50,13 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
   out of auth bundles and installs without it (it failed to resolve before). The
   shared `Auth` contract plus `MIN_PASSWORD_LENGTH` and `unsignedToken` come
   from `@storyshelf/core/auth`; `@storyshelf/auth` re-exports them.
+
+**Server runtime**
+- `@storyshelf/runner-playwright` loads `playwright-core` on the first render
+  instead of at import, taking ~220 ms of CPU and tens of MB off server boot
+  (and off servers that hand renders to a remote worker).
+- Shutdown waits (up to 5 s) for the stuck-capture recovery and credential check
+  that run after setup, so an early SIGTERM no longer logs `database is not open`.
 
 ## 0.6.1 — CLI and auth fixes (2026-10-06)
 
