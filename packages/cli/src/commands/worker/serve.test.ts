@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -45,6 +45,13 @@ afterEach(() => {
 });
 
 describe("resolveWorkerFile", () => {
+  it("prefers src/worker.ts over the legacy root layout", async () => {
+    mkdirSync(join(dir, "src"), { recursive: true });
+    writeFileSync(join(dir, "src", "worker.ts"), "// src");
+    writeFileSync(join(dir, "worker.ts"), "// legacy");
+    await expect(resolveWorkerFile(dir)).resolves.toBe(join(dir, "src", "worker.ts"));
+  });
+
   it("prefers worker.ts over later fallbacks", async () => {
     writeFileSync(join(dir, "worker.ts"), "// ts");
     writeFileSync(join(dir, "worker.js"), "// js");

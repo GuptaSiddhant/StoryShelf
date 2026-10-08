@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -46,6 +46,13 @@ afterEach(() => {
 });
 
 describe("resolveServerFile", () => {
+  it("prefers src/index.ts over the legacy root layout", async () => {
+    mkdirSync(join(dir, "src"), { recursive: true });
+    writeFileSync(join(dir, "src", "index.ts"), "// src");
+    writeFileSync(join(dir, "server.ts"), "// legacy");
+    await expect(resolveServerFile(dir)).resolves.toBe(join(dir, "src", "index.ts"));
+  });
+
   it("prefers server.ts over later fallbacks", async () => {
     writeFileSync(join(dir, "server.ts"), "// ts");
     writeFileSync(join(dir, "server.js"), "// js");

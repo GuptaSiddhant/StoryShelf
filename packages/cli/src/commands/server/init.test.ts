@@ -25,6 +25,34 @@ afterEach(() => {
   rmSync(tmpRoot, { recursive: true, force: true });
 });
 
+async function scaffold(answers: Record<string, unknown>): Promise<void> {
+  vi.mocked(prompts).mockResolvedValue({
+    name: "my-server",
+    dir: "./my-server",
+    database: "sqlite",
+    storage: "local",
+    auth: "none",
+    git: "none",
+    queue: "memory",
+    docker: false,
+    ...answers,
+  });
+  const cwd = process.cwd();
+  process.chdir(tmpRoot);
+  try {
+    await runServerInit({});
+  } finally {
+    process.chdir(cwd);
+  }
+}
+
+function readScripts(): Record<string, string> {
+  const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
+    scripts: Record<string, string>;
+  };
+  return pkg.scripts;
+}
+
 describe("runServerInit", () => {
   it("scaffolds turso from the db-sqlite subpath with the libsql peer", async () => {
     vi.mocked(prompts).mockResolvedValue({
@@ -46,7 +74,7 @@ describe("runServerInit", () => {
       process.chdir(cwd);
     }
 
-    const code = readFileSync(join(dir, "server.ts"), "utf8");
+    const code = readFileSync(join(dir, "src", "index.ts"), "utf8");
     expect(code).toContain('from "@storyshelf/db-sqlite/turso"');
     expect(code).toContain("createTursoDatabase");
     expect(code).not.toContain("@storyshelf/db-turso");
@@ -77,7 +105,7 @@ describe("runServerInit", () => {
       process.chdir(cwd);
     }
 
-    const code = readFileSync(join(dir, "server.ts"), "utf8");
+    const code = readFileSync(join(dir, "src", "index.ts"), "utf8");
     expect(code).toContain('from "@storyshelf/db-sqlite/d1"');
     expect(code).toContain("getD1Binding");
   });
@@ -102,7 +130,7 @@ describe("runServerInit", () => {
       process.chdir(cwd);
     }
 
-    const code = readFileSync(join(dir, "server.ts"), "utf8");
+    const code = readFileSync(join(dir, "src", "index.ts"), "utf8");
     expect(code).toContain("createBetterSqlite3Database");
     const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
       dependencies: Record<string, string>;
@@ -110,7 +138,7 @@ describe("runServerInit", () => {
     expect(pkg.dependencies["better-sqlite3"]).toBeDefined();
   });
 
-  it("scaffolds server.ts with in-memory queue", async () => {
+  it("scaffolds src/index.ts with in-memory queue", async () => {
     vi.mocked(prompts).mockResolvedValue({
       name: "my-server",
       dir: "./my-server",
@@ -130,8 +158,8 @@ describe("runServerInit", () => {
       process.chdir(cwd);
     }
 
-    expect(existsSync(join(dir, "server.ts"))).toBe(true);
-    const code = readFileSync(join(dir, "server.ts"), "utf8");
+    expect(existsSync(join(dir, "src", "index.ts"))).toBe(true);
+    const code = readFileSync(join(dir, "src", "index.ts"), "utf8");
     expect(code).toContain("createShelfApp");
     expect(code).toContain("createPlaywrightCaptureRunner");
     expect(code).not.toContain("createSqsCaptureQueue");
@@ -169,12 +197,12 @@ describe("runServerInit", () => {
       process.chdir(cwd);
     }
 
-    expect(existsSync(join(dir, "server.ts"))).toBe(true);
-    expect(existsSync(join(dir, "worker.ts"))).toBe(true);
-    const serverCode = readFileSync(join(dir, "server.ts"), "utf8");
+    expect(existsSync(join(dir, "src", "index.ts"))).toBe(true);
+    expect(existsSync(join(dir, "src", "worker.ts"))).toBe(true);
+    const serverCode = readFileSync(join(dir, "src", "index.ts"), "utf8");
     expect(serverCode).toContain("createSqsCaptureQueue");
     expect(serverCode).not.toContain("createPlaywrightCaptureRunner");
-    const workerCode = readFileSync(join(dir, "worker.ts"), "utf8");
+    const workerCode = readFileSync(join(dir, "src", "worker.ts"), "utf8");
     expect(workerCode).toContain("createCaptureWorker");
     expect(workerCode).toContain("createPlaywrightCaptureRunner");
     const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
@@ -212,8 +240,8 @@ describe("runServerInit", () => {
       process.chdir(cwd);
     }
 
-    expect(existsSync(join(dir, "server.ts"))).toBe(true);
-    expect(existsSync(join(dir, "worker.ts"))).toBe(false);
+    expect(existsSync(join(dir, "src", "index.ts"))).toBe(true);
+    expect(existsSync(join(dir, "src", "worker.ts"))).toBe(false);
   });
 
   it("generates slim Dockerfile and worker compose when with worker and docker", async () => {
@@ -282,7 +310,7 @@ describe("runServerInit", () => {
     } finally {
       process.chdir(cwd);
     }
-    const code = readFileSync(join(dir, "server.ts"), "utf8");
+    const code = readFileSync(join(dir, "src", "index.ts"), "utf8");
     expect(code).toContain("captureRunner");
   });
 
@@ -313,12 +341,12 @@ describe("runServerInit", () => {
       process.chdir(cwd);
     }
 
-    const serverCode = readFileSync(join(dir, "server.ts"), "utf8");
+    const serverCode = readFileSync(join(dir, "src", "index.ts"), "utf8");
     expect(serverCode).toContain("createPostgresDatabase");
     expect(serverCode).toContain("createS3Storage");
     expect(serverCode).toContain("createSqsCaptureQueue");
     expect(serverCode).toContain("cognitoPreset");
-    expect(existsSync(join(dir, "worker.ts"))).toBe(true);
+    expect(existsSync(join(dir, "src", "worker.ts"))).toBe(true);
     expect(existsSync(join(dir, "terraform", "database.tf"))).toBe(true);
     const databaseTf = readFileSync(join(dir, "terraform", "database.tf"), "utf8");
     expect(databaseTf).toContain("aws_dsql_cluster");
@@ -359,15 +387,15 @@ describe("runServerInit", () => {
       process.chdir(cwd);
     }
 
-    const serverCode = readFileSync(join(dir, "server.ts"), "utf8");
+    const serverCode = readFileSync(join(dir, "src", "index.ts"), "utf8");
     expect(serverCode).toContain("createPostgresDatabase");
     expect(serverCode).toContain("createAzureStorage");
     expect(serverCode).toContain("createAzureServiceBusQueue");
     expect(serverCode).toContain("AZURE_SERVICE_BUS_CONNECTION");
     expect(serverCode).not.toContain("cognitoPreset");
     expect(serverCode).toContain("OIDC_ISSUER");
-    expect(existsSync(join(dir, "worker.ts"))).toBe(true);
-    const workerCode = readFileSync(join(dir, "worker.ts"), "utf8");
+    expect(existsSync(join(dir, "src", "worker.ts"))).toBe(true);
+    const workerCode = readFileSync(join(dir, "src", "worker.ts"), "utf8");
     expect(workerCode).toContain("createAzureServiceBusQueue");
     expect(existsSync(join(dir, "terraform", "queue.tf"))).toBe(true);
     const queueTf = readFileSync(join(dir, "terraform", "queue.tf"), "utf8");
@@ -413,14 +441,14 @@ describe("runServerInit", () => {
       process.chdir(cwd);
     }
 
-    const serverCode = readFileSync(join(dir, "server.ts"), "utf8");
+    const serverCode = readFileSync(join(dir, "src", "index.ts"), "utf8");
     expect(serverCode).toContain("createPostgresDatabase");
     expect(serverCode).toContain("createGcsStorage");
     expect(serverCode).toContain("createGcpPubSubQueue");
     expect(serverCode).toContain("GOOGLE_CLOUD_PROJECT");
     expect(serverCode).not.toContain("cognitoPreset");
-    expect(existsSync(join(dir, "worker.ts"))).toBe(true);
-    const workerCode = readFileSync(join(dir, "worker.ts"), "utf8");
+    expect(existsSync(join(dir, "src", "worker.ts"))).toBe(true);
+    const workerCode = readFileSync(join(dir, "src", "worker.ts"), "utf8");
     expect(workerCode).toContain("createGcpPubSubQueue");
     expect(existsSync(join(dir, "terraform", "queue.tf"))).toBe(true);
     const queueTf = readFileSync(join(dir, "terraform", "queue.tf"), "utf8");
@@ -458,7 +486,7 @@ describe("runServerInit", () => {
     } finally {
       process.chdir(cwd);
     }
-    const code = readFileSync(join(dir, "server.ts"), "utf8");
+    const code = readFileSync(join(dir, "src", "index.ts"), "utf8");
     expect(code).toContain("createShelfAuth");
     expect(code).toContain("keycloakPreset");
     expect(code).toContain("OIDC_ISSUER");
@@ -466,31 +494,115 @@ describe("runServerInit", () => {
     expect(existsSync(join(dir, "terraform"))).toBe(false);
   });
 
-  it("adds docker scripts for the docker target", async () => {
-    vi.mocked(prompts).mockResolvedValue({
-      name: "my-server",
-      dir: "./my-server",
+  it("uses plain docker scripts and no compose file for a single container", async () => {
+    await scaffold({ deployTarget: "docker", docker: true });
+    const scripts = readScripts();
+    expect(scripts["docker:build"]).toBe("docker build -t my-server .");
+    expect(scripts["docker:run"]).toContain("docker run");
+    expect(scripts["docker:up"]).toBeUndefined();
+    expect(scripts["infra:plan"]).toBeUndefined();
+    expect(existsSync(join(dir, "Dockerfile"))).toBe(true);
+    expect(existsSync(join(dir, "compose.yaml"))).toBe(false);
+  });
+
+  it("generates compose when the stack has more than one service", async () => {
+    await scaffold({ deployTarget: "docker", docker: true, database: "postgres" });
+    const scripts = readScripts();
+    expect(scripts["docker:up"]).toBe("docker compose up --build");
+    expect(scripts["docker:run"]).toBeUndefined();
+    expect(existsSync(join(dir, "compose.yaml"))).toBe(true);
+  });
+
+  it("generates compose with a worker service for a remote queue", async () => {
+    await scaffold({
       deployTarget: "docker",
-      database: "sqlite",
-      storage: "local",
-      auth: "none",
-      git: "none",
-      queue: "memory",
       docker: true,
+      database: "postgres",
+      storage: "s3",
+      queue: "sqs",
+      includeWorker: true,
     });
-    const cwd = process.cwd();
-    process.chdir(tmpRoot);
-    try {
-      await runServerInit({});
-    } finally {
-      process.chdir(cwd);
-    }
+    const compose = readFileSync(join(dir, "compose.yaml"), "utf8");
+    expect(compose.indexOf("  worker:")).toBeLessThan(compose.indexOf("\nvolumes:"));
+    expect(existsSync(join(dir, "Dockerfile.worker"))).toBe(true);
+  });
+
+  it("copies the src directory in the Dockerfile and bundles src/index.ts", async () => {
+    await scaffold({ deployTarget: "docker", docker: true });
+    const dockerfile = readFileSync(join(dir, "Dockerfile"), "utf8");
+    expect(dockerfile).toContain("COPY src/ ./src/");
+    expect(dockerfile).toContain("esbuild src/index.ts");
+  });
+
+  it("writes a tsconfig covering src and the typing dependencies", async () => {
+    await scaffold({});
+    const tsconfig = JSON.parse(readFileSync(join(dir, "tsconfig.json"), "utf8")) as {
+      include: string[];
+    };
+    expect(tsconfig.include).toEqual(["src"]);
     const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
       scripts: Record<string, string>;
+      devDependencies: Record<string, string>;
     };
-    expect(pkg.scripts["docker:up"]).toBeDefined();
-    expect(pkg.scripts["docker:down"]).toBeDefined();
-    expect(pkg.scripts["infra:plan"]).toBeUndefined();
+    expect(pkg.devDependencies["@types/node"]).toBeDefined();
+    expect(pkg.devDependencies["typescript"]).toBeDefined();
+    expect(pkg.scripts["start"]).toContain("src/index.ts");
+    expect(pkg.scripts["typecheck"]).toBe("tsc");
+    expect(existsSync(join(dir, "server.ts"))).toBe(false);
+  });
+
+  it("keeps the default output lean: no notifications, no observability", async () => {
+    await scaffold({});
+    const code = readFileSync(join(dir, "src", "index.ts"), "utf8");
+    expect(code).not.toContain("notify-");
+    expect(code).not.toContain("observability");
+    expect(code).not.toContain("createShelfLogger");
+    expect(code).not.toContain("const logger");
+    const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
+      dependencies: Record<string, string>;
+    };
+    expect(Object.keys(pkg.dependencies).toSorted()).toEqual([
+      "@hono/node-server",
+      "@storyshelf/app",
+      "@storyshelf/db-sqlite",
+      "@storyshelf/runner-playwright",
+    ]);
+  });
+
+  it("wires OpenTelemetry only when observability is chosen", async () => {
+    await scaffold({ observability: true });
+    const code = readFileSync(join(dir, "src", "index.ts"), "utf8");
+    expect(code).toContain("initObservabilityFromEnv");
+    expect(code).toContain("logger: shelfLogger,");
+    const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
+      dependencies: Record<string, string>;
+    };
+    expect(pkg.dependencies["@storyshelf/observability"]).toBeDefined();
+    expect(pkg.dependencies["@storyshelf/core"]).toBeDefined();
+  });
+
+  it("does not declare the auth package or import the engine when auth is none", async () => {
+    await scaffold({});
+    const code = readFileSync(join(dir, "src", "index.ts"), "utf8");
+    expect(code).not.toContain("@storyshelf/auth");
+    const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
+      dependencies: Record<string, string>;
+    };
+    expect(pkg.dependencies["@storyshelf/auth"]).toBeUndefined();
+  });
+
+  it("merges imports that share a module into one line", async () => {
+    await scaffold({ auth: "oauth", notifications: true });
+    const code = readFileSync(join(dir, "src", "index.ts"), "utf8");
+    expect(code.match(/from "@storyshelf\/auth"/gu)).toHaveLength(1);
+    expect(code.match(/from "@storyshelf\/app"/gu)).toHaveLength(1);
+  });
+
+  it("only declares dataDir when the stack reads it", async () => {
+    await scaffold({ database: "postgres", storage: "s3", queue: "sqs", includeWorker: false });
+    expect(readFileSync(join(dir, "src", "index.ts"), "utf8")).not.toContain("dataDir");
+    await scaffold({});
+    expect(readFileSync(join(dir, "src", "index.ts"), "utf8")).toContain("dataDir");
   });
 
   it("wires notifications when enabled", async () => {
@@ -512,7 +624,7 @@ describe("runServerInit", () => {
     } finally {
       process.chdir(cwd);
     }
-    const code = readFileSync(join(dir, "server.ts"), "utf8");
+    const code = readFileSync(join(dir, "src", "index.ts"), "utf8");
     expect(code).toContain("chatNotifiers");
     expect(code).toContain("smtpPresetFromEnv");
     expect(code).toContain("onAuthSystemEvent: createAuthSystemHook()");
@@ -543,7 +655,7 @@ describe("runServerInit", () => {
     } finally {
       process.chdir(cwd);
     }
-    const code = readFileSync(join(dir, "server.ts"), "utf8");
+    const code = readFileSync(join(dir, "src", "index.ts"), "utf8");
     expect(code).not.toContain("chatNotifiers");
     expect(code).not.toContain("smtpPresetFromEnv");
     const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
@@ -583,7 +695,7 @@ describe("runServerInit", () => {
     };
     expect(dbPrompt.choices).toHaveLength(4);
 
-    const code = readFileSync(join(dir, "server.ts"), "utf8");
+    const code = readFileSync(join(dir, "src", "index.ts"), "utf8");
     expect(code).toContain("createSqliteDatabase");
   });
 
@@ -617,7 +729,7 @@ describe("runServerInit", () => {
     };
     expect(dbPrompt.choices).toHaveLength(14);
 
-    const code = readFileSync(join(dir, "server.ts"), "utf8");
+    const code = readFileSync(join(dir, "src", "index.ts"), "utf8");
     expect(code).toContain("createTursoDatabase");
   });
 });

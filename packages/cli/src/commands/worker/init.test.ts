@@ -44,9 +44,9 @@ describe("runWorkerInit", () => {
       process.chdir(cwd);
     }
 
-    expect(existsSync(join(dir, "worker.ts"))).toBe(true);
+    expect(existsSync(join(dir, "src", "worker.ts"))).toBe(true);
     expect(existsSync(join(dir, "package.json"))).toBe(true);
-    const workerCode = readFileSync(join(dir, "worker.ts"), "utf8");
+    const workerCode = readFileSync(join(dir, "src", "worker.ts"), "utf8");
     expect(workerCode).toContain("createSqsCaptureQueue");
     expect(workerCode).toContain("createCaptureWorker");
     expect(workerCode).toContain("createSqliteDatabase");
@@ -100,7 +100,7 @@ describe("runWorkerInit", () => {
       process.chdir(cwd);
     }
 
-    const workerCode = readFileSync(join(dir, "worker.ts"), "utf8");
+    const workerCode = readFileSync(join(dir, "src", "worker.ts"), "utf8");
     // memory queue placeholder comment
     expect(workerCode).toContain("remote queue");
   });
@@ -123,7 +123,7 @@ describe("runWorkerInit", () => {
       process.chdir(cwd);
     }
 
-    const workerCode = readFileSync(join(dir, "worker.ts"), "utf8");
+    const workerCode = readFileSync(join(dir, "src", "worker.ts"), "utf8");
     expect(workerCode).toContain("createAzureStorageQueuesQueue");
     expect(workerCode).toContain("AZURE_STORAGE_CONNECTION");
     const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
@@ -151,7 +151,7 @@ describe("runWorkerInit", () => {
       process.chdir(cwd);
     }
 
-    const workerCode = readFileSync(join(dir, "worker.ts"), "utf8");
+    const workerCode = readFileSync(join(dir, "src", "worker.ts"), "utf8");
     expect(workerCode).toContain("createGcpPubSubQueue");
     expect(workerCode).toContain("GOOGLE_CLOUD_PROJECT");
     const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
@@ -206,8 +206,8 @@ describe("runWorkerInit", () => {
     } finally {
       process.chdir(cwd);
     }
-    expect(existsSync(join(dir, "worker.ts"))).toBe(true);
-    const code = readFileSync(join(dir, "worker.ts"), "utf8");
+    expect(existsSync(join(dir, "src", "worker.ts"))).toBe(true);
+    const code = readFileSync(join(dir, "src", "worker.ts"), "utf8");
     expect(code).toContain("createTursoDatabase");
     expect(code).toContain("createS3Storage");
   });
@@ -231,6 +231,6 @@ describe("runWorkerInit helpers", () => {
     } finally {
       process.chdir(cwd);
     }
-    expect(existsSync(resolve(tmpRoot, "my-worker", "worker.ts"))).toBe(true);
+    expect(existsSync(resolve(tmpRoot, "my-worker", "src", "worker.ts"))).toBe(true);
   });
 });

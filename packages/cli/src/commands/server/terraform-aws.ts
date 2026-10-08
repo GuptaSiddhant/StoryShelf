@@ -3,7 +3,7 @@
  *
  * Pure string builders — no runtime dependencies. Emitted by
  * `storyshelf server init` when the deploy target is `aws`, alongside the
- * standard `server.ts` / `worker.ts` / `package.json` files.
+ * standard `src/index.ts` / `src/worker.ts` / `package.json` files.
  *
  * Reference stack: S3 (storage) + SQS + DLQ (capture queue) + Postgres
  * (RDS default, Aurora DSQL option) + ECS Fargate app/worker + ALB +
