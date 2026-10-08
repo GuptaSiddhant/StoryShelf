@@ -29,7 +29,7 @@ Dockerfile        # only if you choose Docker (plus Dockerfile.worker for a work
 compose.yaml      # only when the Docker stack has more than one service
 ```
 
-Entry code lives in `src/` so you can split logic into more files; the Dockerfile bundles `src/index.ts` with esbuild. A single-container setup (for example SQLite + local storage) gets `docker:build` / `docker:run` scripts and no compose file; compose is generated when the stack adds Postgres or a worker.
+Entry code lives in `src/` so you can split logic into more files (use `.ts` in relative imports). The Docker image installs production dependencies and runs `src/index.ts` directly with Node, the same as `npm start`; there is no build step. A single-container setup (for example SQLite + local storage) gets `docker:build` / `docker:run` scripts and no compose file; compose is generated when the stack adds Postgres or a worker.
 
 Notifications and OpenTelemetry wiring are opt-in: the generated server only imports what you selected, so the default output stays short.
 

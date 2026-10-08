@@ -10,53 +10,58 @@ import {
 } from "./docker.ts";
 
 describe("generateDockerfile", () => {
-  it("includes node builder and playwright stages", () => {
+  it("installs production dependencies and copies src on a Playwright image", () => {
     const dockerfile = generateDockerfile();
-    expect(dockerfile).toContain("FROM node:lts-alpine AS builder");
     expect(dockerfile).toContain("FROM mcr.microsoft.com/playwright");
+    expect(dockerfile).toContain("RUN npm install --omit=dev");
     expect(dockerfile).toContain("COPY src/ ./src/");
-    expect(dockerfile).toContain("esbuild src/index.ts");
   });
 
-  it("starts the bundle at the path it was copied to", () => {
-    const dockerfile = generateDockerfile();
-    expect(dockerfile).toContain("COPY --from=builder /app/dist/server.mjs ./");
-    expect(dockerfile).toContain('CMD ["node", "server.mjs"]');
+  it("runs the TypeScript entry directly, like npm start", () => {
+    expect(generateDockerfile()).toContain(
+      'CMD ["node", "--experimental-transform-types", "src/index.ts"]',
+    );
   });
 
-  it("externalizes and ships playwright-core on a pinned image", () => {
+  it("does not bundle: no esbuild, no dist output", () => {
+    for (const dockerfile of [
+      generateDockerfile(),
+      generateSlimServerDockerfile(),
+      generateWorkerDockerfile(),
+    ]) {
+      expect(dockerfile).not.toContain("esbuild");
+      expect(dockerfile).not.toContain("dist/");
+    }
+  });
+
+  it("uses a pinned Playwright image, never latest", () => {
     const dockerfile = generateDockerfile();
-    expect(dockerfile).toContain("--external:playwright-core");
-    expect(dockerfile).toContain("node_modules/playwright-core");
     expect(dockerfile).not.toContain("playwright:latest");
     const image = /FROM (?<image>mcr\S+)/u.exec(generateWorkerDockerfile())?.groups?.["image"];
     expect(image).toBeDefined();
     expect(dockerfile).toContain(`FROM ${image}`);
   });
 
-  it("never needs an interactive npx prompt", () => {
-    expect(generateDockerfile()).toContain("npx -y esbuild");
-    expect(generateSlimServerDockerfile()).toContain("npx -y esbuild");
-    expect(generateWorkerDockerfile()).toContain("npx -y esbuild");
+  it("copies the lockfile when present", () => {
+    expect(generateDockerfile()).toContain("COPY package*.json ./");
   });
 });
 
 describe("generateSlimServerDockerfile", () => {
-  it("bundles src/index.ts without a browser", () => {
+  it("runs src/index.ts on plain node without a browser", () => {
     const dockerfile = generateSlimServerDockerfile();
-    expect(dockerfile).toContain("esbuild src/index.ts");
+    expect(dockerfile).toContain("FROM node:lts-alpine");
     expect(dockerfile).not.toContain("playwright");
-    expect(dockerfile).toContain('CMD ["node", "dist/server.mjs"]');
+    expect(dockerfile).toContain('"src/index.ts"');
   });
 });
 
 describe("generateWorkerDockerfile", () => {
-  it("builds src/worker.ts and uses playwright base", () => {
+  it("runs src/worker.ts on the Playwright base", () => {
     const dockerfile = generateWorkerDockerfile();
-    expect(dockerfile).toContain("esbuild src/worker.ts");
     expect(dockerfile).toContain("mcr.microsoft.com/playwright");
-    expect(dockerfile).toContain("COPY --from=builder /app/dist/worker.mjs ./");
-    expect(dockerfile).toContain('CMD ["node", "worker.mjs"]');
+    expect(dockerfile).toContain('CMD ["node", "--experimental-transform-types", "src/worker.ts"]');
+    expect(dockerfile).not.toContain("EXPOSE");
   });
 });
 

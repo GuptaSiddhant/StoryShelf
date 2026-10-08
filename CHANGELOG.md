@@ -16,12 +16,16 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 - Docker: `compose.yaml` is only generated when the stack has more than one
   service (Postgres or a worker); a single container gets `docker:build` and
   `docker:run` scripts instead.
-- Fixes: the server image now starts (its `CMD` pointed at a path the bundle was
-  not copied to), bundles `playwright-core` instead of a package that was never
-  installed, pins the Playwright image to the `playwright-core` version, and
-  `npx` no longer prompts during `docker build`. With a worker, the compose
-  worker service was written inside the `volumes:` block (invalid) and had no
-  `DATABASE_URL`.
+- Fixes: the generated Docker images could not run. They bundled the server
+  with esbuild into one ESM file, which crashes at startup (`Dynamic require of
+  "util" is not supported` from a CommonJS dependency) and cannot find the
+  vendored assets `@storyshelf/app` reads from disk; the `CMD` also pointed at
+  a path the bundle was never copied to, and the build copied a `playwright`
+  package that is never installed. Images now install production dependencies
+  and run `src/index.ts` directly with Node (as `npm start` does), on a
+  Playwright image pinned to the `playwright-core` version. With a worker, the
+  compose worker service was written inside the `volumes:` block (invalid) and
+  had no `DATABASE_URL`.
 - **Heads-up:** the generated server file moved from `server.ts` to
   `src/index.ts`; existing projects keep working and are not rewritten.
 

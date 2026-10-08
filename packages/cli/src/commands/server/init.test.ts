@@ -527,11 +527,12 @@ describe("runServerInit", () => {
     expect(existsSync(join(dir, "Dockerfile.worker"))).toBe(true);
   });
 
-  it("copies the src directory in the Dockerfile and bundles src/index.ts", async () => {
+  it("copies the src directory in the Dockerfile and runs src/index.ts", async () => {
     await scaffold({ deployTarget: "docker", docker: true });
     const dockerfile = readFileSync(join(dir, "Dockerfile"), "utf8");
     expect(dockerfile).toContain("COPY src/ ./src/");
-    expect(dockerfile).toContain("esbuild src/index.ts");
+    expect(dockerfile).toContain('"src/index.ts"');
+    expect(dockerfile).not.toContain("esbuild");
   });
 
   it("writes a tsconfig covering src and the typing dependencies", async () => {

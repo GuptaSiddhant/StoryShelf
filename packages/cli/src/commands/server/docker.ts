@@ -1,37 +1,29 @@
 /** Playwright base image: its bundled browsers must match the `playwright-core` pin. */
 const PLAYWRIGHT_IMAGE = "mcr.microsoft.com/playwright:v1.63.0-noble";
 
-const DOCKERFILE_LINES = [
-  "FROM node:lts-alpine AS builder",
-  "WORKDIR /app",
-  "COPY package.json ./",
-  "RUN npm install",
-  "COPY src/ ./src/",
-  "RUN npx -y esbuild src/index.ts --bundle --platform=node --format=esm \\",
-  "  --external:playwright-core \\",
-  "  --outfile=dist/server.mjs",
-  "",
-  `FROM ${PLAYWRIGHT_IMAGE}`,
-  "WORKDIR /app",
-  "COPY --from=builder /app/dist/server.mjs ./",
-  "COPY --from=builder /app/node_modules/playwright-core ./node_modules/playwright-core",
-  "EXPOSE 3000",
-  "ENV PORT=3000",
-  "ENV DATA_DIR=/data",
-  'CMD ["node", "server.mjs"]',
-];
+/**
+ * Images run the TypeScript sources directly (Node strips types), exactly like
+ * `npm start`. Bundling is deliberately avoided: a single-file ESM bundle breaks
+ * CommonJS dependencies ("Dynamic require ... is not supported") and the vendored
+ * assets `@storyshelf/app` reads from disk next to its own modules.
+ */
+function imageLines(baseImage: string, entry: string, exposePort: boolean): string[] {
+  return [
+    `FROM ${baseImage}`,
+    "WORKDIR /app",
+    "COPY package*.json ./",
+    "RUN npm install --omit=dev",
+    "COPY src/ ./src/",
+    ...(exposePort ? ["EXPOSE 3000", "ENV PORT=3000"] : []),
+    "ENV DATA_DIR=/data",
+    `CMD ["node", "--experimental-transform-types", "${entry}"]`,
+  ];
+}
+
+const DOCKERFILE_LINES = imageLines(PLAYWRIGHT_IMAGE, "src/index.ts", true);
 
 /** Server image without a browser: the capture worker runs in its own image. */
-const SLIM_DOCKERFILE_LINES = [
-  "FROM node:lts-alpine",
-  "WORKDIR /app",
-  "COPY package.json ./",
-  "RUN npm install --omit=dev",
-  "COPY src/ ./src/",
-  "RUN npx -y esbuild src/index.ts --bundle --platform=node --format=esm --outfile=dist/server.mjs",
-  "EXPOSE 3000",
-  'CMD ["node", "dist/server.mjs"]',
-];
+const SLIM_DOCKERFILE_LINES = imageLines("node:lts-alpine", "src/index.ts", true);
 
 const DOCKERIGNORE_LINES = ["node_modules/", ".git/", "*.md", ".env*", "data/"];
 
@@ -108,23 +100,7 @@ export function generateComposeYaml(database = "sqlite"): string {
   return composeLines(database, false).join("\n");
 }
 
-const WORKER_DOCKERFILE_LINES = [
-  "FROM node:lts-alpine AS builder",
-  "WORKDIR /app",
-  "COPY package.json ./",
-  "RUN npm install",
-  "COPY src/ ./src/",
-  "RUN npx -y esbuild src/worker.ts --bundle --platform=node --format=esm \\",
-  "  --external:playwright-core \\",
-  "  --outfile=dist/worker.mjs",
-  "",
-  `FROM ${PLAYWRIGHT_IMAGE}`,
-  "WORKDIR /app",
-  "COPY --from=builder /app/dist/worker.mjs ./",
-  "COPY --from=builder /app/node_modules/playwright-core ./node_modules/playwright-core",
-  "ENV DATA_DIR=/data",
-  'CMD ["node", "worker.mjs"]',
-];
+const WORKER_DOCKERFILE_LINES = imageLines(PLAYWRIGHT_IMAGE, "src/worker.ts", false);
 
 function workerComposeLines(database: string): string[] {
   const postgres = database === "postgres";
