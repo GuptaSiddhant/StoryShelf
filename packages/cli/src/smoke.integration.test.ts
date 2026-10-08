@@ -23,7 +23,8 @@ const enabled = process.env["RUN_SMOKE"] === "1";
 const repoRoot = resolve(import.meta.dirname, "../../..");
 const scratchRoot = join(repoRoot, ".tmp");
 /** Node used for the spawned CLI and server (`SMOKE_NODE`), default: the one running vitest. */
-const nodeBin = process.env["SMOKE_NODE"] || process.execPath;
+const smokeNode = process.env["SMOKE_NODE"];
+const nodeBin = smokeNode === undefined || smokeNode === "" ? process.execPath : smokeNode;
 const cliDist = join(repoRoot, "packages/cli/dist/index.js");
 const tsc = join(repoRoot, "node_modules/.bin/tsc");
 const honoNodeServer = join(repoRoot, "node_modules/@hono/node-server");
