@@ -78,6 +78,8 @@ nub run verify                   # build + lint + test
 
 ## Getting started
 
+Requires Node.js 24 or later.
+
 ```sh
 npx storyshelf server init  # scaffold a server project
 cd my-storyshelf

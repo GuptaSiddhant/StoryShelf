@@ -23,7 +23,7 @@ function imageLines(baseImage: string, entry: string, exposePort: boolean): stri
 const DOCKERFILE_LINES = imageLines(PLAYWRIGHT_IMAGE, "src/index.ts", true);
 
 /** Server image without a browser: the capture worker runs in its own image. */
-const SLIM_DOCKERFILE_LINES = imageLines("node:lts-alpine", "src/index.ts", true);
+const SLIM_DOCKERFILE_LINES = imageLines("node:24-alpine", "src/index.ts", true);
 
 const DOCKERIGNORE_LINES = ["node_modules/", ".git/", "*.md", ".env*", "data/"];
 

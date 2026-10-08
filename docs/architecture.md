@@ -774,7 +774,7 @@ StoryShelf/
 
 | Concern | Choice | Rationale |
 |---------|--------|-----------|
-| **Runtime** | Node.js 22+ | Playwright's best-supported runtime; LTS |
+| **Runtime** | Node.js 24+ | Minimum supported version (`engines.node >=24`): unflagged TypeScript type stripping, `node:sqlite`; also Playwright's best-supported runtime |
 | **HTTP framework** | Hono (OpenAPIHono) | Type-safe routes, OpenAPI spec generation, edge-compatible |
 | **Database** | SQLite via `node:sqlite` + Drizzle ORM (local, default). Presets in the same package: Turso/libSQL via `@libsql/client` (serverless), better-sqlite3 (native), bun:sqlite (Bun), D1 binding (Workers). | Zero-config on VPS/Docker. Same schema, same queries, different driver. |
 | **Storage** | Local filesystem (default). S3-compatible (R2, MinIO, S3), GCS, Azure Blob as alternatives. | Local for Docker/VPS. S3/GCS/Azure for cloud. Same adapter interface, four implementations. |

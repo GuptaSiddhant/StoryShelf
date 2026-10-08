@@ -14,6 +14,13 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 - Dropped the unused `hono` dependency from the CLI, so `npx storyshelf`
   installs less.
 
+**Node 24 is the minimum**
+- Every published package declares `engines.node >=24` (none did before), the
+  release check fails if one does not, and the docs, README and CI example now
+  say Node 24 instead of 22 or 20.
+- The slim server image is pinned to `node:24-alpine` instead of the floating
+  `node:lts-alpine`.
+  
 **First-run and release safety**
 - `@storyshelf/db-sqlite` creates the database file's directory (all file-based
   presets), so a fresh scaffold or an empty Docker volume boots instead of

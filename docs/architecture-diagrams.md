@@ -761,7 +761,7 @@ flowchart TB
 ```mermaid
 flowchart TB
     subgraph Docker["Single Container — mcr.microsoft.com/playwright:v1.63.0-noble"]
-        Node["Node 22+ — Hono server<br/>node --experimental-transform-types server.ts"]
+        Node["Node 24+ — Hono server<br/>node src/index.ts"]
         PW["Chromium (Playwright) — in-process capture"]
         SQLite["SQLite — node:sqlite (WAL)<br/>@storyshelf/db-sqlite"]
         FS["Filesystem — @storyshelf/storage-local<br/>VOLUME /app/data"]
