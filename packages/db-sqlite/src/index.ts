@@ -3,6 +3,7 @@ import { drizzle, type AsyncRemoteCallback } from "drizzle-orm/sqlite-proxy";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import { DDL, tableColumns } from "./ddl.ts";
 import { createDrizzleAdapter } from "./drizzle-factory.ts";
+import { ensureDbDir } from "./ensure-db-dir.ts";
 import { schema } from "./schema/index.ts";
 
 declare const __PKG_VERSION__: string | undefined;
@@ -14,6 +15,7 @@ declare const __PKG_VERSION__: string | undefined;
  * @returns A DatabaseAdapter backed by the given SQLite file (WAL mode).
  */
 export function createSqliteDatabase(path: string): DatabaseAdapter {
+  ensureDbDir(path);
   const sqlite = new DatabaseSync(path, { returnArrays: true });
   sqlite.exec("PRAGMA journal_mode = WAL");
   sqlite.exec("PRAGMA busy_timeout = 5000");

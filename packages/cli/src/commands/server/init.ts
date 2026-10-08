@@ -742,9 +742,10 @@ function generatePackageJson(answers: Answers): string {
     type: "module",
     private: true,
     description: "StoryShelf self-hosted visual testing server.",
+    engines: { node: ">=24" },
     scripts: {
-      start: `node --experimental-transform-types ${SERVER_ENTRY}`,
-      dev: `node --experimental-transform-types --watch ${SERVER_ENTRY}`,
+      start: `node ${SERVER_ENTRY}`,
+      dev: `node --watch ${SERVER_ENTRY}`,
       typecheck: "tsc",
     } as Record<string, string>,
     dependencies: buildDeps(answers),
@@ -752,8 +753,8 @@ function generatePackageJson(answers: Answers): string {
   };
 
   if (answers.includeWorker) {
-    pkg.scripts["worker"] = `node --experimental-transform-types ${WORKER_ENTRY}`;
-    pkg.scripts["worker:dev"] = `node --experimental-transform-types --watch ${WORKER_ENTRY}`;
+    pkg.scripts["worker"] = `node ${WORKER_ENTRY}`;
+    pkg.scripts["worker:dev"] = `node --watch ${WORKER_ENTRY}`;
   }
 
   if (resolveDeployTarget(answers) === "docker") {

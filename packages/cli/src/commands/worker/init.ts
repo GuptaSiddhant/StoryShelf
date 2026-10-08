@@ -285,9 +285,10 @@ function generatePackageJson(answers: Answers): string {
     type: "module",
     private: true,
     description: "StoryShelf capture worker (remote queue).",
+    engines: { node: ">=24" },
     scripts: {
-      start: `node --experimental-transform-types ${WORKER_ENTRY}`,
-      dev: `node --experimental-transform-types --watch ${WORKER_ENTRY}`,
+      start: `node ${WORKER_ENTRY}`,
+      dev: `node --watch ${WORKER_ENTRY}`,
       typecheck: "tsc",
     },
     dependencies: buildDeps(answers),
