@@ -22,6 +22,8 @@ import { runServerInit } from "./commands/server/init.ts";
 const enabled = process.env["RUN_SMOKE"] === "1";
 const repoRoot = resolve(import.meta.dirname, "../../..");
 const scratchRoot = join(repoRoot, ".tmp");
+/** Node used for the spawned CLI and server (`SMOKE_NODE`), default: the one running vitest. */
+const nodeBin = process.env["SMOKE_NODE"] || process.execPath;
 const cliDist = join(repoRoot, "packages/cli/dist/index.js");
 const tsc = join(repoRoot, "node_modules/.bin/tsc");
 const honoNodeServer = join(repoRoot, "node_modules/@hono/node-server");
@@ -68,6 +70,17 @@ async function waitForOk(
   throw new Error(`no response from ${url} within ${timeoutMs} ms`);
 }
 
+describe.skipIf(!enabled)("runtime under test", () => {
+  it("is the Node major the run asked for (SMOKE_NODE_MAJOR)", () => {
+    const expected = process.env["SMOKE_NODE_MAJOR"];
+    const actual = spawnSync(nodeBin, ["--version"], { encoding: "utf8" }).stdout.trim();
+    if (expected) {
+      expect(actual.startsWith(`v${expected}.`)).toBe(true);
+    }
+    expect(actual).toMatch(/^v\d+\./u);
+  });
+});
+
 describe.skipIf(!enabled)("built CLI", () => {
   it("runs when launched through a .bin symlink (npx)", () => {
     expect(existsSync(cliDist)).toBe(true);
@@ -75,11 +88,11 @@ describe.skipIf(!enabled)("built CLI", () => {
     const link = join(dir, "storyshelf");
     symlinkSync(cliDist, link);
 
-    const help = spawnSync(process.execPath, [link, "-h"], { encoding: "utf8" });
+    const help = spawnSync(nodeBin, [link, "-h"], { encoding: "utf8" });
     expect(help.status).toBe(0);
     expect(help.stdout).toContain("Usage: storyshelf");
 
-    const version = spawnSync(process.execPath, [link, "--version"], { encoding: "utf8" });
+    const version = spawnSync(nodeBin, [link, "--version"], { encoding: "utf8" });
     const pkg = JSON.parse(readFileSync(join(repoRoot, "packages/cli/package.json"), "utf8")) as {
       version: string;
     };
@@ -136,7 +149,7 @@ describe.skipIf(!enabled)("scaffolded server project", () => {
 
   it("boots, serves HTML and vendored assets, and shuts down cleanly", async () => {
     const port = await freePort();
-    server = spawn(process.execPath, ["src/index.ts"], {
+    server = spawn(nodeBin, ["src/index.ts"], {
       cwd: dir,
       env: {
         ...process.env,

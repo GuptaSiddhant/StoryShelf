@@ -21,7 +21,8 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 - CI now smoke-tests the built artifacts: the CLI launched through a `.bin`
   symlink (as `npx` does), and a freshly scaffolded server that type-checks,
   boots, serves HTML and vendored assets, and shuts down cleanly. The two
-  regressions that shipped in 0.6.0 and 0.6.1 would have failed it.
+  regressions that shipped in 0.6.0 and 0.6.1 would have failed it. It runs on
+  the default Node and again on Node 24, the minimum supported version.
 - Generated projects (`npm start`, `dev`, `worker`, the Docker `CMD`) and
   `storyshelf server serve` / `worker serve` no longer pass
   `--experimental-transform-types`, which Node 26 rejects (`bad option`). Node 24
