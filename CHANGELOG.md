@@ -28,8 +28,7 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 - CI now smoke-tests the built artifacts: the CLI launched through a `.bin`
   symlink (as `npx` does), and a freshly scaffolded server that type-checks,
   boots, serves HTML and vendored assets, and shuts down cleanly. The two
-  regressions that shipped in 0.6.0 and 0.6.1 would have failed it. It runs on
-  the default Node and again on Node 24, the minimum supported version.
+  regressions that shipped in 0.6.0 and 0.6.1 would have failed it.
 - Generated projects (`npm start`, `dev`, `worker`, the Docker `CMD`) and
   `storyshelf server serve` / `worker serve` no longer pass
   `--experimental-transform-types`, which Node 26 rejects (`bad option`). Node 24
@@ -37,6 +36,14 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
   generated `package.json` declares `engines.node >= 24`.
 - The npm publish job skips versions that are already published, so a partly
   failed release can be re-run (the JSR job already did this).
+
+**CI**
+- The whole pipeline now runs on Node 24, the minimum supported version
+  (`devEngines.runtime` is `24.x`; it was `>=24`, which CI resolved to the
+  newest Node). The smoke test asserts the Node major so the default cannot
+  drift unnoticed.
+- The website build, link check and accessibility check run only when
+  `apps/website/` changed (scheduled and manual runs always run everything).
 
 **`storyshelf server init` scaffold**
 - Entry code now lives in `src/index.ts` (and `src/worker.ts`) so you can split
