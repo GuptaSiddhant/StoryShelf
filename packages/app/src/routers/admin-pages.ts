@@ -2,6 +2,9 @@ import type { Auth } from "@storyshelf/auth";
 import type { AdapterSetupResult, AdapterSetupSources } from "@storyshelf/core/adapter/setup";
 import type { ShelfRouter } from "../app-types.ts";
 import { loadCredentialProbe, reencryptWithCurrent } from "../credentials.ts";
+import { insightDepsFromStore } from "../insights/deps.ts";
+import { buildUsageReport } from "../insights/usage-report.ts";
+import { renderAdminAiPage } from "../pages/admin-ai.tsx";
 import { renderAdminSystemPage } from "../pages/admin-system.tsx";
 import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
@@ -32,7 +35,26 @@ export function registerAdminPages(app: ShelfRouter, deps: AdminPageDeps, auth?:
     );
     const authMethods = auth?.loginMethods().map((method) => method.label);
     c.header("Cache-Control", "no-store");
-    return c.html(renderAdminSystemPage({ report, authEnabled, config, authMethods, credentials }));
+    return c.html(
+      renderAdminSystemPage({
+        report,
+        authEnabled,
+        config,
+        authMethods,
+        credentials,
+        aiEnabled: getStore().ai !== undefined,
+      }),
+    );
+  });
+
+  app.get("/admin/ai", async (c) => {
+    requireSiteAdmin(c);
+    const aiDeps = insightDepsFromStore();
+    if (!aiDeps) {
+      return c.notFound();
+    }
+    c.header("Cache-Control", "no-store");
+    return c.html(renderAdminAiPage(await buildUsageReport(aiDeps)));
   });
 
   app.post("/admin/credentials/reencrypt", async (c) => {

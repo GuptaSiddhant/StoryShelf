@@ -29,6 +29,8 @@ export interface AdminSystemData {
   authMethods?: string[];
   /** Stored-credential state; null/undefined when no secret is configured. */
   credentials?: CredentialProbe | null;
+  /** True when AI is configured (shows the AI usage link). */
+  aiEnabled?: boolean;
 }
 
 function healthTone(state: string): "success" | "info" | "danger" | "neutral" {
@@ -245,9 +247,16 @@ export function renderAdminSystemPage(data: AdminSystemData): RenderedContent {
           </>
         }
         actions={
-          <Button variant="secondary" size="sm" href="/admin">
-            Recheck
-          </Button>
+          <HStack>
+            {data.aiEnabled ? (
+              <Button variant="secondary" size="sm" href="/admin/ai">
+                AI usage
+              </Button>
+            ) : null}
+            <Button variant="secondary" size="sm" href="/admin">
+              Recheck
+            </Button>
+          </HStack>
         }
       />
       <ServerFacts

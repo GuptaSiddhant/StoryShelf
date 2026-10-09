@@ -126,3 +126,20 @@ describe("build review insight panel", () => {
     expect(html).toContain("AI triage");
   });
 });
+
+describe("admin AI usage page", () => {
+  it("lists usage by day and profile for site admins and 404s without AI", async () => {
+    const { db, storage, build } = await seed();
+    const shelf = app(db, storage);
+    expect(await (await shelf.request("/admin/ai")).text()).toContain("No usage yet");
+    await shelf.request(
+      `/projects/p/builds/${build.id}/insights/generate`,
+      form({ force: "false" }),
+    );
+    await settleInsightJobs();
+    const html = await (await shelf.request("/admin/ai")).text();
+    expect(html).toContain("By profile");
+    expect(html).toContain("default");
+    expect((await app(db, storage, false).request("/admin/ai")).status).toBe(404);
+  });
+});
