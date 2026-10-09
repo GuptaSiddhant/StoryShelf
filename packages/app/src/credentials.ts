@@ -12,7 +12,7 @@ import {
   type ReencryptResult,
 } from "@storyshelf/core/models";
 import type { SecretKeys } from "@storyshelf/core/utils";
-import type { LifecycleCell } from "./lifecycle.ts";
+import { trackBackground, type LifecycleCell } from "./lifecycle.ts";
 
 /** Current/previous key pair for a probe, or null when no secret is configured. */
 export function secretKeysOf(config: ShelfConfig): SecretKeys | null {
@@ -89,13 +89,16 @@ export function checkCredentialsAfterSetup(
   config: ShelfConfig,
   logger: Logger,
 ): void {
-  cell.ready
-    .then(async (setup) => {
-      if (setup.ok) {
-        await checkCredentialsAtBoot(db, config, logger);
-      }
-    })
-    .catch((error: unknown) => {
-      logger.error({ err: error }, "credential check failed");
-    });
+  trackBackground(
+    cell,
+    cell.ready
+      .then(async (setup) => {
+        if (setup.ok) {
+          await checkCredentialsAtBoot(db, config, logger);
+        }
+      })
+      .catch((error: unknown) => {
+        logger.error({ err: error }, "credential check failed");
+      }),
+  );
 }

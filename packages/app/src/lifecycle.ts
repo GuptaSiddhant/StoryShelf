@@ -22,6 +22,30 @@ import type { ServerRuntime } from "./runtime.ts";
 export interface LifecycleCell {
   ready: Promise<AdapterSetupResult>;
   settled: AdapterSetupResult | null;
+  /** Fire-and-forget boot tasks (recovery, credential check) that teardown must outwait. */
+  background?: Promise<unknown>[];
+  /** Override of {@link BACKGROUND_DRAIN_MS} (tests). */
+  drainMs?: number;
+}
+
+/** Longest teardown waits for background boot tasks before closing adapters anyway. */
+const BACKGROUND_DRAIN_MS = 5000;
+
+/** Register a boot task so `teardown()` does not close adapters underneath it. */
+export function trackBackground(cell: LifecycleCell, task: Promise<unknown>): void {
+  (cell.background ??= []).push(task);
+}
+
+/** Wait for tracked boot tasks, bounded so a hung task can never block shutdown. */
+async function drainBackground(cell: LifecycleCell): Promise<void> {
+  const pending = Promise.allSettled(cell.background ?? []);
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, cell.drainMs ?? BACKGROUND_DRAIN_MS);
+    timer.unref();
+  });
+  await Promise.race([pending, timeout]);
+  clearTimeout(timer);
 }
 
 function trackSettlement(cell: LifecycleCell, promise: Promise<AdapterSetupResult>): void {
@@ -195,6 +219,7 @@ function createLifecycle(
     },
     teardown: async () => {
       timer?.stop();
+      await drainBackground(cell);
       await settleInsightJobs();
       await options.ai?.teardown();
       const result = await runAdapterTeardowns(collectTeardowns(options), ctx, logger);

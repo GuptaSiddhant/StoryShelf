@@ -8,7 +8,7 @@ import { printLine } from "../../output.ts";
  * Options for `storyshelf server serve` — runs a scaffolded server project.
  */
 export interface ServerServeOptions {
-  /** Server project directory containing `server.ts` (defaults to `process.cwd()`). */
+  /** Server project directory containing `src/index.ts` (defaults to `process.cwd()`). */
   dir?: string;
   /** Port override; sets `PORT` for the child process. */
   port?: string;
@@ -16,6 +16,9 @@ export interface ServerServeOptions {
 
 /** Server entry filenames tried in order. */
 const SERVER_CANDIDATES = [
+  "src/index.ts",
+  "src/index.js",
+  "src/index.mjs",
   "server.ts",
   "server.js",
   "server.mjs",
@@ -39,7 +42,7 @@ export type SpawnProcess = (
 
 /**
  * Locate the server entry file in a scaffolded project.
- * Tries `server.ts`, `server.js`, `server.mjs`, then `index.*` fallbacks.
+ * Tries `src/index.*` first, then the legacy root `server.*` / `index.*` layouts.
  *
  * @param dir - Absolute path to the server project directory
  * @returns Absolute path to the first entry that exists
@@ -61,9 +64,9 @@ export async function resolveServerFile(dir: string): Promise<string> {
   );
 }
 
-/** Node flags for an entry file (TypeScript needs the transform flag). */
+/** Node runs the entry directly: Node 24+ strips TypeScript types without a flag. */
 function nodeArgs(file: string): string[] {
-  return file.endsWith(".ts") ? ["--experimental-transform-types", file] : [file];
+  return [file];
 }
 
 /** Signal relay handle: stop detaching, relayed reports whether a relay fired. */

@@ -3,6 +3,13 @@ name: CI
 # One job: verify, smoke, docs checks and the real-browser capture tests share a
 # single install/build/Chromium. Only the Storybook 8 fixture runs for now
 # (fixtures/storybook-9 and -10 are skipped; re-add them as steps below).
+#
+# Node: the whole job runs on the version `setup-nub` resolves from
+# package.json#devEngines.runtime (24.x, the minimum supported Node) — there is
+# no separate Node setup step.
+#
+# Website: the docs build, link check and accessibility check run only when
+# apps/website/ changed (scheduled and manual runs always run them).
 on:
   pull_request:
   push:
@@ -26,6 +33,40 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          # 2 is enough to diff a PR's merge commit against its base, or a push
+          # against its parent, for the website change check below.
+          fetch-depth: 2
+
+      - name: Detect website changes
+        id: changes
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          website=true
+          case "$EVENT" in
+            pull_request)
+              # HEAD is the PR merge commit: first parent is the base branch tip.
+              git diff --name-only HEAD^1 HEAD > changed.txt || rm -f changed.txt
+              ;;
+            push)
+              git fetch --no-tags --depth=1 origin "$BEFORE" 2>/dev/null \
+                && git diff --name-only "$BEFORE" HEAD > changed.txt || rm -f changed.txt
+              ;;
+          esac
+          # Anything else (schedule, manual run, or a diff that failed) runs everything.
+          if [ -f changed.txt ]; then
+            if grep -qE '^apps/website/' changed.txt; then website=true; else website=false; fi
+            echo "changed files:"; cat changed.txt
+          fi
+          echo "website=$website" >> "$GITHUB_OUTPUT"
+          if [ "$website" = "true" ]; then
+            echo "verify_args=" >> "$GITHUB_OUTPUT"
+          else
+            echo "verify_args=--filter=!website" >> "$GITHUB_OUTPUT"
+            echo "apps/website/ unchanged: skipping the website build and its checks"
+          fi
 
       - name: Setup Nub
         uses: nubjs/setup-nub@v0
@@ -57,20 +98,31 @@ jobs:
           fi
 
       - name: Verify (build + lint + test)
-        run: nubx turbo verify --force
+        run: nubx turbo verify --force ${{ steps.changes.outputs.verify_args }}
 
       - name: App smoke test (boot once, curl health/API/HTML/htmx)
         if: ${{ !cancelled() }}
         run: bash scripts/smoke.sh
 
+      - name: Built-artifact smoke (CLI via .bin symlink, scaffolded server boots)
+        # The CLI and every package are built by the verify step. Scaffolds a
+        # server, type-checks it, boots it and checks it serves and shuts down.
+        if: ${{ !cancelled() }}
+        working-directory: packages/cli
+        env:
+          RUN_SMOKE: "1"
+          # Fails if the pipeline's default Node ever drifts off the minimum.
+          SMOKE_NODE_MAJOR: "24"
+        run: nubx vitest run src/smoke.integration.test.ts
+
       - name: Check website links
         # dist/ is already built by website#verify (dependsOn build) above.
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.changes.outputs.website == 'true' }}
         working-directory: apps/website
         run: nub run check:links
 
       - name: Check website accessibility (axe, light/dark/mobile)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.changes.outputs.website == 'true' }}
         working-directory: apps/website
         run: nub run check:a11y
 

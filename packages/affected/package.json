@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/affected",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Affected capture for StoryShelf: dependency-graph tracing that selects the stories impacted by a change.",
   "keywords": [
     "affected",
@@ -27,6 +27,9 @@
     "dist"
   ],
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "sideEffects": false,
   "types": "./dist/index.d.mts",
   "exports": {

@@ -39,7 +39,7 @@ The server no longer runs captures itself, so `captureConcurrency` / `--capture-
 
 ### Worker
 
-Scaffold it with `storyshelf worker init` (or choose a remote queue in `storyshelf server init`). That writes a `worker.ts` wired to your adapters and a `Dockerfile.worker` based on the Playwright image. See [`@storyshelf/worker`](/packages/worker/) for the code.
+Scaffold it with `storyshelf worker init` (or choose a remote queue in `storyshelf server init`). That writes a `src/worker.ts` wired to your adapters and a `Dockerfile.worker` based on the Playwright image. See [`@storyshelf/worker`](/packages/worker/) for the code.
 
 Give the worker the same database, storage, and `SECRET` as the server, plus `QUEUE_URL` and credentials for SQS (IAM task role or standard AWS env). Run it locally with `storyshelf worker serve --concurrency 2`.
 

@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -46,6 +46,13 @@ afterEach(() => {
 });
 
 describe("resolveServerFile", () => {
+  it("prefers src/index.ts over the legacy root layout", async () => {
+    mkdirSync(join(dir, "src"), { recursive: true });
+    writeFileSync(join(dir, "src", "index.ts"), "// src");
+    writeFileSync(join(dir, "server.ts"), "// legacy");
+    await expect(resolveServerFile(dir)).resolves.toBe(join(dir, "src", "index.ts"));
+  });
+
   it("prefers server.ts over later fallbacks", async () => {
     writeFileSync(join(dir, "server.ts"), "// ts");
     writeFileSync(join(dir, "server.js"), "// js");
@@ -75,7 +82,7 @@ describe("runServerServe", () => {
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.command).toBe(process.execPath);
-    expect(calls[0]?.args).toEqual(["--experimental-transform-types", join(dir, "server.ts")]);
+    expect(calls[0]?.args).toEqual([join(dir, "server.ts")]);
     expect(calls[0]?.options.cwd).toBe(dir);
   });
 

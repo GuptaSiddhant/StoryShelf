@@ -12,10 +12,18 @@ import {
 import { printError, printLine } from "../../output.ts";
 import { detectInstalledAdapters } from "../shared/detect-adapters.ts";
 import {
+  generateTsconfig,
+  SCAFFOLD_DEV_DEPENDENCIES,
+  SERVER_ENTRY,
+  WORKER_ENTRY,
+  writeScaffoldFile,
+} from "../shared/scaffold.ts";
+import {
   generateComposeYaml,
   generateComposeYamlWithWorker,
   generateDockerfile,
   generateDockerignore,
+  generateSlimServerDockerfile,
   generateWorkerDockerfile,
 } from "./docker.ts";
 import {
@@ -108,6 +116,8 @@ interface Answers {
   includeWorker?: boolean;
   /** Email + chat notification wiring. Absent in older mocked answers. */
   notifications?: boolean;
+  /** OpenTelemetry wiring (opt-in). Absent means off. */
+  observability?: boolean;
   /** Deploy target. Absent in older mocked answers — derived from `docker`. */
   deployTarget?: DeployTarget;
   /** Curated-path opt-in: show the full adapter matrix on local/docker. */
@@ -243,21 +253,46 @@ const STORAGE_INIT: Record<StorageChoice, string> = {
   gcs: `createGcsStorage({ bucket: process.env.GCS_BUCKET! })`,
 };
 
-/** Whether the generated server wires notification providers. */
+/** Whether the generated server wires notification providers (opt-in). */
 function wantsNotifications(answers: Answers): boolean {
-  return answers.notifications ?? true;
+  return answers.notifications ?? false;
+}
+
+/** Whether the generated server/worker wire OpenTelemetry (opt-in). */
+function wantsObservability(answers: Answers): boolean {
+  return answers.observability ?? false;
+}
+
+const NAMED_IMPORT_RE = /^import \{ (?<names>[^}]+) \} from "(?<from>[^"]+)";$/u;
+
+/** Merge named imports that share a module into one line (keeps first-seen order). */
+function mergeImports(lines: string[]): string[] {
+  const merged = new Map<string, string[]>();
+  for (const line of lines) {
+    const match = NAMED_IMPORT_RE.exec(line);
+    const key = match?.groups?.["from"] ?? line;
+    const names = match?.groups?.["names"]?.split(", ") ?? [];
+    merged.set(key, [...(merged.get(key) ?? []), ...names]);
+  }
+  return [...merged].map(([from, names]) =>
+    names.length > 0 ? `import { ${names.join(", ")} } from "${from}";` : from,
+  );
 }
 
 function buildImports(answers: Answers): string[] {
   const imports = [
     `import { serve } from "@hono/node-server";`,
     `import { createShelfApp } from "@storyshelf/app";`,
-    `import { createShelfLogger } from "@storyshelf/core/logger";`,
-    `import { otelLogMixin } from "@storyshelf/observability";`,
-    `import { initObservabilityFromEnv } from "@storyshelf/observability/node";`,
     DB_IMPORT[answers.database],
     STORAGE_IMPORT[answers.storage],
   ];
+  if (wantsObservability(answers)) {
+    imports.push(
+      `import { createShelfLogger } from "@storyshelf/core/logger";`,
+      `import { otelLogMixin } from "@storyshelf/observability";`,
+      `import { initObservabilityFromEnv } from "@storyshelf/observability/node";`,
+    );
+  }
 
   if (answers.queue === "sqs") {
     imports.push(`import { createSqsCaptureQueue } from "@storyshelf/queue-sqs";`);
@@ -306,12 +341,11 @@ function buildImports(answers: Answers): string[] {
   if (answers.queue === "memory") {
     imports.push(`import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";`);
   }
-  return imports;
+  return mergeImports(imports);
 }
 
 function buildAdapterLines(answers: Answers): string[] {
   const lines = [
-    `// Adapters — swap these for your deployment`,
     ...dbPrelude(answers.database),
     `const database = ${DB_INIT[answers.database]};`,
     `const storage = ${STORAGE_INIT[answers.storage]};`,
@@ -342,24 +376,26 @@ function buildAdapterLines(answers: Answers): string[] {
   }
   if (wantsNotifications(answers)) {
     lines.push(
-      `// Notifications: SMTP sender from SMTP_* env (undefined keeps invites out-of-band).`,
+      `// SMTP sender from SMTP_* env (undefined keeps invites out-of-band).`,
       `const emailSender = smtpPresetFromEnv(process.env);`,
-      `const emailNotifiers = emailSender ? [createEmailNotifier(emailSender, { from: process.env.SMTP_FROM })] : [];`,
+      `const emailNotifiers = emailSender`,
+      `  ? [createEmailNotifier(emailSender, { from: process.env.SMTP_FROM })]`,
+      `  : [];`,
     );
   }
   return lines;
 }
 
 function buildRouterLines(answers: Answers): string[] {
-  const lines = [
-    `// Observability (noop unless OTEL_EXPORTER_OTLP_ENDPOINT is set).`,
-    `const observability = await initObservabilityFromEnv();`,
-    `const shelfLogger = createShelfLogger({ mixin: otelLogMixin });`,
-    ``,
-    `const app = createShelfApp({`,
-    `  database,`,
-    `  storage,`,
-  ];
+  const lines = wantsObservability(answers)
+    ? [
+        `// Noop unless OTEL_EXPORTER_OTLP_ENDPOINT is set.`,
+        `const observability = await initObservabilityFromEnv();`,
+        `const shelfLogger = createShelfLogger({ mixin: otelLogMixin });`,
+        ``,
+      ]
+    : [];
+  lines.push(`const app = createShelfApp({`, `  database,`, `  storage,`);
 
   if (isRemoteQueue(answers.queue)) {
     lines.push(`  captureQueue,`);
@@ -372,11 +408,19 @@ function buildRouterLines(answers: Answers): string[] {
   }
 
   if (answers.auth === "password") {
-    const notifyArgs = wantsNotifications(answers)
-      ? `, emailSender, fromEmail: process.env.SMTP_FROM, onAuthSystemEvent: createAuthSystemHook()`
-      : ``;
     lines.push(
-      `  auth: createShelfAuth({ db: database, secret: process.env.SECRET!, baseURL: process.env.PUBLIC_BASE_URL!${notifyArgs} }).adapter,`,
+      `  auth: createShelfAuth({`,
+      `    db: database,`,
+      `    secret: process.env.SECRET!,`,
+      `    baseURL: process.env.PUBLIC_BASE_URL!,`,
+      ...(wantsNotifications(answers)
+        ? [
+            `    emailSender,`,
+            `    fromEmail: process.env.SMTP_FROM,`,
+            `    onAuthSystemEvent: createAuthSystemHook(),`,
+          ]
+        : []),
+      `  }).adapter,`,
     );
   }
   if (answers.auth === "oauth" && resolveDeployTarget(answers) === "aws") {
@@ -431,31 +475,20 @@ function buildRouterLines(answers: Answers): string[] {
     lines.push(`  gitHosts: [${host}],`);
   }
 
-  if (answers.queue === "memory") {
-    lines.push(
-      `  logger: shelfLogger,`,
-      `  observability,`,
-      `  config: {`,
-      `    secret: process.env.SECRET,`,
-      `    // Rotation: keep the old SECRET here until credentials are re-encrypted.`,
-      `    previousSecret: process.env.SECRET_PREVIOUS || undefined,`,
-      `    migrateCredentialsOnBoot: process.env.SECRET_MIGRATE === "true",`,
-      `    scratchDir: dataDir,`,
-      `  },`,
-    );
-  } else {
-    lines.push(
-      `  logger: shelfLogger,`,
-      `  observability,`,
-      `  config: {`,
-      `    secret: process.env.SECRET,`,
-      `    // Rotation: keep the old SECRET here until credentials are re-encrypted.`,
-      `    previousSecret: process.env.SECRET_PREVIOUS || undefined,`,
-      `    migrateCredentialsOnBoot: process.env.SECRET_MIGRATE === "true",`,
-      `  },`,
-    );
+  if (wantsObservability(answers)) {
+    lines.push(`  logger: shelfLogger,`, `  observability,`);
   }
-  lines.push(`});`, ``, `await app.lifecycle.setup();`, `const logger = app.lifecycle.logger;`);
+  lines.push(
+    `  config: {`,
+    `    secret: process.env.SECRET,`,
+    `    previousSecret: process.env.SECRET_PREVIOUS || undefined,`,
+    `    migrateCredentialsOnBoot: process.env.SECRET_MIGRATE === "true",`,
+    ...(answers.queue === "memory" ? [`    scratchDir: dataDir,`] : []),
+    `  },`,
+    `});`,
+    ``,
+    `await app.lifecycle.setup();`,
+  );
 
   if (answers.auth === "password") {
     lines.push(
@@ -471,11 +504,20 @@ function buildRouterLines(answers: Answers): string[] {
   return lines;
 }
 
+/** Whether the generated server reads `dataDir` (local sqlite/storage or in-process scratch). */
+function usesDataDir(answers: Answers): boolean {
+  return (
+    answers.queue === "memory" ||
+    DB_INIT[answers.database].includes("dataDir") ||
+    STORAGE_INIT[answers.storage].includes("dataDir")
+  );
+}
+
 function generateServer(answers: Answers): string {
   return [
     ...buildImports(answers),
     ``,
-    `const dataDir = process.env.DATA_DIR || "./data";`,
+    ...(usesDataDir(answers) ? [`const dataDir = process.env.DATA_DIR || "./data";`] : []),
     `const port = Number(process.env.PORT) || 3000;`,
     ``,
     ...buildAdapterLines(answers),
@@ -483,19 +525,14 @@ function generateServer(answers: Answers): string {
     ...buildRouterLines(answers),
     ``,
     `const server = serve({ fetch: app.fetch, port }, () => {`,
-    `  logger.info({ port }, "StoryShelf server listening");`,
+    `  app.lifecycle.logger.info({ port }, "StoryShelf server listening");`,
     `});`,
     ``,
-    `const shutdown = async () => {`,
-    `  await app.lifecycle.teardown();`,
-    `  server.close();`,
-    `};`,
-    `process.on("SIGTERM", () => {`,
-    `  shutdown().catch(() => {});`,
-    `});`,
-    `process.on("SIGINT", () => {`,
-    `  shutdown().catch(() => {});`,
-    `});`,
+    `for (const signal of ["SIGINT", "SIGTERM"] as const) {`,
+    `  process.once(signal, () => {`,
+    `    app.lifecycle.teardown().finally(() => server.close());`,
+    `  });`,
+    `}`,
     ``,
   ].join("\n");
 }
@@ -533,43 +570,46 @@ function workerQueueInit(queue: QueueChoice): string {
 }
 
 function generateWorkerFile(answers: Answers): string {
-  const queueImport = workerQueueImport(answers.queue);
-  const queueInit = workerQueueInit(answers.queue);
+  const observability = wantsObservability(answers);
   return [
-    queueImport,
+    workerQueueImport(answers.queue),
     `import { createCaptureWorker } from "@storyshelf/worker";`,
-    `import { initObservabilityFromEnv } from "@storyshelf/observability/node";`,
+    ...(observability
+      ? [`import { initObservabilityFromEnv } from "@storyshelf/observability/node";`]
+      : []),
     `import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";`,
     DB_IMPORT[answers.database],
     STORAGE_IMPORT[answers.storage],
     ``,
-    `// Observability (noop unless OTEL_EXPORTER_OTLP_ENDPOINT is set).`,
-    `const observability = await initObservabilityFromEnv();`,
-    ``,
+    ...(observability
+      ? [
+          `// Noop unless OTEL_EXPORTER_OTLP_ENDPOINT is set.`,
+          `const observability = await initObservabilityFromEnv();`,
+          ``,
+        ]
+      : []),
     `const dataDir = process.env.DATA_DIR || "./data";`,
     ...dbPrelude(answers.database),
-    `const database = ${DB_INIT[answers.database]};`,
-    `const storage = ${STORAGE_INIT[answers.storage]};`,
-    queueInit,
-    `const runner = createPlaywrightCaptureRunner();`,
+    workerQueueInit(answers.queue),
     ``,
     `const worker = createCaptureWorker({`,
     `  queue,`,
-    `  db: database,`,
-    `  storage,`,
-    `  runner,`,
+    `  db: ${DB_INIT[answers.database]},`,
+    `  storage: ${STORAGE_INIT[answers.storage]},`,
+    `  runner: createPlaywrightCaptureRunner(),`,
     `  scratchDir: dataDir,`,
     `  config: { concurrency: Number(process.env.WORKER_CONCURRENCY) || 2 },`,
     `});`,
     ``,
     `await worker.start();`,
     ``,
-    `const shutdown = async () => {`,
-    `  await worker.stop();`,
-    `  await observability.shutdown();`,
-    `};`,
-    `process.on("SIGTERM", () => { shutdown().catch(() => {}); });`,
-    `process.on("SIGINT", () => { shutdown().catch(() => {}); });`,
+    `for (const signal of ["SIGINT", "SIGTERM"] as const) {`,
+    `  process.once(signal, () => {`,
+    observability
+      ? `    worker.stop().finally(() => observability.shutdown());`
+      : `    void worker.stop();`,
+    `  });`,
+    `}`,
     ``,
   ].join("\n");
 }
@@ -577,11 +617,13 @@ function generateWorkerFile(answers: Answers): string {
 function buildDeps(answers: Answers): Record<string, string> {
   const deps: Record<string, string> = {
     "@hono/node-server": "^1.17.0",
-    "@storyshelf/core": __PKG_VERSION__ ?? "0.0.0",
     "@storyshelf/app": __PKG_VERSION__ ?? "0.0.0",
-    "@storyshelf/observability": __PKG_VERSION__ ?? "0.0.0",
     [DB_PACKAGE[answers.database]]: __PKG_VERSION__ ?? "0.0.0",
   };
+  if (wantsObservability(answers)) {
+    deps["@storyshelf/core"] = __PKG_VERSION__ ?? "0.0.0";
+    deps["@storyshelf/observability"] = __PKG_VERSION__ ?? "0.0.0";
+  }
   if (answers.database === "turso") {
     deps["@libsql/client"] = LIBSQL_CLIENT_SDK;
   }
@@ -669,6 +711,30 @@ function addInfraScripts(scripts: Record<string, string>): void {
   scripts["infra:outputs"] = "terraform -chdir=terraform output -json";
 }
 
+/** Whether the Docker setup needs compose: more than one service (Postgres or a worker). */
+function needsCompose(answers: Answers): boolean {
+  return (
+    answers.database === "postgres" ||
+    (isRemoteQueue(answers.queue) && Boolean(answers.includeWorker))
+  );
+}
+
+/** `docker:*` npm scripts: compose when several services, plain `docker` for one container. */
+function dockerScripts(answers: Answers): Record<string, string> {
+  if (needsCompose(answers)) {
+    return {
+      "docker:build": "docker compose build",
+      "docker:up": "docker compose up --build",
+      "docker:down": "docker compose down",
+      "docker:logs": "docker compose logs -f",
+    };
+  }
+  return {
+    "docker:build": `docker build -t ${answers.name} .`,
+    "docker:run": `docker run --rm -p 3000:3000 -v ${answers.name}-data:/data -e SECRET=change-me ${answers.name}`,
+  };
+}
+
 function generatePackageJson(answers: Answers): string {
   const pkg = {
     name: answers.name,
@@ -676,29 +742,23 @@ function generatePackageJson(answers: Answers): string {
     type: "module",
     private: true,
     description: "StoryShelf self-hosted visual testing server.",
+    engines: { node: ">=24" },
     scripts: {
-      start: "node --experimental-transform-types server.ts",
-      dev: "node --experimental-transform-types --watch server.ts",
-    },
+      start: `node ${SERVER_ENTRY}`,
+      dev: `node --watch ${SERVER_ENTRY}`,
+      typecheck: "tsc",
+    } as Record<string, string>,
     dependencies: buildDeps(answers),
-    devDependencies: {
-      typescript: "^7.0.2",
-    },
+    devDependencies: SCAFFOLD_DEV_DEPENDENCIES,
   };
 
   if (answers.includeWorker) {
-    (pkg.scripts as Record<string, string>)["worker"] =
-      "node --experimental-transform-types worker.ts";
-    (pkg.scripts as Record<string, string>)["worker:dev"] =
-      "node --experimental-transform-types --watch worker.ts";
+    pkg.scripts["worker"] = `node ${WORKER_ENTRY}`;
+    pkg.scripts["worker:dev"] = `node --watch ${WORKER_ENTRY}`;
   }
 
   if (resolveDeployTarget(answers) === "docker") {
-    const scripts = pkg.scripts as Record<string, string>;
-    scripts["docker:build"] = "docker compose build";
-    scripts["docker:up"] = "docker compose up --build";
-    scripts["docker:down"] = "docker compose down";
-    scripts["docker:logs"] = "docker compose logs -f";
+    Object.assign(pkg.scripts, dockerScripts(answers));
   }
 
   if (
@@ -713,19 +773,17 @@ function generatePackageJson(answers: Answers): string {
 }
 
 async function writeFiles(outDir: string, answers: Answers): Promise<void> {
-  const serverCode = generateServer(answers);
-  await writeFile(join(outDir, "server.ts"), serverCode);
-  printLine(`Created server.ts`);
+  await writeScaffoldFile(outDir, SERVER_ENTRY, generateServer(answers));
+  printLine(`Created ${SERVER_ENTRY}`);
 
   if (answers.includeWorker) {
-    const workerCode = generateWorkerFile(answers);
-    await writeFile(join(outDir, "worker.ts"), workerCode);
-    printLine(`Created worker.ts`);
+    await writeScaffoldFile(outDir, WORKER_ENTRY, generateWorkerFile(answers));
+    printLine(`Created ${WORKER_ENTRY}`);
   }
 
-  const pkgCode = generatePackageJson(answers);
-  await writeFile(join(outDir, "package.json"), pkgCode);
-  printLine(`Created package.json`);
+  await writeFile(join(outDir, "package.json"), generatePackageJson(answers));
+  await writeFile(join(outDir, "tsconfig.json"), generateTsconfig());
+  printLine(`Created package.json, tsconfig.json`);
 
   if (resolveDeployTarget(answers) === "aws") {
     await writeTerraformFiles(outDir, answers);
@@ -794,31 +852,26 @@ async function writeDockerFiles(outDir: string, answers: Answers): Promise<void>
   if (!answers.docker) {
     return;
   }
-
-  if (isRemoteQueue(answers.queue) && answers.includeWorker) {
-    // Server is slim when queue is remote; worker has playwright
-    const slimDockerfile = [
-      "FROM node:lts-alpine",
-      "WORKDIR /app",
-      "COPY package.json ./",
-      "RUN npm install --omit=dev",
-      "COPY server.ts ./",
-      "RUN npx esbuild server.ts --bundle --platform=node --format=esm --outfile=dist/server.mjs",
-      "EXPOSE 3000",
-      'CMD ["node", "dist/server.mjs"]',
-    ].join("\n");
-    await writeFile(join(outDir, "Dockerfile"), slimDockerfile);
-    await writeFile(join(outDir, "Dockerfile.worker"), generateWorkerDockerfile());
-    await writeFile(join(outDir, ".dockerignore"), generateDockerignore());
-    await writeFile(join(outDir, "compose.yaml"), generateComposeYamlWithWorker(answers.database));
-    printLine(`Created Dockerfile, Dockerfile.worker, .dockerignore, compose.yaml`);
-    return;
-  }
-
-  await writeFile(join(outDir, "Dockerfile"), generateDockerfile());
+  const created = ["Dockerfile", ".dockerignore"];
+  const workerSplit = isRemoteQueue(answers.queue) && answers.includeWorker;
+  // Server is slim when the queue is remote; the worker image has Playwright.
+  await writeFile(
+    join(outDir, "Dockerfile"),
+    workerSplit ? generateSlimServerDockerfile() : generateDockerfile(),
+  );
   await writeFile(join(outDir, ".dockerignore"), generateDockerignore());
-  await writeFile(join(outDir, "compose.yaml"), generateComposeYaml(answers.database));
-  printLine(`Created Dockerfile, .dockerignore, compose.yaml`);
+  if (workerSplit) {
+    await writeFile(join(outDir, "Dockerfile.worker"), generateWorkerDockerfile());
+    created.splice(1, 0, "Dockerfile.worker");
+  }
+  if (needsCompose(answers)) {
+    const compose = workerSplit
+      ? generateComposeYamlWithWorker(answers.database)
+      : generateComposeYaml(answers.database);
+    await writeFile(join(outDir, "compose.yaml"), compose);
+    created.push("compose.yaml");
+  }
+  printLine(`Created ${created.join(", ")}`);
 }
 
 function printNextSteps(answers: Answers, runner: PackageRunner): void {
@@ -865,12 +918,17 @@ function printNextSteps(answers: Answers, runner: PackageRunner): void {
   }
 
   if (target === "docker") {
-    printLine(`  npm run docker:up      # builds + starts app (+ worker)`);
-    printLine(`  npm run docker:logs    # follow logs`);
-    printLine(`  npm run docker:down    # tear down`);
-    if (answers.includeWorker) {
-      printLine(`  # or separately:`);
-      printLine(`  # docker compose up storyshelf worker`);
+    if (needsCompose(answers)) {
+      printLine(`  npm run docker:up      # builds + starts app (+ worker)`);
+      printLine(`  npm run docker:logs    # follow logs`);
+      printLine(`  npm run docker:down    # tear down`);
+      if (answers.includeWorker) {
+        printLine(`  # or separately:`);
+        printLine(`  # docker compose up storyshelf worker`);
+      }
+    } else {
+      printLine(`  npm run docker:build   # builds the image`);
+      printLine(`  npm run docker:run     # runs it on :3000 (data in a named volume)`);
     }
     return;
   }

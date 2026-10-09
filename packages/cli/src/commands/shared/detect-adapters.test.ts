@@ -88,6 +88,21 @@ describe("detectInstalledAdapters", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it("detects d1 from the src/index.ts scaffold layout", () => {
+    const dir = makeTmp();
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({ dependencies: { "@storyshelf/db-sqlite": "0.3.2" } }),
+    );
+    mkdirSync(join(dir, "src"));
+    writeFileSync(
+      join(dir, "src", "index.ts"),
+      'import { createD1Database } from "@storyshelf/db-sqlite/d1";',
+    );
+    expect(detectInstalledAdapters(dir).database).toBe("d1");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it("detects bun-sqlite via the worker.ts subpath import", () => {
     const dir = makeTmp();
     writeFileSync(

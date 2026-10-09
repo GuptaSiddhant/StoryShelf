@@ -15,7 +15,7 @@ import { createLocalStorage } from "@storyshelf/storage-local";
  * Runs directly from TypeScript source with NO build step: `nub watch` applies
  * the `conditions: ["development"]` custom condition from `nub.jsonc`, which
  * resolves every `@storyshelf/*` import to its `.ts`/`.tsx` source (the
- * `source` export condition) via the isolated workspace linker. Node 26 strips
+ * `source` export condition) via the isolated workspace linker. Node 24+ strips
  * types natively, so the whole monorepo is served straight from `src/`.
  *
  * Start it with `nub run serve` from the repo root (auto-restarts on change).

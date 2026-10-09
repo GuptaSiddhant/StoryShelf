@@ -294,11 +294,11 @@ const SCHEMA_BASE_URL = "https://unpkg.com/storyshelf";
 const SCHEMA_PACKAGE_PATH = "schema/storyshelf-config.json";
 
 /** Running CLI version, or undefined in dev/test without the build define. */
-function cliVersion(): string | undefined {
-  if (__PKG_VERSION__ === undefined || __PKG_VERSION__ === "" || __PKG_VERSION__ === "0.0.0") {
+export function cliVersion(): string | undefined {
+  if (typeof __PKG_VERSION__ !== "string") {
     return undefined;
   }
-  return __PKG_VERSION__;
+  return __PKG_VERSION__ === "" || __PKG_VERSION__ === "0.0.0" ? undefined : __PKG_VERSION__;
 }
 
 /** Options for resolving the `$schema` value stamped into new configs. */

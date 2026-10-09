@@ -12,6 +12,9 @@ export interface WorkerServeOptions {
 }
 
 const WORKER_CANDIDATES = [
+  "src/worker.ts",
+  "src/worker.js",
+  "src/worker.mjs",
   "worker.ts",
   "worker.js",
   "worker.mjs",
@@ -47,8 +50,9 @@ export async function resolveWorkerFile(dir: string): Promise<string> {
   );
 }
 
+/** Node runs the entry directly: Node 24+ strips TypeScript types without a flag. */
 function nodeArgs(file: string): string[] {
-  return file.endsWith(".ts") ? ["--experimental-transform-types", file] : [file];
+  return [file];
 }
 
 interface SignalRelay {

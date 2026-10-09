@@ -10,6 +10,7 @@ import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { DDL, tableColumns } from "./ddl.ts";
 import { createDrizzleAdapter, withManualTransactions } from "./drizzle-factory.ts";
+import { ensureDbDir } from "./ensure-db-dir.ts";
 import { schema } from "./schema/index.ts";
 
 declare const __PKG_VERSION__: string | undefined;
@@ -44,7 +45,7 @@ export function createBetterSqlite3Database(
   }
 
   const owned = !options.client;
-  const client = options.client ?? new Database(options.path, connectionOptions(options));
+  const client = options.client ?? openDatabase(options);
   if (owned) {
     client.exec("PRAGMA journal_mode = WAL");
     client.exec("PRAGMA busy_timeout = 5000");
@@ -150,4 +151,10 @@ function runMigrations(client: BetterSqlite3Client): void {
   } catch {
     execIgnore(client, "PRAGMA foreign_keys = ON");
   }
+}
+
+/** Open the file-backed database, creating its directory first. */
+function openDatabase(options: BetterSqlite3DatabaseOptions): InstanceType<typeof Database> {
+  ensureDbDir(options.path ?? "");
+  return new Database(options.path, connectionOptions(options));
 }

@@ -11,7 +11,7 @@ StoryShelf is a self-hosted visual testing platform for Storybook. You run one s
 
 <Screenshot name="projects-list" alt="The projects overview: a card per project with its latest build and review backlog" caption="What you will end up with: a project per Storybook, and what still needs review." />
 
-You need a Storybook with a `.storybook/main.*` file, and Node.js on the machine that will run the server.
+You need a Storybook with a `.storybook/main.*` file, and Node.js 24 or later on the machine that will run the server.
 
 ## 1. Scaffold a server
 
@@ -19,7 +19,7 @@ Use the CLI to scaffold a new server project:
 
 <PackageManagers type="dlx" pkg="storyshelf" args="server init" />
 
-It asks for a project name and directory, then which database (SQLite by default), storage (local filesystem by default), auth (none by default), and git provider (GitHub, GitLab, or none). It generates `server.ts` and a `package.json` with the matching adapters.
+It asks for a project name and directory, then which database (SQLite by default), storage (local filesystem by default), auth (none by default), and git provider (GitHub, GitLab, or none). It generates `src/index.ts`, a `package.json` with the matching adapters and a `tsconfig.json` for your editor.
 
 ## 2. Start the server
 

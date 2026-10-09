@@ -16,7 +16,7 @@ import { requestId } from "hono/request-id";
 import type { ShelfApp, ShelfContext, ShelfRouter } from "./app-types.ts";
 import { setupCaptureQueue } from "./capture-setup.ts";
 import { checkCredentialsAfterSetup } from "./credentials.ts";
-import { attachLifecycle, type LifecycleCell } from "./lifecycle.ts";
+import { attachLifecycle, trackBackground, type LifecycleCell } from "./lifecycle.ts";
 import {
   authGate,
   csrf,
@@ -83,15 +83,18 @@ function recoverAfterSetup(
   if (!recoverStuck) {
     return;
   }
-  cell.ready
-    .then(async (setup) => {
-      if (setup.ok) {
-        await recoverStuck();
-      }
-    })
-    .catch((error: unknown) => {
-      logger.error({ err: error }, "stuck capture recovery failed");
-    });
+  trackBackground(
+    cell,
+    cell.ready
+      .then(async (setup) => {
+        if (setup.ok) {
+          await recoverStuck();
+        }
+      })
+      .catch((error: unknown) => {
+        logger.error({ err: error }, "stuck capture recovery failed");
+      }),
+  );
 }
 
 /** Boot-time checks that run once adapters are ready: stuck-capture recovery and credential state. */

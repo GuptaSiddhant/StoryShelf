@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/queue-azure",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Azure capture queue adapter for StoryShelf: Storage Queues or Service Bus.",
   "keywords": [
     "azure",
@@ -28,6 +28,9 @@
     "dist"
   ],
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "sideEffects": false,
   "types": "./dist/index.d.mts",
   "exports": {

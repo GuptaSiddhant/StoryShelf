@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/auth",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Better Auth engine for StoryShelf: opaque DBAdapter bridge, shelf factory, and auth presets.",
   "keywords": [
     "auth",
@@ -26,6 +26,9 @@
     "dist"
   ],
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "sideEffects": false,
   "types": "./dist/index.d.mts",
   "exports": {

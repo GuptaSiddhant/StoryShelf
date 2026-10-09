@@ -230,7 +230,13 @@ export const INFRA_PROMPTS: Prompt[] = [
     type: "confirm",
     name: "notifications",
     message: "Enable email + chat notifications (Slack/Teams/email channels)?",
-    initial: true,
+    initial: false,
+  },
+  {
+    type: "confirm",
+    name: "observability",
+    message: "Add OpenTelemetry tracing + metrics wiring?",
+    initial: false,
   },
 ];
 
@@ -267,7 +273,14 @@ const NOTIFICATIONS_CONFIRM: ConfirmPrompt = {
   type: "confirm",
   name: "notifications",
   message: "Enable email + chat notifications (Slack/Teams/email channels)?",
-  initial: true,
+  initial: false,
+};
+
+const OBSERVABILITY_CONFIRM: ConfirmPrompt = {
+  type: "confirm",
+  name: "observability",
+  message: "Add OpenTelemetry tracing + metrics wiring?",
+  initial: false,
 };
 
 /**
@@ -299,6 +312,7 @@ export function localInfraPrompts(advanced: boolean): Prompt[] {
     },
     DOCKER_CONFIRM,
     NOTIFICATIONS_CONFIRM,
+    OBSERVABILITY_CONFIRM,
   ];
 }
 

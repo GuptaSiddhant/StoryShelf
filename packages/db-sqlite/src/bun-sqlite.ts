@@ -10,6 +10,7 @@ import { Database } from "bun:sqlite";
 import { drizzle } from "drizzle-orm/bun-sqlite";
 import { DDL, tableColumns } from "./ddl.ts";
 import { createDrizzleAdapter, withManualTransactions } from "./drizzle-factory.ts";
+import { ensureDbDir } from "./ensure-db-dir.ts";
 import { schema } from "./schema/index.ts";
 
 declare const __PKG_VERSION__: string | undefined;
@@ -42,7 +43,7 @@ export function createBunSqliteDatabase(options: BunSqliteDatabaseOptions): Data
   }
 
   const owned = !options.client;
-  const client = options.client ?? new Database(options.path, connectionOptions(options));
+  const client = options.client ?? openDatabase(options);
   if (owned) {
     client.exec("PRAGMA journal_mode = WAL");
     client.exec("PRAGMA busy_timeout = 5000");
@@ -164,4 +165,10 @@ function runMigrations(client: Database): void {
   } catch {
     execIgnore(client, "PRAGMA foreign_keys = ON");
   }
+}
+
+/** Open the file-backed database, creating its directory first. */
+function openDatabase(options: BunSqliteDatabaseOptions): InstanceType<typeof Database> {
+  ensureDbDir(options.path ?? "");
+  return new Database(options.path, connectionOptions(options));
 }

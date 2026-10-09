@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/app",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "StoryShelf app: Hono app, API routes, and server-rendered UI over @storyshelf/core.",
   "keywords": [
     "chromatic-alternative",
@@ -27,6 +27,9 @@
     "dist"
   ],
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "sideEffects": false,
   "types": "./dist/index.d.mts",
   "exports": {

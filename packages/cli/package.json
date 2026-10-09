@@ -1,6 +1,6 @@
 {
   "name": "storyshelf",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "StoryShelf CLI: create projects, upload builds, purge, and retry from CI.",
   "keywords": [
     "ci",
@@ -31,6 +31,9 @@
     "schema"
   ],
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "sideEffects": false,
   "types": "./dist/index.d.mts",
   "exports": {
@@ -53,7 +56,6 @@
     "@storyshelf/affected": "workspace:*",
     "archiver": "8.0.0",
     "commander": "^13.0.0",
-    "hono": "catalog:",
     "picomatch": "^4.0.2",
     "prompts": "^2.4.2"
   },

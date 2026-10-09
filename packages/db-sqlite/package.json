@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/db-sqlite",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "SQLite database adapter for StoryShelf (node:sqlite + Drizzle).",
   "keywords": [
     "database",
@@ -27,6 +27,9 @@
     "dist"
   ],
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "sideEffects": false,
   "types": "./dist/index.d.mts",
   "exports": {

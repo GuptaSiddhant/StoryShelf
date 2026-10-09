@@ -14,7 +14,7 @@ description: Change SECRET without losing stored webhook, git and notification c
    SECRET_PREVIOUS=<old value>
    ```
 
-   The scaffolded `server.ts`, `dev-server` and `fly-app` read both. In code this is `ShelfConfig.secret` and `ShelfConfig.previousSecret` (a single value, not a list).
+   The scaffolded `src/index.ts`, `dev-server` and `fly-app` read both. In code this is `ShelfConfig.secret` and `ShelfConfig.previousSecret` (a single value, not a list).
 
 2. Restart. The server decrypts with `SECRET` first and falls back to `SECRET_PREVIOUS`, so webhooks, git statuses and notifications keep working.
 

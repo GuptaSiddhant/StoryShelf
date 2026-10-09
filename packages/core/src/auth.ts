@@ -4,7 +4,8 @@
  * Owned by core so `ShelfOptions.auth` needs no dependency edge into the
  * engine package (which would cycle: the engine already depends on core).
  * `@storyshelf/auth` implements this interface and re-exports it; app code
- * imports `Auth` from `@storyshelf/auth`.
+ * imports `Auth` (and the shared runtime helpers below) from
+ * `@storyshelf/core/auth`, so a server without auth never needs the engine.
  */
 import type { AuthUser } from "./types.ts";
 
@@ -87,4 +88,15 @@ export interface Auth {
   createSession: (user: AuthUser) => Promise<string>;
   /** Revoke one session by token (accepts the signed cookie value). */
   destroySession: (sessionToken: string) => Promise<void>;
+}
+
+/** Minimum password length for local accounts (matches legacy policy). */
+export const MIN_PASSWORD_LENGTH = 12;
+
+/**
+ * Raw session token from a possibly-signed cookie value (`token.signature`).
+ * Single shared parser: cookies, CSRF binding, and table lookups must agree.
+ */
+export function unsignedToken(value: string): string {
+  return value.split(".")[0] ?? "";
 }

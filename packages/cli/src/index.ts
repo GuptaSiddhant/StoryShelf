@@ -1,18 +1,17 @@
 import { Command } from "commander";
-import { runBuild, type BuildOptions } from "./commands/build.ts";
+import type { BuildOptions } from "./commands/build.ts";
 import type { ConnectionOptions } from "./commands/connection.ts";
-import { runCreate, type CreateOptions } from "./commands/create.ts";
-import { runDefaultCommand, handleError } from "./commands/default.ts";
-import { runDoctor, type DoctorOptions } from "./commands/doctor.ts";
-import { runInit, type InitOptions } from "./commands/init.ts";
-import { runPurge, type PurgeOptions } from "./commands/purge.ts";
-import { runRetry, type RetryOptions } from "./commands/retry.ts";
-import { runServerInit, type ServerInitOptions } from "./commands/server/init.ts";
-import { runServerServe, type ServerServeOptions } from "./commands/server/serve.ts";
-import { runUpload, type UploadOptions } from "./commands/upload.ts";
-import { runWhoami } from "./commands/whoami.ts";
-import { runWorkerInit, type WorkerInitOptions } from "./commands/worker/init.ts";
-import { runWorkerServe, type WorkerServeOptions } from "./commands/worker/serve.ts";
+import type { CreateOptions } from "./commands/create.ts";
+import type { DoctorOptions } from "./commands/doctor.ts";
+import type { InitOptions } from "./commands/init.ts";
+import type { PurgeOptions } from "./commands/purge.ts";
+import type { RetryOptions } from "./commands/retry.ts";
+import type { ServerInitOptions } from "./commands/server/init.ts";
+import type { ServerServeOptions } from "./commands/server/serve.ts";
+import type { UploadOptions } from "./commands/upload.ts";
+import type { WorkerInitOptions } from "./commands/worker/init.ts";
+import type { WorkerServeOptions } from "./commands/worker/serve.ts";
+import { cliVersion } from "./config.ts";
 import { isMainModule } from "./is-main.ts";
 
 /**
@@ -25,7 +24,7 @@ export function createProgram(): Command {
   program
     .name("storyshelf")
     .description("Self-hosted visual testing for Storybook.")
-    .version("0.2.0");
+    .version(cliVersion() ?? "0.0.0-dev");
   const commands = [
     buildInitCommand(),
     buildCreateCommand(),
@@ -44,9 +43,22 @@ export function createProgram(): Command {
   return program;
 }
 
-function run<TArgs>(fn: (args: TArgs) => Promise<void>): (args: TArgs) => Promise<void> {
+/**
+ * Wrap a command so its module (and heavy dependencies such as the zip library
+ * or prompts) loads only when that command runs. `storyshelf -h` and the other
+ * commands then skip ~40 ms of imports they never use.
+ */
+function run<TArgs>(
+  load: () => Promise<(args: TArgs) => Promise<void>>,
+): (args: TArgs) => Promise<void> {
   return async (args: TArgs) => {
-    await fn(args).catch(handleError);
+    try {
+      const command = await load();
+      await command(args);
+    } catch (error) {
+      const { handleError } = await import("./commands/default.ts");
+      handleError(error);
+    }
   };
 }
 
@@ -64,7 +76,7 @@ function buildInitCommand(): Command {
       "--token <token>",
       "auth token for sync (or STORYSHELF_TOKEN/STORYSHELF_ADMIN_TOKEN env)",
     )
-    .action(run<InitOptions>(runInit));
+    .action(run<InitOptions>(async () => (await import("./commands/init.ts")).runInit));
 }
 
 function buildCreateCommand(): Command {
@@ -73,7 +85,7 @@ function buildCreateCommand(): Command {
     .option("--url <url>", "server base URL")
     .option("--name <name>", "project name")
     .option("--token <token>", "admin token (or STORYSHELF_ADMIN_TOKEN env)")
-    .action(run<CreateOptions>(runCreate));
+    .action(run<CreateOptions>(async () => (await import("./commands/create.ts")).runCreate));
 }
 
 function buildServerCommand(): Command {
@@ -82,12 +94,18 @@ function buildServerCommand(): Command {
     .command("init")
     .description("Scaffold a new StoryShelf server project")
     .option("--dir <dir>", "output directory")
-    .action(run<ServerInitOptions>(runServerInit));
+    .action(
+      run<ServerInitOptions>(async () => (await import("./commands/server/init.ts")).runServerInit),
+    );
   const serve = new Command("serve")
     .description("Run a scaffolded StoryShelf server project")
     .option("--dir <dir>", "server project directory (default cwd)")
     .option("--port <port>", "port override (sets PORT)")
-    .action(run<ServerServeOptions>(runServerServe));
+    .action(
+      run<ServerServeOptions>(
+        async () => (await import("./commands/server/serve.ts")).runServerServe,
+      ),
+    );
   server.addCommand(serve, { isDefault: true });
   return server;
 }
@@ -98,20 +116,30 @@ function buildWorkerCommand(): Command {
     .command("init")
     .description("Scaffold a new StoryShelf worker project")
     .option("--dir <dir>", "output directory")
-    .action(run<WorkerInitOptions>(runWorkerInit));
+    .action(
+      run<WorkerInitOptions>(async () => (await import("./commands/worker/init.ts")).runWorkerInit),
+    );
   worker
     .command("serve")
     .description("Run a scaffolded StoryShelf worker project")
     .option("--dir <dir>", "worker project directory (default cwd)")
     .option("--queue-url <url>", "SQS queue URL override (sets QUEUE_URL)")
     .option("--concurrency <n>", "concurrency override (sets WORKER_CONCURRENCY)")
-    .action(run<WorkerServeOptions>(runWorkerServe));
+    .action(
+      run<WorkerServeOptions>(
+        async () => (await import("./commands/worker/serve.ts")).runWorkerServe,
+      ),
+    );
   const runCmd = new Command("run")
     .description("Run a scaffolded worker (alias for worker serve)")
     .option("--dir <dir>", "worker project directory (default cwd)")
     .option("--queue-url <url>", "SQS queue URL override")
     .option("--concurrency <n>", "concurrency override")
-    .action(run<WorkerServeOptions>(runWorkerServe));
+    .action(
+      run<WorkerServeOptions>(
+        async () => (await import("./commands/worker/serve.ts")).runWorkerServe,
+      ),
+    );
   worker.addCommand(runCmd);
   return worker;
 }
@@ -121,7 +149,7 @@ function buildPurgeCommand(): Command {
     .description("Purge expired builds on a StoryShelf server")
     .requiredOption("--url <url>", "server base URL")
     .option("--token <token>", "admin token (or STORYSHELF_ADMIN_TOKEN env)")
-    .action(run<PurgeOptions>(runPurge));
+    .action(run<PurgeOptions>(async () => (await import("./commands/purge.ts")).runPurge));
 }
 
 function buildUploadCommand(): Command {
@@ -156,7 +184,7 @@ function buildUploadCommand(): Command {
       (value: string, previous: string[]) => [...previous, value],
       [] as string[],
     )
-    .action(run<UploadOptions>(runUpload));
+    .action(run<UploadOptions>(async () => (await import("./commands/upload.ts")).runUpload));
 }
 
 function buildBuildCommand(): Command {
@@ -167,7 +195,7 @@ function buildBuildCommand(): Command {
     .option("--build-command <cmd>", "build command to run if buildDir missing/empty")
     .option("--build-script-name <name>", "npm script to build Storybook (default build-storybook)")
     .option("--force-build", "force rebuild even if buildDir exists")
-    .action(run<BuildOptions>(runBuild));
+    .action(run<BuildOptions>(async () => (await import("./commands/build.ts")).runBuild));
 }
 
 function buildDoctorCommand(): Command {
@@ -180,7 +208,7 @@ function buildDoctorCommand(): Command {
     .option("-c, --config <path>", "config file path (default .storybook/storyshelf.json)")
     .option("--build-command <cmd>", "build command to run if buildDir missing/empty")
     .option("--build-script-name <name>", "npm script to build Storybook (default build-storybook)")
-    .action(run<DoctorOptions>(runDoctor));
+    .action(run<DoctorOptions>(async () => (await import("./commands/doctor.ts")).runDoctor));
 }
 
 function buildWhoamiCommand(): Command {
@@ -190,7 +218,7 @@ function buildWhoamiCommand(): Command {
     .option("--slug <slug>", "project slug (or .storybook/storyshelf.json)")
     .option("--token <token>", "CI token (or STORYSHELF_TOKEN env)")
     .option("-c, --config <path>", "config file path (default .storybook/storyshelf.json)")
-    .action(run<ConnectionOptions>(runWhoami));
+    .action(run<ConnectionOptions>(async () => (await import("./commands/whoami.ts")).runWhoami));
 }
 
 function buildRetryCommand(): Command {
@@ -200,13 +228,14 @@ function buildRetryCommand(): Command {
     .requiredOption("--slug <slug>", "project slug")
     .requiredOption("--build-id <id>", "build id")
     .option("--token <token>", "CI token (or STORYSHELF_TOKEN env)")
-    .action(run<RetryOptions>(runRetry));
+    .action(run<RetryOptions>(async () => (await import("./commands/retry.ts")).runRetry));
 }
 
 if (isMainModule(import.meta.url, process.argv[1])) {
   const program = createProgram();
   // Default: `storyshelf` with no args -> upload if config exists, else help to init
   if (process.argv.length <= 2) {
+    const { runDefaultCommand } = await import("./commands/default.ts");
     await runDefaultCommand(program);
   } else {
     program.parse(process.argv);

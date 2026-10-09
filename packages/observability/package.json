@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/observability",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "StoryShelf observability: OpenTelemetry tracing, metrics, and log correlation over @storyshelf/core adapters.",
   "keywords": [
     "metrics",
@@ -29,6 +29,9 @@
     "dist"
   ],
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "sideEffects": false,
   "types": "./dist/index.d.mts",
   "exports": {

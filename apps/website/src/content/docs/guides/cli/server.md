@@ -19,7 +19,19 @@ storyshelf server init
 # ? Which git provider? GitHub
 ```
 
-Generates `server.ts` + `package.json` (and `Dockerfile`/`compose.yaml` if selected) in the target directory.
+Generates a small TypeScript project in the target directory:
+
+```
+src/index.ts      # the server (and src/worker.ts when you run a remote-queue worker)
+package.json
+tsconfig.json     # editor types; `npm run typecheck` runs tsc
+Dockerfile        # only if you choose Docker (plus Dockerfile.worker for a worker)
+compose.yaml      # only when the Docker stack has more than one service
+```
+
+Entry code lives in `src/` so you can split logic into more files (use `.ts` in relative imports). The Docker image installs production dependencies and runs `src/index.ts` directly with Node, the same as `npm start`; there is no build step. A single-container setup (for example SQLite + local storage) gets `docker:build` / `docker:run` scripts and no compose file; compose is generated when the stack adds Postgres or a worker.
+
+Notifications and OpenTelemetry wiring are opt-in: the generated server only imports what you selected, so the default output stays short.
 
 **Deploy targets** (when prompted, `local`/`docker`/`aws`/`azure`/`gcp`):
 
@@ -39,6 +51,6 @@ Run a scaffolded server project (also the default for bare `storyshelf server`):
 storyshelf server serve --dir ./my-storyshelf --port 3000
 ```
 
-Looks for `server.ts`, `server.js`/`server.mjs`, then `index.ts`/`index.js`/`index.mjs` and spawns it with output inherited; without any entry it directs you to `storyshelf server init`.
+Looks for `src/index.ts` (also `.js`/`.mjs`), then the older root layout (`server.ts`, `server.js`/`server.mjs`, `index.ts`/`index.js`/`index.mjs`) and spawns it with output inherited; without any entry it directs you to `storyshelf server init`.
 
 See [Getting started](/guides/getting-started/) for the full init flow and [Configuration](/guides/config/) for env vars.

@@ -3,6 +3,102 @@
 All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 `scripts/release.mjs` (every workspace package shares one version).
 
+## 0.6.2 — Lean scaffold, working Docker images, Node 24 (2026-10-08)
+
+A fix-focused release. `storyshelf server init` now generates a smaller
+`src/`-based project with a `tsconfig.json`, and its Docker images actually
+start; `npx storyshelf` starts faster and reports the right version; and a
+server that opts out of auth no longer fails to bundle.
+
+**Upgrading:** Node 24 is now the minimum supported version (every package
+declares `engines.node >=24`, and generated projects require it). Existing
+scaffolded projects keep working and are not rewritten; regenerate to get the
+new layout and fixed Dockerfiles.
+
+**CLI startup**
+- Command modules and their dependencies (the zip library, prompts) now load only
+  when that command runs, so `storyshelf -h`, `whoami` and the rest start in
+  about 10 ms over bare Node instead of about 55 ms.
+- `storyshelf --version` reports the real package version (it was hardcoded to
+  `0.2.0`).
+- Dropped the unused `hono` dependency from the CLI, so `npx storyshelf`
+  installs less.
+
+**Node 24 is the minimum**
+- Every published package declares `engines.node >=24` (none did before), the
+  release check fails if one does not, and the docs, README and CI example now
+  say Node 24 instead of 22 or 20.
+- The slim server image is pinned to `node:24-alpine` instead of the floating
+  `node:lts-alpine`.
+
+**First-run and release safety**
+- `@storyshelf/db-sqlite` creates the database file's directory (all file-based
+  presets), so a fresh scaffold or an empty Docker volume boots instead of
+  failing with `unable to open database file`.
+- CI now smoke-tests the built artifacts: the CLI launched through a `.bin`
+  symlink (as `npx` does), and a freshly scaffolded server that type-checks,
+  boots, serves HTML and vendored assets, and shuts down cleanly. The two
+  regressions that shipped in 0.6.0 and 0.6.1 would have failed it.
+- Generated projects (`npm start`, `dev`, `worker`, the Docker `CMD`) and
+  `storyshelf server serve` / `worker serve` no longer pass
+  `--experimental-transform-types`, which Node 26 rejects (`bad option`). Node 24
+  and later strip types without a flag, so entries run with plain `node`; the
+  generated `package.json` declares `engines.node >= 24`.
+- The npm publish job skips versions that are already published, so a partly
+  failed release can be re-run (the JSR job already did this).
+
+**CI**
+- The whole pipeline now runs on Node 24, the minimum supported version
+  (`devEngines.runtime` is `24.x`; it was `>=24`, which CI resolved to the
+  newest Node). The smoke test asserts the Node major so the default cannot
+  drift unnoticed.
+- The website build, link check and accessibility check run only when
+  `apps/website/` changed (scheduled and manual runs always run everything).
+
+**`storyshelf server init` scaffold**
+- Entry code now lives in `src/index.ts` (and `src/worker.ts`) so you can split
+  logic into more files; `tsconfig.json`, `@types/node` and a `typecheck` script
+  are generated so the editor resolves types. `storyshelf server serve` /
+  `worker serve` find `src/` first and still run the older root layout.
+- Leaner output: notifications and OpenTelemetry wiring are opt-in (the prompts
+  now default to no), imports from the same module are merged, and unused
+  variables and dependencies are no longer emitted.
+- Docker: `compose.yaml` is only generated when the stack has more than one
+  service (Postgres or a worker); a single container gets `docker:build` and
+  `docker:run` scripts instead.
+- Fixes: the generated Docker images could not run. They bundled the server
+  with esbuild into one ESM file, which crashes at startup (`Dynamic require of
+  "util" is not supported` from a CommonJS dependency) and cannot find the
+  vendored assets `@storyshelf/app` reads from disk; the `CMD` also pointed at
+  a path the bundle was never copied to, and the build copied a `playwright`
+  package that is never installed. Images now install production dependencies
+  and run `src/index.ts` directly with Node (as `npm start` does), on a
+  Playwright image pinned to the `playwright-core` version. With a worker, the
+  compose worker service was written inside the `volumes:` block (invalid) and
+  had no `DATABASE_URL`.
+- **Heads-up:** the generated server file moved from `server.ts` to
+  `src/index.ts`; existing projects keep working and are not rewritten.
+
+**Packaging**
+- `@storyshelf/app` no longer imports `@storyshelf/auth`, so a server that opted
+  out of auth bundles and installs without it (it failed to resolve before). The
+  shared `Auth` contract plus `MIN_PASSWORD_LENGTH` and `unsignedToken` come
+  from `@storyshelf/core/auth`; `@storyshelf/auth` re-exports them.
+
+**Server runtime**
+- `@storyshelf/runner-playwright` loads `playwright-core` on the first render
+  instead of at import, taking ~220 ms of CPU and tens of MB off server boot
+  (and off servers that hand renders to a remote worker).
+- Shutdown waits (up to 5 s) for the stuck-capture recovery and credential check
+  that run after setup, so an early SIGTERM no longer logs `database is not open`.
+
+## 0.6.1 — CLI and auth fixes (2026-10-06)
+
+- **CLI:** `npx storyshelf` (and any bin launched through a `.bin` symlink) now
+  runs; it exited silently with no output because the entrypoint check did not
+  resolve symlinks.
+- **Auth:** the env-driven admin login works with a valid default email.
+
 ## 0.6.0 — Better Auth, notifications, affected capture, UI redesign (2026-10-06)
 
 The first release where **all 24 packages are published to both npm and JSR**,
