@@ -21,7 +21,11 @@ export default defineConfig({
   site: SITE,
   base: process.env.BASE_PATH || "/",
   // The API reference used to be a standalone Swagger page at /openapi/.
-  redirects: { "/openapi": "/api/" },
+  redirects: {
+    "/openapi": "/api/",
+    "/guides/ai-insights": "/ai/",
+    "/guides/ai-testing": "/ai/testing/",
+  },
   integrations: [
     mermaid({ autoTheme: true }),
     starlight({
@@ -100,8 +104,6 @@ export default defineConfig({
                 { label: "Merge gate", slug: "guides/merge-gate" },
                 { label: "Interaction testing", slug: "guides/interaction-testing" },
                 { label: "Notifications", slug: "guides/notifications" },
-                { label: "AI insights", slug: "guides/ai-insights" },
-                { label: "Free AI for testing", slug: "guides/ai-testing" },
                 { label: "Without git", slug: "guides/without-git" },
               ],
             },
@@ -152,6 +154,19 @@ export default defineConfig({
                 { label: "Migration", slug: "guides/chromatic-migration" },
               ],
             },
+          ],
+        },
+        {
+          label: "AI insights",
+          items: [
+            { label: "Overview", slug: "ai" },
+            { label: "Setup and providers", slug: "ai/setup" },
+            { label: "Build triage", slug: "ai/triage" },
+            { label: "Project health", slug: "ai/health" },
+            { label: "Privacy and safety", slug: "ai/privacy" },
+            { label: "Budget and usage", slug: "ai/budget" },
+            { label: "AI API", slug: "ai/api" },
+            { label: "Free AI for testing", slug: "ai/testing" },
           ],
         },
         {

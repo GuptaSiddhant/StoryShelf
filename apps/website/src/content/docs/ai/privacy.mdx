@@ -1,0 +1,45 @@
+---
+title: Privacy and safety
+description: What data the AI sees, how secrets are redacted, how untrusted content is handled, and what is (and is not) recorded in traces.
+---
+
+AI insights are designed so that turning them on is a deliberate, per-project decision and so that nothing from your Storybook can steer the result.
+
+## Who decides where data goes
+
+- AI is **off** until the server is given a model *and* a site admin picks a profile for the project.
+- Only **site admins** can change a project's profile (and override the profile for a single API run), because the profile decides which model provider receives the project's data.
+- A profile with `vision: null` never sends screenshots, and a profile built on a local model keeps everything on your network.
+
+## What the model sees
+
+Evidence is assembled deterministically and capped:
+
+| Part | Limit |
+|---|---|
+| Changed snapshots listed individually | 50 (the rest as counts), ranked by failures then difference |
+| Screenshots (vision profiles only) | 3, downscaled to 512 px, kept as PNG |
+| Capture logs | first 2 KB and last 2 KB per failing story, warn/error only |
+| Total text | about 24 KB, cut at a line boundary with a marker |
+| Comments | a few, truncated |
+
+## Secrets are redacted first
+
+Before anything is truncated or sent, values of keys such as `secret`, `token`, `password`, `api key`, `authorization` and `cookie` are replaced, along with bearer and basic credentials, URLs with embedded credentials, JWTs, common key prefixes (`sk-`, `ghp_`, `AKIA`, `xox…`) and long base64 or hex runs. Environment dumps and request headers are excluded by construction. Redaction is a safety net, not a guarantee: don't log secrets.
+
+## Untrusted content
+
+Story names, logs, commit messages and comments come from your repository and CI, so anyone who can push can influence them. They are treated as data:
+
+- Evidence is fenced in the prompt and the model is told to ignore any instructions inside it.
+- The answer must match a fixed schema (verdict, summary, notes, confidence); anything else is rejected.
+- Every string from the model is shown as **plain text**: no markdown, HTML or links.
+- Because insights are advisory, even a successful injection cannot approve, reject or merge anything.
+
+## Observability
+
+With OpenTelemetry on, an `ai.summarize` span and bounded metrics are emitted. The AI SDK's tracing is configured so that **prompts, screenshots and outputs are never recorded**, and no runtime context is attached. Metric labels are limited to the task and outcome. See [Observability](/guides/observability/).
+
+## What is stored
+
+Results (verdict, summary and notes), the profile and model used, and token counts per call. Evidence itself is not stored. Build triage is deleted with its build; health digests and usage rows are deleted after 90 days.

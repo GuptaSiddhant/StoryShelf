@@ -22,6 +22,7 @@ Self-hosted visual testing platform for Storybook. Run visual regression tests i
 - **One `docker run` to self-host**, or Terraform stacks for AWS, Azure, and GCP. Bring your own database, storage, and queue.
 - **Server-side capture.** Upload your built Storybook; Playwright (Chromium, Firefox, WebKit) or Puppeteer renders it, including `play` functions.
 - **Review workflow.** Approve or reject, threaded comments, and GitHub/GitLab merge-gate status checks.
+- **Optional AI triage and project health.** Bring your own model: a verdict and per-snapshot notes on every build, plus a 30-day health digest. Advisory only, off by default. [Learn more](https://storyshelf.js.org/ai/).
 
 ## StoryShelf vs Chromatic
 

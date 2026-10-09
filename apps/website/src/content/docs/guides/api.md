@@ -53,7 +53,7 @@ Unconfigured servers (no auth adapter) accept all requests.
 | Members | `/api/v1/projects/{slug}/members` | Project-scoped roles |
 | Tokens | `/api/v1/projects/{slug}/tokens` | CI access tokens |
 | Webhooks | `/api/v1/projects/{slug}/webhooks` | Outbound event notifications |
-| Insights | `/api/v1/projects/{slug}/builds/{id}/insights`, `/api/v1/projects/{slug}/insights/health` | AI build triage and project health ([AI insights](/guides/ai-insights/)) |
+| Insights | `/api/v1/projects/{slug}/builds/{id}/insights`, `/api/v1/projects/{slug}/insights/health` | AI build triage and project health ([AI insights](/ai/)) |
 | Admin | `/api/v1/admin` | Site-wide operations (retention purge) |
 
 ## Walkthrough: upload a build

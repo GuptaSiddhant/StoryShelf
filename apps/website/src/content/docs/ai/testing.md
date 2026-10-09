@@ -3,7 +3,7 @@ title: Free AI for testing
 description: Try StoryShelf's AI insights cheaply with a free-tier hosted model or a local one — for test data only.
 ---
 
-You do not need a paid plan to try [AI insights](/guides/ai-insights/). Pick one of the routes below, wire the model into your server assembly, then enable a profile for a **test project**.
+You do not need a paid plan to try [AI insights](/ai/). Pick one of the routes below, wire the model into your server assembly, then enable a profile for a **test project**.
 
 :::caution[Use test data only]
 Free tiers can log prompts or use them to improve models, and free models can change or disappear. Evidence includes story names, logs and (with vision) screenshots. Do not point a free-tier profile at a private project. Check each provider's current terms before use.
@@ -53,6 +53,10 @@ const ai = createAi({
   budget: { dailyTokens: 200_000, perProjectCallsPerHour: 10 },
 });
 ```
+
+## Cap reasoning on small models
+
+Free-tier and small reasoning models can spend the whole output cap thinking. Lower the effort for the slot with `providerOptions` (see [Setup](/ai/setup/#provider-options)), for example `{ model, providerOptions: { google: { thinkingConfig: { thinkingBudget: 0 } } } }`; check your provider's current option names.
 
 ## Tips
 

@@ -1,0 +1,54 @@
+---
+title: AI API
+description: REST endpoints for build triage and project health, who can call them, and the order guards are applied.
+---
+
+All endpoints live under `/api/v1` and appear in the [API reference](/api/) under **Insights**. Authentication works like the rest of the API (session or Bearer token).
+
+| Method | Route | Roles | Notes |
+|---|---|---|---|
+| `GET` | `/projects/{slug}/builds/{buildId}/insights/latest` | all | `404 never-generated` until the first run; includes `status` while running |
+| `GET` | `/projects/{slug}/builds/{buildId}/insights` | all | Bounded history (`?limit`) |
+| `POST` | `/projects/{slug}/builds/{buildId}/insights` | approver, admin | `{ force?, profile? }`; `200` cached, `202` started. `profile` is honoured for site admins only |
+| `GET` | `/projects/{slug}/insights/health?window=30d` | all | Cached digest |
+| `POST` | `/projects/{slug}/insights/health` | approver, admin | `{ window?, force? }`; on demand, no scheduler |
+| `PATCH` | `/projects/{slug}` | site admin | `{ aiProfile }`: a configured profile name, or `null` to turn AI off |
+
+## Generating and polling
+
+Generation is asynchronous. A `POST` returns `200` with the cached result when the evidence is unchanged, otherwise `202` with a `Location` header pointing at the `latest` (or health) endpoint. Poll it until `status` is `done` or `failed`.
+
+```sh
+curl -X POST $SHELF/api/v1/projects/my-app/builds/$BUILD/insights \
+  -H "Authorization: Bearer $STORYSHELF_TOKEN" -H "Content-Type: application/json" -d '{}'
+
+curl $SHELF/api/v1/projects/my-app/builds/$BUILD/insights/latest \
+  -H "Authorization: Bearer $STORYSHELF_TOKEN"
+```
+
+An insight looks like:
+
+```json
+{
+  "id": "01J…",
+  "kind": "triage",
+  "status": "done",
+  "profile": "default",
+  "model": "openai.chat:gpt-4o-mini",
+  "verdict": "needs-review",
+  "summary": "…",
+  "output": { "items": [{ "snapshotKey": "Button/Primary@desktop", "note": "…", "severity": "info" }], "confidence": "medium" },
+  "meta": { "profileEffective": "default", "visionSkipped": false, "warnings": [], "usage": { "inputTokens": 2100, "outputTokens": 310, "estimated": false } }
+}
+```
+
+Fallbacks are reported as fields (`profileRequested`/`profileEffective`, `warnings`, `visionSkipped`, `usage.estimated`), never buried in prose.
+
+## Guard order
+
+1. `501 ai-disabled` — the server has no AI configured.
+2. `409 ai-disabled-for-project` — the project has no profile.
+3. Role check (`403`).
+4. `429` — daily budget or the project's hourly limit (with `Retry-After`).
+
+Roles are exact lists, not a hierarchy: developers can read insights but not regenerate them, because regeneration spends the shared budget.

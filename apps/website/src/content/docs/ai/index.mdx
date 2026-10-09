@@ -1,0 +1,54 @@
+---
+title: AI insights
+description: Optional, advisory AI for StoryShelf — triage of each build and a project health digest. Off by default, bring your own model, no data leaves your server until a site admin turns it on per project.
+---
+
+import { Card, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+import Screenshot from '../../../components/Screenshot.astro';
+
+StoryShelf can read a build's results and tell you what it thinks: *is this change intended, does it need a human look, or does it look like a regression?* It can also summarize a project's health over the last 30 days. Both are **advisory only** — they never approve, reject, waive a failing `play` function, or override a changed baseline. You stay in charge of every merge decision.
+
+<Screenshot name="diff-review" alt="The review page with an AI triage panel above the snapshot list: verdict, summary and per-snapshot notes" caption="AI triage on the review page: a verdict, a short summary and notes per snapshot." />
+
+## What you get
+
+<CardGrid>
+  <Card title="Build triage" icon="approve-check">
+    A verdict (`likely-intended`, `needs-review`, `likely-regression`), a short summary, and a note per snapshot — right above the review workspace. [How it works](./triage/)
+  </Card>
+  <Card title="Project health" icon="star">
+    A 30-day digest with a verdict, a 0–100 score and trends, on the Library and Builds pages and as a badge on the project card. [How it works](./health/)
+  </Card>
+  <Card title="Your models, your keys" icon="puzzle">
+    OpenAI, Anthropic, Google, Bedrock, Vertex, Azure, a gateway, or a local model. StoryShelf never sees your keys. [Set it up](./setup/)
+  </Card>
+  <Card title="Private by design" icon="magnifier">
+    Off until a site admin enables a profile per project. Secrets are redacted, output is plain text, and traces never contain prompts or screenshots. [Privacy and safety](./privacy/)
+  </Card>
+</CardGrid>
+
+## Turn it on
+
+<Steps>
+
+1. **Give the server a model.** Install `@storyshelf/ai` and a provider package, create an AI surface, and pass it to `createShelfApp`. See [Setup and providers](./setup/).
+
+2. **Choose a profile for a project.** A site admin opens **Project settings → AI** (or sets `aiProfile` over the API). Until then the project sends nothing anywhere.
+
+3. **Review as usual.** The AI triage panel appears on the review page, and approvers and admins can generate or regenerate it. Generate the health digest from the project's Library page.
+
+</Steps>
+
+<Screenshot name="ai-settings" alt="Project settings, AI tab: a select to choose the AI profile for the project" caption="Site admins choose which profile (and therefore which models) a project uses." />
+
+## Cost and control
+
+Everything is bounded: a daily token budget across all instances, a per-project hourly call limit, capped evidence size, and identical evidence is served from cache for free. Site admins get alerts at 50%, 75%, 90% and 100% of the budget and a usage page. See [Budget and usage](./budget/).
+
+## Where to go next
+
+<CardGrid>
+  <LinkCard title="Setup and providers" href="./setup/" description="createAi, profiles, models, provider options and credentials." />
+  <LinkCard title="API" href="./api/" description="Endpoints, roles and the guard order for scripts and CI." />
+  <LinkCard title="Free AI for testing" href="./testing/" description="Try it with a free-tier hosted model or a local one." />
+</CardGrid>
