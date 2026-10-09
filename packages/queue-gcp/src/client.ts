@@ -19,6 +19,7 @@ export function createPubSubState(options: GcpPubSubQueueOptions): GcpPubSubStat
     subscriber,
     ownsPublisher: options.publisher === undefined,
     ownsSubscriber: options.subscriber === undefined,
+    leaseSeconds: Math.min(600, Math.max(10, options.leaseSeconds ?? 60)),
     logger: options.logger,
     destroyed: false,
   };

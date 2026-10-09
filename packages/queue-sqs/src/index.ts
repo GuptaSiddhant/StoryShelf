@@ -7,6 +7,7 @@
  */
 import type {
   CaptureJob,
+  LeaseRenewal,
   PollableCaptureQueue,
   PollableJob,
   QueueEntry,
@@ -15,7 +16,7 @@ import type { Logger } from "@storyshelf/core/logger";
 import { resolveSqsContext } from "./client.ts";
 import { buildSqsLifecycle } from "./lifecycle.ts";
 import { enqueueJob, queueActive, queueRecent, queueStatus } from "./operations.ts";
-import { ackJob, nackJob, pollJob } from "./poll.ts";
+import { ackJob, extendJob, nackJob, pollJob } from "./poll.ts";
 import type { SqsCaptureQueueOptions } from "./types.ts";
 
 declare const __PKG_VERSION__: string | undefined;
@@ -72,6 +73,9 @@ export function createSqsCaptureQueue(options: SqsCaptureQueueOptions): Pollable
       nackOptions?: { requeue?: boolean; delayMs?: number },
     ): Promise<void> {
       await nackJob(ctx, job, nackOptions);
+    },
+    async extend(job: PollableJob): Promise<LeaseRenewal> {
+      return await extendJob(ctx, job);
     },
   };
 }

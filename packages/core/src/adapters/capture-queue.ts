@@ -31,9 +31,18 @@ export interface PollableJob extends CaptureJob {
   receipt?: string;
   /** Number of delivery attempts already made (0 = first delivery). */
   attempts?: number;
+  /**
+   * Lease (visibility timeout / ack deadline / lock) in ms granted at poll
+   * time. The worker renews at a fraction of this while a capture runs;
+   * absent means the transport has no renewable lease.
+   */
+  leaseMs?: number;
   /** Raw transport message for debugging. */
   raw?: unknown;
 }
+
+/** Outcome of renewing a polled job's lease: `lost` means another consumer owns it now. */
+export type LeaseRenewal = "ok" | "lost";
 
 /**
  * A capture job queue, decoupled from the runtime.
@@ -69,4 +78,12 @@ export interface PollableCaptureQueue extends CaptureQueue {
   ack(job: PollableJob): Promise<void>;
   /** Negatively acknowledge; requeue with optional delay when possible. */
   nack(job: PollableJob, options?: { requeue?: boolean; delayMs?: number }): Promise<void>;
+  /**
+   * Extend the lease on an in-flight job by another `job.leaseMs`. Optional:
+   * queues without a renewable lease (e.g. Redis) omit it. May update
+   * `job.receipt` in place when the transport rotates it. Resolves `"lost"`
+   * only when the transport conclusively reports the message is no longer
+   * owned by this consumer; transient failures must reject.
+   */
+  extend?(job: PollableJob): Promise<LeaseRenewal>;
 }

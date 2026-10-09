@@ -7,6 +7,7 @@ import {
 } from "@azure/service-bus";
 import type {
   CaptureJob,
+  LeaseRenewal,
   PollableCaptureQueue,
   PollableJob,
   QueueEntry,
@@ -94,6 +95,9 @@ export function createAzureServiceBusQueue(
     },
     nack: async (job: PollableJob, nackOptions?: { requeue?: boolean; delayMs?: number }) => {
       await nackServiceBus(state, job, nackOptions);
+    },
+    extend: async (job: PollableJob) => {
+      return await extendServiceBus(state, job);
     },
   };
 }
@@ -251,8 +255,18 @@ async function pollServiceBus(
     traceparent: body.traceparent,
     receipt: typeof msg.messageId === "string" ? msg.messageId : undefined,
     attempts: Math.max(0, (msg.deliveryCount ?? 1) - 1),
+    leaseMs: lockWindowMs(msg),
     raw: msg,
   };
+}
+
+/** Remaining peek-lock window, so renewal tracks the queue's configured lock duration. */
+function lockWindowMs(msg: ServiceBusReceivedMessage): number | undefined {
+  if (!msg.lockedUntilUtc) {
+    return undefined;
+  }
+  const remaining = msg.lockedUntilUtc.getTime() - Date.now();
+  return remaining > 0 ? remaining : undefined;
 }
 
 function rawServiceBusMessage(job: PollableJob): ServiceBusReceivedMessage | undefined {
@@ -281,4 +295,21 @@ async function nackServiceBus(
     return;
   }
   await state.receiver.abandonMessage(msg);
+}
+
+/** Renew the peek-lock; Service Bus caps one lock at 5 minutes, so renewal must be periodic. */
+async function extendServiceBus(state: ServiceBusState, job: PollableJob): Promise<LeaseRenewal> {
+  const msg = rawServiceBusMessage(job);
+  if (!msg) {
+    return "ok";
+  }
+  try {
+    await state.receiver.renewMessageLock(msg);
+    return "ok";
+  } catch (error) {
+    if ((error as { code?: string }).code === "MessageLockLost") {
+      return "lost";
+    }
+    throw error;
+  }
 }

@@ -1,6 +1,7 @@
 import { QueueClient, type DequeuedMessageItem } from "@azure/storage-queue";
 import type {
   CaptureJob,
+  LeaseRenewal,
   PollableCaptureQueue,
   PollableJob,
   QueueEntry,
@@ -83,6 +84,9 @@ export function createAzureStorageQueuesQueue(
     },
     nack: async (job: PollableJob, nackOptions?: { requeue?: boolean; delayMs?: number }) => {
       await nackStorage(state, job, nackOptions);
+    },
+    extend: async (job: PollableJob) => {
+      return await extendStorage(state, job);
     },
   };
 }
@@ -174,6 +178,7 @@ async function receiveSingle(
 }
 
 function toStorageJob(
+  state: StorageQueueState,
   msg: DequeuedMessageItem,
   buildId: string,
   reqId?: string,
@@ -185,6 +190,7 @@ function toStorageJob(
     traceparent,
     receipt: encodeReceipt(msg.messageId, msg.popReceipt),
     attempts: Math.max(0, (msg.dequeueCount ?? 1) - 1),
+    leaseMs: state.visibilitySeconds * 1000,
     raw: msg,
   };
 }
@@ -214,7 +220,7 @@ async function pollStorage(
     await discardMalformed(state.client, msg, state.logger);
     return null;
   }
-  return toStorageJob(msg, body.buildId, body.reqId, body.traceparent);
+  return toStorageJob(state, msg, body.buildId, body.reqId, body.traceparent);
 }
 
 async function setupStorage(client: QueueClient): Promise<void> {
@@ -293,4 +299,50 @@ async function nackStorage(
   }
   const delaySeconds = delaySecondsFor(nackOptions);
   await state.client.updateMessage(messageId, popReceipt, serializeBody(job), delaySeconds);
+}
+
+/** HTTP statuses meaning the pop receipt no longer owns the message. */
+const LOST_LEASE_STATUSES = new Set([400, 404]);
+
+/** Rotate the pop receipt in place after an update. */
+function adoptRotatedReceipt(
+  job: PollableJob,
+  messageId: string,
+  popReceipt: string,
+  rotated: string | undefined,
+): void {
+  job.receipt = encodeReceipt(messageId, rotated ?? popReceipt);
+}
+
+/** Whether a Storage Queues error means the pop receipt no longer owns the message. */
+function isLostLease(error: unknown): boolean {
+  const status = (error as { statusCode?: number }).statusCode;
+  return status !== undefined && LOST_LEASE_STATUSES.has(status);
+}
+
+/**
+ * Push the message's visibility out by another `visibilityTimeout`. Storage
+ * Queues rotate the pop receipt on every update, so the job's receipt is
+ * replaced in place for the eventual ack/nack.
+ */
+async function extendStorage(state: StorageQueueState, job: PollableJob): Promise<LeaseRenewal> {
+  const { messageId, popReceipt } = decodeReceipt(job.receipt ?? "");
+  if (!popReceipt) {
+    return "ok";
+  }
+  try {
+    const updated = await state.client.updateMessage(
+      messageId,
+      popReceipt,
+      undefined,
+      state.visibilitySeconds,
+    );
+    adoptRotatedReceipt(job, messageId, popReceipt, updated.popReceipt);
+    return "ok";
+  } catch (error) {
+    if (isLostLease(error)) {
+      return "lost";
+    }
+    throw error;
+  }
 }

@@ -7,6 +7,7 @@
  */
 import type {
   CaptureJob,
+  LeaseRenewal,
   PollableCaptureQueue,
   PollableJob,
 } from "@storyshelf/core/adapter/capture-queue";
@@ -14,7 +15,7 @@ import type { Logger } from "@storyshelf/core/logger";
 import { createPubSubState } from "./client.ts";
 import { healthPubSub, setupPubSub, teardownPubSub } from "./lifecycle.ts";
 import { enqueuePubSub, pubSubActive, pubSubRecent, pubSubStatus } from "./operations.ts";
-import { ackPubSub, nackPubSub, pollPubSub } from "./poll.ts";
+import { ackPubSub, extendPubSub, nackPubSub, pollPubSub } from "./poll.ts";
 import type { GcpPubSubQueueOptions } from "./types.ts";
 
 /**
@@ -73,6 +74,9 @@ export function createGcpPubSubQueue(options: GcpPubSubQueueOptions): PollableCa
     },
     nack: async (job: PollableJob, nackOptions?: { requeue?: boolean; delayMs?: number }) => {
       await nackPubSub(state, job, nackOptions);
+    },
+    extend: async (job: PollableJob): Promise<LeaseRenewal> => {
+      return await extendPubSub(state, job);
     },
   };
 }

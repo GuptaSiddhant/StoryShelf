@@ -23,6 +23,7 @@ import {
 } from "@storyshelf/db-sqlite/schema";
 import { resolveWorkerConfig, type WorkerConfig } from "./config.ts";
 import { idleDelayMs, isFastEmptyPoll } from "./idle.ts";
+import { LeaseLostError, startLease, type ExtendLease } from "./lease.ts";
 
 /** Table handles required by the worker (orchestrator + dispatch). */
 export type WorkerTables = {
@@ -46,6 +47,8 @@ export interface WorkerOptions {
   ack?: (job: PollableJob) => Promise<void>;
   /** Optional nack override. */
   nack?: (job: PollableJob, options?: { requeue?: boolean; delayMs?: number }) => Promise<void>;
+  /** Optional lease-renewal override; defaults to `queue.extend` when present. */
+  extend?: ExtendLease;
   /** Database adapter (same as server). */
   db: DatabaseAdapter;
   /** Table handles; defaults to sqlite schema handles. */
@@ -168,6 +171,10 @@ export function createCaptureWorker(options: WorkerOptions): WorkerHandle {
       }
     });
 
+  const doExtend: ExtendLease | undefined =
+    options.extend ??
+    (typeof pollable.extend === "function" ? pollable.extend.bind(pollable) : undefined);
+
   let running = false;
   let loopPromise: Promise<void> | null = null;
   let stopResolve: (() => void) | null = null;
@@ -208,6 +215,24 @@ export function createCaptureWorker(options: WorkerOptions): WorkerHandle {
     }
   }
 
+  /** Run the capture while a heartbeat keeps the job's queue lease alive. */
+  async function runWithLease(job: PollableJob): Promise<void> {
+    const lease = startLease(job, doExtend, logger?.child({ buildId: job.buildId }));
+    const run = runJob({ buildId: job.buildId, reqId: job.reqId, traceparent: job.traceparent });
+    try {
+      await (lease ? Promise.race([run, lease.lost]) : run);
+    } finally {
+      lease?.stop();
+      run.catch(() => {});
+    }
+  }
+
+  /** Another consumer owns the message now: stop our render, leave ack/nack to them. */
+  async function abandonLostJob(job: PollableJob, error: LeaseLostError): Promise<void> {
+    logger?.warn({ err: error, buildId: job.buildId }, "queue lease lost, aborting capture");
+    await options.runner.cancel(job.buildId).catch(() => {});
+  }
+
   async function processJob(job: PollableJob): Promise<void> {
     const jobLogger = logger?.child({ buildId: job.buildId, reqId: job.reqId });
     await acquire();
@@ -216,12 +241,16 @@ export function createCaptureWorker(options: WorkerOptions): WorkerHandle {
         jobLogger?.info("worker picked up job");
         // traceparent rides along: executeCaptureJob continues the trace.
         const { timings } = await runWithTimings(async () => {
-          await runJob({ buildId: job.buildId, reqId: job.reqId, traceparent: job.traceparent });
+          await runWithLease(job);
         });
         jobLogger?.info({ timings: roundedTimings(timings) }, "worker job timings");
         await doAck(job);
         jobLogger?.info("worker completed job");
       } catch (error) {
+        if (error instanceof LeaseLostError) {
+          await abandonLostJob(job, error);
+          return;
+        }
         const attempts = job.attempts ?? 0;
         if (attempts < config.maxRetries) {
           const delay = backoffMs(attempts);

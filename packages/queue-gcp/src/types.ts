@@ -16,6 +16,8 @@ export interface GcpPubSubQueueOptions {
   subscriber?: v1.SubscriberClient;
   /** Optional logger for queue diagnostics. */
   logger?: Logger;
+  /** Ack deadline in seconds granted per pull and per renewal (default 60, max 600). */
+  leaseSeconds?: number;
   /** Custom API endpoint (Pub/Sub emulator host). */
   apiEndpoint?: string;
   /** Path to a service-account JSON key file. */
@@ -31,6 +33,7 @@ export interface GcpPubSubState {
   subscriber: v1.SubscriberClient;
   ownsPublisher: boolean;
   ownsSubscriber: boolean;
+  leaseSeconds: number;
   logger?: Logger;
   destroyed: boolean;
 }
