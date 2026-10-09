@@ -6,6 +6,7 @@
  * package implements and re-exports {@link Ai}.
  */
 import type { z } from "zod";
+import type { EvidenceLimits } from "./insights/limits.ts";
 import type { Logger } from "./logger.ts";
 
 /** Tasks the AI surface routes: build triage and project health. */
@@ -102,9 +103,11 @@ export interface Ai {
   /** Whether the profile has an effective vision model for the task. */
   hasVision(profile: string | undefined, task: AiTask): boolean;
   /** Stable identifier of the model a call would use (for hashing/rows). */
-  modelId(profile: string | undefined, task: AiTask, vision: boolean): string;
+  modelId(profile: string | undefined, task: AiTask): string;
   /** Budget options (with defaults applied). */
   budget(): AiBudget;
+  /** Evidence limit overrides configured on the instance. */
+  limits(): Partial<EvidenceLimits>;
   /** Per-slot timeout in milliseconds. */
   timeoutMs(profile: string | undefined, task: AiTask): number;
   /** Host-bound scoped logger. */
