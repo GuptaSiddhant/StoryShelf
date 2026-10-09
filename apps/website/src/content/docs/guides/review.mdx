@@ -39,6 +39,10 @@ Comments persist until the build is purged (see [Retention](/concepts/retention/
 - **Flaky capture:** **Retry** on the build page re-enqueues the same build ID (`POST …/builds/:id/retry`) — see [Interaction testing](/guides/interaction-testing/) for `flakyTest` handling.
 - **Merge gate:** each project posts `storyshelf/<slug>` commit status via the git-host adapter (`@storyshelf/git-github` / `@storyshelf/git-gitlab`). Branch protection marks it **required** — `pending` while capturing, `success` when `approved`, `failure` when `rejected` or remained unresolved. A future GitHub App will add per-snapshot check-run annotations (ADR 0010).
 
+## AI triage and project health
+
+When a site admin has enabled AI for the project, the review page shows an advisory **AI triage** panel (verdict, summary and per-snapshot notes). Approvers and admins can generate or regenerate it. The project Library and Builds pages show an **AI project health** panel, and the project card shows its verdict. None of this approves or rejects anything: it only helps you decide. See [AI insights](/guides/ai-insights/).
+
 ## Related
 
 - [Builds & snapshots](/concepts/builds/) — statuses & attempts

@@ -23,6 +23,7 @@ import { chromium } from "playwright-core";
 // Workspace packages are imported from source by path: the repo root does not
 // have them in node_modules (they are per-package workspace links).
 import { createShelfApp } from "../packages/app/src/index.tsx";
+import { settleInsightJobs } from "../packages/app/src/insights/job.ts";
 import { createShelfLogger } from "../packages/core/src/logger.ts";
 import {
   BaselineModel,
@@ -73,6 +74,67 @@ function diffPng() {
     png.data.set(hit ? [255, 40, 90, 255] : [245, 245, 245, 255], i * 4);
   }
   return PNG.sync.write(png);
+}
+
+/** Deterministic stand-in for the AI surface so the docs show believable insights offline. */
+function demoAi() {
+  const usage = { inputTokens: 2100, outputTokens: 310, estimated: false };
+  const triage = {
+    verdict: "needs-review",
+    summary:
+      "The primary Button gained new spacing and colour tokens, which matches the commit. Card and Input also changed, which the commit does not mention.",
+    items: [
+      { snapshotKey: "Components/Button/Primary@desktop", note: "Padding and fill match the new tokens.", severity: "info" },
+      { snapshotKey: "Components/Input/Error@desktop", note: "Error border colour changed without a matching source change.", severity: "medium" },
+    ],
+    confidence: "medium",
+  };
+  const health = {
+    verdict: "watch",
+    summary:
+      "Review load is steady, but Components/Input/Error changed in four of the last twelve builds, which suggests an unstable story or a shared token.",
+    score: 78,
+    trends: [
+      { label: "Review backlog", note: "Median of 3 snapshots per build, flat over the window.", direction: "flat" },
+      { label: "Churny stories", note: "Input/Error and Card/Default change most often.", direction: "up" },
+    ],
+    confidence: "medium",
+  };
+  return {
+    summarize: async (input) => ({
+      object: input.task === "health" ? health : triage,
+      usage,
+      profileRequested: input.profile ?? null,
+      profileEffective: input.profile ?? "default",
+      model: "demo:model",
+      imagesSent: 0,
+      visionSkipped: false,
+      warnings: [],
+    }),
+    profileNames: () => ["default", "private-local"],
+    defaultProfile: () => "default",
+    hasVision: () => false,
+    modelId: () => "demo:model",
+    budget: () => ({ visionWeight: 5, perProjectCallsPerHour: 50 }),
+    limits: () => ({}),
+    timeoutMs: () => 60_000,
+    setup: async () => {},
+    health: async () => ({ ok: true }),
+    teardown: async () => {},
+  };
+}
+
+/** Generate the demo triage and health digest through the real API. */
+async function seedInsights(base, slug, buildId) {
+  const post = (path, body) =>
+    fetch(base + path, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  await post(`/api/v1/projects/${slug}/builds/${buildId}/insights`, {});
+  await post(`/api/v1/projects/${slug}/insights/health`, {});
+  await settleInsightJobs();
 }
 
 async function captureApp() {
@@ -162,9 +224,12 @@ async function captureApp() {
     );
   }
 
+  await new ProjectModel(db).update(project.id, { aiProfile: "default" });
+
   const app = createShelfApp({
     database: db,
     storage,
+    ai: demoAi(),
     logger: createShelfLogger({ level: "silent" }),
   });
   await app.lifecycle.setup();
@@ -175,6 +240,7 @@ async function captureApp() {
   const base = `http://localhost:${port}`;
 
   const slug = project.slug;
+  await seedInsights(base, slug, build.id);
   const pages = [
     { name: "projects-list", path: "/projects", viewport: { width: 1280, height: 780 } },
     {
@@ -191,6 +257,11 @@ async function captureApp() {
       name: "library",
       path: `/projects/${slug}/library?branch=feature/new-button`,
       viewport: { width: 1280, height: 860 },
+    },
+    {
+      name: "ai-settings",
+      path: `/projects/${slug}/settings/ai`,
+      viewport: { width: 1280, height: 700 },
     },
     {
       name: "project-settings",

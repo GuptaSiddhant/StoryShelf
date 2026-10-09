@@ -3,6 +3,8 @@ import { LabelModel } from "@storyshelf/core/models";
 import { MemberModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
 import type { ProjectRole } from "@storyshelf/core/types";
+import type { Context } from "hono";
+import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
 import { forbidden, requireSiteAdmin, resolveAuthorizedProject } from "./helpers.ts";
@@ -106,6 +108,18 @@ const deleteProjectRoute = createRoute({
   },
 });
 
+/** `aiProfile` is a site-admin data-flow decision; it must name a configured profile. */
+function assertAiProfileChange(c: Context, profile: string | null | undefined): void {
+  if (profile === undefined) {
+    return;
+  }
+  requireSiteAdmin(c);
+  const { ai } = getStore();
+  if (profile !== null && !ai?.profileNames().includes(profile)) {
+    throw new HTTPException(400, { message: `Unknown AI profile "${profile}"` });
+  }
+}
+
 /** Register the project list, create, fetch, update, and delete endpoints. */
 export function registerProjects(app: ShelfRouter): void {
   app.openapi(listProjectsRoute, async (c) => {
@@ -136,7 +150,9 @@ export function registerProjects(app: ShelfRouter): void {
   app.openapi(updateProjectRoute, async (c) => {
     const { slug } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
-    const updated = await new ProjectModel(getStore().db).update(project.id, c.req.valid("json"));
+    const body = c.req.valid("json");
+    assertAiProfileChange(c, body.aiProfile);
+    const updated = await new ProjectModel(getStore().db).update(project.id, body);
     return c.json(updated);
   });
 

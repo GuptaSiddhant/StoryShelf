@@ -20,6 +20,8 @@ export const projectSchema = z
     playTimeoutMs: z.number(),
     // Stored rows predate enum validation, so the response stays a plain string.
     browser: z.string().optional(),
+    /** AI profile gate: null/absent = AI off for this project. */
+    aiProfile: z.string().nullable().optional(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -50,6 +52,8 @@ export const projectUpdateSchema = z
     executePlay: z.boolean().optional(),
     playTimeoutMs: z.number().int().min(1000).max(30_000).optional(),
     browser: z.enum(BROWSER_NAMES).optional(),
+    /** Site admins only: a configured AI profile name, or null to turn AI off. */
+    aiProfile: z.string().min(1).nullable().optional(),
   })
   .openapi("ProjectUpdateInput");
 

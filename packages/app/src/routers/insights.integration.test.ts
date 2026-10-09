@@ -307,3 +307,24 @@ describe("stale runs", () => {
     expect(latest).toMatchObject({ status: "failed", errorCode: "interrupted" });
   });
 });
+
+describe("project PATCH aiProfile", () => {
+  it("lets site admins set a known profile or null, rejects others", async () => {
+    const { db, storage } = await seed(null);
+    const app = appWith(db, storage, fakeAi());
+    const patch = (who: keyof typeof users, body: unknown) =>
+      app.request("/api/v1/projects/p", {
+        method: "PATCH",
+        headers: cookie(who),
+        body: JSON.stringify(body),
+      });
+    expect((await patch("admin", { aiProfile: "ghost" })).status).toBe(400);
+    expect((await patch("admin", { aiProfile: "thorough" })).status).toBe(200);
+    const project = (await (
+      await app.request("/api/v1/projects/p", { headers: cookie("viewer") })
+    ).json()) as { aiProfile?: string };
+    expect(project.aiProfile).toBe("thorough");
+    expect((await patch("admin", { aiProfile: null })).status).toBe(200);
+    expect((await patch("approver", { aiProfile: "default" })).status).toBe(403);
+  });
+});
