@@ -76,7 +76,7 @@ Parallel captures = **workers × `WORKER_CONCURRENCY`** (default 2 per worker, f
 
 Two things to know:
 
-- **Visibility timeout must exceed your longest capture.** The default is 300 seconds (queue and Terraform stack). The worker doesn't extend the timeout while it works, so a capture longer than that is redelivered to another worker while the first is still running. Raise `visibilityTimeout` on `createSqsCaptureQueue` **and** the queue itself.
+- **The worker renews the lease while a capture runs.** It extends the message's visibility timeout at a third of the lease (every 100 seconds with the 300-second default), so a long capture is never redelivered while its worker is alive. Renewal failures are logged once per job and never kill a healthy capture. If the queue reports the message is gone (another worker already owns it), the worker cancels its render and leaves ack/nack to the new owner. `visibilityTimeout` is now only a **backstop for crashes**: it sets how long a dead worker's job waits before being retried, so keep it short enough to recover quickly (for SQS, also keep the queue's own timeout in line with the option).
 - **Failures on remote workers don't reach the server's failure notifications.** The server never sees those outcomes, so alert from worker logs or the dead-letter queue instead.
 
 A message in the DLQ usually means the build stays in `capturing`. Inspect and redrive or delete the message, then **Retry** the build.
@@ -111,6 +111,7 @@ Every queue implements the same contract (`enqueue` on the server; `poll`/`ack`/
 | **Retry delay (`nack`)** | Honored | Honored | Honored | **Not honored** (immediate) | Honored |
 | **Dead-letter queue** | Redrive policy | **None** | **None** | Built in (`maxDeliveryCount`) | Dead-letter policy |
 | **Crash recovery** | Visibility timeout | **Manual** | Visibility timeout | Lock expiry | Ack deadline |
+| **Lease renewal while capturing** | Heartbeat | **None** | Heartbeat | Heartbeat | Heartbeat |
 | **Attempts counted from** | Receive count | Counter in the payload | Dequeue count | Delivery count | Delivery attempt |
 | **Scaffold** | AWS stack | Docker Compose | Azure stack | Azure stack | GCP stack |
 
@@ -125,6 +126,7 @@ const queue = createRedisCaptureQueue({ url: process.env.REDIS_URL! });
 
 Keys: `shelf:queue` (waiting), `shelf:queue:processing` (in flight), `shelf:queue:delayed` (retry backoff). Set `key` to run several StoryShelf environments on one Redis.
 
+- **No lease renewal.** Redis has no visibility timeout, so there is nothing for the worker to extend. The manual `processing`-list reclaim below stays the recovery path.
 - **A crashed worker's job stays in `…:processing`.** The adapter doesn't reclaim it, because Redis has no visibility timeout. After an OOM or hard kill, check that list. Move the entry back to the main list (for example with `LMOVE`), or **Retry** the build from the UI. Graceful `SIGTERM` shutdown is much more important here than on SQS.
 - **There is no dead-letter queue.** After the last retry the worker drops the job and logs `capture permanently failed`.
 - **Retries wait in the delayed set** and are promoted by whichever worker polls next, so at least one worker must keep running.
@@ -144,10 +146,10 @@ createAzureStorageQueuesQueue({ queueName: "capture-jobs", connectionString: pro
 **Service Bus** (recommended for production):
 - Messages are peek-locked. Past the queue's `maxDeliveryCount` (3 in the Terraform stack) Service Bus moves the message to the built-in dead-letter sub-queue.
 - **`nack` retries immediately.** There is no per-message delay, so the worker's exponential backoff does not apply. Three quick attempts can burn through a transient outage before it recovers.
-- **The lock must outlast the capture.** The adapter doesn't renew locks and the Terraform stack leaves the queue's default lock duration. Set `lock_duration` on the queue to longer than your slowest capture (Azure's maximum is 5 minutes). Otherwise the message reappears while the first worker is still rendering.
+- **The worker renews the lock while capturing.** Service Bus caps one lock at 5 minutes, so the worker renews it periodically (at a third of the queue's `lock_duration`) rather than relying on one long lock. Captures can run well past 5 minutes. The queue's lock duration only needs to be long enough to survive a brief renewal hiccup; the default is fine.
 
 **Storage Queues** (cheapest, simplest):
-- `visibilityTimeout` is the lock, 300 seconds by default (option on `createAzureStorageQueuesQueue`).
+- `visibilityTimeout` is the lease, 300 seconds by default (option on `createAzureStorageQueuesQueue`). The worker renews it while a capture runs; it only decides how fast a crashed worker's job comes back. Storage Queues rotate the pop receipt on each renewal, which the adapter tracks for you.
 - There is no dead-letter queue and no long-poll. A job that crashes its worker every time keeps coming back, so alert on repeated `capture failed, requeued` lines for the same `buildId`. If you need dead-lettering, use Service Bus.
 - With no long-poll, an idle worker issues requests continuously, and each is a billable storage transaction.
 
@@ -161,7 +163,7 @@ import { createGcpPubSubQueue } from "@storyshelf/queue-gcp";
 createGcpPubSubQueue({ topic: "capture-jobs", subscription: "capture-jobs-worker", projectId: process.env.GOOGLE_CLOUD_PROJECT! });
 ```
 
-- The subscription's **ack deadline** is the visibility timeout (300 seconds in the Terraform stack). Keep it longer than your slowest capture, as with SQS.
+- The adapter sets each pulled message's **ack deadline** to `leaseSeconds` (60 by default, max 600) and the worker renews it while a capture runs, so the subscription's own ack deadline no longer needs to outlast your slowest capture.
 - Poison messages are dead-lettered by the subscription's dead-letter policy (`max_delivery_attempts` is 5 in the stack). The attempt count only appears when a dead-letter policy is set, so don't skip it.
 - Pull returns immediately when the queue is empty, so an idle worker polls continuously.
 - The subscription name in the code must match the one Terraform creates. The scaffolded worker default is `capture-jobs-worker`, while the stack's subscription resource is named `capture-jobs`, so set `subscription` to whichever you actually deployed.

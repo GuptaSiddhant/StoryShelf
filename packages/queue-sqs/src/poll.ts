@@ -5,7 +5,7 @@ import {
   ReceiveMessageCommand,
   type Message,
 } from "@aws-sdk/client-sqs";
-import type { PollableJob } from "@storyshelf/core/adapter/capture-queue";
+import type { LeaseRenewal, PollableJob } from "@storyshelf/core/adapter/capture-queue";
 import type { SqsContext } from "./client.ts";
 import { parseBody } from "./codec.ts";
 import type { QueuedBody } from "./types.ts";
@@ -35,13 +35,14 @@ function attemptsFromCount(rawCount: string | undefined): number {
 }
 
 /** Build the polled job view from a received message and its parsed body. */
-function buildPolledJob(msg: Message, body: QueuedBody): PollableJob {
+function buildPolledJob(ctx: SqsContext, msg: Message, body: QueuedBody): PollableJob {
   return {
     buildId: body.buildId ?? "",
     reqId: body.reqId,
     traceparent: body.traceparent,
     receipt: msg.ReceiptHandle,
     attempts: attemptsFromCount(msg.Attributes?.["ApproximateReceiveCount"]),
+    leaseMs: ctx.visibilityTimeout * 1000,
     raw: msg,
   };
 }
@@ -80,7 +81,7 @@ export async function pollJob(
   if (!body.buildId) {
     return await dropMalformedMessage(ctx, msg);
   }
-  return buildPolledJob(msg, body);
+  return buildPolledJob(ctx, msg, body);
 }
 
 /** Receive at most one message with long-poll; undefined when the queue is empty. */
@@ -142,4 +143,29 @@ export async function nackJob(
       VisibilityTimeout: delaySeconds,
     }),
   );
+}
+
+/** SQS error names meaning the receipt handle no longer owns the message. */
+const LOST_LEASE_ERRORS = new Set(["ReceiptHandleIsInvalid", "MessageNotInflight"]);
+
+/** Extend the in-flight message's visibility to a fresh `visibilityTimeout` from now. */
+export async function extendJob(ctx: SqsContext, job: PollableJob): Promise<LeaseRenewal> {
+  if (!job.receipt) {
+    return "ok";
+  }
+  try {
+    await ctx.client.send(
+      new ChangeMessageVisibilityCommand({
+        QueueUrl: ctx.queueUrl,
+        ReceiptHandle: job.receipt,
+        VisibilityTimeout: ctx.visibilityTimeout,
+      }),
+    );
+    return "ok";
+  } catch (error) {
+    if (error instanceof Error && LOST_LEASE_ERRORS.has(error.name)) {
+      return "lost";
+    }
+    throw error;
+  }
 }

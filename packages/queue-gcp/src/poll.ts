@@ -1,5 +1,5 @@
 /** Synchronous-pull polling with ack/nack semantics for Pub/Sub. */
-import type { PollableJob } from "@storyshelf/core/adapter/capture-queue";
+import type { LeaseRenewal, PollableJob } from "@storyshelf/core/adapter/capture-queue";
 import { decodeData, parseBody, subscriptionPath } from "./codec.ts";
 import type { GcpPubSubState, PulledMessage } from "./types.ts";
 
@@ -14,11 +14,13 @@ export async function pollPubSub(state: GcpPubSubState): Promise<PollableJob | n
     await discardUnusable(state, pulled);
     return null;
   }
+  await setLease(state, pulled.ackId);
   return {
     buildId: body.buildId,
     reqId: body.reqId,
     traceparent: body.traceparent,
     receipt: pulled.ackId,
+    leaseMs: state.leaseSeconds * 1000,
     attempts: Math.max(0, (pulled.deliveryAttempt ?? 1) - 1),
     raw: pulled.received,
   };
@@ -108,4 +110,32 @@ export async function nackPubSub(
     ackIds: [job.receipt],
     ackDeadlineSeconds: delaySeconds ?? 0,
   });
+}
+
+/** gRPC INVALID_ARGUMENT: the ack id is expired or already settled. */
+const GRPC_INVALID_ARGUMENT = 3;
+
+/** Set the message's ack deadline to the configured lease, starting from now. */
+async function setLease(state: GcpPubSubState, ackId: string): Promise<void> {
+  await state.subscriber.modifyAckDeadline({
+    subscription: subscriptionPath(state.projectId, state.subscription),
+    ackIds: [ackId],
+    ackDeadlineSeconds: state.leaseSeconds,
+  });
+}
+
+/** Extend the ack deadline by another lease; a rejected ack id means the lease is lost. */
+export async function extendPubSub(state: GcpPubSubState, job: PollableJob): Promise<LeaseRenewal> {
+  if (!job.receipt) {
+    return "ok";
+  }
+  try {
+    await setLease(state, job.receipt);
+    return "ok";
+  } catch (error) {
+    if ((error as { code?: number }).code === GRPC_INVALID_ARGUMENT) {
+      return "lost";
+    }
+    throw error;
+  }
 }
