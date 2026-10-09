@@ -5,6 +5,7 @@ import { ProjectModel } from "@storyshelf/core/models";
 import { SnapshotModel } from "@storyshelf/core/models";
 import type { ProjectRole } from "@storyshelf/core/types";
 import type { ShelfRouter } from "../app-types.ts";
+import { loadInsightPanel } from "../insights/panel.ts";
 import { renderBuildDetailPage } from "../pages/build-detail.tsx";
 import { renderBuildDiffPage } from "../pages/build-diff.tsx";
 import { renderComputeJobsPage, renderActiveQueue } from "../pages/compute-jobs.tsx";
@@ -181,6 +182,7 @@ export function registerUiPages(app: ShelfRouter): void {
         canReview,
         hasBaseline,
         drifted,
+        insight: await loadInsightPanel(project, build),
       }),
     );
   });

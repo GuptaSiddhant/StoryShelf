@@ -34,6 +34,7 @@ import { registerAssets } from "./routers/assets.ts";
 import { registerEngineAuth } from "./routers/auth.ts";
 import { registerBuilds } from "./routers/builds.ts";
 import { registerHealth, type HealthDeps } from "./routers/health.ts";
+import { registerInsightFragments } from "./routers/insights-ui.tsx";
 import { registerInsights } from "./routers/insights.ts";
 import { registerLabels } from "./routers/labels.ts";
 import { registerMedia } from "./routers/media.ts";
@@ -158,6 +159,7 @@ const CSRF_PATHS = [
   "/profile/*",
   "/profile",
   "/admin/credentials/*",
+  "/projects/:slug/builds/:buildId/insights/generate",
 ] as const;
 
 /** Attach global middleware: ids, logging, init gate, limits, store scope, auth gate. */
@@ -283,6 +285,7 @@ function registerPageRoutes(app: ShelfRouter, options: ShelfOptions, health: Hea
   registerStorybook(app);
   registerAdminPages(app, health, options.auth);
   registerUiPages(app);
+  registerInsightFragments(app);
 }
 
 /** Register every API router, page set, and optional auth flow. */

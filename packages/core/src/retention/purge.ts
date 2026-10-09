@@ -5,9 +5,12 @@ import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { BaselineModel } from "../models/baseline.ts";
 import { BuildModel, type BuildTables } from "../models/build.ts";
+import { InsightModel } from "../models/insight.ts";
 import { LabelModel, type LabelTables } from "../models/label.ts";
 import type { Project } from "../schema/project.ts";
 import { TERMINAL_BUILD_STATUSES } from "../types.ts";
+
+export { purgeAiData, type AiPurgeResult } from "./ai.ts";
 
 /** Table handles for retention queries. */
 export interface RetentionTables {
@@ -68,6 +71,7 @@ export class Retention {
   }
 
   private async removeBuild(buildId: string): Promise<boolean> {
+    await new InsightModel(this.db).removeForBuild(buildId);
     await new BuildModel(this.db, this.tables as unknown as BuildTables).remove(buildId);
     return true;
   }

@@ -22,6 +22,7 @@ import {
   type SettingsFormState,
   type SettingsTab,
 } from "../pages/project-settings.tsx";
+import type { SettingsAiData } from "../pages/settings-ai.tsx";
 import type { SettingsMember } from "../pages/settings-members.tsx";
 import type {
   SettingsMySubscription,
@@ -31,6 +32,7 @@ import type { SettingsStatusConfig } from "../pages/settings-status.tsx";
 import type { SettingsWebhook } from "../pages/settings-webhooks.tsx";
 import { getStore } from "../store.ts";
 import { notFound } from "./helpers.ts";
+import { isSiteAdmin } from "./insights.handlers.ts";
 /** Aggregated data for rendering a settings tab. */
 export interface SettingsData {
   project: Project;
@@ -253,9 +255,21 @@ export async function renderSettingsPage(
       statusConfigs: data.statusConfigs,
       gitHosts: data.gitHosts,
       isAdmin: data.isAdmin,
+      ai: aiSettingsData(c),
     },
     formState,
   );
+}
+
+/** AI availability and profile choices for the settings AI tab. */
+function aiSettingsData(c: Context): SettingsAiData {
+  const { ai } = getStore();
+  return {
+    available: ai !== undefined,
+    profiles: ai?.profileNames() ?? [],
+    defaultProfile: ai?.defaultProfile() ?? "",
+    isSiteAdmin: isSiteAdmin(c),
+  };
 }
 
 /** Find a project by slug or throw 404. */

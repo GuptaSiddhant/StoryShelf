@@ -11,8 +11,10 @@ import {
 import type { AdapterSetupResult } from "@storyshelf/core/adapter/setup";
 import type { ShelfOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
+import { purgeAiData } from "@storyshelf/core/retention";
 import { sanitizeErrorText } from "@storyshelf/core/utils";
 import type { ShelfRouter, ShelfLifecycle } from "./app-types.ts";
+import { settleInsightJobs } from "./insights/job.ts";
 import { startBranchGcTimer } from "./retention-timer.ts";
 import type { ServerRuntime } from "./runtime.ts";
 
@@ -33,6 +35,30 @@ function trackSettlement(cell: LifecycleCell, promise: Promise<AdapterSetupResul
   );
 }
 
+/** First failing boot check (assembly, auth, AI), or null when all pass. */
+async function firstBootFailure(
+  options: ShelfOptions,
+  logger: Logger,
+): Promise<AdapterSetupResult | null> {
+  const invalid = validateBootAssembly(options);
+  if (invalid.length > 0) {
+    logger.error({ failures: invalid }, "adapter validation failed");
+    return { ok: false, failures: invalid };
+  }
+  for (const [label, run] of [
+    ["auth", runAuthSetup],
+    ["ai", runAiSetup],
+  ] as const) {
+    // eslint-disable-next-line no-await-in-loop -- boot checks run in order and stop at the first failure
+    const failed = await run(options);
+    if (failed) {
+      logger.error({ failures: failed.failures }, `${label} setup failed`);
+      return failed;
+    }
+  }
+  return null;
+}
+
 /** Kick the eager background setup run (resolves; never rejects). */
 function kickSetup(
   options: ShelfOptions,
@@ -43,17 +69,8 @@ function kickSetup(
   // Auth is not an adapter: its one-shot boot validation runs first, then
   // the adapter setups. A failing secret check fails readiness, like others.
   cell.ready = (async (): Promise<AdapterSetupResult> => {
-    const invalid = validateBootAssembly(options);
-    if (invalid.length > 0) {
-      logger.error({ failures: invalid }, "adapter validation failed");
-      return { ok: false, failures: invalid };
-    }
-    const authFailed = await runAuthSetup(options);
-    if (authFailed) {
-      logger.error({ failures: authFailed.failures }, "auth setup failed");
-      return authFailed;
-    }
-    return await runAdapterSetups(collectSetups(options), ctx, logger);
+    const failed = await firstBootFailure(options, logger);
+    return failed ?? (await runAdapterSetups(collectSetups(options), ctx, logger));
   })();
   trackSettlement(cell, cell.ready);
 }
@@ -90,6 +107,7 @@ export function attachLifecycle(
 ): void {
   const setupCtx: AdapterSetupContext = { config: runtime.config, logger: runtime.logger };
   bindAdapterLoggers(options, runtime.logger);
+  options.ai?.setLogger?.(runtime.logger.child({ component: "ai" }));
   logAuthMode(options, runtime.logger);
   kickSetup(options, setupCtx, runtime.logger, cell);
   const timer = startBranchGcInterval(options, runtime);
@@ -116,6 +134,25 @@ async function runAuthSetup(options: ShelfOptions): Promise<AdapterSetupResult |
       ok: false,
       failures: [
         { category: "auth", kind: "auth", name: "auth", error: sanitizeErrorText(message, 500) },
+      ],
+    };
+  }
+}
+/** Run AI boot checks and the stale-run sweep; failure fails readiness like auth. */
+async function runAiSetup(options: ShelfOptions): Promise<AdapterSetupResult | null> {
+  if (!options.ai) {
+    return null;
+  }
+  try {
+    await options.ai.setup();
+    await purgeAiData(options.database);
+    return null;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      ok: false,
+      failures: [
+        { category: "ai", kind: "ai", name: "ai", error: sanitizeErrorText(message, 500) },
       ],
     };
   }
@@ -158,6 +195,8 @@ function createLifecycle(
     },
     teardown: async () => {
       timer?.stop();
+      await settleInsightJobs();
+      await options.ai?.teardown();
       const result = await runAdapterTeardowns(collectTeardowns(options), ctx, logger);
       await options.observability?.shutdown().catch((error: unknown) => {
         logger.error({ err: error }, "observability shutdown failed");
