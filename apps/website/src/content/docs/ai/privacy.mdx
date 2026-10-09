@@ -46,4 +46,4 @@ Results (verdict, summary and notes), the profile and model used, and token coun
 
 ## Agents and MCP
 
-The [MCP server](./mcp/) is a client of the REST API: an agent sees exactly what its token's role can see and nothing more, can only read cached triage (it never generates one, so it never spends budget), and cannot approve, reject or waive anything. Anything an agent reads is sent to *its* model, so give agents tokens scoped to the projects they need.
+The [MCP server](/ai/mcp/) is a client of the REST API: an agent sees exactly what its token's role can see and nothing more, can only read cached triage (it never generates one, so it never spends budget), and cannot approve, reject or waive anything. Anything an agent reads is sent to *its* model, so give agents tokens scoped to the projects they need.

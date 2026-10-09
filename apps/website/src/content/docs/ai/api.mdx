@@ -14,7 +14,7 @@ All endpoints live under `/api/v1` and appear in the [API reference](/api/) unde
 | `POST` | `/projects/{slug}/insights/health` | approver, admin | `{ window?, force? }`; on demand, no scheduler |
 | `PATCH` | `/projects/{slug}` | site admin | `{ aiProfile }`: a configured profile name, or `null` to turn AI off |
 
-Agents can read the `GET` endpoints through the [MCP server](./mcp/), which never triggers generation.
+Agents can read the `GET` endpoints through the [MCP server](/ai/mcp/), which never triggers generation.
 
 ## Generating and polling
 

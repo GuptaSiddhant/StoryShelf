@@ -6,7 +6,7 @@ description: Let Claude Code, Cursor and other AI agents read StoryShelf builds,
 import { Card, CardGrid, Steps } from '@astrojs/starlight/components';
 import { PackageManagers } from 'starlight-package-managers';
 
-The StoryShelf [MCP](https://modelcontextprotocol.io) server gives AI agents the same view of a build that a reviewer has: which stories changed, how much, what the capture logs say, and what the [AI triage](./triage/) concluded. An agent can then explain a failing build, point at the likely regression, or leave a comment on the review.
+The StoryShelf [MCP](https://modelcontextprotocol.io) server gives AI agents the same view of a build that a reviewer has: which stories changed, how much, what the capture logs say, and what the [AI triage](/ai/triage/) concluded. An agent can then explain a failing build, point at the likely regression, or leave a comment on the review.
 
 It is a thin client over the [REST API](/guides/api/): it uses your existing tokens and roles, and needs no changes to your server.
 
@@ -93,7 +93,7 @@ const handler = createMcpHttpHandler({ url: "https://shelf.example.com", slug: "
 
 ## Privacy and safety
 
-An agent sees exactly what its token's role can see, and what it reads goes to *its* model, so give agents tokens scoped to the projects they need. See [Privacy and safety](./privacy/) for how StoryShelf itself treats AI data.
+An agent sees exactly what its token's role can see, and what it reads goes to *its* model, so give agents tokens scoped to the projects they need. See [Privacy and safety](/ai/privacy/) for how StoryShelf itself treats AI data.
 
 ## Reference
 
