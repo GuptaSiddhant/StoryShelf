@@ -14,7 +14,7 @@ function eachModel(state: AiState): LanguageModel[] {
       models.push(effectiveSlot(profile, task).model);
     }
     if (profile.models?.vision) {
-      models.push(effectiveSlot(profile, "triage").model);
+      models.push(effectiveSlot(profile, "triage", true).model);
     }
   }
   return models;

@@ -103,13 +103,13 @@ export interface Ai {
   /** Whether the profile has an effective vision model for the task. */
   hasVision(profile: string | undefined, task: AiTask): boolean;
   /** Stable identifier of the model a call would use (for hashing/rows). */
-  modelId(profile: string | undefined, task: AiTask): string;
+  modelId(profile: string | undefined, task: AiTask, withImages?: boolean): string;
   /** Budget options (with defaults applied). */
   budget(): AiBudget;
   /** Evidence limit overrides configured on the instance. */
   limits(): Partial<EvidenceLimits>;
   /** Per-slot timeout in milliseconds. */
-  timeoutMs(profile: string | undefined, task: AiTask): number;
+  timeoutMs(profile: string | undefined, task: AiTask, withImages?: boolean): number;
   /** Host-bound scoped logger. */
   setLogger?(logger: Logger): void;
   /** Free boot checks (spec version, wiring); never a billed call. */

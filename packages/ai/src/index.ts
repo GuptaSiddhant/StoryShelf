@@ -22,17 +22,20 @@ export function createAi<const P extends string>(options: CreateAiOptions<P>): A
     limits: options.limits ?? {},
   };
   let logger: Logger | undefined;
-  const slot = (profile: string | undefined, task: AiTask): ReturnType<typeof slotFor> =>
-    slotFor(state, profile, task);
+  const slot = (
+    profile: string | undefined,
+    task: AiTask,
+    withImages = false,
+  ): ReturnType<typeof slotFor> => slotFor(state, profile, task, withImages);
   return {
     summarize: async (input) => await summarize(state, input, () => logger),
     profileNames: () => Object.keys(state.profiles),
     defaultProfile: () => state.defaultProfile,
-    hasVision: (profile, task) => slot(profile, task).vision,
-    modelId: (profile, task) => modelId(slot(profile, task).model),
+    hasVision: (profile, task) => slot(profile, task, true).vision,
+    modelId: (profile, task, withImages) => modelId(slot(profile, task, withImages).model),
     budget: () => state.budget,
     limits: () => state.limits,
-    timeoutMs: (profile, task) => slot(profile, task).timeoutMs,
+    timeoutMs: (profile, task, withImages) => slot(profile, task, withImages).timeoutMs,
     setLogger: (next) => {
       logger = next;
     },
@@ -73,4 +76,5 @@ export type {
   ModelSlot,
   ProfileConfig,
   ProfileModels,
+  SlotProviderOptions,
 } from "./types.ts";

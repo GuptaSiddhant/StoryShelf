@@ -29,8 +29,9 @@ export function slotFor(
   state: AiState,
   profile: string | undefined,
   task: AiSummarizeInput<unknown>["task"],
+  withImages = false,
 ): EffectiveSlot {
-  return effectiveSlot(resolveProfile(state, profile).profile, task);
+  return effectiveSlot(resolveProfile(state, profile).profile, task, withImages);
 }
 
 function signalFor(external: AbortSignal | undefined, timeoutMs: number): AbortSignal {
@@ -48,6 +49,7 @@ async function callWithVisionFallback<T>(
     ...input,
     model: slot.model,
     maxTokens: slot.maxTokens,
+    providerOptions: slot.providerOptions,
     signal: signalFor(input.signal, slot.timeoutMs),
   };
   const useImages = input.evidence.images.length > 0 && slot.vision;
@@ -131,7 +133,7 @@ export async function summarize<T>(
   logger: () => Logger | undefined,
 ): Promise<AiSummarizeResult<T>> {
   const { name, profile, warnings } = resolveProfile(state, input.profile);
-  const slot = effectiveSlot(profile, input.task);
+  const slot = effectiveSlot(profile, input.task, input.evidence.images.length > 0);
   const ctx: CallContext<T> = {
     input,
     slot,

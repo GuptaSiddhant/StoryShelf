@@ -26,15 +26,16 @@ describe("slots", () => {
 
 describe("effectiveSlot (vision rules)", () => {
   it("assumes a bare model in the vision slot is vision-capable", () => {
-    expect(effectiveSlot({ defaultModel: m(), models: { vision: m() } }, "triage").vision).toBe(
-      true,
-    );
+    expect(
+      effectiveSlot({ defaultModel: m(), models: { vision: m() } }, "triage", true).vision,
+    ).toBe(true);
   });
 
   it("lets an explicit vision:false win over placement", () => {
     const slot = effectiveSlot(
       { defaultModel: m(), models: { vision: { model: m(), vision: false } } },
       "triage",
+      true,
     );
     expect(slot.vision).toBe(false);
   });
@@ -87,5 +88,25 @@ describe("options", () => {
   it("identifies models by provider and id (or the gateway string)", () => {
     expect(modelId(m())).toContain(":");
     expect(modelId("openai/gpt-x")).toBe("openai/gpt-x");
+  });
+});
+
+describe("slot provider options", () => {
+  it("keeps them on the object form and defaults to none on a bare model", () => {
+    const options = { anthropic: { thinking: { type: "disabled" } } };
+    expect(resolveSlot({ model: m(), providerOptions: options }, "triage").providerOptions).toEqual(
+      options,
+    );
+    expect(resolveSlot(m(), "triage").providerOptions).toBeUndefined();
+  });
+});
+
+describe("vision slot routing", () => {
+  it("uses the vision model only when images are sent", () => {
+    const base = m();
+    const vision = m();
+    const profile = { defaultModel: base, models: { vision } };
+    expect(effectiveSlot(profile, "triage").model).toBe(base);
+    expect(effectiveSlot(profile, "triage", true).model).toBe(vision);
   });
 });

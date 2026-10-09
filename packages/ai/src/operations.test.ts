@@ -128,3 +128,35 @@ describe("telemetry privacy", () => {
     }
   });
 });
+
+describe("providerOptions", () => {
+  it("forwards slot provider options to the model call, per slot", async () => {
+    const base = mockModel([TRIAGE_JSON]);
+    const vision = mockModel([TRIAGE_JSON]);
+    const ai = createAi({
+      profiles: {
+        default: {
+          defaultModel: { model: base, providerOptions: { openai: { reasoningEffort: "low" } } },
+          models: {
+            vision: { model: vision, providerOptions: { openai: { reasoningEffort: "minimal" } } },
+          },
+        },
+      },
+    });
+    await ai.summarize(input({ evidence: { text: "e", images: [] } }));
+    expect(base.doGenerateCalls[0]?.providerOptions).toEqual({
+      openai: { reasoningEffort: "low" },
+    });
+    await ai.summarize(input());
+    expect(vision.doGenerateCalls[0]?.providerOptions).toEqual({
+      openai: { reasoningEffort: "minimal" },
+    });
+  });
+
+  it("sends none when the slot has none", async () => {
+    const model = mockModel([TRIAGE_JSON]);
+    const ai = createAi({ profiles: { default: { defaultModel: model } } });
+    await ai.summarize(input({ evidence: { text: "e", images: [] } }));
+    expect(model.doGenerateCalls[0]?.providerOptions).toBeUndefined();
+  });
+});

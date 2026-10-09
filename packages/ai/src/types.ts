@@ -1,6 +1,11 @@
 /** Options and slot types for `createAi` (no behavior). */
 import type { EvidenceLimits } from "@storyshelf/core/insights";
-import type { LanguageModel } from "ai";
+import type { LanguageModel, generateText } from "ai";
+
+/** Provider-specific call settings, forwarded unchanged (opaque to this package). */
+export type SlotProviderOptions = NonNullable<
+  Parameters<typeof generateText>[0]["providerOptions"]
+>;
 
 /** A model, or a model with per-slot overrides. */
 export type ModelSlot =
@@ -13,6 +18,12 @@ export type ModelSlot =
       vision?: boolean;
       /** Per-call timeout in milliseconds. */
       timeoutMs?: number;
+      /**
+       * Provider-specific settings sent with every call of this slot (for example a
+       * reasoning-effort or thinking-budget cap, or provider routing). Passed to the
+       * SDK unchanged; this package contains no provider code.
+       */
+      providerOptions?: SlotProviderOptions;
     };
 
 /** Per-task models of one profile; `vision: null` disables images. */

@@ -83,7 +83,7 @@ function baseInput(
   evidence: BuiltEvidence,
   images: Uint8Array[],
 ): Pick<InsightStartInput, "inputHash" | "profile" | "model" | "promptVersion" | "projectId"> {
-  const model = deps.ai.modelId(profile, task);
+  const model = deps.ai.modelId(profile, task, images.length > 0);
   return {
     projectId: project.id,
     profile,

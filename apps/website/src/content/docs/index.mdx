@@ -63,10 +63,25 @@ Full walkthrough: [Getting started](./guides/getting-started/).
   <Card title="Merge gate and notifications" icon="comment">
     Commit statuses for GitHub and GitLab, threaded comments, and Slack, Teams or email alerts when a build needs review.
   </Card>
+  <Card title="AI triage and health (optional)" icon="star">
+    Bring your own model and get a verdict and per-snapshot notes on every build, plus a 30-day project health digest. Advisory only, off by default, secrets redacted.
+  </Card>
   <Card title="Self-host anywhere" icon="cloud">
     Docker Compose locally, or Terraform stacks for AWS, Azure and GCP. Bring your own database, storage and queue.
   </Card>
 </CardGrid>
+
+## AI that helps you review
+
+Optional and advisory. Connect any model through the Vercel AI SDK (OpenAI, Anthropic, Google, Bedrock, Vertex, Azure, a gateway, or a local model) and StoryShelf will tell you whether a build's changes look intended, need a human look, or look like a regression, and summarize how healthy each project is.
+
+- **Triage on the review page**: a verdict, a short summary and a note per snapshot, generated on demand and cached.
+- **Project health**: a score, verdict and trends on the Library page and as a badge on the project card.
+- **Under your control**: off until a site admin enables a profile per project, a daily token budget across all instances, and prompts and screenshots never leave your chosen model or your traces.
+
+<Screenshot name="diff-review" alt="The review page with an AI triage panel above the snapshot list: verdict, summary and per-snapshot notes" caption="AI triage above the review workspace: a verdict, a summary and notes per snapshot." />
+
+[Read about AI insights](./ai/) · [Set it up](./ai/setup/) · [Try it with free models](./ai/testing/)
 
 ## See it
 
@@ -81,6 +96,7 @@ Full walkthrough: [Getting started](./guides/getting-started/).
 <CardGrid>
   <LinkCard title="Getting started" href="./guides/getting-started/" description="Scaffold a server, create a project, upload your first build." />
   <LinkCard title="Core concepts" href="./concepts/projects/" description="Projects, baselines, labels, builds, capture and retention: the mental model." />
+  <LinkCard title="AI insights" href="./ai/" description="Optional AI triage and project health: setup, privacy, budget and API." />
   <LinkCard title="API reference" href="/api/" description="Every /api/v1 endpoint, grouped and searchable." />
 </CardGrid>
 

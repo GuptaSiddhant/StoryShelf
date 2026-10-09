@@ -1,0 +1,37 @@
+---
+title: Budget and usage
+description: Daily token budget across instances, per-project limits, alerts at 50/75/90/100 percent, caching and the admin usage page.
+---
+
+## Limits
+
+Set them in `createAi({ budget })`; all fields are optional.
+
+| Option | Meaning | Default |
+|---|---|---|
+| `dailyTokens` | Site-wide cap per **UTC day** | none |
+| `visionWeight` | Multiplier on tokens counted for calls that sent screenshots (providers under-report image cost) | `5` |
+| `perProjectCallsPerHour` | Calls one project can start per rolling hour | `50` |
+
+The budget is counted from the usage recorded in the database, so it holds across **all server instances combined**. Checks run before a run starts and aren't atomic, so concurrent calls can overshoot slightly. When a limit is hit the API answers `429` with `Retry-After`; at 100% of the daily cap new runs wait for the next UTC day. **Cached results are still served** and cost nothing.
+
+Calls that fail after the provider reported usage still count: the provider billed them.
+
+## Alerts
+
+Site admins get a `sys:ai-budget` notification the first time the daily total crosses **50%, 75%, 90% and 100%** of `dailyTokens`, at most once per threshold per day even with several instances. Notifications use your configured [channels](/guides/notifications/) (Slack, Teams or email).
+
+## Usage page
+
+**Admin → System → AI usage** (`/admin/ai`) shows today's position against the cap and the last 14 days by day and by profile, including failed calls.
+
+## Retention
+
+Usage rows and project health digests are deleted after 90 days. Build triage is deleted with its build. A daily pass also marks runs stuck for more than 30 minutes as failed.
+
+## Keeping costs predictable
+
+- Set `dailyTokens` in production. A small cap is cheap insurance.
+- Leave screenshots off (`vision: null`, or no vision model) where they aren't needed; they are the biggest cost multiplier.
+- Prefer small, fast models for triage; they are given a tightly capped, structured input.
+- Remember that triage results are cached by evidence, so repeated views are free.
