@@ -2,6 +2,8 @@ import { libConfig } from "../../config/tsdown.ts";
 
 export default libConfig({
   index: "./src/index.tsx",
+  ai: "./src/ai.ts",
+  insights: "./src/insights/index.ts",
   auth: "./src/auth.ts",
   "adapter/metadata": "./src/adapters/metadata.ts",
   "adapter/setup": "./src/adapters/setup.ts",

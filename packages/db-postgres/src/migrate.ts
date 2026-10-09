@@ -22,6 +22,7 @@ const PROJECT_BROWSER_ALTER =
 const PROJECT_VIEWPORTS_ALTER = "ALTER TABLE projects ADD COLUMN IF NOT EXISTS viewports TEXT";
 const PROJECT_AUTOMIGRATE_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS automigrate BOOLEAN NOT NULL DEFAULT false";
+const PROJECT_AI_PROFILE_ALTER = "ALTER TABLE projects ADD COLUMN IF NOT EXISTS ai_profile TEXT";
 const SNAPSHOT_INFRA_HASH_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS infra_hash TEXT";
 const SNAPSHOT_INHERITED_ALTER =
   "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS inherited BOOLEAN NOT NULL DEFAULT false";
@@ -63,6 +64,7 @@ async function migrateProjectExtras(run: MigrationRunner): Promise<void> {
   await execIgnore(run, EXECUTE_PLAY_ALTER);
   await execIgnore(run, PLAY_TIMEOUT_MS_ALTER);
   await execIgnore(run, PROJECT_AUTOMIGRATE_ALTER);
+  await execIgnore(run, PROJECT_AI_PROFILE_ALTER);
   await migrateSnapshotColumns(run);
   await execIgnore(run, BASELINE_INFRA_HASH_ALTER);
   await execIgnore(run, BUILD_AFFECTED_ONLY_ALTER);

@@ -55,6 +55,9 @@ function matchChunk(chunks: SqlChunk[], row: Record<string, unknown>, table: Tab
   if (text.includes(" in ")) {
     return inArrayMatches(chunks, row, table);
   }
+  if (text.includes(" >= ")) {
+    return !ltMatches(chunks, row, table);
+  }
   if (text.includes(" < ")) {
     return ltMatches(chunks, row, table);
   }

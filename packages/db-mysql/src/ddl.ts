@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS projects (
   browser TEXT NOT NULL DEFAULT 'chromium',
   viewports TEXT,
   automigrate TINYINT(1) NOT NULL DEFAULT false,
+  ai_profile TEXT,
   created_at DATETIME(3) NOT NULL,
   updated_at DATETIME(3) NOT NULL
 );
@@ -205,6 +206,51 @@ CREATE TABLE IF NOT EXISTS notification_subscriptions (
   created_at DATETIME(3) NOT NULL
 );
 CREATE UNIQUE INDEX notification_subscriptions_project_user_idx ON notification_subscriptions (project_id, user_id);
+CREATE TABLE IF NOT EXISTS insights (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  build_id TEXT REFERENCES builds(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,
+  window_key TEXT,
+  input_hash TEXT NOT NULL,
+  status TEXT NOT NULL,
+  profile TEXT NOT NULL,
+  model TEXT NOT NULL,
+  prompt_version TEXT NOT NULL,
+  verdict TEXT,
+  summary TEXT,
+  result TEXT,
+  error_code TEXT,
+  created_at DATETIME(3) NOT NULL,
+  started_at DATETIME(3),
+  finished_at DATETIME(3)
+);
+CREATE INDEX insights_project_build_idx ON insights (project_id, build_id);
+CREATE INDEX insights_created_at_idx ON insights (created_at);
+CREATE UNIQUE INDEX insights_triage_unique_idx ON insights (project_id, build_id, kind, input_hash);
+CREATE UNIQUE INDEX insights_health_unique_idx ON insights (project_id, kind, window_key);
+CREATE TABLE IF NOT EXISTS ai_usage (
+  id TEXT PRIMARY KEY,
+  insight_id TEXT,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  profile TEXT NOT NULL,
+  task TEXT NOT NULL,
+  model TEXT NOT NULL,
+  input_tokens INTEGER NOT NULL DEFAULT 0,
+  output_tokens INTEGER NOT NULL DEFAULT 0,
+  estimated TINYINT(1) NOT NULL DEFAULT false,
+  images INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL,
+  created_at DATETIME(3) NOT NULL
+);
+CREATE INDEX ai_usage_created_at_idx ON ai_usage (created_at);
+CREATE INDEX ai_usage_project_created_idx ON ai_usage (project_id, created_at);
+CREATE TABLE IF NOT EXISTS ai_budget_alerts (
+  id TEXT PRIMARY KEY,
+  day TEXT NOT NULL,
+  threshold INTEGER NOT NULL,
+  created_at DATETIME(3) NOT NULL
+);
 CREATE TABLE IF NOT EXISTS user_invite_tokens (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

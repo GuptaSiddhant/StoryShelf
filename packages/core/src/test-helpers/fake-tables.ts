@@ -65,6 +65,7 @@ const projects = defineTable("projects", {
   browser: "browser",
   viewports: "viewports",
   automigrate: "automigrate",
+  aiProfile: "ai_profile",
   createdAt: "created_at",
   updatedAt: "updated_at",
 });
@@ -263,6 +264,48 @@ const projectGroupMappings = defineTable("project_group_mappings", {
   createdAt: "created_at",
 });
 
+const insights = defineTable("insights", {
+  id: "id",
+  projectId: "project_id",
+  buildId: "build_id",
+  kind: "kind",
+  windowKey: "window_key",
+  inputHash: "input_hash",
+  status: "status",
+  profile: "profile",
+  model: "model",
+  promptVersion: "prompt_version",
+  verdict: "verdict",
+  summary: "summary",
+  result: "result",
+  errorCode: "error_code",
+  createdAt: "created_at",
+  startedAt: "started_at",
+  finishedAt: "finished_at",
+});
+
+const aiUsage = defineTable("ai_usage", {
+  id: "id",
+  insightId: "insight_id",
+  projectId: "project_id",
+  profile: "profile",
+  task: "task",
+  model: "model",
+  inputTokens: "input_tokens",
+  outputTokens: "output_tokens",
+  estimated: "estimated",
+  images: "images",
+  status: "status",
+  createdAt: "created_at",
+});
+
+const aiBudgetAlerts = defineTable("ai_budget_alerts", {
+  id: "id",
+  day: "day",
+  threshold: "threshold",
+  createdAt: "created_at",
+});
+
 const notificationChannels = defineTable("notification_channels", {
   id: "id",
   projectId: "project_id",
@@ -310,6 +353,9 @@ export const fakeSchema: Tables = {
   userInviteTokens,
   projectMembers,
   projectGroupMappings,
+  insights,
+  aiUsage,
+  aiBudgetAlerts,
   notificationChannels,
   notificationSubscriptions,
   contentRefs,

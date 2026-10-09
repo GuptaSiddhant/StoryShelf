@@ -15,6 +15,8 @@ export interface Project {
   browser?: string;
   viewports?: string | null;
   automigrate?: boolean;
+  /** AI profile gate: null = AI off for this project; otherwise a profile name. */
+  aiProfile?: string | null;
   createdAt: string;
   updatedAt: string;
 }

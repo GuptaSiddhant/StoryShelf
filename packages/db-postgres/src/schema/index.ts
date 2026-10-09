@@ -16,6 +16,11 @@ import {
 } from "./capture-attempt.ts";
 import { comments as commentsTable } from "./comment.ts";
 import { contentRefs as contentRefsTable } from "./content-refs.ts";
+import {
+  aiBudgetAlerts as aiBudgetAlertsTable,
+  aiUsage as aiUsageTable,
+  insights as insightsTable,
+} from "./insight.ts";
 import { buildLabels as buildLabelsTable, labelTypes as labelTypesTable } from "./label.ts";
 import { projectMembers as projectMembersTable } from "./member.ts";
 import {
@@ -45,6 +50,7 @@ export { tokens } from "./token.ts";
 export { userInviteTokens } from "./user-invite.ts";
 export { users } from "./user.ts";
 export { webhooks } from "./webhook.ts";
+export { aiBudgetAlerts, aiUsage, insights } from "./insight.ts";
 export { notificationChannels, notificationSubscriptions } from "./notification.ts";
 export { contentRefs } from "./content-refs.ts";
 
@@ -74,6 +80,8 @@ export type { UserInviteToken } from "./user-invite.ts";
 export type { User } from "./user.ts";
 /** Webhook subscription row. */
 export type { Webhook } from "./webhook.ts";
+/** Insight, AI usage and budget-alert rows. */
+export type { AiBudgetAlert, AiUsage, Insight } from "./insight.ts";
 /** Notification channel and subscription rows. */
 export type { NotificationChannel, NotificationSubscription } from "./notification.ts";
 /** Baseline row. */
@@ -95,6 +103,9 @@ export const schema: {
   buildLabels: AnyPgTable;
   tokens: AnyPgTable;
   webhooks: AnyPgTable;
+  insights: AnyPgTable;
+  aiUsage: AnyPgTable;
+  aiBudgetAlerts: AnyPgTable;
   notificationChannels: AnyPgTable;
   notificationSubscriptions: AnyPgTable;
   users: AnyPgTable;
@@ -115,6 +126,9 @@ export const schema: {
   buildLabels: buildLabelsTable,
   tokens: tokensTable,
   webhooks: webhooksTable,
+  insights: insightsTable,
+  aiUsage: aiUsageTable,
+  aiBudgetAlerts: aiBudgetAlertsTable,
   notificationChannels: notificationChannelsTable,
   notificationSubscriptions: notificationSubscriptionsTable,
   users: usersTable,

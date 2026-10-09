@@ -8,6 +8,8 @@ import { captureAttempts, captureLogs } from "./schema/capture-attempt.ts";
 import type { CaptureAttempt, CaptureLog } from "./schema/capture-attempt.ts";
 import { comments } from "./schema/comment.ts";
 import type { Comment } from "./schema/comment.ts";
+import { aiBudgetAlerts, aiUsage, insights } from "./schema/insight.ts";
+import type { AiBudgetAlert, AiUsage, Insight } from "./schema/insight.ts";
 import { buildLabels, labelTypes } from "./schema/label.ts";
 import type { BuildLabel, LabelType } from "./schema/label.ts";
 import { projectMembers } from "./schema/member.ts";
@@ -52,6 +54,9 @@ it("row interfaces match drizzle inference exactly", () => {
     typeof notificationSubscriptions.$inferSelect
   >();
   expectTypeOf<User>().toEqualTypeOf<typeof users.$inferSelect>();
+  expectTypeOf<Insight>().toEqualTypeOf<typeof insights.$inferSelect>();
+  expectTypeOf<AiUsage>().toEqualTypeOf<typeof aiUsage.$inferSelect>();
+  expectTypeOf<AiBudgetAlert>().toEqualTypeOf<typeof aiBudgetAlerts.$inferSelect>();
   expectTypeOf<ProjectMember>().toEqualTypeOf<typeof projectMembers.$inferSelect>();
   expectTypeOf<ProjectGroupMapping>().toEqualTypeOf<typeof projectGroupMappings.$inferSelect>();
 });
@@ -71,6 +76,9 @@ const DDL_TABLES = [
   "webhooks",
   "notification_channels",
   "notification_subscriptions",
+  "insights",
+  "ai_usage",
+  "ai_budget_alerts",
   "users",
   "project_members",
   "project_group_mappings",
@@ -97,6 +105,9 @@ const DDL_INDEXES = [
   "project_group_mappings_project_group_idx",
   "notification_channels_project_id_idx",
   "notification_subscriptions_project_user_idx",
+  "insights_triage_unique_idx",
+  "insights_health_unique_idx",
+  "ai_usage_created_at_idx",
   "session_token_idx",
   "session_user_id_idx",
   "account_user_id_idx",
