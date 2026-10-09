@@ -256,7 +256,7 @@ describe("runUpload affected capture", () => {
         if (method === "PUT") {
           return okJson({ id: "b1" });
         }
-        if (url.endsWith("/affected")) {
+        if (url.endsWith("/affected") || url.endsWith("/usage")) {
           return okJson({ id: "b1" });
         }
         return okJson(created);
@@ -307,6 +307,40 @@ describe("runUpload affected capture", () => {
       affectedImportPaths: ["src/a.stories.tsx"],
     });
     expect(calls.some((call) => call.method === "PUT")).toBe(true);
+  });
+
+  it("posts package usage even for a full capture", async () => {
+    writeBuild(dir);
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ dependencies: { "@acme/ds": "*" } }));
+    mkdirSync(join(dir, "node_modules/@acme/ds"), { recursive: true });
+    writeFileSync(
+      join(dir, "node_modules/@acme/ds/package.json"),
+      JSON.stringify({ version: "2.4.0" }),
+    );
+    writeFileSync(
+      join(dir, "storybook-static", "preview-stats.json"),
+      JSON.stringify({
+        modules: [
+          { id: "src/a.stories.tsx", importedIds: ["node_modules/@acme/ds/dist/Button.js"] },
+        ],
+      }),
+    );
+    const { calls } = stubFetch({ build: { id: "b1" }, uploadUrl: "/x", baselineSha: null });
+
+    await runUpload({ ...baseOptions(), buildDir: "storybook-static", full: true });
+
+    const usage = calls.find((call) => call.url.endsWith("/builds/b1/usage"));
+    expect(usage?.body).toEqual({
+      usage: [
+        {
+          storyImportPath: "src/a.stories.tsx",
+          packageName: "@acme/ds",
+          modulePath: "node_modules/@acme/ds/dist/Button.js",
+          version: "2.4.0",
+        },
+      ],
+    });
+    expect(calls.at(-1)?.method).toBe("PUT");
   });
 
   it("skips the affected post when --full is set", async () => {

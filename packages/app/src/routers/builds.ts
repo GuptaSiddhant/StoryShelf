@@ -1,6 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { DEFAULT_MAX_UPLOAD_BYTES } from "@storyshelf/core/config";
-import { BuildModel } from "@storyshelf/core/models";
+import { BuildModel, PackageUsageModel } from "@storyshelf/core/models";
 import { storybookZipPath } from "@storyshelf/core/utils";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
@@ -92,6 +92,19 @@ export function registerBuilds(app: ShelfRouter): void {
       affectedImportPaths,
     });
     return c.json(updated);
+  });
+
+  app.openapi(usageRoute, async (c) => {
+    const { slug, buildId } = c.req.valid("param");
+    const project = await resolveAuthorizedProject(c, slug, ...DEVELOPER_ROLES);
+    const build = await buildForProject(project.id, buildId);
+    const { usage } = c.req.valid("json");
+    const stored = await new PackageUsageModel(getStore().db).replaceForBuild(
+      project.id,
+      build.id,
+      usage,
+    );
+    return c.json({ stored });
   });
 
   app.openapi(uploadZipRoute, async (c) => {
@@ -396,6 +409,38 @@ const affectedRoute = createRoute({
     200: {
       content: { "application/json": { schema: buildSchema } },
       description: "Affected set recorded",
+    },
+    ...badRequest,
+    ...forbiddenResponse,
+    ...notFoundResponse,
+  },
+});
+
+const usagePayloadSchema = z.object({
+  usage: z
+    .array(
+      z.object({
+        storyImportPath: z.string().min(1).max(1024),
+        packageName: z.string().min(1).max(214),
+        modulePath: z.string().min(1).max(2048),
+        version: z.string().max(128).nullable().optional(),
+      }),
+    )
+    .max(20_000),
+});
+const usageRoute = createRoute({
+  method: "post",
+  tags: ["Builds"],
+  summary: "Record the dependency packages each story uses",
+  path: "/api/v1/projects/{slug}/builds/{buildId}/usage",
+  request: {
+    params: z.object({ slug: z.string(), buildId: z.string() }),
+    body: { content: { "application/json": { schema: usagePayloadSchema } } },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: z.object({ stored: z.number() }) } },
+      description: "Usage recorded (replaces any earlier report for the build)",
     },
     ...badRequest,
     ...forbiddenResponse,

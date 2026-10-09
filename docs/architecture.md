@@ -143,6 +143,31 @@ build_labels (
   UNIQUE(build_id, type_key, value)
 );
 
+-- Linked projects (components only, see issue #123): a downstream app declares which upstream
+-- project publishes a package it consumes. Used to render "Uses @acme/ds" provenance + deep links.
+project_links (
+  id            text PRIMARY KEY,
+  downstream_id text NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  upstream_id   text NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  package_name  text NOT NULL,             -- "@acme/ds"
+  created_at    text NOT NULL,
+  UNIQUE(downstream_id, package_name)
+);
+
+-- Per-build package usage, reported by the CLI at upload (it has the stats graph and node_modules).
+-- One row per (story file, package): the shallowest module of the package the story reaches.
+-- Joined to snapshots on story_import_path at read time, so rows scale with story files, not viewports.
+build_package_usage (
+  id                text PRIMARY KEY,
+  project_id        text NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  build_id          text NOT NULL REFERENCES builds(id) ON DELETE CASCADE,
+  story_import_path text NOT NULL,
+  package_name      text NOT NULL,
+  module_path       text NOT NULL,
+  version           text,                  -- installed version at upload; null when unresolved
+  created_at        text NOT NULL
+);
+
 tokens (
   id                  text PRIMARY KEY,
   project_id          text NOT NULL REFERENCES projects(id) ON DELETE CASCADE,

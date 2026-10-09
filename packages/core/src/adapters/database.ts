@@ -22,6 +22,8 @@ export interface Tables {
   comments: Table;
   labelTypes: Table;
   buildLabels: Table;
+  projectLinks: Table;
+  buildPackageUsage: Table;
   tokens: Table;
   webhooks: Table;
   insights: Table;
