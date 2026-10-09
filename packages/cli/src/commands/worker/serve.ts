@@ -97,7 +97,7 @@ function waitForExit(child: ChildProcess, relay: SignalRelay): Promise<number> {
   });
 }
 
-async function defaultSpawnProcess(
+export async function defaultSpawnProcess(
   command: string,
   args: readonly string[],
   options: SpawnOptions,

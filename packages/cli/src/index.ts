@@ -4,6 +4,8 @@ import type { ConnectionOptions } from "./commands/connection.ts";
 import type { CreateOptions } from "./commands/create.ts";
 import type { DoctorOptions } from "./commands/doctor.ts";
 import type { InitOptions } from "./commands/init.ts";
+import type { McpInitOptions } from "./commands/mcp/init.ts";
+import type { McpServeOptions } from "./commands/mcp/serve.ts";
 import type { PurgeOptions } from "./commands/purge.ts";
 import type { RetryOptions } from "./commands/retry.ts";
 import type { ServerInitOptions } from "./commands/server/init.ts";
@@ -30,6 +32,7 @@ export function createProgram(): Command {
     buildCreateCommand(),
     buildServerCommand(),
     buildWorkerCommand(),
+    buildMcpCommand(),
     buildPurgeCommand(),
     buildUploadCommand(),
     buildBuildCommand(),
@@ -142,6 +145,27 @@ function buildWorkerCommand(): Command {
     );
   worker.addCommand(runCmd);
   return worker;
+}
+
+function buildMcpCommand(): Command {
+  const mcp = new Command("mcp").description("MCP server operations (let AI agents read builds)");
+  mcp
+    .command("init")
+    .description("Scaffold a StoryShelf MCP server project")
+    .option("--dir <dir>", "output directory")
+    .action(run<McpInitOptions>(async () => (await import("./commands/mcp/init.ts")).runMcpInit));
+  const serve = new Command("serve")
+    .description("Run a scaffolded StoryShelf MCP server project")
+    .option("--dir <dir>", "MCP project directory (default cwd)")
+    .option("--url <url>", "StoryShelf server URL (sets STORYSHELF_URL)")
+    .option("--slug <slug>", "default project slug (sets STORYSHELF_SLUG)")
+    .option("--token <token>", "API token for stdio (sets STORYSHELF_TOKEN)")
+    .option("--port <port>", "HTTP port (sets PORT)")
+    .action(
+      run<McpServeOptions>(async () => (await import("./commands/mcp/serve.ts")).runMcpServe),
+    );
+  mcp.addCommand(serve, { isDefault: true });
+  return mcp;
 }
 
 function buildPurgeCommand(): Command {

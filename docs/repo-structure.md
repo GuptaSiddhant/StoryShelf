@@ -47,6 +47,7 @@ There is no `tsdown-entry` key. Each `package.json` `exports` map carries `{ sou
 - `@storyshelf/ai` exports only `createAi` and its option types; the `Ai` contract
   (`core/ai`) and the pure evidence/redaction/budget code (`core/insights`) live in
   core so `ShelfOptions.ai` needs no dependency on the implementation package.
+- `@storyshelf/mcp` is a thin `/api/v1` client (no core models/DB). Public surface: the `storyshelf-mcp` bin and the `@storyshelf/mcp/http` subpath (`createMcpHttpHandler`, `serveHttp`); tools stay internal (ADR 0027).
 - `@storyshelf/observability` root barrel is runtime-agnostic (`@opentelemetry/api`
   only); the Node SDK lifecycle lives under `observability/node` and must never
   be imported under Deno. `core` never imports `observability` (no-cycle rule,
