@@ -66,6 +66,9 @@ Full walkthrough: [Getting started](./guides/getting-started/).
   <Card title="AI triage and health (optional)" icon="star">
     Bring your own model and get a verdict and per-snapshot notes on every build, plus a 30-day project health digest. Advisory only, off by default, secrets redacted.
   </Card>
+  <Card title="Agent-ready (MCP)" icon="rocket">
+    An MCP server lets Claude Code, Cursor and other agents read builds, diffs and AI triage and comment on reviews. Local over stdio or shared over HTTP, scoped by your existing tokens, and it never approves for you.
+  </Card>
   <Card title="Self-host anywhere" icon="cloud">
     Docker Compose locally, or Terraform stacks for AWS, Azure and GCP. Bring your own database, storage and queue.
   </Card>
@@ -80,6 +83,8 @@ Optional and advisory. Connect any model through the Vercel AI SDK (OpenAI, Anth
 - **Under your control**: off until a site admin enables a profile per project, a daily token budget across all instances, and prompts and screenshots never leave your chosen model or your traces.
 
 <Screenshot name="diff-review" alt="The review page with an AI triage panel above the snapshot list: verdict, summary and per-snapshot notes" caption="AI triage above the review workspace: a verdict, a summary and notes per snapshot." />
+
+Agents can read all of it too: the [MCP server](./ai/mcp/) exposes builds, diffs and triage to Claude Code, Cursor and friends.
 
 [Read about AI insights](./ai/) · [Set it up](./ai/setup/) · [Try it with free models](./ai/testing/)
 

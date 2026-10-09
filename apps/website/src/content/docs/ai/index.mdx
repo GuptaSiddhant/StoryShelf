@@ -22,6 +22,9 @@ StoryShelf can read a build's results and tell you what it thinks: *is this chan
   <Card title="Your models, your keys" icon="puzzle">
     OpenAI, Anthropic, Google, Bedrock, Vertex, Azure, a gateway, or a local model. StoryShelf never sees your keys. [Set it up](./setup/)
   </Card>
+  <Card title="MCP server for agents" icon="rocket">
+    Let Claude Code, Cursor and other agents read builds, diffs and triage, and comment on reviews. Read-only plus comments; approving stays human. [Connect an agent](./mcp/)
+  </Card>
   <Card title="Private by design" icon="magnifier">
     Off until a site admin enables a profile per project. Secrets are redacted, output is plain text, and traces never contain prompts or screenshots. [Privacy and safety](./privacy/)
   </Card>
@@ -49,6 +52,7 @@ Everything is bounded: a daily token budget across all instances, a per-project 
 
 <CardGrid>
   <LinkCard title="Setup and providers" href="./setup/" description="createAi, profiles, models, provider options and credentials." />
+  <LinkCard title="MCP server" href="./mcp/" description="Connect AI agents to builds, diffs and triage over stdio or HTTP." />
   <LinkCard title="API" href="./api/" description="Endpoints, roles and the guard order for scripts and CI." />
   <LinkCard title="Free AI for testing" href="./testing/" description="Try it with a free-tier hosted model or a local one." />
 </CardGrid>

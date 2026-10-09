@@ -17,6 +17,7 @@ describe("createProgram", () => {
       "create",
       "doctor",
       "init",
+      "mcp",
       "purge",
       "retry",
       "server",

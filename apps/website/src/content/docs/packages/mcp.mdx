@@ -1,0 +1,26 @@
+---
+title: "@storyshelf/mcp"
+description: MCP server for AI agents — stdio and Streamable HTTP, a thin client over the StoryShelf REST API.
+---
+
+import { PackageManagers } from 'starlight-package-managers';
+
+`@storyshelf/mcp` is the [MCP server](/ai/mcp/): it lets AI agents read builds, snapshot diffs and AI triage and comment on reviews, using your existing API tokens. It never approves or rejects. See [ADR 0027](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/0027-mcp-server.md).
+
+## Install
+
+<PackageManagers pkg="@storyshelf/mcp" />
+
+- [npm package](https://www.npmjs.com/package/@storyshelf/mcp) — install tarballs and version history.
+- [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/mcp) — package directory on `main`.
+
+## Usage
+
+```sh
+STORYSHELF_URL=https://shelf.example.com STORYSHELF_TOKEN=... storyshelf-mcp          # stdio
+STORYSHELF_URL=https://shelf.example.com storyshelf-mcp --http --port 3333             # HTTP at /mcp
+```
+
+Or scaffold a project with `storyshelf mcp init` and run it with `storyshelf mcp serve`.
+
+The `@storyshelf/mcp/http` subpath exports `createMcpHttpHandler` (a `Request` to `Response` handler) and `serveHttp` (a Node server) for embedding.

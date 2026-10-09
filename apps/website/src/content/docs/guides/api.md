@@ -56,6 +56,8 @@ Unconfigured servers (no auth adapter) accept all requests.
 | Insights | `/api/v1/projects/{slug}/builds/{id}/insights`, `/api/v1/projects/{slug}/insights/health` | AI build triage and project health ([AI insights](/ai/)) |
 | Admin | `/api/v1/admin` | Site-wide operations (retention purge) |
 
+AI agents can use this API through the [MCP server](/ai/mcp/), which wraps the read and comment endpoints.
+
 ## Walkthrough: upload a build
 
 The core CI flow in three calls:
