@@ -3,7 +3,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { afterEach, beforeEach } from "vitest";
-import { buildGraph, loadDepGraph, loadStoryImportPaths, normalizePath } from "./stats.ts";
+import {
+  buildGraph,
+  loadDepGraph,
+  loadStoryImportPaths,
+  normalizePath,
+  stripQueryAndLoader,
+} from "./stats.ts";
 
 let dir: string;
 
@@ -23,7 +29,55 @@ describe("normalizePath", () => {
   });
 });
 
+describe("stripQueryAndLoader", () => {
+  it("drops ?query suffixes (Vue, Svelte, Vite)", () => {
+    expect(stripQueryAndLoader("src/Button.vue?vue&type=script&lang.ts")).toBe("src/Button.vue");
+    expect(stripQueryAndLoader("src/Card.svelte?svelte&type=style&lang.css")).toBe(
+      "src/Card.svelte",
+    );
+  });
+
+  it("keeps only the resource after webpack loader prefixes", () => {
+    expect(
+      stripQueryAndLoader(
+        "../node_modules/vue-loader/dist/index.js??ruleSet[1].rules[2]!./src/Button.vue?vue&type=script",
+      ),
+    ).toBe("./src/Button.vue");
+    expect(stripQueryAndLoader("style-loader!css-loader!./a.css")).toBe("./a.css");
+  });
+
+  it("leaves plain paths untouched", () => {
+    expect(stripQueryAndLoader("src/a.ts")).toBe("src/a.ts");
+  });
+
+  it("is applied by normalizePath", () => {
+    expect(normalizePath("./src/Button.vue?vue&type=script")).toBe("src/Button.vue");
+  });
+});
+
 describe("buildGraph", () => {
+  it("folds Vue/Svelte sub-modules into the component file", () => {
+    const graph = buildGraph([
+      { id: "/src/Button.stories.ts", importedIds: ["/src/Button.vue"] },
+      { id: "/src/Button.vue", importedIds: ["/src/Button.vue?vue&type=script&lang.ts"] },
+      { id: "/src/Button.vue?vue&type=script&lang.ts", importedIds: ["/src/tokens.ts"] },
+      { id: "/src/Card.svelte?svelte&type=style&lang.css", importedIds: ["/src/card.css"] },
+    ]);
+    expect(graph?.imports["src/Button.vue"]).toEqual(["src/tokens.ts"]);
+    expect(graph?.importedBy["src/Button.vue"]).toEqual(["src/Button.stories.ts"]);
+    expect(graph?.imports["src/Card.svelte"]).toEqual(["src/card.css"]);
+  });
+
+  it("matches webpack loader-prefixed reasons", () => {
+    const graph = buildGraph([
+      {
+        name: "./src/Button.vue",
+        reasons: [{ moduleName: "vue-loader!./src/Button.stories.ts?x" }],
+      },
+    ]);
+    expect(graph?.importedBy["src/Button.vue"]).toEqual(["src/Button.stories.ts"]);
+  });
+
   it("builds bidirectional edges from Vite forward imports", () => {
     const graph = buildGraph([
       { id: "src/Button.stories.tsx", importedIds: ["src/Button.tsx"] },

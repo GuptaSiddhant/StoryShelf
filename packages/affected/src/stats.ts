@@ -23,9 +23,24 @@ interface StoryIndex {
   entries?: Record<string, { importPath?: unknown }>;
 }
 
+/**
+ * Strip bundler module-id decoration so sub-modules fold into their file:
+ * webpack loader chains (`a-loader!b-loader??opts!./Button.vue`) keep only
+ * the resource after the last `!`, and `?query` suffixes
+ * (`Button.vue?vue&type=script`, `Card.svelte?svelte&type=style`) are dropped.
+ */
+export function stripQueryAndLoader(value: string): string {
+  const resource = value.slice(value.lastIndexOf("!") + 1);
+  const queryStart = resource.indexOf("?");
+  return queryStart === -1 ? resource : resource.slice(0, queryStart);
+}
+
 /** Normalize a stats path to a repo-relative posix form for comparison. */
 export function normalizePath(value: string): string {
-  return value.replaceAll("\\", "/").replaceAll(/^\.\//gu, "").replaceAll(/^\//gu, "");
+  return stripQueryAndLoader(value)
+    .replaceAll("\\", "/")
+    .replaceAll(/^\.\//gu, "")
+    .replaceAll(/^\//gu, "");
 }
 
 /** True when stats module `candidate` refers to repo-relative file `target`. */
