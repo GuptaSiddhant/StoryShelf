@@ -5,6 +5,7 @@ import {
   type CreateAiOptions,
   type ModelSlot,
   type ProfileConfig,
+  type SlotProviderOptions,
   TASK_DEFAULTS,
 } from "./types.ts";
 
@@ -15,6 +16,8 @@ export interface ResolvedSlot {
   timeoutMs: number;
   /** Declared vision flag (undefined = not declared). */
   declaredVision: boolean | undefined;
+  /** Provider options configured on the slot (undefined = none). */
+  providerOptions: SlotProviderOptions | undefined;
 }
 
 /** True for the object form `{ model, ... }` (a bare model has a spec version). */
@@ -36,9 +39,10 @@ export function resolveSlot(slot: ModelSlot, task: AiTask): ResolvedSlot {
       maxTokens: slot.maxTokens ?? defaults.maxTokens,
       timeoutMs: slot.timeoutMs ?? defaults.timeoutMs,
       declaredVision: slot.vision,
+      providerOptions: slot.providerOptions,
     };
   }
-  return { model: slot, ...defaults, declaredVision: undefined };
+  return { model: slot, ...defaults, declaredVision: undefined, providerOptions: undefined };
 }
 
 /** The slot chosen for a call and whether it accepts images. */
@@ -49,12 +53,17 @@ export interface EffectiveSlot extends ResolvedSlot {
 /**
  * Effective vision (ADR 0026 §3): a `vision` slot is assumed vision-capable
  * unless it declares `vision: false`; `vision: null` disables images; a base
- * slot only counts when it declares `vision: true`.
+ * slot only counts when it declares `vision: true`. The vision slot is used only
+ * when images are actually sent; text-only calls use the task/default model.
  */
-export function effectiveSlot(profile: ProfileConfig, task: AiTask): EffectiveSlot {
+export function effectiveSlot(
+  profile: ProfileConfig,
+  task: AiTask,
+  withImages = false,
+): EffectiveSlot {
   const base = resolveSlot(profile.models?.[task] ?? profile.defaultModel, task);
   const visionSlot = task === "triage" ? profile.models?.vision : undefined;
-  if (visionSlot) {
+  if (visionSlot && withImages) {
     const resolved = resolveSlot(visionSlot, task);
     return { ...resolved, vision: resolved.declaredVision !== false };
   }

@@ -12,6 +12,7 @@ import {
   type ModelMessage,
 } from "ai";
 import type { z } from "zod";
+import type { SlotProviderOptions } from "./types.ts";
 
 /** One structured call's parameters. */
 export interface StructuredCall<T> {
@@ -21,6 +22,8 @@ export interface StructuredCall<T> {
   evidence: AiEvidence;
   schema: z.ZodType<T>;
   maxTokens: number;
+  /** Provider-specific settings from the slot (forwarded unchanged). */
+  providerOptions?: SlotProviderOptions | undefined;
   signal: AbortSignal;
   /** Send images (false = text-only fallback). */
   withImages: boolean;
@@ -121,6 +124,7 @@ async function attempt<T>(
       messages,
       output: Output.object({ schema: call.schema }),
       maxOutputTokens: call.maxTokens,
+      ...(call.providerOptions ? { providerOptions: call.providerOptions } : {}),
       maxRetries: 0,
       abortSignal: call.signal,
       telemetry: {
