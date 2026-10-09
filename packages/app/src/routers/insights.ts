@@ -3,6 +3,7 @@ import { InsightModel } from "@storyshelf/core/models";
 import type { ShelfRouter } from "../app-types.ts";
 import { failWith } from "../insights/errors.ts";
 import { requestHealth, requestTriage } from "../insights/request.ts";
+import { freshen } from "../insights/stale.ts";
 import { toInsightView } from "../insights/view.ts";
 import { buildForProject } from "./builds.handlers.ts";
 import { notFound as throwNotFound } from "./helpers.ts";
@@ -107,7 +108,7 @@ function registerBuildInsights(app: ShelfRouter): void {
     const build = await buildForProject(project.id, buildId);
     const [latest] = await new InsightModel(deps.db).listForBuild(build.id, 1);
     return latest
-      ? c.json(toInsightView(latest), 200)
+      ? c.json(toInsightView(await freshen(deps, latest)), 200)
       : throwNotFound("never-generated: POST to this build's insights to create one");
   });
 
@@ -118,7 +119,7 @@ function registerBuildInsights(app: ShelfRouter): void {
     const build = await buildForProject(project.id, buildId);
     const rows = await new InsightModel(deps.db).listForBuild(build.id, limit ?? 20);
     return c.json(
-      rows.map((row) => toInsightView(row)),
+      await Promise.all(rows.map(async (row) => toInsightView(await freshen(deps, row)))),
       200,
     );
   });
@@ -149,7 +150,7 @@ function registerHealthInsights(app: ShelfRouter): void {
     const { deps, project } = await projectForView(c, slug);
     const row = await new InsightModel(deps.db).getHealth(project.id, window ?? "30d");
     return row
-      ? c.json(toInsightView(row), 200)
+      ? c.json(toInsightView(await freshen(deps, row)), 200)
       : throwNotFound("never-generated: POST to create a health digest");
   });
 

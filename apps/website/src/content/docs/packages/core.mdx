@@ -58,6 +58,7 @@ Everything else lives under a subpath:
 - `executeCaptureJob({ buildId, reqId }, deps)` (`core/capture`) — the capture **orchestrator**: loads the build, marks it `capturing`, extracts the uploaded archive, discovers stories, partitions them into render vs inherit sets ([affected capture](/concepts/affected-capture/)), delegates rendering to a pure `CaptureRunner`, and persists. Wired into the `Queue` when `capture` is supplied.
 - `persistCapture(context)` (`core/capture`) writes screenshots, diffs them against baselines, inherits unaffected stories (`inherited: true`), and finalizes a build from a renderer's captures.
 - `StorybookAdapter.loadDependencyGraph(sourceDir)` (`core/capture`) — optional `StorySourceAdapter` hook reading the build's `preview-stats.json` for affected tracing; sources without it render everything.
+- `Ai`, `AiError` (`core/ai`) — the AI singleton surface behind `ShelfOptions.ai` (not an adapter, like `Auth`); `@storyshelf/ai` implements it. `core/insights` holds the pure evidence builders, redaction, result envelopes and budget math. See the [AI insights guide](/guides/ai-insights/).
 - `diffImages(baseline, current, options)` (`core/diff`) performs the pixel-level comparison.
 - `InMemoryCaptureQueue` (`core/capture`) manages capture concurrency and job status.
 - `createUrlBuilder(baseUrl, publishedBaseDomain?)` (`core/urls`) builds application and published Storybook URLs.

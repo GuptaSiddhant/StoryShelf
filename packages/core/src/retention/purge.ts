@@ -10,7 +10,7 @@ import { LabelModel, type LabelTables } from "../models/label.ts";
 import type { Project } from "../schema/project.ts";
 import { TERMINAL_BUILD_STATUSES } from "../types.ts";
 
-export { purgeAiData, type AiPurgeResult } from "./ai.ts";
+export { purgeAiData, STALE_RUN_MS, type AiPurgeResult } from "./ai.ts";
 
 /** Table handles for retention queries. */
 export interface RetentionTables {

@@ -64,6 +64,8 @@ persist), with every log line carrying the same `trace_id`.
 | `capture.extract` / `capture.persist-statics` / `capture.render` / `capture.persist` | Orchestrator phases | `storyshelf.render_count` (render) |
 | `db.insert/get/list/…` | Instrumented database adapter | `db.table` |
 | `storage.read/write/…` | Instrumented storage adapter | `storage.path` |
+| `ai.summarize` | One per AI call (`@storyshelf/ai`) | `ai.task`, `ai.profile`, `ai.model` |
+| `invoke_agent {model}` / `chat {model}` | The AI SDK's `@ai-sdk/otel` GenAI spans, nested under `ai.summarize` | `gen_ai.*` usage attributes (prompts, images and outputs are never recorded) |
 | `http.client` | Outbound `httpJson` (git hosts, webhooks, OIDC) | `http.request.method`, `url.full` (query redacted), `http.retry.count` |
 
 Span names never contain IDs, paths, or branch names. Remote workers
@@ -79,6 +81,8 @@ an upload's trace spans the HTTP request **and** the worker process.
 | `capture.jobs.completed` / `capture.jobs.failed` | counters | — |
 | `db.operation.duration` | histogram (ms) | `db.operation`, `db.table` |
 | `storage.operation.duration` | histogram (ms) | `storage.operation` (paths excluded: cardinality) |
+| `ai.summarize.duration` / `ai.summarize.tokens` | histograms | `ai.task`, `outcome` (model and profile stay on spans) |
+| `ai.insights.completed` / `ai.insights.failed` | counters | `ai.task` |
 
 No per-story or per-build instruments — labels stay low-cardinality by rule.
 

@@ -4,6 +4,8 @@ import type { Build, Project } from "@storyshelf/core/schema";
 import { APPROVER_ROLES } from "../routers/builds.handlers.ts";
 import { currentProjectRole } from "../routers/helpers.ts";
 import { getStore } from "../store.ts";
+import { insightDepsFromStore } from "./deps.ts";
+import { freshen } from "./stale.ts";
 import { toInsightView, type InsightView } from "./view.ts";
 
 /** What the panel shows. */
@@ -17,14 +19,15 @@ export async function loadInsightPanel(
   project: Project,
   build: Build,
 ): Promise<InsightPanelData | null> {
-  const { ai, db, authEnabled } = getStore();
-  if (!ai || project.aiProfile === null || project.aiProfile === undefined) {
+  const deps = insightDepsFromStore();
+  if (!deps || project.aiProfile === null || project.aiProfile === undefined) {
     return null;
   }
-  const [latest] = await new InsightModel(db).listForBuild(build.id, 1);
+  const { authEnabled } = getStore();
+  const [latest] = await new InsightModel(deps.db).listForBuild(build.id, 1);
   const role = authEnabled ? await currentProjectRole(project.id) : "admin";
   return {
-    latest: latest ? toInsightView(latest) : null,
+    latest: latest ? toInsightView(await freshen(deps, latest)) : null,
     canGenerate: role !== null && (APPROVER_ROLES as readonly string[]).includes(role),
   };
 }

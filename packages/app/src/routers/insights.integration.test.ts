@@ -277,3 +277,33 @@ describe("project health", () => {
     });
   });
 });
+
+describe("stale runs", () => {
+  it("marks a long-stuck run as interrupted when read", async () => {
+    const { db, storage, buildId } = await seed();
+    await db.insert(db.tables.insights, {
+      id: "stuck",
+      projectId: "p1",
+      buildId,
+      kind: "triage",
+      windowKey: null,
+      inputHash: "h",
+      status: "running",
+      profile: "default",
+      model: "m",
+      promptVersion: "v1",
+      verdict: null,
+      summary: null,
+      result: null,
+      errorCode: null,
+      createdAt: new Date(Date.now() - 60 * 60_000).toISOString(),
+      startedAt: null,
+      finishedAt: null,
+    });
+    const app = appWith(db, storage, fakeAi());
+    const latest = (await (
+      await app.request(`${path(buildId)}/latest`, { headers: cookie("viewer") })
+    ).json()) as Record<string, unknown>;
+    expect(latest).toMatchObject({ status: "failed", errorCode: "interrupted" });
+  });
+});
