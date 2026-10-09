@@ -50,7 +50,8 @@ export function snapshotKey(s: Pick<SnapshotEvidence, "title" | "name" | "viewpo
   return field(`${s.title}/${s.name}@${s.viewport}`, 200);
 }
 
-function rank(a: SnapshotEvidence, b: SnapshotEvidence): number {
+/** Evidence ranking: failures first, then diff ratio, then key (deterministic). */
+export function rankSnapshots(a: SnapshotEvidence, b: SnapshotEvidence): number {
   const failed = Number(b.status === "failed") - Number(a.status === "failed");
   return (
     failed ||
@@ -71,7 +72,7 @@ function snapshotLines(s: SnapshotEvidence, limits: EvidenceLimits): string[] {
 /** Assemble triage evidence deterministically (redacted, capped, ranked). */
 export function buildTriageEvidence(input: TriageEvidenceInput): BuiltEvidence {
   const limits = resolveLimits(input.limits);
-  const changed = input.snapshots.filter((s) => !s.inherited).toSorted(rank);
+  const changed = input.snapshots.filter((s) => !s.inherited).toSorted(rankSnapshots);
   const listed = changed.slice(0, limits.maxSnapshots);
   const b = input.build;
   const lines = [

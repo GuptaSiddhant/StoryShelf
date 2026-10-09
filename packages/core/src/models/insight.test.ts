@@ -28,6 +28,14 @@ describe("InsightModel", () => {
     expect((await model.start({ ...base, force: true })).run).toBe(true);
   });
 
+  it("peeks without creating", async () => {
+    const { db } = makeDatabase();
+    const model = new InsightModel(db);
+    expect(await model.peek(base)).toBeNull();
+    await model.start(base);
+    expect((await model.peek(base))?.status).toBe("pending");
+  });
+
   it("restarts failed rows and new hashes become new rows", async () => {
     const { db } = makeDatabase();
     const model = new InsightModel(db);

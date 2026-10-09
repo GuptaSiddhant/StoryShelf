@@ -75,6 +75,11 @@ export class InsightModel {
     }
   }
 
+  /** The existing row for a run's unique key, without creating one. */
+  async peek(input: InsightStartInput): Promise<InsightRow | null> {
+    return await this.findByKey(input);
+  }
+
   async get(id: string): Promise<InsightRow | null> {
     return (await this.db.get(this.tables.insights, id)) as unknown as InsightRow | null;
   }

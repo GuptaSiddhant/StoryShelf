@@ -34,6 +34,7 @@ import { registerAssets } from "./routers/assets.ts";
 import { registerEngineAuth } from "./routers/auth.ts";
 import { registerBuilds } from "./routers/builds.ts";
 import { registerHealth, type HealthDeps } from "./routers/health.ts";
+import { registerInsights } from "./routers/insights.ts";
 import { registerLabels } from "./routers/labels.ts";
 import { registerMedia } from "./routers/media.ts";
 import { registerMembers } from "./routers/members.ts";
@@ -228,6 +229,7 @@ function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
       captureQueue: queue,
       gitHosts,
       notifiers,
+      ai: options.ai,
       resolveUser: async (c) => await resolveRequestUser(c, options.auth),
     }),
   );
@@ -251,6 +253,7 @@ function registerProjectRoutes(app: ShelfRouter): void {
   registerMembers(app);
   registerTokens(app);
   registerWebhooks(app);
+  registerInsights(app);
 }
 
 /** Register the notification channel and subscription routers. */
@@ -315,6 +318,10 @@ function registerDocs(app: ShelfRouter): void {
       {
         name: "Members",
         description: "Project members, roles, and identity-provider group mappings.",
+      },
+      {
+        name: "Insights",
+        description: "AI build triage and project health (advisory only; needs AI configured).",
       },
       { name: "Tokens", description: "API tokens used by the CLI and CI." },
       { name: "Webhooks", description: "Signed webhook deliveries for build events." },

@@ -1,5 +1,5 @@
 /** Insight evidence, redaction, hashing, budget math and result envelopes (pure; no SDK). */
-export { buildTriageEvidence, snapshotKey } from "./evidence.ts";
+export { buildTriageEvidence, rankSnapshots, snapshotKey } from "./evidence.ts";
 export type { BuiltEvidence, SnapshotEvidence, TriageEvidenceInput } from "./evidence.ts";
 export { buildHealthEvidence } from "./evidence-health.ts";
 export type { BuildSummary, HealthEvidenceInput } from "./evidence-health.ts";

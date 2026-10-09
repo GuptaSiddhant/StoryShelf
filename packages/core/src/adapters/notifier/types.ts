@@ -58,4 +58,5 @@ export type SystemEventName =
   | "sys:invite-issued"
   | "sys:auth-failed"
   | "sys:capture-failed"
-  | "sys:purge-completed";
+  | "sys:purge-completed"
+  | "sys:ai-budget";
