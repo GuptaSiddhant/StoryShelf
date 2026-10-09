@@ -17,6 +17,7 @@ export const projects = sqliteTable("projects", {
   browser: text("browser").notNull().default("chromium"),
   viewports: text("viewports"),
   automigrate: integer("automigrate", { mode: "boolean" }).notNull().default(false),
+  aiProfile: text("ai_profile"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
@@ -38,6 +39,7 @@ export interface Project {
   browser: string;
   viewports: string | null;
   automigrate: boolean;
+  aiProfile: string | null;
   createdAt: string;
   updatedAt: string;
 }

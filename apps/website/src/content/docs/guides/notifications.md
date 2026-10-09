@@ -9,7 +9,7 @@ StoryShelf sends formatted notifications for build review events and site-wide a
 
 - **Channels** (project admin): where messages go — a Slack workflow webhook, a Teams workflow URL, or an email address — plus an event filter and display toggles. A channel with no project is site-wide and receives `sys:*` admin alerts only.
 - **Subscriptions** (you): per-project opt-in. No row means silence. v1 delivers over email to `users.email`; Slack DMs are deferred.
-- **Topics**: project events reuse webhook names (`build:created`, `build:reviewing`, `build:approved`, `build:rejected`, `baseline:created`, `baseline:updated`, `comment:created`); admin events are `sys:user-created`, `sys:invite-issued`, `sys:auth-failed`, `sys:capture-failed`, `sys:purge-completed`.
+- **Topics**: project events reuse webhook names (`build:created`, `build:reviewing`, `build:approved`, `build:rejected`, `baseline:created`, `baseline:updated`, `comment:created`, plus `insight:ready` when an AI triage or health digest finishes); admin events are `sys:user-created`, `sys:invite-issued`, `sys:auth-failed`, `sys:capture-failed`, `sys:purge-completed`, `sys:ai-budget`.
 
 ## Configure channels (project admin)
 

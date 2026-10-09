@@ -24,6 +24,9 @@ export interface Tables {
   buildLabels: Table;
   tokens: Table;
   webhooks: Table;
+  insights: Table;
+  aiUsage: Table;
+  aiBudgetAlerts: Table;
   notificationChannels: Table;
   notificationSubscriptions: Table;
   users: Table;

@@ -6,6 +6,7 @@ import type { Token } from "@storyshelf/core/schema";
 import { PageHeader, SubNavLayout } from "../ui/components.tsx";
 import type { IconName } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
+import { renderSettingsAi, type SettingsAiData } from "./settings-ai.tsx";
 import { renderSettingsGeneral } from "./settings-general.tsx";
 import { renderSettingsLabels } from "./settings-labels.tsx";
 import { renderSettingsMembers, type SettingsMember } from "./settings-members.tsx";
@@ -28,7 +29,8 @@ export type SettingsTab =
   | "webhooks"
   | "notifications"
   | "members"
-  | "status";
+  | "status"
+  | "ai";
 
 /** Data required to render the project settings page with its active tab. */
 export interface ProjectSettingsData {
@@ -45,6 +47,8 @@ export interface ProjectSettingsData {
   statusConfigs: SettingsStatusConfig[];
   gitHosts: GitHostProvider[];
   isAdmin: boolean;
+  /** AI availability and the profile choices (omitted ⇒ AI off). */
+  ai?: SettingsAiData;
 }
 
 /** Form state shared by the settings tabs (field errors, global error, one-time secret). */
@@ -69,6 +73,7 @@ const TAB_LABELS: Record<SettingsTab, string> = {
   notifications: "Notifications",
   members: "Members",
   status: "Git status",
+  ai: "AI",
 };
 
 const TAB_ICONS: Record<SettingsTab, IconName> = {
@@ -80,6 +85,7 @@ const TAB_ICONS: Record<SettingsTab, IconName> = {
   notifications: "bell",
   members: "users",
   status: "git-branch",
+  ai: "sparkles",
 };
 
 const SETTINGS_TABS: SettingsTab[] = [
@@ -91,12 +97,21 @@ const SETTINGS_TABS: SettingsTab[] = [
   "notifications",
   "members",
   "status",
+  "ai",
 ];
+
+/** Project-behaviour tabs (general, tests, AI); undefined for any other tab. */
+function renderBehaviourTab(data: ProjectSettingsData, formState?: SettingsFormState): unknown {
+  const { project, activeTab } = data;
+  if (activeTab === "general") return renderSettingsGeneral(project, formState, data.isAdmin);
+  if (activeTab === "ai") return renderSettingsAi(project, data.ai, formState);
+  return activeTab === "tests" ? renderSettingsTests(project, data.isAdmin, formState) : undefined;
+}
 
 function renderActiveTab(data: ProjectSettingsData, formState?: SettingsFormState): unknown {
   const { project, activeTab } = data;
-  if (activeTab === "general") return renderSettingsGeneral(project, formState, data.isAdmin);
-  if (activeTab === "tests") return renderSettingsTests(project, data.isAdmin, formState);
+  const behaviour = renderBehaviourTab(data, formState);
+  if (behaviour !== undefined) return behaviour;
   if (activeTab === "labels")
     return renderSettingsLabels(project, data.labelTypes, data.isAdmin, formState);
   if (activeTab === "tokens")
@@ -156,7 +171,7 @@ export function renderProjectSettingsPage(
 
       <SubNavLayout
         label="Settings sections"
-        items={SETTINGS_TABS.map((tab) => ({
+        items={SETTINGS_TABS.filter((tab) => tab !== "ai" || data.ai?.available).map((tab) => ({
           label: TAB_LABELS[tab],
           href: tabHref(project, tab),
           icon: TAB_ICONS[tab],

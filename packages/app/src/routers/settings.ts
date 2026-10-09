@@ -1,4 +1,5 @@
 import type { ShelfRouter } from "../app-types.ts";
+import { registerAiSettings } from "./settings-ai.ts";
 import { registerGeneralSettings } from "./settings-general.ts";
 import { registerLabelSettings } from "./settings-labels.ts";
 import { registerMemberSettings } from "./settings-members.ts";
@@ -16,4 +17,5 @@ export function registerSettingsPages(app: ShelfRouter): void {
   registerNotificationSettings(app);
   registerMemberSettings(app);
   registerStatusSettings(app);
+  registerAiSettings(app);
 }

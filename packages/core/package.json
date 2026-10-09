@@ -85,6 +85,10 @@
       "source": "./src/adapters/webhook-events.ts",
       "default": "./dist/adapter/webhook-events.mjs"
     },
+    "./ai": {
+      "source": "./src/ai.ts",
+      "default": "./dist/ai.mjs"
+    },
     "./auth": {
       "source": "./src/auth.ts",
       "default": "./dist/auth.mjs"
@@ -100,6 +104,10 @@
     "./diff": {
       "source": "./src/diff/index.ts",
       "default": "./dist/diff.mjs"
+    },
+    "./insights": {
+      "source": "./src/insights/index.ts",
+      "default": "./dist/insights.mjs"
     },
     "./logger": {
       "source": "./src/logger.ts",
@@ -166,10 +174,12 @@
       "./adapter/setup": "./dist/adapter/setup.mjs",
       "./adapter/storage": "./dist/adapter/storage.mjs",
       "./adapter/webhook-events": "./dist/adapter/webhook-events.mjs",
+      "./ai": "./dist/ai.mjs",
       "./auth": "./dist/auth.mjs",
       "./capture": "./dist/capture.mjs",
       "./config": "./dist/config.mjs",
       "./diff": "./dist/diff.mjs",
+      "./insights": "./dist/insights.mjs",
       "./logger": "./dist/logger.mjs",
       "./models": "./dist/models.mjs",
       "./orm": "./dist/orm.mjs",

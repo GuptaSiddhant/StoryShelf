@@ -21,6 +21,14 @@ export type { BuildLabel, LabelType } from "./label.ts";
 export type { ProjectMember } from "./member.ts";
 /** Identity-provider group to project-role mapping row. */
 export type { ProjectGroupMapping } from "./project-group-mapping.ts";
+/** Insight, AI usage and budget-alert rows. */
+export type {
+  AiBudgetAlertRow,
+  AiUsageRow,
+  InsightKind,
+  InsightRow,
+  InsightStatus,
+} from "./insight.ts";
 /** Notification channel and per-user subscription rows. */
 export type { NotificationChannelRow, NotificationSubscriptionRow } from "./notification.ts";
 /** Project row and its embedded Storybook metadata. */

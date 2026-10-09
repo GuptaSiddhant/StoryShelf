@@ -32,6 +32,9 @@ export function makeDatabase(): { db: DatabaseAdapter } {
   ): Promise<T["$inferSelect"]> => {
     const row = withoutUndefined(values);
     const key = (row["id"] ?? row["hash"]) as string;
+    if (rowsOf(table).has(key)) {
+      throw new Error(`UNIQUE constraint failed: duplicate key ${key}`);
+    }
     rowsOf(table).set(key, row);
     return row as T["$inferSelect"];
   };
@@ -73,8 +76,11 @@ export function makeDatabase(): { db: DatabaseAdapter } {
     if (opts.orderBy) {
       current = orderRows(current, opts.orderBy, table);
     }
+    const start = opts.offset ?? 0;
     if (opts.limit !== undefined) {
-      current = current.slice(0, clampListLimit(opts.limit));
+      current = current.slice(start, start + (clampListLimit(opts.limit) ?? 0));
+    } else if (start > 0) {
+      current = current.slice(start);
     }
     return current as T["$inferSelect"][];
   };

@@ -1,0 +1,31 @@
+---
+title: "@storyshelf/ai"
+description: AI insights engine on the Vercel AI SDK — build triage and project health, providers supplied by you.
+---
+
+import { PackageManagers } from 'starlight-package-managers';
+
+`@storyshelf/ai` implements the `Ai` surface that `ShelfOptions.ai` accepts. It owns the `ai` core and `@ai-sdk/otel` (pinned exactly) and never sees provider keys: you install a provider package and pass configured models in. See the [AI insights guide](/guides/ai-insights/) and [ADR 0026](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/0026-ai-insights-engine.md).
+
+## Install
+
+<PackageManagers pkg="@storyshelf/ai" />
+
+[![JSR](https://jsr.io/badges/@storyshelf/ai)](https://jsr.io/@storyshelf/ai) [![JSR Score](https://jsr.io/badges/@storyshelf/ai/score)](https://jsr.io/@storyshelf/ai)
+
+- [npm package](https://www.npmjs.com/package/@storyshelf/ai) — install tarballs and version history.
+- [JSR package](https://jsr.io/@storyshelf/ai) — TypeScript-first registry page.
+- [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/ai) — package directory on `main`.
+
+## Usage
+
+```ts
+import { createAi } from "@storyshelf/ai";
+
+const ai = createAi({
+  profiles: { default: { defaultModel: yourModel } },
+  budget: { dailyTokens: 2_000_000 },
+});
+```
+
+One export, `createAi`, plus the option types. Everything else is internal.

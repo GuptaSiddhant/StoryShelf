@@ -3,12 +3,14 @@ import type { Comment } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
+import type { InsightPanelData } from "../insights/panel.ts";
 import { EmptyState } from "../ui/components.tsx";
 import { DocumentLayout, type NavConfig, type RenderedContent } from "../ui/document.tsx";
 import { canvasColumn, workspace } from "../ui/styles/review-layout.ts";
 import { DiffActionBar } from "./build-diff-actions.tsx";
 import { DiffComments } from "./build-diff-comments.tsx";
 import { DiffHeader } from "./build-diff-header.tsx";
+import { InsightSlot } from "./build-diff-insight.tsx";
 import { DiffNav } from "./build-diff-nav.tsx";
 import { ShortcutsDialog } from "./build-diff-shortcuts.tsx";
 import { StaleBaselineNotice } from "./build-diff-stale.tsx";
@@ -25,6 +27,8 @@ export interface BuildDiffData {
   hasBaseline: Record<string, boolean>;
   /** Open snapshots whose baseline changed after their diff was computed. */
   drifted: Record<string, "stale" | "removed">;
+  /** AI triage panel data; omitted/null hides the panel. */
+  insight?: InsightPanelData | null;
 }
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
@@ -129,6 +133,8 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
           canReview={canReview}
         />
       ) : null}
+
+      <InsightSlot project={project} build={build} data={data.insight} />
 
       {snapshots.length === 0 ? (
         <EmptyState

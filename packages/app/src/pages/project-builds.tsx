@@ -1,6 +1,7 @@
 import { BuildModel, ProjectModel } from "@storyshelf/core/models";
 import type { Build, Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
+import { loadHealthPanel } from "../insights/health-panel.ts";
 import { getStore } from "../store.ts";
 import {
   Badge,
@@ -13,6 +14,7 @@ import {
   VStack,
 } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
+import { HealthSlot } from "./health-panel.tsx";
 import { BuildsTable } from "./project-builds-table.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
@@ -111,6 +113,7 @@ export async function renderProjectBuildsPage(
   const builds = all.filter((build) => matches(build, query));
   const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
   const filtered = Boolean(query.status ?? query.branch);
+  const health = await loadHealthPanel(project);
 
   return (
     <DocumentLayout
@@ -132,6 +135,7 @@ export async function renderProjectBuildsPage(
         }
       />
       <VStack>
+        <HealthSlot project={project} data={health} />
         <BuildsToolbar
           project={project}
           all={all}

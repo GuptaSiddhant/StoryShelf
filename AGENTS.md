@@ -67,6 +67,7 @@ StoryShelf/
     queue-sqs/      @storyshelf/queue-sqs       -- SQS-backed remote CaptureQueue (AWS SDK v3)
     queue-redis/    @storyshelf/queue-redis     -- Redis-backed remote CaptureQueue (ioredis)
     observability/  @storyshelf/observability  -- OTEL tracing/metrics/log-correlation (single OTEL owner; see ADR 0022)
+    ai/             @storyshelf/ai              -- AI insights engine on the Vercel AI SDK (build triage + project health; see ADR 0026)
   apps/
     dev-server/     dev-server      -- Local dev server, runs from TS source via `nub run serve` (no build; Playwright capture + optional shared-password auth)
     website/        website         -- Public docs & marketing site (Astro Starlight)
@@ -169,6 +170,7 @@ This distinction matters for:
 | 0018 | Split Core (Domain) from App (HTTP) |
 | 0019 | Shared HTTP Helper in Core (`httpJson`/`HttpError` with timeout + retry; no client libraries) |
 | 0025 | UI Redesign (neutral shell, derived brand tokens, icon sprite, review workspace) |
+| 0026 | AI Epic (`@storyshelf/ai` singleton on Vercel AI SDK, insights first) |
 
 ## Parallel Development with Worktrees
 

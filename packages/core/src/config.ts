@@ -8,6 +8,7 @@ import type { GitHostProvider } from "./adapters/git-host/index.ts";
 import type { AdapterCategory } from "./adapters/metadata.ts";
 import type { NotifierProvider } from "./adapters/notifier/provider.ts";
 import type { StorageAdapter } from "./adapters/storage.ts";
+import type { Ai } from "./ai.ts";
 import type { Auth } from "./auth.ts";
 
 /** Brand color theme for the server-rendered UI. */
@@ -294,6 +295,8 @@ export interface ShelfOptions {
   captureRunner?: CaptureRunner;
   captureQueue?: CaptureQueue;
   auth?: Auth;
+  /** AI insights surface (ADR 0026). Set ⇒ AI on site-wide; absent ⇒ off. */
+  ai?: Ai;
   gitHosts?: GitHostProvider[];
   notifiers?: NotifierProvider[];
   emailSender?: EmailSender;

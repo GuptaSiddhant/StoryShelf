@@ -44,6 +44,9 @@ There is no `tsdown-entry` key. Each `package.json` `exports` map carries `{ sou
   and may change without notice.
 - `Logger` canonical home is `core/logger` (the `core/types` re-export was
   removed in 0.2.0).
+- `@storyshelf/ai` exports only `createAi` and its option types; the `Ai` contract
+  (`core/ai`) and the pure evidence/redaction/budget code (`core/insights`) live in
+  core so `ShelfOptions.ai` needs no dependency on the implementation package.
 - `@storyshelf/observability` root barrel is runtime-agnostic (`@opentelemetry/api`
   only); the Node SDK lifecycle lives under `observability/node` and must never
   be imported under Deno. `core` never imports `observability` (no-cycle rule,

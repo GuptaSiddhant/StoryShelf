@@ -20,6 +20,8 @@ export const projectSchema = z
     playTimeoutMs: z.number(),
     // Stored rows predate enum validation, so the response stays a plain string.
     browser: z.string().optional(),
+    /** AI profile gate: null/absent = AI off for this project. */
+    aiProfile: z.string().nullable().optional(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -50,6 +52,8 @@ export const projectUpdateSchema = z
     executePlay: z.boolean().optional(),
     playTimeoutMs: z.number().int().min(1000).max(30_000).optional(),
     browser: z.enum(BROWSER_NAMES).optional(),
+    /** Site admins only: a configured AI profile name, or null to turn AI off. */
+    aiProfile: z.string().min(1).nullable().optional(),
   })
   .openapi("ProjectUpdateInput");
 
@@ -421,3 +425,39 @@ export const forbidden = {
 export const notFound = {
   404: { content: { "application/json": { schema: errorSchema } }, description: "Not found" },
 } as const;
+
+/** OpenAPI schema for an insight (build triage or project health). */
+export const insightSchema = z
+  .object({
+    id: z.string(),
+    kind: z.enum(["triage", "health"]),
+    buildId: z.string().nullable(),
+    window: z.string().nullable(),
+    status: z.enum(["pending", "running", "done", "failed"]),
+    profile: z.string(),
+    model: z.string(),
+    promptVersion: z.string(),
+    verdict: z.string().nullable(),
+    summary: z.string().nullable(),
+    output: z.unknown().nullable(),
+    meta: z.unknown().nullable(),
+    errorCode: z.string().nullable(),
+    createdAt: z.string(),
+    startedAt: z.string().nullable(),
+    finishedAt: z.string().nullable(),
+  })
+  .openapi("Insight");
+
+/** Request body to (re)generate a build triage. */
+export const insightRequestSchema = z
+  .object({
+    task: z.literal("triage").optional(),
+    force: z.boolean().optional(),
+    profile: z.string().min(1).optional(),
+  })
+  .openapi("InsightRequest");
+
+/** Request body to (re)generate a project-health digest. */
+export const healthRequestSchema = z
+  .object({ window: z.string().optional(), force: z.boolean().optional() })
+  .openapi("HealthInsightRequest");

@@ -100,6 +100,8 @@ export default defineConfig({
                 { label: "Merge gate", slug: "guides/merge-gate" },
                 { label: "Interaction testing", slug: "guides/interaction-testing" },
                 { label: "Notifications", slug: "guides/notifications" },
+                { label: "AI insights", slug: "guides/ai-insights" },
+                { label: "Free AI for testing", slug: "guides/ai-testing" },
                 { label: "Without git", slug: "guides/without-git" },
               ],
             },
@@ -181,7 +183,7 @@ export default defineConfig({
           label: "Packages",
           collapsed: true,
           items: [
-            packageGroup("Core", ["core", "app", "affected", "worker", "observability", "auth"]),
+            packageGroup("Core", ["core", "app", "affected", "worker", "observability", "auth", "ai"]),
             { label: "storyshelf (CLI)", slug: "packages/cli" },
             packageGroup("Databases", ["db-sqlite", "db-postgres", "db-mysql"]),
             packageGroup("Storage", [

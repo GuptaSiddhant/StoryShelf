@@ -4,7 +4,7 @@ import type { ShelfConfig } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 /* oxlint-disable typescript/promise-function-async -- interval helpers return promise factories */
 import { ProjectModel } from "@storyshelf/core/models";
-import { Retention } from "@storyshelf/core/retention";
+import { Retention, purgeAiData } from "@storyshelf/core/retention";
 
 const DEFAULT_BRANCH_TTL_DAYS = 30;
 const DEFAULT_BRANCH_GC_INTERVAL_MS = 86_400_000;
@@ -74,6 +74,7 @@ function createBranchGcRunner(
         (sum: number, r: { removedBaselines: number }) => sum + r.removedBaselines,
         0,
       );
+      await purgeAiData(db, new Date(), logger);
       if (totalBranches > 0 || totalBaselines > 0) {
         logger.info({ totalBranches, totalBaselines }, "branch GC daily sweep complete");
       }

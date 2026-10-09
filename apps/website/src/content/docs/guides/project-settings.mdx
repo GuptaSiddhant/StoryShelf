@@ -5,7 +5,7 @@ description: Configure members, label types, tokens, webhooks, and visibility pe
 
 import Screenshot from '../../../components/Screenshot.astro';
 
-Each project carries its own settings — under `/projects/:slug/settings` (sections: General, Tests, Labels, Tokens, Webhooks, Notifications, Members, Git status) and via `PATCH /api/v1/projects/:slug`.
+Each project carries its own settings — under `/projects/:slug/settings` (sections: General, Tests, Labels, Tokens, Webhooks, Notifications, Members, Git status, and AI when the server has AI configured) and via `PATCH /api/v1/projects/:slug`.
 
 <Screenshot name="project-settings" alt="Project settings: a section list on the left and the API tokens form on the right" />
 
@@ -30,6 +30,10 @@ Per-project CI tokens (`Authorization: Bearer <token>`, `STORYSHELF_TOKEN`) are 
 ## Webhooks
 
 **Settings → Webhooks** or `POST /api/v1/projects/:slug/webhooks { url, events[], secret }`. Secrets are AES-GCM encrypted with server `SECRET`; delivery is HMAC-signed. Filter by `events` or leave null for all. See the dedicated [Webhooks](/guides/webhooks/) guide.
+
+## AI
+
+Shown only when the server is configured with [AI insights](/guides/ai-insights/). Site admins choose an AI profile for the project (or **Off**); everyone else sees the current value read-only. The profile decides which models see the project's data. The same setting is available as `aiProfile` on `PATCH /api/v1/projects/:slug` (site admins only).
 
 ## Related
 

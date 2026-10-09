@@ -18,6 +18,15 @@ export {
   type CaptureAttemptTables,
 } from "./capture-attempt.ts";
 export { CaptureLogModel, type CaptureLogTables } from "./capture-log.ts";
+export { AiBudgetAlertModel, type AiBudgetAlertTables } from "./ai-budget-alert.ts";
+export { AiUsageModel, type AiUsageInput, type AiUsageTables } from "./ai-usage.ts";
+export {
+  InsightModel,
+  type InsightResultInput,
+  type InsightStartInput,
+  type InsightStartResult,
+  type InsightTables,
+} from "./insight.ts";
 export { BuildModel, isPublicBuild, type BuildCreateInput, type BuildListFilter } from "./build.ts";
 export { CommentModel, type CommentCreateInput } from "./comment.ts";
 export { LabelModel } from "./label.ts";
