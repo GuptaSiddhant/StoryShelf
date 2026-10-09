@@ -160,6 +160,7 @@ const CSRF_PATHS = [
   "/profile",
   "/admin/credentials/*",
   "/projects/:slug/builds/:buildId/insights/generate",
+  "/projects/:slug/insights/health/generate",
 ] as const;
 
 /** Attach global middleware: ids, logging, init gate, limits, store scope, auth gate. */

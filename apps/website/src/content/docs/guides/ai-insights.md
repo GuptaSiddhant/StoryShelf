@@ -44,6 +44,7 @@ For a quick, cheap setup while evaluating, see [Free AI for testing](/guides/ai-
 A site admin opens **Project settings → AI** and chooses a profile (or **Off**). The choice decides which models see that project's data, so only site admins can change it. With a profile set:
 
 - the build review page shows an **AI triage** panel (approvers and admins can generate or regenerate it);
+- the project **Library** and **Builds** pages show an **AI project health** panel (last 30 days) with a generate/refresh button for approvers and admins, and the project card on **Projects** shows a health badge once a digest exists;
 - `/api/v1` exposes the endpoints below;
 - an `insight:ready` notification is emitted when a result is ready (opt-in like every notification).
 

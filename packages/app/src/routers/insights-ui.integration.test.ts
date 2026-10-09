@@ -143,3 +143,43 @@ describe("admin AI usage page", () => {
     expect((await app(db, storage, false).request("/admin/ai")).status).toBe(404);
   });
 });
+
+describe("project health UI", () => {
+  it("generates from the project page and shows the badge on the project card", async () => {
+    const { db, storage } = await seed();
+    const shelf = app(db, storage);
+    const before = await (await shelf.request("/projects")).text();
+    expect(before).not.toContain("health:");
+    const started = await shelf.request(
+      "/projects/p/insights/health/generate",
+      form({ force: "false" }),
+    );
+    expect(started.status).toBe(200);
+    expect(await started.text()).toContain("generating");
+    await settleInsightJobs();
+    const panel = await (await shelf.request("/projects/p/insights/health/panel")).text();
+    expect(panel).toContain("healthy");
+    expect(panel).toContain("Refresh health");
+    const cards = await (await shelf.request("/projects")).text();
+    expect(cards).toContain("health: healthy");
+    expect(cards).toContain("90");
+  });
+
+  it("is hidden when AI is off for the project or the server", async () => {
+    const off = await seed(null);
+    expect(
+      (await app(off.db, off.storage).request("/projects/p/insights/health/panel")).status,
+    ).toBe(404);
+    const none = await seed();
+    expect(
+      (await app(none.db, none.storage, false).request("/projects/p/insights/health/panel")).status,
+    ).toBe(501);
+  });
+
+  it("shows the panel on the builds page", async () => {
+    const { db, storage } = await seed();
+    const html = await (await app(db, storage).request("/projects/p/builds")).text();
+    expect(html).toContain("Project health");
+    expect(html).toContain("Generate health");
+  });
+});

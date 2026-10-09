@@ -1,6 +1,7 @@
 import { BuildModel, ProjectModel, SnapshotModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
+import { loadHealthBadge } from "../insights/health-panel.ts";
 import { getStore } from "../store.ts";
 import {
   Button,
@@ -38,13 +39,14 @@ const setupSummary = css`
 async function summarize(project: Project): Promise<ProjectSummary> {
   const { db } = getStore();
   const [latest] = await new BuildModel(db).list(project.id);
+  const health = await loadHealthBadge(project);
   if (!latest) {
-    return { project, latest: null, previews: [], pending: 0 };
+    return { project, latest: null, previews: [], pending: 0, health };
   }
   const snapshots = await new SnapshotModel(db).listByBuild(latest.id);
   const pending = snapshots.filter((snap) => snap.status === "new" || snap.status === "changed");
   const preferred = pending.length > 0 ? pending : snapshots;
-  return { project, latest, previews: preferred.slice(0, 3), pending: pending.length };
+  return { project, latest, previews: preferred.slice(0, 3), pending: pending.length, health };
 }
 
 /** Copy-ready steps to get a first build uploaded. */

@@ -9,6 +9,7 @@ import { createUrlBuilder } from "@storyshelf/core/urls";
 import { storybookDir } from "@storyshelf/core/utils";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { posix } from "node:path";
+import { loadHealthPanel, type HealthPanelData } from "../insights/health-panel.ts";
 import { getStore } from "../store.ts";
 import {
   Badge,
@@ -35,6 +36,7 @@ import {
   snapshotCardMeta,
   snapshotGrid,
 } from "../ui/styles/review.ts";
+import { HealthSlot } from "./health-panel.tsx";
 
 /** Snapshot image with library height cap, extending the shared diff pane image. */
 const snapshotImg = css`
@@ -56,9 +58,12 @@ export async function renderLibraryPage(
   if (!build) return renderEmptyLibrary(project);
   const snapshots = await new SnapshotModel(db).listByBuild(build.id);
   if (snapshots.length === 0) return renderEmptySnapshots(project, build);
-  const branches = await distinctBranches(db, project.id);
-  const docsByStory = await docsEntriesByStory(storage, project.id, build.id, snapshots);
-  return renderLibraryGrid(project, build, snapshots, branches, docsByStory);
+  const [branches, docsByStory, health] = await Promise.all([
+    distinctBranches(db, project.id),
+    docsEntriesByStory(storage, project.id, build.id, snapshots),
+    loadHealthPanel(project),
+  ]);
+  return renderLibraryGrid(project, build, snapshots, branches, docsByStory, health);
 }
 
 async function getLibraryBuild(
@@ -230,6 +235,7 @@ function renderLibraryGrid(
   snapshots: Snapshot[],
   branches: string[],
   docsByStory: Map<string, string>,
+  health: HealthPanelData | null,
 ): RenderedContent {
   const byTitle = groupByTitle(snapshots);
   const viewportNames = distinctViewports(snapshots);
@@ -240,6 +246,7 @@ function renderLibraryGrid(
       nav={{ active: "library", projectSlug: project.slug, projectName: project.name }}
     >
       {renderLibraryHeader(project, build, snapshots.length, branches)}
+      <HealthSlot project={project} data={health} />
       {multi ? (
         <Card>
           <Meta as="span">Viewports: {viewportNames.join(" · ")}</Meta>

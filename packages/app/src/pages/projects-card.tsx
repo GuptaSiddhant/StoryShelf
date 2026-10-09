@@ -1,5 +1,6 @@
 import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
+import type { HealthBadge } from "../insights/health-panel.ts";
 import {
   Badge,
   Button,
@@ -10,6 +11,7 @@ import {
   statusTone,
 } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
+import { healthTone } from "./health-panel.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -81,6 +83,8 @@ export interface ProjectSummary {
   previews: Snapshot[];
   /** Snapshots in the latest build still waiting for a decision. */
   pending: number;
+  /** AI health digest (last 30 days) when one has finished. */
+  health?: HealthBadge | null;
 }
 
 function PendingBadge({
@@ -181,6 +185,14 @@ export function ProjectCard(props: {
           <Badge tone="neutral">{project.gitDefaultBranch}</Badge>
         </Meta>
         <LatestBuild latest={latest} />
+        {summary.health ? (
+          <a href={urls.library}>
+            <Badge tone={healthTone(summary.health.verdict)} icon>
+              health: {summary.health.verdict}
+              {summary.health.score === null ? "" : ` · ${Math.round(summary.health.score)}`}
+            </Badge>
+          </a>
+        ) : null}
       </div>
       <div class={cardFooter}>
         <Button variant="secondary" size="sm" icon="image" href={urls.library}>
