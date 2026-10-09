@@ -1,0 +1,26 @@
+---
+/**
+ * Two menus in one sidebar: the generated API reference gets its own (reached from the
+ * header "API" link), and the docs menu only carries a single link to it.
+ */
+import Default from "@astrojs/starlight/components/Sidebar.astro";
+
+const route = Astro.locals.starlightRoute;
+const base = import.meta.env.BASE_URL.replace(/\/$/u, "");
+const onApi = Astro.url.pathname.startsWith(`${base}/api`);
+const isApiGroup = (e: (typeof route.sidebar)[number]) => e.type === "group" && e.label === "API reference";
+const link = (label: string, href: string) => ({
+  type: "link" as const,
+  label,
+  href,
+  isCurrent: false,
+  badge: undefined,
+  attrs: {},
+});
+
+route.sidebar = onApi
+  ? [link("← Back to docs", `${base}/guides/getting-started/`), ...route.sidebar.filter(isApiGroup)]
+  : route.sidebar.map((e) => (isApiGroup(e) ? link("API reference", `${base}/api/`) : e));
+---
+
+<Default {...Astro.props}><slot /></Default>

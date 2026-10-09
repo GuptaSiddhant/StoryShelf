@@ -32,6 +32,11 @@ export default defineConfig({
       title: "StoryShelf",
       description: "Self-hosted visual testing for Storybook.",
       logo: { src: "./src/assets/logo.svg", alt: "" },
+      components: {
+        Hero: "./src/components/overrides/Hero.astro",
+        SocialIcons: "./src/components/overrides/SocialIcons.astro",
+        Sidebar: "./src/components/overrides/Sidebar.astro",
+      },
       customCss: ["./src/styles/custom.css"],
       editLink: { baseUrl: `${REPO}/edit/main/apps/website/` },
       lastUpdated: true,
@@ -193,12 +198,21 @@ export default defineConfig({
             { label: "Changelog", slug: "changelog" },
           ],
         },
+        // Shown on /api/** only (see components/overrides/Sidebar.astro).
         ...openAPISidebarGroups,
         {
           label: "Packages",
           collapsed: true,
           items: [
-            packageGroup("Core", ["core", "app", "affected", "worker", "observability", "auth", "ai"]),
+            packageGroup("Core", [
+              "core",
+              "app",
+              "affected",
+              "worker",
+              "observability",
+              "auth",
+              "ai",
+            ]),
             { label: "storyshelf (CLI)", slug: "packages/cli" },
             packageGroup("Databases", ["db-sqlite", "db-postgres", "db-mysql"]),
             packageGroup("Storage", [
