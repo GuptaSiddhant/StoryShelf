@@ -1,6 +1,7 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import { LabelModel } from "@storyshelf/core/models";
+import { PackageUsageModel } from "@storyshelf/core/models";
 import { MemberModel } from "@storyshelf/core/models";
 import { NotificationChannelModel } from "@storyshelf/core/models";
 import { NotificationSubscriptionModel } from "@storyshelf/core/models";
@@ -23,6 +24,7 @@ import {
   type SettingsTab,
 } from "../pages/project-settings.tsx";
 import type { SettingsAiData } from "../pages/settings-ai.tsx";
+import type { SettingsLink, SettingsLinkCandidate } from "../pages/settings-links.tsx";
 import type { SettingsMember } from "../pages/settings-members.tsx";
 import type {
   SettingsMySubscription,
@@ -36,6 +38,8 @@ import { isSiteAdmin } from "./insights.handlers.ts";
 /** Aggregated data for rendering a settings tab. */
 export interface SettingsData {
   project: Project;
+  links: SettingsLink[];
+  linkCandidates: SettingsLinkCandidate[];
   labelTypes: LabelType[];
   tokens: Omit<Token, "hash">[];
   members: SettingsMember[];
@@ -211,6 +215,26 @@ async function loadInventorySection(
   return { labelTypes, members, groupMappings, tokens, webhooks, statusConfigs };
 }
 
+/** Package links plus the other projects that can be picked as upstream. */
+async function loadLinksSection(
+  db: DatabaseAdapter,
+  project: Project,
+): Promise<{ links: SettingsLink[]; linkCandidates: SettingsLinkCandidate[] }> {
+  const projects = await new ProjectModel(db).list();
+  const byId = new Map(projects.map((candidate) => [candidate.id, candidate]));
+  const rows = await new PackageUsageModel(db).listLinks(project.id);
+  const links = rows.flatMap((row) => {
+    const upstream = byId.get(row.upstreamId);
+    return upstream
+      ? [{ packageName: row.packageName, upstreamSlug: upstream.slug, upstreamName: upstream.name }]
+      : [];
+  });
+  const linkCandidates = projects
+    .filter((candidate) => candidate.id !== project.id)
+    .map((candidate) => ({ slug: candidate.slug, name: candidate.name }));
+  return { links, linkCandidates };
+}
+
 async function loadSettingsData(slug: string): Promise<SettingsData | null> {
   const project = await new ProjectModel(getStore().db).getBySlug(slug);
   if (!project) {
@@ -226,7 +250,8 @@ async function loadSettingsData(slug: string): Promise<SettingsData | null> {
     notifiers,
   );
   const isAdmin = isProjectAdmin(authEnabled, user, inventory.members);
-  return { project, ...inventory, ...notifications, gitHosts, isAdmin };
+  const linksSection = await loadLinksSection(db, project);
+  return { project, ...inventory, ...notifications, ...linksSection, gitHosts, isAdmin };
 }
 
 /** Render the project settings page for the given tab, optionally with form state. */
@@ -245,6 +270,8 @@ export async function renderSettingsPage(
       project: data.project,
       activeTab: tab,
       labelTypes: data.labelTypes,
+      links: data.links,
+      linkCandidates: data.linkCandidates,
       tokens: data.tokens,
       members: data.members,
       groupMappings: data.groupMappings,
