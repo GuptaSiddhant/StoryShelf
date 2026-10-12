@@ -176,9 +176,30 @@ describe("snapshot usage API", () => {
         package: "@acme/ds",
         version: "2.4.0",
         upstreamSlug: "design-system",
+        upstreamBuildId: "ds-b1",
         upstreamStoryId: "button--primary",
       },
     ]);
+  });
+
+  it("shows the badge with Preview and History links on the review page", async () => {
+    const { app } = await withUsage();
+    await app.request(
+      "/api/v1/projects/app/links",
+      json({ links: [{ package: "@acme/ds", upstreamSlug: "design-system" }] }),
+    );
+    const html = await (await app.request("/projects/app/builds/app-b1/diff")).text();
+    expect(html).toContain("Uses @acme/ds v2.4.0");
+    expect(html).toContain("/projects/design-system/storybook/build/ds-b1?storyId=button--primary");
+    expect(html).toContain("/projects/design-system/library");
+    expect(html).not.toContain("Uses react");
+  });
+
+  it("renders no badge on the review page without links", async () => {
+    const { app } = await withUsage();
+    const html = await (await app.request("/projects/app/builds/app-b1/diff")).text();
+    expect(html).not.toContain("Uses @acme/ds");
+    expect(html).toContain("Story");
   });
 
   it("falls back to a null story when the module has no upstream match", async () => {
