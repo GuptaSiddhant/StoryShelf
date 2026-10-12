@@ -13,25 +13,95 @@ import { resolveAuthorizedProject } from "./helpers.ts";
 
 const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];
 
-/** Upstream stories (latest approved default build) used to map package modules to stories. */
-async function upstreamStories(
-  upstream: Project,
-): Promise<{ importPath: string; storyId: string }[]> {
+type Caller = Parameters<typeof resolveAuthorizedProject>[0];
+
+/** What a link resolves to: the upstream project's latest published build and its stories. */
+interface ResolvedUpstream {
+  slug: string;
+  buildId: string | null;
+  stories: { importPath: string; storyId: string }[];
+}
+
+/** Upstream project resolved from its latest approved default build. */
+async function resolveUpstream(upstream: Project): Promise<ResolvedUpstream> {
   const build = await new BuildModel(getStore().db).latestApprovedDefault(upstream);
-  if (!build) {
-    return [];
-  }
-  const snapshots = await new SnapshotModel(getStore().db).listByBuild(build.id);
-  return snapshots.flatMap((snapshot) =>
-    snapshot.storyImportPath
-      ? [{ importPath: snapshot.storyImportPath, storyId: snapshot.storyId }]
-      : [],
+  const snapshots = build ? await new SnapshotModel(getStore().db).listByBuild(build.id) : [];
+  return {
+    slug: upstream.slug,
+    buildId: build?.id ?? null,
+    stories: snapshots.flatMap((snapshot) =>
+      snapshot.storyImportPath
+        ? [{ importPath: snapshot.storyImportPath, storyId: snapshot.storyId }]
+        : [],
+    ),
+  };
+}
+
+/** Resolve each linked package once; upstreams the viewer cannot open are omitted. */
+async function resolveLinkedUpstreams(
+  c: Caller,
+  project: Project,
+  packages: Set<string>,
+): Promise<Map<string, ResolvedUpstream>> {
+  const links = (await new PackageUsageModel(getStore().db).listLinks(project.id)).filter((link) =>
+    packages.has(link.packageName),
   );
+  const resolved = await Promise.all(
+    links.map(async (link) => {
+      const upstream = await new ProjectModel(getStore().db).get(link.upstreamId);
+      const visible = upstream
+        ? await resolveAuthorizedProject(c, upstream.slug, ...VIEW_ROLES).catch(() => null)
+        : null;
+      return upstream && visible
+        ? ([link.packageName, await resolveUpstream(upstream)] as const)
+        : null;
+    }),
+  );
+  return new Map(resolved.filter((entry) => entry !== null));
+}
+
+/**
+ * Linked-package usage grouped by story file, resolved with one pass over the
+ * build's usage rows and one lookup per linked upstream (never per story).
+ * Omits upstreams the viewer cannot open; pass `storyImportPath` to narrow to one story.
+ */
+export async function linkedUsageByStory(
+  c: Caller,
+  project: Project,
+  buildId: string,
+  storyImportPath?: string,
+): Promise<Map<string, LinkedUsageItem[]>> {
+  const model = new PackageUsageModel(getStore().db);
+  const rows = storyImportPath
+    ? await model.listForStory(buildId, storyImportPath)
+    : await model.listForBuild(buildId);
+  const upstreams = await resolveLinkedUpstreams(
+    c,
+    project,
+    new Set(rows.map((row) => row.packageName)),
+  );
+  const byStory = new Map<string, LinkedUsageItem[]>();
+  for (const row of rows) {
+    const upstream = upstreams.get(row.packageName);
+    if (upstream) {
+      byStory.set(row.storyImportPath, [
+        ...(byStory.get(row.storyImportPath) ?? []),
+        {
+          package: row.packageName,
+          version: row.version,
+          upstreamSlug: upstream.slug,
+          upstreamBuildId: upstream.buildId,
+          upstreamStoryId: matchUpstreamStory(row.modulePath, upstream.stories),
+        },
+      ]);
+    }
+  }
+  return byStory;
 }
 
 /** Linked-package usage of one story, omitting upstreams the viewer cannot open. */
 export async function linkedUsageFor(
-  c: Parameters<typeof resolveAuthorizedProject>[0],
+  c: Caller,
   project: Project,
   buildId: string,
   storyImportPath: string | null,
@@ -39,34 +109,7 @@ export async function linkedUsageFor(
   if (!storyImportPath) {
     return [];
   }
-  const model = new PackageUsageModel(getStore().db);
-  const [rows, links] = await Promise.all([
-    model.listForStory(buildId, storyImportPath),
-    model.listLinks(project.id),
-  ]);
-  const items = await Promise.all(
-    rows.map(async (row) => {
-      const link = links.find((candidate) => candidate.packageName === row.packageName);
-      const upstream = link ? await new ProjectModel(getStore().db).get(link.upstreamId) : null;
-      if (!upstream) {
-        return null;
-      }
-      const visible = await resolveAuthorizedProject(c, upstream.slug, ...VIEW_ROLES).catch(
-        () => null,
-      );
-      if (!visible) {
-        return null;
-      }
-      const stories = await upstreamStories(upstream);
-      const upstreamBuild = await new BuildModel(getStore().db).latestApprovedDefault(upstream);
-      return {
-        package: row.packageName,
-        version: row.version,
-        upstreamSlug: upstream.slug,
-        upstreamBuildId: upstreamBuild?.id ?? null,
-        upstreamStoryId: matchUpstreamStory(row.modulePath, stories),
-      };
-    }),
+  return (
+    (await linkedUsageByStory(c, project, buildId, storyImportPath)).get(storyImportPath) ?? []
   );
-  return items.filter((item): item is LinkedUsageItem => item !== null);
 }

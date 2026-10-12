@@ -195,6 +195,35 @@ describe("snapshot usage API", () => {
     expect(html).not.toContain("Uses react");
   });
 
+  it("shows the badge on build detail cards, resolving upstreams once per build", async () => {
+    const { app, db } = await withUsage();
+    await db.insert(
+      db.tables.snapshots,
+      makeSnapshot("app-s2", "app", "app-b1", "card--dark", "src/Card.stories.tsx"),
+    );
+    await app.request(
+      "/api/v1/projects/app/links",
+      json({ links: [{ package: "@acme/ds", upstreamSlug: "design-system" }] }),
+    );
+    const listed: unknown[] = [];
+    const list = db.list.bind(db);
+    db.list = (async (table: unknown, ...rest: unknown[]) => {
+      listed.push(table);
+      return await (list as (...args: unknown[]) => Promise<unknown>)(table, ...rest);
+    }) as typeof db.list;
+    const html = await (await app.request("/projects/app/builds/app-b1")).text();
+    expect(html.match(/Uses @acme\/ds v2\.4\.0/gu)).toHaveLength(2);
+    expect(html).toContain("/projects/design-system/storybook/build/ds-b1?storyId=button--primary");
+    const upstreamSnapshotReads = listed.filter((table) => table === db.tables.snapshots).length;
+    expect(upstreamSnapshotReads).toBe(2); // the build's own snapshots + the upstream's, once
+  });
+
+  it("renders no badge on build detail without links", async () => {
+    const { app } = await withUsage();
+    const html = await (await app.request("/projects/app/builds/app-b1")).text();
+    expect(html).not.toContain("Uses @acme/ds");
+  });
+
   it("renders no badge on the review page without links", async () => {
     const { app } = await withUsage();
     const html = await (await app.request("/projects/app/builds/app-b1/diff")).text();
