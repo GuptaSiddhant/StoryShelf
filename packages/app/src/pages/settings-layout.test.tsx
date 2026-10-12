@@ -24,6 +24,7 @@ describe("project settings layout", () => {
       "General",
       "Tests",
       "Labels",
+      "Links",
       "Tokens",
       "Webhooks",
       "Notifications",

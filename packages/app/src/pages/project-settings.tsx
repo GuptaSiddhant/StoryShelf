@@ -9,6 +9,11 @@ import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import { renderSettingsAi, type SettingsAiData } from "./settings-ai.tsx";
 import { renderSettingsGeneral } from "./settings-general.tsx";
 import { renderSettingsLabels } from "./settings-labels.tsx";
+import {
+  renderSettingsLinks,
+  type SettingsLink,
+  type SettingsLinkCandidate,
+} from "./settings-links.tsx";
 import { renderSettingsMembers, type SettingsMember } from "./settings-members.tsx";
 import {
   renderSettingsNotifications,
@@ -25,6 +30,7 @@ export type SettingsTab =
   | "general"
   | "tests"
   | "labels"
+  | "links"
   | "tokens"
   | "webhooks"
   | "notifications"
@@ -37,6 +43,8 @@ export interface ProjectSettingsData {
   project: Project;
   activeTab: SettingsTab;
   labelTypes: LabelType[];
+  links: SettingsLink[];
+  linkCandidates: SettingsLinkCandidate[];
   tokens: Omit<Token, "hash">[];
   members: SettingsMember[];
   groupMappings: ProjectGroupMapping[];
@@ -68,6 +76,7 @@ const TAB_LABELS: Record<SettingsTab, string> = {
   general: "General",
   tests: "Tests",
   labels: "Labels",
+  links: "Links",
   tokens: "Tokens",
   webhooks: "Webhooks",
   notifications: "Notifications",
@@ -80,6 +89,7 @@ const TAB_ICONS: Record<SettingsTab, IconName> = {
   general: "settings",
   tests: "activity",
   labels: "tag",
+  links: "external-link",
   tokens: "key",
   webhooks: "webhook",
   notifications: "bell",
@@ -92,6 +102,7 @@ const SETTINGS_TABS: SettingsTab[] = [
   "general",
   "tests",
   "labels",
+  "links",
   "tokens",
   "webhooks",
   "notifications",
@@ -108,16 +119,25 @@ function renderBehaviourTab(data: ProjectSettingsData, formState?: SettingsFormS
   return activeTab === "tests" ? renderSettingsTests(project, data.isAdmin, formState) : undefined;
 }
 
+/** Labels, links, tokens, and webhooks tabs; undefined for any other tab. */
+function renderCatalogTab(data: ProjectSettingsData, formState?: SettingsFormState): unknown {
+  const { project, activeTab, isAdmin } = data;
+  if (activeTab === "labels")
+    return renderSettingsLabels(project, data.labelTypes, isAdmin, formState);
+  if (activeTab === "links")
+    return renderSettingsLinks(project, data.links, data.linkCandidates, isAdmin, formState);
+  if (activeTab === "tokens") return renderSettingsTokens(project, data.tokens, isAdmin, formState);
+  return activeTab === "webhooks"
+    ? renderSettingsWebhooks(project, data.webhooks, isAdmin, formState)
+    : undefined;
+}
+
 function renderActiveTab(data: ProjectSettingsData, formState?: SettingsFormState): unknown {
   const { project, activeTab } = data;
   const behaviour = renderBehaviourTab(data, formState);
   if (behaviour !== undefined) return behaviour;
-  if (activeTab === "labels")
-    return renderSettingsLabels(project, data.labelTypes, data.isAdmin, formState);
-  if (activeTab === "tokens")
-    return renderSettingsTokens(project, data.tokens, data.isAdmin, formState);
-  if (activeTab === "webhooks")
-    return renderSettingsWebhooks(project, data.webhooks, data.isAdmin, formState);
+  const catalog = renderCatalogTab(data, formState);
+  if (catalog !== undefined) return catalog;
   if (activeTab === "notifications")
     return renderSettingsNotifications(
       project,
