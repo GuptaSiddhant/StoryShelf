@@ -96,3 +96,4 @@ export {
 } from "./stats.ts";
 export { matchesAnyGlob, traceAffected } from "./trace.ts";
 export { selectAffectedStories, type StoryPartition } from "./select.ts";
+export { extractPackageUsage, type PackageUsage, type TrackedPackage } from "./usage.ts";

@@ -17,6 +17,8 @@ export type { CaptureAttempt, CaptureLog, CaptureLogLevel } from "./capture-atte
 export type { Comment } from "./comment.ts";
 /** Build label and label type rows. */
 export type { BuildLabel, LabelType } from "./label.ts";
+/** Project link and per-build package usage rows. */
+export type { BuildPackageUsage, ProjectLink } from "./usage.ts";
 /** Project membership row linking a user to a project role. */
 export type { ProjectMember } from "./member.ts";
 /** Identity-provider group to project-role mapping row. */

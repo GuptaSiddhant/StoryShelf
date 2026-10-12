@@ -204,6 +204,25 @@ const buildLabels = defineTable("build_labels", {
   createdAt: "created_at",
 });
 
+const projectLinks = defineTable("project_links", {
+  id: "id",
+  downstreamId: "downstream_id",
+  upstreamId: "upstream_id",
+  packageName: "package_name",
+  createdAt: "created_at",
+});
+
+const buildPackageUsage = defineTable("build_package_usage", {
+  id: "id",
+  projectId: "project_id",
+  buildId: "build_id",
+  storyImportPath: "story_import_path",
+  packageName: "package_name",
+  modulePath: "module_path",
+  version: "version",
+  createdAt: "created_at",
+});
+
 const tokens = defineTable("tokens", {
   id: "id",
   projectId: "project_id",
@@ -347,6 +366,8 @@ export const fakeSchema: Tables = {
   comments,
   labelTypes,
   buildLabels,
+  projectLinks,
+  buildPackageUsage,
   tokens,
   webhooks,
   users,

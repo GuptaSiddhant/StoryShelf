@@ -30,6 +30,8 @@ export {
 export { BuildModel, isPublicBuild, type BuildCreateInput, type BuildListFilter } from "./build.ts";
 export { CommentModel, type CommentCreateInput } from "./comment.ts";
 export { LabelModel } from "./label.ts";
+export { PackageUsageModel } from "./usage.ts";
+export type { PackageUsageInput, PackageUsageTables } from "./usage.ts";
 export { MemberModel } from "./member.ts";
 export {
   NotificationChannelModel,

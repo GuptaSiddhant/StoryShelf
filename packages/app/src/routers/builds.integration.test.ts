@@ -1,4 +1,4 @@
-import { BuildModel, LabelModel } from "@storyshelf/core/models";
+import { BuildModel, LabelModel, PackageUsageModel } from "@storyshelf/core/models";
 import type { Build } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
@@ -340,5 +340,49 @@ describe("affected capture", () => {
     expect(updated.affectedImportPaths).toBe(JSON.stringify(["src/a.stories.tsx"]));
     const stored = await new BuildModel(db).get(created.build.id);
     expect(stored?.changedFiles).toBe(JSON.stringify(["src/a.tsx"]));
+  });
+
+  it("records package usage and replaces it on re-report", async () => {
+    const { db, app } = await setupApp();
+    const created = await createAffectedBuild(app, "sha-1");
+    const post = async (usage: unknown[]) =>
+      await app.request(`/api/v1/projects/affected-project/builds/${created.build.id}/usage`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ usage }),
+      });
+    const row = {
+      storyImportPath: "src/Card.stories.tsx",
+      packageName: "@acme/ds",
+      modulePath: "node_modules/@acme/ds/dist/Button.js",
+      version: "2.4.0",
+    };
+    const first = await post([row, { ...row, packageName: "react", version: null }]);
+    expect(first.status).toBe(200);
+    expect(await first.json()).toEqual({ stored: 2 });
+    await post([row]);
+    const stored = await new PackageUsageModel(db).listForBuild(created.build.id);
+    expect(stored).toHaveLength(1);
+    expect(stored[0]).toMatchObject({ packageName: "@acme/ds", version: "2.4.0" });
+  });
+
+  it("rejects malformed usage and unknown builds", async () => {
+    const { app } = await setupApp();
+    const created = await createAffectedBuild(app, "sha-1");
+    const bad = await app.request(
+      `/api/v1/projects/affected-project/builds/${created.build.id}/usage`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ usage: [{ packageName: "x" }] }),
+      },
+    );
+    expect(bad.status).toBe(400);
+    const missing = await app.request("/api/v1/projects/affected-project/builds/nope/usage", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ usage: [] }),
+    });
+    expect(missing.status).toBe(404);
   });
 });

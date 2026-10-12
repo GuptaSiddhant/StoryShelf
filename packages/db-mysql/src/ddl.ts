@@ -166,6 +166,25 @@ CREATE TABLE IF NOT EXISTS build_labels (
   created_at DATETIME(3) NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS build_labels_build_type_value_idx ON build_labels (build_id, type_key, value);
+CREATE TABLE IF NOT EXISTS project_links (
+  id TEXT PRIMARY KEY,
+  downstream_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  upstream_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  package_name TEXT NOT NULL,
+  created_at DATETIME(3) NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS project_links_downstream_package_idx ON project_links (downstream_id, package_name);
+CREATE TABLE IF NOT EXISTS build_package_usage (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  build_id TEXT NOT NULL REFERENCES builds(id) ON DELETE CASCADE,
+  story_import_path TEXT NOT NULL,
+  package_name TEXT NOT NULL,
+  module_path TEXT NOT NULL,
+  version TEXT,
+  created_at DATETIME(3) NOT NULL
+);
+CREATE INDEX IF NOT EXISTS build_package_usage_build_id_idx ON build_package_usage (build_id);
 CREATE TABLE IF NOT EXISTS tokens (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,

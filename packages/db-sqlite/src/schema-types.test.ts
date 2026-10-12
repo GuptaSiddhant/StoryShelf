@@ -26,6 +26,8 @@ import { projectStatusConfigs } from "./schema/status-config.ts";
 import type { ProjectStatusConfig } from "./schema/status-config.ts";
 import { tokens } from "./schema/token.ts";
 import type { Token } from "./schema/token.ts";
+import { buildPackageUsage, projectLinks } from "./schema/usage.ts";
+import type { BuildPackageUsage, ProjectLink } from "./schema/usage.ts";
 import { users } from "./schema/user.ts";
 import type { User } from "./schema/user.ts";
 import { webhooks } from "./schema/webhook.ts";
@@ -47,6 +49,8 @@ it("row interfaces match drizzle inference exactly", () => {
   expectTypeOf<Comment>().toEqualTypeOf<typeof comments.$inferSelect>();
   expectTypeOf<LabelType>().toEqualTypeOf<typeof labelTypes.$inferSelect>();
   expectTypeOf<BuildLabel>().toEqualTypeOf<typeof buildLabels.$inferSelect>();
+  expectTypeOf<ProjectLink>().toEqualTypeOf<typeof projectLinks.$inferSelect>();
+  expectTypeOf<BuildPackageUsage>().toEqualTypeOf<typeof buildPackageUsage.$inferSelect>();
   expectTypeOf<Token>().toEqualTypeOf<typeof tokens.$inferSelect>();
   expectTypeOf<Webhook>().toEqualTypeOf<typeof webhooks.$inferSelect>();
   expectTypeOf<NotificationChannel>().toEqualTypeOf<typeof notificationChannels.$inferSelect>();
@@ -72,6 +76,8 @@ const DDL_TABLES = [
   "comments",
   "label_types",
   "build_labels",
+  "project_links",
+  "build_package_usage",
   "tokens",
   "webhooks",
   "notification_channels",
@@ -101,6 +107,8 @@ const DDL_INDEXES = [
   "comments_build_id_idx",
   "label_types_project_key_idx",
   "build_labels_build_type_value_idx",
+  "project_links_downstream_package_idx",
+  "build_package_usage_build_id_idx",
   "project_members_project_user_idx",
   "project_group_mappings_project_group_idx",
   "notification_channels_project_id_idx",

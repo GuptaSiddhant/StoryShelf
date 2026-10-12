@@ -13,6 +13,7 @@ import * as picomatch from "picomatch";
 import { createClient, type BuildCreated } from "../client.ts";
 import { loadStorybookConfig, type StorybookConfig } from "../config.ts";
 import { createSpinner, printLine, spinnerFrames } from "../output.ts";
+import { collectPackageUsage } from "./package-usage.ts";
 import { assertBuildOutput, ensureBuildDir } from "./storybook-build.ts";
 
 /**
@@ -277,12 +278,35 @@ async function buildAndPost(
     labels: parseLabels(collected.label),
   });
   await reportAffectedCapture(client, created, cwd, collected);
+  await reportPackageUsage(client, created, cwd, collected);
   // Try content-hash dedup: walk buildDir, hash files, check needed, batch upload or fallback to zip
   const useDedup = await tryDedupUpload(client, created, cwd, collected.buildDir);
   if (!useDedup) {
     await putZipStream(client, created, cwd, collected.buildDir);
   }
   printLine(`Build created: ${created.build.id}`);
+}
+
+/** Post which dependency packages each story uses; best effort, never fails the upload. */
+async function reportPackageUsage(
+  client: ReturnType<typeof createClient>,
+  created: BuildCreated,
+  cwd: string,
+  collected: ResolvedUploadOptions,
+): Promise<void> {
+  try {
+    const usage = await collectPackageUsage({
+      cwd,
+      buildDir: collected.buildDir,
+      statsFile: collected.statsFile,
+    });
+    if (usage.length > 0) {
+      await client.projects.builds.postUsage(collected.slug, created.build.id, usage);
+    }
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    printLine(`Package usage not recorded: ${reason}`);
+  }
 }
 
 /** Compute the affected set and post it, never failing the upload. */

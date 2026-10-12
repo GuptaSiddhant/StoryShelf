@@ -36,6 +36,14 @@ export interface AffectedInput {
   affectedImportPaths: string[] | null;
 }
 
+/** One story-to-package usage row posted after build creation. */
+export interface PackageUsageInput {
+  storyImportPath: string;
+  packageName: string;
+  modulePath: string;
+  version: string | null;
+}
+
 /** Build record plus the zip upload URL returned by JSON creation. */
 export interface BuildCreated {
   build: { id: string };
@@ -61,6 +69,7 @@ interface Client {
       createJson: (slug: string, json: BuildCreateInput) => Promise<BuildCreated>;
       uploadZip: (uploadUrl: string, body: NodeJS.ReadableStream) => Promise<unknown>;
       postAffected: (slug: string, buildId: string, json: AffectedInput) => Promise<unknown>;
+      postUsage: (slug: string, buildId: string, usage: PackageUsageInput[]) => Promise<unknown>;
       retry: (slug: string, buildId: string) => Promise<unknown>;
     };
     admin: {
@@ -136,6 +145,12 @@ function createBuildsApi(
         method: "POST",
         headers: requestHeaders("application/json"),
         body: JSON.stringify({}),
+      }),
+    postUsage: async (slug: string, buildId: string, usage: PackageUsageInput[]) =>
+      await fetchJson(`${baseUrl}/api/v1/projects/${slug}/builds/${buildId}/usage`, {
+        method: "POST",
+        headers: requestHeaders("application/json"),
+        body: JSON.stringify({ usage }),
       }),
     postAffected: async (slug: string, buildId: string, json: AffectedInput) =>
       await fetchJson(`${baseUrl}/api/v1/projects/${slug}/builds/${buildId}/affected`, {

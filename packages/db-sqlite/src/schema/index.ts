@@ -32,6 +32,10 @@ import { projects as projectsTable } from "./project.ts";
 import { snapshots as snapshotsTable } from "./snapshot.ts";
 import { projectStatusConfigs as projectStatusConfigsTable } from "./status-config.ts";
 import { tokens as tokensTable } from "./token.ts";
+import {
+  buildPackageUsage as buildPackageUsageTable,
+  projectLinks as projectLinksTable,
+} from "./usage.ts";
 import { userInviteTokens as userInviteTokensTable } from "./user-invite.ts";
 import { users as usersTable } from "./user.ts";
 import { webhooks as webhooksTable } from "./webhook.ts";
@@ -42,6 +46,7 @@ export { baselines } from "./baseline.ts";
 export { comments } from "./comment.ts";
 export { buildLabels, labelTypes } from "./label.ts";
 export { projectMembers } from "./member.ts";
+export { buildPackageUsage, projectLinks } from "./usage.ts";
 export { aiBudgetAlerts, aiUsage, insights } from "./insight.ts";
 export { notificationChannels, notificationSubscriptions } from "./notification.ts";
 export { projectGroupMappings } from "./project-group-mapping.ts";
@@ -62,6 +67,8 @@ export type { Build } from "./build.ts";
 export type { Comment } from "./comment.ts";
 /** Build label and label type rows. */
 export type { BuildLabel, LabelType } from "./label.ts";
+/** Project link and per-build package usage rows. */
+export type { BuildPackageUsage, ProjectLink } from "./usage.ts";
 /** Project membership row linking a user to a project role. */
 export type { ProjectMember } from "./member.ts";
 /** Identity-provider group to project-role mapping row. */
@@ -99,6 +106,8 @@ export const schema: {
   comments: AnySQLiteTable;
   labelTypes: AnySQLiteTable;
   buildLabels: AnySQLiteTable;
+  projectLinks: AnySQLiteTable;
+  buildPackageUsage: AnySQLiteTable;
   tokens: AnySQLiteTable;
   webhooks: AnySQLiteTable;
   insights: AnySQLiteTable;
@@ -122,6 +131,8 @@ export const schema: {
   comments: commentsTable,
   labelTypes: labelTypesTable,
   buildLabels: buildLabelsTable,
+  projectLinks: projectLinksTable,
+  buildPackageUsage: buildPackageUsageTable,
   tokens: tokensTable,
   webhooks: webhooksTable,
   insights: insightsTable,
