@@ -1,11 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import {
-  BuildModel,
-  matchUpstreamStory,
-  PackageUsageModel,
-  ProjectModel,
-  SnapshotModel,
-} from "@storyshelf/core/models";
+import { PackageUsageModel, ProjectModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
 import type { ProjectRole } from "@storyshelf/core/types";
 import { HTTPException } from "hono/http-exception";
@@ -13,6 +7,7 @@ import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
 import { buildForProject, snapshotForBuild } from "./builds.handlers.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
+import { linkedUsageFor } from "./links.handlers.ts";
 import { badRequest, forbidden, notFound, unauthorized } from "./schemas.ts";
 
 const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];
@@ -27,6 +22,8 @@ const usageItemSchema = z.object({
   package: z.string(),
   version: z.string().nullable(),
   upstreamSlug: z.string(),
+  /** Latest approved default build of the upstream project; null when it has none. */
+  upstreamBuildId: z.string().nullable(),
   /** Upstream story the package module maps to; null falls back to the library. */
   upstreamStoryId: z.string().nullable(),
 });
@@ -124,22 +121,6 @@ async function linkViews(project: Project): Promise<z.infer<typeof linkSchema>[]
   return views.filter((view): view is z.infer<typeof linkSchema> => view !== null);
 }
 
-/** Upstream stories (latest approved default build) used to map package modules to stories. */
-async function upstreamStories(
-  upstream: Project,
-): Promise<{ importPath: string; storyId: string }[]> {
-  const build = await new BuildModel(getStore().db).latestApprovedDefault(upstream);
-  if (!build) {
-    return [];
-  }
-  const snapshots = await new SnapshotModel(getStore().db).listByBuild(build.id);
-  return snapshots.flatMap((snapshot) =>
-    snapshot.storyImportPath
-      ? [{ importPath: snapshot.storyImportPath, storyId: snapshot.storyId }]
-      : [],
-  );
-}
-
 /** Register the package-link and snapshot-usage endpoints. */
 export function registerLinks(app: ShelfRouter): void {
   app.openapi(listLinksRoute, async (c) => {
@@ -160,46 +141,6 @@ export function registerLinks(app: ShelfRouter): void {
     const project = await resolveAuthorizedProject(c, slug, ...VIEW_ROLES);
     const build = await buildForProject(project.id, buildId);
     const snapshot = await snapshotForBuild(build, snapshotId);
-    return c.json(await usageFor(c, project, build.id, snapshot.storyImportPath));
+    return c.json(await linkedUsageFor(c, project, build.id, snapshot.storyImportPath));
   });
-}
-
-/** Linked-package usage of one story, omitting upstreams the viewer cannot open. */
-async function usageFor(
-  c: Parameters<typeof resolveAuthorizedProject>[0],
-  project: Project,
-  buildId: string,
-  storyImportPath: string | null,
-): Promise<z.infer<typeof usageItemSchema>[]> {
-  if (!storyImportPath) {
-    return [];
-  }
-  const model = new PackageUsageModel(getStore().db);
-  const [rows, links] = await Promise.all([
-    model.listForStory(buildId, storyImportPath),
-    model.listLinks(project.id),
-  ]);
-  const items = await Promise.all(
-    rows.map(async (row) => {
-      const link = links.find((candidate) => candidate.packageName === row.packageName);
-      const upstream = link ? await new ProjectModel(getStore().db).get(link.upstreamId) : null;
-      if (!upstream) {
-        return null;
-      }
-      const visible = await resolveAuthorizedProject(c, upstream.slug, ...VIEW_ROLES).catch(
-        () => null,
-      );
-      if (!visible) {
-        return null;
-      }
-      const stories = await upstreamStories(upstream);
-      return {
-        package: row.packageName,
-        version: row.version,
-        upstreamSlug: upstream.slug,
-        upstreamStoryId: matchUpstreamStory(row.modulePath, stories),
-      };
-    }),
-  );
-  return items.filter((item): item is z.infer<typeof usageItemSchema> => item !== null);
 }

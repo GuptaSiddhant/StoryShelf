@@ -4,6 +4,7 @@ import { Badge, CompareStage, VStack, statusTone } from "../ui/components.tsx";
 import { viewerHead, viewerMeta, viewerTitle } from "../ui/styles/review-layout.ts";
 import { diffPercent, snapshotImageUrl } from "./build-diff-model.ts";
 import { StaleSnapshotNotice } from "./build-diff-stale.tsx";
+import { LinkedUsage, type LinkedUsageItem } from "./build-diff-usage.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -15,6 +16,9 @@ export interface DiffViewerProps {
   hasBaseline: Record<string, boolean>;
   /** Set when the baseline changed after this snapshot's diff was computed. */
   drifted?: "stale" | "removed";
+  /** Linked packages the story uses (provenance badges + upstream deep links). */
+  usage?: LinkedUsageItem[];
+  publishedBaseDomain?: string;
 }
 
 /** Why a snapshot has no diff image, phrased for the empty pane. */
@@ -26,7 +30,7 @@ function diffEmptyText(status: string): string {
 
 /** Story heading plus the comparison stage for the selected snapshot. */
 export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { project, build, selected, hasBaseline, drifted } = props;
+  const { project, build, selected, hasBaseline, drifted, usage, publishedBaseDomain } = props;
   const percent = diffPercent(selected);
   return (
     <VStack>
@@ -48,6 +52,9 @@ export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<
         </p>
       </div>
       {drifted ? <StaleSnapshotNotice status={drifted} /> : null}
+      {usage && usage.length > 0 ? (
+        <LinkedUsage usage={usage} publishedBaseDomain={publishedBaseDomain} />
+      ) : null}
       <CompareStage
         baselineSrc={
           hasBaseline[selected.id] ? snapshotImageUrl(project, build, selected, "baseline") : null
