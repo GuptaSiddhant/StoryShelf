@@ -35,6 +35,7 @@ import {
   snapshotGrid,
 } from "../ui/styles/review.ts";
 import { StaleBaselineNotice } from "./build-diff-stale.tsx";
+import { LinkedUsage, type LinkedUsageItem } from "./build-diff-usage.tsx";
 
 /** Map a capture log level to its badge tone. */
 function logTone(level: string): "neutral" | "success" | "warning" | "danger" | "info" {
@@ -50,7 +51,10 @@ function logTone(level: string): "neutral" | "success" | "warning" | "danger" | 
   return "neutral";
 }
 /** Build overview page: snapshot grid, bulk actions, and build comments. */
-export async function renderBuildDetailPage(buildId: string): Promise<RenderedContent | null> {
+export async function renderBuildDetailPage(
+  buildId: string,
+  usageByStory: Map<string, LinkedUsageItem[]> = new Map(),
+): Promise<RenderedContent | null> {
   const { db } = getStore();
   const build = await new BuildModel(db).get(buildId);
   if (!build) {
@@ -281,6 +285,12 @@ export async function renderBuildDetailPage(buildId: string): Promise<RenderedCo
                     ? ""
                     : ` · ${snap.diffPixels} px`}
                 </Meta>
+                {snap.storyImportPath && usageByStory.has(snap.storyImportPath) ? (
+                  <LinkedUsage
+                    usage={usageByStory.get(snap.storyImportPath) ?? []}
+                    publishedBaseDomain={getStore().config.publishedBaseDomain}
+                  />
+                ) : null}
                 <HStack>
                   <Button
                     variant="secondary"

@@ -4,9 +4,11 @@ import { LabelModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
 import { SnapshotModel } from "@storyshelf/core/models";
 import type { ProjectRole } from "@storyshelf/core/types";
+import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { loadInsightPanel } from "../insights/panel.ts";
 import { renderBuildDetailPage } from "../pages/build-detail.tsx";
+import type { LinkedUsageItem } from "../pages/build-diff-usage.tsx";
 import { renderBuildDiffPage, selectedSnapshot } from "../pages/build-diff.tsx";
 import { renderComputeJobsPage, renderActiveQueue } from "../pages/compute-jobs.tsx";
 import { renderLabelDetailPage, renderLabelsPage } from "../pages/label-detail.tsx";
@@ -20,7 +22,7 @@ import { loadBaselineView } from "./baseline-guard.ts";
 import { flash } from "./flash.ts";
 import { currentProjectRole } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
-import { linkedUsageFor } from "./links.handlers.ts";
+import { linkedUsageByStory, linkedUsageFor } from "./links.handlers.ts";
 import { registerSettingsPages } from "./settings.ts";
 function asString(value: FormDataEntryValue | null): string | undefined {
   return typeof value === "string" ? value.trim() : undefined;
@@ -126,7 +128,8 @@ export function registerUiPages(app: ShelfRouter): void {
   });
 
   app.get("/projects/:slug/builds/:buildId", async (c) => {
-    const html = await renderBuildDetailPage(c.req.param("buildId"));
+    const buildId = c.req.param("buildId");
+    const html = await renderBuildDetailPage(buildId, await loadBuildUsage(c, buildId));
     if (!html) {
       return c.notFound();
     }
@@ -226,4 +229,18 @@ export function registerUiPages(app: ShelfRouter): void {
   });
 
   registerSettingsPages(app);
+}
+
+/** Linked-package usage for every story of a build; empty on any failure so the page still renders. */
+async function loadBuildUsage(
+  c: Context,
+  buildId: string,
+): Promise<Map<string, LinkedUsageItem[]>> {
+  try {
+    const build = await new BuildModel(getStore().db).get(buildId);
+    const project = build ? await new ProjectModel(getStore().db).get(build.projectId) : null;
+    return build && project ? await linkedUsageByStory(c, project, build.id) : new Map();
+  } catch {
+    return new Map();
+  }
 }
