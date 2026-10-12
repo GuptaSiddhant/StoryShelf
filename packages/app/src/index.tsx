@@ -37,6 +37,7 @@ import { registerHealth, type HealthDeps } from "./routers/health.ts";
 import { registerInsightFragments } from "./routers/insights-ui.tsx";
 import { registerInsights } from "./routers/insights.ts";
 import { registerLabels } from "./routers/labels.ts";
+import { registerLinks } from "./routers/links.ts";
 import { registerMedia } from "./routers/media.ts";
 import { registerMembers } from "./routers/members.ts";
 import {
@@ -255,6 +256,7 @@ function registerProjectRoutes(app: ShelfRouter): void {
   registerProjects(app);
   registerBuilds(app);
   registerLabels(app);
+  registerLinks(app);
   registerMedia(app);
   registerMembers(app);
   registerTokens(app);
@@ -322,6 +324,11 @@ function registerDocs(app: ShelfRouter): void {
         description: "Approve or reject snapshots, bulk actions, re-diff, and review comments.",
       },
       { name: "Labels", description: "Typed build labels and their link templates." },
+      {
+        name: "Links",
+        description:
+          "Link packages to the projects that publish them and see where stories use them.",
+      },
       {
         name: "Members",
         description: "Project members, roles, and identity-provider group mappings.",

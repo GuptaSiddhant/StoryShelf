@@ -45,4 +45,4 @@ No special retention for published builds — they are purged like any other bui
 
 ## Relationship to linked projects (v2)
 
-Design-system propagation — re-diffing dependent projects when a dependency's baseline changes — is deferred to v2 and modeled as a future dependency edge between projects, not part of this ADR.
+Design-system propagation — re-diffing dependent projects when a dependency's baseline changes — is deferred to v2 and not part of this ADR. Re-diffing separate repos on old `node_modules` yields no diff, so the linked-project work instead records a `project_links` edge (downstream project → upstream project, per package) and shows provenance plus deep links to the upstream published Storybook. See [issue #123](https://github.com/GuptaSiddhant/StoryShelf/issues/123).
