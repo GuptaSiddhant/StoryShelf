@@ -7,7 +7,7 @@ import type { ProjectRole } from "@storyshelf/core/types";
 import type { ShelfRouter } from "../app-types.ts";
 import { loadInsightPanel } from "../insights/panel.ts";
 import { renderBuildDetailPage } from "../pages/build-detail.tsx";
-import { renderBuildDiffPage } from "../pages/build-diff.tsx";
+import { renderBuildDiffPage, selectedSnapshot } from "../pages/build-diff.tsx";
 import { renderComputeJobsPage, renderActiveQueue } from "../pages/compute-jobs.tsx";
 import { renderLabelDetailPage, renderLabelsPage } from "../pages/label-detail.tsx";
 import { renderLibraryPage } from "../pages/library.tsx";
@@ -20,6 +20,7 @@ import { loadBaselineView } from "./baseline-guard.ts";
 import { flash } from "./flash.ts";
 import { currentProjectRole } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
+import { linkedUsageFor } from "./links.handlers.ts";
 import { registerSettingsPages } from "./settings.ts";
 function asString(value: FormDataEntryValue | null): string | undefined {
   return typeof value === "string" ? value.trim() : undefined;
@@ -183,6 +184,13 @@ export function registerUiPages(app: ShelfRouter): void {
         hasBaseline,
         drifted,
         insight: await loadInsightPanel(project, build),
+        usage: await linkedUsageFor(
+          c,
+          project,
+          build.id,
+          selectedSnapshot(snapshots, snapshotId)?.storyImportPath ?? null,
+        ).catch(() => []),
+        publishedBaseDomain: getStore().config.publishedBaseDomain,
       }),
     );
   });

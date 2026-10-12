@@ -14,6 +14,7 @@ import { InsightSlot } from "./build-diff-insight.tsx";
 import { DiffNav } from "./build-diff-nav.tsx";
 import { ShortcutsDialog } from "./build-diff-shortcuts.tsx";
 import { StaleBaselineNotice } from "./build-diff-stale.tsx";
+import type { LinkedUsageItem } from "./build-diff-usage.tsx";
 import { DiffViewer } from "./build-diff-viewer.tsx";
 
 /** Data required to render the three-up build diff review page. */
@@ -29,6 +30,10 @@ export interface BuildDiffData {
   drifted: Record<string, "stale" | "removed">;
   /** AI triage panel data; omitted/null hides the panel. */
   insight?: InsightPanelData | null;
+  /** Linked packages the selected snapshot's story uses; omitted/empty hides the badges. */
+  usage?: LinkedUsageItem[];
+  /** Base domain for published Storybook deep links. */
+  publishedBaseDomain?: string;
 }
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
@@ -42,6 +47,17 @@ interface DiffReviewGridProps {
   canReview: boolean;
   hasBaseline: Record<string, boolean>;
   drifted: Record<string, "stale" | "removed">;
+  usage: LinkedUsageItem[];
+  publishedBaseDomain?: string;
+}
+
+/** The snapshot the review page shows: the requested one, else the first needing review. */
+export function selectedSnapshot(snapshots: Snapshot[], selectedId?: string): Snapshot | undefined {
+  return (
+    snapshots.find((s) => s.id === selectedId) ??
+    snapshots.find((s) => s.status === "changed" || s.status === "new") ??
+    snapshots[0]
+  );
 }
 
 /** Snapshot nav plus the viewer/comments column for the selected snapshot. */
@@ -49,6 +65,7 @@ function DiffReviewGrid(
   props: DiffReviewGridProps,
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, snapshots, comments, selected, canReview, hasBaseline, drifted } = props;
+  const { usage, publishedBaseDomain } = props;
   return (
     <div class={workspace}>
       <DiffNav project={project} build={build} snapshots={snapshots} selectedId={selected?.id} />
@@ -61,6 +78,8 @@ function DiffReviewGrid(
               selected={selected}
               hasBaseline={hasBaseline}
               drifted={drifted[selected.id]}
+              usage={usage}
+              publishedBaseDomain={publishedBaseDomain}
             />
             <DiffComments
               project={project}
@@ -105,10 +124,7 @@ function reviewNav(project: Project, build: Build): NavConfig {
 /** Three-up diff review page: baseline, current, and diff with keyboard review. */
 export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
   const { project, build, snapshots, comments, selectedId, canReview, hasBaseline, drifted } = data;
-  const selected =
-    snapshots.find((s) => s.id === selectedId) ??
-    snapshots.find((s) => s.status === "changed" || s.status === "new") ??
-    snapshots[0];
+  const selected = selectedSnapshot(snapshots, selectedId);
   const pending = snapshots.filter((s) => s.status === "new" || s.status === "changed");
 
   return (
@@ -151,6 +167,8 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
           canReview={canReview}
           hasBaseline={hasBaseline}
           drifted={drifted}
+          usage={data.usage ?? []}
+          publishedBaseDomain={data.publishedBaseDomain}
         />
       )}
       <ShortcutsDialog />
