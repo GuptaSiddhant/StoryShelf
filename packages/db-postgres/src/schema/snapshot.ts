@@ -42,11 +42,18 @@ export const snapshots = pgTable(
     inherited: boolean("inherited").notNull().default(false),
     baselineId: text("baseline_id"),
     baselineVersion: text("baseline_version"),
+    mode: text("mode"),
+    browser: text("browser").notNull().default("chromium"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull(),
   },
   (t) => [
-    uniqueIndex("snapshots_build_story_viewport_idx").on(t.buildId, t.storyId, t.viewportName),
+    uniqueIndex("snapshots_build_story_mode_browser_idx").on(
+      t.buildId,
+      t.storyId,
+      t.viewportName,
+      t.browser,
+    ),
     index("snapshots_build_id_idx").on(t.buildId),
   ],
 );
@@ -75,6 +82,8 @@ export interface Snapshot {
   inherited: boolean;
   baselineId: string | null;
   baselineVersion: string | null;
+  mode?: string | null;
+  browser?: string;
   createdAt: string;
   updatedAt: string;
 }

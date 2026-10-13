@@ -2,6 +2,7 @@
 /** Per-branch baseline screenshots with default-branch fallback. */
 import { and, eq, getTableColumns } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
+import { DEFAULT_BROWSER } from "../adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { emitWebhookEvent } from "../adapters/webhook-events.ts";
@@ -10,6 +11,14 @@ import type { SecretInput } from "../utils/encrypt.ts";
 import { baselinePath } from "../utils/paths.ts";
 import { ulid } from "../utils/ulid.ts";
 import type { WebhookTables } from "./webhook.ts";
+
+/** Extra identity/metadata for {@link BaselineModel.upsert}. */
+export interface BaselineUpsertOptions {
+  /** Engine the baseline belongs to (default chromium). */
+  browser?: string;
+  /** Resolved mode definition as JSON (display only). */
+  mode?: string | null;
+}
 
 /** Tables required by {@link BaselineModel}. */
 export interface BaselineTables {
@@ -40,6 +49,7 @@ export class BaselineModel {
     storyId: string,
     viewport: string,
     branch: string,
+    browser: string = DEFAULT_BROWSER,
   ): Promise<Baseline | null> {
     const rows = (await this.db.list(this.tables.baselines, {
       where: and(
@@ -50,6 +60,7 @@ export class BaselineModel {
           viewport,
         ),
         eq(getTableColumns(this.tables.baselines)["branch"] as unknown as SQLWrapper, branch),
+        eq(getTableColumns(this.tables.baselines)["browser"] as unknown as SQLWrapper, browser),
       ),
       limit: 1,
     })) as unknown as Baseline[];
@@ -62,14 +73,15 @@ export class BaselineModel {
     viewport: string,
     branch: string,
     defaultBranch: string,
+    browser: string = DEFAULT_BROWSER,
   ): Promise<Baseline | null> {
     if (branch !== defaultBranch) {
-      const own = await this.getFor(projectId, storyId, viewport, branch);
+      const own = await this.getFor(projectId, storyId, viewport, branch, browser);
       if (own) {
         return own;
       }
     }
-    return this.getFor(projectId, storyId, viewport, defaultBranch);
+    return this.getFor(projectId, storyId, viewport, defaultBranch, browser);
   }
 
   async read(baseline: Baseline): Promise<Buffer> {
@@ -84,18 +96,21 @@ export class BaselineModel {
     snapshotId: string,
     sourcePath: string,
     infraHash?: string | null,
+    options: BaselineUpsertOptions = {},
   ): Promise<Baseline> {
-    const screenshotPath = baselinePath(projectId, branch, storyId, viewport);
+    const browser = options.browser ?? DEFAULT_BROWSER;
+    const screenshotPath = baselinePath(projectId, branch, storyId, viewport, browser);
     const source = await this.storage.read(sourcePath);
     await this.storage.write(screenshotPath, source);
 
-    const existing = await this.getFor(projectId, storyId, viewport, branch);
+    const existing = await this.getFor(projectId, storyId, viewport, branch, browser);
     let baseline: Baseline;
     if (existing) {
       baseline = (await this.db.update(this.tables.baselines, existing.id, {
         snapshotId,
         screenshotPath,
         infraHash: infraHash ?? existing.infraHash ?? null,
+        mode: options.mode ?? existing.mode ?? null,
         updatedAt: new Date().toISOString(),
       })) as unknown as Baseline;
       if (this.webhookTables) {
@@ -108,6 +123,8 @@ export class BaselineModel {
             baselineId: baseline.id,
             storyId,
             viewport,
+            browser,
+            mode: options.mode ?? null,
             branch,
             snapshotId,
           },
@@ -125,6 +142,8 @@ export class BaselineModel {
         snapshotId,
         screenshotPath,
         infraHash: infraHash ?? null,
+        mode: options.mode ?? null,
+        browser,
         createdAt: now,
         updatedAt: now,
       })) as unknown as Baseline;
@@ -138,6 +157,8 @@ export class BaselineModel {
             baselineId: baseline.id,
             storyId,
             viewport,
+            browser,
+            mode: options.mode ?? null,
             branch,
             snapshotId,
           },

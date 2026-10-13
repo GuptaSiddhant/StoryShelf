@@ -27,6 +27,10 @@ export interface Snapshot {
   baselineId: string | null;
   /** That baseline's `updatedAt` at diff time; compared on approval to detect drift. */
   baselineVersion: string | null;
+  /** Resolved mode definition (JSON) — display/capture only; identity is `viewportName`. */
+  mode?: string | null;
+  /** Engine the image was captured with. */
+  browser?: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -33,11 +33,18 @@ export const snapshots = sqliteTable(
     inherited: integer("inherited", { mode: "boolean" }).notNull().default(false),
     baselineId: text("baseline_id"),
     baselineVersion: text("baseline_version"),
+    mode: text("mode"),
+    browser: text("browser").notNull().default("chromium"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
   (t) => [
-    uniqueIndex("snapshots_build_story_viewport_idx").on(t.buildId, t.storyId, t.viewportName),
+    uniqueIndex("snapshots_build_story_mode_browser_idx").on(
+      t.buildId,
+      t.storyId,
+      t.viewportName,
+      t.browser,
+    ),
     index("snapshots_build_id_idx").on(t.buildId),
   ],
 );
@@ -66,6 +73,8 @@ export interface Snapshot {
   inherited: boolean;
   baselineId: string | null;
   baselineVersion: string | null;
+  mode: string | null;
+  browser: string;
   createdAt: string;
   updatedAt: string;
 }

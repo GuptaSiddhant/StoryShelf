@@ -114,6 +114,49 @@ describe("BaselineModel", () => {
     await expect(model.read(updated)).resolves.toEqual(Buffer.from([1, 2, 3]));
   });
 
+  it("keeps one baseline per engine for the same story and mode", async () => {
+    const { db, storage } = setup();
+    const model = new BaselineModel(db, { baselines: db.tables.baselines }, storage);
+    await storage.write("source/shot.png", PNG);
+    const chromium = await model.upsert("p1", "s", "dark", "main", "snap-1", "source/shot.png");
+    const firefox = await model.upsert(
+      "p1",
+      "s",
+      "dark",
+      "main",
+      "snap-2",
+      "source/shot.png",
+      null,
+      {
+        browser: "firefox",
+        mode: '{"theme":"dark"}',
+      },
+    );
+    expect(firefox.id).not.toBe(chromium.id);
+    expect(chromium.screenshotPath).toBe(baselinePath("p1", "main", "s", "dark"));
+    expect(firefox.screenshotPath).toBe(baselinePath("p1", "main", "s", "dark", "firefox"));
+    expect((await model.getFor("p1", "s", "dark", "main"))?.id).toBe(chromium.id);
+    expect((await model.getFor("p1", "s", "dark", "main", "firefox"))?.id).toBe(firefox.id);
+    expect((await model.resolve("p1", "s", "dark", "feat", "main", "firefox"))?.id).toBe(
+      firefox.id,
+    );
+    await expect(model.getFor("p1", "s", "dark", "main", "webkit")).resolves.toBeNull();
+    const updated = await model.upsert(
+      "p1",
+      "s",
+      "dark",
+      "main",
+      "snap-3",
+      "source/shot.png",
+      null,
+      {
+        browser: "firefox",
+      },
+    );
+    expect(updated.id).toBe(firefox.id);
+    expect(updated.mode).toBe('{"theme":"dark"}');
+  });
+
   it("lists baselines scoped to the project", async () => {
     const { db, storage } = setup();
     const model = new BaselineModel(db, { baselines: db.tables.baselines }, storage);
