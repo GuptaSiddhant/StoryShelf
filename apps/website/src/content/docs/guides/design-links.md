@@ -30,3 +30,7 @@ The same tab holds **Design files** — project-level Figma links shown in the l
 ## Optional: Figma token
 
 Add a Figma personal access token (read access to file content) under **Settings → Design → Figma access token** to show the design name and warn when a design changed after the baseline was approved, or the linked node was deleted. These notices never block review. Tokens are encrypted, never shown again, and expire after at most 90 days — the tab shows the days left and whether the token still works. Without a token, buttons still deep-link to Figma.
+
+## Reference renders
+
+With a token, node links (`?node-id=…`) also get a cached PNG render. The review page shows it as a **Figma reference** pane under the diff stage, and library cards open a small popover with the render and an **Open in Figma** action. Renders are downloaded and stored by StoryShelf (Figma's image URLs expire) and refreshed only when the Figma file version changes. The render is a reference only — StoryShelf never pixel-diffs against it. Links to a whole file (no node) stay plain deep links.

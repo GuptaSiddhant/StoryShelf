@@ -1,9 +1,10 @@
-import { BaselineModel } from "@storyshelf/core/models";
+import { BaselineModel, DesignModel, FigmaNodeModel } from "@storyshelf/core/models";
 import { BuildModel } from "@storyshelf/core/models";
 import { SnapshotModel } from "@storyshelf/core/models";
 import type { Snapshot } from "@storyshelf/core/schema";
 import type { ProjectRole } from "@storyshelf/core/types";
 import type { ShelfRouter } from "../app-types.ts";
+import { credentialKeys } from "../credential-keys.ts";
 import { getStore } from "../store.ts";
 import { notFound, resolveAuthorizedProject } from "./helpers.ts";
 const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];
@@ -39,6 +40,19 @@ export function registerMedia(app: ShelfRouter): void {
       notFound("No diff for this snapshot");
     }
     return imageResponse(await getStore().storage.read(snapshot.diffPath));
+  });
+
+  app.get("/api/v1/projects/:slug/design/renders/:nodeId", async (c) => {
+    const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...VIEW_ROLES);
+    const { db, config, storage } = getStore();
+    const design = new DesignModel(db, undefined, credentialKeys(config));
+    const nodes = new FigmaNodeModel(db, design, { storage });
+    const node = await nodes.get(project.id, c.req.param("nodeId"));
+    const png = node ? await nodes.readRender(node) : null;
+    if (!png) {
+      notFound("No design render");
+    }
+    return imageResponse(png);
   });
 
   app.get("/api/v1/projects/:slug/builds/:buildId/snapshots/:snapshotId/baseline", async (c) => {

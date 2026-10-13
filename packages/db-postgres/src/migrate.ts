@@ -31,6 +31,9 @@ const SNAPSHOT_BASELINE_ID_ALTER =
 const SNAPSHOT_BASELINE_VERSION_ALTER =
   "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS baseline_version TEXT";
 const SNAPSHOT_DESIGN_URL_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS design_url TEXT";
+const FIGMA_RENDER_PATH_ALTER = "ALTER TABLE figma_nodes ADD COLUMN IF NOT EXISTS render_path TEXT";
+const FIGMA_RENDER_VERSION_ALTER =
+  "ALTER TABLE figma_nodes ADD COLUMN IF NOT EXISTS render_version TEXT";
 const BASELINE_INFRA_HASH_ALTER = "ALTER TABLE baselines ADD COLUMN IF NOT EXISTS infra_hash TEXT";
 const BUILD_AFFECTED_ONLY_ALTER =
   "ALTER TABLE builds ADD COLUMN IF NOT EXISTS affected_only BOOLEAN NOT NULL DEFAULT true";
@@ -60,6 +63,8 @@ async function migrateSnapshotColumns(run: MigrationRunner): Promise<void> {
   await execIgnore(run, SNAPSHOT_BASELINE_ID_ALTER);
   await execIgnore(run, SNAPSHOT_BASELINE_VERSION_ALTER);
   await execIgnore(run, SNAPSHOT_DESIGN_URL_ALTER);
+  await execIgnore(run, FIGMA_RENDER_PATH_ALTER);
+  await execIgnore(run, FIGMA_RENDER_VERSION_ALTER);
 }
 
 async function migrateProjectExtras(run: MigrationRunner): Promise<void> {

@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import type { Logger } from "../logger.ts";
 import { injectTraceContext, withSpan } from "../tracing.ts";
 
@@ -18,6 +19,24 @@ export async function httpJson<T>(url: string, options: HttpRequestOptions = {})
     options.retries ?? DEFAULT_RETRIES,
     options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     doFetchJson,
+  );
+}
+
+/**
+ * Download a binary response (images) with the same timeout, retry, and
+ * `Retry-After` semantics as {@link httpJson}.
+ *
+ * @param url - Absolute request URL.
+ * @param options - Method, headers, timeout, retries, logger.
+ * @returns The raw response bytes.
+ */
+export async function httpBytes(url: string, options: HttpRequestOptions = {}): Promise<Buffer> {
+  return await requestWithRetry<Buffer>(
+    url,
+    options,
+    options.retries ?? DEFAULT_RETRIES,
+    options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    doFetchBytes,
   );
 }
 
@@ -207,6 +226,15 @@ async function doFetchText(
 ): Promise<string> {
   const response = await doFetchResponse(url, options, timeoutMs);
   return await response.text();
+}
+
+async function doFetchBytes(
+  url: string,
+  options: HttpRequestOptions,
+  timeoutMs: number,
+): Promise<Buffer> {
+  const response = await doFetchResponse(url, options, timeoutMs);
+  return Buffer.from(await response.arrayBuffer());
 }
 
 async function doFetchResponse(

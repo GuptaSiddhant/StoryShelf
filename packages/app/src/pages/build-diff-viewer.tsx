@@ -5,7 +5,7 @@ import { viewerHead, viewerMeta, viewerTitle } from "../ui/styles/review-layout.
 import { diffPercent, snapshotImageUrl, snapshotVariant } from "./build-diff-model.ts";
 import { StaleSnapshotNotice } from "./build-diff-stale.tsx";
 import { LinkedUsage, type LinkedUsageItem } from "./build-diff-usage.tsx";
-import { DesignStrip, type DesignItem } from "./design-links.tsx";
+import { DesignReferences, DesignStrip, type DesignItem } from "./design-links.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -70,6 +70,7 @@ export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<
         diffEmpty={diffEmptyText(selected.status)}
         diffMeta={percent ?? undefined}
       />
+      {design && design.length > 0 ? <DesignReferences items={design} /> : null}
     </VStack>
   );
 }

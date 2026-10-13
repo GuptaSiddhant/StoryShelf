@@ -49,6 +49,8 @@ export const figmaNodes = sqliteTable(
     version: text("version"),
     lastModified: text("last_modified"),
     state: text("state").notNull().default("ok"),
+    renderPath: text("render_path"),
+    renderVersion: text("render_version"),
     fetchedAt: text("fetched_at").notNull(),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
@@ -93,8 +95,12 @@ export interface FigmaNode {
   version: string | null;
   /** File `lastModified` at fetch time. */
   lastModified: string | null;
-  /** `ok` | `deleted` | `unauthorized` | `forbidden` | `error`. */
+  /** `ok` | `deleted` | `unauthorized` | `forbidden`. */
   state: string;
+  /** Storage path of the cached PNG render (node links only); null when none was fetched. */
+  renderPath: string | null;
+  /** File `version` the cached render was taken at; a newer file version refetches. */
+  renderVersion: string | null;
   fetchedAt: string;
   createdAt: string;
   updatedAt: string;
