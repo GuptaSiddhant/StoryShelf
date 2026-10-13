@@ -1,5 +1,6 @@
 import type { ShelfRouter } from "../app-types.ts";
 import { registerAiSettings } from "./settings-ai.ts";
+import { registerDesignSettings } from "./settings-design.ts";
 import { registerCaptureSettings } from "./settings-capture.ts";
 import { registerGeneralSettings } from "./settings-general.ts";
 import { registerLabelSettings } from "./settings-labels.ts";
@@ -12,14 +13,23 @@ import { registerWebhookSettings } from "./settings-webhooks.ts";
 
 /** Register the server-rendered project settings pages and their form handlers. */
 export function registerSettingsPages(app: ShelfRouter): void {
-  registerGeneralSettings(app);
-  registerCaptureSettings(app);
-  registerLabelSettings(app);
-  registerLinkSettings(app);
+  registerProjectSettings(app);
+  registerCatalogSettings(app);
   registerTokenSettings(app);
   registerWebhookSettings(app);
   registerNotificationSettings(app);
   registerMemberSettings(app);
   registerStatusSettings(app);
   registerAiSettings(app);
+}
+
+function registerProjectSettings(app: ShelfRouter): void {
+  registerGeneralSettings(app);
+  registerCaptureSettings(app);
+}
+
+function registerCatalogSettings(app: ShelfRouter): void {
+  registerLabelSettings(app);
+  registerLinkSettings(app);
+  registerDesignSettings(app);
 }

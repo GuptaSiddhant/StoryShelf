@@ -1,0 +1,32 @@
+---
+title: Design links (Figma)
+description: Link components to Figma from story parameters or project settings, with stale-design and deleted-node warnings.
+---
+
+StoryShelf can link each component (story file) to its Figma design. The link shows up as a **Figma** button on library cards, build cards and the review page — only for components that resolve a link.
+
+## Declare a link in the story
+
+Use the Storybook `design` addon shape, or the explicit `storyshelf.figma` key (which wins when both are set):
+
+```ts
+const meta = {
+  title: "Components/Button",
+  parameters: {
+    design: { type: "figma", url: "https://www.figma.com/design/KEY/Kit?node-id=1-2" },
+    // or: storyshelf: { figma: "https://www.figma.com/design/KEY/Kit?node-id=1-2" },
+  },
+};
+```
+
+Only Figma URLs are accepted; other values are ignored (and logged during capture) — a bad link never fails a build.
+
+## Map a component manually
+
+**Settings → Design → Component mapping** maps a story file (`./src/Button.stories.tsx`) to a Figma URL. A manual mapping overrides the story parameters and survives story renames and new builds. Project admins only.
+
+The same tab holds **Design files** — project-level Figma links shown in the library header.
+
+## Optional: Figma token
+
+Add a Figma personal access token (read access to file content) under **Settings → Design → Figma access token** to show the design name and warn when a design changed after the baseline was approved, or the linked node was deleted. These notices never block review. Tokens are encrypted, never shown again, and expire after at most 90 days — the tab shows the days left and whether the token still works. Without a token, buttons still deep-link to Figma.

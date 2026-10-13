@@ -17,6 +17,7 @@ import { ShortcutsDialog } from "./build-diff-shortcuts.tsx";
 import { StaleBaselineNotice } from "./build-diff-stale.tsx";
 import type { LinkedUsageItem } from "./build-diff-usage.tsx";
 import { DiffViewer } from "./build-diff-viewer.tsx";
+import type { DesignItem } from "./design-links.tsx";
 
 /** Data required to render the three-up build diff review page. */
 export interface BuildDiffData {
@@ -33,6 +34,8 @@ export interface BuildDiffData {
   insight?: InsightPanelData | null;
   /** Linked packages the selected snapshot's story uses; omitted/empty hides the badges. */
   usage?: LinkedUsageItem[];
+  /** Design links the selected snapshot's component resolves to; omitted/empty hides the strip. */
+  design?: DesignItem[];
   /** Base domain for published Storybook deep links. */
   publishedBaseDomain?: string;
 }
@@ -49,6 +52,7 @@ interface DiffReviewGridProps {
   hasBaseline: Record<string, boolean>;
   drifted: Record<string, "stale" | "removed">;
   usage: LinkedUsageItem[];
+  design: DesignItem[];
   publishedBaseDomain?: string;
 }
 
@@ -66,7 +70,7 @@ function DiffReviewGrid(
   props: DiffReviewGridProps,
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, snapshots, comments, selected, canReview, hasBaseline, drifted } = props;
-  const { usage, publishedBaseDomain } = props;
+  const { usage, design, publishedBaseDomain } = props;
   return (
     <div class={workspace}>
       <DiffNav project={project} build={build} snapshots={snapshots} selectedId={selected?.id} />
@@ -81,6 +85,7 @@ function DiffReviewGrid(
               hasBaseline={hasBaseline}
               drifted={drifted[selected.id]}
               usage={usage}
+              design={design}
               publishedBaseDomain={publishedBaseDomain}
             />
             <DiffComments
@@ -170,6 +175,7 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
           hasBaseline={hasBaseline}
           drifted={drifted}
           usage={data.usage ?? []}
+          design={data.design ?? []}
           publishedBaseDomain={data.publishedBaseDomain}
         />
       )}

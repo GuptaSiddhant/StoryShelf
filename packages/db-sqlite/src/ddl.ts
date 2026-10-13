@@ -93,6 +93,7 @@ CREATE TABLE IF NOT EXISTS snapshots (
   story_name TEXT NOT NULL,
   story_title TEXT NOT NULL,
   story_import_path TEXT,
+  design_url TEXT,
   viewport_name TEXT NOT NULL DEFAULT 'desktop',
   viewport_width INTEGER NOT NULL DEFAULT 1280,
   viewport_height INTEGER NOT NULL DEFAULT 720,
@@ -169,6 +170,40 @@ CREATE TABLE IF NOT EXISTS project_links (
   created_at TEXT NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS project_links_downstream_package_idx ON project_links (downstream_id, package_name);
+CREATE TABLE IF NOT EXISTS design_links (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  import_path TEXT,
+  label TEXT,
+  url TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS design_links_project_id_idx ON design_links (project_id);
+CREATE TABLE IF NOT EXISTS design_tokens (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  token_encrypted TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'unknown',
+  checked_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS design_tokens_project_id_idx ON design_tokens (project_id);
+CREATE TABLE IF NOT EXISTS figma_nodes (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  file_key TEXT NOT NULL,
+  node_id TEXT NOT NULL DEFAULT '',
+  name TEXT,
+  version TEXT,
+  last_modified TEXT,
+  state TEXT NOT NULL DEFAULT 'ok',
+  fetched_at TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS figma_nodes_project_file_node_idx ON figma_nodes (project_id, file_key, node_id);
 CREATE TABLE IF NOT EXISTS build_package_usage (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,

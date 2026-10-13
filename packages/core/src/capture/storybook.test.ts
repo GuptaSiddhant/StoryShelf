@@ -218,3 +218,34 @@ describe("StorybookAdapter.discover", () => {
     }
   });
 });
+
+function entry(id: string, parameters: unknown): unknown {
+  return { id, name: id, title: "T", type: "story", importPath: "./T.stories.tsx", parameters };
+}
+
+describe("StorybookAdapter.discover design links", () => {
+  const FIGMA = "https://www.figma.com/design/KEY/Kit?node-id=1-2";
+  it("carries the design url without leaking figma into capture parameters", async () => {
+    const index = {
+      v: 5,
+      entries: {
+        a: entry("a", { design: { type: "figma", url: FIGMA } }),
+        b: entry("b", {
+          design: FIGMA,
+          storyshelf: { figma: "https://www.figma.com/design/WIN/X", delay: 5 },
+        }),
+        c: entry("c", { design: "https://example.com/nope" }),
+        d: entry("d", null),
+      },
+    };
+    await withIndex(index, async (dir) => {
+      const [a, b, c, d] = await new StorybookAdapter().discover(dir);
+      expect(a?.designUrl).toBe(FIGMA);
+      expect(b?.designUrl).toBe("https://www.figma.com/design/WIN/X");
+      expect(b?.parameters).toEqual({ delay: 5 });
+      expect(c?.designUrl).toBeUndefined();
+      expect(c?.designInvalid).toBe("https://example.com/nope");
+      expect(d).not.toHaveProperty("designUrl");
+    });
+  });
+});

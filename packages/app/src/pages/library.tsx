@@ -1,3 +1,4 @@
+// oxlint-disable typescript/promise-function-async -- Hono JSX may return Promise<HtmlEscapedString>
 import { BuildModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
 import { SnapshotModel } from "@storyshelf/core/models";
@@ -9,6 +10,11 @@ import { storybookDir } from "@storyshelf/core/utils";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { posix } from "node:path";
 import { loadHealthPanel, type HealthPanelData } from "../insights/health-panel.ts";
+import {
+  loadDesignResolutions,
+  designUrlsFor,
+  loadProjectDesignLinks,
+} from "../routers/design.handlers.ts";
 import { getStore } from "../store.ts";
 import {
   Badge,
@@ -35,8 +41,8 @@ import {
   snapshotCardMeta,
   snapshotGrid,
 } from "../ui/styles/review.ts";
-// oxlint-disable typescript/promise-function-async -- Hono JSX may return Promise<HtmlEscapedString>
 import { groupSnapshots } from "./build-diff-model.ts";
+import { DesignButtons, ProjectDesignLinks, type ProjectDesignLink } from "./design-links.tsx";
 import { HealthSlot } from "./health-panel.tsx";
 
 /** Snapshot image with library height cap, extending the shared diff pane image. */
@@ -59,12 +65,30 @@ export async function renderLibraryPage(
   if (!build) return renderEmptyLibrary(project);
   const snapshots = await new SnapshotModel(db).listByBuild(build.id);
   if (snapshots.length === 0) return renderEmptySnapshots(project, build);
-  const [branches, docsByStory, health] = await Promise.all([
+  const [branches, docsByStory, health, design] = await Promise.all([
     distinctBranches(db, project.id),
     docsEntriesByStory(storage, project.id, build.id, snapshots),
     loadHealthPanel(project),
+    loadLibraryDesign(project, snapshots),
   ]);
-  return renderLibraryGrid(project, build, snapshots, branches, docsByStory, health);
+  return renderLibraryGrid(project, build, snapshots, { branches, docsByStory, health, design });
+}
+
+/** Library design data: per-snapshot component links plus project-level file links. */
+interface LibraryDesign {
+  bySnapshot: Map<string, string[]>;
+  projectLinks: ProjectDesignLink[];
+}
+
+async function loadLibraryDesign(project: Project, snapshots: Snapshot[]): Promise<LibraryDesign> {
+  const [resolutions, projectLinks] = await Promise.all([
+    loadDesignResolutions(project, snapshots),
+    loadProjectDesignLinks(project),
+  ]);
+  const bySnapshot = new Map(
+    snapshots.map((snap) => [snap.id, designUrlsFor(resolutions, snap)] as const),
+  );
+  return { bySnapshot, projectLinks };
 }
 
 async function getLibraryBuild(
@@ -230,6 +254,14 @@ function distinctViewports(snapshots: Snapshot[]): string[] {
   return [...new Set(snapshots.map((s) => s.viewportName))].toSorted();
 }
 
+/** Everything the library grid renders besides the build and its snapshots. */
+interface LibraryContext {
+  branches: string[];
+  docsByStory: Map<string, string>;
+  health: HealthPanelData | null;
+  design: LibraryDesign;
+}
+
 /** One snapshot per story/mode: the primary engine's (other browsers are review detail). */
 function primaryEngineSnapshots(snapshots: Snapshot[]): Snapshot[] {
   return groupSnapshots(snapshots).map((group) => group.primary);
@@ -239,10 +271,9 @@ function renderLibraryGrid(
   project: Project,
   build: Build,
   allSnapshots: Snapshot[],
-  branches: string[],
-  docsByStory: Map<string, string>,
-  health: HealthPanelData | null,
+  context: LibraryContext,
 ): RenderedContent {
+  const { branches, health } = context;
   const snapshots = primaryEngineSnapshots(allSnapshots);
   const byTitle = groupByTitle(snapshots);
   const viewportNames = distinctViewports(snapshots);
@@ -253,13 +284,16 @@ function renderLibraryGrid(
       nav={{ active: "library", projectSlug: project.slug, projectName: project.name }}
     >
       {renderLibraryHeader(project, build, snapshots.length, branches)}
+      {context.design.projectLinks.length > 0 ? (
+        <ProjectDesignLinks links={context.design.projectLinks} />
+      ) : null}
       <HealthSlot project={project} data={health} />
       {multi ? (
         <Card>
           <Meta as="span">Viewports: {viewportNames.join(" · ")}</Meta>
         </Card>
       ) : null}
-      {renderTitleList(byTitle, project, build, multi, docsByStory)}
+      {renderTitleList(byTitle, project, build, multi, context)}
       <div data-filter-empty hidden>
         <Meta center>No stories match your filter.</Meta>
       </div>
@@ -327,13 +361,13 @@ function renderTitleList(
   project: Project,
   build: Build,
   multi: boolean,
-  docsByStory: Map<string, string>,
+  context: LibraryContext,
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
   const titles = [...byTitle.keys()].toSorted((a, b) => a.localeCompare(b));
   return (
     <VStack>
       {titles.map((title) =>
-        renderTitleGroup(title, byTitle.get(title) ?? [], project, build, multi, docsByStory),
+        renderTitleGroup(title, byTitle.get(title) ?? [], project, build, multi, context),
       )}
     </VStack>
   );
@@ -345,7 +379,7 @@ function renderTitleGroup(
   project: Project,
   build: Build,
   hasMultipleViewports: boolean,
-  docsByStory: Map<string, string>,
+  context: LibraryContext,
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
   const byViewport = groupByViewport(group);
   const vNames = [...byViewport.keys()].toSorted();
@@ -369,7 +403,7 @@ function renderTitleGroup(
               project,
               build,
               hasMultipleViewports,
-              docsByStory,
+              context,
             ),
           )}
         </VStack>
@@ -394,7 +428,7 @@ function renderViewportGroup(
   project: Project,
   build: Build,
   hasMultipleViewports: boolean,
-  docsByStory: Map<string, string>,
+  context: LibraryContext,
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
   return (
     <div key={vName}>
@@ -402,7 +436,7 @@ function renderViewportGroup(
       <div class={snapshotGrid}>
         {snaps
           .toSorted((a, b) => a.storyName.localeCompare(b.storyName))
-          .map((snap) => renderSnapshotCard(snap, project, build, docsByStory))}
+          .map((snap) => renderSnapshotCard(snap, project, build, context))}
       </div>
     </div>
   );
@@ -412,9 +446,9 @@ function renderSnapshotCard(
   snap: Snapshot,
   project: Project,
   build: Build,
-  docsByStory: Map<string, string>,
+  context: LibraryContext,
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const docsId = docsByStory.get(snap.storyId);
+  const docsId = context.docsByStory.get(snap.storyId);
   return (
     <div
       key={snap.id}
@@ -436,7 +470,10 @@ function renderSnapshotCard(
           alt={`${snap.storyTitle} / ${snap.storyName}`}
           loading="lazy"
         />
-        <HStack>{renderCardActions(snap, project, build, docsId)}</HStack>
+        <HStack>
+          {renderCardActions(snap, project, build, docsId)}
+          <DesignButtons urls={context.design.bySnapshot.get(snap.id) ?? []} />
+        </HStack>
       </div>
     </div>
   );

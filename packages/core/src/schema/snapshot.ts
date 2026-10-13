@@ -9,6 +9,8 @@ export interface Snapshot {
   storyName: string;
   storyTitle: string;
   storyImportPath: string | null;
+  /** Figma URL declared by the story at capture time; null when none. */
+  designUrl?: string | null;
   viewportName: string;
   viewportWidth: number;
   viewportHeight: number;

@@ -44,6 +44,7 @@ export class SnapshotModel {
       storyName: input.storyName,
       storyTitle: input.storyTitle,
       storyImportPath: input.storyImportPath,
+      designUrl: input.designUrl ?? null,
       viewportName: input.viewportName,
       viewportWidth: input.viewportWidth,
       viewportHeight: input.viewportHeight,
@@ -104,6 +105,8 @@ export interface SnapshotCreateInput {
   storyName: string;
   storyTitle: string;
   storyImportPath?: string;
+  /** Figma URL declared by the story (`parameters.design` / `storyshelf.figma`). */
+  designUrl?: string | null;
   viewportName: string;
   viewportWidth: number;
   viewportHeight: number;

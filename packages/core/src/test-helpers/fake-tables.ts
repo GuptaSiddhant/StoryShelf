@@ -82,6 +82,40 @@ const projectStatusConfigs = defineTable("project_status_configs", {
   updatedAt: "updated_at",
 });
 
+const designLinks = defineTable("design_links", {
+  id: "id",
+  projectId: "project_id",
+  importPath: "import_path",
+  label: "label",
+  url: "url",
+  createdAt: "created_at",
+  updatedAt: "updated_at",
+});
+
+const designTokens = defineTable("design_tokens", {
+  id: "id",
+  projectId: "project_id",
+  tokenEncrypted: "token_encrypted",
+  status: "status",
+  checkedAt: "checked_at",
+  createdAt: "created_at",
+  updatedAt: "updated_at",
+});
+
+const figmaNodes = defineTable("figma_nodes", {
+  id: "id",
+  projectId: "project_id",
+  fileKey: "file_key",
+  nodeId: "node_id",
+  name: "name",
+  version: "version",
+  lastModified: "last_modified",
+  state: "state",
+  fetchedAt: "fetched_at",
+  createdAt: "created_at",
+  updatedAt: "updated_at",
+});
+
 const builds = defineTable("builds", {
   id: "id",
   projectId: "project_id",
@@ -153,6 +187,7 @@ const snapshots = defineTable("snapshots", {
   status: "status",
   reviewedBy: "reviewed_by",
   reviewedAt: "reviewed_at",
+  designUrl: "design_url",
   infraHash: "infra_hash",
   inherited: "inherited",
   baselineId: "baseline_id",
@@ -373,6 +408,9 @@ export const fakeSchema: Tables = {
   labelTypes,
   buildLabels,
   projectLinks,
+  designLinks,
+  designTokens,
+  figmaNodes,
   buildPackageUsage,
   tokens,
   webhooks,

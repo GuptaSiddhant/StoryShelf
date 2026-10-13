@@ -1,6 +1,6 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
-import { LabelModel } from "@storyshelf/core/models";
+import { DesignModel, LabelModel, tokenDaysLeft } from "@storyshelf/core/models";
 import { PackageUsageModel } from "@storyshelf/core/models";
 import { MemberModel } from "@storyshelf/core/models";
 import { NotificationChannelModel } from "@storyshelf/core/models";
@@ -24,6 +24,7 @@ import {
   type SettingsTab,
 } from "../pages/project-settings.tsx";
 import type { SettingsAiData } from "../pages/settings-ai.tsx";
+import type { SettingsDesignData } from "../pages/settings-design.tsx";
 import type { SettingsLink, SettingsLinkCandidate } from "../pages/settings-links.tsx";
 import type { SettingsMember } from "../pages/settings-members.tsx";
 import type {
@@ -40,6 +41,7 @@ export interface SettingsData {
   project: Project;
   links: SettingsLink[];
   linkCandidates: SettingsLinkCandidate[];
+  design: SettingsDesignData;
   labelTypes: LabelType[];
   tokens: Omit<Token, "hash">[];
   members: SettingsMember[];
@@ -235,6 +237,30 @@ async function loadLinksSection(
   return { links, linkCandidates };
 }
 
+/** Design files, component mappings and token health for the Design tab (never the token). */
+async function loadDesignSection(
+  db: DatabaseAdapter,
+  secret: SecretInput,
+  projectId: string,
+): Promise<SettingsDesignData> {
+  const model = new DesignModel(db, undefined, secret);
+  const files = (await model.projectLinks(projectId)).map((link) => ({
+    id: link.id,
+    label: link.label ?? "Design file",
+    url: link.url,
+  }));
+  const components = (await model.componentLinks(projectId)).map((link) => ({
+    id: link.id,
+    importPath: link.importPath ?? "",
+    url: link.url,
+  }));
+  const row = await model.tokenInfo(projectId);
+  const token = row
+    ? { status: row.status, daysLeft: tokenDaysLeft(row.updatedAt), checkedAt: row.checkedAt }
+    : null;
+  return { files, components, token };
+}
+
 async function loadSettingsData(slug: string): Promise<SettingsData | null> {
   const project = await new ProjectModel(getStore().db).getBySlug(slug);
   if (!project) {
@@ -251,7 +277,8 @@ async function loadSettingsData(slug: string): Promise<SettingsData | null> {
   );
   const isAdmin = isProjectAdmin(authEnabled, user, inventory.members);
   const linksSection = await loadLinksSection(db, project);
-  return { project, ...inventory, ...notifications, ...linksSection, gitHosts, isAdmin };
+  const design = await loadDesignSection(db, credentialKeys(config), project.id);
+  return { project, ...inventory, ...notifications, ...linksSection, design, gitHosts, isAdmin };
 }
 
 /** Render the project settings page for the given tab, optionally with form state. */
@@ -272,6 +299,7 @@ export async function renderSettingsPage(
       labelTypes: data.labelTypes,
       links: data.links,
       linkCandidates: data.linkCandidates,
+      design: data.design,
       tokens: data.tokens,
       members: data.members,
       groupMappings: data.groupMappings,

@@ -19,6 +19,7 @@ import { renderProjectsPage } from "../pages/projects.tsx";
 import { renderRootPage } from "../pages/root.tsx";
 import { getStore } from "../store.ts";
 import { loadBaselineView } from "./baseline-guard.ts";
+import { designUrlsFor, loadDesignResolutions, loadReviewDesign } from "./design.handlers.ts";
 import { flash } from "./flash.ts";
 import { currentProjectRole } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
@@ -176,6 +177,14 @@ export function registerUiPages(app: ShelfRouter): void {
     const { hasBaseline, drifted } = await loadBaselineView(project, build, snapshots);
     const { user, authEnabled } = getStore();
     const canReview = !authEnabled || Boolean(user);
+    const selected = selectedSnapshot(snapshots, snapshotId);
+    const design = selected
+      ? await loadReviewDesign(
+          project,
+          selected,
+          designUrlsFor(await loadDesignResolutions(project, snapshots), selected),
+        ).catch(() => [])
+      : [];
     return c.html(
       renderBuildDiffPage({
         project,
@@ -187,6 +196,7 @@ export function registerUiPages(app: ShelfRouter): void {
         hasBaseline,
         drifted,
         insight: await loadInsightPanel(project, build),
+        design,
         usage: await linkedUsageFor(
           c,
           project,

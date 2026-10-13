@@ -10,6 +10,7 @@ import {
 } from "./build-diff-model.ts";
 import { StaleSnapshotNotice } from "./build-diff-stale.tsx";
 import { LinkedUsage, type LinkedUsageItem } from "./build-diff-usage.tsx";
+import { DesignStrip, type DesignItem } from "./design-links.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -25,6 +26,8 @@ export interface DiffViewerProps {
   drifted?: "stale" | "removed";
   /** Linked packages the story uses (provenance badges + upstream deep links). */
   usage?: LinkedUsageItem[];
+  /** Resolved design links of the story's component (open-in-Figma + stale/deleted notices). */
+  design?: DesignItem[];
   publishedBaseDomain?: string;
 }
 
@@ -60,7 +63,8 @@ function BrowserTabs(props: {
 
 /** Story heading plus the comparison stage for the selected snapshot. */
 export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { project, build, selected, hasBaseline, drifted, usage, publishedBaseDomain } = props;
+  const { project, build, selected, hasBaseline, drifted, usage, design, publishedBaseDomain } =
+    props;
   const siblings = props.siblings ?? [selected];
   const percent = diffPercent(selected);
   return (
@@ -87,6 +91,7 @@ export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<
       {usage && usage.length > 0 ? (
         <LinkedUsage usage={usage} publishedBaseDomain={publishedBaseDomain} />
       ) : null}
+      {design && design.length > 0 ? <DesignStrip items={design} /> : null}
       <CompareStage
         baselineSrc={
           hasBaseline[selected.id] ? snapshotImageUrl(project, build, selected, "baseline") : null

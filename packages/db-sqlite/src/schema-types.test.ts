@@ -8,6 +8,8 @@ import { captureAttempts, captureLogs } from "./schema/capture-attempt.ts";
 import type { CaptureAttempt, CaptureLog } from "./schema/capture-attempt.ts";
 import { comments } from "./schema/comment.ts";
 import type { Comment } from "./schema/comment.ts";
+import { designLinks, designTokens, figmaNodes } from "./schema/design.ts";
+import type { DesignLink, DesignToken, FigmaNode } from "./schema/design.ts";
 import { aiBudgetAlerts, aiUsage, insights } from "./schema/insight.ts";
 import type { AiBudgetAlert, AiUsage, Insight } from "./schema/insight.ts";
 import { buildLabels, labelTypes } from "./schema/label.ts";
@@ -51,6 +53,9 @@ it("row interfaces match drizzle inference exactly", () => {
   expectTypeOf<BuildLabel>().toEqualTypeOf<typeof buildLabels.$inferSelect>();
   expectTypeOf<ProjectLink>().toEqualTypeOf<typeof projectLinks.$inferSelect>();
   expectTypeOf<BuildPackageUsage>().toEqualTypeOf<typeof buildPackageUsage.$inferSelect>();
+  expectTypeOf<DesignLink>().toEqualTypeOf<typeof designLinks.$inferSelect>();
+  expectTypeOf<DesignToken>().toEqualTypeOf<typeof designTokens.$inferSelect>();
+  expectTypeOf<FigmaNode>().toEqualTypeOf<typeof figmaNodes.$inferSelect>();
   expectTypeOf<Token>().toEqualTypeOf<typeof tokens.$inferSelect>();
   expectTypeOf<Webhook>().toEqualTypeOf<typeof webhooks.$inferSelect>();
   expectTypeOf<NotificationChannel>().toEqualTypeOf<typeof notificationChannels.$inferSelect>();
