@@ -40,6 +40,13 @@ export {
 export { BuildModel, isPublicBuild, type BuildCreateInput, type BuildListFilter } from "./build.ts";
 export { CommentModel, type CommentCreateInput } from "./comment.ts";
 export {
+  componentHistory,
+  componentPresence,
+  worstStatus,
+  type ComponentHistoryRow,
+  type ComponentPresence,
+} from "./component.ts";
+export {
   DesignModel,
   normalizeImportPath,
   resolveDesigns,

@@ -84,6 +84,7 @@ export async function linkedUsageByStory(
   for (const row of rows) {
     const upstream = upstreams.get(row.packageName);
     if (upstream) {
+      const upstreamStoryId = matchUpstreamStory(row.modulePath, upstream.stories);
       byStory.set(row.storyImportPath, [
         ...(byStory.get(row.storyImportPath) ?? []),
         {
@@ -91,7 +92,9 @@ export async function linkedUsageByStory(
           version: row.version,
           upstreamSlug: upstream.slug,
           upstreamBuildId: upstream.buildId,
-          upstreamStoryId: matchUpstreamStory(row.modulePath, upstream.stories),
+          upstreamStoryId,
+          upstreamImportPath:
+            upstream.stories.find((story) => story.storyId === upstreamStoryId)?.importPath ?? null,
         },
       ]);
     }

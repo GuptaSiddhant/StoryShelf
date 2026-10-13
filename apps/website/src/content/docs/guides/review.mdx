@@ -44,6 +44,10 @@ Comments persist until the build is purged (see [Retention](/concepts/retention/
 
 When a site admin has enabled AI for the project, the review page shows an advisory **AI triage** panel (verdict, summary and per-snapshot notes). Approvers and admins can generate or regenerate it. The project Library and Builds pages show an **AI project health** panel, and the project card shows its verdict. None of this approves or rejects anything: it only helps you decide. See [AI insights](/ai/).
 
+## Component pages
+
+Every story file has a stable page at `/projects/<slug>/components/<path>` with its **States**, build **History**, **Figma** design and **Linked** packages. The library, review page and build cards link to it. If a file is renamed or removed, the old URL explains where it moved or which build last had it.
+
 ## Related
 
 - [Builds & snapshots](/concepts/builds/) — statuses & attempts

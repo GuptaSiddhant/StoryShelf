@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { safeImageUrl } from "./urls.ts";
+import { createUrlBuilder, safeImageUrl } from "./urls.ts";
 
 describe("safeImageUrl", () => {
   it("allows https and app-relative paths", () => {
@@ -16,5 +16,17 @@ describe("safeImageUrl", () => {
     expect(safeImageUrl("//evil.example.com/x.png")).toBeNull();
     expect(safeImageUrl("not a url")).toBeNull();
     expect(safeImageUrl("")).toBeNull();
+  });
+});
+
+describe("component url", () => {
+  it("keys by import path without a leading ./ and keeps slashes", () => {
+    const urls = createUrlBuilder("https://shelf.example.com/");
+    expect(urls.component("app", "./src/ui/Button.stories.tsx")).toBe(
+      "https://shelf.example.com/projects/app/components/src/ui/Button.stories.tsx",
+    );
+    expect(urls.component("app", "src/My Card.stories.tsx")).toBe(
+      "https://shelf.example.com/projects/app/components/src/My%20Card.stories.tsx",
+    );
   });
 });

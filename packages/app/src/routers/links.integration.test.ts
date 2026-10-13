@@ -178,6 +178,7 @@ describe("snapshot usage API", () => {
         upstreamSlug: "design-system",
         upstreamBuildId: "ds-b1",
         upstreamStoryId: "button--primary",
+        upstreamImportPath: "src/Button.stories.tsx",
       },
     ]);
   });
