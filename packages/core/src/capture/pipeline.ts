@@ -1,5 +1,5 @@
 import type { Logger } from "pino";
-import type { RenderedSnapshot } from "../adapters/capture-runner.ts";
+import { DEFAULT_BROWSER, type RenderedSnapshot } from "../adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { NO_BASELINE } from "../models/baseline-status.ts";
@@ -33,52 +33,57 @@ import { infraHashFor, SIZING_DEFAULTS } from "./sizing.ts";
  * (non-blocking). They are logged as warnings and do not block the build.
  */
 export async function persistCapture(
-  ctx: CaptureContext,
+  input: CaptureContext,
   renderFailedStoryIds: ReadonlySet<string> = new Set(),
   flakyFailedStoryIds: ReadonlySet<string> = new Set(),
   a11yFailedStoryIds: ReadonlySet<string> = new Set(),
 ): Promise<void> {
+  const ctx = await withFreshBrowsers(input);
   const failedStoryIds = new Set(renderFailedStoryIds);
   const flakyIds = new Set(flakyFailedStoryIds);
   const a11yIds = new Set(a11yFailedStoryIds);
-  await Promise.all(
-    ctx.captures.map(async (capture) => {
-      try {
-        await persistSnapshot(ctx, capture);
-      } catch (error) {
-        // A failure in one story/viewport must not abort the other persists.
-        // Flaky and a11y stories remain non-blocking even on persist failure.
-        if (flakyIds.has(capture.story.id) || a11yIds.has(capture.story.id)) {
-          if (flakyIds.has(capture.story.id)) flakyIds.add(capture.story.id);
-          if (a11yIds.has(capture.story.id)) a11yIds.add(capture.story.id);
-          ctx.logger?.warn(
+  // Primary engine first: a newly enabled engine bootstraps from its counterpart.
+  for (const group of capturesByPhase(ctx)) {
+    // oxlint-disable-next-line no-await-in-loop -- phases must run in order
+    await Promise.all(
+      group.map(async (capture) => {
+        try {
+          await persistSnapshot(ctx, capture);
+        } catch (error) {
+          // A failure in one story/viewport must not abort the other persists.
+          // Flaky and a11y stories remain non-blocking even on persist failure.
+          if (flakyIds.has(capture.story.id) || a11yIds.has(capture.story.id)) {
+            if (flakyIds.has(capture.story.id)) flakyIds.add(capture.story.id);
+            if (a11yIds.has(capture.story.id)) a11yIds.add(capture.story.id);
+            ctx.logger?.warn(
+              { storyId: capture.story.id, viewport: capture.viewportName, err: error },
+              "capture failed for flaky/a11y story (non-blocking)",
+            );
+            await emitAttemptLog(
+              ctx.recordLog,
+              ctx.logger,
+              "warn",
+              "capture failed for flaky/a11y story (non-blocking)",
+              {
+                storyId: capture.story.id,
+                viewport: capture.viewportName,
+              },
+            );
+          } else {
+            failedStoryIds.add(capture.story.id);
+          }
+          ctx.logger?.error(
             { storyId: capture.story.id, viewport: capture.viewportName, err: error },
-            "capture failed for flaky/a11y story (non-blocking)",
+            "capture failed for story",
           );
-          await emitAttemptLog(
-            ctx.recordLog,
-            ctx.logger,
-            "warn",
-            "capture failed for flaky/a11y story (non-blocking)",
-            {
-              storyId: capture.story.id,
-              viewport: capture.viewportName,
-            },
-          );
-        } else {
-          failedStoryIds.add(capture.story.id);
+          await emitAttemptLog(ctx.recordLog, ctx.logger, "error", "capture failed for story", {
+            storyId: capture.story.id,
+            viewport: capture.viewportName,
+          });
         }
-        ctx.logger?.error(
-          { storyId: capture.story.id, viewport: capture.viewportName, err: error },
-          "capture failed for story",
-        );
-        await emitAttemptLog(ctx.recordLog, ctx.logger, "error", "capture failed for story", {
-          storyId: capture.story.id,
-          viewport: capture.viewportName,
-        });
-      }
-    }),
-  );
+      }),
+    );
+  }
   // Also log flaky and a11y render failures as warnings
   for (const id of flakyIds) {
     if (!failedStoryIds.has(id)) {
@@ -106,6 +111,61 @@ export async function persistCapture(
     failedStoryIds.add(id);
   }
   await finalize(ctx, allStoryIds(ctx), failedStoryIds, flakyIds, a11yIds);
+}
+
+/** Engines of this run, primary (first) first. */
+function runBrowsers(ctx: CaptureContext): string[] {
+  const listed = ctx.browsers && ctx.browsers.length > 0 ? ctx.browsers : [DEFAULT_BROWSER];
+  return [...new Set(listed)];
+}
+
+function primaryBrowser(ctx: CaptureContext): string {
+  return runBrowsers(ctx)[0] ?? DEFAULT_BROWSER;
+}
+
+function browserOf(capture: { browser?: string }): string {
+  return capture.browser ?? DEFAULT_BROWSER;
+}
+
+/** Captures split into the primary engine's, then everyone else's. */
+function capturesByPhase(ctx: CaptureContext): RenderedSnapshot[][] {
+  const primary = primaryBrowser(ctx);
+  const first = ctx.captures.filter((capture) => browserOf(capture) === primary);
+  const rest = ctx.captures.filter((capture) => browserOf(capture) !== primary);
+  return rest.length > 0 ? [first, rest] : [first];
+}
+
+/** Mark secondary engines with no baseline yet: their first snapshots bootstrap. */
+async function withFreshBrowsers(ctx: CaptureContext): Promise<CaptureContext> {
+  const primary = primaryBrowser(ctx);
+  const baselines = new BaselineModel(ctx.db, ctx.tables, ctx.storage, ctx.secret);
+  const secondary = runBrowsers(ctx).filter((browser) => browser !== primary);
+  const checks = await Promise.all(
+    secondary.map(async (browser) => ({
+      browser,
+      fresh: !(await baselines.hasAny(ctx.project.id, browser)),
+    })),
+  );
+  return { ...ctx, freshBrowsers: new Set(checks.filter((c) => c.fresh).map((c) => c.browser)) };
+}
+
+/**
+ * A newly enabled engine accepts a story/mode's first snapshot when the
+ * primary engine's snapshot of it is clean (Chromatic's "auto-accepted where
+ * the primary browser was accepted"); anything else goes to review as `new`.
+ */
+async function bootstrapAccepts(ctx: CaptureContext, capture: RenderedSnapshot): Promise<boolean> {
+  const browser = browserOf(capture);
+  if (!ctx.freshBrowsers?.has(browser)) return false;
+  const primary = primaryBrowser(ctx);
+  const siblings = await new SnapshotModel(ctx.db, ctx.tables).listByBuild(ctx.build.id);
+  return siblings.some(
+    (snapshot) =>
+      snapshot.storyId === capture.story.id &&
+      snapshot.viewportName === capture.viewportName &&
+      (snapshot.browser ?? DEFAULT_BROWSER) === primary &&
+      (snapshot.status === "approved" || snapshot.status === "unchanged"),
+  );
 }
 
 /** Persist one inherited snapshot; returns the story id on failure. */
@@ -142,9 +202,11 @@ async function persistInheritedSnapshot(
   ctx: CaptureContext,
   inherited: InheritedStory,
 ): Promise<void> {
-  const infraHash = infraHashFor(ctx.project.browser ?? "chromium", ctx.viewports, SIZING_DEFAULTS);
+  const browser = browserOf(inherited);
+  const infraHash = infraHashFor(browser, [inherited.viewport], SIZING_DEFAULTS);
   const snapshots = new SnapshotModel(ctx.db, ctx.tables);
   const snapshot = await snapshots.create(ctx.project.id, ctx.build.id, {
+    browser,
     storyId: inherited.story.id,
     storyName: inherited.story.name,
     storyTitle: inherited.story.title,
@@ -195,6 +257,10 @@ export interface CaptureContext {
   build: Build;
   /** Viewports at which stories were captured. */
   viewports: Viewport[];
+  /** Engines captured this run, primary first (default: chromium only). */
+  browsers?: string[];
+  /** Internal: secondary engines with no baselines yet (set by `persistCapture`). */
+  freshBrowsers?: ReadonlySet<string>;
   /** Screenshot buffers produced by the capture renderer. */
   captures: RenderedSnapshot[];
   /** Stories inheriting their baseline without rendering (affected capture). */
@@ -219,15 +285,17 @@ function viewportByName(ctx: CaptureContext, name: string): Viewport {
 async function persistSnapshot(ctx: CaptureContext, capture: RenderedSnapshot): Promise<void> {
   assertScreenshotBuffer(capture.screenshot);
   const viewport = capture.viewport ?? viewportByName(ctx, capture.viewportName);
+  const browser = browserOf(capture);
   const screenshot = screenshotPath(
     ctx.project.id,
     ctx.build.id,
     capture.story.id,
     capture.viewportName,
+    browser,
   );
   await ctx.storage.write(screenshot, capture.screenshot);
 
-  const baseline = await resolveBaseline(ctx, capture.story.id, capture.viewportName);
+  const baseline = await resolveBaseline(ctx, capture.story.id, capture.viewportName, browser);
   if (!baseline) {
     await createWithoutBaseline(ctx, capture, viewport, screenshot);
     return;
@@ -239,6 +307,7 @@ async function resolveBaseline(
   ctx: CaptureContext,
   storyId: string,
   viewport: string,
+  browser: string,
 ): Promise<Baseline | null> {
   const baselines = new BaselineModel(ctx.db, ctx.tables, ctx.storage, ctx.secret);
   return await baselines.resolve(
@@ -247,6 +316,7 @@ async function resolveBaseline(
     viewport,
     ctx.build.gitBranch,
     ctx.project.gitDefaultBranch,
+    browser,
   );
 }
 
@@ -257,9 +327,12 @@ async function createWithoutBaseline(
   screenshot: string,
 ): Promise<void> {
   const snapshots = new SnapshotModel(ctx.db, ctx.tables);
-  const status = ctx.build.isDefault ? "approved" : "new";
-  const infraHash = infraHashFor(ctx.project.browser ?? "chromium", ctx.viewports, SIZING_DEFAULTS);
+  const browser = browserOf(capture);
+  const accepted = ctx.build.isDefault || (await bootstrapAccepts(ctx, capture));
+  const status = accepted ? "approved" : "new";
+  const infraHash = infraHashFor(browser, [viewport], SIZING_DEFAULTS);
   const snapshot = await snapshots.create(ctx.project.id, ctx.build.id, {
+    browser,
     storyId: capture.story.id,
     storyName: capture.story.name,
     storyTitle: capture.story.title,
@@ -274,7 +347,7 @@ async function createWithoutBaseline(
   });
   await snapshots.setStatus(snapshot.id, status);
 
-  if (ctx.build.isDefault) {
+  if (accepted) {
     const baselines = new BaselineModel(ctx.db, ctx.tables, ctx.storage, ctx.secret);
     await baselines.upsert(
       ctx.project.id,
@@ -284,7 +357,7 @@ async function createWithoutBaseline(
       snapshot.id,
       screenshot,
       infraHash,
-      { mode: modeJsonOf(viewport) },
+      { mode: modeJsonOf(viewport), browser },
     );
   }
 }
@@ -304,9 +377,11 @@ async function createWithBaseline(
     capture.story.parameters?.diffThreshold,
   );
 
-  const infraHash = infraHashFor(ctx.project.browser ?? "chromium", ctx.viewports, SIZING_DEFAULTS);
+  const browser = browserOf(capture);
+  const infraHash = infraHashFor(browser, [viewport], SIZING_DEFAULTS);
   const snapshots = new SnapshotModel(ctx.db, ctx.tables);
   const snapshot = await snapshots.create(ctx.project.id, ctx.build.id, {
+    browser,
     storyId: capture.story.id,
     storyName: capture.story.name,
     storyTitle: capture.story.title,
@@ -330,7 +405,13 @@ async function createWithBaseline(
     baseline.infraHash !== infraHash;
 
   const status = shouldAutomigrate ? "unchanged" : diffStatus(result.passed, ctx.build.isDefault);
-  const diff = diffPath(ctx.project.id, ctx.build.id, capture.story.id, capture.viewportName);
+  const diff = diffPath(
+    ctx.project.id,
+    ctx.build.id,
+    capture.story.id,
+    capture.viewportName,
+    browser,
+  );
   const passed = shouldAutomigrate ? true : result.passed;
   const pixels = shouldAutomigrate ? 0 : result.diffPixels;
   const ratio = shouldAutomigrate ? 0 : result.diffRatio;
@@ -365,7 +446,7 @@ async function upsertDefaultBaseline(
     snapshotId,
     screenshot,
     infraHash,
-    { mode: modeJsonOf(capture.viewport) },
+    { mode: modeJsonOf(capture.viewport), browser: browserOf(capture) },
   );
 }
 

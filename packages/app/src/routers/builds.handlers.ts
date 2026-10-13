@@ -244,6 +244,7 @@ export async function approveSnapshot(
     snapshot.storyId,
     snapshot.viewportName,
     build.gitBranch,
+    snapshot.browser,
   );
   await baselines.upsert(
     project.id,
@@ -252,6 +253,8 @@ export async function approveSnapshot(
     build.gitBranch,
     snapshot.id,
     snapshot.screenshotPath,
+    undefined,
+    { browser: snapshot.browser, mode: snapshot.mode },
   );
   await notifyProject(
     project,
@@ -259,6 +262,7 @@ export async function approveSnapshot(
     {
       storyId: snapshot.storyId,
       viewport: snapshot.viewportName,
+      browser: snapshot.browser ?? "chromium",
       branch: build.gitBranch,
       snapshotId: snapshot.id,
       buildId: build.id,

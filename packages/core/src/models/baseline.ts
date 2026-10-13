@@ -84,6 +84,18 @@ export class BaselineModel {
     return this.getFor(projectId, storyId, viewport, defaultBranch, browser);
   }
 
+  /** Whether the project has any baseline captured on this engine. */
+  async hasAny(projectId: string, browser: string): Promise<boolean> {
+    const rows = (await this.db.list(this.tables.baselines, {
+      where: and(
+        eq(getTableColumns(this.tables.baselines)["projectId"] as unknown as SQLWrapper, projectId),
+        eq(getTableColumns(this.tables.baselines)["browser"] as unknown as SQLWrapper, browser),
+      ),
+      limit: 1,
+    })) as unknown as Baseline[];
+    return rows.length > 0;
+  }
+
   async read(baseline: Baseline): Promise<Buffer> {
     return await this.storage.read(baseline.screenshotPath);
   }

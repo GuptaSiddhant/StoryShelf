@@ -27,6 +27,7 @@ export async function snapshotBaselineStatus(
     snapshot.viewportName,
     build.gitBranch,
     project.gitDefaultBranch,
+    snapshot.browser,
   );
   return baselineStatus(snapshot, current);
 }
@@ -120,6 +121,7 @@ export async function loadBaselineView(
         snapshot.viewportName,
         build.gitBranch,
         project.gitDefaultBranch,
+        snapshot.browser,
       );
       return { snapshot, current };
     }),

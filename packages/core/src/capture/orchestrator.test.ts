@@ -101,6 +101,31 @@ afterEach(async () => {
   await rm(scratchDir, { recursive: true, force: true });
 });
 
+async function setupBrowsers(projectPatch: Record<string, unknown>): Promise<{
+  db: DatabaseAdapter;
+  buildId: string;
+  render: ReturnType<typeof vi.fn>;
+  options: Parameters<typeof executeCaptureJob>[1];
+}> {
+  const { db } = makeDatabase();
+  const { storage } = makeStorage();
+  const project = await new ProjectModel(db, tables(db)).create({ name: "Browsers" });
+  await db.update(db.tables.projects, project.id, projectPatch);
+  const build = await new BuildModel(db, tables(db)).create(project.id, {
+    gitSha: "sha-browsers",
+    gitBranch: "main",
+    isDefault: true,
+  });
+  await storage.write(storybookZipPath(project.id, build.id), zipWithIndex());
+  const { runner, render } = fakeRunner();
+  return {
+    db,
+    buildId: build.id,
+    render,
+    options: { db, tables: tables(db), storage, runner, scratchDir },
+  };
+}
+
 describe("executeCaptureJob", () => {
   it("loads the target, extracts, renders, and persists the capture end to end", async () => {
     const { db } = makeDatabase();
@@ -204,6 +229,43 @@ describe("executeCaptureJob", () => {
       await executeCaptureJob({ buildId }, options);
       const request = render.mock.calls[0]?.[0] as { stories: { parameters?: unknown }[] };
       expect(request.stories[0]?.parameters).toBeUndefined();
+    });
+  });
+
+  describe("browsers", () => {
+    it("renders each engine sequentially and persists per-engine snapshots", async () => {
+      const { db, buildId, render, options } = await setupBrowsers({
+        browsers: '["chromium","firefox"]',
+      });
+      await executeCaptureJob({ buildId }, options);
+
+      expect(render).toHaveBeenCalledTimes(2);
+      const engines = render.mock.calls.map((call) => (call[0] as { browser: string }).browser);
+      expect(engines).toEqual(["chromium", "firefox"]);
+      const rows = await db.list(db.tables.snapshots);
+      expect(rows.map((row) => row.browser)).toEqual(
+        expect.arrayContaining(["chromium", "firefox"]),
+      );
+      expect(rows).toHaveLength(2);
+    });
+
+    it("fails the build for a browser the runner does not support", async () => {
+      const { db, buildId, render, options } = await setupBrowsers({
+        browsers: '["chromium","firefox"]',
+      });
+      (options.runner.metadata as { supportedBrowsers?: string[] }).supportedBrowsers = [
+        "chromium",
+      ];
+      await expect(executeCaptureJob({ buildId }, options)).rejects.toThrow(/firefox/u);
+      expect(render).not.toHaveBeenCalled();
+      expect((await new BuildModel(db, tables(db)).get(buildId))?.status).toBe("failed");
+    });
+
+    it("rejects more than three engines", async () => {
+      const { buildId, options } = await setupBrowsers({
+        browsers: '["chromium","firefox","webkit","chrome"]',
+      });
+      await expect(executeCaptureJob({ buildId }, options)).rejects.toThrow(/At most 3/u);
     });
   });
 

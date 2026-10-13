@@ -7,6 +7,13 @@
  * against any `CaptureQueue` backend.
  */
 export {
+  assertBrowserCount,
+  assertSupportedBrowsers,
+  MAX_BROWSERS,
+  parseBrowsers,
+  resolveBrowsers,
+} from "./browsers.ts";
+export {
   buildGlobalsParam,
   filterModes,
   MAX_MODES_PER_STORY,

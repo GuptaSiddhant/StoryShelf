@@ -10,6 +10,8 @@ export interface InheritedStory {
   story: StoryEntry;
   viewport: Viewport;
   baseline: Baseline;
+  /** Engine whose baseline is reused (chromium when absent). */
+  browser?: string;
 }
 
 /** Stories split into capture-now versus inherit-from-baseline sets. */
@@ -27,6 +29,8 @@ export interface PartitionInput {
   defaultBranch: string;
   stories: StoryEntry[];
   viewports: Viewport[];
+  /** Engine to resolve baselines for (default chromium). */
+  browser?: string;
   /** Affected import paths, or `null` to render everything. */
   affectedPaths: string[] | null;
 }
@@ -49,12 +53,18 @@ async function splitStory(
         viewport.name,
         input.branch,
         input.defaultBranch,
+        input.browser,
       ),
     })),
   );
   for (const { viewport, baseline } of settled) {
     if (baseline) {
-      inherited.push({ story, viewport, baseline });
+      inherited.push({
+        story,
+        viewport,
+        baseline,
+        ...(input.browser ? { browser: input.browser } : {}),
+      });
     } else if (!render.includes(story)) {
       render.push(story);
     }

@@ -2,7 +2,7 @@ import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { Badge, CompareStage, VStack, statusTone } from "../ui/components.tsx";
 import { viewerHead, viewerMeta, viewerTitle } from "../ui/styles/review-layout.ts";
-import { diffPercent, snapshotImageUrl } from "./build-diff-model.ts";
+import { diffPercent, snapshotImageUrl, snapshotVariant } from "./build-diff-model.ts";
 import { StaleSnapshotNotice } from "./build-diff-stale.tsx";
 import { LinkedUsage, type LinkedUsageItem } from "./build-diff-usage.tsx";
 
@@ -43,7 +43,7 @@ export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<
             {selected.status}
           </Badge>
           <span>
-            {selected.viewportName} · {selected.viewportWidth}×{selected.viewportHeight}
+            {snapshotVariant(selected)} · {selected.viewportWidth}×{selected.viewportHeight}
           </span>
           {selected.diffPixels === null || selected.diffPixels === undefined ? null : (
             <span class="mono">{selected.diffPixels} px</span>

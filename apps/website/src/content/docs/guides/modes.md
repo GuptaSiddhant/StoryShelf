@@ -51,3 +51,7 @@ A mode's baseline is keyed by the **slug of its name** (`Dark Desktop` → `dark
 - At most **8** captures per story (project viewports + default viewport + modes). A story over the cap fails the build before anything renders.
 - `modesAllowlist` on the project (a JSON list of mode names) restricts which declared modes run. Unset runs all of them.
 - The Playwright runner reads modes from the running preview, so project-level and component-level modes are picked up without any index parameters. The Puppeteer runner only sees parameters present in `index.json`.
+
+## Multiple browsers
+
+Modes combine with the project's `browsers` list: each story × mode is captured on every listed engine, one engine at a time, and each engine keeps its own baseline. Engines are never compared with each other.

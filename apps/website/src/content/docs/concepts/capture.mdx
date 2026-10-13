@@ -38,7 +38,7 @@ Two runners ship — switch with one import:
 | Playwright | `@storyshelf/runner-playwright` | `chromium` (default), `firefox`, `webkit`, `chrome` |
 | Puppeteer | `@storyshelf/runner-puppeteer` | `chromium`/`chrome` only, `chrome-headless-shell` — smaller image |
 
-Per-project engine lives in **Settings → General → Capture browser** or `PATCH /api/v1/projects/:slug { browser }`. Every snapshot records `infraHash = hash(browser + viewports + sizing defaults)` so baselines are browser-aware — switching browsers starts a fresh baseline.
+Per-project engine lives in **Settings → General → Capture browser** or `PATCH /api/v1/projects/:slug { browser }`. Set `browsers` (up to 3, primary first) to capture every build on each engine in turn; baselines, diffs and storage paths are kept per engine (`<mode>~<browser>` for non-Chromium). Every snapshot records `infraHash = hash(browser + viewport + sizing defaults)`. A newly added engine has no baselines yet, so its first snapshots are auto-accepted where the primary engine's snapshot of the same story and mode is clean, and queued for review as `new` otherwise.
 
 ## Viewports & sizing
 

@@ -16,9 +16,11 @@ import {
 } from "../ui/styles/review-layout.ts";
 import {
   diffPercent,
+  isVariantSnapshot,
   reviewProgress,
   snapshotImageUrl,
   snapshotPageUrl,
+  snapshotVariant,
 } from "./build-diff-model.ts";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
@@ -76,7 +78,10 @@ function FilmItem(props: {
         <span class={filmTitle} title={`${snap.storyTitle} / ${snap.storyName}`}>
           {snap.storyName}
         </span>
-        <span class={filmSub}>{snap.storyTitle}</span>
+        <span class={filmSub}>
+          {snap.storyTitle}
+          {isVariantSnapshot(snap) ? ` · ${snapshotVariant(snap)}` : ""}
+        </span>
         <span class={filmStatus}>
           <span class={statusDots[statusTone(snap.status)]} aria-hidden="true" />
           {snap.status}

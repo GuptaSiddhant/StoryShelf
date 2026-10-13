@@ -20,6 +20,10 @@ export const projectSchema = z
     playTimeoutMs: z.number(),
     // Stored rows predate enum validation, so the response stays a plain string.
     browser: z.string().optional(),
+    /** JSON array of engines to capture, primary first; null = just `browser`. */
+    browsers: z.string().nullable().optional(),
+    /** JSON array of mode names to capture; null = every declared mode. */
+    modesAllowlist: z.string().nullable().optional(),
     /** AI profile gate: null/absent = AI off for this project. */
     aiProfile: z.string().nullable().optional(),
     createdAt: z.string(),
@@ -51,7 +55,12 @@ export const projectUpdateSchema = z
     storybookMeta: storybookMetaSchema,
     executePlay: z.boolean().optional(),
     playTimeoutMs: z.number().int().min(1000).max(30_000).optional(),
+    /** Single engine; clears `browsers`. */
     browser: z.enum(BROWSER_NAMES).optional(),
+    /** Engines to capture, primary first (max 3); null returns to single `browser`. */
+    browsers: z.array(z.enum(BROWSER_NAMES)).min(1).max(3).nullable().optional(),
+    /** Mode names to capture; null runs every declared mode. */
+    modesAllowlist: z.array(z.string().min(1)).max(50).nullable().optional(),
     /** Site admins only: a configured AI profile name, or null to turn AI off. */
     aiProfile: z.string().min(1).nullable().optional(),
   })

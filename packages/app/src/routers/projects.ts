@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { modeSlug } from "@storyshelf/core/capture";
 import { LabelModel } from "@storyshelf/core/models";
 import { MemberModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
@@ -120,6 +121,41 @@ function assertAiProfileChange(c: Context, profile: string | null | undefined): 
   }
 }
 
+type ProjectUpdate = z.infer<typeof projectUpdateSchema>;
+
+/**
+ * Translate the API's array fields into the stored JSON columns and keep the
+ * legacy `browser` column equal to the primary engine.
+ */
+function toProjectPatch(body: ProjectUpdate): Record<string, unknown> {
+  const { browsers, modesAllowlist, ...rest } = body;
+  const patch: Record<string, unknown> = { ...rest };
+  if (browsers !== undefined) {
+    const unique = browsers === null ? null : [...new Set(browsers)];
+    patch["browsers"] = unique ? JSON.stringify(unique) : null;
+    if (unique?.[0]) patch["browser"] = unique[0];
+  } else if (rest.browser !== undefined) {
+    patch["browsers"] = null;
+  }
+  if (modesAllowlist !== undefined) {
+    patch["modesAllowlist"] = modesAllowlist
+      ? JSON.stringify(assertModeNames(modesAllowlist))
+      : null;
+  }
+  return patch;
+}
+
+function assertModeNames(names: string[]): string[] {
+  for (const name of names) {
+    try {
+      modeSlug(name);
+    } catch {
+      throw new HTTPException(400, { message: `Invalid mode name "${name}"` });
+    }
+  }
+  return [...new Set(names)];
+}
+
 /** Register the project list, create, fetch, update, and delete endpoints. */
 export function registerProjects(app: ShelfRouter): void {
   app.openapi(listProjectsRoute, async (c) => {
@@ -152,7 +188,7 @@ export function registerProjects(app: ShelfRouter): void {
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
     const body = c.req.valid("json");
     assertAiProfileChange(c, body.aiProfile);
-    const updated = await new ProjectModel(getStore().db).update(project.id, body);
+    const updated = await new ProjectModel(getStore().db).update(project.id, toProjectPatch(body));
     return c.json(updated);
   });
 

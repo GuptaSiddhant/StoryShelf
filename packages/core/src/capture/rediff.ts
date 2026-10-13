@@ -85,6 +85,7 @@ async function rediffSnapshot(
     row.viewportName,
     build.gitBranch,
     project.gitDefaultBranch,
+    row.browser,
   );
   const patch = baseline ? await diffPatch(deps, project, build, row, baseline) : noBaselinePatch();
   await new SnapshotModel(deps.db).update(row.id, patch);
@@ -116,7 +117,7 @@ async function diffPatch(
     baseline.screenshotPath,
     row.screenshotPath,
   );
-  const target = diffPath(project.id, build.id, row.storyId, row.viewportName);
+  const target = diffPath(project.id, build.id, row.storyId, row.viewportName, row.browser);
   const overlay = await writeDiffOverlay(deps.storage, target, result, result.passed);
   return {
     status: diffStatus(result.passed, false),

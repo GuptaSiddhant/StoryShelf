@@ -7,6 +7,7 @@ import {
   resolveLimits,
 } from "@storyshelf/core/insights";
 import { BuildModel, SnapshotModel } from "@storyshelf/core/models";
+import { modeSegment } from "@storyshelf/core/paths";
 import type { Build, Project } from "@storyshelf/core/schema";
 import type { InsightDeps } from "./deps.ts";
 
@@ -44,7 +45,7 @@ async function churnOf(
     const key = snapshotKey({
       title: snapshot.storyTitle,
       name: snapshot.storyName,
-      viewport: snapshot.viewportName,
+      viewport: modeSegment(snapshot.viewportName, snapshot.browser),
     });
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }

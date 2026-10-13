@@ -17,7 +17,14 @@ export { hmacSha256, randomToken, sha256, timingSafeEqualString } from "./hash.t
 export { HttpError } from "./http.ts";
 export type { HttpRequestOptions, HttpTextOptions } from "./http.ts";
 export { httpJson, httpText } from "./http.ts";
-export { baselinePath, diffPath, screenshotPath, storybookDir, storybookZipPath } from "./paths.ts";
+export {
+  baselinePath,
+  diffPath,
+  modeSegment,
+  screenshotPath,
+  storybookDir,
+  storybookZipPath,
+} from "./paths.ts";
 export { MIME_TYPES, mimeFor } from "./mime.ts";
 export { isBlockedTarget, isPathSafe, isSafeSegment } from "./path-security.ts";
 export { redactSecrets, sanitizeErrorText } from "./redact.ts";

@@ -13,6 +13,7 @@ import {
   CommentModel,
   SnapshotModel,
 } from "@storyshelf/core/models";
+import { modeSegment } from "@storyshelf/core/paths";
 import type { Build, CaptureLog, Project, Snapshot } from "@storyshelf/core/schema";
 import type { InsightDeps } from "./deps.ts";
 
@@ -56,7 +57,7 @@ function toEvidence(snapshot: Snapshot, logs: Map<string, string>): SnapshotEvid
     storyId: snapshot.storyId,
     title: snapshot.storyTitle,
     name: snapshot.storyName,
-    viewport: snapshot.viewportName,
+    viewport: modeSegment(snapshot.viewportName, snapshot.browser),
     status: snapshot.status,
     diffRatio: snapshot.diffRatio,
     inherited: snapshot.inherited,
@@ -107,7 +108,9 @@ export async function loadTriageEvidence(
   const limits = resolveLimits(deps.ai.limits());
   const snapshots = await new SnapshotModel(deps.db).listByBuild(build.id);
   const logs = await logsByStory(deps, build);
-  const rows = new Map(snapshots.map((s) => [`${s.storyId}@${s.viewportName}`, s]));
+  const rows = new Map(
+    snapshots.map((s) => [`${s.storyId}@${modeSegment(s.viewportName, s.browser)}`, s]),
+  );
   const items = await attachScreenshots(
     deps,
     rows,

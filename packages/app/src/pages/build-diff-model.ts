@@ -64,3 +64,14 @@ export function snapshotImageUrl(
 ): string {
   return `/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${snapshot.id}/${kind}`;
 }
+
+/** Mode and engine of a snapshot for labels: `dark`, `dark · firefox` (chromium is implicit). */
+export function snapshotVariant(snap: Pick<Snapshot, "viewportName" | "browser">): string {
+  const browser = snap.browser ?? "chromium";
+  return browser === "chromium" ? snap.viewportName : `${snap.viewportName} · ${browser}`;
+}
+
+/** Whether a snapshot differs from the plain desktop/chromium default (worth a filmstrip tag). */
+export function isVariantSnapshot(snap: Pick<Snapshot, "viewportName" | "browser">): boolean {
+  return snap.viewportName !== "desktop" || (snap.browser ?? "chromium") !== "chromium";
+}

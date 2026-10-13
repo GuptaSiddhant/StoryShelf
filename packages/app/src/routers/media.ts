@@ -59,6 +59,7 @@ export function registerMedia(app: ShelfRouter): void {
       snapshot.viewportName,
       build.gitBranch,
       project.gitDefaultBranch,
+      snapshot.browser,
     );
     if (!baseline) {
       notFound("No baseline for this snapshot");
