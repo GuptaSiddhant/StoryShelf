@@ -19,7 +19,7 @@ npm install @storyshelf/worker
 ```ts
 import { createCaptureWorker } from "@storyshelf/worker";
 
-const handle = createCaptureWorker({ /* database, storage, queue, runner */ });
+const handle = createCaptureWorker({/* database, storage, queue, runner */});
 ```
 
 See the [StoryShelf documentation](https://github.com/GuptaSiddhant/StoryShelf#readme) for configuration details.

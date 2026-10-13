@@ -1,6 +1,7 @@
 /** Snapshot records for captured stories within a build. */
 import { eq, getTableColumns } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
+import { DEFAULT_BROWSER } from "../adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { Snapshot } from "../schema/snapshot.ts";
 import type { SnapshotStatus } from "../types.ts";
@@ -51,6 +52,8 @@ export class SnapshotModel {
       inherited: input.inherited ?? false,
       baselineId: input.baselineId ?? null,
       baselineVersion: input.baselineVersion ?? null,
+      mode: input.mode ?? null,
+      browser: input.browser ?? DEFAULT_BROWSER,
       status: "pending",
       createdAt: now,
       updatedAt: now,
@@ -109,4 +112,8 @@ export interface SnapshotCreateInput {
   inherited?: boolean;
   baselineId?: string | null;
   baselineVersion?: string | null;
+  /** Resolved mode definition as JSON (display/capture only). */
+  mode?: string | null;
+  /** Engine the screenshot was captured with (default chromium). */
+  browser?: string;
 }

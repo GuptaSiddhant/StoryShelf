@@ -14,6 +14,10 @@ export interface Project {
   runA11y?: boolean;
   browser?: string;
   viewports?: string | null;
+  /** JSON list of browsers to capture (null: legacy single `browser`). */
+  browsers?: string | null;
+  /** JSON list of mode names to capture (null: all declared modes). */
+  modesAllowlist?: string | null;
   automigrate?: boolean;
   /** AI profile gate: null = AI off for this project; otherwise a profile name. */
   aiProfile?: string | null;

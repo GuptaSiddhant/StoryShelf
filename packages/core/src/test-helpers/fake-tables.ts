@@ -64,6 +64,8 @@ const projects = defineTable("projects", {
   runA11y: "run_a11y",
   browser: "browser",
   viewports: "viewports",
+  browsers: "browsers",
+  modesAllowlist: "modes_allowlist",
   automigrate: "automigrate",
   aiProfile: "ai_profile",
   createdAt: "created_at",
@@ -155,6 +157,8 @@ const snapshots = defineTable("snapshots", {
   inherited: "inherited",
   baselineId: "baseline_id",
   baselineVersion: "baseline_version",
+  mode: "mode",
+  browser: "browser",
   createdAt: "created_at",
   updatedAt: "updated_at",
 });
@@ -168,6 +172,8 @@ const baselines = defineTable("baselines", {
   snapshotId: "snapshot_id",
   screenshotPath: "screenshot_path",
   infraHash: "infra_hash",
+  mode: "mode",
+  browser: "browser",
   createdAt: "created_at",
   updatedAt: "updated_at",
 });

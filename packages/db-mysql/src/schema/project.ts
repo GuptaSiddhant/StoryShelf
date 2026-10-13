@@ -16,6 +16,8 @@ export const projects = mysqlTable("projects", {
   runA11y: boolean("run_a11y").notNull().default(false),
   browser: text("browser").notNull().default("chromium"),
   viewports: text("viewports"),
+  browsers: text("browsers"),
+  modesAllowlist: text("modes_allowlist"),
   automigrate: boolean("automigrate").notNull().default(false),
   aiProfile: text("ai_profile"),
   createdAt: datetime("created_at", { mode: "string", fsp: 3 }).notNull(),
@@ -38,6 +40,8 @@ export interface Project {
   runA11y?: boolean;
   browser?: string;
   viewports?: string | null;
+  browsers?: string | null;
+  modesAllowlist?: string | null;
   automigrate: boolean;
   aiProfile: string | null;
   createdAt: string;

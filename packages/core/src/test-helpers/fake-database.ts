@@ -1,3 +1,4 @@
+import { getTableName } from "drizzle-orm";
 import type { SQL, Table } from "drizzle-orm";
 import type { DatabaseAdapter, ListOptions, TxStore } from "../adapters/database.ts";
 import { clampListLimit } from "../adapters/database.ts";
@@ -9,6 +10,12 @@ function withoutUndefined(values: unknown): Record<string, unknown> {
     Object.entries(values as Record<string, unknown>).filter((pair) => pair[1] !== undefined),
   );
 }
+
+/** Column defaults real drivers apply on insert (the fake has no DDL). */
+const INSERT_DEFAULTS: Record<string, Record<string, unknown>> = {
+  snapshots: { browser: "chromium" },
+  baselines: { browser: "chromium" },
+};
 
 // The in-memory fake back-fills Drizzle's inferred row types from raw maps
 // Without a driver, so the casts and await-free `async` methods are unavoidable.
@@ -30,7 +37,7 @@ export function makeDatabase(): { db: DatabaseAdapter } {
     table: T,
     values: T["$inferInsert"],
   ): Promise<T["$inferSelect"]> => {
-    const row = withoutUndefined(values);
+    const row = { ...INSERT_DEFAULTS[getTableName(table)], ...withoutUndefined(values) };
     const key = (row["id"] ?? row["hash"]) as string;
     if (rowsOf(table).has(key)) {
       throw new Error(`UNIQUE constraint failed: duplicate key ${key}`);

@@ -15,14 +15,17 @@ export const baselines = mysqlTable(
     snapshotId: text("snapshot_id"),
     screenshotPath: text("screenshot_path").notNull(),
     infraHash: text("infra_hash"),
+    mode: text("mode"),
+    browser: text("browser").notNull().default("chromium"),
     createdAt: datetime("created_at", { mode: "string", fsp: 3 }).notNull(),
     updatedAt: datetime("updated_at", { mode: "string", fsp: 3 }).notNull(),
   },
   (t) => [
-    uniqueIndex("baselines_project_story_viewport_branch_idx").on(
+    uniqueIndex("baselines_project_story_mode_browser_branch_idx").on(
       t.projectId,
       t.storyId,
       t.viewportName,
+      t.browser,
       t.branch,
     ),
     index("baselines_project_story_idx").on(t.projectId, t.storyId),
@@ -39,6 +42,8 @@ export interface Baseline {
   snapshotId: string | null;
   screenshotPath: string;
   infraHash: string | null;
+  mode?: string | null;
+  browser?: string;
   createdAt: string;
   updatedAt: string;
 }

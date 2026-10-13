@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { baselinePath, screenshotPath } from "./paths.ts";
+import { baselinePath, diffPath, modeSegment, screenshotPath } from "./paths.ts";
 
 describe("storage path builders", () => {
   it("builds screenshot paths", () => {
@@ -18,5 +18,19 @@ describe("storage path builders", () => {
     expect(baselinePath("p1", "feature/foo", "a", "desktop")).toBe(
       "p1/baselines/feature/foo/a/desktop.png",
     );
+  });
+});
+
+describe("browser-aware paths", () => {
+  it("keeps chromium paths legacy-compatible and suffixes other engines", () => {
+    expect(modeSegment("dark")).toBe("dark");
+    expect(modeSegment("dark", "chromium")).toBe("dark");
+    expect(modeSegment("dark", "firefox")).toBe("dark~firefox");
+    expect(screenshotPath("p", "b", "s", "dark", "webkit")).toBe(
+      "p/builds/b/screenshots/s/dark~webkit.png",
+    );
+    expect(diffPath("p", "b", "s", "dark", "firefox")).toBe("p/builds/b/diffs/s/dark~firefox.png");
+    expect(baselinePath("p", "main", "s", "dark")).toBe("p/baselines/main/s/dark.png");
+    expect(() => baselinePath("p", "main", "s", "dark", "../x")).toThrow(/Unsafe/u);
   });
 });

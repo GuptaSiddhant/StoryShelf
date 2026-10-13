@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS projects (
   run_a11y INTEGER NOT NULL DEFAULT 0,
   browser TEXT NOT NULL DEFAULT 'chromium',
   viewports TEXT,
+  browsers TEXT,
+  modes_allowlist TEXT,
   automigrate INTEGER NOT NULL DEFAULT 0,
   ai_profile TEXT,
   created_at TEXT NOT NULL,
@@ -106,10 +108,12 @@ CREATE TABLE IF NOT EXISTS snapshots (
   inherited INTEGER NOT NULL DEFAULT 0,
   baseline_id TEXT,
   baseline_version TEXT,
+  mode TEXT,
+  browser TEXT NOT NULL DEFAULT 'chromium',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS snapshots_build_story_viewport_idx ON snapshots (build_id, story_id, viewport_name);
+CREATE UNIQUE INDEX IF NOT EXISTS snapshots_build_story_mode_browser_idx ON snapshots (build_id, story_id, viewport_name, browser);
 CREATE INDEX IF NOT EXISTS snapshots_build_id_idx ON snapshots (build_id);
 CREATE TABLE IF NOT EXISTS baselines (
   id TEXT PRIMARY KEY,
@@ -120,10 +124,12 @@ CREATE TABLE IF NOT EXISTS baselines (
   snapshot_id TEXT,
   screenshot_path TEXT NOT NULL,
   infra_hash TEXT,
+  mode TEXT,
+  browser TEXT NOT NULL DEFAULT 'chromium',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS baselines_project_story_viewport_branch_idx ON baselines (project_id, story_id, viewport_name, branch);
+CREATE UNIQUE INDEX IF NOT EXISTS baselines_project_story_mode_browser_branch_idx ON baselines (project_id, story_id, viewport_name, browser, branch);
 CREATE INDEX IF NOT EXISTS baselines_project_story_idx ON baselines (project_id, story_id);
 CREATE TABLE IF NOT EXISTS comments (
   id TEXT PRIMARY KEY,

@@ -54,6 +54,9 @@ export type BrowserName = "chromium" | "firefox" | "webkit" | "chrome";
 /** Browser names accepted for capture rendering (Chromium default). */
 export const BROWSER_NAMES = ["chromium", "firefox", "webkit", "chrome"] as const;
 
+/** Engine that legacy rows and single-browser projects belong to. */
+export const DEFAULT_BROWSER: BrowserName = "chromium";
+
 export interface CaptureRunner extends Adapter<{
   readonly category: "capture-runner";
   readonly supportedBrowsers?: readonly BrowserName[];

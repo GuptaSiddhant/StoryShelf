@@ -131,6 +131,7 @@ describe("createSqliteDatabase", () => {
         story_name TEXT NOT NULL,
         story_title TEXT NOT NULL,
         viewport_name TEXT NOT NULL DEFAULT 'desktop',
+        browser TEXT NOT NULL DEFAULT 'chromium',
         screenshot_path TEXT NOT NULL,
         status TEXT NOT NULL DEFAULT 'pending',
         created_at TEXT NOT NULL,

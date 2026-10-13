@@ -10,15 +10,25 @@ function assertSegments(segments: string[]): void {
     throw new Error(`Unsafe storage path segment: ${bad.join(",")}`);
   }
 }
+/**
+ * Path segment for a mode on a given engine. Chromium keeps the bare mode key
+ * so pre-multi-browser objects stay addressable; other engines get `~browser`.
+ */
+export function modeSegment(viewport: string, browser?: string): string {
+  return browser && browser !== "chromium" ? `${viewport}~${browser}` : viewport;
+}
+
 /** Storage path for a captured snapshot screenshot. */
 export function screenshotPath(
   projectId: string,
   buildId: string,
   storyId: string,
   viewport: string,
+  browser?: string,
 ): string {
-  assertSegments([projectId, buildId, storyId, viewport]);
-  return `${projectId}/builds/${buildId}/screenshots/${storyId}/${viewport}.png`;
+  const segment = modeSegment(viewport, browser);
+  assertSegments([projectId, buildId, storyId, segment]);
+  return `${projectId}/builds/${buildId}/screenshots/${storyId}/${segment}.png`;
 }
 
 /** Storage path for a snapshot diff overlay image. */
@@ -27,9 +37,11 @@ export function diffPath(
   buildId: string,
   storyId: string,
   viewport: string,
+  browser?: string,
 ): string {
-  assertSegments([projectId, buildId, storyId, viewport]);
-  return `${projectId}/builds/${buildId}/diffs/${storyId}/${viewport}.png`;
+  const segment = modeSegment(viewport, browser);
+  assertSegments([projectId, buildId, storyId, segment]);
+  return `${projectId}/builds/${buildId}/diffs/${storyId}/${segment}.png`;
 }
 
 /** Storage path for a branch baseline screenshot. */
@@ -38,9 +50,11 @@ export function baselinePath(
   branch: string,
   storyId: string,
   viewport: string,
+  browser?: string,
 ): string {
-  assertSegments([projectId, branch, storyId, viewport]);
-  return `${projectId}/baselines/${branch}/${storyId}/${viewport}.png`;
+  const segment = modeSegment(viewport, browser);
+  assertSegments([projectId, branch, storyId, segment]);
+  return `${projectId}/baselines/${branch}/${storyId}/${segment}.png`;
 }
 
 /** Storage prefix for an extracted published Storybook. */
