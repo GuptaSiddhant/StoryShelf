@@ -173,6 +173,7 @@ This distinction matters for:
 | 0025 | UI Redesign (neutral shell, derived brand tokens, icon sprite, review workspace) |
 | 0026 | AI Epic (`@storyshelf/ai` singleton on Vercel AI SDK, insights first) |
 | 0027 | MCP Server (`@storyshelf/mcp`, thin client over `/api/v1`, stdio + HTTP, read + comment only) |
+| 0028 | Modes and Multi-Browser Capture (named modes from parameters, per-engine baselines, shared approval) |
 
 ## Parallel Development with Worktrees
 

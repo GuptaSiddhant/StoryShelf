@@ -32,6 +32,7 @@ import { registerAdminPages } from "./routers/admin-pages.ts";
 import { registerAdmin } from "./routers/admin.ts";
 import { registerAssets } from "./routers/assets.ts";
 import { registerEngineAuth } from "./routers/auth.ts";
+import { registerBaselines } from "./routers/baselines.ts";
 import { registerBuilds } from "./routers/builds.ts";
 import { registerHealth, type HealthDeps } from "./routers/health.ts";
 import { registerInsightFragments } from "./routers/insights-ui.tsx";
@@ -257,6 +258,7 @@ function registerProjectRoutes(app: ShelfRouter): void {
   registerBuilds(app);
   registerLabels(app);
   registerLinks(app);
+  registerBaselines(app);
   registerMedia(app);
   registerMembers(app);
   registerTokens(app);
@@ -329,6 +331,7 @@ function registerDocs(app: ShelfRouter): void {
         description:
           "Link packages to the projects that publish them and see where stories use them.",
       },
+      { name: "Baselines", description: "Export and import baselines as a portable zip." },
       {
         name: "Members",
         description: "Project members, roles, and identity-provider group mappings.",

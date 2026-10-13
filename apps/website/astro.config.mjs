@@ -118,6 +118,7 @@ export default defineConfig({
               collapsed: true,
               items: [
                 { label: "Project settings", slug: "guides/project-settings" },
+                { label: "Baseline portability", slug: "guides/portability" },
                 { label: "Configuration", slug: "guides/config" },
                 { label: "CLI overview", slug: "guides/cli" },
                 { label: "CLI client", slug: "guides/cli/client" },
@@ -153,11 +154,12 @@ export default defineConfig({
               ],
             },
             {
-              label: "Coming from Chromatic",
+              label: "Coming from other tools",
               collapsed: true,
               items: [
                 { label: "Comparison", slug: "guides/chromatic-comparison" },
                 { label: "Migration", slug: "guides/chromatic-migration" },
+                { label: "Lost Pixel migration", slug: "guides/lost-pixel-migration" },
               ],
             },
           ],

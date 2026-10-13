@@ -21,12 +21,14 @@ import {
   snapshotSchema,
   okSchema,
   approveAllResultSchema,
+  groupDecisionResultSchema,
   rediffResultSchema,
   baselineChangedSchema,
   errorSchema,
   notFound,
   unauthorized,
 } from "./schemas.ts";
+import { approveGroup, rejectGroup, splitByDrift } from "./snapshot-groups.ts";
 const listSnapshotsRoute = createRoute({
   method: "get",
   tags: ["Review"],
@@ -94,6 +96,52 @@ const approveAllRoute = createRoute({
     200: {
       content: { "application/json": { schema: approveAllResultSchema } },
       description: "Open snapshots approved; snapshots with a changed baseline are skipped",
+    },
+    ...notFound,
+  },
+});
+
+const groupParams = z.object({
+  slug: z.string(),
+  buildId: z.string(),
+  storyId: z.string(),
+  modeKey: z.string(),
+});
+
+const approveGroupRoute = createRoute({
+  method: "post",
+  tags: ["Review"],
+  summary: "Approve a story/mode across all browsers",
+  path: "/api/v1/projects/{slug}/builds/{buildId}/stories/{storyId}/modes/{modeKey}/approve",
+  request: {
+    params: groupParams,
+    query: z.object({ force: z.enum(["true", "false"]).optional() }),
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: groupDecisionResultSchema } },
+      description:
+        "Every open snapshot of the story and mode approved and each engine's baseline promoted",
+    },
+    409: {
+      content: { "application/json": { schema: baselineChangedSchema } },
+      description:
+        "A member's baseline changed after its diff; nothing was approved. Re-diff or pass force=true",
+    },
+    ...notFound,
+  },
+});
+
+const rejectGroupRoute = createRoute({
+  method: "post",
+  tags: ["Review"],
+  summary: "Reject a story/mode across all browsers",
+  path: "/api/v1/projects/{slug}/builds/{buildId}/stories/{storyId}/modes/{modeKey}/reject",
+  request: { params: groupParams },
+  responses: {
+    200: {
+      content: { "application/json": { schema: groupDecisionResultSchema } },
+      description: "Every open snapshot of the story and mode rejected",
     },
     ...notFound,
   },
@@ -190,15 +238,53 @@ export function registerSnapshots(app: ShelfRouter): void {
     const userId = getStore().user?.id ?? null;
     const forced = force === "true";
     const drifted = forced ? new Map() : await findDriftedSnapshots(project, build, snapshots);
-    await Promise.all(
-      snapshots
-        .filter((snapshot) => isOpenSnapshot(snapshot) && !drifted.has(snapshot.id))
-        .map(async (snapshot) => {
-          await approveSnapshot(snapshot.id, userId, { force: forced });
-        }),
+    // A story/mode is approved on every engine or on none: one drifted member skips its group.
+    const { approvable, skipped } = splitByDrift(
+      snapshots.filter((snapshot) => isOpenSnapshot(snapshot)),
+      drifted,
     );
+    await Promise.all(
+      approvable.map(async (snapshot) => {
+        await approveSnapshot(snapshot.id, userId, { force: forced, deferRefresh: true });
+      }),
+    );
+    await refreshBuild(build.id);
     hxRefresh(c);
-    return c.json({ ok: true, skipped: [...drifted.keys()] });
+    return c.json({ ok: true, skipped: skipped.map((snapshot) => snapshot.id) });
+  });
+
+  app.openapi(approveGroupRoute, async (c) => {
+    const { slug, buildId, storyId, modeKey } = c.req.valid("param");
+    const { force } = c.req.valid("query");
+    const project = await resolveAuthorizedProject(c, slug, ...APPROVER_ROLES);
+    const build = await buildForProject(project.id, buildId);
+    const userId = getStore().user?.id ?? null;
+    let snapshotIds: string[];
+    try {
+      snapshotIds = await approveGroup(project, build, { storyId, modeKey }, userId, {
+        force: force === "true",
+      });
+    } catch (error) {
+      if (!isHxRequest(c) || !isBaselineChanged(error)) {
+        throw error;
+      }
+      c.header("HX-Redirect", `/projects/${slug}/builds/${buildId}/diff`);
+      return c.json({ ok: true, snapshotIds: [] }, 200);
+    }
+    const first = snapshotIds[0];
+    if (first) await hxAdvance(c, { slug, buildId, snapshotId: first });
+    return c.json({ ok: true, snapshotIds }, 200);
+  });
+
+  app.openapi(rejectGroupRoute, async (c) => {
+    const { slug, buildId, storyId, modeKey } = c.req.valid("param");
+    const project = await resolveAuthorizedProject(c, slug, ...APPROVER_ROLES);
+    const build = await buildForProject(project.id, buildId);
+    const userId = getStore().user?.id ?? null;
+    const snapshotIds = await rejectGroup(build, { storyId, modeKey }, userId);
+    const first = snapshotIds[0];
+    if (first) await hxAdvance(c, { slug, buildId, snapshotId: first });
+    return c.json({ ok: true, snapshotIds }, 200);
   });
 
   app.openapi(rediffRoute, async (c) => {

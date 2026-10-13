@@ -8,7 +8,7 @@ import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
  */
 import { Database } from "bun:sqlite";
 import { drizzle } from "drizzle-orm/bun-sqlite";
-import { DDL, tableColumns } from "./ddl.ts";
+import { DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
 import { createDrizzleAdapter, withManualTransactions } from "./drizzle-factory.ts";
 import { ensureDbDir } from "./ensure-db-dir.ts";
 import { schema } from "./schema/index.ts";
@@ -151,10 +151,18 @@ function ensureColumns(client: Database, ddl: string): void {
   }
 }
 
+/** Swap in the browser-aware unique indexes (after `ensureColumns` added the column). */
+function applyIdentityStatements(client: Database): void {
+  for (const statement of IDENTITY_STATEMENTS) {
+    execIgnore(client, statement);
+  }
+}
+
 function runMigrations(client: Database): void {
   client.exec("PRAGMA foreign_keys = ON");
   client.exec(DDL);
   ensureColumns(client, DDL);
+  applyIdentityStatements(client);
   try {
     client.exec(WEBHOOK_SECRET_DROP);
   } catch {

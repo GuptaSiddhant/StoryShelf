@@ -9,7 +9,7 @@
 import { createClient } from "@libsql/client";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { drizzle } from "drizzle-orm/libsql";
-import { DDL, tableColumns } from "./ddl.ts";
+import { DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
 import { createDrizzleAdapter } from "./drizzle-factory.ts";
 import { schema } from "./schema/index.ts";
 
@@ -105,6 +105,10 @@ const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN secret";
 async function runMigrations(client: LibsqlClient): Promise<void> {
   await client.executeMultiple(DDL);
   await ensureColumns(client, DDL);
+  for (const statement of IDENTITY_STATEMENTS) {
+    // oxlint-disable-next-line no-await-in-loop -- ordered: drop old indexes, then create new
+    await execIgnore(client, statement);
+  }
   await execIgnore(client, WEBHOOK_SECRET_DROP);
   await migrateCommentsTable(client);
 }

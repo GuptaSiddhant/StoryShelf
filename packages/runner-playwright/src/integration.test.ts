@@ -10,6 +10,7 @@ import { execFile, type ExecException } from "node:child_process";
 import { access, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { inflateSync } from "node:zlib";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createPlaywrightCaptureRunner } from "./capture-runner.ts";
 
@@ -180,6 +181,26 @@ async function createHarness(): Promise<void> {
   harness = { app, db, storage, staticDir, tmp };
 }
 
+/**
+ * Brightness (0–255) of a PNG's first pixel. The first scanline has no row
+ * above, so every PNG filter reduces to the raw bytes for pixel 0.
+ */
+function firstPixelBrightness(png: Buffer): number {
+  const colorType = png[25];
+  const bytesPerPixel = colorType === 6 ? 4 : 3;
+  const idat: Buffer[] = [];
+  for (let offset = 8; offset < png.length;) {
+    const length = png.readUInt32BE(offset);
+    if (png.toString("ascii", offset + 4, offset + 8) === "IDAT") {
+      idat.push(png.subarray(offset + 8, offset + 8 + length));
+    }
+    offset += 12 + length;
+  }
+  const raw = inflateSync(Buffer.concat(idat));
+  const [red = 0, green = 0, blue = 0] = raw.subarray(1, 1 + bytesPerPixel);
+  return (red + green + blue) / 3;
+}
+
 const isOldestFixture = FIXTURE_DIR.endsWith("storybook-8");
 
 describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smoke", () => {
@@ -303,7 +324,8 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
       expect(final.status).toBe("failed");
       // Disabled story is not counted
       expect(final.snapshotCount).toBeGreaterThan(0);
-      expect(final.snapshotCount).toBeLessThan(8);
+      // 7 plain captures + 5 from the Themed modes stories; the disabled story adds none.
+      expect(final.snapshotCount).toBeLessThan(13);
 
       const snapshots = await (async (): Promise<Snapshot[]> => {
         const res = await app.request(
@@ -318,4 +340,152 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
     },
     300_000,
   );
+
+  it("modes: theme globals produce distinct, correctly sized captures", async () => {
+    const { app, storage, staticDir } = getHarness();
+    const projectResponse = await app.request("/api/v1/projects", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Modes Smoke" }),
+    });
+    const project = await readJson<{ id: string; slug: string }>(projectResponse);
+    const uploaded = await uploadBuild(app, project.slug, staticDir, {
+      gitSha: "c".repeat(40),
+      gitBranch: "feature/modes",
+      message: "modes smoke",
+    });
+    const build = await waitForBuild(app, project.slug, uploaded.id, ["reviewing"]);
+    const snapshots = await readJson<Snapshot[]>(
+      await app.request(`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots`),
+    );
+    const modesOf = (storyId: string): Snapshot[] =>
+      snapshots.filter((snapshot) => snapshot.storyId === storyId);
+
+    // `storyshelf` key: the plain desktop capture plus a light and a dark mode.
+    const surface = modesOf("components-themed--surface");
+    expect(surface.map((snapshot) => snapshot.viewportName).toSorted()).toEqual([
+      "dark",
+      "desktop",
+      "light",
+    ]);
+    const dark = surface.find((snapshot) => snapshot.viewportName === "dark");
+    const light = surface.find((snapshot) => snapshot.viewportName === "light");
+    expect(dark?.mode).toBe('{"theme":"dark"}');
+    const read = async (snapshot: Snapshot | undefined): Promise<Buffer> =>
+      await storage.read(
+        screenshotPath(project.id, build.id, snapshot?.storyId ?? "", snapshot?.viewportName ?? ""),
+      );
+    expect(firstPixelBrightness(await read(dark))).toBeLessThan(40);
+    expect(firstPixelBrightness(await read(light))).toBeGreaterThan(215);
+
+    // `chromatic` key alias: a named dark mode at the mobile1 viewport width.
+    const alias = modesOf("components-themed--chromatic-alias");
+    expect(alias.map((snapshot) => snapshot.viewportName).toSorted()).toEqual([
+      "dark-mobile",
+      "desktop",
+    ]);
+    expect(alias.find((snapshot) => snapshot.viewportName === "dark-mobile")).toMatchObject({
+      viewportWidth: 320,
+      mode: '{"theme":"dark"}',
+    });
+
+    // Group approval covers the story/mode; the rest of the build stays open.
+    const approve = await app.request(
+      `/api/v1/projects/${project.slug}/builds/${build.id}/stories/components-themed--surface/modes/dark/approve`,
+      { method: "POST" },
+    );
+    expect(approve.status).toBe(200);
+  }, 300_000);
+
+  it("browsers: per-engine snapshots, shared approval and stable re-capture", async () => {
+    const { app, storage, staticDir } = getHarness();
+    const created = await app.request("/api/v1/projects", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Browsers Smoke" }),
+    });
+    const project = await readJson<{ id: string; slug: string }>(created);
+    const patched = await app.request(`/api/v1/projects/${project.slug}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ browsers: ["chromium", "firefox"] }),
+    });
+    expect(patched.status).toBe(200);
+
+    const snapshotsFor = async (buildId: string): Promise<Snapshot[]> =>
+      await readJson<Snapshot[]>(
+        await app.request(`/api/v1/projects/${project.slug}/builds/${buildId}/snapshots`),
+      );
+
+    const first = await waitForBuild(
+      app,
+      project.slug,
+      (
+        await uploadBuild(app, project.slug, staticDir, {
+          gitSha: "d".repeat(40),
+          gitBranch: "feature/browsers",
+          message: "two engines",
+        })
+      ).id,
+      ["reviewing"],
+    );
+    const snapshots = await snapshotsFor(first.id);
+    const engines = (key: string): string[] =>
+      snapshots
+        .filter((snapshot) => `${snapshot.storyId}/${snapshot.viewportName}` === key)
+        .map((snapshot) => snapshot.browser ?? "")
+        .toSorted();
+    expect(engines("components-button--primary/desktop")).toEqual(["chromium", "firefox"]);
+    expect(engines("components-themed--surface/dark")).toEqual(["chromium", "firefox"]);
+    const firefox = snapshots.find(
+      (snapshot) =>
+        snapshot.browser === "firefox" && snapshot.storyId === "components-button--primary",
+    );
+    expect(
+      (
+        await storage.read(
+          screenshotPath(project.id, first.id, "components-button--primary", "desktop", "firefox"),
+        )
+      ).length,
+    ).toBeGreaterThan(0);
+    expect(firefox?.screenshotPath).toContain("desktop~firefox");
+
+    // One approval covers the story/mode on both engines and promotes both baselines.
+    const group = await app.request(
+      `/api/v1/projects/${project.slug}/builds/${first.id}/stories/components-button--primary/modes/desktop/approve`,
+      { method: "POST" },
+    );
+    expect(group.status).toBe(200);
+    const afterGroup = await snapshotsFor(first.id);
+    expect(
+      afterGroup
+        .filter((snapshot) => snapshot.storyId === "components-button--primary")
+        .map((snapshot) => snapshot.status),
+    ).toEqual(["approved", "approved"]);
+
+    await app.request(`/api/v1/projects/${project.slug}/builds/${first.id}/approve-all`, {
+      method: "POST",
+    });
+    const approved = await readJson<Build>(
+      await app.request(`/api/v1/projects/${project.slug}/builds/${first.id}`),
+    );
+    expect(approved.status).toBe("approved");
+
+    // A new commit re-captures on both engines and matches each engine's own baseline.
+    const second = await waitForBuild(
+      app,
+      project.slug,
+      (
+        await uploadBuild(app, project.slug, staticDir, {
+          gitSha: "e".repeat(40),
+          gitBranch: "feature/browsers",
+          message: "re-capture",
+        })
+      ).id,
+      ["approved"],
+    );
+    const rechecked = await snapshotsFor(second.id);
+    expect(rechecked.length).toBe(snapshots.length);
+    expect(new Set(rechecked.map((snapshot) => snapshot.status))).toEqual(new Set(["unchanged"]));
+  }, 600_000);
 });

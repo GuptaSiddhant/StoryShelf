@@ -54,12 +54,39 @@ const BUILDS_GITSHA_DEDUP = "DROP INDEX IF EXISTS builds_project_gitsha_idx";
 const BUILDS_GITSHA_INDEX =
   "CREATE INDEX IF NOT EXISTS builds_project_gitsha_idx ON builds (project_id, git_sha)";
 
+const PROJECT_BROWSERS_ALTER = "ALTER TABLE projects ADD COLUMN IF NOT EXISTS browsers TEXT";
+const PROJECT_MODES_ALLOWLIST_ALTER =
+  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS modes_allowlist TEXT";
+const SNAPSHOT_MODE_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS mode TEXT";
+const SNAPSHOT_BROWSER_ALTER =
+  "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS browser TEXT NOT NULL DEFAULT 'chromium'";
+const BASELINE_MODE_ALTER = "ALTER TABLE baselines ADD COLUMN IF NOT EXISTS mode TEXT";
+const BASELINE_BROWSER_ALTER =
+  "ALTER TABLE baselines ADD COLUMN IF NOT EXISTS browser TEXT NOT NULL DEFAULT 'chromium'";
+/** Swap the viewport-only unique indexes for the browser-aware ones (rows default to chromium). */
+const IDENTITY_STATEMENTS = [
+  "DROP INDEX IF EXISTS snapshots_build_story_viewport_idx",
+  "DROP INDEX IF EXISTS baselines_project_story_viewport_branch_idx",
+  "CREATE UNIQUE INDEX IF NOT EXISTS snapshots_build_story_mode_browser_idx ON snapshots (build_id, story_id, viewport_name, browser)",
+  "CREATE UNIQUE INDEX IF NOT EXISTS baselines_project_story_mode_browser_branch_idx ON baselines (project_id, story_id, viewport_name, browser, branch)",
+];
+
 async function migrateSnapshotColumns(run: MigrationRunner): Promise<void> {
   await execIgnore(run, SNAPSHOT_INFRA_HASH_ALTER);
   await execIgnore(run, SNAPSHOT_INHERITED_ALTER);
   await execIgnore(run, SNAPSHOT_BASELINE_ID_ALTER);
   await execIgnore(run, SNAPSHOT_BASELINE_VERSION_ALTER);
   await execIgnore(run, SNAPSHOT_DESIGN_URL_ALTER);
+  await migrateCaptureIdentityColumns(run);
+}
+
+async function migrateCaptureIdentityColumns(run: MigrationRunner): Promise<void> {
+  await execIgnore(run, SNAPSHOT_MODE_ALTER);
+  await execIgnore(run, SNAPSHOT_BROWSER_ALTER);
+  await execIgnore(run, BASELINE_MODE_ALTER);
+  await execIgnore(run, BASELINE_BROWSER_ALTER);
+  await execIgnore(run, PROJECT_BROWSERS_ALTER);
+  await execIgnore(run, PROJECT_MODES_ALLOWLIST_ALTER);
 }
 
 async function migrateProjectExtras(run: MigrationRunner): Promise<void> {
@@ -80,6 +107,7 @@ export async function runMigrations(run: MigrationRunner): Promise<void> {
   await run(DDL);
   await migrateCoreColumns(run);
   await migrateProjectExtras(run);
+  await applyIdentityStatements(run);
   await migrateCommentsTable(run);
 }
 
@@ -94,6 +122,13 @@ async function migrateCoreColumns(run: MigrationRunner): Promise<void> {
   await execIgnore(run, MEMBER_SOURCE_ALTER);
   await execIgnore(run, BUILDS_GITSHA_DEDUP);
   await execIgnore(run, BUILDS_GITSHA_INDEX);
+}
+
+async function applyIdentityStatements(run: MigrationRunner): Promise<void> {
+  for (const statement of IDENTITY_STATEMENTS) {
+    // oxlint-disable-next-line no-await-in-loop -- ordered: drop old indexes, then create new
+    await execIgnore(run, statement);
+  }
 }
 
 async function execIgnore(run: MigrationRunner, sql: string): Promise<void> {

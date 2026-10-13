@@ -382,6 +382,11 @@ export const approveAllResultSchema = z
   .object({ ok: z.boolean(), skipped: z.array(z.string()) })
   .openapi("ApproveAllResult");
 
+/** Group decision result: the snapshots one story/mode decision covered. */
+export const groupDecisionResultSchema = z
+  .object({ ok: z.boolean(), snapshotIds: z.array(z.string()) })
+  .openapi("GroupDecisionResult");
+
 /** Result of re-diffing a build against the baselines that apply now. */
 export const rediffResultSchema = z
   .object({

@@ -114,7 +114,6 @@ CREATE TABLE IF NOT EXISTS snapshots (
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS snapshots_build_story_mode_browser_idx ON snapshots (build_id, story_id, viewport_name, browser);
 CREATE INDEX IF NOT EXISTS snapshots_build_id_idx ON snapshots (build_id);
 CREATE TABLE IF NOT EXISTS baselines (
   id TEXT PRIMARY KEY,
@@ -130,7 +129,6 @@ CREATE TABLE IF NOT EXISTS baselines (
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS baselines_project_story_mode_browser_branch_idx ON baselines (project_id, story_id, viewport_name, browser, branch);
 CREATE INDEX IF NOT EXISTS baselines_project_story_idx ON baselines (project_id, story_id);
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,

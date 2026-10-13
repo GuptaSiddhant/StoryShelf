@@ -1,8 +1,13 @@
 import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge, CompareStage, VStack, statusTone } from "../ui/components.tsx";
+import { Badge, CompareStage, Segmented, VStack, statusTone } from "../ui/components.tsx";
 import { viewerHead, viewerMeta, viewerTitle } from "../ui/styles/review-layout.ts";
-import { diffPercent, snapshotImageUrl, snapshotVariant } from "./build-diff-model.ts";
+import {
+  diffPercent,
+  snapshotImageUrl,
+  snapshotPageUrl,
+  snapshotVariant,
+} from "./build-diff-model.ts";
 import { StaleSnapshotNotice } from "./build-diff-stale.tsx";
 import { LinkedUsage, type LinkedUsageItem } from "./build-diff-usage.tsx";
 import { DesignStrip, type DesignItem } from "./design-links.tsx";
@@ -14,6 +19,8 @@ export interface DiffViewerProps {
   project: Project;
   build: Build;
   selected: Snapshot;
+  /** The selected story/mode's snapshots on every engine (browser tabs when more than one). */
+  siblings?: Snapshot[];
   hasBaseline: Record<string, boolean>;
   /** Set when the baseline changed after this snapshot's diff was computed. */
   drifted?: "stale" | "removed";
@@ -31,10 +38,34 @@ function diffEmptyText(status: string): string {
     : "No diff yet";
 }
 
+/** Browser tabs (one link per engine) when the story/mode was captured on several. */
+function BrowserTabs(props: {
+  project: Project;
+  build: Build;
+  selected: Snapshot;
+  siblings: Snapshot[];
+}): HtmlEscapedString | Promise<HtmlEscapedString> | null {
+  const { project, build, selected, siblings } = props;
+  if (siblings.length < 2) return null;
+  return (
+    <Segmented
+      label="Browser"
+      data-browser-tabs
+      items={siblings.map((snap) => ({
+        label: `${snap.browser ?? "chromium"} · ${snap.status}`,
+        value: snap.id,
+        href: snapshotPageUrl(project, build, snap.id),
+        active: snap.id === selected.id,
+      }))}
+    />
+  );
+}
+
 /** Story heading plus the comparison stage for the selected snapshot. */
 export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, selected, hasBaseline, drifted, usage, design, publishedBaseDomain } =
     props;
+  const siblings = props.siblings ?? [selected];
   const percent = diffPercent(selected);
   return (
     <VStack>
@@ -55,6 +86,7 @@ export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<
           {percent ? <span class="mono">{percent}</span> : null}
         </p>
       </div>
+      <BrowserTabs project={project} build={build} selected={selected} siblings={siblings} />
       {drifted ? <StaleSnapshotNotice status={drifted} /> : null}
       {usage && usage.length > 0 ? (
         <LinkedUsage usage={usage} publishedBaseDomain={publishedBaseDomain} />
