@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DatabaseAdapter } from "../adapters/database.ts";
+import { PackageUsageModel } from "../models/usage.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { Retention } from "./purge.ts";
 
@@ -74,6 +75,15 @@ describe("Retention", () => {
       updatedAt: recentDate,
     });
 
+    const usage = new PackageUsageModel(db);
+    const usageRow = {
+      storyImportPath: "src/Card.stories.tsx",
+      packageName: "@acme/ds",
+      modulePath: "node_modules/@acme/ds/dist/Button.js",
+    };
+    await usage.replaceForBuild("p1", "b-old", [usageRow]);
+    await usage.replaceForBuild("p1", "b-recent", [usageRow]);
+
     const retention = new Retention(db, storage, retentionTables(db));
     const result = await retention.purge(project, { ttlDays: 30, keepLatestPerBranch: false });
 
@@ -82,6 +92,9 @@ describe("Retention", () => {
     const remaining = await db.list(db.tables.builds);
     expect(remaining.length).toBe(1);
     expect(remaining[0]?.id).toBe("b-recent");
+    // Usage rows go with the build explicitly (the fake has no FK cascade)
+    expect(await usage.listForBuild("b-old")).toEqual([]);
+    expect(await usage.listForBuild("b-recent")).toHaveLength(1);
   });
 
   it("purges stale baseline branches via TTL", async () => {

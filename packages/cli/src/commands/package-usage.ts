@@ -56,15 +56,26 @@ function installedDir(cwd: string, name: string): string | null {
   }
 }
 
+/** Parse an installed `package.json`; null when unreadable or corrupt (never throws). */
+async function readManifest(path: string): Promise<{ version?: unknown } | null> {
+  try {
+    const parsed: unknown = JSON.parse(await readFile(path, "utf8"));
+    return typeof parsed === "object" && parsed !== null ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Installed version and, for workspace links, the real source directory. */
 async function resolvePackage(cwd: string, name: string): Promise<ResolvedPackage> {
   const dir = installedDir(cwd, name);
   if (dir === null) {
     return { tracked: {}, version: null };
   }
-  const manifest = JSON.parse(await readFile(join(dir, "package.json"), "utf8")) as {
-    version?: unknown;
-  };
+  const manifest = await readManifest(join(dir, "package.json"));
+  if (manifest === null) {
+    return { tracked: {}, version: null };
+  }
   const version = typeof manifest.version === "string" ? manifest.version : null;
   const real = relative(await realpath(cwd), await realpath(dir));
   const linked = !real.startsWith("..") && !real.split(sep).includes("node_modules");

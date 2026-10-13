@@ -100,4 +100,16 @@ describe("collectPackageUsage", () => {
     ]);
     expect((await collectPackageUsage(options()))[0]?.version).toBeNull();
   });
+
+  it("yields a null version without throwing when the installed manifest is corrupt", async () => {
+    writeJson(join(dir, "package.json"), { dependencies: { "@acme/ds": "^2.0.0" } });
+    mkdirSync(join(dir, "node_modules/@acme/ds"), { recursive: true });
+    writeFileSync(join(dir, "node_modules/@acme/ds/package.json"), "{ not json");
+    writeStorybook([
+      { id: "src/Card.stories.tsx", importedIds: ["node_modules/@acme/ds/dist/Button.js"] },
+    ]);
+    const usage = await collectPackageUsage(options());
+    expect(usage).toHaveLength(1);
+    expect(usage[0]).toMatchObject({ packageName: "@acme/ds", version: null });
+  });
 });

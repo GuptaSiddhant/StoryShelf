@@ -1,7 +1,7 @@
 /** Per-build package usage and cross-project package links. */
 import { and, eq, getTableColumns } from "drizzle-orm";
-import type { SQLWrapper, Table } from "drizzle-orm";
-import type { DatabaseAdapter } from "../adapters/database.ts";
+import type { SQL, SQLWrapper, Table } from "drizzle-orm";
+import type { DatabaseAdapter, TxStore } from "../adapters/database.ts";
 import type { BuildPackageUsage, ProjectLink } from "../schema/usage.ts";
 import { ulid } from "../utils/ulid.ts";
 
@@ -74,6 +74,8 @@ export class PackageUsageModel {
 
   /**
    * Replace the usage rows of a build, so re-reporting is idempotent.
+   * Runs in one transaction when the driver supports it and is serialized per
+   * build, so concurrent re-reports leave exactly one report's rows.
    *
    * @returns The number of rows stored.
    */
@@ -83,35 +85,42 @@ export class PackageUsageModel {
     rows: readonly PackageUsageInput[],
   ): Promise<number> {
     const table = this.tables.buildPackageUsage;
-    const existing = await this.listForBuild(buildId);
-    await Promise.all(
-      existing.map(async (old) => {
-        await this.db.remove(table, old.id);
-      }),
-    );
     const createdAt = new Date().toISOString();
-    await Promise.all(
-      rows.map(async (row) => {
-        await this.db.insert(table, {
-          id: ulid(),
-          projectId,
-          buildId,
-          storyImportPath: row.storyImportPath,
-          packageName: row.packageName,
-          modulePath: row.modulePath,
-          version: row.version ?? null,
-          createdAt,
-        });
+    return await serialized(`usage:${buildId}`, async () =>
+      await this.atomic(async (store) => {
+        await removeAll(store, table, this.buildWhere(buildId));
+        await Promise.all(
+          rows.map(async (row) => {
+            await store.insert(table, {
+              id: ulid(),
+              projectId,
+              buildId,
+              storyImportPath: row.storyImportPath,
+              packageName: row.packageName,
+              modulePath: row.modulePath,
+              version: row.version ?? null,
+              createdAt,
+            });
+          }),
+        );
+        return rows.length;
       }),
     );
-    return rows.length;
+  }
+
+  /**
+   * Explicitly remove all usage rows of a build (no reliance on FK cascade).
+   *
+   * @returns The number of rows removed.
+   */
+  async removeForBuild(buildId: string): Promise<number> {
+    return await removeAll(this.db, this.tables.buildPackageUsage, this.buildWhere(buildId));
   }
 
   /** List all usage rows of a build. */
   async listForBuild(buildId: string): Promise<BuildPackageUsage[]> {
-    const table = this.tables.buildPackageUsage;
-    return (await this.db.list(table, {
-      where: eq(getTableColumns(table)["buildId"] as unknown as SQLWrapper, buildId),
+    return (await this.db.list(this.tables.buildPackageUsage, {
+      where: this.buildWhere(buildId),
     })) as unknown as BuildPackageUsage[];
   }
 
@@ -136,7 +145,8 @@ export class PackageUsageModel {
   }
 
   /**
-   * Replace a downstream project's links with the given list.
+   * Replace a downstream project's links with the given list, atomically when
+   * the driver supports transactions and serialized per downstream project.
    *
    * @returns The stored links.
    */
@@ -145,24 +155,67 @@ export class PackageUsageModel {
     links: readonly { upstreamId: string; packageName: string }[],
   ): Promise<ProjectLink[]> {
     const table = this.tables.projectLinks;
-    const existing = await this.listLinks(downstreamId);
-    await Promise.all(
-      existing.map(async (old) => {
-        await this.db.remove(table, old.id);
+    const where = eq(getTableColumns(table)["downstreamId"] as unknown as SQLWrapper, downstreamId);
+    const createdAt = new Date().toISOString();
+    return await serialized(`links:${downstreamId}`, async () =>
+      await this.atomic(async (store) => {
+        await removeAll(store, table, where);
+        return await Promise.all(
+          links.map(
+            async (link) =>
+              (await store.insert(table, {
+                id: ulid(),
+                downstreamId,
+                upstreamId: link.upstreamId,
+                packageName: link.packageName,
+                createdAt,
+              })) as unknown as ProjectLink,
+          ),
+        );
       }),
     );
-    const createdAt = new Date().toISOString();
-    return await Promise.all(
-      links.map(
-        async (link) =>
-          (await this.db.insert(table, {
-            id: ulid(),
-            downstreamId,
-            upstreamId: link.upstreamId,
-            packageName: link.packageName,
-            createdAt,
-          })) as unknown as ProjectLink,
-      ),
-    );
+  }
+
+  /** Run `work` in a transaction when the driver has one, else directly on the adapter. */
+  private async atomic<R>(work: (store: TxStore) => Promise<R>): Promise<R> {
+    return this.db.transact ? await this.db.transact(work) : await work(this.db);
+  }
+
+  private buildWhere(buildId: string): SQL {
+    const column = getTableColumns(this.tables.buildPackageUsage)["buildId"];
+    return eq(column as unknown as SQLWrapper, buildId);
+  }
+}
+
+/** Delete every row of `table` matching `where`; returns the number removed. */
+async function removeAll(store: TxStore, table: Table, where: SQL): Promise<number> {
+  const rows = (await store.list(table, { where })) as unknown as { id: string }[];
+  await Promise.all(
+    rows.map(async (row) => {
+      await store.remove(table, row.id);
+    }),
+  );
+  return rows.length;
+}
+
+/** In-process tail of pending replaces, keyed by the rows they own. */
+const pending = new Map<string, Promise<unknown>>();
+
+/**
+ * Chain `task` after any in-flight call with the same key so overlapping replaces
+ * of the same rows never interleave (covers drivers without `transact` and
+ * drivers whose transactions do not serialize callers sharing one connection).
+ */
+async function serialized<R>(key: string, task: () => Promise<R>): Promise<R> {
+  const previous = pending.get(key) ?? Promise.resolve();
+  const run = previous.then(task, task);
+  const tail = run.catch(() => null);
+  pending.set(key, tail);
+  try {
+    return await run;
+  } finally {
+    if (pending.get(key) === tail) {
+      pending.delete(key);
+    }
   }
 }

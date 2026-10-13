@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { DatabaseAdapter } from "../adapters/database.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { matchUpstreamStory, PackageUsageModel } from "./usage.ts";
 
@@ -67,6 +68,74 @@ describe("PackageUsageModel links and story filter", () => {
       { ...row, storyImportPath: "src/Other.stories.tsx" },
     ]);
     expect(await model.listForStory("b1", "src/Card.stories.tsx")).toHaveLength(1);
+  });
+});
+
+const reportA = [row, { ...row, storyImportPath: "src/A.stories.tsx" }];
+const reportB = [{ ...row, version: "3.0.0" }];
+
+function withoutTransact(db: DatabaseAdapter): DatabaseAdapter {
+  const { transact: _omit, ...rest } = db;
+  return rest as DatabaseAdapter;
+}
+
+describe("PackageUsageModel concurrency and atomicity", () => {
+  it.each([
+    ["with transact", (db: DatabaseAdapter) => db],
+    ["without transact", withoutTransact],
+  ])("concurrent replaceForBuild leaves exactly one report (%s)", async (_label, wrap) => {
+    const { db } = makeDatabase();
+    const model = new PackageUsageModel(wrap(db));
+    await Promise.all([
+      model.replaceForBuild("p1", "b1", reportA),
+      model.replaceForBuild("p1", "b1", reportB),
+      model.replaceForBuild("p1", "b1", reportA),
+    ]);
+    const stored = await model.listForBuild("b1");
+    expect(stored).toHaveLength(reportA.length);
+    expect(new Set(stored.map((r) => r.version))).toEqual(new Set(["2.4.0"]));
+  });
+
+  it("rolls back a failed replace so the previous report survives", async () => {
+    const { db } = makeDatabase();
+    const model = new PackageUsageModel(db);
+    await model.replaceForBuild("p1", "b1", reportA);
+    const failing: DatabaseAdapter = {
+      ...db,
+      transact: async (work) =>
+        await db.transact!(async (tx) =>
+          work({
+            ...tx,
+            insert: async () => {
+              throw new Error("boom");
+            },
+          }),
+        ),
+    };
+    await expect(
+      new PackageUsageModel(failing).replaceForBuild("p1", "b1", reportB),
+    ).rejects.toThrow("boom");
+    expect(await model.listForBuild("b1")).toHaveLength(reportA.length);
+  });
+
+  it("serializes concurrent replaceLinks without transact", async () => {
+    const { db } = makeDatabase();
+    const model = new PackageUsageModel(withoutTransact(db));
+    await Promise.all([
+      model.replaceLinks("app", [{ upstreamId: "ds", packageName: "@acme/ds" }]),
+      model.replaceLinks("app", [{ upstreamId: "ds2", packageName: "@acme/icons" }]),
+    ]);
+    expect(await model.listLinks("app")).toMatchObject([{ packageName: "@acme/icons" }]);
+  });
+
+  it("removes a build's usage rows explicitly", async () => {
+    const { db } = makeDatabase();
+    const model = new PackageUsageModel(db);
+    await model.replaceForBuild("p1", "b1", reportA);
+    await model.replaceForBuild("p1", "b2", reportB);
+    expect(await model.removeForBuild("b1")).toBe(reportA.length);
+    expect(await model.listForBuild("b1")).toEqual([]);
+    expect(await model.listForBuild("b2")).toHaveLength(1);
   });
 });
 
