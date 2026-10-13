@@ -30,6 +30,7 @@ const SNAPSHOT_BASELINE_ID_ALTER =
   "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS baseline_id TEXT";
 const SNAPSHOT_BASELINE_VERSION_ALTER =
   "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS baseline_version TEXT";
+const SNAPSHOT_DESIGN_URL_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS design_url TEXT";
 const BASELINE_INFRA_HASH_ALTER = "ALTER TABLE baselines ADD COLUMN IF NOT EXISTS infra_hash TEXT";
 const BUILD_AFFECTED_ONLY_ALTER =
   "ALTER TABLE builds ADD COLUMN IF NOT EXISTS affected_only BOOLEAN NOT NULL DEFAULT true";
@@ -58,6 +59,7 @@ async function migrateSnapshotColumns(run: MigrationRunner): Promise<void> {
   await execIgnore(run, SNAPSHOT_INHERITED_ALTER);
   await execIgnore(run, SNAPSHOT_BASELINE_ID_ALTER);
   await execIgnore(run, SNAPSHOT_BASELINE_VERSION_ALTER);
+  await execIgnore(run, SNAPSHOT_DESIGN_URL_ALTER);
 }
 
 async function migrateProjectExtras(run: MigrationRunner): Promise<void> {
