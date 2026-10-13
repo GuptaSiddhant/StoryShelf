@@ -245,9 +245,10 @@ export function registerSnapshots(app: ShelfRouter): void {
     );
     await Promise.all(
       approvable.map(async (snapshot) => {
-        await approveSnapshot(snapshot.id, userId, { force: forced });
+        await approveSnapshot(snapshot.id, userId, { force: forced, deferRefresh: true });
       }),
     );
+    await refreshBuild(build.id);
     hxRefresh(c);
     return c.json({ ok: true, skipped: skipped.map((snapshot) => snapshot.id) });
   });

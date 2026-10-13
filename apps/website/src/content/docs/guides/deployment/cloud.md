@@ -7,14 +7,14 @@ StoryShelf is **cross-runtime**: the core router (`createShelfApp`) uses only We
 
 ## Mix-and-match layers
 
-| Platform | Database | Storage | Capture queue | Auth | Server entry |
-|----------|----------|---------|---------------|------|--------------|
-| **Vercel** | `@storyshelf/db-sqlite/turso` (Turso/libSQL) | `@storyshelf/storage-s3` (R2/S3) | Remote `CaptureQueue` (see below) | `@storyshelf/auth` | Hono + `@hono/vercel-edge` |
-| **Cloudflare Workers** | `@storyshelf/db-sqlite/turso` | `@storyshelf/storage-s3` (R2) | Workers Queues `CaptureQueue` impl | `@storyshelf/auth` | Hono + Workers entry |
-| **Azure Functions** | `@storyshelf/db-sqlite/turso` | `@storyshelf/storage-s3` (Azure Blob) | Azure Storage Queues `CaptureQueue` impl | `@storyshelf/auth` | Hono + Azure Functions handler |
-| **AWS Lambda** | `@storyshelf/db-sqlite/turso` | `@storyshelf/storage-s3` (S3) | SQS `CaptureQueue` impl | `@storyshelf/auth` | Hono + Lambda handler |
-| **Deno Deploy** | `@storyshelf/db-sqlite/turso` | `@storyshelf/storage-s3` (R2/S3) | Custom `CaptureQueue` (Deno KV / HTTP) | `@storyshelf/auth` | Hono + Deno entry |
-| **Bun** | `@storyshelf/db-sqlite` or `@storyshelf/db-sqlite/bun-sqlite` | `storage-local` or `storage-s3` | `InMemoryCaptureQueue` | `@storyshelf/auth` | Hono + Bun.serve |
+| Platform               | Database                                                      | Storage                               | Capture queue                            | Auth               | Server entry                   |
+| ---------------------- | ------------------------------------------------------------- | ------------------------------------- | ---------------------------------------- | ------------------ | ------------------------------ |
+| **Vercel**             | `@storyshelf/db-sqlite/turso` (Turso/libSQL)                  | `@storyshelf/storage-s3` (R2/S3)      | Remote `CaptureQueue` (see below)        | `@storyshelf/auth` | Hono + `@hono/vercel-edge`     |
+| **Cloudflare Workers** | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage-s3` (R2)         | Workers Queues `CaptureQueue` impl       | `@storyshelf/auth` | Hono + Workers entry           |
+| **Azure Functions**    | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage-s3` (Azure Blob) | Azure Storage Queues `CaptureQueue` impl | `@storyshelf/auth` | Hono + Azure Functions handler |
+| **AWS Lambda**         | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage-s3` (S3)         | SQS `CaptureQueue` impl                  | `@storyshelf/auth` | Hono + Lambda handler          |
+| **Deno Deploy**        | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage-s3` (R2/S3)      | Custom `CaptureQueue` (Deno KV / HTTP)   | `@storyshelf/auth` | Hono + Deno entry              |
+| **Bun**                | `@storyshelf/db-sqlite` or `@storyshelf/db-sqlite/bun-sqlite` | `storage-local` or `storage-s3`       | `InMemoryCaptureQueue`                   | `@storyshelf/auth` | Hono + Bun.serve               |
 
 ## Worker model (serverless)
 
@@ -92,14 +92,14 @@ This runs on **any** platform that supports Node-compatible `fetch` + `crypto` +
 
 `@storyshelf/db-postgres` uses `postgres.js` + Drizzle. Use `createPostgresDatabase({ url })` for all providers — only the connection string and pooling change.
 
-| Provider | Connection shape | TLS | Pooling |
-|----------|----------------|-----|---------|
-| Self-hosted | `postgres://user:pass@localhost:5432/shelf` | `ssl: false` | `max: 10` |
-| AWS RDS | `postgres://user:pass@<rds-endpoint>:5432/db?sslmode=require` | `ssl: true` | `prepare: true` |
-| GCP Cloud SQL | `postgres://user:pass@<cloudsql-ip>:5432/db` | `ssl: { ca, cert, key }` | Connector or injected client |
-| Supabase | `postgres://postgres.<ref>:<pass>@<pooler-host>:6543/postgres?pgbouncer=true` | `ssl: true` | `prepare: false` on :6543 |
-| Neon | `postgres://user:pass@<neon-host>/db?sslmode=require` | `ssl: true` | `max: 5`; `prepare: false` on pooled |
-| Azure DB for PG | `postgres://user:pass@<server>.postgres.database.azure.com:5432/db?sslmode=require` | `ssl: true` | Entra ID via injected client |
+| Provider        | Connection shape                                                                    | TLS                      | Pooling                              |
+| --------------- | ----------------------------------------------------------------------------------- | ------------------------ | ------------------------------------ |
+| Self-hosted     | `postgres://user:pass@localhost:5432/shelf`                                         | `ssl: false`             | `max: 10`                            |
+| AWS RDS         | `postgres://user:pass@<rds-endpoint>:5432/db?sslmode=require`                       | `ssl: true`              | `prepare: true`                      |
+| GCP Cloud SQL   | `postgres://user:pass@<cloudsql-ip>:5432/db`                                        | `ssl: { ca, cert, key }` | Connector or injected client         |
+| Supabase        | `postgres://postgres.<ref>:<pass>@<pooler-host>:6543/postgres?pgbouncer=true`       | `ssl: true`              | `prepare: false` on :6543            |
+| Neon            | `postgres://user:pass@<neon-host>/db?sslmode=require`                               | `ssl: true`              | `max: 5`; `prepare: false` on pooled |
+| Azure DB for PG | `postgres://user:pass@<server>.postgres.database.azure.com:5432/db?sslmode=require` | `ssl: true`              | Entra ID via injected client         |
 
 See the [`@storyshelf/db-postgres` package reference](/packages/db-postgres/) for full options.
 

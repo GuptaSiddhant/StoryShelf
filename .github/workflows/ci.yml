@@ -151,15 +151,15 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-1.63.0-chromium-${{ runner.os }}
+          key: playwright-1.63.0-chromium-firefox-${{ runner.os }}
 
-      - name: Install Playwright chromium
+      - name: Install Playwright browsers (chromium, firefox)
         working-directory: packages/runner-playwright
         run: |
-          nubx playwright-core install chromium
-          if ! node --input-type=module -e "const { chromium } = await import('playwright-core'); await (await chromium.launch()).close()"; then
-            echo "chromium failed to launch; installing system dependencies"
-            nubx playwright-core install-deps chromium
+          nubx playwright-core install chromium firefox
+          if ! node --input-type=module -e "const { chromium, firefox } = await import('playwright-core'); await (await chromium.launch()).close(); await (await firefox.launch()).close()"; then
+            echo "a browser failed to launch; installing system dependencies"
+            nubx playwright-core install-deps chromium firefox
           fi
 
       - name: Build workspace packages

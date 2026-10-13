@@ -3,7 +3,7 @@ title: "@storyshelf/core"
 description: StoryShelf's domain layer — adapters, models, capture pipeline, and review engine (no HTTP).
 ---
 
-import { PackageManagers } from 'starlight-package-managers';
+import { PackageManagers } from "starlight-package-managers";
 
 `@storyshelf/core` is the domain layer at the center of StoryShelf. It provides adapter contracts, models, the server-side capture pipeline, pixel diff engine, and retention jobs — with no HTTP dependency, so queue workers and remote runners import it without pulling a server. The HTTP server lives in [@storyshelf/app](../app/).
 
@@ -32,7 +32,13 @@ const app = createShelfApp({
   captureRunner,
   gitHosts: [gitHubHost],
   auth,
-  config: { secret, captureConcurrency: 2, purgeTtlDays: 30, branchTtlDays: 30, branchGcIntervalMs: 86_400_000 },
+  config: {
+    secret,
+    captureConcurrency: 2,
+    purgeTtlDays: 30,
+    branchTtlDays: 30,
+    branchGcIntervalMs: 86_400_000,
+  },
 });
 
 serve({ fetch: app.fetch, port: 3000 });
@@ -45,7 +51,10 @@ await app.lifecycle.setup();
 
 const server = serve({ fetch: app.fetch, port: 3000 });
 process.on("SIGTERM", () => {
-  app.lifecycle.teardown().then(() => server.close()).catch(() => {});
+  app.lifecycle
+    .teardown()
+    .then(() => server.close())
+    .catch(() => {});
 });
 ```
 

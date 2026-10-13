@@ -27,6 +27,7 @@ StoryShelf doesn't repeat this lock-in: once you're on it, [baseline export/impo
 ## 2. Deploy StoryShelf server
 
 Follow [Getting started](/guides/getting-started/) to deploy:
+
 - Choose database (SQLite for single-node, Turso/Postgres for serverless)
 - Choose storage (local for single-node, S3-compatible for multi-node)
 - Choose auth (OIDC recommended for teams)
@@ -35,11 +36,13 @@ Follow [Getting started](/guides/getting-started/) to deploy:
 ## 3. Create project with matching settings
 
 In StoryShelf UI or via CLI:
+
 ```bash
 storyshelf create --url https://shelf.example.com --name "My Design System" --token $ADMIN_TOKEN
 ```
 
 Match Chromatic settings where applicable:
+
 - **Project name** → same as Chromatic
 - **Default branch** → same as Chromatic (usually `main`)
 - **Pixel threshold** → match Chromatic's threshold if customized
@@ -48,6 +51,7 @@ Match Chromatic settings where applicable:
 ## 4. Update CI pipeline
 
 ### Chromatic CI (before):
+
 ```yaml
 - name: Chromatic
   uses: chromatic-action@v1
@@ -57,6 +61,7 @@ Match Chromatic settings where applicable:
 ```
 
 ### StoryShelf CI (after):
+
 ```yaml
 - name: Checkout
   uses: actions/checkout@v4
@@ -74,6 +79,7 @@ Match Chromatic settings where applicable:
 ```
 
 Or with `.storybook/storyshelf.json` committed:
+
 ```yaml
 - name: Upload to StoryShelf
   run: npx storyshelf
@@ -85,39 +91,39 @@ Or with `.storybook/storyshelf.json` committed:
 
 StoryShelf reads both `chromatic:` and `storyshelf:` parameter keys. **`storyshelf:` wins on conflict.**
 
-| Chromatic parameter | StoryShelf equivalent | Notes |
-|---------------------|----------------------|-------|
-| `disableSnapshot` | `disableSnapshot` | Works unchanged |
-| `flakyTest` | `flakyTest` | Works unchanged |
-| `delay` | `delay` | Works unchanged |
-| `diffThreshold` | `diffThreshold` | Works unchanged |
-| `pauseAnimationAtEnd` | `pauseAnimationAtEnd` | Works unchanged |
-| `viewports` | Server config | Set in `ShelfConfig.viewports` |
-| `modes` / `globals` | Not supported | **Gap** — no equivalent |
+| Chromatic parameter   | StoryShelf equivalent | Notes                          |
+| --------------------- | --------------------- | ------------------------------ |
+| `disableSnapshot`     | `disableSnapshot`     | Works unchanged                |
+| `flakyTest`           | `flakyTest`           | Works unchanged                |
+| `delay`               | `delay`               | Works unchanged                |
+| `diffThreshold`       | `diffThreshold`       | Works unchanged                |
+| `pauseAnimationAtEnd` | `pauseAnimationAtEnd` | Works unchanged                |
+| `viewports`           | Server config         | Set in `ShelfConfig.viewports` |
+| `modes` / `globals`   | Not supported         | **Gap** — no equivalent        |
 
 **No code changes needed** for existing `chromatic:` parameters. They work as-is.
 
 ## 6. Baseline model differences
 
-| Chromatic | StoryShelf |
-|-----------|------------|
-| Global baseline + branch baselines | Per-branch baselines with default-branch fallback |
-| Branch baselines independent | Feature branch accepts → branch baseline; merge to main → promotes to default |
-| No GC (manual cleanup) | Auto GC: `branchTtlDays` (default 30), `purgeTtlDays` (default 30) |
+| Chromatic                          | StoryShelf                                                                    |
+| ---------------------------------- | ----------------------------------------------------------------------------- |
+| Global baseline + branch baselines | Per-branch baselines with default-branch fallback                             |
+| Branch baselines independent       | Feature branch accepts → branch baseline; merge to main → promotes to default |
+| No GC (manual cleanup)             | Auto GC: `branchTtlDays` (default 30), `purgeTtlDays` (default 30)            |
 
 **Implication:** On first run, feature branches will diff against `main` baseline. After accepting changes, they get their own branch baseline. Merging to `main` updates the default baseline automatically.
 
 ## 7. What you lose (honest gaps)
 
-| Feature | Chromatic | StoryShelf | Impact |
-|---------|-----------|------------|--------|
-| **TurboSnap** | Yes (dependency graph) | Yes — affected capture (on by default) | Similar skip rates on Vite Storybooks; needs `fetch-depth: 0` and `preview-stats.json` |
-| **Cross-browser** | Chrome, FF, Safari, Edge (branded, cloud) | Chromium / Firefox / WebKit, one per build | Set in project Settings → General or via API; baselines tracked per browser; no branded Safari/Edge |
-| **Modes/Globals** | Yes | No | Theme/locale matrices need workarounds |
-| **A11y testing** | Yes (aXe) | Basic opt-in checks only | Separate aXe job needed for full WCAG coverage |
-| **Cloud parallelization** | Automatic | Manual (`captureConcurrency`) | Limited by your server CPU/memory |
-| **Baseline export** | UI only | API + UI | Cannot bulk-import Chromatic baselines |
-| **Flake detection** | Auto-detect | Explicit `flakyTest` | Manual marking required |
+| Feature                   | Chromatic                                 | StoryShelf                                 | Impact                                                                                              |
+| ------------------------- | ----------------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| **TurboSnap**             | Yes (dependency graph)                    | Yes — affected capture (on by default)     | Similar skip rates on Vite Storybooks; needs `fetch-depth: 0` and `preview-stats.json`              |
+| **Cross-browser**         | Chrome, FF, Safari, Edge (branded, cloud) | Chromium / Firefox / WebKit, one per build | Set in project Settings → General or via API; baselines tracked per browser; no branded Safari/Edge |
+| **Modes/Globals**         | Yes                                       | No                                         | Theme/locale matrices need workarounds                                                              |
+| **A11y testing**          | Yes (aXe)                                 | Basic opt-in checks only                   | Separate aXe job needed for full WCAG coverage                                                      |
+| **Cloud parallelization** | Automatic                                 | Manual (`captureConcurrency`)              | Limited by your server CPU/memory                                                                   |
+| **Baseline export**       | UI only                                   | API + UI                                   | Cannot bulk-import Chromatic baselines                                                              |
+| **Flake detection**       | Auto-detect                               | Explicit `flakyTest`                       | Manual marking required                                                                             |
 
 ## 8. What you gain
 

@@ -9,10 +9,10 @@ StoryShelf has two layers of authorization: **site roles** (from the auth engine
 
 `users.role` — set at invite (role param) or preserved from the existing row on SSO sign-in:
 
-| Site role | Meaning |
-|-----------|---------|
-| `admin` | Site-wide bypass — sees and mutates every project |
-| `member` | Default — can create/join projects via membership |
+| Site role | Meaning                                           |
+| --------- | ------------------------------------------------- |
+| `admin`   | Site-wide bypass — sees and mutates every project |
+| `member`  | Default — can create/join projects via membership |
 
 Everyone else signs in as `member`. SSO users link by email on first sign-in and keep their existing shelf roles (never demoted by login).
 
@@ -24,12 +24,12 @@ IdP group sync (site/project roles from group claims) is deferred — there is n
 
 `project_members.role` — per-project, set in **Settings → Members** or synced from group mappings:
 
-| Project role | Capabilities |
-|--------------|--------------|
-| `viewer` | View builds, diffs, published Storybook |
-| `developer` | Viewer + upload builds |
-| `approver` | Viewer + approve/reject snapshots |
-| `admin` | Full control — members, label types, tokens, settings, delete |
+| Project role | Capabilities                                                  |
+| ------------ | ------------------------------------------------------------- |
+| `viewer`     | View builds, diffs, published Storybook                       |
+| `developer`  | Viewer + upload builds                                        |
+| `approver`   | Viewer + approve/reject snapshots                             |
+| `admin`      | Full control — members, label types, tokens, settings, delete |
 
 Site `admin` bypasses all project checks. `GET /api/v1/projects/:slug/members` lists members; `POST/PATCH/DELETE` is project-admin or site-admin only.
 

@@ -3,7 +3,7 @@ title: "@storyshelf/git-github"
 description: GitHub commit-status provider for StoryShelf's visual-testing merge gate.
 ---
 
-import { PackageManagers } from 'starlight-package-managers';
+import { PackageManagers } from "starlight-package-managers";
 
 `@storyshelf/git-github` posts commit statuses to GitHub so visual tests show up as PR checks. It implements the `GitHostProvider`/`GitHostAdapter` contracts from `@storyshelf/core`: the server reads each project's saved status config, decrypts its token, and posts `pending` while capturing, `success` when approved, and `failure` on rejection or capture errors, plus a single updatable PR comment (`<!-- storyshelf:<url> -->`). The adapter exposes `metadata` (`name`, `version`, `description`, `kind:"github"`, `logo`, `schema`) with `version` injected from `package.json` via `__PKG_VERSION__`.
 

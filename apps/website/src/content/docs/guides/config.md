@@ -22,16 +22,16 @@ Created by `storyshelf init` or `storyshelf create` (both fail if `.storybook/ma
 }
 ```
 
-| Field             | CLI flag                     | Env fallback      | Description                                                                                                                        |
-| ----------------- | ---------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `slug`            | `--slug`                     | `STORYSHELF_SLUG` | Project slug (required)                                                                                                            |
-| `url`             | `--url`                      | `STORYSHELF_URL`  | Server URL                                                                                                                         |
-| `buildDir`        | `--build-dir` / `-d`         | —                 | Built Storybook directory (default `storybook-static`). If missing or empty, `upload` will build                                   |
-| `buildCommand`    | `--build-command`            | —                 | Custom build command (e.g. `nx run app:build-storybook`). Mutually exclusive with `buildScriptName`                                |
-| `buildScriptName` | `--build-script-name` / `-b` | —                 | package script to run (default `build-storybook`)                                                                                     |
-| `skip`            | `--skip`                     | —                 | Glob to skip upload (e.g. `"main"`, `"release/*"`). `branch` matched via `picomatch`; when matched `upload` exits 0 without `POST` |
-| `affectedOnly`    | `--full` (opt-out)           | `STORYSHELF_FULL=1` (opt-out) | Render only impacted stories (default `true`). See [Affected capture](/concepts/affected-capture/)                     |
-| `untraced`          | `--untraced` (union)         | —                 | Trace exclusions, combined with `--untraced` flags. See [Affected capture](/concepts/affected-capture/) |
+| Field             | CLI flag                     | Env fallback                  | Description                                                                                                                        |
+| ----------------- | ---------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `slug`            | `--slug`                     | `STORYSHELF_SLUG`             | Project slug (required)                                                                                                            |
+| `url`             | `--url`                      | `STORYSHELF_URL`              | Server URL                                                                                                                         |
+| `buildDir`        | `--build-dir` / `-d`         | —                             | Built Storybook directory (default `storybook-static`). If missing or empty, `upload` will build                                   |
+| `buildCommand`    | `--build-command`            | —                             | Custom build command (e.g. `nx run app:build-storybook`). Mutually exclusive with `buildScriptName`                                |
+| `buildScriptName` | `--build-script-name` / `-b` | —                             | package script to run (default `build-storybook`)                                                                                  |
+| `skip`            | `--skip`                     | —                             | Glob to skip upload (e.g. `"main"`, `"release/*"`). `branch` matched via `picomatch`; when matched `upload` exits 0 without `POST` |
+| `affectedOnly`    | `--full` (opt-out)           | `STORYSHELF_FULL=1` (opt-out) | Render only impacted stories (default `true`). See [Affected capture](/concepts/affected-capture/)                                 |
+| `untraced`        | `--untraced` (union)         | —                             | Trace exclusions, combined with `--untraced` flags. See [Affected capture](/concepts/affected-capture/)                            |
 
 **Note:** `buildDir` default is Storybook's default `storybook-static` unless `buildDir` is set in file. `buildCommand` and `buildScriptName` are mutually exclusive (validated by `zod` `refine`).
 

@@ -3,7 +3,7 @@ title: Setup and providers
 description: Install @storyshelf/ai, define profiles of models, forward provider options, and choose how to authenticate with your model provider.
 ---
 
-import Screenshot from '../../../components/Screenshot.astro';
+import Screenshot from "../../../components/Screenshot.astro";
 
 AI is a two-step opt-in: the **server** is given a model (this page), then a **site admin** enables a profile for each **project** (see [AI insights](../)).
 
@@ -52,11 +52,11 @@ A **profile** is a named data-flow decision. Which models see a project's data i
 
 Each profile has a `defaultModel` and optional per-task models:
 
-| Slot | Used for |
-|---|---|
-| `defaultModel` | Everything not overridden below |
-| `models.triage` | Build triage |
-| `models.health` | Project health |
+| Slot            | Used for                                                                               |
+| --------------- | -------------------------------------------------------------------------------------- |
+| `defaultModel`  | Everything not overridden below                                                        |
+| `models.triage` | Build triage                                                                           |
+| `models.health` | Project health                                                                         |
 | `models.vision` | Triage **only when screenshots are sent**; `null` disables screenshots for the profile |
 
 A slot is either a bare model or an object with overrides:
@@ -104,6 +104,10 @@ On boot StoryShelf checks that every configured model uses a specification versi
 
 ## Enable it for a project
 
-<Screenshot name="ai-settings" alt="Project settings, AI tab: a select to choose the AI profile for the project" caption="Project settings → AI. Only site admins can change it." />
+<Screenshot
+  name="ai-settings"
+  alt="Project settings, AI tab: a select to choose the AI profile for the project"
+  caption="Project settings → AI. Only site admins can change it."
+/>
 
 A site admin chooses a profile (or **Off**) under **Project settings → AI**, or sends `PATCH /api/v1/projects/{slug}` with `{ "aiProfile": "default" }` (or `null`). See the [API](../api/).

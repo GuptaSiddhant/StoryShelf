@@ -26,10 +26,10 @@ All API endpoints are relative to your server root, e.g. `https://shelf.example.
 
 Two auth mechanisms are supported:
 
-| Mechanism | Use | Transport |
-|-----------|-----|-----------|
-| Bearer token | CI (`storyshelf`), scripts | `Authorization: Bearer <token>` header |
-| Session cookie | The web UI | `Cookie: storyshelf_session=...` (set by the auth adapter) |
+| Mechanism      | Use                        | Transport                                                  |
+| -------------- | -------------------------- | ---------------------------------------------------------- |
+| Bearer token   | CI (`storyshelf`), scripts | `Authorization: Bearer <token>` header                     |
+| Session cookie | The web UI                 | `Cookie: storyshelf_session=...` (set by the auth adapter) |
 
 Create a token from the project settings page (**Tokens** tab) or with the CLI (requires site-admin token):
 
@@ -43,18 +43,18 @@ Unconfigured servers (no auth adapter) accept all requests.
 
 ## Endpoint groups
 
-| Group | Path prefix | Typical use |
-|-------|-------------|-------------|
-| Projects | `/api/v1/projects` | Create and manage Storybook projects |
-| Builds | `/api/v1/projects/{slug}/builds` | Upload builds, list, retry, review |
-| Snapshots | `/api/v1/projects/{slug}/builds/{id}/snapshots` | Inspect and approve/reject individual screenshots |
-| Comments | `/api/v1/projects/{slug}/builds/{id}/comments` | Review discussion threads |
-| Label types | `/api/v1/projects/{slug}/label-types` | Project-defined build label schemas |
-| Members | `/api/v1/projects/{slug}/members` | Project-scoped roles |
-| Tokens | `/api/v1/projects/{slug}/tokens` | CI access tokens |
-| Webhooks | `/api/v1/projects/{slug}/webhooks` | Outbound event notifications |
-| Insights | `/api/v1/projects/{slug}/builds/{id}/insights`, `/api/v1/projects/{slug}/insights/health` | AI build triage and project health ([AI insights](/ai/)) |
-| Admin | `/api/v1/admin` | Site-wide operations (retention purge) |
+| Group       | Path prefix                                                                               | Typical use                                              |
+| ----------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Projects    | `/api/v1/projects`                                                                        | Create and manage Storybook projects                     |
+| Builds      | `/api/v1/projects/{slug}/builds`                                                          | Upload builds, list, retry, review                       |
+| Snapshots   | `/api/v1/projects/{slug}/builds/{id}/snapshots`                                           | Inspect and approve/reject individual screenshots        |
+| Comments    | `/api/v1/projects/{slug}/builds/{id}/comments`                                            | Review discussion threads                                |
+| Label types | `/api/v1/projects/{slug}/label-types`                                                     | Project-defined build label schemas                      |
+| Members     | `/api/v1/projects/{slug}/members`                                                         | Project-scoped roles                                     |
+| Tokens      | `/api/v1/projects/{slug}/tokens`                                                          | CI access tokens                                         |
+| Webhooks    | `/api/v1/projects/{slug}/webhooks`                                                        | Outbound event notifications                             |
+| Insights    | `/api/v1/projects/{slug}/builds/{id}/insights`, `/api/v1/projects/{slug}/insights/health` | AI build triage and project health ([AI insights](/ai/)) |
+| Admin       | `/api/v1/admin`                                                                           | Site-wide operations (retention purge)                   |
 
 AI agents can use this API through the [MCP server](/ai/mcp/), which wraps the read and comment endpoints.
 

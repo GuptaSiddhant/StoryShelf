@@ -3,11 +3,15 @@ title: Published Storybook
 description: Share the latest Storybook — path-based URLs, per-project subdomains, and public-branch access control.
 ---
 
-import Screenshot from '../../../components/Screenshot.astro';
+import Screenshot from "../../../components/Screenshot.astro";
 
 Beyond diff review, StoryShelf **publishes** the uploaded Storybook build as a browsable site for designers and PMs.
 
-<Screenshot name="library" alt="The story library: every story from a branch's latest build, with Review and Preview links" caption="The library lists every story from a branch's latest build; Preview opens the published Storybook." />
+<Screenshot
+  name="library"
+  alt="The story library: every story from a branch's latest build, with Review and Preview links"
+  caption="The library lists every story from a branch's latest build; Preview opens the published Storybook."
+/>
 
 ## URL structure
 
@@ -25,7 +29,7 @@ Build-specific assets live only under `/build/:buildId/...` so label resolution 
 
 A build is **public** iff `builds.public = true` or `builds.git_branch` matches `projects.public_branch_regex` (e.g. `^main$`, `^release-`). Public builds are viewable **without auth**; all others require at least `viewer` membership (see [Roles](/concepts/roles/) and [Auth](/guides/auth/)). Unauthenticated users can still review public published Storybooks while review stays gated.
 
-Retention keeps the latest build per branch, so the latest *published* build on a branch survives purge; if it is purged, the URL falls back to the next-most-recent public build (or 404).
+Retention keeps the latest build per branch, so the latest _published_ build on a branch survives purge; if it is purged, the URL falls back to the next-most-recent public build (or 404).
 
 ## Subdomains (optional)
 

@@ -67,12 +67,12 @@ Parallel captures = **workers × `WORKER_CONCURRENCY`** (default 2 per worker, f
 
 ## Failure modes
 
-| What happens | Result |
-|---|---|
-| Capture throws | Worker requeues with exponential backoff (1s, 2s, 4s… capped at 30s). The default is `maxRetries: 2`, so **3 attempts total**. |
-| Still failing after the last attempt | Message is deleted, the build attempt is marked `failed`, a `failure` git status is posted, and the log line `capture permanently failed` is written. Re-run with **Retry** or `storyshelf retry`. |
-| Worker dies mid-capture (OOM, `SIGKILL`, deploy) | The message reappears after the visibility timeout. Past `maxReceiveCount` (3 in the Terraform stack) SQS moves it to the **dead-letter queue**. |
-| Message body has no `buildId` | Treated as poison: deleted immediately, with a `dropping malformed queue job` warning. It never retries. |
+| What happens                                     | Result                                                                                                                                                                                             |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Capture throws                                   | Worker requeues with exponential backoff (1s, 2s, 4s… capped at 30s). The default is `maxRetries: 2`, so **3 attempts total**.                                                                     |
+| Still failing after the last attempt             | Message is deleted, the build attempt is marked `failed`, a `failure` git status is posted, and the log line `capture permanently failed` is written. Re-run with **Retry** or `storyshelf retry`. |
+| Worker dies mid-capture (OOM, `SIGKILL`, deploy) | The message reappears after the visibility timeout. Past `maxReceiveCount` (3 in the Terraform stack) SQS moves it to the **dead-letter queue**.                                                   |
+| Message body has no `buildId`                    | Treated as poison: deleted immediately, with a `dropping malformed queue job` warning. It never retries.                                                                                           |
 
 Two things to know:
 
@@ -89,14 +89,14 @@ The worker traps `SIGTERM`/`SIGINT`, stops polling, and waits for in-flight capt
 
 The worker logs structured JSON through pino, with `buildId` and `reqId` on each line:
 
-| Message | Meaning |
-|---|---|
-| `worker picked up job` / `worker completed job` | Normal lifecycle. |
-| `worker job timings` | Per-phase timings for the job (`timings`). |
-| `capture failed, requeued` | A retry is scheduled (`attempts`, `delayMs`). |
-| `capture permanently failed` | Retries exhausted. Alert on this one. |
-| `poll failed` | SQS or credentials problem; the worker retries every second. |
-| `dropping malformed queue job` | Poison message removed. |
+| Message                                         | Meaning                                                      |
+| ----------------------------------------------- | ------------------------------------------------------------ |
+| `worker picked up job` / `worker completed job` | Normal lifecycle.                                            |
+| `worker job timings`                            | Per-phase timings for the job (`timings`).                   |
+| `capture failed, requeued`                      | A retry is scheduled (`attempts`, `delayMs`).                |
+| `capture permanently failed`                    | Retries exhausted. Alert on this one.                        |
+| `poll failed`                                   | SQS or credentials problem; the worker retries every second. |
+| `dropping malformed queue job`                  | Poison message removed.                                      |
 
 `reqId` ties worker lines to the upload request that enqueued the build, and the `traceparent` in the message continues the trace when [OpenTelemetry](/guides/observability/) is configured. Also alert on any message in the DLQ.
 
@@ -104,16 +104,16 @@ The worker logs structured JSON through pino, with `buildId` and `reqId` on each
 
 Every queue implements the same contract (`enqueue` on the server; `poll`/`ack`/`nack` for the worker), so the worker code, concurrency math, and monitoring above apply unchanged. What differs is how each backend handles in-flight jobs, retries, and poison messages.
 
-| | SQS | Redis | Azure Storage Queues | Azure Service Bus | GCP Pub/Sub |
-|---|---|---|---|---|---|
-| **Package** | `queue-sqs` | `queue-redis` | `queue-azure` | `queue-azure` | `queue-gcp` |
-| **Idle poll** | Long-poll (20s) | Blocking `BLMOVE` (5s) | Immediate return | Waits up to 30s | Immediate return |
-| **Retry delay (`nack`)** | Honored | Honored | Honored | **Not honored** (immediate) | Honored |
-| **Dead-letter queue** | Redrive policy | **None** | **None** | Built in (`maxDeliveryCount`) | Dead-letter policy |
-| **Crash recovery** | Visibility timeout | **Manual** | Visibility timeout | Lock expiry | Ack deadline |
-| **Lease renewal while capturing** | Heartbeat | **None** | Heartbeat | Heartbeat | Heartbeat |
-| **Attempts counted from** | Receive count | Counter in the payload | Dequeue count | Delivery count | Delivery attempt |
-| **Scaffold** | AWS stack | Docker Compose | Azure stack | Azure stack | GCP stack |
+|                                   | SQS                | Redis                  | Azure Storage Queues | Azure Service Bus             | GCP Pub/Sub        |
+| --------------------------------- | ------------------ | ---------------------- | -------------------- | ----------------------------- | ------------------ |
+| **Package**                       | `queue-sqs`        | `queue-redis`          | `queue-azure`        | `queue-azure`                 | `queue-gcp`        |
+| **Idle poll**                     | Long-poll (20s)    | Blocking `BLMOVE` (5s) | Immediate return     | Waits up to 30s               | Immediate return   |
+| **Retry delay (`nack`)**          | Honored            | Honored                | Honored              | **Not honored** (immediate)   | Honored            |
+| **Dead-letter queue**             | Redrive policy     | **None**               | **None**             | Built in (`maxDeliveryCount`) | Dead-letter policy |
+| **Crash recovery**                | Visibility timeout | **Manual**             | Visibility timeout   | Lock expiry                   | Ack deadline       |
+| **Lease renewal while capturing** | Heartbeat          | **None**               | Heartbeat            | Heartbeat                     | Heartbeat          |
+| **Attempts counted from**         | Receive count      | Counter in the payload | Dequeue count        | Delivery count                | Delivery attempt   |
+| **Scaffold**                      | AWS stack          | Docker Compose         | Azure stack          | Azure stack                   | GCP stack          |
 
 ### Redis
 
@@ -139,16 +139,24 @@ Keys: `shelf:queue` (waiting), `shelf:queue:processing` (in flight), `shelf:queu
 ```ts
 import { createAzureServiceBusQueue, createAzureStorageQueuesQueue } from "@storyshelf/queue-azure";
 
-createAzureServiceBusQueue({ queueName: "capture-jobs", connectionString: process.env.AZURE_SERVICE_BUS_CONNECTION! });
-createAzureStorageQueuesQueue({ queueName: "capture-jobs", connectionString: process.env.AZURE_STORAGE_CONNECTION! });
+createAzureServiceBusQueue({
+  queueName: "capture-jobs",
+  connectionString: process.env.AZURE_SERVICE_BUS_CONNECTION!,
+});
+createAzureStorageQueuesQueue({
+  queueName: "capture-jobs",
+  connectionString: process.env.AZURE_STORAGE_CONNECTION!,
+});
 ```
 
 **Service Bus** (recommended for production):
+
 - Messages are peek-locked. Past the queue's `maxDeliveryCount` (3 in the Terraform stack) Service Bus moves the message to the built-in dead-letter sub-queue.
 - **`nack` retries immediately.** There is no per-message delay, so the worker's exponential backoff does not apply. Three quick attempts can burn through a transient outage before it recovers.
 - **The worker renews the lock while capturing.** Service Bus caps one lock at 5 minutes, so the worker renews it periodically (at a third of the queue's `lock_duration`) rather than relying on one long lock. Captures can run well past 5 minutes. The queue's lock duration only needs to be long enough to survive a brief renewal hiccup; the default is fine.
 
 **Storage Queues** (cheapest, simplest):
+
 - `visibilityTimeout` is the lease, 300 seconds by default (option on `createAzureStorageQueuesQueue`). The worker renews it while a capture runs; it only decides how fast a crashed worker's job comes back. Storage Queues rotate the pop receipt on each renewal, which the adapter tracks for you.
 - There is no dead-letter queue and no long-poll. A job that crashes its worker every time keeps coming back, so alert on repeated `capture failed, requeued` lines for the same `buildId`. If you need dead-lettering, use Service Bus.
 - With no long-poll, an idle worker issues requests continuously, and each is a billable storage transaction.
@@ -160,7 +168,11 @@ createAzureStorageQueuesQueue({ queueName: "capture-jobs", connectionString: pro
 ```ts
 import { createGcpPubSubQueue } from "@storyshelf/queue-gcp";
 
-createGcpPubSubQueue({ topic: "capture-jobs", subscription: "capture-jobs-worker", projectId: process.env.GOOGLE_CLOUD_PROJECT! });
+createGcpPubSubQueue({
+  topic: "capture-jobs",
+  subscription: "capture-jobs-worker",
+  projectId: process.env.GOOGLE_CLOUD_PROJECT!,
+});
 ```
 
 - The adapter sets each pulled message's **ack deadline** to `leaseSeconds` (60 by default, max 600) and the worker renews it while a capture runs, so the subscription's own ack deadline no longer needs to outlast your slowest capture.

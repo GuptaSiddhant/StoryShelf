@@ -7,11 +7,11 @@ StoryShelf ships one auth engine — [`@storyshelf/auth`](../../packages/auth/) 
 
 ## Engine vs shelf
 
-| Concern | Owner | Notes |
-|---|---|---|
-| `user` / `session` / `account` / `verification` / `passkey` / `ssoProvider` | Better Auth tables via opaque bridge | `DatabaseAdapter.transact?` gives atomic `consumeOne` / `incrementOne`; see [custom adapters](https://www.better-auth.com/docs/concepts/database#custom-adapters) |
-| `users` / `user_invite_tokens` / `project_members` | StoryShelf | `users` is the source of truth for roles, memberships, `display_name_override` |
-| Secrets | `resolveAuthOptions` + `{env:NAME}` refs | `process.env` first, then your `resolveSecrets` hook (Vault/AWS/GCP) |
+| Concern                                                                     | Owner                                    | Notes                                                                                                                                                             |
+| --------------------------------------------------------------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `user` / `session` / `account` / `verification` / `passkey` / `ssoProvider` | Better Auth tables via opaque bridge     | `DatabaseAdapter.transact?` gives atomic `consumeOne` / `incrementOne`; see [custom adapters](https://www.better-auth.com/docs/concepts/database#custom-adapters) |
+| `users` / `user_invite_tokens` / `project_members`                          | StoryShelf                               | `users` is the source of truth for roles, memberships, `display_name_override`                                                                                    |
+| Secrets                                                                     | `resolveAuthOptions` + `{env:NAME}` refs | `process.env` first, then your `resolveSecrets` hook (Vault/AWS/GCP)                                                                                              |
 
 ## Login is descriptor-driven
 
