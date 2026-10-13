@@ -1,5 +1,5 @@
 import { expect, expectTypeOf, it } from "vitest";
-import { DDL } from "./ddl.ts";
+import { DDL, IDENTITY_STATEMENTS } from "./ddl.ts";
 import { baselines } from "./schema/baseline.ts";
 import type { Baseline } from "./schema/baseline.ts";
 import { builds } from "./schema/build.ts";
@@ -100,9 +100,7 @@ const DDL_INDEXES = [
   "capture_attempts_build_no_idx",
   "capture_attempts_build_id_idx",
   "capture_logs_attempt_seq_idx",
-  "snapshots_build_story_mode_browser_idx",
   "snapshots_build_id_idx",
-  "baselines_project_story_mode_browser_branch_idx",
   "baselines_project_story_idx",
   "comments_build_id_idx",
   "label_types_project_key_idx",
@@ -134,4 +132,8 @@ it("DDL covers every table and index", () => {
   for (const index of DDL_INDEXES) {
     expect(DDL).toContain(index);
   }
+  // Browser-aware indexes reference a column older volumes only gain after ensureColumns.
+  const identity = IDENTITY_STATEMENTS.join("\n");
+  expect(identity).toContain("snapshots_build_story_mode_browser_idx");
+  expect(identity).toContain("baselines_project_story_mode_browser_branch_idx");
 });

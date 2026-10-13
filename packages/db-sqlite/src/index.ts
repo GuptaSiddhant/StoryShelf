@@ -1,7 +1,7 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { drizzle, type AsyncRemoteCallback } from "drizzle-orm/sqlite-proxy";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
-import { DDL, tableColumns } from "./ddl.ts";
+import { DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
 import { createDrizzleAdapter } from "./drizzle-factory.ts";
 import { ensureDbDir } from "./ensure-db-dir.ts";
 import { schema } from "./schema/index.ts";
@@ -142,10 +142,18 @@ function ensureColumns(sqlite: DatabaseSync, ddl: string): void {
   }
 }
 
+/** Swap in the browser-aware unique indexes (after `ensureColumns` added the column). */
+function applyIdentityStatements(sqlite: DatabaseSync): void {
+  for (const statement of IDENTITY_STATEMENTS) {
+    execIgnore(sqlite, statement);
+  }
+}
+
 function runMigrations(sqlite: DatabaseSync): void {
   sqlite.exec("PRAGMA foreign_keys = ON");
   sqlite.exec(DDL);
   ensureColumns(sqlite, DDL);
+  applyIdentityStatements(sqlite);
   try {
     sqlite.exec(WEBHOOK_SECRET_DROP);
   } catch {

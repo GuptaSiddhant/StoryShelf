@@ -41,6 +41,7 @@ export {
   type CaptureJobOptions,
 } from "./orchestrator.ts";
 export { persistCapture, type CaptureContext } from "./pipeline.ts";
+export { postStatusesForBuild } from "./status-fanout.ts";
 export {
   rediffBuild,
   REDIFFABLE_BUILD_STATUSES,

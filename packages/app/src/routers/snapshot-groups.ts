@@ -48,8 +48,12 @@ export async function approveGroup(
   }
   for (const member of members) {
     // oxlint-disable-next-line no-await-in-loop -- baselines are promoted engine by engine
-    await approveSnapshot(member.id, userId, { force: options.force ?? false });
+    await approveSnapshot(member.id, userId, {
+      force: options.force ?? false,
+      deferRefresh: true,
+    });
   }
+  await refreshBuild(build.id);
   return members.map((member) => member.id);
 }
 
