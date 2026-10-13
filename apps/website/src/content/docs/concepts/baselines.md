@@ -127,11 +127,17 @@ Builds are transient and purged by `purgeTtlDays` (default 30); baselines outliv
 | Default-branch baselines | Never | Yes |
 | Persistent builds | Never | Yes |
 
+## Portability (export & import)
+
+Baselines can leave and enter StoryShelf freely: export a project's baselines (optionally one branch) as a zip of `manifest.json` + PNGs and import the same archive into any instance, for backups, migrations, or staging → prod promotion. Import upserts by story, mode, browser, and branch, and needs the approver role. See [Baseline portability](/guides/portability/).
+
 ## API reference
 
 - `GET /api/v1/projects/:slug/baselines` — List baselines
 - `POST /api/v1/projects/:slug/baselines/promote` — Promote branch baselines
 - `GET /api/v1/projects/:slug/builds/:id/snapshots/:snapshotId/baseline` — Get baseline for snapshot
+- `GET /api/v1/projects/:slug/baselines/export?branch=` — Export baselines as a zip
+- `POST /api/v1/projects/:slug/baselines/import` — Import (upsert) baselines from a zip
 
 ## Common scenarios
 
