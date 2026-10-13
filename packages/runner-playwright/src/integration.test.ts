@@ -180,8 +180,6 @@ async function createHarness(): Promise<void> {
   harness = { app, db, storage, staticDir, tmp };
 }
 
-const isOldestFixture = FIXTURE_DIR.endsWith("storybook-8");
-
 describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smoke", () => {
   beforeAll(async () => {
     await createHarness();
@@ -274,48 +272,66 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
     expect(logs.some((line) => line.message.includes("duplicate sha already approved"))).toBe(true);
   }, 300_000);
 
-  it.skipIf(!isOldestFixture)(
-    "interaction: play, flaky and disableSnapshot",
-    async () => {
-      const { app, staticDir } = getHarness();
+  it("interaction: play, flaky and disableSnapshot", async () => {
+    const { app, staticDir } = getHarness();
 
-      // Create a project with executePlay enabled (opt-in)
-      const projectResponse = await app.request("/api/v1/projects", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: "Play Smoke", executePlay: true, playTimeoutMs: 5000 }),
-      });
-      expect(projectResponse.status).toBe(201);
-      const project = await readJson<{ id: string; slug: string }>(projectResponse);
+    // Create a project with executePlay enabled (opt-in)
+    const projectResponse = await app.request("/api/v1/projects", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Play Smoke", executePlay: true, playTimeoutMs: 5000 }),
+    });
+    expect(projectResponse.status).toBe(201);
+    const project = await readJson<{ id: string; slug: string }>(projectResponse);
 
-      const build = await uploadBuild(app, project.slug, staticDir, {
-        gitSha: "b".repeat(40),
-        gitBranch: "feature/play",
-        message: "play smoke",
-      });
+    const build = await uploadBuild(app, project.slug, staticDir, {
+      gitSha: "b".repeat(40),
+      gitBranch: "feature/play",
+      message: "play smoke",
+    });
 
-      // Poll until terminal. Play results land after snapshots, so the build
-      // passes through "reviewing" first — wait specifically for "failed"
-      // (expected because BlockingFailure is not flaky).
-      const final = await waitForBuild(app, project.slug, build.id, ["failed"]);
+    // Poll until terminal. Play results land after snapshots, so the build
+    // passes through "reviewing" first — wait specifically for "failed"
+    // (expected because BlockingFailure is not flaky).
+    const final = await waitForBuild(app, project.slug, build.id, ["failed"]);
 
-      // Non-flaky play failure blocks the build
-      expect(final.status).toBe("failed");
-      // Disabled story is not counted
-      expect(final.snapshotCount).toBeGreaterThan(0);
-      expect(final.snapshotCount).toBeLessThan(8);
+    // Non-flaky play failure blocks the build
+    expect(final.status).toBe("failed");
 
-      const snapshots = await (async (): Promise<Snapshot[]> => {
-        const res = await app.request(
-          `/api/v1/projects/${project.slug}/builds/${final.id}/snapshots`,
-        );
-        return readJson<Snapshot[]>(res);
-      })();
-      // Flaky stories should still have snapshots (non-blocking, warning)
-      const hasFlaky = snapshots.some((s) => s.storyId.includes("flaky"));
-      // At least one flaky snapshot should be present (they are captured despite play failure being non-blocking)
-      expect(hasFlaky || snapshots.length > 0).toBe(true);
-    },
-    300_000,
-  );
+    const logsRes = await app.request(
+      `/api/v1/projects/${project.slug}/builds/${final.id}/attempts/1/logs`,
+    );
+    const logs =
+      await readJson<{ level: string; message: string; fields: string | null }[]>(logsRes);
+    const storyIdsOf = (predicate: (l: { level: string; message: string }) => boolean) =>
+      logs
+        .filter((l) => predicate(l))
+        .map((l) => (JSON.parse(l.fields ?? "{}") as { storyId?: string }).storyId)
+        .filter((id): id is string => id !== undefined);
+    // Exactly one blocking failure (BlockingFailure); flaky play failures are warnings only
+    const attemptRes = await app.request(
+      `/api/v1/projects/${project.slug}/builds/${final.id}/attempts/1`,
+    );
+    const attempt = await readJson<{ failedCount: number }>(attemptRes);
+    expect(attempt.failedCount).toBe(1);
+    expect(logs.filter((l) => l.level === "error")).toEqual([]);
+    const flaky = storyIdsOf((l) => l.message.includes("flaky story failed"));
+    expect(new Set(flaky)).toEqual(
+      new Set([
+        "components-button--flaky-tag",
+        "components-button--flaky-param",
+        "components-button--chromatic-flaky",
+      ]),
+    );
+    // Disabled story is not counted
+    expect(final.snapshotCount).toBeGreaterThan(0);
+    expect(final.snapshotCount).toBeLessThan(8);
+
+    const res = await app.request(`/api/v1/projects/${project.slug}/builds/${final.id}/snapshots`);
+    const snapshots = await readJson<Snapshot[]>(res);
+    const ids = new Set(snapshots.map((s) => s.storyId));
+    // Stories without a play function (and the flaky ones) are still captured
+    expect(ids.has("components-button--primary")).toBe(true);
+    expect(ids.has("components-button--disabled")).toBe(false);
+  }, 300_000);
 });
