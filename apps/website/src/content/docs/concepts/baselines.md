@@ -30,6 +30,15 @@ The three-step algorithm above runs for every snapshot during capture. This mean
 - **Default branch** (usually `main`) acts as the fallback for all branches
 - **New stories** on any branch start as "new" until accepted
 
+## Rebase- and squash-proof
+
+Baseline lookup is a pure key lookup on `(project, story, viewport, browser, branch)` with the default-branch fallback above. StoryShelf never walks git history or ancestor builds, so:
+
+- **Rebasing or force-pushing** a branch changes its commit shas but not its branch name — the accepted baselines still apply and you are not asked to re-accept the same changes.
+- **Squash-merging** (or rebase-merging) to `main` needs no ancestry between the feature commits and the resulting commit; the next default-branch build simply writes the default baselines.
+
+This is locked in by tests in `baseline.test.ts`. Tools that resolve baselines by ancestor build document rebase/squash troubleshooting for the case where that lookup breaks; here there is nothing to break. (Affected capture does use git, but only to decide which stories to re-render, never which baseline applies.)
+
 ## Default branch behavior
 
 Builds on the default branch auto-approve and become the baselines. Pushing to `main` re-baselines the project — every snapshot on `main` updates the default-branch baseline.

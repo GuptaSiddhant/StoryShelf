@@ -416,6 +416,8 @@ For a snapshot of `(story, viewport)` in a build on branch `B`:
    - On the **default branch**: auto-approve and write the baseline.
    - On a **feature branch**: mark `new` (needs review).
 
+Resolution is a pure key lookup — no git ancestry or build history is consulted, so rebases, force-pushes and squash merges cannot break it (covered by tests in `baseline.test.ts`).
+
 This is what "per-branch acceptance with fallback to default" means: accepting a change on a feature branch writes a baseline **for that branch**, so subsequent commits on the same branch diff against the accepted version instead of re-flagging the same change against an untouched default branch.
 
 ### Workflow

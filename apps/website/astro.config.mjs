@@ -153,11 +153,12 @@ export default defineConfig({
               ],
             },
             {
-              label: "Coming from Chromatic",
+              label: "Coming from other tools",
               collapsed: true,
               items: [
                 { label: "Comparison", slug: "guides/chromatic-comparison" },
                 { label: "Migration", slug: "guides/chromatic-migration" },
+                { label: "Lost Pixel migration", slug: "guides/lost-pixel-migration" },
               ],
             },
           ],

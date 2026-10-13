@@ -5,6 +5,8 @@ description: Step-by-step guide to move from Chromatic to StoryShelf — config,
 
 This guide walks through migrating an existing Chromatic project to StoryShelf. It assumes you have a Chromatic project with existing baselines and CI integration.
 
+> Coming from Lost Pixel? See the [Lost Pixel migration guide](/guides/lost-pixel-migration/).
+
 ## Prerequisites
 
 - A running StoryShelf server (see [Getting started](/guides/getting-started/))

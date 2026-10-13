@@ -215,4 +215,59 @@ describe("BaselineModel", () => {
     const remaining = await model.list("p1");
     expect(remaining.map((b) => b.branch)).toEqual(["fresh"]);
   });
+
+  describe("rebase- and squash-proof lookup (no git ancestry)", () => {
+    it("keeps no commit reference in the baseline row or resolve() signature", async () => {
+      const { db, storage } = setup();
+      const model = new BaselineModel(db, { baselines: db.tables.baselines }, storage);
+      const { id } = await seedBaseline(model, storage, { branch: "feature/x" });
+      const row = (await model.list("p1")).find((b) => b.id === id) as unknown as Record<
+        string,
+        unknown
+      >;
+      expect(Object.keys(row).filter((k) => /sha|commit|parent|ancest/iu.test(k))).toEqual([]);
+      // Key lookup only: (project, story, viewport, branch, defaultBranch[, browser]).
+      expect(model.resolve.length).toBeLessThanOrEqual(6);
+    });
+
+    it("resolves the branch baseline for later builds regardless of their sha (rebase)", async () => {
+      const { db, storage } = setup();
+      const model = new BaselineModel(db, { baselines: db.tables.baselines }, storage);
+      const { id } = await seedBaseline(model, storage, { branch: "feature/x" });
+      // Builds at sha A, a rebased sha B, then sha C: resolve() receives no sha,
+      // so every call returns the same accepted baseline.
+      for (let i = 0; i < 3; i += 1) {
+        const resolved = await model.resolve(
+          "p1",
+          "components-button--primary",
+          "desktop",
+          "feature/x",
+          "main",
+        );
+        expect(resolved?.id).toBe(id);
+      }
+    });
+
+    it("squash-merge promotes via the default branch with an unrelated sha", async () => {
+      const { db, storage } = setup();
+      const model = new BaselineModel(db, { baselines: db.tables.baselines }, storage);
+      const story = "components-button--primary";
+      await seedBaseline(model, storage, { branch: "feature/x" });
+      await expect(model.resolve("p1", story, "desktop", "feature/y", "main")).resolves.toBeNull();
+      // The squash commit on main shares no ancestry with feature/x's commits:
+      // the default-branch build just upserts under (project, story, viewport, main).
+      await storage.write("source/squash.png", PNG);
+      const promoted = await model.upsert(
+        "p1",
+        story,
+        "desktop",
+        "main",
+        "snap-squash",
+        "source/squash.png",
+      );
+      const other = await model.resolve("p1", story, "desktop", "feature/y", "main");
+      expect(other?.id).toBe(promoted.id);
+      expect(other?.branch).toBe("main");
+    });
+  });
 });

@@ -43,6 +43,7 @@ Billed snapshots = visual snapshots + accessibility snapshots. TurboSnap copies 
 |--|-----------|------------|
 | **Capture** | Cloud browsers | Self-hosted on your infra: Playwright (Chromium/Firefox/WebKit) or lightweight Puppeteer (Chromium-only, chrome-headless-shell) |
 | **Baselines** | Global + branch | Per-branch with default-branch fallback |
+| **Baseline lookup** | Traverses git ancestry to find ancestor builds; rebase/squash can break it | Key lookup on project/story/viewport/branch — no history walk, rebase- and squash-proof |
 | **Storage** | Chromatic cloud | Your S3-compatible or local filesystem |
 | **Database** | Chromatic managed | Your SQLite/Turso/Postgres |
 | **Queue** | Chromatic managed | In-memory / Redis / SQS (your choice) |
@@ -76,6 +77,9 @@ Billed snapshots = visual snapshots + accessibility snapshots. TurboSnap copies 
 - **Per-branch baselines with fallback** — Cleaner model for long-lived feature branches.
 
 ## Migration considerations
+
+Coming from Lost Pixel instead? See the [Lost Pixel migration guide](/guides/lost-pixel-migration/).
+
 
 If migrating from Chromatic:
 
