@@ -118,6 +118,7 @@ export default defineConfig({
               collapsed: true,
               items: [
                 { label: "Project settings", slug: "guides/project-settings" },
+                { label: "Baseline portability", slug: "guides/portability" },
                 { label: "Configuration", slug: "guides/config" },
                 { label: "CLI overview", slug: "guides/cli" },
                 { label: "CLI client", slug: "guides/cli/client" },

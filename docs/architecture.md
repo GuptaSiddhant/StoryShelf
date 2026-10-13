@@ -458,6 +458,31 @@ baseline that applies *now* (own branch, else default):
 - Re-diff skips approved/rejected snapshots (decisions), inherited snapshots (never rendered), and
   default-branch builds (authoritative); the build roll-up is refreshed afterwards.
 
+### Baseline Portability (export/import)
+
+Baselines are portable between instances (backup/restore, migration, staging → prod promotion):
+`GET /api/v1/projects/:slug/baselines/export[?branch=]` streams a zip and
+`POST /api/v1/projects/:slug/baselines/import` (approver or admin) upserts from the same format.
+`BaselineTransferModel` (`core/models/baseline-transfer.ts`) owns both directions; the router only
+handles HTTP.
+
+- **Format v1.** `manifest.json` (`format: "storyshelf-baselines"`, `version: 1`, `exportedAt`,
+  `project`, `branch`, `baselines[]`, `skipped[]`) plus one PNG per baseline at
+  `baselines/<branch>/<storyId>/<mode>[~<browser>].png` — the storage layout without the project id.
+  Each manifest entry carries the identity (story, mode, browser, branch), `mode` JSON, `infraHash`,
+  timestamps, the zip `file`, and its SHA-256. Images are STORE-d (PNGs are already compressed) and
+  streamed one at a time; the manifest is written last. Missing images are listed under `skipped` (and logged); other storage
+  errors, or growing past the 512 MiB archive limit shared with import, abort the stream.
+- **Import is all-or-nothing validation, then upsert** (images stored first, rows applied in one
+  transaction when the driver has one, imports per project serialized). The archive (buffered, capped at
+  `min(maxUploadBytes, 512 MiB)`) is checked before any write: zip structure (no zip64, encryption,
+  or multi-disk; entry-count, per-entry and total-size limits applied before inflation; CRC checked),
+  entry names (no absolute paths, `..`, backslashes), manifest schema, identity segments (the same
+  checks as `baselinePath`), PNG signature, and SHA-256. Storage paths are always derived from the
+  manifest identity — zip entry names are lookup keys only. Rows keep their exported timestamps;
+  `snapshot_id` is cleared because snapshots are not portable. Import emits no webhooks.
+- **Out of scope.** Builds, snapshots, and review history (builds are transient by design).
+
 ### Review Comments
 
 Reviewers and developers can leave **threaded comments** on any snapshot (or on the build as a whole), and mark threads **resolved** once addressed. A comment on an unresolved snapshot keeps it in `changed` until the author pushes a fix and it is re-approved — this is the "request changes" flow. Comments persist on the build until the build is purged.
@@ -642,6 +667,10 @@ GET    /api/v1/projects/:projectId/members
 POST   /api/v1/projects/:projectId/members          # { userId, role }
 PATCH  /api/v1/projects/:projectId/members/:userId  # change role
 DELETE /api/v1/projects/:projectId/members/:userId
+
+# Baseline portability (zip: manifest.json + PNGs, format v1)
+GET    /api/v1/projects/:slug/baselines/export?branch=  # stream archive (viewer+)
+POST   /api/v1/projects/:slug/baselines/import          # application/zip body, upsert (approver+)
 
 # Publishing
 POST   /api/v1/projects/:projectId/builds/:buildId/publish     # mark build publicly viewable

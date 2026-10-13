@@ -62,6 +62,8 @@ describe("OpenAPI spec", () => {
     expect(doc.paths["/api/v1/projects"]).toBeDefined();
     expect(doc.paths["/api/v1/projects/{slug}/builds"]).toBeDefined();
     expect(doc.paths["/api/v1/admin/purge"]).toBeDefined();
+    expect(doc.paths["/api/v1/projects/{slug}/baselines/export"]).toHaveProperty("get");
+    expect(doc.paths["/api/v1/projects/{slug}/baselines/import"]).toHaveProperty("post");
   });
 
   it("tags and summarises every operation so the API reference can group and label them", async () => {
