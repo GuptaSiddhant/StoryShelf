@@ -32,14 +32,14 @@ export default {
 
 A mode value is:
 
-| Key | Meaning |
-| --- | --- |
-| `viewport` | A width in px, a Storybook viewport name (`mobile1`, `tablet`, or one from `parameters.viewport.viewports`), or `{ width, height }`. Omitted: the project's first viewport. |
-| `disable: true` | Skip an inherited mode (or viewport of the same name) for this story. |
-| anything else | A Storybook global, passed on the iframe URL as `globals=…`. Nested objects flatten (`backgrounds: { value: "#fff" }` → `backgrounds.value:!hex(fff)`). |
+| Key             | Meaning                                                                                                                                                                     |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `viewport`      | A width in px, a Storybook viewport name (`mobile1`, `tablet`, or one from `parameters.viewport.viewports`), or `{ width, height }`. Omitted: the project's first viewport. |
+| `disable: true` | Skip an inherited mode (or viewport of the same name) for this story.                                                                                                       |
+| anything else   | A Storybook global, passed on the iframe URL as `globals=…`. Nested objects flatten (`backgrounds: { value: "#fff" }` → `backgrounds.value:!hex(fff)`).                     |
 
 :::note
-Storybook only applies globals declared in your `globalTypes` / `initialGlobals`, and only values made of letters, digits, spaces, `_` and `-` (plus the `!true`/`!hex()` forms StoryShelf encodes for you). Anything else is silently ignored by Storybook.
+Storybook only applies globals declared in your `globalTypes` / `initialGlobals`; undeclared ones are ignored. StoryShelf encodes colors, booleans and nested objects for the URL for you (verified on Storybook 8, 9 and 10). Keep other string values to letters, digits, spaces, `_` and `-` for portability.
 :::
 
 ## Identity

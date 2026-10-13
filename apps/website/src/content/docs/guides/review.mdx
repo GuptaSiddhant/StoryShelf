@@ -5,7 +5,7 @@ description: Approve, reject, comment, and retry — the build review flow that 
 
 import Screenshot from '../../../components/Screenshot.astro';
 
-Every build lands in `reviewing` once diffing finishes (default-branch builds auto-approve). Review is per-snapshot; the build gate is the merge gate.
+Every build lands in `reviewing` once diffing finishes (default-branch builds auto-approve). Review is per story and mode: when a project captures several browsers, one decision covers every browser (see below). The build gate is the merge gate.
 
 <Screenshot name="diff-review" alt="The review workspace: snapshot filmstrip, baseline | current | diff comparison, and the action bar" />
 
@@ -19,8 +19,9 @@ Keyboard: `j`/`k` (or `→`/`←`) move between snapshots, `a` approves, `r` rej
 
 ## Approve / reject
 
+- **Story and mode, all browsers:** `POST /api/v1/projects/:slug/builds/:id/stories/:storyId/modes/:modeKey/approve` (or `/reject`). Every open snapshot of that story/mode is approved and each engine's baseline promoted. If any engine's baseline changed after its diff, nothing is approved (409) unless `?force=true`. In the review page the primary **Approve** does this; **Only this browser** (for example “Only firefox”) approves just the browser you are viewing, and `[` / `]` switch browser.
 - **One snapshot:** `POST /api/v1/projects/:slug/builds/:id/snapshots/:snapshotId/approve` (or `/reject`). Approving copies that snapshot’s PNG to `baselines/{branch}/{storyId}/{viewport}.png` — the branch’s new expected.
-- **Bulk:** `POST …/builds/:id/approve-all` / `reject-all`.
+- **Bulk:** `POST …/builds/:id/approve-all` / `reject-all`. A story/mode whose baseline drifted on any engine is skipped as a whole.
 
 The build status flips to `approved` when every `new`/`changed` snapshot is resolved, `rejected` if any is rejected, stays `reviewing` while unresolved. Snapshot statuses: `new` (no baseline), `changed` (threshold exceeded), `unchanged` (within), `approved`/`rejected`/`pending`.
 

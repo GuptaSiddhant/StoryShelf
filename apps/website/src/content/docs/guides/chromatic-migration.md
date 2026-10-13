@@ -5,6 +5,8 @@ description: Step-by-step guide to move from Chromatic to StoryShelf — config,
 
 This guide walks through migrating an existing Chromatic project to StoryShelf. It assumes you have a Chromatic project with existing baselines and CI integration.
 
+> Coming from Lost Pixel? See the [Lost Pixel migration guide](/guides/lost-pixel-migration/).
+
 ## Prerequisites
 
 - A running StoryShelf server (see [Getting started](/guides/getting-started/))
@@ -18,7 +20,9 @@ This guide walks through migrating an existing Chromatic project to StoryShelf. 
 
 **Workaround:** On first StoryShelf run, all snapshots will appear as "new" or "changed" (against default branch). Your team will need to re-accept them once. This is a one-time cost.
 
-> **Tip:** If you have a small number of critical baselines, you can manually download them from Chromatic UI and upload via StoryShelf API, but this is not practical for large projects.
+> **Tip:** If you have a small number of critical baselines, you can download them from the Chromatic UI and package them as a [baseline archive](/guides/portability/#archive-format-v1) to import. This isn't practical for large projects.
+
+StoryShelf doesn't repeat this lock-in: once you're on it, [baseline export/import](/guides/portability/) moves your baselines to any other instance or into backups.
 
 ## 2. Deploy StoryShelf server
 

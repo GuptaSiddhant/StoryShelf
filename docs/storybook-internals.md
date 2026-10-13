@@ -292,20 +292,23 @@ render-finished signal rather than a clock:
   richer failure diagnostics than today's "play failed: <message>" — StoryShelf could record *where*
   in the interaction run a story failed.
 
-### 10.3 Drive stories like the manager (modes / args / globals) (medium — the biggest product lever)
+### 10.3 Drive stories like the manager (modes / args / globals) — modes shipped (ADR 0028)
 
-Chromatic's "modes" (viewports + backgrounds) are manager-style channel broadcasts applied before a
-capture. StoryShelf's runner could emit the same events via the in-page channel instead of only
-resizing the viewport:
+Chromatic-style **modes** are implemented, but through the URL rather than channel events:
+`iframe.html?...&globals=theme:dark;backgrounds.value:!hex(1E293B)` applies Storybook globals before
+the story renders (verified against Storybook 8, 9 and 10 with Chromium and Firefox; the fixtures'
+`theme` global and `Themed` stories are the reference). Findings from that spike:
 
-- `UPDATE_STORY_ARGS` / `UPDATE_GLOBALS` before screenshot → an **args matrix** feature
-  (`parameters.storyshelf.args` overrides) without any StoryShelf-side renderer work — the preview
-  does the re-render.
-- A per-story `background` / `theme` selection in the same way — honoring what the user configured in
-  Storybook's own toolbar.
-- Caveat: capturing the *same* story at N arg sets multiplies snapshots and baseline bookkeeping
-  (snapshot rows are currently `story_id × viewport`). Needs a deliberate schema decision before it's
-  worth it.
+- `preview.extract()` is **async** (it caches every CSF file first); Playwright awaits the returned
+  promise, so one page load yields every story's fully stacked parameters, including
+  `chromatic.modes` / `storyshelf.modes`. `index.json` carries no parameters.
+- Declared globals (`globalTypes` / `initialGlobals`) take effect; undeclared ones are ignored.
+  String values pass through as-is on 8–10; colors use `!hex(...)`, booleans `!true`/`!false`.
+- The `viewport` key of a mode sizes the page; it is not forwarded as a global.
+
+Still open: an **args matrix** (`UPDATE_STORY_ARGS` before the screenshot, i.e.
+`parameters.storyshelf.args` overrides). It would reuse the mode machinery (a mode would carry args),
+but needs its own identity story in the baseline key.
 
 ### 10.4 Per-story viewports from Storybook's own parameters (low effort)
 

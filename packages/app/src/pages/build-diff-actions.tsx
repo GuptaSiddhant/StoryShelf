@@ -2,7 +2,7 @@ import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { Badge, Button, Kbd, statusTone } from "../ui/components.tsx";
 import { actionBar, actionGroup, actionHints, actionPosition } from "../ui/styles/review-layout.ts";
-import { neighbours, snapshotPageUrl } from "./build-diff-model.ts";
+import { groupOf, neighbours, snapshotPageUrl, type SnapshotGroup } from "./build-diff-model.ts";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -13,28 +13,71 @@ export interface DiffActionBarProps {
   snapshots: Snapshot[];
   selected: Snapshot;
   canReview: boolean;
+  /** Open snapshots whose baseline changed after their diff was computed. */
+  drifted: Record<string, "stale" | "removed">;
+}
+
+/** What one decision covers: a whole story/mode across browsers, or a single snapshot. */
+interface DecisionTarget {
+  /** Endpoint prefix; `/approve` and `/reject` are appended. */
+  base: string;
+  /** True when the decision applies to every open browser of the story/mode. */
+  shared: boolean;
   drifted: boolean;
+  label: string;
 }
 
-function snapshotBase(project: Project, build: Build, snapshot: Snapshot): string {
-  return `/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${snapshot.id}`;
+function apiBase(project: Project, build: Build): string {
+  return `/api/v1/projects/${project.slug}/builds/${build.id}`;
 }
 
-type DecisionProps = { project: Project; build: Build; selected: Snapshot; drifted: boolean };
+const isOpenStatus = (snap: Snapshot): boolean =>
+  snap.status === "new" || snap.status === "changed";
 
-/** Approve (or "Approve anyway" when the baseline moved) as its own form. */
-function ApproveForm(props: DecisionProps): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { project, build, selected, drifted } = props;
-  const url = `${snapshotBase(project, build, selected)}/approve${drifted ? "?force=true" : ""}`;
+function sharedTarget(
+  base: string,
+  group: SnapshotGroup,
+  open: Snapshot[],
+  name: string,
+): Pick<DecisionTarget, "base" | "shared" | "label"> {
+  const story = encodeURIComponent(group.storyId);
+  const mode = encodeURIComponent(group.modeKey);
+  return {
+    base: `${base}/stories/${story}/modes/${mode}`,
+    shared: true,
+    label: `${name} (${open.length} browsers)`,
+  };
+}
+
+function decisionTarget(props: DiffActionBarProps): DecisionTarget | null {
+  const { project, build, snapshots, selected, drifted } = props;
+  const group = groupOf(snapshots, selected.id);
+  const open = (group?.members ?? [selected]).filter((snap) => isOpenStatus(snap));
+  const [first] = open;
+  if (!first) return null;
+  const base = apiBase(project, build);
+  const drift = { drifted: open.some((snap) => drifted[snap.id] !== undefined) };
+  if (open.length > 1 && group) {
+    return { ...sharedTarget(base, group, open, selected.storyName), ...drift };
+  }
+  return { base: `${base}/snapshots/${first.id}`, shared: false, label: first.storyName, ...drift };
+}
+
+/** Approve (or "Approve anyway" when a baseline moved) as its own form. */
+function ApproveForm(props: {
+  target: DecisionTarget;
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const { target } = props;
+  const url = `${target.base}/approve${target.drifted ? "?force=true" : ""}`;
   return (
     <form
       method="post"
       action={url}
       hx-post={url}
       hx-target="body"
-      data-toast={`Approved ${selected.storyName}`}
+      data-toast={`Approved ${target.label}`}
     >
-      {drifted ? (
+      {target.drifted ? (
         <Button
           variant="secondary"
           size="sm"
@@ -51,28 +94,59 @@ function ApproveForm(props: DecisionProps): HtmlEscapedString | Promise<HtmlEsca
           type="submit"
           icon="check"
           data-approve
-          title="Approve (a)"
+          title={target.shared ? "Approve every browser (a)" : "Approve (a)"}
         >
-          Approve
+          {target.shared ? "Approve all browsers" : "Approve"}
         </Button>
       )}
     </form>
   );
 }
 
-/** Approve/reject for a reviewable snapshot; both advance to the next open one. */
-function DecisionButtons(props: DecisionProps): HtmlEscapedString | Promise<HtmlEscapedString> {
+/** Per-snapshot escape hatch: approve only the browser being viewed. */
+function ApproveOnlyThisForm(props: {
+  project: Project;
+  build: Build;
+  selected: Snapshot;
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, selected } = props;
-  const base = snapshotBase(project, build, selected);
+  const url = `${apiBase(project, build)}/snapshots/${selected.id}/approve`;
+  return (
+    <form
+      method="post"
+      action={url}
+      hx-post={url}
+      hx-target="body"
+      data-toast={`Approved ${selected.storyName} on ${selected.browser ?? "chromium"}`}
+    >
+      <Button variant="ghost" size="sm" type="submit" title="Approve only this browser">
+        Only {selected.browser ?? "chromium"}
+      </Button>
+    </form>
+  );
+}
+
+/** Approve/reject for a reviewable story/mode; both advance to the next open one. */
+function DecisionButtons(props: {
+  project: Project;
+  build: Build;
+  selected: Snapshot;
+  target: DecisionTarget;
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const { project, build, selected, target } = props;
+  const selectedOpen = selected.status === "new" || selected.status === "changed";
   return (
     <div class={actionGroup}>
-      <ApproveForm {...props} />
+      <ApproveForm target={target} />
+      {target.shared && selectedOpen ? (
+        <ApproveOnlyThisForm project={project} build={build} selected={selected} />
+      ) : null}
       <form
         method="post"
-        action={`${base}/reject`}
-        hx-post={`${base}/reject`}
+        action={`${target.base}/reject`}
+        hx-post={`${target.base}/reject`}
         hx-target="body"
-        data-toast={`Rejected ${selected.storyName}`}
+        data-toast={`Rejected ${target.label}`}
         data-toast-tone="warning"
       >
         <Button variant="danger" size="sm" type="submit" icon="x" data-reject title="Reject (r)">
@@ -117,9 +191,9 @@ function StepButton(props: {
 export function DiffActionBar(
   props: DiffActionBarProps,
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { project, build, snapshots, selected, canReview, drifted } = props;
+  const { project, build, snapshots, selected, canReview } = props;
   const around = neighbours(snapshots, selected.id);
-  const reviewable = selected.status === "new" || selected.status === "changed";
+  const target = decisionTarget(props);
   return (
     <div class={actionBar} role="toolbar" aria-label="Review actions">
       <div class={actionGroup}>
@@ -135,8 +209,8 @@ export function DiffActionBar(
           <Kbd keys="?" />
         </Button>
       </div>
-      {canReview && reviewable ? (
-        <DecisionButtons project={project} build={build} selected={selected} drifted={drifted} />
+      {canReview && target ? (
+        <DecisionButtons project={project} build={build} selected={selected} target={target} />
       ) : (
         <Badge tone={statusTone(selected.status)} icon>
           {selected.status}

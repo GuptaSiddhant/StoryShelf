@@ -16,6 +16,7 @@ import { HTTPException } from "hono/http-exception";
 import { Readable, Transform } from "node:stream";
 import type { ReadableStream as NodeWebStream } from "node:stream/web";
 import { credentialKeys } from "../credential-keys.ts";
+import { postReviewStatus } from "../git-status.ts";
 import { notifyProject } from "../notify.ts";
 import { getStore } from "../store.ts";
 import { assertBaselineCurrent } from "./baseline-guard.ts";
@@ -176,54 +177,52 @@ export async function snapshotForBuild(
   return snapshot;
 }
 
+/** Roll snapshot statuses up into the build's review status. */
+function rollupStatus(snapshots: Snapshot[]): "reviewing" | "rejected" | "approved" {
+  if (snapshots.some((s) => s.status === "new" || s.status === "changed")) {
+    return "reviewing";
+  }
+  return snapshots.some((s) => s.status === "rejected") ? "rejected" : "approved";
+}
+
 /** Recompute a build's counts and roll its status up from its snapshots. */
 export async function refreshBuild(buildId: string): Promise<void> {
   const { db, config } = getStore();
   await new BuildModel(db).updateCounts(buildId);
   const snapshots = await new SnapshotModel(db).listByBuild(buildId);
-  const unresolved = snapshots.some((s) => s.status === "new" || s.status === "changed");
-  let status: "reviewing" | "rejected" | "approved";
-  if (unresolved) {
-    status = "reviewing";
-  } else {
-    const rejected = snapshots.some((s) => s.status === "rejected");
-    status = rejected ? "rejected" : "approved";
-  }
+  const status = rollupStatus(snapshots);
   const build = await new BuildModel(db).get(buildId);
-  if (build) {
-    await new BuildModel(db).setStatus(buildId, status);
-    await emitWebhookEvent(
-      db,
-      { webhooks: getStore().db.tables.webhooks },
-      build.projectId,
-      `build:${status}`,
-      {
-        buildId,
-        status,
-        snapshotCount: snapshots.length,
-      },
-      credentialKeys(config),
-    );
-    const project = await new ProjectModel(db).get(build.projectId);
-    if (project) {
-      await notifyProject(
-        project,
-        `build:${status}`,
-        { buildId, status, snapshotCount: snapshots.length },
-        `/builds/${buildId}`,
-      );
-    }
-  }
+  if (!build) return;
+  await new BuildModel(db).setStatus(buildId, status);
+  await emitWebhookEvent(
+    db,
+    { webhooks: getStore().db.tables.webhooks },
+    build.projectId,
+    `build:${status}`,
+    { buildId, status, snapshotCount: snapshots.length },
+    credentialKeys(config),
+  );
+  const project = await new ProjectModel(db).get(build.projectId);
+  if (!project) return;
+  await postReviewStatus(project, build, build.status, status);
+  await notifyProject(
+    project,
+    `build:${status}`,
+    { buildId, status, snapshotCount: snapshots.length },
+    `/builds/${buildId}`,
+  );
 }
 
 /**
  * Approve a snapshot, promote its screenshot to baseline, and refresh the build.
  * Refuses with 409 when the baseline changed since the diff, unless `force` is set.
+ * Bulk callers pass `deferRefresh` and call {@link refreshBuild} once, so the build's
+ * outcome (and its git status) is announced a single time.
  */
 export async function approveSnapshot(
   snapshotId: string,
   userId: string | null,
-  options: { force?: boolean } = {},
+  options: { force?: boolean; deferRefresh?: boolean } = {},
 ): Promise<void> {
   const { db, config } = getStore();
   const snapshots = new SnapshotModel(db);
@@ -269,7 +268,9 @@ export async function approveSnapshot(
     },
     `/builds/${build.id}`,
   );
-  await refreshBuild(build.id);
+  if (!options.deferRefresh) {
+    await refreshBuild(build.id);
+  }
 }
 
 /** Roles permitted to view builds, snapshots, and comments. */

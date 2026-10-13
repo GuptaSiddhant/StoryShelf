@@ -42,6 +42,7 @@ import {
   snapshotCardMeta,
   snapshotGrid,
 } from "../ui/styles/review.ts";
+import { groupSnapshots } from "./build-diff-model.ts";
 import {
   DesignButtons,
   ProjectDesignLinks,
@@ -269,13 +270,19 @@ interface LibraryContext {
   design: LibraryDesign;
 }
 
+/** One snapshot per story/mode: the primary engine's (other browsers are review detail). */
+function primaryEngineSnapshots(snapshots: Snapshot[]): Snapshot[] {
+  return groupSnapshots(snapshots).map((group) => group.primary);
+}
+
 function renderLibraryGrid(
   project: Project,
   build: Build,
-  snapshots: Snapshot[],
+  allSnapshots: Snapshot[],
   context: LibraryContext,
 ): RenderedContent {
   const { branches, health } = context;
+  const snapshots = primaryEngineSnapshots(allSnapshots);
   const byTitle = groupByTitle(snapshots);
   const viewportNames = distinctViewports(snapshots);
   const multi = viewportNames.length > 1;

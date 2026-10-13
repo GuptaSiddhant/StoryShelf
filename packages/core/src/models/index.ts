@@ -6,6 +6,16 @@
  */
 export { BaselineModel } from "./baseline.ts";
 export {
+  BASELINE_ARCHIVE_FORMAT,
+  BASELINE_ARCHIVE_LIMITS,
+  BASELINE_ARCHIVE_VERSION,
+  BaselineArchiveError,
+  type BaselineManifest,
+  type BaselineManifestEntry,
+} from "./baseline-archive.ts";
+export type { BaselineExportOptions } from "./baseline-export.ts";
+export { BaselineTransferModel, type BaselineImportResult } from "./baseline-transfer.ts";
+export {
   baselineStatus,
   isBaselineDrifted,
   NO_BASELINE,

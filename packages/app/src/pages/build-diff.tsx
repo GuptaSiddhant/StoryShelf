@@ -11,6 +11,7 @@ import { DiffActionBar } from "./build-diff-actions.tsx";
 import { DiffComments } from "./build-diff-comments.tsx";
 import { DiffHeader } from "./build-diff-header.tsx";
 import { InsightSlot } from "./build-diff-insight.tsx";
+import { groupOf, reviewProgress } from "./build-diff-model.ts";
 import { DiffNav } from "./build-diff-nav.tsx";
 import { ShortcutsDialog } from "./build-diff-shortcuts.tsx";
 import { StaleBaselineNotice } from "./build-diff-stale.tsx";
@@ -80,6 +81,7 @@ function DiffReviewGrid(
               project={project}
               build={build}
               selected={selected}
+              siblings={groupOf(snapshots, selected.id)?.members}
               hasBaseline={hasBaseline}
               drifted={drifted[selected.id]}
               usage={usage}
@@ -99,7 +101,7 @@ function DiffReviewGrid(
               snapshots={snapshots}
               selected={selected}
               canReview={canReview}
-              drifted={drifted[selected.id] !== undefined}
+              drifted={drifted}
             />
           </>
         ) : (
@@ -130,7 +132,7 @@ function reviewNav(project: Project, build: Build): NavConfig {
 export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
   const { project, build, snapshots, comments, selectedId, canReview, hasBaseline, drifted } = data;
   const selected = selectedSnapshot(snapshots, selectedId);
-  const pending = snapshots.filter((s) => s.status === "new" || s.status === "changed");
+  const pendingGroups = reviewProgress(snapshots).pending;
 
   return (
     <DocumentLayout
@@ -142,7 +144,7 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
         project={project}
         build={build}
         snapshots={snapshots}
-        pendingCount={pending.length}
+        pendingCount={pendingGroups}
         canReview={canReview}
       />
 

@@ -7,7 +7,8 @@ import { shortcutsDialog } from "../ui/styles/review-layout.ts";
 const SHORTCUTS: { keys: string[]; action: string }[] = [
   { keys: ["j", "→"], action: "Next snapshot" },
   { keys: ["k", "←"], action: "Previous snapshot" },
-  { keys: ["a"], action: "Approve" },
+  { keys: ["[", "]"], action: "Previous / next browser of this story" },
+  { keys: ["a"], action: "Approve (all browsers of the story and mode)" },
   { keys: ["r"], action: "Reject" },
   { keys: ["1", "–", "5"], action: "Side by side, swipe, onion skin, diff, flip" },
   { keys: ["f"], action: "Cycle zoom (fit, 100%, 200%, 400%)" },

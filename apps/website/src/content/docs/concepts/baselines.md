@@ -30,6 +30,15 @@ The three-step algorithm above runs for every snapshot during capture. This mean
 - **Default branch** (usually `main`) acts as the fallback for all branches
 - **New stories** on any branch start as "new" until accepted
 
+## Rebase- and squash-proof
+
+Baseline lookup is a pure key lookup on `(project, story, viewport, browser, branch)` with the default-branch fallback above. StoryShelf never walks git history or ancestor builds, so:
+
+- **Rebasing or force-pushing** a branch changes its commit shas but not its branch name — the accepted baselines still apply and you are not asked to re-accept the same changes.
+- **Squash-merging** (or rebase-merging) to `main` needs no ancestry between the feature commits and the resulting commit; the next default-branch build simply writes the default baselines.
+
+This is locked in by tests in `baseline.test.ts`. Tools that resolve baselines by ancestor build document rebase/squash troubleshooting for the case where that lookup breaks; here there is nothing to break. (Affected capture does use git, but only to decide which stories to re-render, never which baseline applies.)
+
 ## Default branch behavior
 
 Builds on the default branch auto-approve and become the baselines. Pushing to `main` re-baselines the project — every snapshot on `main` updates the default-branch baseline.
@@ -127,11 +136,17 @@ Builds are transient and purged by `purgeTtlDays` (default 30); baselines outliv
 | Default-branch baselines | Never | Yes |
 | Persistent builds | Never | Yes |
 
+## Portability (export & import)
+
+Baselines can leave and enter StoryShelf freely: export a project's baselines (optionally one branch) as a zip of `manifest.json` + PNGs and import the same archive into any instance, for backups, migrations, or staging → prod promotion. Import upserts by story, mode, browser, and branch, and needs the approver role. See [Baseline portability](/guides/portability/).
+
 ## API reference
 
 - `GET /api/v1/projects/:slug/baselines` — List baselines
 - `POST /api/v1/projects/:slug/baselines/promote` — Promote branch baselines
 - `GET /api/v1/projects/:slug/builds/:id/snapshots/:snapshotId/baseline` — Get baseline for snapshot
+- `GET /api/v1/projects/:slug/baselines/export?branch=` — Export baselines as a zip
+- `POST /api/v1/projects/:slug/baselines/import` — Import (upsert) baselines from a zip
 
 ## Common scenarios
 

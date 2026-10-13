@@ -16,11 +16,12 @@ import {
 } from "../ui/styles/review-layout.ts";
 import {
   diffPercent,
-  isVariantSnapshot,
+  groupSnapshots,
+  isOpenGroup,
   reviewProgress,
   snapshotImageUrl,
   snapshotPageUrl,
-  snapshotVariant,
+  type SnapshotGroup,
 } from "./build-diff-model.ts";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
@@ -55,19 +56,24 @@ export interface DiffNavProps {
 function FilmItem(props: {
   project: Project;
   build: Build;
-  snap: Snapshot;
+  group: SnapshotGroup;
   active: boolean;
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { project, build, snap, active } = props;
+  const { project, build, group, active } = props;
+  const snap = group.representative;
   const url = snapshotPageUrl(project, build, snap.id);
   const percent = diffPercent(snap);
+  const tags = [
+    group.modeKey === "desktop" ? "" : group.modeKey,
+    group.members.length > 1 ? `${group.members.length} browsers` : "",
+  ].filter((tag) => tag !== "");
   return (
     <a
       href={url}
       class={active ? filmItemActive : filmItem}
       data-snapshot-link
       data-snapshot-id={snap.id}
-      data-status={snap.status}
+      data-status={isOpenGroup(group) ? "changed" : snap.status}
       aria-current={active ? "true" : undefined}
       hx-get={url}
       hx-target="body"
@@ -78,10 +84,7 @@ function FilmItem(props: {
         <span class={filmTitle} title={`${snap.storyTitle} / ${snap.storyName}`}>
           {snap.storyName}
         </span>
-        <span class={filmSub}>
-          {snap.storyTitle}
-          {isVariantSnapshot(snap) ? ` · ${snapshotVariant(snap)}` : ""}
-        </span>
+        <span class={filmSub}>{[snap.storyTitle, ...tags].join(" · ")}</span>
         <span class={filmStatus}>
           <span class={statusDots[statusTone(snap.status)]} aria-hidden="true" />
           {snap.status}
@@ -92,9 +95,10 @@ function FilmItem(props: {
   );
 }
 
-/** Left filmstrip: filter chips plus a thumbnail per snapshot. */
+/** Left filmstrip: filter chips plus a thumbnail per story/mode (browsers share one entry). */
 export function DiffNav(props: DiffNavProps): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, snapshots, selectedId } = props;
+  const groups = groupSnapshots(snapshots);
   const progress = reviewProgress(snapshots);
   const filter = progress.pending > 0 ? "review" : "all";
   return (
@@ -109,19 +113,19 @@ export function DiffNav(props: DiffNavProps): HtmlEscapedString | Promise<HtmlEs
               value: "review",
               active: filter === "review",
             },
-            { label: `All ${snapshots.length}`, value: "all", active: filter === "all" },
+            { label: `All ${groups.length}`, value: "all", active: filter === "all" },
             { label: `Done ${progress.done}`, value: "done" },
           ]}
         />
       </div>
       <div data-diff-nav data-current={selectedId} data-filter={filter} class={filteredList}>
-        {snapshots.map((snap): HtmlEscapedString | Promise<HtmlEscapedString> => (
+        {groups.map((group): HtmlEscapedString | Promise<HtmlEscapedString> => (
           <FilmItem
-            key={snap.id}
+            key={group.key}
             project={project}
             build={build}
-            snap={snap}
-            active={selectedId === snap.id}
+            group={group}
+            active={group.members.some((snap) => snap.id === selectedId)}
           />
         ))}
       </div>
