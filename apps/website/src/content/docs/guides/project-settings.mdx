@@ -5,7 +5,7 @@ description: Configure members, label types, tokens, webhooks, and visibility pe
 
 import Screenshot from '../../../components/Screenshot.astro';
 
-Each project carries its own settings — under `/projects/:slug/settings` (sections: General, Tests, Labels, Tokens, Webhooks, Notifications, Members, Git status, and AI when the server has AI configured) and via `PATCH /api/v1/projects/:slug`.
+Each project carries its own settings — under `/projects/:slug/settings` (sections: General, Capture, Tests, Labels, Tokens, Webhooks, Notifications, Members, Git status, and AI when the server has AI configured) and via `PATCH /api/v1/projects/:slug`.
 
 <Screenshot name="project-settings" alt="Project settings: a section list on the left and the API tokens form on the right" />
 
@@ -14,6 +14,10 @@ Each project carries its own settings — under `/projects/:slug/settings` (sect
 Name, `git_repository` (`owner/repo`), `git_default_branch` (baseline fallback, default `main`), diff thresholds (`pixel_threshold` 0–1, `max_diff_ratio` 0–1), capture browser (`chromium`/`firefox`/`webkit`/`chrome`), viewports, and `public_branch_regex` for published Storybook access (see [Published Storybook](/concepts/publishing/)).
 
 `PATCH /api/v1/projects/:slug` is site-admin or project-admin only; `GET /api/v1/projects/:slug` respects `viewer`+ membership.
+
+## Capture
+
+Which engines each build is captured on and which [modes](/guides/modes/) run. **Browsers**: a primary engine plus up to two more (`browsers` via `PATCH`, primary first); each engine keeps its own baselines, and one approval covers a story and mode on all of them. **Mode allowlist**: mode names to run (`modesAllowlist`); empty runs every mode declared in your stories' parameters.
 
 ## Label types
 

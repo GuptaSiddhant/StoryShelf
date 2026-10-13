@@ -7,6 +7,7 @@ import { PageHeader, SubNavLayout } from "../ui/components.tsx";
 import type { IconName } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import { renderSettingsAi, type SettingsAiData } from "./settings-ai.tsx";
+import { renderSettingsCapture } from "./settings-capture.tsx";
 import { renderSettingsGeneral } from "./settings-general.tsx";
 import { renderSettingsLabels } from "./settings-labels.tsx";
 import {
@@ -28,6 +29,7 @@ import { renderSettingsWebhooks, type SettingsWebhook } from "./settings-webhook
 /** Tabs available in the project settings section. */
 export type SettingsTab =
   | "general"
+  | "capture"
   | "tests"
   | "labels"
   | "links"
@@ -74,6 +76,7 @@ function tabHref(project: Project, tab: SettingsTab): string {
 
 const TAB_LABELS: Record<SettingsTab, string> = {
   general: "General",
+  capture: "Capture",
   tests: "Tests",
   labels: "Labels",
   links: "Links",
@@ -87,6 +90,7 @@ const TAB_LABELS: Record<SettingsTab, string> = {
 
 const TAB_ICONS: Record<SettingsTab, IconName> = {
   general: "settings",
+  capture: "image",
   tests: "activity",
   labels: "tag",
   links: "external-link",
@@ -100,6 +104,7 @@ const TAB_ICONS: Record<SettingsTab, IconName> = {
 
 const SETTINGS_TABS: SettingsTab[] = [
   "general",
+  "capture",
   "tests",
   "labels",
   "links",
@@ -115,6 +120,7 @@ const SETTINGS_TABS: SettingsTab[] = [
 function renderBehaviourTab(data: ProjectSettingsData, formState?: SettingsFormState): unknown {
   const { project, activeTab } = data;
   if (activeTab === "general") return renderSettingsGeneral(project, formState, data.isAdmin);
+  if (activeTab === "capture") return renderSettingsCapture(project, data.isAdmin, formState);
   if (activeTab === "ai") return renderSettingsAi(project, data.ai, formState);
   return activeTab === "tests" ? renderSettingsTests(project, data.isAdmin, formState) : undefined;
 }

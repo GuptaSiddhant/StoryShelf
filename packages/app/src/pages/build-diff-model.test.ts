@@ -2,14 +2,30 @@ import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
 import { describe, expect, it } from "vitest";
 import {
   diffPercent,
+  groupOf,
+  groupSnapshots,
+  isOpenGroup,
   neighbours,
   reviewProgress,
   snapshotImageUrl,
   snapshotPageUrl,
 } from "./build-diff-model.ts";
 
-const snap = (id: string, status: string, diffRatio: number | null = null): Snapshot =>
-  ({ id, status, diffRatio }) as unknown as Snapshot;
+const snap = (
+  id: string,
+  status: string,
+  diffRatio: number | null = null,
+  extra: Partial<Pick<Snapshot, "storyId" | "viewportName" | "browser">> = {},
+): Snapshot =>
+  ({
+    id,
+    status,
+    diffRatio,
+    storyId: `story-${id}`,
+    viewportName: "desktop",
+    browser: "chromium",
+    ...extra,
+  }) as unknown as Snapshot;
 const project = { slug: "demo" } as Project;
 const build = { id: "b1" } as Build;
 
@@ -25,12 +41,76 @@ describe("reviewProgress", () => {
     expect(progress).toEqual({ reviewable: 4, done: 2, pending: 2 });
   });
 
+  it("counts a story/mode once across browsers (shared approval)", () => {
+    const shared = { storyId: "s", viewportName: "dark" };
+    expect(
+      reviewProgress([
+        snap("c", "changed", null, shared),
+        snap("f", "changed", null, { ...shared, browser: "firefox" }),
+        snap("x", "approved", null, { storyId: "x" }),
+      ]),
+    ).toEqual({ reviewable: 2, done: 1, pending: 1 });
+    // one engine decided individually, the other still open: the group stays pending
+    expect(
+      reviewProgress([
+        snap("c", "approved", null, shared),
+        snap("f", "changed", null, { ...shared, browser: "firefox" }),
+      ]),
+    ).toEqual({ reviewable: 1, done: 0, pending: 1 });
+  });
+
   it("handles an empty build", () => {
     expect(reviewProgress([])).toEqual({ reviewable: 0, done: 0, pending: 0 });
   });
 });
 
+describe("groupSnapshots", () => {
+  it("groups engines of one story/mode, chromium first, representative = first open", () => {
+    const shared = { storyId: "s", viewportName: "dark" };
+    const groups = groupSnapshots([
+      snap("w", "approved", null, { ...shared, browser: "webkit" }),
+      snap("f", "changed", null, { ...shared, browser: "firefox" }),
+      snap("c", "approved", null, shared),
+      snap("other", "new", null, { storyId: "o" }),
+    ]);
+    expect(groups.map((g) => g.members.map((m) => m.id))).toEqual([["c", "f", "w"], ["other"]]);
+    expect(groups[0]?.representative.id).toBe("f");
+    expect(groups[0]).toMatchObject({ storyId: "s", modeKey: "dark" });
+    expect(groups[1] && isOpenGroup(groups[1])).toBe(true);
+  });
+
+  it("separates modes of the same story", () => {
+    const groups = groupSnapshots([
+      snap("a", "new", null, { storyId: "s", viewportName: "dark" }),
+      snap("b", "new", null, { storyId: "s", viewportName: "light" }),
+    ]);
+    expect(groups).toHaveLength(2);
+  });
+
+  it("finds the group of a snapshot", () => {
+    const shared = { storyId: "s", viewportName: "dark" };
+    const list = [
+      snap("c", "new", null, shared),
+      snap("f", "new", null, { ...shared, browser: "firefox" }),
+    ];
+    expect(groupOf(list, "f")?.members).toHaveLength(2);
+    expect(groupOf(list, "nope")).toBeUndefined();
+  });
+});
+
 describe("neighbours", () => {
+  it("steps between groups, not browsers", () => {
+    const shared = { storyId: "s", viewportName: "dark" };
+    const list = [
+      snap("c", "new", null, shared),
+      snap("f", "new", null, { ...shared, browser: "firefox" }),
+      snap("z", "new"),
+    ];
+    const result = neighbours(list, "f");
+    expect(result).toMatchObject({ position: 1, total: 2, prev: null });
+    expect(result.next?.id).toBe("z");
+  });
+
   const list = [snap("a", "new"), snap("b", "new"), snap("c", "new")];
 
   it("returns position and both neighbours for a middle item", () => {

@@ -163,7 +163,15 @@ function keyboardShortcuts(): string {
       if(el&&!el.disabled){ el.click(); return true; }
       return false;
     }
+    function stepBrowser(dir){
+      var tabs=[].slice.call(document.querySelectorAll('[data-browser-tabs] a'));
+      var at=tabs.findIndex(function(a){ return a.getAttribute('aria-current')==='page'; });
+      var target=at===-1?null:tabs[at+dir];
+      if(target){ target.click(); return true; }
+      return false;
+    }
     function handleKey(key,stage){
+      if(key==='['||key===']') return stepBrowser(key===']'?1:-1);
       if(key==='j'||key==='ArrowRight') return press1('[data-snap-next]');
       if(key==='k'||key==='ArrowLeft') return press1('[data-snap-prev]');
       if(key==='a'||key==='A') return press1('[data-approve]');
