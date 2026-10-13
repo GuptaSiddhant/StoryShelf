@@ -31,9 +31,6 @@
     "schema"
   ],
   "type": "module",
-  "engines": {
-    "node": ">=24"
-  },
   "sideEffects": false,
   "types": "./dist/index.d.mts",
   "exports": {
@@ -72,6 +69,9 @@
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
   },
   "jsr": false
 }
