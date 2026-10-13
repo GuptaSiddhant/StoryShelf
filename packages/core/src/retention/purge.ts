@@ -7,6 +7,7 @@ import { BaselineModel } from "../models/baseline.ts";
 import { BuildModel, type BuildTables } from "../models/build.ts";
 import { InsightModel } from "../models/insight.ts";
 import { LabelModel, type LabelTables } from "../models/label.ts";
+import { PackageUsageModel } from "../models/usage.ts";
 import type { Project } from "../schema/project.ts";
 import { TERMINAL_BUILD_STATUSES } from "../types.ts";
 
@@ -72,6 +73,7 @@ export class Retention {
 
   private async removeBuild(buildId: string): Promise<boolean> {
     await new InsightModel(this.db).removeForBuild(buildId);
+    await new PackageUsageModel(this.db).removeForBuild(buildId);
     await new BuildModel(this.db, this.tables as unknown as BuildTables).remove(buildId);
     return true;
   }
