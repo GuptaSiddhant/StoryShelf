@@ -1,4 +1,3 @@
-// oxlint-disable typescript/promise-function-async -- Hono JSX may return Promise<HtmlEscapedString>
 import { BuildModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
 import { SnapshotModel } from "@storyshelf/core/models";
@@ -36,6 +35,8 @@ import {
   snapshotCardMeta,
   snapshotGrid,
 } from "../ui/styles/review.ts";
+// oxlint-disable typescript/promise-function-async -- Hono JSX may return Promise<HtmlEscapedString>
+import { groupSnapshots } from "./build-diff-model.ts";
 import { HealthSlot } from "./health-panel.tsx";
 
 /** Snapshot image with library height cap, extending the shared diff pane image. */
@@ -229,14 +230,20 @@ function distinctViewports(snapshots: Snapshot[]): string[] {
   return [...new Set(snapshots.map((s) => s.viewportName))].toSorted();
 }
 
+/** One snapshot per story/mode: the primary engine's (other browsers are review detail). */
+function primaryEngineSnapshots(snapshots: Snapshot[]): Snapshot[] {
+  return groupSnapshots(snapshots).map((group) => group.primary);
+}
+
 function renderLibraryGrid(
   project: Project,
   build: Build,
-  snapshots: Snapshot[],
+  allSnapshots: Snapshot[],
   branches: string[],
   docsByStory: Map<string, string>,
   health: HealthPanelData | null,
 ): RenderedContent {
+  const snapshots = primaryEngineSnapshots(allSnapshots);
   const byTitle = groupByTitle(snapshots);
   const viewportNames = distinctViewports(snapshots);
   const multi = viewportNames.length > 1;

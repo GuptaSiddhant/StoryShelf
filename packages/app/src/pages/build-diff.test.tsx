@@ -123,3 +123,82 @@ describe("review page breadcrumb", () => {
     expect(header).not.toContain(">Builds<");
   });
 });
+
+const MULTI_BROWSER_SPECS = [
+  ["chromium", "button--dark", "chromium"],
+  ["firefox", "button--dark", "firefox"],
+  ["other", "button--light", "chromium"],
+] as const;
+
+/** Seed one story in two modes, the first on two engines; returns ids by spec key. */
+async function seedMultiBrowser(
+  db: Db,
+  projectId: string,
+  buildId: string,
+): Promise<Record<string, string>> {
+  const snapshots = new SnapshotModel(db);
+  const entries = await Promise.all(
+    MULTI_BROWSER_SPECS.map(async ([key, storyId, browser]) => {
+      const snap = await snapshots.create(projectId, buildId, {
+        storyId,
+        storyName: storyId,
+        storyTitle: "Button",
+        viewportName: storyId.endsWith("dark") ? "dark" : "light",
+        viewportWidth: 1280,
+        viewportHeight: 720,
+        screenshotPath: `shots/${key}.png`,
+        browser,
+      });
+      await snapshots.update(snap.id, { status: "changed" });
+      return [key, snap.id] as const;
+    }),
+  );
+  return Object.fromEntries(entries);
+}
+
+async function multiBrowserPage(query: (ids: Record<string, string>) => string): Promise<string> {
+  const { db } = makeDatabase();
+  const { storage } = makeStorage();
+  const project = await new ProjectModel(db).create({ name: "Docs" });
+  const build = await new BuildModel(db).create(project.id, {
+    gitSha: "abc1234def",
+    gitBranch: "feature/x",
+  });
+  const ids = await seedMultiBrowser(db, project.id, build.id);
+  const app = createShelfApp({
+    database: db,
+    storage,
+    logger: createShelfLogger({ level: "silent" }),
+  });
+  const url = `/projects/${project.slug}/builds/${build.id}/diff${query(ids)}`;
+  return await (await app.request(url)).text();
+}
+
+describe("review page with several browsers", () => {
+  it("counts one review item per story/mode and offers a shared approval", async () => {
+    const html = await multiBrowserPage((ids) => `?snapshot=${ids["chromium"]}`);
+    expect(html).toContain("0 of 2 reviewed");
+    expect(html).toContain("Needs review 2");
+    expect(html).toContain("All 2");
+    expect(html).toContain("2 browsers");
+    expect(html).toContain("Approve all browsers");
+    expect(html).toContain("/stories/button--dark/modes/dark/approve");
+    expect(html).toContain("/stories/button--dark/modes/dark/reject");
+    expect(html).toMatch(/\b1 \/ 2\b/u);
+  });
+
+  it("shows browser tabs and a per-browser escape hatch", async () => {
+    const html = await multiBrowserPage((ids) => `?snapshot=${ids["firefox"]}`);
+    expect(html).toContain('data-browser-tabs="true"');
+    expect(html).toContain("chromium · changed");
+    expect(html).toContain("firefox · changed");
+    expect(html).toContain("Only firefox");
+  });
+
+  it("keeps the single-browser flow unchanged for a lone snapshot", async () => {
+    const html = await multiBrowserPage((ids) => `?snapshot=${ids["other"]}`);
+    expect(html).not.toContain('data-browser-tabs="true"');
+    expect(html).not.toContain("Approve all browsers");
+    expect(html).toMatch(/\/snapshots\/[A-Z0-9]+\/approve/u);
+  });
+});
