@@ -268,6 +268,24 @@ describe("persistCapture", () => {
     ).toEqual({ dark: '{"theme":"dark"}', mobile: null });
   });
 
+  it("stores the story's design url on new and diffed snapshots", async () => {
+    const figma = "https://www.figma.com/design/KEY/Kit?node-id=1-2";
+    const story: StoryEntry = { ...storyOf("a"), importPath: "./A.stories.tsx", designUrl: figma };
+    const { ctx } = await makeContext({
+      captures: [
+        captureFor(story, png(4, 4, [0, 255, 0])),
+        captureFor(storyOf("b"), png(4, 4, [0, 255, 0])),
+      ],
+    });
+    await seedBaseline(ctx);
+
+    await persistCapture(ctx);
+
+    const rows = await ctx.db.list(ctx.db.tables.snapshots);
+    expect(rows.find((row) => row.storyName === "a")?.designUrl).toBe(figma);
+    expect(rows.find((row) => row.storyName === "b")?.designUrl).toBeNull();
+  });
+
   it("persists the captured stories and fails the build when a story failed to render", async () => {
     const { ctx } = await makeContext({
       captures: [captureFor(storyOf("b"), png(4, 4, [0, 255, 0]))],

@@ -7,6 +7,7 @@ import { SnapshotModel } from "@storyshelf/core/models";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { loadBaselineView } from "../routers/baseline-guard.ts";
+import { designUrlsFor, loadDesignResolutions } from "../routers/design.handlers.ts";
 import { getStore } from "../store.ts";
 import {
   Badge,
@@ -37,6 +38,7 @@ import {
 import { snapshotVariant } from "./build-diff-model.ts";
 import { StaleBaselineNotice } from "./build-diff-stale.tsx";
 import { LinkedUsage, type LinkedUsageItem } from "./build-diff-usage.tsx";
+import { DesignButtons } from "./design-links.tsx";
 
 /** Map a capture log level to its badge tone. */
 function logTone(level: string): "neutral" | "success" | "warning" | "danger" | "info" {
@@ -76,6 +78,7 @@ export async function renderBuildDetailPage(
   }
   const canReview = !getStore().authEnabled || Boolean(getStore().user);
   const { drifted } = await loadBaselineView(project, build, snapshots);
+  const designs = await loadDesignResolutions(project, snapshots).catch(() => new Map());
   const staleCount = Object.keys(drifted).length;
   const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
 
@@ -303,6 +306,7 @@ export async function renderBuildDetailPage(
                   <Button variant="ghost" size="sm" href={urls.short(build.id)}>
                     View Storybook
                   </Button>
+                  <DesignButtons urls={designUrlsFor(designs, snap)} />
                   {canReview && (snap.status === "new" || snap.status === "changed") ? (
                     <>
                       <form

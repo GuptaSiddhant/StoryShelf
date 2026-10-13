@@ -7,6 +7,7 @@ import { PageHeader, SubNavLayout } from "../ui/components.tsx";
 import type { IconName } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import { renderSettingsAi, type SettingsAiData } from "./settings-ai.tsx";
+import { renderSettingsDesign, type SettingsDesignData } from "./settings-design.tsx";
 import { renderSettingsGeneral } from "./settings-general.tsx";
 import { renderSettingsLabels } from "./settings-labels.tsx";
 import {
@@ -31,6 +32,7 @@ export type SettingsTab =
   | "tests"
   | "labels"
   | "links"
+  | "design"
   | "tokens"
   | "webhooks"
   | "notifications"
@@ -45,6 +47,7 @@ export interface ProjectSettingsData {
   labelTypes: LabelType[];
   links: SettingsLink[];
   linkCandidates: SettingsLinkCandidate[];
+  design: SettingsDesignData;
   tokens: Omit<Token, "hash">[];
   members: SettingsMember[];
   groupMappings: ProjectGroupMapping[];
@@ -77,6 +80,7 @@ const TAB_LABELS: Record<SettingsTab, string> = {
   tests: "Tests",
   labels: "Labels",
   links: "Links",
+  design: "Design",
   tokens: "Tokens",
   webhooks: "Webhooks",
   notifications: "Notifications",
@@ -90,6 +94,7 @@ const TAB_ICONS: Record<SettingsTab, IconName> = {
   tests: "activity",
   labels: "tag",
   links: "external-link",
+  design: "image",
   tokens: "key",
   webhooks: "webhook",
   notifications: "bell",
@@ -103,6 +108,7 @@ const SETTINGS_TABS: SettingsTab[] = [
   "tests",
   "labels",
   "links",
+  "design",
   "tokens",
   "webhooks",
   "notifications",
@@ -126,6 +132,7 @@ function renderCatalogTab(data: ProjectSettingsData, formState?: SettingsFormSta
     return renderSettingsLabels(project, data.labelTypes, isAdmin, formState);
   if (activeTab === "links")
     return renderSettingsLinks(project, data.links, data.linkCandidates, isAdmin, formState);
+  if (activeTab === "design") return renderSettingsDesign(project, data.design, isAdmin, formState);
   if (activeTab === "tokens") return renderSettingsTokens(project, data.tokens, isAdmin, formState);
   return activeTab === "webhooks"
     ? renderSettingsWebhooks(project, data.webhooks, isAdmin, formState)

@@ -27,6 +27,7 @@ export const snapshots = mysqlTable(
     storyName: text("story_name").notNull(),
     storyTitle: text("story_title").notNull(),
     storyImportPath: text("story_import_path"),
+    designUrl: text("design_url"),
     viewportName: text("viewport_name").notNull().default("desktop"),
     viewportWidth: int("viewport_width").notNull().default(1280),
     viewportHeight: int("viewport_height").notNull().default(720),
@@ -67,6 +68,7 @@ export interface Snapshot {
   storyName: string;
   storyTitle: string;
   storyImportPath: string | null;
+  designUrl: string | null;
   viewportName: string;
   viewportWidth: number;
   viewportHeight: number;

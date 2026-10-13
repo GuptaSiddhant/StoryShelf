@@ -90,6 +90,10 @@ export interface StoryEntry {
   tags?: string[];
   type: "story" | "docs";
   parameters?: StoryParameters;
+  /** Figma URL declared via `parameters.design` / `parameters.storyshelf.figma`. */
+  designUrl?: string;
+  /** Declared design value that is not a usable Figma URL (ignored; logged at capture). */
+  designInvalid?: string;
 }
 
 /** Minimal structural page handle handed to `StorySourceAdapter.waitForReady`. */

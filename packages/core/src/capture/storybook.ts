@@ -10,6 +10,7 @@ import type {
   StoryViewportDefinition,
   Viewport,
 } from "./adapter.ts";
+import { extractDesignUrl } from "./design.ts";
 import { applyModes, buildGlobalsParam } from "./modes.ts";
 
 interface StorybookIndex {
@@ -32,18 +33,17 @@ interface StorybookIndex {
 /** Story parameters as serialized by the Storybook index. */
 interface StorybookParameters {
   chromatic?: StoryParameters;
-  storyshelf?: StoryParameters;
+  storyshelf?: StoryParameters & { figma?: unknown };
   viewport?: StoryViewportConfig;
+  design?: unknown;
 }
 
 /** Merge the `chromatic` and `storyshelf` parameter layers (`storyshelf` wins). */
 export function mergeParameters(entry: {
   parameters?: StorybookParameters;
 }): StoryParameters | undefined {
-  const merged: StoryParameters = {
-    ...entry.parameters?.chromatic,
-    ...entry.parameters?.storyshelf,
-  };
+  const { figma: _figma, ...storyshelf } = entry.parameters?.storyshelf ?? {};
+  const merged: StoryParameters = { ...entry.parameters?.chromatic, ...storyshelf };
   const modes = mergeModes(entry.parameters?.chromatic?.modes, entry.parameters?.storyshelf?.modes);
   if (modes) merged.modes = modes;
   if (entry.parameters?.viewport) merged.viewport = entry.parameters.viewport;
@@ -129,6 +129,22 @@ function pxOf(value: string | number | undefined): number | undefined {
   return match ? Number(match[1]) : undefined;
 }
 
+function toStoryEntry(entry: StorybookIndex["entries"][string]): StoryEntry {
+  const design = extractDesignUrl(entry.parameters);
+  const story: StoryEntry = {
+    id: entry.id,
+    title: entry.title,
+    name: entry.name,
+    importPath: entry.importPath,
+    tags: entry.tags,
+    type: entry.type === "docs" ? "docs" : "story",
+    parameters: mergeParameters(entry),
+  };
+  if (design.url) story.designUrl = design.url;
+  if (design.invalid) story.designInvalid = design.invalid;
+  return story;
+}
+
 /** Discovers stories from a built Storybook via its index file. */
 export class StorybookAdapter implements StorySourceAdapter {
   readonly name = "storybook";
@@ -138,15 +154,7 @@ export class StorybookAdapter implements StorySourceAdapter {
     const index = await this.readIndex(source);
     return Object.values(index.entries)
       .filter((entry) => entry.type !== "docs" && entry.subtype !== "test")
-      .map((entry) => ({
-        id: entry.id,
-        title: entry.title,
-        name: entry.name,
-        importPath: entry.importPath,
-        tags: entry.tags,
-        type: entry.type === "docs" ? "docs" : "story",
-        parameters: mergeParameters(entry),
-      }));
+      .map((entry) => toStoryEntry(entry));
   }
 
   // eslint-disable-next-line class-methods-use-this

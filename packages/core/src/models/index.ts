@@ -29,6 +29,26 @@ export {
 } from "./insight.ts";
 export { BuildModel, isPublicBuild, type BuildCreateInput, type BuildListFilter } from "./build.ts";
 export { CommentModel, type CommentCreateInput } from "./comment.ts";
+export {
+  DesignModel,
+  normalizeImportPath,
+  resolveDesigns,
+  type DesignResolution,
+  type DesignSource,
+  type DesignTables,
+  type DesignTokenStatus,
+} from "./design.ts";
+export {
+  fetchFigmaMeta,
+  FigmaNodeModel,
+  FIGMA_TOKEN_MAX_AGE_DAYS,
+  FIGMA_TTL_MS,
+  isDesignStale,
+  tokenDaysLeft,
+  type FigmaMeta,
+  type FigmaNodeTables,
+  type FigmaState,
+} from "./figma.ts";
 export { LabelModel } from "./label.ts";
 export { matchUpstreamStory, PackageUsageModel } from "./usage.ts";
 export type { PackageUsageInput, PackageUsageTables, UpstreamStory } from "./usage.ts";

@@ -18,6 +18,7 @@ import { roundedTimings, runWithTimings, timed } from "../utils/timing.ts";
 import { DEFAULT_VIEWPORTS, isDisabledStory, isFlakyStory } from "./adapter.ts";
 import type { Viewport } from "./adapter.ts";
 import { assertSupportedBrowsers, resolveBrowsers } from "./browsers.ts";
+import { logInvalidDesigns } from "./design.ts";
 import { assertModeCaps, enrichStories } from "./enrich.ts";
 import { captureAcrossBrowsers } from "./matrix.ts";
 import { parseModesAllowlist } from "./modes.ts";
@@ -165,6 +166,7 @@ async function runCapturePhases(
 
     const adapter = new StorybookAdapter();
     const discovered = await adapter.discover(extractedDir);
+    logInvalidDesigns(logger, discovered);
     // Resolve viewports via single helper (project JSON → server override → default)
     const rawViewports = (project as unknown as { viewports?: string | null }).viewports;
     const viewports = resolveViewports(rawViewports, DEFAULT_VIEWPORTS, options.viewports);

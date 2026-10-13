@@ -17,6 +17,11 @@ import {
 import { comments as commentsTable } from "./comment.ts";
 import { contentRefs as contentRefsTable } from "./content-refs.ts";
 import {
+  designLinks as designLinksTable,
+  designTokens as designTokensTable,
+  figmaNodes as figmaNodesTable,
+} from "./design.ts";
+import {
   aiBudgetAlerts as aiBudgetAlertsTable,
   aiUsage as aiUsageTable,
   insights as insightsTable,
@@ -47,6 +52,7 @@ export { comments } from "./comment.ts";
 export { buildLabels, labelTypes } from "./label.ts";
 export { projectMembers } from "./member.ts";
 export { buildPackageUsage, projectLinks } from "./usage.ts";
+export { designLinks, designTokens, figmaNodes } from "./design.ts";
 export { aiBudgetAlerts, aiUsage, insights } from "./insight.ts";
 export { notificationChannels, notificationSubscriptions } from "./notification.ts";
 export { projectGroupMappings } from "./project-group-mapping.ts";
@@ -67,6 +73,8 @@ export type { Build } from "./build.ts";
 export type { Comment } from "./comment.ts";
 /** Build label and label type rows. */
 export type { BuildLabel, LabelType } from "./label.ts";
+/** Design link, Figma token and cached Figma node rows. */
+export type { DesignLink, DesignToken, FigmaNode } from "./design.ts";
 /** Project link and per-build package usage rows. */
 export type { BuildPackageUsage, ProjectLink } from "./usage.ts";
 /** Project membership row linking a user to a project role. */
@@ -107,6 +115,9 @@ export const schema: {
   labelTypes: AnySQLiteTable;
   buildLabels: AnySQLiteTable;
   projectLinks: AnySQLiteTable;
+  designLinks: AnySQLiteTable;
+  designTokens: AnySQLiteTable;
+  figmaNodes: AnySQLiteTable;
   buildPackageUsage: AnySQLiteTable;
   tokens: AnySQLiteTable;
   webhooks: AnySQLiteTable;
@@ -132,6 +143,9 @@ export const schema: {
   labelTypes: labelTypesTable,
   buildLabels: buildLabelsTable,
   projectLinks: projectLinksTable,
+  designLinks: designLinksTable,
+  designTokens: designTokensTable,
+  figmaNodes: figmaNodesTable,
   buildPackageUsage: buildPackageUsageTable,
   tokens: tokensTable,
   webhooks: webhooksTable,

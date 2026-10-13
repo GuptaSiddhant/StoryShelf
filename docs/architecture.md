@@ -72,6 +72,7 @@ snapshots (
   story_name          text NOT NULL,           -- "Primary"
   story_title         text NOT NULL,           -- "Components/Button"
   story_import_path   text,                    -- "src/components/Button.stories.tsx"
+  design_url          text,                    -- Figma URL the story declares (parameters.storyshelf.figma / design); NULL when none
   viewport_name       text NOT NULL DEFAULT 'desktop',
   viewport_width      integer NOT NULL DEFAULT 1280,
   viewport_height     integer NOT NULL DEFAULT 720,
@@ -141,6 +142,47 @@ build_labels (
   value       text NOT NULL,             -- "123", "ABC-123", "v1.2.3"
   created_at  text NOT NULL,
   UNIQUE(build_id, type_key, value)
+);
+
+-- Design-source links (issue #141). import_path NULL = project-level design file link
+-- (library header); import_path set = manual component mapping (story file -> Figma URL).
+design_links (
+  id          text PRIMARY KEY,
+  project_id  text NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  import_path text,                        -- normalized story file ("src/Button.stories.tsx"), no leading "./"
+  label       text,                        -- display label of a project-level link
+  url         text NOT NULL,               -- validated Figma URL
+  created_at  text NOT NULL,
+  updated_at  text NOT NULL
+);
+
+-- One Figma personal access token per project (encrypted under ShelfConfig.secret, rotated with the
+-- other credentials; never displayed). status = last API outcome: unknown | ok | unauthorized | forbidden.
+design_tokens (
+  id              text PRIMARY KEY,
+  project_id      text NOT NULL REFERENCES projects(id) ON DELETE CASCADE UNIQUE,
+  token_encrypted text NOT NULL,
+  status          text NOT NULL DEFAULT 'unknown',
+  checked_at      text,
+  created_at      text NOT NULL,
+  updated_at      text NOT NULL
+);
+
+-- Figma metadata cache keyed by (project, file key, node id; '' = whole file). state: ok | deleted |
+-- unauthorized | forbidden. Refreshed on view when older than 15 min; outages keep the last good row.
+figma_nodes (
+  id            text PRIMARY KEY,
+  project_id    text NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  file_key      text NOT NULL,
+  node_id       text NOT NULL DEFAULT '',
+  name          text,
+  version       text,
+  last_modified text,
+  state         text NOT NULL DEFAULT 'ok',
+  fetched_at    text NOT NULL,
+  created_at    text NOT NULL,
+  updated_at    text NOT NULL,
+  UNIQUE(project_id, file_key, node_id)
 );
 
 -- Linked projects (components only, see issue #123): a downstream app declares which upstream
@@ -567,6 +609,16 @@ For sharing, a published Storybook can also be served on a **per-project subdoma
 - `:buildId.:slug.stories.example.com` → a specific build
 
 Subdomains serve the Storybook at the domain **root**, so no asset-path rewriting is needed (Storybook's static build expects root serving). They serve **published Storybooks only** — the review UI stays on the main domain at `/projects/:slug/...`. Label values are not exposed as subdomains (DNS labels cannot contain `/`); labels remain on the path-based URLs above. Without `publishedBaseDomain`, the path-based URLs are the only published surface (and stay the default for `localhost` and hosts without a wildcard record). The `linkRoute()` builder switches between path and subdomain forms based on config.
+
+## Design Sources (Figma)
+
+Design links attach to a **component (story file)**, never to a single state or to a build label. A state's Figma button appears iff its file resolves a link; there is no project-default or label fallback on snapshots.
+
+- **Story parameters:** `parameters.storyshelf.figma` (plain URL string) wins over the Storybook `design` addon shape (`string | {url} | {type,url} | {type,url}[]`, first URL wins). `extractDesignUrl()` runs at discovery and stores the result on `StoryEntry.designUrl` → `snapshots.design_url`, keeping `StoryParameters` capture-clean. Non-Figma or malformed values are dropped and logged; capture never fails.
+- **Resolution (read time, per file):** manual mapping (`design_links` by normalized `import_path`) > story parameters. States of one file are deduped; if they disagree the distinct set is shown rather than guessing. Keying by `import_path` survives story renames and builds.
+- **Design settings tab:** project file links (library header), the manual component-mapping table, and one project Figma PAT (admin-only, write-only, encrypted, rotated via `previousSecret`). Tokens expire after at most 90 days, so the tab shows days left and the last health (`ok` / `unauthorized` / `forbidden`).
+- **Metadata cache:** with a token, the review page refreshes `figma_nodes` rows older than 15 minutes (within a ~1.5 s render budget; slower fetches finish into the cache), via the shared `httpJson` helper with `X-Figma-Token`. A design edited after the snapshot's `baseline_version` shows a non-blocking stale banner; a missing node/file shows a deleted notice; API outages degrade to plain deep links. None of this touches the `409 baseline_changed` guard.
+- **Non-goals:** pixel-diffing against Figma renders, token mapping, build-level `figma` labels. Render caching and reference panes are a follow-up.
 
 ## Build Labels
 
