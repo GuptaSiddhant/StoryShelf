@@ -3,7 +3,7 @@ title: "@storyshelf/worker"
 description: Remote capture worker — polls a CaptureQueue and runs the StoryShelf capture pipeline.
 ---
 
-import { PackageManagers } from "starlight-package-managers";
+import { PackageManagers } from 'starlight-package-managers';
 
 `@storyshelf/worker` is a transport-agnostic **remote capture worker**. It polls any `PollableCaptureQueue` (SQS, Redis, Azure Storage Queues / Service Bus today) and runs the capture pipeline with any `CaptureRunner` (Playwright or Puppeteer). The worker shares the server's `DatabaseAdapter` + `StorageAdapter` — Turso/S3 for a serverless split, Postgres/local for single-host.
 
@@ -49,10 +49,10 @@ Or scaffold it with `storyshelf server init` / `storyshelf worker init` — the 
 interface WorkerOptions {
   queue: CaptureQueue | PollableCaptureQueue; // any pollable queue
   poll?: (opts?: { waitMs?: number }) => Promise<PollableJob | null>;
-  ack?: (job: PollableJob) => Promise<void>; // override for custom transports
+  ack?: (job: PollableJob) => Promise<void>;  // override for custom transports
   nack?: (job: PollableJob, opts?: { requeue?: boolean; delayMs?: number }) => Promise<void>;
   db: DatabaseAdapter;
-  tables?: WorkerTables; // defaults to sqlite schema handles
+  tables?: WorkerTables;       // defaults to sqlite schema handles
   storage: StorageAdapter;
   runner: CaptureRunner;
   scratchDir: string;

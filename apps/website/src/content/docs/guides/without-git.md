@@ -9,12 +9,12 @@ StoryShelf works without git. `sha` and `branch` are opaque strings throughout t
 
 `upload` resolves each field independently — **flags > env > local git > synthesized**:
 
-| Priority       | `--sha`                                                | `--branch`                                                       |
-| -------------- | ------------------------------------------------------ | ---------------------------------------------------------------- |
-| Flags          | `--sha <sha>`                                          | `--branch <branch>`                                              |
-| CI env         | `GITHUB_SHA`, `VERCEL_GIT_COMMIT_SHA`, `CI_COMMIT_SHA` | `GITHUB_REF_NAME`, `VERCEL_GIT_COMMIT_REF`, `CI_COMMIT_REF_NAME` |
-| Local checkout | `git rev-parse HEAD`                                   | Current branch                                                   |
-| Synthesized    | `local-<random>` (unique per upload)                   | `local`                                                          |
+| Priority | `--sha` | `--branch` |
+|----------|---------|------------|
+| Flags | `--sha <sha>` | `--branch <branch>` |
+| CI env | `GITHUB_SHA`, `VERCEL_GIT_COMMIT_SHA`, `CI_COMMIT_SHA` | `GITHUB_REF_NAME`, `VERCEL_GIT_COMMIT_REF`, `CI_COMMIT_REF_NAME` |
+| Local checkout | `git rev-parse HEAD` | Current branch |
+| Synthesized | `local-<random>` (unique per upload) | `local` |
 
 A project with no git at all uploads with zero identity flags:
 

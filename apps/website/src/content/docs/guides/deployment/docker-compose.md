@@ -16,7 +16,7 @@ services:
     volumes:
       - storyshelf-data:/app/data
     environment:
-      - SECRET=$(openssl rand -hex 32) # ≥ 32 chars
+      - SECRET=$(openssl rand -hex 32)   # ≥ 32 chars
       - CAPTURE_CONCURRENCY=2
       - PURGE_TTL_DAYS=30
       - BRANCH_TTL_DAYS=30

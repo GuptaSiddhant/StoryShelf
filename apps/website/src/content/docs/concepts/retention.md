@@ -21,13 +21,13 @@ timeline
 
 ## What survives purge
 
-| What                                                           | Retention key                                     | Survives?                                  |
-| -------------------------------------------------------------- | ------------------------------------------------- | ------------------------------------------ |
-| Build metadata, screenshots, diff overlays                     | `purgeTtlDays` (default 30)                       | No — deleted together in one transaction   |
+| What | Retention key | Survives? |
+|------|---------------|-----------|
+| Build metadata, screenshots, diff overlays | `purgeTtlDays` (default 30) | No — deleted together in one transaction |
 | Storybook `content/<hash>` (shared, `content_refs` `refCount`) | `content_refs` 7-day grace (`refCount 0` kept 7d) | Yes — shared, refCounted, GC’d after grace |
-| Branch baselines (`baselines/{branch}/**`)                     | `branchTtlDays` (default 30, `null` = disabled)   | Until branch GC                            |
-| Default-branch baselines (`baselines/main/**`)                 | Never                                             | Yes                                        |
-| Builds bearing `persistent` label (git tags → `v1.2.3`)        | Never                                             | Yes, and their snapshots as baselines      |
+| Branch baselines (`baselines/{branch}/**`) | `branchTtlDays` (default 30, `null` = disabled) | Until branch GC |
+| Default-branch baselines (`baselines/main/**`) | Never | Yes |
+| Builds bearing `persistent` label (git tags → `v1.2.3`) | Never | Yes, and their snapshots as baselines |
 
 Retention keeps **the most recent build per branch** even past TTL — it’s the branch’s “current state” and powers label/PR links.
 
@@ -49,7 +49,7 @@ Configure via `ShelfConfig` or env:
 createShelfApp({
   config: {
     purgeTtlDays: 30,
-    branchTtlDays: 30, // null to disable branch GC
+    branchTtlDays: 30,        // null to disable branch GC
     branchGcIntervalMs: 86_400_000,
     purgeIntervalMinutes: 60,
   },

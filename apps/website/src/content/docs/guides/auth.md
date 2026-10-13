@@ -7,14 +7,14 @@ StoryShelf ships one auth engine — [`@storyshelf/auth`](/packages/auth/) on [B
 
 ## Choose a method
 
-| Type               | When to use                                              | Guide                                 |
-| ------------------ | -------------------------------------------------------- | ------------------------------------- |
-| **Local accounts** | No IdP; invite-only email/password                       | [Local accounts](/guides/auth/local/) |
-| **Social login**   | GitHub / GitLab / Google / Microsoft / Cognito           | [Social login](/guides/auth/social/)  |
-| **OIDC**           | Keycloak, Okta, Auth0, Entra, Google Workforce           | [OIDC](/guides/auth/oidc/)            |
-| **SAML**           | Enterprise SAML IdP (via samlify, never hand-rolled XML) | [SAML](/guides/auth/saml/)            |
-| **Passkeys**       | WebAuthn passwordless (second factor / primary)          | [Passkeys](/guides/auth/passkeys/)    |
-| **None**           | Trusted network / VPN / local dev                        | Below                                 |
+| Type | When to use | Guide |
+|------|-------------|-------|
+| **Local accounts** | No IdP; invite-only email/password | [Local accounts](/guides/auth/local/) |
+| **Social login** | GitHub / GitLab / Google / Microsoft / Cognito | [Social login](/guides/auth/social/) |
+| **OIDC** | Keycloak, Okta, Auth0, Entra, Google Workforce | [OIDC](/guides/auth/oidc/) |
+| **SAML** | Enterprise SAML IdP (via samlify, never hand-rolled XML) | [SAML](/guides/auth/saml/) |
+| **Passkeys** | WebAuthn passwordless (second factor / primary) | [Passkeys](/guides/auth/passkeys/) |
+| **None** | Trusted network / VPN / local dev | Below |
 
 Configuration, secrets, and login text are covered in [Configuration](/guides/auth/configuration/).
 

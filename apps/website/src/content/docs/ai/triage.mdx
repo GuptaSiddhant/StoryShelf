@@ -3,15 +3,11 @@ title: Build triage
 description: What the AI triage panel shows on the review page, how it is generated and cached, and who can regenerate it.
 ---
 
-import Screenshot from "../../../components/Screenshot.astro";
+import Screenshot from '../../../components/Screenshot.astro';
 
-Triage reads one build and answers: _does this set of visual changes match what the commit says it changed?_
+Triage reads one build and answers: *does this set of visual changes match what the commit says it changed?*
 
-<Screenshot
-  name="diff-review"
-  alt="The review page with an AI triage panel above the snapshot list"
-  caption="The triage panel sits above the review workspace."
-/>
+<Screenshot name="diff-review" alt="The review page with an AI triage panel above the snapshot list" caption="The triage panel sits above the review workspace." />
 
 ## What it shows
 
@@ -24,7 +20,7 @@ Everything is plain text. The verdict is a hint for the human reviewer; approvin
 
 ## Generating it
 
-Approvers and admins see a **Generate triage** button (and **Regenerate** once a result exists). The work runs in the background: the panel shows _generating…_ and refreshes itself. A result is also available over the [API](../api/).
+Approvers and admins see a **Generate triage** button (and **Regenerate** once a result exists). The work runs in the background: the panel shows *generating…* and refreshes itself. A result is also available over the [API](../api/).
 
 If the model call fails or times out, the panel says so and the button lets you try again. Runs that never finish (for example because a server restarted) are marked failed after 30 minutes.
 
@@ -38,8 +34,8 @@ Build metadata and changed files, the changed snapshots ranked by difference, he
 
 ## Who can do what
 
-| Action                                       | Roles                              |
-| -------------------------------------------- | ---------------------------------- |
-| See the triage panel                         | Viewer, developer, approver, admin |
-| Generate or regenerate                       | Approver, admin                    |
-| Choose a different profile for one run (API) | Site admin only                    |
+| Action | Roles |
+|---|---|
+| See the triage panel | Viewer, developer, approver, admin |
+| Generate or regenerate | Approver, admin |
+| Choose a different profile for one run (API) | Site admin only |

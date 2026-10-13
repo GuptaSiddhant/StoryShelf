@@ -43,9 +43,9 @@ This is locked in by tests in `baseline.test.ts`. Tools that resolve baselines b
 
 Builds on the default branch auto-approve and become the baselines. Pushing to `main` re-baselines the project — every snapshot on `main` updates the default-branch baseline.
 
-| Config          | Default | Description                                               |
-| --------------- | ------- | --------------------------------------------------------- |
-| `defaultBranch` | `main`  | Branch that auto-approves and provides fallback baselines |
+| Config | Default | Description |
+|--------|---------|-------------|
+| `defaultBranch` | `main` | Branch that auto-approves and provides fallback baselines |
 
 ## Accepting changes on feature branches
 
@@ -86,11 +86,11 @@ Persistent builds are excluded from `purgeTtlDays` retention. Their snapshots re
 
 Feature-branch baselines are GC'd after `branchTtlDays` (default 30, `null` = disabled) of inactivity via a daily sweep (`branchGcIntervalMs` 24h). Default-branch baselines are never GC'd.
 
-| Config               | Default        | Description                                                  |
-| -------------------- | -------------- | ------------------------------------------------------------ |
-| `branchTtlDays`      | 30             | Days of inactivity before feature-branch baselines GC'd      |
-| `branchGcIntervalMs` | 86400000 (24h) | How often to run the GC sweep                                |
-| `purgeTtlDays`       | 30             | Days before terminal builds purged (separate from baselines) |
+| Config | Default | Description |
+|--------|---------|-------------|
+| `branchTtlDays` | 30 | Days of inactivity before feature-branch baselines GC'd |
+| `branchGcIntervalMs` | 86400000 (24h) | How often to run the GC sweep |
+| `purgeTtlDays` | 30 | Days before terminal builds purged (separate from baselines) |
 
 ```mermaid
 timeline
@@ -111,7 +111,6 @@ timeline
 Most teams never promote manually — pushing an accepted feature branch to `main` auto-promotes on the next default-branch build. If you need to pin a branch as a long-lived baseline (e.g., `release/2.0`), set that branch as the default in project settings or copy its baselines via the API.
 
 API for manual promotion:
-
 ```bash
 POST /api/v1/projects/:slug/baselines/promote
 { "sourceBranch": "release/2.0", "targetBranch": "main" }
@@ -128,14 +127,14 @@ On the build detail page each snapshot shows `Baseline: <branch>@<buildId>` or `
 
 Builds are transient and purged by `purgeTtlDays` (default 30); baselines outlive their builds and are stored separately. Purging a build does not delete its baseline — the next build on that branch still compares against it until `branchTtlDays` GC.
 
-| What                     | Retention       | Survives purge? |
-| ------------------------ | --------------- | --------------- |
-| Build metadata           | `purgeTtlDays`  | No              |
-| Screenshots              | `purgeTtlDays`  | No              |
-| Diff overlays            | `purgeTtlDays`  | No              |
-| Branch baselines         | `branchTtlDays` | Until GC        |
-| Default-branch baselines | Never           | Yes             |
-| Persistent builds        | Never           | Yes             |
+| What | Retention | Survives purge? |
+|------|-----------|-----------------|
+| Build metadata | `purgeTtlDays` | No |
+| Screenshots | `purgeTtlDays` | No |
+| Diff overlays | `purgeTtlDays` | No |
+| Branch baselines | `branchTtlDays` | Until GC |
+| Default-branch baselines | Never | Yes |
+| Persistent builds | Never | Yes |
 
 ## Portability (export & import)
 
@@ -151,12 +150,12 @@ Baselines can leave and enter StoryShelf freely: export a project's baselines (o
 
 ## Common scenarios
 
-| Scenario                                      | Expected behavior                                   |
-| --------------------------------------------- | --------------------------------------------------- |
-| New story on feature branch                   | Status: `new` (no baseline anywhere)                |
-| Changed story on feature branch, first time   | Status: `changed` (diff vs default branch)          |
-| Changed story on feature branch, after accept | Status: `unchanged` (diff vs branch baseline)       |
-| Merge feature branch to main                  | Default branch baselines updated on next main build |
-| Delete feature branch                         | Baselines GC'd after `branchTtlDays` inactivity     |
-| Tag release (v1.0.0)                          | Build gets `persistent` label, never purged         |
-| Story deleted from Storybook                  | Baseline remains until GC (orphaned baseline)       |
+| Scenario | Expected behavior |
+|----------|-------------------|
+| New story on feature branch | Status: `new` (no baseline anywhere) |
+| Changed story on feature branch, first time | Status: `changed` (diff vs default branch) |
+| Changed story on feature branch, after accept | Status: `unchanged` (diff vs branch baseline) |
+| Merge feature branch to main | Default branch baselines updated on next main build |
+| Delete feature branch | Baselines GC'd after `branchTtlDays` inactivity |
+| Tag release (v1.0.0) | Build gets `persistent` label, never purged |
+| Story deleted from Storybook | Baseline remains until GC (orphaned baseline) |

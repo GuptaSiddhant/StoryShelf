@@ -7,14 +7,14 @@ Labels identify related builds and link out to external systems. Types are proje
 
 Each type has a `link_template` that turns a value into an external URL:
 
-| Type     | Template                                             |
-| -------- | ---------------------------------------------------- |
-| `pr`     | `https://github.com/{repo}/pull/{value}`             |
-| `mr`     | `https://gitlab.com/{repo}/-/merge_requests/{value}` |
-| `jira`   | `https://myorg.atlassian.net/browse/{value}`         |
-| `linear` | `https://linear.app/{org}/issue/{value}`             |
-| `figma`  | `https://figma.com/file/{value}`                     |
-| `custom` | Any URL with `{value}` placeholder                   |
+| Type | Template |
+|------|----------|
+| `pr` | `https://github.com/{repo}/pull/{value}` |
+| `mr` | `https://gitlab.com/{repo}/-/merge_requests/{value}` |
+| `jira` | `https://myorg.atlassian.net/browse/{value}` |
+| `linear` | `https://linear.app/{org}/issue/{value}` |
+| `figma` | `https://figma.com/file/{value}` |
+| `custom` | Any URL with `{value}` placeholder |
 
 ```mermaid
 flowchart LR
@@ -36,7 +36,6 @@ Use the project builds page filter or `GET /api/v1/projects/:slug/builds?label_k
 When a link template is configured, the build list and build detail pages render the label value as an external link. Example: a `pr` value `42` becomes a clickable `https://github.com/acme/app/pull/42` badge next to the build SHA.
 
 The badge displays:
-
 - Label key (e.g., `pr`)
 - Label value as a link (e.g., `#42`)
 - Hover shows full external URL
@@ -64,14 +63,14 @@ Add label types in project settings (Settings → Labels) or via `PATCH /api/v1/
 
 ## Common label types
 
-| Key      | Use case              | Example template                                     |
-| -------- | --------------------- | ---------------------------------------------------- |
-| `pr`     | GitHub Pull Requests  | `https://github.com/{repo}/pull/{value}`             |
-| `mr`     | GitLab Merge Requests | `https://gitlab.com/{repo}/-/merge_requests/{value}` |
-| `jira`   | Jira Issues           | `https://myorg.atlassian.net/browse/{value}`         |
-| `linear` | Linear Issues         | `https://linear.app/{org}/issue/{value}`             |
-| `figma`  | Figma Files           | `https://figma.com/file/{value}`                     |
-| `custom` | Any external system   | Your custom URL pattern                              |
+| Key | Use case | Example template |
+|-----|----------|------------------|
+| `pr` | GitHub Pull Requests | `https://github.com/{repo}/pull/{value}` |
+| `mr` | GitLab Merge Requests | `https://gitlab.com/{repo}/-/merge_requests/{value}` |
+| `jira` | Jira Issues | `https://myorg.atlassian.net/browse/{value}` |
+| `linear` | Linear Issues | `https://linear.app/{org}/issue/{value}` |
+| `figma` | Figma Files | `https://figma.com/file/{value}` |
+| `custom` | Any external system | Your custom URL pattern |
 
 ## Best practices
 
@@ -91,9 +90,9 @@ Add label types in project settings (Settings → Labels) or via `PATCH /api/v1/
 
 ## Troubleshooting
 
-| Issue                     | Cause                           | Fix                                     |
-| ------------------------- | ------------------------------- | --------------------------------------- |
-| Label shows as plain text | No `link_template` configured   | Add template in Settings → Labels       |
-| External link broken      | Template uses wrong placeholder | Use `{repo}` and `{value}` only         |
-| Label not filtering       | Case mismatch in query          | Query params are case-sensitive         |
-| Stable URL returns 404    | No build has that label yet     | Label appears after first labeled build |
+| Issue | Cause | Fix |
+|-------|-------|-----|
+| Label shows as plain text | No `link_template` configured | Add template in Settings → Labels |
+| External link broken | Template uses wrong placeholder | Use `{repo}` and `{value}` only |
+| Label not filtering | Case mismatch in query | Query params are case-sensitive |
+| Stable URL returns 404 | No build has that label yet | Label appears after first labeled build |

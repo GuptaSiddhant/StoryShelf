@@ -27,14 +27,14 @@ same trace via the queue payload.
 
 ## Configuration
 
-| Variable                                          | Default          | Meaning                                           |
-| ------------------------------------------------- | ---------------- | ------------------------------------------------- |
-| `OTEL_EXPORTER_OTLP_ENDPOINT`                     | unset (disabled) | OTLP/HTTP base URL, e.g. `http://collector:4318`. |
-| `OTEL_SERVICE_NAME`                               | `storyshelf`     | Service name in spans and metrics.                |
-| `OTEL_EXPORTER_OTLP_HEADERS`                      | unset            | Extra OTLP headers, `k=v,k2=v2` (collector auth). |
-| `OTEL_TRACES_SAMPLER` / `OTEL_TRACES_SAMPLER_ARG` | always-on        | Production suggestion: `traceidratio` + `0.1`.    |
-| `STORYSHELF_OTEL_ENABLED`                         | auto             | Explicit `false` kill-switch.                     |
-| `STORYSHELF_OTEL_METRICS_INTERVAL_MS`             | `60000`          | Metric export interval.                           |
+| Variable | Default | Meaning |
+|---|---|---|
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | unset (disabled) | OTLP/HTTP base URL, e.g. `http://collector:4318`. |
+| `OTEL_SERVICE_NAME` | `storyshelf` | Service name in spans and metrics. |
+| `OTEL_EXPORTER_OTLP_HEADERS` | unset | Extra OTLP headers, `k=v,k2=v2` (collector auth). |
+| `OTEL_TRACES_SAMPLER` / `OTEL_TRACES_SAMPLER_ARG` | always-on | Production suggestion: `traceidratio` + `0.1`. |
+| `STORYSHELF_OTEL_ENABLED` | auto | Explicit `false` kill-switch. |
+| `STORYSHELF_OTEL_METRICS_INTERVAL_MS` | `60000` | Metric export interval. |
 
 Scaffolded servers (`storyshelf server init`) already include the
 initialization preamble and log correlation — you only add the endpoint.

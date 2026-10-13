@@ -3,7 +3,7 @@ title: "@storyshelf/auth"
 description: Better Auth engine for StoryShelf — local accounts, social login, enterprise SSO/SAML, and passkeys.
 ---
 
-import { PackageManagers } from "starlight-package-managers";
+import { PackageManagers } from 'starlight-package-managers';
 
 `@storyshelf/auth` is the auth engine: [Better Auth](https://www.better-auth.com/docs) owns OIDC/SAML/WebAuthn wire protocols ([concepts](https://www.better-auth.com/docs/concepts/oauth), [hooks](https://www.better-auth.com/docs/concepts/hooks#databasehooks), [session management](https://www.better-auth.com/docs/concepts/session-management)) while StoryShelf keeps users, memberships, invites, and UI. Sessions are Better Auth DB rows under the `storyshelf_session` cookie (seven-day TTL, `cookieCache` off so revocation bites immediately — see [cookie cache](https://www.better-auth.com/docs/concepts/session-management#cookie-cache)); engine identities mirror into the shelf `users` table with roles preserved.
 
@@ -25,14 +25,12 @@ Exact pins: [`better-auth@1.7.6`](https://www.better-auth.com/docs/changelog), [
 ```ts
 import { createShelfAuth, resolveAuthOptions } from "@storyshelf/auth";
 
-const shelf = createShelfAuth(
-  await resolveAuthOptions({
-    db: database,
-    secret: "{env:SECRET}",
-    baseURL: process.env.PUBLIC_BASE_URL!,
-    passkeys: {},
-  }),
-);
+const shelf = createShelfAuth(await resolveAuthOptions({
+  db: database,
+  secret: "{env:SECRET}",
+  baseURL: process.env.PUBLIC_BASE_URL!,
+  passkeys: {},
+}));
 
 const app = createShelfApp({ database, storage, auth: shelf.adapter });
 ```

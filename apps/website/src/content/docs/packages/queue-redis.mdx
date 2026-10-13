@@ -3,7 +3,7 @@ title: "@storyshelf/queue-redis"
 description: Redis capture job queue adapter for StoryShelf self-hosted Docker Compose.
 ---
 
-import { PackageManagers } from "starlight-package-managers";
+import { PackageManagers } from 'starlight-package-managers';
 
 `@storyshelf/queue-redis` backs StoryShelf's capture queue with Redis for self-hosted Docker Compose. It implements the `CaptureQueue` contract from `@storyshelf/core`: `enqueue` submits a build for capture (returning once queued), and a separately-assembled worker polls the queue and runs `executeCaptureJob`. Because it implements the same interface as `InMemoryCaptureQueue` and `queue-sqs`, switching between in-process, Redis, and SQS is a single dependency swap — no app or build changes.
 
@@ -50,11 +50,11 @@ const queue = createRedisCaptureQueue({ client });
 
 ```ts
 interface RedisCaptureQueueOptions {
-  client?: Redis; // pre-configured ioredis client
-  url?: string; // redis:// URL
-  key?: string; // queue key, default "shelf:queue"
-  logger?: Logger; // optional pino logger
-  waitTimeSeconds?: number; // BLMOVE timeout, default 5
+  client?: Redis;          // pre-configured ioredis client
+  url?: string;            // redis:// URL
+  key?: string;            // queue key, default "shelf:queue"
+  logger?: Logger;         // optional pino logger
+  waitTimeSeconds?: number;// BLMOVE timeout, default 5
 }
 ```
 

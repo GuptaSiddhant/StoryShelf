@@ -3,7 +3,7 @@ title: Projects
 description: A StoryShelf project is one Storybook — learn how projects, tokens, roles, and settings fit together.
 ---
 
-import Screenshot from "../../../components/Screenshot.astro";
+import Screenshot from '../../../components/Screenshot.astro';
 
 A **project** is the top-level unit of organization in StoryShelf. The key mental model: **one project = one Storybook**, not one git repository.
 
@@ -39,12 +39,12 @@ Projects authenticate the CLI/CI with **API tokens** (`Authorization: Bearer <to
 
 When [auth](/guides/auth/) is enabled, projects track **members** and their project-scoped roles:
 
-| Role        | Capabilities                                 |
-| ----------- | -------------------------------------------- |
-| `viewer`    | View builds, diffs, and published Storybooks |
-| `developer` | View + upload builds                         |
-| `approver`  | View + approve/reject snapshots              |
-| `admin`     | Full control, including members and settings |
+| Role | Capabilities |
+|------|--------------|
+| `viewer` | View builds, diffs, and published Storybooks |
+| `developer` | View + upload builds |
+| `approver` | View + approve/reject snapshots |
+| `admin` | Full control, including members and settings |
 
 Site-wide `admin` users bypass project roles. Manage membership from the project settings page.
 
@@ -58,10 +58,7 @@ Each project has settings for:
 - **Tokens** — CI API tokens.
 - **Webhooks** — notify external systems of build events.
 
-<Screenshot
-  name="projects-list"
-  alt="The projects overview: a card per project with its latest build and review backlog"
-/>
+<Screenshot name="projects-list" alt="The projects overview: a card per project with its latest build and review backlog" />
 
 ## Projects vs. builds
 

@@ -3,7 +3,7 @@ title: "@storyshelf/db-mysql"
 description: MySQL and MariaDB database adapter for StoryShelf via mysql2 and Drizzle ORM, with PlanetScale and TiDB presets.
 ---
 
-import { PackageManagers } from "starlight-package-managers";
+import { PackageManagers } from 'starlight-package-managers';
 
 `@storyshelf/db-mysql` connects StoryShelf to MySQL or MariaDB through `mysql2` and Drizzle ORM. It implements the same `DatabaseAdapter` contract as [SQLite](../db-sqlite/) and [Postgres](../db-postgres/), so the rest of the application does not change when you switch databases.
 
@@ -45,10 +45,10 @@ Today both are thin aliases over the same `mysql2` pool: PlanetScale and TiDB Se
 
 ## Other exports
 
-| Subpath                       | Contents                                                                                    |
-| ----------------------------- | ------------------------------------------------------------------------------------------- |
-| `@storyshelf/db-mysql/schema` | The Drizzle table definitions.                                                              |
-| `@storyshelf/db-mysql/ddl`    | The canonical `DDL` string for every table and index, for provisioning outside the adapter. |
+| Subpath | Contents |
+|---|---|
+| `@storyshelf/db-mysql/schema` | The Drizzle table definitions. |
+| `@storyshelf/db-mysql/ddl` | The canonical `DDL` string for every table and index, for provisioning outside the adapter. |
 
 ## When to use it
 

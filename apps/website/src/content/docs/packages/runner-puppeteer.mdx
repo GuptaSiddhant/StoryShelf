@@ -3,7 +3,7 @@ title: "@storyshelf/runner-puppeteer"
 description: Lightweight Puppeteer CaptureRunner — Chromium-only screenshots with a smaller image.
 ---
 
-import { PackageManagers } from "starlight-package-managers";
+import { PackageManagers } from 'starlight-package-managers';
 
 `@storyshelf/runner-puppeteer` is a lightweight `CaptureRunner` that renders Storybook screenshots with Puppeteer (`puppeteer-core` + `chrome-headless-shell`). It produces Chromium-only captures at a smaller image size than the Playwright runner. Pair it with the `@storyshelf/worker` remote worker for a decomposed deploy or wire it directly into `createShelfApp`.
 
@@ -36,8 +36,7 @@ import { createShelfApp } from "@storyshelf/app";
 import { createPuppeteerCaptureRunner } from "@storyshelf/runner-puppeteer";
 
 const app = createShelfApp({
-  database,
-  storage,
+  database, storage,
   capture: createPuppeteerCaptureRunner(),
 });
 ```
@@ -47,9 +46,7 @@ import { createCaptureWorker } from "@storyshelf/worker";
 import { createPuppeteerCaptureRunner } from "@storyshelf/runner-puppeteer";
 
 const worker = createCaptureWorker({
-  queue,
-  db,
-  storage,
+  queue, db, storage,
   runner: createPuppeteerCaptureRunner(),
   scratchDir: "/tmp/shelf",
 });
@@ -57,12 +54,12 @@ const worker = createCaptureWorker({
 
 ## Puppeteer vs Playwright
 
-| Aspect       | `runner-puppeteer`                                                                           | `runner-playwright`                                 |
-| ------------ | -------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| Engine       | `puppeteer-core` + `chrome-headless-shell` (Chromium only)                                   | Playwright (`chromium`/`firefox`/`webkit`/`chrome`) |
-| Selected via | `browser` kept as `chromium`/`chrome` only (other names rejected at the project layer)       | Any `browser` value, per-project                    |
-| Image size   | Smaller — no bundled Firefox/WebKit                                                          | Larger                                              |
-| Capabilities | Same orchestrator-owned controls: `play`, `delay`, `diffThreshold`, `viewports`, a11y, burst | Identical controls                                  |
+| Aspect | `runner-puppeteer` | `runner-playwright` |
+|---|---|---|
+| Engine | `puppeteer-core` + `chrome-headless-shell` (Chromium only) | Playwright (`chromium`/`firefox`/`webkit`/`chrome`) |
+| Selected via | `browser` kept as `chromium`/`chrome` only (other names rejected at the project layer) | Any `browser` value, per-project |
+| Image size | Smaller — no bundled Firefox/WebKit | Larger |
+| Capabilities | Same orchestrator-owned controls: `play`, `delay`, `diffThreshold`, `viewports`, a11y, burst | Identical controls |
 
 Both runners implement the same pure `CaptureRunner` contract. The orchestrator (`@storyshelf/core`, ADR 0015) owns build loading, archive extraction, story discovery, and persistence and delegates only the screenshotting to the runner, so switching is a one-line factory swap.
 

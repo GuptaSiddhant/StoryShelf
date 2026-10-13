@@ -37,9 +37,9 @@ SSO providers are **code-driven recipes**. Runtime provider registration is bloc
 ```ts
 samlPreset({
   // ...
-  groupsAttribute: "http://schemas.example.com/groups", // SAML attribute (default "groups")
+  groupsAttribute: "http://schemas.example.com/groups",  // SAML attribute (default "groups")
   adminGroups: ["Acme Admins"],
-});
+})
 ```
 
 Same reconcile rules as [OIDC](/guides/auth/oidc/): exact match, site `admin` ↔ `member` on every sign-in, `sso:<group>` project grants, manual grants survive.

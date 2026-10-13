@@ -3,9 +3,9 @@ title: "@storyshelf/queue-azure"
 description: Azure capture queue adapter — Storage Queues or Service Bus — for StoryShelf cloud deploys.
 ---
 
-import { PackageManagers } from "starlight-package-managers";
+import { PackageManagers } from 'starlight-package-managers';
 
-`@storyshelf/queue-azure` backs StoryShelf's capture queue with **Azure Storage Queues** _or_ **Azure Service Bus**, selectable per-deploy. It implements the `CaptureQueue` / `PollableCaptureQueue` contract from `@storyshelf/core`, so switching between in-process, Redis, SQS, and Azure is a single dependency swap — no router or build changes.
+`@storyshelf/queue-azure` backs StoryShelf's capture queue with **Azure Storage Queues** *or* **Azure Service Bus**, selectable per-deploy. It implements the `CaptureQueue` / `PollableCaptureQueue` contract from `@storyshelf/core`, so switching between in-process, Redis, SQS, and Azure is a single dependency swap — no router or build changes.
 
 ## Install
 
@@ -62,11 +62,11 @@ Both SDK packages are **optional peer dependencies** — install only the one yo
 
 ```ts
 interface AzureStorageQueuesQueueOptions {
-  queueName: string; // required
-  connectionString: string; // required
-  client?: QueueClient; // optional injected client (tests)
+  queueName: string;          // required
+  connectionString: string;   // required
+  client?: QueueClient;       // optional injected client (tests)
   visibilityTimeout?: number; // default 300
-  waitMs?: number; // polling HTTP timeout, default 20000
+  waitMs?: number;            // polling HTTP timeout, default 20000
   logger?: Logger;
 }
 
@@ -96,8 +96,7 @@ const queue = await createAzureStorageQueuesQueue({
   connectionString: process.env.AZURE_STORAGE_CONNECTION!,
 });
 const worker = createCaptureWorker({
-  queue,
-  scratchDir: "/tmp/shelf",
+  queue, scratchDir: "/tmp/shelf",
   db: createTursoDatabase({ url: process.env.TURSO_URL! }),
   storage: createAzureStorage({ container: process.env.AZURE_CONTAINER! }),
   runner: createPlaywrightCaptureRunner(),

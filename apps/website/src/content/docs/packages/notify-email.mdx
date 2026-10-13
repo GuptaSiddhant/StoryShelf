@@ -3,7 +3,7 @@ title: "@storyshelf/notify-email"
 description: Email transport for StoryShelf notifications and authentication mail — SMTP, Mailpit, HTTP, and log presets.
 ---
 
-import { PackageManagers } from "starlight-package-managers";
+import { PackageManagers } from 'starlight-package-managers';
 
 `@storyshelf/notify-email` is the email transport for StoryShelf. One sender serves notification channels and, optionally, authentication mail such as invites and password resets. It is the only package that owns `nodemailer`.
 
@@ -38,12 +38,12 @@ const app = createShelfApp({
 
 ## Presets
 
-| Preset          | Use for                                                                                                          |
-| --------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `smtpPreset`    | A corporate relay, Postfix, or SES over SMTP. `smtpPresetFromEnv` reads the settings from environment variables. |
-| `mailpitPreset` | Local development against Mailpit (`localhost:1025`).                                                            |
-| `httpPreset`    | A Resend- or Postmark-style JSON HTTP endpoint.                                                                  |
-| `logPreset`     | Tests and unconfigured setups — messages are written to the log.                                                 |
+| Preset | Use for |
+|---|---|
+| `smtpPreset` | A corporate relay, Postfix, or SES over SMTP. `smtpPresetFromEnv` reads the settings from environment variables. |
+| `mailpitPreset` | Local development against Mailpit (`localhost:1025`). |
+| `httpPreset` | A Resend- or Postmark-style JSON HTTP endpoint. |
+| `logPreset` | Tests and unconfigured setups — messages are written to the log. |
 
 Each preset is importable on its own:
 

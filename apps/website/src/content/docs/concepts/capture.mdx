@@ -3,14 +3,11 @@ title: Capture & viewports
 description: How StoryShelf renders stories — orchestrator, pure CaptureRunner, viewports, browsers, and diffing.
 ---
 
-import Screenshot from "../../../components/Screenshot.astro";
+import Screenshot from '../../../components/Screenshot.astro';
 
 Capture is server-side. The CLI uploads a zipped static Storybook; the server extracts it, serves it locally, and screenshots the stories impacted by the change — unaffected stories are inherited from their baselines (see [Affected capture](/concepts/affected-capture/)).
 
-<Screenshot
-  name="build-review"
-  alt="A build's overview: snapshot stats, bulk actions, and a card per snapshot"
-/>
+<Screenshot name="build-review" alt="A build's overview: snapshot stats, bulk actions, and a card per snapshot" />
 
 ## Pipeline
 
@@ -29,25 +26,17 @@ The **orchestrator** (`core/capture/orchestrator.ts`) owns loading, extraction (
 
 ```ts
 interface CaptureRunner {
-  render(input: {
-    buildId;
-    storybookDir;
-    stories;
-    viewports;
-    browser?;
-    executePlay?;
-    playTimeoutMs?;
-  }): Promise<RenderResult>;
+  render(input: { buildId, storybookDir, stories, viewports, browser?, executePlay?, playTimeoutMs? }): Promise<RenderResult>;
   cancel(buildId): Promise<void>;
 }
 ```
 
 Two runners ship — switch with one import:
 
-| Runner     | Package                         | Engines                                                           |
-| ---------- | ------------------------------- | ----------------------------------------------------------------- |
-| Playwright | `@storyshelf/runner-playwright` | `chromium` (default), `firefox`, `webkit`, `chrome`               |
-| Puppeteer  | `@storyshelf/runner-puppeteer`  | `chromium`/`chrome` only, `chrome-headless-shell` — smaller image |
+| Runner | Package | Engines |
+|--------|---------|---------|
+| Playwright | `@storyshelf/runner-playwright` | `chromium` (default), `firefox`, `webkit`, `chrome` |
+| Puppeteer | `@storyshelf/runner-puppeteer` | `chromium`/`chrome` only, `chrome-headless-shell` — smaller image |
 
 Per-project engine lives in **Settings → General → Capture browser** or `PATCH /api/v1/projects/:slug { browser }`. Set `browsers` (up to 3, primary first) to capture every build on each engine in turn; baselines, diffs and storage paths are kept per engine (`<mode>~<browser>` for non-Chromium). Every snapshot records `infraHash = hash(browser + viewport + sizing defaults)`. A newly added engine has no baselines yet, so its first snapshots are auto-accepted where the primary engine's snapshot of the same story and mode is clean, and queued for review as `new` otherwise.
 

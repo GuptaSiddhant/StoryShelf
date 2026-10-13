@@ -38,19 +38,19 @@ export const Primary: Story = {
 };
 ```
 
-The runner does `page.goto(iframe.html?id=...&viewMode=story)` → `waitForSelector(#storybook-root, attached)` → `waitForTimeout(delay ?? 500)` → _if enabled_ `page.evaluate(executePlay)` with `playTimeoutMs` → `screenshot({animations: disabled})`. No code change in `.storybook/main.ts` is required.
+The runner does `page.goto(iframe.html?id=...&viewMode=story)` → `waitForSelector(#storybook-root, attached)` → `waitForTimeout(delay ?? 500)` → *if enabled* `page.evaluate(executePlay)` with `playTimeoutMs` → `screenshot({animations: disabled})`. No code change in `.storybook/main.ts` is required.
 
 ## Per-story controls
 
 StoryShelf reads `parameters` from the Storybook build. Both **chromatic** and **storyshelf** keys are supported; **`storyshelf` wins** on conflict so existing Chromatic users work unchanged.
 
-| Parameter             | Where                                                                                         | Effect                                                                                                                                  |
-| --------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `disableSnapshot`     | `parameters: { storyshelf: { disableSnapshot: true } }` or `chromatic:{disableSnapshot:true}` | Skip capture + play entirely — not counted, no `failed`                                                                                 |
-| `flakyTest`           | `parameters: { storyshelf: { flakyTest: true } }` or `chromatic:{flakyTest:true}`             | Failure is **non-blocking**: build stays `reviewing`/`approved`, UI shows warning, GitHub status stays `success` with a warning comment |
-| `delay`               | `parameters: { storyshelf: { delay: 300 } }`                                                  | Extra wait (ms) after `play` before screenshot (default 500 when no delay)                                                              |
-| `diffThreshold`       | `parameters: { storyshelf: { diffThreshold: 0.2 } }`                                          | Per-story `pixelThreshold` override (0–1)                                                                                               |
-| `pauseAnimationAtEnd` | `parameters: { storyshelf: { pauseAnimationAtEnd: true } }`                                   | Pause CSS animations before screenshot; otherwise `animations:"disabled"`                                                               |
+| Parameter | Where | Effect |
+|---|---|---|
+| `disableSnapshot` | `parameters: { storyshelf: { disableSnapshot: true } }` or `chromatic:{disableSnapshot:true}` | Skip capture + play entirely — not counted, no `failed` |
+| `flakyTest` | `parameters: { storyshelf: { flakyTest: true } }` or `chromatic:{flakyTest:true}` | Failure is **non-blocking**: build stays `reviewing`/`approved`, UI shows warning, GitHub status stays `success` with a warning comment |
+| `delay` | `parameters: { storyshelf: { delay: 300 } }` | Extra wait (ms) after `play` before screenshot (default 500 when no delay) |
+| `diffThreshold` | `parameters: { storyshelf: { diffThreshold: 0.2 } }` | Per-story `pixelThreshold` override (0–1) |
+| `pauseAnimationAtEnd` | `parameters: { storyshelf: { pauseAnimationAtEnd: true } }` | Pause CSS animations before screenshot; otherwise `animations:"disabled"` |
 
 Tags are story-level and case-insensitive. Whole-story non-blocking:
 
@@ -58,23 +58,17 @@ Tags are story-level and case-insensitive. Whole-story non-blocking:
 // via tags (works even when index.json has no parameters)
 export const Flaky: Story = {
   tags: ["flaky-test"],
-  play: async () => {
-    throw new Error("flake");
-  },
+  play: async () => { throw new Error("flake"); },
 };
 
 // via parameters (both keys work)
 export const FlakyParam: Story = {
   parameters: { storyshelf: { flakyTest: true } },
-  play: async () => {
-    throw new Error("flake");
-  },
+  play: async () => { throw new Error("flake"); },
 };
 export const ChromaticFlaky: Story = {
   parameters: { chromatic: { flakyTest: true } },
-  play: async ({ canvasElement }) => {
-    /* ... */
-  },
+  play: async ({ canvasElement }) => { /* ... */ },
 };
 
 export const Hidden: Story = {

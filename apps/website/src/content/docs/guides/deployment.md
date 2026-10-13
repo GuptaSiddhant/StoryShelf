@@ -14,7 +14,7 @@ services:
     volumes:
       - storyshelf-data:/app/data
     environment:
-      - SECRET=$(openssl rand -hex 32) # ≥ 32 chars
+      - SECRET=$(openssl rand -hex 32)   # ≥ 32 chars
       - CAPTURE_CONCURRENCY=2
       - PURGE_TTL_DAYS=30
       - BRANCH_TTL_DAYS=30
@@ -62,12 +62,12 @@ storyshelf server init
 
 This generates `src/index.ts`, `package.json` and `tsconfig.json` with the correct imports and dependencies.
 
-| Layer         | Package                           | Notes                                        |
-| ------------- | --------------------------------- | -------------------------------------------- |
-| Database      | `@storyshelf/db-sqlite`           | node:sqlite + Drizzle, WAL mode, single file |
-| Storage       | `@storyshelf/storage-local`       | Local filesystem, `--data-dir`               |
-| Capture queue | `InMemoryCaptureQueue` (built-in) | Async, concurrency-limited, in-process       |
-| Auth          | `@storyshelf/auth`                | Local accounts, social, SSO/SAML, passkeys   |
+| Layer | Package | Notes |
+|-------|---------|-------|
+| Database | `@storyshelf/db-sqlite` | node:sqlite + Drizzle, WAL mode, single file |
+| Storage | `@storyshelf/storage-local` | Local filesystem, `--data-dir` |
+| Capture queue | `InMemoryCaptureQueue` (built-in) | Async, concurrency-limited, in-process |
+| Auth | `@storyshelf/auth` | Local accounts, social, SSO/SAML, passkeys |
 
 Swap the database layer for `@storyshelf/db-postgres` (Postgres via `postgres.js` + Drizzle, see [Postgres provider recipes](/packages/db-postgres/#provider-recipes)) or `@storyshelf/db-sqlite/turso` (Turso/libSQL) without changing the rest of the stack.
 
