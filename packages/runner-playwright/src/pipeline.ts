@@ -5,15 +5,23 @@ import type {
   RenderResult,
   RenderedSnapshot,
   StoryEntry,
+  StorySourceAdapter,
   Viewport,
 } from "@storyshelf/core/adapter/capture-runner";
 import { StorybookAdapter, resolveStoryViewports } from "@storyshelf/core/capture";
+import type { StoryParameters } from "@storyshelf/core/capture";
 import type { Browser } from "playwright-core";
 import { messageOf, safeCloseBrowser, safeCloseServer } from "./browser.ts";
-import { createRuntimeParamsState } from "./runtime-params.ts";
+import { createRuntimeParamsState, extractAllParameters } from "./runtime-params.ts";
 import { captureScreenshot } from "./screenshot.ts";
 import { createStaticServer } from "./static-server.ts";
-import type { ActiveRun, CaptureContext, PlaywrightRenderInput } from "./types.ts";
+import type {
+  ActiveRun,
+  CaptureContext,
+  ExtractInput,
+  PlaywrightRenderInput,
+  RuntimeParamsPage,
+} from "./types.ts";
 
 /** Render all story/viewport combinations for a build. */
 export async function renderAll(
@@ -24,6 +32,38 @@ export async function renderAll(
   const server = await createStaticServer(input.storybookDir);
   const browser = await launchBrowser(input.browser ?? defaultBrowser);
   return await runWithBrowser(input, active, browser, server);
+}
+
+/**
+ * Load the preview once and read every story's resolved parameters
+ * (`__STORYBOOK_PREVIEW__.extract()`), so the orchestrator can plan modes.
+ */
+export async function extractAll(
+  input: ExtractInput,
+  defaultBrowser: BrowserName,
+): Promise<Record<string, StoryParameters>> {
+  const first = input.stories[0];
+  if (!first) return {};
+  const server = await createStaticServer(input.storybookDir);
+  const browser = await launchBrowser(input.browser ?? defaultBrowser);
+  try {
+    return await readParameters(browser, server.url, first.id, input.adapter);
+  } finally {
+    await Promise.all([safeCloseBrowser(browser), safeCloseServer(server)]);
+  }
+}
+
+async function readParameters(
+  browser: Browser,
+  baseUrl: string,
+  storyId: string,
+  custom: StorySourceAdapter | undefined,
+): Promise<Record<string, StoryParameters>> {
+  const adapter: StorySourceAdapter = custom ?? new StorybookAdapter();
+  const page = await browser.newPage();
+  await page.goto(adapter.buildUrl(baseUrl, storyId), { waitUntil: "networkidle" });
+  await adapter.waitForReady?.(page);
+  return await extractAllParameters(page as unknown as RuntimeParamsPage);
 }
 
 async function runWithBrowser(

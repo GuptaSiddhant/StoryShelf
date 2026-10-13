@@ -256,4 +256,68 @@ describe("createPlaywrightCaptureRunner.render", () => {
     expect(result.captures).toHaveLength(1);
     expect(result.captures.map((c) => c.viewportName)).toEqual(["desktop"]);
   }, 30_000);
+  it("captures each mode with its globals and viewport", async () => {
+    const story: StoryEntry = {
+      id: "components-button--primary",
+      title: "Components/Button",
+      name: "Primary",
+      type: "story",
+      parameters: { modes: { Dark: { theme: "dark", viewport: 900 } } },
+    };
+    const urls: { id: string; globals?: Record<string, unknown> }[] = [];
+    const adapter = {
+      name: "fake",
+      discover: async (): Promise<StoryEntry[]> => [],
+      buildUrl: (_base: string, id: string, globals?: Record<string, unknown>): string => {
+        urls.push({ id, ...(globals ? { globals } : {}) });
+        return "/";
+      },
+    };
+    const runner = createPlaywrightCaptureRunner();
+    playwright.configureHang(false);
+    const result = await runner.render({
+      buildId: "build-1",
+      storybookDir,
+      stories: [story],
+      viewports: VIEWPORTS,
+      adapter,
+    });
+
+    expect(result.captures.map((c) => c.viewportName)).toEqual(["desktop", "dark"]);
+    expect(result.captures[1]?.viewport).toEqual({
+      name: "dark",
+      width: 900,
+      height: 720,
+      globals: { theme: "dark" },
+    });
+    expect(urls).toEqual([{ id: story.id }, { id: story.id, globals: { theme: "dark" } }]);
+  }, 30_000);
+
+  it("extracts resolved parameters (including modes) in one pass", async () => {
+    playwright.setExtractResult({
+      "components-button--primary": {
+        parameters: {
+          chromatic: { modes: { Dark: { theme: "dark" } } },
+          storyshelf: { modes: { Wide: { viewport: 1600 } }, delay: 5 },
+        },
+      },
+    });
+    playwright.configureHang(false);
+    const runner = createPlaywrightCaptureRunner();
+    const params = await runner.extractParameters?.({
+      buildId: "build-1",
+      storybookDir,
+      stories: STORIES,
+    });
+
+    expect(params).toEqual({
+      "components-button--primary": {
+        delay: 5,
+        modes: { Dark: { theme: "dark" }, Wide: { viewport: 1600 } },
+      },
+    });
+    await expect(
+      runner.extractParameters?.({ buildId: "build-1", storybookDir, stories: [] }),
+    ).resolves.toEqual({});
+  }, 30_000);
 });

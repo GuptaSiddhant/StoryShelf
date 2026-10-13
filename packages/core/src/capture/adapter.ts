@@ -15,6 +15,23 @@ export interface StoryViewportConfig {
   viewports?: Record<string, StoryViewportDefinition>;
 }
 
+/** Viewport a mode captures at: a width, a Storybook viewport name, or explicit dimensions. */
+export type ModeViewportValue = number | string | { width: number; height: number };
+
+/**
+ * One entry of `parameters.{chromatic,storyshelf}.modes`. `viewport` sizes the
+ * page, `disable` removes an inherited mode, every other key is a Storybook
+ * global (theme, locale, backgrounds, …) applied through the `globals` URL arg.
+ */
+export interface ModeDefinition {
+  viewport?: ModeViewportValue;
+  disable?: boolean;
+  [global: string]: unknown;
+}
+
+/** Named modes keyed by display name (the slug of the name is the baseline identity). */
+export type ModeMap = Record<string, ModeDefinition>;
+
 /** Per-story capture parameters from the Storybook index. */
 export interface StoryParameters {
   disableSnapshot?: boolean;
@@ -39,6 +56,8 @@ export interface StoryParameters {
   waitForFonts?: boolean;
   /** Storybook viewport config; adds the story's default viewport to the project list at capture time. */
   viewport?: StoryViewportConfig;
+  /** Named modes: extra captures of this story under different globals/viewports. */
+  modes?: ModeMap;
 }
 
 /** Return whether a story is marked flaky (failures stay non-blocking). */
@@ -86,7 +105,7 @@ export interface CapturePage {
 export interface StorySourceAdapter {
   name: string;
   discover(source: string): Promise<StoryEntry[]>;
-  buildUrl(baseUrl: string, storyId: string): string;
+  buildUrl(baseUrl: string, storyId: string, globals?: Record<string, unknown>): string;
   screenshotSelector?: string;
   /**
    * Optional hook loading the module dependency graph of an extracted build,
@@ -109,6 +128,8 @@ export interface Viewport {
   name: string;
   width: number;
   height: number;
+  /** Storybook globals applied for this capture (set for modes only). */
+  globals?: Record<string, unknown>;
 }
 
 /** Default viewport used when none is configured. */

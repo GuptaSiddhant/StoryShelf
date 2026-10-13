@@ -126,6 +126,87 @@ describe("executeCaptureJob", () => {
     expect(rows.map((row) => row.storyName)).toEqual(["Primary"]);
   });
 
+  describe("modes", () => {
+    const MODES = { Dark: { theme: "dark" }, Wide: { viewport: 1600 } };
+    const DEFAULT_EXTRACTED = { [STORY_ID]: { modes: MODES } };
+
+    async function setup(
+      projectPatch: Record<string, unknown> = {},
+      extracted: Record<string, unknown> = DEFAULT_EXTRACTED,
+    ): Promise<{
+      db: DatabaseAdapter;
+      buildId: string;
+      render: ReturnType<typeof vi.fn>;
+      options: Parameters<typeof executeCaptureJob>[1];
+    }> {
+      const { db } = makeDatabase();
+      const { storage } = makeStorage();
+      const project = await new ProjectModel(db, tables(db)).create({ name: "Modes" });
+      await db.update(db.tables.projects, project.id, projectPatch);
+      const build = await new BuildModel(db, tables(db)).create(project.id, {
+        gitSha: "sha-modes",
+        gitBranch: "main",
+        isDefault: true,
+      });
+      await storage.write(storybookZipPath(project.id, build.id), zipWithIndex());
+      const base = fakeRunner();
+      const runner: CaptureRunner = {
+        ...base.runner,
+        extractParameters: vi.fn(async () => {
+          await Promise.resolve();
+          return extracted as never;
+        }),
+      };
+      return {
+        db,
+        buildId: build.id,
+        render: base.render,
+        options: { db, tables: tables(db), storage, runner, scratchDir },
+      };
+    }
+
+    it("passes mode-enriched stories to the renderer", async () => {
+      const { buildId, render, options } = await setup();
+      await executeCaptureJob({ buildId }, options);
+      const request = render.mock.calls[0]?.[0] as {
+        stories: { parameters?: { modes?: unknown } }[];
+      };
+      expect(request.stories[0]?.parameters?.modes).toEqual(MODES);
+    });
+
+    it("applies the project's mode allowlist", async () => {
+      const { buildId, render, options } = await setup({ modesAllowlist: '["dark"]' });
+      await executeCaptureJob({ buildId }, options);
+      const request = render.mock.calls[0]?.[0] as {
+        stories: { parameters?: { modes?: unknown } }[];
+      };
+      expect(request.stories[0]?.parameters?.modes).toEqual({ Dark: { theme: "dark" } });
+    });
+
+    it("fails the build before rendering when a story exceeds the mode cap", async () => {
+      const many = Object.fromEntries(
+        Array.from({ length: 9 }, (_, i) => [`m${i}`, { theme: `t${i}` }]),
+      );
+      const { db, buildId, render, options } = await setup({}, { [STORY_ID]: { modes: many } });
+      await expect(executeCaptureJob({ buildId }, options)).rejects.toThrow(
+        /expands to 10 captures/u,
+      );
+      expect(render).not.toHaveBeenCalled();
+      expect((await new BuildModel(db, tables(db)).get(buildId))?.status).toBe("failed");
+    });
+
+    it("falls back to index parameters when extraction throws", async () => {
+      const { buildId, render, options } = await setup();
+      (options.runner as { extractParameters: unknown }).extractParameters = vi.fn(async () => {
+        await Promise.resolve();
+        throw new Error("no preview");
+      });
+      await executeCaptureJob({ buildId }, options);
+      const request = render.mock.calls[0]?.[0] as { stories: { parameters?: unknown }[] };
+      expect(request.stories[0]?.parameters).toBeUndefined();
+    });
+  });
+
   it("marks the build failed when the renderer rejects", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();

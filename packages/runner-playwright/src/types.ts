@@ -25,6 +25,12 @@ export interface PlaywrightRenderInput {
   adapter?: StorySourceAdapter;
 }
 
+/** Input for the parameter pre-pass (a subset of the render input). */
+export type ExtractInput = Pick<
+  PlaywrightRenderInput,
+  "buildId" | "storybookDir" | "stories" | "logger" | "browser" | "adapter"
+>;
+
 /** Browser + adapter context shared by screenshot helpers. */
 export interface ScreenshotContext {
   browser: Browser;

@@ -6,8 +6,8 @@ import {
   type CaptureRunner,
 } from "@storyshelf/core/adapter/capture-runner";
 import { activeRuns, closeBrowser } from "./browser.ts";
-import { renderAll } from "./pipeline.ts";
-import type { ActiveRun, PlaywrightRenderInput } from "./types.ts";
+import { extractAll, renderAll } from "./pipeline.ts";
+import type { ActiveRun, ExtractInput, PlaywrightRenderInput } from "./types.ts";
 
 declare const __PKG_VERSION__: string | undefined;
 
@@ -36,6 +36,9 @@ export function createPlaywrightCaptureRunner(
       } finally {
         activeRuns.delete(input.buildId);
       }
+    },
+    async extractParameters(input: ExtractInput) {
+      return await extractAll(input, defaultBrowser);
     },
     async cancel(buildId) {
       const active = activeRuns.get(buildId);

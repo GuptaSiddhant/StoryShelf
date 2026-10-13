@@ -2,6 +2,7 @@ import { loadDepGraph, STATS_FILENAME, type DepGraph } from "@storyshelf/affecte
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type {
+  ModeMap,
   StoryEntry,
   StoryParameters,
   StorySourceAdapter,
@@ -9,6 +10,7 @@ import type {
   StoryViewportDefinition,
   Viewport,
 } from "./adapter.ts";
+import { applyModes, buildGlobalsParam } from "./modes.ts";
 
 interface StorybookIndex {
   v: number;
@@ -42,7 +44,15 @@ export function mergeParameters(entry: {
     ...entry.parameters?.chromatic,
     ...entry.parameters?.storyshelf,
   };
+  const modes = mergeModes(entry.parameters?.chromatic?.modes, entry.parameters?.storyshelf?.modes);
+  if (modes) merged.modes = modes;
   if (entry.parameters?.viewport) merged.viewport = entry.parameters.viewport;
+  return Object.keys(merged).length > 0 ? merged : undefined;
+}
+
+/** Union both parameter keys' modes by name (`storyshelf` wins per mode). */
+function mergeModes(chromatic?: ModeMap, storyshelf?: ModeMap): ModeMap | undefined {
+  const merged = { ...chromatic, ...storyshelf };
   return Object.keys(merged).length > 0 ? merged : undefined;
 }
 
@@ -68,10 +78,19 @@ export function resolveStoryViewports(
   globalViewports: Viewport[],
 ): Viewport[] {
   const resolved = storyViewport(entry);
-  if (resolved && !globalViewports.some((v) => v.name === resolved.name)) {
-    return [...globalViewports, resolved];
-  }
-  return [...globalViewports];
+  const withDefault =
+    resolved && !globalViewports.some((v) => v.name === resolved.name)
+      ? [...globalViewports, resolved]
+      : [...globalViewports];
+  return applyModes(entry.parameters?.modes, withDefault, (name) => namedViewport(entry, name));
+}
+
+/** Resolve a Storybook viewport name via the story's inline config, then builtins. */
+function namedViewport(entry: Pick<StoryEntry, "parameters">, name: string): Viewport | undefined {
+  const inline = entry.parameters?.viewport?.viewports?.[name];
+  return (
+    (inline ? viewportFromInline(name, inline) : undefined) ?? STORYBOOK_BUILTIN_VIEWPORTS[name]
+  );
 }
 
 function storyViewport(entry: Pick<StoryEntry, "parameters">): Viewport | undefined {
@@ -131,8 +150,10 @@ export class StorybookAdapter implements StorySourceAdapter {
   }
 
   // eslint-disable-next-line class-methods-use-this
-  buildUrl(baseUrl: string, storyId: string): string {
-    return `${baseUrl}/iframe.html?id=${encodeURIComponent(storyId)}&viewMode=story`;
+  buildUrl(baseUrl: string, storyId: string, globals?: Record<string, unknown>): string {
+    const url = `${baseUrl}/iframe.html?id=${encodeURIComponent(storyId)}&viewMode=story`;
+    const param = globals ? buildGlobalsParam(globals) : "";
+    return param === "" ? url : `${url}&globals=${encodeURIComponent(param)}`;
   }
 
   /**
