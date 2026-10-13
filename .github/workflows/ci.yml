@@ -1,8 +1,7 @@
 name: CI
 
-# One job: verify, smoke, docs checks and the real-browser capture tests share a
-# single install/build/Chromium. Only the Storybook 8 fixture runs for now
-# (fixtures/storybook-9 and -10 are skipped; re-add them as steps below).
+# `verify` runs build/lint/test, smoke and docs checks; `capture` is a matrix of
+# real-browser capture tests, one leg per Storybook fixture (8, 9, 10).
 #
 # Node: the whole job runs on the version `setup-nub` resolves from
 # package.json#devEngines.runtime (24.x, the minimum supported Node) — there is
@@ -126,33 +125,67 @@ jobs:
         working-directory: apps/website
         run: nub run check:a11y
 
+  capture:
+    name: capture (${{ matrix.fixture }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        fixture: [storybook-8, storybook-9, storybook-10]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Nub
+        uses: nubjs/setup-nub@v0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install dependencies
+        run: nub ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-1.63.0-chromium-${{ runner.os }}
+
+      - name: Install Playwright chromium
+        working-directory: packages/runner-playwright
+        run: |
+          nubx playwright-core install chromium
+          if ! node --input-type=module -e "const { chromium } = await import('playwright-core'); await (await chromium.launch()).close()"; then
+            echo "chromium failed to launch; installing system dependencies"
+            nubx playwright-core install-deps chromium
+          fi
+
+      - name: Build workspace packages
+        run: nubx turbo build --filter=@storyshelf/runner-playwright...
+
       - name: Get pnpm store path
         id: pnpm-store
-        if: ${{ !cancelled() }}
         run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
 
       - name: Cache pnpm store
-        if: ${{ !cancelled() }}
         uses: actions/cache@v4
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
-          key: pnpm-store-storybook-8-${{ hashFiles('fixtures/storybook-8/pnpm-lock.yaml') }}
+          key: pnpm-store-${{ matrix.fixture }}-${{ hashFiles(format('fixtures/{0}/pnpm-lock.yaml', matrix.fixture)) }}
 
-      - name: Install fixture (storybook-8)
-        if: ${{ !cancelled() }}
-        run: pnpm --dir fixtures/storybook-8 install --frozen-lockfile
+      - name: Install fixture
+        run: pnpm --dir fixtures/${{ matrix.fixture }} install --frozen-lockfile
 
-      - name: Build fixture Storybook (storybook-8)
-        if: ${{ !cancelled() }}
-        run: pnpm --dir fixtures/storybook-8 run build-storybook
+      - name: Build fixture Storybook
+        run: pnpm --dir fixtures/${{ matrix.fixture }} run build-storybook
 
-      - name: Real-browser capture tests (storybook-8)
-        # Workspace packages are already built by the verify step.
-        if: ${{ !cancelled() }}
+      - name: Real-browser capture tests
         working-directory: packages/runner-playwright
         env:
           # Absolute: cwd-independent. Must flow via `nub run` (step env does
           # not survive `nubx turbo`).
-          FIXTURE_DIR: ${{ github.workspace }}/fixtures/storybook-8
+          FIXTURE_DIR: ${{ github.workspace }}/fixtures/${{ matrix.fixture }}
           RUN_INTEGRATION: "1"
         run: nub run test:integration
