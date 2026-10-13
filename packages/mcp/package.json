@@ -31,9 +31,6 @@
     "dist"
   ],
   "type": "module",
-  "engines": {
-    "node": ">=24"
-  },
   "sideEffects": false,
   "exports": {
     ".": "./dist/index.js",
@@ -65,6 +62,9 @@
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
   },
   "jsr": false
 }

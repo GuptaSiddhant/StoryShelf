@@ -86,25 +86,27 @@ export class PackageUsageModel {
   ): Promise<number> {
     const table = this.tables.buildPackageUsage;
     const createdAt = new Date().toISOString();
-    return await serialized(`usage:${buildId}`, async () =>
-      await this.atomic(async (store) => {
-        await removeAll(store, table, this.buildWhere(buildId));
-        await Promise.all(
-          rows.map(async (row) => {
-            await store.insert(table, {
-              id: ulid(),
-              projectId,
-              buildId,
-              storyImportPath: row.storyImportPath,
-              packageName: row.packageName,
-              modulePath: row.modulePath,
-              version: row.version ?? null,
-              createdAt,
-            });
-          }),
-        );
-        return rows.length;
-      }),
+    return await serialized(
+      `usage:${buildId}`,
+      async () =>
+        await this.atomic(async (store) => {
+          await removeAll(store, table, this.buildWhere(buildId));
+          await Promise.all(
+            rows.map(async (row) => {
+              await store.insert(table, {
+                id: ulid(),
+                projectId,
+                buildId,
+                storyImportPath: row.storyImportPath,
+                packageName: row.packageName,
+                modulePath: row.modulePath,
+                version: row.version ?? null,
+                createdAt,
+              });
+            }),
+          );
+          return rows.length;
+        }),
     );
   }
 
@@ -157,22 +159,24 @@ export class PackageUsageModel {
     const table = this.tables.projectLinks;
     const where = eq(getTableColumns(table)["downstreamId"] as unknown as SQLWrapper, downstreamId);
     const createdAt = new Date().toISOString();
-    return await serialized(`links:${downstreamId}`, async () =>
-      await this.atomic(async (store) => {
-        await removeAll(store, table, where);
-        return await Promise.all(
-          links.map(
-            async (link) =>
-              (await store.insert(table, {
-                id: ulid(),
-                downstreamId,
-                upstreamId: link.upstreamId,
-                packageName: link.packageName,
-                createdAt,
-              })) as unknown as ProjectLink,
-          ),
-        );
-      }),
+    return await serialized(
+      `links:${downstreamId}`,
+      async () =>
+        await this.atomic(async (store) => {
+          await removeAll(store, table, where);
+          return await Promise.all(
+            links.map(
+              async (link) =>
+                (await store.insert(table, {
+                  id: ulid(),
+                  downstreamId,
+                  upstreamId: link.upstreamId,
+                  packageName: link.packageName,
+                  createdAt,
+                })) as unknown as ProjectLink,
+            ),
+          );
+        }),
     );
   }
 
