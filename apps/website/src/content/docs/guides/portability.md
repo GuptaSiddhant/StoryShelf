@@ -90,7 +90,7 @@ baselines/
 ```
 
 - `branch` is the export filter (`null` means all branches).
-- `skipped` lists baselines whose image could not be read at export time (for example, the file was deleted from storage). They are reported, not archived, so a single broken row never blocks an export.
+- `skipped` lists baselines whose image is missing from storage (or over the 64 MiB image limit). They are reported, not archived, and logged by the server, so a single broken row never blocks an export. Other storage errors (for example a transient S3 failure) abort the download instead, so a truncated archive is never mistaken for a complete backup.
 - Images are stored uncompressed inside the zip, since PNGs are already compressed.
 
 Because the format is plain zip, JSON, and PNG, you can also build archives yourself, for example to seed StoryShelf from screenshots taken elsewhere. Write one manifest entry per image and include each image's SHA-256.
@@ -102,6 +102,7 @@ Imports come from outside the instance, so the server treats every archive as un
 | Check | Limit / rule |
 |-------|--------------|
 | Request body | `min(maxUploadBytes, 512 MiB)`, otherwise `413` |
+| Archive size | 512 MiB in both directions, so an export can always be imported back. An export that would grow past it fails; export one branch at a time. |
 | Baselines per archive | 50,000 (export a branch at a time beyond that) |
 | One image | 64 MiB |
 | `manifest.json` | 32 MiB |

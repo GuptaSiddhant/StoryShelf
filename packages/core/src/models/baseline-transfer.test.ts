@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Baseline } from "../schema/baseline.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { baselinePath } from "../utils/paths.ts";
+import { BASELINE_ARCHIVE_LIMITS, BaselineArchiveError } from "./baseline-archive.ts";
 import { BaselineTransferModel } from "./baseline-transfer.ts";
 import { BaselineModel } from "./baseline.ts";
 
@@ -87,5 +88,72 @@ describe("BaselineTransferModel", () => {
     const { transfer } = await seeded();
     const archive = await collect(await transfer.export("p1"));
     expect(await transfer.import("p1", archive)).toEqual({ imported: 4, created: 0, updated: 4 });
+  });
+
+  it("serializes concurrent imports so no duplicate rows are created", async () => {
+    const { transfer, baselines } = await seeded();
+    const archive = await collect(await transfer.export("p1"));
+    const results = await Promise.all([
+      transfer.import("p2", archive),
+      transfer.import("p2", archive),
+    ]);
+    expect(results.reduce((total, result) => total + result.created, 0)).toBe(4);
+    expect(await baselines.list("p2")).toHaveLength(4);
+  });
+
+  it("applies the archive's createdAt when overwriting an existing baseline", async () => {
+    const { transfer, baselines, storage } = await seeded();
+    const archive = await collect(await transfer.export("p1", { branch: "main" }));
+    await storage.write("src/old", png("old"));
+    await baselines.upsert("p2", "button--primary", "desktop", "main", "s", "src/old");
+    await transfer.import("p2", archive);
+    const source = (await baselines.list("p1")).find(
+      (row) =>
+        row.branch === "main" && row.viewportName === "desktop" && row.browser === "chromium",
+    );
+    const row = await baselines.getFor("p2", "button--primary", "desktop", "main");
+    expect(row?.createdAt).toBe(source?.createdAt);
+  });
+
+  it("reports skipped baselines whose image is missing, and aborts on other storage errors", async () => {
+    const { transfer, baselines, storage, objects } = await seeded();
+    const [victim] = await baselines.list("p1");
+    objects.delete(victim!.screenshotPath);
+    const onSkipped = vi.fn();
+    const archive = await collect(await transfer.export("p1", { onSkipped }));
+    expect(onSkipped).toHaveBeenCalledTimes(1);
+    expect(archive.toString("latin1")).toContain('"skipped"');
+
+    const read = vi.spyOn(storage, "read").mockRejectedValueOnce(new Error("S3 503"));
+    await expect(collect(await transfer.export("p1"))).rejects.toThrow("S3 503");
+    read.mockRestore();
+  });
+
+  it("keeps archive file names unique when two identities share a mode segment", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const baselines = new BaselineModel(db, undefined, storage);
+    await storage.write("src/a", png("a"));
+    await baselines.upsert("p1", "s--1", "a~firefox", "main", "snap", "src/a", null, {
+      browser: "chromium",
+    });
+    await baselines.upsert("p1", "s--1", "a", "main", "snap", "src/a", null, {
+      browser: "firefox",
+    });
+    const transfer = new BaselineTransferModel(db, storage);
+    const archive = await collect(await transfer.export("p1"));
+    expect(await transfer.import("p2", archive)).toEqual({ imported: 2, created: 2, updated: 0 });
+  });
+
+  it("fails an export that would outgrow the shared archive limit", async () => {
+    const { transfer } = await seeded();
+    const limits = BASELINE_ARCHIVE_LIMITS as { maxArchiveBytes: number };
+    const original = limits.maxArchiveBytes;
+    limits.maxArchiveBytes = BASELINE_ARCHIVE_LIMITS.maxManifestBytes + 100;
+    try {
+      await expect(collect(await transfer.export("p1"))).rejects.toThrow(BaselineArchiveError);
+    } finally {
+      limits.maxArchiveBytes = original;
+    }
   });
 });

@@ -22,6 +22,8 @@ export interface BaselineExportOptions {
   branch?: string | null;
   /** Source project slug recorded in the manifest. */
   project?: string | null;
+  /** Called for each baseline left out of the archive because its image is missing or too large. */
+  onSkipped?: (baseline: BaselineSkipped) => void;
   /** Clock override for `exportedAt` (tests). */
   now?: () => Date;
 }
@@ -31,7 +33,10 @@ export interface BaselineExportOptions {
  * eagerly so callers can fail the request before streaming; images are then
  * read one at a time while the returned iterable is consumed, and the
  * manifest is written last so it can carry each image's SHA-256. Baselines
- * whose image cannot be read are listed under `skipped` instead of failing.
+ * whose image is missing (or over the per-image limit) are listed under
+ * `skipped` and reported through `onSkipped`. Storage errors on an image that
+ * exists abort the stream, as does outgrowing the archive size limit, so a
+ * truncated stream is never mistaken for a complete backup.
  *
  * @throws {BaselineArchiveError} When there are more baselines than an archive may hold.
  */
@@ -58,7 +63,7 @@ export function exportBaselineArchive(
     baselines: [],
     skipped: [],
   };
-  return zipStream(archiveSources(storage, selected, manifest));
+  return zipStream(archiveSources(storage, selected, manifest, options.onSkipped));
 }
 
 function sortKey(row: Baseline): string[] {
@@ -78,30 +83,66 @@ async function* archiveSources(
   storage: StorageAdapter,
   rows: Baseline[],
   manifest: BaselineManifest,
+  onSkipped?: (baseline: BaselineSkipped) => void,
 ): AsyncGenerator<ZipSource> {
+  const state = { names: new Set<string>(), budget: new ArchiveBudget() };
   for (const row of rows) {
     // oxlint-disable-next-line eslint/no-await-in-loop -- one image in memory at a time
-    const data = await readImage(storage, row);
-    if (data) {
-      const entry = manifestEntry(row, data);
-      manifest.baselines.push(entry);
-      yield { name: entry.file, data: async (): Promise<Buffer> => await Promise.resolve(data) };
-    } else {
-      manifest.skipped?.push(identityOf(row));
+    const source = await rowSource(storage, row, manifest, state, onSkipped);
+    if (source) {
+      yield source;
     }
   }
   const json = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`);
-  yield {
-    name: BASELINE_MANIFEST_NAME,
-    data: async (): Promise<Buffer> => await Promise.resolve(json),
-  };
+  yield { name: BASELINE_MANIFEST_NAME, data: json };
 }
 
+/** The zip entry for one baseline, or null (after recording it as skipped) when its image is unavailable. */
+async function rowSource(
+  storage: StorageAdapter,
+  row: Baseline,
+  manifest: BaselineManifest,
+  state: { names: Set<string>; budget: ArchiveBudget },
+  onSkipped?: (baseline: BaselineSkipped) => void,
+): Promise<ZipSource | null> {
+  const data = await readImage(storage, row);
+  if (!data) {
+    const identity = identityOf(row);
+    manifest.skipped?.push(identity);
+    onSkipped?.(identity);
+    return null;
+  }
+  const entry = manifestEntry(row, data, state.names);
+  state.budget.add(entry.file, data.length);
+  manifest.baselines.push(entry);
+  return { name: entry.file, data };
+}
+
+/** Tracks the streamed size so an export never outgrows what an import accepts. */
+class ArchiveBudget {
+  /** Zip local + central header bytes per entry, excluding the (twice-stored) name. */
+  private static readonly ENTRY_OVERHEAD = 76;
+  private used = BASELINE_ARCHIVE_LIMITS.maxManifestBytes;
+
+  add(name: string, bytes: number): void {
+    this.used += ArchiveBudget.ENTRY_OVERHEAD + Buffer.byteLength(name) * 2 + bytes;
+    if (this.used > BASELINE_ARCHIVE_LIMITS.maxArchiveBytes) {
+      throw new BaselineArchiveError(
+        `Export exceeds ${BASELINE_ARCHIVE_LIMITS.maxArchiveBytes} bytes (the import limit); export one branch at a time`,
+      );
+    }
+  }
+}
+
+/** Read a baseline image; null when it is missing or too large, throws on other storage errors. */
 async function readImage(storage: StorageAdapter, row: Baseline): Promise<Buffer | null> {
   try {
     const data = await storage.read(row.screenshotPath);
     return data.length <= BASELINE_ARCHIVE_LIMITS.maxImageBytes ? data : null;
-  } catch {
+  } catch (error) {
+    if (await storage.exists(row.screenshotPath).catch(() => false)) {
+      throw error;
+    }
     return null;
   }
 }
@@ -115,7 +156,7 @@ function identityOf(row: Baseline): BaselineSkipped {
   };
 }
 
-function manifestEntry(row: Baseline, data: Buffer): BaselineManifestEntry {
+function manifestEntry(row: Baseline, data: Buffer, names: Set<string>): BaselineManifestEntry {
   const identity = identityOf(row);
   return {
     ...identity,
@@ -123,7 +164,23 @@ function manifestEntry(row: Baseline, data: Buffer): BaselineManifestEntry {
     infraHash: row.infraHash,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
-    file: archiveFileName(identity.branch, identity.storyId, identity.viewport, identity.browser),
+    file: uniqueName(
+      archiveFileName(identity.branch, identity.storyId, identity.viewport, identity.browser),
+      names,
+    ),
     sha256: createHash("sha256").update(data).digest("hex"),
   };
+}
+
+/**
+ * `modeSegment` can map two identities to one name (`a~firefox` on chromium vs
+ * `a` on firefox). Names are only lookup keys, so disambiguate with a suffix.
+ */
+function uniqueName(name: string, names: Set<string>): string {
+  let candidate = name;
+  for (let n = 2; names.has(candidate); n += 1) {
+    candidate = name.replace(/\.png$/u, `.${n}.png`);
+  }
+  names.add(candidate);
+  return candidate;
 }

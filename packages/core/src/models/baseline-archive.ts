@@ -15,7 +15,7 @@ export const BASELINE_ARCHIVE_VERSION = 1;
 /** Name of the manifest entry at the archive root. */
 export const BASELINE_MANIFEST_NAME = "manifest.json";
 
-/** Hard limits for archives (both directions). Zip64 is unsupported, so entries stay < 65535. */
+/** Hard limits for archives (both directions). Zip64 is unsupported, so entries stay < 65535 and archives stay far below 4 GiB. */
 export const BASELINE_ARCHIVE_LIMITS = {
   /** Maximum baselines in one archive. */
   maxBaselines: 50_000,
@@ -23,8 +23,12 @@ export const BASELINE_ARCHIVE_LIMITS = {
   maxImageBytes: 64 * 1024 * 1024,
   /** Maximum size of `manifest.json`. */
   maxManifestBytes: 32 * 1024 * 1024,
-  /** Maximum combined uncompressed size of an imported archive. */
-  maxTotalBytes: 4 * 1024 * 1024 * 1024 - 1,
+  /**
+   * Maximum size of an archive in either direction: the combined uncompressed
+   * size of an import, and what an export may stream. Matches the import
+   * request-body ceiling, so every export can be imported back.
+   */
+  maxArchiveBytes: 512 * 1024 * 1024,
 } as const;
 
 const isoTimestamp = z.iso.datetime({ offset: true });

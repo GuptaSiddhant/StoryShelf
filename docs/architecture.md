@@ -469,8 +469,10 @@ handles HTTP.
   `baselines/<branch>/<storyId>/<mode>[~<browser>].png` — the storage layout without the project id.
   Each manifest entry carries the identity (story, mode, browser, branch), `mode` JSON, `infraHash`,
   timestamps, the zip `file`, and its SHA-256. Images are STORE-d (PNGs are already compressed) and
-  streamed one at a time; the manifest is written last. Unreadable images are listed under `skipped`.
-- **Import is all-or-nothing validation, then upsert.** The archive (buffered, capped at
+  streamed one at a time; the manifest is written last. Missing images are listed under `skipped` (and logged); other storage
+  errors, or growing past the 512 MiB archive limit shared with import, abort the stream.
+- **Import is all-or-nothing validation, then upsert** (images stored first, rows applied in one
+  transaction when the driver has one, imports per project serialized). The archive (buffered, capped at
   `min(maxUploadBytes, 512 MiB)`) is checked before any write: zip structure (no zip64, encryption,
   or multi-disk; entry-count, per-entry and total-size limits applied before inflation; CRC checked),
   entry names (no absolute paths, `..`, backslashes), manifest schema, identity segments (the same

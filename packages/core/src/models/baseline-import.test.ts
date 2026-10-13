@@ -54,7 +54,7 @@ const IMAGE = { "baselines/main/button--primary/desktop.png": PNG };
 
 describe("planBaselineImport", () => {
   it("plans storage paths from the manifest identity, not the zip entry name", async () => {
-    const plan = planBaselineImport(
+    const plan = await planBaselineImport(
       await archive({
         "manifest.json": manifest([entry({ file: "anything/at/all.png" })]),
         "anything/at/all.png": PNG,
@@ -131,11 +131,13 @@ describe("planBaselineImport", () => {
     ],
   ])("rejects %s", async (_label, input, message) => {
     const zip = Buffer.isBuffer(input) ? input : await archive(input);
-    expect(() => planBaselineImport(zip, "p1")).toThrow(BaselineArchiveError);
-    expect(() => planBaselineImport(zip, "p1")).toThrow(message);
+    await expect(planBaselineImport(zip, "p1")).rejects.toThrow(BaselineArchiveError);
+    await expect(planBaselineImport(zip, "p1")).rejects.toThrow(message);
   });
 
   it("accepts an empty manifest", async () => {
-    expect(planBaselineImport(await archive({ "manifest.json": manifest([]) }), "p1")).toEqual([]);
+    expect(
+      await planBaselineImport(await archive({ "manifest.json": manifest([]) }), "p1"),
+    ).toEqual([]);
   });
 });

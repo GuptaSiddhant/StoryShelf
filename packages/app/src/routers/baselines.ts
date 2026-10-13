@@ -93,9 +93,15 @@ export function registerBaselines(app: ShelfRouter): void {
   app.openapi(exportRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...VIEW_ROLES);
     const { branch } = c.req.valid("query");
-    const { db, storage } = getStore();
+    const { db, storage, logger } = getStore();
     const chunks = await new BaselineTransferModel(db, storage)
-      .export(project.id, { branch, project: project.slug })
+      .export(project.id, {
+        branch,
+        project: project.slug,
+        onSkipped: (baseline): void => {
+          logger.warn({ projectId: project.id, ...baseline }, "baseline image skipped in export");
+        },
+      })
       .catch(asBadRequest);
     return new Response(toWebStream(chunks), {
       headers: {

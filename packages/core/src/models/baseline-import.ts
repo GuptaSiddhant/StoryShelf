@@ -7,6 +7,7 @@
  * derived from the manifest identity — never from zip entry names.
  */
 import { createHash } from "node:crypto";
+import { setImmediate } from "node:timers/promises";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { baselinePath } from "../utils/paths.ts";
 import { readZip, ZipFormatError, type ZipEntry } from "../utils/zip-read.ts";
@@ -27,35 +28,43 @@ export interface PlannedBaseline {
   /** Destination storage path inside the importing project. */
   storagePath: string;
   zipEntry: ZipEntry;
+  /** The verified PNG bytes, extracted once during planning. */
+  data: Buffer;
 }
 
 /**
- * Parse and fully validate `archive` for import into `projectId`.
+ * Parse and fully validate `archive` for import into `projectId`. Inflating and
+ * hashing is CPU-bound, so the loop yields to the event loop between entries
+ * instead of blocking the server for the whole archive.
  *
  * @throws {BaselineArchiveError} On any malformed, unsafe, or inconsistent input.
  */
-export function planBaselineImport(archive: Buffer, projectId: string): PlannedBaseline[] {
+export async function planBaselineImport(
+  archive: Buffer,
+  projectId: string,
+): Promise<PlannedBaseline[]> {
   const entries = openArchive(archive);
   const manifest = parseManifest(entries);
   const seen = new Set<string>();
-  return manifest.baselines.map((entry) => {
-    // Files are unique too, so total work stays bounded by the archive's own size limit.
-    const keys = [baselineIdentity(entry), `file:${entry.file}`];
-    if (keys.some((key) => seen.has(key))) {
-      fail(`Duplicate baseline or file in manifest: ${entry.file}`);
-    }
-    for (const key of keys) {
-      seen.add(key);
-    }
-    const planned = planEntry(entries, projectId, entry);
-    verifyImage(planned);
-    return planned;
-  });
+  const plan: PlannedBaseline[] = [];
+  for (const entry of manifest.baselines) {
+    claimEntry(seen, entry);
+    plan.push(planEntry(entries, projectId, entry));
+    // oxlint-disable-next-line eslint/no-await-in-loop -- deliberate yield between CPU-bound entries
+    await setImmediate();
+  }
+  return plan;
 }
 
-/** Read a planned baseline's verified PNG bytes. */
-export function plannedImage(planned: PlannedBaseline): Buffer {
-  return planned.zipEntry.read();
+/** Reject repeated identities or files, so total work stays bounded by the archive's own size limit. */
+function claimEntry(seen: Set<string>, entry: BaselineManifestEntry): void {
+  const keys = [baselineIdentity(entry), `file:${entry.file}`];
+  if (keys.some((key) => seen.has(key))) {
+    fail(`Duplicate baseline or file in manifest: ${entry.file}`);
+  }
+  for (const key of keys) {
+    seen.add(key);
+  }
 }
 
 /** Write a planned baseline's image to storage. */
@@ -63,7 +72,7 @@ export async function writePlannedImage(
   storage: StorageAdapter,
   planned: PlannedBaseline,
 ): Promise<void> {
-  await storage.write(planned.storagePath, plannedImage(planned));
+  await storage.write(planned.storagePath, planned.data);
 }
 
 function fail(message: string): never {
@@ -78,7 +87,7 @@ function openArchive(archive: Buffer): Map<string, ZipEntry> {
         BASELINE_ARCHIVE_LIMITS.maxImageBytes,
         BASELINE_ARCHIVE_LIMITS.maxManifestBytes,
       ),
-      maxTotalBytes: BASELINE_ARCHIVE_LIMITS.maxTotalBytes,
+      maxTotalBytes: BASELINE_ARCHIVE_LIMITS.maxArchiveBytes,
     });
   } catch (error) {
     if (error instanceof ZipFormatError) {
@@ -138,15 +147,27 @@ function planEntry(
   } catch {
     return fail(`Unsafe baseline identity for ${entry.file}`);
   }
-  return { entry, storagePath, zipEntry };
+  return { entry, storagePath, zipEntry, data: verifiedImage(zipEntry, entry) };
 }
 
-function verifyImage(planned: PlannedBaseline): void {
-  const data = plannedImage(planned);
+function verifiedImage(zipEntry: ZipEntry, entry: BaselineManifestEntry): Buffer {
+  const data = readEntry(zipEntry);
   if (!isPng(data)) {
-    fail(`${planned.entry.file} is not a PNG`);
+    fail(`${entry.file} is not a PNG`);
   }
-  if (createHash("sha256").update(data).digest("hex") !== planned.entry.sha256) {
-    fail(`${planned.entry.file} does not match its manifest checksum`);
+  if (createHash("sha256").update(data).digest("hex") !== entry.sha256) {
+    fail(`${entry.file} does not match its manifest checksum`);
+  }
+  return data;
+}
+
+function readEntry(zipEntry: ZipEntry): Buffer {
+  try {
+    return zipEntry.read();
+  } catch (error) {
+    if (error instanceof ZipFormatError) {
+      return fail(error.message);
+    }
+    throw error;
   }
 }

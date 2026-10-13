@@ -1,9 +1,10 @@
 /** HTTP helpers for the baseline export/import router. */
 import { DEFAULT_MAX_UPLOAD_BYTES, type ShelfConfig } from "@storyshelf/core/config";
+import { BASELINE_ARCHIVE_LIMITS } from "@storyshelf/core/models";
 import { HTTPException } from "hono/http-exception";
 
 /** Ceiling for a buffered import archive, whatever `maxUploadBytes` allows. */
-export const MAX_BASELINE_IMPORT_BYTES = 512 * 1024 * 1024;
+export const MAX_BASELINE_IMPORT_BYTES = BASELINE_ARCHIVE_LIMITS.maxArchiveBytes;
 
 /** Byte limit for an import body: `maxUploadBytes`, capped because the archive is buffered. */
 export function importByteLimit(config: Pick<ShelfConfig, "maxUploadBytes">): number {

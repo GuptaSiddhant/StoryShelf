@@ -8,10 +8,10 @@
 import { Buffer } from "node:buffer";
 import { crc32 } from "node:zlib";
 
-/** One file to add to an archive; `data` is read lazily when the entry is written. */
+/** One file to add to an archive; a `data` function is called lazily when the entry is written. */
 export interface ZipSource {
   name: string;
-  data: () => Promise<Buffer>;
+  data: Buffer | (() => Promise<Buffer>);
 }
 
 /**
@@ -25,7 +25,7 @@ export async function* zipStream(
   const central: Buffer[] = [];
   let offset = 0;
   for await (const source of sources) {
-    const data = await source.data();
+    const data = typeof source.data === "function" ? await source.data() : source.data;
     const record = entryRecord(source.name, data);
     central.push(centralHeader(record, offset));
     yield* [localHeader(record), data];
