@@ -113,7 +113,6 @@ CREATE TABLE IF NOT EXISTS snapshots (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS snapshots_build_story_mode_browser_idx ON snapshots (build_id, story_id, viewport_name, browser);
 CREATE INDEX IF NOT EXISTS snapshots_build_id_idx ON snapshots (build_id);
 CREATE TABLE IF NOT EXISTS baselines (
   id TEXT PRIMARY KEY,
@@ -129,7 +128,6 @@ CREATE TABLE IF NOT EXISTS baselines (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS baselines_project_story_mode_browser_branch_idx ON baselines (project_id, story_id, viewport_name, browser, branch);
 CREATE INDEX IF NOT EXISTS baselines_project_story_idx ON baselines (project_id, story_id);
 CREATE TABLE IF NOT EXISTS comments (
   id TEXT PRIMARY KEY,
@@ -387,6 +385,19 @@ CREATE TABLE IF NOT EXISTS ssoProvider (
 );
 CREATE INDEX IF NOT EXISTS ssoprovider_domain_idx ON ssoProvider (domain);
 `;
+
+/**
+ * Widen snapshot/baseline identity to include `browser`. Runs after
+ * `ensureColumns`, so volumes created before the column existed first gain it
+ * (rows default to `chromium`), then swap the old unique indexes for the new
+ * ones. Idempotent; an index step that fails is skipped, not fatal.
+ */
+export const IDENTITY_STATEMENTS: string[] = [
+  "DROP INDEX IF EXISTS snapshots_build_story_viewport_idx",
+  "DROP INDEX IF EXISTS baselines_project_story_viewport_branch_idx",
+  "CREATE UNIQUE INDEX IF NOT EXISTS snapshots_build_story_mode_browser_idx ON snapshots (build_id, story_id, viewport_name, browser)",
+  "CREATE UNIQUE INDEX IF NOT EXISTS baselines_project_story_mode_browser_branch_idx ON baselines (project_id, story_id, viewport_name, browser, branch)",
+];
 
 const CONSTRAINT_PREFIX = /^(?:PRIMARY|FOREIGN|UNIQUE|CHECK|CONSTRAINT)\s/iu;
 const TABLE_BLOCK = /CREATE TABLE IF NOT EXISTS\s+(?<table>\w+)\s*\((?<body>[\s\S]*?)\n\);/gu;

@@ -131,7 +131,6 @@ describe("createSqliteDatabase", () => {
         story_name TEXT NOT NULL,
         story_title TEXT NOT NULL,
         viewport_name TEXT NOT NULL DEFAULT 'desktop',
-        browser TEXT NOT NULL DEFAULT 'chromium',
         screenshot_path TEXT NOT NULL,
         status TEXT NOT NULL DEFAULT 'pending',
         created_at TEXT NOT NULL,
@@ -371,6 +370,65 @@ describe("createSqliteDatabase", () => {
       for (const table of expected) {
         expect(tables.has(table), `stale ${table}`).toBe(true);
       }
+      await closeDb(db);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("upgrades a pre-browser volume in place: rows fall back to chromium, indexes are swapped", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "storyshelf-sqlite-browser-"));
+    const path = join(dir, "legacy.db");
+    try {
+      const seed = createSqliteDatabase(path);
+      await initDb(seed);
+      await seed.lifecycle?.teardown();
+      const raw = new DatabaseSync(path);
+      raw.exec(`
+        DROP INDEX snapshots_build_story_mode_browser_idx;
+        DROP INDEX baselines_project_story_mode_browser_branch_idx;
+        ALTER TABLE snapshots DROP COLUMN browser;
+        ALTER TABLE snapshots DROP COLUMN mode;
+        ALTER TABLE baselines DROP COLUMN browser;
+        ALTER TABLE baselines DROP COLUMN mode;
+        ALTER TABLE projects DROP COLUMN browsers;
+        ALTER TABLE projects DROP COLUMN modes_allowlist;
+        CREATE UNIQUE INDEX snapshots_build_story_viewport_idx ON snapshots (build_id, story_id, viewport_name);
+        CREATE UNIQUE INDEX baselines_project_story_viewport_branch_idx ON baselines (project_id, story_id, viewport_name, branch);
+        INSERT INTO projects (id, name, slug, browser, created_at, updated_at) VALUES ('p', 'P', 'p', 'firefox', 't', 't');
+        INSERT INTO baselines (id, project_id, story_id, viewport_name, branch, screenshot_path, created_at, updated_at) VALUES ('b1', 'p', 's', 'desktop', 'main', 'x', 't', 't');
+      `);
+      raw.close();
+
+      const db = createSqliteDatabase(path);
+      await initDb(db);
+      await initDb(db); // idempotent
+
+      const baselines = (await db.list(schema.baselines)) as { browser: string }[];
+      expect(baselines.map((row) => row.browser)).toEqual(["chromium"]);
+      const rows = await db.all<unknown[]>(
+        sql`SELECT name FROM sqlite_master WHERE type = 'index'`,
+      );
+      const names = rows.map((row) => String(row[0]));
+      expect(names).toContain("snapshots_build_story_mode_browser_idx");
+      expect(names).toContain("baselines_project_story_mode_browser_branch_idx");
+      expect(names).not.toContain("snapshots_build_story_viewport_idx");
+
+      const now = "2026-01-01T00:00:00.000Z";
+      const second = (browser: string) =>
+        db.insert(schema.baselines, {
+          id: `b-${browser}`,
+          projectId: "p",
+          storyId: "s",
+          viewportName: "desktop",
+          branch: "main",
+          browser,
+          screenshotPath: "y",
+          createdAt: now,
+          updatedAt: now,
+        });
+      await expect(second("firefox")).resolves.toBeDefined();
+      await expect(second("chromium")).rejects.toThrow();
       await closeDb(db);
     } finally {
       rmSync(dir, { recursive: true, force: true });

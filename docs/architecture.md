@@ -63,7 +63,8 @@ builds (
   updated_at          text NOT NULL
 );
 
--- One row per story x viewport per build
+-- One row per story x mode (viewport) x browser per build. `viewport_name` is the mode key: a
+-- project viewport's name, or the slug of a named mode (ADR 0028).
 snapshots (
   id                  text PRIMARY KEY,
   project_id          text NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -72,7 +73,9 @@ snapshots (
   story_name          text NOT NULL,           -- "Primary"
   story_title         text NOT NULL,           -- "Components/Button"
   story_import_path   text,                    -- "src/components/Button.stories.tsx"
-  viewport_name       text NOT NULL DEFAULT 'desktop',
+  viewport_name       text NOT NULL DEFAULT 'desktop',  -- mode key (viewport name or mode-name slug)
+  mode                text,                    -- JSON of the Storybook globals the mode applied (display/capture only)
+  browser             text NOT NULL DEFAULT 'chromium',  -- engine that captured it
   viewport_width      integer NOT NULL DEFAULT 1280,
   viewport_height     integer NOT NULL DEFAULT 720,
   screenshot_path     text NOT NULL,           -- storage path to current screenshot
@@ -87,7 +90,7 @@ snapshots (
   updated_at          text NOT NULL,
   baseline_id         text,                    -- baseline row the diff was computed against (NULL: none, or legacy row)
   baseline_version    text,                    -- that baseline's updated_at at diff time; 'none' = story had no baseline; NULL = legacy
-  UNIQUE(build_id, story_id, viewport_name)
+  UNIQUE(build_id, story_id, viewport_name, browser)
 );
 
 -- Baseline pointers: the accepted screenshot for a story on a branch
@@ -95,13 +98,15 @@ baselines (
   id                  text PRIMARY KEY,
   project_id          text NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   story_id            text NOT NULL,
-  viewport_name       text NOT NULL DEFAULT 'desktop',
+  viewport_name       text NOT NULL DEFAULT 'desktop',  -- mode key
+  mode                text,
+  browser             text NOT NULL DEFAULT 'chromium',
   branch              text NOT NULL,           -- "main", "feature/xyz"
   snapshot_id         text,                    -- accepted snapshot (informational; may be purged)
   screenshot_path     text NOT NULL,           -- canonical baseline file (independent of builds)
   created_at          text NOT NULL,
   updated_at          text NOT NULL,
-  UNIQUE(project_id, story_id, viewport_name, branch)
+  UNIQUE(project_id, story_id, viewport_name, browser, branch)
 );
 
 -- Review comments (threaded, on a build or a specific snapshot)
@@ -235,8 +240,8 @@ Project 1--* Webhook
 Project 1--* ProjectMember *--1 User   (project-scoped roles)
 ```
 
-- **Build to Snapshot:** one build contains many snapshots (one per story x viewport)
-- **Baseline (table):** a pointer `(project, story, viewport, branch)` → the accepted screenshot file. The **file** (`screenshot_path`) is canonical; builds are transient and can be purged without losing baselines.
+- **Build to Snapshot:** one build contains many snapshots (one per story x mode x browser). Review groups them by story and mode: one approval covers every browser (ADR 0028).
+- **Baseline (table):** a pointer `(project, story, mode, browser, branch)` → the accepted screenshot file. The **file** (`screenshot_path`) is canonical; builds are transient and can be purged without losing baselines.
 - **Accept:** copy the accepted snapshot's screenshot to the baseline path, upsert the `baselines` row for that branch.
 - **Reject:** mark the snapshot rejected, no baseline change.
 - **Access control:** a user's permissions on a project come from `project_members` (project-scoped role); `users.role = 'admin'` is a site-wide admin bypass (ADR 0008).
@@ -250,15 +255,15 @@ data/                                    # --data-dir flag (default: ./data)
     builds/
       {buildId}/
         screenshots/
-          {storyId}/{viewport}.png       # captured screenshots (transient, TTL'd)
+          {storyId}/{mode}.png           # captured screenshots (transient, TTL'd); non-chromium engines: {mode}~{browser}.png
         diffs/
-          {storyId}/{viewport}.png       # generated diff overlay (transient, TTL'd)
+          {storyId}/{mode}.png           # generated diff overlay (transient, TTL'd)
         storybook/                       # extracted Storybook static build (served for capture + preview)
           index.json
           static/
     baselines/
       {branch}/
-        {storyId}/{viewport}.png         # canonical approved screenshot (default branch NEVER TTL'd; feature branches TTL'd via branchTtlDays 30d daily GC)
+        {storyId}/{mode}.png             # canonical approved screenshot (default branch NEVER TTL'd; feature branches TTL'd via branchTtlDays 30d daily GC)
 ```
 
 **Design decisions:**
@@ -408,13 +413,15 @@ Rendering happens on the server against the user's uploaded static build, in a p
 
 ### Resolution (per-branch with fallback to default)
 
-For a snapshot of `(story, viewport)` in a build on branch `B`:
+For a snapshot of `(story, mode, browser)` in a build on branch `B`:
 
-1. Look up `baselines(project, story, viewport, branch=B)`. If found, diff against it.
-2. Otherwise, fall back to `baselines(project, story, viewport, branch=default)`.
+1. Look up `baselines(project, story, mode, browser, branch=B)`. If found, diff against it.
+2. Otherwise, fall back to `baselines(project, story, mode, browser, branch=default)`.
 3. If neither exists (a brand-new story):
    - On the **default branch**: auto-approve and write the baseline.
    - On a **feature branch**: mark `new` (needs review).
+
+A newly enabled browser has no baselines yet: its first snapshots are auto-accepted where the primary browser's snapshot of the same story and mode is clean, otherwise they are `new` (ADR 0028).
 
 Resolution is a pure key lookup — no git ancestry or build history is consulted, so rebases, force-pushes and squash merges cannot break it (covered by tests in `baseline.test.ts`).
 
@@ -973,7 +980,7 @@ See `docs/website.md`. The public site (`apps/website/`, Astro Starlight) hosts 
    back to a full render, and `--full` opts out per run.
 2. **Git-provider merge gate (GitHub App / GitLab)** -- rich check runs, per-snapshot annotations, and auto-reject on review rejection. v1 has the primitive (required commit status); the full integration is ADR 0010.
 3. **Remote capture runners** -- offload capture to a worker fleet (SQS/HTTP). The `CaptureRunner` interface anticipates this.
-4. **`parameters.chromatic` equivalents** -- `modes`/themes (args matrix). Per-story `delay`, `disableSnapshot`, `flakyTest`, `autoCrop`/sizing are implemented; `waitForReady` covers the basic "wait for data" case.
+4. **`parameters.chromatic` equivalents** -- `modes` are implemented (named modes from `parameters.chromatic.modes` / `parameters.storyshelf.modes`, ADR 0028); an args matrix is not. Per-story `delay`, `disableSnapshot`, `flakyTest`, `autoCrop`/sizing are implemented; `waitForReady` covers the basic "wait for data" case.
 5. **Ladle / Histoire / custom pages** -- the `StorySourceAdapter` interface anticipates them.
 6. **Per-story viewport presets** -- a story's Storybook `defaultViewport` is captured **in addition to** the project's global list (union, deduped by name; issue #82), including inline `parameters.viewport.viewports`. Global defaults remain the project-level surface.
 7. **Linked projects / design-system propagation** -- automatically re-diffing dependent projects when a design-system project approves a change. Deferred: re-rendering a separate repo on its old `node_modules` produces no diff. The shipped alternative is provenance, not re-diffing: `project_links` (`PUT /api/v1/projects/:slug/links`) plus per-build `build_package_usage` power `GET …/snapshots/:id/usage`, which links a changed snapshot to the upstream component's published story. Tokens and automatic re-diff stay out of scope.
