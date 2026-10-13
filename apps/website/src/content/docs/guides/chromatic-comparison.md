@@ -13,7 +13,7 @@ This page compares Chromatic (SaaS) and StoryShelf (self-hosted) factually. No r
 | **Hosting** | SaaS only (Chromatic cloud) | Self-hosted (your infrastructure) |
 | **Browsers** | Chrome, Firefox, Safari, Edge (branded, cloud) | Chromium (default), Firefox, WebKit via Playwright (per-project `browser`) |
 | **TurboSnap** | Yes (dependency graph) | Yes — affected capture (dependency graph, on by default) |
-| **Modes / Globals** | Yes | Not implemented |
+| **Modes / Globals** | Yes | Yes — `parameters.chromatic.modes` / `parameters.storyshelf.modes` ([Modes](/guides/modes/)) |
 | **Accessibility testing** | Yes (aXe) | Basic built-in checks (opt-in), no aXe |
 | **Interaction tests** | Yes (`play` functions) | Yes (`play` functions) |
 | **SSO / Enterprise** | Enterprise plan | Better Auth engine (OIDC/SAML via any IdP) |
@@ -62,7 +62,7 @@ Billed snapshots = visual snapshots + accessibility snapshots. TurboSnap copies 
 ### StoryShelf gaps (vs Chromatic)
 - **Cross-browser gaps** — Chromium (default), Firefox, and WebKit are selectable per project (Settings → General → Capture browser, or `PATCH /api/v1/projects/:slug` with `browser`); baselines track the browser. No branded Safari/Edge binaries; one browser per build.
 - **Vite-only tracing** — affected capture reads `preview-stats.json` (plus tolerant Webpack shapes). TurboSnap-equivalent skip rates on Vite Storybooks; custom builders without stats fall back to full renders.
-- **No Modes/Globals** — Cannot test stories under different themes, locales, or viewports via Storybook globals.
+- **Modes differ slightly** — Mode values may only use characters Storybook's `globals` URL arg accepts; baselines are keyed by mode name as in Chromatic.
 - **Limited accessibility testing** — Opt-in per project (`runA11y`); lightweight checks for missing `alt`, button/input labels and link `href`, reported as story failures. No aXe integration, so no WCAG rule coverage.
 - **No cloud parallelization** — Concurrency limited by your server resources (`captureConcurrency` config).
 - **No built-in flake detection** — Relies on explicit `flakyTest` parameter/tags.
@@ -84,7 +84,7 @@ If migrating from Chromatic:
 | **Baselines** | No export API in Chromatic. Requires re-acceptance on first StoryShelf run. |
 | **Parameters** | Dual-key support: `chromatic:` and `storyshelf:` keys both work; `storyshelf:` wins on conflict. |
 | **TurboSnap** | Not replicated. Expect 5-10× more snapshots initially. |
-| **Modes/Globals** | Not supported. Theming/i18n test matrices need workarounds. |
+| **Modes/Globals** | Supported — existing `parameters.chromatic.modes` work unchanged ([Modes](/guides/modes/)). |
 | **Cross-browser** | Chromium / Firefox / WebKit per project (Settings or API); one browser per build; no branded Safari/Edge. |
 | **Team workflow** | Similar — PR status checks, review UI, approve/reject. |
 
@@ -94,7 +94,6 @@ If migrating from Chromatic:
 - You want zero infrastructure maintenance
 - You need branded Safari/Edge binaries or multi-browser matrices in a single build
 - You rely on TurboSnap's Webpack tracing for a non-Vite builder
-- You need Modes/Globals for theme/locale matrices
 - You need full aXe-level accessibility testing
 - Your team prefers SaaS over self-hosting
 

@@ -117,6 +117,31 @@ async function seedBaseline(ctx: CaptureContext): Promise<void> {
 }
 
 describe("persistCapture", () => {
+  it("persists a mode's globals on the snapshot and its default-branch baseline", async () => {
+    const dark: Viewport = { name: "dark", width: 320, height: 480, globals: { theme: "dark" } };
+    const { ctx } = await makeContext({
+      captures: [
+        {
+          story: storyOf("a"),
+          viewportName: "dark",
+          viewport: dark,
+          screenshot: png(4, 4, [0, 0, 0]),
+        },
+        captureFor(storyOf("a"), png(4, 4, [255, 255, 255])),
+      ],
+    });
+
+    await persistCapture(ctx, new Set());
+
+    const rows = await ctx.db.list(ctx.db.tables.snapshots);
+    const byViewport = Object.fromEntries(rows.map((row) => [row.viewportName, row.mode]));
+    expect(byViewport).toEqual({ dark: '{"theme":"dark"}', mobile: null });
+    const baselines = await ctx.db.list(ctx.db.tables.baselines);
+    expect(
+      Object.fromEntries(baselines.map((baseline) => [baseline.viewportName, baseline.mode])),
+    ).toEqual({ dark: '{"theme":"dark"}', mobile: null });
+  });
+
   it("persists the captured stories and fails the build when a story failed to render", async () => {
     const { ctx } = await makeContext({
       captures: [captureFor(storyOf("b"), png(4, 4, [0, 255, 0]))],

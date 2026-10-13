@@ -108,6 +108,7 @@ export default defineConfig({
                 { label: "Reviewing changes", slug: "guides/review" },
                 { label: "Merge gate", slug: "guides/merge-gate" },
                 { label: "Interaction testing", slug: "guides/interaction-testing" },
+                { label: "Modes", slug: "guides/modes" },
                 { label: "Notifications", slug: "guides/notifications" },
                 { label: "Without git", slug: "guides/without-git" },
               ],

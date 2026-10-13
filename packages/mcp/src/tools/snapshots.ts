@@ -7,6 +7,7 @@ const SNAPSHOT_FIELDS = [
   "storyTitle",
   "storyName",
   "viewportName",
+  "mode",
   "status",
   "diffPixels",
   "diffRatio",

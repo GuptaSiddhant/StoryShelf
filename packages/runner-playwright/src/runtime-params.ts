@@ -22,6 +22,16 @@ export async function runtimeParametersForStory(
   return map?.get(storyId);
 }
 
+/** Read every story's resolved parameters from a loaded preview page in one call. */
+export async function extractAllParameters(
+  page: RuntimeParamsPage,
+): Promise<Record<string, StoryParameters>> {
+  const raw = await readExtractedParameters(page);
+  const out = new Map<string, StoryParameters>();
+  if (raw) fillParamsMap(out, raw);
+  return Object.fromEntries(out);
+}
+
 async function extractedParametersMap(
   state: RuntimeParamsState,
   page: RuntimeParamsPage,

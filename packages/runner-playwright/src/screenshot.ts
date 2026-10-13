@@ -30,7 +30,7 @@ async function runCapture(
   inputStory: StoryEntry,
   viewport: Viewport,
 ): Promise<{ screenshot: Buffer; a11yViolations: string[]; story: StoryEntry }> {
-  const story = await navigateAndEnrich(ctx, page, inputStory);
+  const story = await navigateAndEnrich(ctx, page, inputStory, viewport);
   await maybeWaitForSelector(ctx, page, story);
   if (ctx.executePlay) await runPlay(page, story.id, ctx.playTimeoutMs ?? 10_000);
   const a11yViolations = await getA11y(ctx, page);
@@ -46,8 +46,11 @@ async function navigateAndEnrich(
   ctx: CaptureContext,
   page: Page,
   story: StoryEntry,
+  viewport: Viewport,
 ): Promise<StoryEntry> {
-  await page.goto(ctx.adapter.buildUrl(ctx.baseUrl, story.id), { waitUntil: "networkidle" });
+  await page.goto(ctx.adapter.buildUrl(ctx.baseUrl, story.id, viewport.globals), {
+    waitUntil: "networkidle",
+  });
   await ctx.adapter.waitForReady?.(page);
   if (story.parameters) return story;
   const rpPage = page as unknown as RuntimeParamsPage;

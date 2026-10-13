@@ -2,7 +2,12 @@
  * Capture-runner adapter interface: render story screenshots for a build.
  */
 import type { Logger } from "pino";
-import type { StoryEntry, StorySourceAdapter, Viewport } from "../capture/adapter.ts";
+import type {
+  StoryEntry,
+  StoryParameters,
+  StorySourceAdapter,
+  Viewport,
+} from "../capture/adapter.ts";
 import type { Adapter } from "./metadata.ts";
 
 export type { JobStatus } from "./capture-queue.ts";
@@ -93,6 +98,22 @@ export interface CaptureRunner extends Adapter<{
      */
     adapter?: StorySourceAdapter;
   }): Promise<RenderResult>;
+
+  /**
+   * Optional pre-pass reading each story's fully resolved parameters (project,
+   * component and story levels stacked) from the running preview. Storybook's
+   * index rarely carries parameters, so this is how the orchestrator learns
+   * which modes a story declares before it builds the capture matrix.
+   * Absent or failing, the orchestrator falls back to index parameters.
+   */
+  extractParameters?(input: {
+    buildId: string;
+    storybookDir: string;
+    stories: StoryEntry[];
+    logger?: Logger;
+    browser?: BrowserName;
+    adapter?: StorySourceAdapter;
+  }): Promise<Record<string, StoryParameters>>;
 
   /** Cancel a pending or in-flight render for a build. */
   cancel(buildId: string): Promise<void>;

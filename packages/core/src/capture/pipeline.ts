@@ -154,6 +154,7 @@ async function persistInheritedSnapshot(
     viewportHeight: inherited.viewport.height,
     screenshotPath: inherited.baseline.screenshotPath,
     infraHash,
+    mode: modeJsonOf(inherited.viewport),
     inherited: true,
     baselineId: inherited.baseline.id,
     baselineVersion: inherited.baseline.updatedAt,
@@ -204,6 +205,11 @@ export interface CaptureContext {
   recordLog?: AttemptLogRecorder;
   /** Server secret for decrypting webhook secrets at send time. */
   secret?: SecretInput;
+}
+
+/** JSON for the snapshot `mode` column: the globals a mode applied (null for plain viewports). */
+function modeJsonOf(viewport: Viewport | undefined): string | null {
+  return viewport?.globals ? JSON.stringify(viewport.globals) : null;
 }
 
 function viewportByName(ctx: CaptureContext, name: string): Viewport {
@@ -263,6 +269,7 @@ async function createWithoutBaseline(
     viewportHeight: viewport.height,
     screenshotPath: screenshot,
     infraHash,
+    mode: modeJsonOf(viewport),
     baselineVersion: NO_BASELINE,
   });
   await snapshots.setStatus(snapshot.id, status);
@@ -277,6 +284,7 @@ async function createWithoutBaseline(
       snapshot.id,
       screenshot,
       infraHash,
+      { mode: modeJsonOf(viewport) },
     );
   }
 }
@@ -308,6 +316,7 @@ async function createWithBaseline(
     viewportHeight: viewport.height,
     screenshotPath: screenshot,
     infraHash,
+    mode: modeJsonOf(viewport),
     baselineId: baseline.id,
     baselineVersion: baseline.updatedAt,
   });
@@ -356,6 +365,7 @@ async function upsertDefaultBaseline(
     snapshotId,
     screenshot,
     infraHash,
+    { mode: modeJsonOf(capture.viewport) },
   );
 }
 

@@ -7,9 +7,19 @@
  * against any `CaptureQueue` backend.
  */
 export {
+  buildGlobalsParam,
+  filterModes,
+  MAX_MODES_PER_STORY,
+  modeSlug,
+  parseModesAllowlist,
+} from "./modes.ts";
+export {
   DEFAULT_VIEWPORTS,
   isDisabledStory,
   isFlakyStory,
+  type ModeDefinition,
+  type ModeMap,
+  type ModeViewportValue,
   type StoryEntry,
   type StoryParameters,
   type StorySourceAdapter,

@@ -94,6 +94,8 @@ export const snapshotSchema = z
     storyTitle: z.string(),
     storyImportPath: z.string().nullable(),
     viewportName: z.string(),
+    /** Globals JSON the capture's mode applied; null for plain viewports. */
+    mode: z.string().nullable().optional(),
     viewportWidth: z.number(),
     viewportHeight: z.number(),
     screenshotPath: z.string(),

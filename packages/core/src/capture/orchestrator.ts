@@ -19,6 +19,8 @@ import { roundedTimings, runWithTimings, timed } from "../utils/timing.ts";
 import { DEFAULT_VIEWPORTS, isDisabledStory, isFlakyStory } from "./adapter.ts";
 import type { Viewport } from "./adapter.ts";
 import { partitionAffectedStories } from "./affected.ts";
+import { assertModeCaps, enrichStories } from "./enrich.ts";
+import { parseModesAllowlist } from "./modes.ts";
 import { persistCapture, type PipelineTables } from "./pipeline.ts";
 import { resolveViewports } from "./sizing.ts";
 import { extractStorybookToScratch, persistStorybookStatics } from "./statics.ts";
@@ -222,11 +224,21 @@ async function runCapturePhases(
 
     const adapter = new StorybookAdapter();
     const discovered = await adapter.discover(extractedDir);
-    const stories = discovered.filter((s) => !isDisabledStory(s));
     // Resolve viewports via single helper (project JSON → server override → default)
     const rawViewports = (project as unknown as { viewports?: string | null }).viewports;
     const viewports = resolveViewports(rawViewports, DEFAULT_VIEWPORTS, options.viewports);
     const browser = (project as unknown as { browser?: string }).browser as BrowserName | undefined;
+    const enriched = await enrichStories({
+      runner: options.runner,
+      buildId: build.id,
+      storybookDir,
+      stories: discovered.filter((s) => !isDisabledStory(s)),
+      browser: browser ?? "chromium",
+      allowlist: parseModesAllowlist(project.modesAllowlist),
+      logger,
+    });
+    const stories = enriched.filter((s) => !isDisabledStory(s));
+    assertModeCaps(stories, viewports);
 
     const partition = await partitionAffectedStories({
       db: options.db,
