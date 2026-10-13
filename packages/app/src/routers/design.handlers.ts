@@ -8,7 +8,7 @@ import {
 } from "@storyshelf/core/models";
 import type { FigmaNode, Project, Snapshot } from "@storyshelf/core/schema";
 import { credentialKeys } from "../credential-keys.ts";
-import type { DesignItem, ProjectDesignLink } from "../pages/design-links.tsx";
+import type { DesignItem, DesignPreviewInfo, ProjectDesignLink } from "../pages/design-links.tsx";
 import { getStore } from "../store.ts";
 
 /** Most a page render waits for fresh Figma metadata; slower fetches finish into the cache for next time. */
@@ -53,9 +53,7 @@ export async function loadReviewDesign(
   urls: readonly string[],
 ): Promise<DesignItem[]> {
   if (urls.length === 0) return [];
-  const { db, config, logger } = getStore();
-  const design = new DesignModel(db, undefined, credentialKeys(config));
-  const nodes = new FigmaNodeModel(db, design, undefined, logger);
+  const nodes = nodeModel();
   await refreshWithinBudget(nodes, project.id, urls);
   const cached = await nodes.cachedFor(project.id, urls).catch(() => new Map<string, FigmaNode>());
   return urls.map((url) => {
@@ -63,10 +61,52 @@ export async function loadReviewDesign(
     return {
       url,
       name: node?.name ?? null,
+      renderUrl: renderUrlOf(project, node),
       state: node?.state ?? "unknown",
       stale: isDesignStale(node, snapshot.baselineVersion),
     };
   });
+}
+
+/** Most distinct design links a library render warms in the background. */
+const WARM_LIMIT = 10;
+
+/**
+ * Cached name/render per design URL for library popovers (cache read only).
+ * Missing or expired entries are refreshed in the background for the next view.
+ */
+export async function loadDesignPreviews(
+  project: Project,
+  urls: readonly string[],
+): Promise<Map<string, DesignPreviewInfo>> {
+  const distinct = [...new Set(urls)];
+  if (distinct.length === 0) return new Map();
+  const nodes = nodeModel();
+  const cached = await nodes
+    .cachedFor(project.id, distinct)
+    .catch(() => new Map<string, FigmaNode>());
+  Promise.all(
+    distinct.slice(0, WARM_LIMIT).map(async (url) => await nodes.refresh(project.id, url)),
+  ).catch(() => []);
+  return new Map(
+    [...cached].map(([url, node]) => [
+      url,
+      { name: node.name, renderUrl: renderUrlOf(project, node) },
+    ]),
+  );
+}
+
+function nodeModel(): FigmaNodeModel {
+  const { db, config, logger, storage } = getStore();
+  const design = new DesignModel(db, undefined, credentialKeys(config));
+  return new FigmaNodeModel(db, design, { logger, storage });
+}
+
+/** API URL of a node's cached render (version-busted), or null when none is cached. */
+function renderUrlOf(project: Project, node: FigmaNode | undefined): string | null {
+  return node?.renderPath
+    ? `/api/v1/projects/${project.slug}/design/renders/${node.id}?v=${encodeURIComponent(node.renderVersion ?? "")}`
+    : null;
 }
 
 async function refreshWithinBudget(

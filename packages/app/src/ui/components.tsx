@@ -24,6 +24,7 @@ export { Table } from "./table.tsx";
 export { Thumbnail } from "./thumbnail.tsx";
 export { CompareStage, type CompareStageProps } from "./compare-stage.tsx";
 export { Progress } from "./progress.tsx";
+export { DesignPreview, DesignReference } from "./design-reference.tsx";
 export { CodeBlock } from "./code-block.tsx";
 export { FilterInput } from "./filter-input.tsx";
 export { RelativeTime, formatRelative } from "./time.tsx";

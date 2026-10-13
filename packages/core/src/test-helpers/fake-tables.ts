@@ -111,6 +111,8 @@ const figmaNodes = defineTable("figma_nodes", {
   version: "version",
   lastModified: "last_modified",
   state: "state",
+  renderPath: "render_path",
+  renderVersion: "render_version",
   fetchedAt: "fetched_at",
   createdAt: "created_at",
   updatedAt: "updated_at",

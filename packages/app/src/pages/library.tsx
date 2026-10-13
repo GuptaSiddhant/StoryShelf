@@ -13,6 +13,7 @@ import { loadHealthPanel, type HealthPanelData } from "../insights/health-panel.
 import {
   loadDesignResolutions,
   designUrlsFor,
+  loadDesignPreviews,
   loadProjectDesignLinks,
 } from "../routers/design.handlers.ts";
 import { getStore } from "../store.ts";
@@ -42,7 +43,12 @@ import {
   snapshotGrid,
 } from "../ui/styles/review.ts";
 import { groupSnapshots } from "./build-diff-model.ts";
-import { DesignButtons, ProjectDesignLinks, type ProjectDesignLink } from "./design-links.tsx";
+import {
+  DesignButtons,
+  ProjectDesignLinks,
+  type DesignPreviewInfo,
+  type ProjectDesignLink,
+} from "./design-links.tsx";
 import { HealthSlot } from "./health-panel.tsx";
 
 /** Snapshot image with library height cap, extending the shared diff pane image. */
@@ -77,6 +83,7 @@ export async function renderLibraryPage(
 /** Library design data: per-snapshot component links plus project-level file links. */
 interface LibraryDesign {
   bySnapshot: Map<string, string[]>;
+  previews: Map<string, DesignPreviewInfo>;
   projectLinks: ProjectDesignLink[];
 }
 
@@ -88,7 +95,8 @@ async function loadLibraryDesign(project: Project, snapshots: Snapshot[]): Promi
   const bySnapshot = new Map(
     snapshots.map((snap) => [snap.id, designUrlsFor(resolutions, snap)] as const),
   );
-  return { bySnapshot, projectLinks };
+  const previews = await loadDesignPreviews(project, [...bySnapshot.values()].flat());
+  return { bySnapshot, previews, projectLinks };
 }
 
 async function getLibraryBuild(
@@ -472,7 +480,10 @@ function renderSnapshotCard(
         />
         <HStack>
           {renderCardActions(snap, project, build, docsId)}
-          <DesignButtons urls={context.design.bySnapshot.get(snap.id) ?? []} />
+          <DesignButtons
+            urls={context.design.bySnapshot.get(snap.id) ?? []}
+            previews={context.design.previews}
+          />
         </HStack>
       </div>
     </div>

@@ -50,6 +50,7 @@ export {
 } from "./design.ts";
 export {
   fetchFigmaMeta,
+  fetchFigmaRender,
   FigmaNodeModel,
   FIGMA_TOKEN_MAX_AGE_DAYS,
   FIGMA_TTL_MS,

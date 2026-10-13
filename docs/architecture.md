@@ -184,6 +184,8 @@ figma_nodes (
   version       text,
   last_modified text,
   state         text NOT NULL DEFAULT 'ok',
+  render_path   text,                      -- storage path of the cached PNG render (node links only)
+  render_version text,                     -- file version the render was taken at
   fetched_at    text NOT NULL,
   created_at    text NOT NULL,
   updated_at    text NOT NULL,
@@ -652,7 +654,9 @@ Design links attach to a **component (story file)**, never to a single state or 
 - **Resolution (read time, per file):** manual mapping (`design_links` by normalized `import_path`) > story parameters. States of one file are deduped; if they disagree the distinct set is shown rather than guessing. Keying by `import_path` survives story renames and builds.
 - **Design settings tab:** project file links (library header), the manual component-mapping table, and one project Figma PAT (admin-only, write-only, encrypted, rotated via `previousSecret`). Tokens expire after at most 90 days, so the tab shows days left and the last health (`ok` / `unauthorized` / `forbidden`).
 - **Metadata cache:** with a token, the review page refreshes `figma_nodes` rows older than 15 minutes (within a ~1.5 s render budget; slower fetches finish into the cache), via the shared `httpJson` helper with `X-Figma-Token`. A design edited after the snapshot's `baseline_version` shows a non-blocking stale banner; a missing node/file shows a deleted notice; API outages degrade to plain deep links. None of this touches the `409 baseline_changed` guard.
-- **Non-goals:** pixel-diffing against Figma renders, token mapping, build-level `figma` labels. Render caching and reference panes are a follow-up.
+- **Render cache:** for node links the Images API render is downloaded at fetch time (Figma's signed URLs expire, so they are never hot-linked) into storage at `{projectId}/design/{fileKey}/{node}.png` and re-fetched only when the file `version` moves (`render_version`). `GET /api/v1/projects/:slug/design/renders/:nodeId` serves it to viewers. A render failure keeps the previous render and the metadata.
+- **Surfaces:** the review page shows a Figma reference pane under the diff stage (reference only — never diffed); library cards open a click popover with the cached render and `Open in Figma`. Whole-file links have no render and stay deep links.
+- **Non-goals:** pixel-diffing against Figma renders, token mapping, build-level `figma` labels.
 
 ## Build Labels
 
