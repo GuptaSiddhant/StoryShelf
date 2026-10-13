@@ -49,6 +49,8 @@ export const figmaNodes = pgTable(
     version: text("version"),
     lastModified: text("last_modified"),
     state: text("state").notNull().default("ok"),
+    renderPath: text("render_path"),
+    renderVersion: text("render_version"),
     fetchedAt: timestamp("fetched_at", { withTimezone: true, mode: "string" }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull(),
@@ -93,8 +95,12 @@ export interface FigmaNode {
   version: string | null;
   /** File `lastModified` at fetch time. */
   lastModified: string | null;
-  /** `ok` | `deleted` | `unauthorized` | `forbidden` | `error`. */
+  /** `ok` | `deleted` | `unauthorized` | `forbidden`. */
   state: string;
+  /** Storage path of the cached PNG render (node links only); null when none was fetched. */
+  renderPath: string | null;
+  /** File `version` the cached render was taken at; a newer file version refetches. */
+  renderVersion: string | null;
   fetchedAt: string;
   createdAt: string;
   updatedAt: string;
