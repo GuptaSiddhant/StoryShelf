@@ -236,16 +236,12 @@ describe("BaselineModel", () => {
       const { id } = await seedBaseline(model, storage, { branch: "feature/x" });
       // Builds at sha A, a rebased sha B, then sha C: resolve() receives no sha,
       // so every call returns the same accepted baseline.
-      for (let i = 0; i < 3; i += 1) {
-        const resolved = await model.resolve(
-          "p1",
-          "components-button--primary",
-          "desktop",
-          "feature/x",
-          "main",
-        );
-        expect(resolved?.id).toBe(id);
-      }
+      const resolved = await Promise.all(
+        [0, 1, 2].map(() =>
+          model.resolve("p1", "components-button--primary", "desktop", "feature/x", "main"),
+        ),
+      );
+      expect(resolved.map((b) => b?.id)).toEqual([id, id, id]);
     });
 
     it("squash-merge promotes via the default branch with an unrelated sha", async () => {
