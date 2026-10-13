@@ -34,6 +34,7 @@ import {
   snapshotCardMeta,
   snapshotGrid,
 } from "../ui/styles/review.ts";
+import { snapshotVariant } from "./build-diff-model.ts";
 import { StaleBaselineNotice } from "./build-diff-stale.tsx";
 import { LinkedUsage, type LinkedUsageItem } from "./build-diff-usage.tsx";
 
@@ -263,7 +264,7 @@ export async function renderBuildDetailPage(
                   </>
                 ) : null}
                 <span class={snapshotCardMeta}>
-                  {snap.viewportName} · {snap.viewportWidth}×{snap.viewportHeight}
+                  {snapshotVariant(snap)} · {snap.viewportWidth}×{snap.viewportHeight}
                 </span>
               </div>
               <div class={snapshotCardBody}>

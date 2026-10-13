@@ -29,9 +29,13 @@ export async function renderAll(
   active: ActiveRun,
   defaultBrowser: BrowserName,
 ): Promise<RenderResult> {
+  const name = input.browser ?? defaultBrowser;
   const server = await createStaticServer(input.storybookDir);
-  const browser = await launchBrowser(input.browser ?? defaultBrowser);
-  return await runWithBrowser(input, active, browser, server);
+  const browser = await launchBrowser(name);
+  const result = await runWithBrowser(input, active, browser, server);
+  // Echo the engine so persisted rows are attributable without the request.
+  for (const row of [...result.captures, ...result.failures]) row.browser = name;
+  return result;
 }
 
 /**

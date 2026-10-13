@@ -23,6 +23,8 @@ export interface RenderedSnapshot {
   viewport?: Viewport;
   /** PNG screenshot bytes. */
   screenshot: Buffer;
+  /** Engine that produced the screenshot (the request's `browser`); chromium when absent. */
+  browser?: BrowserName;
 }
 
 /** A story/viewport that a renderer could not capture. */
@@ -33,6 +35,8 @@ export interface RenderFailure {
   viewportName: string;
   /** Error message. */
   error: string;
+  /** Engine the failure happened on; chromium when absent. */
+  browser?: BrowserName;
 }
 
 /** The outcome of a render request. */

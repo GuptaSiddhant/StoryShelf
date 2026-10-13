@@ -82,6 +82,8 @@ async function persistGeneralUpdate(
       publicBranchRegex:
         fields.publicBranchRegex === "" ? null : (fields.publicBranchRegex ?? undefined),
       browser: fields.browser ?? undefined,
+      // Picking a different single engine returns the project to one-browser capture.
+      ...(fields.browser && fields.browser !== project.browser ? { browsers: null } : {}),
     });
     flash(c, "Project settings saved");
     return hxRedirect(c, `/projects/${slug}/settings`);

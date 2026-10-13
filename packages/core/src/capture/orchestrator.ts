@@ -1,6 +1,5 @@
 import type { Logger } from "pino";
-import type { CaptureRunner, RenderResult } from "../adapters/capture-runner.ts";
-import type { BrowserName } from "../adapters/capture-runner.ts";
+import type { CaptureRunner } from "../adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { BuildModel, type BuildTables } from "../models/build.ts";
@@ -18,10 +17,12 @@ import type { SecretInput } from "../utils/encrypt.ts";
 import { roundedTimings, runWithTimings, timed } from "../utils/timing.ts";
 import { DEFAULT_VIEWPORTS, isDisabledStory, isFlakyStory } from "./adapter.ts";
 import type { Viewport } from "./adapter.ts";
-import { partitionAffectedStories } from "./affected.ts";
+import { assertSupportedBrowsers, resolveBrowsers } from "./browsers.ts";
 import { assertModeCaps, enrichStories } from "./enrich.ts";
+import { captureAcrossBrowsers } from "./matrix.ts";
 import { parseModesAllowlist } from "./modes.ts";
 import { persistCapture, type PipelineTables } from "./pipeline.ts";
+import { RENDER_TIMEOUT_MS } from "./render.ts";
 import { resolveViewports } from "./sizing.ts";
 import { extractStorybookToScratch, persistStorybookStatics } from "./statics.ts";
 import { StorybookAdapter } from "./storybook.ts";
@@ -46,66 +47,6 @@ export interface CaptureJobOptions {
   secret?: SecretInput;
   /** Render budget override (tests use a short fuse). */
   renderTimeoutMs?: number | undefined;
-}
-
-/** Default budget for one render call before the orchestrator cancels it. */
-export const RENDER_TIMEOUT_MS = 15 * 60_000;
-
-/** Failure error text cap (persisted rows and logs stay bounded). */
-const FAILURE_ERROR_MAX = 500;
-
-/** Render input assembled by the orchestrator for one build. */
-interface RenderRequest {
-  buildId: string;
-  storybookDir: string;
-  stories: Parameters<CaptureRunner["render"]>[0]["stories"];
-  viewports: Parameters<CaptureRunner["render"]>[0]["viewports"];
-  logger: Logger | undefined;
-  executePlay: boolean;
-  playTimeoutMs: number;
-  runA11y: boolean;
-  browser: BrowserName;
-}
-
-/** Cap failure error text so one chatty runner cannot flood rows and logs. */
-function capFailures(result: RenderResult): RenderResult {
-  return {
-    captures: result.captures,
-    failures: result.failures.map((failure) => ({
-      ...failure,
-      error:
-        failure.error.length > FAILURE_ERROR_MAX
-          ? failure.error.slice(0, FAILURE_ERROR_MAX)
-          : failure.error,
-    })),
-  };
-}
-
-/** Render with a timeout; cancels the runner when the budget expires. */
-async function renderWithTimeout(
-  runner: CaptureRunner,
-  request: RenderRequest,
-  timeoutMs: number,
-): Promise<RenderResult> {
-  let timedOut = false;
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => {
-      timedOut = true;
-      reject(new Error(`Render timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
-  });
-  timer?.unref?.();
-  try {
-    return capFailures(await Promise.race([runner.render(request), timeout]));
-  } catch (error) {
-    if (timedOut) {
-      await runner.cancel(request.buildId).catch(() => {});
-    }
-    throw error;
-  } finally {
-    clearTimeout(timer);
-  }
 }
 
 /** Pointer to the attempt row owning this run's log history. */
@@ -227,81 +168,54 @@ async function runCapturePhases(
     // Resolve viewports via single helper (project JSON → server override → default)
     const rawViewports = (project as unknown as { viewports?: string | null }).viewports;
     const viewports = resolveViewports(rawViewports, DEFAULT_VIEWPORTS, options.viewports);
-    const browser = (project as unknown as { browser?: string }).browser as BrowserName | undefined;
+    const browsers = resolveBrowsers(project);
+    assertSupportedBrowsers(browsers, options.runner.metadata.supportedBrowsers);
     const enriched = await enrichStories({
       runner: options.runner,
       buildId: build.id,
       storybookDir,
       stories: discovered.filter((s) => !isDisabledStory(s)),
-      browser: browser ?? "chromium",
+      browser: browsers[0] ?? "chromium",
       allowlist: parseModesAllowlist(project.modesAllowlist),
       logger,
     });
     const stories = enriched.filter((s) => !isDisabledStory(s));
     assertModeCaps(stories, viewports);
 
-    const partition = await partitionAffectedStories({
-      db: options.db,
-      tables: options.tables,
-      projectId: project.id,
-      branch: build.gitBranch,
-      defaultBranch: project.gitDefaultBranch,
-      stories,
-      viewports,
-      affectedPaths: affectedPathsFor(build),
-    });
-    logger?.info(
-      {
-        rendered: partition.render.length,
-        inherited: partition.inherited.length,
-        total: stories.length,
-      },
-      "affected capture partitioned",
-    );
-    await emitAttemptLog(input.recordLog, logger, "info", "affected capture partitioned", {
-      rendered: partition.render.length,
-      inherited: partition.inherited.length,
-      total: stories.length,
-    });
-
     const renderStart = performance.now();
-    const renderTimeoutMs = options.renderTimeoutMs ?? RENDER_TIMEOUT_MS;
-    const result = await timed(
+    const matrix = await timed(
       "capture.render",
       async () =>
         await withSpan(
           "capture.render",
-          async () => {
-            if (partition.render.length === 0) {
-              return { captures: [], failures: [] };
-            }
-            return await renderWithTimeout(
-              options.runner,
-              {
-                buildId: build.id,
-                storybookDir,
-                stories: partition.render,
-                viewports,
-                logger,
-                executePlay: project.executePlay ?? false,
-                playTimeoutMs: project.playTimeoutMs ?? 10_000,
-                runA11y: project.runA11y ?? false,
-                browser: browser ?? "chromium",
-              },
-              renderTimeoutMs,
-            );
-          },
-          { "storyshelf.render_count": partition.render.length },
+          async () =>
+            await captureAcrossBrowsers({
+              db: options.db,
+              tables: options.tables,
+              runner: options.runner,
+              build,
+              project,
+              stories,
+              viewports,
+              storybookDir,
+              browsers,
+              affectedPaths: affectedPathsFor(build),
+              renderTimeoutMs: options.renderTimeoutMs ?? RENDER_TIMEOUT_MS,
+              logger,
+            }),
+          { "storyshelf.browsers": browsers.join(",") },
         ),
     );
+    const result = { captures: matrix.captures, failures: matrix.failures };
     const renderDuration = performance.now() - renderStart;
     logger?.info(
-      { durationMs: Math.round(renderDuration), storyCount: stories.length },
+      { durationMs: Math.round(renderDuration), storyCount: stories.length, browsers },
       "stories rendered",
     );
     await emitAttemptLog(input.recordLog, logger, "info", "stories rendered", {
       durationMs: Math.round(renderDuration),
       storyCount: stories.length,
+      rendered: matrix.renderCount,
     });
 
     const flakyStoryIds = new Set(stories.filter((s) => isFlakyStory(s)).map((s) => s.id));
@@ -328,7 +242,8 @@ async function runCapturePhases(
               build,
               viewports,
               captures: result.captures,
-              inherited: partition.inherited,
+              inherited: matrix.inherited,
+              browsers,
               logger,
               recordLog: input.recordLog,
               secret: options.secret,

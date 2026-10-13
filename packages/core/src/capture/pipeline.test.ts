@@ -75,6 +75,10 @@ function captureFor(story: StoryEntry, screenshot: Buffer): RenderedSnapshot {
   return { story, viewportName: DEFAULT_VIEWPORT.name, screenshot };
 }
 
+function captureOn(browser: "chromium" | "firefox", shot: Buffer): RenderedSnapshot {
+  return { ...captureFor(storyOf("a"), shot), browser };
+}
+
 async function makeContext(options: {
   captures: RenderedSnapshot[];
   isDefault?: boolean;
@@ -117,6 +121,128 @@ async function seedBaseline(ctx: CaptureContext): Promise<void> {
 }
 
 describe("persistCapture", () => {
+  describe("multiple browsers", () => {
+    const RED = png(4, 4, [255, 0, 0]);
+    const GREEN = png(4, 4, [0, 255, 0]);
+
+    it("keeps one baseline per engine and per-engine storage paths", async () => {
+      const { ctx, objects } = await makeContext({
+        captures: [captureOn("chromium", RED), captureOn("firefox", GREEN)],
+      });
+      await persistCapture({ ...ctx, browsers: ["chromium", "firefox"] });
+
+      const rows = await ctx.db.list(ctx.db.tables.snapshots);
+      expect(rows.map((row) => row.browser)).toEqual(
+        expect.arrayContaining(["chromium", "firefox"]),
+      );
+      expect(rows).toHaveLength(2);
+      const baselines = await ctx.db.list(ctx.db.tables.baselines);
+      expect(baselines.map((row) => row.browser)).toEqual(
+        expect.arrayContaining(["chromium", "firefox"]),
+      );
+      expect(baselines).toHaveLength(2);
+      expect(objects.has("p1/baselines/main/a/mobile.png")).toBe(true);
+      expect(objects.has("p1/baselines/main/a/mobile~firefox.png")).toBe(true);
+    });
+
+    it("diffs each engine only against its own baseline", async () => {
+      const { ctx } = await makeContext({
+        captures: [captureOn("chromium", RED), captureOn("firefox", GREEN)],
+        isDefault: false,
+      });
+      await ctx.db.insert(ctx.db.tables.baselines, {
+        id: "c1",
+        projectId: "p1",
+        storyId: "a",
+        viewportName: "mobile",
+        browser: "chromium",
+        branch: "main",
+        screenshotPath: "/b/chromium.png",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      });
+      await ctx.storage.write("/b/chromium.png", RED);
+
+      await persistCapture({ ...ctx, browsers: ["chromium", "firefox"] });
+
+      const rows = await ctx.db.list(ctx.db.tables.snapshots);
+      const status = Object.fromEntries(rows.map((row) => [row.browser, row.status]));
+      // chromium matches its baseline; firefox has none, and is not fresh-bootstrapped
+      // because chromium already has baselines but firefox has none -> bootstrap applies.
+      expect(status["chromium"]).toBe("unchanged");
+      expect(status["firefox"]).toBe("approved");
+    });
+
+    it("bootstraps a newly enabled engine only where the primary is clean", async () => {
+      const { ctx } = await makeContext({
+        captures: [
+          captureOn("chromium", RED),
+          captureOn("firefox", GREEN),
+          { ...captureFor(storyOf("b"), RED), browser: "chromium" },
+          { ...captureFor(storyOf("b"), GREEN), browser: "firefox" },
+        ],
+        isDefault: false,
+      });
+      // story a: primary unchanged (baseline matches); story b: primary changed.
+      await ctx.db.insert(ctx.db.tables.baselines, {
+        id: "ca",
+        projectId: "p1",
+        storyId: "a",
+        viewportName: "mobile",
+        browser: "chromium",
+        branch: "main",
+        screenshotPath: "/b/a.png",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      });
+      await ctx.storage.write("/b/a.png", RED);
+      await ctx.db.insert(ctx.db.tables.baselines, {
+        id: "cb",
+        projectId: "p1",
+        storyId: "b",
+        viewportName: "mobile",
+        browser: "chromium",
+        branch: "main",
+        screenshotPath: "/b/b.png",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      });
+      await ctx.storage.write("/b/b.png", GREEN);
+
+      await persistCapture({ ...ctx, browsers: ["chromium", "firefox"] });
+
+      const rows = await ctx.db.list(ctx.db.tables.snapshots);
+      const firefox = Object.fromEntries(
+        rows.filter((row) => row.browser === "firefox").map((row) => [row.storyId, row.status]),
+      );
+      expect(firefox).toEqual({ a: "approved", b: "new" });
+    });
+
+    it("does not bootstrap once the engine already has baselines", async () => {
+      const { ctx } = await makeContext({
+        captures: [captureOn("chromium", RED), captureOn("firefox", GREEN)],
+        isDefault: false,
+      });
+      await ctx.db.insert(ctx.db.tables.baselines, {
+        id: "f0",
+        projectId: "p1",
+        storyId: "other",
+        viewportName: "mobile",
+        browser: "firefox",
+        branch: "main",
+        screenshotPath: "/b/other.png",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      });
+
+      await persistCapture({ ...ctx, browsers: ["chromium", "firefox"] });
+
+      const rows = await ctx.db.list(ctx.db.tables.snapshots);
+      const firefox = rows.find((row) => row.browser === "firefox");
+      expect(firefox?.status).toBe("new");
+    });
+  });
+
   it("persists a mode's globals on the snapshot and its default-branch baseline", async () => {
     const dark: Viewport = { name: "dark", width: 320, height: 480, globals: { theme: "dark" } };
     const { ctx } = await makeContext({

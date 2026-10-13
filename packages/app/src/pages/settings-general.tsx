@@ -79,7 +79,7 @@ export function renderSettingsGeneral(
               { value: "webkit", label: "WebKit (Safari engine)" },
               { value: "chrome", label: "Chrome (Chromium engine)" },
             ]}
-            hint="Rendering engine for captures. Baselines track the browser, so switching starts a fresh baseline. Firefox and WebKit need Playwright system dependencies installed on the server."
+            hint="Rendering engine for captures. Baselines are kept per browser, so switching starts a fresh baseline for the new one. Firefox and WebKit need Playwright system dependencies installed on the server."
           />
           <Field
             label="Public branch regex"

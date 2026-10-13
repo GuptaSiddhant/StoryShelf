@@ -60,7 +60,7 @@ Billed snapshots = visual snapshots + accessibility snapshots. TurboSnap copies 
 - CI integration (GitHub Actions, GitLab CI, etc.)
 
 ### StoryShelf gaps (vs Chromatic)
-- **Cross-browser gaps** — Chromium (default), Firefox, and WebKit are selectable per project (Settings → General → Capture browser, or `PATCH /api/v1/projects/:slug` with `browser`); baselines track the browser. No branded Safari/Edge binaries; one browser per build.
+- **Cross-browser gaps** — Chromium (default), Firefox, and WebKit are selectable per project; list up to three with `PATCH /api/v1/projects/:slug` (`browsers`) to capture each build on every engine, with per-engine baselines. No branded Safari/Edge binaries.
 - **Vite-only tracing** — affected capture reads `preview-stats.json` (plus tolerant Webpack shapes). TurboSnap-equivalent skip rates on Vite Storybooks; custom builders without stats fall back to full renders.
 - **Modes differ slightly** — Mode values may only use characters Storybook's `globals` URL arg accepts; baselines are keyed by mode name as in Chromatic.
 - **Limited accessibility testing** — Opt-in per project (`runA11y`); lightweight checks for missing `alt`, button/input labels and link `href`, reported as story failures. No aXe integration, so no WCAG rule coverage.
@@ -85,7 +85,7 @@ If migrating from Chromatic:
 | **Parameters** | Dual-key support: `chromatic:` and `storyshelf:` keys both work; `storyshelf:` wins on conflict. |
 | **TurboSnap** | Not replicated. Expect 5-10× more snapshots initially. |
 | **Modes/Globals** | Supported — existing `parameters.chromatic.modes` work unchanged ([Modes](/guides/modes/)). |
-| **Cross-browser** | Chromium / Firefox / WebKit per project (Settings or API); one browser per build; no branded Safari/Edge. |
+| **Cross-browser** | Chromium / Firefox / WebKit, up to 3 per project via `browsers` (per-engine baselines, sequential); no branded Safari/Edge. |
 | **Team workflow** | Similar — PR status checks, review UI, approve/reject. |
 
 ## When to choose each

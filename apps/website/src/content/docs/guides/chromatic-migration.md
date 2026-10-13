@@ -153,7 +153,7 @@ A: No public API. Baselines must be re-accepted on first StoryShelf run.
 A: Yes, as affected capture — enabled by default with the same shape (ancestor → git diff → graph trace → selective render). Differences: Vite stats only, no per-snapshot billing (skipping saves CPU, not money), and unknown cases fail open to full renders. Replace `--only-changed` with nothing (it's the default); use `--full` to opt out.
 
 **Q: Can I test Safari/Firefox?**
-A: Yes — set the project's capture browser to `firefox` or `webkit` (Safari's engine) in Settings → General, or via `PATCH /api/v1/projects/:slug`. Each build captures one browser; baselines track the browser.
+A: Yes — set the project's `browsers` list (for example `["chromium", "firefox", "webkit"]`, up to 3) via `PATCH /api/v1/projects/:slug`, or the single capture browser in Settings → General. Every build captures each listed engine in turn, with one baseline per engine; a newly added engine is seeded from its first build, auto-accepting stories whose primary-browser snapshot is clean.
 
 **Q: What about Modes/Globals?**
 A: Not supported. Workaround: duplicate stories with different args, or use separate Storybook configs.
