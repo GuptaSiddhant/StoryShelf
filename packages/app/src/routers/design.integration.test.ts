@@ -78,7 +78,9 @@ function figmaApi(handler: (url: string) => Response): ReturnType<typeof vi.spyO
   const real = globalThis.fetch;
   return vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const url = input instanceof Request ? input.url : String(input);
-    return url.startsWith("https://api.figma.com/") ? handler(url) : await real(input, init);
+    return url.startsWith("https://api.figma.com/") || url.startsWith("https://cdn.example.com/")
+      ? handler(url)
+      : await real(input, init);
   });
 }
 
@@ -227,5 +229,62 @@ describe("design surfaces", () => {
     ).text();
     expect(expired).toContain("expired or revoked");
     expect(expired).toContain("Open in Figma");
+  });
+});
+
+describe("design renders", () => {
+  const PNG = Buffer.from([137, 80, 78, 71]);
+  const withRender = (version = "7"): ReturnType<typeof vi.spyOn> =>
+    figmaApi((url) => {
+      if (url.includes("/images/")) {
+        return Response.json({ images: { "1:2": "https://cdn.example.com/r.png" } });
+      }
+      if (url.startsWith("https://cdn.example.com/")) return new Response(PNG);
+      return Response.json({
+        name: "Kit",
+        version,
+        lastModified: "2025-12-01T00:00:00Z",
+        nodes: { "1:2": { document: { name: "Button" } } },
+      });
+    });
+
+  it("shows the cached render as a reference pane and serves it to viewers", async () => {
+    const { app, design } = await seed();
+    await design.setToken("p1", "figd_tok");
+    withRender();
+    const html = await (
+      await app.request("/projects/app/builds/b1/diff?snapshot=button-primary")
+    ).text();
+    expect(html).toContain("Figma reference");
+    const src = /src="(\/api\/v1\/projects\/app\/design\/renders\/[^"]+)"/u.exec(html)?.[1];
+    expect(src).toBeDefined();
+    const image = await app.request((src ?? "").replaceAll("&amp;", "&"));
+    expect(image.status).toBe(200);
+    expect(image.headers.get("content-type")).toBe("image/png");
+    expect(Buffer.from(await image.arrayBuffer())).toEqual(PNG);
+  });
+
+  it("404s for unknown render ids and renders from other projects", async () => {
+    const { app } = await seed();
+    expect((await app.request("/api/v1/projects/app/design/renders/missing")).status).toBe(404);
+  });
+
+  it("offers a click popover with the cached render in the library", async () => {
+    const { app, design } = await seed();
+    await design.setToken("p1", "figd_tok");
+    withRender();
+    await app.request("/projects/app/builds/b1/diff?snapshot=button-primary");
+    const html = await (await app.request("/projects/app/library")).text();
+    expect(html).toContain("data-dropdown");
+    expect(html).toContain("Figma design: Button");
+    expect(html).toContain("Open in Figma");
+  });
+
+  it("shows no reference pane without a render", async () => {
+    const { app } = await seed();
+    const html = await (
+      await app.request("/projects/app/builds/b1/diff?snapshot=button-primary")
+    ).text();
+    expect(html).not.toContain("Figma reference");
   });
 });

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { HttpError, httpJson, httpText } from "./http.ts";
+import { HttpError, httpBytes, httpJson, httpText } from "./http.ts";
 
 function jsonResponse(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return Response.json(body, { status, headers });
@@ -132,5 +132,30 @@ describe("httpText", () => {
     const caught = await httpText("https://hooks.example.com/x").catch((error: unknown) => error);
     expect(caught).toBeInstanceOf(HttpError);
     expect(fetchMock).toHaveBeenCalledOnce();
+  });
+});
+
+describe("httpBytes", () => {
+  it("returns the raw bytes", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        await Promise.resolve();
+        return new Response(new Uint8Array([1, 2, 3]));
+      }),
+    );
+    expect([...(await httpBytes("https://example.com/a.png"))]).toEqual([1, 2, 3]);
+  });
+
+  it("throws HttpError on a non-retryable status", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        await Promise.resolve();
+        return new Response("nope", { status: 404 });
+      }),
+    );
+    const caught = await httpBytes("https://example.com/a.png").catch((error: unknown) => error);
+    expect(caught).toBeInstanceOf(HttpError);
   });
 });

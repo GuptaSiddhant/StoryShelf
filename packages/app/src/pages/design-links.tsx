@@ -1,5 +1,14 @@
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Alert, Button, HStack, Meta } from "../ui/components.tsx";
+import {
+  Alert,
+  Button,
+  DesignPreview,
+  DesignReference,
+  Dropdown,
+  DropdownItem,
+  HStack,
+  Meta,
+} from "../ui/components.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -12,8 +21,16 @@ export interface DesignItem {
   name: string | null;
   /** Cache state: `ok` | `deleted` | `unauthorized` | `forbidden` | `unknown` (nothing cached). */
   state: string;
+  /** API URL of the cached render, when one exists. */
+  renderUrl: string | null;
   /** The design changed after the baseline it is compared with was approved. */
   stale: boolean;
+}
+
+/** Cached name and render of a design link, for library popovers. */
+export interface DesignPreviewInfo {
+  name: string | null;
+  renderUrl: string | null;
 }
 
 /** A project-level design file link for the library header. */
@@ -22,24 +39,55 @@ export interface ProjectDesignLink {
   url: string;
 }
 
-/** `Open in Figma` actions for a component's design link(s); renders nothing without links. */
-export function DesignButtons(props: { urls: readonly string[]; size?: "sm" | "md" }): Rendered {
-  const { urls, size = "sm" } = props;
+/**
+ * Figma actions for a component's design link(s). A link with a cached render
+ * opens a click popover (preview + `Open in Figma`); others are plain deep links.
+ */
+export function DesignButtons(props: {
+  urls: readonly string[];
+  previews?: ReadonlyMap<string, DesignPreviewInfo>;
+  size?: "sm" | "md";
+}): Rendered {
+  const { urls, previews, size = "sm" } = props;
   return (
     <>
-      {urls.map((url, index): Rendered => (
-        <Button
-          key={url}
-          variant="ghost"
-          size={size}
-          icon="external-link"
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          {urls.length > 1 ? `Figma ${index + 1}` : "Figma"}
-        </Button>
-      ))}
+      {urls.map((url, index): Rendered => {
+        const label = urls.length > 1 ? `Figma ${index + 1}` : "Figma";
+        const preview = previews?.get(url);
+        return preview?.renderUrl ? (
+          <Dropdown key={url} label={label}>
+            <DesignPreview src={preview.renderUrl} name={preview.name} />
+            <DropdownItem href={url} icon="external-link" target="_blank" rel="noopener noreferrer">
+              Open in Figma
+            </DropdownItem>
+          </Dropdown>
+        ) : (
+          <Button
+            key={url}
+            variant="ghost"
+            size={size}
+            icon="external-link"
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {label}
+          </Button>
+        );
+      })}
+    </>
+  );
+}
+
+/** Figma reference panes (cached renders) for the review page, shown under the diff stage. */
+export function DesignReferences(props: { items: DesignItem[] }): Rendered {
+  return (
+    <>
+      {props.items.map((item): Rendered | null =>
+        item.renderUrl ? (
+          <DesignReference key={item.url} src={item.renderUrl} name={item.name} href={item.url} />
+        ) : null,
+      )}
     </>
   );
 }

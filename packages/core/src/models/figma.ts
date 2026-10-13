@@ -1,11 +1,14 @@
 /** Figma metadata cache: API client (project PAT, shared `httpJson`), TTL refresh, and stale detection. */
 import { and, eq, getTableColumns } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
+import type { Buffer } from "node:buffer";
 import type { DatabaseAdapter } from "../adapters/database.ts";
+import type { StorageAdapter } from "../adapters/storage.ts";
 import type { Logger } from "../logger.ts";
 import type { FigmaNode } from "../schema/design.ts";
 import { parseFigmaUrl, type FigmaRef } from "../utils/figma-url.ts";
-import { HttpError, httpJson } from "../utils/http.ts";
+import { HttpError, httpBytes, httpJson } from "../utils/http.ts";
+import { designRenderPath } from "../utils/paths.ts";
 import { ulid } from "../utils/ulid.ts";
 import type { DesignModel, DesignTokenStatus } from "./design.ts";
 
@@ -78,6 +81,38 @@ function failureMeta(err: unknown): FigmaMeta {
   return { state: "error", ...empty };
 }
 
+interface ImagesResponse {
+  images?: Record<string, string | null>;
+}
+
+/**
+ * Render a node to PNG via the Images API and download the bytes (Figma's
+ * signed URLs expire, so they are never hot-linked). Null when Figma has no
+ * render for the node; throws on API/download failures.
+ */
+export async function fetchFigmaRender(
+  token: string,
+  ref: FigmaRef,
+  logger?: Logger,
+): Promise<Buffer | null> {
+  if (!ref.nodeId) return null;
+  const options = {
+    headers: { "X-Figma-Token": token },
+    timeoutMs: 15_000,
+    retries: 2,
+    ...(logger ? { logger } : {}),
+  };
+  const key = encodeURIComponent(ref.fileKey);
+  const body = await httpJson<ImagesResponse>(
+    `${FIGMA_API}/images/${key}?ids=${encodeURIComponent(ref.nodeId)}&format=png&scale=2`,
+    options,
+  );
+  const url = body.images?.[ref.nodeId];
+  return url
+    ? await httpBytes(url, { timeoutMs: 30_000, retries: 2, ...(logger ? { logger } : {}) })
+    : null;
+}
+
 /** True when the design changed after the baseline it is compared with was approved. */
 export function isDesignStale(
   node: Pick<FigmaNode, "state" | "lastModified"> | null | undefined,
@@ -103,13 +138,28 @@ export interface FigmaNodeTables {
 /** Cache of Figma file/node metadata with TTL refresh. */
 export class FigmaNodeModel {
   private readonly tables: FigmaNodeTables;
+  private readonly storage: StorageAdapter | undefined;
+  private readonly logger: Logger | undefined;
   constructor(
     private readonly db: DatabaseAdapter,
     private readonly design: DesignModel,
-    tables?: FigmaNodeTables,
-    private readonly logger?: Logger,
+    options: { tables?: FigmaNodeTables; logger?: Logger; storage?: StorageAdapter } = {},
   ) {
-    this.tables = tables ?? { figmaNodes: db.tables.figmaNodes };
+    this.tables = options.tables ?? { figmaNodes: db.tables.figmaNodes };
+    this.storage = options.storage;
+    this.logger = options.logger;
+  }
+
+  /** Cached row by id, scoped to the project, or null. */
+  async get(projectId: string, id: string): Promise<FigmaNode | null> {
+    const row = (await this.db.get(this.tables.figmaNodes, id)) as unknown as FigmaNode | null;
+    return row?.projectId === projectId ? row : null;
+  }
+
+  /** Cached render bytes of a node, or null when it has none (or storage is not wired). */
+  async readRender(node: FigmaNode): Promise<Buffer | null> {
+    if (!this.storage || !node.renderPath) return null;
+    return await this.storage.read(node.renderPath).catch(() => null);
   }
 
   /** Cached rows for the given design URLs, keyed by URL (missing/unparseable URLs are absent). */
@@ -134,10 +184,47 @@ export class FigmaNodeModel {
     if (cached && now.getTime() - Date.parse(cached.fetchedAt) < FIGMA_TTL_MS) return cached;
     const token = await this.design.getToken(projectId).catch(() => null);
     if (!token) return cached;
+    const fresh = await this.fetchAndStore(projectId, ref, token, cached, now);
+    return fresh ? await this.ensureRender(projectId, ref, fresh, token) : cached;
+  }
+
+  /** Fetch metadata and upsert the row; null on a transient failure (cache stays as is). */
+  private async fetchAndStore(
+    projectId: string,
+    ref: FigmaRef,
+    token: string,
+    cached: FigmaNode | null,
+    now: Date,
+  ): Promise<FigmaNode | null> {
     const meta = await fetchFigmaMeta(token, ref, this.logger);
-    if (meta.state === "error") return cached;
+    if (meta.state === "error") return null;
     await this.design.recordTokenStatus(projectId, tokenStatusFor(meta.state));
     return await this.store(projectId, ref, meta, cached, now);
+  }
+
+  /** Fetch the node render when missing or taken at an older file version; failures keep the old one. */
+  private async ensureRender(
+    projectId: string,
+    ref: FigmaRef,
+    node: FigmaNode,
+    token: string,
+  ): Promise<FigmaNode> {
+    const due = node.state === "ok" && node.version !== null && node.renderVersion !== node.version;
+    if (!this.storage || !ref.nodeId || !due) return node;
+    try {
+      const png = await fetchFigmaRender(token, ref, this.logger);
+      if (!png) return node;
+      const path = designRenderPath(projectId, ref.fileKey, ref.nodeId);
+      await this.storage.write(path, png);
+      return (await this.db.update(this.tables.figmaNodes, node.id, {
+        renderPath: path,
+        renderVersion: node.version,
+        updatedAt: new Date().toISOString(),
+      })) as unknown as FigmaNode;
+    } catch (error) {
+      this.logger?.warn({ err: error, fileKey: ref.fileKey }, "figma render fetch failed");
+      return node;
+    }
   }
 
   private async lookup(projectId: string, ref: FigmaRef): Promise<FigmaNode | null> {
@@ -181,6 +268,8 @@ export class FigmaNodeModel {
       projectId,
       fileKey: ref.fileKey,
       nodeId: ref.nodeId ?? "",
+      renderPath: null,
+      renderVersion: null,
       createdAt: stamp,
       ...values,
     })) as unknown as FigmaNode;
