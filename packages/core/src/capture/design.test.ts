@@ -32,6 +32,11 @@ describe("extractDesignUrl", () => {
     expect(extractDesignUrl({ storyshelf: { figma: "nope" } })).toEqual({ invalid: "nope" });
   });
 
+  it("treats blank values as not declared", () => {
+    expect(extractDesignUrl({ design: "  " })).toEqual({});
+    expect(extractDesignUrl({ storyshelf: { figma: "" } })).toEqual({});
+  });
+
   it("ignores non-string, non-url shapes", () => {
     expect(extractDesignUrl({ design: 5 })).toEqual({});
     expect(extractDesignUrl({ design: [] })).toEqual({});

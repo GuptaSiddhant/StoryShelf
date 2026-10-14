@@ -83,6 +83,8 @@ export interface HttpRequestOptions {
   timeoutMs?: number;
   /** Total attempts including the first (default 3). */
   retries?: number;
+  /** Aborts the request (and any further retry) when it fires. */
+  signal?: AbortSignal;
   logger?: Logger;
 }
 
@@ -98,6 +100,8 @@ export interface HttpTextOptions {
   timeoutMs?: number;
   /** Total attempts including the first (default 3). */
   retries?: number;
+  /** Aborts the request (and any further retry) when it fires. */
+  signal?: AbortSignal;
   logger?: Logger;
 }
 const DEFAULT_RETRIES = 3;
@@ -166,7 +170,7 @@ async function requestWithRetry<T>(
           return await perform(url, options, timeoutMs);
         } catch (error) {
           span.recordException(error instanceof Error ? error : String(error));
-          if (!shouldRetry(error, attempt, maxAttempts)) {
+          if (options.signal?.aborted || !shouldRetry(error, attempt, maxAttempts)) {
             throw error;
           }
           span.setAttribute("http.retry.count", attempt);
@@ -249,7 +253,9 @@ async function doFetchResponse(
     method: request.method,
     headers: request.headers,
     body: request.body,
-    signal: AbortSignal.timeout(timeoutMs),
+    signal: options.signal
+      ? AbortSignal.any([options.signal, AbortSignal.timeout(timeoutMs)])
+      : AbortSignal.timeout(timeoutMs),
   });
   if (!response.ok) {
     const text = await response.text();

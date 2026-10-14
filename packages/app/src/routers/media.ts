@@ -11,11 +11,14 @@ const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "
 
 const PNG = "image/png";
 
-function imageResponse(buffer: Buffer): Response {
+function imageResponse(buffer: Buffer, cacheControl = "private, max-age=3600"): Response {
   return new Response(new Uint8Array(buffer), {
-    headers: { "content-type": PNG, "cache-control": "private, max-age=3600" },
+    headers: { "content-type": PNG, "cache-control": cacheControl },
   });
 }
+
+/** Design renders are addressed by file version (`?v=`): immutable once the version matches the row. */
+const RENDER_IMMUTABLE = "private, max-age=31536000, immutable";
 
 /** Register the PNG image, diff, and baseline media endpoints for snapshots. */
 export function registerMedia(app: ShelfRouter): void {
@@ -42,17 +45,19 @@ export function registerMedia(app: ShelfRouter): void {
     return imageResponse(await getStore().storage.read(snapshot.diffPath));
   });
 
-  app.get("/api/v1/projects/:slug/design/renders/:nodeId", async (c) => {
+  // `:renderId` is the internal figma_nodes row id (a ULID), not a Figma node id.
+  app.get("/api/v1/projects/:slug/design/renders/:renderId", async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...VIEW_ROLES);
     const { db, config, storage } = getStore();
     const design = new DesignModel(db, undefined, credentialKeys(config));
     const nodes = new FigmaNodeModel(db, design, { storage });
-    const node = await nodes.get(project.id, c.req.param("nodeId"));
+    const node = await nodes.get(project.id, c.req.param("renderId"));
     const png = node ? await nodes.readRender(node) : null;
     if (!png) {
       notFound("No design render");
     }
-    return imageResponse(png);
+    const versioned = node?.renderVersion && c.req.query("v") === node.renderVersion;
+    return imageResponse(png, versioned ? RENDER_IMMUTABLE : undefined);
   });
 
   app.get("/api/v1/projects/:slug/builds/:buildId/snapshots/:snapshotId/baseline", async (c) => {

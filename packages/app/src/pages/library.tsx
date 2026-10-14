@@ -75,7 +75,7 @@ export async function renderLibraryPage(
     distinctBranches(db, project.id),
     docsEntriesByStory(storage, project.id, build.id, snapshots),
     loadHealthPanel(project),
-    loadLibraryDesign(project, snapshots),
+    loadLibraryDesign(project, snapshots).catch(() => NO_LIBRARY_DESIGN),
   ]);
   return renderLibraryGrid(project, build, snapshots, { branches, docsByStory, health, design });
 }
@@ -86,6 +86,13 @@ interface LibraryDesign {
   previews: Map<string, DesignPreviewInfo>;
   projectLinks: ProjectDesignLink[];
 }
+
+/** Rendered when design data cannot be loaded: the library works without Figma. */
+const NO_LIBRARY_DESIGN: LibraryDesign = {
+  bySnapshot: new Map(),
+  previews: new Map(),
+  projectLinks: [],
+};
 
 async function loadLibraryDesign(project: Project, snapshots: Snapshot[]): Promise<LibraryDesign> {
   const [resolutions, projectLinks] = await Promise.all([

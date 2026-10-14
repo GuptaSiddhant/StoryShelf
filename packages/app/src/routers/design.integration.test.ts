@@ -1,9 +1,11 @@
-import { DesignModel } from "@storyshelf/core/models";
+import { DesignModel, MemberModel } from "@storyshelf/core/models";
+import type { FigmaNode } from "@storyshelf/core/schema";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "../index.tsx";
 import { getCsrfToken } from "../middleware/csrf.ts";
+import { stubAuth } from "../stub-auth.ts";
 
 const SECRET = "design-test-secret";
 const NOW = "2026-01-01T00:00:00.000Z";
@@ -131,7 +133,7 @@ describe("design settings", () => {
       post({ label: "x", url: "https://example.com/x" }),
     );
     expect(badFile.status).toBe(400);
-    expect(await badFile.text()).toContain("Figma file, design, board or prototype URL");
+    expect(await badFile.text()).toContain("figma.com file, design, board, prototype or make URL");
     const badComponent = await app.request(
       "/projects/app/settings/design/components",
       post({ importPath: "a.tsx", url: "nope" }),
@@ -286,5 +288,218 @@ describe("design renders", () => {
       await app.request("/projects/app/builds/b1/diff?snapshot=button-primary")
     ).text();
     expect(html).not.toContain("Figma reference");
+  });
+});
+
+const asUser = (session: string, body: Record<string, string>) =>
+  ({
+    method: "POST",
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+      cookie: `storyshelf_session=${session}`,
+      "x-csrf-token": getCsrfToken(SECRET, session),
+    },
+    body: new URLSearchParams(body).toString(),
+  }) as const;
+
+describe("design settings authorization", () => {
+  const admin = { id: "u-admin", email: "a@x.io", name: "Ada", role: "admin" as const };
+  const dev = { id: "u-dev", email: "d@x.io", name: "Dev", role: "member" as const };
+  const auth = stubAuth(null, {
+    check: async (request: Request) => {
+      await Promise.resolve();
+      const cookie = request.headers.get("cookie") ?? "";
+      if (cookie.includes("storyshelf_session=admin")) return admin;
+      if (cookie.includes("storyshelf_session=dev")) return dev;
+      return null;
+    },
+  });
+
+  async function authed() {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    await db.insert(db.tables.projects, {
+      id: "p1",
+      name: "App",
+      slug: "app",
+      gitRepository: null,
+      gitDefaultBranch: "main",
+      createdAt: NOW,
+      updatedAt: NOW,
+    } as never);
+    await Promise.all(
+      [admin, dev].map(
+        async (user) =>
+          await db.insert(db.tables.users, {
+            ...user,
+            avatarUrl: null,
+            lastLoginAt: null,
+            createdAt: NOW,
+          } as never),
+      ),
+    );
+    await new MemberModel(db).set("p1", dev.id, "developer");
+    const app = createShelfApp({
+      database: db,
+      storage,
+      auth,
+      logger: pino({ level: "silent" }),
+      config: { secret: SECRET },
+    });
+    const design = new DesignModel(db, undefined, SECRET);
+    await design.setToken("p1", "figd_original");
+    await design.setComponentLink("p1", "a.tsx", CARD_FIGMA);
+    return { app, design };
+  }
+
+  const BASE = "/projects/app/settings/design";
+
+  it("rejects non-admin members from every credential and mapping mutation", async () => {
+    const { app, design } = await authed();
+    const [link] = await design.componentLinks("p1");
+    const attempts: [string, Record<string, string>][] = [
+      [`${BASE}/token`, { token: "figd_hijack" }],
+      [`${BASE}/token/delete`, {}],
+      [`${BASE}/files`, { label: "x", url: CARD_FIGMA }],
+      [`${BASE}/components`, { importPath: "b.tsx", url: CARD_FIGMA }],
+      [`${BASE}/components/${link?.id}/delete`, {}],
+      [`${BASE}/files/${link?.id}/delete`, {}],
+    ];
+    const responses = await Promise.all(
+      attempts.map(async ([path, body]) => await app.request(path, asUser("dev", body))),
+    );
+    expect(responses.map((res) => res.status)).toEqual(attempts.map(() => 403));
+    expect(await design.getToken("p1")).toBe("figd_original");
+    expect(await design.componentLinks("p1")).toHaveLength(1);
+    expect(await design.projectLinks("p1")).toEqual([]);
+  });
+
+  it("rejects unauthenticated mutations", async () => {
+    const { app, design } = await authed();
+    const res = await app.request(`${BASE}/token`, asUser("nobody", { token: "figd_hijack" }));
+    expect([302, 401, 403]).toContain(res.status);
+    expect(await design.getToken("p1")).toBe("figd_original");
+  });
+
+  it("still lets an admin rotate the token and manage mappings", async () => {
+    const { app, design } = await authed();
+    const rotated = await app.request(`${BASE}/token`, asUser("admin", { token: "figd_new" }));
+    expect([204, 302]).toContain(rotated.status);
+    expect(await design.getToken("p1")).toBe("figd_new");
+    const mapped = await app.request(
+      `${BASE}/components`,
+      asUser("admin", { importPath: "b.tsx", url: CARD_FIGMA }),
+    );
+    expect([204, 302]).toContain(mapped.status);
+    expect(await design.componentLinks("p1")).toHaveLength(2);
+  });
+});
+
+const reviewHtml = async (app: Awaited<ReturnType<typeof seed>>["app"]): Promise<string> =>
+  await (await app.request("/projects/app/builds/b1/diff?snapshot=button-primary")).text();
+
+describe("design hardening", () => {
+  const PNG = Buffer.from([137, 80, 78, 71]);
+  const apiWith = (nodes: Record<string, unknown>, version = "7"): ReturnType<typeof vi.spyOn> =>
+    figmaApi((url) => {
+      if (url.includes("/images/")) {
+        return Response.json({ images: { "1:2": "https://cdn.example.com/r.png" } });
+      }
+      if (url.startsWith("https://cdn.example.com/")) return new Response(PNG);
+      return Response.json({ name: "Kit", version, lastModified: "2025-12-01T00:00:00Z", nodes });
+    });
+
+  it("counts the rotation clock from when the token was set, not from refreshes", async () => {
+    const { app, db, design } = await seed();
+    await design.setToken("p1", "figd_tok");
+    const row = await design.tokenInfo("p1");
+    const eightyDaysAgo = new Date(Date.now() - 80 * 86_400_000).toISOString();
+    await db.update(db.tables.designTokens, row?.id ?? "", { createdAt: eightyDaysAgo } as never);
+    apiWith({ "1:2": { document: { name: "Button" } } });
+    await reviewHtml(app);
+    expect((await design.tokenInfo("p1"))?.status).toBe("ok");
+    const page = await (await app.request("/projects/app/settings/design")).text();
+    expect(page).toMatch(/Rotate within (?:9|10) days/u);
+  });
+
+  it("stops showing a render once the node is deleted", async () => {
+    const { app, db, design } = await seed();
+    await design.setToken("p1", "figd_tok");
+    apiWith({ "1:2": { document: { name: "Button" } } });
+    const withPane = await reviewHtml(app);
+    expect(withPane).toContain("Figma reference");
+    const [node] = (await db.list(db.tables.figmaNodes)) as unknown as FigmaNode[];
+    await db.update(db.tables.figmaNodes, node?.id ?? "", { fetchedAt: NOW } as never);
+    apiWith({ "1:2": null });
+    const gone = await reviewHtml(app);
+    expect(gone).toContain("Design not found");
+    expect(gone).not.toContain("Figma reference");
+    expect((await app.request(`/api/v1/projects/app/design/renders/${node?.id}`)).status).toBe(404);
+  });
+
+  it("caches versioned renders as immutable and unversioned ones briefly", async () => {
+    const { app, db, design } = await seed();
+    await design.setToken("p1", "figd_tok");
+    apiWith({ "1:2": { document: { name: "Button" } } });
+    await reviewHtml(app);
+    const [node] = (await db.list(db.tables.figmaNodes)) as unknown as FigmaNode[];
+    const base = `/api/v1/projects/app/design/renders/${node?.id}`;
+    const versioned = await app.request(`${base}?v=${node?.renderVersion}`);
+    expect(versioned.headers.get("cache-control")).toContain("immutable");
+    const plain = await app.request(base);
+    expect(plain.headers.get("cache-control")).toBe("private, max-age=3600");
+    const stale = await app.request(`${base}?v=old`);
+    expect(stale.headers.get("cache-control")).toBe("private, max-age=3600");
+  });
+
+  it("refreshes at most ten design links, three files at a time, when the library loads", async () => {
+    const { app, db, design } = await seed();
+    await design.setToken("p1", "figd_tok");
+    await Promise.all(
+      Array.from({ length: 14 }, async (_unused, i) => {
+        await db.insert(db.tables.snapshots, {
+          id: `extra-${i}`,
+          projectId: "p1",
+          buildId: "b1",
+          storyId: `extra-${i}`,
+          storyName: "x",
+          storyTitle: `Extra${i}`,
+          storyImportPath: `./src/Extra${i}.stories.tsx`,
+          designUrl: `https://www.figma.com/design/FILE${i}/Kit`,
+          screenshotPath: `p1/extra-${i}.png`,
+          status: "unchanged",
+          createdAt: NOW,
+          updatedAt: NOW,
+        } as never);
+      }),
+    );
+    let inFlight = 0;
+    let peak = 0;
+    const calls: string[] = [];
+    const real = globalThis.fetch;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = input instanceof Request ? input.url : String(input);
+      if (!url.startsWith("https://api.figma.com/")) return await real(input, init);
+      calls.push(url);
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise((resolve) => {
+        setTimeout(resolve, 5);
+      });
+      inFlight -= 1;
+      return Response.json({ name: "Kit", version: "1", lastModified: "2025-12-01T00:00:00Z" });
+    });
+    expect((await app.request("/projects/app/library")).status).toBe(200);
+    expect(calls.length).toBeLessThanOrEqual(10);
+    expect(calls.length).toBeGreaterThan(0);
+    expect(peak).toBeLessThanOrEqual(3);
+  });
+
+  it("keeps the library up when design data cannot be loaded", async () => {
+    const { app } = await seed();
+    vi.spyOn(DesignModel.prototype, "componentLinks").mockRejectedValue(new Error("db down"));
+    const res = await app.request("/projects/app/library");
+    expect(res.status).toBe(200);
+    expect(await res.text()).not.toContain(">Figma<");
   });
 });

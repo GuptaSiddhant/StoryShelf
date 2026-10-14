@@ -61,6 +61,7 @@ const makeSnapshot = (
   storyName: "Primary",
   storyTitle: "Story",
   storyImportPath,
+  designUrl: null,
   viewportName: "desktop",
   viewportWidth: 1280,
   viewportHeight: 720,
