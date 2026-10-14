@@ -79,7 +79,7 @@ Capture drives Chromium, which dominates memory use. Each open page costs roughl
 
 | Setting | Default | What it controls |
 | --- | --- | --- |
-| `config.captureConcurrency` | auto: 2 builds on hosts with ≥ 2 CPUs and ≥ 3 GB, otherwise 1 | Builds captured at the same time (each launches its own browser) |
+| `config.captureConcurrency` (server) / `WORKER_CONCURRENCY` (remote worker) | auto: 2 builds on hosts with ≥ 2 CPUs and ≥ 3 GB, otherwise 1 | Builds captured at the same time (each launches its own browser) |
 | `createPlaywrightCaptureRunner({ concurrency })` / `STORYSHELF_CAPTURE_CONCURRENCY` | auto (see below) | Pages rendering at once within one build |
 | `createPlaywrightCaptureRunner({ navigationTimeoutMs })` / `STORYSHELF_NAVIGATION_TIMEOUT_MS` | auto: 30 s, 60 s under 2 CPUs, 90 s under 1 CPU | Per-page navigation and action timeout |
 

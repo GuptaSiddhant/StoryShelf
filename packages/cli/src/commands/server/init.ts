@@ -598,7 +598,7 @@ function generateWorkerFile(answers: Answers): string {
     `  storage: ${STORAGE_INIT[answers.storage]},`,
     `  runner: createPlaywrightCaptureRunner(),`,
     `  scratchDir: dataDir,`,
-    `  config: { concurrency: Number(process.env.WORKER_CONCURRENCY) || 2 },`,
+    `  config: { concurrency: Number(process.env.WORKER_CONCURRENCY) || undefined },`,
     `});`,
     ``,
     `await worker.start();`,
