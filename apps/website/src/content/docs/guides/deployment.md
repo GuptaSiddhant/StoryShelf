@@ -83,6 +83,7 @@ Capture drives Chromium, which dominates memory use. Each open page costs roughl
 | `createPlaywrightCaptureRunner({ concurrency })` / `STORYSHELF_CAPTURE_CONCURRENCY` | auto (see below) | Pages rendering at once within one build |
 | `createPlaywrightCaptureRunner({ navigationTimeoutMs })` / `STORYSHELF_NAVIGATION_TIMEOUT_MS` | auto: 30 s, 60 s under 2 CPUs, 90 s under 1 CPU | Per-page navigation and action timeout |
 
+| `createPlaywrightCaptureRunner({ reusePages })` / `STORYSHELF_REUSE_PAGES` | off | Reuse a pool of reset pages instead of opening one per capture |
 | `createPlaywrightCaptureRunner({ recycleBrowserEvery })` / `STORYSHELF_BROWSER_RECYCLE_EVERY` | `150` (`0` disables) | Captures between browser restarts |
 
 The defaults are sized from the CPU and memory the process can actually use, including container limits (cgroup CPU quota and memory limit), so a 0.5 vCPU / 1 GB container on a big host is treated as 0.5 / 1 GB. Pages at once is the smaller of the CPU count (rounded up), `(memory − 512 MB) / 300 MB`, and 4, with a minimum of 1. In practice:
@@ -95,6 +96,10 @@ The defaults are sized from the CPU and memory the process can actually use, inc
 | 4 vCPU, 8 GB | 2 | 4 | 30 s |
 
 More pages than CPUs does not make capture faster: the pages compete for the same cores, each loads more slowly, and slow loads time out. The orchestrator also gives each render a time budget of 15 minutes, or 15 seconds per capture for large builds, whichever is longer (an explicit `renderTimeoutMs` always wins). One page at a time on a small host is slower, so a 1,000-capture build gets about 4 hours before it is cancelled as hung; without this, a build that is merely slow would be reported as timed out.
+
+Screenshots are written to storage as each one is captured instead of being held until the whole build has rendered, so memory use no longer grows with the number of stories.
+
+By default every capture opens a fresh page. Set `reusePages: true` (or `STORYSHELF_REUSE_PAGES=1`) to reuse a small pool of pages instead. Each page runs in its own browser context and is reset between captures (cookies, local and session storage and IndexedDB cleared, blank document), and a page that failed a capture is thrown away rather than reused. It is off by default because a story that leaks state outside those resets could affect the next one; on the bundled fixtures, screenshots were byte-identical with reuse on and off. Reuse mostly saves page startup time, which matters most on slower hosts.
 
 Chromium grows slowly over a long run, so the browser is closed and relaunched every 150 captures. The restart happens between batches, after in-flight pages finish, so no capture is interrupted. At the start of every render the runner logs a `capture sizing` line with the detected `cpus` and `memoryMb` and the resulting `pages`, `navigationTimeoutMs` and `recycleBrowserEvery`; check it first if a host behaves differently from the table.
 

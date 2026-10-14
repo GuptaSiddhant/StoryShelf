@@ -29,6 +29,9 @@ const playwright = vi.hoisted(() => {
       });
     },
     setDefaultTimeout: (): void => {},
+    setViewportSize: async (): Promise<void> => {
+      await Promise.resolve();
+    },
     waitForSelector: async (): Promise<unknown> => {
       await Promise.resolve();
       return null;
@@ -54,8 +57,27 @@ const playwright = vi.hoisted(() => {
       await Promise.resolve();
     },
   });
+  const stats = { contextsOpened: 0, contextsClosed: 0, pagesOpened: 0 };
   const browser = {
     closed: false,
+    newContext: async (): Promise<unknown> => {
+      await Promise.resolve();
+      stats.contextsOpened += 1;
+      return {
+        newPage: async (): Promise<ReturnType<typeof makePage>> => {
+          await Promise.resolve();
+          stats.pagesOpened += 1;
+          return makePage();
+        },
+        clearCookies: async (): Promise<void> => {
+          await Promise.resolve();
+        },
+        close: async (): Promise<void> => {
+          await Promise.resolve();
+          stats.contextsClosed += 1;
+        },
+      };
+    },
     newPage: async (): Promise<ReturnType<typeof makePage>> => {
       await Promise.resolve();
       return makePage();
@@ -83,6 +105,7 @@ const playwright = vi.hoisted(() => {
     },
     lastBrowser: (): typeof browser | null => lastBrowser,
     launchCount: (): number => launches,
+    stats,
     configureHang: (hang: boolean): void => {
       hangNextGoto = hang;
     },
@@ -178,6 +201,61 @@ describe("createPlaywrightCaptureRunner.render", () => {
     });
 
     expect(playwright.launchCount() - before).toBe(1);
+  }, 30_000);
+
+  it("reuses pages across captures when reusePages is on", async () => {
+    const stories = Array.from({ length: 8 }, (_, i) => ({ ...STORIES[0]!, id: `s-${i}` }));
+    const before = { ...playwright.stats };
+    playwright.configureHang(false);
+    const result = await createPlaywrightCaptureRunner({ concurrency: 2, reusePages: true }).render(
+      {
+        buildId: "build-1",
+        storybookDir,
+        stories,
+        viewports: VIEWPORTS,
+      },
+    );
+
+    expect(result.captures).toHaveLength(8);
+    // 8 captures through 2 slots: two pages are opened once and reused, then closed.
+    expect(playwright.stats.pagesOpened - before.pagesOpened).toBeLessThanOrEqual(2);
+    expect(playwright.stats.contextsClosed - before.contextsClosed).toBe(
+      playwright.stats.contextsOpened - before.contextsOpened,
+    );
+  }, 30_000);
+
+  it("streams captures to onCapture instead of collecting them", async () => {
+    const seen: string[] = [];
+    playwright.configureHang(false);
+    const result = await createPlaywrightCaptureRunner().render({
+      buildId: "build-1",
+      storybookDir,
+      stories: STORIES,
+      viewports: VIEWPORTS,
+      onCapture: async (capture) => {
+        await Promise.resolve();
+        seen.push(`${capture.story.id}/${capture.viewportName}`);
+      },
+    });
+
+    expect(seen).toEqual(["components-button--primary/desktop"]);
+    expect(result.captures).toHaveLength(0);
+  }, 30_000);
+
+  it("reports a failed onCapture as a render failure for that story", async () => {
+    playwright.configureHang(false);
+    const result = await createPlaywrightCaptureRunner().render({
+      buildId: "build-1",
+      storybookDir,
+      stories: STORIES,
+      viewports: VIEWPORTS,
+      onCapture: async () => {
+        await Promise.resolve();
+        throw new Error("disk full");
+      },
+    });
+
+    expect(result.failures.map((f) => f.error)).toEqual(["disk full"]);
   }, 30_000);
 
   it("resolves cancel for builds that are not rendering", async () => {

@@ -192,6 +192,7 @@ async function runCapturePhases(
           async () =>
             await captureAcrossBrowsers({
               db: options.db,
+              storage: options.storage,
               tables: options.tables,
               runner: options.runner,
               build,

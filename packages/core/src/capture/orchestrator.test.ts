@@ -151,6 +151,79 @@ describe("executeCaptureJob", () => {
     expect(rows.map((row) => row.storyName)).toEqual(["Primary"]);
   });
 
+  it("stores streamed captures as they arrive and persists them without re-writing", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const project = await new ProjectModel(db, tables(db)).create({ name: "Streaming" });
+    const build = await new BuildModel(db, tables(db)).create(project.id, {
+      gitSha: "sha-stream",
+      gitBranch: "main",
+      isDefault: true,
+    });
+    await storage.write(storybookZipPath(project.id, build.id), zipWithIndex());
+    const png = pngBytes();
+    const { runner } = fakeRunner({
+      render: vi.fn(async (input: Parameters<CaptureRunner["render"]>[0]) => {
+        // A streaming runner hands each capture over and keeps nothing.
+        await input.onCapture?.({
+          story: input.stories[0]!,
+          viewportName: "desktop",
+          screenshot: png,
+        });
+        return { captures: [], failures: [] };
+      }),
+    });
+    const writes = vi.spyOn(storage, "write");
+
+    await executeCaptureJob(
+      { buildId: build.id },
+      { db, tables: tables(db), storage, runner, scratchDir },
+    );
+
+    const rows = await db.list(db.tables.snapshots);
+    expect(rows).toHaveLength(1);
+    const stored = await storage.read(rows[0]!.screenshotPath);
+    expect(stored.equals(png)).toBe(true);
+    const shotWrites = writes.mock.calls.filter(([path]) => path === rows[0]!.screenshotPath);
+    expect(shotWrites).toHaveLength(1);
+    expect((await db.get(db.tables.builds, build.id))?.status).toBe("approved");
+  });
+
+  it("reports a streamed capture that is not a PNG as a render failure", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const project = await new ProjectModel(db, tables(db)).create({ name: "StreamingBad" });
+    const build = await new BuildModel(db, tables(db)).create(project.id, {
+      gitSha: "sha-stream-bad",
+      gitBranch: "main",
+      isDefault: true,
+    });
+    await storage.write(storybookZipPath(project.id, build.id), zipWithIndex());
+    let rejected = "";
+    const { runner } = fakeRunner({
+      render: vi.fn(async (input: Parameters<CaptureRunner["render"]>[0]) => {
+        await input
+          .onCapture?.({
+            story: input.stories[0]!,
+            viewportName: "desktop",
+            screenshot: Buffer.from("not a png"),
+          })
+          .catch((error: unknown) => {
+            rejected = String(error);
+          });
+        return { captures: [], failures: [] };
+      }),
+    });
+
+    await executeCaptureJob(
+      { buildId: build.id },
+      { db, tables: tables(db), storage, runner, scratchDir },
+    );
+
+    expect(rejected).toContain("not a PNG");
+    expect(await db.list(db.tables.snapshots)).toHaveLength(0);
+  });
+
   describe("modes", () => {
     const MODES = { Dark: { theme: "dark" }, Wide: { viewport: 1600 } };
     const DEFAULT_EXTRACTED = { [STORY_ID]: { modes: MODES } };

@@ -23,6 +23,8 @@ export function createPlaywrightCaptureRunner(
     navigationTimeoutMs?: number;
     /** Captures between browser restarts (0 disables); falls back to `STORYSHELF_BROWSER_RECYCLE_EVERY`, then 150. */
     recycleBrowserEvery?: number;
+    /** Reuse pages between captures (opt-in); falls back to `STORYSHELF_REUSE_PAGES=1`. */
+    reusePages?: boolean;
   } = {},
 ): CaptureRunner {
   const defaultBrowser = options.browser ?? "chromium";
@@ -33,6 +35,8 @@ export function createPlaywrightCaptureRunner(
     recommendedNavigationTimeoutMs();
   const recycleBrowserEvery =
     options.recycleBrowserEvery ?? envInt("STORYSHELF_BROWSER_RECYCLE_EVERY", 0);
+  const reusePages =
+    options.reusePages ?? ["1", "true"].includes(process.env["STORYSHELF_REUSE_PAGES"] ?? "");
   return {
     metadata: {
       name: "Playwright",
@@ -47,7 +51,7 @@ export function createPlaywrightCaptureRunner(
       activeRuns.set(input.buildId, active);
       try {
         return await renderAll(
-          { concurrency, navigationTimeoutMs, recycleBrowserEvery, ...input },
+          { concurrency, navigationTimeoutMs, recycleBrowserEvery, reusePages, ...input },
           active,
           defaultBrowser,
         );
