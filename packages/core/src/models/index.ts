@@ -40,26 +40,36 @@ export {
 export { BuildModel, isPublicBuild, type BuildCreateInput, type BuildListFilter } from "./build.ts";
 export { CommentModel, type CommentCreateInput } from "./comment.ts";
 export {
-  DesignModel,
+  componentHistory,
+  componentPresence,
+  worstStatus,
+  type ComponentHistoryRow,
+  type ComponentPresence,
+} from "./component.ts";
+export { DesignModel, type DesignTables } from "./design.ts";
+export {
   normalizeImportPath,
   resolveDesigns,
   type DesignResolution,
   type DesignSource,
-  type DesignTables,
   type DesignTokenStatus,
-} from "./design.ts";
+} from "./design-resolve.ts";
+export { FigmaNodeModel, type FigmaNodeTables, type RefreshOptions } from "./figma.ts";
 export {
   fetchFigmaMeta,
+  fetchFigmaMetas,
   fetchFigmaRender,
-  FigmaNodeModel,
+  fetchFigmaRenders,
+  type FigmaCallOptions,
+  type FigmaMeta,
+  type FigmaState,
+} from "./figma-api.ts";
+export {
   FIGMA_TOKEN_MAX_AGE_DAYS,
   FIGMA_TTL_MS,
   isDesignStale,
   tokenDaysLeft,
-  type FigmaMeta,
-  type FigmaNodeTables,
-  type FigmaState,
-} from "./figma.ts";
+} from "./figma-health.ts";
 export { LabelModel } from "./label.ts";
 export { matchUpstreamStory, PackageUsageModel } from "./usage.ts";
 export type { PackageUsageInput, PackageUsageTables, UpstreamStory } from "./usage.ts";

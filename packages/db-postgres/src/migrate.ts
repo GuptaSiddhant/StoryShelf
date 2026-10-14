@@ -31,6 +31,8 @@ const SNAPSHOT_BASELINE_ID_ALTER =
 const SNAPSHOT_BASELINE_VERSION_ALTER =
   "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS baseline_version TEXT";
 const SNAPSHOT_DESIGN_URL_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS design_url TEXT";
+const DESIGN_LINKS_UNIQUE_INDEX =
+  "CREATE UNIQUE INDEX IF NOT EXISTS design_links_project_import_path_idx ON design_links (project_id, import_path)";
 const FIGMA_RENDER_PATH_ALTER = "ALTER TABLE figma_nodes ADD COLUMN IF NOT EXISTS render_path TEXT";
 const FIGMA_RENDER_VERSION_ALTER =
   "ALTER TABLE figma_nodes ADD COLUMN IF NOT EXISTS render_version TEXT";
@@ -92,6 +94,7 @@ async function migrateCaptureIdentityColumns(run: MigrationRunner): Promise<void
   await execIgnore(run, PROJECT_MODES_ALLOWLIST_ALTER);
   await execIgnore(run, FIGMA_RENDER_PATH_ALTER);
   await execIgnore(run, FIGMA_RENDER_VERSION_ALTER);
+  await execIgnore(run, DESIGN_LINKS_UNIQUE_INDEX);
 }
 
 async function migrateProjectExtras(run: MigrationRunner): Promise<void> {

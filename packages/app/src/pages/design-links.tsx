@@ -46,9 +46,11 @@ export interface ProjectDesignLink {
 export function DesignButtons(props: {
   urls: readonly string[];
   previews?: ReadonlyMap<string, DesignPreviewInfo>;
+  /** Component page of the story, offered in the popover as `View component →`. */
+  componentHref?: string;
   size?: "sm" | "md";
 }): Rendered {
-  const { urls, previews, size = "sm" } = props;
+  const { urls, previews, componentHref, size = "sm" } = props;
   return (
     <>
       {urls.map((url, index): Rendered => {
@@ -60,6 +62,9 @@ export function DesignButtons(props: {
             <DropdownItem href={url} icon="external-link" target="_blank" rel="noopener noreferrer">
               Open in Figma
             </DropdownItem>
+            {componentHref ? (
+              <DropdownItem href={componentHref}>View component →</DropdownItem>
+            ) : null}
           </Dropdown>
         ) : (
           <Button

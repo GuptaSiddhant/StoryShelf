@@ -10,6 +10,11 @@ import { loadInsightPanel } from "../insights/panel.ts";
 import { renderBuildDetailPage } from "../pages/build-detail.tsx";
 import type { LinkedUsageItem } from "../pages/build-diff-usage.tsx";
 import { renderBuildDiffPage, selectedSnapshot } from "../pages/build-diff.tsx";
+import {
+  renderComponentPage,
+  COMPONENT_TABS,
+  type ComponentTab,
+} from "../pages/component-detail.tsx";
 import { renderComputeJobsPage, renderActiveQueue } from "../pages/compute-jobs.tsx";
 import { renderLabelDetailPage, renderLabelsPage } from "../pages/label-detail.tsx";
 import { renderLibraryPage } from "../pages/library.tsx";
@@ -19,6 +24,7 @@ import { renderProjectsPage } from "../pages/projects.tsx";
 import { renderRootPage } from "../pages/root.tsx";
 import { getStore } from "../store.ts";
 import { loadBaselineView } from "./baseline-guard.ts";
+import { loadComponentPage } from "./component.handlers.ts";
 import { designUrlsFor, loadDesignResolutions, loadReviewDesign } from "./design.handlers.ts";
 import { flash } from "./flash.ts";
 import { currentProjectRole } from "./helpers.ts";
@@ -228,6 +234,15 @@ export function registerUiPages(app: ShelfRouter): void {
       return c.notFound();
     }
     return c.html(html);
+  });
+
+  app.get("/projects/:slug/components/*", async (c) => {
+    const slug = c.req.param("slug");
+    const base = `/projects/${slug}/components/`;
+    const path = c.req.path.startsWith(base) ? decodeRest(c.req.path.slice(base.length)) : "";
+    const tab = COMPONENT_TABS.find((candidate) => candidate === c.req.query("tab")) ?? "states";
+    const data = await loadComponentPage(c, slug, path, tab satisfies ComponentTab);
+    return data ? c.html(renderComponentPage(data)) : c.notFound();
   });
 
   app.get("/projects/:slug/library", async (c) => {

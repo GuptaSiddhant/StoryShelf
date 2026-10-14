@@ -15,10 +15,14 @@ export const designLinks = mysqlTable(
     createdAt: datetime("created_at", { mode: "string", fsp: 3 }).notNull(),
     updatedAt: datetime("updated_at", { mode: "string", fsp: 3 }).notNull(),
   },
-  (t) => [index("design_links_project_id_idx").on(t.projectId)],
+  (t) => [
+    index("design_links_project_id_idx").on(t.projectId),
+    // One mapping per story file; project-level links (null import_path) never collide.
+    uniqueIndex("design_links_project_import_path_idx").on(t.projectId, t.importPath),
+  ],
 );
 
-/** Narrow `design_tokens` table definition (one Figma token per project). */
+/** Narrow `design_tokens` table definition: the per-project Figma personal access token vault (not design-system tokens). */
 export const designTokens = mysqlTable(
   "design_tokens",
   {

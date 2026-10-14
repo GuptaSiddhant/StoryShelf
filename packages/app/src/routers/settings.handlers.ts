@@ -24,6 +24,7 @@ import {
   type SettingsTab,
 } from "../pages/project-settings.tsx";
 import type { SettingsAiData } from "../pages/settings-ai.tsx";
+import type { DesignTokenState } from "../pages/settings-design-token.tsx";
 import type { SettingsDesignData } from "../pages/settings-design.tsx";
 import type { SettingsLink, SettingsLinkCandidate } from "../pages/settings-links.tsx";
 import type { SettingsMember } from "../pages/settings-members.tsx";
@@ -256,9 +257,20 @@ async function loadDesignSection(
   }));
   const row = await model.tokenInfo(projectId);
   const token = row
-    ? { status: row.status, daysLeft: tokenDaysLeft(row.updatedAt), checkedAt: row.checkedAt }
+    ? {
+        status: tokenState(row.status),
+        daysLeft: tokenDaysLeft(row.createdAt),
+        checkedAt: row.checkedAt,
+      }
     : null;
   return { files, components, token };
+}
+
+/** The stored status column as a known token state (anything unrecognized reads as unknown). */
+function tokenState(status: string): DesignTokenState {
+  return status === "ok" || status === "unauthorized" || status === "forbidden"
+    ? status
+    : "unknown";
 }
 
 async function loadSettingsData(slug: string): Promise<SettingsData | null> {

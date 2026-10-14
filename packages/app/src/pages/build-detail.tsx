@@ -306,6 +306,15 @@ export async function renderBuildDetailPage(
                   <Button variant="ghost" size="sm" href={urls.short(build.id)}>
                     View Storybook
                   </Button>
+                  {snap.storyImportPath ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      href={`${urls.component(project.slug, snap.storyImportPath)}#${snap.storyId}`}
+                    >
+                      Component
+                    </Button>
+                  ) : null}
                   <DesignButtons urls={designUrlsFor(designs, snap)} />
                   {canReview && (snap.status === "new" || snap.status === "changed") ? (
                     <>

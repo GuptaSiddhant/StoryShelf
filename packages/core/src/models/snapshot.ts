@@ -1,5 +1,5 @@
 /** Snapshot records for captured stories within a build. */
-import { eq, getTableColumns } from "drizzle-orm";
+import { and, eq, getTableColumns, inArray } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
 import { DEFAULT_BROWSER } from "../adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
@@ -67,6 +67,21 @@ export class SnapshotModel {
       where: eq(
         getTableColumns(this.tables.snapshots)["buildId"] as unknown as SQLWrapper,
         buildId,
+      ),
+    })) as unknown as Snapshot[];
+  }
+
+  /**
+   * Every snapshot of a story file across the project's builds. Index paths are
+   * stored raw (`./src/A.stories.tsx`), so both spellings of `importPath` match.
+   */
+  async listByImportPath(projectId: string, importPath: string): Promise<Snapshot[]> {
+    const bare = importPath.replace(/^(?:\.\/)+/u, "");
+    const columns = getTableColumns(this.tables.snapshots);
+    return (await this.db.list(this.tables.snapshots, {
+      where: and(
+        eq(columns["projectId"] as unknown as SQLWrapper, projectId),
+        inArray(columns["storyImportPath"] as unknown as SQLWrapper, [bare, `./${bare}`]),
       ),
     })) as unknown as Snapshot[];
   }

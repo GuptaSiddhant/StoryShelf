@@ -11,6 +11,8 @@ export interface UrlBuilder {
   jobs(slug: string): string;
   labels(slug: string): string;
   label(slug: string, key: string, value: string): string;
+  /** Stable component page, keyed by the story file's import path. */
+  component(slug: string, importPath: string): string;
   storybook(slug: string): string;
   storybookLabel(slug: string, key: string, value: string): string;
   storybookBuild(slug: string, buildId: string): string;
@@ -41,6 +43,8 @@ export function createUrlBuilder(baseUrl: string, publishedBaseDomain?: string):
     labels: (slug) => `${root}/projects/${slug}/labels`,
     label: (slug, key, value) =>
       `${root}/projects/${slug}/labels/${encodeURIComponent(key)}/${encodeURI(value)}`,
+    component: (slug, importPath) =>
+      `${root}/projects/${slug}/components/${encodeURI(importPath.replace(/^(?:\.\/)+/u, ""))}`,
     storybook: (slug) =>
       publishedBaseDomain
         ? `https://${slug}.${publishedBaseDomain}`
