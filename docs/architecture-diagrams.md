@@ -316,7 +316,7 @@ sequenceDiagram
     Orc->>Orc: scratchDir cleanup
 ```
 
-**Performance note:** v1 re-renders every story (`architecture.md:797` deferred TurboSnap); pages per build are bounded by the runner (`concurrency`, default 2, `STORYSHELF_CAPTURE_CONCURRENCY`) and persist is capped at 4; queue concurrency defaults to 2 (`ShelfConfig.captureConcurrency`).
+**Performance note:** v1 re-renders every story (`architecture.md:797` deferred TurboSnap); pages per build are bounded by the runner (`concurrency`, sized from detected CPU/memory, `STORYSHELF_CAPTURE_CONCURRENCY`) and persist is capped at 4; queue concurrency defaults from detected resources, 1 or 2 (`ShelfConfig.captureConcurrency`).
 
 ---
 

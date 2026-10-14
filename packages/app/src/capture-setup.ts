@@ -14,6 +14,7 @@ import type {
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 import { BuildModel } from "@storyshelf/core/models";
+import { recommendedBuildConcurrency } from "@storyshelf/core/utils";
 import { captureMetrics, currentTraceparent } from "@storyshelf/observability";
 import { credentialKeys } from "./credential-keys.ts";
 import { notifySystemWith } from "./notify.ts";
@@ -151,7 +152,7 @@ export function setupCaptureQueue(
   const captureQueue =
     options.captureQueue ??
     new InMemoryCaptureQueue({
-      concurrency: config.captureConcurrency ?? 2,
+      concurrency: config.captureConcurrency ?? recommendedBuildConcurrency(),
       logger,
       runJob: async (job: CaptureDispatchJob): Promise<void> => {
         await timedRunJob(runJob, job);

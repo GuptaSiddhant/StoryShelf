@@ -21,8 +21,10 @@ export interface PlaywrightRenderInput {
   playTimeoutMs?: number;
   runA11y?: boolean;
   browser?: BrowserName;
-  /** Max pages rendering at once (default 2; each page is ~100-300 MB in Chromium). */
+  /** Max pages rendering at once (default: sized from detected CPU and memory). */
   concurrency?: number;
+  /** Per-page navigation/action timeout in ms (default: scaled up on CPU-starved hosts). */
+  navigationTimeoutMs?: number;
   /** Test/extension seam: story source adapter (defaults to `StorybookAdapter`). */
   adapter?: StorySourceAdapter;
 }
@@ -42,6 +44,7 @@ export interface ScreenshotContext {
 
 /** Extended context threaded through the capture pipeline. */
 export interface CaptureContext extends ScreenshotContext {
+  navigationTimeoutMs?: number;
   executePlay?: boolean;
   playTimeoutMs?: number;
   runA11y?: boolean;

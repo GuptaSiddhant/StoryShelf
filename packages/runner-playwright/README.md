@@ -20,9 +20,9 @@ Supply it to `createShelfApp({ capture, config: { scratchDir } })` — the route
 
 ## Concurrency and memory
 
-Each open Chromium page costs roughly 100–300 MB, so `render` captures a bounded number of story/viewport pairs at once instead of all of them. The default is **2**; override it with `createPlaywrightCaptureRunner({ concurrency })` or the `STORYSHELF_CAPTURE_CONCURRENCY` environment variable (the option wins). Chromium is launched with low-memory flags (`--disable-dev-shm-usage` so small container `/dev/shm` mounts don't crash it, plus `--disable-extensions`, `--disable-background-networking`, `--mute-audio`). Flags that can change rendered pixels (`--disable-gpu`, `--single-process`) are deliberately left out so baselines stay stable.
+Each open Chromium page costs roughly 100–300 MB, so `render` captures a bounded number of story/viewport pairs at once instead of all of them. The default is sized from the detected CPU and memory (container limits included): the smaller of the CPU count rounded up, `(memory − 512 MB) / 300 MB`, and 4, never below 1. Override it with `createPlaywrightCaptureRunner({ concurrency })` or the `STORYSHELF_CAPTURE_CONCURRENCY` environment variable (the option wins). On a 0.5 vCPU or 1 vCPU host that means one page at a time, because extra pages only compete for the same CPU and trip timeouts. The per-page timeout scales the same way (30 s, 60 s under 2 CPUs, 90 s under 1 CPU); override it with `navigationTimeoutMs` or `STORYSHELF_NAVIGATION_TIMEOUT_MS`. Chromium is launched with low-memory flags (`--disable-dev-shm-usage` so small container `/dev/shm` mounts don't crash it, plus `--disable-extensions`, `--disable-background-networking`, `--mute-audio`). Flags that can change rendered pixels (`--disable-gpu`, `--single-process`) are deliberately left out so baselines stay stable.
 
-Rule of thumb: total pages = `ShelfConfig.captureConcurrency` (builds at once, default 2) × runner `concurrency`. On a 1 GB host use 1 build × 2 pages, or 1 × 1 for very large Storybooks.
+Rule of thumb: total pages = `ShelfConfig.captureConcurrency` (builds at once, auto: 1 unless ≥ 2 CPUs and ≥ 3 GB) × runner `concurrency`.
 
 ## Browsers
 

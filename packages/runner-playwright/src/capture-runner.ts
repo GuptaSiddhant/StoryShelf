@@ -5,6 +5,7 @@ import {
   type BrowserName,
   type CaptureRunner,
 } from "@storyshelf/core/adapter/capture-runner";
+import { recommendedNavigationTimeoutMs } from "@storyshelf/core/utils";
 import { activeRuns, closeBrowser } from "./browser.ts";
 import { extractAll, renderAll } from "./pipeline.ts";
 import type { ActiveRun, ExtractInput, PlaywrightRenderInput } from "./types.ts";
@@ -16,12 +17,18 @@ export function createPlaywrightCaptureRunner(
   options: {
     browser?: BrowserName;
     supportedBrowsers?: readonly BrowserName[];
-    /** Pages rendered at once; falls back to `STORYSHELF_CAPTURE_CONCURRENCY`, then 2. */
+    /** Pages rendered at once; falls back to `STORYSHELF_CAPTURE_CONCURRENCY`, then CPU/memory detection. */
     concurrency?: number;
+    /** Per-page timeout in ms; falls back to `STORYSHELF_NAVIGATION_TIMEOUT_MS`, then CPU detection. */
+    navigationTimeoutMs?: number;
   } = {},
 ): CaptureRunner {
   const defaultBrowser = options.browser ?? "chromium";
-  const concurrency = options.concurrency ?? envConcurrency();
+  const concurrency = options.concurrency ?? envPositiveInt("STORYSHELF_CAPTURE_CONCURRENCY");
+  const navigationTimeoutMs =
+    options.navigationTimeoutMs ??
+    envPositiveInt("STORYSHELF_NAVIGATION_TIMEOUT_MS") ??
+    recommendedNavigationTimeoutMs();
   return {
     metadata: {
       name: "Playwright",
@@ -35,7 +42,11 @@ export function createPlaywrightCaptureRunner(
       const active: ActiveRun = { cancelled: false, browser: null };
       activeRuns.set(input.buildId, active);
       try {
-        return await renderAll({ concurrency, ...input }, active, defaultBrowser);
+        return await renderAll(
+          { concurrency, navigationTimeoutMs, ...input },
+          active,
+          defaultBrowser,
+        );
       } finally {
         activeRuns.delete(input.buildId);
       }
@@ -52,8 +63,8 @@ export function createPlaywrightCaptureRunner(
   };
 }
 
-function envConcurrency(): number | undefined {
-  const parsed = Number.parseInt(process.env["STORYSHELF_CAPTURE_CONCURRENCY"] ?? "", 10);
+function envPositiveInt(name: string): number | undefined {
+  const parsed = Number.parseInt(process.env[name] ?? "", 10);
   return parsed > 0 ? parsed : undefined;
 }
 

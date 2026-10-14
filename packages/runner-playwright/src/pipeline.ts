@@ -10,7 +10,7 @@ import type {
 } from "@storyshelf/core/adapter/capture-runner";
 import { StorybookAdapter, resolveStoryViewports } from "@storyshelf/core/capture";
 import type { StoryParameters } from "@storyshelf/core/capture";
-import { mapLimit } from "@storyshelf/core/utils";
+import { mapLimit, recommendedPageConcurrency } from "@storyshelf/core/utils";
 import type { Browser } from "playwright-core";
 import { messageOf, safeCloseBrowser, safeCloseServer } from "./browser.ts";
 import { createRuntimeParamsState, extractAllParameters } from "./runtime-params.ts";
@@ -35,9 +35,6 @@ const CHROMIUM_ARGS = [
   "--disable-background-networking",
   "--mute-audio",
 ];
-
-/** Pages rendered at once when the runner is not configured otherwise. */
-const DEFAULT_CONCURRENCY = 2;
 
 /** Render all story/viewport combinations for a build. */
 export async function renderAll(
@@ -127,6 +124,7 @@ function buildContext(
     browser,
     adapter: input.adapter ?? new StorybookAdapter(),
     baseUrl,
+    navigationTimeoutMs: input.navigationTimeoutMs,
     executePlay: input.executePlay,
     playTimeoutMs: input.playTimeoutMs,
     runA11y: input.runA11y,
@@ -145,9 +143,13 @@ async function runAllCaptures(
   const jobs = input.stories.flatMap((story) =>
     resolveStoryViewports(story, input.viewports).map((viewport) => ({ story, viewport })),
   );
-  await mapLimit(jobs, input.concurrency ?? DEFAULT_CONCURRENCY, async ({ story, viewport }) => {
-    await captureOne(input, active, ctx, story, viewport, captures, failures);
-  });
+  await mapLimit(
+    jobs,
+    input.concurrency ?? recommendedPageConcurrency(),
+    async ({ story, viewport }) => {
+      await captureOne(input, active, ctx, story, viewport, captures, failures);
+    },
+  );
 }
 
 async function captureOne(

@@ -79,10 +79,22 @@ Capture drives Chromium, which dominates memory use. Each open page costs roughl
 
 | Setting | Default | What it controls |
 | --- | --- | --- |
-| `config.captureConcurrency` | `2` | Builds captured at the same time (each launches its own browser) |
-| `createPlaywrightCaptureRunner({ concurrency })` / `STORYSHELF_CAPTURE_CONCURRENCY` | `2` | Pages rendering at once within one build |
+| `config.captureConcurrency` | auto: 2 builds on hosts with ≥ 2 CPUs and ≥ 3 GB, otherwise 1 | Builds captured at the same time (each launches its own browser) |
+| `createPlaywrightCaptureRunner({ concurrency })` / `STORYSHELF_CAPTURE_CONCURRENCY` | auto (see below) | Pages rendering at once within one build |
+| `createPlaywrightCaptureRunner({ navigationTimeoutMs })` / `STORYSHELF_NAVIGATION_TIMEOUT_MS` | auto: 30 s, 60 s under 2 CPUs, 90 s under 1 CPU | Per-page navigation and action timeout |
 
-Total live pages ≈ `captureConcurrency × concurrency`. On a 1 GB host (Fly, Aiven, small VPS) use `captureConcurrency: 1` with a runner concurrency of 1 or 2; the Fly demo app does this via `CAPTURE_CONCURRENCY`. Give the container a normal `/dev/shm` or rely on the built-in `--disable-dev-shm-usage` flag. Node itself is cheap by comparison, but its default heap limit can be larger than what is left once Chromium has its share. On small hosts cap it, for example `NODE_OPTIONS=--max-old-space-size=384` on a 1 GB machine (the Fly demo sets this in `fly.toml`), so Node collects garbage earlier instead of crowding out the browser.
+The defaults are sized from the CPU and memory the process can actually use, including container limits (cgroup CPU quota and memory limit), so a 0.5 vCPU / 1 GB container on a big host is treated as 0.5 / 1 GB. Pages at once is the smaller of the CPU count (rounded up), `(memory − 512 MB) / 300 MB`, and 4, with a minimum of 1. In practice:
+
+| Host | Builds at once | Pages at once | Navigation timeout |
+| --- | --- | --- | --- |
+| 0.5 vCPU, 1 GB | 1 | 1 | 90 s |
+| 1 vCPU, 2 GB | 1 | 1 | 60 s |
+| 2 vCPU, 4 GB | 1 | 2 | 30 s |
+| 4 vCPU, 8 GB | 2 | 4 | 30 s |
+
+More pages than CPUs does not make capture faster: the pages compete for the same cores, each loads more slowly, and slow loads time out. If your platform reserves CPU in a way the container cannot see (for example a VM with a fractional share), the detection cannot know; set the values explicitly.
+
+Node itself is cheap by comparison, but its default heap limit can be larger than what is left once Chromium has its share. On small hosts cap it, for example `NODE_OPTIONS=--max-old-space-size=384` on a 1 GB machine (the Fly demo sets this in `fly.toml`), so Node collects garbage earlier instead of crowding out the browser.
 
 Storing the uploaded Storybook for the published preview streams each file to storage with at most 8 in flight, so large builds (thousands of files) no longer have to fit in memory. Chromium is launched with low-memory flags (`--disable-dev-shm-usage`, `--disable-extensions`, `--disable-background-networking`, `--mute-audio`); rendering-affecting flags such as `--disable-gpu` are intentionally not used, because they can change pixels and cause false visual diffs.
 

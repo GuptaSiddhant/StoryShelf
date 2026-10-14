@@ -11,7 +11,6 @@ dockerfile = 'Dockerfile'
 
 [env]
 DATA_DIR = '/data'
-CAPTURE_CONCURRENCY = '2'
 # 1 GB VM: cap the Node heap so Chromium keeps the rest.
 NODE_OPTIONS = '--max-old-space-size=384'
 PORT = '3000'

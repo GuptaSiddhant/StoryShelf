@@ -27,6 +27,7 @@ const playwright = vi.hoisted(() => {
         pendingGotos.push(reject);
       });
     },
+    setDefaultTimeout: (): void => {},
     waitForSelector: async (): Promise<unknown> => {
       await Promise.resolve();
       return null;

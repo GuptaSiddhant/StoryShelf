@@ -6,10 +6,12 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 ## Unreleased
 
 **Capture memory**
-- Capture no longer opens a browser page for every story and viewport at once, which ran 500-story Storybooks out of memory on 1 GB hosts. Pages render with bounded concurrency (default 2; set `concurrency` on `createPlaywrightCaptureRunner` or `STORYSHELF_CAPTURE_CONCURRENCY`), and snapshot persisting is capped at 4 at a time.
+- Capture no longer opens a browser page for every story and viewport at once, which ran 500-story Storybooks out of memory on 1 GB hosts. Pages render with bounded concurrency, and snapshot persisting is capped at 4 at a time.
+- Capture concurrency defaults are sized from the CPU and memory the process can use, container limits included (0.5 vCPU / 1 GB renders one page at a time; `ShelfConfig.captureConcurrency` defaults to 1 build unless the host has ≥ 2 CPUs and ≥ 3 GB). Override with `concurrency` on `createPlaywrightCaptureRunner` or `STORYSHELF_CAPTURE_CONCURRENCY`.
+- Page navigation timeout scales up on CPU-starved hosts (60 s under 2 CPUs, 90 s under 1 CPU; override with `navigationTimeoutMs` or `STORYSHELF_NAVIGATION_TIMEOUT_MS`), so slow Storybook loads are not reported as failures.
 - Chromium launches with low-memory flags (`--disable-dev-shm-usage`, `--disable-extensions`, `--disable-background-networking`, `--mute-audio`) to avoid crashes on small container `/dev/shm`.
 - Storing a build's Storybook statics now streams and hashes files with at most 8 in flight instead of reading every file into memory at once.
-- The Fly demo app runs one build at a time, sets `CAPTURE_CONCURRENCY`, and caps the Node heap with `NODE_OPTIONS` in `fly.toml`.
+- The Fly demo app uses the automatic sizing (optional `CAPTURE_CONCURRENCY` override) and caps the Node heap with `NODE_OPTIONS` in `fly.toml`.
 
 ## 0.6.2 — Lean scaffold, working Docker images, Node 24 (2026-10-08)
 
