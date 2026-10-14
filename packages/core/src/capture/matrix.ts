@@ -7,16 +7,20 @@ import type {
   RenderedSnapshot,
 } from "../adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
+import type { StorageAdapter } from "../adapters/storage.ts";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
+import { screenshotPath } from "../utils/paths.ts";
 import type { StoryEntry, Viewport } from "./adapter.ts";
 import { partitionAffectedStories, type InheritedStory } from "./affected.ts";
+import { assertScreenshotBuffer } from "./guards.ts";
 import type { PipelineTables } from "./pipeline.ts";
-import { renderBudgetMs, renderWithTimeout } from "./render.ts";
+import { renderBudgetMs, renderWithTimeout, type RenderRequest } from "./render.ts";
 
 /** Inputs shared by every engine's pass. */
 export interface MatrixInput {
   db: DatabaseAdapter;
+  storage: StorageAdapter;
   tables: PipelineTables;
   runner: CaptureRunner;
   build: Build;
@@ -84,28 +88,66 @@ async function captureOnBrowser(input: MatrixInput, browser: BrowserName): Promi
   if (partition.render.length === 0) {
     return { captures: [], failures: [], inherited, renderCount: 0 };
   }
+  const spooled: RenderedSnapshot[] = [];
   const rendered = await renderWithTimeout(
     input.runner,
-    {
-      buildId: build.id,
-      storybookDir: input.storybookDir,
-      stories: partition.render,
-      viewports: input.viewports,
-      logger: input.logger,
-      executePlay: project.executePlay ?? false,
-      playTimeoutMs: project.playTimeoutMs ?? 10_000,
-      runA11y: project.runA11y ?? false,
-      browser,
-    },
+    renderRequest(input, browser, partition.render, spooled),
     renderBudgetMs(partition.render.length * input.viewports.length, input.renderTimeoutMs),
   );
   return {
-    captures: tagged(rendered.captures, browser),
+    captures: [...spooled, ...tagged(rendered.captures, browser)],
     failures: tagged(rendered.failures, browser),
     inherited,
     renderCount: partition.render.length,
   };
 }
+
+/** The render call for one engine; captures stream into `spooled` as they are taken. */
+function renderRequest(
+  input: MatrixInput,
+  browser: BrowserName,
+  stories: StoryEntry[],
+  spooled: RenderedSnapshot[],
+): RenderRequest {
+  const { project, build } = input;
+  return {
+    onCapture: async (capture) => {
+      spooled.push(await spoolCapture(input, browser, capture));
+    },
+    buildId: build.id,
+    storybookDir: input.storybookDir,
+    stories,
+    viewports: input.viewports,
+    logger: input.logger,
+    executePlay: project.executePlay ?? false,
+    playTimeoutMs: project.playTimeoutMs ?? 10_000,
+    runA11y: project.runA11y ?? false,
+    browser,
+  };
+}
+
+/**
+ * Write a screenshot to storage the moment it is captured and keep only its
+ * metadata, so memory holds the pages in flight rather than the whole build.
+ */
+async function spoolCapture(
+  input: MatrixInput,
+  browser: BrowserName,
+  capture: RenderedSnapshot,
+): Promise<RenderedSnapshot> {
+  assertScreenshotBuffer(capture.screenshot);
+  const path = screenshotPath(
+    input.project.id,
+    input.build.id,
+    capture.story.id,
+    capture.viewportName,
+    browser,
+  );
+  await input.storage.write(path, capture.screenshot);
+  return { ...capture, browser, screenshot: EMPTY_SCREENSHOT, stored: true };
+}
+
+const EMPTY_SCREENSHOT = Buffer.alloc(0);
 
 /** Copy each row with its engine (runners may reuse result objects across calls). */
 function tagged<T extends { browser?: string | undefined }>(rows: T[], browser: BrowserName): T[] {

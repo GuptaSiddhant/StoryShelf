@@ -288,7 +288,6 @@ function viewportByName(ctx: CaptureContext, name: string): Viewport {
 }
 
 async function persistSnapshot(ctx: CaptureContext, capture: RenderedSnapshot): Promise<void> {
-  assertScreenshotBuffer(capture.screenshot);
   const viewport = capture.viewport ?? viewportByName(ctx, capture.viewportName);
   const browser = browserOf(capture);
   const screenshot = screenshotPath(
@@ -298,7 +297,10 @@ async function persistSnapshot(ctx: CaptureContext, capture: RenderedSnapshot): 
     capture.viewportName,
     browser,
   );
-  await ctx.storage.write(screenshot, capture.screenshot);
+  if (!capture.stored) {
+    assertScreenshotBuffer(capture.screenshot);
+    await ctx.storage.write(screenshot, capture.screenshot);
+  }
 
   const baseline = await resolveBaseline(ctx, capture.story.id, capture.viewportName, browser);
   if (!baseline) {

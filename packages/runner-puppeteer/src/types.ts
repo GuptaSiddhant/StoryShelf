@@ -5,10 +5,11 @@ import type {
   StorySourceAdapter,
   Viewport,
 } from "@storyshelf/core/adapter/capture-runner";
-import type { BrowserName } from "@storyshelf/core/adapter/capture-runner";
+import type { BrowserName, RenderedSnapshot } from "@storyshelf/core/adapter/capture-runner";
 import type { StoryParameters } from "@storyshelf/core/capture";
 import type { Logger } from "@storyshelf/core/logger";
 import type { Browser } from "puppeteer-core";
+import type { PagePool } from "./pages.ts";
 
 /** Input for a Puppeteer capture run over a built Storybook directory. */
 export interface PuppeteerRenderInput {
@@ -27,6 +28,10 @@ export interface PuppeteerRenderInput {
   navigationTimeoutMs?: number;
   /** Restart the browser after this many captures to bound its slow growth (0 disables; default 150). */
   recycleBrowserEvery?: number;
+  /** Reuse pages between captures instead of opening one per capture (opt-in; default off). */
+  reusePages?: boolean;
+  /** Streaming hand-off: receives each capture instead of it being collected in the result. */
+  onCapture?: (capture: RenderedSnapshot) => Promise<void>;
   /** Test/extension seam: story source adapter (defaults to `StorybookAdapter`). */
   adapter?: StorySourceAdapter;
 }
@@ -34,6 +39,8 @@ export interface PuppeteerRenderInput {
 /** Browser + adapter context shared by screenshot helpers. */
 export interface ScreenshotContext {
   browser: Browser;
+  /** Present when page reuse is on; replaced together with the browser. */
+  pagePool?: PagePool;
   adapter: StorySourceAdapter;
   baseUrl: string;
 }

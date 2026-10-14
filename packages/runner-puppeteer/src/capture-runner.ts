@@ -21,6 +21,8 @@ export function createPuppeteerCaptureRunner(
     navigationTimeoutMs?: number;
     /** Captures between browser restarts (0 disables); falls back to `STORYSHELF_BROWSER_RECYCLE_EVERY`, then 150. */
     recycleBrowserEvery?: number;
+    /** Reuse pages between captures (opt-in); falls back to `STORYSHELF_REUSE_PAGES=1`. */
+    reusePages?: boolean;
   } = {},
 ): CaptureRunner {
   const concurrency = options.concurrency ?? envPositiveInt("STORYSHELF_CAPTURE_CONCURRENCY");
@@ -30,6 +32,8 @@ export function createPuppeteerCaptureRunner(
     recommendedNavigationTimeoutMs();
   const recycleBrowserEvery =
     options.recycleBrowserEvery ?? envInt("STORYSHELF_BROWSER_RECYCLE_EVERY", 0);
+  const reusePages =
+    options.reusePages ?? ["1", "true"].includes(process.env["STORYSHELF_REUSE_PAGES"] ?? "");
   return {
     metadata: {
       name: "Puppeteer",
@@ -44,7 +48,7 @@ export function createPuppeteerCaptureRunner(
       activeRuns.set(input.buildId, active);
       try {
         return await renderAll(
-          { concurrency, navigationTimeoutMs, recycleBrowserEvery, ...input },
+          { concurrency, navigationTimeoutMs, recycleBrowserEvery, reusePages, ...input },
           active,
           options,
         );

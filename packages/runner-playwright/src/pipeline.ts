@@ -19,6 +19,7 @@ import {
 } from "@storyshelf/core/utils";
 import type { Browser } from "playwright-core";
 import { messageOf, safeCloseBrowser, safeCloseServer } from "./browser.ts";
+import { PagePool } from "./pages.ts";
 import { createRuntimeParamsState, extractAllParameters } from "./runtime-params.ts";
 import { captureScreenshot } from "./screenshot.ts";
 import { createStaticServer } from "./static-server.ts";
@@ -112,6 +113,7 @@ async function runWithBrowser(
     return { captures, failures };
   } finally {
     active.browser = null;
+    await ctx.pagePool?.dispose();
     // ctx.browser is the latest one: recycling replaces the browser mid-run.
     await Promise.all([safeCloseBrowser(ctx.browser), safeCloseServer(server)]);
   }
@@ -144,6 +146,7 @@ function buildContext(
     playTimeoutMs: input.playTimeoutMs,
     runA11y: input.runA11y,
     runtimeParams: createRuntimeParamsState(),
+    ...(input.reusePages ? { pagePool: new PagePool(browser) } : {}),
   };
 }
 
@@ -181,8 +184,10 @@ async function recycleBrowser(
   logger: PlaywrightRenderInput["logger"],
 ): Promise<void> {
   if (active.cancelled) throw new Error("Capture cancelled");
+  await ctx.pagePool?.dispose();
   await safeCloseBrowser(ctx.browser);
   ctx.browser = await relaunch();
+  if (ctx.pagePool) ctx.pagePool = new PagePool(ctx.browser);
   active.browser = ctx.browser;
   logger?.debug({}, "browser recycled");
 }
@@ -213,12 +218,15 @@ async function pushCapture(
   input: PlaywrightRenderInput,
 ): Promise<void> {
   const result = await captureScreenshot(ctx, story, viewport);
-  captures.push({
+  const snapshot: RenderedSnapshot = {
     story: result.story,
     viewportName: viewport.name,
     viewport,
     screenshot: result.screenshot,
-  });
+  };
+  // Streaming: hand it over and drop the buffer rather than holding every screenshot.
+  if (input.onCapture) await input.onCapture(snapshot);
+  else captures.push(snapshot);
   if (result.a11yViolations.length > 0)
     handleA11y(input, failures, story, viewport, result.a11yViolations);
 }

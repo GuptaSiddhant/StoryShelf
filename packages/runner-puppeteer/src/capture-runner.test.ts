@@ -29,6 +29,7 @@ const puppeteer = vi.hoisted(() => {
       });
     },
     setDefaultTimeout: (): void => {},
+
     setViewport: async (): Promise<void> => {
       await Promise.resolve();
     },
@@ -52,8 +53,31 @@ const puppeteer = vi.hoisted(() => {
       await Promise.resolve();
     },
   });
+  const stats = { contextsOpened: 0, contextsClosed: 0, pagesOpened: 0 };
   const browser = {
     closed: false,
+    createBrowserContext: async (): Promise<unknown> => {
+      await Promise.resolve();
+      stats.contextsOpened += 1;
+      return {
+        cookies: async (): Promise<unknown[]> => {
+          await Promise.resolve();
+          return [];
+        },
+        deleteCookie: async (): Promise<void> => {
+          await Promise.resolve();
+        },
+        newPage: async (): Promise<ReturnType<typeof makePage>> => {
+          await Promise.resolve();
+          stats.pagesOpened += 1;
+          return makePage();
+        },
+        close: async (): Promise<void> => {
+          await Promise.resolve();
+          stats.contextsClosed += 1;
+        },
+      };
+    },
     newPage: async (): Promise<ReturnType<typeof makePage>> => {
       await Promise.resolve();
       return makePage();
@@ -79,6 +103,7 @@ const puppeteer = vi.hoisted(() => {
     },
     lastBrowser: (): typeof browser | null => lastBrowser,
     launchCount: (): number => launches,
+    stats,
     configureHang: (hang: boolean): void => {
       hangNextGoto = hang;
     },
@@ -204,6 +229,59 @@ describe("createPuppeteerCaptureRunner.render", () => {
     });
 
     expect(puppeteer.launchCount() - before).toBe(1);
+  }, 30_000);
+
+  it("reuses pages across captures when reusePages is on", async () => {
+    const stories = Array.from({ length: 8 }, (_, i) => ({ ...STORIES[0]!, id: `s-${i}` }));
+    const before = { ...puppeteer.stats };
+    puppeteer.configureHang(false);
+    const result = await createPuppeteerCaptureRunner({ concurrency: 2, reusePages: true }).render({
+      buildId: "build-1",
+      storybookDir,
+      stories,
+      viewports: VIEWPORTS,
+    });
+
+    expect(result.captures).toHaveLength(8);
+    // 8 captures through 2 slots: two pages are opened once and reused, then closed.
+    expect(puppeteer.stats.pagesOpened - before.pagesOpened).toBeLessThanOrEqual(2);
+    expect(puppeteer.stats.contextsClosed - before.contextsClosed).toBe(
+      puppeteer.stats.contextsOpened - before.contextsOpened,
+    );
+  }, 30_000);
+
+  it("streams captures to onCapture instead of collecting them", async () => {
+    const seen: string[] = [];
+    puppeteer.configureHang(false);
+    const result = await createPuppeteerCaptureRunner().render({
+      buildId: "build-1",
+      storybookDir,
+      stories: STORIES,
+      viewports: VIEWPORTS,
+      onCapture: async (capture) => {
+        await Promise.resolve();
+        seen.push(`${capture.story.id}/${capture.viewportName}`);
+      },
+    });
+
+    expect(seen).toEqual(["components-button--primary/desktop"]);
+    expect(result.captures).toHaveLength(0);
+  }, 30_000);
+
+  it("reports a failed onCapture as a render failure for that story", async () => {
+    puppeteer.configureHang(false);
+    const result = await createPuppeteerCaptureRunner().render({
+      buildId: "build-1",
+      storybookDir,
+      stories: STORIES,
+      viewports: VIEWPORTS,
+      onCapture: async () => {
+        await Promise.resolve();
+        throw new Error("disk full");
+      },
+    });
+
+    expect(result.failures.map((f) => f.error)).toEqual(["disk full"]);
   }, 30_000);
 
   it("resolves cancel for builds that are not rendering", async () => {
