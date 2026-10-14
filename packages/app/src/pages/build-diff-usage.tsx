@@ -11,6 +11,8 @@ export interface LinkedUsageItem {
   upstreamBuildId: string | null;
   /** Upstream story the package module maps to; null when nothing matched. */
   upstreamStoryId: string | null;
+  /** Story file of the matched upstream story, for its component page. */
+  upstreamImportPath?: string | null;
 }
 
 /** Deep link to the upstream component's published story (or its Storybook root). */
@@ -49,6 +51,17 @@ export function LinkedUsage(props: {
             {preview ? (
               <Button variant="ghost" size="sm" href={preview} target="_blank" rel="noreferrer">
                 Preview
+              </Button>
+            ) : null}
+            {item.upstreamImportPath ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                href={urls.component(item.upstreamSlug, item.upstreamImportPath)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Story →
               </Button>
             ) : null}
             <Button

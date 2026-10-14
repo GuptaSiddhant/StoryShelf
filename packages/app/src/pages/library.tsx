@@ -381,6 +381,17 @@ function renderTitleList(
   );
 }
 
+/** Component page URL of a title group (its first story file), when the index carries one. */
+function componentHref(project: Project, group: Snapshot[]): string | undefined {
+  const importPath = group.find((snap) => snap.storyImportPath)?.storyImportPath;
+  return importPath
+    ? createUrlBuilder("/", getStore().config.publishedBaseDomain).component(
+        project.slug,
+        importPath,
+      )
+    : undefined;
+}
+
 function renderTitleGroup(
   title: string,
   group: Snapshot[],
@@ -399,7 +410,13 @@ function renderTitleGroup(
       data-filter-text={`${title} ${group.map((snap) => snap.storyName).join(" ")}`}
     >
       <CardSection divider>
-        <SectionTitle>{title}</SectionTitle>
+        <SectionTitle>
+          {componentHref(project, group) ? (
+            <a href={componentHref(project, group)}>{title}</a>
+          ) : (
+            title
+          )}
+        </SectionTitle>
         <Meta as="span">{group.length} stories</Meta>
       </CardSection>
       <CardSection>
@@ -483,6 +500,7 @@ function renderSnapshotCard(
           <DesignButtons
             urls={context.design.bySnapshot.get(snap.id) ?? []}
             previews={context.design.previews}
+            componentHref={componentHref(project, [snap])}
           />
         </HStack>
       </div>

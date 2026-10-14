@@ -1,6 +1,7 @@
 import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
+import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge, CompareStage, Segmented, VStack, statusTone } from "../ui/components.tsx";
+import { Badge, Button, CompareStage, Segmented, VStack, statusTone } from "../ui/components.tsx";
 import { viewerHead, viewerMeta, viewerTitle } from "../ui/styles/review-layout.ts";
 import {
   diffPercent,
@@ -61,6 +62,26 @@ function BrowserTabs(props: {
   );
 }
 
+/** Link to the story file's component page, anchored at the story. */
+function ViewComponentButton(props: {
+  project: Project;
+  selected: Snapshot;
+  base?: string;
+}): HtmlEscapedString | Promise<HtmlEscapedString> | null {
+  const { project, selected, base } = props;
+  if (!selected.storyImportPath) return null;
+  const urls = createUrlBuilder("/", base);
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      href={`${urls.component(project.slug, selected.storyImportPath)}#${selected.storyId}`}
+    >
+      View component
+    </Button>
+  );
+}
+
 /** Story heading plus the comparison stage for the selected snapshot. */
 export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, selected, hasBaseline, drifted, usage, design, publishedBaseDomain } =
@@ -84,6 +105,7 @@ export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<
             <span class="mono">{selected.diffPixels} px</span>
           )}
           {percent ? <span class="mono">{percent}</span> : null}
+          <ViewComponentButton project={project} selected={selected} base={publishedBaseDomain} />
         </p>
       </div>
       <BrowserTabs project={project} build={build} selected={selected} siblings={siblings} />

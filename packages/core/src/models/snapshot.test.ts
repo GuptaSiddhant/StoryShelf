@@ -122,3 +122,38 @@ describe("SnapshotModel", () => {
     expect(snap.id).toBeDefined();
   });
 });
+
+describe("SnapshotModel.listByImportPath", () => {
+  it("matches both ./ and bare spellings within one project", async () => {
+    const { db } = makeDatabase();
+    const model = new SnapshotModel(db);
+    const base = {
+      storyName: "x",
+      storyTitle: "T",
+      viewportName: "desktop",
+      viewportWidth: 1,
+      viewportHeight: 1,
+      screenshotPath: "p",
+    };
+    await model.create("p1", "b1", {
+      ...base,
+      storyId: "a",
+      storyImportPath: "./src/A.stories.tsx",
+    });
+    await model.create("p1", "b2", { ...base, storyId: "a", storyImportPath: "src/A.stories.tsx" });
+    await model.create("p1", "b2", {
+      ...base,
+      storyId: "b",
+      storyImportPath: "./src/B.stories.tsx",
+    });
+    await model.create("p2", "b3", {
+      ...base,
+      storyId: "a",
+      storyImportPath: "./src/A.stories.tsx",
+    });
+    const found = await model.listByImportPath("p1", "./src/A.stories.tsx");
+    expect(new Set(found.map((snap) => snap.buildId))).toEqual(new Set(["b1", "b2"]));
+    expect(await model.listByImportPath("p1", "src/A.stories.tsx")).toHaveLength(2);
+    expect(await model.listByImportPath("p1", "nope.tsx")).toEqual([]);
+  });
+});

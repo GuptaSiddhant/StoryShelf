@@ -646,6 +646,14 @@ For sharing, a published Storybook can also be served on a **per-project subdoma
 
 Subdomains serve the Storybook at the domain **root**, so no asset-path rewriting is needed (Storybook's static build expects root serving). They serve **published Storybooks only** — the review UI stays on the main domain at `/projects/:slug/...`. Label values are not exposed as subdomains (DNS labels cannot contain `/`); labels remain on the path-based URLs above. Without `publishedBaseDomain`, the path-based URLs are the only published surface (and stay the default for `localhost` and hosts without a wildcard record). The `linkRoute()` builder switches between path and subdomain forms based on config.
 
+## Component Page
+
+`GET /projects/:slug/components/<importPath>` (wildcard segment, slashes kept, leading `./` stripped; `urls.component()`) is the stable, purge-proof page of a **component = a story file**. Keying by `import_path` means a retitle updates the page in place and duplicate titles across files never collide. It reads `snapshots` through the `(project_id, story_import_path)` index — no new tables.
+
+- **Tabs** (`?tab=`): **States** (one card per story, `#<storyId>` anchors, linking to its `diff?snapshot=`), **History** (one row per build with any state of the file: states changed, worst-status roll-up, link to that build's diff), **Figma** (the #141 strip and reference panes; empty state without a link), **Linked** (packages the states use, from `build_package_usage`).
+- **Tombstones:** a file missing from the latest default-branch build resolves by its last-seen title to `moved to <newPath>`, else shows `last seen in build X`; a file that was never captured is a real 404.
+- **Link-ins:** library title groups, the review viewer (`View component`, anchored at the story), build cards, the Figma popover, and #123 usage badges (`Story →` to the upstream project's component page).
+
 ## Design Sources (Figma)
 
 Design links attach to a **component (story file)**, never to a single state or to a build label. A state's Figma button appears iff its file resolves a link; there is no project-default or label fallback on snapshots.
