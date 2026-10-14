@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { InvalidDesignUrlError } from "../utils/figma-url.ts";
-import { DesignModel, normalizeImportPath, resolveDesigns } from "./design.ts";
+import { DesignModel } from "./design.ts";
 
 const SECRET = "test-secret-00000000";
 const A = "https://www.figma.com/design/AAA/Kit?node-id=1-2";
@@ -11,51 +11,6 @@ function setup(): DesignModel {
   const { db } = makeDatabase();
   return new DesignModel(db, undefined, SECRET);
 }
-
-describe("resolveDesigns", () => {
-  const snaps = [
-    { storyImportPath: "./src/Button.stories.tsx", designUrl: A },
-    { storyImportPath: "./src/Button.stories.tsx", designUrl: A },
-    { storyImportPath: "./src/Card.stories.tsx", designUrl: null },
-    { storyImportPath: null, designUrl: A },
-    { storyImportPath: "", designUrl: A },
-  ];
-
-  it("dedupes states of a file and drops files without a link", () => {
-    const out = resolveDesigns([], snaps);
-    expect([...out.keys()]).toEqual(["src/Button.stories.tsx"]);
-    expect(out.get("src/Button.stories.tsx")).toEqual({ urls: [A], source: "story" });
-  });
-
-  it("shows the distinct set when states of a file disagree", () => {
-    const out = resolveDesigns(
-      [],
-      [
-        { storyImportPath: "a.tsx", designUrl: A },
-        { storyImportPath: "a.tsx", designUrl: B },
-      ],
-    );
-    expect(out.get("a.tsx")?.urls).toEqual([A, B]);
-  });
-
-  it("lets a manual mapping win and add links for files without one", () => {
-    const out = resolveDesigns(
-      [
-        { importPath: "src/Button.stories.tsx", url: B },
-        { importPath: "./src/Card.stories.tsx", url: A },
-        { importPath: null, url: A },
-      ],
-      snaps,
-    );
-    expect(out.get("src/Button.stories.tsx")).toEqual({ urls: [B], source: "manual" });
-    expect(out.get("src/Card.stories.tsx")).toEqual({ urls: [A], source: "manual" });
-    expect(out.size).toBe(2);
-  });
-
-  it("normalizes leading ./", () => {
-    expect(normalizeImportPath("./././a/b.tsx")).toBe("a/b.tsx");
-  });
-});
 
 describe("DesignModel links", () => {
   it("adds project links and rejects non-Figma urls", async () => {
@@ -109,5 +64,94 @@ describe("DesignModel token", () => {
     await model.removeToken("p1");
     expect(await model.tokenInfo("p1")).toBeNull();
     await model.removeToken("p1");
+  });
+});
+
+describe("DesignModel token age", () => {
+  it("keeps the rotation clock through status writes and restarts it on a new token", async () => {
+    const model = setup();
+    await model.setToken("p1", "figd_one");
+    const first = await model.tokenInfo("p1");
+    await new Promise((resolve) => {
+      setTimeout(resolve, 5);
+    });
+    await model.recordTokenStatus("p1", "ok");
+    await model.recordTokenStatus("p1", "forbidden");
+    await model.recordTokenStatus("p1", "ok");
+    const after = await model.tokenInfo("p1");
+    expect(after?.createdAt).toBe(first?.createdAt);
+    expect(after?.updatedAt).toBe(first?.updatedAt);
+    expect(after?.checkedAt).not.toBeNull();
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, 5);
+    });
+    await model.setToken("p1", "figd_two");
+    const rotated = await model.tokenInfo("p1");
+    expect((rotated?.createdAt ?? "") > (first?.createdAt ?? "")).toBe(true);
+  });
+});
+
+/** Make the first insert into `table` lose a race: a competing row lands, then the insert fails. */
+function loseFirstInsert(
+  db: ReturnType<typeof makeDatabase>["db"],
+  competitor: () => Promise<void>,
+) {
+  const real = db.insert.bind(db);
+  let first = true;
+  vi.spyOn(db, "insert").mockImplementation(async (table, values) => {
+    if (first) {
+      first = false;
+      await competitor();
+      throw new Error("UNIQUE constraint failed");
+    }
+    return await real(table, values);
+  });
+}
+
+describe("DesignModel concurrent writes", () => {
+  it("converges a lost component-mapping insert onto one updated row", async () => {
+    const { db } = makeDatabase();
+    const model = new DesignModel(db, undefined, SECRET);
+    const real = db.insert.bind(db);
+    loseFirstInsert(db, async () => {
+      await real(db.tables.designLinks, {
+        id: "rival",
+        projectId: "p1",
+        importPath: "a.tsx",
+        label: null,
+        url: A,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      } as never);
+    });
+    await model.setComponentLink("p1", "./a.tsx", B);
+    const links = await model.componentLinks("p1");
+    expect(links).toHaveLength(1);
+    expect(links[0]).toMatchObject({ id: "rival", url: B });
+  });
+
+  it("rethrows when the insert fails for a reason other than a rival row", async () => {
+    const { db } = makeDatabase();
+    const model = new DesignModel(db, undefined, SECRET);
+    vi.spyOn(db, "insert").mockRejectedValue(new Error("disk full"));
+    await expect(model.setComponentLink("p1", "a.tsx", A)).rejects.toThrow("disk full");
+    await expect(model.setToken("p1", "figd_x")).rejects.toThrow("disk full");
+  });
+
+  it("converges a lost token insert onto one rotated row", async () => {
+    const { db } = makeDatabase();
+    const model = new DesignModel(db, undefined, SECRET);
+    const rival = new DesignModel(db, undefined, SECRET);
+    const real = db.insert.bind(db);
+    loseFirstInsert(db, async () => {
+      const insert = db.insert;
+      db.insert = real;
+      await rival.setToken("p1", "figd_rival");
+      db.insert = insert;
+    });
+    await model.setToken("p1", "figd_mine");
+    expect(await model.getToken("p1")).toBe("figd_mine");
+    expect(await db.count(db.tables.designTokens)).toBe(1);
   });
 });

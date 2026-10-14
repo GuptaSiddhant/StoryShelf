@@ -18,6 +18,7 @@ export { hmacSha256, randomToken, sha256, timingSafeEqualString } from "./hash.t
 export { HttpError } from "./http.ts";
 export type { HttpRequestOptions, HttpTextOptions } from "./http.ts";
 export { httpBytes, httpJson, httpText } from "./http.ts";
+export { mapLimit } from "./map-limit.ts";
 export {
   baselinePath,
   designRenderPath,

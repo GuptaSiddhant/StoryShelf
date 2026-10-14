@@ -142,13 +142,9 @@ function ensureColumns(sqlite: DatabaseSync, ddl: string): void {
   }
 }
 
-/** Indexed after `ensureColumns`, since a stale volume may predate `story_import_path`. */
-const SNAPSHOT_IMPORT_PATH_INDEX =
-  "CREATE INDEX IF NOT EXISTS snapshots_project_import_path_idx ON snapshots (project_id, story_import_path)";
-
 /** Swap in the browser-aware unique indexes (after `ensureColumns` added the column). */
 function applyIdentityStatements(sqlite: DatabaseSync): void {
-  for (const statement of [...IDENTITY_STATEMENTS, SNAPSHOT_IMPORT_PATH_INDEX]) {
+  for (const statement of IDENTITY_STATEMENTS) {
     execIgnore(sqlite, statement);
   }
 }

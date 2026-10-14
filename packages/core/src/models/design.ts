@@ -1,4 +1,4 @@
-/** Design-source links (project files + per-component overrides), the Figma token, and file-level resolution. */
+/** Design-source links (project files + per-component overrides) and the project's Figma token. */
 import { eq, getTableColumns } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
@@ -6,63 +6,12 @@ import type { DesignLink, DesignToken } from "../schema/design.ts";
 import { decryptCredential, encrypt, type SecretInput } from "../utils/encrypt.ts";
 import { InvalidDesignUrlError, parseFigmaUrl } from "../utils/figma-url.ts";
 import { ulid } from "../utils/ulid.ts";
+import { normalizeImportPath, type DesignTokenStatus } from "./design-resolve.ts";
 
 /** Tables required by {@link DesignModel}. */
 export interface DesignTables {
   designLinks: Table;
   designTokens: Table;
-}
-
-/** Last observed health of the project's Figma token. */
-export type DesignTokenStatus = "unknown" | "ok" | "unauthorized" | "forbidden";
-
-/** Where a component's resolved design link came from. */
-export type DesignSource = "manual" | "story";
-
-/** The design link(s) a story file resolves to. */
-export interface DesignResolution {
-  /** One URL, or the distinct set when states of the file disagree. */
-  urls: string[];
-  source: DesignSource;
-}
-
-/** Story-file key: path without a leading `./`, so index and manual entries compare equal. */
-export function normalizeImportPath(path: string): string {
-  return path.trim().replace(/^(?:\.\/)+/u, "");
-}
-
-/**
- * Resolve design links per component (story file). Precedence: manual mapping
- * > story parameters (`storyshelf.figma` over `design`, already merged at
- * capture). States of one file are deduped; if they disagree the distinct set
- * is returned rather than guessing. Files with no link are absent.
- */
-export function resolveDesigns(
-  manual: readonly Pick<DesignLink, "importPath" | "url">[],
-  snapshots: readonly { storyImportPath: string | null; designUrl?: string | null }[],
-): Map<string, DesignResolution> {
-  const resolved = storyDesigns(snapshots);
-  for (const link of manual) {
-    if (link.importPath) {
-      resolved.set(normalizeImportPath(link.importPath), { urls: [link.url], source: "manual" });
-    }
-  }
-  return resolved;
-}
-
-/** Distinct story-declared URLs per file. */
-function storyDesigns(
-  snapshots: readonly { storyImportPath: string | null; designUrl?: string | null }[],
-): Map<string, DesignResolution> {
-  const resolved = new Map<string, DesignResolution>();
-  for (const snapshot of snapshots) {
-    const key = snapshot.storyImportPath ? normalizeImportPath(snapshot.storyImportPath) : "";
-    if (!key || !snapshot.designUrl) continue;
-    const urls = resolved.get(key)?.urls ?? [];
-    if (!urls.includes(snapshot.designUrl)) urls.push(snapshot.designUrl);
-    resolved.set(key, { urls, source: "story" });
-  }
-  return resolved;
 }
 
 /** Data operations for design links and the project's Figma token. */
@@ -101,17 +50,26 @@ export class DesignModel {
   async setComponentLink(projectId: string, importPath: string, rawUrl: string): Promise<void> {
     const url = validUrl(rawUrl);
     const key = normalizeImportPath(importPath);
+    if (await this.updateComponentLink(projectId, key, url)) return;
+    try {
+      await this.insertLink(projectId, { importPath: key, label: null, url });
+    } catch (error) {
+      // A concurrent writer won the (project_id, import_path) unique index: converge on an update.
+      if (!(await this.updateComponentLink(projectId, key, url))) throw error;
+    }
+  }
+
+  /** Update the mapping of `key` when one exists; false when there is none. */
+  private async updateComponentLink(projectId: string, key: string, url: string): Promise<boolean> {
     const existing = (await this.componentLinks(projectId)).find(
       (link) => normalizeImportPath(link.importPath ?? "") === key,
     );
-    if (existing) {
-      await this.db.update(this.tables.designLinks, existing.id, {
-        url,
-        updatedAt: new Date().toISOString(),
-      });
-    } else {
-      await this.insertLink(projectId, { importPath: key, label: null, url });
-    }
+    if (!existing) return false;
+    await this.db.update(this.tables.designLinks, existing.id, {
+      url,
+      updatedAt: new Date().toISOString(),
+    });
+    return true;
   }
 
   /** Remove a link scoped to the project. */
@@ -135,26 +93,39 @@ export class DesignModel {
     return row ? decryptCredential(this.secret, row.tokenEncrypted) : null;
   }
 
-  /** Store (or rotate) the project's Figma token; health resets to `unknown`. */
+  /**
+   * Store (or rotate) the project's Figma token. A new credential restarts the
+   * 90-day clock (`createdAt`) and resets health to `unknown`.
+   */
   async setToken(projectId: string, token: string): Promise<void> {
     const now = new Date().toISOString();
-    const existing = await this.tokenInfo(projectId);
     const values = {
       tokenEncrypted: encrypt(this.secret, token),
       status: "unknown",
       checkedAt: null,
-    };
-    if (existing) {
-      await this.db.update(this.tables.designTokens, existing.id, { ...values, updatedAt: now });
-      return;
-    }
-    await this.db.insert(this.tables.designTokens, {
-      id: ulid(),
-      projectId,
-      ...values,
       createdAt: now,
       updatedAt: now,
-    });
+    };
+    if (await this.replaceToken(projectId, values)) return;
+    try {
+      await this.db.insert(this.tables.designTokens, { id: ulid(), projectId, ...values });
+    } catch (error) {
+      // A concurrent writer inserted first (unique project_id): rotate theirs instead.
+      if (!(await this.replaceToken(projectId, values))) throw error;
+    }
+  }
+
+  private async replaceToken(
+    projectId: string,
+    values: Pick<
+      DesignToken,
+      "tokenEncrypted" | "status" | "checkedAt" | "createdAt" | "updatedAt"
+    >,
+  ): Promise<boolean> {
+    const existing = await this.tokenInfo(projectId);
+    if (!existing) return false;
+    await this.db.update(this.tables.designTokens, existing.id, values);
+    return true;
   }
 
   /** Delete the project's token. */
@@ -163,15 +134,13 @@ export class DesignModel {
     if (existing) await this.db.remove(this.tables.designTokens, existing.id);
   }
 
-  /** Record the token's last observed API outcome. */
+  /** Record the token's last observed API outcome; never moves the rotation age. */
   async recordTokenStatus(projectId: string, status: DesignTokenStatus): Promise<void> {
     const existing = await this.tokenInfo(projectId);
     if (!existing) return;
-    const now = new Date().toISOString();
     await this.db.update(this.tables.designTokens, existing.id, {
       status,
-      checkedAt: now,
-      updatedAt: now,
+      checkedAt: new Date().toISOString(),
     });
   }
 

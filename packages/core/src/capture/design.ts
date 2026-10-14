@@ -20,8 +20,11 @@ export interface DesignExtraction {
  */
 export function extractDesignUrl(parameters?: DesignParameters): DesignExtraction {
   const explicit = parameters?.storyshelf?.figma;
-  const raw = typeof explicit === "string" ? explicit : firstDesignUrl(parameters?.design);
-  if (raw === undefined) return {};
+  const raw =
+    typeof explicit === "string" && explicit.trim() !== ""
+      ? explicit
+      : firstDesignUrl(parameters?.design);
+  if (raw === undefined || raw.trim() === "") return {};
   const parsed = parseFigmaUrl(raw);
   return parsed ? { url: parsed.url } : { invalid: raw };
 }
