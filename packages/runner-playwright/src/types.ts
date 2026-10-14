@@ -21,6 +21,8 @@ export interface PlaywrightRenderInput {
   playTimeoutMs?: number;
   runA11y?: boolean;
   browser?: BrowserName;
+  /** Max pages rendering at once (default 2; each page is ~100-300 MB in Chromium). */
+  concurrency?: number;
   /** Test/extension seam: story source adapter (defaults to `StorybookAdapter`). */
   adapter?: StorySourceAdapter;
 }

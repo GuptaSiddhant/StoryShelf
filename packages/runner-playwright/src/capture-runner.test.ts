@@ -169,6 +169,36 @@ describe("createPlaywrightCaptureRunner.render", () => {
     expect(waitForReady).toHaveBeenCalledTimes(1);
   }, 30_000);
 
+  it("caps concurrently open pages at the configured concurrency", async () => {
+    let active = 0;
+    let peak = 0;
+    const adapter = {
+      name: "fake",
+      discover: async (): Promise<StoryEntry[]> => [],
+      buildUrl: (): string => "/",
+      waitForReady: async (): Promise<void> => {
+        active += 1;
+        peak = Math.max(peak, active);
+        await new Promise((resolve) => {
+          setTimeout(resolve, 5);
+        });
+        active -= 1;
+      },
+    };
+    const stories = Array.from({ length: 12 }, (_, i) => ({ ...STORIES[0]!, id: `s-${i}` }));
+    playwright.configureHang(false);
+    const result = await createPlaywrightCaptureRunner({ concurrency: 3 }).render({
+      buildId: "build-1",
+      storybookDir,
+      stories,
+      viewports: VIEWPORTS,
+      adapter,
+    });
+
+    expect(result.captures).toHaveLength(12);
+    expect(peak).toBe(3);
+  }, 30_000);
+
   it("enriches parameters from the runtime preview once per run", async () => {
     const runtime = createRuntimeParamsState();
     let evaluateCalls = 0;

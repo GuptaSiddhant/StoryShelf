@@ -10,6 +10,7 @@ import type {
 } from "@storyshelf/core/adapter/capture-runner";
 import { StorybookAdapter, resolveStoryViewports } from "@storyshelf/core/capture";
 import type { StoryParameters } from "@storyshelf/core/capture";
+import { mapLimit } from "@storyshelf/core/utils";
 import type { Browser } from "playwright-core";
 import { messageOf, safeCloseBrowser, safeCloseServer } from "./browser.ts";
 import { createRuntimeParamsState, extractAllParameters } from "./runtime-params.ts";
@@ -22,6 +23,9 @@ import type {
   PlaywrightRenderInput,
   RuntimeParamsPage,
 } from "./types.ts";
+
+/** Pages rendered at once when the runner is not configured otherwise. */
+const DEFAULT_CONCURRENCY = 2;
 
 /** Render all story/viewport combinations for a build. */
 export async function renderAll(
@@ -98,7 +102,8 @@ async function launchBrowser(name: BrowserName): Promise<Browser> {
   const playwright = await import("playwright-core");
   if (name === "firefox") return await playwright.firefox.launch();
   if (name === "webkit") return await playwright.webkit.launch();
-  return await playwright.chromium.launch();
+  // Containers ship a tiny /dev/shm; Chromium crashes (looks like OOM) unless it uses /tmp.
+  return await playwright.chromium.launch({ args: ["--disable-dev-shm-usage"] });
 }
 
 function buildContext(
@@ -124,23 +129,13 @@ async function runAllCaptures(
   captures: RenderedSnapshot[],
   failures: RenderResult["failures"],
 ): Promise<void> {
-  const tasks = input.stories.flatMap((story) =>
-    viewportsTasks(story, input, active, ctx, captures, failures),
+  // Bounded: one page per story x viewport all at once exhausts memory on large Storybooks.
+  const jobs = input.stories.flatMap((story) =>
+    resolveStoryViewports(story, input.viewports).map((viewport) => ({ story, viewport })),
   );
-  await Promise.all(tasks);
-}
-function viewportsTasks(
-  story: StoryEntry,
-  input: PlaywrightRenderInput,
-  active: ActiveRun,
-  ctx: CaptureContext,
-  captures: RenderedSnapshot[],
-  failures: RenderResult["failures"],
-): Promise<void>[] {
-  // oxlint-disable-next-line typescript/promise-function-async -- returns array of promises, not a single promise
-  return resolveStoryViewports(story, input.viewports).map((viewport) =>
-    captureOne(input, active, ctx, story, viewport, captures, failures),
-  );
+  await mapLimit(jobs, input.concurrency ?? DEFAULT_CONCURRENCY, async ({ story, viewport }) => {
+    await captureOne(input, active, ctx, story, viewport, captures, failures);
+  });
 }
 
 async function captureOne(

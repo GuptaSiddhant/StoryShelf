@@ -16,9 +16,12 @@ export function createPlaywrightCaptureRunner(
   options: {
     browser?: BrowserName;
     supportedBrowsers?: readonly BrowserName[];
+    /** Pages rendered at once; falls back to `STORYSHELF_CAPTURE_CONCURRENCY`, then 2. */
+    concurrency?: number;
   } = {},
 ): CaptureRunner {
   const defaultBrowser = options.browser ?? "chromium";
+  const concurrency = options.concurrency ?? envConcurrency();
   return {
     metadata: {
       name: "Playwright",
@@ -32,7 +35,7 @@ export function createPlaywrightCaptureRunner(
       const active: ActiveRun = { cancelled: false, browser: null };
       activeRuns.set(input.buildId, active);
       try {
-        return await renderAll(input, active, defaultBrowser);
+        return await renderAll({ concurrency, ...input }, active, defaultBrowser);
       } finally {
         activeRuns.delete(input.buildId);
       }
@@ -47,6 +50,11 @@ export function createPlaywrightCaptureRunner(
       await closeBrowser(active.browser);
     },
   };
+}
+
+function envConcurrency(): number | undefined {
+  const parsed = Number.parseInt(process.env["STORYSHELF_CAPTURE_CONCURRENCY"] ?? "", 10);
+  return parsed > 0 ? parsed : undefined;
 }
 
 // Re-exports for backward compatibility (tests import these from capture-runner).

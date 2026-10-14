@@ -77,7 +77,9 @@ mkdirSync(dataDir, { recursive: true });
 
 const database = createSqliteDatabase(`${dataDir}/shelf.db`);
 const storage = createLocalStorage(dataDir);
-const captureRunner = createPlaywrightCaptureRunner();
+const captureRunner = createPlaywrightCaptureRunner({
+  concurrency: Number(env["CAPTURE_CONCURRENCY"]) || 2,
+});
 
 // Observability first (noop unless OTEL_EXPORTER_OTLP_ENDPOINT is set).
 const observability = await initObservabilityFromEnv();
@@ -119,6 +121,8 @@ const app = createShelfApp({
     adminToken,
     publicBaseUrl,
     scratchDir: dataDir,
+    // 1 GB VM: one build at a time; pages per build come from CAPTURE_CONCURRENCY (runner).
+    captureConcurrency: 1,
     // Emit Server-Timing response headers (total + db/storage roll-ups).
     serverTiming: true,
     ...(env["SMTP_FROM"] ? { notifications: { fromEmail: env["SMTP_FROM"] } } : {}),

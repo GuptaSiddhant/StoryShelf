@@ -27,6 +27,7 @@ export {
   storybookDir,
   storybookZipPath,
 } from "./paths.ts";
+export { mapLimit } from "./map-limit.ts";
 export { MIME_TYPES, mimeFor } from "./mime.ts";
 export { isBlockedTarget, isPathSafe, isSafeSegment } from "./path-security.ts";
 export { redactSecrets, sanitizeErrorText } from "./redact.ts";

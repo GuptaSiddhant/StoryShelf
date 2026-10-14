@@ -18,6 +18,12 @@ const capture = createPlaywrightCaptureRunner();
 
 Supply it to `createShelfApp({ capture, config: { scratchDir } })` — the router builds the orchestrator that loads the build, extracts the uploaded archive into `scratchDir`, discovers stories, calls `capture.render(...)`, and persists. `server` is the assembly point that hard-wires this renderer today (`storyshelf-server serve`, passing `--data-dir` as `scratchDir`). A future alternative (e.g. a remote runner offloading capture to a worker fleet) implements the same pure `CaptureRunner` interface from `@storyshelf/core/adapters/capture-runner` as its own package and is swapped in at the `serve` assembly site — the router, orchestrator, and pipeline never change.
 
+## Concurrency and memory
+
+Each open Chromium page costs roughly 100–300 MB, so `render` captures a bounded number of story/viewport pairs at once instead of all of them. The default is **2**; override it with `createPlaywrightCaptureRunner({ concurrency })` or the `STORYSHELF_CAPTURE_CONCURRENCY` environment variable (the option wins). Chromium is launched with `--disable-dev-shm-usage` so small container `/dev/shm` mounts don't crash it.
+
+Rule of thumb: total pages = `ShelfConfig.captureConcurrency` (builds at once, default 2) × runner `concurrency`. On a 1 GB host use 1 build × 2 pages, or 1 × 1 for very large Storybooks.
+
 ## Browsers
 
 This package depends on `playwright-core` only — it never downloads browsers. Provision Chromium once per machine (pinned to the client version):

@@ -73,6 +73,17 @@ Swap the database layer for `@storyshelf/db-postgres` (Postgres via `postgres.js
 
 One `npm start` (or `fly deploy`, `railway up`, `render.com`, etc.) and you're running.
 
+## Sizing memory for capture
+
+Capture drives Chromium, which dominates memory use. Each open page costs roughly 100–300 MB, so StoryShelf renders a bounded number of pages at once rather than every story together.
+
+| Setting | Default | What it controls |
+| --- | --- | --- |
+| `config.captureConcurrency` | `2` | Builds captured at the same time (each launches its own browser) |
+| `createPlaywrightCaptureRunner({ concurrency })` / `STORYSHELF_CAPTURE_CONCURRENCY` | `2` | Pages rendering at once within one build |
+
+Total live pages ≈ `captureConcurrency × concurrency`. On a 1 GB host (Fly, Aiven, small VPS) use `captureConcurrency: 1` with a runner concurrency of 1 or 2; the Fly demo app does this via `CAPTURE_CONCURRENCY`. Give the container a normal `/dev/shm` or rely on the built-in `--disable-dev-shm-usage` flag. If builds still run out of memory, lower the runner concurrency first, then add RAM.
+
 ## Cloud reference stacks
 
 Enterprise Terraform stacks are available per cloud — each scaffolds an app + worker, database, storage, queue, auth, and optional DNS/TLS. See the dedicated pages for commands, env wiring, and stable output contracts:

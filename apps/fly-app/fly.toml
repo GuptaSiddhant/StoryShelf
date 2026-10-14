@@ -11,6 +11,7 @@ dockerfile = 'Dockerfile'
 
 [env]
 DATA_DIR = '/data'
+CAPTURE_CONCURRENCY = '2'
 PORT = '3000'
 PUBLIC_BASE_URL = 'https://storyshelf.fly.dev'
 
