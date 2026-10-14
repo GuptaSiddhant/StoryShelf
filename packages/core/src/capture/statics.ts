@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { createReadStream, createWriteStream } from "node:fs";
-import { mkdir, readdir, rm } from "node:fs/promises";
+import { createWriteStream } from "node:fs";
+import { mkdir, readdir, readFile, rm } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Parse, type Entry } from "unzipper";
@@ -85,19 +85,22 @@ export async function persistStorybookStatics(
   const destinationPrefix = storybookDir(projectId, buildId);
   const files = await walkFiles(root);
   const manifest: Record<string, string> = {};
-  // Bounded and streamed: a large Storybook has thousands of files, and
-  // buffering them all at once exhausts memory on small hosts.
+  // Bounded: a large Storybook has thousands of files, and buffering them all
+  // at once exhausts memory on small hosts. Each file is read fully before any
+  // write: the scratch dir is often the storage root, so the per-build path
+  // below can be the very file being read (a streamed write would truncate it).
   await mapLimit(files, STATICS_CONCURRENCY, async (file) => {
     const rel = relative(root, file);
-    const hash = await hashFile(file);
+    const buffer = await readFile(file);
+    const hash = createHash("sha256").update(buffer).digest("hex");
     manifest[rel] = hash;
     // Only write if not already exists (dedup)
     if (!(await storage.exists(`content/${hash}`))) {
-      await storage.writeStream(`content/${hash}`, createReadStream(file));
+      await storage.write(`content/${hash}`, buffer);
     }
     // Also write to legacy per-build path for backward compat (can be removed after migration)
     // and maintain content_refs for GC
-    await storage.writeStream(`${destinationPrefix}/${rel}`, createReadStream(file));
+    await storage.write(`${destinationPrefix}/${rel}`, buffer);
     if (db) {
       await upsertContentRef(db, hash);
     }
@@ -105,14 +108,8 @@ export async function persistStorybookStatics(
   await storage.write(`${destinationPrefix}/manifest.json`, Buffer.from(JSON.stringify(manifest)));
 }
 
-/** Files persisted at once; each holds a read stream open, not the file's bytes. */
+/** Files persisted at once; bounds how many file buffers are in memory together. */
 const STATICS_CONCURRENCY = 8;
-
-async function hashFile(file: string): Promise<string> {
-  const hash = createHash("sha256");
-  await pipeline(createReadStream(file), hash);
-  return hash.digest("hex");
-}
 
 async function upsertContentRef(db: DatabaseAdapter, hash: string): Promise<void> {
   try {
