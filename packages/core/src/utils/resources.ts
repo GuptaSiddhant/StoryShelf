@@ -51,6 +51,25 @@ export function recommendedNavigationTimeoutMs(
   return 30_000;
 }
 
+/** Captures between browser restarts: Chromium grows slowly over a long run, so recycle it. */
+export const DEFAULT_RECYCLE_BROWSER_EVERY = 150;
+
+/** Loggable summary of the host budget and the capture settings derived from it. */
+export function describeSizing(settings: {
+  concurrency?: number;
+  navigationTimeoutMs?: number;
+  recycleBrowserEvery?: number;
+}): Record<string, number> {
+  const resources = detectResources();
+  return {
+    cpus: Math.round(resources.cpus * 100) / 100,
+    memoryMb: Math.round(resources.memoryBytes / MB),
+    pages: settings.concurrency ?? recommendedPageConcurrency(resources),
+    navigationTimeoutMs: settings.navigationTimeoutMs ?? recommendedNavigationTimeoutMs(resources),
+    recycleBrowserEvery: settings.recycleBrowserEvery ?? DEFAULT_RECYCLE_BROWSER_EVERY,
+  };
+}
+
 function cgroupCpus(): number | null {
   return cgroupV2Cpus() ?? cgroupV1Cpus();
 }

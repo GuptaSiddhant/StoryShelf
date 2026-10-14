@@ -27,8 +27,10 @@ export {
   storybookDir,
   storybookZipPath,
 } from "./paths.ts";
-export { mapLimit } from "./map-limit.ts";
+export { chunk, mapLimit } from "./map-limit.ts";
 export {
+  DEFAULT_RECYCLE_BROWSER_EVERY,
+  describeSizing,
   detectResources,
   recommendedBuildConcurrency,
   recommendedNavigationTimeoutMs,

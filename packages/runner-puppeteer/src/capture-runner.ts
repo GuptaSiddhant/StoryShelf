@@ -19,6 +19,8 @@ export function createPuppeteerCaptureRunner(
     concurrency?: number;
     /** Per-page timeout in ms; falls back to `STORYSHELF_NAVIGATION_TIMEOUT_MS`, then CPU detection. */
     navigationTimeoutMs?: number;
+    /** Captures between browser restarts (0 disables); falls back to `STORYSHELF_BROWSER_RECYCLE_EVERY`, then 150. */
+    recycleBrowserEvery?: number;
   } = {},
 ): CaptureRunner {
   const concurrency = options.concurrency ?? envPositiveInt("STORYSHELF_CAPTURE_CONCURRENCY");
@@ -26,6 +28,8 @@ export function createPuppeteerCaptureRunner(
     options.navigationTimeoutMs ??
     envPositiveInt("STORYSHELF_NAVIGATION_TIMEOUT_MS") ??
     recommendedNavigationTimeoutMs();
+  const recycleBrowserEvery =
+    options.recycleBrowserEvery ?? envInt("STORYSHELF_BROWSER_RECYCLE_EVERY", 0);
   return {
     metadata: {
       name: "Puppeteer",
@@ -39,7 +43,11 @@ export function createPuppeteerCaptureRunner(
       const active: ActiveRun = { cancelled: false, browser: null };
       activeRuns.set(input.buildId, active);
       try {
-        return await renderAll({ concurrency, navigationTimeoutMs, ...input }, active, options);
+        return await renderAll(
+          { concurrency, navigationTimeoutMs, recycleBrowserEvery, ...input },
+          active,
+          options,
+        );
       } finally {
         activeRuns.delete(input.buildId);
       }
@@ -54,8 +62,12 @@ export function createPuppeteerCaptureRunner(
 }
 
 function envPositiveInt(name: string): number | undefined {
+  return envInt(name, 1);
+}
+
+function envInt(name: string, min: number): number | undefined {
   const parsed = Number.parseInt(process.env[name] ?? "", 10);
-  return parsed > 0 ? parsed : undefined;
+  return parsed >= min ? parsed : undefined;
 }
 
 // Re-exports for backward compatibility (tests import these from capture-runner).

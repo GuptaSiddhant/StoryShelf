@@ -1,3 +1,13 @@
+/** Split `items` into consecutive batches of at most `size` (a non-positive size means one batch). */
+export function chunk<T>(items: readonly T[], size: number): T[][] {
+  const step = size > 0 ? Math.max(1, Math.floor(size)) : items.length || 1;
+  const batches: T[][] = [];
+  for (let start = 0; start < items.length; start += step) {
+    batches.push(items.slice(start, start + step));
+  }
+  return batches;
+}
+
 /** Run `fn` over `items` with at most `limit` in flight; results keep input order. */
 export async function mapLimit<T, R>(
   items: readonly T[],

@@ -25,6 +25,8 @@ export interface PlaywrightRenderInput {
   concurrency?: number;
   /** Per-page navigation/action timeout in ms (default: scaled up on CPU-starved hosts). */
   navigationTimeoutMs?: number;
+  /** Restart the browser after this many captures to bound its slow growth (0 disables; default 150). */
+  recycleBrowserEvery?: number;
   /** Test/extension seam: story source adapter (defaults to `StorybookAdapter`). */
   adapter?: StorySourceAdapter;
 }

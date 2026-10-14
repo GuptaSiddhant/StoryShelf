@@ -21,6 +21,8 @@ export function createPlaywrightCaptureRunner(
     concurrency?: number;
     /** Per-page timeout in ms; falls back to `STORYSHELF_NAVIGATION_TIMEOUT_MS`, then CPU detection. */
     navigationTimeoutMs?: number;
+    /** Captures between browser restarts (0 disables); falls back to `STORYSHELF_BROWSER_RECYCLE_EVERY`, then 150. */
+    recycleBrowserEvery?: number;
   } = {},
 ): CaptureRunner {
   const defaultBrowser = options.browser ?? "chromium";
@@ -29,6 +31,8 @@ export function createPlaywrightCaptureRunner(
     options.navigationTimeoutMs ??
     envPositiveInt("STORYSHELF_NAVIGATION_TIMEOUT_MS") ??
     recommendedNavigationTimeoutMs();
+  const recycleBrowserEvery =
+    options.recycleBrowserEvery ?? envInt("STORYSHELF_BROWSER_RECYCLE_EVERY", 0);
   return {
     metadata: {
       name: "Playwright",
@@ -43,7 +47,7 @@ export function createPlaywrightCaptureRunner(
       activeRuns.set(input.buildId, active);
       try {
         return await renderAll(
-          { concurrency, navigationTimeoutMs, ...input },
+          { concurrency, navigationTimeoutMs, recycleBrowserEvery, ...input },
           active,
           defaultBrowser,
         );
@@ -64,8 +68,12 @@ export function createPlaywrightCaptureRunner(
 }
 
 function envPositiveInt(name: string): number | undefined {
+  return envInt(name, 1);
+}
+
+function envInt(name: string, min: number): number | undefined {
   const parsed = Number.parseInt(process.env[name] ?? "", 10);
-  return parsed > 0 ? parsed : undefined;
+  return parsed >= min ? parsed : undefined;
 }
 
 // Re-exports for backward compatibility (tests import these from capture-runner).

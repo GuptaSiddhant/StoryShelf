@@ -7,7 +7,13 @@ import type {
   Viewport,
 } from "@storyshelf/core/adapter/capture-runner";
 import { StorybookAdapter, resolveStoryViewports } from "@storyshelf/core/capture";
-import { mapLimit, recommendedPageConcurrency } from "@storyshelf/core/utils";
+import {
+  DEFAULT_RECYCLE_BROWSER_EVERY,
+  chunk,
+  describeSizing,
+  mapLimit,
+  recommendedPageConcurrency,
+} from "@storyshelf/core/utils";
 import type { Browser } from "puppeteer-core";
 import puppeteer from "puppeteer-core";
 import { messageOf, safeCloseBrowser, safeCloseServer } from "./browser.ts";
@@ -24,7 +30,14 @@ export async function renderAll(
 ): Promise<RenderResult> {
   const server = await createStaticServer(input.storybookDir);
   const browser = await launchBrowser(runnerOptions);
-  return await runWithBrowser(input, active, browser, server);
+  input.logger?.info(describeSizing(input), "capture sizing");
+  return await runWithBrowser(
+    input,
+    active,
+    browser,
+    server,
+    async () => await launchBrowser(runnerOptions),
+  );
 }
 
 async function runWithBrowser(
@@ -32,17 +45,19 @@ async function runWithBrowser(
   active: ActiveRun,
   browser: Browser,
   server: Awaited<ReturnType<typeof createStaticServer>>,
+  relaunch: () => Promise<Browser>,
 ): Promise<RenderResult> {
   active.browser = browser;
   const ctx = buildContext(browser, server.url, input);
   const captures: RenderedSnapshot[] = [];
   const failures: RenderResult["failures"] = [];
   try {
-    await runAllCaptures(input, active, ctx, captures, failures);
+    await runAllCaptures(input, active, ctx, captures, failures, relaunch);
     return { captures, failures };
   } finally {
     active.browser = null;
-    await Promise.all([safeCloseBrowser(browser), safeCloseServer(server)]);
+    // ctx.browser is the latest one: recycling replaces the browser mid-run.
+    await Promise.all([safeCloseBrowser(ctx.browser), safeCloseServer(server)]);
   }
 }
 
@@ -90,14 +105,38 @@ async function runAllCaptures(
   ctx: CaptureContext,
   captures: RenderedSnapshot[],
   failures: RenderResult["failures"],
+  relaunch: () => Promise<Browser>,
 ): Promise<void> {
   // Bounded: one page per story x viewport all at once exhausts memory on large Storybooks.
   const jobs = input.stories.flatMap((story) =>
     resolveStoryViewports(story, input.viewports).map((viewport) => ({ story, viewport })),
   );
-  await mapLimit(jobs, input.concurrency ?? recommendedPageConcurrency(), async (job) => {
-    await captureOne(input, active, ctx, job.story, job.viewport, captures, failures);
-  });
+  // Batches drain in-flight pages, so the browser can be swapped between them.
+  const batches = chunk(jobs, input.recycleBrowserEvery ?? DEFAULT_RECYCLE_BROWSER_EVERY);
+  for (const [index, batch] of batches.entries()) {
+    if (index > 0) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- recycle only between drained batches
+      await recycleBrowser(active, ctx, relaunch, input.logger);
+    }
+    // oxlint-disable-next-line eslint/no-await-in-loop -- batches run one after another
+    await mapLimit(batch, input.concurrency ?? recommendedPageConcurrency(), async (job) => {
+      await captureOne(input, active, ctx, job.story, job.viewport, captures, failures);
+    });
+  }
+}
+
+/** Swap in a fresh browser; the old one is closed first so two never coexist. */
+async function recycleBrowser(
+  active: ActiveRun,
+  ctx: CaptureContext,
+  relaunch: () => Promise<Browser>,
+  logger: PuppeteerRenderInput["logger"],
+): Promise<void> {
+  if (active.cancelled) throw new Error("Capture cancelled");
+  await safeCloseBrowser(ctx.browser);
+  ctx.browser = await relaunch();
+  active.browser = ctx.browser;
+  logger?.debug({}, "browser recycled");
 }
 
 async function captureOne(

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  describeSizing,
   detectResources,
   recommendedBuildConcurrency,
   recommendedNavigationTimeoutMs,
@@ -42,5 +43,15 @@ describe("detectResources", () => {
     const resources = detectResources();
     expect(resources.cpus).toBeGreaterThan(0);
     expect(resources.memoryBytes).toBeGreaterThan(0);
+  });
+});
+
+describe("describeSizing", () => {
+  it("reports explicit settings and fills the rest from the host", () => {
+    const sizing = describeSizing({ concurrency: 3, recycleBrowserEvery: 0 });
+    expect(sizing["pages"]).toBe(3);
+    expect(sizing["recycleBrowserEvery"]).toBe(0);
+    expect(sizing["cpus"]).toBeGreaterThan(0);
+    expect(sizing["navigationTimeoutMs"]).toBeGreaterThanOrEqual(30_000);
   });
 });
