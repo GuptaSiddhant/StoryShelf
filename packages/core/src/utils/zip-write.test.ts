@@ -60,7 +60,8 @@ describe("zipStream", () => {
     expect(order).toEqual(["yield:one", "read:one", "yield:two", "read:two"]);
   });
 
-  it("refuses archives that need zip64", async () => {
+  // Builds 65,536 entries, which is CPU-bound and can exceed the 5s default on slow CI runners.
+  it("refuses archives that need zip64", { timeout: 30_000 }, async () => {
     const many = Array.from({ length: 65_536 }, (_unused, index) => source(`${index}`, ""));
     await expect(collect(zipStream(many))).rejects.toThrow(/65535 entries/u);
   });
