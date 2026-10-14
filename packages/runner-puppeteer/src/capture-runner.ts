@@ -1,6 +1,7 @@
 /** Puppeteer capture runner — composition root (factory wiring). */
 
 import type { BrowserName, CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
+import { recommendedNavigationTimeoutMs } from "@storyshelf/core/utils";
 import { activeRuns, closeBrowser } from "./browser.ts";
 import { renderAll } from "./pipeline.ts";
 import type { ActiveRun, PuppeteerRenderInput } from "./types.ts";
@@ -14,8 +15,17 @@ export function createPuppeteerCaptureRunner(
     supportedBrowsers?: readonly BrowserName[];
     executablePath?: string;
     args?: string[];
+    /** Pages rendered at once; falls back to `STORYSHELF_CAPTURE_CONCURRENCY`, then CPU/memory detection. */
+    concurrency?: number;
+    /** Per-page timeout in ms; falls back to `STORYSHELF_NAVIGATION_TIMEOUT_MS`, then CPU detection. */
+    navigationTimeoutMs?: number;
   } = {},
 ): CaptureRunner {
+  const concurrency = options.concurrency ?? envPositiveInt("STORYSHELF_CAPTURE_CONCURRENCY");
+  const navigationTimeoutMs =
+    options.navigationTimeoutMs ??
+    envPositiveInt("STORYSHELF_NAVIGATION_TIMEOUT_MS") ??
+    recommendedNavigationTimeoutMs();
   return {
     metadata: {
       name: "Puppeteer",
@@ -29,7 +39,7 @@ export function createPuppeteerCaptureRunner(
       const active: ActiveRun = { cancelled: false, browser: null };
       activeRuns.set(input.buildId, active);
       try {
-        return await renderAll(input, active, options);
+        return await renderAll({ concurrency, navigationTimeoutMs, ...input }, active, options);
       } finally {
         activeRuns.delete(input.buildId);
       }
@@ -41,6 +51,11 @@ export function createPuppeteerCaptureRunner(
       await closeBrowser(active.browser);
     },
   };
+}
+
+function envPositiveInt(name: string): number | undefined {
+  const parsed = Number.parseInt(process.env[name] ?? "", 10);
+  return parsed > 0 ? parsed : undefined;
 }
 
 // Re-exports for backward compatibility (tests import these from capture-runner).

@@ -7,6 +7,7 @@ import type {
   Viewport,
 } from "@storyshelf/core/adapter/capture-runner";
 import { StorybookAdapter, resolveStoryViewports } from "@storyshelf/core/capture";
+import { mapLimit, recommendedPageConcurrency } from "@storyshelf/core/utils";
 import type { Browser } from "puppeteer-core";
 import puppeteer from "puppeteer-core";
 import { messageOf, safeCloseBrowser, safeCloseServer } from "./browser.ts";
@@ -45,11 +46,24 @@ async function runWithBrowser(
   }
 }
 
+/**
+ * Sandbox flags for containers plus low-memory flags. Rendering-affecting flags
+ * (`--disable-gpu`, `--single-process`) are excluded: they can shift pixels.
+ */
+const DEFAULT_ARGS = [
+  "--no-sandbox",
+  "--disable-setuid-sandbox",
+  "--disable-dev-shm-usage",
+  "--disable-extensions",
+  "--disable-background-networking",
+  "--mute-audio",
+];
+
 async function launchBrowser(opts: { executablePath?: string; args?: string[] }): Promise<Browser> {
   return await puppeteer.launch({
     headless: true,
     executablePath: opts.executablePath,
-    args: opts.args ?? ["--no-sandbox", "--disable-setuid-sandbox"],
+    args: opts.args ?? DEFAULT_ARGS,
   });
 }
 
@@ -62,6 +76,7 @@ function buildContext(
     browser,
     adapter: input.adapter ?? new StorybookAdapter(),
     baseUrl,
+    navigationTimeoutMs: input.navigationTimeoutMs,
     executePlay: input.executePlay,
     playTimeoutMs: input.playTimeoutMs,
     runA11y: input.runA11y,
@@ -76,23 +91,13 @@ async function runAllCaptures(
   captures: RenderedSnapshot[],
   failures: RenderResult["failures"],
 ): Promise<void> {
-  const tasks = input.stories.flatMap((story) =>
-    viewportsTasks(story, input, active, ctx, captures, failures),
+  // Bounded: one page per story x viewport all at once exhausts memory on large Storybooks.
+  const jobs = input.stories.flatMap((story) =>
+    resolveStoryViewports(story, input.viewports).map((viewport) => ({ story, viewport })),
   );
-  await Promise.all(tasks);
-}
-function viewportsTasks(
-  story: StoryEntry,
-  input: PuppeteerRenderInput,
-  active: ActiveRun,
-  ctx: CaptureContext,
-  captures: RenderedSnapshot[],
-  failures: RenderResult["failures"],
-): Promise<void>[] {
-  // oxlint-disable-next-line typescript/promise-function-async -- returns array of promises, not a single promise
-  return resolveStoryViewports(story, input.viewports).map((viewport) =>
-    captureOne(input, active, ctx, story, viewport, captures, failures),
-  );
+  await mapLimit(jobs, input.concurrency ?? recommendedPageConcurrency(), async (job) => {
+    await captureOne(input, active, ctx, job.story, job.viewport, captures, failures);
+  });
 }
 
 async function captureOne(
