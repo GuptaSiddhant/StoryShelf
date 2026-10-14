@@ -5,6 +5,18 @@ import type { BrowserName, CaptureRunner, RenderResult } from "../adapters/captu
 /** Default budget for one render call before the orchestrator cancels it. */
 export const RENDER_TIMEOUT_MS = 15 * 60_000;
 
+/** Extra time granted per capture, so slow single-page hosts are not cancelled mid-run. */
+export const PER_CAPTURE_BUDGET_MS = 15_000;
+
+/**
+ * Budget for one render call: an explicit setting wins; otherwise the default
+ * floor, raised to a per-capture allowance for large matrices. Bounded page
+ * concurrency on small hosts makes big builds legitimately take longer than 15 minutes.
+ */
+export function renderBudgetMs(captureCount: number, explicitMs?: number): number {
+  return explicitMs ?? Math.max(RENDER_TIMEOUT_MS, captureCount * PER_CAPTURE_BUDGET_MS);
+}
+
 /** Failure error text cap (persisted rows and logs stay bounded). */
 const FAILURE_ERROR_MAX = 500;
 

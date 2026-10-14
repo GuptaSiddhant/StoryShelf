@@ -94,7 +94,9 @@ The defaults are sized from the CPU and memory the process can actually use, inc
 | 2 vCPU, 4 GB | 1 | 2 | 30 s |
 | 4 vCPU, 8 GB | 2 | 4 | 30 s |
 
-More pages than CPUs does not make capture faster: the pages compete for the same cores, each loads more slowly, and slow loads time out. Chromium grows slowly over a long run, so the browser is closed and relaunched every 150 captures. The restart happens between batches, after in-flight pages finish, so no capture is interrupted. At the start of every render the runner logs a `capture sizing` line with the detected `cpus` and `memoryMb` and the resulting `pages`, `navigationTimeoutMs` and `recycleBrowserEvery`; check it first if a host behaves differently from the table.
+More pages than CPUs does not make capture faster: the pages compete for the same cores, each loads more slowly, and slow loads time out. The orchestrator also gives each render a time budget of 15 minutes, or 15 seconds per capture for large builds, whichever is longer (an explicit `renderTimeoutMs` always wins). One page at a time on a small host is slower, so a 1,000-capture build gets about 4 hours before it is cancelled as hung; without this, a build that is merely slow would be reported as timed out.
+
+Chromium grows slowly over a long run, so the browser is closed and relaunched every 150 captures. The restart happens between batches, after in-flight pages finish, so no capture is interrupted. At the start of every render the runner logs a `capture sizing` line with the detected `cpus` and `memoryMb` and the resulting `pages`, `navigationTimeoutMs` and `recycleBrowserEvery`; check it first if a host behaves differently from the table.
 
 If your platform reserves CPU in a way the container cannot see (for example a VM with a fractional share), the detection cannot know; set the values explicitly.
 
