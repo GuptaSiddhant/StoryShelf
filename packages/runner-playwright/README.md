@@ -20,7 +20,7 @@ Supply it to `createShelfApp({ capture, config: { scratchDir } })` — the route
 
 ## Concurrency and memory
 
-Each open Chromium page costs roughly 100–300 MB, so `render` captures a bounded number of story/viewport pairs at once instead of all of them. The default is **2**; override it with `createPlaywrightCaptureRunner({ concurrency })` or the `STORYSHELF_CAPTURE_CONCURRENCY` environment variable (the option wins). Chromium is launched with `--disable-dev-shm-usage` so small container `/dev/shm` mounts don't crash it.
+Each open Chromium page costs roughly 100–300 MB, so `render` captures a bounded number of story/viewport pairs at once instead of all of them. The default is **2**; override it with `createPlaywrightCaptureRunner({ concurrency })` or the `STORYSHELF_CAPTURE_CONCURRENCY` environment variable (the option wins). Chromium is launched with low-memory flags (`--disable-dev-shm-usage` so small container `/dev/shm` mounts don't crash it, plus `--disable-extensions`, `--disable-background-networking`, `--mute-audio`). Flags that can change rendered pixels (`--disable-gpu`, `--single-process`) are deliberately left out so baselines stay stable.
 
 Rule of thumb: total pages = `ShelfConfig.captureConcurrency` (builds at once, default 2) × runner `concurrency`. On a 1 GB host use 1 build × 2 pages, or 1 × 1 for very large Storybooks.
 

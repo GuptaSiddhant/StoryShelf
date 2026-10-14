@@ -1,10 +1,12 @@
-import { createWriteStream } from "node:fs";
-import { mkdir, readdir, readFile, rm } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { createReadStream, createWriteStream } from "node:fs";
+import { mkdir, readdir, rm } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Parse, type Entry } from "unzipper";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
+import { mapLimit } from "../utils/map-limit.ts";
 import { storybookDir, storybookZipPath } from "../utils/paths.ts";
 
 /**
@@ -83,31 +85,33 @@ export async function persistStorybookStatics(
   const destinationPrefix = storybookDir(projectId, buildId);
   const files = await walkFiles(root);
   const manifest: Record<string, string> = {};
-  await Promise.all(
-    files.map(async (file) => {
-      const rel = relative(root, file);
-      const buffer = await readFile(file);
-      const hash = await hashBuffer(buffer);
-      const contentPath = `content/${hash}`;
-      manifest[rel] = hash;
-      // Only write if not already exists (dedup)
-      if (!(await storage.exists(contentPath))) {
-        await storage.write(contentPath, buffer);
-      }
-      // Also write to legacy per-build path for backward compat (can be removed after migration)
-      // and maintain content_refs for GC
-      await storage.write(`${destinationPrefix}/${rel}`, buffer);
-      if (db) {
-        await upsertContentRef(db, hash);
-      }
-    }),
-  );
+  // Bounded and streamed: a large Storybook has thousands of files, and
+  // buffering them all at once exhausts memory on small hosts.
+  await mapLimit(files, STATICS_CONCURRENCY, async (file) => {
+    const rel = relative(root, file);
+    const hash = await hashFile(file);
+    manifest[rel] = hash;
+    // Only write if not already exists (dedup)
+    if (!(await storage.exists(`content/${hash}`))) {
+      await storage.writeStream(`content/${hash}`, createReadStream(file));
+    }
+    // Also write to legacy per-build path for backward compat (can be removed after migration)
+    // and maintain content_refs for GC
+    await storage.writeStream(`${destinationPrefix}/${rel}`, createReadStream(file));
+    if (db) {
+      await upsertContentRef(db, hash);
+    }
+  });
   await storage.write(`${destinationPrefix}/manifest.json`, Buffer.from(JSON.stringify(manifest)));
 }
 
-async function hashBuffer(buffer: Buffer): Promise<string> {
-  const { createHash } = await import("node:crypto");
-  return createHash("sha256").update(buffer).digest("hex");
+/** Files persisted at once; each holds a read stream open, not the file's bytes. */
+const STATICS_CONCURRENCY = 8;
+
+async function hashFile(file: string): Promise<string> {
+  const hash = createHash("sha256");
+  await pipeline(createReadStream(file), hash);
+  return hash.digest("hex");
 }
 
 async function upsertContentRef(db: DatabaseAdapter, hash: string): Promise<void> {

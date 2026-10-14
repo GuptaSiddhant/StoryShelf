@@ -24,6 +24,18 @@ import type {
   RuntimeParamsPage,
 } from "./types.ts";
 
+/**
+ * Low-memory Chromium flags. Deliberately excludes rendering-affecting flags
+ * (`--disable-gpu`, `--single-process`): they can shift pixels or crash pages,
+ * which would show up as false visual diffs.
+ */
+const CHROMIUM_ARGS = [
+  "--disable-dev-shm-usage",
+  "--disable-extensions",
+  "--disable-background-networking",
+  "--mute-audio",
+];
+
 /** Pages rendered at once when the runner is not configured otherwise. */
 const DEFAULT_CONCURRENCY = 2;
 
@@ -103,7 +115,7 @@ async function launchBrowser(name: BrowserName): Promise<Browser> {
   if (name === "firefox") return await playwright.firefox.launch();
   if (name === "webkit") return await playwright.webkit.launch();
   // Containers ship a tiny /dev/shm; Chromium crashes (looks like OOM) unless it uses /tmp.
-  return await playwright.chromium.launch({ args: ["--disable-dev-shm-usage"] });
+  return await playwright.chromium.launch({ args: CHROMIUM_ARGS });
 }
 
 function buildContext(

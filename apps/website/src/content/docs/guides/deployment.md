@@ -82,7 +82,11 @@ Capture drives Chromium, which dominates memory use. Each open page costs roughl
 | `config.captureConcurrency` | `2` | Builds captured at the same time (each launches its own browser) |
 | `createPlaywrightCaptureRunner({ concurrency })` / `STORYSHELF_CAPTURE_CONCURRENCY` | `2` | Pages rendering at once within one build |
 
-Total live pages ≈ `captureConcurrency × concurrency`. On a 1 GB host (Fly, Aiven, small VPS) use `captureConcurrency: 1` with a runner concurrency of 1 or 2; the Fly demo app does this via `CAPTURE_CONCURRENCY`. Give the container a normal `/dev/shm` or rely on the built-in `--disable-dev-shm-usage` flag. If builds still run out of memory, lower the runner concurrency first, then add RAM.
+Total live pages ≈ `captureConcurrency × concurrency`. On a 1 GB host (Fly, Aiven, small VPS) use `captureConcurrency: 1` with a runner concurrency of 1 or 2; the Fly demo app does this via `CAPTURE_CONCURRENCY`. Give the container a normal `/dev/shm` or rely on the built-in `--disable-dev-shm-usage` flag. Node itself is cheap by comparison, but its default heap limit can be larger than what is left once Chromium has its share. On small hosts cap it, for example `NODE_OPTIONS=--max-old-space-size=384` on a 1 GB machine (the Fly demo sets this in `fly.toml`), so Node collects garbage earlier instead of crowding out the browser.
+
+Storing the uploaded Storybook for the published preview streams each file to storage with at most 8 in flight, so large builds (thousands of files) no longer have to fit in memory. Chromium is launched with low-memory flags (`--disable-dev-shm-usage`, `--disable-extensions`, `--disable-background-networking`, `--mute-audio`); rendering-affecting flags such as `--disable-gpu` are intentionally not used, because they can change pixels and cause false visual diffs.
+
+If builds still run out of memory, lower the runner concurrency first, then add RAM.
 
 ## Cloud reference stacks
 

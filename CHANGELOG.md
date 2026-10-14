@@ -3,6 +3,14 @@
 All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 `scripts/release.mjs` (every workspace package shares one version).
 
+## Unreleased
+
+**Capture memory**
+- Capture no longer opens a browser page for every story and viewport at once, which ran 500-story Storybooks out of memory on 1 GB hosts. Pages render with bounded concurrency (default 2; set `concurrency` on `createPlaywrightCaptureRunner` or `STORYSHELF_CAPTURE_CONCURRENCY`), and snapshot persisting is capped at 4 at a time.
+- Chromium launches with low-memory flags (`--disable-dev-shm-usage`, `--disable-extensions`, `--disable-background-networking`, `--mute-audio`) to avoid crashes on small container `/dev/shm`.
+- Storing a build's Storybook statics now streams and hashes files with at most 8 in flight instead of reading every file into memory at once.
+- The Fly demo app runs one build at a time, sets `CAPTURE_CONCURRENCY`, and caps the Node heap with `NODE_OPTIONS` in `fly.toml`.
+
 ## 0.6.2 — Lean scaffold, working Docker images, Node 24 (2026-10-08)
 
 A fix-focused release. `storyshelf server init` now generates a smaller
