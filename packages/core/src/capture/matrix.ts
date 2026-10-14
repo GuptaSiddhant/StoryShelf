@@ -8,14 +8,18 @@ import type {
 } from "../adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
+import type { AttemptLogRecorder } from "../models/capture-attempt.ts";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 import { screenshotPath } from "../utils/paths.ts";
-import type { StoryEntry, Viewport } from "./adapter.ts";
+import type { CaptureLogLevel } from "../schema/capture-attempt.ts";
+import { isFlakyStory, type StoryEntry, type Viewport } from "./adapter.ts";
 import { partitionAffectedStories, type InheritedStory } from "./affected.ts";
+import { mirrorAttemptLog, type AttemptMirror } from "./attempt-logger.ts";
 import { assertScreenshotBuffer } from "./guards.ts";
 import type { PipelineTables } from "./pipeline.ts";
 import { renderBudgetMs, renderWithTimeout, type RenderRequest } from "./render.ts";
+import { resolveStoryViewports } from "./storybook.ts";
 
 /** Inputs shared by every engine's pass. */
 export interface MatrixInput {
@@ -33,6 +37,8 @@ export interface MatrixInput {
   /** Explicit render budget; unset scales with the number of captures. */
   renderTimeoutMs?: number | undefined;
   logger: Logger | undefined;
+  /** Records the pass on the build attempt (partitioning, progress, failures). */
+  recordLog?: AttemptLogRecorder | undefined;
 }
 
 /** Everything the passes produced, every row tagged with its engine. */
@@ -63,6 +69,33 @@ export async function captureAcrossBrowsers(input: MatrixInput): Promise<MatrixR
 }
 
 async function captureOnBrowser(input: MatrixInput, browser: BrowserName): Promise<MatrixResult> {
+  const mirror = mirrorAttemptLog(input.logger, input.recordLog, flakyDowngrade(input.stories));
+  try {
+    return await passOnBrowser(input, browser, mirror);
+  } finally {
+    await mirror.flush();
+  }
+}
+
+/**
+ * Failures of flaky stories are non-blocking, so the attempt log shows them as
+ * warnings (matching "flaky story failed (non-blocking)"), not errors.
+ */
+function flakyDowngrade(
+  stories: StoryEntry[],
+): (level: CaptureLogLevel, fields?: Record<string, unknown>) => CaptureLogLevel {
+  const flaky = new Set(stories.filter((story) => isFlakyStory(story)).map((story) => story.id));
+  return (level, fields) =>
+    level === "error" && typeof fields?.["storyId"] === "string" && flaky.has(fields["storyId"])
+      ? "warn"
+      : level;
+}
+
+async function passOnBrowser(
+  input: MatrixInput,
+  browser: BrowserName,
+  mirror: AttemptMirror,
+): Promise<MatrixResult> {
   const { project, build } = input;
   const partition = await partitionAffectedStories({
     db: input.db,
@@ -75,30 +108,46 @@ async function captureOnBrowser(input: MatrixInput, browser: BrowserName): Promi
     browser,
     affectedPaths: input.affectedPaths,
   });
-  input.logger?.info(
-    {
-      browser,
-      rendered: partition.render.length,
-      inherited: partition.inherited.length,
-      total: input.stories.length,
-    },
-    "affected capture partitioned",
-  );
+  mirror.log("info", "affected capture partitioned", {
+    browser,
+    rendered: partition.render.length,
+    inherited: partition.inherited.length,
+    total: input.stories.length,
+  });
   const inherited = tagged(partition.inherited, browser);
   if (partition.render.length === 0) {
     return { captures: [], failures: [], inherited, renderCount: 0 };
   }
+  return await renderPass(input, browser, mirror, partition.render, inherited);
+}
+
+async function renderPass(
+  input: MatrixInput,
+  browser: BrowserName,
+  mirror: AttemptMirror,
+  toRender: StoryEntry[],
+  inherited: InheritedStory[],
+): Promise<MatrixResult> {
   const spooled: RenderedSnapshot[] = [];
+  const expected = toRender.flatMap((story) =>
+    resolveStoryViewports(story, input.viewports),
+  ).length;
   const rendered = await renderWithTimeout(
     input.runner,
-    renderRequest(input, browser, partition.render, spooled),
-    renderBudgetMs(partition.render.length * input.viewports.length, input.renderTimeoutMs),
+    renderRequest(input, browser, toRender, spooled, { mirror, expected }),
+    renderBudgetMs(expected, input.renderTimeoutMs),
   );
+  mirror.log("info", "render pass finished", {
+    browser,
+    captured: spooled.length + rendered.captures.length,
+    failed: rendered.failures.length,
+    expected,
+  });
   return {
     captures: [...spooled, ...tagged(rendered.captures, browser)],
     failures: tagged(rendered.failures, browser),
     inherited,
-    renderCount: partition.render.length,
+    renderCount: toRender.length,
   };
 }
 
@@ -108,22 +157,41 @@ function renderRequest(
   browser: BrowserName,
   stories: StoryEntry[],
   spooled: RenderedSnapshot[],
+  progress: { mirror: AttemptMirror; expected: number },
 ): RenderRequest {
   const { project, build } = input;
   return {
     onCapture: async (capture) => {
       spooled.push(await spoolCapture(input, browser, capture));
+      logProgress(progress, browser, spooled.length);
     },
     buildId: build.id,
     storybookDir: input.storybookDir,
     stories,
     viewports: input.viewports,
-    logger: input.logger,
+    logger: progress.mirror.logger,
     executePlay: project.executePlay ?? false,
     playTimeoutMs: project.playTimeoutMs ?? 10_000,
     runA11y: project.runA11y ?? false,
     browser,
   };
+}
+
+/** Screenshots between progress lines on the attempt log. */
+const PROGRESS_EVERY = 10;
+
+/** Record "captured N/M" every few screenshots so a long render keeps showing movement. */
+function logProgress(
+  progress: { mirror: AttemptMirror; expected: number },
+  browser: BrowserName,
+  captured: number,
+): void {
+  if (captured % PROGRESS_EVERY !== 0) return;
+  progress.mirror.log("info", `captured ${captured}/${progress.expected} screenshots`, {
+    browser,
+    captured,
+    expected: progress.expected,
+  });
 }
 
 /**

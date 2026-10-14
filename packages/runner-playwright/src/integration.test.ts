@@ -335,7 +335,9 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
     );
     const attempt = await readJson<{ failedCount: number }>(attemptRes);
     expect(attempt.failedCount).toBe(1);
-    expect(logs.filter((l) => l.level === "error")).toEqual([]);
+    // The attempt log records the blocking render failure as the only error line;
+    // flaky failures are downgraded to warnings.
+    expect(storyIdsOf((l) => l.level === "error")).toEqual(["components-button--blocking-failure"]);
     const flaky = storyIdsOf((l) => l.message.includes("flaky story failed"));
     expect(new Set(flaky)).toEqual(
       new Set([

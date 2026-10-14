@@ -189,6 +189,68 @@ describe("executeCaptureJob", () => {
     expect((await db.get(db.tables.builds, build.id))?.status).toBe("approved");
   });
 
+  it("records partitioning, runner lines, progress and the finish on the attempt log", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const project = await new ProjectModel(db, tables(db)).create({ name: "AttemptLogs" });
+    const build = await new BuildModel(db, tables(db)).create(project.id, {
+      gitSha: "sha-logs",
+      gitBranch: "main",
+      isDefault: true,
+    });
+    const zip = new AdmZip();
+    const entries = Object.fromEntries(
+      Array.from({ length: 25 }, (_, i) => [
+        `components-s${i}--primary`,
+        {
+          id: `components-s${i}--primary`,
+          name: "Primary",
+          title: `Components/S${i}`,
+          importPath: `./S${i}.stories.tsx`,
+          type: "story",
+        },
+      ]),
+    );
+    zip.addFile("index.json", Buffer.from(JSON.stringify({ v: 4, entries })));
+    await storage.write(storybookZipPath(project.id, build.id), zip.toBuffer());
+    const { runner } = fakeRunner({
+      render: vi.fn(async (input: Parameters<CaptureRunner["render"]>[0]) => {
+        input.logger?.info({ pages: 1 }, "capture sizing");
+        input.logger?.debug({ noisy: true }, "debug detail");
+        for (const story of input.stories) {
+          // Sequential on purpose: progress lines depend on arrival order.
+          // oxlint-disable-next-line eslint/no-await-in-loop
+          await input.onCapture?.({ story, viewportName: "desktop", screenshot: pngBytes() });
+        }
+        return { captures: [], failures: [] };
+      }),
+    });
+    const lines: string[] = [];
+
+    await executeCaptureJob(
+      {
+        buildId: build.id,
+        recordLog: async (level, message) => {
+          await Promise.resolve();
+          lines.push(`${level}:${message}`);
+        },
+      },
+      { db, tables: tables(db), storage, runner, scratchDir },
+    );
+
+    const order = [
+      "info:affected capture partitioned",
+      "info:capture sizing",
+      "info:captured 10/25 screenshots",
+      "info:captured 20/25 screenshots",
+      "info:render pass finished",
+      "info:stories rendered",
+    ];
+    expect(lines.filter((line) => order.includes(line))).toEqual(order);
+    expect(lines.some((line) => line.includes("debug detail"))).toBe(false);
+    expect(lines.some((line) => line.includes("captured 25/25"))).toBe(false);
+  });
+
   it("reports a streamed capture that is not a PNG as a render failure", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();

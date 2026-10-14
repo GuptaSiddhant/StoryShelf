@@ -5,6 +5,9 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 
 ## Unreleased
 
+**Attempt logs**
+- The build attempt log no longer stops at "partitioned" during a render. Per browser engine it now records the partition counts, the runner's `info`/`warn`/`error` lines (`capture sizing`, `browser recycled`, `render failed for story`, a11y warnings; debug stays out), `captured N/M screenshots` every 10 screenshots, and a `render pass finished` summary. Lines are written serially so order and sequence numbers stay correct under parallel rendering.
+
 **Streaming and page reuse**
 - Screenshots are written to storage as each is captured (new optional `onCapture` on `CaptureRunner.render`; both bundled runners support it), so memory no longer grows with the number of stories. Runners that ignore it keep working unchanged.
 - Opt-in page reuse (`reusePages` / `STORYSHELF_REUSE_PAGES=1`) for both runners: pooled pages in their own contexts, reset between captures, discarded after a failure. Screenshots were byte-identical with reuse on and off on the bundled fixtures.
