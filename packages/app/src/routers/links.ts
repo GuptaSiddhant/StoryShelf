@@ -26,6 +26,8 @@ const usageItemSchema = z.object({
   upstreamBuildId: z.string().nullable(),
   /** Upstream story the package module maps to; null falls back to the library. */
   upstreamStoryId: z.string().nullable(),
+  /** Story file of the matched upstream story; null when nothing matched. */
+  upstreamImportPath: z.string().nullable().optional(),
 });
 
 const projectParams = z.object({ slug: z.string() });

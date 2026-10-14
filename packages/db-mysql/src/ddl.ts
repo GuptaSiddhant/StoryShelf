@@ -115,6 +115,7 @@ CREATE TABLE IF NOT EXISTS snapshots (
   updated_at DATETIME(3) NOT NULL
 );
 CREATE INDEX IF NOT EXISTS snapshots_build_id_idx ON snapshots (build_id);
+CREATE INDEX IF NOT EXISTS snapshots_project_import_path_idx ON snapshots (project_id, story_import_path);
 CREATE TABLE IF NOT EXISTS baselines (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,

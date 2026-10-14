@@ -47,6 +47,7 @@ export const snapshots = sqliteTable(
       t.browser,
     ),
     index("snapshots_build_id_idx").on(t.buildId),
+    index("snapshots_project_import_path_idx").on(t.projectId, t.storyImportPath),
   ],
 );
 

@@ -61,6 +61,7 @@ const makeSnapshot = (
   storyName: "Primary",
   storyTitle: "Story",
   storyImportPath,
+  designUrl: null,
   viewportName: "desktop",
   viewportWidth: 1280,
   viewportHeight: 720,
@@ -178,6 +179,7 @@ describe("snapshot usage API", () => {
         upstreamSlug: "design-system",
         upstreamBuildId: "ds-b1",
         upstreamStoryId: "button--primary",
+        upstreamImportPath: "src/Button.stories.tsx",
       },
     ]);
   });

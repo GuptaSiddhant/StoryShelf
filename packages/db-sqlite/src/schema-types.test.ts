@@ -141,4 +141,6 @@ it("DDL covers every table and index", () => {
   const identity = IDENTITY_STATEMENTS.join("\n");
   expect(identity).toContain("snapshots_build_story_mode_browser_idx");
   expect(identity).toContain("baselines_project_story_mode_browser_branch_idx");
+  expect(identity).toContain("snapshots_project_import_path_idx");
+  expect(identity).toContain("design_links_project_import_path_idx");
 });

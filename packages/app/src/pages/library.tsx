@@ -75,7 +75,7 @@ export async function renderLibraryPage(
     distinctBranches(db, project.id),
     docsEntriesByStory(storage, project.id, build.id, snapshots),
     loadHealthPanel(project),
-    loadLibraryDesign(project, snapshots),
+    loadLibraryDesign(project, snapshots).catch(() => NO_LIBRARY_DESIGN),
   ]);
   return renderLibraryGrid(project, build, snapshots, { branches, docsByStory, health, design });
 }
@@ -86,6 +86,13 @@ interface LibraryDesign {
   previews: Map<string, DesignPreviewInfo>;
   projectLinks: ProjectDesignLink[];
 }
+
+/** Rendered when design data cannot be loaded: the library works without Figma. */
+const NO_LIBRARY_DESIGN: LibraryDesign = {
+  bySnapshot: new Map(),
+  previews: new Map(),
+  projectLinks: [],
+};
 
 async function loadLibraryDesign(project: Project, snapshots: Snapshot[]): Promise<LibraryDesign> {
   const [resolutions, projectLinks] = await Promise.all([
@@ -381,6 +388,17 @@ function renderTitleList(
   );
 }
 
+/** Component page URL of a title group (its first story file), when the index carries one. */
+function componentHref(project: Project, group: Snapshot[]): string | undefined {
+  const importPath = group.find((snap) => snap.storyImportPath)?.storyImportPath;
+  return importPath
+    ? createUrlBuilder("/", getStore().config.publishedBaseDomain).component(
+        project.slug,
+        importPath,
+      )
+    : undefined;
+}
+
 function renderTitleGroup(
   title: string,
   group: Snapshot[],
@@ -399,7 +417,13 @@ function renderTitleGroup(
       data-filter-text={`${title} ${group.map((snap) => snap.storyName).join(" ")}`}
     >
       <CardSection divider>
-        <SectionTitle>{title}</SectionTitle>
+        <SectionTitle>
+          {componentHref(project, group) ? (
+            <a href={componentHref(project, group)}>{title}</a>
+          ) : (
+            title
+          )}
+        </SectionTitle>
         <Meta as="span">{group.length} stories</Meta>
       </CardSection>
       <CardSection>
@@ -483,6 +507,7 @@ function renderSnapshotCard(
           <DesignButtons
             urls={context.design.bySnapshot.get(snap.id) ?? []}
             previews={context.design.previews}
+            componentHref={componentHref(project, [snap])}
           />
         </HStack>
       </div>

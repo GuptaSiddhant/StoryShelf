@@ -68,12 +68,13 @@ export async function loadReviewDesign(
   });
 }
 
-/** Most distinct design links a library render warms in the background. */
+/** Most distinct design links a library render refreshes (the model bounds file concurrency). */
 const WARM_LIMIT = 10;
 
 /**
- * Cached name/render per design URL for library popovers (cache read only).
- * Missing or expired entries are refreshed in the background for the next view.
+ * Cached name/render per design URL for library popovers. Missing or expired
+ * entries are refreshed first, within the page-render budget and with bounded
+ * concurrency, so a slow Figma never holds the library up or fans out unbounded.
  */
 export async function loadDesignPreviews(
   project: Project,
@@ -82,12 +83,10 @@ export async function loadDesignPreviews(
   const distinct = [...new Set(urls)];
   if (distinct.length === 0) return new Map();
   const nodes = nodeModel();
+  await refreshWithinBudget(nodes, project.id, distinct.slice(0, WARM_LIMIT));
   const cached = await nodes
     .cachedFor(project.id, distinct)
     .catch(() => new Map<string, FigmaNode>());
-  Promise.all(
-    distinct.slice(0, WARM_LIMIT).map(async (url) => await nodes.refresh(project.id, url)),
-  ).catch(() => []);
   return new Map(
     [...cached].map(([url, node]) => [
       url,
@@ -109,18 +108,13 @@ function renderUrlOf(project: Project, node: FigmaNode | undefined): string | nu
     : null;
 }
 
+/** Refresh the links, aborting every Figma call once the budget is spent (the cache keeps what landed). */
 async function refreshWithinBudget(
   nodes: FigmaNodeModel,
   projectId: string,
   urls: readonly string[],
 ): Promise<void> {
-  const refresh = Promise.all(urls.map(async (url) => await nodes.refresh(projectId, url))).catch(
-    () => [],
-  );
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const budget = new Promise<void>((resolve) => {
-    timer = setTimeout(resolve, REFRESH_BUDGET_MS);
-  });
-  await Promise.race([refresh, budget]);
-  clearTimeout(timer);
+  await nodes
+    .refreshMany(projectId, urls, { signal: AbortSignal.timeout(REFRESH_BUDGET_MS) })
+    .catch(() => new Map());
 }

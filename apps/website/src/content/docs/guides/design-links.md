@@ -23,7 +23,7 @@ Only Figma URLs are accepted; other values are ignored (and logged during captur
 
 ## Map a component manually
 
-**Settings → Design → Component mapping** maps a story file (`./src/Button.stories.tsx`) to a Figma URL. A manual mapping overrides the story parameters and survives story renames and new builds. Project admins only.
+**Settings → Design → Component mapping** maps a story file (`./src/Button.stories.tsx`) to a Figma URL. A manual mapping overrides the story parameters and survives new builds. Mappings are keyed by the story file path, so update one if the file is renamed or moved. Project admins only.
 
 The same tab holds **Design files** — project-level Figma links shown in the library header.
 
