@@ -12,7 +12,7 @@ import type { Project } from "../schema/project.ts";
 import type { StoryEntry, Viewport } from "./adapter.ts";
 import { partitionAffectedStories, type InheritedStory } from "./affected.ts";
 import type { PipelineTables } from "./pipeline.ts";
-import { renderWithTimeout } from "./render.ts";
+import { renderBudgetMs, renderWithTimeout } from "./render.ts";
 
 /** Inputs shared by every engine's pass. */
 export interface MatrixInput {
@@ -26,7 +26,8 @@ export interface MatrixInput {
   storybookDir: string;
   browsers: readonly BrowserName[];
   affectedPaths: string[] | null;
-  renderTimeoutMs: number;
+  /** Explicit render budget; unset scales with the number of captures. */
+  renderTimeoutMs?: number | undefined;
   logger: Logger | undefined;
 }
 
@@ -96,7 +97,7 @@ async function captureOnBrowser(input: MatrixInput, browser: BrowserName): Promi
       runA11y: project.runA11y ?? false,
       browser,
     },
-    input.renderTimeoutMs,
+    renderBudgetMs(partition.render.length * input.viewports.length, input.renderTimeoutMs),
   );
   return {
     captures: tagged(rendered.captures, browser),

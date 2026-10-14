@@ -10,6 +10,13 @@ import type {
 } from "@storyshelf/core/adapter/capture-runner";
 import { StorybookAdapter, resolveStoryViewports } from "@storyshelf/core/capture";
 import type { StoryParameters } from "@storyshelf/core/capture";
+import {
+  DEFAULT_RECYCLE_BROWSER_EVERY,
+  chunk,
+  describeSizing,
+  mapLimit,
+  recommendedPageConcurrency,
+} from "@storyshelf/core/utils";
 import type { Browser } from "playwright-core";
 import { messageOf, safeCloseBrowser, safeCloseServer } from "./browser.ts";
 import { createRuntimeParamsState, extractAllParameters } from "./runtime-params.ts";
@@ -23,6 +30,18 @@ import type {
   RuntimeParamsPage,
 } from "./types.ts";
 
+/**
+ * Low-memory Chromium flags. Deliberately excludes rendering-affecting flags
+ * (`--disable-gpu`, `--single-process`): they can shift pixels or crash pages,
+ * which would show up as false visual diffs.
+ */
+const CHROMIUM_ARGS = [
+  "--disable-dev-shm-usage",
+  "--disable-extensions",
+  "--disable-background-networking",
+  "--mute-audio",
+];
+
 /** Render all story/viewport combinations for a build. */
 export async function renderAll(
   input: PlaywrightRenderInput,
@@ -32,7 +51,14 @@ export async function renderAll(
   const name = input.browser ?? defaultBrowser;
   const server = await createStaticServer(input.storybookDir);
   const browser = await launchBrowser(name);
-  const result = await runWithBrowser(input, active, browser, server);
+  input.logger?.info(describeSizing(input), "capture sizing");
+  const result = await runWithBrowser(
+    input,
+    active,
+    browser,
+    server,
+    async () => await launchBrowser(name),
+  );
   // Echo the engine so persisted rows are attributable without the request.
   for (const row of [...result.captures, ...result.failures]) row.browser = name;
   return result;
@@ -75,17 +101,19 @@ async function runWithBrowser(
   active: ActiveRun,
   browser: Browser,
   server: Awaited<ReturnType<typeof createStaticServer>>,
+  relaunch: () => Promise<Browser>,
 ): Promise<RenderResult> {
   active.browser = browser;
   const ctx = buildContext(browser, server.url, input);
   const captures: RenderedSnapshot[] = [];
   const failures: RenderResult["failures"] = [];
   try {
-    await runAllCaptures(input, active, ctx, captures, failures);
+    await runAllCaptures(input, active, ctx, captures, failures, relaunch);
     return { captures, failures };
   } finally {
     active.browser = null;
-    await Promise.all([safeCloseBrowser(browser), safeCloseServer(server)]);
+    // ctx.browser is the latest one: recycling replaces the browser mid-run.
+    await Promise.all([safeCloseBrowser(ctx.browser), safeCloseServer(server)]);
   }
 }
 
@@ -98,7 +126,8 @@ async function launchBrowser(name: BrowserName): Promise<Browser> {
   const playwright = await import("playwright-core");
   if (name === "firefox") return await playwright.firefox.launch();
   if (name === "webkit") return await playwright.webkit.launch();
-  return await playwright.chromium.launch();
+  // Containers ship a tiny /dev/shm; Chromium crashes (looks like OOM) unless it uses /tmp.
+  return await playwright.chromium.launch({ args: CHROMIUM_ARGS });
 }
 
 function buildContext(
@@ -110,6 +139,7 @@ function buildContext(
     browser,
     adapter: input.adapter ?? new StorybookAdapter(),
     baseUrl,
+    navigationTimeoutMs: input.navigationTimeoutMs,
     executePlay: input.executePlay,
     playTimeoutMs: input.playTimeoutMs,
     runA11y: input.runA11y,
@@ -123,24 +153,38 @@ async function runAllCaptures(
   ctx: CaptureContext,
   captures: RenderedSnapshot[],
   failures: RenderResult["failures"],
+  relaunch: () => Promise<Browser>,
 ): Promise<void> {
-  const tasks = input.stories.flatMap((story) =>
-    viewportsTasks(story, input, active, ctx, captures, failures),
+  // Bounded: one page per story x viewport all at once exhausts memory on large Storybooks.
+  const jobs = input.stories.flatMap((story) =>
+    resolveStoryViewports(story, input.viewports).map((viewport) => ({ story, viewport })),
   );
-  await Promise.all(tasks);
+  // Batches drain in-flight pages, so the browser can be swapped between them.
+  const batches = chunk(jobs, input.recycleBrowserEvery ?? DEFAULT_RECYCLE_BROWSER_EVERY);
+  for (const [index, batch] of batches.entries()) {
+    if (index > 0) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- recycle only between drained batches
+      await recycleBrowser(active, ctx, relaunch, input.logger);
+    }
+    // oxlint-disable-next-line eslint/no-await-in-loop -- batches run one after another
+    await mapLimit(batch, input.concurrency ?? recommendedPageConcurrency(), async (job) => {
+      await captureOne(input, active, ctx, job.story, job.viewport, captures, failures);
+    });
+  }
 }
-function viewportsTasks(
-  story: StoryEntry,
-  input: PlaywrightRenderInput,
+
+/** Swap in a fresh browser; the old one is closed first so two never coexist. */
+async function recycleBrowser(
   active: ActiveRun,
   ctx: CaptureContext,
-  captures: RenderedSnapshot[],
-  failures: RenderResult["failures"],
-): Promise<void>[] {
-  // oxlint-disable-next-line typescript/promise-function-async -- returns array of promises, not a single promise
-  return resolveStoryViewports(story, input.viewports).map((viewport) =>
-    captureOne(input, active, ctx, story, viewport, captures, failures),
-  );
+  relaunch: () => Promise<Browser>,
+  logger: PlaywrightRenderInput["logger"],
+): Promise<void> {
+  if (active.cancelled) throw new Error("Capture cancelled");
+  await safeCloseBrowser(ctx.browser);
+  ctx.browser = await relaunch();
+  active.browser = ctx.browser;
+  logger?.debug({}, "browser recycled");
 }
 
 async function captureOne(

@@ -73,6 +73,39 @@ Swap the database layer for `@storyshelf/db-postgres` (Postgres via `postgres.js
 
 One `npm start` (or `fly deploy`, `railway up`, `render.com`, etc.) and you're running.
 
+## Sizing memory for capture
+
+Capture drives Chromium, which dominates memory use. Each open page costs roughly 100–300 MB, so StoryShelf renders a bounded number of pages at once rather than every story together.
+
+| Setting | Default | What it controls |
+| --- | --- | --- |
+| `config.captureConcurrency` (server) / `WORKER_CONCURRENCY` (remote worker) | auto: 2 builds on hosts with ≥ 2 CPUs and ≥ 3 GB, otherwise 1 | Builds captured at the same time (each launches its own browser) |
+| `createPlaywrightCaptureRunner({ concurrency })` / `STORYSHELF_CAPTURE_CONCURRENCY` | auto (see below) | Pages rendering at once within one build |
+| `createPlaywrightCaptureRunner({ navigationTimeoutMs })` / `STORYSHELF_NAVIGATION_TIMEOUT_MS` | auto: 30 s, 60 s under 2 CPUs, 90 s under 1 CPU | Per-page navigation and action timeout |
+
+| `createPlaywrightCaptureRunner({ recycleBrowserEvery })` / `STORYSHELF_BROWSER_RECYCLE_EVERY` | `150` (`0` disables) | Captures between browser restarts |
+
+The defaults are sized from the CPU and memory the process can actually use, including container limits (cgroup CPU quota and memory limit), so a 0.5 vCPU / 1 GB container on a big host is treated as 0.5 / 1 GB. Pages at once is the smaller of the CPU count (rounded up), `(memory − 512 MB) / 300 MB`, and 4, with a minimum of 1. In practice:
+
+| Host | Builds at once | Pages at once | Navigation timeout |
+| --- | --- | --- | --- |
+| 0.5 vCPU, 1 GB | 1 | 1 | 90 s |
+| 1 vCPU, 2 GB | 1 | 1 | 60 s |
+| 2 vCPU, 4 GB | 1 | 2 | 30 s |
+| 4 vCPU, 8 GB | 2 | 4 | 30 s |
+
+More pages than CPUs does not make capture faster: the pages compete for the same cores, each loads more slowly, and slow loads time out. The orchestrator also gives each render a time budget of 15 minutes, or 15 seconds per capture for large builds, whichever is longer (an explicit `renderTimeoutMs` always wins). One page at a time on a small host is slower, so a 1,000-capture build gets about 4 hours before it is cancelled as hung; without this, a build that is merely slow would be reported as timed out.
+
+Chromium grows slowly over a long run, so the browser is closed and relaunched every 150 captures. The restart happens between batches, after in-flight pages finish, so no capture is interrupted. At the start of every render the runner logs a `capture sizing` line with the detected `cpus` and `memoryMb` and the resulting `pages`, `navigationTimeoutMs` and `recycleBrowserEvery`; check it first if a host behaves differently from the table.
+
+If your platform reserves CPU in a way the container cannot see (for example a VM with a fractional share), the detection cannot know; set the values explicitly.
+
+Node itself is cheap by comparison, but its default heap limit can be larger than what is left once Chromium has its share. On small hosts cap it, for example `NODE_OPTIONS=--max-old-space-size=384` on a 1 GB machine (the Fly demo sets this in `fly.toml`), so Node collects garbage earlier instead of crowding out the browser.
+
+Storing the uploaded Storybook for the published preview handles at most 8 files at a time, so large builds (thousands of files) no longer have to fit in memory. Chromium is launched with low-memory flags (`--disable-dev-shm-usage`, `--disable-extensions`, `--disable-background-networking`, `--mute-audio`); rendering-affecting flags such as `--disable-gpu` are intentionally not used, because they can change pixels and cause false visual diffs.
+
+If builds still run out of memory, lower the runner concurrency first, then add RAM.
+
 ## Cloud reference stacks
 
 Enterprise Terraform stacks are available per cloud — each scaffolds an app + worker, database, storage, queue, auth, and optional DNS/TLS. See the dedicated pages for commands, env wiring, and stable output contracts:

@@ -211,7 +211,7 @@ function generateWorker(answers: Answers): string {
     `  storage,`,
     `  runner,`,
     `  scratchDir: dataDir,`,
-    `  config: { concurrency: Number(process.env.WORKER_CONCURRENCY) || 2 },`,
+    `  config: { concurrency: Number(process.env.WORKER_CONCURRENCY) || undefined },`,
     `});`,
     ``,
     `await worker.start();`,

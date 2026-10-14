@@ -21,6 +21,12 @@ export interface PuppeteerRenderInput {
   playTimeoutMs?: number;
   runA11y?: boolean;
   browser?: BrowserName;
+  /** Max pages rendering at once (default: sized from detected CPU and memory). */
+  concurrency?: number;
+  /** Per-page timeout in ms (default: scaled up on CPU-starved hosts). */
+  navigationTimeoutMs?: number;
+  /** Restart the browser after this many captures to bound its slow growth (0 disables; default 150). */
+  recycleBrowserEvery?: number;
   /** Test/extension seam: story source adapter (defaults to `StorybookAdapter`). */
   adapter?: StorySourceAdapter;
 }
@@ -34,6 +40,7 @@ export interface ScreenshotContext {
 
 /** Extended context threaded through the capture pipeline. */
 export interface CaptureContext extends ScreenshotContext {
+  navigationTimeoutMs?: number;
   executePlay?: boolean;
   playTimeoutMs?: number;
   runA11y?: boolean;

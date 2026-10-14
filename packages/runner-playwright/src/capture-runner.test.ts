@@ -11,6 +11,7 @@ import {
 
 const playwright = vi.hoisted(() => {
   let closed = false;
+  let launches = 0;
   const pendingGotos: ((error: Error) => void)[] = [];
   let lastBrowser: typeof browser | null = null;
   let hangNextGoto = true;
@@ -27,6 +28,7 @@ const playwright = vi.hoisted(() => {
         pendingGotos.push(reject);
       });
     },
+    setDefaultTimeout: (): void => {},
     waitForSelector: async (): Promise<unknown> => {
       await Promise.resolve();
       return null;
@@ -71,6 +73,7 @@ const playwright = vi.hoisted(() => {
     browser,
     chromium: {
       launch: async (): Promise<typeof browser> => {
+        launches += 1;
         closed = false;
         browser.closed = false;
         lastBrowser = browser;
@@ -79,6 +82,7 @@ const playwright = vi.hoisted(() => {
       },
     },
     lastBrowser: (): typeof browser | null => lastBrowser,
+    launchCount: (): number => launches,
     configureHang: (hang: boolean): void => {
       hangNextGoto = hang;
     },
@@ -140,6 +144,42 @@ describe("createPlaywrightCaptureRunner.render", () => {
     expect(browser?.closed).toBe(true);
   }, 30_000);
 
+  it("restarts the browser every N captures and logs the sizing", async () => {
+    const stories = Array.from({ length: 10 }, (_, i) => ({ ...STORIES[0]!, id: `s-${i}` }));
+    const before = playwright.launchCount();
+    const info = vi.fn();
+    playwright.configureHang(false);
+    const result = await createPlaywrightCaptureRunner({ recycleBrowserEvery: 4 }).render({
+      buildId: "build-1",
+      storybookDir,
+      stories,
+      viewports: VIEWPORTS,
+      logger: { info, debug: vi.fn(), warn: vi.fn(), error: vi.fn() } as never,
+    });
+
+    expect(result.captures).toHaveLength(10);
+    // 10 captures in batches of 4 -> 3 browsers (initial + 2 restarts).
+    expect(playwright.launchCount() - before).toBe(3);
+    expect(info).toHaveBeenCalledWith(
+      expect.objectContaining({ recycleBrowserEvery: 4, pages: expect.any(Number) }),
+      "capture sizing",
+    );
+  }, 30_000);
+
+  it("never restarts the browser when recycling is disabled", async () => {
+    const stories = Array.from({ length: 6 }, (_, i) => ({ ...STORIES[0]!, id: `s-${i}` }));
+    const before = playwright.launchCount();
+    playwright.configureHang(false);
+    await createPlaywrightCaptureRunner({ recycleBrowserEvery: 0 }).render({
+      buildId: "build-1",
+      storybookDir,
+      stories,
+      viewports: VIEWPORTS,
+    });
+
+    expect(playwright.launchCount() - before).toBe(1);
+  }, 30_000);
+
   it("resolves cancel for builds that are not rendering", async () => {
     const runner = createPlaywrightCaptureRunner();
     await expect(runner.cancel("does-not-exist")).resolves.toBeUndefined();
@@ -167,6 +207,36 @@ describe("createPlaywrightCaptureRunner.render", () => {
 
     expect(result.captures).toHaveLength(1);
     expect(waitForReady).toHaveBeenCalledTimes(1);
+  }, 30_000);
+
+  it("caps concurrently open pages at the configured concurrency", async () => {
+    let active = 0;
+    let peak = 0;
+    const adapter = {
+      name: "fake",
+      discover: async (): Promise<StoryEntry[]> => [],
+      buildUrl: (): string => "/",
+      waitForReady: async (): Promise<void> => {
+        active += 1;
+        peak = Math.max(peak, active);
+        await new Promise((resolve) => {
+          setTimeout(resolve, 5);
+        });
+        active -= 1;
+      },
+    };
+    const stories = Array.from({ length: 12 }, (_, i) => ({ ...STORIES[0]!, id: `s-${i}` }));
+    playwright.configureHang(false);
+    const result = await createPlaywrightCaptureRunner({ concurrency: 3 }).render({
+      buildId: "build-1",
+      storybookDir,
+      stories,
+      viewports: VIEWPORTS,
+      adapter,
+    });
+
+    expect(result.captures).toHaveLength(12);
+    expect(peak).toBe(3);
   }, 30_000);
 
   it("enriches parameters from the runtime preview once per run", async () => {

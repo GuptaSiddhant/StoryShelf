@@ -16,6 +16,7 @@ export async function captureScreenshot(
 ): Promise<{ screenshot: Buffer; a11yViolations: string[]; story: StoryEntry }> {
   const page = await ctx.browser.newPage();
   await page.setViewport({ width: viewport.width, height: viewport.height });
+  if (ctx.navigationTimeoutMs) page.setDefaultTimeout(ctx.navigationTimeoutMs);
   try {
     return await runCapture(page, ctx, inputStory, viewport);
   } finally {

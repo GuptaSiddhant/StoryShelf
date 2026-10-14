@@ -64,8 +64,10 @@ function createFakeAdapters() {
 
 describe("resolveWorkerConfig", () => {
   it("returns defaults when no input", () => {
-    expect(resolveWorkerConfig()).toEqual(DEFAULT_WORKER_CONFIG);
-    expect(resolveWorkerConfig({})).toEqual(DEFAULT_WORKER_CONFIG);
+    const { concurrency, ...rest } = resolveWorkerConfig();
+    expect(rest).toEqual(DEFAULT_WORKER_CONFIG);
+    expect(concurrency).toBeGreaterThanOrEqual(1);
+    expect(resolveWorkerConfig({}).concurrency).toBe(concurrency);
   });
 
   it("merges overrides", () => {
@@ -79,7 +81,6 @@ describe("resolveWorkerConfig", () => {
 
 describe("createCaptureWorker", () => {
   it("exposes default config", () => {
-    expect(DEFAULT_WORKER_CONFIG.concurrency).toBe(2);
     expect(DEFAULT_WORKER_CONFIG.maxRetries).toBe(2);
   });
 

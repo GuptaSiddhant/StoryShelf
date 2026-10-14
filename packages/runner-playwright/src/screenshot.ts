@@ -17,6 +17,7 @@ export async function captureScreenshot(
   const page = await ctx.browser.newPage({
     viewport: { width: viewport.width, height: viewport.height },
   });
+  if (ctx.navigationTimeoutMs) page.setDefaultTimeout(ctx.navigationTimeoutMs);
   try {
     return await runCapture(page, ctx, inputStory, viewport);
   } finally {

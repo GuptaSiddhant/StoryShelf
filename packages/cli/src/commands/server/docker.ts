@@ -116,7 +116,7 @@ function workerComposeLines(database: string): string[] {
     ...(postgres ? ["      - DATABASE_URL=postgres://shelf:shelf@postgres:5432/shelf"] : []),
     // oxlint-disable-next-line no-template-curly-in-string -- literal compose interpolation
     "      - QUEUE_URL=${QUEUE_URL}",
-    "      - WORKER_CONCURRENCY=2",
+    "      # - WORKER_CONCURRENCY=2  # optional: override CPU/memory-based sizing",
     "    depends_on:",
     "      storyshelf:",
     "        condition: service_started",

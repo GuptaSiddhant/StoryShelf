@@ -18,6 +18,12 @@ const capture = createPlaywrightCaptureRunner();
 
 Supply it to `createShelfApp({ capture, config: { scratchDir } })` — the router builds the orchestrator that loads the build, extracts the uploaded archive into `scratchDir`, discovers stories, calls `capture.render(...)`, and persists. `server` is the assembly point that hard-wires this renderer today (`storyshelf-server serve`, passing `--data-dir` as `scratchDir`). A future alternative (e.g. a remote runner offloading capture to a worker fleet) implements the same pure `CaptureRunner` interface from `@storyshelf/core/adapters/capture-runner` as its own package and is swapped in at the `serve` assembly site — the router, orchestrator, and pipeline never change.
 
+## Concurrency and memory
+
+Each open Chromium page costs roughly 100–300 MB, so `render` captures a bounded number of story/viewport pairs at once instead of all of them. The default is sized from the detected CPU and memory (container limits included): the smaller of the CPU count rounded up, `(memory − 512 MB) / 300 MB`, and 4, never below 1. Override it with `createPlaywrightCaptureRunner({ concurrency })` or the `STORYSHELF_CAPTURE_CONCURRENCY` environment variable (the option wins). On a 0.5 vCPU or 1 vCPU host that means one page at a time, because extra pages only compete for the same CPU and trip timeouts. The per-page timeout scales the same way (30 s, 60 s under 2 CPUs, 90 s under 1 CPU); override it with `navigationTimeoutMs` or `STORYSHELF_NAVIGATION_TIMEOUT_MS`. The browser is restarted every 150 captures to bound its slow memory growth (`recycleBrowserEvery`, or `STORYSHELF_BROWSER_RECYCLE_EVERY`; `0` disables), and each render logs a `capture sizing` line with the detected CPUs, memory and resulting settings. Chromium is launched with low-memory flags (`--disable-dev-shm-usage` so small container `/dev/shm` mounts don't crash it, plus `--disable-extensions`, `--disable-background-networking`, `--mute-audio`). Flags that can change rendered pixels (`--disable-gpu`, `--single-process`) are deliberately left out so baselines stay stable.
+
+Rule of thumb: total pages = `ShelfConfig.captureConcurrency` (builds at once, auto: 1 unless ≥ 2 CPUs and ≥ 3 GB) × runner `concurrency`.
+
 ## Browsers
 
 This package depends on `playwright-core` only — it never downloads browsers. Provision Chromium once per machine (pinned to the client version):

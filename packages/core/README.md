@@ -63,7 +63,7 @@ Assembles the router from the provided adapters. `ShelfOptions`:
 interface ShelfConfig {
   secret?: string; // session signing secret
   publishedBaseDomain?: string; // for published storybook URLs
-  captureConcurrency?: number; // concurrent capture jobs (default 2)
+  captureConcurrency?: number; // concurrent capture jobs; default 2 on hosts with ≥ 2 CPUs and ≥ 3 GB, otherwise 1 (each job drives its own browser)
   scratchDir?: string; // capture working directory (required with captureRunner)
   purgeTtlDays?: number; // purge builds older than N days
   branchTtlDays?: number | null; // branch baseline TTL, days; null disables GC (default 30)

@@ -12,12 +12,16 @@ import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 import type { BuildStatus, SnapshotStatus } from "../types.ts";
 import type { SecretInput } from "../utils/encrypt.ts";
+import { mapLimit } from "../utils/map-limit.ts";
 import { diffPath, screenshotPath } from "../utils/paths.ts";
 import type { Viewport } from "./adapter.ts";
 import type { InheritedStory } from "./affected.ts";
 import { diffStoredScreenshots, writeDiffOverlay } from "./diff-record.ts";
 import { assertScreenshotBuffer } from "./guards.ts";
 import { infraHashFor, SIZING_DEFAULTS } from "./sizing.ts";
+
+/** Snapshots persisted at once: each decodes two PNGs for the diff, so unbounded fan-out spikes memory. */
+const PERSIST_CONCURRENCY = 4;
 
 /**
  * Persist a completed capture run: write screenshots, diff against the branch
@@ -45,44 +49,42 @@ export async function persistCapture(
   // Primary engine first: a newly enabled engine bootstraps from its counterpart.
   for (const group of capturesByPhase(ctx)) {
     // oxlint-disable-next-line no-await-in-loop -- phases must run in order
-    await Promise.all(
-      group.map(async (capture) => {
-        try {
-          await persistSnapshot(ctx, capture);
-        } catch (error) {
-          // A failure in one story/viewport must not abort the other persists.
-          // Flaky and a11y stories remain non-blocking even on persist failure.
-          if (flakyIds.has(capture.story.id) || a11yIds.has(capture.story.id)) {
-            if (flakyIds.has(capture.story.id)) flakyIds.add(capture.story.id);
-            if (a11yIds.has(capture.story.id)) a11yIds.add(capture.story.id);
-            ctx.logger?.warn(
-              { storyId: capture.story.id, viewport: capture.viewportName, err: error },
-              "capture failed for flaky/a11y story (non-blocking)",
-            );
-            await emitAttemptLog(
-              ctx.recordLog,
-              ctx.logger,
-              "warn",
-              "capture failed for flaky/a11y story (non-blocking)",
-              {
-                storyId: capture.story.id,
-                viewport: capture.viewportName,
-              },
-            );
-          } else {
-            failedStoryIds.add(capture.story.id);
-          }
-          ctx.logger?.error(
+    await mapLimit(group, PERSIST_CONCURRENCY, async (capture) => {
+      try {
+        await persistSnapshot(ctx, capture);
+      } catch (error) {
+        // A failure in one story/viewport must not abort the other persists.
+        // Flaky and a11y stories remain non-blocking even on persist failure.
+        if (flakyIds.has(capture.story.id) || a11yIds.has(capture.story.id)) {
+          if (flakyIds.has(capture.story.id)) flakyIds.add(capture.story.id);
+          if (a11yIds.has(capture.story.id)) a11yIds.add(capture.story.id);
+          ctx.logger?.warn(
             { storyId: capture.story.id, viewport: capture.viewportName, err: error },
-            "capture failed for story",
+            "capture failed for flaky/a11y story (non-blocking)",
           );
-          await emitAttemptLog(ctx.recordLog, ctx.logger, "error", "capture failed for story", {
-            storyId: capture.story.id,
-            viewport: capture.viewportName,
-          });
+          await emitAttemptLog(
+            ctx.recordLog,
+            ctx.logger,
+            "warn",
+            "capture failed for flaky/a11y story (non-blocking)",
+            {
+              storyId: capture.story.id,
+              viewport: capture.viewportName,
+            },
+          );
+        } else {
+          failedStoryIds.add(capture.story.id);
         }
-      }),
-    );
+        ctx.logger?.error(
+          { storyId: capture.story.id, viewport: capture.viewportName, err: error },
+          "capture failed for story",
+        );
+        await emitAttemptLog(ctx.recordLog, ctx.logger, "error", "capture failed for story", {
+          storyId: capture.story.id,
+          viewport: capture.viewportName,
+        });
+      }
+    });
   }
   // Also log flaky and a11y render failures as warnings
   for (const id of flakyIds) {
@@ -191,8 +193,10 @@ async function tryPersistInherited(
 
 /** Persist inherited snapshots; a failure marks the story failed. */
 async function persistInherited(ctx: CaptureContext): Promise<ReadonlySet<string>> {
-  const outcomes = await Promise.all(
-    (ctx.inherited ?? []).map(async (inherited) => await tryPersistInherited(ctx, inherited)),
+  const outcomes = await mapLimit(
+    ctx.inherited ?? [],
+    PERSIST_CONCURRENCY,
+    async (inherited) => await tryPersistInherited(ctx, inherited),
   );
   return new Set(outcomes.filter((id): id is string => id !== null));
 }

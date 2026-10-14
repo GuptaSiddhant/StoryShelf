@@ -29,6 +29,8 @@ const runner = createPuppeteerCaptureRunner({
 });
 ```
 
+Pages render through a bounded pool sized from the detected CPU and memory (one page on 0.5–1 vCPU hosts). Tune it with `concurrency` / `STORYSHELF_CAPTURE_CONCURRENCY` and `navigationTimeoutMs` / `STORYSHELF_NAVIGATION_TIMEOUT_MS`; see [Sizing memory for capture](/guides/deployment/#sizing-memory-for-capture). The default launch args include low-memory flags; passing your own `args` replaces them.
+
 Hand the runner to the server or to a remote worker — both are runners-agnostic:
 
 ```ts
