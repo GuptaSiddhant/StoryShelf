@@ -18,8 +18,8 @@ import { comments as commentsTable } from "./comment.ts";
 import { contentRefs as contentRefsTable } from "./content-refs.ts";
 import {
   designLinks as designLinksTable,
-  designTokens as designTokensTable,
-  figmaNodes as figmaNodesTable,
+  designCredentials as designCredentialsTable,
+  designNodes as designNodesTable,
 } from "./design.ts";
 import {
   aiBudgetAlerts as aiBudgetAlertsTable,
@@ -52,7 +52,7 @@ export { comments } from "./comment.ts";
 export { buildLabels, labelTypes } from "./label.ts";
 export { projectMembers } from "./member.ts";
 export { buildPackageUsage, projectLinks } from "./usage.ts";
-export { designLinks, designTokens, figmaNodes } from "./design.ts";
+export { designCredentials, designLinks, designNodes } from "./design.ts";
 export { projectGroupMappings } from "./project-group-mapping.ts";
 export { projects } from "./project.ts";
 export { snapshots } from "./snapshot.ts";
@@ -73,8 +73,8 @@ export type { Build } from "./build.ts";
 export type { Comment } from "./comment.ts";
 /** Build label and label type rows. */
 export type { BuildLabel, LabelType } from "./label.ts";
-/** Design link, Figma token and cached Figma node rows. */
-export type { DesignLink, DesignToken, FigmaNode } from "./design.ts";
+/** Design link, provider credential and cached design node rows. */
+export type { DesignCredential, DesignLink, DesignNode } from "./design.ts";
 /** Project link and per-build package usage rows. */
 export type { BuildPackageUsage, ProjectLink } from "./usage.ts";
 /** Project membership row linking a user to a project role. */
@@ -118,8 +118,8 @@ export const schema: {
   buildLabels: AnyMySqlTable;
   projectLinks: AnyMySqlTable;
   designLinks: AnyMySqlTable;
-  designTokens: AnyMySqlTable;
-  figmaNodes: AnyMySqlTable;
+  designCredentials: AnyMySqlTable;
+  designNodes: AnyMySqlTable;
   buildPackageUsage: AnyMySqlTable;
   tokens: AnyMySqlTable;
   webhooks: AnyMySqlTable;
@@ -146,8 +146,8 @@ export const schema: {
   buildLabels: buildLabelsTable,
   projectLinks: projectLinksTable,
   designLinks: designLinksTable,
-  designTokens: designTokensTable,
-  figmaNodes: figmaNodesTable,
+  designCredentials: designCredentialsTable,
+  designNodes: designNodesTable,
   buildPackageUsage: buildPackageUsageTable,
   tokens: tokensTable,
   webhooks: webhooksTable,

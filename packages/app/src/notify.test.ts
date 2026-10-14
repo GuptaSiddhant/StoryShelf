@@ -60,6 +60,7 @@ function storeFor(db: ReturnType<typeof makeDatabase>["db"], notifiers: Notifier
     authEnabled: false,
     sessionId: "test",
     gitHosts: [],
+    design: [],
     notifiers,
   };
 }

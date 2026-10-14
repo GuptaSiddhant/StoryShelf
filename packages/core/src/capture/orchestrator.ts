@@ -1,6 +1,7 @@
 import type { Logger } from "pino";
 import type { CaptureRunner } from "../adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
+import { parseDesignUrl, type DesignProvider } from "../adapters/design.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { BuildModel, type BuildTables } from "../models/build.ts";
 import {
@@ -16,7 +17,7 @@ import { parentContext, withSpan } from "../tracing.ts";
 import type { SecretInput } from "../utils/encrypt.ts";
 import { roundedTimings, runWithTimings, timed } from "../utils/timing.ts";
 import { DEFAULT_VIEWPORTS, isDisabledStory, isFlakyStory } from "./adapter.ts";
-import type { Viewport } from "./adapter.ts";
+import type { DiscoverOptions, Viewport } from "./adapter.ts";
 import { assertSupportedBrowsers, resolveBrowsers } from "./browsers.ts";
 import { logInvalidDesigns } from "./design.ts";
 import { assertModeCaps, enrichStories } from "./enrich.ts";
@@ -46,8 +47,16 @@ export interface CaptureJobOptions {
   logger?: Logger;
   /** Server secret for decrypting webhook secrets at send time. */
   secret?: SecretInput;
+  /** Design providers validating declared design links; none ⇒ links are not extracted. */
+  design?: DesignProvider[];
   /** Render budget override (tests use a short fuse). */
   renderTimeoutMs?: number | undefined;
+}
+
+/** Parser over the configured design providers, or undefined when there are none. */
+function designParser(providers: DesignProvider[] | undefined): DiscoverOptions["parseDesignUrl"] {
+  if (!providers || providers.length === 0) return undefined;
+  return (raw) => parseDesignUrl(providers, raw)?.ref ?? null;
 }
 
 /** Pointer to the attempt row owning this run's log history. */
@@ -165,7 +174,9 @@ async function runCapturePhases(
     });
 
     const adapter = new StorybookAdapter();
-    const discovered = await adapter.discover(extractedDir);
+    const discovered = await adapter.discover(extractedDir, {
+      parseDesignUrl: designParser(options.design),
+    });
     logInvalidDesigns(logger, discovered);
     // Resolve viewports via single helper (project JSON → server override → default)
     const rawViewports = (project as unknown as { viewports?: string | null }).viewports;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseFigmaUrl } from "./figma-url.ts";
+import { parseFigmaUrl } from "./url.ts";
 
 describe("parseFigmaUrl", () => {
   it("parses file, design, board and proto links", () => {

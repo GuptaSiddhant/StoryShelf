@@ -1,17 +1,19 @@
+import { parseDesignUrl } from "@storyshelf/core/adapter/design";
 import {
+  DesignCredentialModel,
   DesignModel,
-  FigmaNodeModel,
+  DesignNodeModel,
   isDesignStale,
   resolveDesigns,
   normalizeImportPath,
   type DesignResolution,
 } from "@storyshelf/core/models";
-import type { FigmaNode, Project, Snapshot } from "@storyshelf/core/schema";
+import type { DesignNode, Project, Snapshot } from "@storyshelf/core/schema";
 import { credentialKeys } from "../credential-keys.ts";
 import type { DesignItem, DesignPreviewInfo, ProjectDesignLink } from "../pages/design-links.tsx";
 import { getStore } from "../store.ts";
 
-/** Most a page render waits for fresh Figma metadata; slower fetches finish into the cache for next time. */
+/** Most a page render waits for fresh design metadata; slower fetches finish into the cache for next time. */
 const REFRESH_BUDGET_MS = 1500;
 
 /** Component (story file) → design link(s) for a build's snapshots; files without a link are absent. */
@@ -19,8 +21,9 @@ export async function loadDesignResolutions(
   project: Project,
   snapshots: readonly Snapshot[],
 ): Promise<Map<string, DesignResolution>> {
-  const { db, config } = getStore();
-  const model = new DesignModel(db, undefined, credentialKeys(config));
+  const { db, design } = getStore();
+  if (design.length === 0) return new Map();
+  const model = new DesignModel(db, design);
   return resolveDesigns(await model.componentLinks(project.id), snapshots);
 }
 
@@ -35,10 +38,9 @@ export function designUrlsFor(
 
 /** Project-level design file links for the library header. */
 export async function loadProjectDesignLinks(project: Project): Promise<ProjectDesignLink[]> {
-  const { db, config } = getStore();
-  const links = await new DesignModel(db, undefined, credentialKeys(config)).projectLinks(
-    project.id,
-  );
+  const { db, design } = getStore();
+  if (design.length === 0) return [];
+  const links = await new DesignModel(db, design).projectLinks(project.id);
   return links.map((link) => ({ label: link.label ?? "Design", url: link.url }));
 }
 
@@ -55,12 +57,13 @@ export async function loadReviewDesign(
   if (urls.length === 0) return [];
   const nodes = nodeModel();
   await refreshWithinBudget(nodes, project.id, urls);
-  const cached = await nodes.cachedFor(project.id, urls).catch(() => new Map<string, FigmaNode>());
+  const cached = await nodes.cachedFor(project.id, urls).catch(() => new Map<string, DesignNode>());
   return urls.map((url) => {
     const node = cached.get(url);
     return {
       url,
       name: node?.name ?? null,
+      providerName: providerNameFor(url),
       renderUrl: renderUrlOf(project, node),
       state: node?.state ?? "unknown",
       stale: isDesignStale(node, snapshot.baselineVersion),
@@ -74,7 +77,7 @@ const WARM_LIMIT = 10;
 /**
  * Cached name/render per design URL for library popovers. Missing or expired
  * entries are refreshed first, within the page-render budget and with bounded
- * concurrency, so a slow Figma never holds the library up or fans out unbounded.
+ * concurrency, so a slow design API never holds the library up or fans out unbounded.
  */
 export async function loadDesignPreviews(
   project: Project,
@@ -86,7 +89,7 @@ export async function loadDesignPreviews(
   await refreshWithinBudget(nodes, project.id, distinct.slice(0, WARM_LIMIT));
   const cached = await nodes
     .cachedFor(project.id, distinct)
-    .catch(() => new Map<string, FigmaNode>());
+    .catch(() => new Map<string, DesignNode>());
   return new Map(
     [...cached].map(([url, node]) => [
       url,
@@ -95,22 +98,27 @@ export async function loadDesignPreviews(
   );
 }
 
-function nodeModel(): FigmaNodeModel {
-  const { db, config, logger, storage } = getStore();
-  const design = new DesignModel(db, undefined, credentialKeys(config));
-  return new FigmaNodeModel(db, design, { logger, storage });
+function nodeModel(): DesignNodeModel {
+  const { db, config, logger, storage, design } = getStore();
+  const credentials = new DesignCredentialModel(db, credentialKeys(config));
+  return new DesignNodeModel(db, credentials, design, { logger, storage });
+}
+
+/** Display name of the provider that owns a design link ("Figma"), or a generic fallback. */
+export function providerNameFor(url: string): string {
+  return parseDesignUrl(getStore().design, url)?.provider.metadata.name ?? "Design";
 }
 
 /** API URL of a node's cached render (version-busted), or null when none is cached. */
-function renderUrlOf(project: Project, node: FigmaNode | undefined): string | null {
+function renderUrlOf(project: Project, node: DesignNode | undefined): string | null {
   return node?.renderPath
     ? `/api/v1/projects/${project.slug}/design/renders/${node.id}?v=${encodeURIComponent(node.renderVersion ?? "")}`
     : null;
 }
 
-/** Refresh the links, aborting every Figma call once the budget is spent (the cache keeps what landed). */
+/** Refresh the links, aborting every provider call once the budget is spent (the cache keeps what landed). */
 async function refreshWithinBudget(
-  nodes: FigmaNodeModel,
+  nodes: DesignNodeModel,
   projectId: string,
   urls: readonly string[],
 ): Promise<void> {

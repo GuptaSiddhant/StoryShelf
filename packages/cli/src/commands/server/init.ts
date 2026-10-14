@@ -116,6 +116,8 @@ interface Answers {
   includeWorker?: boolean;
   /** Email + chat notification wiring. Absent in older mocked answers. */
   notifications?: boolean;
+  /** Figma design links via `@storyshelf/design-figma` (opt-in). Absent means off. */
+  design?: boolean;
   /** OpenTelemetry wiring (opt-in). Absent means off. */
   observability?: boolean;
   /** Deploy target. Absent in older mocked answers — derived from `docker`. */
@@ -258,6 +260,11 @@ function wantsNotifications(answers: Answers): boolean {
   return answers.notifications ?? false;
 }
 
+/** Whether the generated server/worker wire the Figma design provider (opt-in). */
+function wantsDesign(answers: Answers): boolean {
+  return answers.design ?? false;
+}
+
 /** Whether the generated server/worker wire OpenTelemetry (opt-in). */
 function wantsObservability(answers: Answers): boolean {
   return answers.observability ?? false;
@@ -328,6 +335,9 @@ function buildImports(answers: Answers): string[] {
   if (answers.git !== "none") {
     const host = answers.git === "github" ? "gitHubHost" : "gitLabHost";
     imports.push(`import { ${host} } from "${GIT_PACKAGE[answers.git]}";`);
+  }
+  if (wantsDesign(answers)) {
+    imports.push(`import { createFigmaDesign } from "@storyshelf/design-figma";`);
   }
   if (wantsNotifications(answers)) {
     imports.push(
@@ -474,6 +484,9 @@ function buildRouterLines(answers: Answers): string[] {
     const host = answers.git === "github" ? "gitHubHost" : "gitLabHost";
     lines.push(`  gitHosts: [${host}],`);
   }
+  if (wantsDesign(answers)) {
+    lines.push(`  design: [createFigmaDesign()],`);
+  }
 
   if (wantsObservability(answers)) {
     lines.push(`  logger: shelfLogger,`, `  observability,`);
@@ -578,6 +591,9 @@ function generateWorkerFile(answers: Answers): string {
       ? [`import { initObservabilityFromEnv } from "@storyshelf/observability/node";`]
       : []),
     `import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";`,
+    ...(wantsDesign(answers)
+      ? [`import { createFigmaDesign } from "@storyshelf/design-figma";`]
+      : []),
     DB_IMPORT[answers.database],
     STORAGE_IMPORT[answers.storage],
     ``,
@@ -598,6 +614,7 @@ function generateWorkerFile(answers: Answers): string {
     `  storage: ${STORAGE_INIT[answers.storage]},`,
     `  runner: createPlaywrightCaptureRunner(),`,
     `  scratchDir: dataDir,`,
+    ...(wantsDesign(answers) ? [`  design: [createFigmaDesign()],`] : []),
     `  config: { concurrency: Number(process.env.WORKER_CONCURRENCY) || 2 },`,
     `});`,
     ``,
@@ -686,6 +703,9 @@ function buildDeps(answers: Answers): Record<string, string> {
   }
   if (answers.git !== "none") {
     deps[GIT_PACKAGE[answers.git] ?? ""] = __PKG_VERSION__ ?? "0.0.0";
+  }
+  if (wantsDesign(answers)) {
+    deps["@storyshelf/design-figma"] = __PKG_VERSION__ ?? "0.0.0";
   }
   if (wantsNotifications(answers)) {
     deps["@storyshelf/notify-chat"] = __PKG_VERSION__ ?? "0.0.0";

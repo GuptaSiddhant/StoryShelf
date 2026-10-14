@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { CaptureQueue } from "./adapters/capture-queue.ts";
 import type { CaptureRunner } from "./adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "./adapters/database.ts";
+import type { DesignProvider } from "./adapters/design.ts";
 import type { EmailSender } from "./adapters/email-sender.ts";
 import type { GitHostProvider } from "./adapters/git-host/index.ts";
 import type { AdapterCategory } from "./adapters/metadata.ts";
@@ -180,6 +181,7 @@ const adapterSnapshotSchema: z.ZodType<AdapterSnapshot> = z.object({
     "capture-runner",
     "capture-queue",
     "git-host",
+    "design",
     "notifier",
   ]),
 });
@@ -298,6 +300,8 @@ export interface ShelfOptions {
   /** AI insights surface (ADR 0026). Set ⇒ AI on site-wide; absent ⇒ off. */
   ai?: Ai;
   gitHosts?: GitHostProvider[];
+  /** Design-tool providers (Figma, …) that resolve links, metadata and previews. */
+  design?: DesignProvider[];
   notifiers?: NotifierProvider[];
   emailSender?: EmailSender;
   logger?: Logger;

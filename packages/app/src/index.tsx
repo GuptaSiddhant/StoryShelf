@@ -222,8 +222,18 @@ function mountNotificationLimits(app: ShelfRouter): void {
 
 /** Mount the request-scoped store (db/storage/config/user/adapters). */
 function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
-  const { options, config, ui, logger, authEnabled, enqueueCapture, queue, gitHosts, notifiers } =
-    wiring;
+  const {
+    options,
+    config,
+    ui,
+    logger,
+    authEnabled,
+    enqueueCapture,
+    queue,
+    gitHosts,
+    design,
+    notifiers,
+  } = wiring;
   app.use(
     "*",
     storeScope({
@@ -236,6 +246,7 @@ function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
       enqueueCapture,
       captureQueue: queue,
       gitHosts,
+      design,
       notifiers,
       ai: options.ai,
       resolveUser: async (c) => await resolveRequestUser(c, options.auth),

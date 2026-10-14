@@ -6,6 +6,7 @@ import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
+import { createFigmaDesign } from "@storyshelf/design-figma";
 import { chatNotifiers } from "@storyshelf/notify-chat";
 import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/notify-email";
 import { otelLogMixin } from "@storyshelf/observability";
@@ -94,6 +95,7 @@ const app = createShelfApp({
   database,
   storage,
   captureRunner,
+  design: [createFigmaDesign()],
   notifiers: [...chatNotifiers, ...emailNotifiers],
   auth:
     authPassword && secret

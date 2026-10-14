@@ -1,17 +1,8 @@
 /** Figma URL parsing: validates design links and extracts the file key and node id. */
-
-/** A parsed Figma link. */
-export interface FigmaRef {
-  fileKey: string;
-  /** Node id in API form (`1:2`), or null when the link targets the whole file. */
-  nodeId: string | null;
-  /** URL to open: the pasted link without credentials or fragment. */
-  url: string;
-}
+import type { DesignRef } from "@storyshelf/core/adapter/design";
 
 const FIGMA_HOSTS = new Set(["figma.com", "www.figma.com"]);
 const FILE_PATH = /^\/(?:file|design|proto|board|make)\/(?<key>[A-Za-z0-9]+)(?:\/|$)/u;
-
 /** `1:2` after normalizing; Figma node ids are `<number>:<number>`. */
 const NODE_ID = /^\d+:\d+$/u;
 
@@ -20,7 +11,7 @@ const NODE_ID = /^\d+:\d+$/u;
  * link. Embed (`/embed`), community and Figma Sites (`figma.site`) links are
  * deliberately rejected, as are malformed `node-id` values.
  */
-export function parseFigmaUrl(raw: string): FigmaRef | null {
+export function parseFigmaUrl(raw: string): DesignRef | null {
   let url: URL;
   try {
     url = new URL(raw.trim());
@@ -42,14 +33,4 @@ function withoutCredentials(url: URL): string {
   clean.password = "";
   clean.hash = "";
   return clean.toString();
-}
-
-/** Thrown when a design link is not a usable Figma URL. */
-export class InvalidDesignUrlError extends Error {
-  constructor(readonly value: string) {
-    super(
-      "Enter a figma.com file, design, board, prototype or make URL (https://www.figma.com/design/…); embed, community and Figma Sites links are not supported",
-    );
-    this.name = "InvalidDesignUrlError";
-  }
 }

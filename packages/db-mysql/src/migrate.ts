@@ -33,9 +33,11 @@ const SNAPSHOT_BASELINE_VERSION_ALTER =
 const SNAPSHOT_DESIGN_URL_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS design_url TEXT";
 const DESIGN_LINKS_UNIQUE_INDEX =
   "CREATE UNIQUE INDEX design_links_project_import_path_idx ON design_links (project_id, import_path)";
-const FIGMA_RENDER_PATH_ALTER = "ALTER TABLE figma_nodes ADD COLUMN IF NOT EXISTS render_path TEXT";
-const FIGMA_RENDER_VERSION_ALTER =
-  "ALTER TABLE figma_nodes ADD COLUMN IF NOT EXISTS render_version TEXT";
+/** Pre-adapter Figma tables (replaced by design_nodes / design_credentials; no data is carried over). */
+const LEGACY_DESIGN_DROPS = [
+  "DROP TABLE IF EXISTS figma_nodes",
+  "DROP TABLE IF EXISTS design_tokens",
+];
 const BASELINE_INFRA_HASH_ALTER = "ALTER TABLE baselines ADD COLUMN IF NOT EXISTS infra_hash TEXT";
 const BUILD_AFFECTED_ONLY_ALTER =
   "ALTER TABLE builds ADD COLUMN IF NOT EXISTS affected_only BOOLEAN NOT NULL DEFAULT true";
@@ -92,9 +94,12 @@ async function migrateCaptureIdentityColumns(run: MigrationRunner): Promise<void
   await execIgnore(run, BASELINE_BROWSER_ALTER);
   await execIgnore(run, PROJECT_BROWSERS_ALTER);
   await execIgnore(run, PROJECT_MODES_ALLOWLIST_ALTER);
-  await execIgnore(run, FIGMA_RENDER_PATH_ALTER);
-  await execIgnore(run, FIGMA_RENDER_VERSION_ALTER);
   await execIgnore(run, DESIGN_LINKS_UNIQUE_INDEX);
+  await Promise.all(
+    LEGACY_DESIGN_DROPS.map(async (statement) => {
+      await execIgnore(run, statement);
+    }),
+  );
 }
 
 async function migrateProjectExtras(run: MigrationRunner): Promise<void> {

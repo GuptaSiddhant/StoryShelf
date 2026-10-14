@@ -67,6 +67,7 @@ function targetsOf(sources: AdapterSetupSources): ProbeTarget[] {
     sources.captureQueue,
   ]);
   pushAll(targets, sources.gitHosts ?? []);
+  pushAll(targets, sources.design ?? []);
   pushAll(targets, sources.notifiers ?? []);
   pushTarget(targets, sources.emailSender);
   return targets;

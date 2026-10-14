@@ -130,6 +130,7 @@ export function setupCaptureQueue(
     viewports: config.viewports,
     logger,
     secret: credentialKeys(config),
+    design: options.design,
   };
   const dispatchDeps: DispatchDeps = {
     db: options.database,

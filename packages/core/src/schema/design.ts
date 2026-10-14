@@ -11,27 +11,45 @@ export interface DesignLink {
   updatedAt: string;
 }
 
-/** The project's encrypted Figma personal access token and its last observed health. */
-export interface DesignToken {
+/**
+ * A design provider credential: an admin-set project token (`userId` `""`) or a
+ * user's own connection. `tokenEncrypted` holds the access token; OAuth
+ * connections also carry an encrypted refresh token and an expiry.
+ */
+export interface DesignCredential {
   id: string;
   projectId: string;
+  /** Provider `metadata.kind`, e.g. `figma`. */
+  provider: string;
+  /** Owning user id; `""` for the project-wide credential. */
+  userId: string;
+  /** `token` (pasted personal access token) or `oauth`. */
+  authType: string;
   tokenEncrypted: string;
-  /** Last API outcome: `unknown` | `ok` | `unauthorized` (expired/revoked) | `forbidden` (no access). */
+  refreshTokenEncrypted: string | null;
+  /** When an OAuth access token expires; null for pasted tokens. */
+  expiresAt: string | null;
+  /** Last API outcome: `unknown` | `ok` | `unauthorized` | `forbidden`. */
   status: string;
   checkedAt: string | null;
+  /** When the credential was set or replaced; drives the rotation clock. */
   createdAt: string;
   updatedAt: string;
 }
 
-/** Cached Figma file/node metadata, keyed by project, file key and node id. */
-export interface FigmaNode {
+/** Cached design file/node metadata, keyed by project, provider, viewer, file key and node id. */
+export interface DesignNode {
   id: string;
   projectId: string;
+  /** Provider `metadata.kind`. */
+  provider: string;
+  /** Whose access fetched the entry: `""` for the project credential, else a user id. */
+  viewerId: string;
   fileKey: string;
-  /** API-form node id (`1:2`); empty string for a whole-file link. */
+  /** Provider node id; empty string for a whole-file link. */
   nodeId: string;
   name: string | null;
-  /** Figma file version at fetch time. */
+  /** File version at fetch time. */
   version: string | null;
   /** File `lastModified` at fetch time. */
   lastModified: string | null;

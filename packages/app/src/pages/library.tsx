@@ -15,6 +15,7 @@ import {
   designUrlsFor,
   loadDesignPreviews,
   loadProjectDesignLinks,
+  providerNameFor,
 } from "../routers/design.handlers.ts";
 import { getStore } from "../store.ts";
 import {
@@ -87,7 +88,7 @@ interface LibraryDesign {
   projectLinks: ProjectDesignLink[];
 }
 
-/** Rendered when design data cannot be loaded: the library works without Figma. */
+/** Rendered when design data cannot be loaded: the library works without design links. */
 const NO_LIBRARY_DESIGN: LibraryDesign = {
   bySnapshot: new Map(),
   previews: new Map(),
@@ -506,6 +507,7 @@ function renderSnapshotCard(
           {renderCardActions(snap, project, build, docsId)}
           <DesignButtons
             urls={context.design.bySnapshot.get(snap.id) ?? []}
+            providerName={providerNameFor}
             previews={context.design.previews}
             componentHref={componentHref(project, [snap])}
           />

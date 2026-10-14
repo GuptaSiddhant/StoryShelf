@@ -38,14 +38,14 @@ import { DesignReferences, DesignStrip, type DesignItem } from "./design-links.t
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
 /** Tabs of the component page. */
-export type ComponentTab = "states" | "history" | "figma" | "linked";
+export type ComponentTab = "states" | "history" | "design" | "linked";
 
-export const COMPONENT_TABS: readonly ComponentTab[] = ["states", "history", "figma", "linked"];
+export const COMPONENT_TABS: readonly ComponentTab[] = ["states", "history", "design", "linked"];
 
 const TAB_LABELS: Record<ComponentTab, string> = {
   states: "States",
   history: "History",
-  figma: "Figma",
+  design: "Design",
   linked: "Linked",
 };
 
@@ -57,7 +57,7 @@ export interface ComponentPageData {
   /** Title of the newest snapshot (retitles update in place). */
   title: string;
   tab: ComponentTab;
-  /** Newest build that has the file; its states fill the States/Figma/Linked tabs. */
+  /** Newest build that has the file; its states fill the States/Design/Linked tabs. */
   shownBuild: Build;
   groups: SnapshotGroup[];
   history: ComponentHistoryRow[];
@@ -67,7 +67,7 @@ export interface ComponentPageData {
   publishedBaseDomain?: string;
 }
 
-/** Component detail page: states, history, Figma and linked packages of one story file. */
+/** Component detail page: states, history, design and linked packages of one story file. */
 export function renderComponentPage(data: ComponentPageData): RenderedContent {
   const { project, importPath, title } = data;
   const status = worstStatus(data.groups.map((group) => group.primary.status));
@@ -143,7 +143,7 @@ function PresenceNotice(props: { data: ComponentPageData }): Rendered | null {
 function ActiveTab(props: { data: ComponentPageData }): Rendered {
   const { data } = props;
   if (data.tab === "history") return <HistoryTab data={data} />;
-  if (data.tab === "figma") return <FigmaTab design={data.design} />;
+  if (data.tab === "design") return <DesignTab design={data.design} />;
   if (data.tab === "linked") return <LinkedTab data={data} />;
   return <StatesTab data={data} />;
 }
@@ -232,12 +232,12 @@ function HistoryTab(props: { data: ComponentPageData }): Rendered {
   );
 }
 
-function FigmaTab(props: { design: DesignItem[] }): Rendered {
+function DesignTab(props: { design: DesignItem[] }): Rendered {
   if (props.design.length === 0) {
     return (
       <EmptyState
-        title="No Figma design linked"
-        description="Add parameters.storyshelf.figma to the stories, or map this file under Settings → Design."
+        title="No design linked"
+        description="Declare a design link in the stories’ parameters, or map this file under Settings → Design."
       />
     );
   }
