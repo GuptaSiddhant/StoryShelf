@@ -1,6 +1,11 @@
+import { recommendedBuildConcurrency } from "@storyshelf/core/utils";
+
 /** Configuration for the capture worker. */
 export interface WorkerConfig {
-  /** Max concurrent captures (default 2). */
+  /**
+   * Max concurrent captures. Default: sized from the CPU and memory the process can
+   * use (1, or 2 with at least 2 CPUs and 3 GB); each capture drives its own browser.
+   */
   concurrency?: number;
   /** SQS visibility timeout in seconds (default 300). */
   visibilityTimeout?: number;
@@ -12,8 +17,8 @@ export interface WorkerConfig {
   backoffMs?: number;
 }
 
-export const DEFAULT_WORKER_CONFIG: Required<WorkerConfig> = {
-  concurrency: 2,
+/** Static defaults; `concurrency` is resolved from the host (see {@link WorkerConfig}). */
+export const DEFAULT_WORKER_CONFIG: Omit<Required<WorkerConfig>, "concurrency"> = {
   visibilityTimeout: 300,
   waitTimeSeconds: 20,
   maxRetries: 2,
@@ -22,7 +27,7 @@ export const DEFAULT_WORKER_CONFIG: Required<WorkerConfig> = {
 
 export function resolveWorkerConfig(input?: WorkerConfig): Required<WorkerConfig> {
   return {
-    concurrency: input?.concurrency ?? DEFAULT_WORKER_CONFIG.concurrency,
+    concurrency: input?.concurrency ?? recommendedBuildConcurrency(),
     visibilityTimeout: input?.visibilityTimeout ?? DEFAULT_WORKER_CONFIG.visibilityTimeout,
     waitTimeSeconds: input?.waitTimeSeconds ?? DEFAULT_WORKER_CONFIG.waitTimeSeconds,
     maxRetries: input?.maxRetries ?? DEFAULT_WORKER_CONFIG.maxRetries,

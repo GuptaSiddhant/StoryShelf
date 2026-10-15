@@ -4,6 +4,7 @@ import type { StoryEntry, Viewport } from "@storyshelf/core/adapter/capture-runn
 import { getScreenshotPlan } from "@storyshelf/core/capture";
 import type { Page } from "puppeteer-core";
 import { checkA11y } from "./a11y.ts";
+import { acquirePage } from "./pages.ts";
 import { runPlay } from "./play.ts";
 import { runtimeParametersForStory } from "./runtime-params.ts";
 import type { CaptureContext, RuntimeParamsPage } from "./types.ts";
@@ -14,12 +15,15 @@ export async function captureScreenshot(
   inputStory: StoryEntry,
   viewport: Viewport,
 ): Promise<{ screenshot: Buffer; a11yViolations: string[]; story: StoryEntry }> {
-  const page = await ctx.browser.newPage();
-  await page.setViewport({ width: viewport.width, height: viewport.height });
+  const lease = await acquirePage(ctx, viewport);
+  let reusable = false;
+  if (ctx.navigationTimeoutMs) lease.page.setDefaultTimeout(ctx.navigationTimeoutMs);
   try {
-    return await runCapture(page, ctx, inputStory, viewport);
+    const result = await runCapture(lease.page, ctx, inputStory, viewport);
+    reusable = true;
+    return result;
   } finally {
-    await page.close();
+    await lease.release(reusable);
   }
 }
 

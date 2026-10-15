@@ -1,9 +1,26 @@
 /** Render one engine's pass with a budget; shared by the orchestrator's browser loop. */
 import type { Logger } from "pino";
-import type { BrowserName, CaptureRunner, RenderResult } from "../adapters/capture-runner.ts";
+import type {
+  BrowserName,
+  CaptureRunner,
+  RenderResult,
+  RenderedSnapshot,
+} from "../adapters/capture-runner.ts";
 
 /** Default budget for one render call before the orchestrator cancels it. */
 export const RENDER_TIMEOUT_MS = 15 * 60_000;
+
+/** Extra time granted per capture, so slow single-page hosts are not cancelled mid-run. */
+export const PER_CAPTURE_BUDGET_MS = 15_000;
+
+/**
+ * Budget for one render call: an explicit setting wins; otherwise the default
+ * floor, raised to a per-capture allowance for large matrices. Bounded page
+ * concurrency on small hosts makes big builds legitimately take longer than 15 minutes.
+ */
+export function renderBudgetMs(captureCount: number, explicitMs?: number): number {
+  return explicitMs ?? Math.max(RENDER_TIMEOUT_MS, captureCount * PER_CAPTURE_BUDGET_MS);
+}
 
 /** Failure error text cap (persisted rows and logs stay bounded). */
 const FAILURE_ERROR_MAX = 500;
@@ -19,6 +36,7 @@ export interface RenderRequest {
   playTimeoutMs: number;
   runA11y: boolean;
   browser: BrowserName;
+  onCapture?: (capture: RenderedSnapshot) => Promise<void>;
 }
 
 /** Cap failure error text so one chatty runner cannot flood rows and logs. */

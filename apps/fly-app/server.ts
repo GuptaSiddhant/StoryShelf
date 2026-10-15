@@ -78,7 +78,10 @@ mkdirSync(dataDir, { recursive: true });
 
 const database = createSqliteDatabase(`${dataDir}/shelf.db`);
 const storage = createLocalStorage(dataDir);
-const captureRunner = createPlaywrightCaptureRunner();
+const captureRunner = createPlaywrightCaptureRunner({
+  // Unset: sized from the VM's detected CPU and memory.
+  concurrency: Number(env["CAPTURE_CONCURRENCY"]) || undefined,
+});
 
 // Observability first (noop unless OTEL_EXPORTER_OTLP_ENDPOINT is set).
 const observability = await initObservabilityFromEnv();

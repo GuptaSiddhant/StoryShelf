@@ -23,6 +23,22 @@ the optional `@storyshelf/design-figma` package behind a new `DesignProvider` ad
 `parseDesignUrl`), `designContractSuite` in `@storyshelf/core/test-helpers`, and schema room for
 per-user design connections (`design_credentials.user_id`, `design_nodes.viewer_id`).
 
+**Streaming and page reuse**
+- Screenshots are written to storage as each is captured (new optional `onCapture` on `CaptureRunner.render`; both bundled runners support it), so memory no longer grows with the number of stories. Runners that ignore it keep working unchanged.
+- Opt-in page reuse (`reusePages` / `STORYSHELF_REUSE_PAGES=1`) for both runners: pooled pages in their own contexts, reset between captures, discarded after a failure. Screenshots were byte-identical with reuse on and off on the bundled fixtures.
+
+**Capture memory**
+- Capture no longer opens a browser page for every story and viewport at once, which ran 500-story Storybooks out of memory on 1 GB hosts. Pages render with bounded concurrency, and snapshot persisting is capped at 4 at a time.
+- Capture concurrency defaults are sized from the CPU and memory the process can use, container limits included (0.5 vCPU / 1 GB renders one page at a time; `ShelfConfig.captureConcurrency` defaults to 1 build unless the host has ≥ 2 CPUs and ≥ 3 GB). Override with `concurrency` on `createPlaywrightCaptureRunner` or `STORYSHELF_CAPTURE_CONCURRENCY`.
+- Page navigation timeout scales up on CPU-starved hosts (60 s under 2 CPUs, 90 s under 1 CPU; override with `navigationTimeoutMs` or `STORYSHELF_NAVIGATION_TIMEOUT_MS`), so slow Storybook loads are not reported as failures.
+- Chromium launches with low-memory flags (`--disable-dev-shm-usage`, `--disable-extensions`, `--disable-background-networking`, `--mute-audio`) to avoid crashes on small container `/dev/shm`.
+- `@storyshelf/worker` sizes `concurrency` from the host the same way (1 capture, or 2 with ≥ 2 CPUs and ≥ 3 GB) instead of a fixed 2, and `DEFAULT_WORKER_CONFIG` no longer carries `concurrency`. Scaffolded workers pass `WORKER_CONCURRENCY` only when set.
+- The per-render time budget scales with the number of captures (15 minutes minimum, 15 seconds per capture), so slower one-page-at-a-time captures on small hosts are not cancelled as timed out. An explicit `renderTimeoutMs` is unchanged.
+- Both runners restart the browser every 150 captures (`recycleBrowserEvery` / `STORYSHELF_BROWSER_RECYCLE_EVERY`, `0` disables) and log a `capture sizing` line with the detected CPUs, memory and resulting settings at the start of each render.
+- The Puppeteer runner gets the same bounded concurrency, automatic sizing, timeout scaling and low-memory launch args as the Playwright runner.
+- Storing a build's Storybook statics now reads, hashes and uploads files with at most 8 in flight instead of reading every file into memory at once.
+- The Fly demo app uses the automatic sizing (optional `CAPTURE_CONCURRENCY` override) and caps the Node heap with `NODE_OPTIONS` in `fly.toml`.
+
 ## 0.6.2 — Lean scaffold, working Docker images, Node 24 (2026-10-08)
 
 A fix-focused release. `storyshelf server init` now generates a smaller

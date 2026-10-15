@@ -24,7 +24,6 @@ import { assertModeCaps, enrichStories } from "./enrich.ts";
 import { captureAcrossBrowsers } from "./matrix.ts";
 import { parseModesAllowlist } from "./modes.ts";
 import { persistCapture, type PipelineTables } from "./pipeline.ts";
-import { RENDER_TIMEOUT_MS } from "./render.ts";
 import { resolveViewports } from "./sizing.ts";
 import { extractStorybookToScratch, persistStorybookStatics } from "./statics.ts";
 import { StorybookAdapter } from "./storybook.ts";
@@ -204,6 +203,7 @@ async function runCapturePhases(
           async () =>
             await captureAcrossBrowsers({
               db: options.db,
+              storage: options.storage,
               tables: options.tables,
               runner: options.runner,
               build,
@@ -213,7 +213,7 @@ async function runCapturePhases(
               storybookDir,
               browsers,
               affectedPaths: affectedPathsFor(build),
-              renderTimeoutMs: options.renderTimeoutMs ?? RENDER_TIMEOUT_MS,
+              renderTimeoutMs: options.renderTimeoutMs,
               logger,
             }),
           { "storyshelf.browsers": browsers.join(",") },

@@ -378,10 +378,13 @@ interface CaptureRunner {
     stories: StoryEntry[];
     viewports: Viewport[];
     logger?: Logger;
+    onCapture?: (capture: RenderedSnapshot) => Promise<void>;  // optional streaming hand-off
   }): Promise<RenderResult>;  // { captures, failures }
   cancel(buildId: string): Promise<void>;
 }
 ```
+
+**Streaming captures.** The orchestrator passes `onCapture`: a runner that supports it hands over each screenshot as soon as it is taken and omits it from `RenderResult.captures`. The orchestrator validates the PNG and writes it straight to storage (`capture/matrix.ts`), keeping only metadata marked `stored`, so memory holds the pages in flight instead of every screenshot of the build. Persisting then skips the write and diffs from storage as before. Runners that ignore `onCapture` keep returning buffers and take the original path. A rejected `onCapture` becomes a render failure for that story and viewport.
 
 ### Capture Orchestrator
 

@@ -25,6 +25,12 @@ export interface RenderedSnapshot {
   screenshot: Buffer;
   /** Engine that produced the screenshot (the request's `browser`); chromium when absent. */
   browser?: BrowserName;
+  /**
+   * Set by the orchestrator when it already wrote the screenshot to storage
+   * (via `onCapture`); `screenshot` is then empty and must not be written again.
+   * Runners never set this.
+   */
+  stored?: boolean;
 }
 
 /** A story/viewport that a renderer could not capture. */
@@ -95,6 +101,14 @@ export interface CaptureRunner extends Adapter<{
     runA11y?: boolean;
     /** Browser to use for rendering (chromium default). */
     browser?: BrowserName;
+    /**
+     * Optional streaming hand-off. When provided, the runner awaits it with each
+     * capture as soon as it is taken, then drops the buffer instead of adding the
+     * capture to `RenderResult.captures`, so a large build never holds every
+     * screenshot in memory. A rejection is reported as a render failure for that
+     * story/viewport. Runners that do not support it return captures as usual.
+     */
+    onCapture?: (capture: RenderedSnapshot) => Promise<void>;
     /**
      * Test/extension seam: override the story source adapter (defaults to
      * `StorybookAdapter`). Only the renderer uses it; discovery stays the

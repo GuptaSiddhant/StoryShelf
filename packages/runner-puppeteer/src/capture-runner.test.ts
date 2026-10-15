@@ -11,6 +11,7 @@ import {
 
 const puppeteer = vi.hoisted(() => {
   let closed = false;
+  let launches = 0;
   const pendingGotos: ((error: Error) => void)[] = [];
   let lastBrowser: typeof browser | null = null;
   let hangNextGoto = true;
@@ -27,6 +28,8 @@ const puppeteer = vi.hoisted(() => {
         pendingGotos.push(reject);
       });
     },
+    setDefaultTimeout: (): void => {},
+
     setViewport: async (): Promise<void> => {
       await Promise.resolve();
     },
@@ -50,8 +53,31 @@ const puppeteer = vi.hoisted(() => {
       await Promise.resolve();
     },
   });
+  const stats = { contextsOpened: 0, contextsClosed: 0, pagesOpened: 0 };
   const browser = {
     closed: false,
+    createBrowserContext: async (): Promise<unknown> => {
+      await Promise.resolve();
+      stats.contextsOpened += 1;
+      return {
+        cookies: async (): Promise<unknown[]> => {
+          await Promise.resolve();
+          return [];
+        },
+        deleteCookie: async (): Promise<void> => {
+          await Promise.resolve();
+        },
+        newPage: async (): Promise<ReturnType<typeof makePage>> => {
+          await Promise.resolve();
+          stats.pagesOpened += 1;
+          return makePage();
+        },
+        close: async (): Promise<void> => {
+          await Promise.resolve();
+          stats.contextsClosed += 1;
+        },
+      };
+    },
     newPage: async (): Promise<ReturnType<typeof makePage>> => {
       await Promise.resolve();
       return makePage();
@@ -68,6 +94,7 @@ const puppeteer = vi.hoisted(() => {
   return {
     browser,
     launch: async (): Promise<typeof browser> => {
+      launches += 1;
       closed = false;
       browser.closed = false;
       lastBrowser = browser;
@@ -75,6 +102,8 @@ const puppeteer = vi.hoisted(() => {
       return browser;
     },
     lastBrowser: (): typeof browser | null => lastBrowser,
+    launchCount: (): number => launches,
+    stats,
     configureHang: (hang: boolean): void => {
       hangNextGoto = hang;
     },
@@ -134,6 +163,125 @@ describe("createPuppeteerCaptureRunner.render", () => {
     expect(result.failures[0]?.storyId).toBe("components-button--primary");
     const browser = puppeteer.lastBrowser();
     expect(browser?.closed).toBe(true);
+  }, 30_000);
+
+  it("caps concurrently open pages at the configured concurrency", async () => {
+    let active = 0;
+    let peak = 0;
+    const adapter = {
+      name: "fake",
+      discover: async (): Promise<StoryEntry[]> => [],
+      buildUrl: (): string => "/",
+      waitForReady: async (): Promise<void> => {
+        active += 1;
+        peak = Math.max(peak, active);
+        await new Promise((resolve) => {
+          setTimeout(resolve, 5);
+        });
+        active -= 1;
+      },
+    };
+    const stories = Array.from({ length: 12 }, (_, i) => ({ ...STORIES[0]!, id: `s-${i}` }));
+    puppeteer.configureHang(false);
+    const result = await createPuppeteerCaptureRunner({ concurrency: 3 }).render({
+      buildId: "build-1",
+      storybookDir,
+      stories,
+      viewports: VIEWPORTS,
+      adapter,
+    });
+
+    expect(result.captures).toHaveLength(12);
+    expect(peak).toBe(3);
+  }, 30_000);
+
+  it("restarts the browser every N captures and logs the sizing", async () => {
+    const stories = Array.from({ length: 10 }, (_, i) => ({ ...STORIES[0]!, id: `s-${i}` }));
+    const before = puppeteer.launchCount();
+    const info = vi.fn();
+    puppeteer.configureHang(false);
+    const result = await createPuppeteerCaptureRunner({ recycleBrowserEvery: 4 }).render({
+      buildId: "build-1",
+      storybookDir,
+      stories,
+      viewports: VIEWPORTS,
+      logger: { info, debug: vi.fn(), warn: vi.fn(), error: vi.fn() } as never,
+    });
+
+    expect(result.captures).toHaveLength(10);
+    // 10 captures in batches of 4 -> 3 browsers (initial + 2 restarts).
+    expect(puppeteer.launchCount() - before).toBe(3);
+    expect(info).toHaveBeenCalledWith(
+      expect.objectContaining({ recycleBrowserEvery: 4, pages: expect.any(Number) }),
+      "capture sizing",
+    );
+  }, 30_000);
+
+  it("never restarts the browser when recycling is disabled", async () => {
+    const stories = Array.from({ length: 6 }, (_, i) => ({ ...STORIES[0]!, id: `s-${i}` }));
+    const before = puppeteer.launchCount();
+    puppeteer.configureHang(false);
+    await createPuppeteerCaptureRunner({ recycleBrowserEvery: 0 }).render({
+      buildId: "build-1",
+      storybookDir,
+      stories,
+      viewports: VIEWPORTS,
+    });
+
+    expect(puppeteer.launchCount() - before).toBe(1);
+  }, 30_000);
+
+  it("reuses pages across captures when reusePages is on", async () => {
+    const stories = Array.from({ length: 8 }, (_, i) => ({ ...STORIES[0]!, id: `s-${i}` }));
+    const before = { ...puppeteer.stats };
+    puppeteer.configureHang(false);
+    const result = await createPuppeteerCaptureRunner({ concurrency: 2, reusePages: true }).render({
+      buildId: "build-1",
+      storybookDir,
+      stories,
+      viewports: VIEWPORTS,
+    });
+
+    expect(result.captures).toHaveLength(8);
+    // 8 captures through 2 slots: two pages are opened once and reused, then closed.
+    expect(puppeteer.stats.pagesOpened - before.pagesOpened).toBeLessThanOrEqual(2);
+    expect(puppeteer.stats.contextsClosed - before.contextsClosed).toBe(
+      puppeteer.stats.contextsOpened - before.contextsOpened,
+    );
+  }, 30_000);
+
+  it("streams captures to onCapture instead of collecting them", async () => {
+    const seen: string[] = [];
+    puppeteer.configureHang(false);
+    const result = await createPuppeteerCaptureRunner().render({
+      buildId: "build-1",
+      storybookDir,
+      stories: STORIES,
+      viewports: VIEWPORTS,
+      onCapture: async (capture) => {
+        await Promise.resolve();
+        seen.push(`${capture.story.id}/${capture.viewportName}`);
+      },
+    });
+
+    expect(seen).toEqual(["components-button--primary/desktop"]);
+    expect(result.captures).toHaveLength(0);
+  }, 30_000);
+
+  it("reports a failed onCapture as a render failure for that story", async () => {
+    puppeteer.configureHang(false);
+    const result = await createPuppeteerCaptureRunner().render({
+      buildId: "build-1",
+      storybookDir,
+      stories: STORIES,
+      viewports: VIEWPORTS,
+      onCapture: async () => {
+        await Promise.resolve();
+        throw new Error("disk full");
+      },
+    });
+
+    expect(result.failures.map((f) => f.error)).toEqual(["disk full"]);
   }, 30_000);
 
   it("resolves cancel for builds that are not rendering", async () => {

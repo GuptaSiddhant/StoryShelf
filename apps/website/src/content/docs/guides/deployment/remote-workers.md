@@ -58,9 +58,9 @@ On Fly, deploy `Dockerfile.worker` as its own app without an `[http_service]` se
 
 ## Concurrency and scaling
 
-Parallel captures = **workers × `WORKER_CONCURRENCY`** (default 2 per worker, from `config.concurrency`).
+Parallel captures = **workers × `WORKER_CONCURRENCY`** (by default sized from the worker's CPU and memory, container limits included: 1, or 2 with at least 2 CPUs and 3 GB; set `WORKER_CONCURRENCY` or `config.concurrency` to override).
 
-- Each concurrent capture drives a browser and unzips a Storybook into the scratch dir. Size memory and disk per worker for `concurrency` captures at once. Start at the default and raise it only after watching memory.
+- Each concurrent capture drives a browser and unzips a Storybook into the scratch dir. Size memory and disk per worker for `concurrency` captures at once. Start at the default and raise it only after watching memory. The runner also bounds pages per capture (see [Sizing memory for capture](/guides/deployment/#sizing-memory-for-capture)), so a 2 vCPU / 4 GB worker renders 2 pages of one capture at a time by default.
 - To go wider, prefer more workers over higher concurrency: a crashed worker then loses fewer jobs, and one oversized Storybook can't starve the others.
 - Scale on queue backlog. In CloudWatch, `ApproximateNumberOfMessagesVisible` and `ApproximateAgeOfOldestMessage` on the capture queue show whether workers keep up.
 - A worker polls one message at a time (long-poll, 20 seconds). It stops polling while all slots are busy, so extra jobs wait safely in SQS.

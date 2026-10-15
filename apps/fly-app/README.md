@@ -27,6 +27,8 @@ CI auto-deploys on tag `v*.*.*` via `.github/workflows/fly.yml`.
 
 ## Notes
 
+- Capture concurrency is sized automatically from the VM's CPU and memory (1 build, 1 page at a time on the 1 GB shared-CPU VM). Set `CAPTURE_CONCURRENCY` in `fly.toml` to override the page count; raise it only after scaling `[[vm]]` CPUs and memory.
+- `NODE_OPTIONS=--max-old-space-size=384` in `fly.toml` caps the Node heap so Chromium keeps the rest of the 1 GB. Raise it together with `[[vm]] memory`.
 - Persistent volume `/data` holds `shelf.db` + `builds/` + `baselines/` (survives redeploys).
 - `NODE_OPTIONS=--conditions=source` resolves `@storyshelf/*` to `src/` via `exports.source` in `packages/*/package.json:83`.
 - `*.fly.dev` wildcard works for `PUBLISHED_BASE_DOMAIN=storyshelf.fly.dev` if set.

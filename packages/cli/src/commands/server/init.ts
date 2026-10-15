@@ -615,7 +615,7 @@ function generateWorkerFile(answers: Answers): string {
     `  runner: createPlaywrightCaptureRunner(),`,
     `  scratchDir: dataDir,`,
     ...(wantsDesign(answers) ? [`  design: [createFigmaDesign()],`] : []),
-    `  config: { concurrency: Number(process.env.WORKER_CONCURRENCY) || 2 },`,
+    `  config: { concurrency: Number(process.env.WORKER_CONCURRENCY) || undefined },`,
     `});`,
     ``,
     `await worker.start();`,

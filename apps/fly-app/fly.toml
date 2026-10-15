@@ -11,6 +11,8 @@ dockerfile = 'Dockerfile'
 
 [env]
 DATA_DIR = '/data'
+# 1 GB VM: cap the Node heap so Chromium keeps the rest.
+NODE_OPTIONS = '--max-old-space-size=384'
 PORT = '3000'
 PUBLIC_BASE_URL = 'https://storyshelf.fly.dev'
 
