@@ -29,8 +29,15 @@ interface ImagesResponse {
 
 const EMPTY = { name: null, version: null, lastModified: null } as const;
 
-/** A Figma client bound to a personal access token. */
-export function createFigmaClient(token: string): DesignClient {
+/** Marks an OAuth access token: sent as `Authorization: Bearer`, where a personal token uses `X-Figma-Token`. */
+const BEARER = "Bearer ";
+
+/** A Figma client bound to a personal access token (or, with `authType: "oauth"`, a user's OAuth token). */
+export function createFigmaClient(
+  credential: string,
+  authType: "token" | "oauth" = "token",
+): DesignClient {
+  const token = authType === "oauth" ? `${BEARER}${credential}` : credential;
   return {
     fetchMetas: async (fileKey, refs, options) =>
       await fetchFigmaMetas(token, fileKey, refs, options),
@@ -45,7 +52,7 @@ function requestOptions(
   options: DesignCallOptions,
 ): HttpRequestOptions {
   return {
-    headers: { "X-Figma-Token": token },
+    headers: token.startsWith(BEARER) ? { Authorization: token } : { "X-Figma-Token": token },
     timeoutMs,
     // `retries` is the total attempt count (first try included), so 2 = one retry; the shared default is 3.
     retries: 2,

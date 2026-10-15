@@ -184,17 +184,13 @@ CREATE TABLE IF NOT EXISTS design_credentials (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   provider TEXT NOT NULL,
-  user_id TEXT NOT NULL DEFAULT '',
-  auth_type TEXT NOT NULL DEFAULT 'token',
   token_encrypted TEXT NOT NULL,
-  refresh_token_encrypted TEXT,
-  expires_at TEXT,
   status TEXT NOT NULL DEFAULT 'unknown',
   checked_at TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS design_credentials_project_provider_user_idx ON design_credentials (project_id, provider, user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS design_credentials_project_provider_idx ON design_credentials (project_id, provider);
 CREATE TABLE IF NOT EXISTS design_nodes (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -322,6 +318,18 @@ CREATE TABLE IF NOT EXISTS users (
   auth_provider TEXT NOT NULL DEFAULT 'oidc',
   disabled INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS user_connections (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  service TEXT NOT NULL,
+  token_encrypted TEXT NOT NULL,
+  refresh_token_encrypted TEXT,
+  expires_at TEXT,
+  status TEXT NOT NULL DEFAULT 'ok',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS user_connections_user_service_idx ON user_connections (user_id, service);
 CREATE TABLE IF NOT EXISTS user_invite_tokens (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

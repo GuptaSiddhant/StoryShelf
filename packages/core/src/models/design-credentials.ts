@@ -1,4 +1,4 @@
-/** Encrypted design-provider credentials: the project-wide token and (later) per-user connections. */
+/** Encrypted design-provider credentials: the project-wide token an admin pastes. */
 import { and, eq, getTableColumns } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
@@ -12,7 +12,7 @@ export interface DesignCredentialTables {
   designCredentials: Table;
 }
 
-/** Project scope: the credential an admin set for the whole project (as opposed to a user's own). */
+/** Cache scope of the shared project credential (`design_nodes.viewer_id`); a user id marks a member's own connection. */
 export const PROJECT_SCOPE = "";
 
 type Fields = Pick<
@@ -22,8 +22,7 @@ type Fields = Pick<
 
 /**
  * Data operations for design credentials. Every method addresses one
- * `(project, provider, user)` row; `userId` defaults to the project-wide
- * credential. Plaintext only ever leaves through {@link getCredential}.
+ * `(project, provider)` row. Plaintext only ever leaves through {@link get}.
  */
 export class DesignCredentialModel {
   private readonly tables: DesignCredentialTables;
@@ -36,27 +35,19 @@ export class DesignCredentialModel {
   }
 
   /** The credential row (never the plaintext), or null. */
-  async info(
-    projectId: string,
-    provider: string,
-    userId = PROJECT_SCOPE,
-  ): Promise<DesignCredential | null> {
+  async info(projectId: string, provider: string): Promise<DesignCredential | null> {
     const columns = getTableColumns(this.tables.designCredentials);
     const column = (name: string): SQLWrapper => columns[name] as unknown as SQLWrapper;
     const rows = (await this.db.list(this.tables.designCredentials, {
-      where: and(
-        eq(column("projectId"), projectId),
-        eq(column("provider"), provider),
-        eq(column("userId"), userId),
-      ),
+      where: and(eq(column("projectId"), projectId), eq(column("provider"), provider)),
       limit: 1,
     })) as unknown as DesignCredential[];
     return rows[0] ?? null;
   }
 
   /** Decrypted access token for API calls, or null when none is set. */
-  async get(projectId: string, provider: string, userId = PROJECT_SCOPE): Promise<string | null> {
-    const row = await this.info(projectId, provider, userId);
+  async get(projectId: string, provider: string): Promise<string | null> {
+    const row = await this.info(projectId, provider);
     return row ? decryptCredential(this.secret, row.tokenEncrypted) : null;
   }
 
@@ -64,12 +55,7 @@ export class DesignCredentialModel {
    * Store (or rotate) a pasted token. A new credential restarts the rotation
    * clock (`createdAt`) and resets health to `unknown`.
    */
-  async set(
-    projectId: string,
-    provider: string,
-    token: string,
-    userId = PROJECT_SCOPE,
-  ): Promise<void> {
+  async set(projectId: string, provider: string, token: string): Promise<void> {
     const now = new Date().toISOString();
     const values: Fields = {
       tokenEncrypted: encrypt(this.secret, token),
@@ -78,27 +64,23 @@ export class DesignCredentialModel {
       createdAt: now,
       updatedAt: now,
     };
-    if (await this.replace(projectId, provider, userId, values)) return;
+    if (await this.replace(projectId, provider, values)) return;
     try {
       await this.db.insert(this.tables.designCredentials, {
         id: ulid(),
         projectId,
         provider,
-        userId,
-        authType: "token",
-        refreshTokenEncrypted: null,
-        expiresAt: null,
         ...values,
       });
     } catch (error) {
-      // A concurrent writer inserted first (unique project/provider/user): rotate theirs instead.
-      if (!(await this.replace(projectId, provider, userId, values))) throw error;
+      // A concurrent writer inserted first (unique project/provider): rotate theirs instead.
+      if (!(await this.replace(projectId, provider, values))) throw error;
     }
   }
 
   /** Delete a credential. */
-  async remove(projectId: string, provider: string, userId = PROJECT_SCOPE): Promise<void> {
-    const existing = await this.info(projectId, provider, userId);
+  async remove(projectId: string, provider: string): Promise<void> {
+    const existing = await this.info(projectId, provider);
     if (existing) await this.db.remove(this.tables.designCredentials, existing.id);
   }
 
@@ -107,9 +89,8 @@ export class DesignCredentialModel {
     projectId: string,
     provider: string,
     status: DesignCredentialStatus,
-    userId = PROJECT_SCOPE,
   ): Promise<void> {
-    const existing = await this.info(projectId, provider, userId);
+    const existing = await this.info(projectId, provider);
     if (!existing) return;
     await this.db.update(this.tables.designCredentials, existing.id, {
       status,
@@ -117,19 +98,11 @@ export class DesignCredentialModel {
     });
   }
 
-  private async replace(
-    projectId: string,
-    provider: string,
-    userId: string,
-    values: Fields,
-  ): Promise<boolean> {
-    const existing = await this.info(projectId, provider, userId);
+  private async replace(projectId: string, provider: string, values: Fields): Promise<boolean> {
+    const existing = await this.info(projectId, provider);
     if (!existing) return false;
     await this.db.update(this.tables.designCredentials, existing.id, {
       ...values,
-      authType: "token",
-      refreshTokenEncrypted: null,
-      expiresAt: null,
     });
     return true;
   }

@@ -24,7 +24,7 @@ describe("DesignCredentialModel", () => {
     await model.set("p1", "fake", "tok_one");
     const first = await model.info("p1", "fake");
     expect(first?.tokenEncrypted).not.toContain("tok_one");
-    expect(first).toMatchObject({ userId: "", authType: "token", refreshTokenEncrypted: null });
+    expect(first).toMatchObject({ provider: "fake", status: "unknown" });
     expect(await model.get("p1", "fake")).toBe("tok_one");
     await model.recordStatus("p1", "fake", "unauthorized");
     expect(await model.info("p1", "fake")).toMatchObject({ status: "unauthorized" });
@@ -36,19 +36,16 @@ describe("DesignCredentialModel", () => {
     await model.remove("p1", "fake");
   });
 
-  it("keeps credentials separate per project, provider and user", async () => {
+  it("keeps credentials separate per project and provider", async () => {
     const { model } = setup();
     await model.set("p1", "fake", "project-wide");
-    await model.set("p1", "fake", "ada-own", "u-ada");
     await model.set("p1", "other", "other-provider");
     await model.set("p2", "fake", "other-project");
     expect(await model.get("p1", "fake")).toBe("project-wide");
-    expect(await model.get("p1", "fake", "u-ada")).toBe("ada-own");
-    expect(await model.get("p1", "fake", "u-bob")).toBeNull();
     expect(await model.get("p1", "other")).toBe("other-provider");
     expect(await model.get("p2", "fake")).toBe("other-project");
-    await model.remove("p1", "fake", "u-ada");
-    expect(await model.get("p1", "fake", "u-ada")).toBeNull();
+    await model.remove("p1", "other");
+    expect(await model.get("p1", "other")).toBeNull();
     expect(await model.get("p1", "fake")).toBe("project-wide");
   });
 

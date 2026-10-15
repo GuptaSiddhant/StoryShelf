@@ -10,8 +10,14 @@ import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
 import type { Context } from "hono";
 import { groupSnapshots } from "../pages/build-diff-model.ts";
 import type { ComponentPageData, ComponentTab } from "../pages/component-detail.tsx";
+import type { DesignItem } from "../pages/design-links.tsx";
 import { getStore } from "../store.ts";
-import { designUrlsFor, loadDesignResolutions, loadReviewDesign } from "./design.handlers.ts";
+import {
+  designUrlsFor,
+  loadDesignResolutions,
+  loadReviewDesign,
+  returnPathOf,
+} from "./design.handlers.ts";
 import { linkedUsageFor } from "./links.handlers.ts";
 
 /** Latest build the library shows: newest on the default branch, else the newest at all. */
@@ -31,6 +37,18 @@ async function buildsOf(snapshots: readonly Snapshot[]): Promise<Build[]> {
   return found.filter((build): build is Build => build !== null);
 }
 
+/** Design links of a component's first state, with cached metadata and connect offers. */
+async function loadDesignTab(
+  c: Context,
+  project: ComponentPageData["project"],
+  states: Snapshot[],
+): Promise<DesignItem[]> {
+  const [first] = states;
+  if (!first) return [];
+  const urls = designUrlsFor(await loadDesignResolutions(project, states), first);
+  return await loadReviewDesign(project, first, urls, returnPathOf(c)).catch(() => []);
+}
+
 /** Tab-specific data (design strip or linked packages), loaded only when its tab is open. */
 async function loadTabData(
   c: Context,
@@ -40,11 +58,7 @@ async function loadTabData(
 ): Promise<Pick<ComponentPageData, "design" | "usage">> {
   const [first] = states;
   if (!first) return { design: [], usage: [] };
-  if (tab === "design") {
-    const resolutions = await loadDesignResolutions(data.project, states);
-    const urls = designUrlsFor(resolutions, first);
-    return { design: await loadReviewDesign(data.project, first, urls).catch(() => []), usage: [] };
-  }
+  if (tab === "design") return { design: await loadDesignTab(c, data.project, states), usage: [] };
   if (tab === "linked") {
     const usage = await linkedUsageFor(
       c,

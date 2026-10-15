@@ -25,7 +25,12 @@ import { renderRootPage } from "../pages/root.tsx";
 import { getStore } from "../store.ts";
 import { loadBaselineView } from "./baseline-guard.ts";
 import { loadComponentPage } from "./component.handlers.ts";
-import { designUrlsFor, loadDesignResolutions, loadReviewDesign } from "./design.handlers.ts";
+import {
+  designUrlsFor,
+  loadDesignResolutions,
+  loadReviewDesign,
+  returnPathOf,
+} from "./design.handlers.ts";
 import { flash } from "./flash.ts";
 import { currentProjectRole } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
@@ -189,6 +194,7 @@ export function registerUiPages(app: ShelfRouter): void {
           project,
           selected,
           designUrlsFor(await loadDesignResolutions(project, snapshots), selected),
+          returnPathOf(c),
         ).catch(() => [])
       : [];
     return c.html(

@@ -17,6 +17,8 @@ export type { CaptureAttempt, CaptureLog, CaptureLogLevel } from "./capture-atte
 export type { Comment } from "./comment.ts";
 /** Build label and label type rows. */
 export type { BuildLabel, LabelType } from "./label.ts";
+/** A user's OAuth connection to an external service. */
+export type { UserConnection } from "./connection.ts";
 /** Design link, provider credential and cached design node rows. */
 export type { DesignCredential, DesignLink, DesignNode } from "./design.ts";
 /** Project link and per-build package usage rows. */

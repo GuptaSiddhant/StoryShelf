@@ -96,13 +96,21 @@ const designCredentials = defineTable("design_credentials", {
   id: "id",
   projectId: "project_id",
   provider: "provider",
+  tokenEncrypted: "token_encrypted",
+  status: "status",
+  checkedAt: "checked_at",
+  createdAt: "created_at",
+  updatedAt: "updated_at",
+});
+
+const userConnections = defineTable("user_connections", {
+  id: "id",
   userId: "user_id",
-  authType: "auth_type",
+  service: "service",
   tokenEncrypted: "token_encrypted",
   refreshTokenEncrypted: "refresh_token_encrypted",
   expiresAt: "expires_at",
   status: "status",
-  checkedAt: "checked_at",
   createdAt: "created_at",
   updatedAt: "updated_at",
 });
@@ -419,6 +427,7 @@ export const fakeSchema: Tables = {
   projectLinks,
   designLinks,
   designCredentials,
+  userConnections,
   designNodes,
   buildPackageUsage,
   tokens,

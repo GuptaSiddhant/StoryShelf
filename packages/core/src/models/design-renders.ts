@@ -9,7 +9,8 @@ import type { DesignNode } from "../schema/design.ts";
 import { designRenderPath } from "../utils/paths.ts";
 
 /**
- * Renders live at `{projectId}/design/{provider}/{fileKey}/{node}.png`, one per
+ * Renders live at `{projectId}/design/{provider}/{fileKey}/{node}.png` (a member's own
+ * connection: `…/{provider}/user-{id}/{fileKey}/…`), one per
  * linked node and overwritten in place when the file version moves, so storage
  * is bounded by the number of distinct linked nodes. A deleted node drops its
  * render; a link removed from settings (or a deleted project) leaves its PNG behind.
@@ -72,7 +73,13 @@ export class DesignRenderStore {
   }
 
   private async save(projectId: string, node: DesignNode, png: Buffer): Promise<DesignNode> {
-    const path = designRenderPath(projectId, node.provider, node.fileKey, node.nodeId);
+    const path = designRenderPath(
+      projectId,
+      node.provider,
+      node.fileKey,
+      node.nodeId,
+      node.viewerId,
+    );
     await this.storage?.write(path, png);
     return (await this.db.update(this.table, node.id, {
       renderPath: path,
