@@ -92,19 +92,26 @@ const designLinks = defineTable("design_links", {
   updatedAt: "updated_at",
 });
 
-const designTokens = defineTable("design_tokens", {
+const designCredentials = defineTable("design_credentials", {
   id: "id",
   projectId: "project_id",
+  provider: "provider",
+  userId: "user_id",
+  authType: "auth_type",
   tokenEncrypted: "token_encrypted",
+  refreshTokenEncrypted: "refresh_token_encrypted",
+  expiresAt: "expires_at",
   status: "status",
   checkedAt: "checked_at",
   createdAt: "created_at",
   updatedAt: "updated_at",
 });
 
-const figmaNodes = defineTable("figma_nodes", {
+const designNodes = defineTable("design_nodes", {
   id: "id",
   projectId: "project_id",
+  provider: "provider",
+  viewerId: "viewer_id",
   fileKey: "file_key",
   nodeId: "node_id",
   name: "name",
@@ -411,8 +418,8 @@ export const fakeSchema: Tables = {
   buildLabels,
   projectLinks,
   designLinks,
-  designTokens,
-  figmaNodes,
+  designCredentials,
+  designNodes,
   buildPackageUsage,
   tokens,
   webhooks,

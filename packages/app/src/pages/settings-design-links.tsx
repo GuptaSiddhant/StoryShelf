@@ -28,13 +28,14 @@ export function FilesCard(props: {
   files: SettingsDesignFile[];
   isAdmin: boolean;
   formState?: DesignFormState;
+  urlHint: string;
 }): Rendered {
-  const { base, files, isAdmin, formState } = props;
+  const { base, files, isAdmin, formState, urlHint } = props;
   return (
     <Card>
       <SectionTitle>Design files</SectionTitle>
       <Meta>
-        Figma files for this project. They appear in the library header; individual stories link to
+        Design files for this project. They appear in the library header; individual stories link to
         a design through their component (see below) or their story parameters.
       </Meta>
       <LinkTable
@@ -48,12 +49,14 @@ export function FilesCard(props: {
         confirm="Remove this design file?"
       />
       {files.length === 0 ? <Meta>No design files linked.</Meta> : null}
-      {isAdmin ? <AddFileForm base={base} error={formState?.errors?.["file"]} /> : null}
+      {isAdmin ? (
+        <AddFileForm base={base} urlHint={urlHint} error={formState?.errors?.["file"]} />
+      ) : null}
     </Card>
   );
 }
 
-/** Rows of `key → Figma link` with an optional remove action. */
+/** Rows of `key → design link` with an optional remove action. */
 function LinkTable(props: {
   rows: { id: string; key: string; url: string; removeAction?: string }[];
   keyHeading: string;
@@ -65,7 +68,7 @@ function LinkTable(props: {
         <thead>
           <tr>
             <th>{props.keyHeading}</th>
-            <th>Figma</th>
+            <th>Design</th>
             <th>
               <span class="visually-hidden">Actions</span>
             </th>
@@ -97,7 +100,7 @@ function LinkTable(props: {
   );
 }
 
-function AddFileForm(props: { base: string; error?: string }): Rendered {
+function AddFileForm(props: { base: string; urlHint: string; error?: string }): Rendered {
   const action = `${props.base}/files`;
   return (
     <form method="post" action={action} hx-post={action} hx-target="body">
@@ -105,11 +108,11 @@ function AddFileForm(props: { base: string; error?: string }): Rendered {
       <div class="grid grid--2">
         <Field label="Label" name="label" required placeholder="Design system" />
         <Field
-          label="Figma URL"
+          label="Design URL"
           name="url"
           type="url"
           required
-          placeholder="https://www.figma.com/design/…"
+          placeholder={props.urlHint}
           error={props.error}
         />
       </div>
@@ -126,16 +129,17 @@ export function ComponentsCard(props: {
   base: string;
   components: SettingsDesignComponent[];
   formState?: DesignFormState;
+  urlHint: string;
 }): Rendered {
-  const { base, components, formState } = props;
+  const { base, components, formState, urlHint } = props;
   return (
     <Card>
       <SectionTitle>Component mapping</SectionTitle>
       <Meta>
-        Map a story file (its import path) to a Figma node. A manual mapping overrides the
-        story&apos;s own <code>storyshelf.figma</code> and <code>design</code> parameters, and
-        survives new builds. Mappings are keyed by the story file path, so update one after a file
-        is renamed or moved.
+        Map a story file (its import path) to a design. A manual mapping overrides the story&apos;s
+        own <code>storyshelf.figma</code> and <code>design</code> parameters, and survives new
+        builds. Mappings are keyed by the story file path, so update one after a file is renamed or
+        moved.
       </Meta>
       <LinkTable
         rows={components.map((component) => ({
@@ -148,12 +152,12 @@ export function ComponentsCard(props: {
         confirm="Remove this mapping?"
       />
       {components.length === 0 ? <Meta>No component mappings.</Meta> : null}
-      <MapComponentForm base={base} error={formState?.errors?.["component"]} />
+      <MapComponentForm base={base} urlHint={urlHint} error={formState?.errors?.["component"]} />
     </Card>
   );
 }
 
-function MapComponentForm(props: { base: string; error?: string }): Rendered {
+function MapComponentForm(props: { base: string; urlHint: string; error?: string }): Rendered {
   const action = `${props.base}/components`;
   return (
     <form method="post" action={action} hx-post={action} hx-target="body">
@@ -166,11 +170,11 @@ function MapComponentForm(props: { base: string; error?: string }): Rendered {
           placeholder="./src/Button.stories.tsx"
         />
         <Field
-          label="Figma URL"
+          label="Design URL"
           name="url"
           type="url"
           required
-          placeholder="https://www.figma.com/design/…?node-id=1-2"
+          placeholder={props.urlHint}
           error={props.error}
         />
       </div>

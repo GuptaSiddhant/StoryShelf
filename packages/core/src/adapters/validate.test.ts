@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { makeFakeDesign } from "../test-helpers/fake-design.ts";
 import { validateAdapter, validateAdapterSources, validateAuth } from "./validate.ts";
 
 function storage(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -144,6 +145,29 @@ describe("validateAdapterSources", () => {
     });
     expect(failures).toHaveLength(1);
     expect(failures[0]?.category).toBe("git-host");
+  });
+
+  it("validates design providers", () => {
+    const valid = makeFakeDesign().provider;
+    expect(
+      validateAdapterSources({
+        database: database() as never,
+        storage: storage() as never,
+        design: [valid],
+      }),
+    ).toEqual([]);
+    const failures = validateAdapterSources({
+      database: database() as never,
+      storage: storage() as never,
+      design: [
+        { metadata: { name: "D", version: "1", kind: "d", category: "design" } } as never,
+        "nope" as never,
+      ],
+    });
+    expect(failures).toHaveLength(2);
+    expect(failures[0]).toMatchObject({ category: "design", kind: "d" });
+    expect(failures[0]?.error).toContain("missing methods: parseUrl, create");
+    expect(failures[1]?.error).toContain("design[1]: design provider must be an object");
   });
 
   it("validates notifier providers and email senders", () => {

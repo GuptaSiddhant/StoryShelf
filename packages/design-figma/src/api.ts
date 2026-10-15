@@ -1,8 +1,12 @@
-/** Figma REST client: batched metadata and render fetches with the project PAT, via the shared HTTP helper. */
+/** Figma REST client: batched metadata and render fetches with a personal access token, via the shared HTTP helper. */
+import type {
+  DesignCallOptions,
+  DesignClient,
+  DesignMeta,
+  DesignRef,
+} from "@storyshelf/core/adapter/design";
+import { HttpError, httpBytes, httpJson, type HttpRequestOptions } from "@storyshelf/core/utils";
 import type { Buffer } from "node:buffer";
-import type { Logger } from "../logger.ts";
-import type { FigmaRef } from "../utils/figma-url.ts";
-import { HttpError, httpBytes, httpJson, type HttpRequestOptions } from "../utils/http.ts";
 
 const FIGMA_API = "https://api.figma.com/v1";
 /**
@@ -10,23 +14,6 @@ const FIGMA_API = "https://api.figma.com/v1";
  * 4x payload; renders are reference-only, never diffed.
  */
 const RENDER_SCALE = 2;
-
-/** Outcome of a metadata fetch. `error` is transient (outage/rate limit), never persisted. */
-export type FigmaState = "ok" | "deleted" | "unauthorized" | "forbidden" | "error";
-
-/** Metadata of a Figma file or node. */
-export interface FigmaMeta {
-  state: FigmaState;
-  name: string | null;
-  version: string | null;
-  lastModified: string | null;
-}
-
-/** Shared request options: logger plus a signal that cancels the whole call (page-render budget). */
-export interface FigmaCallOptions {
-  logger?: Logger;
-  signal?: AbortSignal;
-}
 
 interface FileResponse {
   name?: string;
@@ -42,13 +29,20 @@ interface ImagesResponse {
 
 const EMPTY = { name: null, version: null, lastModified: null } as const;
 
-/** Key of a ref inside a per-file result map: the node id, or `""` for the whole file. */
-export const refKey = (ref: Pick<FigmaRef, "nodeId">): string => ref.nodeId ?? "";
+/** A Figma client bound to a personal access token. */
+export function createFigmaClient(token: string): DesignClient {
+  return {
+    fetchMetas: async (fileKey, refs, options) =>
+      await fetchFigmaMetas(token, fileKey, refs, options),
+    fetchRenders: async (fileKey, nodeIds, options) =>
+      await fetchFigmaRenders(token, fileKey, nodeIds, options),
+  };
+}
 
 function requestOptions(
   token: string,
   timeoutMs: number,
-  options: FigmaCallOptions,
+  options: DesignCallOptions,
 ): HttpRequestOptions {
   return {
     headers: { "X-Figma-Token": token },
@@ -63,14 +57,14 @@ function requestOptions(
 /**
  * Fetch metadata for several refs of one file in at most two requests: one
  * `nodes?ids=a,b` call for every node ref and one depth-1 file call when the
- * whole file is linked. API failures map to a {@link FigmaState} per ref.
+ * whole file is linked. API failures map to a state per ref.
  */
 export async function fetchFigmaMetas(
   token: string,
   fileKey: string,
-  refs: readonly FigmaRef[],
-  options: FigmaCallOptions = {},
-): Promise<Map<string, FigmaMeta>> {
+  refs: readonly DesignRef[],
+  options: DesignCallOptions = {},
+): Promise<Map<string, DesignMeta>> {
   const ids = [...new Set(refs.flatMap((ref) => (ref.nodeId ? [ref.nodeId] : [])))];
   const results = ids.length > 0 ? await fetchNodeMetas(token, fileKey, ids, options) : new Map();
   if (refs.some((ref) => !ref.nodeId)) {
@@ -84,8 +78,8 @@ async function fetchNodeMetas(
   token: string,
   fileKey: string,
   ids: readonly string[],
-  options: FigmaCallOptions,
-): Promise<Map<string, FigmaMeta>> {
+  options: DesignCallOptions,
+): Promise<Map<string, DesignMeta>> {
   const key = encodeURIComponent(fileKey);
   const url = `${FIGMA_API}/files/${key}/nodes?ids=${encodeURIComponent(ids.join(","))}&depth=1`;
   const outcome = await fetchOrFail<NodesResponse>(url, token, options);
@@ -95,19 +89,19 @@ async function fetchNodeMetas(
 async function fetchFileMeta(
   token: string,
   fileKey: string,
-  options: FigmaCallOptions,
-): Promise<FigmaMeta> {
+  options: DesignCallOptions,
+): Promise<DesignMeta> {
   const url = `${FIGMA_API}/files/${encodeURIComponent(fileKey)}?depth=1`;
   const outcome = await fetchOrFail<FileResponse>(url, token, options);
   return "meta" in outcome ? fileMeta(outcome.meta) : outcome;
 }
 
-type Fetched<T> = { meta: T } | FigmaMeta;
+type Fetched<T> = { meta: T } | DesignMeta;
 
 async function fetchOrFail<T>(
   url: string,
   token: string,
-  options: FigmaCallOptions,
+  options: DesignCallOptions,
 ): Promise<Fetched<T>> {
   try {
     return { meta: await httpJson<T>(url, requestOptions(token, 10_000, options)) };
@@ -116,7 +110,7 @@ async function fetchOrFail<T>(
   }
 }
 
-function fileMeta(body: FileResponse): FigmaMeta {
+function fileMeta(body: FileResponse): DesignMeta {
   return {
     state: "ok",
     name: body.name ?? null,
@@ -125,30 +119,20 @@ function fileMeta(body: FileResponse): FigmaMeta {
   };
 }
 
-function nodeMeta(body: NodesResponse, id: string): FigmaMeta {
+function nodeMeta(body: NodesResponse, id: string): DesignMeta {
   const base = { version: body.version ?? null, lastModified: body.lastModified ?? null };
   const node = body.nodes?.[id];
   if (!node) return { state: "deleted", name: null, ...base };
   return { state: "ok", name: node.document?.name ?? body.name ?? null, ...base };
 }
 
-function failureMeta(error: unknown): FigmaMeta {
+function failureMeta(error: unknown): DesignMeta {
   if (error instanceof HttpError) {
     if (error.status === 401) return { state: "unauthorized", ...EMPTY };
     if (error.status === 403) return { state: "forbidden", ...EMPTY };
     if (error.status === 404) return { state: "deleted", ...EMPTY };
   }
   return { state: "error", ...EMPTY };
-}
-
-/** Metadata of one file or node; a convenience over {@link fetchFigmaMetas}. */
-export async function fetchFigmaMeta(
-  token: string,
-  ref: FigmaRef,
-  options: FigmaCallOptions = {},
-): Promise<FigmaMeta> {
-  const metas = await fetchFigmaMetas(token, ref.fileKey, [ref], options);
-  return metas.get(refKey(ref)) ?? { state: "error", ...EMPTY };
 }
 
 /**
@@ -161,7 +145,7 @@ export async function fetchFigmaRenders(
   token: string,
   fileKey: string,
   nodeIds: readonly string[],
-  options: FigmaCallOptions = {},
+  options: DesignCallOptions = {},
 ): Promise<Map<string, Buffer>> {
   if (nodeIds.length === 0) return new Map();
   const ids = encodeURIComponent(nodeIds.join(","));
@@ -178,18 +162,7 @@ export async function fetchFigmaRenders(
   return new Map(downloaded.filter((entry) => entry !== null));
 }
 
-async function download(url: string, options: FigmaCallOptions): Promise<Buffer> {
+async function download(url: string, options: DesignCallOptions): Promise<Buffer> {
   const { headers: _headers, ...rest } = requestOptions("", 30_000, options);
   return await httpBytes(url, rest);
-}
-
-/** Render of one node; null for whole-file refs and nodes Figma cannot render. Throws on API/download failure. */
-export async function fetchFigmaRender(
-  token: string,
-  ref: FigmaRef,
-  options: FigmaCallOptions = {},
-): Promise<Buffer | null> {
-  if (!ref.nodeId) return null;
-  const renders = await fetchFigmaRenders(token, ref.fileKey, [ref.nodeId], options);
-  return renders.get(ref.nodeId) ?? null;
 }

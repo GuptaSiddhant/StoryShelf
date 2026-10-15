@@ -46,6 +46,10 @@
       "source": "./src/adapters/database.ts",
       "default": "./dist/adapter/database.mjs"
     },
+    "./adapter/design": {
+      "source": "./src/adapters/design.ts",
+      "default": "./dist/adapter/design.mjs"
+    },
     "./adapter/email-sender": {
       "source": "./src/adapters/email-sender.ts",
       "default": "./dist/adapter/email-sender.mjs"
@@ -162,6 +166,7 @@
       "./adapter/capture-queue": "./dist/adapter/capture-queue.mjs",
       "./adapter/capture-runner": "./dist/adapter/capture-runner.mjs",
       "./adapter/database": "./dist/adapter/database.mjs",
+      "./adapter/design": "./dist/adapter/design.mjs",
       "./adapter/email-sender": "./dist/adapter/email-sender.mjs",
       "./adapter/git-host": "./dist/adapter/git-host.mjs",
       "./adapter/git-host/comments": "./dist/adapter/git-host/comments.mjs",

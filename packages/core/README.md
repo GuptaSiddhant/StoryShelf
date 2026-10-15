@@ -95,6 +95,7 @@ All adapters are constructor-injected (no AsyncLocalStorage). See `docs/architec
 - `Auth` (`@storyshelf/auth`) — the shelf authentication singleton: `check(request)`, `handler` (mount at `/api/auth/*`), `loginMethods()`, invites, sessions, passkeys. `AuthUser` and the shared `SESSION_COOKIE` live in `core/types`.
 - `CaptureRunner` (`core/adapter/capture-runner`) — a **pure capture renderer**: `render(input) => RenderResult`, `cancel(buildId)`. Also exports `RenderedSnapshot`, `RenderResult`, `StoryEntry`, `StorySourceAdapter`, `Viewport`.
 - `CaptureQueue` (`core/adapter/capture-queue`) — `enqueue({ buildId, reqId? })`, plus `status`, `active`, `recent`. Also exports `CaptureJob`, `QueueEntry`, `JobStatus`.
+- `DesignProvider` / `DesignClient` (`core/adapter/design`) — validate design links and fetch file metadata and rendered previews from a design tool. The Figma provider ships in `@storyshelf/design-figma`; also exports `parseDesignUrl` and `InvalidDesignUrlError`.
 - `GitHostProvider` / `GitHostAdapter` (`core/adapter/git-host`) — set commit status checks, detect merges, and upsert PR comments. Real providers ship in `@storyshelf/git-github` and `@storyshelf/git-gitlab`. Also exports `CheckStatus`.
 
 ### Logging

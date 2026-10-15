@@ -180,19 +180,26 @@ CREATE TABLE IF NOT EXISTS design_links (
   updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS design_links_project_id_idx ON design_links (project_id);
-CREATE TABLE IF NOT EXISTS design_tokens (
+CREATE TABLE IF NOT EXISTS design_credentials (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  provider TEXT NOT NULL,
+  user_id TEXT NOT NULL DEFAULT '',
+  auth_type TEXT NOT NULL DEFAULT 'token',
   token_encrypted TEXT NOT NULL,
+  refresh_token_encrypted TEXT,
+  expires_at TEXT,
   status TEXT NOT NULL DEFAULT 'unknown',
   checked_at TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS design_tokens_project_id_idx ON design_tokens (project_id);
-CREATE TABLE IF NOT EXISTS figma_nodes (
+CREATE UNIQUE INDEX IF NOT EXISTS design_credentials_project_provider_user_idx ON design_credentials (project_id, provider, user_id);
+CREATE TABLE IF NOT EXISTS design_nodes (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  provider TEXT NOT NULL,
+  viewer_id TEXT NOT NULL DEFAULT '',
   file_key TEXT NOT NULL,
   node_id TEXT NOT NULL DEFAULT '',
   name TEXT,
@@ -205,7 +212,7 @@ CREATE TABLE IF NOT EXISTS figma_nodes (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS figma_nodes_project_file_node_idx ON figma_nodes (project_id, file_key, node_id);
+CREATE UNIQUE INDEX IF NOT EXISTS design_nodes_project_file_node_idx ON design_nodes (project_id, provider, viewer_id, file_key, node_id);
 CREATE TABLE IF NOT EXISTS build_package_usage (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -437,6 +444,9 @@ export const IDENTITY_STATEMENTS: string[] = [
   "CREATE UNIQUE INDEX IF NOT EXISTS baselines_project_story_mode_browser_branch_idx ON baselines (project_id, story_id, viewport_name, browser, branch)",
   "CREATE INDEX IF NOT EXISTS snapshots_project_import_path_idx ON snapshots (project_id, story_import_path)",
   "CREATE UNIQUE INDEX IF NOT EXISTS design_links_project_import_path_idx ON design_links (project_id, import_path)",
+  // Pre-adapter Figma tables, replaced by design_nodes / design_credentials (no data is carried over).
+  "DROP TABLE IF EXISTS figma_nodes",
+  "DROP TABLE IF EXISTS design_tokens",
 ];
 
 const CONSTRAINT_PREFIX = /^(?:PRIMARY|FOREIGN|UNIQUE|CHECK|CONSTRAINT)\s/iu;

@@ -17,8 +17,8 @@ export type { CaptureAttempt, CaptureLog, CaptureLogLevel } from "./capture-atte
 export type { Comment } from "./comment.ts";
 /** Build label and label type rows. */
 export type { BuildLabel, LabelType } from "./label.ts";
-/** Design link, Figma token and cached Figma node rows. */
-export type { DesignLink, DesignToken, FigmaNode } from "./design.ts";
+/** Design link, provider credential and cached design node rows. */
+export type { DesignCredential, DesignLink, DesignNode } from "./design.ts";
 /** Project link and per-build package usage rows. */
 export type { BuildPackageUsage, ProjectLink } from "./usage.ts";
 /** Project membership row linking a user to a project role. */

@@ -5,6 +5,7 @@ import type {
 } from "@storyshelf/core/adapter/capture-queue";
 import type { CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import type { DesignProvider } from "@storyshelf/core/adapter/design";
 import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import { createDispatchJob } from "@storyshelf/core/capture";
@@ -61,6 +62,8 @@ export interface WorkerOptions {
   scratchDir: string;
   /** Git host providers for status fanout. */
   gitHosts?: GitHostProvider[];
+  /** Design providers validating declared design links during capture. */
+  design?: DesignProvider[];
   /** Server secret for webhook decryption. */
   secret?: string;
   /** Logger for worker diagnostics. */
@@ -118,6 +121,7 @@ export function createCaptureWorker(options: WorkerOptions): WorkerHandle {
     viewports: options.viewports,
     logger,
     secret: options.secret,
+    design: options.design,
   };
 
   const dispatchDeps: DispatchDeps = {

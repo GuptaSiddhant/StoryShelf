@@ -4,9 +4,11 @@
  * In-memory fakes only — never shipped to production bundles, but published
  * so out-of-tree adapter implementations can run the same contract tests.
  */
+export { designContractSuite, type DesignContractSamples } from "./design-contract.ts";
 export { createTestBuild, createTestProject } from "./create-project.ts";
 export { databaseContractSuite, REQUIRED_TABLES } from "./database-contract.ts";
 export { gitContractSuite } from "./git-contract.ts";
+export { FAKE_PNG, fakeUrl, makeFakeDesign, type FakeDesign } from "./fake-design.ts";
 export { makeDatabase, makeStorage, stubTables, type FakeStorage } from "./fake-adapters.ts";
 export { notifierContractSuite } from "./notifier-contract.ts";
 export { queueContractSuite } from "./queue-contract.ts";
