@@ -7,6 +7,8 @@ Design links are provided by a design adapter. Install `@storyshelf/design-figma
 
 StoryShelf can link each component (story file) to its Figma design. The link shows up as a **Figma** button on library cards, build cards and the review page — only for components that resolve a link.
 
+Where a project has no Figma token, members can **Connect Figma** from the review page or a component's Design tab to see previews with their own account, if your operator enabled it (see [the package page](/packages/design-figma/)).
+
 ## Declare a link in the story
 
 Use the Storybook `design` addon shape, or the explicit `storyshelf.figma` key (which wins when both are set):

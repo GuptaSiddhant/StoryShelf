@@ -3,7 +3,7 @@ import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
-import { createFigmaDesign } from "@storyshelf/design-figma";
+import { createFigmaDesign, figmaOAuthFromEnv } from "@storyshelf/design-figma";
 import { chatNotifiers } from "@storyshelf/notify-chat";
 import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/notify-email";
 import { otelLogMixin } from "@storyshelf/observability";
@@ -93,7 +93,7 @@ const app = createShelfApp({
   database,
   storage,
   captureRunner,
-  design: [createFigmaDesign()],
+  design: [createFigmaDesign({ oauth: figmaOAuthFromEnv() })],
   notifiers: [...chatNotifiers, ...emailNotifiers],
   // Enable local-account login by setting AUTH_PASSWORD (and SECRET): the
   // engine provisions an admin identity from the env on every boot.

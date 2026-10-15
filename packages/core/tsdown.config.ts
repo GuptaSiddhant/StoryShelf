@@ -11,6 +11,7 @@ export default libConfig({
   "adapter/storage": "./src/adapters/storage.ts",
   "adapter/capture-runner": "./src/adapters/capture-runner.ts",
   "adapter/design": "./src/adapters/design.ts",
+  "adapter/oauth": "./src/adapters/oauth.ts",
   "adapter/git-host": "./src/adapters/git-host/index.ts",
   "adapter/git-host/helpers": "./src/adapters/git-host/helpers.ts",
   "adapter/git-host/comments": "./src/adapters/git-host/comments.ts",

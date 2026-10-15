@@ -9,10 +9,20 @@ import {
   HStack,
   Meta,
 } from "../ui/components.tsx";
+import { csrfField } from "../ui/csrf-field.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
+
+/** "Connect your own account" state for a provider whose project has no shared credential. */
+export interface DesignConnect {
+  /** `connect` (not connected), `reconnect` (connection expired) or `connected`. */
+  state: "connect" | "reconnect" | "connected";
+  startUrl: string;
+  disconnectUrl: string;
+  returnTo: string;
+}
 
 /** A design link a component resolves to, with cached provider metadata when available. */
 export interface DesignItem {
@@ -27,6 +37,8 @@ export interface DesignItem {
   renderUrl: string | null;
   /** The design changed after the baseline it is compared with was approved. */
   stale: boolean;
+  /** Offer to connect the viewer's own account; absent when not applicable. */
+  connect?: DesignConnect;
 }
 
 /** Cached name and render of a design link, for library popovers. */
@@ -131,7 +143,51 @@ export function DesignStrip(props: { items: DesignItem[] }): Rendered {
         ))}
       </HStack>
       {items.map((item): Rendered | null => designNotice(item))}
+      {connectPrompts(items)}
     </>
+  );
+}
+
+/** One connect/disconnect prompt per provider (several links of one provider share it). */
+function connectPrompts(items: DesignItem[]): Rendered[] {
+  const byProvider = new Map(
+    items.flatMap((item) => (item.connect ? [[item.providerName, item] as const] : [])),
+  );
+  return [...byProvider.values()].map((item): Rendered => connectPrompt(item, item.connect));
+}
+
+function connectPrompt(item: DesignItem, connect: DesignConnect | undefined): Rendered {
+  if (!connect) return <></>;
+  if (connect.state === "connected") {
+    return (
+      <form key={item.providerName} method="post" action={connect.disconnectUrl}>
+        {csrfField()}
+        <input type="hidden" name="return" value={connect.returnTo} />
+        <HStack wrap={false}>
+          <Meta as="span">Previews use your {item.providerName} account.</Meta>
+          <Button variant="ghost" size="sm" type="submit">
+            Disconnect
+          </Button>
+        </HStack>
+      </form>
+    );
+  }
+  return (
+    <Alert
+      key={item.providerName}
+      tone={connect.state === "reconnect" ? "warning" : "info"}
+      title={
+        connect.state === "reconnect"
+          ? `Your ${item.providerName} connection expired`
+          : `Connect ${item.providerName} for design previews`
+      }
+    >
+      Sign in with your own {item.providerName} account to see names, previews and stale-design
+      warnings. Only you will see what your account can open.{" "}
+      <Button variant="secondary" size="sm" href={connect.startUrl}>
+        {connect.state === "reconnect" ? "Reconnect" : "Connect"} {item.providerName}
+      </Button>
+    </Alert>
   );
 }
 

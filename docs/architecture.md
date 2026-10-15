@@ -188,7 +188,7 @@ design_credentials (
 
 -- Design metadata + render cache keyed by (project, provider, viewer, file key, node id; node '' = whole
 -- file). viewer_id '' = fetched with the project credential; a user id = fetched with that user's own
--- access (reserved: such entries may only be served to that user). state: ok | deleted | unauthorized |
+-- access (such entries are served only to that user; see ADR 0030). state: ok | deleted | unauthorized |
 -- forbidden. Refreshed on view when older than 15 min; outages keep the last good row.
 design_nodes (
   id             text PRIMARY KEY,
@@ -207,6 +207,21 @@ design_nodes (
   created_at     text NOT NULL,
   updated_at     text NOT NULL,
   UNIQUE(project_id, provider, viewer_id, file_key, node_id)
+);
+
+-- A user's own OAuth connection to an external service (service = adapter kind, e.g. figma; ADR 0030).
+-- Tokens are encrypted; status: ok | expired (refresh failed - the user must reconnect).
+user_connections (
+  id                      text PRIMARY KEY,
+  user_id                 text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  service                 text NOT NULL,
+  token_encrypted         text NOT NULL,
+  refresh_token_encrypted text,
+  expires_at              timestamp,
+  status                  text NOT NULL DEFAULT 'ok',
+  created_at              timestamp NOT NULL,
+  updated_at              timestamp NOT NULL,
+  UNIQUE(user_id, service)
 );
 
 -- Linked projects (components only, see issue #123): a downstream app declares which upstream
@@ -686,7 +701,7 @@ Design links attach to a **component (story file)**, never to a single state or 
 - **Render cache:** for node links the provider's render is downloaded at fetch time (signed vendor URLs expire, so they are never hot-linked) into storage at `{projectId}/design/{provider}/{fileKey}/{node}.png` and re-fetched only when the file `version` moves (`render_version`). `GET /api/v1/projects/:slug/design/renders/:renderId` (the internal `design_nodes` row id, not a provider node id) serves it to viewers; a request whose `?v=` matches the stored version is cached `immutable`. A render failure keeps the previous render and the metadata. A **deleted** node drops its render (row and stored PNG), so a design that no longer exists is never shown as reference; an auth failure (`unauthorized`/`forbidden`) keeps the last good name, version and render and only flips the state.
 - **Render lifecycle:** one PNG per linked node, overwritten in place when the file version moves, so storage is bounded by the number of distinct linked nodes. Renders are not evicted by build purge (they are not build artifacts); a link removed from settings (or a deleted project) leaves its PNG behind — small, bounded, and safe to delete by hand under `{projectId}/design/`.
 - **Surfaces:** the review page shows a reference pane under the diff stage (reference only — never diffed); library cards open a click popover with the cached render and `Open in <provider>`. Whole-file links have no render and stay deep links.
-- **Per-user connections (reserved):** `design_credentials.user_id` / `design_nodes.viewer_id` and the `auth_type`/refresh/expiry columns reserve room for per-user OAuth connections without further schema changes; today only the project-wide (`''`) scope is used.
+- **Member connections (ADR 0030):** when the project has no credential and the operator configured OAuth for the provider (`createFigmaDesign({ oauth })`), signed-in members see a "Connect <provider>" prompt. Their tokens live in `user_connections`; entries fetched with them carry `design_nodes.viewer_id = user` and (with their renders under `.../user-<id>/...`) are served only to that user. The project credential always wins, and a member token is used only during that member's own visits. The `design_credentials.user_id`/`auth_type`/refresh/expiry columns are currently unused.
 - **Non-goals:** pixel-diffing against design renders, token mapping, build-level `figma` labels.
 
 ## Build Labels

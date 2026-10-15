@@ -26,6 +26,8 @@ export interface FakeDesign {
   delayMs: number;
   /** Credentials the provider was created with, in order. */
   credentials: string[];
+  /** How each of those credentials authenticates, in the same order. */
+  authTypes: string[];
   metaCalls: { fileKey: string; nodeIds: string[] }[];
   renderCalls: { fileKey: string; nodeIds: string[] }[];
   /** Calls currently in flight and the highest value seen. */
@@ -63,6 +65,7 @@ export function makeFakeDesign(kind = "fake"): FakeDesign {
     failRenders: false,
     delayMs: 0,
     credentials: [],
+    authTypes: [],
     metaCalls: [],
     renderCalls: [],
     inFlight: 0,
@@ -96,8 +99,9 @@ export function makeFakeDesign(kind = "fake"): FakeDesign {
       credentialMaxAgeDays: 90,
     },
     parseUrl: parse,
-    create: ({ credential }) => {
+    create: ({ credential, authType }) => {
       fake.credentials.push(credential);
+      fake.authTypes.push(authType ?? "token");
       return {
         fetchMetas: async (fileKey, refs, options) => {
           fake.metaCalls.push({ fileKey, nodeIds: refs.map((ref) => ref.nodeId ?? "") });

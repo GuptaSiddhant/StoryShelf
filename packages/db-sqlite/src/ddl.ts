@@ -322,6 +322,18 @@ CREATE TABLE IF NOT EXISTS users (
   auth_provider TEXT NOT NULL DEFAULT 'oidc',
   disabled INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS user_connections (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  service TEXT NOT NULL,
+  token_encrypted TEXT NOT NULL,
+  refresh_token_encrypted TEXT,
+  expires_at TEXT,
+  status TEXT NOT NULL DEFAULT 'ok',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS user_connections_user_service_idx ON user_connections (user_id, service);
 CREATE TABLE IF NOT EXISTS user_invite_tokens (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

@@ -19,6 +19,15 @@ the optional `@storyshelf/design-figma` package behind a new `DesignProvider` ad
   startup; the metadata/render cache simply refetches.
 - The component page's Figma tab is now `?tab=design`.
 
+**Connect your own account:** when a project has no design token, signed-in members can connect
+their own Figma account for previews (ADR 0030). Set `FIGMA_CLIENT_ID` / `FIGMA_CLIENT_SECRET`
+(a Figma OAuth app with redirect `<publicBaseUrl>/connections/figma/callback`, scope
+`file_content:read`; needs auth enabled and `config.secret`) and pass
+`createFigmaDesign({ oauth: figmaOAuthFromEnv() })`. The flow, token storage
+(`user_connections`) and refresh are service-neutral (`@storyshelf/core/adapter/oauth`), so other
+adapters can offer it too. A project token still takes precedence; a member's token is used
+only on their own visits, and what it fetches is shown only to them.
+
 **Added:** `@storyshelf/core/adapter/design` (`DesignProvider`, `DesignClient`,
 `parseDesignUrl`), `designContractSuite` in `@storyshelf/core/test-helpers`, and schema room for
 per-user design connections (`design_credentials.user_id`, `design_nodes.viewer_id`).

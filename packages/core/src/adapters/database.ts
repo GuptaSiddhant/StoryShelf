@@ -25,6 +25,7 @@ export interface Tables {
   projectLinks: Table;
   designLinks: Table;
   designCredentials: Table;
+  userConnections: Table;
   designNodes: Table;
   buildPackageUsage: Table;
   tokens: Table;

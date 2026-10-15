@@ -20,6 +20,12 @@ const SOURCES = [
     table: "designCredentials",
     column: "refreshTokenEncrypted",
   },
+  { name: "user connections", table: "userConnections", column: "tokenEncrypted" },
+  {
+    name: "user connection refresh tokens",
+    table: "userConnections",
+    column: "refreshTokenEncrypted",
+  },
   { name: "notification channels", table: "notificationChannels", column: "secretEncrypted" },
 ] as const;
 

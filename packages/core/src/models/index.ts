@@ -46,6 +46,7 @@ export {
   type ComponentHistoryRow,
   type ComponentPresence,
 } from "./component.ts";
+export { ConnectionModel, type ConnectionTables } from "./connections.ts";
 export { DesignModel, type DesignTables } from "./design.ts";
 export {
   DesignCredentialModel,

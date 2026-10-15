@@ -16,6 +16,7 @@ import type { Logger } from "../logger.ts";
 import type { DesignNode } from "../schema/design.ts";
 import { mapLimit } from "../utils/map-limit.ts";
 import { ulid } from "../utils/ulid.ts";
+import type { ConnectionModel } from "./connections.ts";
 import { PROJECT_SCOPE, type DesignCredentialModel } from "./design-credentials.ts";
 import { DESIGN_TTL_MS } from "./design-health.ts";
 import { DesignRenderStore } from "./design-renders.ts";
@@ -34,6 +35,8 @@ export interface RefreshOptions {
   now?: Date;
   /** Cancels in-flight provider calls (e.g. a page-render budget). */
   signal?: AbortSignal;
+  /** The visiting user: their own connection is used when the project has no credential. */
+  viewerId?: string;
 }
 
 interface Due {
@@ -41,6 +44,8 @@ interface Due {
   provider: DesignProvider;
   ref: DesignRef;
   cached: DesignNode | null;
+  /** Whose credential fetches this link: {@link PROJECT_SCOPE} or the viewer's user id. */
+  scope: string;
 }
 
 /** Cache of design file/node metadata and node renders with TTL refresh. */
@@ -48,11 +53,18 @@ export class DesignNodeModel {
   private readonly tables: DesignNodeTables;
   private readonly renders: DesignRenderStore;
   private readonly logger: Logger | undefined;
+  private readonly connections: ConnectionModel | undefined;
   constructor(
     private readonly db: DatabaseAdapter,
     private readonly credentials: DesignCredentialModel,
     private readonly providers: readonly DesignProvider[],
-    options: { tables?: DesignNodeTables; logger?: Logger; storage?: StorageAdapter } = {},
+    options: {
+      tables?: DesignNodeTables;
+      logger?: Logger;
+      storage?: StorageAdapter;
+      /** Members' own connections, used when the project has no credential. */
+      connections?: ConnectionModel;
+    } = {},
   ) {
     this.tables = options.tables ?? { designNodes: db.tables.designNodes };
     this.renders = new DesignRenderStore(
@@ -62,6 +74,7 @@ export class DesignNodeModel {
       options.logger,
     );
     this.logger = options.logger;
+    this.connections = options.connections;
   }
 
   /** Cached row by id, scoped to the project, or null. */
@@ -75,13 +88,20 @@ export class DesignNodeModel {
     return await this.renders.read(node);
   }
 
-  /** Cached rows for the given design URLs, keyed by URL (unparseable or uncached URLs are absent). */
-  async cachedFor(projectId: string, urls: readonly string[]): Promise<Map<string, DesignNode>> {
+  /**
+   * Cached rows for the given design URLs, keyed by URL (unparseable or uncached URLs are
+   * absent). A row fetched with someone's own connection is only visible to that viewer.
+   */
+  async cachedFor(
+    projectId: string,
+    urls: readonly string[],
+    viewerId?: string,
+  ): Promise<Map<string, DesignNode>> {
     const rows = await Promise.all(
       [...new Set(urls)].map(async (url) => {
         const parsed = parseDesignUrl(this.providers, url);
         const row = parsed
-          ? await this.lookup(projectId, parsed.provider.metadata.kind, parsed.ref)
+          ? await this.visible(projectId, parsed.provider.metadata.kind, parsed.ref, viewerId)
           : null;
         return [url, row] as const;
       }),
@@ -90,8 +110,16 @@ export class DesignNodeModel {
   }
 
   /** Refresh one link (see {@link refreshMany}); null for unsupported URLs or nothing cached. */
-  async refresh(projectId: string, url: string, now?: Date): Promise<DesignNode | null> {
-    const results = await this.refreshMany(projectId, [url], now ? { now } : {});
+  async refresh(
+    projectId: string,
+    url: string,
+    now?: Date,
+    viewerId?: string,
+  ): Promise<DesignNode | null> {
+    const results = await this.refreshMany(projectId, [url], {
+      ...(now ? { now } : {}),
+      ...(viewerId ? { viewerId } : {}),
+    });
     return results.get(url) ?? null;
   }
 
@@ -107,12 +135,17 @@ export class DesignNodeModel {
     options: RefreshOptions = {},
   ): Promise<Map<string, DesignNode | null>> {
     const now = options.now ?? new Date();
+    const scopes = new Map<string, Promise<string>>();
     const lookups = await Promise.all(
       [...new Set(urls)].map(async (url) => {
         const parsed = parseDesignUrl(this.providers, url);
         if (!parsed) return null;
-        const cached = await this.lookup(projectId, parsed.provider.metadata.kind, parsed.ref);
-        return { url, provider: parsed.provider, ref: parsed.ref, cached };
+        const kind = parsed.provider.metadata.kind;
+        const scope = await memo(scopes, kind, async () => {
+          return await this.scopeFor(projectId, kind, options.viewerId);
+        });
+        const cached = await this.lookup(projectId, kind, parsed.ref, scope);
+        return { url, provider: parsed.provider, ref: parsed.ref, cached, scope };
       }),
     );
     const known = lookups.filter((item) => item !== null);
@@ -162,7 +195,7 @@ export class DesignNodeModel {
       call,
     );
     const answered = [...metas.values()].find((meta) => meta.state !== "error");
-    if (answered) {
+    if (answered && first.scope === PROJECT_SCOPE) {
       await this.credentials.recordStatus(
         projectId,
         provider.metadata.kind,
@@ -191,20 +224,52 @@ export class DesignNodeModel {
     return new Map(rows.filter((entry) => entry !== null));
   }
 
-  /** A client for the provider of `items` bound to the project credential, or null without one. */
+  /** A client for the provider of `items` bound to the items' credential scope, or null without one. */
   private async clientFor(projectId: string, items: Due[]): Promise<DesignClient | null> {
-    const provider = items[0]?.provider;
-    const credential = provider
-      ? await this.credentials.get(projectId, provider.metadata.kind).catch(() => null)
-      : null;
-    if (!provider || !credential) return null;
-    return provider.create({ credential, ...(this.logger ? { logger: this.logger } : {}) });
+    const first = items[0];
+    if (!first) return null;
+    const { provider, scope } = first;
+    const kind = provider.metadata.kind;
+    const own = scope !== PROJECT_SCOPE;
+    const credential = own
+      ? await this.connections?.accessToken(scope, kind, provider.oauth).catch(() => null)
+      : await this.credentials.get(projectId, kind).catch(() => null);
+    if (!credential) return null;
+    return provider.create({
+      credential,
+      authType: own ? "oauth" : "token",
+      ...(this.logger ? { logger: this.logger } : {}),
+    });
+  }
+
+  /**
+   * Whose credential serves a provider: the project's when set (it is shared and
+   * wins), else the viewer's own connection, else the project scope (nothing to fetch with).
+   */
+  private async scopeFor(projectId: string, provider: string, viewerId?: string): Promise<string> {
+    if (!viewerId || !this.connections || (await this.credentials.info(projectId, provider))) {
+      return PROJECT_SCOPE;
+    }
+    return (await this.connections.info(viewerId, provider)) ? viewerId : PROJECT_SCOPE;
+  }
+
+  /** The shared row, else the viewer's own (a connected member's entries are never served to others). */
+  private async visible(
+    projectId: string,
+    provider: string,
+    ref: DesignRef,
+    viewerId?: string,
+  ): Promise<DesignNode | null> {
+    const shared = await this.lookup(projectId, provider, ref, PROJECT_SCOPE);
+    if (shared || !viewerId) return shared;
+    return await this.lookup(projectId, provider, ref, viewerId);
   }
 
   private async lookup(
     projectId: string,
     provider: string,
     ref: DesignRef,
+    scope: string,
   ): Promise<DesignNode | null> {
     const columns = getTableColumns(this.tables.designNodes);
     const column = (name: string): SQLWrapper => columns[name] as unknown as SQLWrapper;
@@ -212,7 +277,7 @@ export class DesignNodeModel {
       where: and(
         eq(column("projectId"), projectId),
         eq(column("provider"), provider),
-        eq(column("viewerId"), PROJECT_SCOPE),
+        eq(column("viewerId"), scope),
         eq(column("fileKey"), ref.fileKey),
         eq(column("nodeId"), ref.nodeId ?? ""),
       ),
@@ -248,7 +313,7 @@ export class DesignNodeModel {
         id: ulid(),
         projectId,
         provider: item.provider.metadata.kind,
-        viewerId: PROJECT_SCOPE,
+        viewerId: item.scope,
         fileKey: ref.fileKey,
         nodeId: ref.nodeId ?? "",
         renderPath: null,
@@ -280,4 +345,17 @@ function callOptions(logger: Logger | undefined, options: RefreshOptions): Desig
 
 function statusFor(state: DesignMeta["state"]): DesignCredentialStatus {
   return state === "unauthorized" || state === "forbidden" ? state : "ok";
+}
+
+/** Run `load` once per key, sharing the in-flight promise between concurrent callers. */
+async function memo<T>(
+  cache: Map<string, Promise<T>>,
+  key: string,
+  load: () => Promise<T>,
+): Promise<T> {
+  const hit = cache.get(key);
+  if (hit) return await hit;
+  const created = load();
+  cache.set(key, created);
+  return await created;
 }

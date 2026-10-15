@@ -9,12 +9,25 @@ import {
   type DesignResolution,
 } from "@storyshelf/core/models";
 import type { DesignNode, Project, Snapshot } from "@storyshelf/core/schema";
+import { connectionModel } from "../connections.ts";
 import { credentialKeys } from "../credential-keys.ts";
-import type { DesignItem, DesignPreviewInfo, ProjectDesignLink } from "../pages/design-links.tsx";
+import type {
+  DesignConnect,
+  DesignItem,
+  DesignPreviewInfo,
+  ProjectDesignLink,
+} from "../pages/design-links.tsx";
 import { getStore } from "../store.ts";
+import { loadConnectStates, viewerIdOf } from "./design-connect.handlers.ts";
 
 /** Most a page render waits for fresh design metadata; slower fetches finish into the cache for next time. */
 const REFRESH_BUDGET_MS = 1500;
+
+/** Path + query of the current request, to return to after a connect round trip. */
+export function returnPathOf(c: { req: { url: string } }): string {
+  const url = new URL(c.req.url);
+  return `${url.pathname}${url.search}`;
+}
 
 /** Component (story file) → design link(s) for a build's snapshots; files without a link are absent. */
 export async function loadDesignResolutions(
@@ -53,14 +66,25 @@ export async function loadReviewDesign(
   project: Project,
   snapshot: Snapshot,
   urls: readonly string[],
+  returnTo = "/",
 ): Promise<DesignItem[]> {
   if (urls.length === 0) return [];
   const nodes = nodeModel();
-  await refreshWithinBudget(nodes, project.id, urls);
-  const cached = await nodes.cachedFor(project.id, urls).catch(() => new Map<string, DesignNode>());
+  const viewerId = viewerIdOf();
+  await refreshWithinBudget(nodes, project.id, urls, viewerId);
+  const cached = await nodes
+    .cachedFor(project.id, urls, viewerId)
+    .catch(() => new Map<string, DesignNode>());
+  const connects = await loadConnectStates(
+    project.id,
+    urls.map((url) => kindOf(url)),
+    returnTo,
+  ).catch(() => new Map<string, DesignConnect>());
   return urls.map((url) => {
     const node = cached.get(url);
+    const connect = connects.get(kindOf(url));
     return {
+      ...(connect ? { connect } : {}),
       url,
       name: node?.name ?? null,
       providerName: providerNameFor(url),
@@ -86,9 +110,10 @@ export async function loadDesignPreviews(
   const distinct = [...new Set(urls)];
   if (distinct.length === 0) return new Map();
   const nodes = nodeModel();
-  await refreshWithinBudget(nodes, project.id, distinct.slice(0, WARM_LIMIT));
+  const viewerId = viewerIdOf();
+  await refreshWithinBudget(nodes, project.id, distinct.slice(0, WARM_LIMIT), viewerId);
   const cached = await nodes
-    .cachedFor(project.id, distinct)
+    .cachedFor(project.id, distinct, viewerId)
     .catch(() => new Map<string, DesignNode>());
   return new Map(
     [...cached].map(([url, node]) => [
@@ -101,7 +126,15 @@ export async function loadDesignPreviews(
 function nodeModel(): DesignNodeModel {
   const { db, config, logger, storage, design } = getStore();
   const credentials = new DesignCredentialModel(db, credentialKeys(config));
-  return new DesignNodeModel(db, credentials, design, { logger, storage });
+  return new DesignNodeModel(db, credentials, design, {
+    logger,
+    storage,
+    connections: connectionModel(),
+  });
+}
+
+function kindOf(url: string): string {
+  return parseDesignUrl(getStore().design, url)?.provider.metadata.kind ?? "";
 }
 
 /** Display name of the provider that owns a design link ("Figma"), or a generic fallback. */
@@ -121,8 +154,12 @@ async function refreshWithinBudget(
   nodes: DesignNodeModel,
   projectId: string,
   urls: readonly string[],
+  viewerId?: string,
 ): Promise<void> {
   await nodes
-    .refreshMany(projectId, urls, { signal: AbortSignal.timeout(REFRESH_BUDGET_MS) })
+    .refreshMany(projectId, urls, {
+      signal: AbortSignal.timeout(REFRESH_BUDGET_MS),
+      ...(viewerId ? { viewerId } : {}),
+    })
     .catch(() => new Map());
 }

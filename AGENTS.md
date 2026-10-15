@@ -176,6 +176,7 @@ This distinction matters for:
 | 0027 | MCP Server (`@storyshelf/mcp`, thin client over `/api/v1`, stdio + HTTP, read + comment only) |
 | 0028 | Modes and Multi-Browser Capture (named modes from parameters, per-engine baselines, shared approval) |
 | 0029 | Design Provider Adapter (`@storyshelf/design-figma`; vendor-neutral links, cache and credentials in core) |
+| 0030 | User OAuth Connections (service-neutral "Connect your account": `OAuthClient`, `user_connections`, shared `/connections/:service` flow) |
 
 ## Parallel Development with Worktrees
 
