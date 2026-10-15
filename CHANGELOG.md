@@ -5,6 +5,9 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 
 ## Unreleased
 
+**Fixes**
+- The Puppeteer runner now runs `play` functions on Storybook 8, 9 and 10 (it failed with `Cannot call fromId/raw() unless you call cacheAllCSFFiles() first`), by loading just the story and running its `playFunction` with the mounted render's context, as the Playwright runner already does.
+
 **Streaming and page reuse**
 - Screenshots are written to storage as each is captured (new optional `onCapture` on `CaptureRunner.render`; both bundled runners support it), so memory no longer grows with the number of stories. Runners that ignore it keep working unchanged.
 - Opt-in page reuse (`reusePages` / `STORYSHELF_REUSE_PAGES=1`) for both runners: pooled pages in their own contexts, reset between captures, discarded after a failure. Screenshots were byte-identical with reuse on and off on the bundled fixtures.
