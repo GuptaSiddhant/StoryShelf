@@ -24,8 +24,8 @@ export interface Tables {
   buildLabels: Table;
   projectLinks: Table;
   designLinks: Table;
-  designTokens: Table;
-  figmaNodes: Table;
+  designCredentials: Table;
+  designNodes: Table;
   buildPackageUsage: Table;
   tokens: Table;
   webhooks: Table;

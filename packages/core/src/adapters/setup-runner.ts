@@ -53,7 +53,7 @@ function pushAll(
   pushHook(entries, sources.storage, hook);
   pushHook(entries, sources.captureRunner, hook);
   pushHook(entries, sources.captureQueue, hook);
-  for (const provider of sources.gitHosts ?? []) {
+  for (const provider of [...(sources.gitHosts ?? []), ...(sources.design ?? [])]) {
     pushHook(entries, provider, hook);
   }
   for (const notifier of sources.notifiers ?? []) {
@@ -93,6 +93,7 @@ export function bindAdapterLoggers(sources: AdapterSetupSources, logger: Logger)
     sources.captureRunner,
     sources.captureQueue,
     ...(sources.gitHosts ?? []),
+    ...(sources.design ?? []),
     ...(sources.notifiers ?? []),
     sources.emailSender,
   ];

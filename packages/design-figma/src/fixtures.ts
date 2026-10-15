@@ -1,4 +1,4 @@
-/** Shared fixtures for the Figma model tests: a scriptable fake of api.figma.com and its CDN. */
+/** Shared fixtures for the Figma API tests: a scriptable fake of api.figma.com and its CDN. */
 import { vi, type MockInstance } from "vitest";
 
 /** Spy on `fetch` returned by the fakes below. */

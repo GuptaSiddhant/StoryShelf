@@ -10,7 +10,8 @@ import type {
   StoryViewportDefinition,
   Viewport,
 } from "./adapter.ts";
-import { extractDesignUrl } from "./design.ts";
+import type { DiscoverOptions } from "./adapter.ts";
+import { extractDesignUrl, type DesignUrlParser } from "./design.ts";
 import { applyModes, buildGlobalsParam } from "./modes.ts";
 
 interface StorybookIndex {
@@ -129,8 +130,11 @@ function pxOf(value: string | number | undefined): number | undefined {
   return match ? Number(match[1]) : undefined;
 }
 
-function toStoryEntry(entry: StorybookIndex["entries"][string]): StoryEntry {
-  const design = extractDesignUrl(entry.parameters);
+function toStoryEntry(
+  entry: StorybookIndex["entries"][string],
+  parseDesignUrl?: DesignUrlParser,
+): StoryEntry {
+  const design = parseDesignUrl ? extractDesignUrl(entry.parameters, parseDesignUrl) : {};
   const story: StoryEntry = {
     id: entry.id,
     title: entry.title,
@@ -150,11 +154,11 @@ export class StorybookAdapter implements StorySourceAdapter {
   readonly name = "storybook";
   readonly screenshotSelector = "#storybook-root";
 
-  async discover(source: string): Promise<StoryEntry[]> {
+  async discover(source: string, options: DiscoverOptions = {}): Promise<StoryEntry[]> {
     const index = await this.readIndex(source);
     return Object.values(index.entries)
       .filter((entry) => entry.type !== "docs" && entry.subtype !== "test")
-      .map((entry) => toStoryEntry(entry));
+      .map((entry) => toStoryEntry(entry, options.parseDesignUrl));
   }
 
   // eslint-disable-next-line class-methods-use-this

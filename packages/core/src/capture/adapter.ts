@@ -105,10 +105,16 @@ export interface CapturePage {
   waitForSelector(selector: string, options?: Record<string, unknown>): Promise<unknown>;
 }
 
+/** Optional discovery inputs. */
+export interface DiscoverOptions {
+  /** Validates declared design links (`design` / `storyshelf.figma`); without it none are extracted. */
+  parseDesignUrl?: (raw: string) => { url: string } | null;
+}
+
 /** Adapter that discovers and renders stories from a Storybook build. */
 export interface StorySourceAdapter {
   name: string;
-  discover(source: string): Promise<StoryEntry[]>;
+  discover(source: string, options?: DiscoverOptions): Promise<StoryEntry[]>;
   buildUrl(baseUrl: string, storyId: string, globals?: Record<string, unknown>): string;
   screenshotSelector?: string;
   /**

@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { extractDesignUrl, logInvalidDesigns } from "./design.ts";
+import { extractDesignUrl as extract, logInvalidDesigns } from "./design.ts";
+
+/** Accepts https://www.figma.com/design/… style links only. */
+const parse = (raw: string): { url: string } | null =>
+  /^https:\/\/www\.figma\.com\/design\/\w+/u.test(raw.trim()) ? { url: raw.trim() } : null;
+const extractDesignUrl = (params?: Parameters<typeof extract>[0]): ReturnType<typeof extract> =>
+  extract(params, parse);
 
 const FILE = "https://www.figma.com/design/AbC123/Kit?node-id=1-2";
 

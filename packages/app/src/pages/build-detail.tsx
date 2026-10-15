@@ -7,7 +7,11 @@ import { SnapshotModel } from "@storyshelf/core/models";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { loadBaselineView } from "../routers/baseline-guard.ts";
-import { designUrlsFor, loadDesignResolutions } from "../routers/design.handlers.ts";
+import {
+  designUrlsFor,
+  loadDesignResolutions,
+  providerNameFor,
+} from "../routers/design.handlers.ts";
 import { getStore } from "../store.ts";
 import {
   Badge,
@@ -315,7 +319,10 @@ export async function renderBuildDetailPage(
                       Component
                     </Button>
                   ) : null}
-                  <DesignButtons urls={designUrlsFor(designs, snap)} />
+                  <DesignButtons
+                    urls={designUrlsFor(designs, snap)}
+                    providerName={providerNameFor}
+                  />
                   {canReview && (snap.status === "new" || snap.status === "changed") ? (
                     <>
                       <form

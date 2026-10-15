@@ -1,16 +1,16 @@
-import { DesignModel } from "@storyshelf/core/models";
+import { InvalidDesignUrlError, type DesignProvider } from "@storyshelf/core/adapter/design";
+import { DesignCredentialModel, DesignModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
-import { InvalidDesignUrlError } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { credentialKeys } from "../credential-keys.ts";
 import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
-import { resolveAuthorizedProject } from "./helpers.ts";
+import { notFound, resolveAuthorizedProject } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
 import { asString, renderSettingsPage } from "./settings.handlers.ts";
 
-/** Design settings (project design files, component mapping, Figma token). */
+/** Design settings (project design files, component mapping, provider credentials). */
 export function registerDesignSettings(app: ShelfRouter): void {
   const base = "/projects/:slug/settings/design";
   app.get(base, async (c) => c.html(await renderSettingsPage(c, "design")));
@@ -18,8 +18,8 @@ export function registerDesignSettings(app: ShelfRouter): void {
   app.post(`${base}/files/:id/delete`, handleRemoveLink);
   app.post(`${base}/components`, handleMapComponent);
   app.post(`${base}/components/:id/delete`, handleRemoveLink);
-  app.post(`${base}/token`, handleSetToken);
-  app.post(`${base}/token/delete`, handleRemoveToken);
+  app.post(`${base}/:provider/token`, handleSetToken);
+  app.post(`${base}/:provider/token/delete`, handleRemoveToken);
 }
 
 /**
@@ -32,8 +32,22 @@ async function adminProject(c: Context): Promise<Project> {
 }
 
 function designModel(): DesignModel {
+  const { db, design } = getStore();
+  return new DesignModel(db, design);
+}
+
+function credentialModel(): DesignCredentialModel {
   const { db, config } = getStore();
-  return new DesignModel(db, undefined, credentialKeys(config));
+  return new DesignCredentialModel(db, credentialKeys(config));
+}
+
+/** The configured provider addressed by `:provider`, or a 404. */
+function providerOf(c: Context): DesignProvider {
+  const provider = getStore().design.find(
+    (candidate) => candidate.metadata.kind === c.req.param("provider"),
+  );
+  if (!provider) notFound("Unknown design provider");
+  return provider;
 }
 
 async function reject(c: Context, errors: Record<string, string>): Promise<Response> {
@@ -82,14 +96,16 @@ async function handleRemoveLink(c: Context): Promise<Response> {
 
 async function handleSetToken(c: Context): Promise<Response> {
   const project = await adminProject(c);
+  const provider = providerOf(c);
   const token = asString((await c.req.formData()).get("token"));
-  if (!token) return await reject(c, { token: "Token is required" });
-  await designModel().setToken(project.id, token);
-  return done(c, project.slug, "Figma token saved");
+  if (!token) return await reject(c, { [`token:${provider.metadata.kind}`]: "Token is required" });
+  await credentialModel().set(project.id, provider.metadata.kind, token);
+  return done(c, project.slug, `${provider.metadata.name} token saved`);
 }
 
 async function handleRemoveToken(c: Context): Promise<Response> {
   const project = await adminProject(c);
-  await designModel().removeToken(project.id);
-  return done(c, project.slug, "Figma token removed");
+  const provider = providerOf(c);
+  await credentialModel().remove(project.id, provider.metadata.kind);
+  return done(c, project.slug, `${provider.metadata.name} token removed`);
 }

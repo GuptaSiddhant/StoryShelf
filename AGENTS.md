@@ -64,6 +64,7 @@ StoryShelf/
     runner-playwright/ @storyshelf/runner-playwright -- pure Playwright CaptureRenderer (server-side render; core orchestrator owns capture)
     git-github/     @storyshelf/git-github      -- GitHub status checks, PR comments, merge-gate helpers (@octokit)
     git-gitlab/     @storyshelf/git-gitlab      -- GitLab commit statuses, MR comments, merge-gate helpers
+    design-figma/   @storyshelf/design-figma    -- Figma design provider: link validation, file metadata, rendered previews (optional; see ADR 0029)
     queue-sqs/      @storyshelf/queue-sqs       -- SQS-backed remote CaptureQueue (AWS SDK v3)
     queue-redis/    @storyshelf/queue-redis     -- Redis-backed remote CaptureQueue (ioredis)
     observability/  @storyshelf/observability  -- OTEL tracing/metrics/log-correlation (single OTEL owner; see ADR 0022)
@@ -174,6 +175,7 @@ This distinction matters for:
 | 0026 | AI Epic (`@storyshelf/ai` singleton on Vercel AI SDK, insights first) |
 | 0027 | MCP Server (`@storyshelf/mcp`, thin client over `/api/v1`, stdio + HTTP, read + comment only) |
 | 0028 | Modes and Multi-Browser Capture (named modes from parameters, per-engine baselines, shared approval) |
+| 0029 | Design Provider Adapter (`@storyshelf/design-figma`; vendor-neutral links, cache and credentials in core) |
 
 ## Parallel Development with Worktrees
 

@@ -1,0 +1,50 @@
+---
+title: "@storyshelf/design-figma"
+description: Figma design provider for StoryShelf — link validation, file metadata and rendered previews.
+---
+
+import { PackageManagers } from 'starlight-package-managers';
+
+`@storyshelf/design-figma` links components to Figma. It implements the `DesignProvider` contract from `@storyshelf/core`: it validates pasted Figma links, reads file/node metadata (name, version, last modified) and downloads rendered previews through the Figma REST API with a personal access token that a project admin saves under **Settings → Design**. StoryShelf itself owns link resolution, the metadata/render cache, stale-design warnings and the UI; this package supplies only the Figma specifics.
+
+## Install
+
+<PackageManagers pkg="@storyshelf/design-figma" />
+
+[![JSR](https://jsr.io/badges/@storyshelf/design-figma)](https://jsr.io/@storyshelf/design-figma) [![JSR Score](https://jsr.io/badges/@storyshelf/design-figma/score)](https://jsr.io/@storyshelf/design-figma)
+
+- [npm package](https://www.npmjs.com/package/@storyshelf/design-figma) — install tarballs and version history.
+- [JSR package](https://jsr.io/@storyshelf/design-figma) — TypeScript-first registry page.
+- [Public API reference](https://jsr.io/@storyshelf/design-figma/doc) — generated docs for every export; start here to learn the API.
+- [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/design-figma) — package directory on `main`.
+
+## Register the provider
+
+Pass `createFigmaDesign()` in the `design` array of `createShelfApp`:
+
+```ts
+import { createShelfApp } from "@storyshelf/app";
+import { createFigmaDesign } from "@storyshelf/design-figma";
+
+const app = createShelfApp({
+  database,
+  storage,
+  captureRunner,
+  design: [createFigmaDesign()],
+  config: {
+    secret: process.env.SHELF_SECRET, // also encrypts the Figma token
+  },
+});
+```
+
+Remote capture workers need the same list so declared links are validated while capturing:
+
+```ts
+createCaptureWorker({ queue, db, storage, runner, scratchDir, design: [createFigmaDesign()] });
+```
+
+Without a provider, StoryShelf extracts and shows no design links. See [Design links](/guides/design-links/) for how stories, mappings and the access token work.
+
+## Accepted links
+
+`https://www.figma.com/{file|design|board|proto|make}/<key>/…`, optionally with `node-id`. Embed, community and Figma Sites links are rejected.

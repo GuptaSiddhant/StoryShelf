@@ -5,6 +5,24 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 
 ## Unreleased
 
+**Breaking: Figma is now a design-provider adapter.** Figma support moved out of core into
+the optional `@storyshelf/design-figma` package behind a new `DesignProvider` adapter
+(ADR 0029).
+
+**Upgrading:**
+- Install `@storyshelf/design-figma` and pass `design: [createFigmaDesign()]` to
+  `createShelfApp` — and to `createCaptureWorker` on remote workers. Without a provider no
+  design links are extracted or shown. `storyshelf server init` asks about it; the dev server and
+  Fly demo are wired.
+- Re-enter the Figma access token once under **Settings → Design** (credentials moved to a
+  new `design_credentials` table). The old `figma_nodes` / `design_tokens` tables are dropped on
+  startup; the metadata/render cache simply refetches.
+- The component page's Figma tab is now `?tab=design`.
+
+**Added:** `@storyshelf/core/adapter/design` (`DesignProvider`, `DesignClient`,
+`parseDesignUrl`), `designContractSuite` in `@storyshelf/core/test-helpers`, and schema room for
+per-user design connections (`design_credentials.user_id`, `design_nodes.viewer_id`).
+
 **Fixes**
 - The Puppeteer runner now runs `play` functions on Storybook 8, 9 and 10 (it failed with `Cannot call fromId/raw() unless you call cacheAllCSFFiles() first`), by loading just the story and running its `playFunction` with the mounted render's context, as the Playwright runner already does.
 

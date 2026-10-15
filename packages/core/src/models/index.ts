@@ -48,28 +48,19 @@ export {
 } from "./component.ts";
 export { DesignModel, type DesignTables } from "./design.ts";
 export {
+  DesignCredentialModel,
+  PROJECT_SCOPE,
+  type DesignCredentialTables,
+} from "./design-credentials.ts";
+export { DesignNodeModel, type DesignNodeTables, type RefreshOptions } from "./design-nodes.ts";
+export {
   normalizeImportPath,
   resolveDesigns,
+  type DesignCredentialStatus,
   type DesignResolution,
   type DesignSource,
-  type DesignTokenStatus,
 } from "./design-resolve.ts";
-export { FigmaNodeModel, type FigmaNodeTables, type RefreshOptions } from "./figma.ts";
-export {
-  fetchFigmaMeta,
-  fetchFigmaMetas,
-  fetchFigmaRender,
-  fetchFigmaRenders,
-  type FigmaCallOptions,
-  type FigmaMeta,
-  type FigmaState,
-} from "./figma-api.ts";
-export {
-  FIGMA_TOKEN_MAX_AGE_DAYS,
-  FIGMA_TTL_MS,
-  isDesignStale,
-  tokenDaysLeft,
-} from "./figma-health.ts";
+export { credentialDaysLeft, DESIGN_TTL_MS, isDesignStale } from "./design-health.ts";
 export { LabelModel } from "./label.ts";
 export { matchUpstreamStory, PackageUsageModel } from "./usage.ts";
 export type { PackageUsageInput, PackageUsageTables, UpstreamStory } from "./usage.ts";

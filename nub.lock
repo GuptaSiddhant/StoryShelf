@@ -149,6 +149,9 @@ importers:
       '@storyshelf/db-sqlite':
         specifier: workspace:*
         version: link:../../packages/db-sqlite
+      '@storyshelf/design-figma':
+        specifier: workspace:*
+        version: link:../../packages/design-figma
       '@storyshelf/notify-chat':
         specifier: workspace:*
         version: link:../../packages/notify-chat
@@ -207,6 +210,9 @@ importers:
       '@storyshelf/db-sqlite':
         specifier: workspace:*
         version: link:../../packages/db-sqlite
+      '@storyshelf/design-figma':
+        specifier: workspace:*
+        version: link:../../packages/design-figma
       '@storyshelf/notify-chat':
         specifier: workspace:*
         version: link:../../packages/notify-chat
@@ -391,6 +397,9 @@ importers:
       '@storyshelf/db-sqlite':
         specifier: workspace:*
         version: link:../db-sqlite
+      '@storyshelf/design-figma':
+        specifier: workspace:*
+        version: link:../design-figma
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.3
@@ -700,6 +709,37 @@ importers:
       better-sqlite3:
         specifier: ^12.0.0
         version: 12.11.1
+      oxfmt:
+        specifier: 'catalog:'
+        version: 0.65.0
+      oxlint:
+        specifier: 'catalog:'
+        version: 1.86.0(oxlint-tsgolint@7.0.2003)
+      oxlint-tsgolint:
+        specifier: 'catalog:'
+        version: 7.0.2003
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.22.14(typescript@7.0.2)
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.2(@opentelemetry/api@1.9.1)(@types/node@26.6.3)(jsdom@30.1.1)(vite@6.4.3(@types/node@26.6.3)(yaml@2.9.1))
+
+  packages/design-figma:
+    dependencies:
+      '@storyshelf/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.3
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.1.11(vitest@5.0.2(@opentelemetry/api@1.9.1)(@types/node@26.6.3)(jsdom@30.1.1)(vite@6.4.3(@types/node@26.6.3)(yaml@2.9.1)))
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0

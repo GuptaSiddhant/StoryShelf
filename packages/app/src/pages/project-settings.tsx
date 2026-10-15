@@ -7,8 +7,8 @@ import { PageHeader, SubNavLayout } from "../ui/components.tsx";
 import type { IconName } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import { renderSettingsAi, type SettingsAiData } from "./settings-ai.tsx";
-import { renderSettingsDesign, type SettingsDesignData } from "./settings-design.tsx";
 import { renderSettingsCapture } from "./settings-capture.tsx";
+import { renderSettingsDesign, type SettingsDesignData } from "./settings-design.tsx";
 import { renderSettingsGeneral } from "./settings-general.tsx";
 import { renderSettingsLabels } from "./settings-labels.tsx";
 import {

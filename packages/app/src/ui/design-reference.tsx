@@ -54,35 +54,42 @@ const previewCaption = css`
   font-size: var(--text-xs);
 `;
 
-/** Cached Figma render shown as a reference pane under the diff stage. */
-export const DesignReference: FC<{ src: string; name?: string | null; href: string }> = ({
-  src,
-  name,
-  href,
-}) => (
+/** Cached design render shown as a reference pane under the diff stage. */
+export const DesignReference: FC<{
+  src: string;
+  name?: string | null;
+  href: string;
+  providerName: string;
+}> = ({ src, name, href, providerName }) => (
   <figure class={referenceRoot}>
     <figcaption class="reference__label">
-      <span>Figma reference{name ? ` · ${name}` : ""}</span>
+      <span>
+        {providerName} reference{name ? ` · ${name}` : ""}
+      </span>
       <a href={href} target="_blank" rel="noopener noreferrer">
-        <Icon name="external-link" size="sm" /> Open in Figma
+        <Icon name="external-link" size="sm" /> Open in {providerName}
       </a>
     </figcaption>
     <img
       class="reference__img"
       src={src}
-      alt={name ? `Figma design: ${name}` : "Figma design"}
+      alt={name ? `${providerName} design: ${name}` : `${providerName} design`}
       loading="lazy"
     />
   </figure>
 );
 
 /** Small cached render for popovers, with an optional caption (the design name). */
-export const DesignPreview: FC<{ src: string; name?: string | null }> = ({ src, name }) => (
+export const DesignPreview: FC<{ src: string; name?: string | null; providerName: string }> = ({
+  src,
+  name,
+  providerName,
+}) => (
   <>
     <img
       class={previewImg}
       src={src}
-      alt={name ? `Figma design: ${name}` : "Figma design"}
+      alt={name ? `${providerName} design: ${name}` : `${providerName} design`}
       loading="lazy"
     />
     {name ? <div class={previewCaption}>{name}</div> : null}

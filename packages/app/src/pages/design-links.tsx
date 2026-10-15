@@ -14,10 +14,12 @@ import {
 
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
-/** A design link a component resolves to, with cached Figma metadata when available. */
+/** A design link a component resolves to, with cached provider metadata when available. */
 export interface DesignItem {
   url: string;
-  /** Figma node/file name from the metadata cache. */
+  /** Display name of the provider that owns the link ("Figma"). */
+  providerName: string;
+  /** Design node/file name from the metadata cache. */
   name: string | null;
   /** Cache state: `ok` | `deleted` | `unauthorized` | `forbidden` | `unknown` (nothing cached). */
   state: string;
@@ -40,27 +42,30 @@ export interface ProjectDesignLink {
 }
 
 /**
- * Figma actions for a component's design link(s). A link with a cached render
- * opens a click popover (preview + `Open in Figma`); others are plain deep links.
+ * Design actions for a component's link(s). A link with a cached render opens a
+ * click popover (preview + `Open in <provider>`); others are plain deep links.
  */
 export function DesignButtons(props: {
   urls: readonly string[];
+  /** Display name of the provider that owns a link. */
+  providerName: (url: string) => string;
   previews?: ReadonlyMap<string, DesignPreviewInfo>;
   /** Component page of the story, offered in the popover as `View component →`. */
   componentHref?: string;
   size?: "sm" | "md";
 }): Rendered {
-  const { urls, previews, componentHref, size = "sm" } = props;
+  const { urls, providerName, previews, componentHref, size = "sm" } = props;
   return (
     <>
       {urls.map((url, index): Rendered => {
-        const label = urls.length > 1 ? `Figma ${index + 1}` : "Figma";
+        const name = providerName(url);
+        const label = urls.length > 1 ? `${name} ${index + 1}` : name;
         const preview = previews?.get(url);
         return preview?.renderUrl ? (
           <Dropdown key={url} label={label}>
-            <DesignPreview src={preview.renderUrl} name={preview.name} />
+            <DesignPreview src={preview.renderUrl} name={preview.name} providerName={name} />
             <DropdownItem href={url} icon="external-link" target="_blank" rel="noopener noreferrer">
-              Open in Figma
+              Open in {name}
             </DropdownItem>
             {componentHref ? (
               <DropdownItem href={componentHref}>View component →</DropdownItem>
@@ -84,20 +89,26 @@ export function DesignButtons(props: {
   );
 }
 
-/** Figma reference panes (cached renders) for the review page, shown under the diff stage. */
+/** Reference panes (cached renders) for the review page, shown under the diff stage. */
 export function DesignReferences(props: { items: DesignItem[] }): Rendered {
   return (
     <>
       {props.items.map((item): Rendered | null =>
         item.renderUrl ? (
-          <DesignReference key={item.url} src={item.renderUrl} name={item.name} href={item.url} />
+          <DesignReference
+            key={item.url}
+            src={item.renderUrl}
+            name={item.name}
+            href={item.url}
+            providerName={item.providerName}
+          />
         ) : null,
       )}
     </>
   );
 }
 
-/** Review-page design strip: open-in-Figma actions plus non-blocking stale/deleted notices. */
+/** Review-page design strip: open-in-provider actions plus non-blocking stale/deleted notices. */
 export function DesignStrip(props: { items: DesignItem[] }): Rendered {
   const { items } = props;
   return (
@@ -113,7 +124,7 @@ export function DesignStrip(props: { items: DesignItem[] }): Rendered {
               target="_blank"
               rel="noopener noreferrer"
             >
-              Open in Figma
+              Open in {item.providerName}
             </Button>
             {item.name ? <Meta as="span">{item.name}</Meta> : null}
           </HStack>
@@ -128,16 +139,16 @@ function designNotice(item: DesignItem): Rendered | null {
   if (item.state === "deleted") {
     return (
       <Alert key={item.url} tone="warning" title="Design not found">
-        The linked Figma file or node no longer exists. Update the link in the project&apos;s Design
-        settings.
+        The linked {item.providerName} file or node no longer exists. Update the link in the
+        project&apos;s Design settings.
       </Alert>
     );
   }
   if (item.stale) {
     return (
       <Alert key={item.url} tone="warning" title="Design changed since this baseline was approved">
-        {item.name ? `${item.name} was` : "The linked design was"} edited in Figma after the
-        baseline. This does not block review.
+        {item.name ? `${item.name} was` : "The linked design was"} edited in {item.providerName}{" "}
+        after the baseline. This does not block review.
       </Alert>
     );
   }
@@ -145,8 +156,8 @@ function designNotice(item: DesignItem): Rendered | null {
     return (
       <Meta key={item.url} as="div">
         {item.state === "unauthorized"
-          ? "The project's Figma token is expired or revoked — design status is unavailable."
-          : "The project's Figma token cannot open this file — design status is unavailable."}
+          ? `The project's ${item.providerName} credential is expired or revoked — design status is unavailable.`
+          : `The project's ${item.providerName} credential cannot open this file — design status is unavailable.`}
       </Meta>
     );
   }

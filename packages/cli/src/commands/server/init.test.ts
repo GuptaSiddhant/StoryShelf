@@ -747,4 +747,31 @@ describe("runServerInit", () => {
     const code = readFileSync(join(dir, "src", "index.ts"), "utf8");
     expect(code).toContain("createTursoDatabase");
   });
+
+  it("wires the Figma design provider into the server and worker when asked", async () => {
+    await scaffold({ design: true, includeWorker: true, queue: "sqs" });
+    const server = readFileSync(join(dir, "src/index.ts"), "utf8");
+    expect(server).toContain('import { createFigmaDesign } from "@storyshelf/design-figma";');
+    expect(server).toContain("design: [createFigmaDesign()],");
+    const deps = (
+      JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
+        dependencies: Record<string, string>;
+      }
+    ).dependencies;
+    expect(deps["@storyshelf/design-figma"]).toBeDefined();
+    const worker = readFileSync(join(dir, "src/worker.ts"), "utf8");
+    expect(worker).toContain("design: [createFigmaDesign()],");
+  });
+
+  it("leaves design links out by default", async () => {
+    await scaffold({});
+    const server = readFileSync(join(dir, "src/index.ts"), "utf8");
+    expect(server).not.toContain("design-figma");
+    const deps = (
+      JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
+        dependencies: Record<string, string>;
+      }
+    ).dependencies;
+    expect(deps["@storyshelf/design-figma"]).toBeUndefined();
+  });
 });

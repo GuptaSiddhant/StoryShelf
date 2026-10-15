@@ -22,31 +22,48 @@ export const designLinks = mysqlTable(
   ],
 );
 
-/** Narrow `design_tokens` table definition: the per-project Figma personal access token vault (not design-system tokens). */
-export const designTokens = mysqlTable(
-  "design_tokens",
+/**
+ * Narrow `design_credentials` table definition: the design-provider credential
+ * vault. `user_id` is `''` for the project-wide credential (not NULL, so the
+ * unique index holds on every dialect) and a user id for a personal connection.
+ */
+export const designCredentials = mysqlTable(
+  "design_credentials",
   {
     id: text("id").primaryKey(),
     projectId: text("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull(),
+    userId: text("user_id").notNull().default(""),
+    authType: text("auth_type").notNull().default("token"),
     tokenEncrypted: text("token_encrypted").notNull(),
+    refreshTokenEncrypted: text("refresh_token_encrypted"),
+    expiresAt: datetime("expires_at", { mode: "string", fsp: 3 }),
     status: text("status").notNull().default("unknown"),
     checkedAt: datetime("checked_at", { mode: "string", fsp: 3 }),
     createdAt: datetime("created_at", { mode: "string", fsp: 3 }).notNull(),
     updatedAt: datetime("updated_at", { mode: "string", fsp: 3 }).notNull(),
   },
-  (t) => [uniqueIndex("design_tokens_project_id_idx").on(t.projectId)],
+  (t) => [
+    uniqueIndex("design_credentials_project_provider_user_idx").on(
+      t.projectId,
+      t.provider,
+      t.userId,
+    ),
+  ],
 );
 
-/** Narrow `figma_nodes` table definition (Figma metadata cache). */
-export const figmaNodes = mysqlTable(
-  "figma_nodes",
+/** Narrow `design_nodes` table definition (design metadata + render cache). */
+export const designNodes = mysqlTable(
+  "design_nodes",
   {
     id: text("id").primaryKey(),
     projectId: text("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull(),
+    viewerId: text("viewer_id").notNull().default(""),
     fileKey: text("file_key").notNull(),
     nodeId: text("node_id").notNull().default(""),
     name: text("name"),
@@ -59,7 +76,15 @@ export const figmaNodes = mysqlTable(
     createdAt: datetime("created_at", { mode: "string", fsp: 3 }).notNull(),
     updatedAt: datetime("updated_at", { mode: "string", fsp: 3 }).notNull(),
   },
-  (t) => [uniqueIndex("figma_nodes_project_file_node_idx").on(t.projectId, t.fileKey, t.nodeId)],
+  (t) => [
+    uniqueIndex("design_nodes_project_file_node_idx").on(
+      t.projectId,
+      t.provider,
+      t.viewerId,
+      t.fileKey,
+      t.nodeId,
+    ),
+  ],
 );
 
 /** A design link: a project-level file link (`importPath` null) or a component mapping override. */
@@ -75,35 +100,46 @@ export interface DesignLink {
   updatedAt: string;
 }
 
-/** The project's encrypted Figma personal access token and its last observed health. */
-export interface DesignToken {
+/** A design provider credential: an admin-set project token (`userId` `""`) or a user's own connection. */
+export interface DesignCredential {
   id: string;
   projectId: string;
+  /** Provider `metadata.kind`, e.g. `figma`. */
+  provider: string;
+  /** Owning user id; `""` for the project-wide credential. */
+  userId: string;
+  /** `token` (pasted personal access token) or `oauth`. */
+  authType: string;
   tokenEncrypted: string;
-  /** Last API outcome: `unknown` | `ok` | `unauthorized` (expired/revoked) | `forbidden` (no access). */
+  refreshTokenEncrypted: string | null;
+  /** When an OAuth access token expires; null for pasted tokens. */
+  expiresAt: string | null;
+  /** Last API outcome: `unknown` | `ok` | `unauthorized` | `forbidden`. */
   status: string;
   checkedAt: string | null;
+  /** When the credential was set or replaced; drives the rotation clock. */
   createdAt: string;
   updatedAt: string;
 }
 
-/** Cached Figma file/node metadata, keyed by project, file key and node id. */
-export interface FigmaNode {
+/** Cached design file/node metadata, keyed by project, provider, viewer, file key and node id. */
+export interface DesignNode {
   id: string;
   projectId: string;
+  provider: string;
+  /** Whose access fetched the entry: `""` for the project credential, else a user id. */
+  viewerId: string;
   fileKey: string;
-  /** API-form node id (`1:2`); empty string for a whole-file link. */
+  /** Provider node id; empty string for a whole-file link. */
   nodeId: string;
   name: string | null;
-  /** Figma file version at fetch time. */
   version: string | null;
-  /** File `lastModified` at fetch time. */
   lastModified: string | null;
   /** `ok` | `deleted` | `unauthorized` | `forbidden`. */
   state: string;
-  /** Storage path of the cached PNG render (node links only); null when none was fetched. */
+  /** Storage path of the cached PNG render (node links only). */
   renderPath: string | null;
-  /** File `version` the cached render was taken at; a newer file version refetches. */
+  /** File `version` the cached render was taken at. */
   renderVersion: string | null;
   fetchedAt: string;
   createdAt: string;
