@@ -51,7 +51,10 @@ export function registerMedia(app: ShelfRouter): void {
     const { db, config, storage, design } = getStore();
     const credentials = new DesignCredentialModel(db, credentialKeys(config));
     const nodes = new DesignNodeModel(db, credentials, design, { storage });
-    const node = await nodes.get(project.id, c.req.param("renderId"));
+    const found = await nodes.get(project.id, c.req.param("renderId"));
+    // A render fetched with a member's own connection is theirs alone (it may show files others cannot open).
+    const node =
+      found && (found.viewerId === "" || found.viewerId === getStore().user?.id) ? found : null;
     const png = node ? await nodes.readRender(node) : null;
     if (!png) {
       notFound("No design render");

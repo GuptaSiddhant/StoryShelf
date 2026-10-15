@@ -15,6 +15,7 @@ import {
   captureLogs as captureLogsTable,
 } from "./capture-attempt.ts";
 import { comments as commentsTable } from "./comment.ts";
+import { userConnections as userConnectionsTable } from "./connection.ts";
 import { contentRefs as contentRefsTable } from "./content-refs.ts";
 import {
   designLinks as designLinksTable,
@@ -52,6 +53,7 @@ export { comments } from "./comment.ts";
 export { buildLabels, labelTypes } from "./label.ts";
 export { projectMembers } from "./member.ts";
 export { buildPackageUsage, projectLinks } from "./usage.ts";
+export { userConnections } from "./connection.ts";
 export { designCredentials, designLinks, designNodes } from "./design.ts";
 export { aiBudgetAlerts, aiUsage, insights } from "./insight.ts";
 export { notificationChannels, notificationSubscriptions } from "./notification.ts";
@@ -73,6 +75,8 @@ export type { Build } from "./build.ts";
 export type { Comment } from "./comment.ts";
 /** Build label and label type rows. */
 export type { BuildLabel, LabelType } from "./label.ts";
+/** A user's OAuth connection to an external service. */
+export type { UserConnection } from "./connection.ts";
 /** Design link, provider credential and cached design node rows. */
 export type { DesignCredential, DesignLink, DesignNode } from "./design.ts";
 /** Project link and per-build package usage rows. */
@@ -117,6 +121,7 @@ export const schema: {
   projectLinks: AnySQLiteTable;
   designLinks: AnySQLiteTable;
   designCredentials: AnySQLiteTable;
+  userConnections: AnySQLiteTable;
   designNodes: AnySQLiteTable;
   buildPackageUsage: AnySQLiteTable;
   tokens: AnySQLiteTable;
@@ -145,6 +150,7 @@ export const schema: {
   projectLinks: projectLinksTable,
   designLinks: designLinksTable,
   designCredentials: designCredentialsTable,
+  userConnections: userConnectionsTable,
   designNodes: designNodesTable,
   buildPackageUsage: buildPackageUsageTable,
   tokens: tokensTable,

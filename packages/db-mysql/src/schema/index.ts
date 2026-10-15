@@ -27,6 +27,7 @@ import {
   insights as insightsTable,
 } from "./insight.ts";
 import { buildLabels as buildLabelsTable, labelTypes as labelTypesTable } from "./label.ts";
+import { userConnections as userConnectionsTable } from "./connection.ts";
 import { projectMembers as projectMembersTable } from "./member.ts";
 import {
   notificationChannels as notificationChannelsTable,
@@ -52,6 +53,7 @@ export { comments } from "./comment.ts";
 export { buildLabels, labelTypes } from "./label.ts";
 export { projectMembers } from "./member.ts";
 export { buildPackageUsage, projectLinks } from "./usage.ts";
+export { userConnections } from "./connection.ts";
 export { designCredentials, designLinks, designNodes } from "./design.ts";
 export { projectGroupMappings } from "./project-group-mapping.ts";
 export { projects } from "./project.ts";
@@ -73,6 +75,8 @@ export type { Build } from "./build.ts";
 export type { Comment } from "./comment.ts";
 /** Build label and label type rows. */
 export type { BuildLabel, LabelType } from "./label.ts";
+/** A user's OAuth connection to an external service. */
+export type { UserConnection } from "./connection.ts";
 /** Design link, provider credential and cached design node rows. */
 export type { DesignCredential, DesignLink, DesignNode } from "./design.ts";
 /** Project link and per-build package usage rows. */
@@ -119,6 +123,7 @@ export const schema: {
   projectLinks: AnyMySqlTable;
   designLinks: AnyMySqlTable;
   designCredentials: AnyMySqlTable;
+  userConnections: AnyMySqlTable;
   designNodes: AnyMySqlTable;
   buildPackageUsage: AnyMySqlTable;
   tokens: AnyMySqlTable;
@@ -147,6 +152,7 @@ export const schema: {
   projectLinks: projectLinksTable,
   designLinks: designLinksTable,
   designCredentials: designCredentialsTable,
+  userConnections: userConnectionsTable,
   designNodes: designNodesTable,
   buildPackageUsage: buildPackageUsageTable,
   tokens: tokensTable,

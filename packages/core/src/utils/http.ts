@@ -79,6 +79,8 @@ export interface HttpRequestOptions {
   headers?: Record<string, string>;
   /** Body serialized as JSON with a `content-type` header. */
   json?: unknown;
+  /** Body serialized as `application/x-www-form-urlencoded` (ignored when `json` is set). */
+  form?: Record<string, string>;
   /** Per-attempt timeout in milliseconds (default 30s). */
   timeoutMs?: number;
   /** Total attempts including the first (default 3). */
@@ -210,6 +212,9 @@ function buildRequest(options: HttpRequestOptions): {
   if (options.json !== undefined) {
     headers["content-type"] = "application/json";
     body = JSON.stringify(options.json);
+  } else if (options.form) {
+    headers["content-type"] = "application/x-www-form-urlencoded";
+    body = new URLSearchParams(options.form).toString();
   }
   return { headers, body, method: options.method ?? "GET" };
 }

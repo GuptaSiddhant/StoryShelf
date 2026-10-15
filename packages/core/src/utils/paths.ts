@@ -50,10 +50,12 @@ export function designRenderPath(
   provider: string,
   fileKey: string,
   nodeId: string,
+  viewerId = "",
 ): string {
   const node = nodeId.replaceAll(":", "-");
-  assertSegments([projectId, provider, fileKey, node]);
-  return `${projectId}/design/${provider}/${fileKey}/${node}.png`;
+  assertSegments([projectId, provider, fileKey, node, ...(viewerId ? [viewerId] : [])]);
+  const owner = viewerId ? `user-${viewerId}/` : "";
+  return `${projectId}/design/${provider}/${owner}${fileKey}/${node}.png`;
 }
 
 /** Storage path for a branch baseline screenshot. */

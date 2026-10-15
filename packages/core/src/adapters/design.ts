@@ -7,6 +7,7 @@
 import type { Buffer } from "node:buffer";
 import type { Logger } from "../logger.ts";
 import type { Adapter, AdapterMetadata } from "./metadata.ts";
+import type { OAuthClient } from "./oauth.ts";
 
 /** Design-provider metadata: identity plus the copy the settings UI shows for its credential. */
 export interface DesignAdapterMetadata extends AdapterMetadata {
@@ -50,12 +51,17 @@ export interface DesignCallOptions {
   signal?: AbortSignal;
 }
 
+/** How a stored credential authenticates: a pasted personal token or a user's OAuth access token. */
+export type DesignAuthType = "token" | "oauth";
+
 /** Descriptor — registered at startup, parses links and binds a credential. */
 export interface DesignProvider extends Adapter<DesignAdapterMetadata> {
   /** Parse a pasted link; null when it is not one of this provider's links. */
   parseUrl(raw: string): DesignRef | null;
-  /** Create a client bound to a decrypted credential. */
-  create(opts: { credential: string; logger?: Logger }): DesignClient;
+  /** Create a client bound to a decrypted credential (`authType` defaults to a personal token). */
+  create(opts: { credential: string; authType?: DesignAuthType; logger?: Logger }): DesignClient;
+  /** Present only when the operator configured OAuth for this provider. */
+  readonly oauth?: OAuthClient;
 }
 
 /** Runtime — bound to a credential, talks to the vendor API. */

@@ -140,6 +140,18 @@ CREATE TABLE IF NOT EXISTS users (
   last_login_at DATETIME(3),
   created_at DATETIME(3) NOT NULL
 );
+CREATE TABLE IF NOT EXISTS user_connections (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  service TEXT NOT NULL,
+  token_encrypted TEXT NOT NULL,
+  refresh_token_encrypted TEXT,
+  expires_at DATETIME(3),
+  status TEXT NOT NULL DEFAULT 'ok',
+  created_at DATETIME(3) NOT NULL,
+  updated_at DATETIME(3) NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS user_connections_user_service_idx ON user_connections (user_id, service);
 CREATE TABLE IF NOT EXISTS comments (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,

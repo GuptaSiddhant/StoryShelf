@@ -34,6 +34,7 @@ import { registerAssets } from "./routers/assets.ts";
 import { registerEngineAuth } from "./routers/auth.ts";
 import { registerBaselines } from "./routers/baselines.ts";
 import { registerBuilds } from "./routers/builds.ts";
+import { registerConnections } from "./routers/connections.ts";
 import { registerHealth, type HealthDeps } from "./routers/health.ts";
 import { registerInsightFragments } from "./routers/insights-ui.tsx";
 import { registerInsights } from "./routers/insights.ts";
@@ -162,6 +163,7 @@ const CSRF_PATHS = [
   "/auth/invites/*",
   "/projects/:slug/settings/*",
   "/profile/*",
+  "/connections/*",
   "/profile",
   "/admin/credentials/*",
   "/projects/:slug/builds/:buildId/insights/generate",
@@ -295,6 +297,7 @@ function registerAuthFlow(app: ShelfRouter, options: ShelfOptions): void {
   registerEngineAuth(app, options.auth);
   registerWellKnown(app, options.auth);
   registerProfile(app, options.auth);
+  registerConnections(app);
 }
 
 /** Register HTML pages, assets, and the optional auth flow. */

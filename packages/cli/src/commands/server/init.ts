@@ -337,7 +337,9 @@ function buildImports(answers: Answers): string[] {
     imports.push(`import { ${host} } from "${GIT_PACKAGE[answers.git]}";`);
   }
   if (wantsDesign(answers)) {
-    imports.push(`import { createFigmaDesign } from "@storyshelf/design-figma";`);
+    imports.push(
+      `import { createFigmaDesign, figmaOAuthFromEnv } from "@storyshelf/design-figma";`,
+    );
   }
   if (wantsNotifications(answers)) {
     imports.push(
@@ -485,7 +487,7 @@ function buildRouterLines(answers: Answers): string[] {
     lines.push(`  gitHosts: [${host}],`);
   }
   if (wantsDesign(answers)) {
-    lines.push(`  design: [createFigmaDesign()],`);
+    lines.push(`  design: [createFigmaDesign({ oauth: figmaOAuthFromEnv() })],`);
   }
 
   if (wantsObservability(answers)) {
