@@ -44,11 +44,16 @@ export function diffPath(
   return `${projectId}/builds/${buildId}/diffs/${storyId}/${segment}.png`;
 }
 
-/** Storage path for a cached Figma node render (overwritten in place when the file version moves). */
-export function designRenderPath(projectId: string, fileKey: string, nodeId: string): string {
+/** Storage path for a cached design node render (overwritten in place when the file version moves). */
+export function designRenderPath(
+  projectId: string,
+  provider: string,
+  fileKey: string,
+  nodeId: string,
+): string {
   const node = nodeId.replaceAll(":", "-");
-  assertSegments([projectId, fileKey, node]);
-  return `${projectId}/design/${fileKey}/${node}.png`;
+  assertSegments([projectId, provider, fileKey, node]);
+  return `${projectId}/design/${provider}/${fileKey}/${node}.png`;
 }
 
 /** Storage path for a branch baseline screenshot. */

@@ -1,3 +1,4 @@
+import type { DesignProvider } from "@storyshelf/core/adapter/design";
 import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import type { AdapterMetadata, GitAdapterMetadata } from "@storyshelf/core/adapter/metadata";
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
@@ -17,6 +18,7 @@ export interface ServerRuntime {
   logger: Logger;
   authEnabled: boolean;
   gitHosts: GitHostProvider[];
+  design: DesignProvider[];
   notifiers: NotifierProvider[];
 }
 
@@ -51,6 +53,9 @@ export function buildAdapterSnapshot(
   for (const p of options.gitHosts ?? []) {
     snap[`git:${p.metadata.kind}`] = p.metadata;
   }
+  for (const p of options.design ?? []) {
+    snap[`design:${p.metadata.kind}`] = p.metadata;
+  }
   for (const n of options.notifiers ?? []) {
     snap[`notify:${n.metadata.kind}`] = n.metadata;
   }
@@ -68,6 +73,7 @@ export function resolveRuntime(options: ShelfOptions): ServerRuntime {
   const logger = options.logger ?? createShelfLogger();
   const authEnabled = options.auth !== undefined;
   const gitHosts = options.gitHosts ?? [];
+  const design = options.design ?? [];
   const notifiers = options.notifiers ?? [];
   // Adapter introspection — auto-populate config.adapters if not supplied
   const config: ShelfConfig = rawConfig.adapters
@@ -76,5 +82,5 @@ export function resolveRuntime(options: ShelfOptions): ServerRuntime {
         ...rawConfig,
         adapters: buildAdapterSnapshot(options),
       };
-  return { config, ui, logger, authEnabled, gitHosts, notifiers };
+  return { config, ui, logger, authEnabled, gitHosts, design, notifiers };
 }

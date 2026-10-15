@@ -48,6 +48,7 @@ packages/
   storage-s3/     @storyshelf/storage-s3    — S3-compatible storage
   auth/         @storyshelf/auth        — Better Auth engine (local / social / SSO / passkeys)
   git-github/     @storyshelf/git-github    — GitHub commit status / merge gate / PR comments
+  design-figma/   @storyshelf/design-figma  — Figma design links, metadata and rendered previews
   git-gitlab/     @storyshelf/git-gitlab    — GitLab commit statuses, MR comments, merge-gate helpers
   queue-sqs/      @storyshelf/queue-sqs     — AWS SQS capture job queue
   queue-redis/    @storyshelf/queue-redis   — Redis capture job queue (ioredis)

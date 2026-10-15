@@ -142,6 +142,20 @@ function gitReasons(provider: unknown): string[] {
   return reasons;
 }
 
+/** Reasons a design provider lacks its descriptor shape. */
+function designReasons(provider: unknown): string[] {
+  const record = asRecord(provider);
+  if (!record) {
+    return ["design provider must be an object"];
+  }
+  const reasons = metadataReasons(record, "design");
+  const missing = ["parseUrl", "create"].filter((name) => typeof record[name] !== "function");
+  if (missing.length > 0) {
+    reasons.push(`missing methods: ${missing.join(", ")}`);
+  }
+  return reasons;
+}
+
 /** Required methods for a slot category. */
 function slotMethods(category: string): string[] {
   if (category === "database") {
@@ -268,27 +282,32 @@ interface SlotCheck {
   slot: string;
 }
 
-/** Descriptor check for provider lists (git hosts, notifiers). */
+/** Descriptor check for provider lists (git hosts, design providers, notifiers). */
 interface ProviderCheck {
   provider: unknown;
   index: number;
-  kinds: "git" | "notifier";
+  kinds: "git" | "design" | "notifier";
 }
 
-/** Failures for git-host or notifier provider lists. */
+const PROVIDER_KINDS = {
+  git: { reasons: gitReasons, list: "gitHosts", category: "git-host" },
+  design: { reasons: designReasons, list: "design", category: "design" },
+  notifier: { reasons: notifierReasons, list: "notifiers", category: "notifier" },
+} as const;
+
+/** Failures for git-host, design or notifier provider lists. */
 function checkProviders(checks: ProviderCheck[]): AdapterSetupFailure[] {
   const failures: AdapterSetupFailure[] = [];
   for (const check of checks) {
-    const reasons =
-      check.kinds === "git" ? gitReasons(check.provider) : notifierReasons(check.provider);
+    const kind = PROVIDER_KINDS[check.kinds];
+    const reasons = kind.reasons(check.provider);
     if (reasons.length === 0) {
       continue;
     }
-    const slot = check.kinds === "git" ? `gitHosts[${check.index}]` : `notifiers[${check.index}]`;
-    const category = check.kinds === "git" ? "git-host" : "notifier";
+    const slot = `${kind.list}[${check.index}]`;
     const metadata = asRecord(asRecord(check.provider)?.["metadata"]);
     failures.push({
-      category,
+      category: kind.category,
       kind: stringField(metadata, "kind") ?? "unknown",
       name: stringField(metadata, "name") ?? slot,
       error: reasons.map((reason) => `${slot}: ${reason}`).join("; "),
@@ -360,6 +379,11 @@ export function validateAdapterSources(sources: AdapterSetupSources): AdapterSet
       provider,
       index,
       kinds: "git" as const,
+    })),
+    ...(sources.design ?? []).map((provider, index) => ({
+      provider,
+      index,
+      kinds: "design" as const,
     })),
     ...(sources.notifiers ?? []).map((provider, index) => ({
       provider,

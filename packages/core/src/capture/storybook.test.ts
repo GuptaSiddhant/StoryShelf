@@ -219,6 +219,10 @@ describe("StorybookAdapter.discover", () => {
   });
 });
 
+/** Accepts https://www.figma.com/design/… style links only. */
+const parseFigma = (raw: string): { url: string } | null =>
+  /^https:\/\/www\.figma\.com\/design\/\w+/u.test(raw) ? { url: raw } : null;
+
 function entry(id: string, parameters: unknown): unknown {
   return { id, name: id, title: "T", type: "story", importPath: "./T.stories.tsx", parameters };
 }
@@ -239,13 +243,24 @@ describe("StorybookAdapter.discover design links", () => {
       },
     };
     await withIndex(index, async (dir) => {
-      const [a, b, c, d] = await new StorybookAdapter().discover(dir);
+      const [a, b, c, d] = await new StorybookAdapter().discover(dir, {
+        parseDesignUrl: parseFigma,
+      });
       expect(a?.designUrl).toBe(FIGMA);
       expect(b?.designUrl).toBe("https://www.figma.com/design/WIN/X");
       expect(b?.parameters).toEqual({ delay: 5 });
       expect(c?.designUrl).toBeUndefined();
       expect(c?.designInvalid).toBe("https://example.com/nope");
       expect(d).not.toHaveProperty("designUrl");
+    });
+  });
+
+  it("extracts nothing without a design parser", async () => {
+    const index = { v: 5, entries: { a: entry("a", { design: FIGMA }) } };
+    await withIndex(index, async (dir) => {
+      const [a] = await new StorybookAdapter().discover(dir);
+      expect(a).not.toHaveProperty("designUrl");
+      expect(a).not.toHaveProperty("designInvalid");
     });
   });
 });

@@ -8,6 +8,7 @@
 import type { CaptureQueue } from "./capture-queue.ts";
 import type { CaptureRunner } from "./capture-runner.ts";
 import type { DatabaseAdapter } from "./database.ts";
+import type { DesignProvider } from "./design.ts";
 import type { EmailSender } from "./email-sender.ts";
 import type { GitHostProvider } from "./git-host/index.ts";
 import type { AdapterSetupContext } from "./metadata.ts";
@@ -21,6 +22,7 @@ export interface AdapterSetupSources {
   captureRunner?: CaptureRunner;
   captureQueue?: CaptureQueue;
   gitHosts?: GitHostProvider[];
+  design?: DesignProvider[];
   notifiers?: NotifierProvider[];
   emailSender?: EmailSender;
 }

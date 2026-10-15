@@ -229,6 +229,7 @@ export default defineConfig({
             packageGroup("Queues", ["queue-sqs", "queue-redis", "queue-azure", "queue-gcp"]),
             packageGroup("Capture runners", ["runner-playwright", "runner-puppeteer"]),
             packageGroup("Git hosts", ["git-github", "git-gitlab"]),
+            packageGroup("Design", ["design-figma"]),
             packageGroup("Notifications", ["notify-chat", "notify-email"]),
           ],
         },

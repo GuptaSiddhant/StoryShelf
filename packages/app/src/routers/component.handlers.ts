@@ -31,7 +31,7 @@ async function buildsOf(snapshots: readonly Snapshot[]): Promise<Build[]> {
   return found.filter((build): build is Build => build !== null);
 }
 
-/** Tab-specific data (Figma strip or linked packages), loaded only when its tab is open. */
+/** Tab-specific data (design strip or linked packages), loaded only when its tab is open. */
 async function loadTabData(
   c: Context,
   data: Pick<ComponentPageData, "project" | "shownBuild">,
@@ -40,7 +40,7 @@ async function loadTabData(
 ): Promise<Pick<ComponentPageData, "design" | "usage">> {
   const [first] = states;
   if (!first) return { design: [], usage: [] };
-  if (tab === "figma") {
+  if (tab === "design") {
     const resolutions = await loadDesignResolutions(data.project, states);
     const urls = designUrlsFor(resolutions, first);
     return { design: await loadReviewDesign(data.project, first, urls).catch(() => []), usage: [] };

@@ -1,4 +1,4 @@
-import { BaselineModel, DesignModel, FigmaNodeModel } from "@storyshelf/core/models";
+import { BaselineModel, DesignCredentialModel, DesignNodeModel } from "@storyshelf/core/models";
 import { BuildModel } from "@storyshelf/core/models";
 import { SnapshotModel } from "@storyshelf/core/models";
 import type { Snapshot } from "@storyshelf/core/schema";
@@ -45,12 +45,12 @@ export function registerMedia(app: ShelfRouter): void {
     return imageResponse(await getStore().storage.read(snapshot.diffPath));
   });
 
-  // `:renderId` is the internal figma_nodes row id (a ULID), not a Figma node id.
+  // `:renderId` is the internal design_nodes row id (a ULID), not a provider node id.
   app.get("/api/v1/projects/:slug/design/renders/:renderId", async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.param("slug"), ...VIEW_ROLES);
-    const { db, config, storage } = getStore();
-    const design = new DesignModel(db, undefined, credentialKeys(config));
-    const nodes = new FigmaNodeModel(db, design, { storage });
+    const { db, config, storage, design } = getStore();
+    const credentials = new DesignCredentialModel(db, credentialKeys(config));
+    const nodes = new DesignNodeModel(db, credentials, design, { storage });
     const node = await nodes.get(project.id, c.req.param("renderId"));
     const png = node ? await nodes.readRender(node) : null;
     if (!png) {

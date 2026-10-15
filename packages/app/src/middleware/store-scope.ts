@@ -1,5 +1,6 @@
 import type { CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import type { DesignProvider } from "@storyshelf/core/adapter/design";
 import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
@@ -22,6 +23,7 @@ export interface StoreScopeDeps {
   enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
   captureQueue: CaptureQueue | null;
   gitHosts: GitHostProvider[];
+  design: DesignProvider[];
   notifiers: NotifierProvider[];
   ai?: Ai;
   resolveUser: (c: Context) => Promise<AuthUser | null>;
@@ -46,6 +48,7 @@ export function storeScope(deps: StoreScopeDeps) {
         enqueueCapture: deps.enqueueCapture,
         captureQueue: deps.captureQueue,
         gitHosts: deps.gitHosts,
+        design: deps.design,
         notifiers: deps.notifiers,
         ai: deps.ai,
       },

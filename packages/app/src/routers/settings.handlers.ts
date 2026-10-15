@@ -1,6 +1,12 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import type { DesignProvider } from "@storyshelf/core/adapter/design";
 import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
-import { DesignModel, LabelModel, tokenDaysLeft } from "@storyshelf/core/models";
+import {
+  credentialDaysLeft,
+  DesignCredentialModel,
+  DesignModel,
+  LabelModel,
+} from "@storyshelf/core/models";
 import { PackageUsageModel } from "@storyshelf/core/models";
 import { MemberModel } from "@storyshelf/core/models";
 import { NotificationChannelModel } from "@storyshelf/core/models";
@@ -24,8 +30,8 @@ import {
   type SettingsTab,
 } from "../pages/project-settings.tsx";
 import type { SettingsAiData } from "../pages/settings-ai.tsx";
-import type { DesignTokenState } from "../pages/settings-design-token.tsx";
-import type { SettingsDesignData } from "../pages/settings-design.tsx";
+import type { DesignCredentialState } from "../pages/settings-design-credential.tsx";
+import type { SettingsDesignData, SettingsDesignProvider } from "../pages/settings-design.tsx";
 import type { SettingsLink, SettingsLinkCandidate } from "../pages/settings-links.tsx";
 import type { SettingsMember } from "../pages/settings-members.tsx";
 import type {
@@ -238,13 +244,14 @@ async function loadLinksSection(
   return { links, linkCandidates };
 }
 
-/** Design files, component mappings and token health for the Design tab (never the token). */
+/** Design files, component mappings and per-provider credential health for the Design tab (never a token). */
 async function loadDesignSection(
   db: DatabaseAdapter,
   secret: SecretInput,
+  providers: DesignProvider[],
   projectId: string,
 ): Promise<SettingsDesignData> {
-  const model = new DesignModel(db, undefined, secret);
+  const model = new DesignModel(db, providers);
   const files = (await model.projectLinks(projectId)).map((link) => ({
     id: link.id,
     label: link.label ?? "Design file",
@@ -255,19 +262,43 @@ async function loadDesignSection(
     importPath: link.importPath ?? "",
     url: link.url,
   }));
-  const row = await model.tokenInfo(projectId);
-  const token = row
-    ? {
-        status: tokenState(row.status),
-        daysLeft: tokenDaysLeft(row.createdAt),
-        checkedAt: row.checkedAt,
-      }
-    : null;
-  return { files, components, token };
+  const credentials = new DesignCredentialModel(db, secret);
+  const rows = await Promise.all(
+    providers.map(async (provider) => await providerSettings(credentials, provider, projectId)),
+  );
+  return { files, components, providers: rows };
 }
 
-/** The stored status column as a known token state (anything unrecognized reads as unknown). */
-function tokenState(status: string): DesignTokenState {
+async function providerSettings(
+  credentials: DesignCredentialModel,
+  provider: DesignProvider,
+  projectId: string,
+): Promise<SettingsDesignProvider> {
+  const { metadata } = provider;
+  const maxAgeDays = metadata.credentialMaxAgeDays;
+  const row = await credentials.info(projectId, metadata.kind);
+  return {
+    kind: metadata.kind,
+    name: metadata.name,
+    credentialLabel: metadata.credentialLabel,
+    credentialHelp: metadata.credentialHelp,
+    ...(metadata.credentialPlaceholder
+      ? { credentialPlaceholder: metadata.credentialPlaceholder }
+      : {}),
+    urlHint: metadata.urlHint,
+    ...(maxAgeDays === undefined ? {} : { maxAgeDays }),
+    credential: row
+      ? {
+          status: credentialState(row.status),
+          daysLeft: maxAgeDays === undefined ? null : credentialDaysLeft(row.createdAt, maxAgeDays),
+          checkedAt: row.checkedAt,
+        }
+      : null,
+  };
+}
+
+/** The stored status column as a known state (anything unrecognized reads as unknown). */
+function credentialState(status: string): DesignCredentialState {
   return status === "ok" || status === "unauthorized" || status === "forbidden"
     ? status
     : "unknown";
@@ -278,7 +309,15 @@ async function loadSettingsData(slug: string): Promise<SettingsData | null> {
   if (!project) {
     return null;
   }
-  const { db, config, user, authEnabled, gitHosts, notifiers } = getStore();
+  const {
+    db,
+    config,
+    user,
+    authEnabled,
+    gitHosts,
+    design: designProviders,
+    notifiers,
+  } = getStore();
   const inventory = await loadInventorySection(db, credentialKeys(config), project.id);
   const notifications = await loadNotificationSection(
     db,
@@ -289,7 +328,7 @@ async function loadSettingsData(slug: string): Promise<SettingsData | null> {
   );
   const isAdmin = isProjectAdmin(authEnabled, user, inventory.members);
   const linksSection = await loadLinksSection(db, project);
-  const design = await loadDesignSection(db, credentialKeys(config), project.id);
+  const design = await loadDesignSection(db, credentialKeys(config), designProviders, project.id);
   return { project, ...inventory, ...notifications, ...linksSection, design, gitHosts, isAdmin };
 }
 

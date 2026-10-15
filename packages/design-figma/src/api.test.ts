@@ -1,11 +1,6 @@
+import type { DesignCallOptions, DesignMeta, DesignRef } from "@storyshelf/core/adapter/design";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { parseFigmaUrl } from "../utils/figma-url.ts";
-import {
-  fetchFigmaMeta,
-  fetchFigmaMetas,
-  fetchFigmaRender,
-  fetchFigmaRenders,
-} from "./figma-api.ts";
+import { fetchFigmaMetas, fetchFigmaRenders } from "./api.ts";
 import {
   figmaWithRender,
   PNG_BYTES,
@@ -14,9 +9,28 @@ import {
   URL_FILE,
   URL_NODE,
   URL_NODE_B,
-} from "./figma-fixtures.ts";
+} from "./fixtures.ts";
+import { parseFigmaUrl } from "./url.ts";
 
 afterEach(() => vi.restoreAllMocks());
+
+/** Metadata of one ref, through the batched client. */
+async function fetchFigmaMeta(
+  token: string,
+  ref: DesignRef,
+  options: DesignCallOptions = {},
+): Promise<DesignMeta> {
+  const metas = await fetchFigmaMetas(token, ref.fileKey, [ref], options);
+  return (
+    metas.get(ref.nodeId ?? "") ?? { state: "error", name: null, version: null, lastModified: null }
+  );
+}
+
+/** Render of one node; null for whole-file refs and nodes Figma cannot render. */
+async function fetchFigmaRender(token: string, ref: DesignRef) {
+  if (!ref.nodeId) return null;
+  return (await fetchFigmaRenders(token, ref.fileKey, [ref.nodeId])).get(ref.nodeId) ?? null;
+}
 
 describe("fetchFigmaMeta", () => {
   const node = parseFigmaUrl(URL_NODE)!;

@@ -1,6 +1,7 @@
-import { DesignModel, MemberModel } from "@storyshelf/core/models";
-import type { FigmaNode } from "@storyshelf/core/schema";
+import { DesignCredentialModel, DesignModel, MemberModel } from "@storyshelf/core/models";
+import type { DesignNode } from "@storyshelf/core/schema";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
+import { createFigmaDesign } from "@storyshelf/design-figma";
 import { pino } from "pino";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "../index.tsx";
@@ -8,6 +9,7 @@ import { getCsrfToken } from "../middleware/csrf.ts";
 import { stubAuth } from "../stub-auth.ts";
 
 const SECRET = "design-test-secret";
+const figma = createFigmaDesign();
 const NOW = "2026-01-01T00:00:00.000Z";
 const BUTTON_FIGMA = "https://www.figma.com/design/KEY/Kit?node-id=1-2";
 const CARD_FIGMA = "https://www.figma.com/design/OTHER/Kit";
@@ -60,9 +62,15 @@ async function seed() {
     database: db,
     storage,
     logger: pino({ level: "silent" }),
+    design: [figma],
     config: { secret: SECRET },
   });
-  return { db, app, design: new DesignModel(db, undefined, SECRET) };
+  return {
+    db,
+    app,
+    design: new DesignModel(db, [figma]),
+    credentials: new DesignCredentialModel(db, SECRET),
+  };
 }
 
 function post(body: Record<string, string>) {
@@ -88,7 +96,7 @@ function figmaApi(handler: (url: string) => Response): ReturnType<typeof vi.spyO
 
 describe("design settings", () => {
   it("manages design files, component mappings and the write-only token", async () => {
-    const { app, design } = await seed();
+    const { app, design, credentials } = await seed();
     const page = await (await app.request("/projects/app/settings/design")).text();
     expect(page).toContain("Design files");
     expect(page).toContain("No design files linked.");
@@ -109,14 +117,17 @@ describe("design settings", () => {
       { importPath: "src/Card.stories.tsx", url: CARD_FIGMA },
     ]);
 
-    await app.request("/projects/app/settings/design/token", post({ token: "figd_secret_value" }));
+    await app.request(
+      "/projects/app/settings/design/figma/token",
+      post({ token: "figd_secret_value" }),
+    );
     const withToken = await (await app.request("/projects/app/settings/design")).text();
     expect(withToken).toContain("Not used yet");
     expect(withToken).not.toContain("figd_secret_value");
-    expect(await design.getToken("p1")).toBe("figd_secret_value");
+    expect(await credentials.get("p1", "figma")).toBe("figd_secret_value");
 
-    await app.request("/projects/app/settings/design/token/delete", post({}));
-    expect(await design.tokenInfo("p1")).toBeNull();
+    await app.request("/projects/app/settings/design/figma/token/delete", post({}));
+    expect(await credentials.info("p1", "figma")).toBeNull();
 
     const [link] = await design.componentLinks("p1");
     await app.request(`/projects/app/settings/design/components/${link?.id}/delete`, post({}));
@@ -133,7 +144,7 @@ describe("design settings", () => {
       post({ label: "x", url: "https://example.com/x" }),
     );
     expect(badFile.status).toBe(400);
-    expect(await badFile.text()).toContain("figma.com file, design, board, prototype or make URL");
+    expect(await badFile.text()).toContain("Enter a supported design link");
     const badComponent = await app.request(
       "/projects/app/settings/design/components",
       post({ importPath: "a.tsx", url: "nope" }),
@@ -144,7 +155,10 @@ describe("design settings", () => {
       post({ importPath: "", url: CARD_FIGMA }),
     );
     expect(noPath.status).toBe(400);
-    const noToken = await app.request("/projects/app/settings/design/token", post({ token: "" }));
+    const noToken = await app.request(
+      "/projects/app/settings/design/figma/token",
+      post({ token: "" }),
+    );
     expect(noToken.status).toBe(400);
     expect(await design.projectLinks("p1")).toEqual([]);
     expect(await design.componentLinks("p1")).toEqual([]);
@@ -192,8 +206,8 @@ describe("design surfaces", () => {
   });
 
   it("flags a design edited after the baseline, using cached metadata", async () => {
-    const { app, design } = await seed();
-    await design.setToken("p1", "figd_tok");
+    const { app, credentials } = await seed();
+    await credentials.set("p1", "figma", "figd_tok");
     figmaApi(() =>
       Response.json({
         name: "Kit",
@@ -208,12 +222,12 @@ describe("design surfaces", () => {
     expect(html).toContain("Open in Figma");
     expect(html).toContain("Design changed since this baseline was approved");
     expect(html).toContain("Button");
-    expect((await design.tokenInfo("p1"))?.status).toBe("ok");
+    expect((await credentials.info("p1", "figma"))?.status).toBe("ok");
   });
 
   it("reports a deleted node without blocking review", async () => {
-    const { app, design } = await seed();
-    await design.setToken("p1", "figd_tok");
+    const { app, credentials } = await seed();
+    await credentials.set("p1", "figma", "figd_tok");
     figmaApi(() => Response.json({ name: "Kit", nodes: { "1:2": null } }));
     const gone = await (
       await app.request("/projects/app/builds/b1/diff?snapshot=button-primary")
@@ -223,8 +237,8 @@ describe("design surfaces", () => {
   });
 
   it("reports an expired token without blocking review", async () => {
-    const { app, design } = await seed();
-    await design.setToken("p1", "figd_tok");
+    const { app, credentials } = await seed();
+    await credentials.set("p1", "figma", "figd_tok");
     figmaApi(() => new Response("{}", { status: 401 }));
     const expired = await (
       await app.request("/projects/app/builds/b1/diff?snapshot=button-primary")
@@ -251,8 +265,8 @@ describe("design renders", () => {
     });
 
   it("shows the cached render as a reference pane and serves it to viewers", async () => {
-    const { app, design } = await seed();
-    await design.setToken("p1", "figd_tok");
+    const { app, credentials } = await seed();
+    await credentials.set("p1", "figma", "figd_tok");
     withRender();
     const html = await (
       await app.request("/projects/app/builds/b1/diff?snapshot=button-primary")
@@ -272,8 +286,8 @@ describe("design renders", () => {
   });
 
   it("offers a click popover with the cached render in the library", async () => {
-    const { app, design } = await seed();
-    await design.setToken("p1", "figd_tok");
+    const { app, credentials } = await seed();
+    await credentials.set("p1", "figma", "figd_tok");
     withRender();
     await app.request("/projects/app/builds/b1/diff?snapshot=button-primary");
     const html = await (await app.request("/projects/app/library")).text();
@@ -344,22 +358,24 @@ describe("design settings authorization", () => {
       storage,
       auth,
       logger: pino({ level: "silent" }),
+      design: [figma],
       config: { secret: SECRET },
     });
-    const design = new DesignModel(db, undefined, SECRET);
-    await design.setToken("p1", "figd_original");
+    const design = new DesignModel(db, [figma]);
+    const credentials = new DesignCredentialModel(db, SECRET);
+    await credentials.set("p1", "figma", "figd_original");
     await design.setComponentLink("p1", "a.tsx", CARD_FIGMA);
-    return { app, design };
+    return { app, design, credentials };
   }
 
   const BASE = "/projects/app/settings/design";
 
   it("rejects non-admin members from every credential and mapping mutation", async () => {
-    const { app, design } = await authed();
+    const { app, design, credentials } = await authed();
     const [link] = await design.componentLinks("p1");
     const attempts: [string, Record<string, string>][] = [
-      [`${BASE}/token`, { token: "figd_hijack" }],
-      [`${BASE}/token/delete`, {}],
+      [`${BASE}/figma/token`, { token: "figd_hijack" }],
+      [`${BASE}/figma/token/delete`, {}],
       [`${BASE}/files`, { label: "x", url: CARD_FIGMA }],
       [`${BASE}/components`, { importPath: "b.tsx", url: CARD_FIGMA }],
       [`${BASE}/components/${link?.id}/delete`, {}],
@@ -369,23 +385,29 @@ describe("design settings authorization", () => {
       attempts.map(async ([path, body]) => await app.request(path, asUser("dev", body))),
     );
     expect(responses.map((res) => res.status)).toEqual(attempts.map(() => 403));
-    expect(await design.getToken("p1")).toBe("figd_original");
+    expect(await credentials.get("p1", "figma")).toBe("figd_original");
     expect(await design.componentLinks("p1")).toHaveLength(1);
     expect(await design.projectLinks("p1")).toEqual([]);
   });
 
   it("rejects unauthenticated mutations", async () => {
-    const { app, design } = await authed();
-    const res = await app.request(`${BASE}/token`, asUser("nobody", { token: "figd_hijack" }));
+    const { app, credentials } = await authed();
+    const res = await app.request(
+      `${BASE}/figma/token`,
+      asUser("nobody", { token: "figd_hijack" }),
+    );
     expect([302, 401, 403]).toContain(res.status);
-    expect(await design.getToken("p1")).toBe("figd_original");
+    expect(await credentials.get("p1", "figma")).toBe("figd_original");
   });
 
   it("still lets an admin rotate the token and manage mappings", async () => {
-    const { app, design } = await authed();
-    const rotated = await app.request(`${BASE}/token`, asUser("admin", { token: "figd_new" }));
+    const { app, design, credentials } = await authed();
+    const rotated = await app.request(
+      `${BASE}/figma/token`,
+      asUser("admin", { token: "figd_new" }),
+    );
     expect([204, 302]).toContain(rotated.status);
-    expect(await design.getToken("p1")).toBe("figd_new");
+    expect(await credentials.get("p1", "figma")).toBe("figd_new");
     const mapped = await app.request(
       `${BASE}/components`,
       asUser("admin", { importPath: "b.tsx", url: CARD_FIGMA }),
@@ -410,26 +432,28 @@ describe("design hardening", () => {
     });
 
   it("counts the rotation clock from when the token was set, not from refreshes", async () => {
-    const { app, db, design } = await seed();
-    await design.setToken("p1", "figd_tok");
-    const row = await design.tokenInfo("p1");
+    const { app, db, credentials } = await seed();
+    await credentials.set("p1", "figma", "figd_tok");
+    const row = await credentials.info("p1", "figma");
     const eightyDaysAgo = new Date(Date.now() - 80 * 86_400_000).toISOString();
-    await db.update(db.tables.designTokens, row?.id ?? "", { createdAt: eightyDaysAgo } as never);
+    await db.update(db.tables.designCredentials, row?.id ?? "", {
+      createdAt: eightyDaysAgo,
+    } as never);
     apiWith({ "1:2": { document: { name: "Button" } } });
     await reviewHtml(app);
-    expect((await design.tokenInfo("p1"))?.status).toBe("ok");
+    expect((await credentials.info("p1", "figma"))?.status).toBe("ok");
     const page = await (await app.request("/projects/app/settings/design")).text();
     expect(page).toMatch(/Rotate within (?:9|10) days/u);
   });
 
   it("stops showing a render once the node is deleted", async () => {
-    const { app, db, design } = await seed();
-    await design.setToken("p1", "figd_tok");
+    const { app, db, credentials } = await seed();
+    await credentials.set("p1", "figma", "figd_tok");
     apiWith({ "1:2": { document: { name: "Button" } } });
     const withPane = await reviewHtml(app);
     expect(withPane).toContain("Figma reference");
-    const [node] = (await db.list(db.tables.figmaNodes)) as unknown as FigmaNode[];
-    await db.update(db.tables.figmaNodes, node?.id ?? "", { fetchedAt: NOW } as never);
+    const [node] = (await db.list(db.tables.designNodes)) as unknown as DesignNode[];
+    await db.update(db.tables.designNodes, node?.id ?? "", { fetchedAt: NOW } as never);
     apiWith({ "1:2": null });
     const gone = await reviewHtml(app);
     expect(gone).toContain("Design not found");
@@ -438,11 +462,11 @@ describe("design hardening", () => {
   });
 
   it("caches versioned renders as immutable and unversioned ones briefly", async () => {
-    const { app, db, design } = await seed();
-    await design.setToken("p1", "figd_tok");
+    const { app, db, credentials } = await seed();
+    await credentials.set("p1", "figma", "figd_tok");
     apiWith({ "1:2": { document: { name: "Button" } } });
     await reviewHtml(app);
-    const [node] = (await db.list(db.tables.figmaNodes)) as unknown as FigmaNode[];
+    const [node] = (await db.list(db.tables.designNodes)) as unknown as DesignNode[];
     const base = `/api/v1/projects/app/design/renders/${node?.id}`;
     const versioned = await app.request(`${base}?v=${node?.renderVersion}`);
     expect(versioned.headers.get("cache-control")).toContain("immutable");
@@ -453,8 +477,8 @@ describe("design hardening", () => {
   });
 
   it("refreshes at most ten design links, three files at a time, when the library loads", async () => {
-    const { app, db, design } = await seed();
-    await design.setToken("p1", "figd_tok");
+    const { app, db, credentials } = await seed();
+    await credentials.set("p1", "figma", "figd_tok");
     await Promise.all(
       Array.from({ length: 14 }, async (_unused, i) => {
         await db.insert(db.tables.snapshots, {
@@ -501,5 +525,80 @@ describe("design hardening", () => {
     const res = await app.request("/projects/app/library");
     expect(res.status).toBe(200);
     expect(await res.text()).not.toContain(">Figma<");
+  });
+});
+
+async function bare() {
+  const { db } = makeDatabase();
+  const { storage } = makeStorage();
+  await db.insert(db.tables.projects, {
+    id: "p1",
+    name: "App",
+    slug: "app",
+    gitRepository: null,
+    gitDefaultBranch: "main",
+    createdAt: NOW,
+    updatedAt: NOW,
+  } as never);
+  await db.insert(db.tables.builds, {
+    id: "b1",
+    projectId: "p1",
+    gitSha: "abc1234",
+    gitBranch: "main",
+    isDefault: true,
+    status: "approved",
+    createdAt: NOW,
+    updatedAt: NOW,
+  } as never);
+  await db.insert(db.tables.snapshots, {
+    id: "s1",
+    projectId: "p1",
+    buildId: "b1",
+    storyId: "button--primary",
+    storyName: "Primary",
+    storyTitle: "Button",
+    storyImportPath: "./src/Button.stories.tsx",
+    designUrl: BUTTON_FIGMA,
+    screenshotPath: "p1/s1.png",
+    status: "changed",
+    createdAt: NOW,
+    updatedAt: NOW,
+  } as never);
+  const app = createShelfApp({
+    database: db,
+    storage,
+    logger: pino({ level: "silent" }),
+    config: { secret: SECRET },
+  });
+  return { app, design: new DesignModel(db, []) };
+}
+
+describe("without a design provider", () => {
+  it("shows an empty Design tab and no design actions anywhere", async () => {
+    const { app } = await bare();
+    const settings = await (await app.request("/projects/app/settings/design")).text();
+    expect(settings).toContain("No design provider configured");
+    expect(settings).not.toContain("Component mapping");
+    const library = await (await app.request("/projects/app/library")).text();
+    expect(library).not.toContain(">Figma<");
+    const review = await (await app.request("/projects/app/builds/b1/diff?snapshot=s1")).text();
+    expect(review).not.toContain("Open in");
+    const card = await (await app.request("/projects/app/builds/b1")).text();
+    expect(card).not.toContain(">Figma<");
+  });
+
+  it("refuses to store design links or credentials", async () => {
+    const { app, design } = await bare();
+    const link = await app.request(
+      "/projects/app/settings/design/components",
+      post({ importPath: "a.tsx", url: BUTTON_FIGMA }),
+    );
+    expect(link.status).toBe(400);
+    const token = await app.request(
+      "/projects/app/settings/design/figma/token",
+      post({ token: "x" }),
+    );
+    expect(token.status).toBe(404);
+    expect(await design.componentLinks("p1")).toEqual([]);
   });
 });

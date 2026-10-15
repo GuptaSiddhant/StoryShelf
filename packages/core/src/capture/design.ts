@@ -1,5 +1,4 @@
 /** Design-source extraction from Storybook story parameters (`design` addon + `storyshelf.figma`). */
-import { parseFigmaUrl } from "../utils/figma-url.ts";
 
 /** Story parameters relevant to design linking, as serialized in the Storybook index. */
 export interface DesignParameters {
@@ -7,10 +6,13 @@ export interface DesignParameters {
   storyshelf?: { figma?: unknown };
 }
 
-/** Outcome of extraction: a valid Figma URL, a rejected raw value, or nothing declared. */
+/** Parses a declared link into its canonical URL; null when no design provider accepts it. */
+export type DesignUrlParser = (raw: string) => { url: string } | null;
+
+/** Outcome of extraction: a valid design URL, a rejected raw value, or nothing declared. */
 export interface DesignExtraction {
   url?: string;
-  /** Raw value that was declared but is not a usable Figma URL (logged by the caller). */
+  /** Raw value that was declared but is not a usable design URL (logged by the caller). */
   invalid?: string;
 }
 
@@ -18,14 +20,17 @@ export interface DesignExtraction {
  * Resolve a story's design URL. `storyshelf.figma` (plain string) wins over the
  * `design` addon shape (`string | {url} | {type,url} | {type,url}[]`, first URL wins).
  */
-export function extractDesignUrl(parameters?: DesignParameters): DesignExtraction {
+export function extractDesignUrl(
+  parameters: DesignParameters | undefined,
+  parse: DesignUrlParser,
+): DesignExtraction {
   const explicit = parameters?.storyshelf?.figma;
   const raw =
     typeof explicit === "string" && explicit.trim() !== ""
       ? explicit
       : firstDesignUrl(parameters?.design);
   if (raw === undefined || raw.trim() === "") return {};
-  const parsed = parseFigmaUrl(raw);
+  const parsed = parse(raw);
   return parsed ? { url: parsed.url } : { invalid: raw };
 }
 

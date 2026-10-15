@@ -1,5 +1,6 @@
 import { PackageUsageModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
+import { createFigmaDesign } from "@storyshelf/design-figma";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
@@ -106,6 +107,7 @@ async function seed() {
     database: db,
     storage,
     logger: pino({ level: "silent" }),
+    design: [createFigmaDesign()],
     config: { secret: "s" },
   });
   return { db, app };
@@ -159,9 +161,9 @@ describe("component page", () => {
   it("shows the Figma and Linked tabs, with empty states", async () => {
     const { app, db } = await seed();
     const figma = await (
-      await get(app, "/projects/app/components/src/Button.stories.tsx?tab=figma")
+      await get(app, "/projects/app/components/src/Button.stories.tsx?tab=design")
     ).text();
-    expect(figma).toContain("No Figma design linked");
+    expect(figma).toContain("No design linked");
     const none = await (
       await get(app, "/projects/app/components/src/Button.stories.tsx?tab=linked")
     ).text();

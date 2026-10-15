@@ -5,6 +5,24 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 
 ## Unreleased
 
+**Breaking: Figma is now a design-provider adapter.** Figma support moved out of core into
+the optional `@storyshelf/design-figma` package behind a new `DesignProvider` adapter
+(ADR 0029).
+
+**Upgrading:**
+- Install `@storyshelf/design-figma` and pass `design: [createFigmaDesign()]` to
+  `createShelfApp` — and to `createCaptureWorker` on remote workers. Without a provider no
+  design links are extracted or shown. `storyshelf server init` asks about it; the dev server and
+  Fly demo are wired.
+- Re-enter the Figma access token once under **Settings → Design** (credentials moved to a
+  new `design_credentials` table). The old `figma_nodes` / `design_tokens` tables are dropped on
+  startup; the metadata/render cache simply refetches.
+- The component page's Figma tab is now `?tab=design`.
+
+**Added:** `@storyshelf/core/adapter/design` (`DesignProvider`, `DesignClient`,
+`parseDesignUrl`), `designContractSuite` in `@storyshelf/core/test-helpers`, and schema room for
+per-user design connections (`design_credentials.user_id`, `design_nodes.viewer_id`).
+
 **Attempt logs**
 - The build attempt log no longer stops at "partitioned" during a render. Per browser engine it now records the partition counts, the runner's `info`/`warn`/`error` lines (`capture sizing`, `browser recycled`, `render failed for story`, a11y warnings; debug stays out), `captured N/M screenshots` every 10 screenshots, and a `render pass finished` summary. Lines are written serially so order and sequence numbers stay correct under parallel rendering.
 

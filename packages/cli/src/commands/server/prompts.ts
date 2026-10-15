@@ -276,6 +276,13 @@ const NOTIFICATIONS_CONFIRM: ConfirmPrompt = {
   initial: false,
 };
 
+const DESIGN_CONFIRM: ConfirmPrompt = {
+  type: "confirm",
+  name: "design",
+  message: "Link components to Figma designs (adds @storyshelf/design-figma)?",
+  initial: true,
+};
+
 const OBSERVABILITY_CONFIRM: ConfirmPrompt = {
   type: "confirm",
   name: "observability",
@@ -312,6 +319,7 @@ export function localInfraPrompts(advanced: boolean): Prompt[] {
     },
     DOCKER_CONFIRM,
     NOTIFICATIONS_CONFIRM,
+    DESIGN_CONFIRM,
     OBSERVABILITY_CONFIRM,
   ];
 }

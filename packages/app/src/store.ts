@@ -1,5 +1,6 @@
 import type { CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import type { DesignProvider } from "@storyshelf/core/adapter/design";
 import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
@@ -23,6 +24,8 @@ export interface Store {
   enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
   captureQueue?: CaptureQueue | null;
   gitHosts: GitHostProvider[];
+  /** Design providers (Figma, …); empty when none is wired. */
+  design: DesignProvider[];
   notifiers: NotifierProvider[];
   /** AI insights surface; absent ⇒ AI off site-wide. */
   ai?: Ai;

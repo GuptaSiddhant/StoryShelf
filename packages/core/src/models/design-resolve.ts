@@ -1,8 +1,8 @@
 /** Per-component design link resolution: manual mappings over story-declared URLs. */
 import type { DesignLink } from "../schema/design.ts";
 
-/** Last observed health of the project's Figma token. */
-export type DesignTokenStatus = "unknown" | "ok" | "unauthorized" | "forbidden";
+/** Last observed health of a design credential. */
+export type DesignCredentialStatus = "unknown" | "ok" | "unauthorized" | "forbidden";
 
 /** Where a component's resolved design link came from. */
 export type DesignSource = "manual" | "story";
