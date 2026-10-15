@@ -206,6 +206,7 @@ async function runCapturePhases(
               storage: options.storage,
               tables: options.tables,
               runner: options.runner,
+              recordLog: input.recordLog,
               build,
               project,
               stories,

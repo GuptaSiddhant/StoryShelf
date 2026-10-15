@@ -189,7 +189,7 @@ async function recycleBrowser(
   ctx.browser = await relaunch();
   if (ctx.pagePool) ctx.pagePool = new PagePool(ctx.browser);
   active.browser = ctx.browser;
-  logger?.debug({}, "browser recycled");
+  logger?.info({}, "browser recycled");
 }
 
 async function captureOne(
