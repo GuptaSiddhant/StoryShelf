@@ -23,6 +23,9 @@ the optional `@storyshelf/design-figma` package behind a new `DesignProvider` ad
 `parseDesignUrl`), `designContractSuite` in `@storyshelf/core/test-helpers`, and schema room for
 per-user design connections (`design_credentials.user_id`, `design_nodes.viewer_id`).
 
+**Fixes**
+- The Puppeteer runner now runs `play` functions on Storybook 8, 9 and 10 (it failed with `Cannot call fromId/raw() unless you call cacheAllCSFFiles() first`), by loading just the story and running its `playFunction` with the mounted render's context, as the Playwright runner already does.
+
 **Attempt logs**
 - The build attempt log no longer stops at "partitioned" during a render. Per browser engine it now records the partition counts, the runner's `info`/`warn`/`error` lines (`capture sizing`, `browser recycled`, `render failed for story`, a11y warnings; debug stays out), `captured N/M screenshots` every 10 screenshots, and a `render pass finished` summary. Lines are written serially so order and sequence numbers stay correct under parallel rendering.
 

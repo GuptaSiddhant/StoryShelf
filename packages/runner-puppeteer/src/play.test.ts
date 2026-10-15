@@ -57,6 +57,48 @@ describe("inPagePlay (as serialized into the page)", () => {
     expect(play).toHaveBeenCalledOnce();
   });
 
+  it("loads only this story and runs its playFunction with the mounted render's context", async () => {
+    const playFunction = vi.fn(async () => {});
+    const loadStory = vi.fn(async () => ({ playFunction }));
+    setPreview({
+      storyStoreValue: { loadStory },
+      storyRenders: [{ id: "a--b", storyContext: () => ({ args: { x: 1 } }) }],
+    });
+    await run({ storyId: "a--b", timeoutMs: 1000 });
+    expect(loadStory).toHaveBeenCalledWith({ storyId: "a--b" });
+    expect(playFunction).toHaveBeenCalledWith(expect.objectContaining({ args: { x: 1 } }));
+  });
+
+  it("uses the store's story context when no render is mounted", async () => {
+    const playFunction = vi.fn(async () => {});
+    const story = { playFunction };
+    setPreview({
+      storyStoreValue: { loadStory: async () => story, getStoryContext: () => ({ id: "a--b" }) },
+    });
+    await run({ storyId: "a--b", timeoutMs: 1000 });
+    expect(playFunction).toHaveBeenCalledWith(expect.objectContaining({ id: "a--b" }));
+  });
+
+  it("does not fail stories without a play function", async () => {
+    setPreview({ storyStoreValue: { loadStory: async () => ({}) } });
+    await expect(run({ storyId: "a--b", timeoutMs: 1000 })).resolves.toBeUndefined();
+  });
+
+  it("propagates a rejection from the loaded playFunction", async () => {
+    setPreview({
+      storyStoreValue: {
+        loadStory: async () => ({
+          playFunction: async () => {
+            throw new Error("blocking play failure");
+          },
+        }),
+      },
+    });
+    await expect(run({ storyId: "a--b", timeoutMs: 1000 })).rejects.toThrow(
+      "blocking play failure",
+    );
+  });
+
   it("times out a play function that never settles", async () => {
     setPreview({ executePlay: () => new Promise<void>(() => {}) });
     await expect(run({ storyId: "a--b", timeoutMs: 20 })).rejects.toThrow(
