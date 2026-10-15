@@ -70,13 +70,13 @@ describe("design credentials on a real database", () => {
     expect(await credentials.get("p1", "fake")).toMatch(/^tok_/u);
   });
 
-  it("allows one credential per project, provider and user", async () => {
+  it("allows one credential per project and provider", async () => {
     const { db, credentials } = await setup();
     await credentials.set("p1", "fake", "project-wide");
-    await credentials.set("p1", "fake", "ada", "u-ada");
+    await credentials.set("p1", "fake", "rotated");
     await credentials.set("p1", "other", "other-provider");
-    expect(await db.count(db.tables.designCredentials)).toBe(3);
-    expect(await credentials.get("p1", "fake", "u-ada")).toBe("ada");
+    expect(await db.count(db.tables.designCredentials)).toBe(2);
+    expect(await credentials.get("p1", "fake")).toBe("rotated");
   });
 });
 

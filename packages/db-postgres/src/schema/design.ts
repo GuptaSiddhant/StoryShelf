@@ -22,11 +22,7 @@ export const designLinks = pgTable(
   ],
 );
 
-/**
- * Narrow `design_credentials` table definition: the design-provider credential
- * vault. `user_id` is `''` for the project-wide credential (not NULL, so the
- * unique index holds on every dialect) and a user id for a personal connection.
- */
+/** Narrow `design_credentials` table definition: the project-wide design-provider token. */
 export const designCredentials = pgTable(
   "design_credentials",
   {
@@ -35,23 +31,13 @@ export const designCredentials = pgTable(
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
     provider: text("provider").notNull(),
-    userId: text("user_id").notNull().default(""),
-    authType: text("auth_type").notNull().default("token"),
     tokenEncrypted: text("token_encrypted").notNull(),
-    refreshTokenEncrypted: text("refresh_token_encrypted"),
-    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "string" }),
     status: text("status").notNull().default("unknown"),
     checkedAt: timestamp("checked_at", { withTimezone: true, mode: "string" }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull(),
   },
-  (t) => [
-    uniqueIndex("design_credentials_project_provider_user_idx").on(
-      t.projectId,
-      t.provider,
-      t.userId,
-    ),
-  ],
+  (t) => [uniqueIndex("design_credentials_project_provider_idx").on(t.projectId, t.provider)],
 );
 
 /** Narrow `design_nodes` table definition (design metadata + render cache). */
@@ -100,20 +86,13 @@ export interface DesignLink {
   updatedAt: string;
 }
 
-/** A design provider credential: an admin-set project token (`userId` `""`) or a user's own connection. */
+/** The project-wide token of a design provider (an admin pastes it; encrypted at rest). */
 export interface DesignCredential {
   id: string;
   projectId: string;
   /** Provider `metadata.kind`, e.g. `figma`. */
   provider: string;
-  /** Owning user id; `""` for the project-wide credential. */
-  userId: string;
-  /** `token` (pasted personal access token) or `oauth`. */
-  authType: string;
   tokenEncrypted: string;
-  refreshTokenEncrypted: string | null;
-  /** When an OAuth access token expires; null for pasted tokens. */
-  expiresAt: string | null;
   /** Last API outcome: `unknown` | `ok` | `unauthorized` | `forbidden`. */
   status: string;
   checkedAt: string | null;

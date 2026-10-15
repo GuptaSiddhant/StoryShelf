@@ -19,4 +19,4 @@ Design previews need a credential. The project token (ADR 0029) is shared and al
 
 - Jira/Linear/etc. need only an `oauth` client on their adapter plus a line in `connectableServices()`; storage, refresh, state signing and routes are reused.
 - Figma issues one access token per app per user, so a refresh invalidates the previous token; the in-process lock prevents concurrent refreshes in one process but not across several app instances (a rare race that ends in `expired` and a reconnect).
-- `design_credentials.user_id`/`auth_type`/refresh/expiry columns are now unused (user connections live in `user_connections`); dropping them is a cleanup for a later change.
+- `design_credentials` holds only the project-wide token (user connections live in `user_connections`); the reserved per-user columns from ADR 0029 were dropped.

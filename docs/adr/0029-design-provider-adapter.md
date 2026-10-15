@@ -14,7 +14,7 @@ Figma support (#141) landed as Figma-specific code inside core and the app: URL 
 2. **Core stays vendor-neutral.** Link resolution (manual mapping > story parameters), the metadata/render cache (`DesignNodeModel`, `DesignRenderStore`), staleness and credential-age rules, credential storage (`DesignCredentialModel`), the render route and all UI live in core/app and take the provider list from `createShelfApp({ design })`. Remote workers take the same list so capture validates declared links.
 3. **`@storyshelf/design-figma`** is the first provider (`createFigmaDesign()`): URL parser, batched metadata/render client on the shared `httpJson`/`httpBytes` helpers (ADR 0019), 90-day credential metadata.
 4. **Opt-in.** Servers pass `design: [createFigmaDesign()]` (as with `gitHosts`); the dev server, Fly demo and `storyshelf server init` are wired. With no provider nothing is extracted or shown, and the Design settings tab explains how to add one.
-5. **Schema renamed and made provider-aware.** `figma_nodes` → `design_nodes` (+ `provider`, `viewer_id`), `design_tokens` → `design_credentials` (+ `provider`, `user_id`, `auth_type`, `refresh_token_encrypted`, `expires_at`). `user_id`/`viewer_id` use `''` for the project scope (not NULL) so the unique indexes hold on every dialect. **Reserved space for per-user connections:** a personal OAuth connection is a `design_credentials` row with the user's id, and cache entries fetched with a user's own access carry that `viewer_id`, so they can be served only to that user. This release uses only the `''` scope.
+5. **Schema renamed and made provider-aware.** `figma_nodes` → `design_nodes` (+ `provider`, `viewer_id`), `design_tokens` → `design_credentials` (+ `provider`). `viewer_id` uses `''` for the project scope (not NULL) so the unique index holds on every dialect; cache entries fetched with a user's own access carry that `viewer_id`, so they can be served only to that user (see ADR 0030, which stores user connections in their own table).
 6. **Breaking change, no data migration** (agreed up front): old `figma_nodes`/`design_tokens` tables are dropped on startup (the cache refetches itself); the Figma token must be re-entered once; the component page tab `?tab=figma` is now `?tab=design`; existing servers must add `design: [createFigmaDesign()]`.
 7. The explicit story parameter keeps its name (`parameters.storyshelf.figma`); a provider-neutral key can be added alongside it when a second provider exists.
 
@@ -28,6 +28,6 @@ Figma support (#141) landed as Figma-specific code inside core and the app: URL 
 
 ## Consequences
 
-- Per-user OAuth becomes a provider capability plus core credential/cache-visibility logic with no further table changes.
+- Per-user OAuth becomes a provider capability plus core connection/cache-visibility logic (ADR 0030).
 - Existing deployments must wire the provider and re-enter the Figma token.
 - One more published package (`@storyshelf/design-figma`) to version and document.

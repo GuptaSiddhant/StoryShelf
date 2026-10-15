@@ -162,28 +162,21 @@ design_links (
   UNIQUE(project_id, import_path)          -- one mapping per story file (NULL import_path never collides)
 );
 
--- The design-provider credential vault. `provider` = DesignProvider metadata.kind ("figma").
--- user_id '' = the project-wide credential an admin set; a user id = that user's own connection
--- (reserved for per-user OAuth; this release reads and writes only the '' scope). '' rather than NULL so
--- the unique index holds on every dialect. auth_type token | oauth; refresh_token_encrypted/expires_at
--- carry an OAuth pair. Everything secret is encrypted under ShelfConfig.secret and rotated with the
--- other credentials (both token columns), never displayed. created_at = when the credential was
--- set/replaced and drives the provider's max-age clock; status/checked_at record the last API outcome
--- (unknown | ok | unauthorized | forbidden) and never move created_at/updated_at.
+-- The project-wide design-provider token an admin pastes. `provider` = DesignProvider metadata.kind
+-- ("figma"). Encrypted under ShelfConfig.secret and rotated with the other credentials, never displayed.
+-- created_at = when the credential was set/replaced and drives the provider's max-age clock;
+-- status/checked_at record the last API outcome (unknown | ok | unauthorized | forbidden) and never move
+-- created_at/updated_at. Members' own OAuth connections live in user_connections (ADR 0030).
 design_credentials (
-  id                      text PRIMARY KEY,
-  project_id              text NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-  provider                text NOT NULL,
-  user_id                 text NOT NULL DEFAULT '',
-  auth_type               text NOT NULL DEFAULT 'token',
-  token_encrypted         text NOT NULL,
-  refresh_token_encrypted text,
-  expires_at              text,
-  status                  text NOT NULL DEFAULT 'unknown',
-  checked_at              text,
-  created_at              text NOT NULL,
-  updated_at              text NOT NULL,
-  UNIQUE(project_id, provider, user_id)
+  id               text PRIMARY KEY,
+  project_id       text NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  provider         text NOT NULL,
+  token_encrypted  text NOT NULL,
+  status           text NOT NULL DEFAULT 'unknown',
+  checked_at       text,
+  created_at       text NOT NULL,
+  updated_at       text NOT NULL,
+  UNIQUE(project_id, provider)
 );
 
 -- Design metadata + render cache keyed by (project, provider, viewer, file key, node id; node '' = whole
@@ -701,7 +694,7 @@ Design links attach to a **component (story file)**, never to a single state or 
 - **Render cache:** for node links the provider's render is downloaded at fetch time (signed vendor URLs expire, so they are never hot-linked) into storage at `{projectId}/design/{provider}/{fileKey}/{node}.png` and re-fetched only when the file `version` moves (`render_version`). `GET /api/v1/projects/:slug/design/renders/:renderId` (the internal `design_nodes` row id, not a provider node id) serves it to viewers; a request whose `?v=` matches the stored version is cached `immutable`. A render failure keeps the previous render and the metadata. A **deleted** node drops its render (row and stored PNG), so a design that no longer exists is never shown as reference; an auth failure (`unauthorized`/`forbidden`) keeps the last good name, version and render and only flips the state.
 - **Render lifecycle:** one PNG per linked node, overwritten in place when the file version moves, so storage is bounded by the number of distinct linked nodes. Renders are not evicted by build purge (they are not build artifacts); a link removed from settings (or a deleted project) leaves its PNG behind — small, bounded, and safe to delete by hand under `{projectId}/design/`.
 - **Surfaces:** the review page shows a reference pane under the diff stage (reference only — never diffed); library cards open a click popover with the cached render and `Open in <provider>`. Whole-file links have no render and stay deep links.
-- **Member connections (ADR 0030):** when the project has no credential and the operator configured OAuth for the provider (`createFigmaDesign({ oauth })`), signed-in members see a "Connect <provider>" prompt. Their tokens live in `user_connections`; entries fetched with them carry `design_nodes.viewer_id = user` and (with their renders under `.../user-<id>/...`) are served only to that user. The project credential always wins, and a member token is used only during that member's own visits. The `design_credentials.user_id`/`auth_type`/refresh/expiry columns are currently unused.
+- **Member connections (ADR 0030):** when the project has no credential and the operator configured OAuth for the provider (`createFigmaDesign({ oauth })`), signed-in members see a "Connect <provider>" prompt. Their tokens live in `user_connections`; entries fetched with them carry `design_nodes.viewer_id = user` and (with their renders under `.../user-<id>/...`) are served only to that user. The project credential always wins, and a member token is used only during that member's own visits.
 - **Non-goals:** pixel-diffing against design renders, token mapping, build-level `figma` labels.
 
 ## Build Labels

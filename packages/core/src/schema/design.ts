@@ -11,24 +11,13 @@ export interface DesignLink {
   updatedAt: string;
 }
 
-/**
- * A design provider credential: an admin-set project token (`userId` `""`) or a
- * user's own connection. `tokenEncrypted` holds the access token; OAuth
- * connections also carry an encrypted refresh token and an expiry.
- */
+/** The project-wide token of a design provider (an admin pastes it; encrypted at rest). */
 export interface DesignCredential {
   id: string;
   projectId: string;
   /** Provider `metadata.kind`, e.g. `figma`. */
   provider: string;
-  /** Owning user id; `""` for the project-wide credential. */
-  userId: string;
-  /** `token` (pasted personal access token) or `oauth`. */
-  authType: string;
   tokenEncrypted: string;
-  refreshTokenEncrypted: string | null;
-  /** When an OAuth access token expires; null for pasted tokens. */
-  expiresAt: string | null;
   /** Last API outcome: `unknown` | `ok` | `unauthorized` | `forbidden`. */
   status: string;
   checkedAt: string | null;

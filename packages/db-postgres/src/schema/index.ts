@@ -15,6 +15,7 @@ import {
   captureLogs as captureLogsTable,
 } from "./capture-attempt.ts";
 import { comments as commentsTable } from "./comment.ts";
+import { userConnections as userConnectionsTable } from "./connection.ts";
 import { contentRefs as contentRefsTable } from "./content-refs.ts";
 import {
   designLinks as designLinksTable,
@@ -27,7 +28,6 @@ import {
   insights as insightsTable,
 } from "./insight.ts";
 import { buildLabels as buildLabelsTable, labelTypes as labelTypesTable } from "./label.ts";
-import { userConnections as userConnectionsTable } from "./connection.ts";
 import { projectMembers as projectMembersTable } from "./member.ts";
 import {
   notificationChannels as notificationChannelsTable,

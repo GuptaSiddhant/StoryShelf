@@ -15,11 +15,6 @@ const SOURCES = [
   { name: "webhooks", table: "webhooks", column: "secretEncrypted" },
   { name: "git status tokens", table: "projectStatusConfigs", column: "tokenEncrypted" },
   { name: "design credentials", table: "designCredentials", column: "tokenEncrypted" },
-  {
-    name: "design refresh tokens",
-    table: "designCredentials",
-    column: "refreshTokenEncrypted",
-  },
   { name: "user connections", table: "userConnections", column: "tokenEncrypted" },
   {
     name: "user connection refresh tokens",

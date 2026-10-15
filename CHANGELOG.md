@@ -29,8 +29,8 @@ adapters can offer it too. A project token still takes precedence; a member's to
 only on their own visits, and what it fetches is shown only to them.
 
 **Added:** `@storyshelf/core/adapter/design` (`DesignProvider`, `DesignClient`,
-`parseDesignUrl`), `designContractSuite` in `@storyshelf/core/test-helpers`, and schema room for
-per-user design connections (`design_credentials.user_id`, `design_nodes.viewer_id`).
+`parseDesignUrl`), `designContractSuite` in `@storyshelf/core/test-helpers`, and a per-viewer
+cache scope (`design_nodes.viewer_id`).
 
 **Streaming and page reuse**
 - Screenshots are written to storage as each is captured (new optional `onCapture` on `CaptureRunner.render`; both bundled runners support it), so memory no longer grows with the number of stories. Runners that ignore it keep working unchanged.
