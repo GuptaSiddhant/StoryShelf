@@ -77,6 +77,11 @@ export interface WorkerOptions {
   config?: WorkerConfig;
   /** Viewports to capture (defaults to DEFAULT_VIEWPORTS). */
   viewports?: CaptureJobOptions["viewports"];
+  /**
+   * Split big builds across the queue: captures per shard. A build of up to twice this size still
+   * runs as one job. Unset keeps every build in one job.
+   */
+  shardSize?: number;
 }
 
 /** Handle returned by `createCaptureWorker`. */
@@ -127,6 +132,10 @@ export function createCaptureWorker(options: WorkerOptions): WorkerHandle {
     logger,
     secret: options.secret,
     design: options.design,
+    shardSize: options.shardSize,
+    enqueue: async (job) => {
+      await options.queue.enqueue(job);
+    },
   };
 
   const dispatchDeps: DispatchDeps = {
@@ -144,6 +153,7 @@ export function createCaptureWorker(options: WorkerOptions): WorkerHandle {
     gitHosts,
     secret: options.secret,
     logger,
+    maxRetries: config.maxRetries,
   };
 
   const runJob = createDispatchJob(dispatchDeps);
@@ -229,7 +239,13 @@ export function createCaptureWorker(options: WorkerOptions): WorkerHandle {
     const lease = startLease(job, doExtend, logger?.child({ buildId: job.buildId }));
     const onProgress = options.onProgress;
     const run = runJob(
-      { buildId: job.buildId, reqId: job.reqId, traceparent: job.traceparent },
+      {
+        buildId: job.buildId,
+        shard: job.shard,
+        attempts: job.attempts,
+        reqId: job.reqId,
+        traceparent: job.traceparent,
+      },
       onProgress ? { touch: (): void => onProgress(job) } : undefined,
     );
     try {

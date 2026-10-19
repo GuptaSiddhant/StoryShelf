@@ -23,4 +23,6 @@ export interface QueuedBody {
   reqId?: string;
   /** W3C traceparent continuing the enqueueing request's trace. */
   traceparent?: string;
+  /** The `capture_shards` row this job renders, when the build is sharded. */
+  shard?: string;
 }

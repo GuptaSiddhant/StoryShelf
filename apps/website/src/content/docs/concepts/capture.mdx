@@ -80,6 +80,24 @@ The server keeps the queue and its status; the child pulls jobs over IPC and sha
 
 `capture.mode` controls this: `auto` (default) forks only when `workerEntry` is set and the host has at least 2 CPUs and 2 GB; `in-process` never forks; `fork` always forks and fails at boot if it cannot. `capture.runner` is still required, since it serves the fallback. `SIGTERM` lets the child finish its current captures; if the server disappears, the child exits at once.
 
+## Sharding big builds
+
+A build with thousands of captures does not have to render in one job. Set `capture.shardSize` (in-process server) or `shardSize` (`createCaptureWorker`) to the number of captures (story × viewport × browser engine) one shard should hold:
+
+```ts
+createShelfApp({ ..., capture: { runner, shardSize: 500 } });
+```
+
+The build's own job becomes a **plan**: it decides what to render, records the shards in `capture_shards` and puts one queue job per shard on the queue. Any worker can take a shard; the one that finishes the last shard claims the finalize (a unique insert, so exactly one worker wins), runs the build's diffing wrap-up and sets the final status. A build of up to twice `shardSize` captures still renders as one piece, so small Storybooks pay no overhead.
+
+Details worth knowing:
+
+- All of a story's engines stay in one shard, so engine bootstrapping never races across workers.
+- A failed shard is retried by the queue like any job; once its retries are used up it fails every story in it and the build ends `failed`.
+- Re-running a build starts from a clean slate: old shard rows are replaced by the new plan.
+- Remote queues need no changes beyond carrying the optional `shard` field in the message body; a message with only `buildId` still means "the whole build".
+- Not yet combined with `capture.workerEntry` (forked capture).
+
 ## Content-addressed storage
 
 Published Storybooks are deduplicated by content hash. `persistStorybookStatics` (`core/capture/statics.ts`) `sha256`s every file, writes once to `content/<hash>` (`storage.write(content/<hash>, buffer)` if missing), upserts `content_refs { hash, refCount, lastSeenAt }` via `db.tables.contentRefs` (type-safe `DatabaseAdapter.tables`, no `as never`), and writes a per-build `manifest.json` (`{ "assets/index.js": "abc..." }`). Serving prefers `manifest.json` → `content/<hash>` with `readWithManifestFallback`, falling back to the legacy per-build copy during migration. Uploads use the same dedup: `POST /dedup { hashes }` → `needed`, batch `POST /content` (multipart, `80%` bytes fallback `neededBytes/totalBytes > 0.8` → `PUT zip`), then `POST /manifest` — see [Publishing](/concepts/publishing/) and ADR 0020.

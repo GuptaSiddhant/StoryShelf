@@ -13,6 +13,7 @@ export type { Baseline } from "./baseline.ts";
 export type { Build } from "./build.ts";
 /** A capture attempt and its log lines for a single build run. */
 export type { CaptureAttempt, CaptureLog, CaptureLogLevel } from "./capture-attempt.ts";
+export type { CaptureShard, CaptureShardKind, CaptureShardStatus } from "./capture-shard.ts";
 /** Review comment row as stored in the `comments` table. */
 export type { Comment } from "./comment.ts";
 /** Build label and label type rows. */

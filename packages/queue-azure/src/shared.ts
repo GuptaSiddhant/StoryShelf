@@ -6,6 +6,7 @@ export function serializeBody(job: CaptureJob): string {
     buildId: job.buildId,
     reqId: job.reqId,
     traceparent: job.traceparent,
+    shard: job.shard,
     queuedAt: new Date().toISOString(),
     status: "queued",
   });
@@ -46,4 +47,6 @@ export interface QueuedBody {
   status?: string;
   /** W3C traceparent continuing the enqueueing request's trace. */
   traceparent?: string;
+  /** The `capture_shards` row this job renders, when the build is sharded. */
+  shard?: string;
 }

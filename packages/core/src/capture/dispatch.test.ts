@@ -9,6 +9,7 @@ import { createShelfLogger } from "../logger.ts";
 import { BuildModel } from "../models/build.ts";
 import { CaptureAttemptModel } from "../models/capture-attempt.ts";
 import { CaptureLogModel } from "../models/capture-log.ts";
+import { CaptureShardModel } from "../models/capture-shard.ts";
 import { ProjectModel } from "../models/project.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { storybookZipPath } from "../utils/paths.ts";
@@ -24,6 +25,7 @@ function tables(db: DatabaseAdapter) {
     projectStatusConfigs: db.tables.projectStatusConfigs,
     captureAttempts: db.tables.captureAttempts,
     captureLogs: db.tables.captureLogs,
+    captureShards: db.tables.captureShards,
   };
 }
 
@@ -46,6 +48,25 @@ function zipWithIndex(): Buffer {
       }),
     ),
   );
+  return zip.toBuffer();
+}
+
+function zipOfStories(count: number): Buffer {
+  const entries = Object.fromEntries(
+    Array.from({ length: count }, (_unused, index) => {
+      const id = `s-${String(index).padStart(2, "0")}`;
+      const entry = {
+        id,
+        name: id,
+        title: "Components/Button",
+        importPath: "./B.stories.tsx",
+        type: "story",
+      };
+      return [id, entry];
+    }),
+  );
+  const zip = new AdmZip();
+  zip.addFile("index.json", Buffer.from(JSON.stringify({ v: 4, entries })));
   return zip.toBuffer();
 }
 
@@ -181,5 +202,84 @@ describe("createDispatchJob attempt history", () => {
     expect(attempts[0]?.error).toContain("renderer exploded");
     const logs = await new CaptureLogModel(db, tables(db)).listByAttempt(attempts[0]?.id ?? "");
     expect(logs.map((row) => row.message)).toContain("capture failed");
+  });
+});
+
+function shardRunner(failing: boolean): CaptureRunner {
+  return fakeRunner(
+    vi.fn<CaptureRunner["render"]>(async (input) => {
+      await Promise.resolve();
+      if (failing) {
+        throw new Error("browser crashed");
+      }
+      const header = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+      return {
+        captures: input.stories.map((story) => ({
+          story,
+          viewportName: "desktop",
+          screenshot: Buffer.concat([header, Buffer.from(story.id)]),
+        })),
+        failures: [],
+      };
+    }),
+  );
+}
+
+async function planBuild(failShard: boolean) {
+  const { db } = makeDatabase();
+  const { storage } = makeStorage();
+  const { project, build } = await seedBuild(db);
+  await storage.write(storybookZipPath(project.id, build.id), zipOfStories(6));
+  const queued: { buildId: string; shard: string }[] = [];
+  const deps = depsFor(db, storage, shardRunner(failShard));
+  deps.jobOptions.shardSize = 1;
+  deps.jobOptions.enqueue = async (job) => {
+    await Promise.resolve();
+    queued.push({ buildId: job.buildId, shard: job.shard });
+  };
+  const runJob = createDispatchJob(deps);
+  await runJob({ buildId: build.id });
+  return { db, build, queued, runJob };
+}
+
+async function inOrder<T>(items: T[], run: (item: T) => Promise<void>): Promise<void> {
+  const [head, ...rest] = items;
+  if (head === undefined) {
+    return;
+  }
+  await run(head);
+  await inOrder(rest, run);
+}
+
+describe("createDispatchJob sharding", () => {
+  it("keeps the attempt open until the last shard ends, then closes it once", async () => {
+    const { db, build, queued, runJob } = await planBuild(false);
+    const attempts = new CaptureAttemptModel(db, tables(db));
+
+    expect(queued.length).toBeGreaterThan(1);
+    expect((await attempts.listByBuild(build.id))[0]?.status).toBe("running");
+
+    await inOrder(queued, runJob);
+
+    const rows = await attempts.listByBuild(build.id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.status).toBe("completed");
+    expect(rows[0]?.storyCount).toBe(6);
+    expect((await new BuildModel(db, tables(db)).get(build.id))?.status).not.toBe("capturing");
+    expect(
+      (await new CaptureShardModel(db).renderShards(build.id)).every((s) => s.status === "done"),
+    ).toBe(true);
+  });
+
+  it("fails the attempt when a shard's last try fails", async () => {
+    const { db, build, queued, runJob } = await planBuild(true);
+
+    await inOrder(queued, async (job) => {
+      await expect(runJob({ ...job, attempts: 0 })).rejects.toThrow("browser crashed");
+    });
+
+    const rows = await new CaptureAttemptModel(db, tables(db)).listByBuild(build.id);
+    expect(rows[0]?.status).toBe("failed");
+    expect((await new BuildModel(db, tables(db)).get(build.id))?.status).toBe("failed");
   });
 });

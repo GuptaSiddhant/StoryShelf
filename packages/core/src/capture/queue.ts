@@ -43,9 +43,9 @@ export class InMemoryCaptureQueue implements CaptureQueue {
   }
 
   async enqueue(job: CaptureJob): Promise<void> {
-    const entry = this.#track(job.buildId);
+    const entry = this.#track(job);
     this.#log(job)?.info("capture queued");
-    this.#inFlight.set(job.buildId, this.#process(job, entry));
+    this.#inFlight.set(entryKey(job), this.#process(job, entry));
     await Promise.resolve();
   }
 
@@ -135,8 +135,9 @@ export class InMemoryCaptureQueue implements CaptureQueue {
     return this.#options.logger?.child({ buildId: job.buildId, reqId: job.reqId });
   }
 
-  #track(buildId: string): QueueEntry {
-    const existing = this.#entries.get(buildId);
+  #track(job: CaptureJob): QueueEntry {
+    const key = entryKey(job);
+    const existing = this.#entries.get(key);
     if (existing) {
       existing.status = "queued";
       existing.queuedAt = new Date().toISOString();
@@ -145,8 +146,13 @@ export class InMemoryCaptureQueue implements CaptureQueue {
       existing.error = undefined;
       return existing;
     }
-    const entry: QueueEntry = { buildId, status: "queued", queuedAt: new Date().toISOString() };
-    this.#entries.set(buildId, entry);
+    const entry: QueueEntry = {
+      buildId: job.buildId,
+      ...(job.shard ? { shard: job.shard } : {}),
+      status: "queued",
+      queuedAt: new Date().toISOString(),
+    };
+    this.#entries.set(key, entry);
     return entry;
   }
 
@@ -160,4 +166,9 @@ export class InMemoryCaptureQueue implements CaptureQueue {
     });
     await this.#acquire();
   }
+}
+
+/** Queue key of a job: the build's own entry, or one per shard so shards of a build do not overwrite each other. */
+export function entryKey(job: CaptureJob): string {
+  return job.shard ? `${job.buildId}#${job.shard}` : job.buildId;
 }

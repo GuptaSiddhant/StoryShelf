@@ -40,6 +40,7 @@ function buildPolledJob(ctx: SqsContext, msg: Message, body: QueuedBody): Pollab
     buildId: body.buildId ?? "",
     reqId: body.reqId,
     traceparent: body.traceparent,
+    shard: body.shard,
     receipt: msg.ReceiptHandle,
     attempts: attemptsFromCount(msg.Attributes?.["ApproximateReceiveCount"]),
     leaseMs: ctx.visibilityTimeout * 1000,

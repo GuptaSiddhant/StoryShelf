@@ -170,6 +170,15 @@ the codec does not dominate here, revisit the premise before building the pool.
 - The planner emits a single shard below a size threshold, so small Storybooks do not
   pay sharding overhead.
 
+**Implemented (first slice).** Plan + render stages, `capture_shards` table
+(`plan` / `render` rows plus a `finalize` claim row), the planner (contiguous slices,
+a story's engines kept together), optional `shard` field on queue jobs and transports,
+and the reducer as a **unique-claim insert** rather than a decrement (no
+`DatabaseAdapter` change): the last shard to end inserts `<build>:finalize`; the single
+winner finalizes. Opt-in via `capture.shardSize` / worker `shardSize`; unset keeps
+today's one-job behaviour. Not yet done: poison-shard isolation, longest-first
+ordering, a separate compare stage/queue, and sharding together with the forked child.
+
 ## Consequences
 
 **Positive**

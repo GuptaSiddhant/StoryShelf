@@ -33,6 +33,23 @@ function assertCaptureProcess(capture: ShelfOptions["capture"]): void {
   if (capture?.mode === "fork" && capture.workerEntry === undefined) {
     throw new Error('capture.mode "fork" requires capture.workerEntry');
   }
+  assertShardSize(capture);
+}
+
+function assertShardSize(capture: ShelfOptions["capture"]): void {
+  const size = capture?.shardSize;
+  if (size === undefined) {
+    return;
+  }
+  if (!Number.isInteger(size) || size < 1) {
+    throw new Error(`capture.shardSize must be a positive integer, got ${String(size)}`);
+  }
+  if (capture?.runner === undefined) {
+    throw new Error("capture.shardSize requires capture.runner (workers set their own shardSize)");
+  }
+  if (capture.workerEntry !== undefined) {
+    throw new Error("capture.shardSize is not supported together with capture.workerEntry");
+  }
 }
 
 function assertThreads(threads: number | undefined): void {

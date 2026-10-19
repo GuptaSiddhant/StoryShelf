@@ -19,6 +19,7 @@ import { mirrorAttemptLog, type AttemptMirror } from "./attempt-logger.ts";
 import { assertScreenshotBuffer } from "./guards.ts";
 import type { PipelineTables } from "./pipeline.ts";
 import { renderBudgetMs, renderWithTimeout, type RenderRequest } from "./render.ts";
+import type { EngineWork } from "./shard-plan.ts";
 import { resolveStoryViewports } from "./storybook.ts";
 
 /** Inputs shared by every engine's pass. */
@@ -64,6 +65,61 @@ export async function captureAcrossBrowsers(input: MatrixInput): Promise<MatrixR
     result.failures.push(...pass.failures);
     result.inherited.push(...pass.inherited);
     result.renderCount += pass.renderCount;
+  }
+  return result;
+}
+
+/** Which stories each engine renders and which inherit their baseline, decided before any render. */
+export interface PartitionedWork {
+  work: EngineWork[];
+  inherited: InheritedStory[];
+}
+
+/**
+ * Affected-capture partitioning for every engine, without rendering: the plan stage of a sharded
+ * capture decides what to render (and how to slice it) before any browser starts.
+ */
+export async function partitionBrowsers(input: MatrixInput): Promise<PartitionedWork> {
+  const { project, build } = input;
+  const work: EngineWork[] = [];
+  const inherited: InheritedStory[] = [];
+  for (const browser of input.browsers) {
+    // oxlint-disable-next-line no-await-in-loop -- one engine at a time, like the render loop
+    const partition = await partitionAffectedStories({
+      db: input.db,
+      tables: input.tables,
+      projectId: project.id,
+      branch: build.gitBranch,
+      defaultBranch: project.gitDefaultBranch,
+      stories: input.stories,
+      viewports: input.viewports,
+      browser,
+      affectedPaths: input.affectedPaths,
+    });
+    work.push({ browser, stories: partition.render });
+    inherited.push(...tagged(partition.inherited, browser));
+  }
+  return { work, inherited };
+}
+
+/** Render explicit per-engine work (one shard's slice), engine by engine. Nothing is inherited here. */
+export async function renderWork(
+  input: MatrixInput,
+  work: readonly EngineWork[],
+): Promise<MatrixResult> {
+  const result: MatrixResult = { captures: [], failures: [], inherited: [], renderCount: 0 };
+  for (const engine of work) {
+    const mirror = mirrorAttemptLog(input.logger, input.recordLog, flakyDowngrade(input.stories));
+    try {
+      // oxlint-disable-next-line no-await-in-loop -- engines run sequentially by design
+      const pass = await renderPass(input, engine.browser, mirror, engine.stories, []);
+      result.captures.push(...pass.captures);
+      result.failures.push(...pass.failures);
+      result.renderCount += pass.renderCount;
+    } finally {
+      // oxlint-disable-next-line no-await-in-loop -- flush before the next engine starts
+      await mirror.flush();
+    }
   }
   return result;
 }

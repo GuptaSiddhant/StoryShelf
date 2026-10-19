@@ -183,11 +183,13 @@ function toStorageJob(
   buildId: string,
   reqId?: string,
   traceparent?: string,
+  shard?: string,
 ): PollableJob {
   return {
     buildId,
     reqId,
     traceparent,
+    shard,
     receipt: encodeReceipt(msg.messageId, msg.popReceipt),
     attempts: Math.max(0, (msg.dequeueCount ?? 1) - 1),
     leaseMs: state.visibilitySeconds * 1000,
@@ -220,7 +222,7 @@ async function pollStorage(
     await discardMalformed(state.client, msg, state.logger);
     return null;
   }
-  return toStorageJob(state, msg, body.buildId, body.reqId, body.traceparent);
+  return toStorageJob(state, msg, body.buildId, body.reqId, body.traceparent, body.shard);
 }
 
 async function setupStorage(client: QueueClient): Promise<void> {

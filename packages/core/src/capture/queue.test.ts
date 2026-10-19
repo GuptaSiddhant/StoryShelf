@@ -119,6 +119,25 @@ describe("InMemoryCaptureQueue", () => {
     expect(await queue.active()).toHaveLength(0);
   });
 
+  it("tracks a build's shards beside the build itself", async () => {
+    const gate = deferred();
+    const runJob = vi.fn(async () => {
+      await gate.promise;
+    });
+    const queue = new InMemoryCaptureQueue({ concurrency: 3, runJob });
+
+    await queue.enqueue({ buildId: "b1" });
+    await queue.enqueue({ buildId: "b1", shard: "b1:render:1" });
+    await queue.enqueue({ buildId: "b1", shard: "b1:render:2" });
+    await flush();
+
+    expect(runJob).toHaveBeenCalledTimes(3);
+    expect((await queue.status("b1"))?.shard).toBeUndefined();
+    gate.resolve();
+    await flush();
+    expect((await queue.status("b1"))?.status).toBe("completed");
+  });
+
   it("re-enqueuing an existing build resets its status to queued", async () => {
     const gate = deferred();
     const runJob = vi.fn(async () => {
