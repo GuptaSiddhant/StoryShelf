@@ -95,4 +95,13 @@ describe("LabelModel", () => {
       "Label type 'build' cannot be updated.",
     );
   });
+
+  it("lists the project's persistent build ids", async () => {
+    const { db } = makeDatabase();
+    const model = new LabelModel(db);
+    await model.attach("p1", "b1", "persistent", "true");
+    await model.attach("p1", "b2", "pr", "12");
+    await model.attach("p2", "b3", "persistent", "true");
+    expect(await model.persistentBuildIds("p1")).toEqual(new Set(["b1"]));
+  });
 });

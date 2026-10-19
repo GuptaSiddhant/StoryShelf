@@ -8,10 +8,10 @@
  * when the run before the interrupted one was itself interrupted, so a crash loop stops after
  * one requeue while manual retries stay unrestricted. In-process queues only: remote queues redeliver on their own.
  */
-import { eq, getTableColumns } from "drizzle-orm";
-import type { SQLWrapper } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { BuildModel } from "../models/build.ts";
 import { CaptureAttemptModel } from "../models/capture-attempt.ts";
+import { col } from "../models/columns.ts";
 import { ProjectModel } from "../models/project.ts";
 import type { Build } from "../schema/build.ts";
 import type { DispatchDeps } from "./dispatch.ts";
@@ -44,7 +44,7 @@ export interface RecoveryDeps {
 export async function recoverStuckCaptures(recovery: RecoveryDeps): Promise<RecoveryResult> {
   const { deps } = recovery;
   const stuck = (await deps.db.list(deps.tables.builds, {
-    where: eq(getTableColumns(deps.tables.builds)["status"] as unknown as SQLWrapper, "capturing"),
+    where: eq(col(deps.tables.builds, "status"), "capturing"),
   })) as unknown as Build[];
   const outcomes = await Promise.all(
     stuck.map(async (build) => await recoverBuild(recovery, build, INTERRUPTED_ERROR)),

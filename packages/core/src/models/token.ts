@@ -1,10 +1,11 @@
 /** CI tokens for project-scoped API access. */
-import { and, eq, getTableColumns } from "drizzle-orm";
-import type { SQLWrapper, Table } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import type { Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { Token } from "../schema/token.ts";
 import { randomToken } from "../utils/hash.ts";
 import { ulid } from "../utils/ulid.ts";
+import { col } from "./columns.ts";
 
 /** Tables required by {@link TokenModel}. */
 export interface TokenTables {
@@ -64,10 +65,7 @@ export class TokenModel {
   /** List all tokens for a project. */
   async list(projectId: string): Promise<Token[]> {
     return (await this.db.list(this.tables.tokens, {
-      where: eq(
-        getTableColumns(this.tables.tokens)["projectId"] as unknown as SQLWrapper,
-        projectId,
-      ),
+      where: eq(col(this.tables.tokens, "projectId"), projectId),
     })) as unknown as Token[];
   }
 
@@ -75,8 +73,8 @@ export class TokenModel {
   async get(projectId: string, id: string): Promise<Token | null> {
     const rows = (await this.db.list(this.tables.tokens, {
       where: and(
-        eq(getTableColumns(this.tables.tokens)["projectId"] as unknown as SQLWrapper, projectId),
-        eq(getTableColumns(this.tables.tokens)["id"] as unknown as SQLWrapper, id),
+        eq(col(this.tables.tokens, "projectId"), projectId),
+        eq(col(this.tables.tokens, "id"), id),
       ),
       limit: 1,
     })) as unknown as Token[];
@@ -86,7 +84,7 @@ export class TokenModel {
   /** Fetch a token by its hashed value, or null if not found. */
   async findByHash(hash: string): Promise<Token | null> {
     const rows = (await this.db.list(this.tables.tokens, {
-      where: eq(getTableColumns(this.tables.tokens)["hash"] as unknown as SQLWrapper, hash),
+      where: eq(col(this.tables.tokens, "hash"), hash),
       limit: 1,
     })) as unknown as Token[];
     return rows[0] ?? null;

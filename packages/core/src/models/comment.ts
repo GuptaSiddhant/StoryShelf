@@ -1,9 +1,10 @@
 /** Build and snapshot review comments. */
-import { eq, getTableColumns } from "drizzle-orm";
-import type { SQLWrapper, Table } from "drizzle-orm";
+import { eq } from "drizzle-orm";
+import type { Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { Comment } from "../schema/comment.ts";
 import { ulid } from "../utils/ulid.ts";
+import { col } from "./columns.ts";
 
 /** Tables required by {@link CommentModel}. */
 export interface CommentTables {
@@ -26,7 +27,7 @@ export class CommentModel {
 
   async listByBuild(buildId: string): Promise<Comment[]> {
     return (await this.db.list(this.tables.comments, {
-      where: eq(getTableColumns(this.tables.comments)["buildId"] as unknown as SQLWrapper, buildId),
+      where: eq(col(this.tables.comments, "buildId"), buildId),
     })) as unknown as Comment[];
   }
 

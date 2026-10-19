@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { DatabaseAdapter } from "../adapters/database.ts";
+import { LabelModel } from "../models/label.ts";
 import { PackageUsageModel } from "../models/usage.ts";
+import { createTestProject } from "../test-helpers/create-project.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { Retention } from "./purge.ts";
 
@@ -95,6 +97,36 @@ describe("Retention", () => {
     // Usage rows go with the build explicitly (the fake has no FK cascade)
     expect(await usage.listForBuild("b-old")).toEqual([]);
     expect(await usage.listForBuild("b-recent")).toHaveLength(1);
+  });
+
+  it("keeps persistent builds and purges the rest", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const old = new Date(Date.now() - 60 * 86_400_000).toISOString();
+    const project = await createTestProject(db, db.tables);
+    const insertBuild = async (id: string): Promise<unknown> =>
+      await db.insert(db.tables.builds, {
+        id,
+        projectId: project.id,
+        gitSha: id,
+        gitBranch: "main",
+        isDefault: false,
+        status: "approved",
+        snapshotCount: 0,
+        changedCount: 0,
+        approvedCount: 0,
+        rejectedCount: 0,
+        createdAt: old,
+        updatedAt: old,
+      });
+    await Promise.all(["b-persistent", "b-plain"].map((id) => insertBuild(id)));
+    await new LabelModel(db).attach(project.id, "b-persistent", "persistent", "true");
+
+    const retention = new Retention(db, storage, retentionTables(db));
+    const result = await retention.purge(project, { ttlDays: 30, keepLatestPerBranch: false });
+
+    expect(result.removedBuilds).toBe(1);
+    expect((await db.list(db.tables.builds)).map((row) => row.id)).toEqual(["b-persistent"]);
   });
 
   it("purges stale baseline branches via TTL", async () => {

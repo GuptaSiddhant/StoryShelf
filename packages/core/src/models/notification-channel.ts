@@ -1,11 +1,12 @@
 /** Project and site-wide notification channel subscriptions. */
-import { eq, getTableColumns, isNull } from "drizzle-orm";
-import type { SQLWrapper, Table } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
+import type { Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { NotifierProvider } from "../adapters/notifier/provider.ts";
 import type { NotificationChannelRow } from "../schema/notification.ts";
 import { decryptCredential, encrypt, type SecretInput } from "../utils/encrypt.ts";
 import { ulid } from "../utils/ulid.ts";
+import { col } from "./columns.ts";
 
 /** Tables required by {@link NotificationChannelModel}. */
 export interface NotificationChannelTables {
@@ -42,14 +43,14 @@ export class NotificationChannelModel {
   /** List channels for a project. */
   async list(projectId: string): Promise<NotificationChannelRow[]> {
     return (await this.db.list(this.tables.notificationChannels, {
-      where: eq(this.column("projectId"), projectId),
+      where: eq(col(this.tables.notificationChannels, "projectId"), projectId),
     })) as unknown as NotificationChannelRow[];
   }
 
   /** List site-wide admin channels (`project_id IS NULL`). */
   async listSystem(): Promise<NotificationChannelRow[]> {
     return (await this.db.list(this.tables.notificationChannels, {
-      where: isNull(this.column("projectId")),
+      where: isNull(col(this.tables.notificationChannels, "projectId")),
     })) as unknown as NotificationChannelRow[];
   }
 
@@ -72,7 +73,7 @@ export class NotificationChannelModel {
   /** Fetch a channel by id, or null. */
   async get(id: string): Promise<NotificationChannelRow | null> {
     const rows = (await this.db.list(this.tables.notificationChannels, {
-      where: eq(this.column("id"), id),
+      where: eq(col(this.tables.notificationChannels, "id"), id),
       limit: 1,
     })) as unknown as NotificationChannelRow[];
     return rows[0] ?? null;
@@ -122,10 +123,6 @@ export class NotificationChannelModel {
     } catch {
       return {};
     }
-  }
-
-  private column(name: string): SQLWrapper {
-    return getTableColumns(this.tables.notificationChannels)[name] as unknown as SQLWrapper;
   }
 }
 

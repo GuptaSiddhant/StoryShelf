@@ -1,8 +1,9 @@
 /** Budget-threshold alert claims: the primary key makes "once per day" atomic. */
-import { eq, getTableColumns } from "drizzle-orm";
-import type { SQLWrapper, Table } from "drizzle-orm";
+import { eq } from "drizzle-orm";
+import type { Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { AiBudgetAlertRow } from "../schema/insight.ts";
+import { col } from "./columns.ts";
 
 /** Tables required by {@link AiBudgetAlertModel}. */
 export interface AiBudgetAlertTables {
@@ -36,9 +37,8 @@ export class AiBudgetAlertModel {
 
   /** Claims already made for a day. */
   async listForDay(day: string): Promise<AiBudgetAlertRow[]> {
-    const col = getTableColumns(this.tables.aiBudgetAlerts)["day"] as unknown as SQLWrapper;
     return (await this.db.list(this.tables.aiBudgetAlerts, {
-      where: eq(col, day),
+      where: eq(col(this.tables.aiBudgetAlerts, "day"), day),
     })) as unknown as AiBudgetAlertRow[];
   }
 }

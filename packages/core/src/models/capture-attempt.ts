@@ -1,11 +1,12 @@
 /** Capture attempts and their log lines: per-run history for a build. */
-import { and, asc, eq, getTableColumns } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
 import type { Logger } from "pino";
 import type { JobStatus } from "../adapters/capture-queue.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { CaptureAttempt, CaptureLogLevel } from "../schema/capture-attempt.ts";
 import { ulid } from "../utils/ulid.ts";
+import { col } from "./columns.ts";
 
 /** Tables required by {@link CaptureAttemptModel}. */
 export interface CaptureAttemptTables {
@@ -94,7 +95,7 @@ export class CaptureAttemptModel {
 }
 
 function columnsOf(table: Table, column: string): SQLWrapper {
-  return getTableColumns(table)[column] as unknown as SQLWrapper;
+  return col(table, column);
 }
 
 /**

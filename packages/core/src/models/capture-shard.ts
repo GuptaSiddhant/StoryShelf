@@ -1,9 +1,10 @@
 /** Shard rows of a sharded capture: the plan, the render slices, and the finalize claim. */
-import { asc, eq, getTableColumns } from "drizzle-orm";
-import type { SQLWrapper, Table } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
+import type { Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { CaptureShard, CaptureShardKind } from "../schema/capture-shard.ts";
 import { ulid } from "../utils/ulid.ts";
+import { col } from "./columns.ts";
 
 /** Tables required by {@link CaptureShardModel}. */
 export interface CaptureShardTables {
@@ -32,8 +33,8 @@ export class CaptureShardModel {
   /** Every row of a build, in plan, render, finalize and ordinal order. */
   async listForBuild(buildId: string): Promise<CaptureShard[]> {
     const rows = (await this.#db.list(this.#table, {
-      where: eq(column(this.#table, "buildId"), buildId),
-      orderBy: asc(column(this.#table, "ordinal")),
+      where: eq(col(this.#table, "buildId"), buildId),
+      orderBy: asc(col(this.#table, "ordinal")),
     })) as unknown as CaptureShard[];
     return rows.toSorted((a, b) => kindRank(a.kind) - kindRank(b.kind) || a.ordinal - b.ordinal);
   }
@@ -179,8 +180,4 @@ function base(
 
 function kindRank(kind: CaptureShardKind): number {
   return kind === "plan" ? 0 : kind === "render" ? 1 : 2;
-}
-
-function column(table: Table, name: string): SQLWrapper {
-  return getTableColumns(table)[name] as unknown as SQLWrapper;
 }

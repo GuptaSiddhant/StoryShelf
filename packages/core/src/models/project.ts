@@ -1,9 +1,10 @@
 /** Project records and slug management. */
-import { eq, getTableColumns } from "drizzle-orm";
-import type { SQLWrapper, Table } from "drizzle-orm";
+import { eq } from "drizzle-orm";
+import type { Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { Project } from "../schema/project.ts";
 import { slugify, ulid } from "../utils/ulid.ts";
+import { col } from "./columns.ts";
 
 /** Tables required by {@link ProjectModel}. */
 export interface ProjectTables {
@@ -55,7 +56,7 @@ export class ProjectModel {
   /** Fetch a project by its slug, or null if not found. */
   async getBySlug(slug: string): Promise<Project | null> {
     const rows = (await this.db.list(this.tables.projects, {
-      where: eq(getTableColumns(this.tables.projects)["slug"] as unknown as SQLWrapper, slug),
+      where: eq(col(this.tables.projects, "slug"), slug),
       limit: 1,
     })) as unknown as Project[];
     return rows[0] ?? null;
@@ -97,7 +98,7 @@ export class ProjectModel {
   private async uniqueSlug(name: string): Promise<string> {
     const base = slugify(name) || "project";
     const existing = (await this.db.list(this.tables.projects, {
-      where: eq(getTableColumns(this.tables.projects)["slug"] as unknown as SQLWrapper, base),
+      where: eq(col(this.tables.projects, "slug"), base),
     })) as unknown as Project[];
     if (existing.length === 0) {
       return base;

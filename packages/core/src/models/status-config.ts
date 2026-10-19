@@ -1,12 +1,13 @@
 /* oxlint-disable eslint/no-await-in-loop, typescript/promise-function-async, eslint/require-await */
 /** Per-project git-provider status check configurations. */
-import { eq, getTableColumns } from "drizzle-orm";
-import type { SQLWrapper, Table } from "drizzle-orm";
+import { eq } from "drizzle-orm";
+import type { Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { GitHostProvider } from "../adapters/git-host/index.ts";
 import type { ProjectStatusConfig } from "../schema/status-config.ts";
 import { decryptCredential, encrypt, type SecretInput } from "../utils/encrypt.ts";
 import { ulid } from "../utils/ulid.ts";
+import { col } from "./columns.ts";
 
 /** Tables required by {@link StatusConfigModel}. */
 export interface StatusConfigTables {
@@ -47,20 +48,14 @@ export class StatusConfigModel {
   /** List all status configs for a project. */
   async list(projectId: string): Promise<ProjectStatusConfig[]> {
     return (await this.db.list(this.tables.projectStatusConfigs, {
-      where: eq(
-        getTableColumns(this.tables.projectStatusConfigs)["projectId"] as unknown as SQLWrapper,
-        projectId,
-      ),
+      where: eq(col(this.tables.projectStatusConfigs, "projectId"), projectId),
     })) as unknown as ProjectStatusConfig[];
   }
 
   /** Fetch a config by id scoped to a project, or null. */
   async get(projectId: string, id: string): Promise<ProjectStatusConfig | null> {
     const rows = (await this.db.list(this.tables.projectStatusConfigs, {
-      where: eq(
-        getTableColumns(this.tables.projectStatusConfigs)["id"] as unknown as SQLWrapper,
-        id,
-      ),
+      where: eq(col(this.tables.projectStatusConfigs, "id"), id),
       limit: 1,
     })) as unknown as ProjectStatusConfig[];
     const found = rows[0] ?? null;

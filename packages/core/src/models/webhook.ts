@@ -1,11 +1,12 @@
 /** Webhook subscriptions for project events. */
-import { eq, getTableColumns } from "drizzle-orm";
-import type { SQLWrapper, Table } from "drizzle-orm";
+import { eq } from "drizzle-orm";
+import type { Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { Webhook } from "../schema/webhook.ts";
 import { decryptCredential, encrypt, type SecretInput } from "../utils/encrypt.ts";
 import { randomToken } from "../utils/hash.ts";
 import { ulid } from "../utils/ulid.ts";
+import { col } from "./columns.ts";
 
 /** Tables required by {@link WebhookModel}. */
 export interface WebhookTables {
@@ -32,10 +33,7 @@ export class WebhookModel {
   /** List all webhooks for a project. */
   async list(projectId: string): Promise<Webhook[]> {
     return (await this.db.list(this.tables.webhooks, {
-      where: eq(
-        getTableColumns(this.tables.webhooks)["projectId"] as unknown as SQLWrapper,
-        projectId,
-      ),
+      where: eq(col(this.tables.webhooks, "projectId"), projectId),
     })) as unknown as Webhook[];
   }
 
@@ -95,7 +93,7 @@ export class WebhookModel {
   /** Fetch a webhook by id scoped to a project, or null if not found. */
   async get(projectId: string, id: string): Promise<Webhook | null> {
     const rows = (await this.db.list(this.tables.webhooks, {
-      where: eq(getTableColumns(this.tables.webhooks)["id"] as unknown as SQLWrapper, id),
+      where: eq(col(this.tables.webhooks, "id"), id),
       limit: 1,
     })) as unknown as Webhook[];
     const found = rows[0] ?? null;
