@@ -52,6 +52,8 @@ const png = (tag: string): Buffer =>
 interface Behaviour {
   /** Story ids the runner reports as failed to render. */
   failStories: Set<string>;
+  /** Story ids that kill the browser: the render call throws when it reaches one. */
+  crashStories: Set<string>;
   /** Renders that throw outright, counted down. */
   throwTimes: number;
   rendered: string[];
@@ -70,6 +72,10 @@ function fakeRunner(behaviour: Behaviour): CaptureRunner {
       const failures: { storyId: string; viewportName: string; error: string }[] = [];
       for (const story of input.stories) {
         behaviour.rendered.push(story.id);
+        if (behaviour.crashStories.has(story.id)) {
+          // Dies on this story; the ones before it already streamed out through `onCapture`.
+          throw new Error(`browser crashed on ${story.id}`);
+        }
         if (behaviour.failStories.has(story.id)) {
           failures.push({ storyId: story.id, viewportName: "desktop", error: "render failed" });
           continue;
@@ -110,7 +116,12 @@ async function world(options: {
     isDefault: true,
   });
   await storage.write(storybookZipPath(project.id, build.id), zipOfStories(options.stories));
-  const behaviour: Behaviour = { failStories: new Set(), throwTimes: 0, rendered: [] };
+  const behaviour: Behaviour = {
+    failStories: new Set(),
+    crashStories: new Set(),
+    throwTimes: 0,
+    rendered: [],
+  };
   const queued: ShardJob[] = [];
   const jobOptions: CaptureJobOptions = {
     db,
@@ -225,12 +236,51 @@ describe("sharded capture", () => {
     expect(await w.snapshots()).toHaveLength(24);
   });
 
-  it("a shard that fails for good fails the build and rethrows", async () => {
+  it("fails a story that crashes the browser on its own, not its shard-mates", async () => {
+    const w = await world({ stories: 25, shardSize: 10 });
+    w.behaviour.crashStories.add("components-button--story-12");
+    await w.plan();
+
+    const outcomes = await Promise.all(w.queued.map(async (job) => await w.runShard(job, true)));
+
+    expect(await w.snapshots()).toHaveLength(24);
+    expect(await w.status()).toBe("failed");
+    const summary = outcomes.flatMap((outcome) =>
+      outcome.status === "rendered" && outcome.finalized ? [outcome.summary] : [],
+    )[0];
+    expect(summary).toMatchObject({ failedCount: 1, buildStatus: "failed" });
+    // The shard itself finished: only the crashing story is held against it.
+    const [, , second] = await w.shards.listForBuild(w.build.id);
+    expect(second?.status).toBe("done");
+    expect(JSON.parse(second?.result ?? "{}")).toMatchObject({
+      failedStoryIds: ["components-button--story-12"],
+    });
+  });
+
+  it("isolates two crashing stories in the same shard", async () => {
+    const w = await world({ stories: 25, shardSize: 10 });
+    w.behaviour.crashStories.add("components-button--story-10");
+    w.behaviour.crashStories.add("components-button--story-17");
+    await w.plan();
+
+    await Promise.all(w.queued.map(async (job) => await w.runShard(job, true)));
+
+    expect(await w.snapshots()).toHaveLength(23);
+    const [, , second] = await w.shards.listForBuild(w.build.id);
+    expect(second?.status).toBe("done");
+    const result = JSON.parse(second?.result ?? "{}") as { failedStoryIds: string[] };
+    expect(new Set(result.failedStoryIds)).toEqual(
+      new Set(["components-button--story-10", "components-button--story-17"]),
+    );
+  });
+
+  it("a shard that cannot render at all fails for good and rethrows", async () => {
     const w = await world({ stories: 25, shardSize: 10 });
     await w.plan();
     await w.runShard(w.queued[0] as ShardJob);
     await w.runShard(w.queued[1] as ShardJob);
-    w.behaviour.throwTimes = 1;
+    // Every render dies, so no one story can be blamed: the shard itself fails.
+    w.behaviour.throwTimes = Number.POSITIVE_INFINITY;
 
     await expect(w.runShard(w.queued[2] as ShardJob, true)).rejects.toThrow("browser crashed");
 
@@ -244,7 +294,7 @@ describe("sharded capture", () => {
     await w.plan();
     await w.runShard(w.queued[0] as ShardJob);
     await w.runShard(w.queued[1] as ShardJob);
-    w.behaviour.throwTimes = 1;
+    w.behaviour.throwTimes = Number.POSITIVE_INFINITY;
 
     await expect(w.runShard(w.queued[2] as ShardJob, false)).rejects.toThrow("browser crashed");
     expect(await w.status()).toBe("capturing");
@@ -253,6 +303,7 @@ describe("sharded capture", () => {
       error: "browser crashed",
     });
 
+    w.behaviour.throwTimes = 0;
     const retried = await w.runShard(w.queued[2] as ShardJob, true);
     expect(retried).toMatchObject({ status: "rendered", finalized: true });
     expect(await w.status()).toBe("approved");

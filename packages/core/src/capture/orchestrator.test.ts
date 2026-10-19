@@ -48,6 +48,42 @@ function zipWithIndex(): Buffer {
   return zip.toBuffer();
 }
 
+/** A Storybook index of `count` plain stories, for the cases that need more than one. */
+function zipOfStories(count: number): Buffer {
+  const entries = Object.fromEntries(
+    Array.from({ length: count }, (_unused, index) => [
+      `s-${index}`,
+      {
+        id: `s-${index}`,
+        name: `Story ${index}`,
+        title: "Components/Button",
+        importPath: "./Button.stories.tsx",
+        type: "story",
+      },
+    ]),
+  );
+  const zip = new AdmZip();
+  zip.addFile("index.json", Buffer.from(JSON.stringify({ v: 4, entries })));
+  return zip.toBuffer();
+}
+
+/** A runner that dies when it reaches `storyId`, after streaming out the captures before it. */
+function crashOnRunner(storyId: string): CaptureRunner {
+  const { runner } = fakeRunner({
+    render: vi.fn(async (input: Parameters<CaptureRunner["render"]>[0]) => {
+      for (const story of input.stories) {
+        if (story.id === storyId) {
+          throw new Error("browser exploded");
+        }
+        // oxlint-disable-next-line no-await-in-loop -- one capture at a time, like a page pool of 1
+        await input.onCapture?.({ story, viewportName: "desktop", screenshot: pngBytes() });
+      }
+      return { captures: [], failures: [] };
+    }),
+  });
+  return runner;
+}
+
 function pngBytes(): Buffer {
   const header = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   return Buffer.concat([header, Buffer.alloc(100)]);
@@ -477,6 +513,28 @@ describe("executeCaptureJob", () => {
 
     const updatedBuild = await db.get(db.tables.builds, build.id);
     expect(updatedBuild?.status).toBe("failed");
+  });
+
+  it("fails only the story that crashed the browser and keeps the rest", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const project = await new ProjectModel(db, tables(db)).create({ name: "Orchestrator" });
+    const build = await new BuildModel(db, tables(db)).create(project.id, {
+      gitSha: "sha-abc",
+      gitBranch: "main",
+    });
+    await storage.write(storybookZipPath(project.id, build.id), zipOfStories(4));
+
+    await expect(
+      executeCaptureJob(
+        { buildId: build.id },
+        { db, tables: tables(db), storage, runner: crashOnRunner("s-2"), scratchDir },
+      ),
+    ).resolves.toMatchObject({ storyCount: 4, failedCount: 1 });
+
+    const rows = await db.list(db.tables.snapshots);
+    expect(new Set(rows.map((row) => String(row.storyId)))).toEqual(new Set(["s-0", "s-1", "s-3"]));
+    expect((await db.get(db.tables.builds, build.id))?.status).toBe("failed");
   });
 
   it("cancels the runner and fails the build when render times out", async () => {

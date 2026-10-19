@@ -31,7 +31,7 @@ Secondary findings from the audit:
 
 - `rediffBuild` uses an unbounded `Promise.all` over every snapshot in a build.
 - Nothing removes a build's scratch directory after capture; the only `rm` is
-  `prepareTargetDir`, which resets the target *before* extracting.
+  `prepareTargetDir`, which resets the target _before_ extracting.
 - `config.viewports` is deployment-wide, but base viewports are a per-project
   concern, and viewport name is part of baseline identity. `projects.modesAllowlist`
   is the precedent for per-project capture policy living in the database.
@@ -176,8 +176,20 @@ a story's engines kept together), optional `shard` field on queue jobs and trans
 and the reducer as a **unique-claim insert** rather than a decrement (no
 `DatabaseAdapter` change): the last shard to end inserts `<build>:finalize`; the single
 winner finalizes. Opt-in via `capture.shardSize` / worker `shardSize`; unset keeps
-today's one-job behaviour. Not yet done: poison-shard isolation, longest-first
-ordering, a separate compare stage/queue, and sharding together with the forked child.
+today's one-job behaviour. Not yet done: longest-first ordering, a separate compare
+stage/queue, and sharding together with the forked child.
+
+**Poison-shard isolation (second slice).** A render call that throws takes its whole
+slice with it, so `renderIsolating` (`capture/isolate.ts`) re-renders the stories the
+crash never reached as two halves, and so on until one story is left holding it: that
+story is failed on its own (`browser crashed: …`) and its shard-mates are still
+captured. Screenshots spooled before the crash are kept and inherit the capture
+environment of a later pass on the same engine. Halving costs about log2(n) passes per
+bad story instead of a browser per story, with a pass cap beyond which the stories left
+are failed unrendered. A crash that never produces a single screenshot is read as the
+environment being broken rather than any story's fault: it is rethrown, and the shard
+fails as before (the queue retries it, and its final failure fails its stories). This
+also covers the unsharded path, which shares the render loop.
 
 ## Consequences
 
@@ -204,16 +216,16 @@ ordering, a separate compare stage/queue, and sharding together with the forked 
 
 ## Alternatives considered
 
-| Option | Why not |
-|---|---|
-| Rewrite capture or diff in Rust/Go | Chromium renders in its own processes; Node mostly awaits IPC. `sharp` (libvips) plus workers captures most of the codec gain without a second toolchain. |
-| Replace `pixelmatch` with `odiff` | Different anti-aliasing and threshold behaviour would invalidate existing baselines. A deliberate migration at best, not a drop-in. |
-| Database-backed queue | Deployments may use Postgres or MySQL; the queue must not constrain the database adapter. |
-| Loopback HTTP self-enqueue | Lands in the same process unless a second one is already listening — in which case IPC is the better transport. Adds internal auth, request timeouts and no durability. |
-| `connectOverCDP` | Chromium only, and Playwright documents it as significantly lower fidelity than `browserType.connect()`. |
-| Remote browser server (`run-server`) sidecar | Client and server must share the same major.minor Playwright version, coupling releases to a browser image. Keep as an opt-in endpoint option, not the default. |
-| Managed grids (Browserless, Azure Playwright Workspaces) | A self-hosted product should not require a SaaS browser fleet. Optional at most. |
-| Workers bootstrapping from serializable config | Would remove constructed `database`/`storage` instances from the public API — the best property it has. The role-flag re-entry is less elegant and keeps the API simple. |
+| Option                                                   | Why not                                                                                                                                                                  |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Rewrite capture or diff in Rust/Go                       | Chromium renders in its own processes; Node mostly awaits IPC. `sharp` (libvips) plus workers captures most of the codec gain without a second toolchain.                |
+| Replace `pixelmatch` with `odiff`                        | Different anti-aliasing and threshold behaviour would invalidate existing baselines. A deliberate migration at best, not a drop-in.                                      |
+| Database-backed queue                                    | Deployments may use Postgres or MySQL; the queue must not constrain the database adapter.                                                                                |
+| Loopback HTTP self-enqueue                               | Lands in the same process unless a second one is already listening — in which case IPC is the better transport. Adds internal auth, request timeouts and no durability.  |
+| `connectOverCDP`                                         | Chromium only, and Playwright documents it as significantly lower fidelity than `browserType.connect()`.                                                                 |
+| Remote browser server (`run-server`) sidecar             | Client and server must share the same major.minor Playwright version, coupling releases to a browser image. Keep as an opt-in endpoint option, not the default.          |
+| Managed grids (Browserless, Azure Playwright Workspaces) | A self-hosted product should not require a SaaS browser fleet. Optional at most.                                                                                         |
+| Workers bootstrapping from serializable config           | Would remove constructed `database`/`storage` instances from the public API — the best property it has. The role-flag re-entry is less elegant and keeps the API simple. |
 
 ## Open questions
 
