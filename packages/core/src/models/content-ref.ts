@@ -5,10 +5,10 @@ import type { ContentRef } from "../schema/content-ref.ts";
 /** Content refs for deduplicated Storybook assets. */
 export class ContentRefModel {
   private readonly tables: { contentRefs: Table };
-  constructor(
-    private readonly db: DatabaseAdapter,
-    tables?: { contentRefs: Table },
-  ) {
+  private readonly db: DatabaseAdapter;
+
+  constructor(db: DatabaseAdapter, tables?: { contentRefs: Table }) {
+    this.db = db;
     this.tables = tables ?? { contentRefs: db.tables.contentRefs };
   }
 

@@ -14,14 +14,14 @@ export interface ProjectGroupMappingTables {
 /** Data operations for identity-provider group mappings. */
 export class ProjectGroupMappingModel {
   private readonly tables: ProjectGroupMappingTables;
+  private readonly db: DatabaseAdapter;
+
   /**
    * @param db - Database adapter.
    * @param tables - Table handles.
    */
-  constructor(
-    private readonly db: DatabaseAdapter,
-    tables?: ProjectGroupMappingTables,
-  ) {
+  constructor(db: DatabaseAdapter, tables?: ProjectGroupMappingTables) {
+    this.db = db;
     this.tables = tables ?? { projectGroupMappings: db.tables.projectGroupMappings };
   }
 

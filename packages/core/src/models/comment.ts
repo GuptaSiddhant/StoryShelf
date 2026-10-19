@@ -14,10 +14,10 @@ export interface CommentTables {
 /** Data operations for review comments. */
 export class CommentModel {
   private readonly tables: CommentTables;
-  constructor(
-    private readonly db: DatabaseAdapter,
-    tables?: CommentTables,
-  ) {
+  private readonly db: DatabaseAdapter;
+
+  constructor(db: DatabaseAdapter, tables?: CommentTables) {
+    this.db = db;
     this.tables = tables ?? {
       comments: db.tables.comments,
       projects: db.tables.projects,

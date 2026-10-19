@@ -25,11 +25,12 @@ const refreshing = new Map<string, Promise<string | null>>();
  */
 export class ConnectionModel {
   private readonly tables: ConnectionTables;
-  constructor(
-    private readonly db: DatabaseAdapter,
-    private readonly secret?: SecretInput,
-    tables?: ConnectionTables,
-  ) {
+  private readonly db: DatabaseAdapter;
+  private readonly secret?: SecretInput;
+
+  constructor(db: DatabaseAdapter, secret?: SecretInput, tables?: ConnectionTables) {
+    this.db = db;
+    this.secret = secret;
     this.tables = tables ?? { userConnections: db.tables.userConnections };
   }
 

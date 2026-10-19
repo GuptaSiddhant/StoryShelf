@@ -15,14 +15,14 @@ export interface SnapshotTables {
 /** Data operations for snapshot records. */
 export class SnapshotModel {
   private readonly tables: SnapshotTables;
+  private readonly db: DatabaseAdapter;
+
   /**
    * @param db - Database adapter.
    * @param tables - Table handles.
    */
-  constructor(
-    private readonly db: DatabaseAdapter,
-    tables?: SnapshotTables,
-  ) {
+  constructor(db: DatabaseAdapter, tables?: SnapshotTables) {
+    this.db = db;
     this.tables = tables ?? { snapshots: db.tables.snapshots };
   }
 

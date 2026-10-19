@@ -12,14 +12,14 @@ export interface UserTables {
 /** Data operations for users. */
 export class UserModel {
   private readonly tables: UserTables;
+  private readonly db: DatabaseAdapter;
+
   /**
    * @param db - Database adapter.
    * @param tables - Table handles.
    */
-  constructor(
-    private readonly db: DatabaseAdapter,
-    tables?: UserTables,
-  ) {
+  constructor(db: DatabaseAdapter, tables?: UserTables) {
+    this.db = db;
     this.tables = tables ?? { users: db.tables.users };
   }
 
