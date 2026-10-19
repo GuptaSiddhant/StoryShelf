@@ -12,7 +12,7 @@ import type { AttemptLogRecorder } from "../models/capture-attempt.ts";
 import type { Build } from "../schema/build.ts";
 import type { CaptureLogLevel } from "../schema/capture-attempt.ts";
 import type { Project } from "../schema/project.ts";
-import { screenshotPath } from "../utils/paths.ts";
+import { storeScreenshot } from "../utils/screenshot-store.ts";
 import { isFlakyStory, type StoryEntry, type Viewport } from "./adapter.ts";
 import { partitionAffectedStories, type InheritedStory } from "./affected.ts";
 import { mirrorAttemptLog, type AttemptMirror } from "./attempt-logger.ts";
@@ -205,15 +205,8 @@ async function spoolCapture(
   capture: RenderedSnapshot,
 ): Promise<RenderedSnapshot> {
   assertScreenshotBuffer(capture.screenshot);
-  const path = screenshotPath(
-    input.project.id,
-    input.build.id,
-    capture.story.id,
-    capture.viewportName,
-    browser,
-  );
-  await input.storage.write(path, capture.screenshot);
-  return { ...capture, browser, screenshot: EMPTY_SCREENSHOT, stored: true };
+  const storedPath = await storeScreenshot(input.storage, input.project.id, capture.screenshot);
+  return { ...capture, browser, screenshot: EMPTY_SCREENSHOT, stored: true, storedPath };
 }
 
 const EMPTY_SCREENSHOT = Buffer.alloc(0);

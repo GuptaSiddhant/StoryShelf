@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Baseline } from "../schema/baseline.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
-import { baselinePath } from "../utils/paths.ts";
 import { BASELINE_ARCHIVE_LIMITS, BaselineArchiveError } from "./baseline-archive.ts";
 import { BaselineTransferModel } from "./baseline-transfer.ts";
 import { BaselineModel } from "./baseline.ts";
@@ -79,7 +78,7 @@ describe("BaselineTransferModel", () => {
     expect(await transfer.import("p2", archive)).toEqual({ imported: 3, created: 2, updated: 1 });
     const row = await baselines.getFor("p2", "button--primary", "desktop", "main");
     expect(row?.snapshotId).toBeNull();
-    expect(row?.screenshotPath).toBe(baselinePath("p2", "main", "button--primary", "desktop"));
+    expect(row?.screenshotPath).toMatch(/^p2\/content\/[0-9a-f]{64}\.png$/u);
     expect((await baselines.read(row!)).toString("latin1")).toContain(":main:chromium");
     expect(await baselines.getFor("p2", "button--primary", "desktop", "feature/x")).toBeNull();
   });

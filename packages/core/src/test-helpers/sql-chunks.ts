@@ -52,6 +52,9 @@ function matchChunk(chunks: SqlChunk[], row: Record<string, unknown>, table: Tab
   if (/is null/iu.test(text)) {
     return isNullMatches(chunks, row, table, false);
   }
+  if (text.includes(" like ")) {
+    return likeMatches(chunks, row, table);
+  }
   if (text.includes(" in ")) {
     return inArrayMatches(chunks, row, table);
   }
@@ -99,6 +102,30 @@ function eqMatches(chunks: SqlChunk[], row: Record<string, unknown>, table: Tabl
     return false;
   }
   return row[columnKey(table, columnName)] === argument;
+}
+
+/** Match `column like 'pattern'`: `%` is any run of characters, `_` any one; everything else literal. */
+function likeMatches(chunks: SqlChunk[], row: Record<string, unknown>, table: Table): boolean {
+  let columnName: string | undefined;
+  let pattern: unknown;
+  for (const chunk of chunks as unknown[]) {
+    if (typeof chunk === "string") {
+      pattern = chunk;
+    } else if (chunk !== null && typeof chunk === "object") {
+      const node = chunk as SqlChunk;
+      if (typeof node.name === "string" && node.table !== undefined) {
+        columnName = node.name;
+      } else if ("brand" in node) {
+        pattern = node.value;
+      }
+    }
+  }
+  const cell = columnName === undefined ? undefined : row[columnKey(table, columnName)];
+  if (typeof cell !== "string" || typeof pattern !== "string") {
+    return false;
+  }
+  const source = pattern.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
+  return new RegExp(`^${source.replaceAll("%", ".*").replaceAll("_", ".")}$`, "su").test(cell);
 }
 
 /* eslint-disable complexity, max-depth -- handles drizzle's varied chunk shapes */

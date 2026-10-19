@@ -8,7 +8,8 @@ import type { StorageAdapter } from "../adapters/storage.ts";
 import { emitWebhookEvent } from "../adapters/webhook-events.ts";
 import type { Baseline } from "../schema/baseline.ts";
 import type { SecretInput } from "../utils/encrypt.ts";
-import { baselinePath } from "../utils/paths.ts";
+import { isContentPath } from "../utils/paths.ts";
+import { storeScreenshot } from "../utils/screenshot-store.ts";
 import { ulid } from "../utils/ulid.ts";
 import type { WebhookTables } from "./webhook.ts";
 
@@ -113,6 +114,17 @@ export class BaselineModel {
     await this.db.update(this.tables.baselines, baseline.id, { infraHash, fingerprint });
   }
 
+  /**
+   * The content-addressed object a baseline should point at. A source that already is one is
+   * reused as is (no copy); a legacy per-build path is stored once by content.
+   */
+  private async contentFor(projectId: string, sourcePath: string): Promise<string> {
+    if (isContentPath(projectId, sourcePath)) {
+      return sourcePath;
+    }
+    return await storeScreenshot(this.storage, projectId, await this.storage.read(sourcePath));
+  }
+
   async read(baseline: Baseline): Promise<Buffer> {
     return await this.storage.read(baseline.screenshotPath);
   }
@@ -128,9 +140,7 @@ export class BaselineModel {
     options: BaselineUpsertOptions = {},
   ): Promise<Baseline> {
     const browser = options.browser ?? DEFAULT_BROWSER;
-    const screenshotPath = baselinePath(projectId, branch, storyId, viewport, browser);
-    const source = await this.storage.read(sourcePath);
-    await this.storage.write(screenshotPath, source);
+    const screenshotPath = await this.contentFor(projectId, sourcePath);
 
     const existing = await this.getFor(projectId, storyId, viewport, branch, browser);
     let baseline: Baseline;
@@ -209,16 +219,27 @@ export class BaselineModel {
     })) as unknown as Baseline[];
   }
 
+  /**
+   * Delete a baseline's own file. A content-addressed screenshot is shared with snapshots and other
+   * baselines, so it is left for the retention sweep instead.
+   */
+  private async discardFile(baseline: Baseline): Promise<void> {
+    if (isContentPath(baseline.projectId, baseline.screenshotPath)) {
+      return;
+    }
+    try {
+      await this.storage.delete(baseline.screenshotPath);
+    } catch {
+      // ignore missing file
+    }
+  }
+
   async removeOrphans(projectId: string, validStoryIds: Set<string>): Promise<number> {
     const all = await this.list(projectId);
     const toRemove = all.filter((baseline) => !validStoryIds.has(baseline.storyId));
     await Promise.all(
       toRemove.map(async (baseline) => {
-        try {
-          await this.storage.delete(baseline.screenshotPath);
-        } catch {
-          // ignore missing file
-        }
+        await this.discardFile(baseline);
         await this.db.remove(this.tables.baselines, baseline.id);
       }),
     );
@@ -230,11 +251,7 @@ export class BaselineModel {
     const toRemove = all.filter((baseline) => baseline.branch === branch);
     await Promise.all(
       toRemove.map(async (baseline) => {
-        try {
-          await this.storage.delete(baseline.screenshotPath);
-        } catch {
-          // ignore missing file
-        }
+        await this.discardFile(baseline);
         await this.db.remove(this.tables.baselines, baseline.id);
       }),
     );

@@ -10,7 +10,15 @@ import { LabelModel, type LabelTables } from "../models/label.ts";
 import { PackageUsageModel } from "../models/usage.ts";
 import type { Project } from "../schema/project.ts";
 import { TERMINAL_BUILD_STATUSES } from "../types.ts";
+import { sweepScreenshotContent } from "./screenshot-sweep.ts";
 
+export {
+  sweepScreenshotContent,
+  SWEEP_GRACE_MS,
+  type SweepDeps,
+  type SweepResult,
+  type SweepTables,
+} from "./screenshot-sweep.ts";
 export { purgeAiData, STALE_RUN_MS, type AiPurgeResult } from "./ai.ts";
 
 /** Table handles for retention queries. */
@@ -74,11 +82,32 @@ export class Retention {
     );
     const removedBuilds = results.filter((r: { removed: boolean }) => r.removed).length;
     const removedFiles = results.reduce((sum: number, r: { files: number }) => sum + r.files, 0);
+    await this.sweepScreenshots(project);
     this.logger?.info(
       { projectId: project.id, removedBuilds, removedFiles },
       "build retention purge complete",
     );
     return { removedBuilds, removedFiles };
+  }
+
+  /** Reclaim screenshots no snapshot or baseline references any more; never blocks the purge. */
+  private async sweepScreenshots(project: Project): Promise<void> {
+    try {
+      await sweepScreenshotContent(
+        {
+          db: this.db,
+          storage: this.storage,
+          tables: {
+            snapshots: this.db.tables.snapshots,
+            baselines: this.tables.baselines,
+          },
+          logger: this.logger,
+        },
+        project.id,
+      );
+    } catch (error) {
+      this.logger?.warn({ err: error, projectId: project.id }, "screenshot sweep failed");
+    }
   }
 
   private async removeBuild(buildId: string): Promise<boolean> {
@@ -194,6 +223,7 @@ export class Retention {
     }
     const baselines = new BaselineModel(this.db, this.tables, this.storage);
     const removedBaselines = await baselines.removeStaleBranches(project.id, stale);
+    await this.sweepScreenshots(project);
     this.logger?.info(
       { projectId: project.id, removedBranches: stale.size, removedBaselines },
       "branch GC complete",

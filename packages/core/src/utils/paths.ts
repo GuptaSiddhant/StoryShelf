@@ -31,6 +31,23 @@ export function screenshotPath(
   return `${projectId}/builds/${buildId}/screenshots/${storyId}/${segment}.png`;
 }
 
+/** Storage prefix of a project's content-addressed screenshots. */
+export function contentDir(projectId: string): string {
+  assertSegments([projectId]);
+  return `${projectId}/content`;
+}
+
+/** Storage path of a screenshot stored by the SHA-256 of its bytes (shared by builds and baselines). */
+export function contentPath(projectId: string, hash: string): string {
+  assertSegments([projectId, hash]);
+  return `${contentDir(projectId)}/${hash}.png`;
+}
+
+/** Whether `path` is one of `projectId`'s content-addressed screenshots. */
+export function isContentPath(projectId: string, path: string): boolean {
+  return path.startsWith(`${contentDir(projectId)}/`) && path.endsWith(".png");
+}
+
 /** Storage path for a snapshot diff overlay image. */
 export function diffPath(
   projectId: string,

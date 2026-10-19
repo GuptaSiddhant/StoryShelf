@@ -13,7 +13,8 @@ import type { Project } from "../schema/project.ts";
 import type { BuildStatus, SnapshotStatus } from "../types.ts";
 import type { SecretInput } from "../utils/encrypt.ts";
 import { mapLimit } from "../utils/map-limit.ts";
-import { diffPath, screenshotPath } from "../utils/paths.ts";
+import { diffPath } from "../utils/paths.ts";
+import { storeScreenshot } from "../utils/screenshot-store.ts";
 import type { Viewport } from "./adapter.ts";
 import type { InheritedStory } from "./affected.ts";
 import { diffStoredScreenshots, writeDiffOverlay } from "./diff-record.ts";
@@ -295,20 +296,19 @@ function viewportByName(ctx: CaptureContext, name: string): Viewport {
   return ctx.viewports.find((v) => v.name === name) ?? { name, width: 0, height: 0 };
 }
 
+/** Where the capture's screenshot lives: already stored by the orchestrator, or stored now. */
+async function screenshotLocation(ctx: CaptureContext, capture: RenderedSnapshot): Promise<string> {
+  if (capture.storedPath) {
+    return capture.storedPath;
+  }
+  assertScreenshotBuffer(capture.screenshot);
+  return await storeScreenshot(ctx.storage, ctx.project.id, capture.screenshot);
+}
+
 async function persistSnapshot(ctx: CaptureContext, capture: RenderedSnapshot): Promise<void> {
   const viewport = capture.viewport ?? viewportByName(ctx, capture.viewportName);
   const browser = browserOf(capture);
-  const screenshot = screenshotPath(
-    ctx.project.id,
-    ctx.build.id,
-    capture.story.id,
-    capture.viewportName,
-    browser,
-  );
-  if (!capture.stored) {
-    assertScreenshotBuffer(capture.screenshot);
-    await ctx.storage.write(screenshot, capture.screenshot);
-  }
+  const screenshot = await screenshotLocation(ctx, capture);
 
   const baseline = await resolveBaseline(ctx, capture.story.id, capture.viewportName, browser);
   if (!baseline) {

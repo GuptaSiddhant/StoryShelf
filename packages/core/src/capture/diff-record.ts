@@ -15,6 +15,23 @@ export function resolvePixelThreshold(projectThreshold: number, override?: numbe
   return valid && override >= 0 && override <= 1 ? override : projectThreshold;
 }
 
+/**
+ * Content-addressed screenshots share a path exactly when their bytes are equal, so the diff is
+ * empty without reading either image. Dimensions are not known (nothing was read) and report 0.
+ */
+function samePathResult(): DiffResult {
+  const unread = { width: 0, height: 0 };
+  return {
+    passed: true,
+    diffPixels: 0,
+    diffRatio: 0,
+    diffImage: null,
+    baselineDimensions: unread,
+    currentDimensions: unread,
+    sizeChanged: false,
+  };
+}
+
 /** Read two stored PNGs and diff them with the project's thresholds (optionally a per-story pixel threshold). */
 export async function diffStoredScreenshots(
   storage: StorageAdapter,
@@ -23,6 +40,9 @@ export async function diffStoredScreenshots(
   currentPath: string,
   diffThreshold?: number,
 ): Promise<DiffResult> {
+  if (baselinePath === currentPath) {
+    return samePathResult();
+  }
   const current = await storage.read(currentPath);
   const previous = await storage.read(baselinePath);
   return await diffImagesAsync(previous, current, {

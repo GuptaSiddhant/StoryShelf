@@ -321,10 +321,12 @@ Project 1--* ProjectMember *--1 User   (project-scoped roles)
 ```
 data/                                    # --data-dir flag (default: ./data)
   {projectId}/
+    content/
+      {sha256}.png                       # screenshots, stored by content; shared by snapshots and baselines, swept when unreferenced
     builds/
       {buildId}/
         screenshots/
-          {storyId}/{mode}.png           # captured screenshots (transient, TTL'd); non-chromium engines: {mode}~{browser}.png
+          {storyId}/{mode}.png           # legacy captured screenshots (pre content-addressing); non-chromium engines: {mode}~{browser}.png
         diffs/
           {storyId}/{mode}.png           # generated diff overlay (transient, TTL'd)
         storybook/                       # extracted Storybook static build (served for capture + preview)

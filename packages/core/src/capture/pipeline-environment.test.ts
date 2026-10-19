@@ -1,5 +1,5 @@
 import { PNG } from "pngjs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { CaptureEnvironment, RenderedSnapshot } from "../adapters/capture-runner.ts";
 import type { Baseline } from "../schema/baseline.ts";
 import type { Build } from "../schema/build.ts";
@@ -100,7 +100,7 @@ function world() {
   const snapshotOf = async (buildId: string) =>
     (await db.list(db.tables.snapshots)).find((row) => row.buildId === buildId);
   const baselines = async () => (await db.list(db.tables.baselines)) as unknown as Baseline[];
-  return { db, objects, run, snapshotOf, baselines };
+  return { db, storage, objects, run, snapshotOf, baselines };
 }
 
 describe("capture environment migration", () => {
@@ -210,5 +210,52 @@ describe("capture environment migration", () => {
     await run({ shot: GREEN, isDefault: false });
     expect((await snapshotOf("b2"))?.status).toBe("changed");
     expect((await snapshotOf("b2"))?.envChange).toBeNull();
+  });
+});
+
+const contentObjects = (objects: Map<string, Buffer>): string[] =>
+  [...objects.keys()].filter((key) => key.startsWith("p1/content/") && key.endsWith(".png"));
+
+describe("content-addressed screenshots", () => {
+  it("stores each distinct screenshot once and points snapshots and baselines at it", async () => {
+    const { run, objects, baselines, snapshotOf } = world();
+    await run({ shot: RED, environment: ENV_A, isDefault: true });
+    const [baseline] = await baselines();
+    const snapshot = await snapshotOf("b1");
+    expect(baseline?.screenshotPath).toMatch(/^p1\/content\/[0-9a-f]{64}\.png$/u);
+    expect(snapshot?.screenshotPath).toBe(baseline?.screenshotPath);
+    expect(contentObjects(objects)).toHaveLength(1);
+  });
+
+  it("uploads nothing and reads no image when a story is unchanged", async () => {
+    const { run, storage, objects, snapshotOf } = world();
+    await run({ shot: RED, environment: ENV_A, isDefault: true });
+    const write = vi.spyOn(storage, "write");
+    const read = vi.spyOn(storage, "read");
+
+    await run({ shot: RED, environment: ENV_A, isDefault: false });
+    const snapshot = await snapshotOf("b2");
+
+    expect(snapshot).toMatchObject({ status: "unchanged", diffPassed: true, diffPixels: 0 });
+    expect(write).not.toHaveBeenCalled();
+    expect(read).not.toHaveBeenCalled();
+    expect(contentObjects(objects)).toHaveLength(1);
+  });
+
+  it("keeps the old object when a baseline moves to new pixels", async () => {
+    const { run, objects, baselines } = world();
+    await run({ shot: RED, environment: ENV_A, isDefault: true });
+    await run({ shot: GREEN, environment: ENV_A, isDefault: true });
+    const [baseline] = await baselines();
+    expect(objects.get(baseline?.screenshotPath ?? "")?.equals(GREEN)).toBe(true);
+    // The superseded screenshot is still there for earlier builds; the sweep reclaims it later.
+    expect(contentObjects(objects)).toHaveLength(2);
+  });
+
+  it("still diffs different pixels", async () => {
+    const { run, snapshotOf } = world();
+    await run({ shot: RED, environment: ENV_A, isDefault: true });
+    await run({ shot: GREEN, environment: ENV_A, isDefault: false });
+    expect((await snapshotOf("b2"))?.status).toBe("changed");
   });
 });

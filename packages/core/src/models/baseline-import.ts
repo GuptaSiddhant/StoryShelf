@@ -9,7 +9,7 @@
 import { createHash } from "node:crypto";
 import { setImmediate } from "node:timers/promises";
 import type { StorageAdapter } from "../adapters/storage.ts";
-import { baselinePath } from "../utils/paths.ts";
+import { baselinePath, contentPath } from "../utils/paths.ts";
 import { readZip, ZipFormatError, type ZipEntry } from "../utils/zip-read.ts";
 import {
   BASELINE_ARCHIVE_LIMITS,
@@ -25,7 +25,7 @@ import {
 /** A validated baseline ready to write. */
 export interface PlannedBaseline {
   entry: BaselineManifestEntry;
-  /** Destination storage path inside the importing project. */
+  /** Content-addressed destination inside the importing project. */
   storagePath: string;
   zipEntry: ZipEntry;
   /** The verified PNG bytes, extracted once during planning. */
@@ -72,7 +72,9 @@ export async function writePlannedImage(
   storage: StorageAdapter,
   planned: PlannedBaseline,
 ): Promise<void> {
-  await storage.write(planned.storagePath, planned.data);
+  if (!(await storage.exists(planned.storagePath))) {
+    await storage.write(planned.storagePath, planned.data);
+  }
 }
 
 function fail(message: string): never {
@@ -135,19 +137,19 @@ function planEntry(
   if (zipEntry.size > BASELINE_ARCHIVE_LIMITS.maxImageBytes) {
     fail(`${entry.file} exceeds ${BASELINE_ARCHIVE_LIMITS.maxImageBytes} bytes`);
   }
-  let storagePath: string;
+  assertSafeIdentity(projectId, entry);
+  const data = verifiedImage(zipEntry, entry);
+  const storagePath = contentPath(projectId, createHash("sha256").update(data).digest("hex"));
+  return { entry, storagePath, zipEntry, data };
+}
+
+/** The identity only has to be safe here: the image itself is stored by content. */
+function assertSafeIdentity(projectId: string, entry: BaselineManifestEntry): void {
   try {
-    storagePath = baselinePath(
-      projectId,
-      entry.branch,
-      entry.storyId,
-      entry.viewport,
-      entry.browser,
-    );
+    baselinePath(projectId, entry.branch, entry.storyId, entry.viewport, entry.browser);
   } catch {
-    return fail(`Unsafe baseline identity for ${entry.file}`);
+    fail(`Unsafe baseline identity for ${entry.file}`);
   }
-  return { entry, storagePath, zipEntry, data: verifiedImage(zipEntry, entry) };
 }
 
 function verifiedImage(zipEntry: ZipEntry, entry: BaselineManifestEntry): Buffer {
