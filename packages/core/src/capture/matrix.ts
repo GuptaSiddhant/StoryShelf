@@ -17,6 +17,7 @@ import { isFlakyStory, type StoryEntry, type Viewport } from "./adapter.ts";
 import { partitionAffectedStories, type InheritedStory } from "./affected.ts";
 import { mirrorAttemptLog, type AttemptMirror } from "./attempt-logger.ts";
 import { assertScreenshotBuffer } from "./guards.ts";
+import { renderIsolating, type IsolationNote, type PassOutcome } from "./isolate.ts";
 import type { PipelineTables } from "./pipeline.ts";
 import { renderBudgetMs, renderWithTimeout, type RenderRequest } from "./render.ts";
 import type { EngineWork } from "./shard-plan.ts";
@@ -102,7 +103,12 @@ export async function partitionBrowsers(input: MatrixInput): Promise<Partitioned
   return { work, inherited };
 }
 
-/** Render explicit per-engine work (one shard's slice), engine by engine. Nothing is inherited here. */
+/**
+ * Render explicit per-engine work (one shard's slice), engine by engine. Nothing is inherited here.
+ *
+ * A story that crashes the browser is narrowed down and failed on its own, so it does not take the
+ * rest of the slice with it — see {@link renderIsolating}.
+ */
 export async function renderWork(
   input: MatrixInput,
   work: readonly EngineWork[],
@@ -112,7 +118,7 @@ export async function renderWork(
     const mirror = mirrorAttemptLog(input.logger, input.recordLog, flakyDowngrade(input.stories));
     try {
       // oxlint-disable-next-line no-await-in-loop -- engines run sequentially by design
-      const pass = await renderPass(input, engine.browser, mirror, engine.stories, []);
+      const pass = await isolatedPass(input, engine.browser, mirror, engine.stories, []);
       result.captures.push(...pass.captures);
       result.failures.push(...pass.failures);
       result.renderCount += pass.renderCount;
@@ -122,6 +128,82 @@ export async function renderWork(
     }
   }
   return result;
+}
+
+/**
+ * One engine's render, with a crashing story narrowed down and failed on its own rather than taking
+ * the rest of the pass with it — see {@link renderIsolating}.
+ */
+async function isolatedPass(
+  input: MatrixInput,
+  browser: BrowserName,
+  mirror: AttemptMirror,
+  toRender: StoryEntry[],
+  inherited: InheritedStory[],
+): Promise<MatrixResult> {
+  const pass = await renderIsolating(
+    toRender,
+    async (slice) => await attemptPass(input, browser, mirror, slice),
+    isolationNote(mirror, browser),
+  );
+  return {
+    captures: fillEnvironment(pass.captures),
+    failures: pass.failures,
+    inherited,
+    renderCount: pass.renderCount,
+  };
+}
+
+/** One render pass that never throws: a crash comes back beside whatever it captured first. */
+async function attemptPass(
+  input: MatrixInput,
+  browser: BrowserName,
+  mirror: AttemptMirror,
+  stories: StoryEntry[],
+): Promise<PassOutcome> {
+  const spooled: RenderedSnapshot[] = [];
+  try {
+    const pass = await renderPass(input, browser, mirror, stories, [], spooled);
+    return { captures: pass.captures, failures: pass.failures };
+  } catch (error) {
+    mirror.log("warn", "render pass crashed, isolating the story at fault", {
+      browser,
+      stories: stories.length,
+      captured: spooled.length,
+      err: error instanceof Error ? error.message : String(error),
+    });
+    return { captures: spooled, failures: [], error };
+  }
+}
+
+/** Record how a crash was narrowed down on the attempt log. */
+function isolationNote(mirror: AttemptMirror, browser: BrowserName): IsolationNote {
+  return (event, fields) => {
+    if (event === "poisoned") {
+      mirror.log("error", "story crashed the browser on its own", { browser, ...fields });
+      return;
+    }
+    const message =
+      event === "isolating"
+        ? "retrying the stories a crash interrupted"
+        : "giving up on the stories left after repeated crashes";
+    mirror.log("warn", message, { browser, ...fields });
+  };
+}
+
+/**
+ * Give captures spooled before a crash the environment a later pass reported: every pass of an
+ * engine runs on the same browser build and host, so the one fingerprint covers them all.
+ */
+function fillEnvironment(captures: RenderedSnapshot[]): RenderedSnapshot[] {
+  const known = captures.find((capture) => capture.environment)?.environment;
+  if (!known) {
+    return captures;
+  }
+  for (const capture of captures) {
+    capture.environment ??= known;
+  }
+  return captures;
 }
 
 async function captureOnBrowser(input: MatrixInput, browser: BrowserName): Promise<MatrixResult> {
@@ -174,17 +256,21 @@ async function passOnBrowser(
   if (partition.render.length === 0) {
     return { captures: [], failures: [], inherited, renderCount: 0 };
   }
-  return await renderPass(input, browser, mirror, partition.render, inherited);
+  return await isolatedPass(input, browser, mirror, partition.render, inherited);
 }
 
+/**
+ * One engine's render call. `spooled` may be supplied by the caller so that the screenshots taken
+ * before a crash survive the throw (they stream in through `onCapture`).
+ */
 async function renderPass(
   input: MatrixInput,
   browser: BrowserName,
   mirror: AttemptMirror,
   toRender: StoryEntry[],
   inherited: InheritedStory[],
+  spooled: RenderedSnapshot[] = [],
 ): Promise<MatrixResult> {
-  const spooled: RenderedSnapshot[] = [];
   const expected = toRender.flatMap((story) =>
     resolveStoryViewports(story, input.viewports),
   ).length;
