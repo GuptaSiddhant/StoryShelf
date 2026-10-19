@@ -67,6 +67,14 @@ describe("static assets", () => {
     expect(body).toContain("htmx");
   });
 
+  it("serves the shell client script at its content-hashed URL as immutable JavaScript", async () => {
+    const response = await makeApp().request(assetManifest.client.href);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("application/javascript");
+    expect(response.headers.get("cache-control")).toContain("immutable");
+    expect(await response.text()).toContain("__ssInit");
+  });
+
   it("revalidates (never immutably caches) the legacy unversioned htmx URL", async () => {
     const response = await makeApp().request("/assets/htmx.js");
     expect(response.status).toBe(200);
