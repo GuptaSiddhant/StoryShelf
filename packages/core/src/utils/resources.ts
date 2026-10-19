@@ -14,6 +14,8 @@ const BASE_MEMORY_MB = 512;
 /** Typical cost of one rendering page. */
 const PAGE_MEMORY_MB = 300;
 const MAX_PAGES = 4;
+/** Ceiling for the adaptive controller, in Chromium-page slots. */
+const MAX_ADAPTIVE_PAGES = 8;
 
 /**
  * Detect the CPU and memory budget. Container limits win over the host's: a
@@ -28,13 +30,48 @@ export function detectResources(): HostResources {
 }
 
 /**
- * Pages to render at once: no more than the CPUs (extra pages only slow each
- * other down and trip timeouts) and no more than memory allows.
+ * Cost of one page in Chromium-page slots. Firefox and WebKit pages cost about twice a Chromium
+ * page in CPU time (ray.run cross-browser benchmarks: Firefox +71%, WebKit +60%; some Playwright
+ * reports show WebKit worse), so they get half the page budget.
  */
-export function recommendedPageConcurrency(resources: HostResources = detectResources()): number {
-  const byCpu = Math.ceil(resources.cpus);
-  const byMemory = Math.floor((resources.memoryBytes / MB - BASE_MEMORY_MB) / PAGE_MEMORY_MB);
-  return Math.max(1, Math.min(byCpu, byMemory, MAX_PAGES));
+export function engineWeight(browser?: string): number {
+  return browser === "firefox" || browser === "webkit" ? 2 : 1;
+}
+
+/**
+ * Pages to render at once: no more than the CPUs (extra pages only slow each
+ * other down and trip timeouts) and no more than memory allows. A heavier engine
+ * (see {@link engineWeight}) spends the same budget on fewer pages.
+ */
+export function recommendedPageConcurrency(
+  resources: HostResources = detectResources(),
+  browser?: string,
+): number {
+  const budget = Math.min(Math.ceil(resources.cpus), memoryPages(resources), MAX_PAGES);
+  return Math.max(1, Math.floor(budget / engineWeight(browser)));
+}
+
+/**
+ * Most pages the adaptive controller may reach: memory is a hard limit, but CPU is only a
+ * starting point (latency tells us when it is saturated), so allow up to twice the CPUs.
+ */
+export function maxPageConcurrency(
+  resources: HostResources = detectResources(),
+  browser?: string,
+): number {
+  const budget = Math.min(
+    Math.ceil(resources.cpus) * 2,
+    memoryPages(resources),
+    MAX_ADAPTIVE_PAGES,
+  );
+  return Math.max(
+    recommendedPageConcurrency(resources, browser),
+    Math.floor(budget / engineWeight(browser)),
+  );
+}
+
+function memoryPages(resources: HostResources): number {
+  return Math.floor((resources.memoryBytes / MB - BASE_MEMORY_MB) / PAGE_MEMORY_MB);
 }
 
 /** Builds to capture at once: each launches its own browser, so only on roomy hosts. */
@@ -56,6 +93,7 @@ export const DEFAULT_RECYCLE_BROWSER_EVERY = 150;
 
 /** Loggable summary of the host budget and the capture settings derived from it. */
 export function describeSizing(settings: {
+  browser?: string;
   concurrency?: number;
   navigationTimeoutMs?: number;
   recycleBrowserEvery?: number;
@@ -64,7 +102,8 @@ export function describeSizing(settings: {
   return {
     cpus: Math.round(resources.cpus * 100) / 100,
     memoryMb: Math.round(resources.memoryBytes / MB),
-    pages: settings.concurrency ?? recommendedPageConcurrency(resources),
+    pages: settings.concurrency ?? recommendedPageConcurrency(resources, settings.browser),
+    maxPages: settings.concurrency ?? maxPageConcurrency(resources, settings.browser),
     navigationTimeoutMs: settings.navigationTimeoutMs ?? recommendedNavigationTimeoutMs(resources),
     recycleBrowserEvery: settings.recycleBrowserEvery ?? DEFAULT_RECYCLE_BROWSER_EVERY,
   };

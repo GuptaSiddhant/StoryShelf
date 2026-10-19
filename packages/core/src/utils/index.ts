@@ -26,11 +26,21 @@ export {
   storybookDir,
   storybookZipPath,
 } from "./paths.ts";
+export {
+  AdaptiveConcurrency,
+  isTimeoutError,
+  type AdaptiveOptions,
+  type Observation,
+} from "./adaptive-concurrency.ts";
+export { createPageLimiter, type PageLimiter, type PageLimiterOptions } from "./page-limiter.ts";
+export { mapAdaptive } from "./map-adaptive.ts";
 export { chunk, mapLimit } from "./map-limit.ts";
 export {
   DEFAULT_RECYCLE_BROWSER_EVERY,
   describeSizing,
   detectResources,
+  engineWeight,
+  maxPageConcurrency,
   recommendedBuildConcurrency,
   recommendedNavigationTimeoutMs,
   recommendedPageConcurrency,
