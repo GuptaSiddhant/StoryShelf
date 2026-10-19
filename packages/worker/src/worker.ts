@@ -350,7 +350,9 @@ export function createCaptureWorker(options: WorkerOptions): WorkerHandle {
         return;
       }
       running = true;
-      await sweepOrphanedScratch(options.scratchDir, { logger }).catch((error: unknown) => {
+      // Not awaited before the loop: `start()` must reach its stop hook synchronously so an early
+      // `stop()` still resolves it. Settled before start() returns.
+      const sweep = sweepOrphanedScratch(options.scratchDir, { logger }).catch((error: unknown) => {
         logger.warn({ err: error }, "scratch sweep failed");
       });
       loopPromise = loop();
@@ -366,6 +368,7 @@ export function createCaptureWorker(options: WorkerOptions): WorkerHandle {
       if (inFlight.size > 0) {
         await Promise.all([...inFlight]).catch(() => {});
       }
+      await sweep;
     },
     async stop(): Promise<void> {
       if (!running && loopPromise === null) {
