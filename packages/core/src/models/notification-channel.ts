@@ -2,6 +2,7 @@
 import { eq, getTableColumns, isNull } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
+import type { NotifierProvider } from "../adapters/notifier/provider.ts";
 import type { NotificationChannelRow } from "../schema/notification.ts";
 import { decryptCredential, encrypt, type SecretInput } from "../utils/encrypt.ts";
 import { ulid } from "../utils/ulid.ts";
@@ -88,6 +89,22 @@ export class NotificationChannelModel {
       throw new Error("Channel has no secret");
     }
     return decryptCredential(this.secret, row.secretEncrypted);
+  }
+
+  /** Validate channel input against the matching notifier's schema. */
+  static validateInput(
+    notifiers: readonly NotifierProvider[],
+    provider: string,
+    config: unknown,
+  ): { ok: true } | { ok: false; field: "provider" | "config"; message: string } {
+    const descriptor = notifiers.find((candidate) => candidate.metadata.kind === provider);
+    if (!descriptor) {
+      return { ok: false, field: "provider", message: `Unknown provider: ${provider}` };
+    }
+    const parsed = descriptor.metadata.schema.safeParse(config);
+    return parsed.success
+      ? { ok: true }
+      : { ok: false, field: "config", message: parsed.error.message };
   }
 
   /** Decode the JSON-serialized event list of a channel. */

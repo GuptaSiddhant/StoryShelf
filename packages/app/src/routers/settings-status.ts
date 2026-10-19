@@ -1,12 +1,10 @@
-import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
-import { StatusConfigModel } from "@storyshelf/core/models";
-import type { Project } from "@storyshelf/core/schema";
+import { StatusConfigModel, type StatusConfigValidation } from "@storyshelf/core/models";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
-import { credentialKeys } from "../credential-keys.ts";
 import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
 import { hxRedirect } from "./htmx.ts";
+import { statusConfigModel } from "./scoped-models.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
 /** Merge-gate status-config settings (provider configs + tokens, delete). */
 export function registerStatusSettings(app: ShelfRouter): void {
@@ -17,96 +15,58 @@ export function registerStatusSettings(app: ShelfRouter): void {
   app.post("/projects/:slug/settings/status/:id/delete", handleDeleteStatus);
 }
 
-async function unknownProviderResponse(c: Context): Promise<Response> {
-  return c.html(
-    (await renderSettingsPage(c, "status", { globalError: "Unknown git provider" })) ?? "",
-    400,
-  );
+async function statusError(
+  c: Context,
+  errors: Record<string, string>,
+  globalError?: string,
+): Promise<Response> {
+  return c.html((await renderSettingsPage(c, "status", { errors, globalError })) ?? "", 400);
 }
 
-async function missingTokenResponse(c: Context): Promise<Response> {
-  return c.html(
-    (await renderSettingsPage(c, "status", { errors: { token: "Token is required" } })) ?? "",
-    400,
-  );
-}
-
-interface StatusFields {
-  project: Project;
-  provider: GitHostProvider;
+interface StatusInput {
+  provider: string;
+  config: unknown;
   token: string;
-  configRaw: string;
 }
 
-async function readStatusFields(c: Context): Promise<StatusFields | Response> {
-  const project = await findProject(c.req.param("slug") ?? "");
-  const form = await c.req.formData();
-  const provider = getStore().gitHosts.find(
-    (p) => p.metadata.kind === asString(form.get("provider")),
-  );
-  if (!provider) {
-    return await unknownProviderResponse(c);
+/** First problem with the status form, in field order (provider, token, JSON, schema). */
+function statusFormProblem(
+  token: string | undefined,
+  config: unknown,
+  checked: StatusConfigValidation,
+): { errors: Record<string, string>; globalError?: string } | null {
+  if (!checked.ok && checked.field === "provider") {
+    return { errors: {}, globalError: "Unknown git provider" };
   }
-  const token = asString(form.get("token"));
   if (!token) {
-    return await missingTokenResponse(c);
+    return { errors: { token: "Token is required" } };
   }
-  return { project, provider, token, configRaw: asString(form.get("config")) ?? "{}" };
+  if (config === undefined) {
+    return { errors: { config: "Config must be valid JSON" } };
+  }
+  return checked.ok ? null : { errors: { config: checked.message } };
+}
+
+/** Validate the status form; returns the input or the error response. */
+async function readStatusInput(c: Context, form: FormData): Promise<StatusInput | Response> {
+  const token = asString(form.get("token"));
+  const config = parseJsonConfig(asString(form.get("config")) ?? "{}");
+  const provider = asString(form.get("provider"));
+  const checked = StatusConfigModel.validateInput(getStore().gitHosts, provider, config);
+  const problem = statusFormProblem(token, config, checked);
+  if (problem || !checked.ok || !token) {
+    return await statusError(c, problem?.errors ?? {}, problem?.globalError);
+  }
+  return { provider: checked.provider.metadata.kind, config: checked.config, token };
 }
 
 async function handleCreateStatus(c: Context): Promise<Response> {
-  const fields = await readStatusFields(c);
-  if (fields instanceof Response) {
-    return fields;
+  const project = await findProject(c.req.param("slug") ?? "");
+  const input = await readStatusInput(c, await c.req.formData());
+  if (input instanceof Response) {
+    return input;
   }
-  return await createStatusFromForm(
-    c,
-    fields.project,
-    fields.provider,
-    fields.token,
-    fields.configRaw,
-  );
-}
-
-async function createStatusFromForm(
-  c: Context,
-  project: Project,
-  provider: GitHostProvider,
-  token: string,
-  configRaw: string,
-): Promise<Response> {
-  const config = parseJsonConfig(configRaw);
-  if (config === undefined) {
-    return c.html(
-      (await renderSettingsPage(c, "status", {
-        errors: { config: "Config must be valid JSON" },
-      })) ?? "",
-      400,
-    );
-  }
-  const parsed = provider.metadata.schema.safeParse(config);
-  if (!parsed.success) {
-    return c.html(
-      (await renderSettingsPage(c, "status", { errors: { config: parsed.error.message } })) ?? "",
-      400,
-    );
-  }
-  return await persistStatusConfig(c, project, provider, token, parsed.data);
-}
-
-async function persistStatusConfig(
-  c: Context,
-  project: Project,
-  provider: GitHostProvider,
-  token: string,
-  config: unknown,
-): Promise<Response> {
-  const { db, config: shelfConfig } = getStore();
-  await new StatusConfigModel(db, undefined, credentialKeys(shelfConfig)).create(project.id, {
-    provider: provider.metadata.kind,
-    config,
-    token,
-  });
+  await statusConfigModel().create(project.id, input);
   flash(c, "Git status config added");
   return hxRedirect(c, `/projects/${project.slug}/settings/status`);
 }
@@ -122,11 +82,7 @@ function parseJsonConfig(raw: string): unknown {
 
 async function handleDeleteStatus(c: Context): Promise<Response> {
   const project = await findProject(c.req.param("slug") ?? "");
-  const { db, config: shelfConfig } = getStore();
-  await new StatusConfigModel(db, undefined, credentialKeys(shelfConfig)).remove(
-    project.id,
-    c.req.param("id") ?? "",
-  );
+  await statusConfigModel().remove(project.id, c.req.param("id") ?? "");
   flash(c, "Git status config removed");
   return hxRedirect(c, `/projects/${project.slug}/settings/status`);
 }

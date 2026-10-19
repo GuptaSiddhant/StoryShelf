@@ -3,6 +3,7 @@ import { and, eq, getTableColumns } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { Token } from "../schema/token.ts";
+import { randomToken } from "../utils/hash.ts";
 import { ulid } from "../utils/ulid.ts";
 
 /** Tables required by {@link TokenModel}. */
@@ -44,6 +45,20 @@ export class TokenModel {
       userId: input.userId ?? null,
       createdAt: new Date().toISOString(),
     })) as unknown as Token;
+  }
+
+  /**
+   * Mint a new `shelf_` token for a project and store only its hash.
+   *
+   * @returns The stored record and the plaintext value (shown to the user once).
+   */
+  async issue(
+    projectId: string,
+    input: { name: string; userId?: string | null },
+  ): Promise<{ token: Token; value: string }> {
+    const { value, hash } = randomToken("shelf_");
+    const token = await this.create(projectId, { name: input.name, hash, userId: input.userId });
+    return { token, value };
   }
 
   /** List all tokens for a project. */

@@ -93,4 +93,24 @@ describe("WebhookModel", () => {
     const listed = await model(db).list("p1");
     expect(listed.length).toBe(0);
   });
+
+  it("issues a webhook with a generated whsec_ secret", async () => {
+    const { db } = makeDatabase();
+    const { webhook, secret } = await model(db).issue("p1", {
+      url: "https://example.com/hook",
+      events: ["build:completed"],
+    });
+    expect(secret.startsWith("whsec_")).toBe(true);
+    expect(webhook.secretEncrypted).not.toContain(secret);
+    expect(WebhookModel.eventsOf(webhook)).toEqual(["build:completed"]);
+  });
+
+  it("validates webhook URLs", () => {
+    expect(WebhookModel.urlError("")).toBe("A valid URL is required");
+    expect(WebhookModel.urlError("not a url")).toBe("Enter a valid URL");
+    expect(WebhookModel.urlError("ftp://example.com/hook")).toBe("URL must use http or https");
+    expect(WebhookModel.urlError("javascript:alert(1)")).toBe("URL must use http or https");
+    expect(WebhookModel.urlError("https://example.com/hook")).toBeNull();
+    expect(WebhookModel.urlError("http://localhost:3000/hook")).toBeNull();
+  });
 });

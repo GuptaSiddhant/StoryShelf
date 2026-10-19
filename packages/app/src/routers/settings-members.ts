@@ -1,5 +1,5 @@
 import { MemberModel, ProjectGroupMappingModel } from "@storyshelf/core/models";
-import type { ProjectRole } from "@storyshelf/core/types";
+import { isProjectRole } from "@storyshelf/core/types";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
@@ -16,14 +16,14 @@ export function registerMemberSettings(app: ShelfRouter): void {
     const form = await c.req.formData();
     const userId = asString(form.get("userId"));
     const role = asString(form.get("role"));
-    if (!userId || !role) {
+    if (!userId || !isProjectRole(role)) {
       return c.html(
         (await renderSettingsPage(c, "members", { globalError: "User and role are required" })) ??
           "",
         400,
       );
     }
-    await new MemberModel(getStore().db).set(project.id, userId, role as ProjectRole);
+    await new MemberModel(getStore().db).set(project.id, userId, role);
     flash(c, "Member saved");
     return hxRedirect(c, `/projects/${project.slug}/settings/members`);
   });
@@ -44,10 +44,11 @@ function registerGroupMappingSettings(app: ShelfRouter): void {
     const project = await findProject(c.req.param("slug") ?? "");
     const form = await c.req.formData();
     const groupName = asString(form.get("groupName"));
-    const role = asString(form.get("role")) as ProjectRole | undefined;
-    if (!groupName || !role || !["viewer", "developer", "approver", "admin"].includes(role)) {
+    const role = asString(form.get("role"));
+    const inputError = ProjectGroupMappingModel.inputError(groupName, role);
+    if (inputError || !groupName || !isProjectRole(role)) {
       return c.html(
-        (await renderSettingsPage(c, "members", { globalError: "Group and role are required" })) ??
+        (await renderSettingsPage(c, "members", { globalError: inputError ?? "Invalid input" })) ??
           "",
         400,
       );

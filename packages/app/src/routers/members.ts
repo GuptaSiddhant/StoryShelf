@@ -170,11 +170,9 @@ function registerGroupMappingRoutes(app: ShelfRouter): void {
   app.openapi(createGroupMappingRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
     const body = c.req.valid("json");
-    if (body.groupName.includes("*")) {
-      throw new HTTPException(400, {
-        message:
-          "Group names match exactly; wildcards are not expanded. A broad pattern can silently grant org-wide access.",
-      });
+    const inputError = ProjectGroupMappingModel.inputError(body.groupName, body.role);
+    if (inputError) {
+      throw new HTTPException(400, { message: inputError });
     }
     return c.json(
       await new ProjectGroupMappingModel(getStore().db).create(

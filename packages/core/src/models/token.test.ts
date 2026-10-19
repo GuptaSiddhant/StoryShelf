@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
+import { sha256 } from "../utils/hash.ts";
 import { TokenModel } from "./token.ts";
 
 describe("TokenModel", () => {
@@ -63,5 +64,14 @@ describe("TokenModel", () => {
     const model = new TokenModel(db, { tokens: db.tables.tokens });
     const token = await model.create("p1", { name: "legacy-token", hash: "hash-legacy" });
     expect(token.userId).toBeNull();
+  });
+
+  it("issues a shelf_ token and stores only its hash", async () => {
+    const { db } = makeDatabase();
+    const model = new TokenModel(db, { tokens: db.tables.tokens });
+    const { token, value } = await model.issue("p1", { name: "ci", userId: "user_1" });
+    expect(value.startsWith("shelf_")).toBe(true);
+    expect(token.hash).toBe(sha256(value));
+    expect(token.userId).toBe("user_1");
   });
 });

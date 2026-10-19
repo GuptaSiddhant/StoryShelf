@@ -2,10 +2,10 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { StatusConfigModel } from "@storyshelf/core/models";
 import type { ProjectStatusConfig } from "@storyshelf/core/schema";
 import type { ShelfRouter } from "../app-types.ts";
-import { credentialKeys } from "../credential-keys.ts";
 import { getStore } from "../store.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
 import { notFound, statusConfigCreateSchema, statusConfigSchema, unauthorized } from "./schemas.ts";
+import { statusConfigModel } from "./scoped-models.ts";
 const ADMIN_ROLES = ["admin"] as const;
 
 const listRoute = createRoute({
@@ -83,11 +83,7 @@ export function registerStatusConfigs(app: ShelfRouter): void {
   app.openapi(listRoute, async (c) => {
     const { slug } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, "admin");
-    const model = new StatusConfigModel(
-      getStore().db,
-      undefined,
-      credentialKeys(getStore().config),
-    );
+    const model = statusConfigModel();
     const rows = await model.list(project.id);
     return c.json(rows.map((row) => toPublic(row)));
   });
@@ -96,23 +92,18 @@ export function registerStatusConfigs(app: ShelfRouter): void {
     const { slug } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
     const body = c.req.valid("json");
-    const providers = getStore().gitHosts;
-    const provider = providers.find((p) => p.metadata.kind === body.provider);
-    if (!provider) {
-      return c.json({ message: `Unknown provider: ${body.provider}` }, 400);
-    }
-    const parsed = provider.metadata.schema.safeParse(body.config);
-    if (!parsed.success) {
-      return c.json({ message: parsed.error.message }, 400);
-    }
-    const model = new StatusConfigModel(
-      getStore().db,
-      undefined,
-      credentialKeys(getStore().config),
+    const checked = StatusConfigModel.validateInput(
+      getStore().gitHosts,
+      body.provider,
+      body.config,
     );
+    if (!checked.ok) {
+      return c.json({ message: checked.message }, 400);
+    }
+    const model = statusConfigModel();
     const row = await model.create(project.id, {
       provider: body.provider,
-      config: parsed.data,
+      config: checked.config,
       token: body.token,
     });
     return c.json(toPublic(row), 201);
@@ -121,11 +112,7 @@ export function registerStatusConfigs(app: ShelfRouter): void {
   app.openapi(deleteRoute, async (c) => {
     const { slug, id } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
-    const model = new StatusConfigModel(
-      getStore().db,
-      undefined,
-      credentialKeys(getStore().config),
-    );
+    const model = statusConfigModel();
     const existing = await model.get(project.id, id);
     if (!existing) {
       return c.json({ message: "Status config not found" }, 404);

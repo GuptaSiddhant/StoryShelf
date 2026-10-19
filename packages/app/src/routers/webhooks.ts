@@ -1,10 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { WebhookModel } from "@storyshelf/core/models";
 import type { ProjectRole } from "@storyshelf/core/types";
-import { randomToken } from "@storyshelf/core/utils";
 import type { ShelfRouter } from "../app-types.ts";
-import { credentialKeys } from "../credential-keys.ts";
-import { getStore } from "../store.ts";
 import { resolveAuthorizedProject, notFound } from "./helpers.ts";
 import {
   notFound as notFoundResponse,
@@ -13,6 +10,7 @@ import {
   webhookCreateSchema,
   webhookPublicSchema,
 } from "./schemas.ts";
+import { webhookModel } from "./scoped-models.ts";
 const ADMIN_ROLES: readonly ProjectRole[] = ["admin"];
 
 const listWebhooksRoute = createRoute({
@@ -65,11 +63,7 @@ const deleteWebhookRoute = createRoute({
 export function registerWebhooks(app: ShelfRouter): void {
   app.openapi(listWebhooksRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
-    const webhooks = await new WebhookModel(
-      getStore().db,
-      undefined,
-      credentialKeys(getStore().config),
-    ).list(project.id);
+    const webhooks = await webhookModel().list(project.id);
     return c.json(
       webhooks.map((webhook) => ({
         id: webhook.id,
@@ -82,30 +76,18 @@ export function registerWebhooks(app: ShelfRouter): void {
   app.openapi(createWebhookRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
     const body = c.req.valid("json");
-    const secret = randomToken("whsec_").value;
-    const webhook = await new WebhookModel(
-      getStore().db,
-      undefined,
-      credentialKeys(getStore().config),
-    ).create(project.id, { ...body, secret });
+    const { webhook, secret } = await webhookModel().issue(project.id, body);
     return c.json({ id: webhook.id, url: webhook.url, events: body.events ?? [], secret }, 201);
   });
 
   app.openapi(deleteWebhookRoute, async (c) => {
     const { slug, webhookId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
-    const webhook = await new WebhookModel(
-      getStore().db,
-      undefined,
-      credentialKeys(getStore().config),
-    ).get(project.id, webhookId);
+    const webhook = await webhookModel().get(project.id, webhookId);
     if (!webhook) {
       notFound("Webhook not found");
     }
-    await new WebhookModel(getStore().db, undefined, credentialKeys(getStore().config)).remove(
-      project.id,
-      webhook.id,
-    );
+    await webhookModel().remove(project.id, webhook.id);
     return c.body(null, 204);
   });
 }

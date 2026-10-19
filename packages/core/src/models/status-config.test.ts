@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
+import type { GitHostProvider } from "../adapters/git-host/index.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { StatusConfigModel } from "./status-config.ts";
 
@@ -77,5 +79,21 @@ describe("StatusConfigModel", () => {
     await model.removeByProject("p1");
     await expect(model.list("p1")).resolves.toHaveLength(0);
     await expect(model.list("p2")).resolves.toHaveLength(1);
+  });
+
+  it("validates status-config input against the provider schema", () => {
+    const provider = {
+      metadata: { kind: "github", schema: z.object({ owner: z.string() }) },
+    } as unknown as GitHostProvider;
+    const ok = StatusConfigModel.validateInput([provider], "github", { owner: "acme" });
+    expect(ok).toMatchObject({ ok: true, config: { owner: "acme" } });
+    expect(StatusConfigModel.validateInput([provider], "gitlab", {})).toMatchObject({
+      ok: false,
+      field: "provider",
+    });
+    expect(StatusConfigModel.validateInput([provider], "github", {})).toMatchObject({
+      ok: false,
+      field: "config",
+    });
   });
 });

@@ -3,6 +3,7 @@
 import { eq, getTableColumns } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
+import type { GitHostProvider } from "../adapters/git-host/index.ts";
 import type { ProjectStatusConfig } from "../schema/status-config.ts";
 import { decryptCredential, encrypt, type SecretInput } from "../utils/encrypt.ts";
 import { ulid } from "../utils/ulid.ts";
@@ -22,6 +23,25 @@ export class StatusConfigModel {
     this.db = db;
     this.tables = tables ?? { projectStatusConfigs: db.tables.projectStatusConfigs };
     this.secret = secret;
+  }
+
+  /**
+   * Resolve the provider and validate its config for a new status config.
+   * `field` names the input at fault so form handlers can attach the message.
+   */
+  static validateInput(
+    providers: readonly GitHostProvider[],
+    kind: string | undefined,
+    config: unknown,
+  ): StatusConfigValidation {
+    const provider = providers.find((candidate) => candidate.metadata.kind === kind);
+    if (!provider) {
+      return { ok: false, field: "provider", message: `Unknown provider: ${kind ?? ""}` };
+    }
+    const parsed = provider.metadata.schema.safeParse(config);
+    return parsed.success
+      ? { ok: true, provider, config: parsed.data }
+      : { ok: false, field: "config", message: parsed.error.message };
   }
 
   /** List all status configs for a project. */
@@ -91,3 +111,8 @@ export interface StatusConfigCreateInput {
   config: unknown;
   token: string;
 }
+
+/** Result of {@link StatusConfigModel.validateInput}. */
+export type StatusConfigValidation =
+  | { ok: true; provider: GitHostProvider; config: unknown }
+  | { ok: false; field: "provider" | "config"; message: string };
