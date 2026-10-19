@@ -16,52 +16,55 @@ export interface JobLease {
 export class ProgressLease implements JobLease {
   /** Resolves once, when no progress was seen for a full lease. Never resolves when disabled or stopped. */
   readonly expired: Promise<true>;
-  private lastTouch = Date.now();
-  private timer: ReturnType<typeof setTimeout> | undefined;
-  private stopped = false;
-  private readonly expire: () => void;
+  #lastTouch = Date.now();
+  #timer: ReturnType<typeof setTimeout> | undefined;
+  #stopped = false;
+  readonly #expire: () => void;
 
-  constructor(private readonly leaseMs: number) {
+  readonly #leaseMs: number;
+
+  constructor(leaseMs: number) {
+    this.#leaseMs = leaseMs;
     const { promise, resolve } = Promise.withResolvers<true>();
     this.expired = promise;
-    this.expire = (): void => {
+    this.#expire = (): void => {
       resolve(true);
     };
     if (leaseMs > 0) {
-      this.arm(leaseMs);
+      this.#arm(leaseMs);
     }
   }
 
   touch(): void {
-    this.lastTouch = Date.now();
+    this.#lastTouch = Date.now();
   }
 
   /** Stop watching; idempotent. */
   stop(): void {
-    this.stopped = true;
-    clearTimeout(this.timer);
+    this.#stopped = true;
+    clearTimeout(this.#timer);
   }
 
-  private arm(delayMs: number): void {
-    this.timer = setTimeout(
+  #arm(delayMs: number): void {
+    this.#timer = setTimeout(
       () => {
-        this.check();
+        this.#check();
       },
       Math.max(1, delayMs),
     );
-    this.timer.unref();
+    this.#timer.unref();
   }
 
-  private check(): void {
-    if (this.stopped) {
+  #check(): void {
+    if (this.#stopped) {
       return;
     }
-    const idleMs = Date.now() - this.lastTouch;
-    if (idleMs >= this.leaseMs) {
-      this.stopped = true;
-      this.expire();
+    const idleMs = Date.now() - this.#lastTouch;
+    if (idleMs >= this.#leaseMs) {
+      this.#stopped = true;
+      this.#expire();
       return;
     }
-    this.arm(this.leaseMs - idleMs);
+    this.#arm(this.#leaseMs - idleMs);
   }
 }
