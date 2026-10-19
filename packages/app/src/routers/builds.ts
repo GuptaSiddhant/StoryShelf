@@ -72,11 +72,7 @@ export function registerBuilds(app: ShelfRouter): void {
       c.req.valid("param").slug,
       ...DEVELOPER_ROLES,
     );
-    const parsed = buildCreateJsonSchema.safeParse(await c.req.json());
-    if (!parsed.success) {
-      throw new HTTPException(400, { message: parsed.error.message });
-    }
-    const build = await createBuildRecord(project, parsed.data);
+    const build = await createBuildRecord(project, c.req.valid("json"));
     const uploadUrl = `/api/v1/projects/${project.slug}/builds/${build.id}/zip`;
     return c.json({ build, uploadUrl, baselineSha: build.baselineSha }, 202);
   });

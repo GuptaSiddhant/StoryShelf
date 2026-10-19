@@ -27,7 +27,7 @@ import { attachLifecycle, trackBackground, type LifecycleCell } from "./lifecycl
 import {
   authGate,
   csrf,
-  rateLimit,
+  createRateLimiter,
   rateLimitKey,
   requestLogging,
   resolveRequestUser,
@@ -217,39 +217,56 @@ function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
   app.use("*", requestLogging(logger));
   app.use("*", setupGate(getReady));
   mountGuards(app, config);
-  mountNotificationLimits(app);
   mountStoreScope(app, wiring);
   app.use("*", authGate());
 }
 
+const MINUTE = 60_000;
+
+/** Per-path limits; `bucket` gives a route family its own counter (default: shared `api:`). */
+const RATE_LIMITS: readonly { paths: string[]; max: number; bucket?: string }[] = [
+  { paths: ["/api/v1/*"], max: 100 },
+  { paths: ["/api/v1/tokens/*"], max: 10 },
+  { paths: ["/api/v1/webhooks/*"], max: 20 },
+  // Auth endpoints ride their own buckets (the store keys by IP, so a prefix
+  // keeps login floods from eating the API budget or vice versa).
+  { paths: ["/auth/*"], max: 100, bucket: "auth" },
+  { paths: ["/api/auth/*"], max: 300, bucket: "engine" },
+  {
+    paths: [
+      "/api/v1/projects/:slug/notification-channels",
+      "/api/v1/projects/:slug/notification-channels/:channelId",
+    ],
+    max: 20,
+    bucket: "notify-channels",
+  },
+  {
+    paths: ["/api/v1/projects/:slug/notifications", "/api/v1/projects/:slug/notifications/me"],
+    max: 30,
+    bucket: "notify-subs",
+  },
+  {
+    paths: [
+      "/api/v1/admin/notification-channels",
+      "/api/v1/admin/notification-channels/:channelId",
+    ],
+    max: 20,
+    bucket: "notify-admin",
+  },
+];
+
 /** Mount rate limits and CSRF guards (abuse floors, not strict protection). */
 function mountGuards(app: ShelfRouter, config: ShelfConfig): void {
-  app.use("/api/v1/*", rateLimit({ windowMs: 60_000, max: 100 }));
-  app.use("/api/v1/tokens/*", rateLimit({ windowMs: 60_000, max: 10 }));
-  app.use("/api/v1/webhooks/*", rateLimit({ windowMs: 60_000, max: 20 }));
-  // Auth endpoints ride their own buckets (the shared store keys by IP, so
-  // prefix the key: login floods must not eat the API budget or vice versa).
-  app.use("/auth/*", rateLimit({ windowMs: 60_000, max: 100, keyGenerator: rateLimitKey("auth") }));
-  app.use(
-    "/api/auth/*",
-    rateLimit({ windowMs: 60_000, max: 300, keyGenerator: rateLimitKey("engine") }),
-  );
+  const rateLimit = createRateLimiter();
+  for (const { paths, max, bucket } of RATE_LIMITS) {
+    const keyGenerator = bucket ? rateLimitKey(bucket) : undefined;
+    for (const path of paths) {
+      app.use(path, rateLimit({ windowMs: MINUTE, max, keyGenerator }));
+    }
+  }
   for (const path of CSRF_PATHS) {
     app.use(path, csrf(config.secret));
   }
-}
-
-/** Abuse floors for notification management endpoints (own counters). */
-function mountNotificationLimits(app: ShelfRouter): void {
-  const channel = { windowMs: 60_000, max: 20, keyGenerator: rateLimitKey("notify-channels") };
-  const admin = { windowMs: 60_000, max: 20, keyGenerator: rateLimitKey("notify-admin") };
-  const subscription = { windowMs: 60_000, max: 30, keyGenerator: rateLimitKey("notify-subs") };
-  app.use("/api/v1/projects/:slug/notification-channels", rateLimit(channel));
-  app.use("/api/v1/projects/:slug/notification-channels/:channelId", rateLimit(channel));
-  app.use("/api/v1/projects/:slug/notifications", rateLimit(subscription));
-  app.use("/api/v1/projects/:slug/notifications/me", rateLimit(subscription));
-  app.use("/api/v1/admin/notification-channels", rateLimit(admin));
-  app.use("/api/v1/admin/notification-channels/:channelId", rateLimit(admin));
 }
 
 /** Mount the request-scoped store (db/storage/config/user/adapters). */
