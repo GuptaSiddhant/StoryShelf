@@ -1,13 +1,11 @@
 import { WebhookModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
-import { randomToken } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
-import { credentialKeys } from "../credential-keys.ts";
-import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
 import { notFound } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
+import { webhookModel } from "./scoped-models.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
 /** Webhook settings (create with one-time secret display, delete). */
 export function registerWebhookSettings(app: ShelfRouter): void {
@@ -16,23 +14,6 @@ export function registerWebhookSettings(app: ShelfRouter): void {
   );
   app.post("/projects/:slug/settings/webhooks", handleCreateWebhook);
   app.post("/projects/:slug/settings/webhooks/:webhookId/delete", handleDeleteWebhook);
-}
-
-/** Validate a webhook URL, returning the error message or null when valid. */
-function webhookUrlError(url: string | undefined): string | null {
-  if (!url) {
-    return "A valid URL is required";
-  }
-  let protocol: string;
-  try {
-    protocol = new URL(url).protocol;
-  } catch {
-    return "Enter a valid URL";
-  }
-  if (protocol !== "https:" && protocol !== "http:") {
-    return "URL must use http or https";
-  }
-  return null;
 }
 
 /** Parse the comma-separated events field. */
@@ -51,7 +32,7 @@ async function handleCreateWebhook(c: Context): Promise<Response> {
   const project = await findProject(c.req.param("slug") ?? "");
   const form = await c.req.formData();
   const url = asString(form.get("url"));
-  const urlError = webhookUrlError(url);
+  const urlError = WebhookModel.urlError(url);
   if (urlError || !url) {
     return c.html(
       (await renderSettingsPage(c, "webhooks", { errors: { url: urlError ?? "Invalid URL" } })) ??
@@ -68,31 +49,18 @@ async function createWebhookRecord(
   url: string,
   events: string[] | undefined,
 ): Promise<Response> {
-  const webhookModel = new WebhookModel(
-    getStore().db,
-    undefined,
-    credentialKeys(getStore().config),
-  );
-  const secret = randomToken("whsec_").value;
-  await webhookModel.create(project.id, { url, events, secret });
+  const { secret } = await webhookModel().issue(project.id, { url, events });
   flash(c, "Webhook created — copy the signing secret now");
   return c.html((await renderSettingsPage(c, "webhooks", { secret })) ?? "", 201);
 }
 
 async function handleDeleteWebhook(c: Context): Promise<Response> {
   const project = await findProject(c.req.param("slug") ?? "");
-  const webhook = await new WebhookModel(
-    getStore().db,
-    undefined,
-    credentialKeys(getStore().config),
-  ).get(project.id, c.req.param("webhookId") ?? "");
+  const webhook = await webhookModel().get(project.id, c.req.param("webhookId") ?? "");
   if (!webhook) {
     notFound("Webhook not found");
   }
-  await new WebhookModel(getStore().db, undefined, credentialKeys(getStore().config)).remove(
-    project.id,
-    webhook.id,
-  );
+  await webhookModel().remove(project.id, webhook.id);
   flash(c, "Webhook deleted");
   return hxRedirect(c, `/projects/${project.slug}/settings/webhooks`);
 }

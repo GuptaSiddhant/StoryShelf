@@ -1,5 +1,6 @@
 import { z } from "@hono/zod-openapi";
 import { BROWSER_NAMES } from "@storyshelf/core/adapter/capture-runner";
+import { WebhookModel } from "@storyshelf/core/models";
 import { BUILD_STATUSES, PROJECT_ROLES, SNAPSHOT_STATUSES } from "@storyshelf/core/types";
 
 const storybookMetaSchema = z.record(z.string(), z.unknown()).nullable().optional();
@@ -287,11 +288,15 @@ export const webhookPublicSchema = z
   })
   .openapi("Webhook");
 
+// oxlint-disable-next-line typescript/no-deprecated -- z.string().url() kept for zod v3 API compat
+const webhookUrlBase = z.string().url();
+
 /** OpenAPI schema for creating a webhook. */
 export const webhookCreateSchema = z
   .object({
-    // oxlint-disable-next-line typescript/no-deprecated -- z.string().url() kept for zod v3 API compat
-    url: z.string().url(),
+    url: webhookUrlBase.refine((url) => WebhookModel.urlError(url) === null, {
+      message: "URL must use http or https",
+    }),
     events: z.array(z.string().min(1)).optional(),
   })
   .openapi("WebhookCreateInput");

@@ -2,9 +2,9 @@ import { NotificationChannelModel, NotificationSubscriptionModel } from "@storys
 import type { Project } from "@storyshelf/core/schema";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
-import { credentialKeys } from "../credential-keys.ts";
 import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
+import { notificationChannelModel } from "./scoped-models.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
 
 /** Notifications settings (channels plus my preferences). */
@@ -78,15 +78,14 @@ async function createChannelRecord(
   target: string,
   form: FormData,
 ): Promise<Response> {
-  const descriptor = getStore().notifiers.find((candidate) => candidate.metadata.kind === provider);
-  if (!descriptor) {
-    return await providerError(c, `Unknown provider: ${provider}`);
+  const config = channelConfig(provider, target, form);
+  const checked = NotificationChannelModel.validateInput(getStore().notifiers, provider, config);
+  if (!checked.ok) {
+    return checked.field === "provider"
+      ? await providerError(c, checked.message)
+      : await targetError(c, checked.message);
   }
-  const parsed = descriptor.metadata.schema.safeParse(channelConfig(provider, target, form));
-  if (!parsed.success) {
-    return await targetError(c, parsed.error.message);
-  }
-  await persistChannel(project, provider, target, parsed.data, form);
+  await persistChannel(project, provider, target, config, form);
   flash(c, "Notification channel added");
   return c.html((await renderSettingsPage(c, "notifications")) ?? "", 201);
 }
@@ -108,11 +107,7 @@ async function persistChannel(
   config: unknown,
   form: FormData,
 ): Promise<void> {
-  await new NotificationChannelModel(
-    getStore().db,
-    undefined,
-    credentialKeys(getStore().config),
-  ).create({
+  await notificationChannelModel().create({
     projectId: project.id,
     provider,
     config: config as Record<string, unknown>,
@@ -123,11 +118,7 @@ async function persistChannel(
 
 async function handleDeleteChannel(c: Context): Promise<Response> {
   const project = await findProject(c.req.param("slug") ?? "");
-  const model = new NotificationChannelModel(
-    getStore().db,
-    undefined,
-    credentialKeys(getStore().config),
-  );
+  const model = notificationChannelModel();
   const channel = await model.get(c.req.param("channelId") ?? "");
   if (!channel || channel.projectId !== project.id) {
     return c.html(

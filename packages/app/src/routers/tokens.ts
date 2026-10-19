@@ -1,7 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { TokenModel } from "@storyshelf/core/models";
 import type { ProjectRole } from "@storyshelf/core/types";
-import { randomToken } from "@storyshelf/core/utils";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
 import { resolveAuthorizedProject, notFound } from "./helpers.ts";
@@ -71,13 +70,11 @@ export function registerTokens(app: ShelfRouter): void {
   app.openapi(createTokenRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
     const body = c.req.valid("json");
-    const token = randomToken("shelf_");
-    await new TokenModel(getStore().db).create(project.id, {
+    const { value } = await new TokenModel(getStore().db).issue(project.id, {
       name: body.name,
-      hash: token.hash,
       userId: getStore().user?.id ?? null,
     });
-    return c.json({ ...body, token: token.value }, 201);
+    return c.json({ ...body, token: value }, 201);
   });
 
   app.openapi(deleteTokenRoute, async (c) => {

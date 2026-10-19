@@ -4,6 +4,7 @@ import type { SQLWrapper, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { Webhook } from "../schema/webhook.ts";
 import { decryptCredential, encrypt, type SecretInput } from "../utils/encrypt.ts";
+import { randomToken } from "../utils/hash.ts";
 import { ulid } from "../utils/ulid.ts";
 
 /** Tables required by {@link WebhookModel}. */
@@ -36,6 +37,34 @@ export class WebhookModel {
         projectId,
       ),
     })) as unknown as Webhook[];
+  }
+
+  /** Validate a webhook target URL; returns an error message, or null when acceptable. */
+  static urlError(url: string | undefined): string | null {
+    if (!url) {
+      return "A valid URL is required";
+    }
+    let protocol: string;
+    try {
+      ({ protocol } = new URL(url));
+    } catch {
+      return "Enter a valid URL";
+    }
+    return protocol === "https:" || protocol === "http:" ? null : "URL must use http or https";
+  }
+
+  /**
+   * Create a webhook with a freshly generated `whsec_` signing secret.
+   *
+   * @returns The stored webhook and the plaintext secret (shown to the user once).
+   */
+  async issue(
+    projectId: string,
+    input: { url: string; events?: string[] },
+  ): Promise<{ webhook: Webhook; secret: string }> {
+    const secret = randomToken("whsec_").value;
+    const webhook = await this.create(projectId, { url: input.url, events: input.events, secret });
+    return { webhook, secret };
   }
 
   /**

@@ -43,4 +43,15 @@ describe("ProjectGroupMappingModel", () => {
     await model.remove("p1", other.id);
     expect(await model.list("p2")).toHaveLength(1);
   });
+
+  it("validates mapping input (exact names, known roles)", () => {
+    expect(ProjectGroupMappingModel.inputError("team-design", "developer")).toBeNull();
+    expect(ProjectGroupMappingModel.inputError(undefined, "developer")).toBe(
+      "Group and role are required",
+    );
+    expect(ProjectGroupMappingModel.inputError("team", "owner")).toBe(
+      "Group and role are required",
+    );
+    expect(ProjectGroupMappingModel.inputError("team-*", "admin")).toContain("wildcards");
+  });
 });

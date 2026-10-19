@@ -72,6 +72,11 @@ export const PROJECT_ROLES = ["admin", "approver", "developer", "viewer"] as con
 /** Per-project role of a member. */
 export type ProjectRole = (typeof PROJECT_ROLES)[number];
 
+/** Narrow an untrusted string to a {@link ProjectRole}. */
+export function isProjectRole(value: unknown): value is ProjectRole {
+  return typeof value === "string" && (PROJECT_ROLES as readonly string[]).includes(value);
+}
+
 /** Label type keys seeded for every new project. */
 export const SEEDED_LABEL_KEYS = [
   "branch",

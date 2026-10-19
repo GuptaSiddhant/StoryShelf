@@ -3,7 +3,6 @@ import { NotificationChannelModel } from "@storyshelf/core/models";
 import type { NotificationChannelRow } from "@storyshelf/core/schema";
 import type { ProjectRole } from "@storyshelf/core/types";
 import type { ShelfRouter } from "../app-types.ts";
-import { credentialKeys } from "../credential-keys.ts";
 import { getStore } from "../store.ts";
 import { notFound, requireSiteAdmin, resolveAuthorizedProject } from "./helpers.ts";
 import {
@@ -12,6 +11,7 @@ import {
   notificationChannelSchema,
   unauthorized,
 } from "./schemas.ts";
+import { notificationChannelModel } from "./scoped-models.ts";
 const ADMIN_ROLES: readonly ProjectRole[] = ["admin"];
 
 /** Public channel view (secret redacted, config/events decoded). */
@@ -37,22 +37,6 @@ function toPublic(row: NotificationChannelRow): {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
-}
-
-/** Validate channel input against the provider descriptor. */
-function validateChannelInput(
-  provider: string,
-  config: unknown,
-): { ok: true } | { ok: false; message: string } {
-  const descriptor = getStore().notifiers.find((candidate) => candidate.metadata.kind === provider);
-  if (!descriptor) {
-    return { ok: false, message: `Unknown provider: ${provider}` };
-  }
-  const parsed = descriptor.metadata.schema.safeParse(config);
-  if (!parsed.success) {
-    return { ok: false, message: parsed.error.message };
-  }
-  return { ok: true };
 }
 
 const listChannelsRoute = createRoute({
@@ -109,37 +93,29 @@ const deleteChannelRoute = createRoute({
 export function registerNotificationChannels(app: ShelfRouter): void {
   app.openapi(listChannelsRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
-    const rows = await new NotificationChannelModel(
-      getStore().db,
-      undefined,
-      credentialKeys(getStore().config),
-    ).list(project.id);
+    const rows = await notificationChannelModel().list(project.id);
     return c.json(rows.map((row) => toPublic(row)));
   });
 
   app.openapi(createChannelRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...ADMIN_ROLES);
     const body = c.req.valid("json");
-    const valid = validateChannelInput(body.provider, body.config);
+    const valid = NotificationChannelModel.validateInput(
+      getStore().notifiers,
+      body.provider,
+      body.config,
+    );
     if (!valid.ok) {
       return c.json({ message: valid.message }, 400);
     }
-    const row = await new NotificationChannelModel(
-      getStore().db,
-      undefined,
-      credentialKeys(getStore().config),
-    ).create({ projectId: project.id, ...body });
+    const row = await notificationChannelModel().create({ projectId: project.id, ...body });
     return c.json(toPublic(row), 201);
   });
 
   app.openapi(deleteChannelRoute, async (c) => {
     const { slug, channelId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
-    const model = new NotificationChannelModel(
-      getStore().db,
-      undefined,
-      credentialKeys(getStore().config),
-    );
+    const model = notificationChannelModel();
     const existing = await model.get(channelId);
     if (existing?.projectId !== project.id) {
       notFound("Notification channel not found");
@@ -201,37 +177,29 @@ const deleteSystemRoute = createRoute({
 export function registerSystemChannels(app: ShelfRouter): void {
   app.openapi(listSystemRoute, async (c) => {
     requireSiteAdmin(c);
-    const rows = await new NotificationChannelModel(
-      getStore().db,
-      undefined,
-      credentialKeys(getStore().config),
-    ).listSystem();
+    const rows = await notificationChannelModel().listSystem();
     return c.json(rows.map((row) => toPublic(row)));
   });
 
   app.openapi(createSystemRoute, async (c) => {
     requireSiteAdmin(c);
     const body = c.req.valid("json");
-    const valid = validateChannelInput(body.provider, body.config);
+    const valid = NotificationChannelModel.validateInput(
+      getStore().notifiers,
+      body.provider,
+      body.config,
+    );
     if (!valid.ok) {
       return c.json({ message: valid.message }, 400);
     }
-    const row = await new NotificationChannelModel(
-      getStore().db,
-      undefined,
-      credentialKeys(getStore().config),
-    ).create({ projectId: null, ...body });
+    const row = await notificationChannelModel().create({ projectId: null, ...body });
     return c.json(toPublic(row), 201);
   });
 
   app.openapi(deleteSystemRoute, async (c) => {
     requireSiteAdmin(c);
     const { channelId } = c.req.valid("param");
-    const model = new NotificationChannelModel(
-      getStore().db,
-      undefined,
-      credentialKeys(getStore().config),
-    );
+    const model = notificationChannelModel();
     const existing = await model.get(channelId);
     if (existing?.projectId !== null) {
       notFound("Notification channel not found");

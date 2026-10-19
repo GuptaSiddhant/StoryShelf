@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
+import type { NotifierProvider } from "../adapters/notifier/index.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { NotificationChannelModel } from "./notification-channel.ts";
 
@@ -59,5 +61,22 @@ describe("NotificationChannelModel", () => {
     expect(model(db).decryptSecret(created)).toBe("shh");
     await model(db).remove(created.id);
     expect(await model(db).get(created.id)).toBeNull();
+  });
+
+  it("validates channel input against the notifier schema", () => {
+    const email = {
+      metadata: { kind: "email", schema: z.object({ to: z.string() }) },
+    } as unknown as NotifierProvider;
+    expect(NotificationChannelModel.validateInput([email], "email", { to: "a@b.c" })).toEqual({
+      ok: true,
+    });
+    expect(NotificationChannelModel.validateInput([email], "slack", {})).toMatchObject({
+      ok: false,
+      field: "provider",
+    });
+    expect(NotificationChannelModel.validateInput([email], "email", {})).toMatchObject({
+      ok: false,
+      field: "config",
+    });
   });
 });

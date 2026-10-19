@@ -3,7 +3,7 @@ import { and, eq, getTableColumns } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { ProjectGroupMapping } from "../schema/project-group-mapping.ts";
-import type { ProjectRole } from "../types.ts";
+import { isProjectRole, type ProjectRole } from "../types.ts";
 import { ulid } from "../utils/ulid.ts";
 
 /** Tables required by {@link ProjectGroupMappingModel}. */
@@ -33,6 +33,19 @@ export class ProjectGroupMappingModel {
         projectId,
       ),
     })) as unknown as ProjectGroupMapping[];
+  }
+
+  /**
+   * Validate group-mapping input; returns an error message, or null when acceptable.
+   * Names match exactly: a wildcard would silently grant org-wide access.
+   */
+  static inputError(groupName: string | undefined, role: string | undefined): string | null {
+    if (!groupName || !role || !isProjectRole(role)) {
+      return "Group and role are required";
+    }
+    return groupName.includes("*")
+      ? "Group names match exactly; wildcards are not expanded. A broad pattern can silently grant org-wide access."
+      : null;
   }
 
   /** Create a group mapping for a project. */
