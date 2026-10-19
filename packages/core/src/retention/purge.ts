@@ -22,22 +22,12 @@ export interface RetentionTables {
 
 /** Removes expired transient builds while keeping baselines and persistent builds. */
 export class Retention {
-  private readonly db: DatabaseAdapter;
-  private readonly storage: StorageAdapter;
-  private readonly tables: RetentionTables;
-  private readonly logger?: Logger;
-
   constructor(
-    db: DatabaseAdapter,
-    storage: StorageAdapter,
-    tables: RetentionTables,
-    logger?: Logger,
-  ) {
-    this.db = db;
-    this.storage = storage;
-    this.tables = tables;
-    this.logger = logger;
-  }
+    private readonly db: DatabaseAdapter,
+    private readonly storage: StorageAdapter,
+    private readonly tables: RetentionTables,
+    private readonly logger?: Logger,
+  ) {}
 
   async purge(project: Project, options: PurgeOptions): Promise<PurgeResult> {
     const cutoff = new Date(Date.now() - options.ttlDays * 86_400_000).toISOString();

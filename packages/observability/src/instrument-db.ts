@@ -24,11 +24,7 @@ export function createInstrumentedDatabase(db: DatabaseAdapter): DatabaseAdapter
 }
 
 class InstrumentedDatabase implements DatabaseAdapter {
-  private readonly inner: DatabaseAdapter;
-
-  constructor(inner: DatabaseAdapter) {
-    this.inner = inner;
-  }
+  constructor(private readonly inner: DatabaseAdapter) {}
 
   get metadata(): DatabaseAdapter["metadata"] {
     return this.inner.metadata;

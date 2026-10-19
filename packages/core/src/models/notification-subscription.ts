@@ -20,14 +20,14 @@ export interface NotificationSubscriptionInput {
 /** Data operations for per-user notification subscriptions. */
 export class NotificationSubscriptionModel {
   private readonly tables: NotificationSubscriptionTables;
-  private readonly db: DatabaseAdapter;
-
   /**
    * @param db - Database adapter.
    * @param tables - Table handles (defaults to the adapter's tables).
    */
-  constructor(db: DatabaseAdapter, tables?: NotificationSubscriptionTables) {
-    this.db = db;
+  constructor(
+    private readonly db: DatabaseAdapter,
+    tables?: NotificationSubscriptionTables,
+  ) {
     this.tables = tables ?? { notificationSubscriptions: db.tables.notificationSubscriptions };
   }
 

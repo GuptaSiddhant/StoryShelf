@@ -89,13 +89,6 @@ export {
   type ForkedJobOutcome,
 } from "./forked/forked-queue.ts";
 export { IpcCaptureQueue } from "./forked/ipc-queue.ts";
-export {
-  canForkCaptureChild,
-  CAPTURE_CONCURRENCY_ENV,
-  CAPTURE_WORKER_ROLE,
-  forkCaptureChild,
-  type ForkOptions,
-} from "./forked/fork.ts";
 export type { ChildProcessHandle, ParentPort } from "./forked/channel.ts";
 export type { ChildMessage, ParentMessage } from "./forked/protocol.ts";
 export {

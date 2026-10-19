@@ -29,10 +29,10 @@ const PAGE = 500;
 /** Data operations for AI usage rows. */
 export class AiUsageModel {
   private readonly tables: AiUsageTables;
-  private readonly db: DatabaseAdapter;
-
-  constructor(db: DatabaseAdapter, tables?: AiUsageTables) {
-    this.db = db;
+  constructor(
+    private readonly db: DatabaseAdapter,
+    tables?: AiUsageTables,
+  ) {
     this.tables = tables ?? { aiUsage: db.tables.aiUsage };
   }
 

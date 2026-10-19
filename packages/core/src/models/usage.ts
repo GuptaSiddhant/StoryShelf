@@ -58,14 +58,14 @@ export function matchUpstreamStory(
 export class PackageUsageModel {
   private readonly tables: PackageUsageTables;
 
-  private readonly db: DatabaseAdapter;
-
   /**
    * @param db - Database adapter.
    * @param tables - Table handles.
    */
-  constructor(db: DatabaseAdapter, tables?: PackageUsageTables) {
-    this.db = db;
+  constructor(
+    private readonly db: DatabaseAdapter,
+    tables?: PackageUsageTables,
+  ) {
     this.tables = tables ?? {
       buildPackageUsage: db.tables.buildPackageUsage,
       projectLinks: db.tables.projectLinks,

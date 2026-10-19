@@ -26,12 +26,11 @@ type Fields = Pick<
  */
 export class DesignCredentialModel {
   private readonly tables: DesignCredentialTables;
-  private readonly db: DatabaseAdapter;
-  private readonly secret?: SecretInput;
-
-  constructor(db: DatabaseAdapter, secret?: SecretInput, tables?: DesignCredentialTables) {
-    this.db = db;
-    this.secret = secret;
+  constructor(
+    private readonly db: DatabaseAdapter,
+    private readonly secret?: SecretInput,
+    tables?: DesignCredentialTables,
+  ) {
     this.tables = tables ?? { designCredentials: db.tables.designCredentials };
   }
 

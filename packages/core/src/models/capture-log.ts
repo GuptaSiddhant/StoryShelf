@@ -13,10 +13,10 @@ export interface CaptureLogTables {
 /** Data operations for capture log lines (every line of an attempt). */
 export class CaptureLogModel {
   private readonly tables: CaptureLogTables;
-  private readonly db: DatabaseAdapter;
-
-  constructor(db: DatabaseAdapter, tables?: CaptureLogTables) {
-    this.db = db;
+  constructor(
+    private readonly db: DatabaseAdapter,
+    tables?: CaptureLogTables,
+  ) {
     this.tables = tables ?? { captureLogs: db.tables.captureLogs };
   }
 

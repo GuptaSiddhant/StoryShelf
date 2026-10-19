@@ -14,14 +14,14 @@ export interface MemberTables {
 /** Data operations for project membership and roles. */
 export class MemberModel {
   private readonly tables: MemberTables;
-  private readonly db: DatabaseAdapter;
-
   /**
    * @param db - Database adapter.
    * @param tables - Table handles.
    */
-  constructor(db: DatabaseAdapter, tables?: MemberTables) {
-    this.db = db;
+  constructor(
+    private readonly db: DatabaseAdapter,
+    tables?: MemberTables,
+  ) {
     this.tables = tables ?? { projectMembers: db.tables.projectMembers };
   }
 

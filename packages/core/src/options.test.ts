@@ -57,25 +57,3 @@ describe("resolveShelfOptions", () => {
     ).not.toThrow();
   });
 });
-
-describe("resolveShelfOptions capture process options", () => {
-  it("requires a runner alongside workerEntry", () => {
-    expect(() =>
-      resolveShelfOptions({ ...base, capture: { workerEntry: "/app/capture-worker.ts" } }),
-    ).toThrow(/requires capture\.runner/u);
-  });
-
-  it('requires workerEntry for mode "fork"', () => {
-    expect(() => resolveShelfOptions({ ...base, capture: { runner, mode: "fork" } })).toThrow(
-      /requires capture\.workerEntry/u,
-    );
-  });
-
-  it("accepts a runner with a worker entry and any mode", () => {
-    for (const mode of ["auto", "in-process", "fork"] as const) {
-      expect(() =>
-        resolveShelfOptions({ ...base, capture: { runner, workerEntry: "/app/w.ts", mode } }),
-      ).not.toThrow();
-    }
-  });
-});

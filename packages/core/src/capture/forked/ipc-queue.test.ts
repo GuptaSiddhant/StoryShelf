@@ -109,8 +109,9 @@ describe("IpcCaptureQueue", () => {
     const { port } = fakePort();
     const queue = new IpcCaptureQueue(port);
     const pending = queue.poll({ waitMs: 1000 });
+    const settled = expect(pending).rejects.toThrow(/closed/u);
     await queue.lifecycle.teardown();
-    expect(await pending).toBeNull();
+    await settled;
     await expect(queue.lifecycle.teardown()).resolves.toBeUndefined();
     expect(queue.metadata.category).toBe("capture-queue");
   });

@@ -39,9 +39,8 @@ export class IpcCaptureQueue implements PollableCaptureQueue {
     setup: async (): Promise<void> => {
       await Promise.resolve();
     },
-    // A clean stop releases parked polls with "no job"; a vanished parent rejects them instead.
     teardown: async (): Promise<void> => {
-      this.#releasePending();
+      this.#failPending(new Error("capture queue closed"));
       await Promise.resolve();
     },
     health: async (): Promise<{ ok: boolean }> => await Promise.resolve({ ok: !this.#closed }),
@@ -127,14 +126,6 @@ export class IpcCaptureQueue implements PollableCaptureQueue {
     clearTimeout(poll.timer);
     this.#polls.delete(message.id);
     poll.resolve(message.type === "job" ? message.job : null);
-  }
-
-  #releasePending(): void {
-    for (const poll of this.#polls.values()) {
-      clearTimeout(poll.timer);
-      poll.resolve(null);
-    }
-    this.#polls.clear();
   }
 
   #failPending(error: Error): void {

@@ -15,10 +15,10 @@ export interface CaptureAttemptTables {
 /** Data operations for capture attempts (one row per build run). */
 export class CaptureAttemptModel {
   private readonly tables: CaptureAttemptTables;
-  private readonly db: DatabaseAdapter;
-
-  constructor(db: DatabaseAdapter, tables?: CaptureAttemptTables) {
-    this.db = db;
+  constructor(
+    private readonly db: DatabaseAdapter,
+    tables?: CaptureAttemptTables,
+  ) {
     this.tables = tables ?? { captureAttempts: db.tables.captureAttempts };
   }
 

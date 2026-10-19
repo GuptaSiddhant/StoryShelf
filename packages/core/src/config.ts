@@ -299,17 +299,6 @@ export interface ShelfCaptureOptions {
   queue?: CaptureQueue;
   /** Builds captured at once by the in-process queue; auto-sized from CPU and memory when unset. */
   concurrency?: number;
-  /**
-   * Module run in a forked capture child (it calls `runCaptureChild` from `@storyshelf/worker`).
-   * Needs `runner`, which serves as the in-process fallback. Ignored when `queue` is a remote queue.
-   */
-  workerEntry?: string;
-  /**
-   * Where captures run. `auto` (default) forks when `workerEntry` is set and the host can afford
-   * a second process; `in-process` never forks; `fork` forks regardless of the host and fails at
-   * boot if it cannot.
-   */
-  mode?: "auto" | "in-process" | "fork";
 }
 
 /** Notification options: who can deliver, over which transport, with what branding. */

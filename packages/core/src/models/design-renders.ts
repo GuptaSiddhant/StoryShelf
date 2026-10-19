@@ -16,22 +16,12 @@ import { designRenderPath } from "../utils/paths.ts";
  * render; a link removed from settings (or a deleted project) leaves its PNG behind.
  */
 export class DesignRenderStore {
-  private readonly db: DatabaseAdapter;
-  private readonly table: Table;
-  private readonly storage: StorageAdapter | undefined;
-  private readonly logger: Logger | undefined;
-
   constructor(
-    db: DatabaseAdapter,
-    table: Table,
-    storage: StorageAdapter | undefined,
-    logger: Logger | undefined,
-  ) {
-    this.db = db;
-    this.table = table;
-    this.storage = storage;
-    this.logger = logger;
-  }
+    private readonly db: DatabaseAdapter,
+    private readonly table: Table,
+    private readonly storage: StorageAdapter | undefined,
+    private readonly logger: Logger | undefined,
+  ) {}
 
   /** Cached render bytes of a node, or null when it has none (or storage is not wired). */
   async read(node: DesignNode): Promise<Buffer | null> {

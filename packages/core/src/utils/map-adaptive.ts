@@ -20,18 +20,11 @@ class AdaptiveRun<T, R> {
   private failure: { error: Error } | null = null;
   private finish: { resolve: (value: R[]) => void; reject: (error: Error) => void } | null = null;
 
-  private readonly items: readonly T[];
-  private readonly controller: AdaptiveConcurrency;
-  private readonly fn: (item: T, index: number) => Promise<{ value: R; timedOut?: boolean }>;
-
   constructor(
-    items: readonly T[],
-    controller: AdaptiveConcurrency,
-    fn: (item: T, index: number) => Promise<{ value: R; timedOut?: boolean }>,
+    private readonly items: readonly T[],
+    private readonly controller: AdaptiveConcurrency,
+    private readonly fn: (item: T, index: number) => Promise<{ value: R; timedOut?: boolean }>,
   ) {
-    this.items = items;
-    this.controller = controller;
-    this.fn = fn;
     this.results = Array.from<R>({ length: items.length });
   }
 

@@ -27,12 +27,11 @@ export interface BaselineImportResult {
 export class BaselineTransferModel {
   private readonly tables: BaselineTables;
   private readonly baselines: BaselineModel;
-  private readonly db: DatabaseAdapter;
-  private readonly storage: StorageAdapter;
-
-  constructor(db: DatabaseAdapter, storage: StorageAdapter, tables?: BaselineTables) {
-    this.db = db;
-    this.storage = storage;
+  constructor(
+    private readonly db: DatabaseAdapter,
+    private readonly storage: StorageAdapter,
+    tables?: BaselineTables,
+  ) {
     this.tables = tables ?? { baselines: db.tables.baselines };
     this.baselines = new BaselineModel(db, this.tables, storage);
   }

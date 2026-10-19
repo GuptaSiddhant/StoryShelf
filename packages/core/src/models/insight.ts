@@ -41,10 +41,10 @@ export interface InsightResultInput {
 /** Data operations for insights. */
 export class InsightModel {
   private readonly tables: InsightTables;
-  private readonly db: DatabaseAdapter;
-
-  constructor(db: DatabaseAdapter, tables?: InsightTables) {
-    this.db = db;
+  constructor(
+    private readonly db: DatabaseAdapter,
+    tables?: InsightTables,
+  ) {
     this.tables = tables ?? { insights: db.tables.insights };
   }
 

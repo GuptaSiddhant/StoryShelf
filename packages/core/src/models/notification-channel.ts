@@ -25,15 +25,16 @@ export interface NotificationChannelCreateInput {
 export class NotificationChannelModel {
   private readonly tables: NotificationChannelTables;
   private readonly secret?: SecretInput;
-  private readonly db: DatabaseAdapter;
-
   /**
    * @param db - Database adapter.
    * @param tables - Table handles (defaults to the adapter's tables).
    * @param secret - Server secret for channel-secret encryption.
    */
-  constructor(db: DatabaseAdapter, tables?: NotificationChannelTables, secret?: SecretInput) {
-    this.db = db;
+  constructor(
+    private readonly db: DatabaseAdapter,
+    tables?: NotificationChannelTables,
+    secret?: SecretInput,
+  ) {
     this.tables = tables ?? { notificationChannels: db.tables.notificationChannels };
     this.secret = secret;
   }

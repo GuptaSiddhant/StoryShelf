@@ -15,15 +15,16 @@ export interface WebhookTables {
 export class WebhookModel {
   private readonly tables: WebhookTables;
   private readonly secret?: SecretInput;
-  private readonly db: DatabaseAdapter;
-
   /**
    * @param db - Database adapter.
    * @param tables - Table handles.
    * @param secret - Server secret for webhook-secret encryption (throws on write/decrypt when unset).
    */
-  constructor(db: DatabaseAdapter, tables?: WebhookTables, secret?: SecretInput) {
-    this.db = db;
+  constructor(
+    private readonly db: DatabaseAdapter,
+    tables?: WebhookTables,
+    secret?: SecretInput,
+  ) {
     this.tables = tables ?? { webhooks: db.tables.webhooks };
     this.secret = secret;
   }

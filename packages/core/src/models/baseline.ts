@@ -31,16 +31,13 @@ export class BaselineModel {
   private readonly storage: StorageAdapter;
   private readonly secret?: SecretInput;
   private readonly webhookTables?: WebhookTables;
-  private readonly db: DatabaseAdapter;
-
   constructor(
-    db: DatabaseAdapter,
+    private readonly db: DatabaseAdapter,
     tables?: BaselineTables,
     storage?: StorageAdapter,
     secret?: SecretInput,
     webhookTables?: WebhookTables,
   ) {
-    this.db = db;
     this.tables = tables ?? { baselines: db.tables.baselines };
     this.storage = storage as StorageAdapter;
     this.secret = secret;
