@@ -2,6 +2,7 @@ import type { AdapterSetupContext } from "@storyshelf/core/adapter/metadata";
 import {
   AdapterLifecycleError,
   bindAdapterLoggers,
+  adapterSourcesOf,
   collectSetups,
   collectTeardowns,
   runAdapterSetups,
@@ -65,7 +66,7 @@ async function firstBootFailure(
   options: ShelfOptions,
   logger: Logger,
 ): Promise<AdapterSetupResult | null> {
-  const invalid = validateBootAssembly(options);
+  const invalid = validateBootAssembly(adapterSourcesOf(options));
   if (invalid.length > 0) {
     logger.error({ failures: invalid }, "adapter validation failed");
     return { ok: false, failures: invalid };
@@ -95,7 +96,9 @@ function kickSetup(
   // the adapter setups. A failing secret check fails readiness, like others.
   cell.ready = (async (): Promise<AdapterSetupResult> => {
     const failed = await firstBootFailure(options, logger);
-    return failed ?? (await runAdapterSetups(collectSetups(options), ctx, logger));
+    return (
+      failed ?? (await runAdapterSetups(collectSetups(adapterSourcesOf(options)), ctx, logger))
+    );
   })();
   trackSettlement(cell, cell.ready);
 }
@@ -184,7 +187,7 @@ async function runAiSetup(options: ShelfOptions): Promise<AdapterSetupResult | n
 }
 /** Validation failure settled on the cell — null when the assembly is sound. */
 function invalidSources(options: ShelfOptions, cell: LifecycleCell): AdapterSetupResult | null {
-  const invalid = validateBootAssembly(options);
+  const invalid = validateBootAssembly(adapterSourcesOf(options));
   if (invalid.length === 0) {
     return null;
   }
@@ -211,7 +214,7 @@ function createLifecycle(
       if (blocked) {
         throw new AdapterLifecycleError("setup", blocked.failures);
       }
-      const result = await runAdapterSetups(collectSetups(options), ctx, logger);
+      const result = await runAdapterSetups(collectSetups(adapterSourcesOf(options)), ctx, logger);
       cell.ready = Promise.resolve(result);
       cell.settled = result;
       if (!result.ok) {
@@ -224,7 +227,11 @@ function createLifecycle(
       await settleInsightJobs();
       await options.ai?.teardown();
       await shutdownDiffPool();
-      const result = await runAdapterTeardowns(collectTeardowns(options), ctx, logger);
+      const result = await runAdapterTeardowns(
+        collectTeardowns(adapterSourcesOf(options)),
+        ctx,
+        logger,
+      );
       await options.observability?.shutdown().catch((error: unknown) => {
         logger.error({ err: error }, "observability shutdown failed");
       });

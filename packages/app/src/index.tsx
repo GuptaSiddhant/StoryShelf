@@ -1,15 +1,19 @@
 import { swaggerUI } from "@hono/swagger-ui";
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { AdapterLifecycleError, validateBootAssembly } from "@storyshelf/core/adapter/setup";
+import {
+  AdapterLifecycleError,
+  adapterSourcesOf,
+  validateBootAssembly,
+} from "@storyshelf/core/adapter/setup";
 import { sweepOrphanedScratch } from "@storyshelf/core/capture";
-import { normalizeShelfOptions } from "@storyshelf/core/config";
+import { resolveShelfOptions } from "@storyshelf/core/config";
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import { configureDiffPool } from "@storyshelf/core/diff";
 /**
  * StoryShelf app: compose database, storage, capture, auth, and git-host
  * adapters into a complete self-hosted visual-testing Hono app.
  */
-import { createShelfLogger, type Logger } from "@storyshelf/core/logger";
+import type { Logger } from "@storyshelf/core/logger";
 import {
   createHttpMiddleware,
   createInstrumentedDatabase,
@@ -65,7 +69,7 @@ import { resolveRuntime } from "./runtime.ts";
  * Throws before any route or lifecycle hook runs.
  */
 function throwOnInvalidAdapters(options: ShelfOptions): void {
-  const invalid = validateBootAssembly(options);
+  const invalid = validateBootAssembly(adapterSourcesOf(options));
   if (invalid.length > 0) {
     throw new AdapterLifecycleError("setup", invalid);
   }
@@ -158,7 +162,7 @@ function assembleApp(app: ShelfApp, options: ShelfOptions, scoped: ShelfOptions)
     getReady: async () => await cell.ready,
   });
   registerAllRoutes(app, options, {
-    sources: options,
+    sources: adapterSourcesOf(options),
     getSettled: () => cell.settled,
     bootTimeMs: Date.now(),
     version: packageVersion(),
@@ -174,27 +178,13 @@ function assembleApp(app: ShelfApp, options: ShelfOptions, scoped: ShelfOptions)
  * fail-fast startup, or let the first request gate on settlement.
  */
 export function createShelfApp(rawOptions: ShelfOptions): ShelfApp {
-  const { options: normalized, deprecated } = normalizeShelfOptions(rawOptions);
-  // One logger for the whole app, so the boot warning and runtime share it.
-  const logger = normalized.logger ?? createShelfLogger();
-  const options: ShelfOptions = { ...normalized, logger };
-  warnDeprecatedOptions(logger, deprecated);
+  const options = resolveShelfOptions(rawOptions);
   configureDiffPool({ threads: options.compare?.threads });
   throwOnInvalidAdapters(options);
   const app = new OpenAPIHono<{ Variables: ShelfContext }>() as ShelfApp;
   assembleApp(app, options, instrumentedOptions(options));
 
   return app;
-}
-
-/** Warn once at boot about flat capture options that moved under `capture`. */
-function warnDeprecatedOptions(logger: Logger, deprecated: string[]): void {
-  if (deprecated.length > 0) {
-    logger.warn(
-      { deprecated },
-      "deprecated createShelfApp options in use; move them under `capture` (removed in a future major)",
-    );
-  }
 }
 
 /** Cookie-authenticated write paths guarded by CSRF tokens. */
@@ -290,6 +280,7 @@ function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
       gitHosts,
       design,
       notifiers,
+      notificationsConfig: options.notifications?.config,
       ai: options.ai,
       resolveUser: async (c) => await resolveRequestUser(c, options.auth),
     }),
@@ -426,6 +417,7 @@ export type {
   ShelfOptions,
   ShelfCaptureOptions,
   ShelfCompareOptions,
+  ShelfNotificationsOptions,
   ShelfConfig,
   UIConfig,
   BrandTheme,

@@ -30,8 +30,10 @@ import { createSqsCaptureQueue } from "@storyshelf/queue-sqs";
 const app = createShelfApp({
   database,
   storage,
-  capture: { runner: captureRunner },
-  captureQueue: createSqsCaptureQueue({ queueUrl: process.env.QUEUE_URL! }),
+  capture: {
+    runner: captureRunner,
+    queue: createSqsCaptureQueue({ queueUrl: process.env.QUEUE_URL! }),
+  },
 });
 ```
 

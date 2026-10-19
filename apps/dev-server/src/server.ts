@@ -96,7 +96,7 @@ const app = createShelfApp({
   design: [createFigmaDesign({ oauth: figmaOAuthFromEnv() })],
   notifications: {
     notifiers: [...chatNotifiers, ...emailNotifiers],
-    ...(env["SMTP_FROM"] ? { defaults: { fromEmail: env["SMTP_FROM"] } } : {}),
+    ...(env["SMTP_FROM"] ? { config: { fromEmail: env["SMTP_FROM"] } } : {}),
   },
   // Enable local-account login by setting AUTH_PASSWORD (and SECRET): the
   // engine provisions an admin identity from the env on every boot.

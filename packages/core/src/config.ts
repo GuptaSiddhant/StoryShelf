@@ -120,8 +120,6 @@ export interface ShelfConfig {
    * helper document; falls back to the request origin when unset.
    */
   publicBaseUrl?: string;
-  /** @deprecated Use `ShelfOptions.capture.concurrency`. Still read as an alias; removed in ADR 0031 phase 5. */
-  captureConcurrency?: number;
   /**
    * Working directory for capture and inline statics extraction. Defaults to
    * `<os.tmpdir()>/storyshelf` once a capture runner (or `maxInlineUnzipSize`) needs it.
@@ -145,8 +143,6 @@ export interface ShelfConfig {
   maxInlineUnzipSize?: number;
   viewports?: ShelfViewport[];
   adapters?: Record<string, AdapterSnapshot>;
-  /** @deprecated Use `ShelfOptions.notifications.defaults`. Still read as an alias; removed in ADR 0031 phase 5. */
-  notifications?: NotificationsConfig;
 }
 
 const viewportSchema: z.ZodType<ShelfViewport> = z.object({
@@ -203,7 +199,8 @@ const authUiConfigSchema: z.ZodType<AuthUiConfig> = z.object({
   footerText: z.string().optional(),
 });
 
-const notificationsConfigSchema: z.ZodType<NotificationsConfig> = z.object({
+/** Zod schema validating `notifications.config`. */
+export const notificationsConfigSchema: z.ZodType<NotificationsConfig> = z.object({
   fromEmail: z.string().min(1).optional(),
   fromName: z.string().min(1).optional(),
   footerText: z.string().min(1).optional(),
@@ -220,7 +217,6 @@ export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
     publishedBaseDomain: z.string().optional(),
     // oxlint-disable-next-line typescript/no-deprecated -- z.string().url() kept for zod v3 API compat
     publicBaseUrl: z.string().url().optional(),
-    captureConcurrency: z.number().int().positive().optional(),
     scratchDir: z.string().optional(),
     purgeTtlDays: z.number().int().positive().optional(),
     branchTtlDays: z.number().int().positive().nullable().optional(),
@@ -230,7 +226,6 @@ export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
     maxInlineUnzipSize: z.number().int().positive().optional(),
     viewports: z.array(viewportSchema).min(1, "at least one viewport required").optional(),
     adapters: z.record(z.string(), adapterSnapshotSchema).optional(),
-    notifications: notificationsConfigSchema.optional(),
   })
   .strict()
   .superRefine((config, ctx) => {
@@ -306,12 +301,14 @@ export interface ShelfCaptureOptions {
   concurrency?: number;
 }
 
-/** Notification options: who can deliver, and the defaults they share. */
+/** Notification options: who can deliver, over which transport, with what branding. */
 export interface ShelfNotificationsOptions {
-  /** Provider adapters; a channel's `provider` must name one of these. */
+  /** Provider adapters (Slack, Teams, email, ...); a channel's `provider` must name one of these. */
   notifiers?: NotifierProvider[];
-  /** Site-wide brand and sender defaults for outgoing notifications. */
-  defaults?: NotificationsConfig;
+  /** Email transport. Listed here so its setup/teardown/validation hooks run with the app's. */
+  emailSender?: EmailSender;
+  /** Site-wide brand and sender settings for outgoing notifications. */
+  config?: NotificationsConfig;
 }
 
 /** Comparison options. */
@@ -334,24 +331,14 @@ export interface ShelfOptions {
   capture?: ShelfCaptureOptions;
   /** Screenshot comparison, shared by capture and the re-diff endpoint (which needs it even when nothing renders here). */
   compare?: ShelfCompareOptions;
-  /** @deprecated Use `capture.runner`. Still accepted; removed in ADR 0031 phase 5. */
-  captureRunner?: CaptureRunner;
-  /** @deprecated Use `capture.queue`. Still accepted; removed in ADR 0031 phase 5. */
-  captureQueue?: CaptureQueue;
   auth?: Auth;
   /** AI insights surface (ADR 0026). Set ⇒ AI on site-wide; absent ⇒ off. */
   ai?: Ai;
   gitHosts?: GitHostProvider[];
   /** Design-tool providers (Figma, …) that resolve links, metadata and previews. */
   design?: DesignProvider[];
-  /**
-   * Notification subsystem: provider adapters (Slack, Teams, email, ...) and the brand/sender
-   * defaults they share.
-   */
+  /** Notification subsystem: providers, the email transport, and shared brand/sender settings. */
   notifications?: ShelfNotificationsOptions;
-  /** @deprecated Use `notifications.notifiers`. Still accepted; removed in ADR 0031 phase 5. */
-  notifiers?: NotifierProvider[];
-  emailSender?: EmailSender;
   logger?: Logger;
   ui?: UIConfig;
   config?: ShelfConfig;
@@ -371,8 +358,4 @@ export interface ObservabilityHandle {
   /** Flush exporters and release SDK resources. Must be idempotent. */
   shutdown(): Promise<void>;
 }
-export {
-  DEFAULT_SCRATCH_DIR,
-  normalizeShelfOptions,
-  type NormalizedShelfOptions,
-} from "./config-compat.ts";
+export { DEFAULT_SCRATCH_DIR, resolveShelfOptions } from "./options.ts";

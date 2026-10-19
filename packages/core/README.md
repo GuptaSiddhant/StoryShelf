@@ -51,7 +51,7 @@ Assembles the router from the provided adapters. `ShelfOptions`:
 | `storage`       | `StorageAdapter`            | **Required.** Blob storage for screenshots, diffs, storybook archives.                   |
 | `capture`       | `{ runner?, queue?, concurrency? }` | Optional. Enables the async capture pipeline: `runner` (pure renderer), `queue` (defaults to `InMemoryCaptureQueue`), `concurrency` (builds at once; default 2 on hosts with ≥ 2 CPUs and ≥ 3 GB, otherwise 1). Absent means Storybook hosting only. |
 | `compare`       | `{ threads? }`              | Optional. Worker threads for pixel diffs (default CPU count − 1; `0` = main thread). Also serves the re-diff endpoint. Overrides `STORYSHELF_DIFF_WORKERS`. |
-| `captureRunner` / `captureQueue` | —            | Deprecated aliases for `capture.runner` / `capture.queue`; a boot warning is logged. Removed in a future major. |
+| `notifications` | `{ notifiers?, emailSender?, config? }` | Optional. `notifiers` (Slack/Teams/email providers), `emailSender` (transport whose lifecycle hooks run with the app's), `config` (`fromEmail`, `fromName`, `footerText`, `slackUsername`). |
 | `auth`          | `Auth` (`@storyshelf/auth`) | Optional. Enables auth and the login UI.                                                 |
 | `gitHosts`      | `GitHostProvider[]`         | Optional. Git-host adapters (GitHub/GitLab) for status checks, merge gates, PR comments. |
 | `logger`        | `Logger` (pino)             | Optional. Shared logger. Construct a fallback via `createShelfLogger()`.                 |

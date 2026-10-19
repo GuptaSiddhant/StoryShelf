@@ -101,7 +101,7 @@ const app = createShelfApp({
   design: [createFigmaDesign({ oauth: figmaOAuthFromEnv() })],
   notifications: {
     notifiers: [...chatNotifiers, ...emailNotifiers],
-    ...(env["SMTP_FROM"] ? { defaults: { fromEmail: env["SMTP_FROM"] } } : {}),
+    ...(env["SMTP_FROM"] ? { config: { fromEmail: env["SMTP_FROM"] } } : {}),
   },
   auth:
     authPassword && secret
