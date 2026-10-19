@@ -88,13 +88,13 @@ export interface DesignClient {
 
 /** Thrown when a design link is not accepted by any configured provider. */
 export class InvalidDesignUrlError extends Error {
-  constructor(
-    readonly value: string,
-    hint?: string,
-  ) {
+  readonly value: string;
+
+  constructor(value: string, hint?: string) {
     super(
       hint ? `Enter a supported design link, e.g. ${hint}` : "No design provider is configured",
     );
+    this.value = value;
     this.name = "InvalidDesignUrlError";
   }
 }

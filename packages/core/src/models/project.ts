@@ -13,14 +13,14 @@ export interface ProjectTables {
 /** Data operations for project records. */
 export class ProjectModel {
   private readonly tables: ProjectTables;
+  private readonly db: DatabaseAdapter;
+
   /**
    * @param db - Database adapter.
    * @param tables - Table handles (injected by the database adapter).
    */
-  constructor(
-    private readonly db: DatabaseAdapter,
-    tables?: ProjectTables,
-  ) {
+  constructor(db: DatabaseAdapter, tables?: ProjectTables) {
+    this.db = db;
     this.tables = tables ?? { projects: db.tables.projects };
   }
 

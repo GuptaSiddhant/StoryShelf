@@ -16,11 +16,10 @@ export interface StatusConfigTables {
 export class StatusConfigModel {
   private readonly tables: StatusConfigTables;
   private readonly secret: SecretInput;
-  constructor(
-    private readonly db: DatabaseAdapter,
-    tables?: StatusConfigTables,
-    secret?: SecretInput,
-  ) {
+  private readonly db: DatabaseAdapter;
+
+  constructor(db: DatabaseAdapter, tables?: StatusConfigTables, secret?: SecretInput) {
+    this.db = db;
     this.tables = tables ?? { projectStatusConfigs: db.tables.projectStatusConfigs };
     this.secret = secret;
   }

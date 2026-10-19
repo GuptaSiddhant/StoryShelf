@@ -16,10 +16,10 @@ export interface BuildTables {
 /** Data operations for build records. */
 export class BuildModel {
   private readonly tables: BuildTables;
-  constructor(
-    private readonly db: DatabaseAdapter,
-    tables?: BuildTables,
-  ) {
+  private readonly db: DatabaseAdapter;
+
+  constructor(db: DatabaseAdapter, tables?: BuildTables) {
+    this.db = db;
     this.tables = tables ?? {
       builds: db.tables.builds,
       buildLabels: db.tables.buildLabels,
