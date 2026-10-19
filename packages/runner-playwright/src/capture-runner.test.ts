@@ -61,6 +61,7 @@ const playwright = vi.hoisted(() => {
   const stats = { contextsOpened: 0, contextsClosed: 0, pagesOpened: 0 };
   const browser = {
     closed: false,
+    version: (): string => "124.0.6367.29",
     newContext: async (): Promise<unknown> => {
       await Promise.resolve();
       stats.contextsOpened += 1;
@@ -350,6 +351,21 @@ describe("createPlaywrightCaptureRunner.render", () => {
     expect(result.captures).toHaveLength(60);
     expect(peak).toBeGreaterThanOrEqual(1);
     expect(peak).toBeLessThanOrEqual(maxPageConcurrency());
+  }, 30_000);
+
+  it("reports the browser build and host platform as the capture environment", async () => {
+    playwright.configureHang(false);
+    const result = await createPlaywrightCaptureRunner({}).render({
+      buildId: "build-1",
+      storybookDir,
+      stories: STORIES,
+      viewports: VIEWPORTS,
+    });
+    expect(result.environment).toMatchObject({
+      browserVersion: "124.0.6367.29",
+      platform: `${process.platform}-${process.arch}`,
+      deviceScaleFactor: 1,
+    });
   }, 30_000);
 
   it("sizes the page budget by engine in the sizing log", async () => {

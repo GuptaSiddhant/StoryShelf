@@ -32,6 +32,7 @@ export {
   type AdaptiveOptions,
   type Observation,
 } from "./adaptive-concurrency.ts";
+export { detectCaptureEnvironment, systemFontsHash } from "./environment.ts";
 export { createPageLimiter, type PageLimiter, type PageLimiterOptions } from "./page-limiter.ts";
 export { mapAdaptive } from "./map-adaptive.ts";
 export { chunk, mapLimit } from "./map-limit.ts";

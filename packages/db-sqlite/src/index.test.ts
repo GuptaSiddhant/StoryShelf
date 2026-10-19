@@ -434,4 +434,38 @@ describe("createSqliteDatabase", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it("adds the fingerprint columns to a volume created before them, keeping existing rows", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "storyshelf-sqlite-fingerprint-"));
+    const path = join(dir, "legacy.db");
+    try {
+      const seed = createSqliteDatabase(path);
+      await initDb(seed);
+      await seed.lifecycle?.teardown();
+      const raw = new DatabaseSync(path);
+      raw.exec(`
+        ALTER TABLE snapshots DROP COLUMN env_change;
+        ALTER TABLE baselines DROP COLUMN fingerprint;
+        INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', 't', 't');
+        INSERT INTO baselines (id, project_id, story_id, viewport_name, branch, screenshot_path, infra_hash, created_at, updated_at) VALUES ('b1', 'p', 's', 'desktop', 'main', 'x', 'old-hash', 't', 't');
+      `);
+      raw.close();
+
+      const db = createSqliteDatabase(path);
+      await initDb(db);
+
+      const [baseline] = (await db.list(schema.baselines)) as {
+        infraHash: string | null;
+        fingerprint: string | null;
+      }[];
+      expect(baseline).toMatchObject({ infraHash: "old-hash", fingerprint: null });
+      const columns = (
+        await db.all<unknown[]>(sql`SELECT name FROM pragma_table_info('snapshots')`)
+      ).map((row) => String(row[0]));
+      expect(columns).toContain("env_change");
+      await closeDb(db);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

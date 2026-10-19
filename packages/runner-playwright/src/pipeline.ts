@@ -15,6 +15,7 @@ import {
   chunk,
   describeSizing,
   createPageLimiter,
+  detectCaptureEnvironment,
   isTimeoutError,
 } from "@storyshelf/core/utils";
 import type { Browser } from "playwright-core";
@@ -63,7 +64,7 @@ export async function renderAll(
   );
   // Echo the engine so persisted rows are attributable without the request.
   for (const row of [...result.captures, ...result.failures]) row.browser = name;
-  return result;
+  return { ...result, environment: await detectCaptureEnvironment(browserVersionOf(browser)) };
 }
 
 /**
@@ -96,6 +97,11 @@ async function readParameters(
   await page.goto(adapter.buildUrl(baseUrl, storyId), { waitUntil: "networkidle" });
   await adapter.waitForReady?.(page);
   return await extractAllParameters(page as unknown as RuntimeParamsPage);
+}
+
+/** The driver's browser version; undefined for a driver (or test double) that does not report one. */
+function browserVersionOf(browser: Browser): string | undefined {
+  return typeof browser.version === "function" ? browser.version() : undefined;
 }
 
 async function runWithBrowser(

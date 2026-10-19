@@ -41,6 +41,8 @@ export const baselineManifestEntrySchema = z.object({
   branch: z.string().min(1).max(512),
   mode: z.string().max(65_536).nullable(),
   infraHash: z.string().max(512).nullable(),
+  /** JSON fingerprint behind `infraHash`; absent in archives from before fingerprints. */
+  fingerprint: z.string().max(4096).nullable().optional(),
   createdAt: isoTimestamp,
   updatedAt: isoTimestamp,
   /** Zip entry holding the PNG. */

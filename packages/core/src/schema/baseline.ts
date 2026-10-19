@@ -8,6 +8,8 @@ export interface Baseline {
   snapshotId: string | null;
   screenshotPath: string;
   infraHash: string | null;
+  /** JSON `Fingerprint` behind `infraHash`; null on baselines recorded before fingerprints. */
+  fingerprint: string | null;
   /** Resolved mode definition (JSON) — display/capture only; identity is `viewportName`. */
   mode?: string | null;
   /** Engine the image was captured with. */

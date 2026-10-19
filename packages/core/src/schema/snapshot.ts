@@ -23,6 +23,8 @@ export interface Snapshot {
   reviewedBy: string | null;
   reviewedAt: string | null;
   infraHash: string | null;
+  /** JSON `EnvironmentChange` when the capture environment differed from the baseline and the snapshot was accepted as a migration. */
+  envChange: string | null;
   /** True when inherited unchanged from the baseline without rendering. */
   inherited: boolean;
   /** Baseline row the diff was computed against (null: no baseline, or legacy row). */

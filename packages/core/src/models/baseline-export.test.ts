@@ -22,6 +22,7 @@ function row(storyId: string, branch: string, browser = "chromium"): Baseline {
     snapshotId: null,
     screenshotPath: `p1/${branch}/${storyId}/${browser}.png`,
     infraHash: null,
+    fingerprint: null,
     mode: null,
     browser,
     createdAt: NOW,

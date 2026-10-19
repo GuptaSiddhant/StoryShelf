@@ -548,7 +548,7 @@ handles HTTP.
 - **Format v1.** `manifest.json` (`format: "storyshelf-baselines"`, `version: 1`, `exportedAt`,
   `project`, `branch`, `baselines[]`, `skipped[]`) plus one PNG per baseline at
   `baselines/<branch>/<storyId>/<mode>[~<browser>].png` — the storage layout without the project id.
-  Each manifest entry carries the identity (story, mode, browser, branch), `mode` JSON, `infraHash`,
+  Each manifest entry carries the identity (story, mode, browser, branch), `mode` JSON, `infraHash` and its `fingerprint`,
   timestamps, the zip `file`, and its SHA-256. Images are STORE-d (PNGs are already compressed) and
   streamed one at a time; the manifest is written last. Missing images are listed under `skipped` (and logged); other storage
   errors, or growing past the 512 MiB archive limit shared with import, abort the stream.

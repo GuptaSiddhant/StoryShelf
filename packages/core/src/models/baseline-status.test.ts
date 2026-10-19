@@ -11,6 +11,7 @@ const baseline: Baseline = {
   snapshotId: "s0",
   screenshotPath: "/b.png",
   infraHash: null,
+  fingerprint: null,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-02T00:00:00.000Z",
 };

@@ -143,8 +143,9 @@ async function renderPass(
     failed: rendered.failures.length,
     expected,
   });
+  const { environment } = rendered;
   return {
-    captures: [...spooled, ...tagged(rendered.captures, browser)],
+    captures: withEnvironment([...spooled, ...tagged(rendered.captures, browser)], environment),
     failures: tagged(rendered.failures, browser),
     inherited,
     renderCount: toRender.length,
@@ -216,6 +217,19 @@ async function spoolCapture(
 }
 
 const EMPTY_SCREENSHOT = Buffer.alloc(0);
+
+/** Attach the render pass's environment to each capture (rows are already private copies). */
+function withEnvironment(
+  captures: RenderedSnapshot[],
+  environment: RenderedSnapshot["environment"],
+): RenderedSnapshot[] {
+  if (environment) {
+    for (const capture of captures) {
+      capture.environment = environment;
+    }
+  }
+  return captures;
+}
 
 /** Copy each row with its engine (runners may reuse result objects across calls). */
 function tagged<T extends { browser?: string | undefined }>(rows: T[], browser: BrowserName): T[] {

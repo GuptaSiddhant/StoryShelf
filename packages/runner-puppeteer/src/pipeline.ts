@@ -12,6 +12,7 @@ import {
   chunk,
   describeSizing,
   createPageLimiter,
+  detectCaptureEnvironment,
   isTimeoutError,
 } from "@storyshelf/core/utils";
 import type { Browser } from "puppeteer-core";
@@ -31,14 +32,16 @@ export async function renderAll(
 ): Promise<RenderResult> {
   const server = await createStaticServer(input.storybookDir);
   const browser = await launchBrowser(runnerOptions);
+  const version = typeof browser.version === "function" ? await browser.version() : undefined;
   input.logger?.info(describeSizing(input), "capture sizing");
-  return await runWithBrowser(
+  const result = await runWithBrowser(
     input,
     active,
     browser,
     server,
     async () => await launchBrowser(runnerOptions),
   );
+  return { ...result, environment: await detectCaptureEnvironment(version) };
 }
 
 async function runWithBrowser(

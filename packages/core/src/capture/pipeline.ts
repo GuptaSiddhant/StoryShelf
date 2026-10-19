@@ -17,8 +17,15 @@ import { diffPath, screenshotPath } from "../utils/paths.ts";
 import type { Viewport } from "./adapter.ts";
 import type { InheritedStory } from "./affected.ts";
 import { diffStoredScreenshots, writeDiffOverlay } from "./diff-record.ts";
+import {
+  buildFingerprint,
+  changedFields,
+  fingerprintHash,
+  parseFingerprint,
+  type EnvironmentChange,
+  type Fingerprint,
+} from "./fingerprint.ts";
 import { assertScreenshotBuffer } from "./guards.ts";
-import { infraHashFor, SIZING_DEFAULTS } from "./sizing.ts";
 
 /** Snapshots persisted at once: each decodes two PNGs for the diff, so unbounded fan-out spikes memory. */
 export const PERSIST_CONCURRENCY = 4;
@@ -207,7 +214,8 @@ async function persistInheritedSnapshot(
   inherited: InheritedStory,
 ): Promise<void> {
   const browser = browserOf(inherited);
-  const infraHash = infraHashFor(browser, [inherited.viewport], SIZING_DEFAULTS);
+  // Nothing rendered, so there is no new fingerprint: the snapshot carries the baseline's.
+  const infraHash = inherited.baseline.infraHash;
   const snapshots = new SnapshotModel(ctx.db, ctx.tables);
   const snapshot = await snapshots.create(ctx.project.id, ctx.build.id, {
     browser,
@@ -337,7 +345,7 @@ async function createWithoutBaseline(
   const browser = browserOf(capture);
   const accepted = ctx.build.isDefault || (await bootstrapAccepts(ctx, capture));
   const status = accepted ? "approved" : "new";
-  const infraHash = infraHashFor(browser, [viewport], SIZING_DEFAULTS);
+  const now = fingerprintOf(capture, viewport);
   const snapshot = await snapshots.create(ctx.project.id, ctx.build.id, {
     browser,
     storyId: capture.story.id,
@@ -349,7 +357,7 @@ async function createWithoutBaseline(
     viewportWidth: viewport.width,
     viewportHeight: viewport.height,
     screenshotPath: screenshot,
-    infraHash,
+    infraHash: now.infraHash,
     mode: modeJsonOf(viewport),
     baselineVersion: NO_BASELINE,
   });
@@ -364,10 +372,39 @@ async function createWithoutBaseline(
       ctx.build.gitBranch,
       snapshot.id,
       screenshot,
-      infraHash,
-      { mode: modeJsonOf(viewport), browser },
+      now.infraHash,
+      { mode: modeJsonOf(viewport), browser, fingerprint: now.json },
     );
   }
+}
+
+/** A capture's fingerprint: its components, their hash (stored as `infraHash`), and the stored JSON. */
+interface CaptureFingerprint {
+  fingerprint: Fingerprint;
+  infraHash: string;
+  json: string;
+}
+
+function fingerprintOf(capture: RenderedSnapshot, viewport: Viewport): CaptureFingerprint {
+  const fingerprint = buildFingerprint(browserOf(capture), viewport, capture.environment);
+  return {
+    fingerprint,
+    infraHash: fingerprintHash(fingerprint),
+    json: JSON.stringify(fingerprint),
+  };
+}
+
+/**
+ * What changed in the capture environment since the baseline was recorded, or null when nothing
+ * did. A baseline from before fingerprints (no stored fingerprint) cannot be compared, so it is
+ * never reported as changed; it gets its fingerprint backfilled instead.
+ */
+function environmentChange(baseline: Baseline, now: CaptureFingerprint): EnvironmentChange | null {
+  if (!baseline.fingerprint || baseline.infraHash === now.infraHash) {
+    return null;
+  }
+  const from = parseFingerprint(baseline.fingerprint);
+  return { changed: changedFields(from, now.fingerprint), from, to: now.fingerprint };
 }
 
 async function createWithBaseline(
@@ -377,19 +414,29 @@ async function createWithBaseline(
   screenshot: string,
   baseline: Baseline,
 ): Promise<void> {
-  const result = await diffStoredScreenshots(
-    ctx.storage,
-    ctx.project,
-    baseline.screenshotPath,
-    screenshot,
-    capture.story.parameters?.diffThreshold,
-  );
+  const now = fingerprintOf(capture, viewport);
+  const change = environmentChange(baseline, now);
+  const input = { ctx, capture, viewport, screenshot, baseline, now };
+  if (change) {
+    await persistMigration(input, change);
+  } else {
+    await persistDiff(input);
+  }
+}
 
-  const browser = browserOf(capture);
-  const infraHash = infraHashFor(browser, [viewport], SIZING_DEFAULTS);
-  const snapshots = new SnapshotModel(ctx.db, ctx.tables);
-  const snapshot = await snapshots.create(ctx.project.id, ctx.build.id, {
-    browser,
+interface BaselineCapture {
+  ctx: CaptureContext;
+  capture: RenderedSnapshot;
+  viewport: Viewport;
+  screenshot: string;
+  baseline: Baseline;
+  now: CaptureFingerprint;
+}
+
+function snapshotInput(input: BaselineCapture): Parameters<SnapshotModel["create"]>[2] {
+  const { capture, viewport, screenshot, baseline, now } = input;
+  return {
+    browser: browserOf(capture),
     storyId: capture.story.id,
     storyName: capture.story.name,
     storyTitle: capture.story.title,
@@ -399,21 +446,54 @@ async function createWithBaseline(
     viewportWidth: viewport.width,
     viewportHeight: viewport.height,
     screenshotPath: screenshot,
-    infraHash,
+    infraHash: now.infraHash,
     mode: modeJsonOf(viewport),
     baselineId: baseline.id,
     baselineVersion: baseline.updatedAt,
+  };
+}
+
+/**
+ * The capture environment changed (browser build, fonts, platform, scale, viewport): pixels would
+ * differ with no code change, so no diff is computed. The snapshot is accepted and records what
+ * changed; on the default branch the new screenshot becomes the baseline.
+ */
+async function persistMigration(input: BaselineCapture, change: EnvironmentChange): Promise<void> {
+  const { ctx, capture, viewport, screenshot, now } = input;
+  const snapshots = new SnapshotModel(ctx.db, ctx.tables);
+  const snapshot = await snapshots.create(ctx.project.id, ctx.build.id, {
+    ...snapshotInput(input),
+    envChange: JSON.stringify(change),
   });
+  await snapshots.update(snapshot.id, {
+    status: "unchanged",
+    diffPath: null,
+    diffPixels: 0,
+    diffRatio: 0,
+    diffPassed: true,
+    infraHash: now.infraHash,
+  });
+  if (ctx.build.isDefault) {
+    await upsertDefaultBaseline(ctx, snapshot.id, capture, screenshot, now);
+  }
+  ctx.logger?.debug(
+    { storyId: capture.story.id, viewport: viewport.name, changed: change.changed },
+    "capture environment changed; accepted without a diff",
+  );
+}
 
-  // Automigrate: infra-induced size change with project.automigrate enabled
-  const shouldAutomigrate =
-    result.sizeChanged &&
-    !result.passed &&
-    (ctx.project as unknown as { automigrate?: boolean }).automigrate &&
-    baseline.infraHash !== null &&
-    baseline.infraHash !== infraHash;
-
-  const status = shouldAutomigrate ? "unchanged" : diffStatus(result.passed, ctx.build.isDefault);
+async function persistDiff(input: BaselineCapture): Promise<void> {
+  const { ctx, capture, screenshot, baseline, now } = input;
+  const result = await diffStoredScreenshots(
+    ctx.storage,
+    ctx.project,
+    baseline.screenshotPath,
+    screenshot,
+    capture.story.parameters?.diffThreshold,
+  );
+  const browser = browserOf(capture);
+  const snapshots = new SnapshotModel(ctx.db, ctx.tables);
+  const snapshot = await snapshots.create(ctx.project.id, ctx.build.id, snapshotInput(input));
   const diff = diffPath(
     ctx.project.id,
     ctx.build.id,
@@ -421,20 +501,26 @@ async function createWithBaseline(
     capture.viewportName,
     browser,
   );
-  const passed = shouldAutomigrate ? true : result.passed;
-  const pixels = shouldAutomigrate ? 0 : result.diffPixels;
-  const ratio = shouldAutomigrate ? 0 : result.diffRatio;
-  const overlay = await writeDiffOverlay(ctx.storage, diff, result, passed);
+  const overlay = await writeDiffOverlay(ctx.storage, diff, result, result.passed);
   await snapshots.update(snapshot.id, {
-    status,
+    status: diffStatus(result.passed, ctx.build.isDefault),
     diffPath: overlay,
-    diffPixels: pixels,
-    diffRatio: ratio,
-    diffPassed: passed,
-    infraHash,
+    diffPixels: result.diffPixels,
+    diffRatio: result.diffRatio,
+    diffPassed: result.passed,
+    infraHash: now.infraHash,
   });
-  if (ctx.build.isDefault && (shouldAutomigrate || !passed)) {
-    await upsertDefaultBaseline(ctx, snapshot.id, capture, screenshot, infraHash);
+  if (!ctx.build.isDefault) {
+    return;
+  }
+  if (!result.passed) {
+    await upsertDefaultBaseline(ctx, snapshot.id, capture, screenshot, now);
+  } else if (!baseline.fingerprint) {
+    await new BaselineModel(ctx.db, ctx.tables, ctx.storage, ctx.secret).backfillFingerprint(
+      baseline,
+      now.infraHash,
+      now.json,
+    );
   }
 }
 
@@ -444,7 +530,7 @@ async function upsertDefaultBaseline(
   snapshotId: string,
   capture: RenderedSnapshot,
   screenshot: string,
-  infraHash: string,
+  now: CaptureFingerprint,
 ): Promise<void> {
   const baselines = new BaselineModel(ctx.db, ctx.tables, ctx.storage, ctx.secret);
   await baselines.upsert(
@@ -454,8 +540,8 @@ async function upsertDefaultBaseline(
     ctx.build.gitBranch,
     snapshotId,
     screenshot,
-    infraHash,
-    { mode: modeJsonOf(capture.viewport), browser: browserOf(capture) },
+    now.infraHash,
+    { mode: modeJsonOf(capture.viewport), browser: browserOf(capture), fingerprint: now.json },
   );
 }
 

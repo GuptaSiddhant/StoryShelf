@@ -131,9 +131,15 @@ the codec does not dominate here, revisit the premise before building the pool.
 
 ### Phase 4 — Schema
 
-- **Widen `infraHash` into a capture fingerprint** covering browser build, fonts,
-  scale and viewport, so a mismatch registers as a migration event rather than a
-  visual diff.
+- **Widen `infraHash` into a capture fingerprint** covering engine, browser build,
+  host platform, device scale factor, a digest of the system fonts, viewport and sizing
+  defaults. A mismatch against the baseline is an **environment migration**, not a
+  visual diff: no pixel diff is computed, the snapshot is accepted (`unchanged`) and
+  records which components changed (`snapshots.env_change`); on the default branch the
+  baseline is rewritten with the new fingerprint (`baselines.fingerprint`). Baselines
+  from before fingerprints are compared normally and backfilled. This replaces the
+  unused `projects.automigrate` flag's size-change special case. Trade-off accepted: a
+  regression landing in the same build as an environment change is masked.
 - **Content-address screenshot blobs**, reusing the `content/<hash>` + manifest +
   ref-tracking pattern `persistStorybookStatics` already uses for statics. Unchanged
   stories then need no upload, no decode and no diff.
