@@ -47,6 +47,8 @@ export interface RenderedSnapshot {
    * Runners never set this.
    */
   stored?: boolean;
+  /** Where the orchestrator stored it (content-addressed); set together with `stored`. */
+  storedPath?: string;
   /** Environment of the render pass that produced it; filled in by the orchestrator from {@link RenderResult.environment}. */
   environment?: CaptureEnvironment;
 }

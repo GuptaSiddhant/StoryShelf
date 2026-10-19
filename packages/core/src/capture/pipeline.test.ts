@@ -125,7 +125,7 @@ describe("persistCapture", () => {
     const RED = png(4, 4, [255, 0, 0]);
     const GREEN = png(4, 4, [0, 255, 0]);
 
-    it("keeps one baseline per engine and per-engine storage paths", async () => {
+    it("keeps one baseline per engine, each stored by content", async () => {
       const { ctx, objects } = await makeContext({
         captures: [captureOn("chromium", RED), captureOn("firefox", GREEN)],
       });
@@ -141,8 +141,13 @@ describe("persistCapture", () => {
         expect.arrayContaining(["chromium", "firefox"]),
       );
       expect(baselines).toHaveLength(2);
-      expect(objects.has("p1/baselines/main/a/mobile.png")).toBe(true);
-      expect(objects.has("p1/baselines/main/a/mobile~firefox.png")).toBe(true);
+      // Each engine's baseline points at its own screenshot, stored by content.
+      const paths = baselines.map((row) => row.screenshotPath);
+      expect(new Set(paths).size).toBe(2);
+      for (const path of paths) {
+        expect(path).toMatch(/^p1\/content\/[0-9a-f]{64}\.png$/u);
+        expect(objects.has(path)).toBe(true);
+      }
     });
 
     it("diffs each engine only against its own baseline", async () => {

@@ -53,7 +53,7 @@ async function archive(files: Record<string, Buffer | string>): Promise<Buffer> 
 const IMAGE = { "baselines/main/button--primary/desktop.png": PNG };
 
 describe("planBaselineImport", () => {
-  it("plans storage paths from the manifest identity, not the zip entry name", async () => {
+  it("plans content-addressed storage paths, not the zip entry name", async () => {
     const plan = await planBaselineImport(
       await archive({
         "manifest.json": manifest([entry({ file: "anything/at/all.png" })]),
@@ -62,7 +62,7 @@ describe("planBaselineImport", () => {
       "p9",
     );
     expect(plan.map((item) => item.storagePath)).toEqual([
-      "p9/baselines/main/button--primary/desktop.png",
+      `p9/content/${createHash("sha256").update(PNG).digest("hex")}.png`,
     ]);
   });
 

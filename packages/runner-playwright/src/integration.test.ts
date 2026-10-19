@@ -1,7 +1,6 @@
 import { createShelfApp } from "@storyshelf/app";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
-import { screenshotPath } from "@storyshelf/core/paths";
 import type { Build, Snapshot } from "@storyshelf/core/schema";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { createLocalStorage } from "@storyshelf/storage-local";
@@ -254,9 +253,9 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
     if (!probe) {
       throw new Error("Expected at least one snapshot");
     }
-    const screenshot = await storage.read(
-      screenshotPath(project.id, first.id, probe.storyId, probe.viewportName),
-    );
+    // Screenshots are stored by content, so the row, not the story identity, says where.
+    expect(probe.screenshotPath).toMatch(/\/content\/[0-9a-f]{64}\.png$/u);
+    const screenshot = await storage.read(probe.screenshotPath);
     expect(screenshot.length).toBeGreaterThan(0);
 
     const approveResponse = await app.request(
@@ -390,9 +389,7 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
     const light = surface.find((snapshot) => snapshot.viewportName === "light");
     expect(dark?.mode).toBe('{"theme":"dark"}');
     const read = async (snapshot: Snapshot | undefined): Promise<Buffer> =>
-      await storage.read(
-        screenshotPath(project.id, build.id, snapshot?.storyId ?? "", snapshot?.viewportName ?? ""),
-      );
+      await storage.read(snapshot?.screenshotPath ?? "");
     expect(firstPixelBrightness(await read(dark))).toBeLessThan(40);
     expect(firstPixelBrightness(await read(light))).toBeGreaterThan(215);
 
@@ -459,14 +456,7 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
       (snapshot) =>
         snapshot.browser === "firefox" && snapshot.storyId === "components-button--primary",
     );
-    expect(
-      (
-        await storage.read(
-          screenshotPath(project.id, first.id, "components-button--primary", "desktop", "firefox"),
-        )
-      ).length,
-    ).toBeGreaterThan(0);
-    expect(firefox?.screenshotPath).toContain("desktop~firefox");
+    expect((await storage.read(firefox?.screenshotPath ?? "")).length).toBeGreaterThan(0);
 
     // One approval covers the story/mode on both engines and promotes both baselines.
     const group = await app.request(

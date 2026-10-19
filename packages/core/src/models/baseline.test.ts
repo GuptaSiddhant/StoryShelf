@@ -1,9 +1,12 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
-import { baselinePath } from "../utils/paths.ts";
+import { baselinePath, contentPath } from "../utils/paths.ts";
 import { BaselineModel } from "./baseline.ts";
 
 const PNG = Buffer.from([137, 80, 78, 71]);
+const contentOf = (data: Buffer, project = "p1"): string =>
+  contentPath(project, createHash("sha256").update(data).digest("hex"));
 
 function setup(): {
   db: ReturnType<typeof makeDatabase>["db"];
@@ -98,7 +101,7 @@ describe("BaselineModel", () => {
       "source/shot.png",
     );
     expect(created.snapshotId).toBe("snap-1");
-    expect(created.screenshotPath).toBe(baselinePath("p1", "main", "story", "desktop"));
+    expect(created.screenshotPath).toBe(contentOf(PNG));
 
     await storage.write("source/shot2.png", Buffer.from([1, 2, 3]));
     const updated = await model.upsert(
@@ -111,7 +114,10 @@ describe("BaselineModel", () => {
     );
     expect(updated.id).toBe(created.id);
     expect(updated.snapshotId).toBe("snap-2");
+    // The baseline is repointed at the new content; the old object stays for the retention sweep.
+    expect(updated.screenshotPath).toBe(contentOf(Buffer.from([1, 2, 3])));
     await expect(model.read(updated)).resolves.toEqual(Buffer.from([1, 2, 3]));
+    await expect(storage.exists(contentOf(PNG))).resolves.toBe(true);
   });
 
   it("keeps one baseline per engine for the same story and mode", async () => {
@@ -133,8 +139,9 @@ describe("BaselineModel", () => {
       },
     );
     expect(firefox.id).not.toBe(chromium.id);
-    expect(chromium.screenshotPath).toBe(baselinePath("p1", "main", "s", "dark"));
-    expect(firefox.screenshotPath).toBe(baselinePath("p1", "main", "s", "dark", "firefox"));
+    // Identical bytes are one object, however many baselines use them.
+    expect(chromium.screenshotPath).toBe(contentOf(PNG));
+    expect(firefox.screenshotPath).toBe(chromium.screenshotPath);
     expect((await model.getFor("p1", "s", "dark", "main"))?.id).toBe(chromium.id);
     expect((await model.getFor("p1", "s", "dark", "main", "firefox"))?.id).toBe(firefox.id);
     expect((await model.resolve("p1", "s", "dark", "feat", "main", "firefox"))?.id).toBe(
@@ -178,30 +185,50 @@ describe("BaselineModel", () => {
     expect(listed.map((b) => b.storyId)).toEqual(["components-button--primary"]);
   });
 
-  it("removeOrphans also deletes the storage object", async () => {
+  it("removeOrphans leaves a shared content object for the sweep", async () => {
     const { db, storage } = setup();
     const model = new BaselineModel(db, { baselines: db.tables.baselines }, storage);
     await seedBaseline(model, storage, { storyId: "gone" });
-    const gonePath = baselinePath("p1", "main", "gone", "desktop");
-    await expect(storage.exists(gonePath)).resolves.toBe(true);
+    await seedBaseline(model, storage, { storyId: "keep" });
     await model.removeOrphans("p1", new Set(["keep"]));
-    await expect(storage.exists(gonePath)).resolves.toBe(false);
+    await expect(model.list("p1")).resolves.toHaveLength(1);
+    // "keep" still points at the same bytes, so the object must survive.
+    await expect(storage.exists(contentOf(PNG))).resolves.toBe(true);
+  });
+
+  it("removeOrphans still deletes a legacy per-baseline file", async () => {
+    const { db, storage } = setup();
+    const model = new BaselineModel(db, { baselines: db.tables.baselines }, storage);
+    const legacy = baselinePath("p1", "main", "gone", "desktop");
+    await storage.write(legacy, PNG);
+    await db.insert(db.tables.baselines, {
+      id: "legacy",
+      projectId: "p1",
+      storyId: "gone",
+      viewportName: "desktop",
+      branch: "main",
+      snapshotId: null,
+      screenshotPath: legacy,
+      browser: "chromium",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+    await model.removeOrphans("p1", new Set(["keep"]));
+    await expect(storage.exists(legacy)).resolves.toBe(false);
     await expect(model.list("p1")).resolves.toHaveLength(0);
   });
 
-  it("removeForBranch deletes only that branch", async () => {
+  it("removeForBranch removes only that branch's rows and keeps shared content", async () => {
     const { db, storage } = setup();
     const model = new BaselineModel(db, { baselines: db.tables.baselines }, storage);
     await seedBaseline(model, storage, { branch: "feature", storyId: "s1" });
     await seedBaseline(model, storage, { branch: "main", storyId: "s1" });
-    const featurePath = baselinePath("p1", "feature", "s1", "desktop");
-    await expect(storage.exists(featurePath)).resolves.toBe(true);
     const removed = await model.removeForBranch("p1", "feature");
     expect(removed).toBe(1);
-    await expect(storage.exists(featurePath)).resolves.toBe(false);
     const remaining = await model.list("p1");
     expect(remaining).toHaveLength(1);
     expect(remaining[0]?.branch).toBe("main");
+    await expect(storage.exists(remaining[0]?.screenshotPath ?? "")).resolves.toBe(true);
   });
 
   it("removeStaleBranches deletes multiple branches", async () => {

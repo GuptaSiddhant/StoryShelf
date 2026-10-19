@@ -224,4 +224,41 @@ describe("Retention", () => {
     expect(result.removedBranches).toBe(0);
     expect(result.removedBaselines).toBe(0);
   });
+
+  it("sweeps unreferenced content-addressed screenshots after a purge, and never fails it", async () => {
+    const { db } = makeDatabase();
+    const { storage, objects } = makeStorage();
+    const now = new Date().toISOString();
+    const project = {
+      id: "p1",
+      name: "Test",
+      slug: "test",
+      gitRepository: null,
+      gitDefaultBranch: "main",
+      pixelThreshold: 0.1,
+      maxDiffRatio: 0.01,
+      publicBranchRegex: null,
+      executePlay: false,
+      playTimeoutMs: 10_000,
+      storybookMeta: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await db.insert(db.tables.projects, project);
+    objects.set("p1/content/" + "a".repeat(64) + ".png", Buffer.from("orphan"));
+    const retention = new Retention(db, storage, retentionTables(db));
+
+    await retention.purge(project as never, { ttlDays: 30, keepLatestPerBranch: true });
+
+    // First sighting: kept, and remembered so a later purge can reclaim it.
+    expect(objects.has("p1/content/" + "a".repeat(64) + ".png")).toBe(true);
+    expect(objects.has("p1/content/.sweep.json")).toBe(true);
+
+    storage.list = async () => {
+      throw new Error("storage down");
+    };
+    await expect(
+      retention.purge(project as never, { ttlDays: 30, keepLatestPerBranch: true }),
+    ).resolves.toBeDefined();
+  });
 });

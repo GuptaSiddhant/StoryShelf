@@ -22,6 +22,9 @@ export {
   designRenderPath,
   diffPath,
   modeSegment,
+  contentDir,
+  contentPath,
+  isContentPath,
   screenshotPath,
   storybookDir,
   storybookZipPath,
@@ -33,6 +36,7 @@ export {
   type Observation,
 } from "./adaptive-concurrency.ts";
 export { detectCaptureEnvironment, systemFontsHash } from "./environment.ts";
+export { storeScreenshot } from "./screenshot-store.ts";
 export { createPageLimiter, type PageLimiter, type PageLimiterOptions } from "./page-limiter.ts";
 export { mapAdaptive } from "./map-adaptive.ts";
 export { chunk, mapLimit } from "./map-limit.ts";

@@ -140,9 +140,19 @@ the codec does not dominate here, revisit the premise before building the pool.
   from before fingerprints are compared normally and backfilled. This replaces the
   unused `projects.automigrate` flag's size-change special case. Trade-off accepted: a
   regression landing in the same build as an environment change is masked.
-- **Content-address screenshot blobs**, reusing the `content/<hash>` + manifest +
-  ref-tracking pattern `persistStorybookStatics` already uses for statics. Unchanged
-  stories then need no upload, no decode and no diff.
+- **Content-address screenshot blobs** as `<project>/content/<sha256>.png`: per project (not
+  global, so project deletion and isolation stay simple), shared by snapshots and
+  baselines (a baseline repoints instead of copying), and skipped on upload when the
+  bytes already exist. Identical paths mean identical bytes, so the diff is skipped
+  without reading either image. Unlike statics, which count references in
+  `content_refs`, screenshots are reclaimed by **mark-and-sweep** in the retention
+  purge: an object no snapshot or baseline references is deleted once it has stayed
+  unreferenced across two sweeps at least 24 h apart (first-seen times live in
+  `<project>/content/.sweep.json`, so no schema change and no storage `stat`), and each
+  candidate is re-checked against the database immediately before deletion. Counters
+  would need every delete path (builds, baselines, imports, project delete) to stay
+  balanced, and a miss frees a live image. Older per-build and per-baseline files keep
+  working and are cleaned up as before.
 
 ### Phase 5 — Sharded capture (breaking)
 
