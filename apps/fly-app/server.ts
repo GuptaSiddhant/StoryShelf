@@ -99,7 +99,10 @@ const app = createShelfApp({
   storage,
   capture: { runner: captureRunner },
   design: [createFigmaDesign({ oauth: figmaOAuthFromEnv() })],
-  notifiers: [...chatNotifiers, ...emailNotifiers],
+  notifications: {
+    notifiers: [...chatNotifiers, ...emailNotifiers],
+    ...(env["SMTP_FROM"] ? { defaults: { fromEmail: env["SMTP_FROM"] } } : {}),
+  },
   auth:
     authPassword && secret
       ? createShelfAuth({
@@ -126,7 +129,6 @@ const app = createShelfApp({
     scratchDir: dataDir,
     // Emit Server-Timing response headers (total + db/storage roll-ups).
     serverTiming: true,
-    ...(env["SMTP_FROM"] ? { notifications: { fromEmail: env["SMTP_FROM"] } } : {}),
   },
 });
 

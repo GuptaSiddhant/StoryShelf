@@ -98,4 +98,46 @@ describe("normalizeShelfOptions", () => {
       normalizeShelfOptions({ ...base, compare: { threads: 0 } }).options.compare?.threads,
     ).toBe(0);
   });
+
+  it("groups notifiers and the notification defaults under notifications", () => {
+    const email = { metadata: { kind: "email" } } as never;
+    const { options, deprecated } = normalizeShelfOptions({
+      ...base,
+      notifications: { notifiers: [email], defaults: { fromEmail: "shelf@example.com" } },
+    });
+    expect(deprecated).toEqual([]);
+    expect(options.notifiers).toEqual([email]);
+    expect(options.config?.notifications).toEqual({ fromEmail: "shelf@example.com" });
+  });
+
+  it("still accepts flat notifiers and config.notifications and reports them", () => {
+    const email = { metadata: { kind: "email" } } as never;
+    const { options, deprecated } = normalizeShelfOptions({
+      ...base,
+      notifiers: [email],
+      config: { notifications: { fromName: "Shelf" } },
+    });
+    expect(options.notifications).toEqual({ notifiers: [email], defaults: { fromName: "Shelf" } });
+    expect(deprecated).toEqual([
+      "notifiers → notifications.notifiers",
+      "config.notifications → notifications.defaults",
+    ]);
+  });
+
+  it("prefers the grouped notification options over the flat ones", () => {
+    const grouped = { metadata: { kind: "grouped" } } as never;
+    const flat = { metadata: { kind: "flat" } } as never;
+    const { options, deprecated } = normalizeShelfOptions({
+      ...base,
+      notifications: { notifiers: [grouped], defaults: { fromName: "New" } },
+      notifiers: [flat],
+      config: { notifications: { fromName: "Old" } },
+    });
+    expect(options.notifications?.notifiers).toEqual([grouped]);
+    expect(options.config?.notifications?.fromName).toBe("New");
+    expect(deprecated).toEqual([
+      "notifiers → notifications.notifiers (ignored: both set)",
+      "config.notifications → notifications.defaults (ignored: both set)",
+    ]);
+  });
 });

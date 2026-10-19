@@ -145,6 +145,7 @@ export interface ShelfConfig {
   maxInlineUnzipSize?: number;
   viewports?: ShelfViewport[];
   adapters?: Record<string, AdapterSnapshot>;
+  /** @deprecated Use `ShelfOptions.notifications.defaults`. Still read as an alias; removed in ADR 0031 phase 5. */
   notifications?: NotificationsConfig;
 }
 
@@ -305,6 +306,14 @@ export interface ShelfCaptureOptions {
   concurrency?: number;
 }
 
+/** Notification options: who can deliver, and the defaults they share. */
+export interface ShelfNotificationsOptions {
+  /** Provider adapters; a channel's `provider` must name one of these. */
+  notifiers?: NotifierProvider[];
+  /** Site-wide brand and sender defaults for outgoing notifications. */
+  defaults?: NotificationsConfig;
+}
+
 /** Comparison options. */
 export interface ShelfCompareOptions {
   /**
@@ -335,6 +344,12 @@ export interface ShelfOptions {
   gitHosts?: GitHostProvider[];
   /** Design-tool providers (Figma, …) that resolve links, metadata and previews. */
   design?: DesignProvider[];
+  /**
+   * Notification subsystem: provider adapters (Slack, Teams, email, ...) and the brand/sender
+   * defaults they share.
+   */
+  notifications?: ShelfNotificationsOptions;
+  /** @deprecated Use `notifications.notifiers`. Still accepted; removed in ADR 0031 phase 5. */
   notifiers?: NotifierProvider[];
   emailSender?: EmailSender;
   logger?: Logger;

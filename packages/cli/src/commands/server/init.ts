@@ -416,7 +416,7 @@ function buildRouterLines(answers: Answers): string[] {
   }
 
   if (wantsNotifications(answers)) {
-    lines.push(`  notifiers: [...chatNotifiers, ...emailNotifiers],`);
+    lines.push(`  notifications: { notifiers: [...chatNotifiers, ...emailNotifiers] },`);
   }
 
   if (answers.auth === "password") {

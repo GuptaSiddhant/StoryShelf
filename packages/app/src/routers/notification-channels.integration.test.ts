@@ -70,7 +70,7 @@ function appWith(db: ReturnType<typeof makeDatabase>["db"], storage: unknown) {
     database: db,
     storage: storage as never,
     auth: authFor(null),
-    notifiers: [stubProvider("log"), stubProvider("strict", false)],
+    notifications: { notifiers: [stubProvider("log"), stubProvider("strict", false)] },
     logger: pino({ level: "silent" }),
   });
 }

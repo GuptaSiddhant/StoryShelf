@@ -30,7 +30,7 @@ const sender = smtpPreset({ host: "mail.example.com", port: 587, from: "shelf@ex
 const app = createShelfApp({
   database,
   storage,
-  notifiers: [createEmailNotifier(sender, { from: "shelf@example.com" })],
+  notifications: { notifiers: [createEmailNotifier(sender, { from: "shelf@example.com" })] },
   // Optional: invites and password resets share the same transport.
   // auth: createShelfAuth({ db, secret, baseURL, emailSender: sender }),
 });

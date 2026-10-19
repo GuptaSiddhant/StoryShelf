@@ -22,7 +22,7 @@ Pass the providers to `createShelfApp`:
 import { createShelfApp } from "@storyshelf/app";
 import { chatNotifiers } from "@storyshelf/notify-chat";
 
-const app = createShelfApp({ database, storage, notifiers: chatNotifiers });
+const app = createShelfApp({ database, storage, notifications: { notifiers: chatNotifiers } });
 ```
 
 `chatNotifiers` aggregates all three providers. To wire only some, import them individually:

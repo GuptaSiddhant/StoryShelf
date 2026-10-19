@@ -24,6 +24,7 @@ export interface NormalizedShelfOptions {
  * - Nested `capture.{runner,queue,concurrency}` wins over the deprecated flat aliases
  *   (`captureRunner`, `captureQueue`, `config.captureConcurrency`); a flat key that disagrees with
  *   the nested one is reported as ignored.
+ * - Likewise `notifications.{notifiers,defaults}` over `notifiers` and `config.notifications`.
  * - `compare.threads` must be a non-negative integer.
  * - `config.scratchDir` defaults to {@link DEFAULT_SCRATCH_DIR} once something needs it (a runner,
  *   or inline statics extraction); hosting-only deployments stay untouched.
@@ -36,12 +37,18 @@ export function normalizeShelfOptions(raw: ShelfOptions): NormalizedShelfOptions
     queue: raw.capture?.queue ?? raw.captureQueue,
     concurrency: raw.capture?.concurrency ?? raw.config?.captureConcurrency,
   };
-  const config = withDerivedConfig(raw.config, capture);
+  const notifications = {
+    notifiers: raw.notifications?.notifiers ?? raw.notifiers,
+    defaults: raw.notifications?.defaults ?? raw.config?.notifications,
+  };
+  const config = withDerivedConfig(raw.config, capture, notifications.defaults);
   const options: ShelfOptions = {
     ...raw,
     capture,
     captureRunner: capture.runner,
     captureQueue: capture.queue,
+    notifications,
+    notifiers: notifications.notifiers,
     ...(config ? { config } : {}),
   };
   return { options, deprecated };
@@ -50,11 +57,13 @@ export function normalizeShelfOptions(raw: ShelfOptions): NormalizedShelfOptions
 function withDerivedConfig(
   config: ShelfConfig | undefined,
   capture: { runner?: unknown; concurrency?: number },
+  notificationDefaults: ShelfConfig["notifications"],
 ): ShelfConfig | undefined {
   const needsScratch = capture.runner !== undefined || (config?.maxInlineUnzipSize ?? 0) > 0;
   const derived: ShelfConfig = {
     ...config,
     ...(capture.concurrency === undefined ? {} : { captureConcurrency: capture.concurrency }),
+    ...(notificationDefaults === undefined ? {} : { notifications: notificationDefaults }),
     ...(needsScratch ? { scratchDir: config?.scratchDir ?? DEFAULT_SCRATCH_DIR } : {}),
   };
   return Object.keys(derived).length > 0 ? derived : undefined;
@@ -84,6 +93,18 @@ function deprecatedKeys(raw: ShelfOptions): string[] {
     "capture.concurrency",
     raw.config?.captureConcurrency !== undefined,
     raw.capture?.concurrency !== undefined,
+  );
+  note(
+    "notifiers",
+    "notifications.notifiers",
+    raw.notifiers !== undefined,
+    raw.notifications?.notifiers !== undefined,
+  );
+  note(
+    "config.notifications",
+    "notifications.defaults",
+    raw.config?.notifications !== undefined,
+    raw.notifications?.defaults !== undefined,
   );
   return keys;
 }

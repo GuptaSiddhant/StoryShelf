@@ -78,7 +78,7 @@ async function notifyCaptureFailed(
       config,
       ui: options.ui ?? {},
       logger,
-      notifiers: options.notifiers ?? [],
+      notifiers: options.notifications?.notifiers ?? [],
     },
     "sys:capture-failed",
     { buildId, projectId: build.projectId, gitBranch: build.gitBranch },

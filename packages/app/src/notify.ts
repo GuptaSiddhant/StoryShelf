@@ -54,6 +54,7 @@ function reviewUrlForWith(
 
 /** Brand inputs from UI config plus server notification defaults. */
 function brandFor(ui: UIConfig, config: ShelfConfig, reviewUrl?: string): NotificationBrand {
+  /* oxlint-disable typescript/no-deprecated -- the resolved config mirrors notifications.defaults */
   return {
     name: ui.name,
     logo: ui.logo,
@@ -62,6 +63,7 @@ function brandFor(ui: UIConfig, config: ShelfConfig, reviewUrl?: string): Notifi
     fromName: config.notifications?.fromName ?? ui.name,
     footerText: config.notifications?.footerText,
   };
+  /* oxlint-enable typescript/no-deprecated */
 }
 
 /** Convert a stored row to a send-ready view (null when undecryptable). */

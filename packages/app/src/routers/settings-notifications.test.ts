@@ -75,7 +75,7 @@ function testApp(seeded: Seeded, auth: boolean): ReturnType<typeof createShelfAp
     database: seeded.db,
     storage: seeded.storage,
     ...(auth ? { auth: memberAuth } : {}),
-    notifiers: [stubProvider("email"), stubProvider("log")],
+    notifications: { notifiers: [stubProvider("email"), stubProvider("log")] },
     logger: pino({ level: "silent" }),
     config: { secret },
   });

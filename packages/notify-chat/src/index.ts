@@ -13,7 +13,7 @@ export { teamsWorkflowNotifier };
 /** Log-only provider for tests, dev, and unconfigured servers (`log`). */
 export { logNotifier };
 
-/** All chat providers in one list for `ShelfOptions.notifiers`. */
+/** All chat providers in one list for `ShelfOptions.notifications.notifiers`. */
 export const chatNotifiers = [slackWebhookNotifier, teamsWorkflowNotifier, logNotifier];
 
 export type { ChatToggles } from "./types.ts";
