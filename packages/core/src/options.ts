@@ -16,6 +16,7 @@ export const DEFAULT_SCRATCH_DIR: string = join(tmpdir(), "storyshelf");
  */
 export function resolveShelfOptions(options: ShelfOptions): ShelfOptions {
   assertThreads(options.compare?.threads);
+  assertCaptureProcess(options.capture);
   assertNotificationsConfig(options.notifications?.config);
   const needsScratch =
     options.capture?.runner !== undefined || (options.config?.maxInlineUnzipSize ?? 0) > 0;
@@ -23,6 +24,15 @@ export function resolveShelfOptions(options: ShelfOptions): ShelfOptions {
     return options;
   }
   return { ...options, config: { ...options.config, scratchDir: DEFAULT_SCRATCH_DIR } };
+}
+
+function assertCaptureProcess(capture: ShelfOptions["capture"]): void {
+  if (capture?.workerEntry !== undefined && capture.runner === undefined) {
+    throw new Error("capture.workerEntry requires capture.runner (it is the in-process fallback)");
+  }
+  if (capture?.mode === "fork" && capture.workerEntry === undefined) {
+    throw new Error('capture.mode "fork" requires capture.workerEntry');
+  }
 }
 
 function assertThreads(threads: number | undefined): void {
