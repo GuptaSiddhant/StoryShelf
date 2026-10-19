@@ -1,9 +1,10 @@
 /** Per-user opt-in rows for project notifications. */
-import { and, eq, getTableColumns } from "drizzle-orm";
-import type { SQLWrapper, Table } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import type { Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { NotificationSubscriptionRow } from "../schema/notification.ts";
 import { ulid } from "../utils/ulid.ts";
+import { col } from "./columns.ts";
 
 /** Tables required by {@link NotificationSubscriptionModel}. */
 export interface NotificationSubscriptionTables {
@@ -33,8 +34,8 @@ export class NotificationSubscriptionModel {
 
   /** Fetch a user's subscription for a project, or null (null = silent). */
   async getFor(projectId: string, userId: string): Promise<NotificationSubscriptionRow | null> {
-    const projectScope = eq(this.column("projectId"), projectId);
-    const userScope = eq(this.column("userId"), userId);
+    const projectScope = eq(col(this.tables.notificationSubscriptions, "projectId"), projectId);
+    const userScope = eq(col(this.tables.notificationSubscriptions, "userId"), userId);
     const rows = (await this.db.list(this.tables.notificationSubscriptions, {
       where: and(projectScope, userScope),
       limit: 1,
@@ -45,14 +46,14 @@ export class NotificationSubscriptionModel {
   /** List all subscriptions for a project (admin audit). */
   async list(projectId: string): Promise<NotificationSubscriptionRow[]> {
     return (await this.db.list(this.tables.notificationSubscriptions, {
-      where: eq(this.column("projectId"), projectId),
+      where: eq(col(this.tables.notificationSubscriptions, "projectId"), projectId),
     })) as unknown as NotificationSubscriptionRow[];
   }
 
   /** List all subscriptions for a user (profile overview). */
   async listForUser(userId: string): Promise<NotificationSubscriptionRow[]> {
     return (await this.db.list(this.tables.notificationSubscriptions, {
-      where: eq(this.column("userId"), userId),
+      where: eq(col(this.tables.notificationSubscriptions, "userId"), userId),
     })) as unknown as NotificationSubscriptionRow[];
   }
 
@@ -97,10 +98,6 @@ export class NotificationSubscriptionModel {
   /** Decode the JSON-serialized channel list of a subscription. */
   static viaOf(row: NotificationSubscriptionRow): string[] {
     return decodeList(row.via);
-  }
-
-  private column(name: string): SQLWrapper {
-    return getTableColumns(this.tables.notificationSubscriptions)[name] as unknown as SQLWrapper;
   }
 }
 

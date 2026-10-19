@@ -1,9 +1,10 @@
 /** Insight rows: pending/running/done/failed runs with dedupe by unique key. */
-import { and, asc, desc, eq, getTableColumns, inArray, isNull, lt } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, lt } from "drizzle-orm";
 import type { SQL, SQLWrapper, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { InsightKind, InsightRow } from "../schema/insight.ts";
 import { ulid } from "../utils/ulid.ts";
+import { col } from "./columns.ts";
 
 /** Tables required by {@link InsightModel}. */
 export interface InsightTables {
@@ -219,7 +220,7 @@ export class InsightModel {
   }
 
   private col(name: string): SQLWrapper {
-    return getTableColumns(this.tables.insights)[name] as unknown as SQLWrapper;
+    return col(this.tables.insights, name);
   }
 }
 

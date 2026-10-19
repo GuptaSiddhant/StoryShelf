@@ -1,9 +1,10 @@
 /** Provider-reported AI usage rows; budget and hourly limits are counted from them. */
-import { and, asc, eq, getTableColumns, gte, lt } from "drizzle-orm";
+import { and, asc, eq, gte, lt } from "drizzle-orm";
 import type { SQLWrapper, Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { AiUsageRow } from "../schema/insight.ts";
 import { ulid } from "../utils/ulid.ts";
+import { col } from "./columns.ts";
 
 /** Tables required by {@link AiUsageModel}. */
 export interface AiUsageTables {
@@ -86,6 +87,6 @@ export class AiUsageModel {
   }
 
   private col(name: string): SQLWrapper {
-    return getTableColumns(this.tables.aiUsage)[name] as unknown as SQLWrapper;
+    return col(this.tables.aiUsage, name);
   }
 }

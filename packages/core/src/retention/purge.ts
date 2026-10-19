@@ -1,5 +1,5 @@
-import { and, desc, eq, getTableColumns, inArray, lt } from "drizzle-orm";
-import type { SQLWrapper, Table } from "drizzle-orm";
+import { and, desc, eq, inArray, lt } from "drizzle-orm";
+import type { Table } from "drizzle-orm";
 import type { Logger } from "pino";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
@@ -19,6 +19,7 @@ export {
   type SweepResult,
   type SweepTables,
 } from "./screenshot-sweep.ts";
+import { col } from "../models/columns.ts";
 export { purgeAiData, STALE_RUN_MS, type AiPurgeResult } from "./ai.ts";
 
 /** Table handles for retention queries. */
@@ -51,29 +52,22 @@ export class Retention {
     const cutoff = new Date(Date.now() - options.ttlDays * 86_400_000).toISOString();
     const candidates = await this.db.list(this.tables.builds, {
       where: and(
-        eq(getTableColumns(this.tables.builds)["projectId"] as unknown as SQLWrapper, project.id),
-        inArray(getTableColumns(this.tables.builds)["status"] as unknown as SQLWrapper, [
-          ...TERMINAL_BUILD_STATUSES,
-        ]),
-        lt(getTableColumns(this.tables.builds)["updatedAt"] as unknown as SQLWrapper, cutoff),
+        eq(col(this.tables.builds, "projectId"), project.id),
+        inArray(col(this.tables.builds, "status"), [...TERMINAL_BUILD_STATUSES]),
+        lt(col(this.tables.builds, "updatedAt"), cutoff),
       ),
     });
 
     const keep = options.keepLatestPerBranch
       ? await this.latestPerBranch(project.id)
       : new Set<string>();
-    const labelModel = new LabelModel(this.db, this.tables as unknown as LabelTables);
-    const target = await Promise.all(
-      candidates.map(async (build) => {
-        const buildId = (build as { id: string }).id;
-        if (keep.has(buildId) || (await labelModel.hasPersistent(project.id, buildId))) {
-          return null;
-        }
-        return buildId;
-      }),
-    );
-
-    const buildIds = target.filter((id): id is string => id !== null);
+    const persistent = await new LabelModel(
+      this.db,
+      this.tables as unknown as LabelTables,
+    ).persistentBuildIds(project.id);
+    const buildIds = candidates
+      .map((build) => (build as { id: string }).id)
+      .filter((buildId) => !keep.has(buildId) && !persistent.has(buildId));
     const results = await Promise.all(
       buildIds.map(async (buildId) => ({
         files: await this.deleteBuildFiles(project.id, buildId),
@@ -119,11 +113,8 @@ export class Retention {
 
   private async latestPerBranch(projectId: string): Promise<Set<string>> {
     const rows = (await this.db.list(this.tables.builds, {
-      where: eq(
-        getTableColumns(this.tables.builds)["projectId"] as unknown as SQLWrapper,
-        projectId,
-      ),
-      orderBy: desc(getTableColumns(this.tables.builds)["updatedAt"] as unknown as SQLWrapper),
+      where: eq(col(this.tables.builds, "projectId"), projectId),
+      orderBy: desc(col(this.tables.builds, "updatedAt")),
     })) as unknown as { gitBranch: string; id: string }[];
     const latest = new Map<string, string>();
     for (const row of rows) {
@@ -212,10 +203,7 @@ export class Retention {
     }
     const cutoff = new Date(Date.now() - ttlDays * 86_400_000).toISOString();
     const rows = (await this.db.list(this.tables.builds, {
-      where: eq(
-        getTableColumns(this.tables.builds)["projectId"] as unknown as SQLWrapper,
-        project.id,
-      ),
+      where: eq(col(this.tables.builds, "projectId"), project.id),
     })) as unknown as { gitBranch: string; updatedAt: string }[];
     const stale = collectStaleBranches(rows, project.gitDefaultBranch, cutoff);
     if (stale.size === 0) {

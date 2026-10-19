@@ -1,11 +1,12 @@
 /** A user's own OAuth connections to external services: encrypted tokens, lazy refresh on use. */
-import { and, eq, getTableColumns } from "drizzle-orm";
-import type { SQLWrapper, Table } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import type { Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { OAuthClient, OAuthTokens } from "../adapters/oauth.ts";
 import type { UserConnection } from "../schema/connection.ts";
 import { decryptCredential, encrypt, type SecretInput } from "../utils/encrypt.ts";
 import { ulid } from "../utils/ulid.ts";
+import { col } from "./columns.ts";
 
 /** Tables required by {@link ConnectionModel}. */
 export interface ConnectionTables {
@@ -36,10 +37,11 @@ export class ConnectionModel {
 
   /** The connection row (never the plaintext), or null. */
   async info(userId: string, service: string): Promise<UserConnection | null> {
-    const columns = getTableColumns(this.tables.userConnections);
-    const column = (name: string): SQLWrapper => columns[name] as unknown as SQLWrapper;
     const rows = (await this.db.list(this.tables.userConnections, {
-      where: and(eq(column("userId"), userId), eq(column("service"), service)),
+      where: and(
+        eq(col(this.tables.userConnections, "userId"), userId),
+        eq(col(this.tables.userConnections, "service"), service),
+      ),
       limit: 1,
     })) as unknown as UserConnection[];
     return rows[0] ?? null;
@@ -47,9 +49,8 @@ export class ConnectionModel {
 
   /** Every connection of a user (no plaintext), for a "connected apps" list. */
   async listForUser(userId: string): Promise<UserConnection[]> {
-    const columns = getTableColumns(this.tables.userConnections);
     return (await this.db.list(this.tables.userConnections, {
-      where: eq(columns["userId"] as unknown as SQLWrapper, userId),
+      where: eq(col(this.tables.userConnections, "userId"), userId),
     })) as unknown as UserConnection[];
   }
 

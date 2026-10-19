@@ -1,11 +1,12 @@
 /** Snapshot records for captured stories within a build. */
-import { and, eq, getTableColumns, inArray } from "drizzle-orm";
-import type { SQLWrapper, Table } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
+import type { Table } from "drizzle-orm";
 import { DEFAULT_BROWSER } from "../adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { Snapshot } from "../schema/snapshot.ts";
 import type { SnapshotStatus } from "../types.ts";
 import { ulid } from "../utils/ulid.ts";
+import { col } from "./columns.ts";
 
 /** Tables required by {@link SnapshotModel}. */
 export interface SnapshotTables {
@@ -79,10 +80,7 @@ export class SnapshotModel {
 
   async listByBuild(buildId: string): Promise<Snapshot[]> {
     return (await this.db.list(this.tables.snapshots, {
-      where: eq(
-        getTableColumns(this.tables.snapshots)["buildId"] as unknown as SQLWrapper,
-        buildId,
-      ),
+      where: eq(col(this.tables.snapshots, "buildId"), buildId),
     })) as unknown as Snapshot[];
   }
 
@@ -92,11 +90,10 @@ export class SnapshotModel {
    */
   async listByImportPath(projectId: string, importPath: string): Promise<Snapshot[]> {
     const bare = importPath.replace(/^(?:\.\/)+/u, "");
-    const columns = getTableColumns(this.tables.snapshots);
     return (await this.db.list(this.tables.snapshots, {
       where: and(
-        eq(columns["projectId"] as unknown as SQLWrapper, projectId),
-        inArray(columns["storyImportPath"] as unknown as SQLWrapper, [bare, `./${bare}`]),
+        eq(col(this.tables.snapshots, "projectId"), projectId),
+        inArray(col(this.tables.snapshots, "storyImportPath"), [bare, `./${bare}`]),
       ),
     })) as unknown as Snapshot[];
   }

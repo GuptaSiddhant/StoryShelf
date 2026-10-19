@@ -1,10 +1,11 @@
 /** Build records, status transitions, and publication helpers. */
-import { and, desc, eq, getTableColumns, inArray } from "drizzle-orm";
-import type { SQLWrapper, Table } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
+import type { Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { Build } from "../schema/build.ts";
 import type { BuildStatus } from "../types.ts";
 import { ulid } from "../utils/ulid.ts";
+import { col } from "./columns.ts";
 
 /** Tables required by {@link BuildModel}. */
 export interface BuildTables {
@@ -54,50 +55,30 @@ export class BuildModel {
   }
 
   async list(projectId: string, filter: BuildListFilter = {}): Promise<Build[]> {
-    const conditions = [
-      eq(getTableColumns(this.tables.builds)["projectId"] as unknown as SQLWrapper, projectId),
-    ];
+    const conditions = [eq(col(this.tables.builds, "projectId"), projectId)];
     if (filter.status) {
-      conditions.push(
-        eq(getTableColumns(this.tables.builds)["status"] as unknown as SQLWrapper, filter.status),
-      );
+      conditions.push(eq(col(this.tables.builds, "status"), filter.status));
     }
     if (filter.branch) {
-      conditions.push(
-        eq(
-          getTableColumns(this.tables.builds)["gitBranch"] as unknown as SQLWrapper,
-          filter.branch,
-        ),
-      );
+      conditions.push(eq(col(this.tables.builds, "gitBranch"), filter.branch));
     }
     if (filter.labelKey && filter.labelValue) {
       const labels = (await this.db.list(this.tables.buildLabels, {
         where: and(
-          eq(
-            getTableColumns(this.tables.buildLabels)["projectId"] as unknown as SQLWrapper,
-            projectId,
-          ),
-          eq(
-            getTableColumns(this.tables.buildLabels)["typeKey"] as unknown as SQLWrapper,
-            filter.labelKey,
-          ),
-          eq(
-            getTableColumns(this.tables.buildLabels)["value"] as unknown as SQLWrapper,
-            filter.labelValue,
-          ),
+          eq(col(this.tables.buildLabels, "projectId"), projectId),
+          eq(col(this.tables.buildLabels, "typeKey"), filter.labelKey),
+          eq(col(this.tables.buildLabels, "value"), filter.labelValue),
         ),
       })) as unknown as { buildId: string }[];
       const ids = labels.map((l) => l.buildId);
       if (ids.length === 0) {
         return [];
       }
-      conditions.push(
-        inArray(getTableColumns(this.tables.builds)["id"] as unknown as SQLWrapper, ids),
-      );
+      conditions.push(inArray(col(this.tables.builds, "id"), ids));
     }
     return (await this.db.list(this.tables.builds, {
       where: and(...conditions),
-      orderBy: desc(getTableColumns(this.tables.builds)["createdAt"] as unknown as SQLWrapper),
+      orderBy: desc(col(this.tables.builds, "createdAt")),
     })) as unknown as Build[];
   }
 
@@ -156,7 +137,7 @@ export class BuildModel {
 
   async updateCounts(id: string): Promise<Build> {
     const rows = (await this.db.list(this.tables.snapshots, {
-      where: eq(getTableColumns(this.tables.snapshots)["buildId"] as unknown as SQLWrapper, id),
+      where: eq(col(this.tables.snapshots, "buildId"), id),
     })) as unknown as { status: string }[];
     const snapshotCount = rows.length;
     const changedCount = rows.filter((s) => s.status === "changed" || s.status === "new").length;

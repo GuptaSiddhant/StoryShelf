@@ -1,10 +1,11 @@
 /** Design-source links: project-level design files and per-component (story file) mappings. */
-import { eq, getTableColumns } from "drizzle-orm";
-import type { SQLWrapper, Table } from "drizzle-orm";
+import { eq } from "drizzle-orm";
+import type { Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import { InvalidDesignUrlError, parseDesignUrl, type DesignProvider } from "../adapters/design.ts";
 import type { DesignLink } from "../schema/design.ts";
 import { ulid } from "../utils/ulid.ts";
+import { col } from "./columns.ts";
 import { normalizeImportPath } from "./design-resolve.ts";
 
 /** Tables required by {@link DesignModel}. */
@@ -86,7 +87,7 @@ export class DesignModel {
   }
 
   private async links(projectId: string): Promise<DesignLink[]> {
-    const column = getTableColumns(this.tables.designLinks)["projectId"] as unknown as SQLWrapper;
+    const column = col(this.tables.designLinks, "projectId");
     const rows = (await this.db.list(this.tables.designLinks, {
       where: eq(column, projectId),
     })) as unknown as DesignLink[];

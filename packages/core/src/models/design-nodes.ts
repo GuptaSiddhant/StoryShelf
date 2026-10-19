@@ -1,6 +1,6 @@
 /** Design metadata + render cache: TTL refresh, batched per file, bounded concurrency, abortable. */
-import { and, eq, getTableColumns } from "drizzle-orm";
-import type { SQLWrapper, Table } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import type { Table } from "drizzle-orm";
 import type { Buffer } from "node:buffer";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type {
@@ -16,6 +16,7 @@ import type { Logger } from "../logger.ts";
 import type { DesignNode } from "../schema/design.ts";
 import { mapLimit } from "../utils/map-limit.ts";
 import { ulid } from "../utils/ulid.ts";
+import { col } from "./columns.ts";
 import type { ConnectionModel } from "./connections.ts";
 import { PROJECT_SCOPE, type DesignCredentialModel } from "./design-credentials.ts";
 import { DESIGN_TTL_MS } from "./design-health.ts";
@@ -278,15 +279,13 @@ export class DesignNodeModel {
     ref: DesignRef,
     scope: string,
   ): Promise<DesignNode | null> {
-    const columns = getTableColumns(this.tables.designNodes);
-    const column = (name: string): SQLWrapper => columns[name] as unknown as SQLWrapper;
     const rows = (await this.db.list(this.tables.designNodes, {
       where: and(
-        eq(column("projectId"), projectId),
-        eq(column("provider"), provider),
-        eq(column("viewerId"), scope),
-        eq(column("fileKey"), ref.fileKey),
-        eq(column("nodeId"), ref.nodeId ?? ""),
+        eq(col(this.tables.designNodes, "projectId"), projectId),
+        eq(col(this.tables.designNodes, "provider"), provider),
+        eq(col(this.tables.designNodes, "viewerId"), scope),
+        eq(col(this.tables.designNodes, "fileKey"), ref.fileKey),
+        eq(col(this.tables.designNodes, "nodeId"), ref.nodeId ?? ""),
       ),
       limit: 1,
     })) as unknown as DesignNode[];

@@ -1,10 +1,11 @@
 /** Encrypted design-provider credentials: the project-wide token an admin pastes. */
-import { and, eq, getTableColumns } from "drizzle-orm";
-import type { SQLWrapper, Table } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import type { Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { DesignCredential } from "../schema/design.ts";
 import { decryptCredential, encrypt, type SecretInput } from "../utils/encrypt.ts";
 import { ulid } from "../utils/ulid.ts";
+import { col } from "./columns.ts";
 import type { DesignCredentialStatus } from "./design-resolve.ts";
 
 /** Tables required by {@link DesignCredentialModel}. */
@@ -37,10 +38,11 @@ export class DesignCredentialModel {
 
   /** The credential row (never the plaintext), or null. */
   async info(projectId: string, provider: string): Promise<DesignCredential | null> {
-    const columns = getTableColumns(this.tables.designCredentials);
-    const column = (name: string): SQLWrapper => columns[name] as unknown as SQLWrapper;
     const rows = (await this.db.list(this.tables.designCredentials, {
-      where: and(eq(column("projectId"), projectId), eq(column("provider"), provider)),
+      where: and(
+        eq(col(this.tables.designCredentials, "projectId"), projectId),
+        eq(col(this.tables.designCredentials, "provider"), provider),
+      ),
       limit: 1,
     })) as unknown as DesignCredential[];
     return rows[0] ?? null;

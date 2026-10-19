@@ -1,9 +1,10 @@
 /** Mark-and-sweep for a project's content-addressed screenshots. */
-import { and, eq, getTableColumns, like } from "drizzle-orm";
-import type { Column, Table } from "drizzle-orm";
+import { and, eq, like } from "drizzle-orm";
+import type { Table } from "drizzle-orm";
 import type { Logger } from "pino";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
+import { col } from "../models/columns.ts";
 import { contentDir } from "../utils/paths.ts";
 
 /** Longest an unreferenced screenshot is kept after the sweep first sees it (default 24 h). */
@@ -102,8 +103,8 @@ async function referencedPaths(deps: SweepDeps, projectId: string): Promise<Set<
       async (table) =>
         (await deps.db.list(table, {
           where: and(
-            eq(column(table, "projectId"), projectId),
-            like(column(table, "screenshotPath"), `${contentDir(projectId)}/%`),
+            eq(col(table, "projectId"), projectId),
+            like(col(table, "screenshotPath"), `${contentDir(projectId)}/%`),
           ),
         })) as unknown as { screenshotPath: string }[],
     ),
@@ -118,8 +119,8 @@ async function isReferenced(deps: SweepDeps, projectId: string, path: string): P
         (
           await deps.db.list(table, {
             where: and(
-              eq(column(table, "projectId"), projectId),
-              eq(column(table, "screenshotPath"), path),
+              eq(col(table, "projectId"), projectId),
+              eq(col(table, "screenshotPath"), path),
             ),
             limit: 1,
           })
@@ -127,10 +128,6 @@ async function isReferenced(deps: SweepDeps, projectId: string, path: string): P
     ),
   );
   return hits.some(Boolean);
-}
-
-function column(table: Table, name: string): Column {
-  return getTableColumns(table)[name] as Column;
 }
 
 async function readMarker(storage: StorageAdapter, dir: string): Promise<Record<string, number>> {

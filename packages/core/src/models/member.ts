@@ -1,10 +1,11 @@
 /** Project membership and role resolution. */
-import { and, eq, getTableColumns } from "drizzle-orm";
-import type { SQLWrapper, Table } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import type { Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { ProjectMember } from "../schema/member.ts";
 import type { ProjectRole, SiteRole } from "../types.ts";
 import { ulid } from "../utils/ulid.ts";
+import { col } from "./columns.ts";
 
 /** Tables required by {@link MemberModel}. */
 export interface MemberTables {
@@ -28,10 +29,7 @@ export class MemberModel {
   /** List all members of a project. */
   async list(projectId: string): Promise<ProjectMember[]> {
     return (await this.db.list(this.tables.projectMembers, {
-      where: eq(
-        getTableColumns(this.tables.projectMembers)["projectId"] as unknown as SQLWrapper,
-        projectId,
-      ),
+      where: eq(col(this.tables.projectMembers, "projectId"), projectId),
     })) as unknown as ProjectMember[];
   }
 
@@ -39,11 +37,8 @@ export class MemberModel {
   async get(projectId: string, userId: string): Promise<ProjectMember | null> {
     const rows = (await this.db.list(this.tables.projectMembers, {
       where: and(
-        eq(
-          getTableColumns(this.tables.projectMembers)["projectId"] as unknown as SQLWrapper,
-          projectId,
-        ),
-        eq(getTableColumns(this.tables.projectMembers)["userId"] as unknown as SQLWrapper, userId),
+        eq(col(this.tables.projectMembers, "projectId"), projectId),
+        eq(col(this.tables.projectMembers, "userId"), userId),
       ),
       limit: 1,
     })) as unknown as ProjectMember[];

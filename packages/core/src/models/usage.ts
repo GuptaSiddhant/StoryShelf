@@ -1,9 +1,10 @@
 /** Per-build package usage and cross-project package links. */
-import { and, eq, getTableColumns } from "drizzle-orm";
-import type { SQL, SQLWrapper, Table } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import type { SQL, Table } from "drizzle-orm";
 import type { DatabaseAdapter, TxStore } from "../adapters/database.ts";
 import type { BuildPackageUsage, ProjectLink } from "../schema/usage.ts";
 import { ulid } from "../utils/ulid.ts";
+import { col } from "./columns.ts";
 
 /** Tables required by {@link PackageUsageModel}. */
 export interface PackageUsageTables {
@@ -130,18 +131,17 @@ export class PackageUsageModel {
   async listLinks(downstreamId: string): Promise<ProjectLink[]> {
     const table = this.tables.projectLinks;
     return (await this.db.list(table, {
-      where: eq(getTableColumns(table)["downstreamId"] as unknown as SQLWrapper, downstreamId),
+      where: eq(col(table, "downstreamId"), downstreamId),
     })) as unknown as ProjectLink[];
   }
 
   /** List the usage rows of one story file within a build. */
   async listForStory(buildId: string, storyImportPath: string): Promise<BuildPackageUsage[]> {
     const table = this.tables.buildPackageUsage;
-    const columns = getTableColumns(table);
     return (await this.db.list(table, {
       where: and(
-        eq(columns["buildId"] as unknown as SQLWrapper, buildId),
-        eq(columns["storyImportPath"] as unknown as SQLWrapper, storyImportPath),
+        eq(col(table, "buildId"), buildId),
+        eq(col(table, "storyImportPath"), storyImportPath),
       ),
     })) as unknown as BuildPackageUsage[];
   }
@@ -157,7 +157,7 @@ export class PackageUsageModel {
     links: readonly { upstreamId: string; packageName: string }[],
   ): Promise<ProjectLink[]> {
     const table = this.tables.projectLinks;
-    const where = eq(getTableColumns(table)["downstreamId"] as unknown as SQLWrapper, downstreamId);
+    const where = eq(col(table, "downstreamId"), downstreamId);
     const createdAt = new Date().toISOString();
     return await serialized(
       `links:${downstreamId}`,
@@ -186,8 +186,7 @@ export class PackageUsageModel {
   }
 
   private buildWhere(buildId: string): SQL {
-    const column = getTableColumns(this.tables.buildPackageUsage)["buildId"];
-    return eq(column as unknown as SQLWrapper, buildId);
+    return eq(col(this.tables.buildPackageUsage, "buildId"), buildId);
   }
 }
 

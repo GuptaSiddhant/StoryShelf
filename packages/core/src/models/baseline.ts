@@ -1,7 +1,7 @@
 /* oxlint-disable typescript/promise-function-async -- map callbacks return promises from async helpers */
 /** Per-branch baseline screenshots with default-branch fallback. */
-import { and, eq, getTableColumns } from "drizzle-orm";
-import type { SQLWrapper, Table } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import type { Table } from "drizzle-orm";
 import { DEFAULT_BROWSER } from "../adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
@@ -11,6 +11,7 @@ import type { SecretInput } from "../utils/encrypt.ts";
 import { isContentPath } from "../utils/paths.ts";
 import { storeScreenshot } from "../utils/screenshot-store.ts";
 import { ulid } from "../utils/ulid.ts";
+import { col } from "./columns.ts";
 import type { WebhookTables } from "./webhook.ts";
 
 /** Extra identity/metadata for {@link BaselineModel.upsert}. */
@@ -59,14 +60,11 @@ export class BaselineModel {
   ): Promise<Baseline | null> {
     const rows = (await this.db.list(this.tables.baselines, {
       where: and(
-        eq(getTableColumns(this.tables.baselines)["projectId"] as unknown as SQLWrapper, projectId),
-        eq(getTableColumns(this.tables.baselines)["storyId"] as unknown as SQLWrapper, storyId),
-        eq(
-          getTableColumns(this.tables.baselines)["viewportName"] as unknown as SQLWrapper,
-          viewport,
-        ),
-        eq(getTableColumns(this.tables.baselines)["branch"] as unknown as SQLWrapper, branch),
-        eq(getTableColumns(this.tables.baselines)["browser"] as unknown as SQLWrapper, browser),
+        eq(col(this.tables.baselines, "projectId"), projectId),
+        eq(col(this.tables.baselines, "storyId"), storyId),
+        eq(col(this.tables.baselines, "viewportName"), viewport),
+        eq(col(this.tables.baselines, "branch"), branch),
+        eq(col(this.tables.baselines, "browser"), browser),
       ),
       limit: 1,
     })) as unknown as Baseline[];
@@ -94,8 +92,8 @@ export class BaselineModel {
   async hasAny(projectId: string, browser: string): Promise<boolean> {
     const rows = (await this.db.list(this.tables.baselines, {
       where: and(
-        eq(getTableColumns(this.tables.baselines)["projectId"] as unknown as SQLWrapper, projectId),
-        eq(getTableColumns(this.tables.baselines)["browser"] as unknown as SQLWrapper, browser),
+        eq(col(this.tables.baselines, "projectId"), projectId),
+        eq(col(this.tables.baselines, "browser"), browser),
       ),
       limit: 1,
     })) as unknown as Baseline[];
@@ -212,10 +210,7 @@ export class BaselineModel {
 
   async list(projectId: string): Promise<Baseline[]> {
     return (await this.db.list(this.tables.baselines, {
-      where: eq(
-        getTableColumns(this.tables.baselines)["projectId"] as unknown as SQLWrapper,
-        projectId,
-      ),
+      where: eq(col(this.tables.baselines, "projectId"), projectId),
     })) as unknown as Baseline[];
   }
 
