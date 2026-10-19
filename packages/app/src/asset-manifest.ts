@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { findAsset } from "./asset-paths.ts";
 import { contentHash, iconSprite, iconSpriteHash, iconSpriteHref } from "./ui/icons/sprite.ts";
+import { clientScript } from "./ui/shell/client-script.ts";
 
 /**
  * Static assets with content-addressed URLs. A URL that embeds the content
@@ -17,7 +18,12 @@ const htmxHash = contentHash(htmxSource);
 const markSource = readFileSync(findAsset("mark.svg", import.meta.url), "utf8");
 const markHash = contentHash(markSource);
 
+/** The shell's interactive behaviour; static, so it is served as a cacheable file. */
+const clientSource = clientScript();
+const clientHash = contentHash(clientSource);
+
 export const assetManifest = {
+  client: { source: clientSource, hash: clientHash, href: `/assets/client-${clientHash}.js` },
   htmx: { source: htmxSource, hash: htmxHash, href: `/assets/htmx-${htmxHash}.js` },
   icons: { source: iconSprite, hash: iconSpriteHash, href: iconSpriteHref },
   mark: { source: markSource, hash: markHash, href: `/assets/mark-${markHash}.svg` },

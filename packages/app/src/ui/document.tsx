@@ -6,7 +6,6 @@ import { getStore } from "../store.ts";
 import { Style, css } from "./css.ts";
 import { BareShell } from "./shell/bare.tsx";
 import { bootScript } from "./shell/boot-script.ts";
-import { clientScript } from "./shell/client-script.ts";
 import type { NavConfig } from "./shell/nav.ts";
 import { Sidebar } from "./shell/sidebar.tsx";
 import { ToastRegion, TopBar } from "./shell/topbar.tsx";
@@ -133,7 +132,7 @@ export const DocumentLayout: FC<{
           )}
           <ToastRegion />
           <script src={assetManifest.htmx.href} />
-          <script dangerouslySetInnerHTML={{ __html: clientScript() }} />
+          <script src={assetManifest.client.href} />
         </body>
       </html>
     </>
