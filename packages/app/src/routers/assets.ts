@@ -34,12 +34,16 @@ function serveHashed(c: Context, asset: Asset, requestedHash: string): Response 
   });
 }
 
-/** Register the static-asset routes (HTMX bundle and icon sprite). */
+/** Register the static-asset routes (HTMX bundle, shell script, icon sprite and mark). */
 export function registerAssets(app: ShelfRouter): void {
-  const { htmx, icons, mark } = assetManifest;
+  const { client, htmx, icons, mark } = assetManifest;
   app.get(String.raw`/assets/:file{htmx-[a-f0-9]+\.js}`, (c) => {
     const hash = (c.req.param("file") ?? "").replaceAll(/^htmx-|\.js$/gu, "");
     return serveHashed(c, { ...htmx, contentType: "application/javascript" }, hash);
+  });
+  app.get(String.raw`/assets/:file{client-[a-f0-9]+\.js}`, (c) => {
+    const hash = (c.req.param("file") ?? "").replaceAll(/^client-|\.js$/gu, "");
+    return serveHashed(c, { ...client, contentType: "application/javascript" }, hash);
   });
   app.get(String.raw`/assets/:file{icons-[a-f0-9]+\.svg}`, (c) => {
     const hash = (c.req.param("file") ?? "").replaceAll(/^icons-|\.svg$/gu, "");

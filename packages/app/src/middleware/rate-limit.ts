@@ -1,11 +1,11 @@
-import type { Context, Next } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 
 interface RateLimitEntry {
   count: number;
   resetAt: number;
 }
 
-interface RateLimitOptions {
+export interface RateLimitOptions {
   windowMs: number;
   max: number;
   keyGenerator?: (c: Context) => string;
@@ -46,48 +46,56 @@ export function rateLimitKey(prefix: string): (c: Context) => string {
   };
 }
 
-const stores = new Map<string, RateLimitEntry>();
-
 /** Cap tracked buckets (spoofed keys would otherwise grow the map forever). */
 const MAX_BUCKETS = 10_000;
+const SWEEP_INTERVAL_MS = 60_000;
 
-function cleanup(): void {
-  const now = Date.now();
-  for (const [key, entry] of stores) {
-    if (now > entry.resetAt) {
-      stores.delete(key);
-    }
-  }
-}
+/**
+ * Create a rate limiter with its own bucket store, so each app instance
+ * counts independently. Limiters built from the same `rateLimit` factory that
+ * resolve to the same key share one counter (e.g. `/api/v1/*` and
+ * `/api/v1/tokens/*` both bill the caller's `api:` bucket).
+ */
+export function createRateLimiter(): (options: RateLimitOptions) => MiddlewareHandler {
+  const stores = new Map<string, RateLimitEntry>();
+  let lastSweep = Date.now();
 
-setInterval(cleanup, 60_000).unref();
-
-/** Hono middleware limiting requests per key within a sliding window. */
-export function rateLimit(options: RateLimitOptions) {
-  const { windowMs, max, keyGenerator } = options;
-  // oxlint-disable-next-line typescript/no-invalid-void-type -- Hono middleware may not return Response
-  return async (c: Context, next: Next): Promise<Response | void> => {
-    const key = keyGenerator ? keyGenerator(c) : rateLimitKey("api")(c);
-    const now = Date.now();
-    let entry = stores.get(key);
-    if (!entry || now > entry.resetAt) {
-      entry = { count: 0, resetAt: now + windowMs };
-      if (stores.size >= MAX_BUCKETS) {
-        const oldest = stores.keys().next();
-        if (!oldest.done) {
-          stores.delete(oldest.value);
-        }
+  const sweep = (now: number): void => {
+    lastSweep = now;
+    for (const [key, entry] of stores) {
+      if (now > entry.resetAt) {
+        stores.delete(key);
       }
-      stores.set(key, entry);
     }
-    entry.count += 1;
-    if (entry.count > max) {
-      const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
-      c.header("Retry-After", String(retryAfter));
-      return c.json({ error: "Too many requests" }, 429);
-    }
-    c.header("X-RateLimit-Limit", String(max));
-    c.header("X-RateLimit-Remaining", String(Math.max(0, max - entry.count)));
-    await next();
+  };
+
+  return (options) => {
+    const { windowMs, max, keyGenerator } = options;
+    return async (c, next) => {
+      const key = keyGenerator ? keyGenerator(c) : rateLimitKey("api")(c);
+      const now = Date.now();
+      if (now - lastSweep > SWEEP_INTERVAL_MS) {
+        sweep(now);
+      }
+      let entry = stores.get(key);
+      if (!entry || now > entry.resetAt) {
+        entry = { count: 0, resetAt: now + windowMs };
+        if (stores.size >= MAX_BUCKETS) {
+          const oldest = stores.keys().next();
+          if (!oldest.done) {
+            stores.delete(oldest.value);
+          }
+        }
+        stores.set(key, entry);
+      }
+      entry.count += 1;
+      if (entry.count > max) {
+        c.header("Retry-After", String(Math.ceil((entry.resetAt - now) / 1000)));
+        return c.json({ error: "Too many requests" }, 429);
+      }
+      c.header("X-RateLimit-Limit", String(max));
+      c.header("X-RateLimit-Remaining", String(Math.max(0, max - entry.count)));
+      return await next();
+    };
   };
 }

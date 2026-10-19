@@ -57,6 +57,29 @@ Global viewports live in `ShelfConfig.viewports` (or project settings). Per-stor
 
 Configure via server config or project patch. The queue then fans out `stories × viewports` renders at `capture.concurrency`.
 
+## Capturing in a child process
+
+By default the server renders in its own process, so a browser crash or a runaway capture shares a process with the web UI. Set `capture.workerEntry` to run captures in a forked child instead:
+
+```ts
+// capture-worker.ts — the module named by capture.workerEntry
+import { runCaptureChild } from "@storyshelf/worker";
+
+await runCaptureChild({ db: database, storage, runner, scratchDir });
+```
+
+```ts
+const app = createShelfApp({
+  database,
+  storage,
+  capture: { runner, workerEntry: new URL("./capture-worker.ts", import.meta.url).pathname },
+});
+```
+
+The server keeps the queue and its status; the child pulls jobs over IPC and shares the server's database and storage. If the child crashes, its in-flight jobs are requeued and the child restarts; a job that crashes it repeatedly is failed. After repeated crashes (3 in 5 minutes) or a failed fork, capture falls back to the in-process queue.
+
+`capture.mode` controls this: `auto` (default) forks only when `workerEntry` is set and the host has at least 2 CPUs and 2 GB; `in-process` never forks; `fork` always forks and fails at boot if it cannot. `capture.runner` is still required, since it serves the fallback. `SIGTERM` lets the child finish its current captures; if the server disappears, the child exits at once.
+
 ## Content-addressed storage
 
 Published Storybooks are deduplicated by content hash. `persistStorybookStatics` (`core/capture/statics.ts`) `sha256`s every file, writes once to `content/<hash>` (`storage.write(content/<hash>, buffer)` if missing), upserts `content_refs { hash, refCount, lastSeenAt }` via `db.tables.contentRefs` (type-safe `DatabaseAdapter.tables`, no `as never`), and writes a per-build `manifest.json` (`{ "assets/index.js": "abc..." }`). Serving prefers `manifest.json` → `content/<hash>` with `readWithManifestFallback`, falling back to the legacy per-build copy during migration. Uploads use the same dedup: `POST /dedup { hashes }` → `needed`, batch `POST /content` (multipart, `80%` bytes fallback `neededBytes/totalBytes > 0.8` → `PUT zip`), then `POST /manifest` — see [Publishing](/concepts/publishing/) and ADR 0020.

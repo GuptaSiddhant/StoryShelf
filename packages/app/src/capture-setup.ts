@@ -18,6 +18,7 @@ import type { Logger } from "@storyshelf/core/logger";
 import { BuildModel } from "@storyshelf/core/models";
 import { recommendedBuildConcurrency } from "@storyshelf/core/utils";
 import { captureMetrics, currentTraceparent } from "@storyshelf/observability";
+import { createForkedQueue, shouldForkCapture } from "./capture-process.ts";
 import { credentialKeys } from "./credential-keys.ts";
 import { notifySystemWith } from "./notify.ts";
 import { CAPTURE_LEASE_MS, createStalledHandler } from "./stalled-capture.ts";
@@ -84,6 +85,29 @@ async function notifyCaptureFailed(
     "sys:capture-failed",
     { buildId, projectId: build.projectId, gitBranch: build.gitBranch },
   );
+}
+
+/** The in-process queue, or a forked child fronting it when `capture.workerEntry` and the host allow. */
+function pickProcessQueue(
+  options: ShelfOptions,
+  config: ShelfConfig,
+  logger: Logger,
+  inProcess: CaptureQueue,
+): CaptureQueue {
+  const workerEntry = options.capture?.workerEntry;
+  if (!workerEntry || !shouldForkCapture(options.capture, logger)) {
+    return inProcess;
+  }
+  return createForkedQueue({
+    workerEntry,
+    concurrency: options.capture?.concurrency,
+    fallback: inProcess,
+    onSettled: async (job) => {
+      // Notifications stay in this process; the build's own status says whether the capture failed.
+      await notifyCaptureFailed(options, config, logger, job.buildId);
+    },
+    logger,
+  });
 }
 
 /** Assemble the capture queue and its enqueue hook. */
@@ -159,20 +183,20 @@ export function setupCaptureQueue(
       await enqueueCapture(buildId);
     },
   };
+  const inProcessQueue = new InMemoryCaptureQueue({
+    concurrency: options.capture?.concurrency ?? recommendedBuildConcurrency(),
+    logger,
+    leaseMs: CAPTURE_LEASE_MS,
+    onStalled: createStalledHandler({ runner: options.capture?.runner, recovery, logger }),
+    runJob: async (job: CaptureDispatchJob, lease): Promise<void> => {
+      await timedRunJob(async (dispatched) => await runJob(dispatched, lease), job);
+      // In-process completions only: remote-queue workers own their own
+      // alerting (the server never sees those outcomes).
+      await notifyCaptureFailed(options, config, logger, job.buildId);
+    },
+  });
   const captureQueue =
-    options.capture?.queue ??
-    new InMemoryCaptureQueue({
-      concurrency: options.capture?.concurrency ?? recommendedBuildConcurrency(),
-      logger,
-      leaseMs: CAPTURE_LEASE_MS,
-      onStalled: createStalledHandler({ runner: options.capture?.runner, recovery, logger }),
-      runJob: async (job: CaptureDispatchJob, lease): Promise<void> => {
-        await timedRunJob(async (dispatched) => await runJob(dispatched, lease), job);
-        // In-process completions only: remote-queue workers own their own
-        // alerting (the server never sees those outcomes).
-        await notifyCaptureFailed(options, config, logger, job.buildId);
-      },
-    });
+    options.capture?.queue ?? pickProcessQueue(options, config, logger, inProcessQueue);
   const enqueueCapture = async (buildId: string, reqId?: string): Promise<void> => {
     await enqueueJob(captureQueue, buildId, reqId);
   };
