@@ -74,7 +74,7 @@
     "import/exports-last": "allow",
     "import/group-exports": "allow",
     "import/max-dependencies": "allow",
-    "import/no-cycle": "warn",
+    "import/no-cycle": "error",
     "import/no-relative-parent-imports": "allow",
     "import/no-namespace": "allow",
     "import/prefer-default-export": "allow",

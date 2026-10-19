@@ -72,6 +72,27 @@ export class StatusConfigModel {
     return decryptCredential(this.secret, row.tokenEncrypted);
   }
 
+  /**
+   * Turn a stored row into what a provider needs: the matching provider, its
+   * validated config and the decrypted token. Callers decide how loudly to
+   * report each failure `reason`.
+   */
+  resolveRow(row: ProjectStatusConfig, providers: readonly GitHostProvider[]): ResolvedStatusRow {
+    const provider = providers.find((candidate) => candidate.metadata.kind === row.provider);
+    if (!provider) {
+      return { ok: false, reason: "no-provider" };
+    }
+    const config = validRowConfig(row, provider);
+    if (!config.ok) {
+      return { ok: false, reason: "invalid-config", error: config.error };
+    }
+    try {
+      return { ok: true, provider, config: config.value, token: this.decryptToken(row) };
+    } catch (error: unknown) {
+      return { ok: false, reason: "undecryptable-token", error };
+    }
+  }
+
   /** Parse the JSON config column. */
   static parseConfig(row: ProjectStatusConfig): unknown {
     return JSON.parse(row.config) as unknown;
@@ -116,3 +137,23 @@ export interface StatusConfigCreateInput {
 export type StatusConfigValidation =
   | { ok: true; provider: GitHostProvider; config: unknown }
   | { ok: false; field: "provider" | "config"; message: string };
+
+/** Result of {@link StatusConfigModel.resolveRow}. */
+export type ResolvedStatusRow =
+  | { ok: true; provider: GitHostProvider; config: unknown; token: string }
+  | { ok: false; reason: "no-provider" }
+  | { ok: false; reason: "invalid-config" | "undecryptable-token"; error: unknown };
+
+/** Parse a row's JSON config and validate it against the provider's schema. */
+function validRowConfig(
+  row: ProjectStatusConfig,
+  provider: GitHostProvider,
+): { ok: true; value: unknown } | { ok: false; error: unknown } {
+  try {
+    const value = StatusConfigModel.parseConfig(row);
+    provider.metadata.schema.parse(value);
+    return { ok: true, value };
+  } catch (error: unknown) {
+    return { ok: false, error };
+  }
+}

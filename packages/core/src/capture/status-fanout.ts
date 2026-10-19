@@ -3,9 +3,32 @@ import type { Logger } from "pino";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import { buildCommentMarkdown } from "../adapters/git-host/helpers.ts";
 import type { CheckStatus, GitHostProvider } from "../adapters/git-host/index.ts";
-import { StatusConfigModel, type StatusConfigTables } from "../models/status-config.ts";
+import {
+  StatusConfigModel,
+  type ResolvedStatusRow,
+  type StatusConfigTables,
+} from "../models/status-config.ts";
 import type { Project } from "../schema/project.ts";
 import type { SecretInput } from "../utils/encrypt.ts";
+
+const UNRESOLVED_MESSAGES = {
+  "no-provider": "no provider registered for status config",
+  "invalid-config": "invalid status config",
+  "undecryptable-token": "failed to decrypt status token",
+} as const;
+
+/** Log why a status-config row could not be used. */
+function logUnresolved(
+  logger: Logger | undefined,
+  provider: string,
+  failure: Exclude<ResolvedStatusRow, { ok: true }>,
+): void {
+  const error = "error" in failure ? failure.error : undefined;
+  logger?.warn(
+    { ...(error === undefined ? {} : { err: error }), provider },
+    UNRESOLVED_MESSAGES[failure.reason],
+  );
+}
 
 /** Post build check statuses (and review comments) to every configured git provider. */
 async function postStatusesForBuild(opts: {
@@ -34,26 +57,12 @@ async function postStatusesForBuild(opts: {
   const ctx = `storyshelf/${opts.project.slug}`;
   await Promise.allSettled(
     rows.map(async (row) => {
-      const provider = opts.providers.find((p) => p.metadata.kind === row.provider);
-      if (!provider) {
-        opts.logger?.warn({ provider: row.provider }, "no provider registered for status config");
+      const resolved = model.resolveRow(row, opts.providers);
+      if (!resolved.ok) {
+        logUnresolved(opts.logger, row.provider, resolved);
         return;
       }
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(row.config);
-        provider.metadata.schema.parse(parsed);
-      } catch (error: unknown) {
-        opts.logger?.warn({ err: error, provider: row.provider }, "invalid status config");
-        return;
-      }
-      let token: string;
-      try {
-        token = model.decryptToken(row);
-      } catch (error: unknown) {
-        opts.logger?.warn({ err: error }, "failed to decrypt status token");
-        return;
-      }
+      const { provider, config: parsed, token } = resolved;
       const adapter = provider.create({ config: parsed, token, logger: opts.logger });
       await adapter.setStatus({
         context: ctx,

@@ -82,6 +82,7 @@ export { ProjectGroupMappingModel } from "./project-group-mapping.ts";
 export { SnapshotModel, type SnapshotCreateInput } from "./snapshot.ts";
 export {
   StatusConfigModel,
+  type ResolvedStatusRow,
   type StatusConfigCreateInput,
   type StatusConfigValidation,
 } from "./status-config.ts";
