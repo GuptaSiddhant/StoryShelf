@@ -22,13 +22,13 @@ import { createShelfApp } from "@storyshelf/app";
 const app = createShelfApp({
   database, // DatabaseAdapter
   storage, // StorageAdapter
-  captureRunner, // CaptureRunner (optional)
+  capture: { runner: captureRunner, concurrency: 2 }, // capture pipeline (optional; absent = Storybook hosting only)
+  compare: { threads: 2 }, // screenshot comparison threads (optional)
   auth, // Auth from @storyshelf/auth (optional)
   gitHosts, // GitHostProvider[] (optional)
   logger, // pino Logger (optional; built internally if omitted)
   ui: { name: "My Shelf" }, // UIConfig (optional)
   config: {
-    captureConcurrency: 2,
     purgeTtlDays: 30,
     branchTtlDays: 30,
     branchGcIntervalMs: 86_400_000,
@@ -49,8 +49,9 @@ Assembles the router from the provided adapters. `ShelfOptions`:
 | --------------- | --------------------------- | ---------------------------------------------------------------------------------------- |
 | `database`      | `DatabaseAdapter`           | **Required.** Data access.                                                               |
 | `storage`       | `StorageAdapter`            | **Required.** Blob storage for screenshots, diffs, storybook archives.                   |
-| `captureRunner` | `CaptureRunner`             | Optional. Enables the async capture pipeline (pure renderer).                            |
-| `captureQueue`  | `CaptureQueue`              | Optional. Queue adapter; defaults to `InMemoryCaptureQueue`.                             |
+| `capture`       | `{ runner?, queue?, concurrency? }` | Optional. Enables the async capture pipeline: `runner` (pure renderer), `queue` (defaults to `InMemoryCaptureQueue`), `concurrency` (builds at once; default 2 on hosts with ≥ 2 CPUs and ≥ 3 GB, otherwise 1). Absent means Storybook hosting only. |
+| `compare`       | `{ threads? }`              | Optional. Worker threads for pixel diffs (default CPU count − 1; `0` = main thread). Also serves the re-diff endpoint. Overrides `STORYSHELF_DIFF_WORKERS`. |
+| `captureRunner` / `captureQueue` | —            | Deprecated aliases for `capture.runner` / `capture.queue`; a boot warning is logged. Removed in a future major. |
 | `auth`          | `Auth` (`@storyshelf/auth`) | Optional. Enables auth and the login UI.                                                 |
 | `gitHosts`      | `GitHostProvider[]`         | Optional. Git-host adapters (GitHub/GitLab) for status checks, merge gates, PR comments. |
 | `logger`        | `Logger` (pino)             | Optional. Shared logger. Construct a fallback via `createShelfLogger()`.                 |
@@ -63,8 +64,7 @@ Assembles the router from the provided adapters. `ShelfOptions`:
 interface ShelfConfig {
   secret?: string; // session signing secret
   publishedBaseDomain?: string; // for published storybook URLs
-  captureConcurrency?: number; // concurrent capture jobs; default 2 on hosts with ≥ 2 CPUs and ≥ 3 GB, otherwise 1 (each job drives its own browser)
-  scratchDir?: string; // capture working directory (required with captureRunner)
+  scratchDir?: string; // capture working directory (default: <os.tmpdir()>/storyshelf)
   purgeTtlDays?: number; // purge builds older than N days
   branchTtlDays?: number | null; // branch baseline TTL, days; null disables GC (default 30)
   branchGcIntervalMs?: number; // branch GC interval, ms; daily via interval clock (default 86_400_000)

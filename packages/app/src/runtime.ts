@@ -26,11 +26,11 @@ function addOptionalSnapshots(
   snap: Record<string, AdapterMetadata | GitAdapterMetadata>,
   options: ShelfOptions,
 ): void {
-  if (options.captureRunner) {
-    snap["captureRunner"] = options.captureRunner.metadata;
+  if (options.capture?.runner) {
+    snap["captureRunner"] = options.capture.runner.metadata;
   }
-  if (options.captureQueue) {
-    snap["captureQueue"] = options.captureQueue.metadata;
+  if (options.capture?.queue) {
+    snap["captureQueue"] = options.capture.queue.metadata;
   }
 }
 

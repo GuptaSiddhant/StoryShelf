@@ -97,7 +97,7 @@ const emailNotifiers = emailSender
 const app = createShelfApp({
   database,
   storage,
-  captureRunner,
+  capture: { runner: captureRunner },
   design: [createFigmaDesign({ oauth: figmaOAuthFromEnv() })],
   notifiers: [...chatNotifiers, ...emailNotifiers],
   auth:

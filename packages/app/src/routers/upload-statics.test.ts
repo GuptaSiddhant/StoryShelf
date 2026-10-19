@@ -124,8 +124,7 @@ describe("upload inline statics", () => {
       database: db,
       storage,
       logger: silentLogger,
-      captureQueue: queue,
-      captureRunner: makeRunner(),
+      capture: { queue, runner: makeRunner() },
       config: { scratchDir, maxInlineUnzipSize: 1024 * 1024 },
     });
     const { slug, id: projectId } = await setupProject(app);
@@ -149,8 +148,7 @@ describe("upload inline statics", () => {
       database: db,
       storage,
       logger: silentLogger,
-      captureQueue: queue,
-      captureRunner: makeRunner(),
+      capture: { queue, runner: makeRunner() },
       config: { scratchDir, maxInlineUnzipSize: 10 },
     });
     const { slug, id: projectId } = await setupProject(app);
@@ -177,7 +175,7 @@ describe("upload inline statics", () => {
     expect(await storage.exists(`${storybookDir(projectId, buildId)}/iframe.html`)).toBe(false);
   });
 
-  it("skips inline extraction without scratchDir", async () => {
+  it("defaults the scratch dir for inline extraction when none is configured", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
     const app = createShelfApp({
@@ -190,7 +188,7 @@ describe("upload inline statics", () => {
     const zip = storybookZip();
     const { buildId, status } = await uploadZip(app, slug, zip, String(zip.length));
     expect(status).toBe(202);
-    expect(await storage.exists(`${storybookDir(projectId, buildId)}/iframe.html`)).toBe(false);
+    expect(await storage.exists(`${storybookDir(projectId, buildId)}/iframe.html`)).toBe(true);
   });
 
   it("still returns 202 when inline extraction fails", async () => {
@@ -201,8 +199,7 @@ describe("upload inline statics", () => {
       database: db,
       storage,
       logger: silentLogger,
-      captureQueue: queue,
-      captureRunner: makeRunner(),
+      capture: { queue, runner: makeRunner() },
       config: { scratchDir, maxInlineUnzipSize: 1024 * 1024 },
     });
     const { slug, id: projectId } = await setupProject(app);

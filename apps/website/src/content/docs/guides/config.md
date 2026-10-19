@@ -80,14 +80,15 @@ Each upload resolves `packagePath` (`relative(cwd, dirname(.storybook))`) and is
 ## Server config vs client config
 
 - **Client file** (`.storybook/storyshelf.json`): `slug`, `url`, `buildDir`, `buildCommand`, `buildScriptName`, `skip`, `affectedOnly`, `untraced` — per-Storybook, committed, non-secret.
-- **Server `ShelfConfig` / DB `projects`** (`core/src/config.ts:48`, `core/src/schema.ts:5`): `secret` (see [rotating it](/guides/deployment/secret-rotation/)), `previousSecret`, `migrateCredentialsOnBoot`, `captureConcurrency`, `scratchDir`, `purgeTtlDays`, `branchTtlDays`, `branchGcIntervalMs`, `maxUploadBytes`, `maxInlineUnzipSize`, `viewports`, `browser` (per-project capture engine: `chromium`/`firefox`/`webkit`/`chrome`), `pixel_threshold`, `storybook_meta` (`framework/addons/storiesGlobs/packagePath` auto-detected at `create`).
+- **Server `ShelfConfig` / DB `projects`** (`core/src/config.ts:48`, `core/src/schema.ts:5`): `secret` (see [rotating it](/guides/deployment/secret-rotation/)), `previousSecret`, `migrateCredentialsOnBoot`, `scratchDir` (default `<os.tmpdir()>/storyshelf`), `purgeTtlDays`, `branchTtlDays`, `branchGcIntervalMs`, `maxUploadBytes`, `maxInlineUnzipSize`, `viewports`, `browser` (per-project capture engine: `chromium`/`firefox`/`webkit`/`chrome`), `pixel_threshold`, `storybook_meta` (`framework/addons/storiesGlobs/packagePath` auto-detected at `create`).
 
 Uploads at or under `maxInlineUnzipSize` bytes are extracted inline so the published Storybook preview is live on response; larger uploads wait for capture. Leave it unset (the default) to always wait for capture — required on diskless hosts.
 
 ### Capture performance tuning
 
-- `captureConcurrency` pins how many pages render at once. Left unset, the runner starts from a CPU/memory-sized budget (Firefox and WebKit pages count as two Chromium slots) and adapts: it raises the limit while capture latency and event-loop lag stay flat, halves it on timeouts, and logs every change as `capture concurrency adjusted`.
-- `STORYSHELF_DIFF_WORKERS` sets how many worker threads compare screenshots (default: CPU count minus one, minimum 1). `0` diffs on the main thread. The pool serves both capture and the re-diff endpoint, so it matters on servers that never render.
+- `capture.concurrency` (a `createShelfApp` option, formerly `config.captureConcurrency`) sets how many builds the in-process queue captures at once.
+- The Playwright and Puppeteer runners' own `concurrency` option pins how many pages render at once. Left unset, the runner starts from a CPU/memory-sized budget (Firefox and WebKit pages count as two Chromium slots) and adapts: it raises the limit while capture latency and event-loop lag stay flat, halves it on timeouts, and logs every change as `capture concurrency adjusted`.
+- `compare.threads` (a `createShelfApp` option) or `STORYSHELF_DIFF_WORKERS` sets how many worker threads compare screenshots (default: CPU count minus one, minimum 1; the option wins over the variable). `0` diffs on the main thread. The pool serves both capture and the re-diff endpoint, so it matters on servers that never render.
 
 ## Validation
 

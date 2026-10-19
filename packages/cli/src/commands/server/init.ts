@@ -410,9 +410,9 @@ function buildRouterLines(answers: Answers): string[] {
   lines.push(`const app = createShelfApp({`, `  database,`, `  storage,`);
 
   if (isRemoteQueue(answers.queue)) {
-    lines.push(`  captureQueue,`);
+    lines.push(`  capture: { queue: captureQueue },`);
   } else {
-    lines.push(`  captureRunner,`);
+    lines.push(`  capture: { runner: captureRunner },`);
   }
 
   if (wantsNotifications(answers)) {

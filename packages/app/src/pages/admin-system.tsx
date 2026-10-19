@@ -162,6 +162,7 @@ function ServerFacts(props: ServerFactsProps): HtmlEscapedString | Promise<HtmlE
       </div>
       <Meta>
         Auth {authEnabled ? "enabled" : "disabled — all operations permitted"} · Capture concurrency{" "}
+        {/* oxlint-disable-next-line typescript/no-deprecated -- resolved config mirrors capture.concurrency */}
         {formatOptional(config.captureConcurrency)} · Purge TTL{" "}
         {formatOptional(config.purgeTtlDays)} days · Branch TTL{" "}
         {config.branchTtlDays === null

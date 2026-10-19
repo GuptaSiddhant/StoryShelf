@@ -3,7 +3,7 @@ title: "@storyshelf/storage-gcs"
 description: Store StoryShelf artifacts in Google Cloud Storage.
 ---
 
-import { PackageManagers } from 'starlight-package-managers';
+import { PackageManagers } from "starlight-package-managers";
 
 `@storyshelf/storage-gcs` stores StoryShelf blobs in a **Google Cloud Storage (GCS)** bucket — captured screenshots, diff overlays, and uploaded Storybook archives.
 
@@ -30,15 +30,15 @@ const storage = createGcsStorage({
 });
 ```
 
-| Option | Required | Notes |
-|---|---|---|
-| `bucket` | yes | GCS bucket name |
-| `prefix` | no | Key prefix for every object |
-| `client` | no | Pre-built `Storage` client (tests, custom endpoint) |
-| `projectId` | no | GCP project ID (defaults to ADC) |
-| `keyFilename` | no | Path to service-account JSON |
-| `credentials` | no | Inline service-account object |
-| `apiEndpoint` | no | Custom endpoint (emulator, e.g. `http://localhost:9090`) |
+| Option        | Required | Notes                                                    |
+| ------------- | -------- | -------------------------------------------------------- |
+| `bucket`      | yes      | GCS bucket name                                          |
+| `prefix`      | no       | Key prefix for every object                              |
+| `client`      | no       | Pre-built `Storage` client (tests, custom endpoint)      |
+| `projectId`   | no       | GCP project ID (defaults to ADC)                         |
+| `keyFilename` | no       | Path to service-account JSON                             |
+| `credentials` | no       | Inline service-account object                            |
+| `apiEndpoint` | no       | Custom endpoint (emulator, e.g. `http://localhost:9090`) |
 
 Auth otherwise uses Application Default Credentials. The adapter implements `StorageAdapter`: `read`, `write`, `delete`, `exists`, `list(prefix)`, plus `readStream`/`writeStream`. `gcsKey(prefix, path)` is re-exported for manual key construction.
 

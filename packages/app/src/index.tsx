@@ -2,12 +2,14 @@ import { swaggerUI } from "@hono/swagger-ui";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { AdapterLifecycleError, validateBootAssembly } from "@storyshelf/core/adapter/setup";
 import { sweepOrphanedScratch } from "@storyshelf/core/capture";
+import { normalizeShelfOptions } from "@storyshelf/core/config";
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
+import { configureDiffPool } from "@storyshelf/core/diff";
 /**
  * StoryShelf app: compose database, storage, capture, auth, and git-host
  * adapters into a complete self-hosted visual-testing Hono app.
  */
-import type { Logger } from "@storyshelf/core/logger";
+import { createShelfLogger, type Logger } from "@storyshelf/core/logger";
 import {
   createHttpMiddleware,
   createInstrumentedDatabase,
@@ -171,12 +173,28 @@ function assembleApp(app: ShelfApp, options: ShelfOptions, scoped: ShelfOptions)
  * stays synchronous). Await `app.lifecycle.setup()` before serving for
  * fail-fast startup, or let the first request gate on settlement.
  */
-export function createShelfApp(options: ShelfOptions): ShelfApp {
+export function createShelfApp(rawOptions: ShelfOptions): ShelfApp {
+  const { options: normalized, deprecated } = normalizeShelfOptions(rawOptions);
+  // One logger for the whole app, so the boot warning and runtime share it.
+  const logger = normalized.logger ?? createShelfLogger();
+  const options: ShelfOptions = { ...normalized, logger };
+  warnDeprecatedOptions(logger, deprecated);
+  configureDiffPool({ threads: options.compare?.threads });
   throwOnInvalidAdapters(options);
   const app = new OpenAPIHono<{ Variables: ShelfContext }>() as ShelfApp;
   assembleApp(app, options, instrumentedOptions(options));
 
   return app;
+}
+
+/** Warn once at boot about flat capture options that moved under `capture`. */
+function warnDeprecatedOptions(logger: Logger, deprecated: string[]): void {
+  if (deprecated.length > 0) {
+    logger.warn(
+      { deprecated },
+      "deprecated createShelfApp options in use; move them under `capture` (removed in a future major)",
+    );
+  }
 }
 
 /** Cookie-authenticated write paths guarded by CSRF tokens. */
@@ -406,6 +424,8 @@ function packageVersion(): string {
 export { createAuthSystemHook } from "./notify.ts";
 export type {
   ShelfOptions,
+  ShelfCaptureOptions,
+  ShelfCompareOptions,
   ShelfConfig,
   UIConfig,
   BrandTheme,

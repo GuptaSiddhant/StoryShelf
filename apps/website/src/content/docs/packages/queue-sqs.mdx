@@ -3,7 +3,7 @@ title: "@storyshelf/queue-sqs"
 description: AWS SQS capture job queue adapter for StoryShelf cloud deployments.
 ---
 
-import { PackageManagers } from 'starlight-package-managers';
+import { PackageManagers } from "starlight-package-managers";
 
 `@storyshelf/queue-sqs` backs StoryShelf's capture queue with AWS SQS for cloud/serverless deployments. It implements the `CaptureQueue` contract from `@storyshelf/core`: `enqueue` submits a build for capture (returning once queued), and a separately-assembled worker polls the queue and runs `executeCaptureJob`. Because it implements the same interface as the in-process `InMemoryCaptureQueue`, switching between in-process and remote capture is a single dependency swap — no router or build changes.
 
@@ -20,7 +20,7 @@ import { PackageManagers } from 'starlight-package-managers';
 
 ## Register the queue
 
-Pass the SQS-backed queue as the `captureQueue` option of `createShelfApp`:
+Pass the SQS-backed queue as the `capture.queue` option of `createShelfApp`:
 
 ```ts
 import { createShelfApp } from "@storyshelf/app";
@@ -33,8 +33,7 @@ const queue = createSqsCaptureQueue({
 const app = createShelfApp({
   database,
   storage,
-  captureRunner: myRenderer,
-  captureQueue: queue,
+  capture: { runner: myRenderer, queue },
 });
 ```
 
@@ -42,9 +41,9 @@ const app = createShelfApp({
 
 ```ts
 interface SqsCaptureQueueOptions {
-  queueUrl: string;   // required SQS queue URL
+  queueUrl: string; // required SQS queue URL
   client?: SqsClient; // optional pre-configured client
-  logger?: Logger;    // optional pino logger
+  logger?: Logger; // optional pino logger
 }
 ```
 

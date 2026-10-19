@@ -5,6 +5,6 @@
  * the same on a worker-thread pool;
  * `DiffOptions` tunes thresholds (also settable per-project).
  */
-export { diffImagesAsync, shutdownDiffPool } from "./async.ts";
+export { configureDiffPool, diffImagesAsync, shutdownDiffPool } from "./async.ts";
 export { diffImages } from "./engine.ts";
 export { DEFAULT_DIFF_OPTIONS, type DiffOptions, type DiffResult } from "./options.ts";

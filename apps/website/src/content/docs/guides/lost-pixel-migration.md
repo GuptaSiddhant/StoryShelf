@@ -7,16 +7,16 @@ description: Move Lost Pixel Storybook shots to StoryShelf — config mapping, b
 
 ## Concept mapping
 
-| Lost Pixel | StoryShelf |
-|------------|------------|
-| `storybookShots.storybookUrl` (a local `storybook-static` path or URL) | Upload the built Storybook; the server renders it |
-| Lost Pixel runner on CI | Capture runs on the StoryShelf server (Playwright) — no browser in CI |
-| `.lostpixel/baseline/` committed (or platform baselines) | Baselines stored on the server, per branch with default-branch fallback |
-| `threshold` | `pixel_threshold` / `max_diff_ratio` |
-| `breakpoints` | Server `ShelfConfig.viewports` |
-| `waitBeforeScreenshot` | Story `parameters.storyshelf.delay` |
-| `lostpixel update` (accept) | Approve in the review UI |
-| `lostPixelProjectId` / `apiKey` | `STORYSHELF_SLUG` / `STORYSHELF_TOKEN` |
+| Lost Pixel                                                             | StoryShelf                                                              |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `storybookShots.storybookUrl` (a local `storybook-static` path or URL) | Upload the built Storybook; the server renders it                       |
+| Lost Pixel runner on CI                                                | Capture runs on the StoryShelf server (Playwright) — no browser in CI   |
+| `.lostpixel/baseline/` committed (or platform baselines)               | Baselines stored on the server, per branch with default-branch fallback |
+| `threshold`                                                            | `pixel_threshold` / `max_diff_ratio`                                    |
+| `breakpoints`                                                          | Server `ShelfConfig.viewports`                                          |
+| `waitBeforeScreenshot`                                                 | Story `parameters.storyshelf.delay`                                     |
+| `lostpixel update` (accept)                                            | Approve in the review UI                                                |
+| `lostPixelProjectId` / `apiKey`                                        | `STORYSHELF_SLUG` / `STORYSHELF_TOKEN`                                  |
 
 ## 1. Deploy a server and create the project
 

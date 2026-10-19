@@ -99,17 +99,17 @@ Because the format is plain zip, JSON, and PNG, you can also build archives your
 
 Imports come from outside the instance, so the server treats every archive as untrusted:
 
-| Check | Limit / rule |
-|-------|--------------|
-| Request body | `min(maxUploadBytes, 512 MiB)`, otherwise `413` |
-| Archive size | 512 MiB in both directions, so an export can always be imported back. An export that would grow past it fails; export one branch at a time. |
-| Baselines per archive | 50,000 (export a branch at a time beyond that) |
-| One image | 64 MiB |
-| `manifest.json` | 32 MiB |
-| Zip features | No zip64, encryption, or multi-disk. Entry sizes are checked before decompression, and CRCs are verified. |
-| Entry names | No absolute paths, `..` segments, backslashes, or drive letters |
-| Identities | Story, mode, browser, and branch pass the same path-segment checks as captured baselines |
-| Content | PNG signature plus SHA-256 match with the manifest |
+| Check                 | Limit / rule                                                                                                                                |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Request body          | `min(maxUploadBytes, 512 MiB)`, otherwise `413`                                                                                             |
+| Archive size          | 512 MiB in both directions, so an export can always be imported back. An export that would grow past it fails; export one branch at a time. |
+| Baselines per archive | 50,000 (export a branch at a time beyond that)                                                                                              |
+| One image             | 64 MiB                                                                                                                                      |
+| `manifest.json`       | 32 MiB                                                                                                                                      |
+| Zip features          | No zip64, encryption, or multi-disk. Entry sizes are checked before decompression, and CRCs are verified.                                   |
+| Entry names           | No absolute paths, `..` segments, backslashes, or drive letters                                                                             |
+| Identities            | Story, mode, browser, and branch pass the same path-segment checks as captured baselines                                                    |
+| Content               | PNG signature plus SHA-256 match with the manifest                                                                                          |
 
 Storage paths are always derived from the manifest identity, never from file names inside the zip, so an archive can't write outside its project's baseline prefix.
 

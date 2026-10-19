@@ -92,7 +92,7 @@ const emailNotifiers = emailSender
 const app = createShelfApp({
   database,
   storage,
-  captureRunner,
+  capture: { runner: captureRunner },
   design: [createFigmaDesign({ oauth: figmaOAuthFromEnv() })],
   notifiers: [...chatNotifiers, ...emailNotifiers],
   // Enable local-account login by setting AUTH_PASSWORD (and SECRET): the

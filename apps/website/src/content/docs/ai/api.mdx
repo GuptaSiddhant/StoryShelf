@@ -5,14 +5,14 @@ description: REST endpoints for build triage and project health, who can call th
 
 All endpoints live under `/api/v1` and appear in the [API reference](/api/) under **Insights**. Authentication works like the rest of the API (session or Bearer token).
 
-| Method | Route | Roles | Notes |
-|---|---|---|---|
-| `GET` | `/projects/{slug}/builds/{buildId}/insights/latest` | all | `404 never-generated` until the first run; includes `status` while running |
-| `GET` | `/projects/{slug}/builds/{buildId}/insights` | all | Bounded history (`?limit`) |
-| `POST` | `/projects/{slug}/builds/{buildId}/insights` | approver, admin | `{ force?, profile? }`; `200` cached, `202` started. `profile` is honoured for site admins only |
-| `GET` | `/projects/{slug}/insights/health?window=30d` | all | Cached digest |
-| `POST` | `/projects/{slug}/insights/health` | approver, admin | `{ window?, force? }`; on demand, no scheduler |
-| `PATCH` | `/projects/{slug}` | site admin | `{ aiProfile }`: a configured profile name, or `null` to turn AI off |
+| Method  | Route                                               | Roles           | Notes                                                                                           |
+| ------- | --------------------------------------------------- | --------------- | ----------------------------------------------------------------------------------------------- |
+| `GET`   | `/projects/{slug}/builds/{buildId}/insights/latest` | all             | `404 never-generated` until the first run; includes `status` while running                      |
+| `GET`   | `/projects/{slug}/builds/{buildId}/insights`        | all             | Bounded history (`?limit`)                                                                      |
+| `POST`  | `/projects/{slug}/builds/{buildId}/insights`        | approver, admin | `{ force?, profile? }`; `200` cached, `202` started. `profile` is honoured for site admins only |
+| `GET`   | `/projects/{slug}/insights/health?window=30d`       | all             | Cached digest                                                                                   |
+| `POST`  | `/projects/{slug}/insights/health`                  | approver, admin | `{ window?, force? }`; on demand, no scheduler                                                  |
+| `PATCH` | `/projects/{slug}`                                  | site admin      | `{ aiProfile }`: a configured profile name, or `null` to turn AI off                            |
 
 Agents can read the `GET` endpoints through the [MCP server](/ai/mcp/), which never triggers generation.
 
@@ -39,8 +39,16 @@ An insight looks like:
   "model": "openai.chat:gpt-4o-mini",
   "verdict": "needs-review",
   "summary": "…",
-  "output": { "items": [{ "snapshotKey": "Button/Primary@desktop", "note": "…", "severity": "info" }], "confidence": "medium" },
-  "meta": { "profileEffective": "default", "visionSkipped": false, "warnings": [], "usage": { "inputTokens": 2100, "outputTokens": 310, "estimated": false } }
+  "output": {
+    "items": [{ "snapshotKey": "Button/Primary@desktop", "note": "…", "severity": "info" }],
+    "confidence": "medium"
+  },
+  "meta": {
+    "profileEffective": "default",
+    "visionSkipped": false,
+    "warnings": [],
+    "usage": { "inputTokens": 2100, "outputTokens": 310, "estimated": false }
+  }
 }
 ```
 

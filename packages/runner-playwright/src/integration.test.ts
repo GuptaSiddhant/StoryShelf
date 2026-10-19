@@ -174,8 +174,8 @@ async function createHarness(): Promise<void> {
   const app = createShelfApp({
     database: db,
     storage,
-    captureRunner: createPlaywrightCaptureRunner(),
-    config: { captureConcurrency: 1, scratchDir: dataDir, purgeTtlDays: 30 },
+    capture: { runner: createPlaywrightCaptureRunner(), concurrency: 1 },
+    config: { scratchDir: dataDir, purgeTtlDays: 30 },
   });
   await app.lifecycle.setup();
   harness = { app, db, storage, staticDir, tmp };

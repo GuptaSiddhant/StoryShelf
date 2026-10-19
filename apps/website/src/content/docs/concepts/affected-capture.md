@@ -25,10 +25,10 @@ flowchart LR
 
 ## Opting out
 
-| Method | Effect |
-|--------|--------|
-| `storyshelf upload --full` | Render every story for this upload |
-| `STORYSHELF_FULL=1` | Same, via env (useful for release pipelines) |
+| Method                                                  | Effect                                                         |
+| ------------------------------------------------------- | -------------------------------------------------------------- |
+| `storyshelf upload --full`                              | Render every story for this upload                             |
+| `STORYSHELF_FULL=1`                                     | Same, via env (useful for release pipelines)                   |
 | `"affectedOnly": false` in `.storybook/storyshelf.json` | Disable for the project (see [Configuration](/guides/config/)) |
 
 ## Build identity: sha and branch without git
@@ -39,15 +39,15 @@ flowchart LR
 
 Affected capture never fails an upload. When it cannot prove a story unchanged, it renders everything and prints the reason:
 
-| Reason | Meaning |
-|--------|---------|
-| `shallow-clone` | No git history (`actions/checkout` needs `fetch-depth: 0`) |
-| `not-a-git-repo` | No git repository — upload used a synthetic local identity |
-| `dependency-graph-unavailable` | No usable `preview-stats.json` in the built Storybook |
-| `story-index-unreadable` | No `index.json`/`stories.json` to map stories to files |
-| `global-file-changed` | A change touches `preview.*`, `manager.*`, `.storybook/main.*`, or a lockfile — these can affect every story |
-| `too-many-changed-files` | Change list exceeds 10,000 files (large merges, vendored drops) |
-| First build | No baseline revision exists yet (`baselineSha: null`) |
+| Reason                         | Meaning                                                                                                      |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| `shallow-clone`                | No git history (`actions/checkout` needs `fetch-depth: 0`)                                                   |
+| `not-a-git-repo`               | No git repository — upload used a synthetic local identity                                                   |
+| `dependency-graph-unavailable` | No usable `preview-stats.json` in the built Storybook                                                        |
+| `story-index-unreadable`       | No `index.json`/`stories.json` to map stories to files                                                       |
+| `global-file-changed`          | A change touches `preview.*`, `manager.*`, `.storybook/main.*`, or a lockfile — these can affect every story |
+| `too-many-changed-files`       | Change list exceeds 10,000 files (large merges, vendored drops)                                              |
+| First build                    | No baseline revision exists yet (`baselineSha: null`)                                                        |
 
 Typical CLI output:
 
@@ -73,7 +73,7 @@ For project-wide exclusions that apply to every upload, commit them once in `.st
 { "slug": "my-design-system", "untraced": ["**/*.generated.ts"] } }
 ```
 
-Config and flag globs are combined (union, deduplicated). Untraced files are dropped *before* tracing — stories reachable only through them are inherited. Stories reachable through another (traced) changed file still render.
+Config and flag globs are combined (union, deduplicated). Untraced files are dropped _before_ tracing — stories reachable only through them are inherited. Stories reachable through another (traced) changed file still render.
 
 **Custom stats file.** The graph is read from `<buildDir>/preview-stats.json` by default (emitted by the Vite builder). Override per run:
 

@@ -3,7 +3,7 @@ title: "@storyshelf/design-figma"
 description: Figma design provider for StoryShelf — link validation, file metadata and rendered previews.
 ---
 
-import { PackageManagers } from 'starlight-package-managers';
+import { PackageManagers } from "starlight-package-managers";
 
 `@storyshelf/design-figma` links components to Figma. It implements the `DesignProvider` contract from `@storyshelf/core`: it validates pasted Figma links, reads file/node metadata (name, version, last modified) and downloads rendered previews through the Figma REST API with a personal access token that a project admin saves under **Settings → Design**. StoryShelf itself owns link resolution, the metadata/render cache, stale-design warnings and the UI; this package supplies only the Figma specifics.
 
@@ -29,7 +29,7 @@ import { createFigmaDesign } from "@storyshelf/design-figma";
 const app = createShelfApp({
   database,
   storage,
-  captureRunner,
+  capture: { runner: captureRunner },
   design: [createFigmaDesign()],
   config: {
     secret: process.env.SHELF_SECRET, // also encrypts the Figma token

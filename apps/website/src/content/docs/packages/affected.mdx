@@ -3,7 +3,7 @@ title: "@storyshelf/affected"
 description: Zero-dependency dependency-graph tracing for affected capture — shared by the server and the CLI.
 ---
 
-import { PackageManagers } from 'starlight-package-managers';
+import { PackageManagers } from "starlight-package-managers";
 
 `@storyshelf/affected` computes which stories are impacted by a change: git diff → bundler graph → reverse trace → affected story files. Both `@storyshelf/core` (server partition) and `storyshelf` (CLI computation) consume it, so the two sides always agree. It has **zero runtime dependencies** (Node builtins only) to keep the CI client light.
 
@@ -22,15 +22,15 @@ import { PackageManagers } from 'starlight-package-managers';
 
 ```ts
 import {
-  computeAffected,      // full pipeline: git + index + stats + trace (never throws)
-  traceAffected,        // graph + changed files + story files -> affected, or null for full
-  selectAffectedStories,// stories + affected paths -> { render, inherit }
-  changedFiles,         // git diff baseline..HEAD plus staged/untracked
-  gitHeadSha,           // local git HEAD, or null without git
-  gitBranchName,        // local git branch, or null without git
-  gitRepoStatus,        // "ok" | "shallow" | "no-git"
-  localSha,             // synthetic unique sha (LOCAL_SHA_PREFIX) for non-git checkouts
-  loadDepGraph,         // preview-stats.json -> bidirectional DepGraph (null when unusable)
+  computeAffected, // full pipeline: git + index + stats + trace (never throws)
+  traceAffected, // graph + changed files + story files -> affected, or null for full
+  selectAffectedStories, // stories + affected paths -> { render, inherit }
+  changedFiles, // git diff baseline..HEAD plus staged/untracked
+  gitHeadSha, // local git HEAD, or null without git
+  gitBranchName, // local git branch, or null without git
+  gitRepoStatus, // "ok" | "shallow" | "no-git"
+  localSha, // synthetic unique sha (LOCAL_SHA_PREFIX) for non-git checkouts
+  loadDepGraph, // preview-stats.json -> bidirectional DepGraph (null when unusable)
   loadStoryImportPaths, // index.json/stories.json -> story import paths
 } from "@storyshelf/affected";
 ```

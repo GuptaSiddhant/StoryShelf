@@ -120,7 +120,12 @@ export interface ShelfConfig {
    * helper document; falls back to the request origin when unset.
    */
   publicBaseUrl?: string;
+  /** @deprecated Use `ShelfOptions.capture.concurrency`. Still read as an alias; removed in ADR 0031 phase 5. */
   captureConcurrency?: number;
+  /**
+   * Working directory for capture and inline statics extraction. Defaults to
+   * `<os.tmpdir()>/storyshelf` once a capture runner (or `maxInlineUnzipSize`) needs it.
+   */
   scratchDir?: string;
   purgeTtlDays?: number;
   /** Branch baseline TTL, days; null disables branch GC (default 30). */
@@ -290,11 +295,39 @@ export function validateUiConfig(config: Record<string, unknown>): UIConfig {
   return result.data;
 }
 
+/** Capture options: what renders, how jobs are queued, and how many run at once. */
+export interface ShelfCaptureOptions {
+  /** Pure renderer. Without one this process does not render (a remote worker may). */
+  runner?: CaptureRunner;
+  /** Queue adapter; defaults to the in-process queue when a runner is set. */
+  queue?: CaptureQueue;
+  /** Builds captured at once by the in-process queue; auto-sized from CPU and memory when unset. */
+  concurrency?: number;
+}
+
+/** Comparison options. */
+export interface ShelfCompareOptions {
+  /**
+   * Worker threads for pixel diffs: default CPU count minus one (min 1), `0` diffs on the main
+   * thread. Takes precedence over `STORYSHELF_DIFF_WORKERS`.
+   */
+  threads?: number;
+}
+
 /** Adapter and configuration options for creating the shelf router. */
 export interface ShelfOptions {
   database: DatabaseAdapter;
   storage: StorageAdapter;
+  /**
+   * Capture (render + diff in the background). Absent means Storybook hosting only: no renderer,
+   * no queue, and the capture tuning below is unreachable rather than silently ignored.
+   */
+  capture?: ShelfCaptureOptions;
+  /** Screenshot comparison, shared by capture and the re-diff endpoint (which needs it even when nothing renders here). */
+  compare?: ShelfCompareOptions;
+  /** @deprecated Use `capture.runner`. Still accepted; removed in ADR 0031 phase 5. */
   captureRunner?: CaptureRunner;
+  /** @deprecated Use `capture.queue`. Still accepted; removed in ADR 0031 phase 5. */
   captureQueue?: CaptureQueue;
   auth?: Auth;
   /** AI insights surface (ADR 0026). Set ⇒ AI on site-wide; absent ⇒ off. */
@@ -323,3 +356,8 @@ export interface ObservabilityHandle {
   /** Flush exporters and release SDK resources. Must be idempotent. */
   shutdown(): Promise<void>;
 }
+export {
+  DEFAULT_SCRATCH_DIR,
+  normalizeShelfOptions,
+  type NormalizedShelfOptions,
+} from "./config-compat.ts";
