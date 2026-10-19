@@ -24,7 +24,11 @@ export class RemoteCaptureQueue implements CaptureQueue {
     category: "capture-queue",
   } as const;
 
-  constructor(private readonly options: RemoteCaptureQueueOptions) {}
+  private readonly options: RemoteCaptureQueueOptions;
+
+  constructor(options: RemoteCaptureQueueOptions) {
+    this.options = options;
+  }
 
   async enqueue(job: CaptureJob): Promise<void> {
     const headers: Record<string, string> = { "Content-Type": "application/json" };

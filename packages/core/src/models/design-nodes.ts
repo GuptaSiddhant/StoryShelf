@@ -54,10 +54,14 @@ export class DesignNodeModel {
   private readonly renders: DesignRenderStore;
   private readonly logger: Logger | undefined;
   private readonly connections: ConnectionModel | undefined;
+  private readonly db: DatabaseAdapter;
+  private readonly credentials: DesignCredentialModel;
+  private readonly providers: readonly DesignProvider[];
+
   constructor(
-    private readonly db: DatabaseAdapter,
-    private readonly credentials: DesignCredentialModel,
-    private readonly providers: readonly DesignProvider[],
+    db: DatabaseAdapter,
+    credentials: DesignCredentialModel,
+    providers: readonly DesignProvider[],
     options: {
       tables?: DesignNodeTables;
       logger?: Logger;
@@ -66,6 +70,9 @@ export class DesignNodeModel {
       connections?: ConnectionModel;
     } = {},
   ) {
+    this.db = db;
+    this.credentials = credentials;
+    this.providers = providers;
     this.tables = options.tables ?? { designNodes: db.tables.designNodes };
     this.renders = new DesignRenderStore(
       db,

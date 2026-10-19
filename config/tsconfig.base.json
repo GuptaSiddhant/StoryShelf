@@ -32,6 +32,7 @@
     "noEmitOnError": true,
     "isolatedDeclarations": false,
     "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
     "jsx": "react-jsx",
     "jsxImportSource": "hono/jsx",
     "types": ["node"],

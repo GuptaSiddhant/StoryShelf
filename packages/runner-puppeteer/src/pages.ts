@@ -39,7 +39,11 @@ interface Entry {
 export class PagePool {
   private readonly free: Entry[] = [];
 
-  constructor(private readonly browser: Browser) {}
+  private readonly browser: Browser;
+
+  constructor(browser: Browser) {
+    this.browser = browser;
+  }
 
   async acquire(viewport: Viewport): Promise<PageLease> {
     const entry = this.free.pop() ?? (await this.open());
