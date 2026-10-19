@@ -25,7 +25,7 @@ import { classifyFailures } from "./failure-sets.ts";
 import { captureAcrossBrowsers } from "./matrix.ts";
 import { parseModesAllowlist } from "./modes.ts";
 import { persistCapture, type PipelineTables } from "./pipeline.ts";
-import { removeBuildScratch } from "./scratch.ts";
+import { removeBuildScratch, removePlanScratch } from "./scratch.ts";
 import { fanOutCapture } from "./shards/fan-out.ts";
 import { resolveViewports } from "./sizing.ts";
 import { extractStorybookToScratch, persistStorybookStatics } from "./statics.ts";
@@ -246,7 +246,9 @@ async function runCapturePhases(
       logger,
     });
     if (fanned) {
-      await cleanScratch();
+      // Only the plan's own extraction: shards already handed out may be running in `shards/`.
+      scratchPending = false;
+      await removePlanScratch(options.scratchDir, project.id, build.id, logger);
       return fanned;
     }
 

@@ -214,6 +214,52 @@ environment being broken rather than any story's fault: it is rethrown, and the 
 fails as before (the queue retries it, and its final failure fails its stories). This
 also covers the unsharded path, which shares the render loop.
 
+### Measured: sharded capture on one host
+
+`scripts/bench-shards.mjs` runs a real capture (db-sqlite, local storage, the Playwright
+runner, the in-memory queue) of one built Storybook per configuration and reports
+enqueue-to-finished wall clock, peak resident memory of the process and its browsers,
+and a check that every story was captured exactly once. One 10-core, 64 GB Mac, a
+synthetic 600-story Storybook (React, 1 viewport, a fixed 500 ms per-story settle, 10%
+of stories heavy: 4000-cell grid and a 1.5 s `play`), Chromium only, 2 repeats (3 for the
+ordering runs). "Pages" is Playwright page concurrency per render call; `workers x pages`
+is what the host runs at once.
+
+| Configuration                     | Total pages | Wall    | vs unsharded | Peak RSS |
+| --------------------------------- | ----------- | ------- | ------------ | -------- |
+| Unsharded, 1 job                  | 8           | 97.8 s  | -            | 1.7 GB   |
+| Sharded (100/shard), 1 worker x 8 | 8           | 103.5 s | +6%          | 1.8 GB   |
+| Sharded, 2 workers x 4            | 8           | 94.1 s  | -4%          | 2.0 GB   |
+| Sharded, 4 workers x 2            | 8           | 122.0 s | +25%         | 2.4 GB   |
+| Sharded, 2 workers x 8            | 16          | 51.5 s  | 1.9x faster  | 3.1 GB   |
+| Sharded, 4 workers x 8            | 32          | 37.5 s  | 2.6x faster  | 5.5 GB   |
+
+What this says, and what it does not:
+
+- **Sharding is not a single-host speedup.** At equal total pages it costs between -4%
+  and +25%: every shard re-extracts the Storybook, starts its own static server and
+  browser, and more browsers compete for the same cores. The cost is smallest at one or
+  two workers and visible at four. Use it for scale-out and isolation, not to speed up
+  one machine.
+- **Scale-out works but is sub-linear.** Doubling and quadrupling the pages gave 1.9x
+  and 2.6x. The 32-page run is CPU-bound on this host (and uses 5.5 GB); a fleet of
+  separate machines would not share that ceiling, but that is not measured here.
+- **Longest-first ordering showed no wall-clock benefit on this setup.** On a fixture
+  with the slow stories clustered together, the timed plan tightened the spread between
+  the fastest and slowest shard (35.5-40.9 s down to 36.3-37.5 s in two of three runs)
+  but build time stayed at about 112 s (mean 112.8 s untimed vs 116.7 s timed, one timed
+  run an unexplained 126.6 s outlier). The wall clock here is bound by total page
+  throughput, and with 10 shards on 4 workers the last wave leaves two workers idle
+  whatever the order. That is a hypothesis about the tail, not a measured result; finer
+  shards would be the thing to try next.
+- **Not measured:** multiple machines, Firefox/WebKit, multi-viewport builds, Postgres
+  or MySQL, and a Storybook where story cost varies far more than 10% heavy.
+
+The benchmark also found a bug: the plan job removed the build's whole scratch directory
+after enqueueing its shards, which could delete the directory of a worker that had
+already started extracting (one failed shard in the first matrix). The plan now removes
+only its own extraction, and the last shard to finalize sweeps the build directory.
+
 ## Consequences
 
 **Positive**
