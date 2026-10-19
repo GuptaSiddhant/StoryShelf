@@ -2,6 +2,7 @@ import type { AdapterSetupResult, AdapterSetupSources } from "@storyshelf/core/a
 import type { Auth } from "@storyshelf/core/auth";
 import { describeCaptureHost } from "@storyshelf/core/utils";
 import type { ShelfRouter } from "../app-types.ts";
+import { capturesLocally } from "../capture-process.ts";
 import { loadCredentialProbe, reencryptWithCurrent } from "../credentials.ts";
 import { insightDepsFromStore } from "../insights/deps.ts";
 import { buildUsageReport } from "../insights/usage-report.ts";
@@ -45,8 +46,7 @@ export function registerAdminPages(app: ShelfRouter, deps: AdminPageDeps, auth?:
         credentials,
         aiEnabled: getStore().ai !== undefined,
         // Only an in-process queue captures on this host; remote queues size themselves elsewhere.
-        capture:
-          captureQueue?.metadata.kind === "memory" ? describeCaptureHost(captureConcurrency) : null,
+        capture: capturesLocally(captureQueue) ? describeCaptureHost(captureConcurrency) : null,
       }),
     );
   });
