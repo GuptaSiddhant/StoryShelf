@@ -203,6 +203,7 @@ const captureLogs = defineTable("capture_logs", {
 });
 
 const snapshots = defineTable("snapshots", {
+  durationMs: "duration_ms",
   id: "id",
   projectId: "project_id",
   buildId: "build_id",

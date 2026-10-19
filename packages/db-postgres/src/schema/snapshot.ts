@@ -46,6 +46,7 @@ export const snapshots = pgTable(
     baselineVersion: text("baseline_version"),
     mode: text("mode"),
     browser: text("browser").notNull().default("chromium"),
+    durationMs: integer("duration_ms"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull(),
   },
@@ -89,6 +90,7 @@ export interface Snapshot {
   baselineVersion: string | null;
   mode?: string | null;
   browser?: string;
+  durationMs: number | null;
   createdAt: string;
   updatedAt: string;
 }

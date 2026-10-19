@@ -56,6 +56,8 @@ interface Behaviour {
   crashStories: Set<string>;
   /** Renders that throw outright, counted down. */
   throwTimes: number;
+  /** Milliseconds the runner claims each story took; unset reports none. */
+  durationOf?: (storyId: string) => number;
   rendered: string[];
 }
 
@@ -85,6 +87,7 @@ function fakeRunner(behaviour: Behaviour): CaptureRunner {
           viewportName: "desktop",
           viewport: { name: "desktop", width: 1280, height: 720 },
           screenshot: png(story.id),
+          ...(behaviour.durationOf ? { durationMs: behaviour.durationOf(story.id) } : {}),
         };
         // oxlint-disable-next-line no-await-in-loop -- one capture at a time, like a page pool of 1
         await input.onCapture?.(capture);
@@ -145,6 +148,18 @@ async function world(options: {
   const runShard = async (job: ShardJob, final?: boolean): Promise<ShardOutcome> =>
     await executeCaptureShard({ buildId: job.buildId, shard: job.shard, final }, jobOptions);
   const plan = async () => await executeCaptureJob({ buildId: build.id }, jobOptions);
+  /** Plan a second build of the same project, so the first build's timings are history. */
+  const planNextBuild = async () => {
+    const next = await new BuildModel(db, tables(db)).create(project.id, {
+      gitSha: "sha-2",
+      gitBranch: "main",
+      isDefault: true,
+    });
+    await storage.write(storybookZipPath(project.id, next.id), zipOfStories(options.stories));
+    queued.length = 0;
+    await executeCaptureJob({ buildId: next.id }, jobOptions);
+    return next;
+  };
   return {
     db,
     build,
@@ -157,6 +172,7 @@ async function world(options: {
     snapshots,
     runShard,
     plan,
+    planNextBuild,
   };
 }
 
@@ -234,6 +250,51 @@ describe("sharded capture", () => {
     )[0];
     expect(summary).toMatchObject({ failedCount: 1, buildStatus: "failed" });
     expect(await w.snapshots()).toHaveLength(24);
+  });
+
+  it("orders the next build's shards by what each story cost last time", async () => {
+    const w = await world({ stories: 25, shardSize: 10 });
+    // Later stories render slower; story 24 is the single dearest.
+    w.behaviour.durationOf = (storyId) => (Number(storyId.slice(-2)) + 1) * 100;
+    await w.plan();
+    await Promise.all(w.queued.map(async (job) => await w.runShard(job, true)));
+
+    const next = await w.planNextBuild();
+
+    const rows = await w.shards.renderShards(next.id);
+    expect(rows).toHaveLength(3);
+    const first = JSON.parse(rows[0]?.payload ?? "{}") as {
+      browsers: { stories: { id: string }[] }[];
+    };
+    const firstIds = first.browsers.flatMap((engine) => engine.stories.map((story) => story.id));
+    // The dearest story leads the heaviest shard, which is handed to the queue first.
+    expect(firstIds).toContain("components-button--story-24");
+    expect(w.queued[0]?.shard).toBe(rows[0]?.id);
+    // Every story is still planned exactly once.
+    const planned = rows.flatMap((row) => {
+      const payload = JSON.parse(row.payload ?? "{}") as {
+        browsers: { stories: { id: string }[] }[];
+      };
+      return payload.browsers.flatMap((engine) => engine.stories.map((story) => story.id));
+    });
+    expect(new Set(planned).size).toBe(25);
+  });
+
+  it("falls back to capture-count order when no build has timings yet", async () => {
+    const w = await world({ stories: 25, shardSize: 10 });
+    await w.plan();
+    await Promise.all(w.queued.map(async (job) => await w.runShard(job, true)));
+
+    const next = await w.planNextBuild();
+
+    const rows = await w.shards.renderShards(next.id);
+    const firstPayload = JSON.parse(rows[0]?.payload ?? "{}") as {
+      browsers: { stories: { id: string }[] }[];
+    };
+    const firstIds = firstPayload.browsers.flatMap((engine) =>
+      engine.stories.map((story) => story.id),
+    );
+    expect(firstIds[0]).toBe("components-button--story-00");
   });
 
   it("fails a story that crashes the browser on its own, not its shard-mates", async () => {

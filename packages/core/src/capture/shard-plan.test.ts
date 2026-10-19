@@ -87,6 +87,85 @@ describe("planShards", () => {
   });
 });
 
+describe("planShards with timings", () => {
+  it("packs the dearest stories first and hands back the heaviest shard first", () => {
+    // 6 stories, one capture each, 3 shards of 2: costs 60/50/40/30/20/10.
+    const cost = new Map([
+      ["s0", 60],
+      ["s1", 50],
+      ["s2", 40],
+      ["s3", 30],
+      ["s4", 20],
+      ["s5", 10],
+    ]);
+    const slices = planShards([chromium(6)], one, 2, (id) => cost.get(id));
+
+    const weights = slices.map((slice) =>
+      ids(slice).reduce((sum, id) => sum + (cost.get(id) ?? 0), 0),
+    );
+    // Longest-first balances the shards: 60+10, 50+20, 40+30 — not 60+50, 40+30, 20+10.
+    expect(weights).toEqual([70, 70, 70]);
+    expect(ids(slices[0] ?? [])).toContain("s0");
+  });
+
+  it("evens out shards a contiguous slice would leave lopsided", () => {
+    const slow = new Set(["s0", "s1", "s2", "s3"]);
+    const weightOf = (id: string): number => (slow.has(id) ? 100 : 10);
+    const weigh = (slices: EngineWork[][]): number[] =>
+      slices.map((slice) => ids(slice).reduce((sum, id) => sum + weightOf(id), 0));
+
+    const timed = weigh(planShards([chromium(12)], one, 4, weightOf));
+    // Contiguous slicing puts every slow story in the first shard, which then sets the wall clock.
+    const plain = weigh(planShards([chromium(12)], one, 4));
+
+    expect(Math.max(...plain)).toBe(400);
+    expect(Math.max(...timed)).toBeLessThan(Math.max(...plain));
+    // Capacity still binds: four slow stories cannot spread over three shards any more evenly.
+    expect(timed).toEqual([220, 130, 130]);
+  });
+
+  it("prices an unknown story at the average cost of a capture", () => {
+    const slices = planShards([chromium(6)], one, 2, (id) => (id === "s0" ? 100 : undefined));
+
+    // s0 is dearest; the untimed five are all worth the same, so they fill the rest evenly.
+    expect(ids(slices[0] ?? [])).toContain("s0");
+    expect(slices.flatMap((slice) => ids(slice))).toHaveLength(6);
+  });
+
+  it("falls back to capture-count slices when no story has a timing", () => {
+    const none = new Map<string, number>();
+    const slices = planShards([chromium(25)], one, 10, (id) => none.get(id));
+
+    expect(slices.map((slice) => ids(slice).length)).toEqual([10, 10, 5]);
+    expect(slices.flatMap((slice) => ids(slice))).toEqual(stories(25).map((entry) => entry.id));
+  });
+
+  it("keeps a story's engines together when packing by weight", () => {
+    const work: EngineWork[] = [
+      { browser: "chromium", stories: stories(15) },
+      { browser: "firefox", stories: stories(15) },
+    ];
+    const slices = planShards(work, one, 10, (id) => (id === "s7" ? 500 : 5));
+
+    for (const slice of slices) {
+      const perEngine = slice.map((engine) => engine.stories.map((entry) => entry.id));
+      for (const engineIds of perEngine) {
+        expect(engineIds).toEqual(perEngine[0]);
+      }
+    }
+    expect(new Set(slices.flatMap((slice) => ids(slice))).size).toBe(15);
+  });
+
+  it("never packs a shard past its capture capacity", () => {
+    const slices = planShards([chromium(30)], one, 10, (id) => Number(id.slice(1)) * 7);
+
+    for (const slice of slices) {
+      expect(ids(slice).length).toBeLessThanOrEqual(10);
+    }
+    expect(slices.flatMap((slice) => ids(slice))).toHaveLength(30);
+  });
+});
+
 describe("totalCaptures", () => {
   it("sums story x engine captures", () => {
     expect(totalCaptures([chromium(4), { browser: "firefox", stories: stories(2) }], () => 3)).toBe(

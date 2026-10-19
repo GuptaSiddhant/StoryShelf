@@ -176,8 +176,19 @@ a story's engines kept together), optional `shard` field on queue jobs and trans
 and the reducer as a **unique-claim insert** rather than a decrement (no
 `DatabaseAdapter` change): the last shard to end inserts `<build>:finalize`; the single
 winner finalizes. Opt-in via `capture.shardSize` / worker `shardSize`; unset keeps
-today's one-job behaviour. Not yet done: longest-first ordering, a separate compare
-stage/queue, and sharding together with the forked child.
+today's one-job behaviour. Not yet done: a separate compare stage/queue, and sharding
+together with the forked child.
+
+**Longest-first ordering (third slice).** Runners report `RenderedSnapshot.durationMs`
+and it is persisted per snapshot (`snapshots.duration_ms`, nullable; third-party runners
+that report none keep working). The plan stage reads the per-story totals of the newest
+recent build that carries timings (`capture/shards/history.ts`, at most three builds
+scanned) and passes them to `planShards`, which switches from contiguous slices to
+longest-processing-time packing: dearest stories placed first, each into the shard with
+the least work that still has room for its captures, shards handed to the queue heaviest
+first. A story with no timing is priced at the average cost of a capture. Capture
+capacity still binds, so shards stay about `shardSize`; with no timings at all (fresh
+project, purged history) the contiguous slicing is unchanged.
 
 **Poison-shard isolation (second slice).** A render call that throws takes its whole
 slice with it, so `renderIsolating` (`capture/isolate.ts`) re-renders the stories the

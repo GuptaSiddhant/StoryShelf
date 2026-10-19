@@ -2,6 +2,21 @@ import { describe, expect, it } from "vitest";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { SnapshotModel } from "./snapshot.ts";
 
+/** A snapshot row for the timing cases, with the duration the renderer reported (or none). */
+function timedRow(storyId: string, viewportName: string, durationMs: number | null) {
+  return {
+    storyId,
+    storyName: storyId,
+    storyTitle: storyId,
+    storyImportPath: "",
+    viewportName,
+    viewportWidth: 1280,
+    viewportHeight: 720,
+    screenshotPath: `/${storyId}-${viewportName}.png`,
+    durationMs,
+  };
+}
+
 describe("SnapshotModel", () => {
   it("creates a snapshot for a build", async () => {
     const { db } = makeDatabase();
@@ -21,6 +36,22 @@ describe("SnapshotModel", () => {
     expect(snapshot.storyName).toBe("A");
     expect(snapshot.viewportName).toBe("desktop");
     expect(snapshot.status).toBe("pending");
+  });
+
+  it("sums each story's recorded durations for a build", async () => {
+    const { db } = makeDatabase();
+    const model = new SnapshotModel(db, { snapshots: db.tables.snapshots });
+    await model.create("p1", "b1", timedRow("a", "desktop", 300));
+    await model.create("p1", "b1", timedRow("a", "mobile", 200));
+    await model.create("p1", "b1", timedRow("b", "desktop", 50));
+    // Untimed rows (an inherited snapshot, or a runner that reports none) are left out entirely.
+    await model.create("p1", "b1", timedRow("c", "desktop", null));
+    await model.create("p1", "b2", timedRow("a", "desktop", 999));
+
+    const timings = await model.durationsByStory("b1");
+
+    expect(Object.fromEntries(timings)).toEqual({ a: 500, b: 50 });
+    expect(timings.has("c")).toBe(false);
   });
 
   it("lists snapshots by build", async () => {

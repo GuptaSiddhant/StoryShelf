@@ -42,6 +42,11 @@ export interface RenderedSnapshot {
   /** Engine that produced the screenshot (the request's `browser`); chromium when absent. */
   browser?: BrowserName;
   /**
+   * Wall-clock milliseconds the renderer spent on this capture, when it measured it. Recorded per
+   * snapshot and read back as the per-story cost a shard plan orders its work by (ADR 0031).
+   */
+  durationMs?: number;
+  /**
    * Set by the orchestrator when it already wrote the screenshot to storage
    * (via `onCapture`); `screenshot` is then empty and must not be written again.
    * Runners never set this.

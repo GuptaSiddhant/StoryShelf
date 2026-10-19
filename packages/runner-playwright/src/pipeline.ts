@@ -251,12 +251,14 @@ async function pushCapture(
   failures: RenderResult["failures"],
   input: PlaywrightRenderInput,
 ): Promise<void> {
+  const started = performance.now();
   const result = await captureScreenshot(ctx, story, viewport);
   const snapshot: RenderedSnapshot = {
     story: result.story,
     viewportName: viewport.name,
     viewport,
     screenshot: result.screenshot,
+    durationMs: Math.round(performance.now() - started),
   };
   // Streaming: hand it over and drop the buffer rather than holding every screenshot.
   if (input.onCapture) await input.onCapture(snapshot);

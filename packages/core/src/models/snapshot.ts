@@ -57,6 +57,7 @@ export class SnapshotModel {
       baselineVersion: input.baselineVersion ?? null,
       mode: input.mode ?? null,
       browser: input.browser ?? DEFAULT_BROWSER,
+      durationMs: input.durationMs ?? null,
       status: "pending",
       createdAt: now,
       updatedAt: now,
@@ -76,6 +77,20 @@ export class SnapshotModel {
       }),
     );
     return doomed.length;
+  }
+
+  /**
+   * Milliseconds each story cost on one build, summed over its viewports and engines. Stories the
+   * renderer did not time are left out, so an empty map means this build carries no timings.
+   */
+  async durationsByStory(buildId: string): Promise<Map<string, number>> {
+    const totals = new Map<string, number>();
+    for (const row of await this.listByBuild(buildId)) {
+      if (typeof row.durationMs === "number") {
+        totals.set(row.storyId, (totals.get(row.storyId) ?? 0) + row.durationMs);
+      }
+    }
+    return totals;
   }
 
   async listByBuild(buildId: string): Promise<Snapshot[]> {
@@ -148,4 +163,6 @@ export interface SnapshotCreateInput {
   mode?: string | null;
   /** Engine the screenshot was captured with (default chromium). */
   browser?: string;
+  /** Milliseconds the renderer spent on this capture, when it reported any. */
+  durationMs?: number | null;
 }

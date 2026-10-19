@@ -76,6 +76,7 @@ const makeSnapshot = (
   infraHash: null,
   envChange: null,
   inherited: false,
+  durationMs: null,
   baselineId: null,
   baselineVersion: null,
   createdAt: NOW,
