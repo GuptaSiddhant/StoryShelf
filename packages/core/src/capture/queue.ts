@@ -24,7 +24,11 @@ export class InMemoryCaptureQueue implements CaptureQueue {
   private readonly waiting: (() => void)[] = [];
   private readonly inFlight = new Map<string, Promise<void>>();
 
-  constructor(private readonly options: InMemoryCaptureQueueOptions) {}
+  private readonly options: InMemoryCaptureQueueOptions;
+
+  constructor(options: InMemoryCaptureQueueOptions) {
+    this.options = options;
+  }
 
   async enqueue(job: CaptureJob): Promise<void> {
     const entry = this.track(job.buildId);

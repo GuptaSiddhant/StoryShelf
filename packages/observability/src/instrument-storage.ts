@@ -25,7 +25,11 @@ export function createInstrumentedStorage(storage: StorageAdapter): StorageAdapt
 }
 
 class InstrumentedStorage implements StorageAdapter {
-  constructor(private readonly inner: StorageAdapter) {}
+  private readonly inner: StorageAdapter;
+
+  constructor(inner: StorageAdapter) {
+    this.inner = inner;
+  }
 
   get metadata(): StorageAdapter["metadata"] {
     return this.inner.metadata;

@@ -75,13 +75,18 @@ export type AiErrorCode = "timeout" | "provider" | "schema" | "aborted" | "unkno
 
 /** Failure from {@link Ai.summarize}; carries usage the provider still billed. */
 export class AiError extends Error {
+  readonly code: AiErrorCode;
+  readonly usage?: AiUsageReport;
+
   constructor(
-    readonly code: AiErrorCode,
+    code: AiErrorCode,
     message: string,
-    readonly usage?: AiUsageReport,
+    usage?: AiUsageReport,
     options?: { cause?: unknown },
   ) {
     super(message, options);
+    this.code = code;
+    this.usage = usage;
     this.name = "AiError";
   }
 }

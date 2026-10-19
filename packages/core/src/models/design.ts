@@ -15,11 +15,12 @@ export interface DesignTables {
 /** Data operations for design links; URLs are validated by the configured providers. */
 export class DesignModel {
   private readonly tables: DesignTables;
-  constructor(
-    private readonly db: DatabaseAdapter,
-    private readonly providers: readonly DesignProvider[],
-    tables?: DesignTables,
-  ) {
+  private readonly db: DatabaseAdapter;
+  private readonly providers: readonly DesignProvider[];
+
+  constructor(db: DatabaseAdapter, providers: readonly DesignProvider[], tables?: DesignTables) {
+    this.db = db;
+    this.providers = providers;
     this.tables = tables ?? { designLinks: db.tables.designLinks };
   }
 

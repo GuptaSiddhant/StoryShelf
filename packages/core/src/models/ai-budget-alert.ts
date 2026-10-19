@@ -12,10 +12,10 @@ export interface AiBudgetAlertTables {
 /** Data operations for budget alert claims. */
 export class AiBudgetAlertModel {
   private readonly tables: AiBudgetAlertTables;
-  constructor(
-    private readonly db: DatabaseAdapter,
-    tables?: AiBudgetAlertTables,
-  ) {
+  private readonly db: DatabaseAdapter;
+
+  constructor(db: DatabaseAdapter, tables?: AiBudgetAlertTables) {
+    this.db = db;
     this.tables = tables ?? { aiBudgetAlerts: db.tables.aiBudgetAlerts };
   }
 
