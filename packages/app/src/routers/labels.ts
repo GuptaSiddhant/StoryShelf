@@ -1,82 +1,46 @@
-import { createRoute, z } from "@hono/zod-openapi";
+import { z } from "@hono/zod-openapi";
 import { LabelModel } from "@storyshelf/core/models";
-import type { ProjectRole } from "@storyshelf/core/types";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
-import {
-  labelTypeCreateSchema,
-  labelTypeSchema,
-  labelTypeUpdateSchema,
-  notFound,
-  unauthorized,
-} from "./schemas.ts";
-const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];
-const ADMIN_ROLES: readonly ProjectRole[] = ["admin"];
+import { ADMIN_ROLES, VIEW_ROLES } from "./roles.ts";
+import { deleteRouteDef, listRouteDef, patchRouteDef, postRouteDef } from "./route-defs.ts";
+import { labelTypeCreateSchema, labelTypeSchema, labelTypeUpdateSchema } from "./schemas.ts";
 
-const listLabelsRoute = createRoute({
-  method: "get",
-  tags: ["Labels"],
+const listLabelsRoute = listRouteDef({
+  tag: "Labels",
   summary: "List label types",
   path: "/api/v1/projects/{slug}/label-types",
-  request: { params: z.object({ slug: z.string() }) },
-  responses: {
-    200: {
-      content: { "application/json": { schema: labelTypeSchema.array() } },
-      description: "List label types",
-    },
-    ...notFound,
-    ...unauthorized,
-  },
+  schema: labelTypeSchema,
+  description: "List label types",
 });
 
-const createLabelRoute = createRoute({
-  method: "post",
-  tags: ["Labels"],
+const createLabelRoute = postRouteDef({
+  tag: "Labels",
   summary: "Create a label type",
   path: "/api/v1/projects/{slug}/label-types",
-  request: {
-    params: z.object({ slug: z.string() }),
-    body: { content: { "application/json": { schema: labelTypeCreateSchema } } },
-  },
-  responses: {
-    201: {
-      content: { "application/json": { schema: labelTypeSchema } },
-      description: "Created label type",
-    },
-    ...notFound,
-  },
+  body: labelTypeCreateSchema,
+  schema: labelTypeSchema,
+  description: "Created label type",
 });
 
-const deleteLabelRoute = createRoute({
-  method: "delete",
-  tags: ["Labels"],
+const deleteLabelRoute = deleteRouteDef({
+  tag: "Labels",
   summary: "Delete a label type",
   path: "/api/v1/projects/{slug}/label-types/{key}",
-  request: { params: z.object({ slug: z.string(), key: z.string() }) },
-  responses: {
-    204: { description: "Deleted label type" },
-    ...notFound,
-  },
+  params: { key: z.string() },
+  description: "Deleted label type",
 });
 
-const updateLabelRoute = createRoute({
-  method: "patch",
-  tags: ["Labels"],
+const updateLabelRoute = patchRouteDef({
+  tag: "Labels",
   summary: "Update a label type",
   path: "/api/v1/projects/{slug}/label-types/{key}",
-  request: {
-    params: z.object({ slug: z.string(), key: z.string() }),
-    body: { content: { "application/json": { schema: labelTypeUpdateSchema } } },
-  },
-  responses: {
-    200: {
-      content: { "application/json": { schema: labelTypeSchema } },
-      description: "Updated label type",
-    },
-    ...notFound,
-  },
+  params: { key: z.string() },
+  body: labelTypeUpdateSchema,
+  schema: labelTypeSchema,
+  description: "Updated label type",
 });
 
 /** Register the project label-type list, create, update, and delete endpoints. */

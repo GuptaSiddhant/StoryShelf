@@ -2,13 +2,13 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { LabelModel } from "@storyshelf/core/models";
 import { MemberModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
-import type { ProjectRole } from "@storyshelf/core/types";
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
 import { toProjectPatch } from "./capture-config.ts";
 import { forbidden, requireSiteAdmin, resolveAuthorizedProject } from "./helpers.ts";
+import { ADMIN_ROLES, VIEW_ROLES } from "./roles.ts";
 import {
   badRequest,
   forbidden as forbiddenResponse,
@@ -18,8 +18,6 @@ import {
   projectUpdateSchema,
   unauthorized,
 } from "./schemas.ts";
-const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];
-const ADMIN_ROLES: readonly ProjectRole[] = ["admin"];
 
 function requireSessionUser(): void {
   if (!getStore().authEnabled) {

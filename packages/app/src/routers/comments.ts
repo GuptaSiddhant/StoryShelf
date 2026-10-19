@@ -1,60 +1,43 @@
-import { createRoute, z } from "@hono/zod-openapi";
+import { z } from "@hono/zod-openapi";
 import { CommentModel } from "@storyshelf/core/models";
 import type { ShelfRouter } from "../app-types.ts";
 import { notifyProject } from "../notify.ts";
 import { getStore } from "../store.ts";
-import { VIEW_ROLES, DEVELOPER_ROLES, buildForProject } from "./builds.handlers.ts";
+import { buildForProject } from "./builds.handlers.ts";
 import { flashHx } from "./flash.ts";
 import { resolveAuthorizedProject, notFound as throwNotFound } from "./helpers.ts";
 import { hxRefresh } from "./htmx.ts";
-import { commentSchema, commentCreateSchema, notFound, unauthorized } from "./schemas.ts";
-const listCommentsRoute = createRoute({
-  method: "get",
-  tags: ["Review"],
+import { DEVELOPER_ROLES, VIEW_ROLES } from "./roles.ts";
+import { actionRouteDef, listRouteDef, postRouteDef } from "./route-defs.ts";
+import { commentSchema, commentCreateSchema } from "./schemas.ts";
+const buildParams = { buildId: z.string() };
+
+const listCommentsRoute = listRouteDef({
+  tag: "Review",
   summary: "List comments",
   path: "/api/v1/projects/{slug}/builds/{buildId}/comments",
-  request: { params: z.object({ slug: z.string(), buildId: z.string() }) },
-  responses: {
-    200: {
-      content: { "application/json": { schema: commentSchema.array() } },
-      description: "List comments on a build",
-    },
-    ...notFound,
-    ...unauthorized,
-  },
+  params: buildParams,
+  schema: commentSchema,
+  description: "List comments on a build",
 });
 
-const createCommentRoute = createRoute({
-  method: "post",
-  tags: ["Review"],
+const createCommentRoute = postRouteDef({
+  tag: "Review",
   summary: "Add a comment",
   path: "/api/v1/projects/{slug}/builds/{buildId}/comments",
-  request: {
-    params: z.object({ slug: z.string(), buildId: z.string() }),
-    body: { content: { "application/json": { schema: commentCreateSchema } } },
-  },
-  responses: {
-    201: {
-      content: { "application/json": { schema: commentSchema } },
-      description: "Comment created",
-    },
-    ...notFound,
-  },
+  params: buildParams,
+  body: commentCreateSchema,
+  schema: commentSchema,
+  description: "Comment created",
 });
 
-const resolveCommentRoute = createRoute({
-  method: "post",
-  tags: ["Review"],
+const resolveCommentRoute = actionRouteDef({
+  tag: "Review",
   summary: "Resolve a comment",
   path: "/api/v1/projects/{slug}/builds/{buildId}/comments/{commentId}/resolve",
-  request: { params: z.object({ slug: z.string(), buildId: z.string(), commentId: z.string() }) },
-  responses: {
-    200: {
-      content: { "application/json": { schema: commentSchema } },
-      description: "Comment resolved",
-    },
-    ...notFound,
-  },
+  params: { ...buildParams, commentId: z.string() },
+  schema: commentSchema,
+  description: "Comment resolved",
 });
 
 /** Register the build comment list, create, and resolve endpoints. */

@@ -6,12 +6,10 @@ import {
   SnapshotModel,
 } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
-import type { ProjectRole } from "@storyshelf/core/types";
 import type { LinkedUsageItem } from "../pages/build-diff-usage.tsx";
 import { getStore } from "../store.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
-
-const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];
+import { VIEW_ROLES } from "./roles.ts";
 
 type Caller = Parameters<typeof resolveAuthorizedProject>[0];
 

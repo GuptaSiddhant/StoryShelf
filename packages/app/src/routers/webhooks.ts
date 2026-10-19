@@ -1,64 +1,37 @@
-import { createRoute, z } from "@hono/zod-openapi";
+import { z } from "@hono/zod-openapi";
 import { WebhookModel } from "@storyshelf/core/models";
-import type { ProjectRole } from "@storyshelf/core/types";
 import { randomToken } from "@storyshelf/core/utils";
 import type { ShelfRouter } from "../app-types.ts";
 import { credentialKeys } from "../credential-keys.ts";
 import { getStore } from "../store.ts";
 import { resolveAuthorizedProject, notFound } from "./helpers.ts";
-import {
-  notFound as notFoundResponse,
-  unauthorized,
-  webhookCreatedSchema,
-  webhookCreateSchema,
-  webhookPublicSchema,
-} from "./schemas.ts";
-const ADMIN_ROLES: readonly ProjectRole[] = ["admin"];
+import { ADMIN_ROLES } from "./roles.ts";
+import { deleteRouteDef, listRouteDef, postRouteDef } from "./route-defs.ts";
+import { webhookCreatedSchema, webhookCreateSchema, webhookPublicSchema } from "./schemas.ts";
 
-const listWebhooksRoute = createRoute({
-  method: "get",
-  tags: ["Webhooks"],
+const listWebhooksRoute = listRouteDef({
+  tag: "Webhooks",
   summary: "List webhooks",
   path: "/api/v1/projects/{slug}/webhooks",
-  request: { params: z.object({ slug: z.string() }) },
-  responses: {
-    200: {
-      content: { "application/json": { schema: webhookPublicSchema.array() } },
-      description: "List webhooks",
-    },
-    ...notFoundResponse,
-    ...unauthorized,
-  },
+  schema: webhookPublicSchema,
+  description: "List webhooks",
 });
 
-const createWebhookRoute = createRoute({
-  method: "post",
-  tags: ["Webhooks"],
+const createWebhookRoute = postRouteDef({
+  tag: "Webhooks",
   summary: "Create a webhook",
   path: "/api/v1/projects/{slug}/webhooks",
-  request: {
-    params: z.object({ slug: z.string() }),
-    body: { content: { "application/json": { schema: webhookCreateSchema } } },
-  },
-  responses: {
-    201: {
-      content: { "application/json": { schema: webhookCreatedSchema } },
-      description: "Created webhook",
-    },
-    ...notFoundResponse,
-  },
+  body: webhookCreateSchema,
+  schema: webhookCreatedSchema,
+  description: "Created webhook",
 });
 
-const deleteWebhookRoute = createRoute({
-  method: "delete",
-  tags: ["Webhooks"],
+const deleteWebhookRoute = deleteRouteDef({
+  tag: "Webhooks",
   summary: "Delete a webhook",
   path: "/api/v1/projects/{slug}/webhooks/{webhookId}",
-  request: { params: z.object({ slug: z.string(), webhookId: z.string() }) },
-  responses: {
-    204: { description: "Deleted webhook" },
-    ...notFoundResponse,
-  },
+  params: { webhookId: z.string() },
+  description: "Deleted webhook",
 });
 
 /** Register the project webhook list, create, and delete endpoints. */

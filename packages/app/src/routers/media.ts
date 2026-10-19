@@ -2,12 +2,11 @@ import { BaselineModel, DesignCredentialModel, DesignNodeModel } from "@storyshe
 import { BuildModel } from "@storyshelf/core/models";
 import { SnapshotModel } from "@storyshelf/core/models";
 import type { Snapshot } from "@storyshelf/core/schema";
-import type { ProjectRole } from "@storyshelf/core/types";
 import type { ShelfRouter } from "../app-types.ts";
 import { credentialKeys } from "../credential-keys.ts";
 import { getStore } from "../store.ts";
 import { notFound, resolveAuthorizedProject } from "./helpers.ts";
-const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];
+import { VIEW_ROLES } from "./roles.ts";
 
 const PNG = "image/png";
 

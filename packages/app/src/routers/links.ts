@@ -1,17 +1,14 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { PackageUsageModel, ProjectModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
-import type { ProjectRole } from "@storyshelf/core/types";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
 import { buildForProject, snapshotForBuild } from "./builds.handlers.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
 import { linkedUsageFor } from "./links.handlers.ts";
+import { ADMIN_ROLES, VIEW_ROLES } from "./roles.ts";
 import { badRequest, forbidden, notFound, unauthorized } from "./schemas.ts";
-
-const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];
-const ADMIN_ROLES: readonly ProjectRole[] = ["admin"];
 
 const linkSchema = z.object({
   package: z.string().min(1).max(214),

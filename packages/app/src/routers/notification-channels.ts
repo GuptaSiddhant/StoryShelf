@@ -1,18 +1,17 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { NotificationChannelModel } from "@storyshelf/core/models";
 import type { NotificationChannelRow } from "@storyshelf/core/schema";
-import type { ProjectRole } from "@storyshelf/core/types";
 import type { ShelfRouter } from "../app-types.ts";
 import { credentialKeys } from "../credential-keys.ts";
 import { getStore } from "../store.ts";
 import { notFound, requireSiteAdmin, resolveAuthorizedProject } from "./helpers.ts";
+import { ADMIN_ROLES } from "./roles.ts";
 import {
   notFound as notFoundResponse,
   notificationChannelCreateSchema,
   notificationChannelSchema,
   unauthorized,
 } from "./schemas.ts";
-const ADMIN_ROLES: readonly ProjectRole[] = ["admin"];
 
 /** Public channel view (secret redacted, config/events decoded). */
 function toPublic(row: NotificationChannelRow): {

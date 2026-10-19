@@ -1,130 +1,77 @@
-import { createRoute, z } from "@hono/zod-openapi";
+import { z } from "@hono/zod-openapi";
 import { MemberModel, ProjectGroupMappingModel } from "@storyshelf/core/models";
-import type { ProjectRole } from "@storyshelf/core/types";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
+import { ADMIN_ROLES, VIEW_ROLES } from "./roles.ts";
+import { deleteRouteDef, listRouteDef, patchRouteDef, postRouteDef } from "./route-defs.ts";
 import {
   groupMappingCreateSchema,
   groupMappingSchema,
   memberRoleSchema,
   memberSchema,
   memberSetSchema,
-  notFound,
-  unauthorized,
 } from "./schemas.ts";
-const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];
-const ADMIN_ROLES: readonly ProjectRole[] = ["admin"];
 
-const listMembersRoute = createRoute({
-  method: "get",
-  tags: ["Members"],
+const listMembersRoute = listRouteDef({
+  tag: "Members",
   summary: "List members",
   path: "/api/v1/projects/{slug}/members",
-  request: { params: z.object({ slug: z.string() }) },
-  responses: {
-    200: {
-      content: { "application/json": { schema: memberSchema.array() } },
-      description: "List project members",
-    },
-    ...notFound,
-    ...unauthorized,
-  },
+  schema: memberSchema,
+  description: "List project members",
 });
 
-const setMemberRoute = createRoute({
-  method: "post",
-  tags: ["Members"],
+const setMemberRoute = postRouteDef({
+  tag: "Members",
   summary: "Add or update a member",
   path: "/api/v1/projects/{slug}/members",
-  request: {
-    params: z.object({ slug: z.string() }),
-    body: { content: { "application/json": { schema: memberSetSchema } } },
-  },
-  responses: {
-    201: {
-      content: { "application/json": { schema: memberSchema } },
-      description: "Added or updated member",
-    },
-    ...notFound,
-  },
+  body: memberSetSchema,
+  schema: memberSchema,
+  description: "Added or updated member",
 });
 
-const updateMemberRoute = createRoute({
-  method: "patch",
-  tags: ["Members"],
+const updateMemberRoute = patchRouteDef({
+  tag: "Members",
   summary: "Change a member's role",
   path: "/api/v1/projects/{slug}/members/{userId}",
-  request: {
-    params: z.object({ slug: z.string(), userId: z.string() }),
-    body: { content: { "application/json": { schema: memberRoleSchema } } },
-  },
-  responses: {
-    200: {
-      content: { "application/json": { schema: memberSchema } },
-      description: "Updated member role",
-    },
-    ...notFound,
-  },
+  params: { userId: z.string() },
+  body: memberRoleSchema,
+  schema: memberSchema,
+  description: "Updated member role",
 });
 
-const deleteMemberRoute = createRoute({
-  method: "delete",
-  tags: ["Members"],
+const deleteMemberRoute = deleteRouteDef({
+  tag: "Members",
   summary: "Remove a member",
   path: "/api/v1/projects/{slug}/members/{userId}",
-  request: { params: z.object({ slug: z.string(), userId: z.string() }) },
-  responses: {
-    204: { description: "Removed member" },
-    ...notFound,
-  },
+  params: { userId: z.string() },
+  description: "Removed member",
 });
 
-const listGroupMappingsRoute = createRoute({
-  method: "get",
-  tags: ["Members"],
+const listGroupMappingsRoute = listRouteDef({
+  tag: "Members",
   summary: "List group mappings",
   path: "/api/v1/projects/{slug}/group-mappings",
-  request: { params: z.object({ slug: z.string() }) },
-  responses: {
-    200: {
-      content: { "application/json": { schema: groupMappingSchema.array() } },
-      description: "List identity-provider group mappings",
-    },
-    ...notFound,
-    ...unauthorized,
-  },
+  schema: groupMappingSchema,
+  description: "List identity-provider group mappings",
 });
 
-const createGroupMappingRoute = createRoute({
-  method: "post",
-  tags: ["Members"],
+const createGroupMappingRoute = postRouteDef({
+  tag: "Members",
   summary: "Create a group mapping",
   path: "/api/v1/projects/{slug}/group-mappings",
-  request: {
-    params: z.object({ slug: z.string() }),
-    body: { content: { "application/json": { schema: groupMappingCreateSchema } } },
-  },
-  responses: {
-    201: {
-      content: { "application/json": { schema: groupMappingSchema } },
-      description: "Created group mapping (exact group-name match)",
-    },
-    ...notFound,
-  },
+  body: groupMappingCreateSchema,
+  schema: groupMappingSchema,
+  description: "Created group mapping (exact group-name match)",
 });
 
-const deleteGroupMappingRoute = createRoute({
-  method: "delete",
-  tags: ["Members"],
+const deleteGroupMappingRoute = deleteRouteDef({
+  tag: "Members",
   summary: "Remove a group mapping",
   path: "/api/v1/projects/{slug}/group-mappings/{mappingId}",
-  request: { params: z.object({ slug: z.string(), mappingId: z.string() }) },
-  responses: {
-    204: { description: "Removed group mapping" },
-    ...notFound,
-  },
+  params: { mappingId: z.string() },
+  description: "Removed group mapping",
 });
 
 /** Register the project member list, upsert, and removal endpoints. */

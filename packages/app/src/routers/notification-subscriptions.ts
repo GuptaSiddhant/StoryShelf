@@ -1,19 +1,16 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { NotificationSubscriptionModel } from "@storyshelf/core/models";
 import type { NotificationSubscriptionRow } from "@storyshelf/core/schema";
-import type { ProjectRole } from "@storyshelf/core/types";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
 import { resolveAuthorizedProject, unauthorized } from "./helpers.ts";
+import { ADMIN_ROLES, VIEW_ROLES } from "./roles.ts";
 import {
   notFound as notFoundResponse,
   notificationSubscriptionPutSchema,
   notificationSubscriptionSchema,
   unauthorized as unauthorizedResponse,
 } from "./schemas.ts";
-
-const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];
-const ADMIN_ROLES: readonly ProjectRole[] = ["admin"];
 
 /** Public subscription view (event/via lists decoded). */
 function toPublic(row: NotificationSubscriptionRow): {

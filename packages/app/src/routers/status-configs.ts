@@ -5,23 +5,16 @@ import type { ShelfRouter } from "../app-types.ts";
 import { credentialKeys } from "../credential-keys.ts";
 import { getStore } from "../store.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
-import { notFound, statusConfigCreateSchema, statusConfigSchema, unauthorized } from "./schemas.ts";
-const ADMIN_ROLES = ["admin"] as const;
+import { ADMIN_ROLES } from "./roles.ts";
+import { deleteRouteDef, listRouteDef } from "./route-defs.ts";
+import { notFound, statusConfigCreateSchema, statusConfigSchema } from "./schemas.ts";
 
-const listRoute = createRoute({
-  method: "get",
-  tags: ["Git status"],
+const listRoute = listRouteDef({
+  tag: "Git status",
   summary: "List status configs",
   path: "/api/v1/projects/{slug}/status-configs",
-  request: { params: z.object({ slug: z.string() }) },
-  responses: {
-    200: {
-      content: { "application/json": { schema: statusConfigSchema.array() } },
-      description: "List status configs",
-    },
-    ...notFound,
-    ...unauthorized,
-  },
+  schema: statusConfigSchema,
+  description: "List status configs",
 });
 
 const createRouteDef = createRoute({
@@ -46,16 +39,12 @@ const createRouteDef = createRoute({
   },
 });
 
-const deleteRoute = createRoute({
-  method: "delete",
-  tags: ["Git status"],
+const deleteRoute = deleteRouteDef({
+  tag: "Git status",
   summary: "Delete a status config",
   path: "/api/v1/projects/{slug}/status-configs/{id}",
-  request: { params: z.object({ slug: z.string(), id: z.string() }) },
-  responses: {
-    204: { description: "Deleted status config" },
-    ...notFound,
-  },
+  params: { id: z.string() },
+  description: "Deleted status config",
 });
 
 function toPublic(row: ProjectStatusConfig): {

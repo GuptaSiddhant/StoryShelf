@@ -6,7 +6,6 @@
  */
 import { createRoute, z } from "@hono/zod-openapi";
 import { BaselineArchiveError, BaselineTransferModel } from "@storyshelf/core/models";
-import type { ProjectRole } from "@storyshelf/core/types";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
@@ -17,10 +16,8 @@ import {
   toWebStream,
 } from "./baselines.handlers.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
+import { APPROVER_ROLES, VIEW_ROLES } from "./roles.ts";
 import { badRequest, errorSchema, forbidden, notFound, unauthorized } from "./schemas.ts";
-
-const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];
-const APPROVER_ROLES: readonly ProjectRole[] = ["approver", "admin"];
 
 const zipSchema = z.string().openapi({ type: "string", format: "binary" });
 const importResultSchema = z

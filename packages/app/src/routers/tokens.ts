@@ -1,63 +1,36 @@
-import { createRoute, z } from "@hono/zod-openapi";
+import { z } from "@hono/zod-openapi";
 import { TokenModel } from "@storyshelf/core/models";
-import type { ProjectRole } from "@storyshelf/core/types";
 import { randomToken } from "@storyshelf/core/utils";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
 import { resolveAuthorizedProject, notFound } from "./helpers.ts";
-import {
-  notFound as notFoundResponse,
-  tokenCreatedSchema,
-  tokenCreateSchema,
-  tokenPublicSchema,
-  unauthorized,
-} from "./schemas.ts";
-const ADMIN_ROLES: readonly ProjectRole[] = ["admin"];
+import { ADMIN_ROLES } from "./roles.ts";
+import { deleteRouteDef, listRouteDef, postRouteDef } from "./route-defs.ts";
+import { tokenCreatedSchema, tokenCreateSchema, tokenPublicSchema } from "./schemas.ts";
 
-const listTokensRoute = createRoute({
-  method: "get",
-  tags: ["Tokens"],
+const listTokensRoute = listRouteDef({
+  tag: "Tokens",
   summary: "List API tokens",
   path: "/api/v1/projects/{slug}/tokens",
-  request: { params: z.object({ slug: z.string() }) },
-  responses: {
-    200: {
-      content: { "application/json": { schema: tokenPublicSchema.array() } },
-      description: "List API tokens",
-    },
-    ...notFoundResponse,
-    ...unauthorized,
-  },
+  schema: tokenPublicSchema,
+  description: "List API tokens",
 });
 
-const createTokenRoute = createRoute({
-  method: "post",
-  tags: ["Tokens"],
+const createTokenRoute = postRouteDef({
+  tag: "Tokens",
   summary: "Create an API token",
   path: "/api/v1/projects/{slug}/tokens",
-  request: {
-    params: z.object({ slug: z.string() }),
-    body: { content: { "application/json": { schema: tokenCreateSchema } } },
-  },
-  responses: {
-    201: {
-      content: { "application/json": { schema: tokenCreatedSchema } },
-      description: "Created token",
-    },
-    ...notFoundResponse,
-  },
+  body: tokenCreateSchema,
+  schema: tokenCreatedSchema,
+  description: "Created token",
 });
 
-const deleteTokenRoute = createRoute({
-  method: "delete",
-  tags: ["Tokens"],
+const deleteTokenRoute = deleteRouteDef({
+  tag: "Tokens",
   summary: "Delete an API token",
   path: "/api/v1/projects/{slug}/tokens/{tokenId}",
-  request: { params: z.object({ slug: z.string(), tokenId: z.string() }) },
-  responses: {
-    204: { description: "Deleted token" },
-    ...notFoundResponse,
-  },
+  params: { tokenId: z.string() },
+  description: "Deleted token",
 });
 
 /** Register the project API token list, create, and revoke endpoints. */

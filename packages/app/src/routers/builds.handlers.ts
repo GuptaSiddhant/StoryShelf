@@ -15,7 +15,7 @@ import { ProjectModel } from "@storyshelf/core/models";
 import { SnapshotModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
 import type { Build, Snapshot } from "@storyshelf/core/schema";
-import { type ProjectRole, BUILD_STATUSES } from "@storyshelf/core/types";
+import { BUILD_STATUSES } from "@storyshelf/core/types";
 import { HTTPException } from "hono/http-exception";
 import { Readable, Transform } from "node:stream";
 import type { ReadableStream as NodeWebStream } from "node:stream/web";
@@ -279,12 +279,7 @@ export async function approveSnapshot(
   }
 }
 
-/** Roles permitted to view builds, snapshots, and comments. */
-export const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];
-/** Roles permitted to upload builds and write comments. */
-export const DEVELOPER_ROLES: readonly ProjectRole[] = ["developer", "approver", "admin"];
-/** Roles permitted to approve or reject snapshots and delete builds. */
-export const APPROVER_ROLES: readonly ProjectRole[] = ["approver", "admin"];
+export { APPROVER_ROLES, DEVELOPER_ROLES, VIEW_ROLES } from "./roles.ts";
 
 /** JSON input schema for creating a build before streaming its bundle. */
 export const buildCreateJsonSchema = z
