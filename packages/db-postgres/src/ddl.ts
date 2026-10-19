@@ -130,6 +130,7 @@ CREATE TABLE IF NOT EXISTS snapshots (
   baseline_version TEXT,
   mode TEXT,
   browser TEXT NOT NULL DEFAULT 'chromium',
+  duration_ms INTEGER,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );

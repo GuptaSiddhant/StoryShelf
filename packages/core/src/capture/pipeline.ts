@@ -380,6 +380,7 @@ async function createWithoutBaseline(
   const now = fingerprintOf(capture, viewport);
   const snapshot = await snapshots.create(ctx.project.id, ctx.build.id, {
     browser,
+    durationMs: capture.durationMs ?? null,
     storyId: capture.story.id,
     storyName: capture.story.name,
     storyTitle: capture.story.title,
@@ -469,6 +470,7 @@ function snapshotInput(input: BaselineCapture): Parameters<SnapshotModel["create
   const { capture, viewport, screenshot, baseline, now } = input;
   return {
     browser: browserOf(capture),
+    durationMs: capture.durationMs ?? null,
     storyId: capture.story.id,
     storyName: capture.story.name,
     storyTitle: capture.story.title,

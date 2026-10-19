@@ -35,6 +35,8 @@ export interface Snapshot {
   mode?: string | null;
   /** Engine the image was captured with. */
   browser?: string;
+  /** Milliseconds the renderer spent on this capture; null when it reported none or nothing rendered. */
+  durationMs: number | null;
   createdAt: string;
   updatedAt: string;
 }
