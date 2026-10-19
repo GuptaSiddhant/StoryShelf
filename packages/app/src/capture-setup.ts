@@ -9,6 +9,7 @@ import type {
   CaptureDispatchJob,
   CaptureJobOptions,
   DispatchDeps,
+  RecoveryDeps,
   RecoveryResult,
 } from "@storyshelf/core/capture";
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
@@ -18,6 +19,7 @@ import { recommendedBuildConcurrency } from "@storyshelf/core/utils";
 import { captureMetrics, currentTraceparent } from "@storyshelf/observability";
 import { credentialKeys } from "./credential-keys.ts";
 import { notifySystemWith } from "./notify.ts";
+import { CAPTURE_LEASE_MS, createStalledHandler } from "./stalled-capture.ts";
 
 /**
  * Wiring for the capture queue: the queue instance (if any) and a helper
@@ -150,13 +152,21 @@ export function setupCaptureQueue(
     logger,
   };
   const runJob = createDispatchJob(dispatchDeps);
+  const recovery: RecoveryDeps = {
+    deps: dispatchDeps,
+    enqueue: async (buildId) => {
+      await enqueueCapture(buildId);
+    },
+  };
   const captureQueue =
     options.captureQueue ??
     new InMemoryCaptureQueue({
       concurrency: config.captureConcurrency ?? recommendedBuildConcurrency(),
       logger,
-      runJob: async (job: CaptureDispatchJob): Promise<void> => {
-        await timedRunJob(runJob, job);
+      leaseMs: CAPTURE_LEASE_MS,
+      onStalled: createStalledHandler({ runner: options.captureRunner, recovery, logger }),
+      runJob: async (job: CaptureDispatchJob, lease): Promise<void> => {
+        await timedRunJob(async (dispatched) => await runJob(dispatched, lease), job);
         // In-process completions only: remote-queue workers own their own
         // alerting (the server never sees those outcomes).
         await notifyCaptureFailed(options, config, logger, job.buildId);
@@ -165,12 +175,6 @@ export function setupCaptureQueue(
   const enqueueCapture = async (buildId: string, reqId?: string): Promise<void> => {
     await enqueueJob(captureQueue, buildId, reqId);
   };
-  const recoverStuck = async (): Promise<RecoveryResult> =>
-    await recoverStuckCaptures({
-      deps: dispatchDeps,
-      enqueue: async (buildId) => {
-        await enqueueCapture(buildId);
-      },
-    });
+  const recoverStuck = async (): Promise<RecoveryResult> => await recoverStuckCaptures(recovery);
   return { queue: captureQueue, enqueueCapture, recoverStuck };
 }

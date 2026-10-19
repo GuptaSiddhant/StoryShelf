@@ -1,5 +1,6 @@
 /**
- * Boot-time recovery for builds left in `capturing` by a server restart.
+ * Recovery for builds left in `capturing` by a server restart (boot sweep) or by a stalled
+ * in-process capture (lease expiry): one policy, two triggers.
  *
  * Policy: requeue once. The interrupted attempt is closed with
  * {@link INTERRUPTED_ERROR}; a build with no earlier interrupted attempt goes back to `pending`
@@ -18,6 +19,14 @@ import { postStatusesForBuild } from "./status-fanout.ts";
 
 /** Error recorded on attempts that a restart cut short; also the requeue-once marker. */
 export const INTERRUPTED_ERROR = "Interrupted by server restart";
+
+/** Error recorded on attempts whose in-process lease expired (a hung capture); also a requeue-once marker. */
+export const STALLED_ERROR = "Interrupted: capture stalled (lease expired)";
+
+/** Whether an attempt error marks an interruption (restart or stall) for the requeue-once rule. */
+function isInterruption(error: string | null | undefined): boolean {
+  return error === INTERRUPTED_ERROR || error === STALLED_ERROR;
+}
 
 /** Outcome of one recovery sweep. */
 export interface RecoveryResult {
@@ -38,7 +47,7 @@ export async function recoverStuckCaptures(recovery: RecoveryDeps): Promise<Reco
     where: eq(getTableColumns(deps.tables.builds)["status"] as unknown as SQLWrapper, "capturing"),
   })) as unknown as Build[];
   const outcomes = await Promise.all(
-    stuck.map(async (build) => await recoverBuild(recovery, build)),
+    stuck.map(async (build) => await recoverBuild(recovery, build, INTERRUPTED_ERROR)),
   );
   const result: RecoveryResult = {
     requeued: stuck.filter((_, index) => outcomes[index]).map((build) => build.id),
@@ -53,18 +62,38 @@ export async function recoverStuckCaptures(recovery: RecoveryDeps): Promise<Reco
   return result;
 }
 
+/**
+ * Recover one build whose in-process lease expired: same policy as a restart (requeue once, then
+ * fail), triggered by the stall instead of a boot. Does nothing unless the build is still
+ * `capturing`, so a run that finished or failed on its own is left alone.
+ *
+ * @returns `"requeued"`, `"failed"`, or `"skipped"`.
+ */
+export async function recoverStalledCapture(
+  recovery: RecoveryDeps,
+  buildId: string,
+): Promise<"requeued" | "failed" | "skipped"> {
+  const build = await new BuildModel(recovery.deps.db, recovery.deps.tables).get(buildId);
+  if (build?.status !== "capturing") {
+    return "skipped";
+  }
+  return (await recoverBuild(recovery, build, STALLED_ERROR)) ? "requeued" : "failed";
+}
+
 /** Recover one build; returns true when it was requeued. */
-async function recoverBuild(recovery: RecoveryDeps, build: Build): Promise<boolean> {
+async function recoverBuild(
+  recovery: RecoveryDeps,
+  build: Build,
+  reason: string,
+): Promise<boolean> {
   const { deps } = recovery;
   const attempts = new CaptureAttemptModel(deps.db, deps.tables);
   const history = await attempts.listByBuild(build.id);
   const open = history.filter((a) => a.status === "queued" || a.status === "running");
   // Requeue-once: the run before the interrupted one was itself interrupted => crash loop.
   const lastClosed = history.findLast((a) => !open.includes(a));
-  await Promise.all(
-    open.map(async (a) => await attempts.markFinished(a.id, "failed", INTERRUPTED_ERROR)),
-  );
-  return lastClosed?.error === INTERRUPTED_ERROR
+  await Promise.all(open.map(async (a) => await attempts.markFinished(a.id, "failed", reason)));
+  return isInterruption(lastClosed?.error)
     ? await failInterrupted(deps, build)
     : await requeueInterrupted(recovery, build);
 }
