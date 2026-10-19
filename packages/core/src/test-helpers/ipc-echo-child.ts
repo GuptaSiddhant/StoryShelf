@@ -1,7 +1,8 @@
 /**
  * A minimal capture child for the real-fork tests: polls the parent over process IPC and settles jobs
  * by build id. `crash*` exits non-zero, `fail*` nacks without requeue, `hang*` goes silent forever,
- * `slow*` takes ~400 ms while reporting progress, anything else is acked.
+ * `slow*` takes ~400 ms while reporting progress, `fan*` hands two shards of its build back to the
+ * parent before acking (a sharded plan), anything else is acked.
  */
 import { IpcCaptureQueue } from "../capture/forked/ipc-queue.ts";
 
@@ -41,6 +42,11 @@ for (;;) {
     // A crash is the point of this helper.
     // oxlint-disable-next-line unicorn/no-process-exit
     process.exit(1);
+  }
+  if (job.buildId.startsWith("fan") && !job.shard) {
+    for (const shard of [`${job.buildId}:render:1`, `${job.buildId}:render:2`]) {
+      await queue.enqueue({ buildId: job.buildId, shard });
+    }
   }
   await (job.buildId.startsWith("fail") ? queue.nack(job, { requeue: false }) : queue.ack(job));
 }

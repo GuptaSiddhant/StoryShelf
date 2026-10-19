@@ -176,8 +176,7 @@ a story's engines kept together), optional `shard` field on queue jobs and trans
 and the reducer as a **unique-claim insert** rather than a decrement (no
 `DatabaseAdapter` change): the last shard to end inserts `<build>:finalize`; the single
 winner finalizes. Opt-in via `capture.shardSize` / worker `shardSize`; unset keeps
-today's one-job behaviour. Not yet done: a separate compare stage/queue, and sharding
-together with the forked child.
+today's one-job behaviour. Not yet done: a separate compare stage/queue.
 
 **Longest-first ordering (third slice).** Runners report `RenderedSnapshot.durationMs`
 and it is persisted per snapshot (`snapshots.duration_ms`, nullable; third-party runners
@@ -189,6 +188,19 @@ the least work that still has room for its captures, shards handed to the queue 
 first. A story with no timing is priced at the average cost of a capture. Capture
 capacity still binds, so shards stay about `shardSize`; with no timings at all (fresh
 project, purged history) the contiguous slicing is unchanged.
+
+**Forked capture (fourth slice).** The forked child already had an `enqueue` message
+that puts a job on the parent's queue, so a child that plans a build hands its shards
+back over IPC and the parent delivers them to the same child like any other job (queue
+entries, receipts, leases and crash redelivery are keyed per shard, and a requeued shard
+stays a shard). What was missing was configuration: the parent now passes
+`capture.shardSize` to the child in `STORYSHELF_CAPTURE_SHARD_SIZE` (the entry module's
+own `shardSize` wins), and `capture.shardSize` together with `capture.workerEntry` is no
+longer rejected. The in-process fallback shards through the same queue, so tripping it
+mid-build keeps working. Because every shard settles as its own job, the parent alerts a
+failed build once per failure instead of once per shard. A single child still renders one
+shard at a time per its concurrency, so this buys granular retries, isolation and
+progress on one host rather than throughput; horizontal scale remains a remote queue.
 
 **Poison-shard isolation (second slice).** A render call that throws takes its whole
 slice with it, so `renderIsolating` (`capture/isolate.ts`) re-renders the stories the

@@ -100,6 +100,7 @@ export { IpcCaptureQueue } from "./forked/ipc-queue.ts";
 export {
   canForkCaptureChild,
   CAPTURE_CONCURRENCY_ENV,
+  CAPTURE_SHARD_SIZE_ENV,
   CAPTURE_WORKER_ROLE,
   forkCaptureChild,
   type ForkOptions,

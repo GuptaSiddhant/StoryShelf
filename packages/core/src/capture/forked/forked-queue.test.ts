@@ -134,6 +134,63 @@ describe("ForkedCaptureQueue delivery", () => {
   });
 });
 
+describe("ForkedCaptureQueue shards", () => {
+  it("tracks each shard of a build beside the build and delivers it with its shard", async () => {
+    const { queue, last } = make();
+    await queue.enqueue({ buildId: "b1" });
+    last().say({ type: "enqueue", job: { buildId: "b1", shard: "b1:render:1" } });
+    last().say({ type: "enqueue", job: { buildId: "b1", shard: "b1:render:2" } });
+
+    last().say({ type: "poll", id: 1, waitMs: 1000 });
+    last().say({ type: "poll", id: 2, waitMs: 1000 });
+    last().say({ type: "poll", id: 3, waitMs: 1000 });
+
+    const jobs = last()
+      .delivered()
+      .map((delivery) => delivery.job);
+    expect(jobs.map((job) => job.shard)).toEqual([undefined, "b1:render:1", "b1:render:2"]);
+    // Three jobs for one build never collapse into one entry.
+    expect(new Set(jobs.map((job) => job.receipt)).size).toBe(3);
+    expect((await queue.status("b1"))?.shard).toBeUndefined();
+  });
+
+  it("settles one shard without finishing its siblings", async () => {
+    const onSettled = vi.fn(async () => {});
+    const { queue, last } = make({ onSettled });
+    await queue.enqueue({ buildId: "b1", shard: "b1:render:1" });
+    await queue.enqueue({ buildId: "b1", shard: "b1:render:2" });
+    last().say({ type: "poll", id: 1, waitMs: 1000 });
+    last().say({ type: "poll", id: 2, waitMs: 1000 });
+    const [first, second] = last().delivered();
+
+    last().say({ type: "ack", receipt: first?.job.receipt });
+
+    expect(onSettled).toHaveBeenCalledTimes(1);
+    expect(onSettled).toHaveBeenCalledWith(
+      expect.objectContaining({ shard: "b1:render:1" }),
+      expect.anything(),
+    );
+    last().say({ type: "ack", receipt: second?.job.receipt });
+    expect(onSettled).toHaveBeenCalledTimes(2);
+  });
+
+  it("redelivers a shard whose child crashed, still a shard", async () => {
+    const { queue, last, children } = make();
+    await queue.enqueue({ buildId: "b1", shard: "b1:render:1" });
+    last().say({ type: "poll", id: 1, waitMs: 1000 });
+    last().exit(1);
+    await tick(20);
+
+    const restarted = children.at(-1) as FakeChild;
+    restarted.say({ type: "poll", id: 1, waitMs: 1000 });
+    expect(restarted.delivered()[0]?.job).toMatchObject({
+      buildId: "b1",
+      shard: "b1:render:1",
+      attempts: 1,
+    });
+  });
+});
+
 describe("ForkedCaptureQueue nack", () => {
   it("redelivers a requeued job with attempts bumped, after the delay", async () => {
     const { queue, last } = make();

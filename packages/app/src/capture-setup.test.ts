@@ -10,7 +10,7 @@ import { createShelfLogger } from "@storyshelf/core/logger";
 import { BuildModel, ProjectModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { describe, expect, it, vi } from "vitest";
-import { setupCaptureQueue } from "./capture-setup.ts";
+import { alreadyAlerted, setupCaptureQueue } from "./capture-setup.ts";
 
 function makeLogger() {
   return createShelfLogger({ level: "silent" });
@@ -33,6 +33,21 @@ function makeRunner() {
     cancel: vi.fn(async () => {}),
   } as unknown as import("@storyshelf/core/adapter/capture-runner").CaptureRunner;
 }
+
+describe("alreadyAlerted", () => {
+  it("lets only the first of several settles of one failed build through", () => {
+    const build = { id: "b-alert", updatedAt: "2026-10-19T10:00:00.000Z" };
+    expect(alreadyAlerted(build)).toBe(false);
+    // Every other shard of the same failed build settles against the same build row.
+    expect(alreadyAlerted(build)).toBe(true);
+    expect(alreadyAlerted({ ...build })).toBe(true);
+  });
+
+  it("alerts again when a retry fails the build anew", () => {
+    expect(alreadyAlerted({ id: "b-retry", updatedAt: "2026-10-19T10:00:00.000Z" })).toBe(false);
+    expect(alreadyAlerted({ id: "b-retry", updatedAt: "2026-10-19T11:30:00.000Z" })).toBe(false);
+  });
+});
 
 describe("setupCaptureQueue", () => {
   it("returns null when no queue and no runner", () => {

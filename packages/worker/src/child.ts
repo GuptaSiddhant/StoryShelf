@@ -9,7 +9,11 @@
  * ```
  */
 import type { PollableJob } from "@storyshelf/core/adapter/capture-queue";
-import { CAPTURE_CONCURRENCY_ENV, IpcCaptureQueue } from "@storyshelf/core/capture";
+import {
+  CAPTURE_CONCURRENCY_ENV,
+  CAPTURE_SHARD_SIZE_ENV,
+  IpcCaptureQueue,
+} from "@storyshelf/core/capture";
 import type { ChildMessage, ParentPort } from "@storyshelf/core/capture";
 import {
   createCaptureWorker,
@@ -75,6 +79,7 @@ function buildWorker(
     }),
     tables: options.tables ?? tablesOf(options),
     config: { ...options.config, concurrency: concurrencyOf(options, host.env) },
+    shardSize: shardSizeOf(options, host.env),
   });
   return { worker, queue };
 }
@@ -145,6 +150,15 @@ function concurrencyOf(
   return (
     options.config?.concurrency ?? (Number.isInteger(fromEnv) && fromEnv > 0 ? fromEnv : undefined)
   );
+}
+
+/** The module's own `shardSize`, else the parent's `capture.shardSize` handed down in the environment. */
+function shardSizeOf(
+  options: CaptureChildOptions,
+  env: Record<string, string | undefined>,
+): number | undefined {
+  const fromEnv = Number(env[CAPTURE_SHARD_SIZE_ENV]);
+  return options.shardSize ?? (Number.isInteger(fromEnv) && fromEnv > 0 ? fromEnv : undefined);
 }
 
 function processHost(): ChildHost {

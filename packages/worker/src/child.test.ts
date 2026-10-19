@@ -1,13 +1,21 @@
 import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
 
-const dispatch = vi.hoisted(() => ({ run: vi.fn(), tables: [] as unknown[] }));
+const dispatch = vi.hoisted(() => ({
+  run: vi.fn(),
+  tables: [] as unknown[],
+  jobOptions: [] as { shardSize?: number; enqueue?: (job: unknown) => Promise<void> }[],
+}));
 vi.mock("@storyshelf/core/capture", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@storyshelf/core/capture")>();
   return {
     ...actual,
-    createDispatchJob: (deps: { tables: unknown }) => {
+    createDispatchJob: (deps: {
+      tables: unknown;
+      jobOptions: (typeof dispatch.jobOptions)[number];
+    }) => {
       dispatch.tables.push(deps.tables);
+      dispatch.jobOptions.push(deps.jobOptions);
       return dispatch.run;
     },
     sweepOrphanedScratch: async () => 0,
@@ -15,7 +23,8 @@ vi.mock("@storyshelf/core/capture", async (importOriginal) => {
 });
 
 const { runCaptureChild } = await import("./child.ts");
-const { CAPTURE_CONCURRENCY_ENV } = await import("@storyshelf/core/capture");
+const { CAPTURE_CONCURRENCY_ENV, CAPTURE_SHARD_SIZE_ENV } =
+  await import("@storyshelf/core/capture");
 type Host = import("./child.ts").ChildHost;
 
 const sleep = async (ms: number): Promise<void> => {
@@ -147,6 +156,43 @@ describe("runCaptureChild", () => {
     await sleep(30);
     // Both captures are in flight at once, which only happens with concurrency 2.
     expect(dispatch.run).toHaveBeenCalledTimes(2);
+    events.emit("SIGTERM");
+    await running;
+  });
+
+  it("plans shards with the parent's shard size and hands them back over IPC", async () => {
+    dispatch.jobOptions.length = 0;
+    const { host, events, sent } = fakeHost({ [CAPTURE_SHARD_SIZE_ENV]: "250" });
+    const running = runCaptureChild(options(), host);
+    await sleep(20);
+
+    const [jobOptions] = dispatch.jobOptions.slice(-1);
+    expect(jobOptions?.shardSize).toBe(250);
+    await jobOptions?.enqueue?.({ buildId: "b1", shard: "b1:render:1" });
+    expect(sent).toContainEqual({ type: "enqueue", job: { buildId: "b1", shard: "b1:render:1" } });
+
+    events.emit("SIGTERM");
+    await running;
+  });
+
+  it("prefers the entry module's own shard size over the parent's", async () => {
+    dispatch.jobOptions.length = 0;
+    const { host, events } = fakeHost({ [CAPTURE_SHARD_SIZE_ENV]: "250" });
+    const running = runCaptureChild(options({ shardSize: 40 }), host);
+    await sleep(20);
+
+    expect(dispatch.jobOptions.at(-1)?.shardSize).toBe(40);
+    events.emit("SIGTERM");
+    await running;
+  });
+
+  it("does not shard unless a size is given", async () => {
+    dispatch.jobOptions.length = 0;
+    const { host, events } = fakeHost();
+    const running = runCaptureChild(options(), host);
+    await sleep(20);
+
+    expect(dispatch.jobOptions.at(-1)?.shardSize).toBeUndefined();
     events.emit("SIGTERM");
     await running;
   });
