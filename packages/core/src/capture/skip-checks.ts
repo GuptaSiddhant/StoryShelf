@@ -30,59 +30,8 @@ export interface MergeCheck {
   logger?: Logger;
 }
 
-interface ParsedRow {
-  provider: GitHostProvider;
-  config: unknown;
-  token: string;
-}
-
-function findRowProvider(
-  providers: GitHostProvider[],
-  row: { provider: string },
-): GitHostProvider | undefined {
-  return providers.find((p) => p.metadata.kind === row.provider);
-}
-
-function decodeRowConfig(provider: GitHostProvider, configJson: string): unknown {
-  try {
-    const parsed: unknown = JSON.parse(configJson);
-    provider.metadata.schema.parse(parsed);
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function decodeRowToken(model: StatusConfigModel, row: ProjectStatusConfig): string | null {
-  try {
-    return model.decryptToken(row);
-  } catch {
-    return null;
-  }
-}
-
-function parseRow(
-  model: StatusConfigModel,
-  row: ProjectStatusConfig,
-  providers: GitHostProvider[],
-): ParsedRow | null {
-  const provider = findRowProvider(providers, row);
-  if (!provider) {
-    return null;
-  }
-  const parsed = decodeRowConfig(provider, row.config);
-  if (parsed === null) {
-    return null;
-  }
-  const token = decodeRowToken(model, row);
-  if (token === null) {
-    return null;
-  }
-  return { provider, config: parsed, token };
-}
-
 async function checkRowMerged(
-  parsed: ParsedRow,
+  parsed: { provider: GitHostProvider; config: unknown; token: string },
   sha: string,
   branch: string,
   logger?: Logger,
@@ -108,11 +57,11 @@ async function checkRow(
   branch: string,
   logger?: Logger,
 ): Promise<boolean> {
-  const parsed = parseRow(model, row, providers);
-  if (!parsed) {
+  const resolved = model.resolveRow(row, providers);
+  if (!resolved.ok) {
     return false;
   }
-  return await checkRowMerged(parsed, sha, branch, logger);
+  return await checkRowMerged(resolved, sha, branch, logger);
 }
 
 /** True when any configured provider reports the commit already merged. */

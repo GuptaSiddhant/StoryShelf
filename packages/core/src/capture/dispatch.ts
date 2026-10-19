@@ -337,17 +337,9 @@ async function loadJobTarget(
   deps: DispatchDeps,
   job: CaptureDispatchJob,
 ): Promise<{ build: Build; project: Project } | null> {
-  const builds = new BuildModel(deps.db, deps.tables);
-  const build = await builds.get(job.buildId);
-  if (!build) {
-    await executeCaptureJob(
-      { buildId: job.buildId, reqId: job.reqId, traceparent: job.traceparent },
-      deps.jobOptions,
-    );
-    return null;
-  }
-  const project = await new ProjectModel(deps.db, deps.tables).get(build.projectId);
-  if (!project) {
+  const build = await new BuildModel(deps.db, deps.tables).get(job.buildId);
+  const project = build ? await new ProjectModel(deps.db, deps.tables).get(build.projectId) : null;
+  if (!build || !project) {
     await executeCaptureJob(
       { buildId: job.buildId, reqId: job.reqId, traceparent: job.traceparent },
       deps.jobOptions,

@@ -96,4 +96,37 @@ describe("StatusConfigModel", () => {
       field: "config",
     });
   });
+
+  it("resolves a row to provider, validated config and decrypted token", async () => {
+    const { model } = setup();
+    const provider = {
+      metadata: { kind: "github", schema: z.object({ owner: z.string() }) },
+    } as unknown as GitHostProvider;
+    const row = await model.create("p1", {
+      provider: "github",
+      config: { owner: "a" },
+      token: "t",
+    });
+    expect(model.resolveRow(row, [provider])).toMatchObject({
+      ok: true,
+      provider,
+      config: { owner: "a" },
+      token: "t",
+    });
+    expect(model.resolveRow(row, [])).toEqual({ ok: false, reason: "no-provider" });
+    const badConfig = await model.create("p1", { provider: "github", config: {}, token: "t" });
+    expect(model.resolveRow(badConfig, [provider])).toMatchObject({
+      ok: false,
+      reason: "invalid-config",
+    });
+    const otherKey = new StatusConfigModel(
+      setup().db,
+      { projectStatusConfigs: setup().db.tables.projectStatusConfigs },
+      "a-different-secret-0000",
+    );
+    expect(otherKey.resolveRow(row, [provider])).toMatchObject({
+      ok: false,
+      reason: "undecryptable-token",
+    });
+  });
 });
