@@ -11,6 +11,10 @@ import type { DiffOptions, DiffResult } from "./options.ts";
  * @returns The diff result with pixel counts and an optional overlay image.
  */
 export function diffImages(baseline: Buffer, current: Buffer, options: DiffOptions): DiffResult {
+  const identical = identicalResult(baseline, current);
+  if (identical) {
+    return identical;
+  }
   const baselinePng = PNG.sync.read(baseline);
   const currentPng = PNG.sync.read(current);
 
@@ -72,6 +76,37 @@ export function diffImages(baseline: Buffer, current: Buffer, options: DiffOptio
   };
 }
 
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const IHDR_END = 24;
+
+/**
+ * Fast path for byte-equal inputs: no decode, no pixelmatch, no overlay.
+ *
+ * Equal bytes decode to equal pixels, so the diff is empty by construction. Dimensions come from
+ * the IHDR chunk (big-endian width/height at bytes 16-23). Inputs that are not recognisably PNG
+ * return null so the regular path reports the decode error as before. A direct byte comparison
+ * is used instead of hashing both buffers: it is exact and cheaper than two digests.
+ */
+function identicalResult(baseline: Buffer, current: Buffer): DiffResult | null {
+  if (
+    baseline.length < IHDR_END ||
+    !baseline.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE) ||
+    !baseline.equals(current)
+  ) {
+    return null;
+  }
+  const dimensions = { width: baseline.readUInt32BE(16), height: baseline.readUInt32BE(20) };
+  return {
+    passed: true,
+    diffPixels: 0,
+    diffRatio: 0,
+    diffImage: null,
+    baselineDimensions: dimensions,
+    currentDimensions: { ...dimensions },
+    sizeChanged: false,
+  };
+}
+
 function cropRgba(source: Buffer, sourceWidth: number, width: number, height: number): Buffer {
   const cropped = Buffer.alloc(width * height * 4);
   const rowBytes = width * 4;
@@ -82,17 +117,26 @@ function cropRgba(source: Buffer, sourceWidth: number, width: number, height: nu
   return cropped;
 }
 
+/**
+ * Count differing pixels first without an output buffer; only a failing result pays for the
+ * overlay (a second pixelmatch pass plus PNG encode), since passing overlays are discarded.
+ */
 function compareRegions(
   baselineData: Buffer,
   currentData: Buffer,
   width: number,
   height: number,
   options: DiffOptions,
-): { diffPixels: number; diffImage: Buffer } {
-  const diffPng = new PNG({ width, height });
-  const diffPixels = pixelmatch(baselineData, currentData, diffPng.data, width, height, {
+): { diffPixels: number; diffImage: Buffer | null } {
+  const matchOptions = {
     threshold: options.pixelThreshold,
     includeAA: options.includeAntialiasing,
-  });
+  };
+  const diffPixels = pixelmatch(baselineData, currentData, undefined, width, height, matchOptions);
+  if (diffPixels / (width * height) <= options.maxDiffRatio) {
+    return { diffPixels, diffImage: null };
+  }
+  const diffPng = new PNG({ width, height });
+  pixelmatch(baselineData, currentData, diffPng.data, width, height, matchOptions);
   return { diffPixels, diffImage: PNG.sync.write(diffPng) };
 }
