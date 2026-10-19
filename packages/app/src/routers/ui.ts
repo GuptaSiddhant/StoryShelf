@@ -6,6 +6,7 @@ import { SnapshotModel } from "@storyshelf/core/models";
 import type { ProjectRole } from "@storyshelf/core/types";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
+import { capturesLocally } from "../capture-process.ts";
 import { loadInsightPanel } from "../insights/panel.ts";
 import { renderBuildDetailPage } from "../pages/build-detail.tsx";
 import type { LinkedUsageItem } from "../pages/build-diff-usage.tsx";
@@ -163,7 +164,7 @@ export function registerUiPages(app: ShelfRouter): void {
       slug,
       queueView,
       canRetry,
-      getStore().captureQueue?.metadata.kind === "memory",
+      capturesLocally(getStore().captureQueue),
     );
     if (!html) {
       return c.notFound();
