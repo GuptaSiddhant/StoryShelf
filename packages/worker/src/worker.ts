@@ -50,6 +50,11 @@ export interface WorkerOptions {
   nack?: (job: PollableJob, options?: { requeue?: boolean; delayMs?: number }) => Promise<void>;
   /** Optional lease-renewal override; defaults to `queue.extend` when present. */
   extend?: ExtendLease;
+  /**
+   * Called whenever a running capture makes progress (each attempt-log line). The forked child
+   * uses it to renew the job's lease in the parent, so a hung capture is noticed.
+   */
+  onProgress?: (job: PollableJob) => void;
   /** Database adapter (same as server). */
   db: DatabaseAdapter;
   /** Table handles; defaults to sqlite schema handles. */
@@ -222,7 +227,11 @@ export function createCaptureWorker(options: WorkerOptions): WorkerHandle {
   /** Run the capture while a heartbeat keeps the job's queue lease alive. */
   async function runWithLease(job: PollableJob): Promise<void> {
     const lease = startLease(job, doExtend, logger?.child({ buildId: job.buildId }));
-    const run = runJob({ buildId: job.buildId, reqId: job.reqId, traceparent: job.traceparent });
+    const onProgress = options.onProgress;
+    const run = runJob(
+      { buildId: job.buildId, reqId: job.reqId, traceparent: job.traceparent },
+      onProgress ? { touch: (): void => onProgress(job) } : undefined,
+    );
     try {
       await (lease ? Promise.race([run, lease.lost]) : run);
     } finally {

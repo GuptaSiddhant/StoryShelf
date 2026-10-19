@@ -7,6 +7,7 @@ describe("isChildMessage", () => {
     expect(isChildMessage({ type: "ack", receipt: "r1" })).toBe(true);
     expect(isChildMessage({ type: "nack", receipt: "r1", requeue: true, delayMs: 5 })).toBe(true);
     expect(isChildMessage({ type: "enqueue", job: { buildId: "b1" } })).toBe(true);
+    expect(isChildMessage({ type: "progress", receipt: "r1" })).toBe(true);
   });
 
   it("rejects malformed or unknown payloads", () => {
@@ -21,6 +22,8 @@ describe("isChildMessage", () => {
       { type: "nack", receipt: "r1" },
       { type: "enqueue", job: {} },
       { type: "enqueue", job: { buildId: "" } },
+      { type: "progress" },
+      { type: "progress", receipt: 5 },
       { type: "mystery" },
     ]) {
       expect(isChildMessage(bad)).toBe(false);

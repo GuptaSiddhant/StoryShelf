@@ -6,7 +6,9 @@ export type ChildMessage =
   | { type: "poll"; id: number; waitMs: number }
   | { type: "ack"; receipt: string }
   | { type: "nack"; receipt: string; requeue: boolean; delayMs?: number; error?: string }
-  | { type: "enqueue"; job: CaptureJob };
+  | { type: "enqueue"; job: CaptureJob }
+  /** The job under `receipt` made progress; renews its lease in the parent. */
+  | { type: "progress"; receipt: string };
 
 /** Parent to child: the answer to one `poll`. */
 export type ParentMessage =
@@ -35,6 +37,8 @@ export function isChildMessage(value: unknown): value is ChildMessage {
       return typeof value["receipt"] === "string" && typeof value["requeue"] === "boolean";
     case "enqueue":
       return isJob(value["job"]);
+    case "progress":
+      return typeof value["receipt"] === "string";
     default:
       return false;
   }

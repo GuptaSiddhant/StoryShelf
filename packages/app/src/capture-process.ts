@@ -11,6 +11,7 @@ import {
 import type { ShelfCaptureOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 import { detectResources } from "@storyshelf/core/utils";
+import { CAPTURE_LEASE_MS } from "./stalled-capture.ts";
 
 /** True when the capture runs in a process this server owns, so its queue can retry and cancel. */
 export function capturesLocally(queue: CaptureQueue | null | undefined): boolean {
@@ -72,6 +73,7 @@ export function createForkedQueue(deps: ForkedQueueDeps): ForkedCaptureQueue {
   return new ForkedCaptureQueue({
     spawn: () => forkCaptureChild({ entry: deps.workerEntry, env }),
     fallback: deps.fallback,
+    leaseMs: CAPTURE_LEASE_MS,
     onSettled: async (job) => {
       await deps.onSettled(job);
     },

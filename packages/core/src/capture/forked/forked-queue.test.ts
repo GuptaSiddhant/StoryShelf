@@ -247,6 +247,78 @@ describe("ForkedCaptureQueue crash handling", () => {
   });
 });
 
+async function deliverOne(leaseMs: number, overrides: Partial<ForkedCaptureQueueOptions> = {}) {
+  const made = make({ leaseMs, ...overrides });
+  await made.queue.enqueue({ buildId: "b1" });
+  made.last().say({ type: "poll", id: 1, waitMs: 1000 });
+  return { ...made, receipt: made.last().delivered()[0]?.job.receipt };
+}
+
+describe("ForkedCaptureQueue hang detection", () => {
+  it("force-kills a child whose job makes no progress, then treats it as a crash", async () => {
+    const { queue, children } = await deliverOne(30);
+    await tick(80);
+    expect(children[0]?.killed).toBe(true);
+    expect(children[0]?.forced).toBe(true);
+
+    children[0]?.exit(null, "SIGKILL"); // what the real kill produces
+    expect((await queue.status("b1"))?.status).toBe("queued");
+    await tick(20);
+    expect(children).toHaveLength(2);
+    children[1]?.say({ type: "poll", id: 1, waitMs: 1000 });
+    expect(children[1]?.delivered()[0]?.job).toMatchObject({ buildId: "b1", attempts: 1 });
+  });
+
+  it("leaves a job alone while the child reports progress", async () => {
+    const { children, receipt } = await deliverOne(50);
+    for (let step = 0; step < 5; step += 1) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- sequential progress ticks
+      await tick(20);
+      children[0]?.say({ type: "progress", receipt });
+    }
+    expect(children[0]?.killed).toBe(false);
+  });
+
+  it("stops watching a job once it is acked", async () => {
+    const { children, receipt } = await deliverOne(30);
+    children[0]?.say({ type: "ack", receipt });
+    await tick(80);
+    expect(children[0]?.killed).toBe(false);
+  });
+
+  it("stops watching a nacked job", async () => {
+    const { children, receipt } = await deliverOne(30);
+    children[0]?.say({ type: "nack", receipt, requeue: false });
+    await tick(80);
+    expect(children[0]?.killed).toBe(false);
+  });
+
+  it("does nothing without a lease, however long a job runs", async () => {
+    const { children } = await deliverOne(0);
+    await tick(80);
+    expect(children[0]?.killed).toBe(false);
+  });
+
+  it("fails a job that keeps hanging the child past maxCrashRetries", async () => {
+    const { queue, children } = await deliverOne(25, { maxCrashRetries: 1, crashLimit: 10 });
+    for (let round = 0; round < 2; round += 1) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- one hang per restarted child
+      await tick(70);
+      (children.at(-1) as FakeChild).exit(null, "SIGKILL");
+      // oxlint-disable-next-line eslint/no-await-in-loop -- waits out the restart delay
+      await tick(20);
+      children.at(-1)?.say({ type: "poll", id: 1, waitMs: 1000 });
+    }
+    expect((await queue.status("b1"))?.status).toBe("failed");
+  });
+
+  it("ignores progress for a receipt it no longer knows", async () => {
+    const { children } = await deliverOne(30);
+    children[0]?.say({ type: "progress", receipt: "stale" });
+    expect(children[0]?.killed).toBe(false);
+  });
+});
+
 describe("ForkedCaptureQueue fallback", () => {
   it("hands unfinished jobs to the fallback after a crash loop", async () => {
     const { fallback, jobs } = fakeFallback();

@@ -8,6 +8,7 @@
  * await runCaptureChild({ db, storage, runner, scratchDir });
  * ```
  */
+import type { PollableJob } from "@storyshelf/core/adapter/capture-queue";
 import { CAPTURE_CONCURRENCY_ENV, IpcCaptureQueue } from "@storyshelf/core/capture";
 import type { ChildMessage, ParentPort } from "@storyshelf/core/capture";
 import {
@@ -69,6 +70,9 @@ function buildWorker(
   const worker = createCaptureWorker({
     ...options,
     queue,
+    onProgress: throttled((job) => {
+      queue.reportProgress(job);
+    }),
     tables: options.tables ?? tablesOf(options),
     config: { ...options.config, concurrency: concurrencyOf(options, host.env) },
   });
@@ -98,6 +102,21 @@ function wireShutdown(
 }
 
 function ignore(): void {}
+
+/** At most one progress message per second per job: a capture logs far more often than a lease needs. */
+const PROGRESS_INTERVAL_MS = 1000;
+
+function throttled(report: (job: PollableJob) => void): (job: PollableJob) => void {
+  const last = new Map<string, number>();
+  return (job) => {
+    const key = job.receipt ?? job.buildId;
+    const now = Date.now();
+    if (now - (last.get(key) ?? 0) >= PROGRESS_INTERVAL_MS) {
+      last.set(key, now);
+      report(job);
+    }
+  };
+}
 
 function portOf(host: ChildHost, send: NonNullable<ChildHost["send"]>): ParentPort {
   return {

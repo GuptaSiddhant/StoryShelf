@@ -65,6 +65,32 @@ describe("forkCaptureChild (real child process)", () => {
     }
   }, 40_000);
 
+  it("kills a hung child, restarts it, and fails the job that hung it", async () => {
+    const { queue, handles } = realQueue({ leaseMs: 300, maxCrashRetries: 1, crashLimit: 10 });
+    try {
+      await queue.enqueue({ buildId: "hang-1" });
+      await until(async () => (await queue.status("hang-1"))?.status === "failed", 30_000);
+      expect((await queue.status("hang-1"))?.error).toMatch(/2 times/u);
+      expect(handles.length).toBeGreaterThanOrEqual(2);
+
+      await queue.enqueue({ buildId: "ok-after-hang" });
+      await until(async () => (await queue.status("ok-after-hang"))?.status === "completed");
+    } finally {
+      await queue.lifecycle.teardown();
+    }
+  }, 60_000);
+
+  it("does not kill a slow child that keeps reporting progress", async () => {
+    const { queue, handles } = realQueue({ leaseMs: 300 });
+    try {
+      await queue.enqueue({ buildId: "slow-1" });
+      await until(async () => (await queue.status("slow-1"))?.status === "completed");
+      expect(handles).toHaveLength(1);
+    } finally {
+      await queue.lifecycle.teardown();
+    }
+  }, 30_000);
+
   it("stops the child on teardown", async () => {
     const { queue, handles } = realQueue();
     await queue.enqueue({ buildId: "ok-1" });

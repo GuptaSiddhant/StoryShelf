@@ -76,7 +76,7 @@ const app = createShelfApp({
 });
 ```
 
-The server keeps the queue and its status; the child pulls jobs over IPC and shares the server's database and storage. If the child crashes, its in-flight jobs are requeued and the child restarts; a job that crashes it repeatedly is failed. After repeated crashes (3 in 5 minutes) or a failed fork, capture falls back to the in-process queue.
+The server keeps the queue and its status; the child pulls jobs over IPC and shares the server's database and storage. If the child crashes, its in-flight jobs are requeued and the child restarts; a job that crashes it repeatedly is failed. After repeated crashes (3 in 5 minutes) or a failed fork, capture falls back to the in-process queue. A child that hangs without dying is caught too: the child reports progress as a capture logs, and if a running job goes 10 minutes without any, the server kills the child and treats it like a crash (the job is redelivered, and fails if it keeps hanging the child).
 
 `capture.mode` controls this: `auto` (default) forks only when `workerEntry` is set and the host has at least 2 CPUs and 2 GB; `in-process` never forks; `fork` always forks and fails at boot if it cannot. `capture.runner` is still required, since it serves the fallback. `SIGTERM` lets the child finish its current captures; if the server disappears, the child exits at once.
 
