@@ -10,10 +10,16 @@ export default defineConfig({
   platform: "node",
   // Absolute paths so the build works from any CWD (package dir locally,
   // repo root in Docker).
-  input: resolve(root, "apps/fly-app/server.ts"),
+  // `worker` is the diff pool's thread entry: core spawns `new URL("worker.mjs", import.meta.url)`,
+  // and once core is inlined into server.mjs that resolves next to it. Without it the pool would
+  // silently fall back to diffing on the main thread.
+  input: {
+    server: resolve(root, "apps/fly-app/server.ts"),
+    worker: resolve(root, "packages/core/src/diff/worker.ts"),
+  },
   output: {
     dir: resolve(root, "apps/fly-app/dist"),
-    entryFileNames: "server.mjs",
+    entryFileNames: "[name].mjs",
     format: "esm",
     // Inlined CommonJS deps (unzipper, ...) call `require("zlib")`, which ESM does not provide.
     banner:

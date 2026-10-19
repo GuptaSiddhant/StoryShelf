@@ -1,6 +1,6 @@
 /** Diff a stored screenshot against a baseline and persist the overlay; shared by capture and re-diff. */
 import type { StorageAdapter } from "../adapters/storage.ts";
-import { diffImages } from "../diff/engine.ts";
+import { diffImagesAsync } from "../diff/async.ts";
 import { DEFAULT_DIFF_OPTIONS, type DiffResult } from "../diff/options.ts";
 
 /** Project thresholds that drive a diff. */
@@ -25,7 +25,7 @@ export async function diffStoredScreenshots(
 ): Promise<DiffResult> {
   const current = await storage.read(currentPath);
   const previous = await storage.read(baselinePath);
-  return diffImages(previous, current, {
+  return await diffImagesAsync(previous, current, {
     ...DEFAULT_DIFF_OPTIONS,
     pixelThreshold: resolvePixelThreshold(project.pixelThreshold, diffThreshold),
     maxDiffRatio: project.maxDiffRatio,

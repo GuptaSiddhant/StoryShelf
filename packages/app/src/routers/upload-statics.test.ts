@@ -1,9 +1,10 @@
 import type { CaptureJob, CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
 import type { CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
+import { SCRATCH_DIRNAME } from "@storyshelf/core/capture";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { storybookDir } from "@storyshelf/core/utils";
 import AdmZip from "adm-zip";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pino } from "pino";
@@ -133,6 +134,11 @@ describe("upload inline statics", () => {
     expect(status).toBe(202);
     expect(jobs.map((job) => job.buildId)).toContain(buildId);
     expect(await storage.exists(`${storybookDir(projectId, buildId)}/iframe.html`)).toBe(true);
+    // The extracted scratch copy is removed once the statics are persisted.
+    const left = await readdir(join(scratchDir, SCRATCH_DIRNAME, projectId, buildId)).catch(
+      () => null,
+    );
+    expect(left).toBeNull();
   });
 
   it("defers large zips to capture", async () => {

@@ -40,6 +40,14 @@ export {
   type CaptureJobInput,
   type CaptureJobOptions,
 } from "./orchestrator.ts";
+export {
+  buildScratchDir,
+  removeBuildScratch,
+  SCRATCH_DIRNAME,
+  SCRATCH_MAX_AGE_MS,
+  sweepOrphanedScratch,
+  type ScratchSweepOptions,
+} from "./scratch.ts";
 export { persistCapture, type CaptureContext } from "./pipeline.ts";
 export { postStatusesForBuild } from "./status-fanout.ts";
 export {

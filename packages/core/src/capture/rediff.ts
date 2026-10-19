@@ -9,9 +9,10 @@ import type { Baseline } from "../schema/baseline.ts";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 import type { Snapshot } from "../schema/snapshot.ts";
+import { mapLimit } from "../utils/map-limit.ts";
 import { diffPath } from "../utils/paths.ts";
 import { diffStoredScreenshots, writeDiffOverlay } from "./diff-record.ts";
-import { diffStatus } from "./pipeline.ts";
+import { diffStatus, PERSIST_CONCURRENCY } from "./pipeline.ts";
 
 /** Dependencies for {@link rediffBuild}. */
 export interface RediffDeps {
@@ -54,8 +55,10 @@ export async function rediffBuild(
   const rows = (await snapshots.listByBuild(build.id)).filter(
     (row) => !row.inherited && REDIFFABLE_SNAPSHOT_STATUSES.has(row.status),
   );
-  const outcomes = await Promise.all(
-    rows.map(async (row) => await rediffSnapshot(deps, project, build, row)),
+  const outcomes = await mapLimit(
+    rows,
+    PERSIST_CONCURRENCY,
+    async (row) => await rediffSnapshot(deps, project, build, row),
   );
   const result: RediffResult = {
     rediffed: outcomes.filter((outcome) => outcome !== "missing").length,

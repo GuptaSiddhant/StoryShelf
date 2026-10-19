@@ -1,6 +1,6 @@
 import { libConfig } from "../../config/tsdown.ts";
 
-export default libConfig({
+const config = libConfig({
   index: "./src/index.tsx",
   ai: "./src/ai.ts",
   insights: "./src/insights/index.ts",
@@ -23,6 +23,7 @@ export default libConfig({
   capture: "./src/capture/index.ts",
   config: "./src/config.ts",
   diff: "./src/diff/index.ts",
+  "diff/worker": "./src/diff/worker.ts",
   models: "./src/models/index.ts",
   retention: "./src/retention/purge.ts",
   orm: "./src/orm/index.ts",
@@ -35,3 +36,10 @@ export default libConfig({
   utils: "./src/utils/index.ts",
   "test-helpers": "./src/test-helpers/index.ts",
 });
+
+// `diff/worker` is built only so `diff/pool` can spawn it via `new URL("./worker.mjs", import.meta.url)`;
+// it stays out of the frozen public `exports` map.
+export default {
+  ...config,
+  exports: { devExports: "source", exclude: ["diff/worker"] },
+};
