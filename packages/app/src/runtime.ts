@@ -26,11 +26,11 @@ function addOptionalSnapshots(
   snap: Record<string, AdapterMetadata | GitAdapterMetadata>,
   options: ShelfOptions,
 ): void {
-  if (options.captureRunner) {
-    snap["captureRunner"] = options.captureRunner.metadata;
+  if (options.capture?.runner) {
+    snap["captureRunner"] = options.capture.runner.metadata;
   }
-  if (options.captureQueue) {
-    snap["captureQueue"] = options.captureQueue.metadata;
+  if (options.capture?.queue) {
+    snap["captureQueue"] = options.capture.queue.metadata;
   }
 }
 
@@ -56,7 +56,7 @@ export function buildAdapterSnapshot(
   for (const p of options.design ?? []) {
     snap[`design:${p.metadata.kind}`] = p.metadata;
   }
-  for (const n of options.notifiers ?? []) {
+  for (const n of options.notifications?.notifiers ?? []) {
     snap[`notify:${n.metadata.kind}`] = n.metadata;
   }
   return snap;
@@ -74,7 +74,7 @@ export function resolveRuntime(options: ShelfOptions): ServerRuntime {
   const authEnabled = options.auth !== undefined;
   const gitHosts = options.gitHosts ?? [];
   const design = options.design ?? [];
-  const notifiers = options.notifiers ?? [];
+  const notifiers = options.notifications?.notifiers ?? [];
   // Adapter introspection — auto-populate config.adapters if not supplied
   const config: ShelfConfig = rawConfig.adapters
     ? rawConfig

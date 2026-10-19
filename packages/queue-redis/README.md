@@ -30,8 +30,7 @@ const queue = createRedisCaptureQueue({
 const app = createShelfApp({
   database,
   storage,
-  captureRunner: myRenderer,
-  captureQueue: queue,
+  capture: { runner: myRenderer, queue },
 });
 ```
 
@@ -63,7 +62,7 @@ Creates a Redis-backed `CaptureQueue`. Implements `enqueue`, `status`, `active`,
 
 ## How it fits in
 
-`queue-redis` is the `captureQueue` option for `createShelfApp` in self-hosted Docker Compose where you want horizontal workers without AWS. It implements the same `CaptureQueue` interface as `InMemoryCaptureQueue` and `queue-sqs`.
+`queue-redis` is the `capture.queue` option for `createShelfApp` in self-hosted Docker Compose where you want horizontal workers without AWS. It implements the same `CaptureQueue` interface as `InMemoryCaptureQueue` and `queue-sqs`.
 
 See `docs/architecture.md` and ADR 0009.
 

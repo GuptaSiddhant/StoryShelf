@@ -3,15 +3,15 @@ title: Merge gate setup
 description: Block PRs and MRs until StoryShelf visual review is approved — required status checks for GitHub and GitLab.
 ---
 
-StoryShelf posts a **commit status** on the commit it captured. The gate only blocks merges once you mark that status as *required* on your git provider, and that last step is manual: StoryShelf never edits branch protection for you ([ADR 0010](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/0010-git-provider-merge-gate.md)).
+StoryShelf posts a **commit status** on the commit it captured. The gate only blocks merges once you mark that status as _required_ on your git provider, and that last step is manual: StoryShelf never edits branch protection for you ([ADR 0010](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/0010-git-provider-merge-gate.md)).
 
 ## How the gate works
 
-| Build state | Status posted |
-|---|---|
-| Capture started | `pending` |
-| All `new`/`changed` snapshots approved | `success` |
-| Changes rejected, or capture failed | `failure` |
+| Build state                            | Status posted |
+| -------------------------------------- | ------------- |
+| Capture started                        | `pending`     |
+| All `new`/`changed` snapshots approved | `success`     |
+| Changes rejected, or capture failed    | `failure`     |
 
 The status context is **`storyshelf/<project-slug>`** (for example `storyshelf/my-app`) and links to the build review page. Only approvers and admins can accept snapshots, so who can green-light a merge is a matter of [roles](/concepts/roles/).
 
@@ -30,7 +30,7 @@ The token is stored encrypted with the server `SECRET`. It is separate from the 
 
 The status goes to the SHA you pass to `storyshelf upload --sha`. It has to be the commit the PR or MR is on.
 
-On GitHub, `$GITHUB_SHA` in a `pull_request` workflow is a temporary *merge commit*, not the PR head, so the status would land on a commit the PR never shows. Pass the head SHA instead:
+On GitHub, `$GITHUB_SHA` in a `pull_request` workflow is a temporary _merge commit_, not the PR head, so the status would land on a commit the PR never shows. Pass the head SHA instead:
 
 ```yaml
 - name: Upload to StoryShelf
@@ -61,7 +61,7 @@ On GitLab, `$CI_COMMIT_SHA` is already the MR head for branch pipelines (see the
 2. Protect the target branch (**Settings → Repository → Protected branches**) so nobody can push around the MR.
 3. For approvals on top of the status, add an **approval rule** (**Settings → Merge requests → Merge request approvals**) for the people who own visual review.
 
-StoryShelf posts a GitLab *commit status* named `storyshelf/<project-slug>` on the MR head commit. Whether your "Pipelines must succeed" setting counts it depends on how the status attaches to the pipeline, so confirm the behavior on your instance with the check in step 4 before relying on it.
+StoryShelf posts a GitLab _commit status_ named `storyshelf/<project-slug>` on the MR head commit. Whether your "Pipelines must succeed" setting counts it depends on how the status attaches to the pipeline, so confirm the behavior on your instance with the check in step 4 before relying on it.
 
 ## Several projects in one repo
 

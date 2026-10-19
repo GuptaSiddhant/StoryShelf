@@ -3,7 +3,7 @@ title: "@storyshelf/storage-azure"
 description: Store StoryShelf artifacts in Azure Blob Storage.
 ---
 
-import { PackageManagers } from 'starlight-package-managers';
+import { PackageManagers } from "starlight-package-managers";
 
 `@storyshelf/storage-azure` stores StoryShelf blobs in an **Azure Blob Storage** container. It persists the same artifacts as the other storage adapters — captured screenshots, diff overlays, and uploaded Storybook archives.
 
@@ -46,14 +46,14 @@ const storage = createAzureStorage({
 });
 ```
 
-| Option | Required | Notes |
-|---|---|---|
-| `container` | yes | Blob container name |
-| `prefix` | no | Key prefix applied to every object |
-| `client` | no | Pre-built `ContainerClient`; skips client construction |
-| `connectionString` | no* | Storage connection string |
-| `accountName` / `accountKey` | no* | Explicit credentials pair |
-| `accountUrl` / `sasToken` | no* | URL + SAS form (emulator, fine-grained SAS) |
+| Option                       | Required | Notes                                                  |
+| ---------------------------- | -------- | ------------------------------------------------------ |
+| `container`                  | yes      | Blob container name                                    |
+| `prefix`                     | no       | Key prefix applied to every object                     |
+| `client`                     | no       | Pre-built `ContainerClient`; skips client construction |
+| `connectionString`           | no\*     | Storage connection string                              |
+| `accountName` / `accountKey` | no\*     | Explicit credentials pair                              |
+| `accountUrl` / `sasToken`    | no\*     | URL + SAS form (emulator, fine-grained SAS)            |
 
 `*` At least one auth form is needed unless `client` is supplied.
 

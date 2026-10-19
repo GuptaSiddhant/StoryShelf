@@ -5,7 +5,7 @@ import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import type { Ai } from "@storyshelf/core/ai";
-import type { ShelfConfig, UIConfig } from "@storyshelf/core/config";
+import type { NotificationsConfig, ShelfConfig, UIConfig } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 import type { AuthUser } from "@storyshelf/core/types";
 import type { Context, Next } from "hono";
@@ -22,9 +22,11 @@ export interface StoreScopeDeps {
   authEnabled: boolean;
   enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
   captureQueue: CaptureQueue | null;
+  captureConcurrency?: number;
   gitHosts: GitHostProvider[];
   design: DesignProvider[];
   notifiers: NotifierProvider[];
+  notificationsConfig?: NotificationsConfig;
   ai?: Ai;
   resolveUser: (c: Context) => Promise<AuthUser | null>;
 }
@@ -47,9 +49,11 @@ export function storeScope(deps: StoreScopeDeps) {
         sessionId: sessionIdFrom(c),
         enqueueCapture: deps.enqueueCapture,
         captureQueue: deps.captureQueue,
+        captureConcurrency: deps.captureConcurrency,
         gitHosts: deps.gitHosts,
         design: deps.design,
         notifiers: deps.notifiers,
+        notificationsConfig: deps.notificationsConfig,
         ai: deps.ai,
       },
       async () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  describeCaptureHost,
   describeSizing,
   detectResources,
   engineWeight,
@@ -81,5 +82,28 @@ describe("describeSizing", () => {
     expect(sizing["recycleBrowserEvery"]).toBe(0);
     expect(sizing["cpus"]).toBeGreaterThan(0);
     expect(sizing["navigationTimeoutMs"]).toBeGreaterThanOrEqual(30_000);
+  });
+});
+
+describe("describeCaptureHost", () => {
+  it("reports hardware-sized builds and the page range", () => {
+    const summary = describeCaptureHost(undefined, { cpus: 4, memoryBytes: 8 * GB });
+    expect(summary).toEqual({
+      cpus: 4,
+      memoryMb: 8192,
+      builds: { value: 2, auto: true },
+      pages: { start: 4, max: 8 },
+    });
+  });
+
+  it("marks an explicit build concurrency as configured", () => {
+    const summary = describeCaptureHost(5, { cpus: 1, memoryBytes: 2 * GB });
+    expect(summary.builds).toEqual({ value: 5, auto: false });
+    expect(summary.pages).toEqual({ start: 1, max: 2 });
+  });
+
+  it("rounds fractional container CPUs", () => {
+    expect(describeCaptureHost(undefined, { cpus: 0.5, memoryBytes: GB }).cpus).toBe(0.5);
+    expect(describeCaptureHost(undefined, { cpus: 1.2345, memoryBytes: GB }).cpus).toBe(1.23);
   });
 });

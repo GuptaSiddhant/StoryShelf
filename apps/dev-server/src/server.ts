@@ -92,9 +92,12 @@ const emailNotifiers = emailSender
 const app = createShelfApp({
   database,
   storage,
-  captureRunner,
+  capture: { runner: captureRunner },
   design: [createFigmaDesign({ oauth: figmaOAuthFromEnv() })],
-  notifiers: [...chatNotifiers, ...emailNotifiers],
+  notifications: {
+    notifiers: [...chatNotifiers, ...emailNotifiers],
+    ...(env["SMTP_FROM"] ? { config: { fromEmail: env["SMTP_FROM"] } } : {}),
+  },
   // Enable local-account login by setting AUTH_PASSWORD (and SECRET): the
   // engine provisions an admin identity from the env on every boot.
   // AUTH_PASSWORD must be at least 12 characters; AUTH_EMAIL overrides the
@@ -128,7 +131,6 @@ const app = createShelfApp({
     publicBaseUrl,
     scratchDir: dataDir,
     serverTiming: true,
-    ...(env["SMTP_FROM"] ? { notifications: { fromEmail: env["SMTP_FROM"] } } : {}),
   },
 });
 

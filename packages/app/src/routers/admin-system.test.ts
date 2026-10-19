@@ -31,6 +31,56 @@ function brokenLifecycle(message: string): {
   };
 }
 
+function inProcessRunner() {
+  return {
+    metadata: { name: "mock", version: "0.0.0", kind: "mock", category: "capture-runner" as const },
+    render: async () => ({ captures: [], failures: [] }),
+    cancel: async () => {},
+  } as never;
+}
+
+describe("admin system page capture sizing", () => {
+  it("shows the detected hardware and auto-sized concurrency for an in-process queue", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const app = createShelfApp({
+      database: db,
+      storage,
+      logger: silentLogger,
+      capture: { runner: inProcessRunner() },
+    });
+    await app.lifecycle.setup();
+    const html = await (await app.request("/admin")).text();
+    expect(html).toContain("Capture host");
+    expect(html).toContain("builds at once");
+    expect(html).toContain("(auto)");
+    expect(html).toContain("pages per build");
+  });
+
+  it("marks an explicit capture.concurrency as configured", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const app = createShelfApp({
+      database: db,
+      storage,
+      logger: silentLogger,
+      capture: { runner: inProcessRunner(), concurrency: 3 },
+    });
+    await app.lifecycle.setup();
+    const html = await (await app.request("/admin")).text();
+    expect(html).toContain("builds at once 3 (configured)");
+  });
+
+  it("omits the line when capture is not in-process", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const app = createShelfApp({ database: db, storage, logger: silentLogger });
+    await app.lifecycle.setup();
+    const html = await (await app.request("/admin")).text();
+    expect(html).not.toContain("Capture host");
+  });
+});
+
 describe("admin system page", () => {
   it("is open with adapter rows when auth is disabled", async () => {
     const { db } = makeDatabase();

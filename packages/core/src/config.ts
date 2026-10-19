@@ -120,7 +120,10 @@ export interface ShelfConfig {
    * helper document; falls back to the request origin when unset.
    */
   publicBaseUrl?: string;
-  captureConcurrency?: number;
+  /**
+   * Working directory for capture and inline statics extraction. Defaults to
+   * `<os.tmpdir()>/storyshelf` once a capture runner (or `maxInlineUnzipSize`) needs it.
+   */
   scratchDir?: string;
   purgeTtlDays?: number;
   /** Branch baseline TTL, days; null disables branch GC (default 30). */
@@ -140,7 +143,6 @@ export interface ShelfConfig {
   maxInlineUnzipSize?: number;
   viewports?: ShelfViewport[];
   adapters?: Record<string, AdapterSnapshot>;
-  notifications?: NotificationsConfig;
 }
 
 const viewportSchema: z.ZodType<ShelfViewport> = z.object({
@@ -197,7 +199,8 @@ const authUiConfigSchema: z.ZodType<AuthUiConfig> = z.object({
   footerText: z.string().optional(),
 });
 
-const notificationsConfigSchema: z.ZodType<NotificationsConfig> = z.object({
+/** Zod schema validating `notifications.config`. */
+export const notificationsConfigSchema: z.ZodType<NotificationsConfig> = z.object({
   fromEmail: z.string().min(1).optional(),
   fromName: z.string().min(1).optional(),
   footerText: z.string().min(1).optional(),
@@ -214,7 +217,6 @@ export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
     publishedBaseDomain: z.string().optional(),
     // oxlint-disable-next-line typescript/no-deprecated -- z.string().url() kept for zod v3 API compat
     publicBaseUrl: z.string().url().optional(),
-    captureConcurrency: z.number().int().positive().optional(),
     scratchDir: z.string().optional(),
     purgeTtlDays: z.number().int().positive().optional(),
     branchTtlDays: z.number().int().positive().nullable().optional(),
@@ -224,7 +226,6 @@ export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
     maxInlineUnzipSize: z.number().int().positive().optional(),
     viewports: z.array(viewportSchema).min(1, "at least one viewport required").optional(),
     adapters: z.record(z.string(), adapterSnapshotSchema).optional(),
-    notifications: notificationsConfigSchema.optional(),
   })
   .strict()
   .superRefine((config, ctx) => {
@@ -290,20 +291,54 @@ export function validateUiConfig(config: Record<string, unknown>): UIConfig {
   return result.data;
 }
 
+/** Capture options: what renders, how jobs are queued, and how many run at once. */
+export interface ShelfCaptureOptions {
+  /** Pure renderer. Without one this process does not render (a remote worker may). */
+  runner?: CaptureRunner;
+  /** Queue adapter; defaults to the in-process queue when a runner is set. */
+  queue?: CaptureQueue;
+  /** Builds captured at once by the in-process queue; auto-sized from CPU and memory when unset. */
+  concurrency?: number;
+}
+
+/** Notification options: who can deliver, over which transport, with what branding. */
+export interface ShelfNotificationsOptions {
+  /** Provider adapters (Slack, Teams, email, ...); a channel's `provider` must name one of these. */
+  notifiers?: NotifierProvider[];
+  /** Email transport. Listed here so its setup/teardown/validation hooks run with the app's. */
+  emailSender?: EmailSender;
+  /** Site-wide brand and sender settings for outgoing notifications. */
+  config?: NotificationsConfig;
+}
+
+/** Comparison options. */
+export interface ShelfCompareOptions {
+  /**
+   * Worker threads for pixel diffs: default CPU count minus one (min 1), `0` diffs on the main
+   * thread. Takes precedence over `STORYSHELF_DIFF_WORKERS`.
+   */
+  threads?: number;
+}
+
 /** Adapter and configuration options for creating the shelf router. */
 export interface ShelfOptions {
   database: DatabaseAdapter;
   storage: StorageAdapter;
-  captureRunner?: CaptureRunner;
-  captureQueue?: CaptureQueue;
+  /**
+   * Capture (render + diff in the background). Absent means Storybook hosting only: no renderer,
+   * no queue, and the capture tuning below is unreachable rather than silently ignored.
+   */
+  capture?: ShelfCaptureOptions;
+  /** Screenshot comparison, shared by capture and the re-diff endpoint (which needs it even when nothing renders here). */
+  compare?: ShelfCompareOptions;
   auth?: Auth;
   /** AI insights surface (ADR 0026). Set ⇒ AI on site-wide; absent ⇒ off. */
   ai?: Ai;
   gitHosts?: GitHostProvider[];
   /** Design-tool providers (Figma, …) that resolve links, metadata and previews. */
   design?: DesignProvider[];
-  notifiers?: NotifierProvider[];
-  emailSender?: EmailSender;
+  /** Notification subsystem: providers, the email transport, and shared brand/sender settings. */
+  notifications?: ShelfNotificationsOptions;
   logger?: Logger;
   ui?: UIConfig;
   config?: ShelfConfig;
@@ -323,3 +358,4 @@ export interface ObservabilityHandle {
   /** Flush exporters and release SDK resources. Must be idempotent. */
   shutdown(): Promise<void>;
 }
+export { DEFAULT_SCRATCH_DIR, resolveShelfOptions } from "./options.ts";

@@ -3,7 +3,7 @@ title: "@storyshelf/observability"
 description: OpenTelemetry tracing, metrics, and log correlation for StoryShelf.
 ---
 
-import { PackageManagers } from 'starlight-package-managers';
+import { PackageManagers } from "starlight-package-managers";
 
 `@storyshelf/observability` is the single owner of StoryShelf's OpenTelemetry
 wiring. It exports traces and metrics to **your own** OTLP/HTTP collector and
@@ -35,7 +35,7 @@ const observability = await initObservabilityFromEnv();
 const app = createShelfApp({
   database,
   storage,
-  captureRunner,
+  capture: { runner: captureRunner },
   logger: createShelfLogger({ mixin: otelLogMixin }),
   observability,
   config: { scratchDir: dataDir },

@@ -109,6 +109,32 @@ export function describeSizing(settings: {
   };
 }
 
+/** What capture will use on this host: detected resources and the effective concurrency. */
+export interface CaptureHostSummary {
+  cpus: number;
+  memoryMb: number;
+  /** Builds captured at once, and whether that was sized from the hardware or configured. */
+  builds: { value: number; auto: boolean };
+  /** Pages per build when the runner is not pinned: where it starts and the most it may reach (Chromium). */
+  pages: { start: number; max: number };
+}
+
+/** Summarise the host budget and effective capture concurrency, for the System page. */
+export function describeCaptureHost(
+  configuredBuilds?: number,
+  resources: HostResources = detectResources(),
+): CaptureHostSummary {
+  return {
+    cpus: Math.round(resources.cpus * 100) / 100,
+    memoryMb: Math.round(resources.memoryBytes / MB),
+    builds: {
+      value: configuredBuilds ?? recommendedBuildConcurrency(resources),
+      auto: configuredBuilds === undefined,
+    },
+    pages: { start: recommendedPageConcurrency(resources), max: maxPageConcurrency(resources) },
+  };
+}
+
 function cgroupCpus(): number | null {
   return cgroupV2Cpus() ?? cgroupV1Cpus();
 }

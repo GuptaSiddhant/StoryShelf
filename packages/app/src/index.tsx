@@ -1,8 +1,14 @@
 import { swaggerUI } from "@hono/swagger-ui";
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { AdapterLifecycleError, validateBootAssembly } from "@storyshelf/core/adapter/setup";
+import {
+  AdapterLifecycleError,
+  adapterSourcesOf,
+  validateBootAssembly,
+} from "@storyshelf/core/adapter/setup";
 import { sweepOrphanedScratch } from "@storyshelf/core/capture";
+import { resolveShelfOptions } from "@storyshelf/core/config";
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
+import { configureDiffPool } from "@storyshelf/core/diff";
 /**
  * StoryShelf app: compose database, storage, capture, auth, and git-host
  * adapters into a complete self-hosted visual-testing Hono app.
@@ -63,7 +69,7 @@ import { resolveRuntime } from "./runtime.ts";
  * Throws before any route or lifecycle hook runs.
  */
 function throwOnInvalidAdapters(options: ShelfOptions): void {
-  const invalid = validateBootAssembly(options);
+  const invalid = validateBootAssembly(adapterSourcesOf(options));
   if (invalid.length > 0) {
     throw new AdapterLifecycleError("setup", invalid);
   }
@@ -156,7 +162,7 @@ function assembleApp(app: ShelfApp, options: ShelfOptions, scoped: ShelfOptions)
     getReady: async () => await cell.ready,
   });
   registerAllRoutes(app, options, {
-    sources: options,
+    sources: adapterSourcesOf(options),
     getSettled: () => cell.settled,
     bootTimeMs: Date.now(),
     version: packageVersion(),
@@ -171,7 +177,9 @@ function assembleApp(app: ShelfApp, options: ShelfOptions, scoped: ShelfOptions)
  * stays synchronous). Await `app.lifecycle.setup()` before serving for
  * fail-fast startup, or let the first request gate on settlement.
  */
-export function createShelfApp(options: ShelfOptions): ShelfApp {
+export function createShelfApp(rawOptions: ShelfOptions): ShelfApp {
+  const options = resolveShelfOptions(rawOptions);
+  configureDiffPool({ threads: options.compare?.threads });
   throwOnInvalidAdapters(options);
   const app = new OpenAPIHono<{ Variables: ShelfContext }>() as ShelfApp;
   assembleApp(app, options, instrumentedOptions(options));
@@ -269,9 +277,11 @@ function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
       authEnabled,
       enqueueCapture,
       captureQueue: queue,
+      captureConcurrency: options.capture?.concurrency,
       gitHosts,
       design,
       notifiers,
+      notificationsConfig: options.notifications?.config,
       ai: options.ai,
       resolveUser: async (c) => await resolveRequestUser(c, options.auth),
     }),
@@ -406,6 +416,9 @@ function packageVersion(): string {
 export { createAuthSystemHook } from "./notify.ts";
 export type {
   ShelfOptions,
+  ShelfCaptureOptions,
+  ShelfCompareOptions,
+  ShelfNotificationsOptions,
   ShelfConfig,
   UIConfig,
   BrandTheme,

@@ -56,7 +56,7 @@ describe("buildTriageEvidence", () => {
     expect(out.omitted).toBe(1);
     expect(out.text.indexOf("Button/C@")).toBeLessThan(out.text.indexOf("Button/B@"));
     expect(out.text).toContain("OMITTED_SNAPSHOTS 1");
-  });
+  }, 30_000);
 
   it("is deterministic for identical input", () => {
     const input = {

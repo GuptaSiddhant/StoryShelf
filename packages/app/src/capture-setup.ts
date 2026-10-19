@@ -12,6 +12,7 @@ import type {
   RecoveryDeps,
   RecoveryResult,
 } from "@storyshelf/core/capture";
+import { DEFAULT_SCRATCH_DIR } from "@storyshelf/core/config";
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 import { BuildModel } from "@storyshelf/core/models";
@@ -77,7 +78,8 @@ async function notifyCaptureFailed(
       config,
       ui: options.ui ?? {},
       logger,
-      notifiers: options.notifiers ?? [],
+      notifiers: options.notifications?.notifiers ?? [],
+      notificationsConfig: options.notifications?.config,
     },
     "sys:capture-failed",
     { buildId, projectId: build.projectId, gitBranch: build.gitBranch },
@@ -91,31 +93,30 @@ export function setupCaptureQueue(
   gitHosts: GitHostProvider[],
   logger: Logger,
 ): QueueWiring {
-  if (!options.captureQueue && !options.captureRunner) {
+  if (!options.capture?.queue && !options.capture?.runner) {
     return { queue: null, enqueueCapture: undefined };
   }
-  if (options.captureQueue) {
-    const queue = options.captureQueue;
+  if (options.capture?.queue) {
+    const queue = options.capture?.queue;
     const enqueueCapture = async (buildId: string, reqId?: string): Promise<void> => {
       await enqueueJob(queue, buildId, reqId);
     };
-    if (!options.captureRunner) {
-      return { queue: options.captureQueue, enqueueCapture };
+    if (!options.capture?.runner) {
+      return { queue: options.capture?.queue, enqueueCapture };
     }
     // Both queue and runner supplied: runner is ignored server-side for remote queues;
     // enqueue goes to the supplied queue and capture is handled by an external worker.
     if (!config.scratchDir) {
-      return { queue: options.captureQueue, enqueueCapture };
+      return { queue: options.capture?.queue, enqueueCapture };
     }
     // If scratchDir is set with both, still prefer the supplied queue; no in-memory queue needed.
-    return { queue: options.captureQueue, enqueueCapture };
+    return { queue: options.capture?.queue, enqueueCapture };
   }
-  if (!options.captureRunner) {
+  if (!options.capture?.runner) {
     return { queue: null, enqueueCapture: undefined };
   }
-  if (!config.scratchDir) {
-    throw new Error("captureRunner is enabled but ShelfConfig.scratchDir is not set");
-  }
+  // `normalizeShelfOptions` defaults scratchDir whenever a runner is set.
+  const scratchDir = config.scratchDir ?? DEFAULT_SCRATCH_DIR;
   const jobOptions: CaptureJobOptions = {
     db: options.database,
     tables: {
@@ -128,8 +129,8 @@ export function setupCaptureQueue(
       captureLogs: options.database.tables.captureLogs,
     },
     storage: options.storage,
-    runner: options.captureRunner,
-    scratchDir: config.scratchDir,
+    runner: options.capture?.runner,
+    scratchDir,
     viewports: config.viewports,
     logger,
     secret: credentialKeys(config),
@@ -159,12 +160,12 @@ export function setupCaptureQueue(
     },
   };
   const captureQueue =
-    options.captureQueue ??
+    options.capture?.queue ??
     new InMemoryCaptureQueue({
-      concurrency: config.captureConcurrency ?? recommendedBuildConcurrency(),
+      concurrency: options.capture?.concurrency ?? recommendedBuildConcurrency(),
       logger,
       leaseMs: CAPTURE_LEASE_MS,
-      onStalled: createStalledHandler({ runner: options.captureRunner, recovery, logger }),
+      onStalled: createStalledHandler({ runner: options.capture?.runner, recovery, logger }),
       runJob: async (job: CaptureDispatchJob, lease): Promise<void> => {
         await timedRunJob(async (dispatched) => await runJob(dispatched, lease), job);
         // In-process completions only: remote-queue workers own their own

@@ -12,7 +12,7 @@ import {
   type NotificationChannel,
   type SystemEventName,
 } from "@storyshelf/core/adapter/notifier";
-import type { ShelfConfig, UIConfig } from "@storyshelf/core/config";
+import type { NotificationsConfig, ShelfConfig, UIConfig } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 import {
   NotificationChannelModel,
@@ -32,6 +32,8 @@ export interface NotifyDeps {
   ui: UIConfig;
   logger: Logger;
   notifiers: NotifierProvider[];
+  /** Brand/sender settings (`notifications.config`). */
+  notificationsConfig?: NotificationsConfig;
 }
 
 /** Review URL for a project page (absolute when `publicBaseUrl` is set). */
@@ -52,15 +54,19 @@ function reviewUrlForWith(
   return `${base}/projects/${slug}${suffix}`;
 }
 
-/** Brand inputs from UI config plus server notification defaults. */
-function brandFor(ui: UIConfig, config: ShelfConfig, reviewUrl?: string): NotificationBrand {
+/** Brand inputs from UI config plus the notification sender settings. */
+function brandFor(
+  ui: UIConfig,
+  settings: NotificationsConfig | undefined,
+  reviewUrl?: string,
+): NotificationBrand {
   return {
     name: ui.name,
     logo: ui.logo,
     reviewUrl,
-    fromEmail: config.notifications?.fromEmail,
-    fromName: config.notifications?.fromName ?? ui.name,
-    footerText: config.notifications?.footerText,
+    fromEmail: settings?.fromEmail,
+    fromName: settings?.fromName ?? ui.name,
+    footerText: settings?.footerText,
   };
 }
 
@@ -173,7 +179,7 @@ export async function notifyProjectWith(
     {
       notifiers: deps.notifiers,
       channels: [...channels, ...targets],
-      brand: brandFor(deps.ui, deps.config, reviewUrl),
+      brand: brandFor(deps.ui, deps.notificationsConfig, reviewUrl),
       logger: deps.logger,
     },
   );
@@ -206,7 +212,7 @@ export async function notifySystemWith(
     {
       notifiers: deps.notifiers,
       channels: await loadChannels(deps, null),
-      brand: brandFor(deps.ui, deps.config),
+      brand: brandFor(deps.ui, deps.notificationsConfig),
       logger: deps.logger,
     },
   );

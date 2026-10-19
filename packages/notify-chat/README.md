@@ -14,7 +14,7 @@ nub add @storyshelf/notify-chat
 import { createShelfApp } from "@storyshelf/app";
 import { chatNotifiers } from "@storyshelf/notify-chat";
 
-const app = createShelfApp({ database, storage, notifiers: chatNotifiers });
+const app = createShelfApp({ database, storage, notifications: { notifiers: chatNotifiers } });
 ```
 
 ## Subpaths

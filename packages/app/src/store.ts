@@ -5,7 +5,7 @@ import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import type { Ai } from "@storyshelf/core/ai";
-import type { ShelfConfig, UIConfig } from "@storyshelf/core/config";
+import type { NotificationsConfig, ShelfConfig, UIConfig } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 import type { AuthUser } from "@storyshelf/core/types";
 import { AsyncLocalStorage } from "node:async_hooks";
@@ -23,10 +23,14 @@ export interface Store {
   sessionId: string;
   enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
   captureQueue?: CaptureQueue | null;
+  /** Explicit `capture.concurrency`; unset means sized from the hardware. */
+  captureConcurrency?: number;
   gitHosts: GitHostProvider[];
   /** Design providers (Figma, …); empty when none is wired. */
   design: DesignProvider[];
   notifiers: NotifierProvider[];
+  /** Brand/sender settings for outgoing notifications (`notifications.config`). */
+  notificationsConfig?: NotificationsConfig;
   /** AI insights surface; absent ⇒ AI off site-wide. */
   ai?: Ai;
 }

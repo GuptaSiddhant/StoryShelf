@@ -94,13 +94,18 @@ the codec does not dominate here, revisit the premise before building the pool.
 - **Separate `compare?: { engine, threads }`.** Required by the re-diff route in
   queue-only deployments where the server never renders. The thread pool's lifecycle
   belongs to the app, not the capture worker.
-- **Move base `viewports` to a project setting** beside `modesAllowlist`, with
-  `config.viewports` demoted to a default for newly created projects. Storybook
-  `modes` parameters continue to layer on top via `applyModes`; the base set is what
-  stories without modes render at.
-- Accept the old flat keys as deprecated aliases, warn once at boot, remove in
-  Phase 5. Decide at the same time whether `notifiers` + `notifications` gets the
-  same subsystem grouping, so the break happens once.
+- **Group notifications.** `notifications?: { notifiers, emailSender, config }` replaces
+  `notifiers`, `emailSender` and `config.notifications`, so the one breaking change
+  covers the whole subsystem.
+- **Breaking, no aliases.** The old flat keys (`captureRunner`, `captureQueue`,
+  `config.captureConcurrency`, `notifiers`, `emailSender`, `config.notifications`) are
+  removed outright rather than deprecated; `ShelfConfig` is strict, so a stale key
+  fails at boot instead of being ignored.
+- **`viewports` stay global.** Not moved to a project setting: `config.viewports` is the
+  default when neither Storybook nor story parameters configure viewports, and
+  screenshots are taken of the content box rather than the whole viewport in most
+  cases, so a per-project base set earns little. `compare.engine` is also left out,
+  since pixelmatch is the only engine.
 
 ### Phase 3 — Process boundary
 
@@ -187,9 +192,6 @@ the codec does not dominate here, revisit the premise before building the pool.
 
 ## Open questions
 
-- Does anything outside the capture path read `config.viewports`, and how do CLI
-  per-run overrides resolve against a project-level value?
-- Does anything read `options.captureRunner` directly, which the rename would break?
 - Does `db-sqlite` set WAL and a busy timeout? A forked child adds a second writer.
 - Reducer idempotency under at-least-once delivery needs a deliberate test, not just
   a race-free happy path.

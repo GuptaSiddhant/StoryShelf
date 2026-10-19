@@ -3,7 +3,7 @@ title: "@storyshelf/queue-gcp"
 description: Google Cloud Pub/Sub capture queue adapter for StoryShelf cloud deployments.
 ---
 
-import { PackageManagers } from 'starlight-package-managers';
+import { PackageManagers } from "starlight-package-managers";
 
 `@storyshelf/queue-gcp` backs StoryShelf's capture queue with **Google Cloud Pub/Sub**. It implements the `CaptureQueue` / `PollableCaptureQueue` contract from `@storyshelf/core`: the server publishes a message per build, and a separately-assembled [worker](/packages/worker/) pulls from a subscription and runs the capture. Switching between in-process, Redis, SQS, Azure, and Pub/Sub is a single dependency swap, with no router or build changes.
 
@@ -22,7 +22,7 @@ import { PackageManagers } from 'starlight-package-managers';
 
 ## Register the queue
 
-Pass the Pub/Sub queue as the `captureQueue` option of `createShelfApp`:
+Pass the Pub/Sub queue as the `capture.queue` option of `createShelfApp`:
 
 ```ts
 import { createShelfApp } from "@storyshelf/app";
@@ -37,7 +37,7 @@ const queue = createGcpPubSubQueue({
 const app = createShelfApp({
   database,
   storage,
-  captureQueue: queue,
+  capture: { queue },
 });
 ```
 
@@ -47,12 +47,12 @@ The server only publishes (`enqueue`). Workers use the same factory to pull, ack
 
 ```ts
 interface GcpPubSubQueueOptions {
-  projectId: string;      // GCP project ID
-  topic: string;          // topic short name
-  subscription: string;   // pull subscription short name
-  keyFilename?: string;   // service-account JSON key; omit to use Application Default Credentials
-  apiEndpoint?: string;   // custom endpoint, e.g. the Pub/Sub emulator host
-  publisher?: v1.PublisherClient;   // injected client (tests)
+  projectId: string; // GCP project ID
+  topic: string; // topic short name
+  subscription: string; // pull subscription short name
+  keyFilename?: string; // service-account JSON key; omit to use Application Default Credentials
+  apiEndpoint?: string; // custom endpoint, e.g. the Pub/Sub emulator host
+  publisher?: v1.PublisherClient; // injected client (tests)
   subscriber?: v1.SubscriberClient; // injected client (tests)
   logger?: Logger;
 }

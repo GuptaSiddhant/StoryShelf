@@ -7,6 +7,22 @@ import { DiffPool } from "./pool.ts";
 export const DIFF_WORKERS_ENV = "STORYSHELF_DIFF_WORKERS";
 
 let pool: DiffPool | undefined;
+let configuredThreads: number | undefined;
+
+/**
+ * Set the pool size from configuration (`compare.threads`); beats `STORYSHELF_DIFF_WORKERS`.
+ * `undefined` goes back to the environment/default. A running pool of a different size is shut
+ * down and rebuilt on next use.
+ */
+export function configureDiffPool(options: { threads?: number }): void {
+  if (options.threads === configuredThreads) {
+    return;
+  }
+  configuredThreads = options.threads;
+  const stale = pool;
+  pool = undefined;
+  stale?.shutdown().catch(() => {});
+}
 
 /**
  * Diff two PNGs without blocking the event loop; same result as `diffImages`.
@@ -24,7 +40,10 @@ export async function diffImagesAsync(
   current: Buffer,
   options: DiffOptions,
 ): Promise<DiffResult> {
-  pool ??= new DiffPool({ size: resolveDiffWorkers(process.env), workerUrl: defaultWorkerUrl() });
+  pool ??= new DiffPool({
+    size: configuredThreads ?? resolveDiffWorkers(process.env),
+    workerUrl: defaultWorkerUrl(),
+  });
   return await pool.run(baseline, current, options);
 }
 

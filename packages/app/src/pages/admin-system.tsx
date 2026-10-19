@@ -1,5 +1,6 @@
 import type { ShelfConfig } from "@storyshelf/core/config";
 import type { CredentialProbe } from "@storyshelf/core/models";
+import type { CaptureHostSummary } from "@storyshelf/core/utils";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { HealthReport } from "../routers/health-report.ts";
 import {
@@ -31,6 +32,8 @@ export interface AdminSystemData {
   credentials?: CredentialProbe | null;
   /** True when AI is configured (shows the AI usage link). */
   aiEnabled?: boolean;
+  /** Detected host budget and effective capture concurrency; null when capture runs elsewhere. */
+  capture?: CaptureHostSummary | null;
 }
 
 function healthTone(state: string): "success" | "info" | "danger" | "neutral" {
@@ -142,16 +145,27 @@ function AdapterTable(props: AdapterTableProps): HtmlEscapedString | Promise<Htm
   );
 }
 
+/** Detected hardware and the capture concurrency it yields (auto unless configured). */
+function CaptureSizing(props: {
+  capture: CaptureHostSummary;
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const { cpus, memoryMb, builds, pages } = props.capture;
+  return (
+    <Meta>
+      Capture host {cpus} CPU · {memoryMb} MB · builds at once {builds.value}
+      {builds.auto ? " (auto)" : " (configured)"} · pages per build {pages.start}–{pages.max} (auto,
+      adapts to load unless the runner pins it)
+    </Meta>
+  );
+}
+
 interface ServerFactsProps {
-  report: HealthReport;
-  authEnabled: boolean;
-  config: ShelfConfig;
-  authMethods?: string[];
+  data: AdminSystemData;
 }
 
 /** Non-secret server facts (never secret, admin token, or credentials). */
 function ServerFacts(props: ServerFactsProps): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { report, authEnabled, config, authMethods } = props;
+  const { report, authEnabled, config, authMethods, capture } = props.data;
   return (
     <Card>
       <SectionTitle>Server</SectionTitle>
@@ -161,8 +175,7 @@ function ServerFacts(props: ServerFactsProps): HtmlEscapedString | Promise<HtmlE
         <Stat label="Version" value={report.version} />
       </div>
       <Meta>
-        Auth {authEnabled ? "enabled" : "disabled — all operations permitted"} · Capture concurrency{" "}
-        {formatOptional(config.captureConcurrency)} · Purge TTL{" "}
+        Auth {authEnabled ? "enabled" : "disabled — all operations permitted"} · Purge TTL{" "}
         {formatOptional(config.purgeTtlDays)} days · Branch TTL{" "}
         {config.branchTtlDays === null
           ? "disabled"
@@ -175,6 +188,7 @@ function ServerFacts(props: ServerFactsProps): HtmlEscapedString | Promise<HtmlE
           ))}
         </HStack>
       ) : null}
+      {capture ? <CaptureSizing capture={capture} /> : null}
       <Meta>
         Scratch dir {formatOptional(config.scratchDir)} · Published domain{" "}
         {formatOptional(config.publishedBaseDomain)} · Max upload{" "}
@@ -234,7 +248,7 @@ function CredentialsCard(props: {
 
 /** Site-admin System page: adapter inventory with in-depth health. */
 export function renderAdminSystemPage(data: AdminSystemData): RenderedContent {
-  const { report, authEnabled, config, authMethods, credentials } = data;
+  const { report, config, credentials } = data;
   return (
     <DocumentLayout title="System" nav={{ active: "admin" }}>
       <PageHeader
@@ -259,12 +273,7 @@ export function renderAdminSystemPage(data: AdminSystemData): RenderedContent {
           </HStack>
         }
       />
-      <ServerFacts
-        report={report}
-        authEnabled={authEnabled}
-        config={config}
-        authMethods={authMethods}
-      />
+      <ServerFacts data={data} />
       {credentials ? (
         <div class="mt-1">
           <CredentialsCard probe={credentials} config={config} />

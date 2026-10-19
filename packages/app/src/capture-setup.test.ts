@@ -48,24 +48,23 @@ describe("setupCaptureQueue", () => {
     expect(result.enqueueCapture).toBeUndefined();
   });
 
-  it("throws when runner provided without scratchDir", () => {
+  it("falls back to the default scratch dir when none is configured", () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    expect(() =>
-      setupCaptureQueue(
-        { database: db as never, storage: storage as never, captureRunner: makeRunner() },
-        {},
-        [],
-        makeLogger(),
-      ),
-    ).toThrow("ShelfConfig.scratchDir is not set");
+    const result = setupCaptureQueue(
+      { database: db as never, storage: storage as never, capture: { runner: makeRunner() } },
+      {},
+      [],
+      makeLogger(),
+    );
+    expect(result.queue?.metadata.kind).toBe("memory");
   });
 
   it("creates InMemory queue when runner and scratchDir provided", () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
     const result = setupCaptureQueue(
-      { database: db as never, storage: storage as never, captureRunner: makeRunner() },
+      { database: db as never, storage: storage as never, capture: { runner: makeRunner() } },
       { scratchDir: "/tmp" },
       [],
       makeLogger(),
@@ -80,7 +79,7 @@ describe("setupCaptureQueue", () => {
     const { storage } = makeStorage();
     const queue = makeQueue();
     const result = setupCaptureQueue(
-      { database: db as never, storage: storage as never, captureQueue: queue },
+      { database: db as never, storage: storage as never, capture: { queue } },
       {},
       [],
       makeLogger(),
@@ -99,8 +98,7 @@ describe("setupCaptureQueue", () => {
       {
         database: db as never,
         storage: storage as never,
-        captureQueue: queue,
-        captureRunner: makeRunner(),
+        capture: { queue, runner: makeRunner() },
       },
       {},
       [],
@@ -117,8 +115,7 @@ describe("setupCaptureQueue", () => {
       {
         database: db as never,
         storage: storage as never,
-        captureQueue: queue,
-        captureRunner: makeRunner(),
+        capture: { queue, runner: makeRunner() },
       },
       { scratchDir: "/tmp" },
       [],
@@ -141,12 +138,16 @@ describe("setupCaptureQueue", () => {
     expect(result.queue).toBeNull();
   });
 
-  it("respects captureConcurrency config", () => {
+  it("respects capture.concurrency", () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
     const result = setupCaptureQueue(
-      { database: db as never, storage: storage as never, captureRunner: makeRunner() },
-      { scratchDir: "/tmp", captureConcurrency: 5 },
+      {
+        database: db as never,
+        storage: storage as never,
+        capture: { runner: makeRunner(), concurrency: 5 },
+      },
+      { scratchDir: "/tmp" },
       [],
       makeLogger(),
     );
@@ -167,7 +168,7 @@ describe("setupCaptureQueue", () => {
       const { storage } = makeStorage();
       const queue = makeQueue();
       const result = setupCaptureQueue(
-        { database: db as never, storage: storage as never, captureQueue: queue },
+        { database: db as never, storage: storage as never, capture: { queue } },
         {},
         [],
         makeLogger(),
@@ -192,13 +193,13 @@ describe("setupCaptureQueue", () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
     const inProcess = setupCaptureQueue(
-      { database: db as never, storage: storage as never, captureRunner: makeRunner() },
+      { database: db as never, storage: storage as never, capture: { runner: makeRunner() } },
       { scratchDir: "/tmp" },
       [],
       makeLogger(),
     );
     const remote = setupCaptureQueue(
-      { database: db as never, storage: storage as never, captureQueue: makeQueue() },
+      { database: db as never, storage: storage as never, capture: { queue: makeQueue() } },
       {},
       [],
       makeLogger(),
@@ -215,7 +216,7 @@ describe("setupCaptureQueue", () => {
     const build = await builds.create(project.id, { gitSha: "sha", gitBranch: "feature/x" });
     await builds.setStatus(build.id, "capturing");
     const { recoverStuck } = setupCaptureQueue(
-      { database: db as never, storage: storage as never, captureRunner: makeRunner() },
+      { database: db as never, storage: storage as never, capture: { runner: makeRunner() } },
       { scratchDir: "/tmp" },
       [],
       makeLogger(),

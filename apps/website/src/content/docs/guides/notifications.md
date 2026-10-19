@@ -22,7 +22,7 @@ curl -X POST $SHELF/api/v1/projects/my-app/notification-channels \
   -d '{ "provider": "slack-webhook", "events": ["build:reviewing"], "config": { "style": "compact" }, "secret": "https://hooks.slack.com/..." }'
 ```
 
-- `provider` — `slack-webhook` | `teams-workflow` | `email` (must be wired in `ShelfOptions.notifiers`; unknown kinds are a 400).
+- `provider` — `slack-webhook` | `teams-workflow` | `email` (must be wired in `ShelfOptions.notifications.notifiers`; unknown kinds are a 400).
 - `events` — allowlist or empty for all; `enabled` toggles delivery without deleting.
 - Secrets (webhook URLs, SMTP passwords) are stored AES-256-GCM encrypted with server `SECRET` and decrypted only in memory at send time.
 - Display toggles: `style` (`compact`|`verbose`), `subjectPrefix`, `includeAuthor`, `includeMessage`, `includeCounts`. Brand (name, logo, links) comes from server `UIConfig` + `publicBaseUrl`.
@@ -40,15 +40,15 @@ Site admins manage project-less channels (`POST /api/v1/admin/notification-chann
 
 ## Email transport
 
-One SMTP configuration serves notification channels and (optionally) auth mail: wire the same sender into `createShelfAuth({ emailSender })` and `notifiers`. Without it, invites stay out-of-band links (fictional addresses keep working; sends are best-effort and the token is still returned). Presets: `smtp` (default), `mailpit` (local dev), `log` (tests/unconfigured), HTTP APIs (`resend`-style via shared `httpJson`).
+One SMTP configuration serves notification channels and (optionally) auth mail: wire the same sender into `createShelfAuth({ emailSender })` and `notifications.notifiers`. Without it, invites stay out-of-band links (fictional addresses keep working; sends are best-effort and the token is still returned). Presets: `smtp` (default), `mailpit` (local dev), `log` (tests/unconfigured), HTTP APIs (`resend`-style via shared `httpJson`).
 
-| Env | Purpose | Default |
-|---|---|---|
-| `SMTP_HOST` | SMTP relay host (unset = no sender) | — |
-| `SMTP_PORT` | Relay port | `587` |
-| `SMTP_SECURE` | `1`/`true` for implicit TLS (465) | STARTTLS |
-| `SMTP_USER` / `SMTP_PASS` | Relay credentials | — |
-| `SMTP_FROM` | Sender address (`fromEmail`) | — |
+| Env                       | Purpose                             | Default  |
+| ------------------------- | ----------------------------------- | -------- |
+| `SMTP_HOST`               | SMTP relay host (unset = no sender) | —        |
+| `SMTP_PORT`               | Relay port                          | `587`    |
+| `SMTP_SECURE`             | `1`/`true` for implicit TLS (465)   | STARTTLS |
+| `SMTP_USER` / `SMTP_PASS` | Relay credentials                   | —        |
+| `SMTP_FROM`               | Sender address (`fromEmail`)        | —        |
 
 Password recovery is both: users can request a reset email when a sender is configured; admins can always re-invite (which also resets access). Failed local logins emit `sys:auth-failed` to admin channels (SSO failures excluded in v1).
 

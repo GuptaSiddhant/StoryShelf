@@ -1,6 +1,7 @@
 import { PNG } from "pngjs";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  configureDiffPool,
   DIFF_WORKERS_ENV,
   diffImagesAsync,
   resolveDiffWorkers,
@@ -42,6 +43,7 @@ function makePool(size: number, workerUrl: URL | string = WORKER_URL): DiffPool 
 afterEach(async () => {
   await Promise.all(pools.splice(0).map(async (pool) => await pool.shutdown()));
   await shutdownDiffPool();
+  configureDiffPool({});
   Reflect.deleteProperty(process.env, DIFF_WORKERS_ENV);
 });
 
@@ -166,6 +168,19 @@ describe("worker count", () => {
 
   it("STORYSHELF_DIFF_WORKERS=0 runs diffImagesAsync in-thread", async () => {
     process.env[DIFF_WORKERS_ENV] = "0";
+    expect(await diffImagesAsync(base(), changed(), failOnResize)).toEqual(
+      diffImages(base(), changed(), failOnResize),
+    );
+  });
+
+  it("compare.threads beats STORYSHELF_DIFF_WORKERS and can be changed at runtime", async () => {
+    process.env[DIFF_WORKERS_ENV] = "3";
+    configureDiffPool({ threads: 0 });
+    expect(await diffImagesAsync(base(), changed(), failOnResize)).toEqual(
+      diffImages(base(), changed(), failOnResize),
+    );
+    // Reconfiguring replaces the pool; it still produces the same result.
+    configureDiffPool({ threads: 1 });
     expect(await diffImagesAsync(base(), changed(), failOnResize)).toEqual(
       diffImages(base(), changed(), failOnResize),
     );

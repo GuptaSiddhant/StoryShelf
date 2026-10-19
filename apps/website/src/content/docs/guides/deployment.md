@@ -14,7 +14,7 @@ services:
     volumes:
       - storyshelf-data:/app/data
     environment:
-      - SECRET=$(openssl rand -hex 32)   # ≥ 32 chars
+      - SECRET=$(openssl rand -hex 32) # ≥ 32 chars
       - CAPTURE_CONCURRENCY=2
       - PURGE_TTL_DAYS=30
       - BRANCH_TTL_DAYS=30
@@ -62,12 +62,12 @@ storyshelf server init
 
 This generates `src/index.ts`, `package.json` and `tsconfig.json` with the correct imports and dependencies.
 
-| Layer | Package | Notes |
-|-------|---------|-------|
-| Database | `@storyshelf/db-sqlite` | node:sqlite + Drizzle, WAL mode, single file |
-| Storage | `@storyshelf/storage-local` | Local filesystem, `--data-dir` |
-| Capture queue | `InMemoryCaptureQueue` (built-in) | Async, concurrency-limited, in-process |
-| Auth | `@storyshelf/auth` | Local accounts, social, SSO/SAML, passkeys |
+| Layer         | Package                           | Notes                                        |
+| ------------- | --------------------------------- | -------------------------------------------- |
+| Database      | `@storyshelf/db-sqlite`           | node:sqlite + Drizzle, WAL mode, single file |
+| Storage       | `@storyshelf/storage-local`       | Local filesystem, `--data-dir`               |
+| Capture queue | `InMemoryCaptureQueue` (built-in) | Async, concurrency-limited, in-process       |
+| Auth          | `@storyshelf/auth`                | Local accounts, social, SSO/SAML, passkeys   |
 
 Swap the database layer for `@storyshelf/db-postgres` (Postgres via `postgres.js` + Drizzle, see [Postgres provider recipes](/packages/db-postgres/#provider-recipes)) or `@storyshelf/db-sqlite/turso` (Turso/libSQL) without changing the rest of the stack.
 
@@ -77,23 +77,23 @@ One `npm start` (or `fly deploy`, `railway up`, `render.com`, etc.) and you're r
 
 Capture drives Chromium, which dominates memory use. Each open page costs roughly 100–300 MB, so StoryShelf renders a bounded number of pages at once rather than every story together.
 
-| Setting | Default | What it controls |
-| --- | --- | --- |
-| `config.captureConcurrency` (server) / `WORKER_CONCURRENCY` (remote worker) | auto: 2 builds on hosts with ≥ 2 CPUs and ≥ 3 GB, otherwise 1 | Builds captured at the same time (each launches its own browser) |
-| `createPlaywrightCaptureRunner({ concurrency })` / `STORYSHELF_CAPTURE_CONCURRENCY` | auto (see below) | Pages rendering at once within one build |
-| `createPlaywrightCaptureRunner({ navigationTimeoutMs })` / `STORYSHELF_NAVIGATION_TIMEOUT_MS` | auto: 30 s, 60 s under 2 CPUs, 90 s under 1 CPU | Per-page navigation and action timeout |
+| Setting                                                                                       | Default                                                       | What it controls                                                 |
+| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `capture.concurrency` (server) / `WORKER_CONCURRENCY` (remote worker)                         | auto: 2 builds on hosts with ≥ 2 CPUs and ≥ 3 GB, otherwise 1 | Builds captured at the same time (each launches its own browser) |
+| `createPlaywrightCaptureRunner({ concurrency })` / `STORYSHELF_CAPTURE_CONCURRENCY`           | auto (see below)                                              | Pages rendering at once within one build                         |
+| `createPlaywrightCaptureRunner({ navigationTimeoutMs })` / `STORYSHELF_NAVIGATION_TIMEOUT_MS` | auto: 30 s, 60 s under 2 CPUs, 90 s under 1 CPU               | Per-page navigation and action timeout                           |
 
 | `createPlaywrightCaptureRunner({ reusePages })` / `STORYSHELF_REUSE_PAGES` | off | Reuse a pool of reset pages instead of opening one per capture |
 | `createPlaywrightCaptureRunner({ recycleBrowserEvery })` / `STORYSHELF_BROWSER_RECYCLE_EVERY` | `150` (`0` disables) | Captures between browser restarts |
 
 The defaults are sized from the CPU and memory the process can actually use, including container limits (cgroup CPU quota and memory limit), so a 0.5 vCPU / 1 GB container on a big host is treated as 0.5 / 1 GB. Pages at once is the smaller of the CPU count (rounded up), `(memory − 512 MB) / 300 MB`, and 4, with a minimum of 1. In practice:
 
-| Host | Builds at once | Pages at once | Navigation timeout |
-| --- | --- | --- | --- |
-| 0.5 vCPU, 1 GB | 1 | 1 | 90 s |
-| 1 vCPU, 2 GB | 1 | 1 | 60 s |
-| 2 vCPU, 4 GB | 1 | 2 | 30 s |
-| 4 vCPU, 8 GB | 2 | 4 | 30 s |
+| Host           | Builds at once | Pages at once | Navigation timeout |
+| -------------- | -------------- | ------------- | ------------------ |
+| 0.5 vCPU, 1 GB | 1              | 1             | 90 s               |
+| 1 vCPU, 2 GB   | 1              | 1             | 60 s               |
+| 2 vCPU, 4 GB   | 1              | 2             | 30 s               |
+| 4 vCPU, 8 GB   | 2              | 4             | 30 s               |
 
 More pages than CPUs does not make capture faster: the pages compete for the same cores, each loads more slowly, and slow loads time out. The orchestrator also gives each render a time budget of 15 minutes, or 15 seconds per capture for large builds, whichever is longer (an explicit `renderTimeoutMs` always wins). One page at a time on a small host is slower, so a 1,000-capture build gets about 4 hours before it is cancelled as hung; without this, a build that is merely slow would be reported as timed out.
 

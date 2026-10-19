@@ -39,9 +39,9 @@ ssoKeycloakPreset("https://idp.example.com/realms/shelf", {
   domain: "example.com",
   clientId: "storyshelf",
   clientSecret: "{env:OIDC_CLIENT_SECRET}",
-  groupsClaim: ["groups", "cognito:groups"],  // OIDC claim names (default ["groups"])
-  adminGroups: ["shelf-admins"],               // exact match → site admin
-})
+  groupsClaim: ["groups", "cognito:groups"], // OIDC claim names (default ["groups"])
+  adminGroups: ["shelf-admins"], // exact match → site admin
+});
 ```
 
 - Claim values pass through as arrays; a lone string counts as one group (never whitespace-split). Matching is **exact** — no wildcards.

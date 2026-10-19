@@ -88,3 +88,4 @@ export {
   validateAuth,
   validateBootAssembly,
 } from "./validate.ts";
+export { adapterSourcesOf } from "./sources.ts";

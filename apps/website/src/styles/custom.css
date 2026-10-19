@@ -5,8 +5,8 @@
  */
 
 :root {
-  --sl-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
-    sans-serif;
+  --sl-font:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --sl-font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
   --ss-radius: 0.5rem;
   --ss-radius-lg: 0.75rem;
