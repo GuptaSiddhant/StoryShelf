@@ -114,4 +114,15 @@ describe("IpcCaptureQueue", () => {
     await expect(queue.lifecycle.teardown()).resolves.toBeUndefined();
     expect(queue.metadata.category).toBe("capture-queue");
   });
+
+  it("reports progress by receipt, and only for delivered, open jobs", async () => {
+    const { port, sent, drop } = fakePort();
+    const queue = new IpcCaptureQueue(port);
+    queue.reportProgress({ buildId: "b1", receipt: "r1" });
+    queue.reportProgress({ buildId: "b1" });
+    expect(sent).toEqual([{ type: "progress", receipt: "r1" }]);
+    drop();
+    queue.reportProgress({ buildId: "b1", receipt: "r2" });
+    expect(sent).toHaveLength(1);
+  });
 });

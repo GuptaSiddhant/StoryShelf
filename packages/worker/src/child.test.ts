@@ -74,7 +74,10 @@ describe("runCaptureChild", () => {
       job: { buildId: "b1", receipt: "r1", attempts: 0 },
     });
     await sleep(40);
-    expect(dispatch.run).toHaveBeenCalledWith(expect.objectContaining({ buildId: "b1" }));
+    expect(dispatch.run).toHaveBeenCalledWith(
+      expect.objectContaining({ buildId: "b1" }),
+      expect.objectContaining({ touch: expect.any(Function) }),
+    );
     expect(sent).toContainEqual({ type: "ack", receipt: "r1" });
 
     events.emit("SIGTERM");
@@ -144,6 +147,34 @@ describe("runCaptureChild", () => {
     await sleep(30);
     // Both captures are in flight at once, which only happens with concurrency 2.
     expect(dispatch.run).toHaveBeenCalledTimes(2);
+    events.emit("SIGTERM");
+    await running;
+  });
+
+  it("reports capture progress to the parent, at most once a second per job", async () => {
+    dispatch.run
+      .mockReset()
+      .mockImplementation(async (_job: unknown, lease?: { touch(): void }) => {
+        // A capture logs many lines; each one touches the lease.
+        for (let line = 0; line < 20; line += 1) {
+          lease?.touch();
+        }
+        await sleep(60);
+      });
+    const { host, events, sent } = fakeHost();
+    const running = runCaptureChild(options(), host);
+    await sleep(20);
+    const poll = sent.find((message) => message["type"] === "poll");
+    events.emit("message", {
+      type: "job",
+      id: poll?.["id"],
+      job: { buildId: "b1", receipt: "r1", attempts: 0 },
+    });
+    await sleep(100);
+
+    expect(sent.filter((message) => message["type"] === "progress")).toEqual([
+      { type: "progress", receipt: "r1" },
+    ]);
     events.emit("SIGTERM");
     await running;
   });

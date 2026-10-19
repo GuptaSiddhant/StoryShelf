@@ -101,6 +101,13 @@ export class IpcCaptureQueue implements PollableCaptureQueue {
     });
   }
 
+  /** Tell the parent this job is still making progress (renews its lease there). */
+  reportProgress(job: PollableJob): void {
+    if (job.receipt && !this.#closed) {
+      this.#port.send({ type: "progress", receipt: job.receipt });
+    }
+  }
+
   async ack(job: PollableJob): Promise<void> {
     this.#port.send({ type: "ack", receipt: receiptOf(job) });
     await Promise.resolve();

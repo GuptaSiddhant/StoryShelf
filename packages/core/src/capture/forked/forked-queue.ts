@@ -8,7 +8,8 @@ import type {
 import type { Logger } from "../../logger.ts";
 import type { ChildProcessHandle } from "./channel.ts";
 import { CrashTracker } from "./crash-tracker.ts";
-import { JobBook } from "./job-book.ts";
+import { JobBook, type DeliveredJob } from "./job-book.ts";
+import { LeaseBook } from "./lease-book.ts";
 import { isChildMessage, type ChildMessage } from "./protocol.ts";
 
 declare const __PKG_VERSION__: string | undefined;
@@ -30,6 +31,11 @@ export interface ForkedCaptureQueueOptions {
   /** Non-zero exits within `crashWindowMs` that trip the fallback (default 3). */
   crashLimit?: number;
   crashWindowMs?: number;
+  /**
+   * Longest a delivered job may go without a `progress` message before the child is declared hung,
+   * killed, and treated as crashed (0 or unset disables). Needs a child that reports progress.
+   */
+  leaseMs?: number;
   /** Delay before restarting a crashed child (default 250 ms). */
   restartDelayMs?: number;
   /** Called when a job finishes for good, in the parent, so notifications stay out of the child. */
@@ -75,6 +81,7 @@ export class ForkedCaptureQueue implements CaptureQueue {
   readonly #options: ForkedCaptureQueueOptions;
   readonly #book = new JobBook();
   readonly #crashes: CrashTracker;
+  readonly #leases: LeaseBook;
   readonly #routed = new Set<string>();
   #waiters: Waiter[] = [];
   #child: ChildProcessHandle | null = null;
@@ -85,6 +92,9 @@ export class ForkedCaptureQueue implements CaptureQueue {
   constructor(options: ForkedCaptureQueueOptions) {
     this.#options = options;
     this.#crashes = new CrashTracker(options.crashLimit ?? 3, options.crashWindowMs ?? 300_000);
+    this.#leases = new LeaseBook(options.leaseMs ?? 0, (receipt) => {
+      this.#onHung(receipt);
+    });
   }
 
   async enqueue(job: CaptureJob): Promise<void> {
@@ -153,6 +163,9 @@ export class ForkedCaptureQueue implements CaptureQueue {
       case "nack":
         this.#onNack(message);
         break;
+      case "progress":
+        this.#leases.touch(message.receipt);
+        break;
       case "enqueue":
         this.enqueue(message.job).catch(() => {});
         break;
@@ -182,13 +195,19 @@ export class ForkedCaptureQueue implements CaptureQueue {
         this.#waiters.unshift(waiter);
         return;
       }
-      clearTimeout(waiter.timer);
-      this.#child.send({ type: "job", id: waiter.id, job });
+      this.#handOver(waiter, job);
     }
   }
 
+  /** Give a job to the child that is waiting on `waiter`, and start watching it for progress. */
+  #handOver(waiter: Waiter, job: DeliveredJob): void {
+    clearTimeout(waiter.timer);
+    this.#leases.start(job.receipt);
+    this.#child?.send({ type: "job", id: waiter.id, job });
+  }
+
   #onNack(message: Extract<ChildMessage, { type: "nack" }>): void {
-    const job = this.#book.release(message.receipt);
+    const job = this.#release(message.receipt);
     if (!job) {
       return;
     }
@@ -208,10 +227,16 @@ export class ForkedCaptureQueue implements CaptureQueue {
   }
 
   #settle(receipt: string, outcome: ForkedJobOutcome): void {
-    const job = this.#book.release(receipt);
+    const job = this.#release(receipt);
     if (job) {
       this.#finish(job, outcome);
     }
+  }
+
+  /** Take a job back from the child: stop its lease and remove it from the in-flight set. */
+  #release(receipt: string): PollableJob | undefined {
+    this.#leases.stop(receipt);
+    return this.#book.release(receipt);
   }
 
   #finish(job: PollableJob, outcome: ForkedJobOutcome): void {
@@ -240,6 +265,7 @@ export class ForkedCaptureQueue implements CaptureQueue {
   #recoverInFlight(info: { code: number | null; signal: string | null }): void {
     const maxRetries = this.#options.maxCrashRetries ?? 2;
     for (const job of this.#book.releaseAll()) {
+      this.#leases.stop(job.receipt);
       if ((job.attempts ?? 0) >= maxRetries) {
         this.#finish(job, {
           status: "failed",
@@ -296,8 +322,21 @@ export class ForkedCaptureQueue implements CaptureQueue {
     this.#waiters = [];
   }
 
+  /** A delivered job went a full lease without progress: the child is hung, so kill it like a crash. */
+  #onHung(receipt: string): void {
+    if (!this.#book.isInFlight(receipt) || !this.#child) {
+      return;
+    }
+    this.#options.logger?.error(
+      { receipt, leaseMs: this.#options.leaseMs },
+      "capture child made no progress; killing it",
+    );
+    this.#child.kill(true);
+  }
+
   #close(): void {
     this.#closed = true;
+    this.#leases.stopAll();
     clearTimeout(this.#restart);
     this.#restart = undefined;
     this.#clearWaiters();

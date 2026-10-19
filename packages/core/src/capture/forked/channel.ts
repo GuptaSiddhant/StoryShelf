@@ -7,7 +7,8 @@ export interface ChildProcessHandle {
   onMessage(listener: (message: unknown) => void): void;
   /** Fires once when the child ends; `code` is null when it was killed by a signal. */
   onExit(listener: (info: { code: number | null; signal: string | null }) => void): void;
-  kill(): void;
+  /** Stop the child: SIGTERM, escalating to SIGKILL; `force` goes straight to SIGKILL (a hung child ignores SIGTERM). */
+  kill(force?: boolean): void;
 }
 
 /** How the child sees its parent (`process.send` / `process.on("message")` adapt to this). */

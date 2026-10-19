@@ -85,7 +85,11 @@ function wrap(child: ChildProcess, stopOnExit: () => void): ChildProcessHandle {
         report(1, null);
       });
     },
-    kill: () => {
+    kill: (force) => {
+      if (force) {
+        child.kill("SIGKILL");
+        return;
+      }
       child.kill("SIGTERM");
       setTimeout(() => {
         if (child.exitCode === null && child.signalCode === null) {

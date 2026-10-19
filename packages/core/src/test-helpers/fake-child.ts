@@ -6,6 +6,8 @@ import type { ChildMessage, ParentMessage } from "../capture/forked/protocol.ts"
 export class FakeChild implements ChildProcessHandle {
   readonly sent: ParentMessage[] = [];
   killed = false;
+  /** Whether the last kill was forced (SIGKILL). */
+  forced = false;
   readonly #messageListeners: ((message: unknown) => void)[] = [];
   readonly #exitListeners: ((info: { code: number | null; signal: string | null }) => void)[] = [];
 
@@ -21,8 +23,9 @@ export class FakeChild implements ChildProcessHandle {
     this.#exitListeners.push(listener);
   }
 
-  kill(): void {
+  kill(force = false): void {
     this.killed = true;
+    this.forced = force;
   }
 
   /** The child says something to the parent. */

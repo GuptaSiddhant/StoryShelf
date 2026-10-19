@@ -2,11 +2,14 @@
 import type { PollableJob, QueueEntry } from "../../adapters/capture-queue.ts";
 import type { CaptureJob } from "../../adapters/capture-queue.ts";
 
+/** A job delivered to the child, always carrying its receipt. */
+export type DeliveredJob = PollableJob & { receipt: string };
+
 /** Pending and in-flight jobs plus the observable {@link QueueEntry} per build. */
 export class JobBook {
   readonly #entries = new Map<string, QueueEntry>();
   readonly #pending: PollableJob[] = [];
-  readonly #inFlight = new Map<string, PollableJob>();
+  readonly #inFlight = new Map<string, DeliveredJob>();
   #receipts = 0;
 
   /** Register a build as queued (re-enqueueing a known build resets its entry) and wait for delivery. */
@@ -43,12 +46,17 @@ export class JobBook {
     }
   }
 
+  /** Whether `receipt` is currently out with the child. */
+  isInFlight(receipt: string): boolean {
+    return this.#inFlight.has(receipt);
+  }
+
   get hasPending(): boolean {
     return this.#pending.length > 0;
   }
 
   /** Hand the next pending job to the child: assigns a receipt and marks it running. */
-  take(): PollableJob | undefined {
+  take(): DeliveredJob | undefined {
     const job = this.#pending.shift();
     if (!job) {
       return undefined;
@@ -69,14 +77,14 @@ export class JobBook {
   }
 
   /** Remove and return an in-flight job by receipt; undefined for stale or unknown receipts. */
-  release(receipt: string): PollableJob | undefined {
+  release(receipt: string): DeliveredJob | undefined {
     const job = this.#inFlight.get(receipt);
     this.#inFlight.delete(receipt);
     return job;
   }
 
   /** Every in-flight job, removed from the in-flight set (the child that held them is gone). */
-  releaseAll(): PollableJob[] {
+  releaseAll(): DeliveredJob[] {
     const jobs = [...this.#inFlight.values()];
     this.#inFlight.clear();
     return jobs;
