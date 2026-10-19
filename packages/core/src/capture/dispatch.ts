@@ -15,13 +15,16 @@ import type { Build } from "../schema/build.ts";
 import type { CaptureAttempt } from "../schema/capture-attempt.ts";
 import type { Project } from "../schema/project.ts";
 import type { SecretInput } from "../utils/encrypt.ts";
+import type { JobLease } from "./job-lease.ts";
 import { executeCaptureJob, type CaptureJobOptions } from "./orchestrator.ts";
 import { hasApprovedBuildForSha, isAlreadyMerged } from "./skip-checks.ts";
 import { postStatusesForBuild } from "./status-fanout.ts";
 
 /** Build the queue's job runner: post pending, apply skip rules, capture, report. */
-export function createDispatchJob(deps: DispatchDeps): (job: CaptureDispatchJob) => Promise<void> {
-  return async (job: CaptureDispatchJob): Promise<void> => {
+export function createDispatchJob(
+  deps: DispatchDeps,
+): (job: CaptureDispatchJob, lease?: JobLease) => Promise<void> {
+  return async (job: CaptureDispatchJob, lease?: JobLease): Promise<void> => {
     const target = await loadJobTarget(deps, job);
     if (!target) {
       return;
@@ -33,6 +36,7 @@ export function createDispatchJob(deps: DispatchDeps): (job: CaptureDispatchJob)
       target.project,
       target.build,
       job.reqId,
+      lease,
     );
     const ctx: JobContext = {
       deps,
@@ -89,11 +93,14 @@ async function beginAttempt(
   project: Project,
   build: Build,
   reqId: string | undefined,
+  lease?: JobLease,
 ): Promise<{ attempt: CaptureAttempt; recordLog: AttemptLogRecorder }> {
   const attempts = new CaptureAttemptModel(deps.db, deps.tables);
   const logs = new CaptureLogModel(deps.db, deps.tables);
   const attempt = await attempts.startAttempt(project.id, build.id, reqId);
+  // Every attempt-log line (stages, render progress, runner output) counts as progress.
   const recordLog: AttemptLogRecorder = async (level, message, fields) => {
+    lease?.touch();
     await logs.append(project.id, build.id, attempt.id, level, message, fields);
   };
   await emitAttemptLog(recordLog, deps.logger, "info", "capture queued", {

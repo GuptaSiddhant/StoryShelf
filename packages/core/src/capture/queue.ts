@@ -1,13 +1,25 @@
 import type { Logger } from "pino";
 import type { CaptureJob, CaptureQueue, QueueEntry } from "../adapters/capture-queue.ts";
+import { ProgressLease, type JobLease } from "./job-lease.ts";
 
 declare const __PKG_VERSION__: string | undefined;
 
 /** Options for the in-process capture queue. */
 export interface InMemoryCaptureQueueOptions {
   concurrency: number;
-  runJob: (job: CaptureJob) => Promise<void>;
+  /** Runs one job; call `lease.touch()` as it makes progress. */
+  runJob: (job: CaptureJob, lease: JobLease) => Promise<void>;
   logger?: Logger;
+  /**
+   * Longest a running job may go without touching its lease before it is declared stalled
+   * (0 or unset disables). The in-process counterpart of a remote queue's visibility timeout.
+   */
+  leaseMs?: number;
+  /**
+   * Called once when a job's lease expires, before its slot is released. `settled` resolves when the
+   * stuck run finally ends (never, if it is truly hung). The queue ignores the run's late result.
+   */
+  onStalled?: (job: CaptureJob, run: { settled: Promise<void> }) => Promise<void>;
 }
 /** In-process capture queue with bounded concurrency. */
 export class InMemoryCaptureQueue implements CaptureQueue {
@@ -59,8 +71,9 @@ export class InMemoryCaptureQueue implements CaptureQueue {
     entry.status = "running";
     entry.startedAt = new Date().toISOString();
     log?.info("capture started");
+    let stalled = false;
     try {
-      await this.options.runJob(job);
+      stalled = await this.runLeased(job, entry);
     } catch (error) {
       entry.status = "failed";
       entry.finishedAt = new Date().toISOString();
@@ -69,11 +82,48 @@ export class InMemoryCaptureQueue implements CaptureQueue {
     } finally {
       this.running -= 1;
       this.waiting.shift()?.();
-      if (entry.status !== "failed") {
+      // A stalled job's entry already belongs to its recovery (it may have been requeued).
+      if (!stalled && entry.status !== "failed") {
         entry.status = "completed";
         entry.finishedAt = new Date().toISOString();
         log?.info("capture completed");
       }
+    }
+  }
+
+  /** Run the job under its progress lease; resolves true when the lease expired instead. */
+  private async runLeased(job: CaptureJob, entry: QueueEntry): Promise<boolean> {
+    const lease = new ProgressLease(this.options.leaseMs ?? 0);
+    const run = this.options.runJob(job, lease);
+    try {
+      const outcome = await Promise.race([
+        run.then(() => "done" as const),
+        lease.expired.then(() => "expired" as const),
+      ]);
+      if (outcome === "done") {
+        return false;
+      }
+    } finally {
+      lease.stop();
+    }
+    await this.handleStall(job, entry, run);
+    return true;
+  }
+
+  private async handleStall(job: CaptureJob, entry: QueueEntry, run: Promise<void>): Promise<void> {
+    const leaseMs = this.options.leaseMs ?? 0;
+    this.log(job)?.error({ leaseMs }, "capture stalled: no progress, lease expired");
+    entry.status = "failed";
+    entry.finishedAt = new Date().toISOString();
+    entry.error = `Capture stalled: no progress for ${Math.round(leaseMs / 1000)}s`;
+    const settled = run.then(
+      () => {},
+      () => {},
+    );
+    try {
+      await this.options.onStalled?.(job, { settled });
+    } catch (error) {
+      this.log(job)?.error({ err: error }, "stalled-capture recovery failed");
     }
   }
 
