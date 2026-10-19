@@ -3,6 +3,7 @@ import type { CaptureQueue, PollableJob } from "@storyshelf/core/adapter/capture
 import {
   canForkCaptureChild,
   CAPTURE_CONCURRENCY_ENV,
+  CAPTURE_SHARD_SIZE_ENV,
   decideCaptureProcess,
   ForkedCaptureQueue,
   forkCaptureChild,
@@ -58,6 +59,8 @@ function decideForHost(): ForkDecision {
 export interface ForkedQueueDeps {
   workerEntry: string;
   concurrency?: number;
+  /** Captures per shard for big builds, handed to the child (`capture.shardSize`). */
+  shardSize?: number;
   /** Takes over if forking stops being viable. */
   fallback: CaptureQueue;
   onSettled: (job: PollableJob) => Promise<void>;
@@ -69,6 +72,9 @@ export function createForkedQueue(deps: ForkedQueueDeps): ForkedCaptureQueue {
   const env: Record<string, string> = {};
   if (deps.concurrency !== undefined) {
     env[CAPTURE_CONCURRENCY_ENV] = String(deps.concurrency);
+  }
+  if (deps.shardSize !== undefined) {
+    env[CAPTURE_SHARD_SIZE_ENV] = String(deps.shardSize);
   }
   return new ForkedCaptureQueue({
     spawn: () => forkCaptureChild({ entry: deps.workerEntry, env }),

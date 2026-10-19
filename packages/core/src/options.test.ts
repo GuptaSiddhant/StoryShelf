@@ -75,7 +75,7 @@ describe("resolveShelfOptions capture process options", () => {
     expect(shardSized(100)).not.toThrow();
     expect(shardSized(0)).toThrow(/positive integer/u);
     expect(shardSized(1.5)).toThrow(/positive integer/u);
-    expect(shardSized(10, { workerEntry: "/app/w.ts" })).toThrow(/workerEntry/u);
+    expect(shardSized(10, { workerEntry: "/app/w.ts" })).not.toThrow();
     expect(() => resolveShelfOptions({ ...base, capture: { shardSize: 10 } })).toThrow(
       /requires capture\.runner/u,
     );

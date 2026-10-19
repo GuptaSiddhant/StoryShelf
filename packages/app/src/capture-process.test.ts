@@ -104,6 +104,36 @@ describe("setupCaptureQueue process model", () => {
     }
   }, 30_000);
 
+  it("lets the forked child hand shards back to be delivered to it", async () => {
+    const result = setup({
+      runner: runner(),
+      workerEntry: ECHO_CHILD,
+      mode: "fork",
+      shardSize: 10,
+    });
+    const queue = result.queue;
+    try {
+      await result.enqueueCapture?.("fan-1");
+      const deadline = Date.now() + 15_000;
+      const settled = async (): Promise<string[]> =>
+        (await queue?.recent(10))
+          ?.filter((entry) => entry.status === "completed")
+          .map((entry) => entry.shard ?? "plan")
+          .toSorted() ?? [];
+      // oxlint-disable-next-line eslint/no-await-in-loop -- polling loop
+      while ((await settled()).length < 3) {
+        if (Date.now() > deadline) {
+          throw new Error("the child's shards were not delivered back to it");
+        }
+        // oxlint-disable-next-line eslint/no-await-in-loop -- polling loop
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+      expect(await settled()).toEqual(["fan-1:render:1", "fan-1:render:2", "plan"]);
+    } finally {
+      await queue?.lifecycle?.teardown();
+    }
+  }, 30_000);
+
   it("prefers a supplied queue over forking", () => {
     const supplied = {
       metadata: { name: "q", version: "0", kind: "sqs", category: "capture-queue" },

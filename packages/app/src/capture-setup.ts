@@ -63,6 +63,22 @@ async function timedRunJob(
   instruments.jobDuration.record(performance.now() - start);
 }
 
+/**
+ * Builds already alerted about, keyed by the build's last update. A sharded build settles one job
+ * per shard and every one of them sees the failed build; only the first alerts. A retry rewrites
+ * the build, so its next failure is a new key.
+ */
+const alerted = new Set<string>();
+
+export function alreadyAlerted(build: { id: string; updatedAt: string }): boolean {
+  const key = `${build.id}@${build.updatedAt}`;
+  if (alerted.has(key)) {
+    return true;
+  }
+  alerted.add(key);
+  return false;
+}
+
 /** Alert admins when an in-process capture leaves its build failed. */
 async function notifyCaptureFailed(
   options: ShelfOptions,
@@ -71,7 +87,7 @@ async function notifyCaptureFailed(
   buildId: string,
 ): Promise<void> {
   const build = await new BuildModel(options.database).get(buildId);
-  if (build?.status !== "failed") {
+  if (build?.status !== "failed" || alreadyAlerted(build)) {
     return;
   }
   await notifySystemWith(
@@ -102,6 +118,7 @@ function pickProcessQueue(
   return createForkedQueue({
     workerEntry,
     concurrency: options.capture?.concurrency,
+    shardSize: options.capture?.shardSize,
     fallback: inProcess,
     onSettled: async (job) => {
       // Notifications stay in this process; the build's own status says whether the capture failed.

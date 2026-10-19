@@ -47,9 +47,6 @@ function assertShardSize(capture: ShelfOptions["capture"]): void {
   if (capture?.runner === undefined) {
     throw new Error("capture.shardSize requires capture.runner (workers set their own shardSize)");
   }
-  if (capture.workerEntry !== undefined) {
-    throw new Error("capture.shardSize is not supported together with capture.workerEntry");
-  }
 }
 
 function assertThreads(threads: number | undefined): void {

@@ -9,6 +9,9 @@ export const CAPTURE_WORKER_ROLE = "capture-worker";
 /** Environment variable carrying the parent's `capture.concurrency` to the child, which sizes itself with it. */
 export const CAPTURE_CONCURRENCY_ENV = "STORYSHELF_CAPTURE_CONCURRENCY";
 
+/** Environment variable carrying the parent's `capture.shardSize` to the child, which plans big builds with it. */
+export const CAPTURE_SHARD_SIZE_ENV = "STORYSHELF_CAPTURE_SHARD_SIZE";
+
 /** Grace between SIGTERM and SIGKILL when the parent stops a child. */
 const KILL_ESCALATION_MS = 30_000;
 
