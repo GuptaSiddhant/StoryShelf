@@ -83,3 +83,18 @@ export {
   type ScreenshotPlan,
   type SizingOptions,
 } from "./sizing.ts";
+export {
+  ForkedCaptureQueue,
+  type ForkedCaptureQueueOptions,
+  type ForkedJobOutcome,
+} from "./forked/forked-queue.ts";
+export { IpcCaptureQueue } from "./forked/ipc-queue.ts";
+export type { ChildProcessHandle, ParentPort } from "./forked/channel.ts";
+export type { ChildMessage, ParentMessage } from "./forked/protocol.ts";
+export {
+  decideCaptureProcess,
+  FORK_MIN_CPUS,
+  FORK_MIN_MEMORY_BYTES,
+  type ForkDecision,
+  type ForkHost,
+} from "./forked/decision.ts";
