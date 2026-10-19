@@ -48,6 +48,13 @@ describe("buildRequeuePayload", () => {
     expect(typeof payload["queuedAt"]).toBe("string");
   });
 
+  it("preserves the shard across requeues", () => {
+    const payload = JSON.parse(
+      buildRequeuePayload({ buildId: "b1", shard: "b1:render:1", attempts: 0 }),
+    ) as Record<string, unknown>;
+    expect(payload["shard"]).toBe("b1:render:1");
+  });
+
   it("preserves the traceparent across requeues", () => {
     const payload = JSON.parse(
       buildRequeuePayload({ buildId: "b1", traceparent: "00-abc", attempts: 0 }),

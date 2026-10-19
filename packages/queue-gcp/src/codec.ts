@@ -8,6 +8,7 @@ export function serializeBody(job: CaptureJob): string {
     buildId: job.buildId,
     reqId: job.reqId,
     traceparent: job.traceparent,
+    shard: job.shard,
     queuedAt: new Date().toISOString(),
     status: "queued",
   });

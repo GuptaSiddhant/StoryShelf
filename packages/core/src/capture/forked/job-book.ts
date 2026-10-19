@@ -1,6 +1,7 @@
 /** Parent-side bookkeeping for the forked queue: what is waiting, what is out with the child, and each build's entry. */
 import type { PollableJob, QueueEntry } from "../../adapters/capture-queue.ts";
 import type { CaptureJob } from "../../adapters/capture-queue.ts";
+import { entryKey } from "../queue.ts";
 
 /** A job delivered to the child, always carrying its receipt. */
 export type DeliveredJob = PollableJob & { receipt: string };
@@ -14,13 +15,19 @@ export class JobBook {
 
   /** Register a build as queued (re-enqueueing a known build resets its entry) and wait for delivery. */
   add(job: CaptureJob): void {
-    this.#resetEntry(job.buildId);
+    this.#resetEntry(job);
     this.#pending.push({ ...job, attempts: 0 });
   }
 
-  #resetEntry(buildId: string): void {
+  #resetEntry(job: CaptureJob): void {
     const queuedAt = new Date().toISOString();
-    const entry = this.#entries.get(buildId) ?? { buildId, status: "queued", queuedAt };
+    const key = entryKey(job);
+    const entry = this.#entries.get(key) ?? {
+      buildId: job.buildId,
+      ...(job.shard ? { shard: job.shard } : {}),
+      status: "queued" as const,
+      queuedAt,
+    };
     Object.assign(entry, {
       status: "queued",
       queuedAt,
@@ -28,12 +35,12 @@ export class JobBook {
       finishedAt: undefined,
       error: undefined,
     });
-    this.#entries.set(buildId, entry);
+    this.#entries.set(key, entry);
   }
 
   /** Put a job back for redelivery (front for crash recovery so it is not starved by newer work). */
   requeue(job: PollableJob, options: { front: boolean }): void {
-    const entry = this.#entries.get(job.buildId);
+    const entry = this.#entries.get(entryKey(job));
     if (entry) {
       entry.status = "queued";
       entry.startedAt = undefined;
@@ -64,12 +71,12 @@ export class JobBook {
     this.#receipts += 1;
     const delivered = { ...job, receipt: `r${this.#receipts}` };
     this.#inFlight.set(delivered.receipt, delivered);
-    this.#markRunning(job.buildId);
+    this.#markRunning(job);
     return delivered;
   }
 
-  #markRunning(buildId: string): void {
-    const entry = this.#entries.get(buildId);
+  #markRunning(job: CaptureJob): void {
+    const entry = this.#entries.get(entryKey(job));
     if (entry) {
       entry.status = "running";
       entry.startedAt = new Date().toISOString();
@@ -97,8 +104,8 @@ export class JobBook {
     return jobs;
   }
 
-  finish(buildId: string, status: "completed" | "failed", error?: string): void {
-    const entry = this.#entries.get(buildId);
+  finish(job: CaptureJob, status: "completed" | "failed", error?: string): void {
+    const entry = this.#entries.get(entryKey(job));
     if (entry) {
       entry.status = status;
       entry.finishedAt = new Date().toISOString();
@@ -109,8 +116,9 @@ export class JobBook {
   /** Record a build that never entered the book as failed (nothing could run it). */
   reject(job: CaptureJob, error: string): void {
     const now = new Date().toISOString();
-    this.#entries.set(job.buildId, {
+    this.#entries.set(entryKey(job), {
       buildId: job.buildId,
+      ...(job.shard ? { shard: job.shard } : {}),
       status: "failed",
       queuedAt: now,
       finishedAt: now,
@@ -118,8 +126,8 @@ export class JobBook {
     });
   }
 
-  forget(buildId: string): void {
-    this.#entries.delete(buildId);
+  forget(job: CaptureJob): void {
+    this.#entries.delete(entryKey(job));
   }
 
   status(buildId: string): QueueEntry | null {

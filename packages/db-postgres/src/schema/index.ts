@@ -14,6 +14,7 @@ import {
   captureAttempts as captureAttemptsTable,
   captureLogs as captureLogsTable,
 } from "./capture-attempt.ts";
+import { captureShards as captureShardsTable } from "./capture-shard.ts";
 import { comments as commentsTable } from "./comment.ts";
 import { userConnections as userConnectionsTable } from "./connection.ts";
 import { contentRefs as contentRefsTable } from "./content-refs.ts";
@@ -48,6 +49,7 @@ import { webhooks as webhooksTable } from "./webhook.ts";
 
 export { builds } from "./build.ts";
 export { captureAttempts, captureLogs } from "./capture-attempt.ts";
+export { captureShards } from "./capture-shard.ts";
 export { baselines } from "./baseline.ts";
 export { comments } from "./comment.ts";
 export { buildLabels, labelTypes } from "./label.ts";
@@ -115,6 +117,7 @@ export const schema: {
   builds: AnyPgTable;
   captureAttempts: AnyPgTable;
   captureLogs: AnyPgTable;
+  captureShards: AnyPgTable;
   snapshots: AnyPgTable;
   baselines: AnyPgTable;
   comments: AnyPgTable;
@@ -144,6 +147,7 @@ export const schema: {
   builds: buildsTable,
   captureAttempts: captureAttemptsTable,
   captureLogs: captureLogsTable,
+  captureShards: captureShardsTable,
   snapshots: snapshotsTable,
   baselines: baselinesTable,
   comments: commentsTable,

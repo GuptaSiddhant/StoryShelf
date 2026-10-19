@@ -305,6 +305,12 @@ export interface ShelfCaptureOptions {
    */
   workerEntry?: string;
   /**
+   * Split a big build across the queue: captures (story x viewport x engine) per shard. A build of
+   * up to twice this size still renders in one piece. Unset keeps every build in one job. Needs
+   * `runner`; not yet supported with `workerEntry`.
+   */
+  shardSize?: number;
+  /**
    * Where captures run. `auto` (default) forks when `workerEntry` is set and the host can afford
    * a second process; `in-process` never forks; `fork` forks regardless of the host and fails at
    * boot if it cannot.

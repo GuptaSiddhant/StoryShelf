@@ -50,6 +50,35 @@ export async function persistCapture(
   flakyFailedStoryIds: ReadonlySet<string> = new Set(),
   a11yFailedStoryIds: ReadonlySet<string> = new Set(),
 ): Promise<void> {
+  const sets = await persistRendered(
+    input,
+    renderFailedStoryIds,
+    flakyFailedStoryIds,
+    a11yFailedStoryIds,
+  );
+  for (const id of await persistInherited(input)) {
+    sets.failed.add(id);
+  }
+  await finalizeBuild(input, allStoryIds(input), sets.failed, sets.flaky, sets.a11y);
+}
+
+/** Blocking, flaky and a11y story ids a persist run ended with. */
+export interface PersistedSets {
+  failed: Set<string>;
+  flaky: Set<string>;
+  a11y: Set<string>;
+}
+
+/**
+ * Persist the rendered captures only: screenshots, diffs and snapshot rows, without the
+ * inherited snapshots or the build finalize. A sharded capture runs this once per shard.
+ */
+export async function persistRendered(
+  input: CaptureContext,
+  renderFailedStoryIds: ReadonlySet<string> = new Set(),
+  flakyFailedStoryIds: ReadonlySet<string> = new Set(),
+  a11yFailedStoryIds: ReadonlySet<string> = new Set(),
+): Promise<PersistedSets> {
   const ctx = await withFreshBrowsers(input);
   const failedStoryIds = new Set(renderFailedStoryIds);
   const flakyIds = new Set(flakyFailedStoryIds);
@@ -117,10 +146,7 @@ export async function persistCapture(
       );
     }
   }
-  for (const id of await persistInherited(ctx)) {
-    failedStoryIds.add(id);
-  }
-  await finalize(ctx, allStoryIds(ctx), failedStoryIds, flakyIds, a11yIds);
+  return { failed: failedStoryIds, flaky: flakyIds, a11y: a11yIds };
 }
 
 /** Engines of this run, primary (first) first. */
@@ -145,8 +171,8 @@ function capturesByPhase(ctx: CaptureContext): RenderedSnapshot[][] {
   return rest.length > 0 ? [first, rest] : [first];
 }
 
-/** Mark secondary engines with no baseline yet: their first snapshots bootstrap. */
-async function withFreshBrowsers(ctx: CaptureContext): Promise<CaptureContext> {
+/** Secondary engines with no baseline yet (their first snapshots bootstrap from the primary). */
+export async function freshBrowsersOf(ctx: CaptureContext): Promise<Set<string>> {
   const primary = primaryBrowser(ctx);
   const baselines = new BaselineModel(ctx.db, ctx.tables, ctx.storage, ctx.secret);
   const secondary = runBrowsers(ctx).filter((browser) => browser !== primary);
@@ -156,7 +182,12 @@ async function withFreshBrowsers(ctx: CaptureContext): Promise<CaptureContext> {
       fresh: !(await baselines.hasAny(ctx.project.id, browser)),
     })),
   );
-  return { ...ctx, freshBrowsers: new Set(checks.filter((c) => c.fresh).map((c) => c.browser)) };
+  return new Set(checks.filter((check) => check.fresh).map((check) => check.browser));
+}
+
+/** Mark secondary engines with no baseline yet: their first snapshots bootstrap. */
+async function withFreshBrowsers(ctx: CaptureContext): Promise<CaptureContext> {
+  return ctx.freshBrowsers ? ctx : { ...ctx, freshBrowsers: await freshBrowsersOf(ctx) };
 }
 
 /**
@@ -200,7 +231,8 @@ async function tryPersistInherited(
 }
 
 /** Persist inherited snapshots; a failure marks the story failed. */
-async function persistInherited(ctx: CaptureContext): Promise<ReadonlySet<string>> {
+/** Persist the inherited snapshots (stories reusing their baseline); returns the story ids that failed. */
+export async function persistInherited(ctx: CaptureContext): Promise<ReadonlySet<string>> {
   const outcomes = await mapLimit(
     ctx.inherited ?? [],
     PERSIST_CONCURRENCY,
@@ -273,7 +305,7 @@ export interface CaptureContext {
   viewports: Viewport[];
   /** Engines captured this run, primary first (default: chromium only). */
   browsers?: string[];
-  /** Internal: secondary engines with no baselines yet (set by `persistCapture`). */
+  /** Secondary engines with no baselines yet; worked out by `persistCapture`, or fixed up front by a shard plan. */
   freshBrowsers?: ReadonlySet<string>;
   /** Screenshot buffers produced by the capture renderer. */
   captures: RenderedSnapshot[];
@@ -569,7 +601,11 @@ function finalBuildStatus(
   return "reviewing";
 }
 
-async function finalize(
+/**
+ * Close out a capture: roll the snapshot counts up, set the build's final status from the failed
+ * story ids, and (on the default branch) drop baselines of stories that no longer exist.
+ */
+export async function finalizeBuild(
   ctx: CaptureContext,
   storyIds: ReadonlySet<string>,
   failedStoryIds: ReadonlySet<string>,

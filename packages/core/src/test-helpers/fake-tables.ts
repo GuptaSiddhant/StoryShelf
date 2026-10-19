@@ -173,6 +173,23 @@ const captureAttempts = defineTable("capture_attempts", {
   updatedAt: "updated_at",
 });
 
+const captureShards = defineTable("capture_shards", {
+  id: "id",
+  projectId: "project_id",
+  buildId: "build_id",
+  kind: "kind",
+  ordinal: "ordinal",
+  status: "status",
+  attemptId: "attempt_id",
+  payload: "payload",
+  result: "result",
+  error: "error",
+  startedAt: "started_at",
+  finishedAt: "finished_at",
+  createdAt: "created_at",
+  updatedAt: "updated_at",
+});
+
 const captureLogs = defineTable("capture_logs", {
   id: "id",
   projectId: "project_id",
@@ -421,6 +438,7 @@ export const fakeSchema: Tables = {
   builds,
   captureAttempts,
   captureLogs,
+  captureShards,
   snapshots,
   baselines,
   comments,

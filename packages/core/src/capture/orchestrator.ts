@@ -10,24 +10,27 @@ import {
   type CaptureAttemptTables,
 } from "../models/capture-attempt.ts";
 import type { CaptureLogTables } from "../models/capture-log.ts";
-import { ProjectModel, type ProjectTables } from "../models/project.ts";
+import type { ProjectTables } from "../models/project.ts";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 import { parentContext, withSpan } from "../tracing.ts";
 import type { SecretInput } from "../utils/encrypt.ts";
 import { roundedTimings, runWithTimings, timed } from "../utils/timing.ts";
-import { DEFAULT_VIEWPORTS, isDisabledStory, isFlakyStory } from "./adapter.ts";
+import { DEFAULT_VIEWPORTS, isDisabledStory } from "./adapter.ts";
 import type { DiscoverOptions, Viewport } from "./adapter.ts";
 import { assertSupportedBrowsers, resolveBrowsers } from "./browsers.ts";
 import { logInvalidDesigns } from "./design.ts";
 import { assertModeCaps, enrichStories } from "./enrich.ts";
+import { classifyFailures } from "./failure-sets.ts";
 import { captureAcrossBrowsers } from "./matrix.ts";
 import { parseModesAllowlist } from "./modes.ts";
 import { persistCapture, type PipelineTables } from "./pipeline.ts";
 import { removeBuildScratch } from "./scratch.ts";
+import { fanOutCapture } from "./shards/fan-out.ts";
 import { resolveViewports } from "./sizing.ts";
 import { extractStorybookToScratch, persistStorybookStatics } from "./statics.ts";
 import { StorybookAdapter } from "./storybook.ts";
+import { loadTarget } from "./target.ts";
 
 /** Table handles required by the orchestrator. */
 export type OrchestratorTables = BuildTables &
@@ -51,12 +54,38 @@ export interface CaptureJobOptions {
   design?: DesignProvider[];
   /** Render budget override (tests use a short fuse). */
   renderTimeoutMs?: number | undefined;
+  /**
+   * Target captures (story x viewport x engine) per shard. Unset turns sharding off; a build of up
+   * to twice this size still runs as one shard, in this process, exactly as without sharding.
+   */
+  shardSize?: number | undefined;
+  /**
+   * Puts a job on the capture queue. Sharding needs it to hand the shards out; without it every
+   * build runs in one piece.
+   */
+  enqueue?: ((job: ShardJob) => Promise<void>) | undefined;
+}
+
+/** A shard job: the build and the `capture_shards` row to render. */
+export interface ShardJob {
+  buildId: string;
+  shard: string;
+  reqId?: string | undefined;
+  traceparent?: string | undefined;
 }
 
 /** Parser over the configured design providers, or undefined when there are none. */
 function designParser(providers: DesignProvider[] | undefined): DiscoverOptions["parseDesignUrl"] {
   if (!providers || providers.length === 0) return undefined;
   return (raw) => parseDesignUrl(providers, raw)?.ref ?? null;
+}
+
+/** What a capture job reports: counts for the attempt row, and how many shards it handed out. */
+export interface CaptureSummary {
+  storyCount: number;
+  failedCount: number;
+  /** Set when the build was split: the shards are still to run and this job did not finish it. */
+  shards?: number;
 }
 
 /** Pointer to the attempt row owning this run's log history. */
@@ -93,7 +122,7 @@ export interface CaptureJobInput {
 export async function executeCaptureJob(
   input: CaptureJobInput,
   options: CaptureJobOptions,
-): Promise<{ storyCount: number; failedCount: number }> {
+): Promise<CaptureSummary> {
   const builds = new BuildModel(options.db, options.tables);
   const { build, project } = await loadTarget(options, input.buildId);
   return await withSpan(
@@ -123,7 +152,7 @@ async function runCapturePhases(
   builds: BuildModel,
   build: Build,
   project: Project,
-): Promise<{ storyCount: number; failedCount: number }> {
+): Promise<CaptureSummary> {
   const logger = options.logger?.child({
     buildId: input.buildId,
     reqId: input.reqId,
@@ -205,6 +234,22 @@ async function runCapturePhases(
     const stories = enriched.filter((s) => !isDisabledStory(s));
     assertModeCaps(stories, viewports);
 
+    // A big build is planned into shards that other workers render; this job's part ends there.
+    const fanned = await fanOutCapture({
+      options,
+      input,
+      build,
+      project,
+      stories,
+      viewports,
+      browsers,
+      logger,
+    });
+    if (fanned) {
+      await cleanScratch();
+      return fanned;
+    }
+
     const renderStart = performance.now();
     const matrix = await timed(
       "capture.render",
@@ -244,15 +289,11 @@ async function runCapturePhases(
       rendered: matrix.renderCount,
     });
 
-    const flakyStoryIds = new Set(stories.filter((s) => isFlakyStory(s)).map((s) => s.id));
-    const blockingFailed = new Set<string>();
-    const flakyFailed = new Set<string>();
-    const a11yFailed = new Set<string>();
-    for (const f of result.failures) {
-      if (f.error.startsWith("a11y:")) a11yFailed.add(f.storyId);
-      else if (flakyStoryIds.has(f.storyId)) flakyFailed.add(f.storyId);
-      else blockingFailed.add(f.storyId);
-    }
+    const {
+      blocking: blockingFailed,
+      flaky: flakyFailed,
+      a11y: a11yFailed,
+    } = classifyFailures(stories, result.failures);
 
     const persistStart = performance.now();
     await timed(
@@ -315,19 +356,4 @@ function affectedPathsFor(build: Build): string[] | null {
     return null;
   }
   return BuildModel.affectedPaths(build);
-}
-
-async function loadTarget(
-  options: CaptureJobOptions,
-  buildId: string,
-): Promise<{ build: Build; project: Project }> {
-  const build = await new BuildModel(options.db, options.tables).get(buildId);
-  if (!build) {
-    throw new Error(`Build not found: ${buildId}`);
-  }
-  const project = await new ProjectModel(options.db, options.tables).get(build.projectId);
-  if (!project) {
-    throw new Error(`Project not found: ${build.projectId}`);
-  }
-  return { build, project };
 }

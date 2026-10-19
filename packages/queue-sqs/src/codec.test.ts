@@ -15,6 +15,11 @@ describe("serializeEnqueueBody", () => {
     expect(typeof body["queuedAt"]).toBe("string");
   });
 
+  it("round-trips the shard", () => {
+    const raw = serializeEnqueueBody({ buildId: "build-1", shard: "build-1:render:2" });
+    expect(parseBody(raw).shard).toBe("build-1:render:2");
+  });
+
   it("round-trips the traceparent", () => {
     const raw = serializeEnqueueBody({
       buildId: "build-1",

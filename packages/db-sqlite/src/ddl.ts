@@ -73,6 +73,24 @@ CREATE TABLE IF NOT EXISTS capture_attempts (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS capture_attempts_build_no_idx ON capture_attempts (build_id, attempt_no);
 CREATE INDEX IF NOT EXISTS capture_attempts_build_id_idx ON capture_attempts (build_id);
+CREATE TABLE IF NOT EXISTS capture_shards (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  build_id TEXT NOT NULL REFERENCES builds(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,
+  ordinal INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  attempt_id TEXT,
+  payload TEXT,
+  result TEXT,
+  error TEXT,
+  started_at TEXT,
+  finished_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS capture_shards_build_kind_ordinal_idx ON capture_shards (build_id, kind, ordinal);
+CREATE INDEX IF NOT EXISTS capture_shards_build_id_idx ON capture_shards (build_id);
 CREATE TABLE IF NOT EXISTS capture_logs (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,

@@ -6,6 +6,8 @@ export type JobStatus = "queued" | "running" | "completed" | "failed" | "cancell
 /** Observable state of a single capture queue entry. */
 export interface QueueEntry {
   buildId: string;
+  /** Set on the entry of a shard job; the build's own entry has none. */
+  shard?: string;
   status: JobStatus;
   queuedAt: string;
   startedAt?: string;
@@ -23,6 +25,11 @@ export interface CaptureJob {
    * instead of starting a root span; absent means start a new trace.
    */
   traceparent?: string;
+  /**
+   * `capture_shards` row to render. Absent on a build job, which plans the build (and, when it is
+   * big, hands out shard jobs) or captures it whole; every transport carries it through unchanged.
+   */
+  shard?: string;
 }
 
 /** A job polled from a queue with transport metadata. */

@@ -22,6 +22,7 @@ export function buildCoreMethods(
         buildId: job.buildId,
         reqId: job.reqId,
         traceparent: job.traceparent,
+        shard: job.shard,
         queuedAt: new Date().toISOString(),
         status: "queued",
         attempts: 0,

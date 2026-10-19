@@ -6,6 +6,7 @@ import type {
   QueueEntry,
 } from "../../adapters/capture-queue.ts";
 import type { Logger } from "../../logger.ts";
+import { entryKey } from "../queue.ts";
 import type { ChildProcessHandle } from "./channel.ts";
 import { CrashTracker } from "./crash-tracker.ts";
 import { JobBook, type DeliveredJob } from "./job-book.ts";
@@ -102,7 +103,7 @@ export class ForkedCaptureQueue implements CaptureQueue {
       await this.#divert(job);
       return;
     }
-    this.#routed.delete(job.buildId);
+    this.#routed.delete(entryKey(job));
     this.#book.add(job);
     this.#options.logger?.child({ buildId: job.buildId }).info("capture queued");
     this.#ensureChild();
@@ -240,7 +241,7 @@ export class ForkedCaptureQueue implements CaptureQueue {
   }
 
   #finish(job: PollableJob, outcome: ForkedJobOutcome): void {
-    this.#book.finish(job.buildId, outcome.status, outcome.error);
+    this.#book.finish(job, outcome.status, outcome.error);
     this.#options.onSettled?.(job, outcome).catch((error: unknown) => {
       this.#options.logger?.error({ err: error, buildId: job.buildId }, "settle hook failed");
     });
@@ -298,9 +299,12 @@ export class ForkedCaptureQueue implements CaptureQueue {
     );
     this.#close();
     for (const job of this.#book.drain()) {
-      this.#divert({ buildId: job.buildId, reqId: job.reqId, traceparent: job.traceparent }).catch(
-        () => {},
-      );
+      this.#divert({
+        buildId: job.buildId,
+        reqId: job.reqId,
+        traceparent: job.traceparent,
+        ...(job.shard ? { shard: job.shard } : {}),
+      }).catch(() => {});
     }
   }
 
@@ -310,8 +314,8 @@ export class ForkedCaptureQueue implements CaptureQueue {
       this.#book.reject(job, "capture child unavailable and no fallback queue");
       return;
     }
-    this.#book.forget(job.buildId);
-    this.#routed.add(job.buildId);
+    this.#book.forget(job);
+    this.#routed.add(entryKey(job));
     await fallback.enqueue(job);
   }
 

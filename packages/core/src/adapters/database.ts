@@ -17,6 +17,7 @@ export interface Tables {
   builds: Table;
   captureAttempts: Table;
   captureLogs: Table;
+  captureShards: Table;
   snapshots: Table;
   baselines: Table;
   comments: Table;

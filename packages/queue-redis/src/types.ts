@@ -25,6 +25,8 @@ export interface QueuedBody {
   attempts?: number;
   /** W3C traceparent continuing the enqueueing request's trace. */
   traceparent?: string;
+  /** The `capture_shards` row this job renders, when the build is sharded. */
+  shard?: string;
 }
 
 /** Shared per-queue runtime threaded through core and poll methods. */

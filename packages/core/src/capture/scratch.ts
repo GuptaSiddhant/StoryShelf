@@ -20,6 +20,34 @@ export function buildScratchDir(scratchDir: string, projectId: string, buildId: 
   return join(scratchDir, SCRATCH_DIRNAME, projectId, buildId);
 }
 
+/** Scratch directory of one shard of a build, inside the build's: shards of a build can share a host. */
+export function shardScratchDir(
+  scratchDir: string,
+  projectId: string,
+  buildId: string,
+  shardId: string,
+): string {
+  return join(buildScratchDir(scratchDir, projectId, buildId), "shards", shardId);
+}
+
+/** Remove one shard's scratch directory, leaving the build's other shards alone. Best effort. */
+export async function removeShardScratch(
+  scratchDir: string,
+  projectId: string,
+  buildId: string,
+  shardId: string,
+  logger?: Logger,
+): Promise<void> {
+  try {
+    await rm(shardScratchDir(scratchDir, projectId, buildId, shardId), {
+      recursive: true,
+      force: true,
+    });
+  } catch (error) {
+    logger?.warn({ err: error, buildId, shardId }, "failed to remove shard scratch directory");
+  }
+}
+
 /** Remove a build's scratch directory. Best effort: a failure is logged, never thrown. */
 export async function removeBuildScratch(
   scratchDir: string,

@@ -63,6 +63,20 @@ export class SnapshotModel {
   }
 
   /** List all snapshots belonging to a build. */
+  /**
+   * Delete a build's snapshots of some stories: a shard that is run again starts from a clean slate
+   * instead of colliding with rows an earlier, interrupted run left behind.
+   */
+  async removeForStories(buildId: string, storyIds: ReadonlySet<string>): Promise<number> {
+    const doomed = (await this.listByBuild(buildId)).filter((row) => storyIds.has(row.storyId));
+    await Promise.all(
+      doomed.map(async (row) => {
+        await this.db.remove(this.tables.snapshots, row.id);
+      }),
+    );
+    return doomed.length;
+  }
+
   async listByBuild(buildId: string): Promise<Snapshot[]> {
     return (await this.db.list(this.tables.snapshots, {
       where: eq(

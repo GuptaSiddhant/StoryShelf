@@ -150,6 +150,7 @@ function setupInProcessQueue(
 ): QueueWiring {
   // `normalizeShelfOptions` defaults scratchDir whenever a runner is set.
   const scratchDir = config.scratchDir ?? DEFAULT_SCRATCH_DIR;
+  const captureQueueRef: { current: CaptureQueue | null } = { current: null };
   const jobOptions: CaptureJobOptions = {
     db: options.database,
     tables: {
@@ -168,6 +169,11 @@ function setupInProcessQueue(
     logger,
     secret: credentialKeys(config),
     design: options.design,
+    shardSize: options.capture?.shardSize,
+    // The queue is built below, from these options; shards go back onto it.
+    enqueue: async (job) => {
+      await captureQueueRef.current?.enqueue(job);
+    },
   };
   const dispatchDeps: DispatchDeps = {
     db: options.database,
@@ -205,6 +211,7 @@ function setupInProcessQueue(
     },
   });
   const captureQueue = pickProcessQueue(options, config, logger, inProcessQueue);
+  captureQueueRef.current = captureQueue;
   const enqueueCapture = enqueuerFor(captureQueue);
   const recoverStuck = async (): Promise<RecoveryResult> => await recoverStuckCaptures(recovery);
   return { queue: captureQueue, enqueueCapture, recoverStuck };

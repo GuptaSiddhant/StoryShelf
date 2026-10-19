@@ -58,11 +58,27 @@ describe("resolveShelfOptions", () => {
   });
 });
 
+function shardSized(shardSize: number, extra = {}): () => void {
+  return () => {
+    resolveShelfOptions({ ...base, capture: { runner, shardSize, ...extra } });
+  };
+}
+
 describe("resolveShelfOptions capture process options", () => {
   it("requires a runner alongside workerEntry", () => {
     expect(() =>
       resolveShelfOptions({ ...base, capture: { workerEntry: "/app/capture-worker.ts" } }),
     ).toThrow(/requires capture\.runner/u);
+  });
+
+  it("validates shardSize", () => {
+    expect(shardSized(100)).not.toThrow();
+    expect(shardSized(0)).toThrow(/positive integer/u);
+    expect(shardSized(1.5)).toThrow(/positive integer/u);
+    expect(shardSized(10, { workerEntry: "/app/w.ts" })).toThrow(/workerEntry/u);
+    expect(() => resolveShelfOptions({ ...base, capture: { shardSize: 10 } })).toThrow(
+      /requires capture\.runner/u,
+    );
   });
 
   it('requires workerEntry for mode "fork"', () => {

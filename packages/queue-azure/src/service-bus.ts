@@ -190,7 +190,7 @@ async function serviceBusRecent(_limit: number): Promise<QueueEntry[]> {
 
 /** Copy optional string fields from a Service Bus body candidate. */
 function copyOptionalFields(
-  candidate: { reqId?: unknown; traceparent?: unknown },
+  candidate: { reqId?: unknown; traceparent?: unknown; shard?: unknown },
   queued: QueuedBody,
 ): void {
   if (typeof candidate.reqId === "string") {
@@ -198,6 +198,9 @@ function copyOptionalFields(
   }
   if (typeof candidate.traceparent === "string") {
     queued.traceparent = candidate.traceparent;
+  }
+  if (typeof candidate.shard === "string") {
+    queued.shard = candidate.shard;
   }
 }
 
@@ -207,7 +210,12 @@ function toQueuedBody(body: unknown): QueuedBody {
     return parseBody(body);
   }
   if (typeof body === "object" && body !== null) {
-    const candidate = body as { buildId?: unknown; reqId?: unknown; traceparent?: unknown };
+    const candidate = body as {
+      buildId?: unknown;
+      reqId?: unknown;
+      traceparent?: unknown;
+      shard?: unknown;
+    };
     if (typeof candidate.buildId === "string") {
       const queued: QueuedBody = { buildId: candidate.buildId };
       copyOptionalFields(candidate, queued);
@@ -253,6 +261,7 @@ async function pollServiceBus(
     buildId: body.buildId,
     reqId: body.reqId,
     traceparent: body.traceparent,
+    shard: body.shard,
     receipt: typeof msg.messageId === "string" ? msg.messageId : undefined,
     attempts: Math.max(0, (msg.deliveryCount ?? 1) - 1),
     leaseMs: lockWindowMs(msg),
