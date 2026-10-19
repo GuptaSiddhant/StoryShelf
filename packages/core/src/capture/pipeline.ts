@@ -21,7 +21,7 @@ import { assertScreenshotBuffer } from "./guards.ts";
 import { infraHashFor, SIZING_DEFAULTS } from "./sizing.ts";
 
 /** Snapshots persisted at once: each decodes two PNGs for the diff, so unbounded fan-out spikes memory. */
-const PERSIST_CONCURRENCY = 4;
+export const PERSIST_CONCURRENCY = 4;
 
 /**
  * Persist a completed capture run: write screenshots, diff against the branch

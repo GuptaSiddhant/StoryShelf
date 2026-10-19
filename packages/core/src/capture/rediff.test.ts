@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/index.ts";
+import { PERSIST_CONCURRENCY } from "./pipeline.ts";
 import { rediffBuild } from "./rediff.ts";
 
 const T1 = "2026-01-01T00:00:00.000Z";
@@ -162,5 +163,61 @@ describe("rediffBuild", () => {
     const row = await db.get(db.tables.snapshots, "s1");
     expect(row?.status).toBe("unchanged");
     expect(row?.baselineId).toBe("bl-main");
+  });
+
+  it("bounds how many snapshots are diffed at once", async () => {
+    const { db, storage, objects } = await setup();
+    const count = PERSIST_CONCURRENCY * 4;
+    const ids = Array.from({ length: count }, (_unused, index) => `extra-${index}`);
+    await Promise.all(
+      ids.map(async (id) => {
+        objects.set(`baselines/main/${id}.png`, png(GREEN));
+        objects.set(`shots/${id}.png`, png(GREEN));
+        await db.insert(db.tables.baselines, {
+          id: `bl-${id}`,
+          projectId: "p1",
+          storyId: id,
+          viewportName: "desktop",
+          branch: "main",
+          snapshotId: "s0",
+          screenshotPath: `baselines/main/${id}.png`,
+          createdAt: T1,
+          updatedAt: T2,
+        });
+        await db.insert(db.tables.snapshots, {
+          id,
+          projectId: "p1",
+          buildId: "f1",
+          storyId: id,
+          storyName: id,
+          storyTitle: "T",
+          viewportName: "desktop",
+          screenshotPath: `shots/${id}.png`,
+          status: "changed",
+          baselineId: `bl-${id}`,
+          baselineVersion: T1,
+          inherited: false,
+          createdAt: T1,
+          updatedAt: T1,
+        });
+      }),
+    );
+
+    let inFlight = 0;
+    let peak = 0;
+    const read = storage.read.bind(storage);
+    storage.read = async (path) => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      inFlight -= 1;
+      return await read(path);
+    };
+
+    const result = await rediffBuild({ db, storage }, project, build);
+
+    expect(result.rediffed).toBe(count + 1);
+    expect(peak).toBeGreaterThan(1);
+    expect(peak).toBeLessThanOrEqual(PERSIST_CONCURRENCY);
   });
 });
