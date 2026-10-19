@@ -11,8 +11,8 @@ import {
   DEFAULT_RECYCLE_BROWSER_EVERY,
   chunk,
   describeSizing,
-  mapLimit,
-  recommendedPageConcurrency,
+  createPageLimiter,
+  isTimeoutError,
 } from "@storyshelf/core/utils";
 import type { Browser } from "puppeteer-core";
 import puppeteer from "puppeteer-core";
@@ -116,15 +116,40 @@ async function runAllCaptures(
   );
   // Batches drain in-flight pages, so the browser can be swapped between them.
   const batches = chunk(jobs, input.recycleBrowserEvery ?? DEFAULT_RECYCLE_BROWSER_EVERY);
+  const pages = createPageLimiter({
+    concurrency: input.concurrency,
+    browser: input.browser,
+    logger: input.logger,
+  });
+  try {
+    await runBatches(batches, pages, input, active, ctx, { captures, failures, relaunch });
+  } finally {
+    pages.dispose();
+  }
+}
+
+async function runBatches(
+  batches: { story: StoryEntry; viewport: Viewport }[][],
+  pages: ReturnType<typeof createPageLimiter>,
+  input: PuppeteerRenderInput,
+  active: ActiveRun,
+  ctx: CaptureContext,
+  out: {
+    captures: RenderedSnapshot[];
+    failures: RenderResult["failures"];
+    relaunch: () => Promise<Browser>;
+  },
+): Promise<void> {
   for (const [index, batch] of batches.entries()) {
     if (index > 0) {
       // oxlint-disable-next-line eslint/no-await-in-loop -- recycle only between drained batches
-      await recycleBrowser(active, ctx, relaunch, input.logger);
+      await recycleBrowser(active, ctx, out.relaunch, input.logger);
     }
     // oxlint-disable-next-line eslint/no-await-in-loop -- batches run one after another
-    await mapLimit(batch, input.concurrency ?? recommendedPageConcurrency(), async (job) => {
-      await captureOne(input, active, ctx, job.story, job.viewport, captures, failures);
-    });
+    await pages.each(
+      batch,
+      async (job) => await captureOne(input, active, ctx, job.story, job.viewport, out),
+    );
   }
 }
 
@@ -144,20 +169,22 @@ async function recycleBrowser(
   logger?.info({}, "browser recycled");
 }
 
+/** Capture one story x viewport; resolves to whether it timed out (failures are recorded, not thrown). */
 async function captureOne(
   input: PuppeteerRenderInput,
   active: ActiveRun,
   ctx: CaptureContext,
   story: StoryEntry,
   viewport: Viewport,
-  captures: RenderedSnapshot[],
-  failures: RenderResult["failures"],
-): Promise<void> {
+  out: { captures: RenderedSnapshot[]; failures: RenderResult["failures"] },
+): Promise<boolean> {
   if (active.cancelled) throw new Error("Capture cancelled");
   try {
-    await pushCapture(ctx, story, viewport, captures, failures, input);
+    await pushCapture(ctx, story, viewport, out.captures, out.failures, input);
+    return false;
   } catch (error) {
-    pushRenderFailure(failures, input, story.id, viewport.name, error);
+    pushRenderFailure(out.failures, input, story.id, viewport.name, error);
+    return isTimeoutError(error);
   }
 }
 

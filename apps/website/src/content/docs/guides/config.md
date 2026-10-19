@@ -22,16 +22,16 @@ Created by `storyshelf init` or `storyshelf create` (both fail if `.storybook/ma
 }
 ```
 
-| Field             | CLI flag                     | Env fallback      | Description                                                                                                                        |
-| ----------------- | ---------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `slug`            | `--slug`                     | `STORYSHELF_SLUG` | Project slug (required)                                                                                                            |
-| `url`             | `--url`                      | `STORYSHELF_URL`  | Server URL                                                                                                                         |
-| `buildDir`        | `--build-dir` / `-d`         | —                 | Built Storybook directory (default `storybook-static`). If missing or empty, `upload` will build                                   |
-| `buildCommand`    | `--build-command`            | —                 | Custom build command (e.g. `nx run app:build-storybook`). Mutually exclusive with `buildScriptName`                                |
-| `buildScriptName` | `--build-script-name` / `-b` | —                 | package script to run (default `build-storybook`)                                                                                     |
-| `skip`            | `--skip`                     | —                 | Glob to skip upload (e.g. `"main"`, `"release/*"`). `branch` matched via `picomatch`; when matched `upload` exits 0 without `POST` |
-| `affectedOnly`    | `--full` (opt-out)           | `STORYSHELF_FULL=1` (opt-out) | Render only impacted stories (default `true`). See [Affected capture](/concepts/affected-capture/)                     |
-| `untraced`          | `--untraced` (union)         | —                 | Trace exclusions, combined with `--untraced` flags. See [Affected capture](/concepts/affected-capture/) |
+| Field             | CLI flag                     | Env fallback                  | Description                                                                                                                        |
+| ----------------- | ---------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `slug`            | `--slug`                     | `STORYSHELF_SLUG`             | Project slug (required)                                                                                                            |
+| `url`             | `--url`                      | `STORYSHELF_URL`              | Server URL                                                                                                                         |
+| `buildDir`        | `--build-dir` / `-d`         | —                             | Built Storybook directory (default `storybook-static`). If missing or empty, `upload` will build                                   |
+| `buildCommand`    | `--build-command`            | —                             | Custom build command (e.g. `nx run app:build-storybook`). Mutually exclusive with `buildScriptName`                                |
+| `buildScriptName` | `--build-script-name` / `-b` | —                             | package script to run (default `build-storybook`)                                                                                  |
+| `skip`            | `--skip`                     | —                             | Glob to skip upload (e.g. `"main"`, `"release/*"`). `branch` matched via `picomatch`; when matched `upload` exits 0 without `POST` |
+| `affectedOnly`    | `--full` (opt-out)           | `STORYSHELF_FULL=1` (opt-out) | Render only impacted stories (default `true`). See [Affected capture](/concepts/affected-capture/)                                 |
+| `untraced`        | `--untraced` (union)         | —                             | Trace exclusions, combined with `--untraced` flags. See [Affected capture](/concepts/affected-capture/)                            |
 
 **Note:** `buildDir` default is Storybook's default `storybook-static` unless `buildDir` is set in file. `buildCommand` and `buildScriptName` are mutually exclusive (validated by `zod` `refine`).
 
@@ -83,6 +83,11 @@ Each upload resolves `packagePath` (`relative(cwd, dirname(.storybook))`) and is
 - **Server `ShelfConfig` / DB `projects`** (`core/src/config.ts:48`, `core/src/schema.ts:5`): `secret` (see [rotating it](/guides/deployment/secret-rotation/)), `previousSecret`, `migrateCredentialsOnBoot`, `captureConcurrency`, `scratchDir`, `purgeTtlDays`, `branchTtlDays`, `branchGcIntervalMs`, `maxUploadBytes`, `maxInlineUnzipSize`, `viewports`, `browser` (per-project capture engine: `chromium`/`firefox`/`webkit`/`chrome`), `pixel_threshold`, `storybook_meta` (`framework/addons/storiesGlobs/packagePath` auto-detected at `create`).
 
 Uploads at or under `maxInlineUnzipSize` bytes are extracted inline so the published Storybook preview is live on response; larger uploads wait for capture. Leave it unset (the default) to always wait for capture — required on diskless hosts.
+
+### Capture performance tuning
+
+- `captureConcurrency` pins how many pages render at once. Left unset, the runner starts from a CPU/memory-sized budget (Firefox and WebKit pages count as two Chromium slots) and adapts: it raises the limit while capture latency and event-loop lag stay flat, halves it on timeouts, and logs every change as `capture concurrency adjusted`.
+- `STORYSHELF_DIFF_WORKERS` sets how many worker threads compare screenshots (default: CPU count minus one, minimum 1). `0` diffs on the main thread. The pool serves both capture and the re-diff endpoint, so it matters on servers that never render.
 
 ## Validation
 

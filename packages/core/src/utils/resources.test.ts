@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   describeSizing,
   detectResources,
+  engineWeight,
+  maxPageConcurrency,
   recommendedBuildConcurrency,
   recommendedNavigationTimeoutMs,
   recommendedPageConcurrency,
@@ -19,6 +21,32 @@ describe("recommendedPageConcurrency", () => {
     expect(recommendedPageConcurrency({ cpus: 2, memoryBytes: 4 * GB })).toBe(2);
     expect(recommendedPageConcurrency({ cpus: 16, memoryBytes: 64 * GB })).toBe(4);
     expect(recommendedPageConcurrency({ cpus: 8, memoryBytes: 1 * GB })).toBe(1);
+  });
+});
+
+describe("engine weights", () => {
+  it("counts Firefox and WebKit as two Chromium slots", () => {
+    expect(engineWeight("chromium")).toBe(1);
+    expect(engineWeight("chrome")).toBe(1);
+    expect(engineWeight("firefox")).toBe(2);
+    expect(engineWeight("webkit")).toBe(2);
+    expect(engineWeight()).toBe(1);
+  });
+
+  it("halves the page budget for heavier engines, never below one", () => {
+    const roomy = { cpus: 16, memoryBytes: 64 * GB };
+    expect(recommendedPageConcurrency(roomy, "chromium")).toBe(4);
+    expect(recommendedPageConcurrency(roomy, "firefox")).toBe(2);
+    expect(recommendedPageConcurrency({ cpus: 1, memoryBytes: 2 * GB }, "webkit")).toBe(1);
+  });
+
+  it("lets the adaptive ceiling exceed the CPU-sized start, bounded by memory", () => {
+    const host = { cpus: 2, memoryBytes: 8 * GB };
+    expect(recommendedPageConcurrency(host)).toBe(2);
+    expect(maxPageConcurrency(host)).toBe(4);
+    expect(maxPageConcurrency(host, "firefox")).toBe(2);
+    expect(maxPageConcurrency({ cpus: 8, memoryBytes: 1 * GB })).toBe(1);
+    expect(maxPageConcurrency({ cpus: 64, memoryBytes: 256 * GB })).toBe(8);
   });
 });
 

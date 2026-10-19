@@ -10,6 +10,7 @@ import {
 } from "@storyshelf/core/adapter/setup";
 import type { AdapterSetupResult } from "@storyshelf/core/adapter/setup";
 import type { ShelfOptions } from "@storyshelf/core/config";
+import { shutdownDiffPool } from "@storyshelf/core/diff";
 import type { Logger } from "@storyshelf/core/logger";
 import { purgeAiData } from "@storyshelf/core/retention";
 import { sanitizeErrorText } from "@storyshelf/core/utils";
@@ -222,6 +223,7 @@ function createLifecycle(
       await drainBackground(cell);
       await settleInsightJobs();
       await options.ai?.teardown();
+      await shutdownDiffPool();
       const result = await runAdapterTeardowns(collectTeardowns(options), ctx, logger);
       await options.observability?.shutdown().catch((error: unknown) => {
         logger.error({ err: error }, "observability shutdown failed");

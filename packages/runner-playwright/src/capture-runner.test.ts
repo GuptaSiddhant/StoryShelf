@@ -1,4 +1,5 @@
 import type { StoryEntry, Viewport } from "@storyshelf/core/adapter/capture-runner";
+import { maxPageConcurrency, recommendedPageConcurrency } from "@storyshelf/core/utils";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -115,7 +116,10 @@ const playwright = vi.hoisted(() => {
   };
 });
 
-vi.mock("playwright-core", () => ({ chromium: playwright.chromium }));
+vi.mock("playwright-core", () => ({
+  chromium: playwright.chromium,
+  firefox: playwright.chromium,
+}));
 
 const STORIES: StoryEntry[] = [
   {
@@ -315,6 +319,55 @@ describe("createPlaywrightCaptureRunner.render", () => {
 
     expect(result.captures).toHaveLength(12);
     expect(peak).toBe(3);
+  }, 30_000);
+
+  it("adapts page concurrency when none is configured, never above the ceiling", async () => {
+    let active = 0;
+    let peak = 0;
+    const adapter = {
+      name: "fake",
+      discover: async (): Promise<StoryEntry[]> => [],
+      buildUrl: (): string => "/",
+      waitForReady: async (): Promise<void> => {
+        active += 1;
+        peak = Math.max(peak, active);
+        await new Promise((resolve) => {
+          setTimeout(resolve, 2);
+        });
+        active -= 1;
+      },
+    };
+    const stories = Array.from({ length: 60 }, (_, i) => ({ ...STORIES[0]!, id: `s-${i}` }));
+    playwright.configureHang(false);
+    const result = await createPlaywrightCaptureRunner({}).render({
+      buildId: "build-1",
+      storybookDir,
+      stories,
+      viewports: VIEWPORTS,
+      adapter,
+    });
+
+    expect(result.captures).toHaveLength(60);
+    expect(peak).toBeGreaterThanOrEqual(1);
+    expect(peak).toBeLessThanOrEqual(maxPageConcurrency());
+  }, 30_000);
+
+  it("sizes the page budget by engine in the sizing log", async () => {
+    const info = vi.fn();
+    playwright.configureHang(false);
+    const logger = { info, debug: vi.fn(), warn: vi.fn(), error: vi.fn() } as never;
+    await createPlaywrightCaptureRunner({}).render({
+      buildId: "build-1",
+      storybookDir,
+      stories: STORIES,
+      viewports: VIEWPORTS,
+      browser: "firefox",
+      logger,
+    });
+    expect(info).toHaveBeenCalledWith(
+      expect.objectContaining({ pages: recommendedPageConcurrency(undefined, "firefox") }),
+      "capture sizing",
+    );
   }, 30_000);
 
   it("enriches parameters from the runtime preview once per run", async () => {
