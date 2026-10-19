@@ -10,11 +10,12 @@
  * whole-call `diffImages` timings and event-loop lag via a 5ms ticker plus `monitorEventLoopDelay`.
  * When the engine exports `diffImagesAsync` it is measured too (pooled, 4 in flight).
  *
- * --dist imports the built `packages/core/dist/diff/index.mjs` instead of the TS source.
+ * --entry <file> imports any diff module (e.g. an older engine for before/after runs).
+ * --dist imports the built `packages/core/dist/diff.mjs` instead of the TS source.
  */
 import { createRequire } from "node:module";
-import { monitorEventLoopDelay, performance } from "node:perf_hooks";
 import { dirname, join } from "node:path";
+import { monitorEventLoopDelay, performance } from "node:perf_hooks";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -25,11 +26,19 @@ const { PNG } = require("pngjs");
 
 const args = process.argv.slice(2);
 const runs = Number(args[args.indexOf("--runs") + 1]) || 15;
-const entry = args.includes("--dist")
-  ? join(core, "dist/diff/index.mjs")
-  : join(core, "src/diff/index.ts");
+const entryArg = args[args.indexOf("--entry") + 1];
+const entry = args.includes("--entry")
+  ? entryArg
+  : args.includes("--dist")
+    ? join(core, "dist/diff.mjs")
+    : join(core, "src/diff/index.ts");
 const diff = await import(pathToFileURL(entry).href);
-const OPTIONS = { pixelThreshold: 0.1, maxDiffRatio: 0.01, includeAntialiasing: false, failOnSizeChange: true };
+const OPTIONS = {
+  pixelThreshold: 0.1,
+  maxDiffRatio: 0.01,
+  includeAntialiasing: false,
+  failOnSizeChange: true,
+};
 
 /** Small deterministic PRNG so every run benchmarks identical bytes. */
 function rng(seed) {
@@ -55,7 +64,7 @@ function fill(png, x0, y0, w, h, [r, g, b]) {
 }
 
 /** White page with card rows, "text" bars and a gradient header: compresses like a real screenshot. */
-function render(width, height, { shift = 0 } = {}) {
+function render(width, height, { shift = 0, block = 0 } = {}) {
   const png = new PNG({ width, height });
   const rand = rng(1234);
   fill(png, 0, 0, width, height, [255, 255, 255]);
@@ -73,6 +82,10 @@ function render(width, height, { shift = 0 } = {}) {
   if (shift) {
     fill(png, 56, 104, 400 + shift, 10, [200, 40, 40]);
   }
+  // A large block, so the diff exceeds maxDiffRatio and fails (the overlay then has to be encoded).
+  if (block) {
+    fill(png, 0, 64, width, Math.round(height * block), [20, 160, 60]);
+  }
   return png;
 }
 
@@ -82,7 +95,8 @@ const sizes = [
 ];
 
 const mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
-const p95 = (xs) => xs.toSorted((a, b) => a - b)[Math.min(xs.length - 1, Math.floor(xs.length * 0.95))];
+const p95 = (xs) =>
+  xs.toSorted((a, b) => a - b)[Math.min(xs.length - 1, Math.floor(xs.length * 0.95))];
 const ms = (n) => n.toFixed(1).padStart(8);
 
 function timed(fn) {
@@ -137,6 +151,7 @@ console.log(`entry: ${entry}\nruns per case: ${runs}, node ${process.version}\n`
 for (const { label, width, height } of sizes) {
   const baseline = PNG.sync.write(render(width, height));
   const changed = PNG.sync.write(render(width, height, { shift: 120 }));
+  const failing = PNG.sync.write(render(width, height, { block: 0.05 }));
   console.log(`== ${label}  (png ${(baseline.length / 1024).toFixed(0)} KiB) ==`);
 
   const s = stageTimings(baseline, changed);
@@ -150,6 +165,7 @@ for (const { label, width, height } of sizes) {
   for (const [name, a, b] of [
     ["identical", baseline, Buffer.from(baseline)],
     ["changed", baseline, changed],
+    ["failing", baseline, failing],
   ]) {
     const times = [];
     for (let i = 0; i < runs; i += 1) {
@@ -159,14 +175,16 @@ for (const { label, width, height } of sizes) {
   }
 
   // 16 diffs, 4 in flight: the shape persistCapture produces. Lag = how long the loop stalls.
-  const batch = Array.from({ length: 16 }, () => [baseline, changed]);
+  const batch = Array.from({ length: 16 }, () => [baseline, failing]);
   const syncRun = await lagWhile(async () => {
     for (let i = 0; i < batch.length; i += 4) {
-      await Promise.all(batch.slice(i, i + 4).map(async ([a, b]) => diff.diffImages(a, b, OPTIONS)));
+      await Promise.all(
+        batch.slice(i, i + 4).map(async ([a, b]) => diff.diffImages(a, b, OPTIONS)),
+      );
     }
   });
   console.log(
-    `16 diffs sync  wall ${ms(syncRun.wall)}   longest stall ${ms(syncRun.lagMax)}  delay p99 ${ms(syncRun.lagP99)}`,
+    `16 failing diffs sync  wall ${ms(syncRun.wall)}   longest stall ${ms(syncRun.lagMax)}  delay p99 ${ms(syncRun.lagP99)}`,
   );
   if (diff.diffImagesAsync) {
     // Copies: the pool transfers (detaches) the buffers it is given.
@@ -180,7 +198,7 @@ for (const { label, width, height } of sizes) {
       }
     });
     console.log(
-      `16 diffs async wall ${ms(asyncRun.wall)}   longest stall ${ms(asyncRun.lagMax)}  delay p99 ${ms(asyncRun.lagP99)}`,
+      `16 failing diffs async wall ${ms(asyncRun.wall)}   longest stall ${ms(asyncRun.lagMax)}  delay p99 ${ms(asyncRun.lagP99)}`,
     );
   }
   console.log();

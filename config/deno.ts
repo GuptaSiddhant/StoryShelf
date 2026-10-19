@@ -149,6 +149,14 @@ function refreshImports(pkgRoot: string, deno: Record<string, unknown>): void {
   }
 }
 
+/** Entries minus the string patterns in tsdown's `exports.exclude` (internal-only build entries). */
+function withoutExcluded(config: ResolvedConfig): Record<string, string> {
+  const excluded = config.exports ? (config.exports.exclude ?? []) : [];
+  return Object.fromEntries(
+    Object.entries(config.entry).filter(([key]) => !excluded.includes(key)),
+  );
+}
+
 /**
  * tsdown `onSuccess` hook: derive JSR `exports` from the resolved tsdown entry map
  * and write them to the package's `deno.json` for TypeScript-source publishing.
@@ -176,5 +184,5 @@ export function generateDenoConfig(config: ResolvedConfig): void {
     manifest.name,
     String(manifest.pkg["version"] ?? "0.0.0"),
   );
-  writeDenoManifest(pkgRoot, denoPath, deno, config.entry);
+  writeDenoManifest(pkgRoot, denoPath, deno, withoutExcluded(config));
 }

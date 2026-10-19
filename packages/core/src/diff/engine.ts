@@ -87,7 +87,7 @@ const IHDR_END = 24;
  * return null so the regular path reports the decode error as before. A direct byte comparison
  * is used instead of hashing both buffers: it is exact and cheaper than two digests.
  */
-function identicalResult(baseline: Buffer, current: Buffer): DiffResult | null {
+export function identicalResult(baseline: Buffer, current: Buffer): DiffResult | null {
   if (
     baseline.length < IHDR_END ||
     !baseline.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE) ||
