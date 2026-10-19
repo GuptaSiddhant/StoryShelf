@@ -1,6 +1,7 @@
 import { swaggerUI } from "@hono/swagger-ui";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { AdapterLifecycleError, validateBootAssembly } from "@storyshelf/core/adapter/setup";
+import { sweepOrphanedScratch } from "@storyshelf/core/capture";
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 /**
  * StoryShelf app: compose database, storage, capture, auth, and git-host
@@ -100,6 +101,26 @@ function recoverAfterSetup(
   );
 }
 
+/** Remove scratch dirs a crash left behind; filesystem only, so it never waits on adapters. */
+function sweepScratchOnBoot(
+  cell: LifecycleCell,
+  scratchDir: string | undefined,
+  logger: Logger,
+): void {
+  if (!scratchDir) {
+    return;
+  }
+  trackBackground(
+    cell,
+    sweepOrphanedScratch(scratchDir, { logger }).then(
+      () => {},
+      (error: unknown) => {
+        logger.warn({ err: error }, "scratch sweep failed");
+      },
+    ),
+  );
+}
+
 /** Boot-time checks that run once adapters are ready: stuck-capture recovery and credential state. */
 function runAfterSetup(
   cell: LifecycleCell,
@@ -108,6 +129,7 @@ function runAfterSetup(
   recoverStuck: (() => Promise<unknown>) | undefined,
 ): void {
   recoverAfterSetup(cell, recoverStuck, runtime.logger);
+  sweepScratchOnBoot(cell, runtime.config.scratchDir, runtime.logger);
   checkCredentialsAfterSetup(cell, scoped.database, runtime.config, runtime.logger);
 }
 

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 const run = vi.hoisted(() => ({ fn: vi.fn() }));
 vi.mock("@storyshelf/core/capture", () => ({
   createDispatchJob: () => run.fn,
+  sweepOrphanedScratch: async () => 0,
 }));
 
 const sleep = async (ms: number): Promise<void> => {

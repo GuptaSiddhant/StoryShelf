@@ -1,5 +1,5 @@
 import AdmZip from "adm-zip";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -10,6 +10,7 @@ import { ProjectModel } from "../models/project.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { storybookDir, storybookZipPath } from "../utils/paths.ts";
 import { executeCaptureJob } from "./orchestrator.ts";
+import { buildScratchDir } from "./scratch.ts";
 
 function tables(db: DatabaseAdapter) {
   return {
@@ -126,6 +127,13 @@ async function setupBrowsers(projectPatch: Record<string, unknown>): Promise<{
   };
 }
 
+async function scratchExists(projectId: string, buildId: string): Promise<boolean> {
+  return await readdir(buildScratchDir(scratchDir, projectId, buildId)).then(
+    () => true,
+    () => false,
+  );
+}
+
 describe("executeCaptureJob", () => {
   it("loads the target, extracts, renders, and persists the capture end to end", async () => {
     const { db } = makeDatabase();
@@ -149,6 +157,7 @@ describe("executeCaptureJob", () => {
     expect(render).toHaveBeenCalledTimes(1);
     const rows = await db.list(db.tables.snapshots);
     expect(rows.map((row) => row.storyName)).toEqual(["Primary"]);
+    expect(await scratchExists(project.id, build.id)).toBe(false);
   });
 
   it("stores streamed captures as they arrive and persists them without re-writing", async () => {
@@ -504,6 +513,8 @@ describe("executeCaptureJob", () => {
     ).rejects.toThrow("browser exploded");
 
     expect(await storage.exists(`${storybookDir(project.id, build.id)}/iframe.html`)).toBe(true);
+    // Scratch is gone even though the capture failed; persisted statics remain in storage.
+    expect(await scratchExists(project.id, build.id)).toBe(false);
     const failedBuild = await db.get(db.tables.builds, build.id);
     expect(failedBuild?.status).toBe("failed");
   });

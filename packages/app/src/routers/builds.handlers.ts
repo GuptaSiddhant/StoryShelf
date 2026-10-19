@@ -2,7 +2,11 @@ import { z } from "@hono/zod-openapi";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import { emitWebhookEvent } from "@storyshelf/core/adapter/webhook-events";
-import { extractStorybookToScratch, persistStorybookStatics } from "@storyshelf/core/capture";
+import {
+  extractStorybookToScratch,
+  persistStorybookStatics,
+  removeBuildScratch,
+} from "@storyshelf/core/capture";
 import type { Logger } from "@storyshelf/core/logger";
 import { BaselineModel } from "@storyshelf/core/models";
 import { BuildModel } from "@storyshelf/core/models";
@@ -145,6 +149,8 @@ export async function persistInlineStatics(
     logger.info({ buildId, size }, "upload statics persisted inline");
   } catch (error) {
     logger.error({ err: error, buildId }, "inline statics persist failed; capture will backfill");
+  } finally {
+    await removeBuildScratch(scratchDir, projectId, buildId, logger);
   }
 }
 

@@ -8,7 +8,7 @@ import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { DesignProvider } from "@storyshelf/core/adapter/design";
 import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
-import { createDispatchJob } from "@storyshelf/core/capture";
+import { createDispatchJob, sweepOrphanedScratch } from "@storyshelf/core/capture";
 import type { CaptureJobOptions, DispatchDeps } from "@storyshelf/core/capture";
 import { createShelfLogger, type Logger } from "@storyshelf/core/logger";
 import { roundedTimings, runWithTimings } from "@storyshelf/core/utils";
@@ -350,6 +350,9 @@ export function createCaptureWorker(options: WorkerOptions): WorkerHandle {
         return;
       }
       running = true;
+      await sweepOrphanedScratch(options.scratchDir, { logger }).catch((error: unknown) => {
+        logger.warn({ err: error }, "scratch sweep failed");
+      });
       loopPromise = loop();
       // Keep start() pending until stop() is called; loop() runs in background
       await new Promise<void>((resolve) => {

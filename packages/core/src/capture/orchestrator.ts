@@ -24,6 +24,7 @@ import { assertModeCaps, enrichStories } from "./enrich.ts";
 import { captureAcrossBrowsers } from "./matrix.ts";
 import { parseModesAllowlist } from "./modes.ts";
 import { persistCapture, type PipelineTables } from "./pipeline.ts";
+import { removeBuildScratch } from "./scratch.ts";
 import { resolveViewports } from "./sizing.ts";
 import { extractStorybookToScratch, persistStorybookStatics } from "./statics.ts";
 import { StorybookAdapter } from "./storybook.ts";
@@ -132,6 +133,16 @@ async function runCapturePhases(
 
   const startTime = performance.now();
   let extractedDir: string | undefined;
+  // Statics are persisted to storage once extracted; the copy on disk is only scratch. Removed as
+  // soon as rendering ends (before persist, so no I/O sits between the build's final status and the
+  // status fan-out) or on any failure, whichever comes first.
+  let scratchPending = true;
+  const cleanScratch = async (): Promise<void> => {
+    if (scratchPending) {
+      scratchPending = false;
+      await removeBuildScratch(options.scratchDir, project.id, build.id, logger);
+    }
+  };
   try {
     const extractStart = performance.now();
     extractedDir = await timed(
@@ -220,6 +231,7 @@ async function runCapturePhases(
           { "storyshelf.browsers": browsers.join(",") },
         ),
     );
+    await cleanScratch();
     const result = { captures: matrix.captures, failures: matrix.failures };
     const renderDuration = performance.now() - renderStart;
     logger?.info(
@@ -281,6 +293,7 @@ async function runCapturePhases(
     });
     return { storyCount: stories.length, failedCount: blockingFailed.size };
   } catch (error) {
+    await cleanScratch();
     const totalDuration = performance.now() - startTime;
     logger?.error({ durationMs: Math.round(totalDuration), err: error }, "capture failed");
     await emitAttemptLog(input.recordLog, logger, "error", "capture failed", {
