@@ -58,10 +58,13 @@ export {
 } from "./rediff.ts";
 export {
   INTERRUPTED_ERROR,
+  recoverStalledCapture,
   recoverStuckCaptures,
+  STALLED_ERROR,
   type RecoveryDeps,
   type RecoveryResult,
 } from "./recovery.ts";
+export { ProgressLease, type JobLease } from "./job-lease.ts";
 export { InMemoryCaptureQueue, type InMemoryCaptureQueueOptions } from "./queue.ts";
 export type { PollableCaptureQueue, PollableJob } from "../adapters/capture-queue.ts";
 export {

@@ -147,6 +147,21 @@ describe("createDispatchJob attempt history", () => {
     expect(first.map((row) => row.seq)).toEqual(first.map((_, index) => index + 1));
   });
 
+  it("touches the job lease on every attempt-log line", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const { project, build } = await seedBuild(db);
+    await storage.write(storybookZipPath(project.id, build.id), zipWithIndex());
+    const runJob = createDispatchJob(depsFor(db, storage, fakeRunner(successRender())));
+    const touch = vi.fn();
+
+    await runJob({ buildId: build.id }, { touch });
+
+    const attempts = await new CaptureAttemptModel(db, tables(db)).listByBuild(build.id);
+    const logs = await new CaptureLogModel(db, tables(db)).listByAttempt(attempts[0]?.id ?? "");
+    expect(touch.mock.calls.length).toBeGreaterThanOrEqual(logs.length);
+  });
+
   it("records a failed attempt with the full error text", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
