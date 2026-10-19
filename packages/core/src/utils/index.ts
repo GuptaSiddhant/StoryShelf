@@ -37,6 +37,7 @@ export { mapAdaptive } from "./map-adaptive.ts";
 export { chunk, mapLimit } from "./map-limit.ts";
 export {
   DEFAULT_RECYCLE_BROWSER_EVERY,
+  describeCaptureHost,
   describeSizing,
   detectResources,
   engineWeight,
@@ -44,6 +45,7 @@ export {
   recommendedBuildConcurrency,
   recommendedNavigationTimeoutMs,
   recommendedPageConcurrency,
+  type CaptureHostSummary,
   type HostResources,
 } from "./resources.ts";
 export { MIME_TYPES, mimeFor } from "./mime.ts";

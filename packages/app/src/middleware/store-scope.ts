@@ -22,6 +22,7 @@ export interface StoreScopeDeps {
   authEnabled: boolean;
   enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
   captureQueue: CaptureQueue | null;
+  captureConcurrency?: number;
   gitHosts: GitHostProvider[];
   design: DesignProvider[];
   notifiers: NotifierProvider[];
@@ -48,6 +49,7 @@ export function storeScope(deps: StoreScopeDeps) {
         sessionId: sessionIdFrom(c),
         enqueueCapture: deps.enqueueCapture,
         captureQueue: deps.captureQueue,
+        captureConcurrency: deps.captureConcurrency,
         gitHosts: deps.gitHosts,
         design: deps.design,
         notifiers: deps.notifiers,

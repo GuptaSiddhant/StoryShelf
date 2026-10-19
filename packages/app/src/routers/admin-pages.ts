@@ -1,5 +1,6 @@
 import type { AdapterSetupResult, AdapterSetupSources } from "@storyshelf/core/adapter/setup";
 import type { Auth } from "@storyshelf/core/auth";
+import { describeCaptureHost } from "@storyshelf/core/utils";
 import type { ShelfRouter } from "../app-types.ts";
 import { loadCredentialProbe, reencryptWithCurrent } from "../credentials.ts";
 import { insightDepsFromStore } from "../insights/deps.ts";
@@ -24,7 +25,7 @@ export interface AdminPageDeps {
 export function registerAdminPages(app: ShelfRouter, deps: AdminPageDeps, auth?: Auth): void {
   app.get("/admin", async (c) => {
     requireSiteAdmin(c);
-    const { authEnabled, config, db } = getStore();
+    const { authEnabled, config, db, captureQueue, captureConcurrency } = getStore();
     const credentials = await loadCredentialProbe(db, config);
     const report = await collectHealthReport(
       deps.sources,
@@ -43,6 +44,9 @@ export function registerAdminPages(app: ShelfRouter, deps: AdminPageDeps, auth?:
         authMethods,
         credentials,
         aiEnabled: getStore().ai !== undefined,
+        // Only an in-process queue captures on this host; remote queues size themselves elsewhere.
+        capture:
+          captureQueue?.metadata.kind === "memory" ? describeCaptureHost(captureConcurrency) : null,
       }),
     );
   });

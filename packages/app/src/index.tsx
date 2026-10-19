@@ -277,6 +277,7 @@ function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
       authEnabled,
       enqueueCapture,
       captureQueue: queue,
+      captureConcurrency: options.capture?.concurrency,
       gitHosts,
       design,
       notifiers,
