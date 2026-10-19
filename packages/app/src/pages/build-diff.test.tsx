@@ -202,3 +202,60 @@ describe("review page with several browsers", () => {
     expect(html).toMatch(/\/snapshots\/[A-Z0-9]+\/approve/u);
   });
 });
+
+const change = JSON.stringify({
+  changed: ["browserVersion"],
+  from: { engine: "chromium", browserVersion: "124.0.1" },
+  to: { engine: "chromium", browserVersion: "126.0.0" },
+});
+
+async function seedMigrated(db: Db, migrated: boolean): Promise<string> {
+  const project = await new ProjectModel(db).create({ name: "Env" });
+  const build = await new BuildModel(db).create(project.id, {
+    gitSha: "abc1234def",
+    gitBranch: "main",
+  });
+  const snapshots = new SnapshotModel(db);
+  const snap = await snapshots.create(project.id, build.id, {
+    storyId: "button--Primary",
+    storyName: "Primary",
+    storyTitle: "Button",
+    viewportName: "desktop",
+    viewportWidth: 1280,
+    viewportHeight: 720,
+    screenshotPath: "shots/Primary.png",
+    ...(migrated ? { envChange: change } : {}),
+  });
+  await snapshots.update(snap.id, { status: "unchanged" });
+  return `/projects/${project.slug}/builds/${build.id}/diff?snapshot=${snap.id}`;
+}
+
+async function pageWithMigration(migrated: boolean): Promise<string> {
+  const { db } = makeDatabase();
+  const { storage } = makeStorage();
+  const url = await seedMigrated(db, migrated);
+  const app = createShelfApp({
+    database: db,
+    storage,
+    logger: createShelfLogger({ level: "silent" }),
+  });
+  await app.lifecycle.setup();
+  return await (await app.request(url)).text();
+}
+
+describe("review page: capture environment migration", () => {
+  it("explains that migrated snapshots were accepted without a diff", async () => {
+    const html = await pageWithMigration(true);
+    expect(html).toContain("Capture environment changed");
+    expect(html).toContain("accepted without a pixel diff");
+    expect(html).toContain("browser version");
+    expect(html).toContain("124.0.1 → 126.0.0");
+    expect(html).toContain("No diff: capture environment changed");
+  });
+
+  it("shows nothing about the environment for an ordinary build", async () => {
+    const html = await pageWithMigration(false);
+    expect(html).not.toContain("Capture environment changed");
+    expect(html).not.toContain("No diff:");
+  });
+});

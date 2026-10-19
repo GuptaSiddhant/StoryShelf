@@ -116,6 +116,7 @@ export class BaselineTransferModel {
       snapshotId: null,
       screenshotPath: storagePath,
       infraHash: entry.infraHash,
+      fingerprint: entry.fingerprint ?? null,
       mode: entry.mode,
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,

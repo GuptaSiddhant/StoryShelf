@@ -162,6 +162,7 @@ function manifestEntry(row: Baseline, data: Buffer, names: Set<string>): Baselin
     ...identity,
     mode: row.mode ?? null,
     infraHash: row.infraHash,
+    fingerprint: row.fingerprint ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     file: uniqueName(

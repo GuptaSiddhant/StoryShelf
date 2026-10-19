@@ -30,6 +30,7 @@ const SNAPSHOT_BASELINE_ID_ALTER =
   "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS baseline_id TEXT";
 const SNAPSHOT_BASELINE_VERSION_ALTER =
   "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS baseline_version TEXT";
+const SNAPSHOT_ENV_CHANGE_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS env_change TEXT";
 const SNAPSHOT_DESIGN_URL_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS design_url TEXT";
 const DESIGN_LINKS_UNIQUE_INDEX =
   "CREATE UNIQUE INDEX design_links_project_import_path_idx ON design_links (project_id, import_path)";
@@ -38,6 +39,8 @@ const LEGACY_DESIGN_DROPS = [
   "DROP TABLE IF EXISTS figma_nodes",
   "DROP TABLE IF EXISTS design_tokens",
 ];
+const BASELINE_FINGERPRINT_ALTER =
+  "ALTER TABLE baselines ADD COLUMN IF NOT EXISTS fingerprint TEXT";
 const BASELINE_INFRA_HASH_ALTER = "ALTER TABLE baselines ADD COLUMN IF NOT EXISTS infra_hash TEXT";
 const BUILD_AFFECTED_ONLY_ALTER =
   "ALTER TABLE builds ADD COLUMN IF NOT EXISTS affected_only BOOLEAN NOT NULL DEFAULT true";
@@ -84,6 +87,7 @@ async function migrateSnapshotColumns(run: MigrationRunner): Promise<void> {
   await execIgnore(run, SNAPSHOT_BASELINE_ID_ALTER);
   await execIgnore(run, SNAPSHOT_BASELINE_VERSION_ALTER);
   await execIgnore(run, SNAPSHOT_DESIGN_URL_ALTER);
+  await execIgnore(run, SNAPSHOT_ENV_CHANGE_ALTER);
   await migrateCaptureIdentityColumns(run);
 }
 
@@ -102,13 +106,18 @@ async function migrateCaptureIdentityColumns(run: MigrationRunner): Promise<void
   );
 }
 
+async function migrateBaselineColumns(run: MigrationRunner): Promise<void> {
+  await execIgnore(run, BASELINE_INFRA_HASH_ALTER);
+  await execIgnore(run, BASELINE_FINGERPRINT_ALTER);
+}
+
 async function migrateProjectExtras(run: MigrationRunner): Promise<void> {
   await execIgnore(run, EXECUTE_PLAY_ALTER);
   await execIgnore(run, PLAY_TIMEOUT_MS_ALTER);
   await execIgnore(run, PROJECT_AUTOMIGRATE_ALTER);
   await execIgnore(run, PROJECT_AI_PROFILE_ALTER);
   await migrateSnapshotColumns(run);
-  await execIgnore(run, BASELINE_INFRA_HASH_ALTER);
+  await migrateBaselineColumns(run);
   await execIgnore(run, BUILD_AFFECTED_ONLY_ALTER);
   await execIgnore(run, BUILD_BASELINE_SHA_ALTER);
   await execIgnore(run, BUILD_CHANGED_FILES_ALTER);

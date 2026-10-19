@@ -13,6 +13,22 @@ import type { Adapter } from "./metadata.ts";
 export type { JobStatus } from "./capture-queue.ts";
 export type { StoryEntry, StorySourceAdapter, Viewport } from "../capture/adapter.ts";
 
+/**
+ * The rendering environment a runner captured in. Two captures with the same environment (and
+ * engine and viewport) should produce identical pixels; a different one explains a visual diff
+ * that no code change caused. Every field is optional: runners report what they can.
+ */
+export interface CaptureEnvironment {
+  /** Browser build, as the driver reports it (for example `124.0.6367.29`). */
+  browserVersion?: string;
+  /** Host OS and CPU (`process.platform-arch`); text rendering differs between them. */
+  platform?: string;
+  /** Device pixel ratio the pages were rendered at. */
+  deviceScaleFactor?: number;
+  /** Digest of the installed system fonts, when they could be listed. */
+  fontsHash?: string;
+}
+
 /** A screenshot produced by a capture renderer. */
 export interface RenderedSnapshot {
   /** The rendered story (echoed back from the render request). */
@@ -31,6 +47,8 @@ export interface RenderedSnapshot {
    * Runners never set this.
    */
   stored?: boolean;
+  /** Environment of the render pass that produced it; filled in by the orchestrator from {@link RenderResult.environment}. */
+  environment?: CaptureEnvironment;
 }
 
 /** A story/viewport that a renderer could not capture. */
@@ -51,6 +69,8 @@ export interface RenderResult {
   captures: RenderedSnapshot[];
   /** Story/viewport pairs the renderer could not capture. */
   failures: RenderFailure[];
+  /** What this render ran on; optional so third-party runners keep working. */
+  environment?: CaptureEnvironment;
 }
 
 /**

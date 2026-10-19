@@ -1,4 +1,3 @@
-import { sha256 } from "../utils/hash.ts";
 import type { Viewport } from "./adapter.ts";
 
 /** Padding around the cropped component (8px each side). */
@@ -159,14 +158,4 @@ function parsedViewports(raw: string): Viewport[] | null {
     // fallback
   }
   return null;
-}
-
-/** Hash infra determinism: browser + viewports + sizing defaults. */
-export function infraHashFor(
-  browser: string,
-  viewports: Viewport[],
-  defaults: typeof SIZING_DEFAULTS = SIZING_DEFAULTS,
-): string {
-  const payload = JSON.stringify({ browser, viewports, defaults });
-  return sha256(payload);
 }

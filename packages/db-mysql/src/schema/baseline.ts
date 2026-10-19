@@ -15,6 +15,7 @@ export const baselines = mysqlTable(
     snapshotId: text("snapshot_id"),
     screenshotPath: text("screenshot_path").notNull(),
     infraHash: text("infra_hash"),
+    fingerprint: text("fingerprint"),
     mode: text("mode"),
     browser: text("browser").notNull().default("chromium"),
     createdAt: datetime("created_at", { mode: "string", fsp: 3 }).notNull(),
@@ -42,6 +43,7 @@ export interface Baseline {
   snapshotId: string | null;
   screenshotPath: string;
   infraHash: string | null;
+  fingerprint: string | null;
   mode?: string | null;
   browser?: string;
   createdAt: string;

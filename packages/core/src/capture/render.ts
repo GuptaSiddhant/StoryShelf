@@ -42,6 +42,7 @@ export interface RenderRequest {
 /** Cap failure error text so one chatty runner cannot flood rows and logs. */
 function capFailures(result: RenderResult): RenderResult {
   return {
+    ...result,
     captures: result.captures,
     failures: result.failures.map((failure) => ({
       ...failure,

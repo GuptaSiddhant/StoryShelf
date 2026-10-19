@@ -56,6 +56,10 @@ const puppeteer = vi.hoisted(() => {
   const stats = { contextsOpened: 0, contextsClosed: 0, pagesOpened: 0 };
   const browser = {
     closed: false,
+    version: async (): Promise<string> => {
+      await Promise.resolve();
+      return "HeadlessChrome/124.0.6367.29";
+    },
     createBrowserContext: async (): Promise<unknown> => {
       await Promise.resolve();
       stats.contextsOpened += 1;
@@ -215,6 +219,20 @@ describe("createPuppeteerCaptureRunner.render", () => {
       expect.objectContaining({ recycleBrowserEvery: 4, pages: expect.any(Number) }),
       "capture sizing",
     );
+  }, 30_000);
+
+  it("reports the browser build and host platform as the capture environment", async () => {
+    puppeteer.configureHang(false);
+    const result = await createPuppeteerCaptureRunner().render({
+      buildId: "build-1",
+      storybookDir,
+      stories: STORIES,
+      viewports: VIEWPORTS,
+    });
+    expect(result.environment).toMatchObject({
+      browserVersion: "HeadlessChrome/124.0.6367.29",
+      platform: `${process.platform}-${process.arch}`,
+    });
   }, 30_000);
 
   it("never restarts the browser when recycling is disabled", async () => {

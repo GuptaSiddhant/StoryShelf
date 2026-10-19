@@ -160,6 +160,45 @@ describe("executeCaptureJob", () => {
     expect(await scratchExists(project.id, build.id)).toBe(false);
   });
 
+  it("records the runner's reported environment in the baseline fingerprint", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const project = await new ProjectModel(db, tables(db)).create({ name: "Environment" });
+    const build = await new BuildModel(db, tables(db)).create(project.id, {
+      gitSha: "sha-env",
+      gitBranch: "main",
+      isDefault: true,
+    });
+    await storage.write(storybookZipPath(project.id, build.id), zipWithIndex());
+    const { runner } = fakeRunner({
+      render: vi.fn(async (input: Parameters<CaptureRunner["render"]>[0]) => {
+        // Streamed like the real runners: the capture arrives through onCapture, the
+        // environment only on the final result.
+        await input.onCapture?.({
+          story: input.stories[0] as never,
+          viewportName: "desktop",
+          screenshot: pngBytes(),
+        });
+        return {
+          captures: [],
+          failures: [],
+          environment: { browserVersion: "124.0.1", platform: "linux-x64", deviceScaleFactor: 1 },
+        };
+      }),
+    });
+
+    await executeCaptureJob(
+      { buildId: build.id },
+      { db, tables: tables(db), storage, runner, scratchDir },
+    );
+
+    const [baseline] = await db.list(db.tables.baselines);
+    expect(JSON.parse(baseline?.fingerprint ?? "{}")).toMatchObject({
+      browserVersion: "124.0.1",
+      platform: "linux-x64",
+    });
+  });
+
   it("stores streamed captures as they arrive and persists them without re-writing", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();

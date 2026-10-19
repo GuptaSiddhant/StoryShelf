@@ -50,6 +50,7 @@ export class SnapshotModel {
       viewportHeight: input.viewportHeight,
       screenshotPath: input.screenshotPath,
       infraHash: input.infraHash ?? null,
+      envChange: input.envChange ?? null,
       inherited: input.inherited ?? false,
       baselineId: input.baselineId ?? null,
       baselineVersion: input.baselineVersion ?? null,
@@ -127,6 +128,8 @@ export interface SnapshotCreateInput {
   viewportHeight: number;
   screenshotPath: string;
   infraHash?: string | null;
+  /** JSON `EnvironmentChange` when accepted as an environment migration. */
+  envChange?: string | null;
   inherited?: boolean;
   baselineId?: string | null;
   baselineVersion?: string | null;

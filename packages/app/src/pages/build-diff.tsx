@@ -9,12 +9,12 @@ import { DocumentLayout, type NavConfig, type RenderedContent } from "../ui/docu
 import { canvasColumn, workspace } from "../ui/styles/review-layout.ts";
 import { DiffActionBar } from "./build-diff-actions.tsx";
 import { DiffComments } from "./build-diff-comments.tsx";
+import { ReviewNotices } from "./build-diff-environment.tsx";
 import { DiffHeader } from "./build-diff-header.tsx";
 import { InsightSlot } from "./build-diff-insight.tsx";
 import { groupOf, reviewProgress } from "./build-diff-model.ts";
 import { DiffNav } from "./build-diff-nav.tsx";
 import { ShortcutsDialog } from "./build-diff-shortcuts.tsx";
-import { StaleBaselineNotice } from "./build-diff-stale.tsx";
 import type { LinkedUsageItem } from "./build-diff-usage.tsx";
 import { DiffViewer } from "./build-diff-viewer.tsx";
 import type { DesignItem } from "./design-links.tsx";
@@ -147,16 +147,13 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
         pendingCount={pendingGroups}
         canReview={canReview}
       />
-
-      {Object.keys(drifted).length > 0 ? (
-        <StaleBaselineNotice
-          project={project}
-          build={build}
-          staleCount={Object.keys(drifted).length}
-          canReview={canReview}
-        />
-      ) : null}
-
+      <ReviewNotices
+        project={project}
+        build={build}
+        snapshots={snapshots}
+        drifted={drifted}
+        canReview={canReview}
+      />
       <InsightSlot project={project} build={build} data={data.insight} />
 
       {snapshots.length === 0 ? (

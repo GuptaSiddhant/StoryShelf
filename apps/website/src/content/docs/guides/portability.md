@@ -79,6 +79,7 @@ baselines/
       "branch": "main",
       "mode": null,
       "infraHash": "…",
+      "fingerprint": "{…}",
       "createdAt": "2026-09-01T12:00:00.000Z",
       "updatedAt": "2026-10-10T08:30:00.000Z",
       "file": "baselines/main/button--primary/desktop.png",

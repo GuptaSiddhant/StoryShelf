@@ -48,6 +48,14 @@ export {
   sweepOrphanedScratch,
   type ScratchSweepOptions,
 } from "./scratch.ts";
+export {
+  buildFingerprint,
+  changedFields,
+  fingerprintHash,
+  parseFingerprint,
+  type EnvironmentChange,
+  type Fingerprint,
+} from "./fingerprint.ts";
 export { persistCapture, type CaptureContext } from "./pipeline.ts";
 export { postStatusesForBuild } from "./status-fanout.ts";
 export {

@@ -18,6 +18,8 @@ export interface BaselineUpsertOptions {
   browser?: string;
   /** Resolved mode definition as JSON (display only). */
   mode?: string | null;
+  /** JSON `Fingerprint` behind the `infraHash` being written. */
+  fingerprint?: string | null;
 }
 
 /** Tables required by {@link BaselineModel}. */
@@ -99,6 +101,18 @@ export class BaselineModel {
     return rows.length > 0;
   }
 
+  /**
+   * Record the fingerprint of a baseline that predates fingerprints, without touching its
+   * screenshot. Lets the next environment change be detected instead of diffing as a regression.
+   */
+  async backfillFingerprint(
+    baseline: Baseline,
+    infraHash: string,
+    fingerprint: string,
+  ): Promise<void> {
+    await this.db.update(this.tables.baselines, baseline.id, { infraHash, fingerprint });
+  }
+
   async read(baseline: Baseline): Promise<Buffer> {
     return await this.storage.read(baseline.screenshotPath);
   }
@@ -125,6 +139,7 @@ export class BaselineModel {
         snapshotId,
         screenshotPath,
         infraHash: infraHash ?? existing.infraHash ?? null,
+        fingerprint: options.fingerprint ?? existing.fingerprint ?? null,
         mode: options.mode ?? existing.mode ?? null,
         updatedAt: new Date().toISOString(),
       })) as unknown as Baseline;
@@ -157,6 +172,7 @@ export class BaselineModel {
         snapshotId,
         screenshotPath,
         infraHash: infraHash ?? null,
+        fingerprint: options.fingerprint ?? null,
         mode: options.mode ?? null,
         browser,
         createdAt: now,
