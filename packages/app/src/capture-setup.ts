@@ -1,4 +1,5 @@
 import type { CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
+import type { CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
 import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import {
   createDispatchJob,
@@ -110,35 +111,43 @@ function pickProcessQueue(
   });
 }
 
-/** Assemble the capture queue and its enqueue hook. */
+/** Bind an enqueue hook to a queue. */
+function enqueuerFor(queue: CaptureQueue): (buildId: string, reqId?: string) => Promise<void> {
+  return async (buildId, reqId) => {
+    await enqueueJob(queue, buildId, reqId);
+  };
+}
+
+/**
+ * Assemble the capture queue and its enqueue hook. A supplied (remote) queue
+ * wins and any runner is ignored server-side: an external worker captures.
+ * With only a runner, captures run in-process. With neither, builds stay
+ * `pending` until a runner is added.
+ */
 export function setupCaptureQueue(
   options: ShelfOptions,
   config: ShelfConfig,
   gitHosts: GitHostProvider[],
   logger: Logger,
 ): QueueWiring {
-  if (!options.capture?.queue && !options.capture?.runner) {
+  const { queue: remote, runner } = options.capture ?? {};
+  if (remote) {
+    return { queue: remote, enqueueCapture: enqueuerFor(remote) };
+  }
+  if (!runner) {
     return { queue: null, enqueueCapture: undefined };
   }
-  if (options.capture?.queue) {
-    const queue = options.capture?.queue;
-    const enqueueCapture = async (buildId: string, reqId?: string): Promise<void> => {
-      await enqueueJob(queue, buildId, reqId);
-    };
-    if (!options.capture?.runner) {
-      return { queue: options.capture?.queue, enqueueCapture };
-    }
-    // Both queue and runner supplied: runner is ignored server-side for remote queues;
-    // enqueue goes to the supplied queue and capture is handled by an external worker.
-    if (!config.scratchDir) {
-      return { queue: options.capture?.queue, enqueueCapture };
-    }
-    // If scratchDir is set with both, still prefer the supplied queue; no in-memory queue needed.
-    return { queue: options.capture?.queue, enqueueCapture };
-  }
-  if (!options.capture?.runner) {
-    return { queue: null, enqueueCapture: undefined };
-  }
+  return setupInProcessQueue(options, config, gitHosts, logger, runner);
+}
+
+/** In-process queue (optionally forked) running the dispatch job with recovery and stall handling. */
+function setupInProcessQueue(
+  options: ShelfOptions,
+  config: ShelfConfig,
+  gitHosts: GitHostProvider[],
+  logger: Logger,
+  runner: CaptureRunner,
+): QueueWiring {
   // `normalizeShelfOptions` defaults scratchDir whenever a runner is set.
   const scratchDir = config.scratchDir ?? DEFAULT_SCRATCH_DIR;
   const jobOptions: CaptureJobOptions = {
@@ -153,7 +162,7 @@ export function setupCaptureQueue(
       captureLogs: options.database.tables.captureLogs,
     },
     storage: options.storage,
-    runner: options.capture?.runner,
+    runner,
     scratchDir,
     viewports: config.viewports,
     logger,
@@ -187,7 +196,7 @@ export function setupCaptureQueue(
     concurrency: options.capture?.concurrency ?? recommendedBuildConcurrency(),
     logger,
     leaseMs: CAPTURE_LEASE_MS,
-    onStalled: createStalledHandler({ runner: options.capture?.runner, recovery, logger }),
+    onStalled: createStalledHandler({ runner, recovery, logger }),
     runJob: async (job: CaptureDispatchJob, lease): Promise<void> => {
       await timedRunJob(async (dispatched) => await runJob(dispatched, lease), job);
       // In-process completions only: remote-queue workers own their own
@@ -195,11 +204,8 @@ export function setupCaptureQueue(
       await notifyCaptureFailed(options, config, logger, job.buildId);
     },
   });
-  const captureQueue =
-    options.capture?.queue ?? pickProcessQueue(options, config, logger, inProcessQueue);
-  const enqueueCapture = async (buildId: string, reqId?: string): Promise<void> => {
-    await enqueueJob(captureQueue, buildId, reqId);
-  };
+  const captureQueue = pickProcessQueue(options, config, logger, inProcessQueue);
+  const enqueueCapture = enqueuerFor(captureQueue);
   const recoverStuck = async (): Promise<RecoveryResult> => await recoverStuckCaptures(recovery);
   return { queue: captureQueue, enqueueCapture, recoverStuck };
 }
