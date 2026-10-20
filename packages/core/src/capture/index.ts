@@ -43,6 +43,7 @@ export {
 export {
   buildScratchDir,
   removeBuildScratch,
+  removeJobScratch,
   SCRATCH_DIRNAME,
   SCRATCH_MAX_AGE_MS,
   sweepOrphanedScratch,

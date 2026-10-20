@@ -90,9 +90,10 @@ export class CaptureShardModel {
     );
   }
 
+  /** Mark a shard running. A shard already done stays done: this run is a redelivered duplicate. */
   async markRunning(id: string): Promise<void> {
     const now = new Date().toISOString();
-    await this.#db.update(this.#table, id, { status: "running", startedAt: now, updatedAt: now });
+    await this.#unlessDone(id, { status: "running", startedAt: now, updatedAt: now });
   }
 
   /** Finish a shard with its outcome (JSON). Idempotent: a redelivered shard overwrites its own result. */
@@ -107,23 +108,34 @@ export class CaptureShardModel {
     });
   }
 
-  /** A failed run that will be retried: back to `pending`, remembering why. */
+  /**
+   * A failed run that will be retried: back to `pending`, remembering why. Ignored for a shard
+   * already done, whose result a failing duplicate must not undo.
+   */
   async retry(id: string, error: string): Promise<void> {
-    await this.#db.update(this.#table, id, {
+    await this.#unlessDone(id, {
       status: "pending",
       error,
       updatedAt: new Date().toISOString(),
     });
   }
 
+  /** The shard's last try failed. Ignored for a shard already done, like {@link retry}. */
   async fail(id: string, error: string): Promise<void> {
     const now = new Date().toISOString();
-    await this.#db.update(this.#table, id, {
-      status: "failed",
-      error,
-      finishedAt: now,
-      updatedAt: now,
-    });
+    await this.#unlessDone(id, { status: "failed", error, finishedAt: now, updatedAt: now });
+  }
+
+  /**
+   * A queue that redelivers (at-least-once) can run one shard twice. Whichever finishes first wins;
+   * the other must not move the row out of `done`. Read-then-write, not atomic, but the window is
+   * the time between two statements, and the outcome of losing it is one extra identical write.
+   */
+  async #unlessDone(id: string, patch: Record<string, unknown>): Promise<void> {
+    if ((await this.get(id))?.status === "done") {
+      return;
+    }
+    await this.#db.update(this.#table, id, patch);
   }
 
   /**

@@ -8,7 +8,7 @@ import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { mapLimit } from "../utils/map-limit.ts";
 import { storybookDir, storybookZipPath } from "../utils/paths.ts";
-import { buildScratchDir, shardScratchDir } from "./scratch.ts";
+import { jobScratchDir, shardScratchDir } from "./scratch.ts";
 
 /**
  * Shared Storybook statics handling: unzip a stored build into a scratch
@@ -19,7 +19,7 @@ import { buildScratchDir, shardScratchDir } from "./scratch.ts";
 
 /**
  * Extract a build's stored zip into a dedicated scratch directory. The caller removes it when
- * done (`removeBuildScratch`).
+ * done (`removeJobScratch`).
  *
  * @param storage - Storage holding the uploaded zip.
  * @param scratchDir - Root under which per-build scratch dirs are created.
@@ -37,7 +37,7 @@ export async function extractStorybookToScratch(
 ): Promise<string> {
   const base = shardId
     ? shardScratchDir(scratchDir, projectId, buildId, shardId)
-    : buildScratchDir(scratchDir, projectId, buildId);
+    : jobScratchDir(scratchDir, projectId, buildId);
   const targetDir = join(base, "storybook");
   const root = await prepareTargetDir(targetDir);
   const source = await storage.readStream(storybookZipPath(projectId, buildId));

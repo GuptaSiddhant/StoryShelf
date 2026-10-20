@@ -66,6 +66,24 @@ describe("CaptureShardModel", () => {
     expect(await model.get(shard?.id ?? "")).toMatchObject({ status: "done", error: null });
   });
 
+  it("keeps a finished shard done when a redelivered duplicate runs or fails afterwards", async () => {
+    const { model } = setup();
+    const [shard] = await model.createPlan("p1", "b1", plan, [{ payload: "s1" }]);
+    const id = shard?.id ?? "";
+    await model.markRunning(id);
+    await model.complete(id, '{"captured":3}');
+
+    await model.markRunning(id);
+    await model.retry(id, "duplicate crashed");
+    await model.fail(id, "duplicate crashed for good");
+
+    expect(await model.get(id)).toMatchObject({
+      status: "done",
+      error: null,
+      result: '{"captured":3}',
+    });
+  });
+
   it("keeps builds apart and clears one build's rows", async () => {
     const { model } = setup();
     await model.createPlan("p1", "b1", plan, [{ payload: "a" }]);

@@ -1,5 +1,5 @@
 /** Per-build scratch directories: where they live, removing them, and sweeping crash leftovers. */
-import { readdir, rm, stat } from "node:fs/promises";
+import { readdir, rm, rmdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { Logger } from "../logger.ts";
 
@@ -18,9 +18,17 @@ export const SCRATCH_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 /** Directory inside a build's scratch directory that holds one subdirectory per shard. */
 const SHARDS_DIRNAME = "shards";
 
+/** Directory inside a build's scratch directory for the build's own job, apart from its shards. */
+const JOB_DIRNAME = "job";
+
 /** Scratch directory owned by one build: `<scratchDir>/.storyshelf-scratch/<projectId>/<buildId>`. */
 export function buildScratchDir(scratchDir: string, projectId: string, buildId: string): string {
   return join(scratchDir, SCRATCH_DIRNAME, projectId, buildId);
+}
+
+/** Scratch directory of the build's own job (plan or whole build): `<build>/job`, beside `shards/`. */
+export function jobScratchDir(scratchDir: string, projectId: string, buildId: string): string {
+  return join(buildScratchDir(scratchDir, projectId, buildId), JOB_DIRNAME);
 }
 
 /** Scratch directory of one shard of a build, inside the build's: shards of a build can share a host. */
@@ -33,7 +41,10 @@ export function shardScratchDir(
   return join(buildScratchDir(scratchDir, projectId, buildId), SHARDS_DIRNAME, shardId);
 }
 
-/** Remove one shard's scratch directory, leaving the build's other shards alone. Best effort. */
+/**
+ * Remove one shard's scratch directory, leaving the build's other shards alone, then the build's
+ * directories if that left them empty: whichever shard finishes last tidies up. Best effort.
+ */
 export async function removeShardScratch(
   scratchDir: string,
   projectId: string,
@@ -46,35 +57,47 @@ export async function removeShardScratch(
       recursive: true,
       force: true,
     });
+    await pruneBuildScratch(scratchDir, projectId, buildId);
   } catch (error) {
     logger?.warn({ err: error, buildId, shardId }, "failed to remove shard scratch directory");
   }
 }
 
 /**
- * Remove what the plan job extracted, leaving `shards/` alone. The plan hands its shards to the
- * queue before it cleans up, and a worker may already be extracting into its own shard directory:
- * removing the whole build directory then pulls it out from under that worker.
+ * Remove the scratch of the build's own job (the plan, or the whole build when it is not sharded)
+ * and the build directory too if nothing else is left in it.
+ *
+ * Shards live in their own `shards/` directory beside `job/`, so this can never reach one: the plan
+ * hands its shards to the queue before it cleans up, and a worker may already be extracting.
  */
-export async function removePlanScratch(
+export async function removeJobScratch(
   scratchDir: string,
   projectId: string,
   buildId: string,
   logger?: Logger,
 ): Promise<void> {
-  const dir = buildScratchDir(scratchDir, projectId, buildId);
   try {
-    const entries = await readdir(dir).catch(() => [] as string[]);
-    await Promise.all(
-      entries
-        .filter((entry) => entry !== SHARDS_DIRNAME)
-        .map(async (entry) => {
-          await rm(join(dir, entry), { recursive: true, force: true });
-        }),
-    );
+    await rm(jobScratchDir(scratchDir, projectId, buildId), { recursive: true, force: true });
+    await pruneBuildScratch(scratchDir, projectId, buildId);
   } catch (error) {
-    logger?.warn({ err: error, buildId }, "failed to remove plan scratch directory");
+    logger?.warn({ err: error, buildId }, "failed to remove job scratch directory");
   }
+}
+
+/**
+ * Remove the build's scratch directories that are empty, and nothing that is not. A shard that is
+ * still running (a redelivered duplicate of one that already finished) keeps its directory; its own
+ * cleanup, or the boot sweep, removes it later. `rmdir` fails on a non-empty directory, which is
+ * the point.
+ */
+export async function pruneBuildScratch(
+  scratchDir: string,
+  projectId: string,
+  buildId: string,
+): Promise<void> {
+  const buildDir = buildScratchDir(scratchDir, projectId, buildId);
+  await rmdir(join(buildDir, SHARDS_DIRNAME)).catch(ignore);
+  await rmdir(buildDir).catch(ignore);
 }
 
 /** Remove a build's scratch directory. Best effort: a failure is logged, never thrown. */

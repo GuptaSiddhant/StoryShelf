@@ -1,5 +1,5 @@
 import AdmZip from "adm-zip";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -56,6 +56,10 @@ interface Behaviour {
   crashStories: Set<string>;
   /** Renders that throw outright, counted down. */
   throwTimes: number;
+  /** The next render waits for this, then throws: a duplicate run that is still going. */
+  holdNextThenCrash?: Promise<void> | undefined;
+  /** Called when a render has been taken by {@link holdNextThenCrash}, so a test can wait for it. */
+  onHeld?: (() => void) | undefined;
   /** Milliseconds the runner claims each story took; unset reports none. */
   durationOf?: (storyId: string) => number;
   rendered: string[];
@@ -67,6 +71,13 @@ function fakeRunner(behaviour: Behaviour): CaptureRunner {
     cancel: async () => {},
     render: async (input) => {
       await Promise.resolve();
+      const held = behaviour.holdNextThenCrash;
+      if (held) {
+        behaviour.holdNextThenCrash = undefined;
+        behaviour.onHeld?.();
+        await held;
+        throw new Error("duplicate crashed");
+      }
       if (behaviour.throwTimes > 0) {
         behaviour.throwTimes -= 1;
         throw new Error("browser crashed");
@@ -450,7 +461,6 @@ describe("sharded capture", () => {
 
   it("does not pull a shard's scratch out from under a worker that started during the plan", async () => {
     const w = await world({ stories: 25, shardSize: 10 });
-    const { mkdir, readFile, writeFile } = await import("node:fs/promises");
     const buildDir = join(scratchDir, ".storyshelf-scratch", w.project.id, w.build.id);
     const marker = join(buildDir, "shards", "already-extracting", "storybook", "iframe.html");
     // The first shard is enqueued, and a free worker starts extracting at once, while the plan
@@ -467,12 +477,74 @@ describe("sharded capture", () => {
     expect(await readFile(marker, "utf8")).toBe("<html></html>");
   });
 
+  it("keeps a started shard's scratch when the plan itself fails after handing shards out", async () => {
+    const w = await world({ stories: 25, shardSize: 10 });
+    const marker = join(
+      scratchDir,
+      ".storyshelf-scratch",
+      w.project.id,
+      w.build.id,
+      "shards",
+      "already-extracting",
+      "storybook",
+      "iframe.html",
+    );
+    let handedOut = 0;
+    const enqueue = w.jobOptions.enqueue;
+    w.jobOptions.enqueue = async (job) => {
+      handedOut += 1;
+      if (handedOut === 2) {
+        // A worker has started on the first shard; the queue then refuses the second.
+        await mkdir(join(marker, ".."), { recursive: true });
+        await writeFile(marker, "<html></html>");
+        throw new Error("queue unavailable");
+      }
+      await enqueue?.(job);
+    };
+
+    await expect(w.plan()).rejects.toThrow("queue unavailable");
+
+    expect(await w.status()).toBe("failed");
+    expect(await readFile(marker, "utf8")).toBe("<html></html>");
+  });
+
+  it("a duplicate run that crashes after the shard finished does not undo it", async () => {
+    const w = await world({ stories: 25, shardSize: 10 });
+    await w.plan();
+    const [first, ...others] = w.queued as ShardJob[];
+    await Promise.all(others.map(async (job) => await w.runShard(job, true)));
+
+    // The queue hands shard 1 to a second worker too; it starts and sits in its render...
+    let crash!: () => void;
+    let sitting!: () => void;
+    const inRender = new Promise<void>((resolve) => {
+      sitting = resolve;
+    });
+    w.behaviour.onHeld = sitting;
+    w.behaviour.holdNextThenCrash = new Promise<void>((resolve) => {
+      crash = resolve;
+    });
+    const duplicate = w.runShard(first as ShardJob, true);
+    await inRender;
+    // ...while the original run finishes the shard and, as the last one, finalizes the build.
+    const original = await w.runShard(first as ShardJob, true);
+    expect(original).toMatchObject({ status: "rendered", finalized: true });
+
+    // Its browser is broken for good, so narrowing the crash down finds nothing to render.
+    w.behaviour.throwTimes = Number.POSITIVE_INFINITY;
+    crash();
+    await expect(duplicate).rejects.toThrow("duplicate crashed");
+
+    const rows = await w.shards.renderShards(w.build.id);
+    expect(rows.every((row) => row.status === "done")).toBe(true);
+    expect(await w.status()).toBe("approved");
+  });
+
   it("sweeps the build's scratch directory once the last shard has finalized it", async () => {
     const w = await world({ stories: 25, shardSize: 10 });
     await w.plan();
     await Promise.all(w.queued.map(async (job) => await w.runShard(job, true)));
 
-    const { stat } = await import("node:fs/promises");
     const buildDir = join(scratchDir, ".storyshelf-scratch", w.project.id, w.build.id);
     await expect(stat(buildDir)).rejects.toThrow(/ENOENT/u);
   });

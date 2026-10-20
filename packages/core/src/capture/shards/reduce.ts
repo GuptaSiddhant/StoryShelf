@@ -4,7 +4,6 @@ import { CaptureShardModel } from "../../models/capture-shard.ts";
 import type { CaptureShard } from "../../schema/capture-shard.ts";
 import type { BuildStatus } from "../../types.ts";
 import { finalizeBuild } from "../pipeline.ts";
-import { removeBuildScratch } from "../scratch.ts";
 import type { PlanResult, ShardPayload, ShardResult } from "../shard-plan.ts";
 import { contextOf, type ShardTarget } from "./context.ts";
 
@@ -47,13 +46,6 @@ async function finalizeSharded(
     sets.failed,
     sets.flaky,
     sets.a11y,
-  );
-  // Every shard has ended, so nothing is left to extract here; sweep the empty build directory.
-  await removeBuildScratch(
-    target.options.scratchDir,
-    target.project.id,
-    target.build.id,
-    target.options.logger,
   );
   const finished = await new BuildModel(target.options.db, target.options.tables).get(
     target.build.id,
