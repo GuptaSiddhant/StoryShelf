@@ -447,4 +447,33 @@ describe("sharded capture", () => {
     const shardsDir = join(scratchDir, ".storyshelf-scratch", w.project.id, w.build.id, "shards");
     expect(await readdir(shardsDir).catch(() => [])).toEqual([]);
   });
+
+  it("does not pull a shard's scratch out from under a worker that started during the plan", async () => {
+    const w = await world({ stories: 25, shardSize: 10 });
+    const { mkdir, readFile, writeFile } = await import("node:fs/promises");
+    const buildDir = join(scratchDir, ".storyshelf-scratch", w.project.id, w.build.id);
+    const marker = join(buildDir, "shards", "already-extracting", "storybook", "iframe.html");
+    // The first shard is enqueued, and a free worker starts extracting at once, while the plan
+    // job has yet to clean up after itself.
+    const enqueue = w.jobOptions.enqueue;
+    w.jobOptions.enqueue = async (job) => {
+      await enqueue?.(job);
+      await mkdir(join(marker, ".."), { recursive: true });
+      await writeFile(marker, "<html></html>");
+    };
+
+    await w.plan();
+
+    expect(await readFile(marker, "utf8")).toBe("<html></html>");
+  });
+
+  it("sweeps the build's scratch directory once the last shard has finalized it", async () => {
+    const w = await world({ stories: 25, shardSize: 10 });
+    await w.plan();
+    await Promise.all(w.queued.map(async (job) => await w.runShard(job, true)));
+
+    const { stat } = await import("node:fs/promises");
+    const buildDir = join(scratchDir, ".storyshelf-scratch", w.project.id, w.build.id);
+    await expect(stat(buildDir)).rejects.toThrow(/ENOENT/u);
+  });
 });

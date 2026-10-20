@@ -15,6 +15,9 @@ export const SCRATCH_DIRNAME = ".storyshelf-scratch";
 /** Scratch dirs untouched for this long are assumed orphaned by a crash (no capture runs this long). */
 export const SCRATCH_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 
+/** Directory inside a build's scratch directory that holds one subdirectory per shard. */
+const SHARDS_DIRNAME = "shards";
+
 /** Scratch directory owned by one build: `<scratchDir>/.storyshelf-scratch/<projectId>/<buildId>`. */
 export function buildScratchDir(scratchDir: string, projectId: string, buildId: string): string {
   return join(scratchDir, SCRATCH_DIRNAME, projectId, buildId);
@@ -27,7 +30,7 @@ export function shardScratchDir(
   buildId: string,
   shardId: string,
 ): string {
-  return join(buildScratchDir(scratchDir, projectId, buildId), "shards", shardId);
+  return join(buildScratchDir(scratchDir, projectId, buildId), SHARDS_DIRNAME, shardId);
 }
 
 /** Remove one shard's scratch directory, leaving the build's other shards alone. Best effort. */
@@ -45,6 +48,32 @@ export async function removeShardScratch(
     });
   } catch (error) {
     logger?.warn({ err: error, buildId, shardId }, "failed to remove shard scratch directory");
+  }
+}
+
+/**
+ * Remove what the plan job extracted, leaving `shards/` alone. The plan hands its shards to the
+ * queue before it cleans up, and a worker may already be extracting into its own shard directory:
+ * removing the whole build directory then pulls it out from under that worker.
+ */
+export async function removePlanScratch(
+  scratchDir: string,
+  projectId: string,
+  buildId: string,
+  logger?: Logger,
+): Promise<void> {
+  const dir = buildScratchDir(scratchDir, projectId, buildId);
+  try {
+    const entries = await readdir(dir).catch(() => [] as string[]);
+    await Promise.all(
+      entries
+        .filter((entry) => entry !== SHARDS_DIRNAME)
+        .map(async (entry) => {
+          await rm(join(dir, entry), { recursive: true, force: true });
+        }),
+    );
+  } catch (error) {
+    logger?.warn({ err: error, buildId }, "failed to remove plan scratch directory");
   }
 }
 
