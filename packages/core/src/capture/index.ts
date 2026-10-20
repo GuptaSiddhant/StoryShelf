@@ -73,6 +73,7 @@ export {
   type RecoveryDeps,
   type RecoveryResult,
 } from "./recovery.ts";
+export { failCrashedCapture, type CrashFailureOutcome } from "./crash-failure.ts";
 export { ProgressLease, type JobLease } from "./job-lease.ts";
 export { InMemoryCaptureQueue, type InMemoryCaptureQueueOptions } from "./queue.ts";
 export type { PollableCaptureQueue, PollableJob } from "../adapters/capture-queue.ts";

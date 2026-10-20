@@ -113,12 +113,16 @@ export class IpcCaptureQueue implements PollableCaptureQueue {
     await Promise.resolve();
   }
 
-  async nack(job: PollableJob, options?: { requeue?: boolean; delayMs?: number }): Promise<void> {
+  async nack(
+    job: PollableJob,
+    options?: { requeue?: boolean; delayMs?: number; error?: string },
+  ): Promise<void> {
     this.#port.send({
       type: "nack",
       receipt: receiptOf(job),
       requeue: options?.requeue ?? false,
       ...(options?.delayMs === undefined ? {} : { delayMs: options.delayMs }),
+      ...(options?.error === undefined ? {} : { error: options.error }),
     });
     await Promise.resolve();
   }

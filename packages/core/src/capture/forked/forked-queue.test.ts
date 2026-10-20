@@ -279,9 +279,10 @@ describe("ForkedCaptureQueue crash handling", () => {
     const entry = await queue.status("poison");
     expect(entry?.status).toBe("failed");
     expect(entry?.error).toMatch(/exited \(code 1\) 2 times/u);
+    // The child never recorded this failure, so the hook is told to write it.
     expect(onSettled).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ status: "failed" }),
+      expect.objectContaining({ status: "failed", crashed: true }),
     );
   });
 
@@ -481,3 +482,108 @@ describe("ForkedCaptureQueue lifecycle", () => {
 });
 
 queueContractSuite("forked", () => new ForkedCaptureQueue({ spawn: () => new FakeChild() }));
+
+/** Deliver every pending job to `child` through `count` polls; returns the jobs it got. */
+function pollAll(child: FakeChild, count: number) {
+  for (let id = 1; id <= count; id += 1) {
+    child.say({ type: "poll", id, waitMs: 1000 });
+  }
+  return child.delivered().map((delivery) => delivery.job);
+}
+
+describe("ForkedCaptureQueue crash attribution", () => {
+  it("does not charge a co-resident job for a crash, and runs each one alone next", async () => {
+    const { queue, children } = make({ crashLimit: 10 });
+    await queue.enqueue({ buildId: "a" });
+    await queue.enqueue({ buildId: "b" });
+    expect(pollAll(children[0] as FakeChild, 2)).toHaveLength(2);
+    children[0]?.exit(1);
+    await tick(20);
+
+    const child = children[1] as FakeChild;
+    const [first, ...rest] = pollAll(child, 2);
+    expect(rest).toEqual([]); // held back: a suspect runs alone
+    expect(first?.attempts).toBe(0);
+    child.say({ type: "ack", receipt: first?.receipt });
+    const second = child.delivered()[1]?.job;
+    expect(second?.buildId).not.toBe(first?.buildId);
+    expect(second?.attempts).toBe(0);
+  });
+
+  it("charges a crash to the only job in flight", async () => {
+    const { queue, children } = make({ crashLimit: 10 });
+    await queue.enqueue({ buildId: "a" });
+    await queue.enqueue({ buildId: "b" });
+    pollAll(children[0] as FakeChild, 2);
+    children[0]?.exit(1);
+    await tick(20);
+    const [alone] = pollAll(children[1] as FakeChild, 1);
+    children[1]?.exit(1);
+    await tick(20);
+    const [again] = pollAll(children[2] as FakeChild, 1);
+    expect(again).toMatchObject({ buildId: alone?.buildId, attempts: 1 });
+  });
+
+  it("charges a hang only to the job that hung, and delivers nothing to the dying child", async () => {
+    const { queue, children } = make({ leaseMs: 40, crashLimit: 10 });
+    await queue.enqueue({ buildId: "stuck" });
+    await queue.enqueue({ buildId: "healthy" });
+    const child = children[0] as FakeChild;
+    const [stuck, healthy] = pollAll(child, 2);
+    for (let beat = 0; beat < 4; beat += 1) {
+      child.say({ type: "progress", receipt: healthy?.receipt });
+      // oxlint-disable-next-line eslint/no-await-in-loop -- paces the heartbeats
+      await tick(15);
+    }
+    expect(child.forced).toBe(true);
+    await queue.enqueue({ buildId: "late" });
+    child.say({ type: "poll", id: 3, waitMs: 1000 });
+    expect(child.delivered()).toHaveLength(2);
+    child.exit(null, "SIGKILL");
+    await tick(20);
+    const next = pollAll(children[1] as FakeChild, 3);
+    expect(next.find((job) => job.buildId === stuck?.buildId)?.attempts).toBe(1);
+    expect(next.find((job) => job.buildId === "healthy")?.attempts).toBe(0);
+  });
+});
+
+describe("ForkedCaptureQueue unrequested exits", () => {
+  it("counts a clean exit with work pending as a crash, so a broken entry trips the fallback", async () => {
+    const { fallback, jobs } = fakeFallback();
+    const { queue, children } = make({ crashLimit: 3, fallback });
+    await queue.enqueue({ buildId: "b1" });
+    for (let round = 0; round < 3; round += 1) {
+      children.at(-1)?.exit(0);
+      // oxlint-disable-next-line eslint/no-await-in-loop -- waits out the restart delay
+      await tick(10);
+    }
+    expect(children).toHaveLength(3);
+    expect(jobs.map((job) => job.buildId)).toEqual(["b1"]);
+    expect((await queue.lifecycle.health()).detail).toMatch(/in-process/u);
+  });
+});
+
+describe("ForkedCaptureQueue delayed redelivery", () => {
+  it("starts a child for a delayed requeue when the old one exited during the delay", async () => {
+    const { queue, children } = make();
+    await queue.enqueue({ buildId: "a" });
+    const [job] = pollAll(children[0] as FakeChild, 1);
+    children[0]?.say({ type: "nack", receipt: job?.receipt, requeue: true, delayMs: 20 });
+    children[0]?.exit(0);
+    await tick(40);
+    expect(children).toHaveLength(2);
+    expect(pollAll(children[1] as FakeChild, 1)[0]).toMatchObject({ buildId: "a", attempts: 1 });
+  });
+
+  it("hands a delayed requeue to the fallback when the queue tripped during the delay", async () => {
+    const { fallback, jobs } = fakeFallback();
+    const { queue, children } = make({ crashLimit: 1, fallback });
+    await queue.enqueue({ buildId: "a" });
+    const [job] = pollAll(children[0] as FakeChild, 1);
+    children[0]?.say({ type: "nack", receipt: job?.receipt, requeue: true, delayMs: 20 });
+    children[0]?.exit(1);
+    await tick(40);
+    expect(jobs.map((diverted) => diverted.buildId)).toEqual(["a"]);
+    expect((await queue.status("a"))?.status).toBe("running"); // the fallback's entry
+  });
+});

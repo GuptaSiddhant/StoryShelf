@@ -1,5 +1,8 @@
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { PNG } from "pngjs";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   configureImages,
   DIFF_WORKERS_ENV,
@@ -38,8 +41,9 @@ function makePool(
   size: number,
   workerUrl: URL | string = WORKER_URL,
   engine?: "pngjs" | "sharp",
+  onFallback: (reason: string) => void = () => {},
 ): DiffPool {
-  const pool = new DiffPool({ size, workerUrl, engine });
+  const pool = new DiffPool({ size, workerUrl, engine, onFallback });
   pools.push(pool);
   return pool;
 }
@@ -50,6 +54,22 @@ afterEach(async () => {
   configureImages({});
   Reflect.deleteProperty(process.env, DIFF_WORKERS_ENV);
 });
+
+/** Wait until `ready()` holds, checking every few milliseconds. */
+async function until(ready: () => boolean): Promise<void> {
+  while (!ready()) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- polling a condition
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
+
+/** "diffed", or the message the diff was rejected with. */
+async function settled(diff: Promise<unknown>): Promise<string> {
+  return await diff.then(
+    () => "diffed",
+    (error: unknown) => (error instanceof Error ? error.message : String(error)),
+  );
+}
 
 const failOnResize = { ...DEFAULT_DIFF_OPTIONS };
 const overlap = { ...DEFAULT_DIFF_OPTIONS, failOnSizeChange: false };
@@ -134,6 +154,55 @@ describe("DiffPool failure modes", () => {
     // The pool stays in-thread for later calls and keeps no workers.
     expect(await pool.run(base(), changed(), failOnResize)).toEqual(expected);
     expect(pool.workerCount).toBe(0);
+  });
+
+  it("warns once when it falls back in-thread", async () => {
+    const onFallback = vi.fn();
+    const pool = makePool(2, new URL("does-not-exist.mjs", import.meta.url), "pngjs", onFallback);
+    await Promise.all([
+      pool.run(base(), changed(), failOnResize),
+      pool.run(base(), changed(), failOnResize),
+    ]);
+    await pool.run(base(), changed(), failOnResize);
+    expect(onFallback).toHaveBeenCalledTimes(1);
+    expect(onFallback.mock.calls[0]?.[0]).toMatch(/before it was ready/u);
+  });
+
+  it("keeps a running diff when a later worker dies before it is ready", async () => {
+    // The first worker starts fine and answers slowly; every later one dies during start-up.
+    const dir = mkdtempSync(join(tmpdir(), "storyshelf-pool-"));
+    const marker = JSON.stringify(join(dir, "first"));
+    const busy = join(dir, "busy");
+    const flaky = `data:text/javascript,${encodeURIComponent(
+      `import { closeSync, openSync } from "node:fs";
+       import { parentPort } from "node:worker_threads";
+       let first = false;
+       try { closeSync(openSync(${marker}, "wx")); first = true; } catch {}
+       if (first) {
+         parentPort.on("message", (req) => {
+           closeSync(openSync(${JSON.stringify(busy)}, "w"));
+           setTimeout(() => parentPort.postMessage(
+             { type: "error", id: req.id, name: "Error", message: "answered" }), 300);
+         });
+         parentPort.postMessage({ type: "ready" });
+       } else {
+         setTimeout(() => process.exit(9), 20);
+       }`,
+    )}`;
+    const onFallback = vi.fn();
+    const pool = makePool(2, new URL(flaky), "pngjs", onFallback);
+    try {
+      const first = settled(pool.run(base(), changed(), failOnResize));
+      await until(() => existsSync(busy)); // the first worker has the diff
+      // Its start-up kills the next workers; the diff runs in-thread or on the first worker.
+      const second = settled(pool.run(base(), changed(), failOnResize));
+      // Without the fix the fallback terminated the busy worker and this never settled.
+      expect(await first).toBe("answered");
+      expect(["diffed", "answered"]).toContain(await second);
+      expect(onFallback.mock.calls.length).toBeLessThanOrEqual(1);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("shuts down cleanly: rejects pending work and terminates workers", async () => {

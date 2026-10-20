@@ -37,7 +37,8 @@ const MIN_WINDOW = 8;
  * Captures are grouped in windows (at least 8, or two per slot). A window with any timeout halves
  * the limit and holds it there for a few windows; a window whose p95 latency grew more than the
  * tolerance over the first window, or whose event-loop lag p99 is high, lowers it by one; a healthy
- * window raises it by one. The first window sets the latency baseline, so it only ever holds.
+ * window raises it by one. The first window without timeouts sets the latency baseline, so it only
+ * ever holds.
  */
 export class AdaptiveConcurrency {
   private current: number;
@@ -88,7 +89,10 @@ export class AdaptiveConcurrency {
     };
     const from = this.current;
     const verdict = this.judge(stats);
-    this.baselineP95 ??= stats.p95;
+    // A window with a timeout carries the timeout's duration in its p95: never a baseline.
+    if (stats.timeouts === 0) {
+      this.baselineP95 ??= stats.p95;
+    }
     this.current = verdict.halve
       ? Math.max(this.min, Math.floor(from / 2))
       : clamp(from + verdict.delta, this.min, this.max);

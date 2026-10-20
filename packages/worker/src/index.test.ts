@@ -84,7 +84,7 @@ describe("createCaptureWorker", () => {
     expect(DEFAULT_WORKER_CONFIG.maxRetries).toBe(2);
   });
 
-  it("processes a job and acks on permanent failure when maxRetries 0", async () => {
+  it("nacks a permanent failure without requeue, with its error, when maxRetries 0", async () => {
     const job: PollableJob = { buildId: "build-1", reqId: "req-1", attempts: 0, receipt: "r1" };
     const queue = createMockQueue([job]);
     const { db, storage, runner } = createFakeAdapters();
@@ -107,7 +107,12 @@ describe("createCaptureWorker", () => {
     await worker.stop();
     await startPromise.catch(() => {});
 
-    expect(queue.ack).toHaveBeenCalled();
+    // The queue records the job failed (the forked parent's views show `failed`, not `completed`).
+    expect(queue.nack).toHaveBeenCalledWith(expect.objectContaining({ buildId: "build-1" }), {
+      requeue: false,
+      error: "Build not found: build-1",
+    });
+    expect(queue.ack).not.toHaveBeenCalled();
   });
 
   it("drops malformed jobs without retries", async () => {
@@ -208,10 +213,10 @@ describe("createCaptureWorker", () => {
     expect(poll).toHaveBeenCalled();
   });
 
-  it("handles ack failure by trying nack", async () => {
+  it("acks a permanent failure when the final nack fails", async () => {
     const job: PollableJob = { buildId: "build-1", attempts: 2, receipt: "r1" };
     const queue = createMockQueue([job]);
-    queue.ack.mockRejectedValueOnce(new Error("ack failed"));
+    queue.nack.mockRejectedValueOnce(new Error("nack failed"));
     const { db, storage, runner } = createFakeAdapters();
     const worker = createCaptureWorker({
       queue: queue as unknown as import("@storyshelf/core/adapter/capture-queue").CaptureQueue,
@@ -233,6 +238,7 @@ describe("createCaptureWorker", () => {
       expect.objectContaining({ buildId: "build-1" }),
       expect.objectContaining({ requeue: false }),
     );
+    expect(queue.ack).toHaveBeenCalledTimes(1);
   });
 
   it("handles nack failure gracefully", async () => {
@@ -304,7 +310,10 @@ describe("createCaptureWorker", () => {
     await worker.stop();
     await startPromise.catch(() => {});
     expect(customPoll).toHaveBeenCalled();
-    expect(customAck).toHaveBeenCalled();
+    expect(customNack).toHaveBeenCalledWith(
+      expect.objectContaining({ buildId: "build-1" }),
+      expect.objectContaining({ requeue: false }),
+    );
   });
 
   it("isRunning reflects state", async () => {
@@ -377,7 +386,40 @@ describe("createCaptureWorker", () => {
     });
     await worker.stop();
     await startPromise.catch(() => {});
-    expect(queue.ack).toHaveBeenCalledTimes(2);
+    expect(queue.nack).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not poll for a job while every slot is busy", async () => {
+    let polled = 0;
+    const poll = vi.fn(async () => {
+      polled += 1;
+      return { buildId: `b${polled}`, receipt: `r${polled}` };
+    });
+    const queue = { ...createMockQueue([]), poll };
+    const { db, storage, runner } = createFakeAdapters();
+    const { promise: gate, resolve: unblock } = Promise.withResolvers<null>();
+    // The first job hangs loading its build until the test lets it go.
+    db.get = vi.fn(async () => {
+      await gate;
+      return null;
+    });
+    const worker = createCaptureWorker({
+      queue: queue as unknown as import("@storyshelf/core/adapter/capture-queue").CaptureQueue,
+      db,
+      storage,
+      runner,
+      scratchDir: "/tmp",
+      config: { maxRetries: 0, waitTimeSeconds: 0, concurrency: 1 },
+    });
+    const startPromise = worker.start();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    // A second poll here would park a job whose lease runs out while it waits for the slot.
+    expect(poll).toHaveBeenCalledTimes(1);
+    const stopped = worker.stop();
+    unblock(null);
+    await stopped;
+    await startPromise.catch(() => {});
+    expect(poll).toHaveBeenCalledTimes(1);
   });
 
   it("stop is idempotent", async () => {

@@ -10,7 +10,7 @@ import { createShelfLogger } from "@storyshelf/core/logger";
 import { BuildModel, ProjectModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { describe, expect, it, vi } from "vitest";
-import { alreadyAlerted, setupCaptureQueue } from "./capture-setup.ts";
+import { alreadyAlerted, forkedSettleHook, setupCaptureQueue } from "./capture-setup.ts";
 
 function makeLogger() {
   return createShelfLogger({ level: "silent" });
@@ -240,5 +240,47 @@ describe("setupCaptureQueue", () => {
     const result = await recoverStuck?.();
 
     expect(result).toEqual({ requeued: [build.id], failed: [] });
+  });
+});
+
+async function crashedBuild() {
+  const { db } = makeDatabase();
+  const project = await new ProjectModel(db as never).create({ name: "Crashed" });
+  const builds = new BuildModel(db as never);
+  const build = await builds.create(project.id, { gitSha: "sha", gitBranch: "feature/x" });
+  await builds.setStatus(build.id, "capturing");
+  const dispatch = {
+    db,
+    tables: db.tables,
+    jobOptions: {},
+    gitHosts: [],
+    secret: undefined,
+    logger: makeLogger(),
+  } as never;
+  return { builds, build, dispatch };
+}
+
+describe("forkedSettleHook", () => {
+  it("fails the build of a job the child kept crashing on, then notifies", async () => {
+    const { builds, build, dispatch } = await crashedBuild();
+    const seen: (string | undefined)[] = [];
+    const hook = forkedSettleHook(dispatch, async (buildId) => {
+      seen.push((await builds.get(buildId))?.status);
+    });
+
+    await hook({ buildId: build.id }, { status: "failed", error: "exited 3 times", crashed: true });
+
+    expect(seen).toEqual(["failed"]); // the alert reads the status the hook just wrote
+  });
+
+  it("leaves the build to the child's own outcome otherwise", async () => {
+    const { builds, build, dispatch } = await crashedBuild();
+    const notify = vi.fn(async () => {});
+    await forkedSettleHook(dispatch, notify)(
+      { buildId: build.id },
+      { status: "failed", error: "x" },
+    );
+    expect((await builds.get(build.id))?.status).toBe("capturing");
+    expect(notify).toHaveBeenCalledWith(build.id);
   });
 });

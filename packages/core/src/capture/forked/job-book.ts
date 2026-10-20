@@ -11,10 +11,13 @@ export class JobBook {
   readonly #entries = new Map<string, QueueEntry>();
   readonly #pending: PollableJob[] = [];
   readonly #inFlight = new Map<string, DeliveredJob>();
+  /** Jobs that shared a crashed child: each runs alone until it finishes, so a crash names its culprit. */
+  readonly #solo = new Set<string>();
   #receipts = 0;
 
   /** Register a build as queued (re-enqueueing a known build resets its entry) and wait for delivery. */
   add(job: CaptureJob): void {
+    this.#solo.delete(entryKey(job));
     this.#resetEntry(job);
     this.#pending.push({ ...job, attempts: 0 });
   }
@@ -38,18 +41,29 @@ export class JobBook {
     this.#entries.set(key, entry);
   }
 
-  /** Put a job back for redelivery (front for crash recovery so it is not starved by newer work). */
-  requeue(job: PollableJob, options: { front: boolean }): void {
-    const entry = this.#entries.get(entryKey(job));
-    if (entry) {
-      entry.status = "queued";
-      entry.startedAt = undefined;
+  /**
+   * Put a job back for redelivery (front for crash recovery so it is not starved by newer work).
+   * `charge: false` keeps its attempt count (it was not at fault); `solo` makes it run alone next.
+   */
+  requeue(job: PollableJob, options: { front: boolean; charge?: boolean; solo?: boolean }): void {
+    this.#markQueued(job);
+    if (options.solo) {
+      this.#solo.add(entryKey(job));
     }
-    const next = { ...job, receipt: undefined, attempts: (job.attempts ?? 0) + 1 };
+    const charge = options.charge === false ? 0 : 1;
+    const next = { ...job, receipt: undefined, attempts: (job.attempts ?? 0) + charge };
     if (options.front) {
       this.#pending.unshift(next);
     } else {
       this.#pending.push(next);
+    }
+  }
+
+  #markQueued(job: CaptureJob): void {
+    const entry = this.#entries.get(entryKey(job));
+    if (entry) {
+      entry.status = "queued";
+      entry.startedAt = undefined;
     }
   }
 
@@ -64,7 +78,8 @@ export class JobBook {
 
   /** Hand the next pending job to the child: assigns a receipt and marks it running. */
   take(): DeliveredJob | undefined {
-    const job = this.#pending.shift();
+    const index = this.#nextIndex();
+    const [job] = index === -1 ? [] : this.#pending.splice(index, 1);
     if (!job) {
       return undefined;
     }
@@ -73,6 +88,20 @@ export class JobBook {
     this.#inFlight.set(delivered.receipt, delivered);
     this.#markRunning(job);
     return delivered;
+  }
+
+  /** The next deliverable pending job: a solo job waits for an empty child and then runs alone. */
+  #nextIndex(): number {
+    const busy = this.#inFlight.size > 0;
+    if (busy && [...this.#inFlight.values()].some((job) => this.#solo.has(entryKey(job)))) {
+      return -1;
+    }
+    return this.#pending.findIndex((job) => !busy || !this.#solo.has(entryKey(job)));
+  }
+
+  /** How many jobs are out with the child. */
+  get inFlightCount(): number {
+    return this.#inFlight.size;
   }
 
   #markRunning(job: CaptureJob): void {
@@ -105,6 +134,7 @@ export class JobBook {
   }
 
   finish(job: CaptureJob, status: "completed" | "failed", error?: string): void {
+    this.#solo.delete(entryKey(job));
     const entry = this.#entries.get(entryKey(job));
     if (entry) {
       entry.status = status;
@@ -127,6 +157,7 @@ export class JobBook {
   }
 
   forget(job: CaptureJob): void {
+    this.#solo.delete(entryKey(job));
     this.#entries.delete(entryKey(job));
   }
 
