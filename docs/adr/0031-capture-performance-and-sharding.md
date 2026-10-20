@@ -223,7 +223,10 @@ and a check that every story was captured exactly once. One 10-core, 64 GB Mac, 
 synthetic 600-story Storybook (React, 1 viewport, a fixed 500 ms per-story settle, 10%
 of stories heavy: 4000-cell grid and a 1.5 s `play`), Chromium only, 2 repeats (3 for the
 ordering runs). "Pages" is Playwright page concurrency per render call; `workers x pages`
-is what the host runs at once.
+is what the host runs at once. To reproduce: `scripts/bench-fixture.mjs` generates the
+Storybook (`--heavy even` for the configuration table, `--heavy first --heavy-count 90`
+for the ordering runs) and `scripts/bench-shards.mjs` runs it; a row is marked invalid
+and the exit code is 1 unless the build ends approved with one snapshot per story.
 
 | Configuration                     | Total pages | Wall    | vs unsharded | Peak RSS |
 | --------------------------------- | ----------- | ------- | ------------ | -------- |
@@ -237,10 +240,12 @@ is what the host runs at once.
 What this says, and what it does not:
 
 - **Sharding is not a single-host speedup.** At equal total pages it costs between -4%
-  and +25%: every shard re-extracts the Storybook, starts its own static server and
-  browser, and more browsers compete for the same cores. The cost is smallest at one or
-  two workers and visible at four. Use it for scale-out and isolation, not to speed up
-  one machine.
+  and +25%, smallest at one or two workers and visible at four. Each shard re-extracts
+  the Storybook, starts its own static server and launches its own browser, and more
+  browsers compete for the same cores; these are the likely causes and were not
+  separated by measurement (browser launch, CPU contention and SQLite write contention
+  would each fit the numbers). Use it for scale-out and isolation, not to speed up one
+  machine.
 - **Scale-out works but is sub-linear.** Doubling and quadrupling the pages gave 1.9x
   and 2.6x. The 32-page run is CPU-bound on this host (and uses 5.5 GB); a fleet of
   separate machines would not share that ceiling, but that is not measured here.
@@ -257,8 +262,14 @@ What this says, and what it does not:
 
 The benchmark also found a bug: the plan job removed the build's whole scratch directory
 after enqueueing its shards, which could delete the directory of a worker that had
-already started extracting (one failed shard in the first matrix). The plan now removes
-only its own extraction, and the last shard to finalize sweeps the build directory.
+already started extracting (one failed shard in the first matrix). The build's own job
+(the plan, or the whole build when it is not sharded) now extracts into `<build>/job/`,
+beside `<build>/shards/<shard>/`, so removing one can never reach the other, including
+when the plan fails after handing shards out. Each shard removes its own directory and,
+if that leaves the build's directories empty, those too (`rmdir`, so a directory that
+still holds a running duplicate of a finished shard is kept). A shard row that is already
+`done` is no longer moved by `markRunning`, `retry` or `fail`, so a redelivered duplicate
+that crashes cannot undo it.
 
 ## Consequences
 

@@ -25,7 +25,7 @@ import { classifyFailures } from "./failure-sets.ts";
 import { captureAcrossBrowsers } from "./matrix.ts";
 import { parseModesAllowlist } from "./modes.ts";
 import { persistCapture, type PipelineTables } from "./pipeline.ts";
-import { removeBuildScratch, removePlanScratch } from "./scratch.ts";
+import { removeJobScratch } from "./scratch.ts";
 import { fanOutCapture } from "./shards/fan-out.ts";
 import { resolveViewports } from "./sizing.ts";
 import { extractStorybookToScratch, persistStorybookStatics } from "./statics.ts";
@@ -169,7 +169,7 @@ async function runCapturePhases(
   const cleanScratch = async (): Promise<void> => {
     if (scratchPending) {
       scratchPending = false;
-      await removeBuildScratch(options.scratchDir, project.id, build.id, logger);
+      await removeJobScratch(options.scratchDir, project.id, build.id, logger);
     }
   };
   try {
@@ -246,9 +246,7 @@ async function runCapturePhases(
       logger,
     });
     if (fanned) {
-      // Only the plan's own extraction: shards already handed out may be running in `shards/`.
-      scratchPending = false;
-      await removePlanScratch(options.scratchDir, project.id, build.id, logger);
+      await cleanScratch();
       return fanned;
     }
 

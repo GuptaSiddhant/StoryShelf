@@ -4,7 +4,12 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   buildScratchDir,
+  jobScratchDir,
+  pruneBuildScratch,
   removeBuildScratch,
+  removeJobScratch,
+  removeShardScratch,
+  shardScratchDir,
   SCRATCH_DIRNAME,
   SCRATCH_MAX_AGE_MS,
   sweepOrphanedScratch,
@@ -34,6 +39,54 @@ const exists = async (path: string): Promise<boolean> =>
     () => true,
     () => false,
   );
+
+async function seedShard(projectId: string, buildId: string, shardId: string): Promise<string> {
+  const dir = shardScratchDir(root, projectId, buildId, shardId);
+  await mkdir(join(dir, "storybook"), { recursive: true });
+  await writeFile(join(dir, "storybook", "index.html"), "x");
+  return dir;
+}
+
+describe("job and shard scratch", () => {
+  it("removeJobScratch leaves a running shard's directory alone", async () => {
+    const job = jobScratchDir(root, "p1", "b1");
+    await mkdir(join(job, "storybook"), { recursive: true });
+    const shard = await seedShard("p1", "b1", "s1");
+
+    await removeJobScratch(root, "p1", "b1");
+
+    expect(await exists(job)).toBe(false);
+    expect(await exists(shard)).toBe(true);
+  });
+
+  it("removeJobScratch removes the build directory too when nothing else is in it", async () => {
+    await mkdir(join(jobScratchDir(root, "p1", "b1"), "storybook"), { recursive: true });
+
+    await removeJobScratch(root, "p1", "b1");
+
+    expect(await exists(buildScratchDir(root, "p1", "b1"))).toBe(false);
+  });
+
+  it("removeShardScratch leaves the siblings, and the last shard out removes the directories", async () => {
+    const first = await seedShard("p1", "b1", "s1");
+    const second = await seedShard("p1", "b1", "s2");
+
+    await removeShardScratch(root, "p1", "b1", "s1");
+    expect(await exists(first)).toBe(false);
+    expect(await exists(second)).toBe(true);
+
+    await removeShardScratch(root, "p1", "b1", "s2");
+    expect(await exists(buildScratchDir(root, "p1", "b1"))).toBe(false);
+  });
+
+  it("pruneBuildScratch never removes a directory that still has something in it", async () => {
+    const running = await seedShard("p1", "b1", "still-running");
+
+    await pruneBuildScratch(root, "p1", "b1");
+
+    expect(await exists(running)).toBe(true);
+  });
+});
 
 describe("removeBuildScratch", () => {
   it("removes only the given build's scratch dir", async () => {

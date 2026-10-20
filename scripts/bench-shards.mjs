@@ -8,24 +8,30 @@
  *
  * Runs a real capture (db-sqlite, local storage, Playwright, the in-memory queue) of one built
  * Storybook under several configurations and reports wall-clock from enqueue to a finished build,
- * peak resident memory across this process and its browsers, shard timings and a correctness check
- * (every story captured exactly once). Needs the built `dist/` of core, db-sqlite, storage-local
- * and runner-playwright (`nubx turbo build`).
+ * peak resident memory of this process and the browsers it launched, shard timings and a
+ * correctness check: the build must end approved with exactly one snapshot per story, otherwise
+ * the row is marked `valid: false`, a warning goes to stderr and the exit code is 1. Needs the
+ * built `dist/` of core, db-sqlite, storage-local and runner-playwright (`nubx turbo build`).
+ *
+ * A Storybook to point it at can be generated with `scripts/bench-fixture.mjs` (see there).
  *
  * `pages` is the Playwright page concurrency of one render call. A sharded run with `workers: W`
  * has W render calls at once, so `workers x pages` is the pages the host runs in total.
  */
-import { execFileSync } from "node:child_process";
+import { execFile } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { promisify } from "node:util";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const load = async (path) => await import(pathToFileURL(join(root, path)).href);
 const core = createRequire(join(root, "packages/core/package.json"));
 const AdmZip = core("adm-zip");
+const execFileAsync = promisify(execFile);
 
 const { createSqliteDatabase } = await load("packages/db-sqlite/dist/index.mjs");
 const { createLocalStorage } = await load("packages/storage-local/dist/index.mjs");
@@ -75,17 +81,51 @@ function tablesOf(db) {
   };
 }
 
-/** Resident memory (MB) of this process and every Playwright browser process. */
-function residentMb() {
-  const out = execFileSync("ps", ["-A", "-o", "pid=,rss=,command="], { encoding: "utf8" });
-  let kb = 0;
-  for (const line of out.split("\n")) {
-    const match = /^\s*(\d+)\s+(\d+)\s+(.*)$/u.exec(line);
-    if (match && (Number(match[1]) === process.pid || /ms-playwright/u.test(match[3]))) {
-      kb += Number(match[2]);
+/** Resident memory (MB) of this process and everything it launched (the browsers), from `ps`. */
+async function residentMb() {
+  const { stdout } = await execFileAsync("ps", ["-A", "-o", "pid=,ppid=,rss="]);
+  const rows = stdout
+    .split("\n")
+    .map((line) => line.trim().split(/\s+/u).map(Number))
+    .filter((cols) => cols.length === 3 && cols.every(Number.isFinite));
+  const mine = new Set([process.pid]);
+  // `ps` lists parents in no particular order, so grow the set until nothing new joins it.
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const [pid, ppid] of rows) {
+      if (mine.has(ppid) && !mine.has(pid)) {
+        mine.add(pid);
+        grew = true;
+      }
     }
   }
-  return kb / 1024;
+  return rows.filter(([pid]) => mine.has(pid)).reduce((kb, [, , rss]) => kb + rss, 0) / 1024;
+}
+
+/**
+ * Peak resident memory over one build. Asynchronous and one `ps` at a time, so sampling does not
+ * block the event loop of the process under test (it does cost a little CPU for the `ps` itself).
+ */
+function samplePeak(everyMs = 1000) {
+  const peak = { mb: 0, busy: false };
+  const timer = setInterval(async () => {
+    if (peak.busy) return;
+    peak.busy = true;
+    try {
+      peak.mb = Math.max(peak.mb, await residentMb());
+    } finally {
+      peak.busy = false;
+    }
+  }, everyMs);
+  return { stop: () => (clearInterval(timer), peak.mb) };
+}
+
+/** Story entries in a built Storybook: the number of snapshots a one-viewport capture must make. */
+function countStories(dir) {
+  const index = JSON.parse(readFileSync(join(dir, "index.json"), "utf8"));
+  return Object.values(index.entries ?? index.stories ?? {}).filter(
+    (entry) => entry.type === undefined || entry.type === "story",
+  ).length;
 }
 
 async function waitForBuild(db, buildId, timeoutMs) {
@@ -116,23 +156,33 @@ async function seedBuild(db, storage, project, sha) {
 }
 
 async function runBuild(setup, build) {
-  const { queue, db, peak } = setup;
+  const { queue, db } = setup;
+  const sampler = samplePeak();
   const started = performance.now();
   await queue.enqueue({ buildId: build.id });
-  const finished = await waitForBuild(db, build.id, 20 * 60_000);
+  let finished;
+  try {
+    finished = await waitForBuild(db, build.id, 20 * 60_000);
+  } finally {
+    setup.peakMb = sampler.stop();
+  }
   const wallMs = performance.now() - started;
   const snapshots = await new SnapshotModel(db, tablesOf(db)).listByBuild(build.id);
   const shards = await new CaptureShardModel(db).renderShards(build.id);
   const durations = shards.map((row) => JSON.parse(row.result ?? "{}").durationMs ?? 0);
+  const unique = new Set(snapshots.map((row) => `${row.storyId}|${row.viewportName}`)).size;
+  const expected = countStories(storybookDir);
   return {
     wallMs: Math.round(wallMs),
     status: finished.status,
     snapshots: snapshots.length,
-    uniqueStories: new Set(snapshots.map((row) => `${row.storyId}|${row.viewportName}`)).size,
+    uniqueStories: unique,
+    expectedStories: expected,
+    valid: finished.status === "approved" && snapshots.length === expected && unique === expected,
     shards: shards.length,
     shardMinMs: durations.length ? Math.min(...durations) : null,
     shardMaxMs: durations.length ? Math.max(...durations) : null,
-    peakRssMb: Math.round(peak.max),
+    peakRssMb: Math.round(setup.peakMb),
   };
 }
 
@@ -146,10 +196,6 @@ async function runScenario(scenario, runIndex) {
   const logger = createShelfLogger({ level: "silent" });
   const runner = createPlaywrightCaptureRunner({ concurrency: scenario.pages });
   const project = await new ProjectModel(db, tablesOf(db)).create({ name: "Bench" });
-  const peak = { max: 0 };
-  const sampler = setInterval(() => {
-    peak.max = Math.max(peak.max, residentMb());
-  }, 500);
 
   const jobOptions = {
     db,
@@ -172,7 +218,7 @@ async function runScenario(scenario, runIndex) {
     maxRetries: 0,
   });
   queue = new InMemoryCaptureQueue({ concurrency: scenario.workers, runJob, logger });
-  const setup = { queue, db, peak };
+  const setup = { queue, db, peakMb: 0 };
 
   const results = [];
   try {
@@ -181,7 +227,6 @@ async function runScenario(scenario, runIndex) {
       results.push(await runBuild(setup, build));
     }
   } finally {
-    clearInterval(sampler);
     await runner.lifecycle?.teardown?.();
     await db.lifecycle?.teardown?.();
   }
@@ -197,6 +242,13 @@ for (const scenario of selected) {
       const row = { scenario: scenario.name, run, build: index + 1, ...scenario, ...result };
       report.push(row);
       console.log(JSON.stringify(row));
+      if (!row.valid) {
+        console.error(
+          `INVALID: ${scenario.name} run ${run} build ${index + 1} ended ${row.status} with ` +
+            `${row.snapshots}/${row.expectedStories} snapshots`,
+        );
+        process.exitCode = 1;
+      }
     }
   }
 }

@@ -5,7 +5,7 @@ import { emitWebhookEvent } from "@storyshelf/core/adapter/webhook-events";
 import {
   extractStorybookToScratch,
   persistStorybookStatics,
-  removeBuildScratch,
+  removeJobScratch,
 } from "@storyshelf/core/capture";
 import type { Logger } from "@storyshelf/core/logger";
 import { BaselineModel } from "@storyshelf/core/models";
@@ -150,7 +150,7 @@ export async function persistInlineStatics(
   } catch (error) {
     logger.error({ err: error, buildId }, "inline statics persist failed; capture will backfill");
   } finally {
-    await removeBuildScratch(scratchDir, projectId, buildId, logger);
+    await removeJobScratch(scratchDir, projectId, buildId, logger);
   }
 }
 
