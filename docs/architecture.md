@@ -384,13 +384,14 @@ interface RenderedSnapshot {
 interface CaptureRunner {
   render(input: {
     buildId: string;
+    runId?: string;         // this call's cancel handle (a shard id); defaults to buildId
     storybookDir: string;   // already-extracted Storybook root
     stories: StoryEntry[];
     viewports: Viewport[];
     logger?: Logger;
     onCapture?: (capture: RenderedSnapshot) => Promise<void>;  // optional streaming hand-off
   }): Promise<RenderResult>;  // { captures, failures }
-  cancel(buildId: string): Promise<void>;
+  cancel(buildId: string, runId?: string): Promise<void>;  // one run, or every run of the build
 }
 ```
 

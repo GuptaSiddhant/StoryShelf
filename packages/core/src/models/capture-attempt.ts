@@ -92,6 +92,22 @@ export class CaptureAttemptModel {
       updatedAt: now,
     })) as unknown as CaptureAttempt;
   }
+
+  /**
+   * Close every attempt of a build still `queued` or `running` other than `keepId`, as `cancelled`
+   * with `reason`: a new plan of the build supersedes them, and nothing else would ever close them.
+   */
+  async closeOthers(buildId: string, keepId: string | null, reason: string): Promise<number> {
+    const open = (await this.listByBuild(buildId)).filter(
+      (row) => row.id !== keepId && (row.status === "queued" || row.status === "running"),
+    );
+    await Promise.all(
+      open.map(async (row) => {
+        await this.markFinished(row.id, "cancelled", reason);
+      }),
+    );
+    return open.length;
+  }
 }
 
 function columnsOf(table: Table, column: string): SQLWrapper {

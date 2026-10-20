@@ -79,6 +79,7 @@ export class BuildModel {
     return (await this.db.list(this.tables.builds, {
       where: and(...conditions),
       orderBy: desc(col(this.tables.builds, "createdAt")),
+      ...(filter.limit === undefined ? {} : { limit: filter.limit }),
     })) as unknown as Build[];
   }
 
@@ -230,4 +231,6 @@ export interface BuildListFilter {
   branch?: string;
   labelKey?: string;
   labelValue?: string;
+  /** Newest builds to return at most. */
+  limit?: number;
 }

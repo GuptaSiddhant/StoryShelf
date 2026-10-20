@@ -7,6 +7,7 @@ import type { Viewport } from "../adapter.ts";
 import type { MatrixInput } from "../matrix.ts";
 import type { CaptureJobOptions } from "../orchestrator.ts";
 import type { CaptureContext } from "../pipeline.ts";
+import type { CaptureProgress } from "../progress.ts";
 
 /** The build being captured and the adapters to capture it with. */
 export interface ShardTarget {
@@ -24,6 +25,7 @@ export function contextOf(
     captures?: CaptureContext["captures"];
     inherited?: NonNullable<CaptureContext["inherited"]>;
     freshBrowsers?: ReadonlySet<string>;
+    progress?: CaptureProgress | undefined;
   },
 ): CaptureContext {
   const { options } = target;
@@ -38,6 +40,7 @@ export function contextOf(
     captures: parts.captures ?? [],
     inherited: parts.inherited ?? [],
     ...(parts.freshBrowsers ? { freshBrowsers: parts.freshBrowsers } : {}),
+    progress: parts.progress,
     ...(options.logger ? { logger: options.logger } : {}),
     ...(options.secret ? { secret: options.secret } : {}),
   };
@@ -54,6 +57,8 @@ export function matrixInputOf(
     affectedPaths: string[] | null;
     logger?: Logger | undefined;
     recordLog?: MatrixInput["recordLog"];
+    progress?: CaptureProgress | undefined;
+    runId?: string | undefined;
   },
 ): MatrixInput {
   const { options } = target;
@@ -72,5 +77,7 @@ export function matrixInputOf(
     renderTimeoutMs: options.renderTimeoutMs,
     logger: parts.logger ?? options.logger,
     recordLog: parts.recordLog,
+    progress: parts.progress,
+    runId: parts.runId,
   };
 }

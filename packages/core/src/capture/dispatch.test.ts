@@ -205,10 +205,22 @@ describe("createDispatchJob attempt history", () => {
   });
 });
 
-function shardRunner(failing: boolean): CaptureRunner {
+/** A render to hold: it waits for `release`, then throws, like a duplicate whose browser died. */
+interface Hold {
+  next?: { entered: () => void; release: Promise<unknown> } | undefined;
+}
+
+function shardRunner(failing: boolean, hold: Hold = {}): CaptureRunner {
   return fakeRunner(
     vi.fn<CaptureRunner["render"]>(async (input) => {
       await Promise.resolve();
+      const held = hold.next;
+      if (held) {
+        hold.next = undefined;
+        held.entered();
+        await held.release;
+        throw new Error("duplicate crashed");
+      }
       if (failing) {
         throw new Error("browser crashed");
       }
@@ -225,13 +237,13 @@ function shardRunner(failing: boolean): CaptureRunner {
   );
 }
 
-async function planBuild(failShard: boolean) {
+async function planBuild(failShard: boolean, hold: Hold = {}) {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
   const { project, build } = await seedBuild(db);
   await storage.write(storybookZipPath(project.id, build.id), zipOfStories(6));
   const queued: { buildId: string; shard: string }[] = [];
-  const deps = depsFor(db, storage, shardRunner(failShard));
+  const deps = depsFor(db, storage, shardRunner(failShard, hold));
   deps.jobOptions.shardSize = 1;
   deps.jobOptions.enqueue = async (job) => {
     await Promise.resolve();
@@ -240,6 +252,17 @@ async function planBuild(failShard: boolean) {
   const runJob = createDispatchJob(deps);
   await runJob({ buildId: build.id });
   return { db, build, queued, runJob };
+}
+
+/** A promise the test resolves by hand: an explicit signal instead of a sleep. */
+function gate(): { passed: Promise<null>; open: () => void } {
+  const opener: { open: () => void } = { open: () => {} };
+  const passed = new Promise<null>((resolve) => {
+    opener.open = () => {
+      resolve(null);
+    };
+  });
+  return { passed, open: () => opener.open() };
 }
 
 async function inOrder<T>(items: T[], run: (item: T) => Promise<void>): Promise<void> {
@@ -281,5 +304,40 @@ describe("createDispatchJob sharding", () => {
     const rows = await new CaptureAttemptModel(db, tables(db)).listByBuild(build.id);
     expect(rows[0]?.status).toBe("failed");
     expect((await new BuildModel(db, tables(db)).get(build.id))?.status).toBe("failed");
+  });
+
+  it("touches the job lease while a shard renders and persists", async () => {
+    const { queued, runJob } = await planBuild(false);
+    const touch = vi.fn();
+
+    await runJob(queued[0] as { buildId: string; shard: string }, { touch });
+
+    expect(touch).toHaveBeenCalled();
+  });
+
+  it("a duplicate shard that fails after the build finalized leaves the attempt alone", async () => {
+    const hold: Hold = {};
+    const { db, build, queued, runJob } = await planBuild(false, hold);
+    const last = queued.at(-1) as { buildId: string; shard: string };
+    await inOrder(queued.slice(0, -1), async (job) => {
+      await runJob(job);
+    });
+    const entered = gate();
+    const release = gate();
+    hold.next = { entered: entered.open, release: release.passed };
+
+    // The queue hands the last shard to two workers; the duplicate sits in its render...
+    const duplicate = runJob({ ...last, attempts: 0 });
+    await entered.passed;
+    // ...while the original finishes it and finalizes the build.
+    await runJob(last);
+    const attempts = new CaptureAttemptModel(db, tables(db));
+    const closed = (await attempts.listByBuild(build.id))[0];
+    expect(closed).toMatchObject({ status: "completed", storyCount: 6, error: null });
+
+    release.open();
+    await expect(duplicate).rejects.toThrow("duplicate crashed");
+
+    expect((await attempts.listByBuild(build.id))[0]).toEqual(closed);
   });
 });

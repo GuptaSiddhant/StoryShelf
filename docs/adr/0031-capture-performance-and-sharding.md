@@ -182,7 +182,7 @@ today's one-job behaviour. Not yet done: a separate compare stage/queue.
 and it is persisted per snapshot (`snapshots.duration_ms`, nullable; third-party runners
 that report none keep working). The plan stage reads the per-story totals of the newest
 recent build that carries timings (`capture/shards/history.ts`, at most three builds
-scanned) and passes them to `planShards`, which switches from contiguous slices to
+scanned, and only once the plan knows the build will shard) and passes them to `planShards`, which switches from contiguous slices to
 longest-processing-time packing: dearest stories placed first, each into the shard with
 the least work that still has room for its captures, shards handed to the queue heaviest
 first. A story with no timing is priced at the average cost of a capture. Capture
@@ -204,15 +204,48 @@ progress on one host rather than throughput; horizontal scale remains a remote q
 
 **Poison-shard isolation (second slice).** A render call that throws takes its whole
 slice with it, so `renderIsolating` (`capture/isolate.ts`) re-renders the stories the
-crash never reached as two halves, and so on until one story is left holding it: that
-story is failed on its own (`browser crashed: …`) and its shard-mates are still
-captured. Screenshots spooled before the crash are kept and inherit the capture
+crash never reached as two halves, and so on until one story is left holding it. That
+story gets one pass on its own first, and only if it crashes there too is it failed
+(`browser crashed: …`); its shard-mates are still captured. A story counts as reached
+only once every one of its resolved viewports has a capture or a failure, so a crash
+partway through a story's viewports renders it again (the viewports it already captured
+are kept once) instead of silently losing the rest. Screenshots spooled before the crash are kept and inherit the capture
 environment of a later pass on the same engine. Halving costs about log2(n) passes per
 bad story instead of a browser per story, with a pass cap beyond which the stories left
 are failed unrendered. A crash that never produces a single screenshot is read as the
 environment being broken rather than any story's fault: it is rethrown, and the shard
 fails as before (the queue retries it, and its final failure fails its stories). This
 also covers the unsharded path, which shares the render loop.
+
+**Review fixes (fifth slice).** A review of the merged work found the shards and the
+reducer assumed one render per build at a time, and that only a completing shard would
+ever reduce. Behaviour since:
+
+- A shard's cleanup before it persists deletes only the **rendered** rows of the
+  `(story, engine)` pairs it is about to write, never the plan's inherited rows (a build
+  that renders a newly enabled engine keeps the primary engine's inherited snapshots).
+- **Progress is separate from logging.** A `CaptureProgress` callback (`capture/progress.ts`,
+  throttled to one lease touch a second) is threaded through shard execution, the render
+  loop (one call per screenshot) and the persist phase (one call per snapshot, inherited
+  ones included), and dispatch builds it from the job's lease for build and shard jobs
+  alike. Healthy long shards and long diff phases no longer read as hung; attempt-log
+  lines still touch the lease too.
+- **Render cancellation is per run.** `RenderRequest.runId` (the shard id for a shard,
+  the build id otherwise) and `CaptureRunner.cancel(buildId, runId?)`: a timeout, stall
+  or lost lease cancels only that run, and a cancel without a run id stops every render
+  of the build. Runners track their calls with `RenderRuns` (`@storyshelf/core/adapter/capture-runner`).
+- **The build always reaches an owner of "finished".** A redelivered shard that is already
+  `done` still reduces when its build is `capturing`, so a worker that died between
+  completing the shard and finalizing is covered. A finalize that throws releases its
+  claim row for that redelivery; on a last try it fails the build instead. A claim left
+  `running` past five minutes (a worker that died mid-finalize) is taken over; a finished
+  one is marked `done`. `finalizeBuild` is idempotent, so a second finalize is harmless.
+- **Only the finalizer closes the plan's attempt** (and posts the terminal status), with
+  its counts, through `ShardRunInput.onFinalized`; a shard that fails after another run
+  finalized, or while siblings are open, leaves the attempt alone.
+- The plan uses the same `affectedPathsFor` rule as the unsharded path (a build that did
+  not opt into affected capture renders everything), and a new plan of a build first drops
+  the build's earlier snapshots and cancels the attempts an earlier plan left open.
 
 ### Measured: sharded capture on one host
 

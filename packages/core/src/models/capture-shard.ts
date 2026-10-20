@@ -142,26 +142,66 @@ export class CaptureShardModel {
    * Try to become the one worker that finalizes the build. The claim row's primary key is
    * `<buildId>:finalize`, so inserting it succeeds for exactly one caller on every database;
    * everyone else gets a key conflict, which this reports as `false`.
+   *
+   * A claim still `running` after {@link FINALIZE_STALE_MS} belonged to a worker that died
+   * mid-finalize, and is taken over. Two late takers can both win; finalizing is idempotent.
    */
-  async claimFinalize(projectId: string, buildId: string): Promise<boolean> {
-    const now = new Date().toISOString();
-    const id = `${buildId}:finalize`;
+  async claimFinalize(projectId: string, buildId: string, now = new Date()): Promise<boolean> {
+    const id = finalizeId(buildId);
     try {
       await this.#db.insert(this.#table, {
-        ...base(projectId, buildId, "finalize", 0, now),
+        ...base(projectId, buildId, "finalize", 0, now.toISOString()),
         id,
         status: "running",
-        startedAt: now,
+        startedAt: now.toISOString(),
       });
       return true;
     } catch (error) {
       // A conflict means someone else holds the claim; anything else is a real failure.
-      if ((await this.get(id)) !== null) {
-        return false;
+      const held = await this.get(id);
+      if (held === null) {
+        throw error;
       }
-      throw error;
+      return await this.#takeOverStale(held, now);
     }
   }
+
+  /** The finalize ran to the end: its claim is closed for good. */
+  async finishFinalize(buildId: string): Promise<void> {
+    const now = new Date().toISOString();
+    await this.#db.update(this.#table, finalizeId(buildId), {
+      status: "done",
+      finishedAt: now,
+      updatedAt: now,
+    });
+  }
+
+  /** The finalize failed: drop its claim, so the next run to reduce the build can finalize it. */
+  async releaseFinalize(buildId: string): Promise<void> {
+    await this.#db.remove(this.#table, finalizeId(buildId));
+  }
+
+  async #takeOverStale(held: CaptureShard, now: Date): Promise<boolean> {
+    const since = Date.parse(held.startedAt ?? held.createdAt);
+    if (held.status !== "running" || now.getTime() - since < FINALIZE_STALE_MS) {
+      return false;
+    }
+    await this.#db.update(this.#table, held.id, {
+      startedAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    });
+    return true;
+  }
+}
+
+/**
+ * How long a finalize claim may stay `running` before it counts as abandoned. Finalizing is a
+ * handful of queries over the build's snapshots, so minutes is long past any healthy run.
+ */
+export const FINALIZE_STALE_MS = 5 * 60_000;
+
+function finalizeId(buildId: string): string {
+  return `${buildId}:finalize`;
 }
 
 type NewShardRow = Omit<CaptureShard, "id">;

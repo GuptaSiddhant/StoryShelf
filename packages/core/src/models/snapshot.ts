@@ -64,19 +64,41 @@ export class SnapshotModel {
     })) as unknown as Snapshot;
   }
 
-  /** List all snapshots belonging to a build. */
   /**
-   * Delete a build's snapshots of some stories: a shard that is run again starts from a clean slate
-   * instead of colliding with rows an earlier, interrupted run left behind.
+   * Delete the rendered snapshots a shard is about to write again: rows of `(story, engine)` pairs
+   * in `work`, so a rerun starts from a clean slate instead of colliding with rows an earlier,
+   * interrupted run left behind. Inherited rows are kept: the plan wrote them, for engines or
+   * viewports this shard does not render.
    */
-  async removeForStories(buildId: string, storyIds: ReadonlySet<string>): Promise<number> {
-    const doomed = (await this.listByBuild(buildId)).filter((row) => storyIds.has(row.storyId));
+  async removeRendered(
+    buildId: string,
+    work: readonly { browser: string; storyIds: ReadonlySet<string> }[],
+  ): Promise<number> {
+    const doomed = (await this.listByBuild(buildId)).filter(
+      (row) =>
+        !row.inherited &&
+        work.some(
+          (engine) =>
+            engine.browser === (row.browser ?? DEFAULT_BROWSER) && engine.storyIds.has(row.storyId),
+        ),
+    );
+    await this.#removeAll(doomed);
+    return doomed.length;
+  }
+
+  /** Delete every snapshot of a build: a new plan of it starts clean. */
+  async removeForBuild(buildId: string): Promise<number> {
+    const doomed = await this.listByBuild(buildId);
+    await this.#removeAll(doomed);
+    return doomed.length;
+  }
+
+  async #removeAll(rows: readonly Snapshot[]): Promise<void> {
     await Promise.all(
-      doomed.map(async (row) => {
+      rows.map(async (row) => {
         await this.db.remove(this.tables.snapshots, row.id);
       }),
     );
-    return doomed.length;
   }
 
   /**
@@ -93,6 +115,7 @@ export class SnapshotModel {
     return totals;
   }
 
+  /** List all snapshots belonging to a build. */
   async listByBuild(buildId: string): Promise<Snapshot[]> {
     return (await this.db.list(this.tables.snapshots, {
       where: eq(col(this.tables.snapshots, "buildId"), buildId),

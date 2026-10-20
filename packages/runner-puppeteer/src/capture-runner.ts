@@ -45,7 +45,7 @@ export function createPuppeteerCaptureRunner(
     },
     async render(input: PuppeteerRenderInput) {
       const active: ActiveRun = { cancelled: false, browser: null };
-      activeRuns.set(input.buildId, active);
+      const remove = activeRuns.add(input.buildId, input.runId, active);
       try {
         return await renderAll(
           { concurrency, navigationTimeoutMs, recycleBrowserEvery, reusePages, ...input },
@@ -53,14 +53,16 @@ export function createPuppeteerCaptureRunner(
           options,
         );
       } finally {
-        activeRuns.delete(input.buildId);
+        remove();
       }
     },
-    async cancel(buildId) {
-      const active = activeRuns.get(buildId);
-      if (!active) return;
-      active.cancelled = true;
-      await closeBrowser(active.browser);
+    async cancel(buildId, runId) {
+      await Promise.all(
+        activeRuns.matching(buildId, runId).map(async (active) => {
+          active.cancelled = true;
+          await closeBrowser(active.browser);
+        }),
+      );
     },
   };
 }

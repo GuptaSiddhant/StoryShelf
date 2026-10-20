@@ -28,6 +28,8 @@ const FAILURE_ERROR_MAX = 500;
 /** Render input assembled by the orchestrator for one build. */
 export interface RenderRequest {
   buildId: string;
+  /** This render's cancel handle within the build (see `CaptureRunner.render`). */
+  runId?: string | undefined;
   storybookDir: string;
   stories: Parameters<CaptureRunner["render"]>[0]["stories"];
   viewports: Parameters<CaptureRunner["render"]>[0]["viewports"];
@@ -73,7 +75,8 @@ export async function renderWithTimeout(
     return capFailures(await Promise.race([runner.render(request), timeout]));
   } catch (error) {
     if (timedOut) {
-      await runner.cancel(request.buildId).catch(() => {});
+      // Only this render: a sibling shard of the same build may be rendering in this process.
+      await runner.cancel(request.buildId, request.runId).catch(() => {});
     }
     throw error;
   } finally {

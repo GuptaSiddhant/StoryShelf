@@ -38,7 +38,7 @@ interface CaptureRunner {
     executePlay?;
     playTimeoutMs?;
   }): Promise<RenderResult>;
-  cancel(buildId): Promise<void>;
+  cancel(buildId, runId?): Promise<void>; // one render (a shard), or all of the build
 }
 ```
 

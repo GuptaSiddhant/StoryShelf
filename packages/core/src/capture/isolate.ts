@@ -6,17 +6,22 @@ import type { StoryEntry } from "./adapter.ts";
  * Render one engine's stories, narrowing a crash down to the story that caused it.
  *
  * A render call that throws takes its whole slice with it, so the stories it had not reached yet are
- * re-rendered as two halves, and so on until a single story is left holding the crash: that story is
- * failed on its own and its shard-mates still get captured. A crash that never yields a single
- * screenshot is treated as the environment being broken rather than any one story's fault, and
- * rethrown for the caller to fail the whole slice.
+ * re-rendered as two halves, and so on until a single story is left holding the crash. That story
+ * gets one pass on its own (a fresh browser) before it is blamed: only a story that crashes alone is
+ * failed, and its shard-mates still get captured. A crash that never yields a single screenshot is
+ * treated as the environment being broken rather than any one story's fault, and rethrown for the
+ * caller to fail the whole slice.
+ *
+ * A story counts as done only once every one of its viewports has a capture or a failure, so a
+ * crash partway through a story's viewports renders it again rather than losing the rest.
  */
 export async function renderIsolating(
   stories: readonly StoryEntry[],
   pass: (slice: StoryEntry[]) => Promise<PassOutcome>,
-  note?: IsolationNote,
+  options: IsolationOptions = {},
 ): Promise<IsolatedResult> {
-  const state = newState(stories.length);
+  const { note } = options;
+  const state = newState(stories.length, options.viewportsOf);
   const queue: StoryEntry[][] = stories.length > 0 ? [[...stories]] : [];
   while (queue.length > 0) {
     // oxlint-disable-next-line no-await-in-loop -- one browser at a time, like the render loop
@@ -70,6 +75,16 @@ export interface IsolatedResult {
   poisoned: string[];
 }
 
+/** How {@link renderIsolating} reports and what it knows about the stories. */
+export interface IsolationOptions {
+  note?: IsolationNote | undefined;
+  /**
+   * Names of the viewports a story is rendered at (as resolved for the pass). Without it, a story
+   * counts as done after its first capture or failure.
+   */
+  viewportsOf?: ((story: StoryEntry) => readonly string[]) | undefined;
+}
+
 /** Progress lines for the attempt log; the caller decides where they go. */
 export type IsolationNote = (
   event: "isolating" | "poisoned" | "abandoned",
@@ -90,7 +105,11 @@ interface IsolationState {
   captures: RenderedSnapshot[];
   failures: RenderFailure[];
   poisoned: string[];
+  /** Stories with every viewport captured or failed, or blamed as a whole. */
   captured: Set<string>;
+  /** `(story, viewport)` pairs captured or failed so far. */
+  settled: Set<string>;
+  viewportsOf: ((story: StoryEntry) => readonly string[]) | undefined;
   passes: number;
   /**
    * Crashing passes to allow before a slice that has produced nothing at all is given up on: enough
@@ -101,12 +120,14 @@ interface IsolationState {
   crash?: unknown;
 }
 
-function newState(total: number): IsolationState {
+function newState(total: number, viewportsOf: IsolationState["viewportsOf"]): IsolationState {
   return {
     captures: [],
     failures: [],
     poisoned: [],
     captured: new Set(),
+    settled: new Set(),
+    viewportsOf,
     passes: 0,
     blindBudget: Math.ceil(Math.log2(total + 1)) + 2,
   };
@@ -121,42 +142,75 @@ function result(state: IsolationState, renderCount: number): IsolatedResult {
   };
 }
 
-/** Take in what a pass produced, successful or not. */
+/**
+ * Take in what a pass produced, successful or not. A story rendered again after a crash yields its
+ * already-settled viewports a second time; only the first of each is kept.
+ */
 function absorb(state: IsolationState, outcome: PassOutcome): void {
   state.passes += 1;
-  state.captures.push(...outcome.captures);
-  state.failures.push(...outcome.failures);
   for (const capture of outcome.captures) {
-    state.captured.add(capture.story.id);
+    if (settle(state, capture.story.id, capture.viewportName)) {
+      state.captures.push(capture);
+    }
   }
   for (const failure of outcome.failures) {
-    state.captured.add(failure.storyId);
+    if (settle(state, failure.storyId, failure.viewportName)) {
+      state.failures.push(failure);
+    }
   }
   if (outcome.error !== undefined) {
     state.crash ??= outcome.error;
   }
 }
 
-/** Blame a single story, or queue the halves of a crashed slice for another try. */
+/** Record one `(story, viewport)` outcome; false when it was already in. */
+function settle(state: IsolationState, storyId: string, viewportName: string): boolean {
+  const key = `${storyId}\u0000${viewportName}`;
+  if (state.settled.has(key) || state.captured.has(storyId)) {
+    return false;
+  }
+  state.settled.add(key);
+  return true;
+}
+
+/** Whether every viewport of the story has an outcome (or the story was failed as a whole). */
+function isDone(state: IsolationState, story: StoryEntry): boolean {
+  if (state.captured.has(story.id)) {
+    return true;
+  }
+  const names = state.viewportsOf?.(story);
+  const done = names
+    ? names.every((name) => state.settled.has(`${story.id}\u0000${name}`))
+    : [...state.settled].some((key) => key.startsWith(`${story.id}\u0000`));
+  if (done) {
+    state.captured.add(story.id);
+  }
+  return done;
+}
+
+/**
+ * Narrow a crashed slice down: queue the halves of what it left unfinished for another try. The
+ * last story left gets a pass on its own first, and is blamed only if it crashes there too.
+ */
 function split(
   state: IsolationState,
   slice: StoryEntry[],
   queue: StoryEntry[][],
   note?: IsolationNote,
 ): void {
-  const rest = slice.filter((story) => !state.captured.has(story.id));
+  const rest = slice.filter((story) => !isDone(state, story));
   const [first] = rest;
   if (first === undefined) {
     return;
   }
-  if (rest.length === 1) {
+  if (rest.length === 1 && slice.length === 1) {
     blame(state, first, note);
     return;
   }
   const half = Math.ceil(rest.length / 2);
   // Breadth first: the healthy half renders early, which is what tells a bad story apart from a
   // broken browser (see `blindBudget`).
-  queue.push(rest.slice(0, half), rest.slice(half));
+  queue.push(...[rest.slice(0, half), rest.slice(half)].filter((part) => part.length > 0));
   note?.("isolating", { stories: rest.length });
 }
 
@@ -176,7 +230,7 @@ function blame(state: IsolationState, story: StoryEntry, note?: IsolationNote): 
 function failRest(state: IsolationState, queue: StoryEntry[][], note?: IsolationNote): void {
   const rest = queue
     .flat()
-    .filter((story) => !state.captured.has(story.id))
+    .filter((story) => !isDone(state, story))
     .map((story) => story.id);
   for (const storyId of new Set(rest)) {
     state.captured.add(storyId);

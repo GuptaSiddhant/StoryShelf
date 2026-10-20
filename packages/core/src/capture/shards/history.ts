@@ -15,7 +15,8 @@ export async function storyDurations(target: ShardTarget): Promise<Map<string, n
   const { options, project, build } = target;
   const builds = new BuildModel(options.db, options.tables);
   const snapshots = new SnapshotModel(options.db, options.tables);
-  const recent = (await builds.list(project.id))
+  // One extra in case the build being planned is among the newest.
+  const recent = (await builds.list(project.id, { limit: BUILDS_SCANNED + 1 }))
     .filter((candidate) => candidate.id !== build.id)
     .slice(0, BUILDS_SCANNED);
   for (const candidate of recent) {
