@@ -51,8 +51,11 @@ COPY --from=builder /app/fixtures/storybook-8 ./fixtures/storybook-8
 # `/app/dist/server.mjs` is `/app/assets/` — a path the bundler does not emit
 # on its own. Copy the whole directory so new assets don't break boot.
 COPY --from=builder /app/packages/app/src/assets ./assets
-# Install chromium + system deps (node:slim has no browsers)
-RUN npm i -g playwright@1.63.0 && playwright install --with-deps chromium
+# Install the browser + system deps (node:slim has none) with the app's own
+# hoisted playwright-core, so the browser build always matches the locked
+# version. `chromium.launch()` runs headless, which uses chrome-headless-shell
+# only, so skip the full Chromium download (~190 MB compressed).
+RUN node node_modules/playwright-core/cli.js install --with-deps --only-shell chromium
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV DATA_DIR=/data
