@@ -8,24 +8,41 @@ let fonts: Promise<string | undefined> | undefined;
 
 /**
  * Digest of the installed system font families (`fc-list`), or undefined where fontconfig is not
- * available. Cached for the process: fonts do not change under a running server.
+ * available. Cached for the process (fonts do not change under a running server), except a failed
+ * run such as a timeout under load: that is retried next time rather than reported as "no fonts"
+ * for the life of the process.
  */
 export async function systemFontsHash(): Promise<string | undefined> {
-  fonts ??= listFonts();
+  fonts ??= listFonts().then((result) => {
+    if (!result.settled) {
+      fonts = undefined;
+    }
+    return result.hash;
+  });
   return await fonts;
 }
 
-async function listFonts(): Promise<string | undefined> {
+/** An `fc-list` outcome; `settled` is false for a failure worth retrying. */
+interface FontsResult {
+  hash: string | undefined;
+  settled: boolean;
+}
+
+async function listFonts(): Promise<FontsResult> {
   const getBuiltin = (process as { getBuiltinModule?: (id: string) => unknown }).getBuiltinModule;
   const childProcess = getBuiltin?.call(process, "node:child_process") as
     | ChildProcessModule
     | undefined;
   if (!childProcess) {
-    return undefined;
+    return { hash: undefined, settled: true };
   }
-  return await new Promise<string | undefined>((resolve) => {
+  return await new Promise<FontsResult>((resolve) => {
     childProcess.execFile("fc-list", [":", "family"], { timeout: 3000 }, (error, stdout) => {
-      resolve(error ? undefined : digestOf(stdout));
+      resolve(
+        error
+          ? { hash: undefined, settled: (error as { code?: unknown }).code === "ENOENT" }
+          : { hash: digestOf(stdout), settled: true },
+      );
     });
   });
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { contentPath } from "../utils/paths.ts";
+import { storeScreenshot, withContentClaim } from "../utils/screenshot-store.ts";
 import { sweepScreenshotContent, SWEEP_GRACE_MS } from "./screenshot-sweep.ts";
 
 const STAMP = "2026-01-01T00:00:00.000Z";
@@ -12,7 +13,11 @@ async function world() {
   const deps = {
     db,
     storage,
-    tables: { snapshots: db.tables.snapshots, baselines: db.tables.baselines },
+    tables: {
+      snapshots: db.tables.snapshots,
+      baselines: db.tables.baselines,
+      builds: db.tables.builds,
+    },
   };
   const put = (hash: string, project = "p1"): string => {
     const path = contentPath(project, hash);
@@ -47,7 +52,18 @@ async function world() {
       updatedAt: STAMP,
     });
   };
-  return { deps, objects, put, snapshotAt, baselineAt };
+  const buildAt = async (status: string, updatedAt: number, project = "p1"): Promise<string> => {
+    const id = `b-${status}-${updatedAt}`;
+    await db.insert(db.tables.builds, {
+      id,
+      projectId: project,
+      status,
+      createdAt: STAMP,
+      updatedAt: new Date(updatedAt).toISOString(),
+    });
+    return id;
+  };
+  return { deps, storage, objects, put, snapshotAt, baselineAt, buildAt };
 }
 
 describe("sweepScreenshotContent", () => {
@@ -137,5 +153,56 @@ describe("sweepScreenshotContent", () => {
     const result = await sweepScreenshotContent(deps, "p1", { now: 1_000 });
     expect(result).toEqual({ removed: 0, pending: 1 });
     expect(objects.has(path)).toBe(true);
+  });
+});
+
+describe("sweepScreenshotContent with reuse in flight", () => {
+  const T0 = Date.parse("2026-06-01T00:00:00.000Z");
+  const DUE = T0 + SWEEP_GRACE_MS + 60 * 60 * 1000;
+  const BYTES = Buffer.from("same pixels");
+
+  it("keeps an object a capturing build just reused, until the build settles", async () => {
+    const { deps, storage, objects, buildAt } = await world();
+    const path = await storeScreenshot(storage, "p1", BYTES);
+    await sweepScreenshotContent(deps, "p1", { now: T0 });
+
+    // A rebuild renders the same bytes: the write is skipped, and no row exists yet.
+    const build = await buildAt("capturing", DUE - 1000);
+    expect(await storeScreenshot(storage, "p1", BYTES)).toBe(path);
+    const during = await sweepScreenshotContent(deps, "p1", { now: DUE });
+    expect(during).toEqual({ removed: 0, pending: 1 });
+    expect(objects.has(path)).toBe(true);
+
+    // Once the build is terminal (and still nothing references it), the object goes.
+    await deps.db.update(deps.db.tables.builds, build, { status: "failed" });
+    expect((await sweepScreenshotContent(deps, "p1", { now: DUE })).removed).toBe(1);
+  });
+
+  it("ignores builds of other projects and builds stuck past the grace period", async () => {
+    const { deps, objects, put, buildAt } = await world();
+    const path = put(H("h"));
+    await sweepScreenshotContent(deps, "p1", { now: T0 });
+    await buildAt("capturing", DUE, "p2");
+    await buildAt("pending", DUE - SWEEP_GRACE_MS - 1);
+    expect((await sweepScreenshotContent(deps, "p1", { now: DUE })).removed).toBe(1);
+    expect(objects.has(path)).toBe(false);
+  });
+
+  it("keeps everything while a reuse claim is held, and ignores a stale claim", async () => {
+    const { deps, storage, objects, put } = await world();
+    const path = put(H("i"));
+    await sweepScreenshotContent(deps, "p1", { now: T0 });
+    const during = await withContentClaim(
+      storage,
+      "p1",
+      async () =>
+        await sweepScreenshotContent(deps, "p1", { now: Date.now() + SWEEP_GRACE_MS / 2 }),
+    );
+    expect(during.removed).toBe(0);
+    expect(objects.has(path)).toBe(true);
+    // The claim is released afterwards; a crash-left claim older than the grace does not block.
+    expect([...objects.keys()].some((key) => key.includes("/.claims/"))).toBe(false);
+    objects.set("p1/content/.claims/old.json", Buffer.from(JSON.stringify({ at: T0 })));
+    expect((await sweepScreenshotContent(deps, "p1", { now: DUE })).removed).toBe(1);
   });
 });

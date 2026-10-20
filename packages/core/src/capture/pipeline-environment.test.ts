@@ -35,8 +35,8 @@ const ENV_A: CaptureEnvironment = {
 };
 const ENV_B: CaptureEnvironment = { ...ENV_A, browserVersion: "126.0.0" };
 
-function png(rgb: [number, number, number]): Buffer {
-  const image = new PNG({ width: 4, height: 4 });
+function png(rgb: [number, number, number], width = 4): Buffer {
+  const image = new PNG({ width, height: 4 });
   for (let index = 0; index < image.data.length; index += 4) {
     [image.data[index], image.data[index + 1], image.data[index + 2]] = rgb;
     image.data[index + 3] = 255;
@@ -47,11 +47,15 @@ function png(rgb: [number, number, number]): Buffer {
 const RED = png([255, 0, 0]);
 const GREEN = png([0, 255, 0]);
 
-function capture(screenshot: Buffer, environment?: CaptureEnvironment): RenderedSnapshot {
+function capture(
+  screenshot: Buffer,
+  environment?: CaptureEnvironment,
+  viewport = VIEWPORT,
+): RenderedSnapshot {
   return {
     story: { id: "a", title: "Button", name: "Primary", type: "story" },
-    viewportName: VIEWPORT.name,
-    viewport: VIEWPORT,
+    viewportName: viewport.name,
+    viewport,
     screenshot,
     ...(environment ? { environment } : {}),
   };
@@ -67,6 +71,7 @@ function world() {
     environment?: CaptureEnvironment;
     isDefault: boolean;
     branch?: string;
+    viewport?: typeof VIEWPORT;
   }): Promise<CaptureContext> => {
     count += 1;
     const build = {
@@ -92,7 +97,7 @@ function world() {
       project,
       build,
       viewports: [VIEWPORT],
-      captures: [capture(options.shot, options.environment)],
+      captures: [capture(options.shot, options.environment, options.viewport)],
     };
     await persistCapture(ctx);
     return ctx;
@@ -143,20 +148,75 @@ describe("capture environment migration", () => {
     expect(objects.get(after?.screenshotPath ?? "")?.equals(GREEN)).toBe(true);
   });
 
-  it("accepts a feature-branch snapshot but leaves the default baseline alone", async () => {
+  it("still diffs a feature-branch snapshot under a changed environment", async () => {
     const { run, baselines, snapshotOf } = world();
     await run({ shot: RED, environment: ENV_A, isDefault: true });
     const before = (await baselines())[0];
 
+    // A real change must not be auto-accepted just because main has not re-rendered yet.
     await run({ shot: GREEN, environment: ENV_B, isDefault: false });
     const snapshot = await snapshotOf("b2");
 
-    expect(snapshot?.status).toBe("unchanged");
-    expect(snapshot?.envChange).toBeTruthy();
+    expect(snapshot?.status).toBe("changed");
+    expect(snapshot?.diffPixels).toBeGreaterThan(0);
+    const change = JSON.parse(snapshot?.envChange ?? "null") as EnvironmentChange;
+    expect(change.changed).toEqual(["browserVersion"]);
     const after = await baselines();
     expect(after).toHaveLength(1);
     expect(after[0]?.updatedAt).toBe(before?.updatedAt);
     expect(after[0]?.infraHash).toBe(before?.infraHash);
+  });
+
+  it("passes an identical feature-branch snapshot under a changed environment", async () => {
+    const { run, snapshotOf } = world();
+    await run({ shot: RED, environment: ENV_A, isDefault: true });
+    await run({ shot: RED, environment: ENV_B, isDefault: false });
+    const snapshot = await snapshotOf("b2");
+    expect(snapshot?.status).toBe("unchanged");
+    expect(snapshot?.envChange).toBeTruthy();
+  });
+
+  it("diffs a capture with no environment instead of migrating, and keeps the fingerprint", async () => {
+    const { run, baselines, snapshotOf } = world();
+    await run({ shot: RED, environment: ENV_A, isDefault: true });
+
+    // Spooled before a browser crash: no environment reported.
+    await run({ shot: GREEN, isDefault: false });
+    expect(await snapshotOf("b2")).toMatchObject({ status: "changed", envChange: null });
+
+    await run({ shot: GREEN, isDefault: true });
+    expect(await snapshotOf("b3")).toMatchObject({ status: "approved", envChange: null });
+    const [baseline] = await baselines();
+    expect(JSON.parse(baseline?.fingerprint ?? "{}")).toMatchObject({
+      browserVersion: "124.0.1",
+      platform: "linux-x64",
+      fontsHash: "fonts-a",
+    });
+
+    // The next healthy build is not a migration either: it diffs.
+    await run({ shot: RED, environment: ENV_A, isDefault: false });
+    expect(await snapshotOf("b4")).toMatchObject({ status: "changed", envChange: null });
+  });
+
+  it("fills a baseline's unknown components once a capture reports them", async () => {
+    const { run, baselines } = world();
+    await run({ shot: RED, isDefault: true });
+    await run({ shot: RED, environment: ENV_A, isDefault: true });
+    const [baseline] = await baselines();
+    expect(JSON.parse(baseline?.fingerprint ?? "{}").browserVersion).toBe("124.0.1");
+  });
+
+  it("diffs a viewport size change from story code instead of migrating", async () => {
+    const { run, snapshotOf } = world();
+    await run({ shot: RED, environment: ENV_A, isDefault: true });
+    await run({
+      shot: png([255, 0, 0], 6),
+      environment: ENV_A,
+      isDefault: false,
+      viewport: { ...VIEWPORT, width: 1440 },
+    });
+    const snapshot = await snapshotOf("b2");
+    expect(snapshot).toMatchObject({ status: "changed", envChange: null, diffPassed: false });
   });
 
   it("still diffs when the environment is unchanged", async () => {

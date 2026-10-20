@@ -133,13 +133,31 @@ the codec does not dominate here, revisit the premise before building the pool.
 
 - **Widen `infraHash` into a capture fingerprint** covering engine, browser build,
   host platform, device scale factor, a digest of the system fonts, viewport and sizing
-  defaults. A mismatch against the baseline is an **environment migration**, not a
-  visual diff: no pixel diff is computed, the snapshot is accepted (`unchanged`) and
-  records which components changed (`snapshots.env_change`); on the default branch the
-  baseline is rewritten with the new fingerprint (`baselines.fingerprint`). Baselines
-  from before fingerprints are compared normally and backfilled. This replaces the
-  unused `projects.automigrate` flag's size-change special case. Trade-off accepted: a
-  regression landing in the same build as an environment change is masked.
+  defaults. The components are compared against the baseline's one by one, and only
+  where both sides report a value: a component a capture did not report (a runner that
+  does not report it, screenshots spooled before a browser crash, a failed `fc-list`) is
+  unknown, not a change, and is never written over a known value on the baseline.
+  Viewport is recorded but never counts as a change: its size comes from story
+  parameters, so a new size is the PR's own change and diffs as a dimension change. A
+  change in any other component is an **environment change**, recorded on the snapshot
+  (`snapshots.env_change`):
+  - On the **default branch** it is a **migration**: no pixel diff is computed, the
+    snapshot is accepted (`unchanged`) and the baseline is rewritten with the new
+    screenshot and fingerprint (`baselines.fingerprint`). Kept because the default branch
+    is authoritative and auto-approves its own changes anyway; the diff would only change
+    the status label. Trade-off accepted: a regression landing on the default branch in
+    the same build as an environment change is masked.
+  - On **any other branch** the snapshot is still diffed, and a difference is `changed`
+    (review required) with the environment change attached, so the review page can say
+    "probably the environment". Auto-accepting here was rejected: it suppressed every
+    diff on every branch until the default branch re-rendered each story, which with
+    affected capture (unaffected stories never re-render) could last indefinitely, and
+    with a mixed worker pool happened constantly. A capture pool should therefore be
+    homogeneous (same image, arch and fonts), or feature builds will show environment
+    noise until the default branch migrates.
+
+  Baselines from before fingerprints are compared normally and backfilled. This replaces
+  the unused `projects.automigrate` flag's size-change special case.
 - **Content-address screenshot blobs** as `<project>/content/<sha256>.png`: per project (not
   global, so project deletion and isolation stay simple), shared by snapshots and
   baselines (a baseline repoints instead of copying), and skipped on upload when the
@@ -149,7 +167,20 @@ the codec does not dominate here, revisit the premise before building the pool.
   purge: an object no snapshot or baseline references is deleted once it has stayed
   unreferenced across two sweeps at least 24 h apart (first-seen times live in
   `<project>/content/.sweep.json`, so no schema change and no storage `stat`), and each
-  candidate is re-checked against the database immediately before deletion. Counters
+  candidate is re-checked against the database immediately before deletion. Reusing an
+  object that already exists writes nothing, so the sweep cannot see it in storage; a
+  capture may hold such a reuse for minutes or hours before its snapshot rows land. The
+  sweep therefore defers every deletion in a project while reuse may be in flight: a
+  build of the project is `pending`, `capturing` or `comparing` (and was updated within
+  the grace period, so a stuck build delays reclaiming storage but never blocks it for
+  good), or a reuse claim (`<project>/content/.claims/<ulid>.json`, written by baseline
+  import and by approving a legacy per-build snapshot around their store-then-write-rows
+  step) younger than the grace period exists. Per-object claims on every dedupe hit
+  were rejected: they would write on exactly the path whose point is to write nothing.
+  Local storage writes through a temp file and a rename, so a write cut short never leaves
+  a torn file at a content address (an existing object is trusted, so a torn one would be
+  reused by every later capture of those bytes), and lists keys `/`-separated on every
+  host. Counters
   would need every delete path (builds, baselines, imports, project delete) to stay
   balanced, and a miss frees a live image. Older per-build and per-baseline files keep
   working and are cleaned up as before.

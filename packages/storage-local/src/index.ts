@@ -1,8 +1,10 @@
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
+import { randomUUID } from "node:crypto";
 import { createReadStream, createWriteStream } from "node:fs";
-import { access, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { access, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { pipeline } from "node:stream/promises";
+import { storageKey } from "./keys.ts";
 
 declare const __PKG_VERSION__: string | undefined;
 
@@ -40,9 +42,9 @@ export function createLocalStorage(dataDir: string): StorageAdapter {
       return await readFile(toAbsolute(root, path));
     },
     async write(path, data) {
-      const target = toAbsolute(root, path);
-      await mkdir(dirname(target), { recursive: true });
-      await writeFile(target, data);
+      await writeAtomically(toAbsolute(root, path), async (temp) => {
+        await writeFile(temp, data);
+      });
     },
     async delete(path) {
       await rm(toAbsolute(root, path), { force: true });
@@ -70,6 +72,27 @@ async function pathExists(target: string): Promise<boolean> {
   }
 }
 
+/**
+ * Write through a temp file in the target's directory, then rename it into place: a write cut
+ * short by a crash or kill never leaves a torn file at `target` (content-addressed screenshots
+ * trust an existing object, so a torn one would poison every later capture with those bytes).
+ * The temp name is a dotfile ending in `.tmp`, so it never looks like a stored screenshot.
+ */
+async function writeAtomically(
+  target: string,
+  fill: (temp: string) => Promise<void>,
+): Promise<void> {
+  await mkdir(dirname(target), { recursive: true });
+  const temp = join(dirname(target), `.${basename(target)}.${randomUUID()}.tmp`);
+  try {
+    await fill(temp);
+    await rename(temp, target);
+  } catch (error) {
+    await rm(temp, { force: true });
+    throw error;
+  }
+}
+
 function toAbsolute(root: string, path: string): string {
   const target = resolve(root, path);
   const rel = relative(root, target);
@@ -87,7 +110,7 @@ async function walk(root: string, dir: string): Promise<string[]> {
       if (entry.isDirectory()) {
         return await walk(root, full);
       }
-      return [relative(root, full)];
+      return [storageKey(relative(root, full))];
     }),
   );
   return nested.flat();
@@ -97,15 +120,9 @@ async function walk(root: string, dir: string): Promise<string[]> {
 function buildStreamMethods(root: string): Pick<StorageAdapter, "writeStream" | "readStream"> {
   return {
     async writeStream(path, stream) {
-      const target = toAbsolute(root, path);
-      await mkdir(dirname(target), { recursive: true });
-      const out = createWriteStream(target);
-      try {
-        await pipeline(stream, out);
-      } catch (error) {
-        await rm(target, { force: true });
-        throw error;
-      }
+      await writeAtomically(toAbsolute(root, path), async (temp) => {
+        await pipeline(stream, createWriteStream(temp));
+      });
     },
     async readStream(path) {
       const target = toAbsolute(root, path);

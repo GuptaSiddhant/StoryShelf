@@ -120,6 +120,25 @@ describe("BaselineModel", () => {
     await expect(storage.exists(contentOf(PNG))).resolves.toBe(true);
   });
 
+  it("claims content while storing a legacy source, and not for a content source", async () => {
+    const { db, storage } = setup();
+    const model = new BaselineModel(db, { baselines: db.tables.baselines }, storage);
+    await storage.write("source/shot.png", PNG);
+    const writes: string[] = [];
+    const write = storage.write.bind(storage);
+    storage.write = async (path, data) => {
+      writes.push(path);
+      await write(path, data);
+    };
+    await model.upsert("p1", "story", "desktop", "main", "snap-1", "source/shot.png");
+    expect(writes[0]).toMatch(/^p1\/content\/\.claims\/.+\.json$/u);
+    await expect(storage.exists(writes[0] ?? "")).resolves.toBe(false);
+
+    writes.length = 0;
+    await model.upsert("p1", "story", "desktop", "main", "snap-2", contentOf(PNG));
+    expect(writes).toEqual([]);
+  });
+
   it("keeps one baseline per engine for the same story and mode", async () => {
     const { db, storage } = setup();
     const model = new BaselineModel(db, { baselines: db.tables.baselines }, storage);

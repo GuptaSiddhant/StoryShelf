@@ -7,6 +7,7 @@ import { DEFAULT_BROWSER } from "../adapters/capture-runner.ts";
 import type { DatabaseAdapter, TxStore } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import type { Baseline } from "../schema/baseline.ts";
+import { withContentClaim } from "../utils/screenshot-store.ts";
 import { ulid } from "../utils/ulid.ts";
 import { baselineIdentity } from "./baseline-archive.ts";
 import { exportBaselineArchive, type BaselineExportOptions } from "./baseline-export.ts";
@@ -61,15 +62,21 @@ export class BaselineTransferModel {
    */
   async import(projectId: string, archive: Buffer): Promise<BaselineImportResult> {
     const plan = await planBaselineImport(archive, projectId);
-    return await serialized(projectId, async () => {
-      for (const planned of plan) {
-        // oxlint-disable-next-line eslint/no-await-in-loop -- sequential writes bound storage load
-        await writePlannedImage(this.storage, planned);
-      }
-      const existing = await this.existingByIdentity(projectId);
-      const created = await this.applyRows(projectId, plan, existing);
-      return { imported: plan.length, created, updated: plan.length - created };
-    });
+    // Images that already exist are reused, not written: claim the project's content so the
+    // screenshot sweep cannot delete one before the rows pointing at it are committed.
+    return await serialized(
+      projectId,
+      async () =>
+        await withContentClaim(this.storage, projectId, async () => {
+          for (const planned of plan) {
+            // oxlint-disable-next-line eslint/no-await-in-loop -- sequential writes bound storage load
+            await writePlannedImage(this.storage, planned);
+          }
+          const existing = await this.existingByIdentity(projectId);
+          const created = await this.applyRows(projectId, plan, existing);
+          return { imported: plan.length, created, updated: plan.length - created };
+        }),
+    );
   }
 
   private async existingByIdentity(projectId: string): Promise<Map<string, Baseline>> {

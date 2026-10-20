@@ -94,6 +94,7 @@ export class Retention {
           tables: {
             snapshots: this.db.tables.snapshots,
             baselines: this.tables.baselines,
+            builds: this.tables.builds,
           },
           logger: this.logger,
         },
