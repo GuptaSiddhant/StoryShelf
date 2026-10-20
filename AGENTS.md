@@ -59,6 +59,7 @@ StoryShelf/
     db-mysql/       @storyshelf/db-mysql        -- MySQL/MariaDB database adapters (mysql2 default + planetscale/tidb presets via subpaths)
     storage-local/  @storyshelf/storage-local  -- Local filesystem storage adapter
     storage-s3/     @storyshelf/storage-s3     -- S3-compatible storage adapter (S3, R2, MinIO)
+    image/          @storyshelf/image           -- Pixel diff, overlay rendering and thumbnails on a worker pool; pngjs default codec, optional sharp (leaf package, see ADR 0032)
     auth/           @storyshelf/auth            -- Better Auth engine (local accounts, OAuth/OIDC, SSO, passkeys; see ADR 0023)
     cli/            storyshelf              -- CLI client (commander; upload/init/create/server/retry/purge, no Playwright)
     runner-playwright/ @storyshelf/runner-playwright -- pure Playwright CaptureRenderer (server-side render; core orchestrator owns capture)
@@ -177,6 +178,7 @@ This distinction matters for:
 | 0028 | Modes and Multi-Browser Capture (named modes from parameters, per-engine baselines, shared approval) |
 | 0029 | Design Provider Adapter (`@storyshelf/design-figma`; vendor-neutral links, cache and credentials in core) |
 | 0030 | User OAuth Connections (service-neutral "Connect your account": `OAuthClient`, `user_connections`, shared `/connections/:service` flow) |
+| 0032 | Image Engines (`@storyshelf/image` leaf package; opt-in `sharp` codec; pixelmatch stays the comparator) |
 
 ## Parallel Development with Worktrees
 

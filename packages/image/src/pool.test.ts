@@ -1,7 +1,7 @@
 import { PNG } from "pngjs";
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  configureDiffPool,
+  configureImages,
   DIFF_WORKERS_ENV,
   diffImagesAsync,
   resolveDiffWorkers,
@@ -34,8 +34,12 @@ const tolerated = (): Buffer => png(40, 30, (x, y) => x === 0 && y === 0);
 const resized = (): Buffer => png(20, 15);
 
 const pools: DiffPool[] = [];
-function makePool(size: number, workerUrl: URL | string = WORKER_URL): DiffPool {
-  const pool = new DiffPool({ size, workerUrl });
+function makePool(
+  size: number,
+  workerUrl: URL | string = WORKER_URL,
+  engine?: "pngjs" | "sharp",
+): DiffPool {
+  const pool = new DiffPool({ size, workerUrl, engine });
   pools.push(pool);
   return pool;
 }
@@ -43,7 +47,7 @@ function makePool(size: number, workerUrl: URL | string = WORKER_URL): DiffPool 
 afterEach(async () => {
   await Promise.all(pools.splice(0).map(async (pool) => await pool.shutdown()));
   await shutdownDiffPool();
-  configureDiffPool({});
+  configureImages({});
   Reflect.deleteProperty(process.env, DIFF_WORKERS_ENV);
 });
 
@@ -63,7 +67,7 @@ describe("sync / pooled parity", () => {
   for (const [name, inputs, options] of cases) {
     it(`gives identical output for: ${name}`, async () => {
       const [a, b] = inputs();
-      const expected = diffImages(a, b, options);
+      const expected = await diffImages(a, b, options);
       const pooled = await makePool(2).run(Buffer.from(a), Buffer.from(b), options);
       const inThread = await makePool(0).run(Buffer.from(a), Buffer.from(b), options);
       expect(pooled).toEqual(expected);
@@ -74,7 +78,7 @@ describe("sync / pooled parity", () => {
 
   it("runs many concurrent diffs across a small pool", async () => {
     const pool = makePool(2);
-    const expected = diffImages(base(), changed(), failOnResize);
+    const expected = await diffImages(base(), changed(), failOnResize);
     const results = await Promise.all(
       Array.from({ length: 12 }, async () => await pool.run(base(), changed(), failOnResize)),
     );
@@ -91,7 +95,7 @@ describe("sync / pooled parity", () => {
 
   it("diffImagesAsync matches diffImages", async () => {
     expect(await diffImagesAsync(base(), changed(), failOnResize)).toEqual(
-      diffImages(base(), changed(), failOnResize),
+      await diffImages(base(), changed(), failOnResize),
     );
   });
 });
@@ -102,7 +106,7 @@ describe("DiffPool failure modes", () => {
     const junk = Buffer.alloc(64, 7);
     await expect(pool.run(junk, base(), failOnResize)).rejects.toThrow();
     expect(await pool.run(base(), changed(), failOnResize)).toEqual(
-      diffImages(base(), changed(), failOnResize),
+      await diffImages(base(), changed(), failOnResize),
     );
     expect(pool.workerCount).toBe(1);
   });
@@ -125,7 +129,7 @@ describe("DiffPool failure modes", () => {
       pool.run(base(), changed(), failOnResize),
       pool.run(base(), changed(), failOnResize),
     ]);
-    const expected = diffImages(base(), changed(), failOnResize);
+    const expected = await diffImages(base(), changed(), failOnResize);
     expect(results).toEqual([expected, expected]);
     // The pool stays in-thread for later calls and keeps no workers.
     expect(await pool.run(base(), changed(), failOnResize)).toEqual(expected);
@@ -169,20 +173,44 @@ describe("worker count", () => {
   it("STORYSHELF_DIFF_WORKERS=0 runs diffImagesAsync in-thread", async () => {
     process.env[DIFF_WORKERS_ENV] = "0";
     expect(await diffImagesAsync(base(), changed(), failOnResize)).toEqual(
-      diffImages(base(), changed(), failOnResize),
+      await diffImages(base(), changed(), failOnResize),
     );
   });
 
   it("compare.threads beats STORYSHELF_DIFF_WORKERS and can be changed at runtime", async () => {
     process.env[DIFF_WORKERS_ENV] = "3";
-    configureDiffPool({ threads: 0 });
+    configureImages({ threads: 0 });
     expect(await diffImagesAsync(base(), changed(), failOnResize)).toEqual(
-      diffImages(base(), changed(), failOnResize),
+      await diffImages(base(), changed(), failOnResize),
     );
     // Reconfiguring replaces the pool; it still produces the same result.
-    configureDiffPool({ threads: 1 });
+    configureImages({ threads: 1 });
     expect(await diffImagesAsync(base(), changed(), failOnResize)).toEqual(
-      diffImages(base(), changed(), failOnResize),
+      await diffImages(base(), changed(), failOnResize),
     );
+  });
+});
+
+describe("sharp engine", () => {
+  it("diffs in workers and in-thread with the same verdict as pngjs", async () => {
+    const expected = await diffImages(base(), changed(), failOnResize);
+    const inWorker = await makePool(1, WORKER_URL, "sharp").run(base(), changed(), failOnResize);
+    const inThread = await makePool(0, WORKER_URL, "sharp").run(base(), changed(), failOnResize);
+    for (const result of [inWorker, inThread]) {
+      expect({ ...result, diffImage: null }).toEqual({ ...expected, diffImage: null });
+      expect(result.diffImage).not.toBeNull();
+      expect(
+        PNG.sync
+          .read(Buffer.from(result.diffImage!))
+          .data.equals(PNG.sync.read(expected.diffImage!).data),
+      ).toBe(true);
+    }
+  });
+
+  it("applies images.engine from configureImages to the shared pool", async () => {
+    configureImages({ engine: "sharp", threads: 1 });
+    const result = await diffImagesAsync(base(), changed(), failOnResize);
+    expect(result.passed).toBe(false);
+    expect(result.diffPixels).toBe(200);
   });
 });

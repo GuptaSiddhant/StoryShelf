@@ -338,6 +338,17 @@ export interface ShelfCompareOptions {
   threads?: number;
 }
 
+/** Image-handling options: which library decodes, encodes and resizes the PNGs. */
+export interface ShelfImagesOptions {
+  /**
+   * Image library for diffs, diff overlays and AI thumbnails: `"pngjs"` (default, pure JavaScript,
+   * runs anywhere) or `"sharp"` (native, several times faster on large PNGs; needs the optional
+   * `sharp` package installed). Falls back to `STORYSHELF_IMAGE_ENGINE`. The pixel comparison is
+   * pixelmatch either way, so verdicts match.
+   */
+  engine?: "pngjs" | "sharp";
+}
+
 /** Adapter and configuration options for creating the shelf router. */
 export interface ShelfOptions {
   database: DatabaseAdapter;
@@ -349,6 +360,8 @@ export interface ShelfOptions {
   capture?: ShelfCaptureOptions;
   /** Screenshot comparison, shared by capture and the re-diff endpoint (which needs it even when nothing renders here). */
   compare?: ShelfCompareOptions;
+  /** Image library selection; see {@link ShelfImagesOptions}. */
+  images?: ShelfImagesOptions;
   auth?: Auth;
   /** AI insights surface (ADR 0026). Set ⇒ AI on site-wide; absent ⇒ off. */
   ai?: Ai;

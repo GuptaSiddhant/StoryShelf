@@ -36,7 +36,7 @@ There is no `tsdown-entry` key. Each `package.json` `exports` map carries `{ sou
   (e.g. runners, workers) — enforced by keeping all HTTP modules in app.
 - Everything else lives under a subpath: adapter interfaces under
   `core/adapter/*`, runtime capture under `core/capture`, logging under
-  `core/logger`, diff under `core/diff`, URLs under `core/urls`, storage paths
+  `core/logger`, diff under `core/diff` (re-exported from the leaf `@storyshelf/image`), URLs under `core/urls`, storage paths
   under `core/paths`, tables/rows under `core/schema`, models under
   `core/models`, config under `core/config`, retention under `core/retention`,
   shared utils under `core/utils`, in-memory fakes under `core/test-helpers`.

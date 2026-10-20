@@ -602,7 +602,7 @@ interface DiffResult {
 }
 ```
 
-Uses `pixelmatch` for pixel comparison and `pngjs` for PNG manipulation.
+Uses `pixelmatch` for pixel comparison and a PNG codec for decode/encode: `pngjs` by default, or opt-in `sharp` (`images.engine`, ADR 0032). The engine lives in `@storyshelf/image` (a leaf package), re-exported from `core/diff`.
 
 ### Diff Overlay
 

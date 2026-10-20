@@ -1,5 +1,7 @@
 /** A small `worker_threads` pool that runs `diffImages` off the main thread. */
 import type { Worker } from "node:worker_threads";
+import type { ImageEngine } from "./codec.ts";
+import { loadCodec } from "./codecs.ts";
 import { diffImages, identicalResult } from "./engine.ts";
 import type { DiffOptions, DiffResult } from "./options.ts";
 import type { DiffRequest, DiffResponse } from "./protocol.ts";
@@ -11,6 +13,8 @@ export interface DiffPoolOptions {
   size: number;
   /** Worker module to spawn. */
   workerUrl: URL | string;
+  /** Image engine the workers (and the in-thread fallback) use; pngjs when omitted. */
+  engine?: ImageEngine;
 }
 
 interface Pending {
@@ -18,6 +22,7 @@ interface Pending {
   baseline: Buffer;
   current: Buffer;
   options: DiffOptions;
+  engine: ImageEngine;
   resolve: (result: DiffResult) => void;
   reject: (error: Error) => void;
 }
@@ -43,6 +48,7 @@ let exitHookInstalled = false;
 export class DiffPool {
   private readonly size: number;
   private readonly workerUrl: URL | string;
+  private readonly engine: ImageEngine;
   private readonly slots: Slot[] = [];
   private queue: Pending[] = [];
   private nextId = 0;
@@ -52,6 +58,7 @@ export class DiffPool {
   constructor(options: DiffPoolOptions) {
     this.size = Math.max(0, Math.floor(options.size));
     this.workerUrl = options.workerUrl;
+    this.engine = options.engine ?? "pngjs";
   }
 
   /**
@@ -64,12 +71,22 @@ export class DiffPool {
       return identical;
     }
     if (this.size === 0 || this.broken || !(await this.loadWorkerClass())) {
-      return diffImages(baseline, current, options);
+      return await this.diffInThread(baseline, current, options);
     }
     return await new Promise<DiffResult>((resolve, reject) => {
-      this.queue.push({ id: (this.nextId += 1), baseline, current, options, resolve, reject });
+      this.nextId += 1;
+      const { nextId: id } = this;
+      this.queue.push({ id, baseline, current, options, engine: this.engine, resolve, reject });
       this.pump();
     });
+  }
+
+  private async diffInThread(
+    baseline: Buffer,
+    current: Buffer,
+    options: DiffOptions,
+  ): Promise<DiffResult> {
+    return await diffImages(baseline, current, options, await loadCodec(this.engine));
   }
 
   /** Stop all workers and reject unfinished work. The pool starts fresh workers if used again. */
@@ -177,11 +194,12 @@ export class DiffPool {
     const queued = this.queue;
     this.queue = [];
     for (const task of queued) {
-      try {
-        task.resolve(diffImages(task.baseline, task.current, task.options));
-      } catch (error) {
-        task.reject(error instanceof Error ? error : new Error(String(error)));
-      }
+      this.diffInThread(task.baseline, task.current, task.options).then(
+        task.resolve,
+        (error: unknown) => {
+          task.reject(error instanceof Error ? error : new Error(String(error)));
+        },
+      );
     }
   }
 }
@@ -211,7 +229,13 @@ function dispatch(slot: Slot, task: Pending): void {
   }
   slot.task = task;
   slot.worker.ref();
-  const request: DiffRequest = { id: task.id, baseline, current, options: task.options };
+  const request: DiffRequest = {
+    id: task.id,
+    baseline,
+    current,
+    options: task.options,
+    engine: task.engine,
+  };
   slot.worker.postMessage(request, [baseline.buffer as ArrayBuffer, current.buffer as ArrayBuffer]);
 }
 

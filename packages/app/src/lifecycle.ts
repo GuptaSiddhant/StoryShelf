@@ -11,7 +11,7 @@ import {
 } from "@storyshelf/core/adapter/setup";
 import type { AdapterSetupResult } from "@storyshelf/core/adapter/setup";
 import type { ShelfOptions } from "@storyshelf/core/config";
-import { shutdownDiffPool } from "@storyshelf/core/diff";
+import { shutdownDiffPool, verifyImageEngine } from "@storyshelf/core/diff";
 import type { Logger } from "@storyshelf/core/logger";
 import { purgeAiData } from "@storyshelf/core/retention";
 import { sanitizeErrorText } from "@storyshelf/core/utils";
@@ -74,6 +74,7 @@ async function firstBootFailure(
   for (const [label, run] of [
     ["auth", runAuthSetup],
     ["ai", runAiSetup],
+    ["images", runImagesSetup],
   ] as const) {
     // eslint-disable-next-line no-await-in-loop -- boot checks run in order and stop at the first failure
     const failed = await run(options);
@@ -181,6 +182,26 @@ async function runAiSetup(options: ShelfOptions): Promise<AdapterSetupResult | n
       ok: false,
       failures: [
         { category: "ai", kind: "ai", name: "ai", error: sanitizeErrorText(message, 500) },
+      ],
+    };
+  }
+}
+/** Load the configured image engine now, so a missing `sharp` fails readiness instead of the first diff. */
+async function runImagesSetup(): Promise<AdapterSetupResult | null> {
+  try {
+    await verifyImageEngine();
+    return null;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      ok: false,
+      failures: [
+        {
+          category: "images",
+          kind: "images",
+          name: "images",
+          error: sanitizeErrorText(message, 500),
+        },
       ],
     };
   }

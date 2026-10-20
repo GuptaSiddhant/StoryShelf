@@ -1,24 +1,30 @@
-/** `diffImagesAsync`: `diffImages` on a lazily created, process-wide worker pool. */
+/** `diffImagesAsync`: `diffImages` on a lazily created, process-wide worker pool, plus `configureImages`. */
 import { availableParallelism } from "node:os";
 import type { DiffOptions, DiffResult } from "./options.ts";
 import { DiffPool } from "./pool.ts";
+import {
+  configuredThreadCount,
+  currentImageEngine,
+  type ImageSettings,
+  setImageSettings,
+} from "./settings.ts";
 
 /** Environment variable overriding the pool size; `0` runs diffs in-thread. */
 export const DIFF_WORKERS_ENV = "STORYSHELF_DIFF_WORKERS";
 
 let pool: DiffPool | undefined;
-let configuredThreads: number | undefined;
 
 /**
- * Set the pool size from configuration (`compare.threads`); beats `STORYSHELF_DIFF_WORKERS`.
- * `undefined` goes back to the environment/default. A running pool of a different size is shut
- * down and rebuilt on next use.
+ * Apply `images.engine` and `compare.threads`; both beat their environment variables
+ * (`STORYSHELF_IMAGE_ENGINE`, `STORYSHELF_DIFF_WORKERS`). A running pool whose engine or size no
+ * longer matches is shut down and rebuilt on next use.
  */
-export function configureDiffPool(options: { threads?: number }): void {
-  if (options.threads === configuredThreads) {
+export function configureImages(settings: ImageSettings): void {
+  const before = { engine: currentImageEngine(), threads: configuredThreadCount() };
+  setImageSettings(settings);
+  if (before.engine === currentImageEngine() && before.threads === configuredThreadCount()) {
     return;
   }
-  configuredThreads = options.threads;
   const stale = pool;
   pool = undefined;
   stale?.shutdown().catch(() => {});
@@ -41,8 +47,9 @@ export async function diffImagesAsync(
   options: DiffOptions,
 ): Promise<DiffResult> {
   pool ??= new DiffPool({
-    size: configuredThreads ?? resolveDiffWorkers(process.env),
+    size: configuredThreadCount() ?? resolveDiffWorkers(process.env),
     workerUrl: defaultWorkerUrl(),
+    engine: currentImageEngine(),
   });
   return await pool.run(baseline, current, options);
 }

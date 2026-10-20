@@ -1,7 +1,6 @@
 /** Diff a stored screenshot against a baseline and persist the overlay; shared by capture and re-diff. */
+import { DEFAULT_DIFF_OPTIONS, diffImagesAsync, type DiffResult } from "@storyshelf/image";
 import type { StorageAdapter } from "../adapters/storage.ts";
-import { diffImagesAsync } from "../diff/async.ts";
-import { DEFAULT_DIFF_OPTIONS, type DiffResult } from "../diff/options.ts";
 
 /** Project thresholds that drive a diff. */
 export interface DiffThresholds {

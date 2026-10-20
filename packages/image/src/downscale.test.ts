@@ -9,14 +9,16 @@ function png(width: number, height: number): Uint8Array {
 }
 
 describe("downscalePng", () => {
-  it("shrinks so the long edge fits and keeps the aspect ratio", () => {
-    const out = PNG.sync.read(Buffer.from(downscalePng(png(1000, 500), 100)));
+  it("shrinks so the long edge fits and keeps the aspect ratio", async () => {
+    const small = await downscalePng(png(1000, 500), 100);
+    const out = PNG.sync.read(Buffer.from(small));
     expect(out.width).toBe(100);
     expect(out.height).toBe(50);
   });
 
-  it("returns small images unchanged in size", () => {
-    const out = PNG.sync.read(Buffer.from(downscalePng(png(40, 20), 100)));
+  it("returns small images unchanged in size", async () => {
+    const small = await downscalePng(png(40, 20), 100);
+    const out = PNG.sync.read(Buffer.from(small));
     expect([out.width, out.height]).toEqual([40, 20]);
   });
 });

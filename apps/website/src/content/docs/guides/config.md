@@ -90,6 +90,10 @@ Uploads at or under `maxInlineUnzipSize` bytes are extracted inline so the publi
 - The Playwright and Puppeteer runners' own `concurrency` option pins how many pages render at once. Left unset, the runner starts from a CPU/memory-sized budget (Firefox and WebKit pages count as two Chromium slots) and adapts: it raises the limit while capture latency and event-loop lag stay flat, halves it on timeouts, and logs every change as `capture concurrency adjusted`.
 - `compare.threads` (a `createShelfApp` option) or `STORYSHELF_DIFF_WORKERS` sets how many worker threads compare screenshots (default: CPU count minus one, minimum 1; the option wins over the variable). `0` diffs on the main thread. The pool serves both capture and the re-diff endpoint, so it matters on servers that never render.
 
+### Image engine
+
+- `images.engine` (a `createShelfApp` option) or `STORYSHELF_IMAGE_ENGINE` picks the PNG library for diffs, diff overlays, and AI thumbnails: `"pngjs"` (default, pure JavaScript, runs anywhere) or `"sharp"` (native, faster on large screenshots; install the optional `sharp` package). The option wins over the variable. An unknown name fails at startup, and so does `"sharp"` without the package installed. See [Image engines](/guides/image-engines/).
+
 ## Validation
 
 File is validated by the CLI's config parser (`cli/src/config.ts`): unknown keys are ignored, and any present-but-invalid field (`url` shape, `buildCommand`+`buildScriptName` together, non-boolean `affectedOnly`, malformed `untraced`) invalidates the whole file — `upload` then errors on the missing `slug`/`url` with a helpful message.
