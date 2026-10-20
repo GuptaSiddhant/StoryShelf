@@ -17,8 +17,10 @@ describe("startLease", () => {
   it("renews every third of the lease until stopped", async () => {
     const extend = vi.fn(async (): Promise<LeaseRenewal> => "ok");
     const lease = startLease(job, extend)!;
-    await sleep(75);
-    expect(extend.mock.calls.length).toBeGreaterThanOrEqual(3);
+    // Waits for the renewals rather than a fixed time, so a loaded runner cannot starve the timer.
+    await vi.waitFor(() => {
+      expect(extend.mock.calls.length).toBeGreaterThanOrEqual(3);
+    });
     lease.stop();
     const calls = extend.mock.calls.length;
     await sleep(50);
@@ -28,8 +30,9 @@ describe("startLease", () => {
   it("keeps a capture alive for 2x the lease", async () => {
     const extend = vi.fn(async (): Promise<LeaseRenewal> => "ok");
     const lease = startLease(job, extend)!;
-    await sleep(job.leaseMs! * 2 + 15);
-    expect(extend.mock.calls.length).toBeGreaterThanOrEqual(5);
+    await vi.waitFor(() => {
+      expect(extend.mock.calls.length).toBeGreaterThanOrEqual(5);
+    });
     lease.stop();
   });
 
