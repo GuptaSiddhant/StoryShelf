@@ -25,9 +25,13 @@ export interface StalledHandlerDeps {
  */
 export function createStalledHandler(
   deps: StalledHandlerDeps,
-): (job: { buildId: string }, run: { settled: Promise<void> }) => Promise<void> {
+): (
+  job: { buildId: string; shard?: string | undefined },
+  run: { settled: Promise<void> },
+) => Promise<void> {
   return async (job, run) => {
-    await deps.runner.cancel(job.buildId).catch((error: unknown) => {
+    // A stalled shard cancels only its own render, not its siblings'; a build job cancels them all.
+    await deps.runner.cancel(job.buildId, job.shard).catch((error: unknown) => {
       deps.logger.warn({ err: error, buildId: job.buildId }, "cancelling stalled capture failed");
     });
     await Promise.race([run.settled, delay(deps.graceMs ?? STALL_GRACE_MS)]);

@@ -35,12 +35,12 @@ async function setup(status: "capturing" | "failed" = "capturing") {
 describe("createStalledHandler", () => {
   it("cancels the render and requeues a build still capturing after the grace period", async () => {
     const { builds, build, enqueue, logger, recovery } = await setup();
-    const cancel = vi.fn(async (_buildId: string) => {});
+    const cancel = vi.fn(async (_buildId: string, _runId?: string) => {});
     const handler = createStalledHandler({ runner: { cancel }, recovery, logger, graceMs: 20 });
 
     await handler({ buildId: build.id }, { settled: new Promise<void>(() => {}) });
 
-    expect(cancel).toHaveBeenCalledWith(build.id);
+    expect(cancel).toHaveBeenCalledWith(build.id, undefined);
     expect(enqueue).toHaveBeenCalledWith(build.id);
     expect((await builds.get(build.id))?.status).toBe("pending");
   });
@@ -95,5 +95,15 @@ describe("createStalledHandler", () => {
     await handler({ buildId: build.id }, { settled: Promise.resolve() });
 
     expect(Date.now() - started).toBeLessThan(5000);
+  });
+
+  it("cancels only the stalled shard's render, not every render of its build", async () => {
+    const { build, logger, recovery } = await setup();
+    const cancel = vi.fn(async (_buildId: string, _runId?: string) => {});
+    const handler = createStalledHandler({ runner: { cancel }, recovery, logger, graceMs: 20 });
+
+    await handler({ buildId: build.id, shard: "shard-2" }, { settled: Promise.resolve() });
+
+    expect(cancel).toHaveBeenCalledWith(build.id, "shard-2");
   });
 });

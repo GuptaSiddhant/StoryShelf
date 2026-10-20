@@ -20,6 +20,7 @@ import { mirrorAttemptLog, type AttemptMirror } from "./attempt-logger.ts";
 import { assertScreenshotBuffer } from "./guards.ts";
 import { renderIsolating, type IsolationNote, type PassOutcome } from "./isolate.ts";
 import type { PipelineTables } from "./pipeline.ts";
+import type { CaptureProgress } from "./progress.ts";
 import { renderBudgetMs, renderWithTimeout, type RenderRequest } from "./render.ts";
 import type { EngineWork } from "./shard-plan.ts";
 import { resolveStoryViewports } from "./storybook.ts";
@@ -42,6 +43,13 @@ export interface MatrixInput {
   logger: Logger | undefined;
   /** Records the pass on the build attempt (partitioning, progress, failures). */
   recordLog?: AttemptLogRecorder | undefined;
+  /** Called on every screenshot taken, so a long healthy render keeps its job's lease. */
+  progress?: CaptureProgress | undefined;
+  /**
+   * Handle for this job's render calls, so cancelling it reaches only them: the shard id when
+   * rendering a shard (sibling shards of one build render at once), the build id otherwise.
+   */
+  runId?: string | undefined;
 }
 
 /** Everything the passes produced, every row tagged with its engine. */
@@ -145,7 +153,11 @@ async function isolatedPass(
   const pass = await renderIsolating(
     toRender,
     async (slice) => await attemptPass(input, browser, mirror, slice),
-    isolationNote(mirror, browser),
+    {
+      note: isolationNote(mirror, browser),
+      viewportsOf: (story) =>
+        resolveStoryViewports(story, input.viewports).map((viewport) => viewport.name),
+    },
   );
   return {
     captures: fillEnvironment(pass.captures),
@@ -308,9 +320,11 @@ function renderRequest(
   return {
     onCapture: async (capture) => {
       spooled.push(await spoolCapture(input, browser, capture));
+      input.progress?.();
       logProgress(progress, browser, spooled.length);
     },
     buildId: build.id,
+    runId: input.runId ?? build.id,
     storybookDir: input.storybookDir,
     stories,
     viewports: input.viewports,

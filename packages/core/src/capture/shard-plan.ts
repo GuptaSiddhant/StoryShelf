@@ -65,17 +65,25 @@ export function planShards(
   size: number | undefined,
   weightOf?: (storyId: string) => number | undefined,
 ): EngineWork[][] {
-  if (!size || size < 1) {
+  if (!size || !worthSharding(work, capturesOf, size)) {
     return [];
   }
   const costs = storyCosts(work, capturesOf);
-  const total = [...costs.values()].reduce((sum, cost) => sum + cost, 0);
-  if (total <= size * 2) {
-    return [];
-  }
   const weights = weightOf ? weighted(costs, weightOf) : undefined;
   const slices = weights ? packLongestFirst(costs, weights, size) : sliceByCost(costs, size);
   return slices.map((ids) => restrictTo(work, new Set(ids)));
+}
+
+/**
+ * Whether {@link planShards} would split this work at all: sharding is on (`size` of at least 1)
+ * and the work is more than twice the shard size. Lets the plan stage skip work only an ordering needs.
+ */
+export function worthSharding(
+  work: readonly EngineWork[],
+  capturesOf: (story: StoryEntry) => number,
+  size: number | undefined,
+): boolean {
+  return size !== undefined && size >= 1 && totalCaptures(work, capturesOf) > size * 2;
 }
 
 /** Total captures the work produces. */

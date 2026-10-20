@@ -187,4 +187,32 @@ describe("SnapshotModel.listByImportPath", () => {
     expect(await model.listByImportPath("p1", "src/A.stories.tsx")).toHaveLength(2);
     expect(await model.listByImportPath("p1", "nope.tsx")).toEqual([]);
   });
+
+  it("removes only the rendered rows of the (story, engine) pairs a shard rewrites", async () => {
+    const { db } = makeDatabase();
+    const model = new SnapshotModel(db, { snapshots: db.tables.snapshots });
+    const row = (storyId: string, browser: string, inherited: boolean) =>
+      model.create("p1", "b1", { ...timedRow(storyId, "desktop", null), browser, inherited });
+    await row("a", "chromium", true);
+    await row("a", "firefox", false);
+    await row("a", "chromium", false);
+    await row("b", "firefox", false);
+    await model.create("p1", "b2", { ...timedRow("a", "desktop", null), browser: "firefox" });
+
+    const removed = await model.removeRendered("b1", [
+      { browser: "firefox", storyIds: new Set(["a"]) },
+    ]);
+
+    expect(removed).toBe(1);
+    const left = (await model.listByBuild("b1")).map(
+      (s) => `${s.storyId}:${s.browser}:${s.inherited}`,
+    );
+    expect(left).toHaveLength(3);
+    expect(new Set(left)).toEqual(
+      new Set(["a:chromium:false", "a:chromium:true", "b:firefox:false"]),
+    );
+    expect(await model.listByBuild("b2")).toHaveLength(1);
+    expect(await model.removeForBuild("b1")).toBe(3);
+    expect(await model.listByBuild("b1")).toEqual([]);
+  });
 });

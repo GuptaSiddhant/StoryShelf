@@ -13,8 +13,12 @@ const sleep = async (ms: number): Promise<void> => {
 
 const { createCaptureWorker } = await import("./index.ts");
 
-function setup(extend: () => Promise<"ok" | "lost">, captureMs: number) {
-  const job: PollableJob = { buildId: "b1", leaseMs: 30, attempts: 0 };
+function setup(
+  extend: () => Promise<"ok" | "lost">,
+  captureMs: number,
+  extra: Partial<PollableJob> = {},
+) {
+  const job: PollableJob = { buildId: "b1", leaseMs: 30, attempts: 0, ...extra };
   let delivered = false;
   const queue = {
     metadata: { name: "m", version: "0", kind: "mock", category: "capture-queue" as const },
@@ -84,10 +88,21 @@ describe("worker lease heartbeat", () => {
     const { queue, runner, worker } = setup(async () => "lost", 60_000);
     const started = worker.start();
     await vi.waitFor(() => {
-      expect(runner.cancel).toHaveBeenCalledWith("b1");
+      expect(runner.cancel).toHaveBeenCalledWith("b1", undefined);
     });
     expect(queue.ack).not.toHaveBeenCalled();
     expect(queue.nack).not.toHaveBeenCalled();
+    await worker.stop();
+    await started;
+  });
+
+  it("cancels only the lost shard's render, not its sibling shards'", async () => {
+    const { runner, worker } = setup(async () => "lost", 60_000, { shard: "shard-1" });
+    const started = worker.start();
+    await vi.waitFor(() => {
+      expect(runner.cancel).toHaveBeenCalled();
+    });
+    expect(runner.cancel).toHaveBeenCalledWith("b1", "shard-1");
     await worker.stop();
     await started;
   });

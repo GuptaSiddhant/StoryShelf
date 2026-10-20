@@ -1,17 +1,18 @@
 /** The plan stage: decide what to render, record it as shards, and hand the shards to the queue. */
 import type { Logger } from "pino";
 import type { BrowserName } from "../../adapters/capture-runner.ts";
-import { BuildModel } from "../../models/build.ts";
-import { emitAttemptLog } from "../../models/capture-attempt.ts";
+import { CaptureAttemptModel, emitAttemptLog } from "../../models/capture-attempt.ts";
 import { CaptureShardModel } from "../../models/capture-shard.ts";
+import { SnapshotModel } from "../../models/snapshot.ts";
 import type { CaptureShard } from "../../schema/capture-shard.ts";
 import type { Viewport } from "../adapter.ts";
-import type { InheritedStory } from "../affected.ts";
+import { affectedPathsFor, type InheritedStory } from "../affected.ts";
 import { partitionBrowsers, type MatrixInput } from "../matrix.ts";
 import type { CaptureJobInput, CaptureSummary } from "../orchestrator.ts";
 import { freshBrowsersOf, persistInherited } from "../pipeline.ts";
 import {
   planShards,
+  worthSharding,
   type EngineWork,
   type PlanPayload,
   type PlanResult,
@@ -49,17 +50,28 @@ export async function fanOutCapture(args: FanOutInput): Promise<CaptureSummary |
     viewports: args.viewports,
     browsers: args.browsers,
     storybookDir: "",
-    affectedPaths: BuildModel.affectedPaths(args.build),
+    affectedPaths: affectedPathsFor(args.build),
     logger: args.logger,
     recordLog: args.input.recordLog,
+    progress: args.input.progress,
   });
   const partition = await partitionBrowsers(matrix);
+  const capturesOf = (story: MatrixInput["stories"][number]): number =>
+    resolveStoryViewports(story, args.viewports).length;
+  // Past timings only order the shards: not worth a lookup for a build that runs in one piece.
+  return worthSharding(partition.work, capturesOf, options.shardSize)
+    ? await planAndCommit(args, partition, capturesOf)
+    : null;
+}
+
+async function planAndCommit(
+  args: FanOutInput,
+  partition: { work: EngineWork[]; inherited: InheritedStory[] },
+  capturesOf: (story: MatrixInput["stories"][number]) => number,
+): Promise<CaptureSummary | null> {
   const durations = await storyDurations(args);
-  const slices = planShards(
-    partition.work,
-    (story) => resolveStoryViewports(story, args.viewports).length,
-    options.shardSize,
-    (storyId) => durations.get(storyId),
+  const slices = planShards(partition.work, capturesOf, args.options.shardSize, (storyId) =>
+    durations.get(storyId),
   );
   return slices.length === 0
     ? null
@@ -71,10 +83,12 @@ async function commitPlan(
   slices: EngineWork[][],
   partition: { work: EngineWork[]; inherited: InheritedStory[] },
 ): Promise<CaptureSummary> {
+  await supersedeEarlierRuns(args);
   const ctx = contextOf(args, {
     viewports: args.viewports,
     browsers: args.browsers,
     inherited: partition.inherited,
+    progress: args.input.progress,
   });
   const failedInherits = await persistInherited(ctx);
   const storyIds = new Set([
@@ -90,6 +104,21 @@ async function commitPlan(
     ordering: args.timed ? "longest-first" : "by-capture-count",
   });
   return { storyCount: storyIds.size, failedCount: failedInherits.size, shards: rows.length };
+}
+
+/**
+ * A new plan of a build (recovery requeue, retry, a redelivered plan job) starts clean: the
+ * snapshots an earlier plan or its shards wrote are dropped, so inherited rows are not doubled,
+ * and the attempts it left open are closed, since only the newest plan's attempt is ever closed.
+ */
+async function supersedeEarlierRuns(args: FanOutInput): Promise<void> {
+  const { db, tables } = args.options;
+  await new SnapshotModel(db, tables).removeForBuild(args.build.id);
+  await new CaptureAttemptModel(db, tables).closeOthers(
+    args.build.id,
+    args.input.attempt?.id ?? null,
+    "superseded by a new capture plan",
+  );
 }
 
 async function recordPlan(

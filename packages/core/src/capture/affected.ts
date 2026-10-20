@@ -1,9 +1,21 @@
 import { selectAffectedStories } from "@storyshelf/affected";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import { BaselineModel, type BaselineTables } from "../models/baseline.ts";
+import { BuildModel } from "../models/build.ts";
 import type { Baseline } from "../schema/baseline.ts";
+import type { Build } from "../schema/build.ts";
 import type { StoryEntry, Viewport } from "./adapter.ts";
 import { resolveStoryViewports } from "./storybook.ts";
+
+/**
+ * Resolve the affected import paths for a build, or `null` for full capture (affected capture
+ * disabled, or no computation was posted). The one rule for the whole and the sharded path alike.
+ */
+export function affectedPathsFor(
+  build: Pick<Build, "affectedOnly" | "affectedImportPaths">,
+): string[] | null {
+  return build.affectedOnly ? BuildModel.affectedPaths(build) : null;
+}
 
 /** An inherit candidate paired with the baseline it reuses. */
 export interface InheritedStory {

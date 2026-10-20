@@ -1,9 +1,27 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createLocalStorage } from "./index.ts";
+
+/** When set, the next `writeFile` writes only a prefix of its data and then fails, like a kill. */
+const torn = vi.hoisted(() => ({ next: false }));
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return {
+    ...actual,
+    writeFile: async (...args: Parameters<typeof actual.writeFile>) => {
+      if (!torn.next) {
+        return await actual.writeFile(...args);
+      }
+      torn.next = false;
+      await actual.writeFile(args[0], (args[1] as Buffer).subarray(0, 2));
+      throw new Error("killed");
+    },
+  };
+});
 
 /** Collect a stream into a single buffer. */
 async function collect(stream: Readable): Promise<Buffer> {
@@ -87,6 +105,29 @@ describe("createLocalStorage", () => {
     });
     await expect(storage.writeStream("s/partial.bin", failing)).rejects.toThrow("boom");
     expect(await storage.exists("s/partial.bin")).toBe(false);
+  });
+
+  it("never leaves a torn file at the path when a write is cut short", async () => {
+    const storage = createLocalStorage(dir);
+    torn.next = true;
+    await expect(storage.write("c/new.png", Buffer.from("complete"))).rejects.toThrow("killed");
+    expect(await storage.exists("c/new.png")).toBe(false);
+
+    await storage.write("c/old.png", Buffer.from("original"));
+    torn.next = true;
+    await expect(storage.write("c/old.png", Buffer.from("replacement"))).rejects.toThrow("killed");
+    expect((await storage.read("c/old.png")).toString()).toBe("original");
+    expect(await readdir(join(dir, "c"))).toEqual(["old.png"]);
+  });
+
+  it("lists exactly the keys it was given to write", async () => {
+    const storage = createLocalStorage(dir);
+    const keys = ["p1/content/a.png", "p1/content/.claims/x.json", "p1/builds/b1/s/desktop.png"];
+    await Promise.all(keys.map(async (key) => await storage.write(key, Buffer.from(key))));
+    expect((await storage.list("p1/")).toSorted()).toEqual(keys.toSorted());
+    expect(await storage.list("p1/content/")).toEqual(
+      expect.arrayContaining(["p1/content/a.png", "p1/content/.claims/x.json"]),
+    );
   });
 
   it("exposes local storage metadata", () => {

@@ -111,7 +111,7 @@ export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<
       </div>
       <BrowserTabs project={project} build={build} selected={selected} siblings={siblings} />
       {drifted ? <StaleSnapshotNotice status={drifted} /> : null}
-      <EnvironmentChangeSnapshotNotice snapshot={selected} />
+      <EnvironmentChangeSnapshotNotice snapshot={selected} migrated={build.isDefault} />
       {usage && usage.length > 0 ? (
         <LinkedUsage usage={usage} publishedBaseDomain={publishedBaseDomain} />
       ) : null}

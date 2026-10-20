@@ -2,12 +2,14 @@ import AdmZip from "adm-zip";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CaptureRunner, RenderedSnapshot } from "../../adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "../../adapters/database.ts";
 import { BuildModel } from "../../models/build.ts";
+import { CaptureAttemptModel } from "../../models/capture-attempt.ts";
 import { CaptureShardModel } from "../../models/capture-shard.ts";
 import { ProjectModel } from "../../models/project.ts";
+import { SnapshotModel } from "../../models/snapshot.ts";
 import { makeDatabase, makeStorage } from "../../test-helpers/fake-adapters.ts";
 import { storybookZipPath } from "../../utils/paths.ts";
 import { executeCaptureJob, type CaptureJobOptions, type ShardJob } from "../orchestrator.ts";
@@ -108,6 +110,40 @@ function fakeRunner(behaviour: Behaviour): CaptureRunner {
   };
 }
 
+interface SnapshotRow {
+  buildId: string;
+  storyId: string;
+  browser: string;
+  inherited: boolean;
+}
+
+/** Engine counts of a build's snapshots, inherited ones apart. */
+function engines(rows: SnapshotRow[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const row of rows) {
+    const key = `${row.browser}${row.inherited ? ":inherited" : ""}`;
+    counts[key] = (counts[key] ?? 0) + 1;
+  }
+  return counts;
+}
+
+/** Make the next `count` calls of a prototype method throw, then restore it. */
+function failNext<T extends object>(proto: T, method: keyof T & string, count = 1): () => void {
+  const target = proto as Record<string, unknown>;
+  const original = target[method] as (...args: unknown[]) => unknown;
+  let left = count;
+  target[method] = async function (this: unknown, ...args: unknown[]) {
+    if (left > 0) {
+      left -= 1;
+      throw new Error(`${method} failed`);
+    }
+    return await original.apply(this, args);
+  };
+  return () => {
+    target[method] = original;
+  };
+}
+
 let scratchDir: string;
 beforeEach(async () => {
   scratchDir = await mkdtemp(join(tmpdir(), "storyshelf-shards-"));
@@ -171,10 +207,42 @@ async function world(options: {
     await executeCaptureJob({ buildId: next.id }, jobOptions);
     return next;
   };
+  /**
+   * Approve the first build (baselines on chromium), enable firefox, and plan a feature build in
+   * which nothing is affected: chromium inherits every story, firefox (no baselines) renders them.
+   */
+  const planFirefoxOnFeature = async (affectedOnly = true) => {
+    await plan();
+    await Promise.all(queued.map(async (job) => await runShard(job, true)));
+    await db.update(db.tables.projects, project.id, {
+      browsers: JSON.stringify(["chromium", "firefox"]),
+    });
+    const builds = new BuildModel(db, tables(db));
+    const next = await builds.create(project.id, {
+      gitSha: "sha-feat",
+      gitBranch: "feat",
+      isDefault: false,
+      affectedOnly,
+    });
+    await builds.setAffected(next.id, {
+      baselineSha: "sha-1",
+      changedFiles: [],
+      affectedImportPaths: [],
+    });
+    await storage.write(storybookZipPath(project.id, next.id), zipOfStories(options.stories));
+    queued.length = 0;
+    await executeCaptureJob({ buildId: next.id }, jobOptions);
+    return next;
+  };
+  const snapshotsOf = async (buildId: string) =>
+    ((await db.list(db.tables.snapshots)) as unknown as SnapshotRow[]).filter(
+      (row) => row.buildId === buildId,
+    );
   return {
     db,
     build,
     project,
+    storage,
     behaviour,
     queued,
     jobOptions,
@@ -184,6 +252,8 @@ async function world(options: {
     runShard,
     plan,
     planNextBuild,
+    planFirefoxOnFeature,
+    snapshotsOf,
   };
 }
 
@@ -547,5 +617,209 @@ describe("sharded capture", () => {
 
     const buildDir = join(scratchDir, ".storyshelf-scratch", w.project.id, w.build.id);
     await expect(stat(buildDir)).rejects.toThrow(/ENOENT/u);
+  });
+  it("keeps the plan's inherited snapshots of the stories a shard renders on another engine", async () => {
+    const w = await world({ stories: 25, shardSize: 10 });
+    const next = await w.planFirefoxOnFeature();
+    expect(engines(await w.snapshotsOf(next.id))).toEqual({ "chromium:inherited": 25 });
+
+    await Promise.all(w.queued.map(async (job) => await w.runShard(job, true)));
+
+    expect(engines(await w.snapshotsOf(next.id))).toEqual({
+      "chromium:inherited": 25,
+      firefox: 25,
+    });
+  });
+
+  it("renders every story when the build does not ask for affected capture", async () => {
+    const w = await world({ stories: 25, shardSize: 10 });
+    const next = await w.planFirefoxOnFeature(false);
+
+    await Promise.all(w.queued.map(async (job) => await w.runShard(job, true)));
+
+    // Like the unsharded path: an affected computation is ignored unless the build opted in.
+    expect(engines(await w.snapshotsOf(next.id))).toEqual({ chromium: 25, firefox: 25 });
+  });
+
+  it("a redelivered last shard finalizes the build when its first run's finalize failed", async () => {
+    const w = await world({ stories: 25, shardSize: 10 });
+    await w.plan();
+    const last = w.queued.at(-1) as ShardJob;
+    for (const job of w.queued.slice(0, -1)) {
+      // oxlint-disable-next-line no-await-in-loop -- shards run one after another here
+      await w.runShard(job);
+    }
+    const restore = failNext(BuildModel.prototype, "updateCounts");
+    await expect(w.runShard(last, false)).rejects.toThrow("updateCounts failed");
+    restore();
+    expect(await w.status()).toBe("capturing");
+
+    const redelivered = await w.runShard(last, false);
+
+    expect(redelivered).toMatchObject({ status: "reduced", summary: { buildStatus: "approved" } });
+    expect(await w.status()).toBe("approved");
+    const claim = (await w.shards.listForBuild(w.build.id)).at(-1);
+    expect(claim).toMatchObject({ kind: "finalize", status: "done" });
+  });
+
+  it("a redelivered shard finalizes the build when the worker died before reducing", async () => {
+    const w = await world({ stories: 25, shardSize: 10 });
+    await w.plan();
+    const last = w.queued.at(-1) as ShardJob;
+    for (const job of w.queued.slice(0, -1)) {
+      // oxlint-disable-next-line no-await-in-loop -- shards run one after another here
+      await w.runShard(job);
+    }
+    // The shard completes, then the worker is gone before it can claim the finalize.
+    const restore = failNext(CaptureShardModel.prototype, "claimFinalize");
+    await expect(w.runShard(last, false)).rejects.toThrow("claimFinalize failed");
+    restore();
+
+    expect(await w.runShard(last, false)).toMatchObject({ status: "reduced" });
+    expect(await w.status()).toBe("approved");
+  });
+
+  it("fails the build, not leaves it capturing, when the finalize fails on the last try", async () => {
+    const w = await world({ stories: 25, shardSize: 10 });
+    await w.plan();
+    const finalized: { error?: string | undefined }[] = [];
+    for (const job of w.queued.slice(0, -1)) {
+      // oxlint-disable-next-line no-await-in-loop -- shards run one after another here
+      await w.runShard(job);
+    }
+    const restore = failNext(BuildModel.prototype, "updateCounts");
+    const last = w.queued.at(-1) as ShardJob;
+    const outcome = await executeCaptureShard(
+      {
+        buildId: last.buildId,
+        shard: last.shard,
+        final: true,
+        onFinalized: async (summary) => {
+          await Promise.resolve();
+          finalized.push(summary);
+        },
+      },
+      w.jobOptions,
+    );
+    restore();
+
+    expect(outcome).toMatchObject({ status: "rendered", finalized: true });
+    expect(finalized).toEqual([expect.objectContaining({ error: "updateCounts failed" })]);
+    expect(await w.status()).toBe("failed");
+  });
+
+  it("reports the finalize to the one run that won it, including a failing last shard", async () => {
+    const w = await world({ stories: 25, shardSize: 10 });
+    await w.plan();
+    for (const job of w.queued.slice(0, -1)) {
+      // oxlint-disable-next-line no-await-in-loop -- shards run one after another here
+      await w.runShard(job);
+    }
+    w.behaviour.throwTimes = Number.POSITIVE_INFINITY;
+    const last = w.queued.at(-1) as ShardJob;
+    const calls: { summary: unknown; error: unknown }[] = [];
+
+    await expect(
+      executeCaptureShard(
+        {
+          buildId: last.buildId,
+          shard: last.shard,
+          final: true,
+          onFinalized: async (summary, error) => {
+            await Promise.resolve();
+            calls.push({ summary, error });
+          },
+        },
+        w.jobOptions,
+      ),
+    ).rejects.toThrow("browser crashed");
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.summary).toMatchObject({ storyCount: 25, failedCount: 5 });
+    expect(String(calls[0]?.error)).toContain("browser crashed");
+  });
+
+  it("touches progress for every screenshot and snapshot of a shard", async () => {
+    const w = await world({ stories: 25, shardSize: 10 });
+    await w.plan();
+    const first = w.queued[0] as ShardJob;
+    let ticks = 0;
+
+    await executeCaptureShard(
+      {
+        buildId: first.buildId,
+        shard: first.shard,
+        progress: () => {
+          ticks += 1;
+        },
+      },
+      w.jobOptions,
+    );
+
+    // Two stage marks (running, extracted), then one per screenshot taken and one per snapshot.
+    const captured = (await w.snapshots()).length;
+    expect(captured).toBeGreaterThan(0);
+    expect(ticks).toBe(2 + captured * 2);
+  });
+
+  it("cancels only its own render when a shard's render budget runs out", async () => {
+    const w = await world({ stories: 25, shardSize: 10 });
+    await w.plan();
+    const cancels: (string | undefined)[][] = [];
+    w.jobOptions.renderTimeoutMs = 5;
+    w.jobOptions.runner = {
+      ...w.jobOptions.runner,
+      render: async () => await new Promise<never>(() => {}),
+      cancel: async (buildId, runId) => {
+        await Promise.resolve();
+        cancels.push([buildId, runId]);
+      },
+    };
+    const first = w.queued[0] as ShardJob;
+
+    await expect(w.runShard(first, true)).rejects.toThrow("timed out");
+
+    expect(cancels.length).toBeGreaterThan(0);
+    expect(
+      cancels.every(([buildId, runId]) => buildId === w.build.id && runId === first.shard),
+    ).toBe(true);
+  });
+
+  it("looks up past timings only for a build that will shard, and only a few builds back", async () => {
+    const small = await world({ stories: 10, shardSize: 10 });
+    await small.plan();
+    const durations = vi.spyOn(SnapshotModel.prototype, "durationsByStory");
+    await small.planNextBuild();
+    expect(durations).not.toHaveBeenCalled();
+    durations.mockRestore();
+
+    const big = await world({ stories: 25, shardSize: 10 });
+    await big.plan();
+    const list = vi.spyOn(BuildModel.prototype, "list");
+    await big.planNextBuild();
+    expect(list).toHaveBeenCalledWith(big.project.id, { limit: 4 });
+    list.mockRestore();
+  });
+
+  it("planning again starts clean: no doubled inherited snapshots, no attempt left open", async () => {
+    const w = await world({ stories: 25, shardSize: 10 });
+    const next = await w.planFirefoxOnFeature();
+    const attempts = new CaptureAttemptModel(w.db, tables(w.db));
+    const earlier = await attempts.startAttempt(w.project.id, next.id);
+    await attempts.markRunning(earlier.id);
+    const current = await attempts.startAttempt(w.project.id, next.id);
+
+    await executeCaptureJob(
+      {
+        buildId: next.id,
+        attempt: { id: current.id, attemptNo: current.attemptNo, projectId: w.project.id },
+      },
+      w.jobOptions,
+    );
+
+    expect(engines(await w.snapshotsOf(next.id))).toEqual({ "chromium:inherited": 25 });
+    const rows = await attempts.listByBuild(next.id);
+    expect(rows.find((row) => row.id === earlier.id)).toMatchObject({ status: "cancelled" });
+    expect(rows.find((row) => row.id === current.id)?.status).toBe("queued");
   });
 });

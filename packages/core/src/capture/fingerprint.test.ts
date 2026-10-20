@@ -3,6 +3,7 @@ import {
   buildFingerprint,
   changedFields,
   fingerprintHash,
+  mergeFingerprint,
   parseFingerprint,
 } from "./fingerprint.ts";
 
@@ -63,8 +64,27 @@ describe("fingerprint", () => {
         browserVersion: "125.0.0",
       },
     );
-    expect(changedFields(from, to)).toEqual(["browserVersion", "viewport"]);
+    // Viewport size comes from story code: it diffs, it is not an environment change.
+    expect(changedFields(from, to)).toEqual(["browserVersion"]);
     expect(changedFields(from, from)).toEqual([]);
+  });
+
+  it("treats a component either side did not report as unknown, not changed", () => {
+    const known = buildFingerprint("chromium", viewport, env);
+    const unknown = buildFingerprint("chromium", viewport, {});
+    expect(changedFields(known, unknown)).toEqual([]);
+    expect(changedFields(unknown, known)).toEqual([]);
+    const partial = buildFingerprint("chromium", viewport, { ...env, fontsHash: undefined });
+    expect(changedFields(known, { ...partial, browserVersion: "125.0.0" })).toEqual([
+      "browserVersion",
+    ]);
+  });
+
+  it("merges a capture's unknown components from the earlier fingerprint", () => {
+    const earlier = buildFingerprint("chromium", viewport, env);
+    const now = buildFingerprint("chromium", viewport, { browserVersion: "125.0.0" });
+    expect(mergeFingerprint(earlier, now)).toEqual({ ...earlier, browserVersion: "125.0.0" });
+    expect(mergeFingerprint(null, now)).toEqual(now);
   });
 
   it("reports unknown when the earlier fingerprint was not recorded", () => {

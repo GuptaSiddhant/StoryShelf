@@ -36,6 +36,11 @@ function crashingPass(poison: Set<string>, log: string[][]) {
   };
 }
 
+/** A capture of one story at a named viewport. */
+function at(story: StoryEntry, viewportName: string): RenderedSnapshot {
+  return { story, viewportName, screenshot: Buffer.from(`${story.id}@${viewportName}`) };
+}
+
 /** A pass that reports one story as failed (not crashed) and captures the rest. */
 async function reportingPass(slice: StoryEntry[]): Promise<PassOutcome> {
   await Promise.resolve();
@@ -130,9 +135,9 @@ describe("renderIsolating", () => {
 
   it("reports what it did through the note callback", async () => {
     const events: string[] = [];
-    const result = await renderIsolating(stories(8), crashingPass(new Set(["s-04"]), []), (event) =>
-      events.push(event),
-    );
+    const result = await renderIsolating(stories(8), crashingPass(new Set(["s-04"]), []), {
+      note: (event) => events.push(event),
+    });
 
     expect(result.poisoned).toEqual(["s-04"]);
     expect(events).toContain("isolating");
@@ -145,5 +150,58 @@ describe("renderIsolating", () => {
 
     expect(log).toEqual([]);
     expect(result).toMatchObject({ captures: [], failures: [], renderCount: 0 });
+  });
+
+  it("renders a story again when a crash cut off its later viewports, and blames it alone", async () => {
+    const [a, b] = stories(2) as [StoryEntry, StoryEntry];
+    const tried: string[][] = [];
+    // A is captured at v1, then takes the browser down at v2; B renders fine on its own.
+    const pass = async (slice: StoryEntry[]): Promise<PassOutcome> => {
+      await Promise.resolve();
+      tried.push(slice.map((story) => story.id));
+      if (slice.includes(a)) {
+        return { captures: [at(a, "v1")], failures: [], error: new Error("boom on A@v2") };
+      }
+      return {
+        captures: slice.flatMap((story) => [at(story, "v1"), at(story, "v2")]),
+        failures: [],
+      };
+    };
+
+    const result = await renderIsolating([a, b], pass, { viewportsOf: () => ["v1", "v2"] });
+
+    expect(tried).toEqual([[a.id, b.id], [a.id], [b.id]]);
+    expect(result.poisoned).toEqual([a.id]);
+    expect(result.failures.map((failure) => failure.storyId)).toEqual([a.id]);
+    // B is rendered and kept at both viewports; A's v1, taken twice, is kept once.
+    const kept = result.captures.map((c) => `${c.story.id}@${c.viewportName}`);
+    expect(kept).toHaveLength(3);
+    expect(new Set(kept)).toEqual(new Set([`${a.id}@v1`, `${b.id}@v1`, `${b.id}@v2`]));
+  });
+
+  it("gives the one story a crash left unrendered a pass of its own instead of blaming it", async () => {
+    const tried: string[][] = [];
+    let crashed = false;
+    // The browser dies once, after the first story; the story left over is healthy.
+    const pass = async (slice: StoryEntry[]): Promise<PassOutcome> => {
+      await Promise.resolve();
+      tried.push(slice.map((story) => story.id));
+      if (!crashed) {
+        crashed = true;
+        return {
+          captures: [capture(slice[0] as StoryEntry)],
+          failures: [],
+          error: new Error("oom"),
+        };
+      }
+      return { captures: slice.map((story) => capture(story)), failures: [] };
+    };
+
+    const result = await renderIsolating(stories(2), pass);
+
+    expect(tried).toEqual([["s-00", "s-01"], ["s-01"]]);
+    expect(result.poisoned).toEqual([]);
+    expect(result.failures).toEqual([]);
+    expect(result.captures).toHaveLength(2);
   });
 });

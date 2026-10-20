@@ -275,7 +275,7 @@ export function createCaptureWorker(options: WorkerOptions): WorkerHandle {
   /** Another consumer owns the message now: stop our render, leave ack/nack to them. */
   async function abandonLostJob(job: PollableJob, error: LeaseLostError): Promise<void> {
     logger?.warn({ err: error, buildId: job.buildId }, "queue lease lost, aborting capture");
-    await options.runner.cancel(job.buildId).catch(() => {});
+    await options.runner.cancel(job.buildId, job.shard).catch(() => {});
   }
 
   async function processJob(job: PollableJob): Promise<void> {

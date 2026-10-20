@@ -196,6 +196,17 @@ describe("executeCaptureJob", () => {
     expect(await scratchExists(project.id, build.id)).toBe(false);
   });
 
+  it("reports progress while it persists, apart from the attempt log", async () => {
+    const { db, buildId, options } = await setupBrowsers({});
+    const progress = vi.fn();
+
+    // The fake runner hands its capture back at the end, not streamed: all progress is the persist.
+    await executeCaptureJob({ buildId, progress }, options);
+
+    expect(await db.list(db.tables.snapshots)).toHaveLength(1);
+    expect(progress).toHaveBeenCalledTimes(1);
+  });
+
   it("records the runner's reported environment in the baseline fingerprint", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
@@ -562,7 +573,8 @@ describe("executeCaptureJob", () => {
       ),
     ).rejects.toThrow("timed out");
 
-    expect(cancel).toHaveBeenCalledWith(build.id);
+    // The whole-build render is its own run, keyed by the build id.
+    expect(cancel).toHaveBeenCalledWith(build.id, build.id);
     const timedOut = await db.get(db.tables.builds, build.id);
     expect(timedOut?.status).toBe("failed");
   });

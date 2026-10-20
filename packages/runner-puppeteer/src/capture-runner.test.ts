@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { activeRuns } from "./browser.ts";
 import {
   createPuppeteerCaptureRunner,
   createRuntimeParamsState,
@@ -300,6 +301,36 @@ describe("createPuppeteerCaptureRunner.render", () => {
     });
 
     expect(result.failures.map((f) => f.error)).toEqual(["disk full"]);
+  }, 30_000);
+
+  it("cancels one render of a build by its run id, leaving a concurrent sibling running", async () => {
+    const runner = createPuppeteerCaptureRunner();
+    puppeteer.configureHang(true);
+    const render = (runId: string) =>
+      runner.render({
+        buildId: "build-1",
+        runId,
+        storybookDir,
+        stories: STORIES,
+        viewports: VIEWPORTS,
+      });
+    const first = render("shard-a");
+    const second = render("shard-b");
+    await vi.waitFor(() => {
+      expect(activeRuns.matching("build-1").every((run) => run.browser !== null)).toBe(true);
+      expect(activeRuns.matching("build-1")).toHaveLength(2);
+    });
+    const [a] = activeRuns.matching("build-1", "shard-a");
+    const [b] = activeRuns.matching("build-1", "shard-b");
+
+    await runner.cancel("build-1", "shard-a");
+
+    expect(a?.cancelled).toBe(true);
+    expect(b?.cancelled).toBe(false);
+    await runner.cancel("build-1");
+    expect(b?.cancelled).toBe(true);
+    await Promise.all([first, second]);
+    expect(activeRuns.matching("build-1")).toEqual([]);
   }, 30_000);
 
   it("resolves cancel for builds that are not rendering", async () => {
