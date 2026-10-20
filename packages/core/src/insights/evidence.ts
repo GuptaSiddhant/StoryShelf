@@ -1,6 +1,6 @@
 /** Pure evidence builders: already-loaded inputs in, delimited text + images out. */
+import { downscalePng } from "@storyshelf/image";
 import type { AiEvidence } from "../ai.ts";
-import { downscalePng } from "./downscale.ts";
 import { type EvidenceLimits, resolveLimits } from "./limits.ts";
 import { capBytes, field, headTail } from "./text.ts";
 
@@ -70,7 +70,7 @@ function snapshotLines(s: SnapshotEvidence, limits: EvidenceLimits): string[] {
 }
 
 /** Assemble triage evidence deterministically (redacted, capped, ranked). */
-export function buildTriageEvidence(input: TriageEvidenceInput): BuiltEvidence {
+export async function buildTriageEvidence(input: TriageEvidenceInput): Promise<BuiltEvidence> {
   const limits = resolveLimits(input.limits);
   const changed = input.snapshots.filter((s) => !s.inherited).toSorted(rankSnapshots);
   const listed = changed.slice(0, limits.maxSnapshots);
@@ -92,23 +92,28 @@ export function buildTriageEvidence(input: TriageEvidenceInput): BuiltEvidence {
       .map((c) => `COMMENT ${field(c.author, 60)}: ${field(c.body, 300)}`),
     "</evidence>",
   ];
-  const images = listed
-    .flatMap((item) =>
-      item.screenshot
-        ? [
-            {
-              mediaType: "image/png" as const,
-              data: downscalePng(item.screenshot, limits.imageMaxEdge),
-              label: snapshotKey(item),
-            },
-          ]
-        : [],
-    )
-    .slice(0, limits.maxImages);
+  const images = await triageImages(listed, limits);
   return {
     text: capBytes(lines, limits.maxTextBytes),
     images,
     listed: listed.length,
     omitted: changed.length - listed.length,
   };
+}
+
+/** Downscaled screenshots of the listed snapshots, capped at `maxImages` (downscales only what is kept). */
+async function triageImages(
+  listed: SnapshotEvidence[],
+  limits: { imageMaxEdge: number; maxImages: number },
+): Promise<AiEvidence["images"]> {
+  const withScreenshots = listed
+    .flatMap((item) => (item.screenshot ? [{ item, screenshot: item.screenshot }] : []))
+    .slice(0, limits.maxImages);
+  return await Promise.all(
+    withScreenshots.map(async ({ item, screenshot }) => ({
+      mediaType: "image/png" as const,
+      data: await downscalePng(screenshot, limits.imageMaxEdge),
+      label: snapshotKey(item),
+    })),
+  );
 }

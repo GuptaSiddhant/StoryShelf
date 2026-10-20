@@ -119,6 +119,8 @@ function pickProcessQueue(
     workerEntry,
     concurrency: options.capture?.concurrency,
     shardSize: options.capture?.shardSize,
+    imageEngine: options.images?.engine,
+    diffThreads: options.compare?.threads,
     fallback: inProcess,
     onSettled: async (job) => {
       // Notifications stay in this process; the build's own status says whether the capture failed.

@@ -10,6 +10,7 @@ import {
   type ForkDecision,
 } from "@storyshelf/core/capture";
 import type { ShelfCaptureOptions } from "@storyshelf/core/config";
+import { DIFF_WORKERS_ENV, IMAGE_ENGINE_ENV } from "@storyshelf/core/diff";
 import type { Logger } from "@storyshelf/core/logger";
 import { detectResources } from "@storyshelf/core/utils";
 import { CAPTURE_LEASE_MS } from "./stalled-capture.ts";
@@ -61,14 +62,20 @@ export interface ForkedQueueDeps {
   concurrency?: number;
   /** Captures per shard for big builds, handed to the child (`capture.shardSize`). */
   shardSize?: number;
+  /** `images.engine`, handed to the child so it diffs with the same codec. */
+  imageEngine?: string;
+  /** `compare.threads`, handed to the child's diff pool. */
+  diffThreads?: number;
   /** Takes over if forking stops being viable. */
   fallback: CaptureQueue;
   onSettled: (job: PollableJob) => Promise<void>;
   logger: Logger;
 }
 
-/** The parent-side queue for a forked capture child, with the in-process queue as its fallback. */
-export function createForkedQueue(deps: ForkedQueueDeps): ForkedCaptureQueue {
+/** Settings the parent hands to a forked child through its environment. */
+export function childEnvOf(
+  deps: Pick<ForkedQueueDeps, "concurrency" | "shardSize" | "imageEngine" | "diffThreads">,
+): Record<string, string> {
   const env: Record<string, string> = {};
   if (deps.concurrency !== undefined) {
     env[CAPTURE_CONCURRENCY_ENV] = String(deps.concurrency);
@@ -76,6 +83,18 @@ export function createForkedQueue(deps: ForkedQueueDeps): ForkedCaptureQueue {
   if (deps.shardSize !== undefined) {
     env[CAPTURE_SHARD_SIZE_ENV] = String(deps.shardSize);
   }
+  if (deps.imageEngine !== undefined) {
+    env[IMAGE_ENGINE_ENV] = deps.imageEngine;
+  }
+  if (deps.diffThreads !== undefined) {
+    env[DIFF_WORKERS_ENV] = String(deps.diffThreads);
+  }
+  return env;
+}
+
+/** The parent-side queue for a forked capture child, with the in-process queue as its fallback. */
+export function createForkedQueue(deps: ForkedQueueDeps): ForkedCaptureQueue {
+  const env = childEnvOf(deps);
   return new ForkedCaptureQueue({
     spawn: () => forkCaptureChild({ entry: deps.workerEntry, env }),
     fallback: deps.fallback,

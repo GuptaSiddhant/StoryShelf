@@ -1,8 +1,8 @@
-/** PNG thumbnails via `pngjs` (no new image dependency; output stays PNG). */
+/** Box-sampling PNG downscale on pngjs. */
 import { PNG } from "pngjs";
 
 /** Downscale a PNG so its long edge is at most `maxEdge` (box sampling). */
-export function downscalePng(buffer: Uint8Array, maxEdge: number): Uint8Array {
+export function downscaleWithPngjs(buffer: Uint8Array, maxEdge: number): Uint8Array {
   const src = PNG.sync.read(Buffer.from(buffer));
   const scale = Math.min(1, maxEdge / Math.max(src.width, src.height));
   if (scale >= 1) {

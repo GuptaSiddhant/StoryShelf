@@ -7,7 +7,7 @@ import {
 } from "@storyshelf/core/adapter/setup";
 import { resolveShelfOptions } from "@storyshelf/core/config";
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
-import { configureDiffPool } from "@storyshelf/core/diff";
+import { configureImages } from "@storyshelf/core/diff";
 /**
  * StoryShelf app: compose database, storage, capture, auth, and git-host
  * adapters into a complete self-hosted visual-testing Hono app.
@@ -122,7 +122,7 @@ function assembleApp(app: ShelfApp, options: ShelfOptions, scoped: ShelfOptions)
  */
 export function createShelfApp(rawOptions: ShelfOptions): ShelfApp {
   const options = resolveShelfOptions(rawOptions);
-  configureDiffPool({ threads: options.compare?.threads });
+  configureImages({ engine: options.images?.engine, threads: options.compare?.threads });
   throwOnInvalidAdapters(options);
   const app = new OpenAPIHono<{ Variables: ShelfContext }>() as ShelfApp;
   assembleApp(app, options, instrumentedOptions(options));

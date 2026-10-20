@@ -1,20 +1,22 @@
 /** Worker-thread entry for the diff pool: runs the same `diffImages` as the in-thread path. */
 import { parentPort } from "node:worker_threads";
+import { loadCodec } from "./codecs.ts";
 import { diffImages } from "./engine.ts";
 import type { DiffRequest, DiffResponse } from "./protocol.ts";
 import { fromTransferred, toTransferable } from "./transfer.ts";
 
 const port = parentPort;
 
-function handle(request: DiffRequest): void {
+async function handle(request: DiffRequest): Promise<void> {
   if (!port) {
     return;
   }
   try {
-    const result = diffImages(
+    const result = await diffImages(
       fromTransferred(request.baseline),
       fromTransferred(request.current),
       request.options,
+      await loadCodec(request.engine),
     );
     const diffImage = result.diffImage ? toTransferable(result.diffImage) : null;
     const response: DiffResponse = {
@@ -35,5 +37,13 @@ function handle(request: DiffRequest): void {
   }
 }
 
-port?.on("message", handle);
+port?.on("message", (request: DiffRequest) => {
+  handle(request).catch((error: unknown) => {
+    // Not even the error reply could be posted. Throw outside the promise so the thread dies with
+    // an 'error' event, which rejects the pool's task, instead of leaving it waiting forever.
+    setImmediate(() => {
+      throw error;
+    });
+  });
+});
 port?.postMessage({ type: "ready" } satisfies DiffResponse);

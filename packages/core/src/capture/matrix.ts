@@ -1,4 +1,5 @@
 /** The browser loop: one partition + render pass per engine, sequentially. */
+import { currentImageEngine } from "@storyshelf/image";
 import type { Logger } from "pino";
 import type {
   BrowserName,
@@ -284,6 +285,7 @@ async function renderPass(
     captured: spooled.length + rendered.captures.length,
     failed: rendered.failures.length,
     expected,
+    imageEngine: currentImageEngine(),
   });
   const { environment } = rendered;
   return {

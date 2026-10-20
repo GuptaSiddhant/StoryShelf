@@ -217,10 +217,9 @@
   "dependencies": {
     "@opentelemetry/api": "catalog:",
     "@storyshelf/affected": "workspace:*",
+    "@storyshelf/image": "workspace:*",
     "drizzle-orm": "catalog:",
     "pino": "catalog:",
-    "pixelmatch": "^7.1.0",
-    "pngjs": "^7.0.0",
     "unzipper": "0.12.5",
     "zod": "catalog:"
   },
@@ -233,6 +232,7 @@
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
+    "pngjs": "^7.0.0",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
