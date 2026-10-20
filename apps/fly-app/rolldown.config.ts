@@ -2,7 +2,8 @@ import { builtinModules } from "node:module";
 import { resolve } from "node:path";
 import { defineConfig } from "rolldown";
 
-const EXTERNAL = /^(pino(\/|$)|playwright(-core)?(\/|$))/u;
+// `sharp` is the optional native image engine: it must resolve at runtime, never be inlined.
+const EXTERNAL = /^(pino(\/|$)|playwright(-core)?(\/|$)|sharp(\/|$))/u;
 
 const root = resolve(import.meta.dirname ?? ".", "../..");
 
@@ -10,12 +11,12 @@ export default defineConfig({
   platform: "node",
   // Absolute paths so the build works from any CWD (package dir locally,
   // repo root in Docker).
-  // `worker` is the diff pool's thread entry: core spawns `new URL("worker.mjs", import.meta.url)`,
-  // and once core is inlined into server.mjs that resolves next to it. Without it the pool would
+  // `worker` is the diff pool's thread entry: `@storyshelf/image` spawns `new URL("worker.mjs", import.meta.url)`,
+  // and once it is inlined into server.mjs that resolves next to it. Without it the pool would
   // silently fall back to diffing on the main thread.
   input: {
     server: resolve(root, "apps/fly-app/server.ts"),
-    worker: resolve(root, "packages/core/src/diff/worker.ts"),
+    worker: resolve(root, "packages/image/src/worker.ts"),
   },
   output: {
     dir: resolve(root, "apps/fly-app/dist"),
