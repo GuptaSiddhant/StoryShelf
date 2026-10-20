@@ -48,27 +48,50 @@ export function fingerprintHash(fingerprint: Fingerprint): string {
   );
 }
 
-/** Names of the components that differ; `["unknown"]` when the earlier fingerprint was not recorded. */
+/** The components whose change is an environment migration. Viewport is not one (see below). */
+const ENVIRONMENT_FIELDS = [
+  "engine",
+  "browserVersion",
+  "platform",
+  "deviceScaleFactor",
+  "fontsHash",
+] as const;
+
+/**
+ * Names of the environment components that differ; `["unknown"]` when the earlier fingerprint was
+ * not recorded. A component one side did not report (`null`: a runner that does not report it, a
+ * capture spooled before a browser crash, a failed `fc-list`) is unknown, not changed. Viewport is
+ * never a change here: its size comes from story parameters (the PR's own code), so a new size must
+ * be reviewed, and it diffs on its own as a dimension change.
+ */
 export function changedFields(from: Fingerprint | null, to: Fingerprint): string[] {
   if (!from) {
     return ["unknown"];
   }
-  const scalars = [
-    "engine",
-    "browserVersion",
-    "platform",
-    "deviceScaleFactor",
-    "fontsHash",
-  ] as const;
   return [
-    ...scalars.filter((key) => from[key] !== to[key]),
-    ...(sameViewport(from, to) ? [] : ["viewport"]),
+    ...ENVIRONMENT_FIELDS.filter(
+      (key) => known(from[key]) && known(to[key]) && from[key] !== to[key],
+    ),
     ...(JSON.stringify(from.sizing) === JSON.stringify(to.sizing) ? [] : ["sizing"]),
   ];
 }
 
-function sameViewport(from: Fingerprint, to: Fingerprint): boolean {
-  return from.viewport.width === to.viewport.width && from.viewport.height === to.viewport.height;
+function known(value: unknown): boolean {
+  return value !== null && value !== undefined;
+}
+
+/**
+ * The fingerprint to store on a baseline: the capture's, with any component it did not report kept
+ * from the baseline's earlier fingerprint, so an unknown component never overwrites a known one.
+ */
+export function mergeFingerprint(earlier: Fingerprint | null, now: Fingerprint): Fingerprint {
+  return {
+    ...now,
+    browserVersion: now.browserVersion ?? earlier?.browserVersion ?? null,
+    platform: now.platform ?? earlier?.platform ?? null,
+    deviceScaleFactor: now.deviceScaleFactor ?? earlier?.deviceScaleFactor ?? null,
+    fontsHash: now.fontsHash ?? earlier?.fontsHash ?? null,
+  };
 }
 
 /** Parse a stored fingerprint; null for a missing or malformed value. */

@@ -5,6 +5,17 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 
 ## Unreleased
 
+**Fixed: environment migrations and the screenshot sweep (ADR 0031 phase 4).** A feature-branch
+build no longer auto-accepts snapshots whose capture environment differs from the baseline's: it
+diffs them, and a difference is `changed` with the environment change shown on the review page.
+The default branch still migrates without a diff. Fingerprint components a capture did not report
+(screenshots spooled before a browser crash, a failed `fc-list`) are unknown rather than changed
+and never overwrite the baseline's, and a viewport size change diffs instead of migrating. The
+screenshot sweep defers deletions while a build of the project is still capturing or a baseline
+import or approval holds a reuse claim, so it can no longer delete an object a capture has just
+reused. Local storage writes are atomic (temp file + rename) and `list()` returns `/`-separated
+keys on every host. `sweepScreenshotContent` now needs `tables.builds`.
+
 **New: `@storyshelf/image` and an opt-in `sharp` image engine (ADR 0032).** The pixel diff, its
 worker pool, overlay rendering and AI thumbnails moved into the new leaf package
 `@storyshelf/image` (`@storyshelf/core/diff` re-exports it). `pixelmatch` stays the comparator;

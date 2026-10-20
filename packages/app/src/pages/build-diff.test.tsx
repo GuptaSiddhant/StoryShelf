@@ -209,11 +209,12 @@ const change = JSON.stringify({
   to: { engine: "chromium", browserVersion: "126.0.0" },
 });
 
-async function seedMigrated(db: Db, migrated: boolean): Promise<string> {
+async function seedMigrated(db: Db, migrated: boolean, branch = "main"): Promise<string> {
   const project = await new ProjectModel(db).create({ name: "Env" });
   const build = await new BuildModel(db).create(project.id, {
     gitSha: "abc1234def",
-    gitBranch: "main",
+    gitBranch: branch,
+    isDefault: branch === "main",
   });
   const snapshots = new SnapshotModel(db);
   const snap = await snapshots.create(project.id, build.id, {
@@ -230,10 +231,10 @@ async function seedMigrated(db: Db, migrated: boolean): Promise<string> {
   return `/projects/${project.slug}/builds/${build.id}/diff?snapshot=${snap.id}`;
 }
 
-async function pageWithMigration(migrated: boolean): Promise<string> {
+async function pageWithMigration(migrated: boolean, branch?: string): Promise<string> {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
-  const url = await seedMigrated(db, migrated);
+  const url = await seedMigrated(db, migrated, branch);
   const app = createShelfApp({
     database: db,
     storage,
@@ -251,6 +252,15 @@ describe("review page: capture environment migration", () => {
     expect(html).toContain("browser version");
     expect(html).toContain("124.0.1 → 126.0.0");
     expect(html).toContain("No diff: capture environment changed");
+  });
+
+  it("explains that a feature branch still diffed, against another environment", async () => {
+    const html = await pageWithMigration(true, "feature/x");
+    expect(html).toContain("Capture environment changed");
+    expect(html).toContain("compared against a baseline from a");
+    expect(html).toContain("may come from the environment");
+    expect(html).not.toContain("accepted without a pixel diff");
+    expect(html).not.toContain("No diff:");
   });
 
   it("shows nothing about the environment for an ordinary build", async () => {

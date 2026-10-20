@@ -9,7 +9,7 @@ import { emitWebhookEvent } from "../adapters/webhook-events.ts";
 import type { Baseline } from "../schema/baseline.ts";
 import type { SecretInput } from "../utils/encrypt.ts";
 import { isContentPath } from "../utils/paths.ts";
-import { storeScreenshot } from "../utils/screenshot-store.ts";
+import { storeScreenshot, withContentClaim } from "../utils/screenshot-store.ts";
 import { ulid } from "../utils/ulid.ts";
 import { col } from "./columns.ts";
 import type { WebhookTables } from "./webhook.ts";
@@ -137,8 +137,35 @@ export class BaselineModel {
     infraHash?: string | null,
     options: BaselineUpsertOptions = {},
   ): Promise<Baseline> {
+    const write = async (): Promise<Baseline> =>
+      await this.#upsertAt(
+        projectId,
+        storyId,
+        viewport,
+        branch,
+        snapshotId,
+        await this.contentFor(projectId, sourcePath),
+        infraHash,
+        options,
+      );
+    // Storing a legacy source may reuse an object the sweep is about to delete: claim it until the
+    // row points at it. A content source is already referenced by its snapshot row.
+    return isContentPath(projectId, sourcePath)
+      ? await write()
+      : await withContentClaim(this.storage, projectId, write);
+  }
+
+  async #upsertAt(
+    projectId: string,
+    storyId: string,
+    viewport: string,
+    branch: string,
+    snapshotId: string,
+    screenshotPath: string,
+    infraHash: string | null | undefined,
+    options: BaselineUpsertOptions,
+  ): Promise<Baseline> {
     const browser = options.browser ?? DEFAULT_BROWSER;
-    const screenshotPath = await this.contentFor(projectId, sourcePath);
 
     const existing = await this.getFor(projectId, storyId, viewport, branch, browser);
     let baseline: Baseline;

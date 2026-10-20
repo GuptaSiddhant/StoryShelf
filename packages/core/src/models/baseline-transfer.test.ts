@@ -83,6 +83,22 @@ describe("BaselineTransferModel", () => {
     expect(await baselines.getFor("p2", "button--primary", "desktop", "feature/x")).toBeNull();
   });
 
+  it("holds a content reuse claim while it reuses existing images", async () => {
+    const { storage, objects, transfer } = await seeded();
+    const archive = await collect(await transfer.export("p1", { project: "demo" }));
+    const claimed = (): boolean => [...objects.keys()].some((key) => key.includes("/.claims/"));
+    const seen: boolean[] = [];
+    // Every image already exists, so each one is reused (the write is skipped).
+    vi.spyOn(storage, "exists").mockImplementation(async (path) => {
+      seen.push(claimed());
+      return objects.has(path);
+    });
+    await transfer.import("p1", archive);
+    expect(seen).toHaveLength(4);
+    expect(seen.every(Boolean)).toBe(true);
+    expect(claimed()).toBe(false);
+  });
+
   it("is idempotent", async () => {
     const { transfer } = await seeded();
     const archive = await collect(await transfer.export("p1"));

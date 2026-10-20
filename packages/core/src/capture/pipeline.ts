@@ -22,6 +22,7 @@ import {
   buildFingerprint,
   changedFields,
   fingerprintHash,
+  mergeFingerprint,
   parseFingerprint,
   type EnvironmentChange,
   type Fingerprint,
@@ -419,7 +420,11 @@ interface CaptureFingerprint {
 }
 
 function fingerprintOf(capture: RenderedSnapshot, viewport: Viewport): CaptureFingerprint {
-  const fingerprint = buildFingerprint(browserOf(capture), viewport, capture.environment);
+  return captureFingerprintOf(buildFingerprint(browserOf(capture), viewport, capture.environment));
+}
+
+/** A fingerprint as stored: its hash (the `infraHash`) and JSON. */
+function captureFingerprintOf(fingerprint: Fingerprint): CaptureFingerprint {
   return {
     fingerprint,
     infraHash: fingerprintHash(fingerprint),
@@ -429,17 +434,24 @@ function fingerprintOf(capture: RenderedSnapshot, viewport: Viewport): CaptureFi
 
 /**
  * What changed in the capture environment since the baseline was recorded, or null when nothing
- * did. A baseline from before fingerprints (no stored fingerprint) cannot be compared, so it is
- * never reported as changed; it gets its fingerprint backfilled instead.
+ * did. Compared component by component, only where both sides report a value: a capture with no
+ * environment (spooled before a browser crash) is unknown, not a change. A baseline from before
+ * fingerprints cannot be compared, so it is never reported as changed; it is backfilled instead.
  */
 function environmentChange(baseline: Baseline, now: CaptureFingerprint): EnvironmentChange | null {
-  if (!baseline.fingerprint || baseline.infraHash === now.infraHash) {
+  const from = parseFingerprint(baseline.fingerprint);
+  if (!from) {
     return null;
   }
-  const from = parseFingerprint(baseline.fingerprint);
-  return { changed: changedFields(from, now.fingerprint), from, to: now.fingerprint };
+  const changed = changedFields(from, now.fingerprint);
+  return changed.length > 0 ? { changed, from, to: now.fingerprint } : null;
 }
 
+/**
+ * A changed environment migrates the baseline without a diff only on the default branch, which is
+ * authoritative and auto-approves its own changes anyway. A feature branch still diffs: a real
+ * change is reported as `changed` with the environment change attached, never auto-accepted.
+ */
 async function createWithBaseline(
   ctx: CaptureContext,
   capture: RenderedSnapshot,
@@ -449,8 +461,8 @@ async function createWithBaseline(
 ): Promise<void> {
   const now = fingerprintOf(capture, viewport);
   const change = environmentChange(baseline, now);
-  const input = { ctx, capture, viewport, screenshot, baseline, now };
-  if (change) {
+  const input = { ctx, capture, viewport, screenshot, baseline, now, change };
+  if (change && ctx.build.isDefault) {
     await persistMigration(input, change);
   } else {
     await persistDiff(input);
@@ -464,6 +476,13 @@ interface BaselineCapture {
   screenshot: string;
   baseline: Baseline;
   now: CaptureFingerprint;
+  change: EnvironmentChange | null;
+}
+
+/** The fingerprint to write on the baseline: the capture's, keeping components it did not report. */
+function baselineFingerprintOf(input: BaselineCapture): CaptureFingerprint {
+  const earlier = parseFingerprint(input.baseline.fingerprint);
+  return captureFingerprintOf(mergeFingerprint(earlier, input.now.fingerprint));
 }
 
 function snapshotInput(input: BaselineCapture): Parameters<SnapshotModel["create"]>[2] {
@@ -488,9 +507,9 @@ function snapshotInput(input: BaselineCapture): Parameters<SnapshotModel["create
 }
 
 /**
- * The capture environment changed (browser build, fonts, platform, scale, viewport): pixels would
- * differ with no code change, so no diff is computed. The snapshot is accepted and records what
- * changed; on the default branch the new screenshot becomes the baseline.
+ * The default branch's capture environment changed (browser build, fonts, platform, scale): pixels
+ * would differ with no code change, so no diff is computed. The snapshot is accepted, records what
+ * changed, and the new screenshot becomes the baseline.
  */
 async function persistMigration(input: BaselineCapture, change: EnvironmentChange): Promise<void> {
   const { ctx, capture, viewport, screenshot, now } = input;
@@ -507,17 +526,16 @@ async function persistMigration(input: BaselineCapture, change: EnvironmentChang
     diffPassed: true,
     infraHash: now.infraHash,
   });
-  if (ctx.build.isDefault) {
-    await upsertDefaultBaseline(ctx, snapshot.id, capture, screenshot, now);
-  }
+  await upsertDefaultBaseline(ctx, snapshot.id, capture, screenshot, baselineFingerprintOf(input));
   ctx.logger?.debug(
     { storyId: capture.story.id, viewport: viewport.name, changed: change.changed },
     "capture environment changed; accepted without a diff",
   );
 }
 
+/** Diff against the baseline; a feature-branch environment change rides along as `envChange`. */
 async function persistDiff(input: BaselineCapture): Promise<void> {
-  const { ctx, capture, screenshot, baseline, now } = input;
+  const { ctx, capture, screenshot, baseline, now, change } = input;
   const result = await diffStoredScreenshots(
     ctx.storage,
     ctx.project,
@@ -525,15 +543,17 @@ async function persistDiff(input: BaselineCapture): Promise<void> {
     screenshot,
     capture.story.parameters?.diffThreshold,
   );
-  const browser = browserOf(capture);
   const snapshots = new SnapshotModel(ctx.db, ctx.tables);
-  const snapshot = await snapshots.create(ctx.project.id, ctx.build.id, snapshotInput(input));
+  const snapshot = await snapshots.create(ctx.project.id, ctx.build.id, {
+    ...snapshotInput(input),
+    ...(change ? { envChange: JSON.stringify(change) } : {}),
+  });
   const diff = diffPath(
     ctx.project.id,
     ctx.build.id,
     capture.story.id,
     capture.viewportName,
-    browser,
+    browserOf(capture),
   );
   const overlay = await writeDiffOverlay(ctx.storage, diff, result, result.passed);
   await snapshots.update(snapshot.id, {
@@ -544,16 +564,29 @@ async function persistDiff(input: BaselineCapture): Promise<void> {
     diffPassed: result.passed,
     infraHash: now.infraHash,
   });
-  if (!ctx.build.isDefault) {
-    return;
+  if (ctx.build.isDefault) {
+    await refreshDefaultBaseline(input, snapshot.id, result.passed);
   }
-  if (!result.passed) {
-    await upsertDefaultBaseline(ctx, snapshot.id, capture, screenshot, now);
-  } else if (!baseline.fingerprint) {
+}
+
+/**
+ * After a default-branch diff: a failed diff moves the baseline to the new screenshot; a passing
+ * one backfills the fingerprint when it was missing or had components the capture now reports.
+ */
+async function refreshDefaultBaseline(
+  input: BaselineCapture,
+  snapshotId: string,
+  passed: boolean,
+): Promise<void> {
+  const { ctx, capture, screenshot, baseline } = input;
+  const target = baselineFingerprintOf(input);
+  if (!passed) {
+    await upsertDefaultBaseline(ctx, snapshotId, capture, screenshot, target);
+  } else if (!baseline.fingerprint || baseline.infraHash !== target.infraHash) {
     await new BaselineModel(ctx.db, ctx.tables, ctx.storage, ctx.secret).backfillFingerprint(
       baseline,
-      now.infraHash,
-      now.json,
+      target.infraHash,
+      target.json,
     );
   }
 }
