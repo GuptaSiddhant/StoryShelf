@@ -4,7 +4,7 @@
 # Turbo 2.11+ prunes nub.lock natively (pnpm v9 format) — output lock is
 # pnpm-lock.yaml, renamed to nub.lock for `nub install --frozen-lockfile`.
 
-FROM ghcr.io/nubjs/nub:0.8.1 AS pruner
+FROM ghcr.io/nubjs/nub:0.9.5 AS pruner
 WORKDIR /app
 COPY package.json nub.lock nub.jsonc turbo.json ./
 COPY config ./config
@@ -13,7 +13,7 @@ COPY apps ./apps
 COPY fixtures/storybook-8 ./fixtures/storybook-8
 RUN nubx --yes turbo@2.11.2 prune fly-app --docker --out-dir out && mv out/json/pnpm-lock.yaml out/json/nub.lock
 
-FROM ghcr.io/nubjs/nub:0.8.1 AS builder
+FROM ghcr.io/nubjs/nub:0.9.5 AS builder
 WORKDIR /app
 USER root
 # Copy pruned package.json + lock for install (json) plus nub config
@@ -35,11 +35,12 @@ COPY fixtures/storybook-8 ./fixtures/storybook-8
 USER root
 RUN chown -R node:node /app/fixtures
 USER node
-RUN npm --prefix fixtures/storybook-8 install && npm --prefix fixtures/storybook-8 run build-storybook
+# Fixtures are independent pnpm installs (same as CI): honour its pnpm-lock.yaml.
+RUN cd fixtures/storybook-8 && npx -y pnpm@10 install --frozen-lockfile && npx -y pnpm@10 run build-storybook
 # Bundle workspace @storyshelf/* into single mjs; keep native + npm deps external
 RUN nubx rolldown -c apps/fly-app/rolldown.config.ts
 
-FROM node:26-bookworm-slim
+FROM node:24-bookworm-slim
 WORKDIR /app
 # Copy bundled server + chunks and hoisted node_modules (external npm deps + native)
 COPY --from=builder /app/apps/fly-app/dist ./dist
