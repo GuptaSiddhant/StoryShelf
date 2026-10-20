@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { builtinModules } from "node:module";
 import { resolve } from "node:path";
 import { defineConfig } from "rolldown";
@@ -6,6 +7,14 @@ import { defineConfig } from "rolldown";
 const EXTERNAL = /^(pino(\/|$)|playwright(-core)?(\/|$)|sharp(\/|$))/u;
 
 const root = resolve(import.meta.dirname ?? ".", "../..");
+
+// The bundle inlines workspace sources, so stamp the `@storyshelf/app` version the health
+// endpoint reports (what tsdown's `libConfig` does for published builds).
+const appVersion = (
+  JSON.parse(readFileSync(resolve(root, "packages/app/package.json"), "utf8")) as {
+    version: string;
+  }
+).version;
 
 export default defineConfig({
   platform: "node",
@@ -31,6 +40,7 @@ export default defineConfig({
   // dep so each resolves to its own version; only pino (worker transports load real files) and
   // Playwright (browser binaries) stay external, and both are hoisted in nub.jsonc.
   external: (id) => id.startsWith("node:") || builtinModules.includes(id) || EXTERNAL.test(id),
+  transform: { define: { __PKG_VERSION__: JSON.stringify(appVersion) } },
   // Keep side-effect-only imports (e.g. `reflect-metadata`, required by tsyringe) in order.
   treeshake: { moduleSideEffects: true },
   resolve: {

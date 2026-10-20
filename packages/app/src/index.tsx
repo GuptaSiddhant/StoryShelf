@@ -359,9 +359,15 @@ function registerDocs(app: ShelfRouter): void {
   app.get("/api/v1/docs", swaggerUI({ url: "/api/v1/openapi.json" }));
 }
 
-/** Package version injected at build via __PKG_VERSION__. */
+declare const __PKG_VERSION__: string | undefined;
+
+/**
+ * Package version injected at build via the `__PKG_VERSION__` define. Read as a bare identifier:
+ * bundler defines replace identifiers, not `globalThis` property reads. Undefined when running
+ * from source (dev server, tests).
+ */
 function packageVersion(): string {
-  return (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0";
+  return typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0";
 }
 
 /**

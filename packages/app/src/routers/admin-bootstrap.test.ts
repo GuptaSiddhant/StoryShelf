@@ -93,6 +93,23 @@ describe("admin token bootstrap", () => {
     expect(response.status).toBe(200);
   });
 
+  it("grants project routes as admin via Bearer admin token", async () => {
+    const { app } = appWithToken();
+    const headers = { "content-type": "application/json", authorization: `Bearer ${ADMIN_TOKEN}` };
+    const project = await app.request("/api/v1/projects", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ name: "Token Builds" }),
+    });
+    const { slug } = (await project.json()) as { slug: string };
+    const response = await app.request(`/api/v1/projects/${slug}/builds`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ gitSha: "abc123", gitBranch: "main" }),
+    });
+    expect(response.status).toBe(202);
+  });
+
   it("adds the session creator as project admin", async () => {
     const { app, db } = appWithToken();
     const response = await app.request("/api/v1/projects", {

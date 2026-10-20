@@ -58,3 +58,4 @@ export { isBlockedTarget, isPathSafe, isSafeSegment } from "./path-security.ts";
 export { redactSecrets, sanitizeErrorText } from "./redact.ts";
 export { addTiming, roundedTimings, runWithTimings, timed, type TimingMap } from "./timing.ts";
 export { slugify, ulid } from "./ulid.ts";
+export { zipStream, type ZipSource } from "./zip-write.ts";

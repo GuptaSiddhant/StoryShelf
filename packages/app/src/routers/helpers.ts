@@ -75,7 +75,8 @@ async function resolveProjectByToken(
   slug: string,
 ): Promise<{ project: Project; token: Token } | null> {
   const authHeader = c.req.header("authorization");
-  if (authHeader?.startsWith("Bearer ")) {
+  // The bootstrap admin token is not a project token: let callers grant it as admin.
+  if (authHeader?.startsWith("Bearer ") && !requestHasAdminToken(c)) {
     const token = authHeader.slice("Bearer ".length);
     const found = await new TokenModel(getStore().db).findByHash(sha256(token));
     if (!found) {
