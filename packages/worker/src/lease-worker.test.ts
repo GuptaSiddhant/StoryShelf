@@ -13,13 +13,9 @@ const sleep = async (ms: number): Promise<void> => {
 
 const { createCaptureWorker } = await import("./index.ts");
 
-/**
- * `capture` is how the fake render ends: `renewals` ends it after that many lease renewals (so the
- * test does not depend on timer speed), `never` keeps it running.
- */
 function setup(
   extend: () => Promise<"ok" | "lost">,
-  capture: { renewals: number } | "never",
+  captureMs: number,
   extra: Partial<PollableJob> = {},
 ) {
   const job: PollableJob = { buildId: "b1", leaseMs: 30, attempts: 0, ...extra };
@@ -41,18 +37,7 @@ function setup(
     nack: vi.fn(async () => {}),
     extend: vi.fn(extend),
   };
-  run.fn.mockImplementation(async () => {
-    if (capture === "never") {
-      await new Promise<void>(() => {});
-      return;
-    }
-    await vi.waitFor(
-      () => {
-        expect(queue.extend.mock.calls.length).toBeGreaterThanOrEqual(capture.renewals);
-      },
-      { timeout: 5000, interval: 5 },
-    );
-  });
+  run.fn.mockImplementation(() => new Promise<void>((resolve) => setTimeout(resolve, captureMs)));
   const runner = { cancel: vi.fn(async () => {}), render: vi.fn() };
   const worker = createCaptureWorker({
     queue: queue as never,
@@ -74,13 +59,24 @@ function setup(
 }
 
 describe("worker lease heartbeat", () => {
-  it("renews through a capture 2x the lease, then acks and stops the timer", async () => {
-    const { queue, worker } = setup(async () => "ok", { renewals: 3 });
+  it("renews while a capture runs, then acks and stops the timer", async () => {
+    // The capture ends when the test says so, after it has seen the renewals: counting renewals
+    // inside a fixed wall-clock window was flaky on a loaded CI runner (a stalled tick is one renewal).
+    const { queue, worker } = setup(async () => "ok", 0);
+    const capture = Promise.withResolvers<null>();
+    run.fn.mockImplementation(() => capture.promise);
     const started = worker.start();
+    await vi.waitFor(
+      () => {
+        expect(queue.extend.mock.calls.length).toBeGreaterThanOrEqual(3);
+      },
+      { timeout: 10_000, interval: 5 },
+    );
+    expect(queue.ack).not.toHaveBeenCalled();
+    capture.resolve(null);
     await vi.waitFor(() => {
       expect(queue.ack).toHaveBeenCalledTimes(1);
     });
-    expect(queue.extend.mock.calls.length).toBeGreaterThanOrEqual(3);
     const calls = queue.extend.mock.calls.length;
     await sleep(60);
     expect(queue.extend.mock.calls.length).toBe(calls);
@@ -89,10 +85,11 @@ describe("worker lease heartbeat", () => {
   });
 
   it("cancels the render and skips ack/nack when the lease is lost", async () => {
-    const { queue, runner, worker } = setup(async () => "lost", "never");
+    const { queue, runner, worker } = setup(async () => "lost", 60_000);
     const started = worker.start();
-    await sleep(80);
-    expect(runner.cancel).toHaveBeenCalledWith("b1", undefined);
+    await vi.waitFor(() => {
+      expect(runner.cancel).toHaveBeenCalledWith("b1", undefined);
+    });
     expect(queue.ack).not.toHaveBeenCalled();
     expect(queue.nack).not.toHaveBeenCalled();
     await worker.stop();
@@ -100,7 +97,7 @@ describe("worker lease heartbeat", () => {
   });
 
   it("cancels only the lost shard's render, not its sibling shards'", async () => {
-    const { runner, worker } = setup(async () => "lost", "never", { shard: "shard-1" });
+    const { runner, worker } = setup(async () => "lost", 60_000, { shard: "shard-1" });
     const started = worker.start();
     await vi.waitFor(() => {
       expect(runner.cancel).toHaveBeenCalled();

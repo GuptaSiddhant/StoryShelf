@@ -11,8 +11,14 @@ function terraformAvailable(): boolean {
 
 const hasTerraform = terraformAvailable();
 
+/** Repo-local scratch root (`.tmp` is gitignored and absent on a fresh checkout, e.g. CI). */
+function scratchRoot(): string {
+  mkdirSync(".tmp", { recursive: true });
+  return ".tmp";
+}
+
 function materialize(options: GcpTerraformOptions): string {
-  const dir = mkdtempSync(join(".tmp", "terraform-gcp-check-"));
+  const dir = mkdtempSync(join(scratchRoot(), "terraform-gcp-check-"));
   mkdirSync(join(dir, "terraform"), { recursive: true });
   for (const [rel, contents] of Object.entries(generateGcpTerraformFiles(options))) {
     writeFileSync(join(dir, rel), contents);
