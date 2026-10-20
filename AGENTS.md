@@ -59,15 +59,24 @@ StoryShelf/
     db-mysql/       @storyshelf/db-mysql        -- MySQL/MariaDB database adapters (mysql2 default + planetscale/tidb presets via subpaths)
     storage-local/  @storyshelf/storage-local  -- Local filesystem storage adapter
     storage-s3/     @storyshelf/storage-s3     -- S3-compatible storage adapter (S3, R2, MinIO)
+    storage-azure/  @storyshelf/storage-azure  -- Azure Blob Storage adapter
+    storage-gcs/    @storyshelf/storage-gcs    -- Google Cloud Storage adapter
     image/          @storyshelf/image           -- Pixel diff, overlay rendering and thumbnails on a worker pool; pngjs default codec, optional sharp (leaf package, see ADR 0032)
     auth/           @storyshelf/auth            -- Better Auth engine (local accounts, OAuth/OIDC, SSO, passkeys; see ADR 0023)
     cli/            storyshelf              -- CLI client (commander; upload/init/create/server/retry/purge, no Playwright)
     runner-playwright/ @storyshelf/runner-playwright -- pure Playwright CaptureRenderer (server-side render; core orchestrator owns capture)
+    runner-puppeteer/  @storyshelf/runner-puppeteer  -- Puppeteer CaptureRunner (Chromium via chrome-headless-shell, smaller image)
+    worker/         @storyshelf/worker          -- Remote capture worker: polls a CaptureQueue and runs the capture pipeline with any runner
+    affected/       @storyshelf/affected        -- Affected capture: dependency-graph tracing that selects the stories impacted by a change
     git-github/     @storyshelf/git-github      -- GitHub status checks, PR comments, merge-gate helpers (@octokit)
     git-gitlab/     @storyshelf/git-gitlab      -- GitLab commit statuses, MR comments, merge-gate helpers
     design-figma/   @storyshelf/design-figma    -- Figma design provider: link validation, file metadata, rendered previews (optional; see ADR 0029)
     queue-sqs/      @storyshelf/queue-sqs       -- SQS-backed remote CaptureQueue (AWS SDK v3)
     queue-redis/    @storyshelf/queue-redis     -- Redis-backed remote CaptureQueue (ioredis)
+    queue-azure/    @storyshelf/queue-azure     -- Azure remote CaptureQueue (Storage Queues or Service Bus)
+    queue-gcp/      @storyshelf/queue-gcp       -- GCP remote CaptureQueue (Cloud Pub/Sub)
+    notify-chat/    @storyshelf/notify-chat     -- Chat notification providers (Slack and Teams incoming webhooks)
+    notify-email/   @storyshelf/notify-email    -- Email notification transport (SMTP, Mailpit, log, HTTP APIs)
     observability/  @storyshelf/observability  -- OTEL tracing/metrics/log-correlation (single OTEL owner; see ADR 0022)
     ai/             @storyshelf/ai              -- AI insights engine on the Vercel AI SDK (build triage + project health; see ADR 0026)
     mcp/            @storyshelf/mcp             -- MCP server for AI agents (stdio + Streamable HTTP; thin client over /api/v1, read + comment only; see ADR 0027)
@@ -84,6 +93,7 @@ StoryShelf/
     testing.md            -- Testing strategy (unit/adapter/integration/gated-browser)
     website.md            -- Public website, docs & examples plan
     adr/                  -- Architecture Decision Records
+  .agents/skills/   -- Agent skills (ui-building-blocks, adapter-layout); tool-neutral SKILL.md format, symlinked as .claude/skills
 ```
 
 **Terminology note:** When working in this repo:
@@ -117,7 +127,7 @@ This distinction matters for:
 - **Temp files:** for scratch work, prefer a repo-local `.tmp/` directory over `/tmp` (permissions). `.tmp` is gitignored.
 - **Logging:** pino baked into core via `createShelfLogger()`. Always structured objects, never interpolate into the message (`logger.info({ buildId }, "msg")`); attach errors as an `err` child (`logger.error({ err }, "msg")`); derive scoped children for background work (`logger.child({ buildId })`). Runtime loggers are host-owned: the app/worker binds scoped children onto adapters via the optional `Adapter.setLogger` (factories accept `options.logger` only as an explicit override and must never create their own loggers). Hosted observability (Sentry/PostHog/Datadog/GCP/OTEL) are optional pino `transports`, not separate loggers. See ADR 0014.
 - **HTTP:** outbound calls go through the shared helper (`@storyshelf/core/utils`: `httpJson`/`HttpError`) — timeout plus retry with `Retry-After` built in. Never hand-roll fetch error handling per package, and never add client libraries (`ky`/`ofetch`) — see ADR 0019.
-- **UI:** server-rendered `hono/jsx` + HTMX + `hono/css`. Fixed UI with a `ui` brand config (logo/theme); icon sidebar + slim top bar shell (`ui/shell/`); system theme with manual override; no client framework and no UI adapter — custom UIs consume `/api/v1`. The customer accent is used subtly (derived `color-mix` tokens, never a full-width bar). Icons come from the cached sprite (`<Icon>`, `ui/icons/paths.ts`). HTMX is vendored locally; a small vanilla-JS layer (theme/sidebar/dropdown/toast, review comparison + keyboard) runs once per document — see the `ui-building-blocks` skill before touching it.
+- **UI:** server-rendered `hono/jsx` + HTMX + `hono/css`. Fixed UI with a `ui` brand config (logo/theme); icon sidebar + slim top bar shell (`ui/shell/`); system theme with manual override; no client framework and no UI adapter — custom UIs consume `/api/v1`. The customer accent is used subtly (derived `color-mix` tokens, never a full-width bar). Icons come from the cached sprite (`<Icon>`, `ui/icons/paths.ts`). HTMX is vendored locally; a small vanilla-JS layer (theme/sidebar/dropdown/toast, review comparison + keyboard) runs once per document — see the `ui-building-blocks` skill (`.agents/skills/`) before touching it.
 - **UI building blocks (strict):** pages compose facade components from `app/src/ui/components.tsx` (`Button`, `Tabs`, `Badge`, `Alert`, `EmptyState`, `Stat`, `Field`, `Card`, `PageHeader`, `HStack`, `VStack`, …) — never raw `btn`/`tabs`/`card` classes, never `style="..."` in `pages/`, never direct family imports. Component styles live colocated via `hono/css` imported from `app/src/ui/css.ts` (custom context: readable `ss-<label>-<hash>` names, one `<style id="storyshelf-css">` mounted in `DocumentLayout`): one labeled `css` template per variant composed via `${base}` extension (never `cx` for variants — it drops labels), `&` nesting for pseudo-states, static values only (brand tokens stay CSS vars). Stack layout uses `HStack`/`VStack`, never utility divs. Inline/table/card actions use `size="sm"`. `app/src/ui/consistency.test.ts` is the ratchet — zero tolerance on classes, imports, and inline styles. See the `ui-building-blocks` skill.
 - **Primary export first:** in every module, the primary exported item (the factory/router/class readers came for — e.g. `createShelfApp`, `createLocalStorage`, model classes) sits as high as possible: doc header, imports, then the primary export before helpers, secondary types, and internal utilities. Skim-reading rule: the file's purpose must be obvious within the first screen.
 - **Module layout (one concern per file):** split a module when it exceeds ~150 lines or holds 3+ distinct concerns. Adapter packages follow per-kind layouts — storage: `types` (Options), `keys` (key join/split), `client` (construction), `lifecycle` (setup/health/teardown), `operations` (buffered CRUD + listing), `streams`, `errors`; queue: `types`, `client`, `lifecycle`, `codec` (serialize/parse), `operations` (enqueue + remote no-ops), `poll` (poll/ack/nack); runners: `types`, `browser`, `runtime-params`, `pipeline`, `screenshot`, `play`, `a11y`. `index.ts` is a hybrid composition root (factory wiring first, type re-exports at the bottom) — never a logic dump. Keep the package `exports` map frozen: new modules stay internal unless the package owner approves a new subpath. New module ⇒ colocated `<module>.test.ts` (move cases with the code); indirect coverage is allowed only for pure mappers. See the `adapter-layout` skill for templates.
@@ -135,6 +145,7 @@ This distinction matters for:
 
 - **Local filesystem** (default): `@storyshelf/storage-local` — reads/writes to `--data-dir`. One `docker run` to self-host.
 - **S3-compatible** (cloud): `@storyshelf/storage-s3` — works with AWS S3, Cloudflare R2, MinIO, DigitalOcean Spaces. Same adapter interface, different implementation.
+- **Azure Blob / Google Cloud Storage**: `@storyshelf/storage-azure`, `@storyshelf/storage-gcs` — same adapter interface for those clouds.
 
 ## Lint rules that bite (oxlint, type-aware)
 
