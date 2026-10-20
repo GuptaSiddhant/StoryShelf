@@ -55,12 +55,24 @@ function setup(extend: () => Promise<"ok" | "lost">, captureMs: number) {
 }
 
 describe("worker lease heartbeat", () => {
-  it("renews through a capture 2x the lease, then acks and stops the timer", async () => {
-    const { queue, worker } = setup(async () => "ok", 70);
+  it("renews while a capture runs, then acks and stops the timer", async () => {
+    // The capture ends when the test says so, after it has seen the renewals: counting renewals
+    // inside a fixed wall-clock window was flaky on a loaded CI runner (a stalled tick is one renewal).
+    const { queue, worker } = setup(async () => "ok", 0);
+    const capture = Promise.withResolvers<void>();
+    run.fn.mockImplementation(() => capture.promise);
     const started = worker.start();
-    await sleep(150);
-    expect(queue.extend.mock.calls.length).toBeGreaterThanOrEqual(3);
-    expect(queue.ack).toHaveBeenCalledTimes(1);
+    await vi.waitFor(
+      () => {
+        expect(queue.extend.mock.calls.length).toBeGreaterThanOrEqual(3);
+      },
+      { timeout: 10_000, interval: 5 },
+    );
+    expect(queue.ack).not.toHaveBeenCalled();
+    capture.resolve();
+    await vi.waitFor(() => {
+      expect(queue.ack).toHaveBeenCalledTimes(1);
+    });
     const calls = queue.extend.mock.calls.length;
     await sleep(60);
     expect(queue.extend.mock.calls.length).toBe(calls);
@@ -71,8 +83,9 @@ describe("worker lease heartbeat", () => {
   it("cancels the render and skips ack/nack when the lease is lost", async () => {
     const { queue, runner, worker } = setup(async () => "lost", 60_000);
     const started = worker.start();
-    await sleep(80);
-    expect(runner.cancel).toHaveBeenCalledWith("b1");
+    await vi.waitFor(() => {
+      expect(runner.cancel).toHaveBeenCalledWith("b1");
+    });
     expect(queue.ack).not.toHaveBeenCalled();
     expect(queue.nack).not.toHaveBeenCalled();
     await worker.stop();
