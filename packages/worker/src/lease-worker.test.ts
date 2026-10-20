@@ -59,7 +59,7 @@ describe("worker lease heartbeat", () => {
     // The capture ends when the test says so, after it has seen the renewals: counting renewals
     // inside a fixed wall-clock window was flaky on a loaded CI runner (a stalled tick is one renewal).
     const { queue, worker } = setup(async () => "ok", 0);
-    const capture = Promise.withResolvers<void>();
+    const capture = Promise.withResolvers<null>();
     run.fn.mockImplementation(() => capture.promise);
     const started = worker.start();
     await vi.waitFor(
@@ -69,7 +69,7 @@ describe("worker lease heartbeat", () => {
       { timeout: 10_000, interval: 5 },
     );
     expect(queue.ack).not.toHaveBeenCalled();
-    capture.resolve();
+    capture.resolve(null);
     await vi.waitFor(() => {
       expect(queue.ack).toHaveBeenCalledTimes(1);
     });
