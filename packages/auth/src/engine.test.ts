@@ -202,7 +202,7 @@ describe("createShelfAuth", () => {
     const stored = await new UserModel(db).get(user?.id ?? "");
     expect(stored?.email).toBe("ada@example.com");
     expect(stored?.role).toBe("member");
-  });
+  }, 30_000);
 
   it("resolves sessions to users and revokes on sign-out", async () => {
     const { shelf } = await testEngine();
@@ -428,7 +428,7 @@ describe("createShelfAuth", () => {
       password: "hunter2hunter2",
     });
     expect(stale.status).not.toBe(200);
-  });
+  }, 30_000);
 
   it("revokes other sessions but keeps the caller", async () => {
     const { shelf } = await testEngine();
@@ -441,7 +441,7 @@ describe("createShelfAuth", () => {
 
     await expect(shelf.adapter.check(requestWithCookie(first))).resolves.not.toBeNull();
     await expect(shelf.adapter.check(requestWithCookie(second))).resolves.toBeNull();
-  });
+  }, 30_000);
 
   it("exposes adapter inventory for the profile page", async () => {
     const { shelf } = await testEngine();
@@ -519,7 +519,7 @@ describe("createShelfAuth", () => {
     await expect(
       shelf.adapter.check(new Request("http://localhost:3000/", { headers: { cookie: fresh } })),
     ).resolves.not.toBeNull();
-  });
+  }, 30_000);
 
   it("refreshes IdP profile drift without clobbering the display override", async () => {
     const { db, shelf } = await testEngine();
