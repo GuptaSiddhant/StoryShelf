@@ -4,7 +4,16 @@
 # Turbo 2.11+ prunes nub.lock natively (pnpm v9 format) — output lock is
 # pnpm-lock.yaml, renamed to nub.lock for `nub install --frozen-lockfile`.
 
-FROM ghcr.io/nubjs/nub:0.9.5 AS pruner
+# Build stages run on Node 24 with nub from npm: nub 0.9.5 enforces devEngines.runtime (24.x) and
+# would otherwise try to download Node at build time. Slim images ship no system CA store, which
+# nub needs for registry HTTPS.
+FROM node:24-bookworm-slim AS nub
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && npm i -g @nubjs/nub@0.9.5
+
+FROM nub AS pruner
 WORKDIR /app
 COPY package.json nub.lock nub.jsonc turbo.json ./
 COPY config ./config
@@ -13,7 +22,7 @@ COPY apps ./apps
 COPY fixtures/storybook-8 ./fixtures/storybook-8
 RUN nubx --yes turbo@2.11.2 prune fly-app --docker --out-dir out && mv out/json/pnpm-lock.yaml out/json/nub.lock
 
-FROM ghcr.io/nubjs/nub:0.9.5 AS builder
+FROM nub AS builder
 WORKDIR /app
 USER root
 # Copy pruned package.json + lock for install (json) plus nub config
@@ -26,15 +35,11 @@ USER node
 # Install only pruned deps (fly-app + its 5 workspace deps) — pruned lock is 116K vs 312K
 RUN --mount=type=cache,target=/root/.cache/nub,id=nub-cache \
     nub install --frozen-lockfile
-# Then copy pruned source for bundling (full) — overwrites package.json with full source
-COPY --from=pruner /app/out/full ./
-# Ensure demo seed file is present even if prune cache is stale (new file)
-COPY apps/fly-app/src/seed-demo.ts ./apps/fly-app/src/seed-demo.ts
+# Then copy pruned source for bundling (full) — overwrites package.json with full source.
+# Owned by `node`: rolldown writes its bundled config next to rolldown.config.ts and emits dist/.
+COPY --chown=node:node --from=pruner /app/out/full ./
 # Copy only the fixture needed for demo seed — build static inside image so repo stays clean (fixtures/**/storybook-static is gitignored)
-COPY fixtures/storybook-8 ./fixtures/storybook-8
-USER root
-RUN chown -R node:node /app/fixtures
-USER node
+COPY --chown=node:node fixtures/storybook-8 ./fixtures/storybook-8
 # Fixtures are independent pnpm installs (same as CI): honour its pnpm-lock.yaml.
 RUN cd fixtures/storybook-8 && npx -y pnpm@10 install --frozen-lockfile && npx -y pnpm@10 run build-storybook
 # Bundle workspace @storyshelf/* into single mjs; keep native + npm deps external
