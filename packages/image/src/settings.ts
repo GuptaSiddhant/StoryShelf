@@ -1,5 +1,10 @@
 /** Process-wide image settings, set once at app boot and read by the diff pool and thumbnails. */
-import { IMAGE_ENGINE_ENV, type ImageEngine, resolveImageEngine } from "./codec.ts";
+import {
+  DEFAULT_IMAGE_ENGINE,
+  IMAGE_ENGINE_ENV,
+  type ImageEngine,
+  resolveImageEngine,
+} from "./codec.ts";
 import { loadCodec } from "./codecs.ts";
 
 /** What `createShelfApp` passes down: `images.engine` and `compare.threads`. */
@@ -44,10 +49,13 @@ export function configuredThreadCount(): number | undefined {
 
 /**
  * Load the engine's dependencies now, so a missing `sharp` fails at boot with a clear message
- * instead of on the first diff.
+ * instead of on the first diff. The default engine is a hard dependency with nothing to verify,
+ * so it returns at once and never delays startup (or the first poll of a capture worker).
  */
 export async function verifyImageEngine(): Promise<ImageEngine> {
   const engine = currentImageEngine();
-  await loadCodec(engine);
+  if (engine !== DEFAULT_IMAGE_ENGINE) {
+    await loadCodec(engine);
+  }
   return engine;
 }
