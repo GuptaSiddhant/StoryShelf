@@ -2,7 +2,6 @@
 name: adapter-layout
 description: Split crammed adapter modules into one-concern-per-file layouts with clear names, frozen public exports, and colocated tests; use when creating a new adapter package, splitting a module over ~150 lines, or reviewing adapter file organization
 license: MIT
-compatibility: opencode
 metadata:
   audience: maintainers
   scope: packages/*

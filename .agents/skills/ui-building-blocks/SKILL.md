@@ -2,7 +2,6 @@
 name: ui-building-blocks
 description: Build or migrate server-rendered UI with strict facade components and colocated hono/css styles; use when adding UI variants, touching pages under packages/app/src/pages, styling components under packages/app/src/ui, or reviewing UI consistency
 license: MIT
-compatibility: opencode
 metadata:
   audience: maintainers
   scope: packages/app/src/ui, packages/app/src/pages

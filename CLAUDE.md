@@ -8,20 +8,9 @@ The canonical agent guide is `AGENTS.md` — toolchain, commands, layout, archit
 
 ## Claude Code specifics
 
-- **Skills live in `.opencode/skills/`, not `.claude/skills/`**, so they are not auto-loaded. When `AGENTS.md` says "see the `ui-building-blocks` skill" or "see the `adapter-layout` skill", read `.opencode/skills/<name>/SKILL.md` directly before touching `packages/app/src/ui/` or adding/restructuring an adapter package.
+- **Skills** live in `.agents/skills/` (tool-neutral); `.claude/skills` is a symlink to it, so `ui-building-blocks` and `adapter-layout` load automatically. Edit them under `.agents/skills/`.
 - **Running a single test:** from the package dir, `nubx vitest run src/path/to/file.test.ts` (add `-t "<name>"` to filter by test name). Integration suites follow the same pattern, e.g. `nubx vitest run src/smoke.integration.test.ts`.
 - **Node 24.x is required** (`devEngines.runtime` fails hard otherwise). If `~/.nub/bin` doesn't exist the toolchain isn't installed yet; run `nub ci` once it is.
 - **Launch configs** in `.claude/launch.json`: `app` (`nub run serve`, port 3000) and `website` (astro dev, port 4321).
 - **Commit hooks** (`nub run hook:install`): pre-commit rejects whitespace errors and non-oxfmt/oxlint-clean staged files; commit-msg enforces conventional commits. Fix with `nub run fmt` and re-stage rather than bypassing.
 - **What CI runs** (`.github/workflows/ci.yml`): `nub ci` → `nubx turbo verify --force` (scoped to changed packages) → `scripts/smoke.sh` → link/a11y checks on the website, plus a matrix job that builds each `fixtures/storybook-*` with pnpm and runs `nub run test:integration` against it. Reproduce locally with the same commands before pushing.
-
-## Packages not yet listed in AGENTS.md's layout
-
-`AGENTS.md`'s layout block predates these; they follow the same adapter conventions:
-
-- `affected/` — dependency-graph tracing that selects the stories impacted by a change
-- `worker/` — remote capture worker: polls a `CaptureQueue` and runs the capture pipeline with any runner
-- `runner-puppeteer/` — Puppeteer `CaptureRunner` (chrome-headless-shell)
-- `queue-azure/`, `queue-gcp/` — Azure Storage Queues / Service Bus and GCP Pub/Sub capture queues
-- `storage-azure/`, `storage-gcs/` — Azure Blob and Google Cloud Storage adapters
-- `notify-chat/`, `notify-email/` — Slack/Teams webhooks and email (SMTP, Mailpit, HTTP APIs) notifications
