@@ -64,7 +64,11 @@ the codec does not dominate here, revisit the premise before building the pool.
   new `tsdown` entry, resolved via `new URL("./worker.mjs", import.meta.url)`).
   Default size `max(1, availableParallelism() - 1)`, overridable, `0` meaning
   in-thread. Transfer `ArrayBuffer`s rather than copying. Fall back to the sync path
-  when `worker_threads` is unavailable (Deno, edge) or the worker fails to load.
+  when `worker_threads` is unavailable (Deno, edge) or the worker fails to load. A
+  worker dying before `ready` is a load failure only while no worker has ever started;
+  after that it is a crash, and the pool gives up only after three in a row. Falling
+  back never drops a running diff (a busy worker finishes before it stops) and emits
+  one `STORYSHELF_DIFF_POOL_FALLBACK` process warning.
   Switch `diffStoredScreenshots` in `capture/diff-record.ts` — the single call site
   for both `persistCapture` and `rediffBuild`.
 - **Bound `rediffBuild`** with `mapLimit(rows, PERSIST_CONCURRENCY, ...)`.
@@ -73,7 +77,8 @@ the codec does not dominate here, revisit the premise before building the pool.
   +70.8% and WebKit +59.6% against Chromium; several Playwright issues report worse
   WebKit ratios). Replace the static `recommendedPageConcurrency()` with an adaptive
   controller: raise in-flight pages while p95 capture latency and event-loop lag stay
-  flat, back off on timeouts.
+  flat, back off on timeouts. The latency baseline comes from the first window without
+  a timeout, so a timeout in the first window cannot inflate it.
 - **Leases on the in-process transport**, so crash recovery is one mechanism across
   all queue transports.
 - **Scratch cleanup.** Remove the build's scratch directory in a `finally` after
@@ -126,6 +131,25 @@ the codec does not dominate here, revisit the premise before building the pool.
 - **Crash handling.** Parent watches `exit`, requeues in-flight jobs with incremented
   `attempts`, fails the build past `maxRetries`. Leave `leaseMs` unset so child
   liveness is the lease. Notifications stay in the parent; the child reports outcomes.
+  Refinements from the post-merge review:
+  - A job failed for crashing the child settles with `crashed: true`, and the parent
+    writes the failure the child never could (`failCrashedCapture`): the build fails
+    with a failure status, or a shard's row fails through `CaptureShardModel.fail` and
+    the build is reduced as on any other shard's end. The alert then reads the status.
+  - A crash is charged only to the job that caused it: the hung receipt, or the only
+    job in flight. Jobs that shared a crashed child go back uncharged and each runs
+    alone next, so a repeat crash names its culprit.
+  - Any exit the parent did not ask for while work is pending or in flight counts as a
+    crash, whatever its code, so a broken entry module that returns at once trips the
+    fallback instead of being re-forked forever.
+  - A requeue waiting out its backoff starts a child when it lands, or goes to the
+    fallback if the queue tripped meanwhile.
+  - The worker takes a slot before it polls, so it never holds a job it cannot start
+    (whose lease would kill the child, or whose remote visibility would lapse).
+  - A final failure is a `nack { requeue: false, error }`, so forked views show it
+    `failed` with its error; SQS and Redis drop the message as an ack would.
+  - `compare.threads` reaches the child as `STORYSHELF_DIFF_WORKERS`, and
+    `capture.concurrency` must be a positive integer.
 - Child must pass `tables` explicitly, since `createCaptureWorker` defaults to the
   `db-sqlite` schema handles.
 
@@ -383,7 +407,8 @@ that crashes cannot undo it.
 
 - Parity: existing `diff/engine.test.ts` cases pass for sync and pooled backends, with
   a test asserting identical output across them.
-- Pool: worker crash, task error propagation, `workers=0` fallback, clean shutdown.
+- Pool: worker crash, task error propagation, `workers=0` fallback, clean shutdown,
+  a pre-ready death beside a busy worker.
 - Fast path: equal buffers return correct dimensions and no overlay; different buffers
   do not take it.
 - Queue: one shared `CaptureQueue` contract suite run against in-memory, forked and

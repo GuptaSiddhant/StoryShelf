@@ -15,7 +15,15 @@ export interface DiffPoolOptions {
   workerUrl: URL | string;
   /** Image engine the workers (and the in-thread fallback) use; pngjs when omitted. */
   engine?: ImageEngine;
+  /**
+   * Called once if the pool gives up on threads and runs every diff in-thread from then on. Defaults
+   * to a process warning, since every later diff then blocks the event loop.
+   */
+  onFallback?: (reason: string) => void;
 }
+
+/** Workers dying before `ready` in a row, after one has started fine, before the pool gives up. */
+const MAX_START_FAILURES = 3;
 
 interface Pending {
   id: number;
@@ -53,12 +61,17 @@ export class DiffPool {
   private queue: Pending[] = [];
   private nextId = 0;
   private broken = false;
+  /** Whether any worker has reported ready, which proves the worker file loads. */
+  private everReady = false;
+  private startFailures = 0;
+  private readonly onFallback: (reason: string) => void;
   private workerClass: WorkerCtor | null | undefined;
 
   constructor(options: DiffPoolOptions) {
     this.size = Math.max(0, Math.floor(options.size));
     this.workerUrl = options.workerUrl;
     this.engine = options.engine ?? "pngjs";
+    this.onFallback = options.onFallback ?? warnFallback;
   }
 
   /**
@@ -119,6 +132,14 @@ export class DiffPool {
   }
 
   private pump(): void {
+    if (this.broken) {
+      return;
+    }
+    this.dispatchToIdle();
+    this.spawnForQueue();
+  }
+
+  private dispatchToIdle(): void {
     for (let idle = this.idleSlot(); idle; idle = this.idleSlot()) {
       const next = this.queue.shift();
       if (!next) {
@@ -126,6 +147,10 @@ export class DiffPool {
       }
       dispatch(idle, next);
     }
+  }
+
+  /** Start workers for queued work beyond the ones already starting, up to the pool size. */
+  private spawnForQueue(): void {
     const starting = this.slots.filter((slot) => !slot.ready).length;
     const wanted = Math.min(this.queue.length - starting, this.size - this.slots.length);
     for (let index = 0; index < wanted && this.workerClass; index += 1) {
@@ -143,31 +168,53 @@ export class DiffPool {
       const slot: Slot = { worker, ready: false, task: null };
       this.slots.push(slot);
       installExitHook(this);
-      worker.on("message", (message: DiffResponse) => {
-        this.onMessage(slot, message);
-      });
-      worker.on("error", (error: Error) => {
-        this.onLost(slot, error);
-      });
-      worker.on("exit", (code) => {
-        this.onLost(slot, new Error(`diff worker exited with code ${code}`));
-      });
-    } catch {
-      this.fallBackToThread();
+      this.watch(slot);
+    } catch (error) {
+      this.onSpawnError(error);
+    }
+  }
+
+  private watch(slot: Slot): void {
+    slot.worker.on("message", (message: DiffResponse) => {
+      this.onMessage(slot, message);
+    });
+    slot.worker.on("error", (error: Error) => {
+      this.onLost(slot, error);
+    });
+    slot.worker.on("exit", (code) => {
+      this.onLost(slot, new Error(`diff worker exited with code ${code}`));
+    });
+  }
+
+  /** `new Worker` threw (a thread limit, say): a start failure, and fatal with no worker left. */
+  private onSpawnError(error: unknown): void {
+    const reason = `diff worker could not start: ${String(error)}`;
+    this.onStartFailure(reason);
+    if (this.slots.length === 0) {
+      this.fallBackToThread(reason);
     }
   }
 
   private onMessage(slot: Slot, message: DiffResponse): void {
     if (message.type === "ready") {
-      slot.ready = true;
-      slot.worker.unref();
+      this.markReady(slot);
     } else if (slot.task?.id === message.id) {
       const { task } = slot;
       slot.task = null;
       slot.worker.unref();
       settle(task, message);
     }
+    if (this.broken && !slot.task) {
+      this.retire(slot);
+    }
     this.pump();
+  }
+
+  private markReady(slot: Slot): void {
+    slot.ready = true;
+    this.everReady = true;
+    this.startFailures = 0;
+    slot.worker.unref();
   }
 
   private onLost(slot: Slot, error: Error): void {
@@ -176,20 +223,45 @@ export class DiffPool {
       return;
     }
     this.slots.splice(index, 1);
+    slot.task?.reject(error);
     if (!slot.ready) {
-      this.fallBackToThread();
-    } else if (slot.task) {
-      slot.task.reject(error);
+      this.onStartFailure(`diff worker exited before it was ready: ${error.message}`);
     }
     this.pump();
   }
 
-  /** The worker file could not run (missing, syntax error, no `worker_threads`): stay in-thread for good. */
-  private fallBackToThread(): void {
+  /**
+   * A worker died before reporting ready. Before any worker ever has, the worker file cannot run, so
+   * go in-thread; after one has, it is a crash (memory pressure, a thread limit) and the pool only
+   * gives up if replacements keep failing.
+   */
+  private onStartFailure(reason: string): void {
+    this.startFailures += 1;
+    if (!this.everReady || this.startFailures >= MAX_START_FAILURES) {
+      this.fallBackToThread(reason);
+    }
+  }
+
+  private retire(slot: Slot): void {
+    const index = this.slots.indexOf(slot);
+    if (index !== -1) {
+      this.slots.splice(index, 1);
+    }
+    slot.worker.terminate().catch(ignore);
+  }
+
+  /**
+   * Stay in-thread for good. Idle and starting workers stop now; a worker busy with a diff keeps it
+   * (its buffers were transferred to it) and stops once it answers, so no running diff is dropped.
+   */
+  private fallBackToThread(reason: string): void {
+    if (this.broken) {
+      return;
+    }
     this.broken = true;
-    const slots = this.slots.splice(0);
-    for (const slot of slots) {
-      slot.worker.terminate().catch(ignore);
+    this.onFallback(reason);
+    for (const slot of this.slots.filter((candidate) => !candidate.task)) {
+      this.retire(slot);
     }
     const queued = this.queue;
     this.queue = [];
@@ -219,6 +291,12 @@ function installExitHook(pool: DiffPool): void {
 }
 
 function ignore(): void {}
+
+function warnFallback(reason: string): void {
+  process.emitWarning(`${reason}; running image diffs on the main thread from now on`, {
+    code: "STORYSHELF_DIFF_POOL_FALLBACK",
+  });
+}
 
 /** Hand a task to an idle worker, transferring both PNGs (copying any that are not exclusively owned). */
 function dispatch(slot: Slot, task: Pending): void {

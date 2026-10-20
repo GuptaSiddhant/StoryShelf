@@ -53,6 +53,21 @@ describe("AdaptiveConcurrency", () => {
     expect(ctl.limit).toBe(3);
   });
 
+  it("never takes the latency baseline from a window with a timeout", () => {
+    const ctl = controller({ initial: 4, max: 8 });
+    // First window: seven normal captures and one 30 s navigation timeout.
+    for (let index = 0; index < 7; index += 1) {
+      ctl.observe({ durationMs: 1000 });
+    }
+    ctl.observe({ durationMs: 30_000, timedOut: true });
+    expect(ctl.limit).toBe(2);
+    feed(ctl, 1000); // the baseline: 1 s, not 30 s
+    for (let window = 0; window < 4; window += 1) {
+      feed(ctl, 10_000); // saturated: ten times slower, no timeouts
+    }
+    expect(ctl.limit).toBe(1);
+  });
+
   it("steps down when p95 latency grows past the tolerance", () => {
     const ctl = controller({ initial: 4 });
     feed(ctl, 100);

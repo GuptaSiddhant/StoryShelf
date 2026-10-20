@@ -8,6 +8,7 @@ import {
   ForkedCaptureQueue,
   forkCaptureChild,
   type ForkDecision,
+  type ForkedJobOutcome,
 } from "@storyshelf/core/capture";
 import type { ShelfCaptureOptions } from "@storyshelf/core/config";
 import { DIFF_WORKERS_ENV, IMAGE_ENGINE_ENV } from "@storyshelf/core/diff";
@@ -68,7 +69,7 @@ export interface ForkedQueueDeps {
   diffThreads?: number;
   /** Takes over if forking stops being viable. */
   fallback: CaptureQueue;
-  onSettled: (job: PollableJob) => Promise<void>;
+  onSettled: (job: PollableJob, outcome: ForkedJobOutcome) => Promise<void>;
   logger: Logger;
 }
 
@@ -99,8 +100,8 @@ export function createForkedQueue(deps: ForkedQueueDeps): ForkedCaptureQueue {
     spawn: () => forkCaptureChild({ entry: deps.workerEntry, env }),
     fallback: deps.fallback,
     leaseMs: CAPTURE_LEASE_MS,
-    onSettled: async (job) => {
-      await deps.onSettled(job);
+    onSettled: async (job, outcome) => {
+      await deps.onSettled(job, outcome);
     },
     logger: deps.logger,
   });

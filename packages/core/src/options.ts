@@ -34,6 +34,14 @@ function assertCaptureProcess(capture: ShelfOptions["capture"]): void {
     throw new Error('capture.mode "fork" requires capture.workerEntry');
   }
   assertShardSize(capture);
+  assertConcurrency(capture?.concurrency);
+}
+
+/** `0` would deadlock the in-process queue, and the forked child would silently ignore it. */
+function assertConcurrency(concurrency: number | undefined): void {
+  if (concurrency !== undefined && (!Number.isInteger(concurrency) || concurrency < 1)) {
+    throw new Error(`capture.concurrency must be a positive integer, got ${String(concurrency)}`);
+  }
 }
 
 function assertShardSize(capture: ShelfOptions["capture"]): void {

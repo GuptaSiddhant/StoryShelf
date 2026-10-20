@@ -74,10 +74,13 @@ describe("IpcCaptureQueue", () => {
     await queue.ack({ buildId: "b1", receipt: "r1" });
     await queue.nack({ buildId: "b1", receipt: "r2" }, { requeue: true, delayMs: 100 });
     await queue.nack({ buildId: "b1", receipt: "r3" });
+    await queue.nack({ buildId: "b1", receipt: "r4" }, { requeue: false, error: "boom" });
     expect(sent).toEqual([
       { type: "ack", receipt: "r1" },
       { type: "nack", receipt: "r2", requeue: true, delayMs: 100 },
       { type: "nack", receipt: "r3", requeue: false },
+      // A final failure carries its error, so the parent's views show why it failed.
+      { type: "nack", receipt: "r4", requeue: false, error: "boom" },
     ]);
   });
 

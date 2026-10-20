@@ -49,7 +49,10 @@ export interface WorkerOptions {
   /** Optional ack override. */
   ack?: (job: PollableJob) => Promise<void>;
   /** Optional nack override. */
-  nack?: (job: PollableJob, options?: { requeue?: boolean; delayMs?: number }) => Promise<void>;
+  nack?: (
+    job: PollableJob,
+    options?: { requeue?: boolean; delayMs?: number; error?: string },
+  ) => Promise<void>;
   /** Optional lease-renewal override; defaults to `queue.extend` when present. */
   extend?: ExtendLease;
   /**
@@ -196,7 +199,7 @@ export function createCaptureWorker(options: WorkerOptions): WorkerHandle {
     options.nack ??
     (async (
       job: PollableJob,
-      nackOpts?: { requeue?: boolean; delayMs?: number },
+      nackOpts?: { requeue?: boolean; delayMs?: number; error?: string },
     ): Promise<void> => {
       if (typeof pollable.nack === "function") {
         await pollable.nack(job, nackOpts);
@@ -278,9 +281,23 @@ export function createCaptureWorker(options: WorkerOptions): WorkerHandle {
     await options.runner.cancel(job.buildId, job.shard).catch(() => {});
   }
 
-  async function processJob(job: PollableJob): Promise<void> {
-    const jobLogger = logger?.child({ buildId: job.buildId, reqId: job.reqId });
-    await acquire();
+  /** Final failure: nack without requeue (so the queue can record it failed), else ack it away. */
+  async function dropFailedJob(job: PollableJob, error: unknown, jobLogger: Logger): Promise<void> {
+    const message = error instanceof Error ? error.message : String(error);
+    try {
+      await doNack(job, { requeue: false, error: message });
+    } catch (nackError) {
+      try {
+        await doAck(job);
+      } catch {
+        jobLogger.error({ err: nackError }, "failed to drop permanently failed job");
+      }
+    }
+  }
+
+  /** Run a polled job in the slot the loop acquired for it; the slot is released when it ends. */
+  function processJob(job: PollableJob): void {
+    const jobLogger = logger.child({ buildId: job.buildId, reqId: job.reqId });
     const execution = (async (): Promise<void> => {
       try {
         jobLogger?.info("worker picked up job");
@@ -306,15 +323,7 @@ export function createCaptureWorker(options: WorkerOptions): WorkerHandle {
           }
           jobLogger?.warn({ err: error, attempts, delayMs: delay }, "capture failed, requeued");
         } else {
-          try {
-            await doAck(job);
-          } catch (ackError) {
-            try {
-              await doNack(job, { requeue: false });
-            } catch {
-              jobLogger?.error({ err: ackError }, "failed to ack permanently failed job");
-            }
-          }
+          await dropFailedJob(job, error, jobLogger);
           jobLogger?.error({ err: error, attempts }, "capture permanently failed");
         }
       } finally {
@@ -371,6 +380,23 @@ export function createCaptureWorker(options: WorkerOptions): WorkerHandle {
     }
   }
 
+  /**
+   * Take a slot, then poll for a job to run in it. Polling first would leave a job idle while every
+   * slot is busy, and its lease (a remote queue's visibility, the forked parent's progress lease)
+   * would run out. The slot is released again unless a job came back to run in it.
+   */
+  async function pollInSlot(
+    waitMs: number,
+  ): Promise<{ job: PollableJob | null | undefined; elapsedMs: number }> {
+    await acquire();
+    const startedAt = Date.now();
+    const job = running ? await pollOnce(waitMs) : undefined;
+    if (!job || !running) {
+      release();
+    }
+    return { job: running ? job : undefined, elapsedMs: Date.now() - startedAt };
+  }
+
   async function loop(): Promise<void> {
     if (!(await engineLoads())) {
       return;
@@ -378,25 +404,25 @@ export function createCaptureWorker(options: WorkerOptions): WorkerHandle {
     const waitMs = config.waitTimeSeconds * 1000;
     let emptyStreak = 0;
     while (running) {
-      const startedAt = Date.now();
-      const job = await pollOnce(waitMs);
-      if (job === undefined || !running) {
+      const { job, elapsedMs } = await pollInSlot(waitMs);
+      if (job === undefined) {
         continue;
       }
       if (!job) {
         // Queues without long-poll return instantly; back off instead of spinning.
-        emptyStreak = isFastEmptyPoll(Date.now() - startedAt) ? emptyStreak + 1 : 0;
+        emptyStreak = isFastEmptyPoll(elapsedMs) ? emptyStreak + 1 : 0;
         if (emptyStreak > 0) {
           await idleSleep(idleDelayMs(emptyStreak));
         }
         continue;
       }
       emptyStreak = 0;
-      if (!isValidJob(job)) {
+      if (isValidJob(job)) {
+        processJob(job);
+      } else {
+        release();
         await dropPoisonJob(job);
-        continue;
       }
-      await processJob(job);
     }
   }
 

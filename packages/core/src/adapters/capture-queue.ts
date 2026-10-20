@@ -83,8 +83,14 @@ export interface PollableCaptureQueue extends CaptureQueue {
   poll(options?: { waitMs?: number }): Promise<PollableJob | null>;
   /** Acknowledge successful processing of a polled job. */
   ack(job: PollableJob): Promise<void>;
-  /** Negatively acknowledge; requeue with optional delay when possible. */
-  nack(job: PollableJob, options?: { requeue?: boolean; delayMs?: number }): Promise<void>;
+  /**
+   * Negatively acknowledge; requeue with optional delay when possible. `requeue: false` is a final
+   * failure: the job is dropped, and `error` says why for queues that keep a record of it.
+   */
+  nack(
+    job: PollableJob,
+    options?: { requeue?: boolean; delayMs?: number; error?: string },
+  ): Promise<void>;
   /**
    * Extend the lease on an in-flight job by another `job.leaseMs`. Optional:
    * queues without a renewable lease (e.g. Redis) omit it. May update

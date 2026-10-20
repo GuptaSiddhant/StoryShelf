@@ -64,6 +64,12 @@ function shardSized(shardSize: number, extra = {}): () => void {
   };
 }
 
+function concurrent(concurrency: number): () => void {
+  return () => {
+    resolveShelfOptions({ ...base, capture: { runner, concurrency } });
+  };
+}
+
 describe("resolveShelfOptions capture process options", () => {
   it("requires a runner alongside workerEntry", () => {
     expect(() =>
@@ -79,6 +85,13 @@ describe("resolveShelfOptions capture process options", () => {
     expect(() => resolveShelfOptions({ ...base, capture: { shardSize: 10 } })).toThrow(
       /requires capture\.runner/u,
     );
+  });
+
+  it("validates concurrency as a positive integer", () => {
+    expect(concurrent(2)).not.toThrow();
+    expect(concurrent(0)).toThrow(/capture\.concurrency must be a positive integer, got 0/u);
+    expect(concurrent(2.5)).toThrow(/positive integer/u);
+    expect(concurrent(-1)).toThrow(/positive integer/u);
   });
 
   it('requires workerEntry for mode "fork"', () => {

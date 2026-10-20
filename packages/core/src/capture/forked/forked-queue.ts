@@ -19,6 +19,11 @@ declare const __PKG_VERSION__: string | undefined;
 export interface ForkedJobOutcome {
   status: "completed" | "failed";
   error?: string;
+  /**
+   * The job was failed by the parent because the child kept dying on it. The child never got to
+   * record that, so the settle hook must write the build (or shard) failure itself.
+   */
+  crashed?: true;
 }
 
 /** Options for {@link ForkedCaptureQueue}. */
@@ -86,6 +91,8 @@ export class ForkedCaptureQueue implements CaptureQueue {
   readonly #routed = new Set<string>();
   #waiters: Waiter[] = [];
   #child: ChildProcessHandle | null = null;
+  /** The receipt whose lease ran out, while its child is being killed; that job alone is at fault. */
+  #hung: string | null = null;
   #restart: ReturnType<typeof setTimeout> | undefined;
   #tripped = false;
   #closed = false;
@@ -186,7 +193,7 @@ export class ForkedCaptureQueue implements CaptureQueue {
   }
 
   #deliver(): void {
-    while (this.#child && this.#book.hasPending) {
+    while (this.#child && this.#hung === null && this.#book.hasPending) {
       const waiter = this.#waiters.shift();
       if (!waiter) {
         return;
@@ -217,8 +224,7 @@ export class ForkedCaptureQueue implements CaptureQueue {
       return;
     }
     const redeliver = (): void => {
-      this.#book.requeue(job, { front: false });
-      this.#deliver();
+      this.#redeliver(job);
     };
     if (message.delayMs && message.delayMs > 0) {
       setTimeout(redeliver, message.delayMs).unref();
@@ -227,10 +233,26 @@ export class ForkedCaptureQueue implements CaptureQueue {
     }
   }
 
+  /**
+   * Put a nacked job back after its backoff. The child may have exited, or the queue tripped, while
+   * the job sat out the delay; it was in neither the pending nor the in-flight set then.
+   */
+  #redeliver(job: PollableJob): void {
+    if (this.#tripped) {
+      this.#divert(divertable(job)).catch(() => {});
+      return;
+    }
+    this.#book.requeue(job, { front: false });
+    this.#ensureChild();
+    this.#deliver();
+  }
+
   #settle(receipt: string, outcome: ForkedJobOutcome): void {
     const job = this.#release(receipt);
     if (job) {
       this.#finish(job, outcome);
+      // A job held back to run alone may be waiting for this one to finish.
+      this.#deliver();
     }
   }
 
@@ -253,29 +275,53 @@ export class ForkedCaptureQueue implements CaptureQueue {
     }
     this.#child = null;
     this.#clearWaiters();
+    const crashed = this.#isCrash(info);
     this.#recoverInFlight(info);
-    if (info.code !== 0 && this.#crashes.record()) {
+    if (crashed && this.#crashes.record()) {
       this.#trip(`capture child crashed repeatedly (last: ${describeExit(info)})`);
-      return;
-    }
-    if (this.#book.hasPending && !this.#closed) {
+    } else if (this.#book.hasPending && !this.#closed) {
       this.#scheduleRestart();
     }
   }
 
+  /**
+   * An exit the parent did not ask for while work was waiting is a crash whatever its code: a child
+   * that returns cleanly before polling (a broken entry module) would otherwise loop forever.
+   */
+  #isCrash(info: { code: number | null }): boolean {
+    return info.code !== 0 || this.#book.hasPending || this.#book.inFlightCount > 0;
+  }
+
+  /**
+   * Requeue (or, past `maxCrashRetries`, fail) what the dead child held. A crash is charged only to
+   * the job that caused it: the hung one, or the only one in flight. Jobs that shared a crashed child
+   * go back uncharged and each runs alone next, so a repeat crash names its culprit.
+   */
   #recoverInFlight(info: { code: number | null; signal: string | null }): void {
-    const maxRetries = this.#options.maxCrashRetries ?? 2;
-    for (const job of this.#book.releaseAll()) {
+    const jobs = this.#book.releaseAll();
+    const hung = this.#hung;
+    this.#hung = null;
+    for (const job of jobs) {
       this.#leases.stop(job.receipt);
-      if ((job.attempts ?? 0) >= maxRetries) {
-        this.#finish(job, {
-          status: "failed",
-          error: `capture worker exited (${describeExit(info)}) ${(job.attempts ?? 0) + 1} times`,
-        });
+      if (hung === null ? jobs.length === 1 : job.receipt === hung) {
+        this.#chargeCrash(job, info);
       } else {
-        this.#book.requeue(job, { front: true });
+        this.#book.requeue(job, { front: true, charge: false, solo: hung === null });
       }
     }
+  }
+
+  #chargeCrash(job: PollableJob, info: { code: number | null; signal: string | null }): void {
+    const attempts = job.attempts ?? 0;
+    if (attempts < (this.#options.maxCrashRetries ?? 2)) {
+      this.#book.requeue(job, { front: true });
+      return;
+    }
+    this.#finish(job, {
+      status: "failed",
+      error: `capture worker exited (${describeExit(info)}) ${attempts + 1} times`,
+      crashed: true,
+    });
   }
 
   #scheduleRestart(): void {
@@ -299,12 +345,7 @@ export class ForkedCaptureQueue implements CaptureQueue {
     );
     this.#close();
     for (const job of this.#book.drain()) {
-      this.#divert({
-        buildId: job.buildId,
-        reqId: job.reqId,
-        traceparent: job.traceparent,
-        ...(job.shard ? { shard: job.shard } : {}),
-      }).catch(() => {});
+      this.#divert(divertable(job)).catch(() => {});
     }
   }
 
@@ -328,18 +369,20 @@ export class ForkedCaptureQueue implements CaptureQueue {
 
   /** A delivered job went a full lease without progress: the child is hung, so kill it like a crash. */
   #onHung(receipt: string): void {
-    if (!this.#book.isInFlight(receipt) || !this.#child) {
+    if (!this.#book.isInFlight(receipt) || !this.#child || this.#hung !== null) {
       return;
     }
     this.#options.logger?.error(
       { receipt, leaseMs: this.#options.leaseMs },
       "capture child made no progress; killing it",
     );
+    this.#hung = receipt;
     this.#child.kill(true);
   }
 
   #close(): void {
     this.#closed = true;
+    this.#hung = null;
     this.#leases.stopAll();
     clearTimeout(this.#restart);
     this.#restart = undefined;
@@ -348,6 +391,16 @@ export class ForkedCaptureQueue implements CaptureQueue {
     this.#child = null;
     child?.kill();
   }
+}
+
+/** The parts of a job the fallback queue takes (no receipt or attempt count). */
+function divertable(job: PollableJob): CaptureJob {
+  return {
+    buildId: job.buildId,
+    reqId: job.reqId,
+    traceparent: job.traceparent,
+    ...(job.shard ? { shard: job.shard } : {}),
+  };
 }
 
 function describeExit(info: { code: number | null; signal: string | null }): string {

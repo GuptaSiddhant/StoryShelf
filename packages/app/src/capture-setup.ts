@@ -1,8 +1,9 @@
-import type { CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
+import type { CaptureQueue, PollableJob } from "@storyshelf/core/adapter/capture-queue";
 import type { CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
 import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import {
   createDispatchJob,
+  failCrashedCapture,
   InMemoryCaptureQueue,
   recoverStuckCaptures,
 } from "@storyshelf/core/capture";
@@ -10,6 +11,7 @@ import type {
   CaptureDispatchJob,
   CaptureJobOptions,
   DispatchDeps,
+  ForkedJobOutcome,
   RecoveryDeps,
   RecoveryResult,
 } from "@storyshelf/core/capture";
@@ -104,12 +106,30 @@ async function notifyCaptureFailed(
   );
 }
 
+/**
+ * Settle hook for jobs that ran in a forked child. A job the parent failed because the child kept
+ * crashing on it was never recorded by the child, so its build (or shard) is failed here first, the
+ * way an in-process failure would be; then admins are alerted from the build's own status.
+ */
+export function forkedSettleHook(
+  dispatch: DispatchDeps,
+  notify: (buildId: string) => Promise<void>,
+): (job: PollableJob, outcome: ForkedJobOutcome) => Promise<void> {
+  return async (job, outcome) => {
+    if (outcome.crashed) {
+      await failCrashedCapture(dispatch, job, outcome.error ?? "capture worker crashed");
+    }
+    await notify(job.buildId);
+  };
+}
+
 /** The in-process queue, or a forked child fronting it when `capture.workerEntry` and the host allow. */
 function pickProcessQueue(
   options: ShelfOptions,
   config: ShelfConfig,
   logger: Logger,
   inProcess: CaptureQueue,
+  dispatch: DispatchDeps,
 ): CaptureQueue {
   const workerEntry = options.capture?.workerEntry;
   if (!workerEntry || !shouldForkCapture(options.capture, logger)) {
@@ -122,10 +142,10 @@ function pickProcessQueue(
     imageEngine: options.images?.engine,
     diffThreads: options.compare?.threads,
     fallback: inProcess,
-    onSettled: async (job) => {
-      // Notifications stay in this process; the build's own status says whether the capture failed.
-      await notifyCaptureFailed(options, config, logger, job.buildId);
-    },
+    // Notifications stay in this process; the build's own status says whether the capture failed.
+    onSettled: forkedSettleHook(dispatch, async (buildId) => {
+      await notifyCaptureFailed(options, config, logger, buildId);
+    }),
     logger,
   });
 }
@@ -229,7 +249,7 @@ function setupInProcessQueue(
       await notifyCaptureFailed(options, config, logger, job.buildId);
     },
   });
-  const captureQueue = pickProcessQueue(options, config, logger, inProcessQueue);
+  const captureQueue = pickProcessQueue(options, config, logger, inProcessQueue, dispatchDeps);
   captureQueueRef.current = captureQueue;
   const enqueueCapture = enqueuerFor(captureQueue);
   const recoverStuck = async (): Promise<RecoveryResult> => await recoverStuckCaptures(recovery);
