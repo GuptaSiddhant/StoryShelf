@@ -1,4 +1,5 @@
 /** The optional native codec: libvips via `sharp`. Several times faster than pngjs on large PNGs. */
+import { isMainThread } from "node:worker_threads";
 import type { ImageCodec, RgbaImage } from "./codec.ts";
 
 type SharpModule = typeof import("sharp");
@@ -9,6 +10,11 @@ type SharpModule = typeof import("sharp");
  */
 export async function createSharpCodec(): Promise<ImageCodec> {
   const sharp = await importSharp();
+  if (!isMainThread) {
+    // Each pool worker would otherwise run libvips on a CPU-count thread pool of its own; the pool
+    // already parallelises across workers, so one libvips thread each avoids oversubscription.
+    sharp.concurrency(1);
+  }
   return {
     name: "sharp",
     decode: async (png) => await decodeWithSharp(sharp, png),

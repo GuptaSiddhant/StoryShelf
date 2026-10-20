@@ -10,6 +10,8 @@ import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import { createDispatchJob, sweepOrphanedScratch } from "@storyshelf/core/capture";
 import type { CaptureJobOptions, DispatchDeps } from "@storyshelf/core/capture";
+import type { ShelfCompareOptions, ShelfImagesOptions } from "@storyshelf/core/config";
+import { configureImages, verifyImageEngine } from "@storyshelf/core/diff";
 import { createShelfLogger, type Logger } from "@storyshelf/core/logger";
 import { roundedTimings, runWithTimings } from "@storyshelf/core/utils";
 import {
@@ -69,6 +71,14 @@ export interface WorkerOptions {
   gitHosts?: GitHostProvider[];
   /** Design providers validating declared design links during capture. */
   design?: DesignProvider[];
+  /**
+   * Image engine, same as the server's `images` option. Set it (or `STORYSHELF_IMAGE_ENGINE`) to
+   * match the server so remote workers diff with the same codec; `start()` fails when the engine
+   * cannot load.
+   */
+  images?: ShelfImagesOptions;
+  /** Diff pool size, same as the server's `compare` option. */
+  compare?: ShelfCompareOptions;
   /** Server secret for webhook decryption. */
   secret?: string;
   /** Logger for worker diagnostics. */
@@ -100,6 +110,11 @@ function isValidJob(job: PollableJob): boolean {
 }
 
 export function createCaptureWorker(options: WorkerOptions): WorkerHandle {
+  // Only touch the process-wide image settings when asked, so a worker created next to an app in
+  // one process does not undo the app's own `images`/`compare` options.
+  if (options.images || options.compare) {
+    configureImages({ engine: options.images?.engine, threads: options.compare?.threads });
+  }
   const config = resolveWorkerConfig(options.config);
   const tables: WorkerTables = options.tables ?? {
     projects,
@@ -197,6 +212,7 @@ export function createCaptureWorker(options: WorkerOptions): WorkerHandle {
   let running = false;
   let loopPromise: Promise<void> | null = null;
   let stopResolve: (() => void) | null = null;
+  let startFailure: Error | null = null;
   const inFlight = new Set<Promise<void>>();
   let concurrencyRunning = 0;
   const waiting: (() => void)[] = [];
@@ -340,7 +356,25 @@ export function createCaptureWorker(options: WorkerOptions): WorkerHandle {
     }
   }
 
+  /** Check the image engine before the first poll; when it cannot load, `start()` ends with the error. */
+  async function engineLoads(): Promise<boolean> {
+    try {
+      await verifyImageEngine();
+      return true;
+    } catch (error) {
+      startFailure = error instanceof Error ? error : new Error(String(error));
+      logger.error({ err: startFailure }, "image engine cannot load; capture worker stopping");
+      running = false;
+      stopResolve?.();
+      stopResolve = null;
+      return false;
+    }
+  }
+
   async function loop(): Promise<void> {
+    if (!(await engineLoads())) {
+      return;
+    }
     const waitMs = config.waitTimeSeconds * 1000;
     let emptyStreak = 0;
     while (running) {
@@ -394,6 +428,11 @@ export function createCaptureWorker(options: WorkerOptions): WorkerHandle {
         await Promise.all([...inFlight]).catch(() => {});
       }
       await sweep;
+      if (startFailure) {
+        const failure = startFailure;
+        startFailure = null;
+        throw failure;
+      }
     },
     async stop(): Promise<void> {
       if (!running && loopPromise === null) {

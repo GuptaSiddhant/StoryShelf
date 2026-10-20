@@ -213,6 +213,7 @@ export default defineConfig({
               "core",
               "app",
               "affected",
+              "image",
               "worker",
               "observability",
               "auth",

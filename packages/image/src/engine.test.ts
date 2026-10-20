@@ -184,3 +184,15 @@ describe("diffImages: pngjs and sharp agree", () => {
     }
   });
 });
+
+describe("diffImages: malformed input fails on both engines", () => {
+  it.each(["pngjs", "sharp"] as const)("%s rejects truncated and junk PNGs", async (engine) => {
+    const codec = await loadCodec(engine);
+    const good = png(8, 8, solid([1, 2, 3]));
+    const truncated = good.subarray(0, good.length - 20);
+    await expect(diffImages(truncated, good, DEFAULT_DIFF_OPTIONS, codec)).rejects.toThrow();
+    await expect(
+      diffImages(Buffer.from("junk"), good, DEFAULT_DIFF_OPTIONS, codec),
+    ).rejects.toThrow();
+  });
+});

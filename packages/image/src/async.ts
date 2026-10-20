@@ -3,6 +3,7 @@ import { availableParallelism } from "node:os";
 import type { DiffOptions, DiffResult } from "./options.ts";
 import { DiffPool } from "./pool.ts";
 import {
+  appliedImageSettings,
   configuredThreadCount,
   currentImageEngine,
   type ImageSettings,
@@ -20,9 +21,10 @@ let pool: DiffPool | undefined;
  * longer matches is shut down and rebuilt on next use.
  */
 export function configureImages(settings: ImageSettings): void {
-  const before = { engine: currentImageEngine(), threads: configuredThreadCount() };
+  const before = appliedImageSettings();
   setImageSettings(settings);
-  if (before.engine === currentImageEngine() && before.threads === configuredThreadCount()) {
+  const after = appliedImageSettings();
+  if (before.engine === after.engine && before.threads === after.threads) {
     return;
   }
   const stale = pool;

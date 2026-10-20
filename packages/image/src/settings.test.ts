@@ -8,8 +8,8 @@ import {
 } from "./settings.ts";
 
 afterEach(() => {
-  setImageSettings({});
   Reflect.deleteProperty(process.env, IMAGE_ENGINE_ENV);
+  setImageSettings({});
 });
 
 describe("image settings", () => {
@@ -29,6 +29,13 @@ describe("image settings", () => {
     expect(currentImageEngine()).toBe("pngjs");
     setImageSettings({});
     expect(currentImageEngine()).toBe("sharp");
+  });
+
+  it("lets an explicit option win over an invalid variable, which only fails when it is used", () => {
+    process.env[IMAGE_ENGINE_ENV] = "typo";
+    expect(() => setImageSettings({ engine: "pngjs" })).not.toThrow();
+    expect(currentImageEngine()).toBe("pngjs");
+    expect(() => setImageSettings({})).toThrow(/Unknown image engine "typo"/u);
   });
 
   it("rejects an unknown engine at configuration time", () => {

@@ -15,12 +15,21 @@ let configuredThreads: number | undefined;
 
 /**
  * Record the engine and thread count (the caller then rebuilds anything that depends on them).
- * Throws on an unknown engine name so a typo never silently picks a different engine.
+ * The option wins: `STORYSHELF_IMAGE_ENGINE` is read only when no engine is given, so a bad
+ * variable cannot break an explicit option. Throws on an unknown name so a typo never silently
+ * picks a different engine.
  */
 export function setImageSettings(settings: ImageSettings): void {
-  configuredEngine =
-    settings.engine === undefined ? undefined : resolveImageEngine(settings.engine);
+  configuredEngine = resolveImageEngine(settings.engine ?? process.env[IMAGE_ENGINE_ENV]);
   configuredThreads = settings.threads;
+}
+
+/** What the last {@link setImageSettings} resolved, without consulting the environment. */
+export function appliedImageSettings(): {
+  engine: ImageEngine | undefined;
+  threads: number | undefined;
+} {
+  return { engine: configuredEngine, threads: configuredThreads };
 }
 
 /** The engine in effect: the configured one, else the environment, else the default. */

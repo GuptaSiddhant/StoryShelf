@@ -10,9 +10,10 @@ export const pngjsCodec: ImageCodec = {
     return { width, height, data };
   },
   encode({ width, height, data }: RgbaImage): Buffer {
-    const out = new PNG({ width, height });
-    out.data.set(data);
-    return PNG.sync.write(out);
+    // The packer only reads `width`, `height` and `data`, so hand it the pixels as they are
+    // instead of copying a full frame into a fresh PNG.
+    const view = Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+    return PNG.sync.write({ width, height, data: view } as PNG);
   },
   downscale: downscaleWithPngjs,
 };

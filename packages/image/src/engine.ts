@@ -22,8 +22,10 @@ export async function diffImages(
   if (identical) {
     return identical;
   }
-  const baselineImage = await codec.decode(baseline);
-  const currentImage = await codec.decode(current);
+  const [baselineImage, currentImage] = await Promise.all([
+    codec.decode(baseline),
+    codec.decode(current),
+  ]);
   return await compareImages(baselineImage, currentImage, options, codec);
 }
 

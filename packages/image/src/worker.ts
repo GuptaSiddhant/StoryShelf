@@ -38,6 +38,12 @@ async function handle(request: DiffRequest): Promise<void> {
 }
 
 port?.on("message", (request: DiffRequest) => {
-  handle(request).catch(() => {});
+  handle(request).catch((error: unknown) => {
+    // Not even the error reply could be posted. Throw outside the promise so the thread dies with
+    // an 'error' event, which rejects the pool's task, instead of leaving it waiting forever.
+    setImmediate(() => {
+      throw error;
+    });
+  });
 });
 port?.postMessage({ type: "ready" } satisfies DiffResponse);

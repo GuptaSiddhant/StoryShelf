@@ -5,7 +5,7 @@
  * the same on a worker-thread pool; `DiffOptions` tunes thresholds (also settable per-project).
  * `configureImages` picks the codec (`pngjs` default, optional `sharp`) and the pool size.
  */
-export { configureImages, diffImagesAsync, shutdownDiffPool } from "./async.ts";
+export { configureImages, DIFF_WORKERS_ENV, diffImagesAsync, shutdownDiffPool } from "./async.ts";
 export {
   DEFAULT_IMAGE_ENGINE,
   IMAGE_ENGINE_ENV,

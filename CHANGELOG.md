@@ -5,6 +5,21 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 
 ## Unreleased
 
+**New: `@storyshelf/image` and an opt-in `sharp` image engine (ADR 0032).** The pixel diff, its
+worker pool, overlay rendering and AI thumbnails moved into the new leaf package
+`@storyshelf/image` (`@storyshelf/core/diff` re-exports it). `pixelmatch` stays the comparator;
+the PNG codec is selectable: `createShelfApp({ images: { engine: "sharp" } })` or
+`STORYSHELF_IMAGE_ENGINE=sharp` (the option wins), with `pngjs` the zero-dependency default.
+`sharp` is an optional peer: install it yourself, and startup fails clearly when it is missing.
+Remote workers take the same `images`/`compare` options on `createCaptureWorker`, and forked
+capture children inherit them from the server. See the "Image engines" guide.
+
+**Upgrading (image engine):**
+- `diffImages` and `buildTriageEvidence` now return Promises (the `sharp` codec is async): `await`
+  them. Code that read `diffImages(...).passed` synchronously now reads `undefined`.
+- `configureDiffPool({ threads })` is deprecated in favour of `configureImages({ engine, threads })`;
+  the old name still works.
+
 **Breaking: Figma is now a design-provider adapter.** Figma support moved out of core into
 the optional `@storyshelf/design-figma` package behind a new `DesignProvider` adapter
 (ADR 0029).

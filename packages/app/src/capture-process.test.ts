@@ -2,7 +2,7 @@ import { createShelfLogger } from "@storyshelf/core/logger";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
-import { capturesLocally, shouldForkCapture } from "./capture-process.ts";
+import { capturesLocally, childEnvOf, shouldForkCapture } from "./capture-process.ts";
 import { setupCaptureQueue } from "./capture-setup.ts";
 
 const ECHO_CHILD = fileURLToPath(
@@ -20,6 +20,27 @@ function runner() {
 }
 
 const queueOf = (kind: string) => ({ metadata: { kind } }) as never;
+
+describe("childEnvOf", () => {
+  it("hands the image engine and diff threads to the child, with the other settings", () => {
+    expect(
+      childEnvOf({ concurrency: 3, shardSize: 40, imageEngine: "sharp", diffThreads: 2 }),
+    ).toEqual({
+      STORYSHELF_CAPTURE_CONCURRENCY: "3",
+      STORYSHELF_CAPTURE_SHARD_SIZE: "40",
+      STORYSHELF_IMAGE_ENGINE: "sharp",
+      STORYSHELF_DIFF_WORKERS: "2",
+    });
+  });
+
+  it("sets nothing for options that were not given", () => {
+    expect(childEnvOf({})).toEqual({});
+  });
+
+  it("keeps a diff thread count of 0 (main-thread diffs)", () => {
+    expect(childEnvOf({ diffThreads: 0 })).toEqual({ STORYSHELF_DIFF_WORKERS: "0" });
+  });
+});
 
 describe("capturesLocally", () => {
   it("is true for the in-process and forked queues only", () => {

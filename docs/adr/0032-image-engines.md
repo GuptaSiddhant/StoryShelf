@@ -22,7 +22,10 @@ The image code was also scattered: the diff engine and worker pool lived in `cor
 
 - `diffImages` is now async (a `sharp` codec is async). `diffImagesAsync`, `DiffPool`, and the worker were adapted; `buildTriageEvidence` became async and downscales only the images it keeps.
 - `sharp` returns Buffers over native memory that workers cannot transfer, so its encoded overlay is copied once.
-- `configureDiffPool` became `configureImages({ engine, threads })` (still re-exported from `@storyshelf/core/diff`).
+- `configureDiffPool` became `configureImages({ engine, threads })`; `@storyshelf/core/diff` keeps `configureDiffPool` as a deprecated alias.
+- **Where the setting applies.** The server calls `configureImages` and verifies the engine at boot. A forked capture child inherits `STORYSHELF_IMAGE_ENGINE` / `STORYSHELF_DIFF_WORKERS` from the parent, and `createCaptureWorker` takes `images`/`compare` options (and refuses to start when the engine cannot load), so remote workers can match the server.
+- **sharp inside pool workers** caps libvips at one thread each, since the pool already parallelises.
+- **The option beats the variable**: `STORYSHELF_IMAGE_ENGINE` is read only when no option is given, so a bad variable cannot break an explicit option.
 
 ## Deferred
 

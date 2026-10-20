@@ -45,6 +45,8 @@ Scaffold it with `storyshelf worker init` (or choose a remote queue in `storyshe
 
 Give the worker the same database, storage, and `SECRET` as the server, plus `QUEUE_URL` and credentials for SQS (IAM task role or standard AWS env). Run it locally with `storyshelf worker serve --concurrency 2`.
 
+Workers do the diffing, so they need the same image engine as the server: pass `images: { engine: "sharp" }` (and `compare: { threads }`) to `createCaptureWorker`, or set `STORYSHELF_IMAGE_ENGINE` in the worker's environment. With `sharp`, install it in the worker image; the worker refuses to start when it cannot load. See [Image engines](/guides/image-engines/).
+
 The [AWS stack](/guides/deployment/aws/) provisions the queue, a dead-letter queue, and an ECS Fargate worker for you.
 
 ### Docker or Fly

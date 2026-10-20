@@ -1,0 +1,51 @@
+---
+title: "@storyshelf/image"
+description: Pixel diffing, diff overlays and thumbnails on a worker-thread pool, with a pure-JavaScript default and an optional native sharp codec.
+---
+
+import { PackageManagers } from "starlight-package-managers";
+
+`@storyshelf/image` is StoryShelf's image engine: it compares a baseline and a current screenshot with [pixelmatch](https://github.com/mapbox/pixelmatch), renders the diff overlay, and downscales screenshots into thumbnails for AI insights, all on a pool of worker threads. `@storyshelf/core` depends on it and re-exports it as `@storyshelf/core/diff`, so most setups never install or import it directly.
+
+It is a **leaf package**: it imports nothing else from StoryShelf, and a test keeps it that way.
+
+## Install
+
+<PackageManagers pkg="@storyshelf/image" />
+
+[![JSR](https://jsr.io/badges/@storyshelf/image)](https://jsr.io/@storyshelf/image) [![JSR Score](https://jsr.io/badges/@storyshelf/image/score)](https://jsr.io/@storyshelf/image)
+
+- [npm package](https://www.npmjs.com/package/@storyshelf/image) — install tarballs and version history.
+- [JSR package](https://jsr.io/@storyshelf/image) — TypeScript-first registry page.
+- [Public API reference](https://jsr.io/@storyshelf/image/doc) — generated docs for every export; start here to learn the API.
+- [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/image) — package directory on `main`.
+
+## Engines
+
+The comparison is always pixelmatch; the **engine** is the PNG codec around it.
+
+| Engine            | Install             | Notes                                       |
+| ----------------- | ------------------- | ------------------------------------------- |
+| `pngjs` (default) | built in            | Pure JavaScript; runs anywhere Node runs.   |
+| `sharp`           | `npm install sharp` | Optional peer; native (libvips) and faster. |
+
+Pick one with `createShelfApp({ images: { engine: "sharp" } })` or `STORYSHELF_IMAGE_ENGINE`; see [Image engines](../../guides/image-engines/) for benchmarks and trade-offs.
+
+## API
+
+```ts
+import {
+  diffImages, // (baseline, current, options, codec?) -> Promise<DiffResult>
+  diffImagesAsync, // same, on the shared worker-thread pool
+  downscalePng, // (png, maxEdge) -> Promise<Uint8Array>, on the configured engine
+  configureImages, // ({ engine?, threads? }) apply images.engine and compare.threads
+  verifyImageEngine, // load the configured engine now; rejects when it cannot load
+  shutdownDiffPool, // stop the pool's workers
+  DEFAULT_DIFF_OPTIONS,
+  type DiffOptions,
+  type DiffResult,
+  type ImageEngine,
+} from "@storyshelf/image";
+```
+
+`configureImages` is process-wide. The option beats `STORYSHELF_IMAGE_ENGINE`, and an unknown engine name throws.
