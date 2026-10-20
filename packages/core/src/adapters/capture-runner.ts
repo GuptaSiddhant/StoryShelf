@@ -11,6 +11,7 @@ import type {
 import type { Adapter } from "./metadata.ts";
 
 export type { JobStatus } from "./capture-queue.ts";
+export { RenderRuns } from "./render-runs.ts";
 export type { StoryEntry, StorySourceAdapter, Viewport } from "../capture/adapter.ts";
 
 /**
@@ -112,6 +113,11 @@ export interface CaptureRunner extends Adapter<{
   render(input: {
     /** Build being captured, used to correlate cancels with in-flight work. */
     buildId: string;
+    /**
+     * This call's handle within the build, for `cancel(buildId, runId)`: several renders of one
+     * build (its shards) can be in flight in one process. Absent, the build id is used.
+     */
+    runId?: string | undefined;
     /** Root of the already-extracted Storybook build. */
     storybookDir: string;
     /** Stories to render. */
@@ -160,6 +166,9 @@ export interface CaptureRunner extends Adapter<{
     adapter?: StorySourceAdapter;
   }): Promise<Record<string, StoryParameters>>;
 
-  /** Cancel a pending or in-flight render for a build. */
-  cancel(buildId: string): Promise<void>;
+  /**
+   * Cancel in-flight renders of a build: the ones started with `runId`, or every one of the build
+   * when it is absent. Runners can track their calls with {@link RenderRuns}.
+   */
+  cancel(buildId: string, runId?: string): Promise<void>;
 }

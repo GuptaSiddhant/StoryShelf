@@ -18,6 +18,7 @@ import type { Project } from "../schema/project.ts";
 import type { SecretInput } from "../utils/encrypt.ts";
 import type { JobLease } from "./job-lease.ts";
 import { executeCaptureJob, type CaptureJobOptions, type CaptureSummary } from "./orchestrator.ts";
+import { leaseProgress, type CaptureProgress } from "./progress.ts";
 import { executeCaptureShard } from "./shards/execute.ts";
 import type { FinalSummary } from "./shards/reduce.ts";
 import { hasApprovedBuildForSha, isAlreadyMerged } from "./skip-checks.ts";
@@ -29,7 +30,7 @@ export function createDispatchJob(
 ): (job: CaptureDispatchJob, lease?: JobLease) => Promise<void> {
   return async (job: CaptureDispatchJob, lease?: JobLease): Promise<void> => {
     await (job.shard
-      ? runShardJob(deps, { ...job, shard: job.shard })
+      ? runShardJob(deps, { ...job, shard: job.shard }, lease)
       : runBuildJob(deps, job, lease));
   };
 }
@@ -60,6 +61,7 @@ async function runBuildJob(
     pendingUrl,
     attempt,
     recordLog,
+    progress: leaseProgress(lease),
   };
   if ((await maybeSkipMerged(ctx)) || (await maybeSkipDuplicate(ctx))) {
     return;
@@ -105,6 +107,7 @@ interface JobContext {
   pendingUrl: string;
   attempt: CaptureAttempt;
   recordLog: AttemptLogRecorder;
+  progress: CaptureProgress | undefined;
 }
 
 /** Open a new attempt row for this run and return its log recorder. */
@@ -309,6 +312,7 @@ async function runAndReport(ctx: JobContext, job: CaptureDispatchJob): Promise<v
           projectId: ctx.project.id,
         },
         recordLog: ctx.recordLog,
+        progress: ctx.progress,
       },
       deps.jobOptions,
     );
@@ -349,47 +353,50 @@ async function loadJobTarget(
   return { build, project };
 }
 
-/** Run one render shard; the worker that finishes the last one closes the build's attempt. */
+/**
+ * Run one render shard. Only the run that finalized the build closes the plan's attempt and posts
+ * the terminal status, whether its shard succeeded or failed; every other run leaves them alone.
+ */
 async function runShardJob(
   deps: DispatchDeps,
   job: CaptureDispatchJob & { shard: string },
+  lease?: JobLease,
 ): Promise<void> {
   const final = (job.attempts ?? 0) >= (deps.maxRetries ?? 0);
-  try {
-    const outcome = await executeCaptureShard(
-      { buildId: job.buildId, shard: job.shard, reqId: job.reqId, final },
-      deps.jobOptions,
-    );
-    if (outcome.status === "rendered" && outcome.finalized) {
-      await closeShardedBuild(deps, job.buildId, outcome.summary);
-    }
-  } catch (error: unknown) {
-    if (final) {
-      await closeShardedBuild(deps, job.buildId, null, errorText(error));
-    }
-    throw error;
-  }
+  await executeCaptureShard(
+    {
+      buildId: job.buildId,
+      shard: job.shard,
+      reqId: job.reqId,
+      final,
+      progress: leaseProgress(lease),
+      onFinalized: async (summary, error) => {
+        await closeShardedBuild(deps, job.buildId, summary, error);
+      },
+    },
+    deps.jobOptions,
+  );
 }
 
-/** End the plan's attempt and report the terminal status once the build's shards are all in. */
+/** End the plan's attempt with the finalizer's counts and report the build's terminal status. */
 async function closeShardedBuild(
   deps: DispatchDeps,
   buildId: string,
-  summary: FinalSummary | null,
-  failure?: string,
+  summary: FinalSummary,
+  error?: unknown,
 ): Promise<void> {
   const loaded = await loadClosing(deps, buildId);
-  // A failed shard ends the build only if it was the last one open.
-  if (!loaded || (summary === null && loaded.build.status === "capturing")) {
+  if (!loaded) {
     return;
   }
-  const failed = failure !== undefined || summary?.buildStatus === "failed";
-  const attemptId = summary?.attemptId ?? (await planAttemptId(deps, buildId));
+  const failure = error === undefined ? summary.error : errorText(error);
+  const failed = failure !== undefined || summary.buildStatus === "failed";
+  const attemptId = summary.attemptId ?? (await planAttemptId(deps, buildId));
   if (attemptId) {
     await new CaptureAttemptModel(deps.db, deps.tables)
-      .markFinished(attemptId, failed ? "failed" : "completed", failure, summary ?? undefined)
-      .catch((error: unknown) => {
-        deps.logger.error({ err: error }, "failed to close attempt");
+      .markFinished(attemptId, failed ? "failed" : "completed", failure, summary)
+      .catch((closeError: unknown) => {
+        deps.logger.error({ err: closeError }, "failed to close attempt");
       });
   }
   const pendingUrl = `/projects/${loaded.project.slug}/builds/${buildId}`;

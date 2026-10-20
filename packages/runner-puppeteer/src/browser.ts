@@ -1,10 +1,11 @@
 /** Browser lifecycle and active-run tracking for Puppeteer. */
 
+import { RenderRuns } from "@storyshelf/core/adapter/capture-runner";
 import type { Browser } from "puppeteer-core";
 import type { ActiveRun } from "./types.ts";
 
-/** Tracks in-flight renders so `cancel` can abort them. */
-export const activeRuns = new Map<string, ActiveRun>();
+/** Tracks in-flight renders, each by its own handle, so `cancel` aborts exactly the runs it names. */
+export const activeRuns = new RenderRuns<ActiveRun>();
 
 /** Close a browser if present; `cancel` must never throw. */
 export async function closeBrowser(browser: Browser | null): Promise<void> {

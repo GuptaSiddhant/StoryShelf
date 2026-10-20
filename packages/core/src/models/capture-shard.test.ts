@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
-import { CaptureShardModel } from "./capture-shard.ts";
+import { CaptureShardModel, FINALIZE_STALE_MS } from "./capture-shard.ts";
 
 function setup() {
   const { db } = makeDatabase();
@@ -124,5 +124,32 @@ describe("CaptureShardModel", () => {
       throw new Error("connection reset");
     };
     await expect(model.claimFinalize("p1", "b1")).rejects.toThrow("connection reset");
+  });
+
+  it("a released claim can be taken again; a finished one cannot", async () => {
+    const { model } = setup();
+    await model.createPlan("p1", "b1", plan, [{ payload: "a" }]);
+    expect(await model.claimFinalize("p1", "b1")).toBe(true);
+    await model.releaseFinalize("b1");
+    expect(await model.claimFinalize("p1", "b1")).toBe(true);
+    await model.finishFinalize("b1");
+
+    const later = new Date(Date.now() + FINALIZE_STALE_MS * 2);
+    expect(await model.claimFinalize("p1", "b1", later)).toBe(false);
+    expect((await model.listForBuild("b1")).at(-1)).toMatchObject({ status: "done" });
+  });
+
+  it("takes over a claim left running by a worker that died mid-finalize", async () => {
+    const { model } = setup();
+    await model.createPlan("p1", "b1", plan, [{ payload: "a" }]);
+    const start = new Date("2026-01-01T00:00:00.000Z");
+    expect(await model.claimFinalize("p1", "b1", start)).toBe(true);
+
+    const soon = new Date(start.getTime() + FINALIZE_STALE_MS - 1);
+    expect(await model.claimFinalize("p1", "b1", soon)).toBe(false);
+    const late = new Date(start.getTime() + FINALIZE_STALE_MS);
+    expect(await model.claimFinalize("p1", "b1", late)).toBe(true);
+    // The takeover restarts the clock, so a third run does not barge in right behind it.
+    expect(await model.claimFinalize("p1", "b1", late)).toBe(false);
   });
 });

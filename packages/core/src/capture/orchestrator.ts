@@ -18,6 +18,7 @@ import type { SecretInput } from "../utils/encrypt.ts";
 import { roundedTimings, runWithTimings, timed } from "../utils/timing.ts";
 import { DEFAULT_VIEWPORTS, isDisabledStory } from "./adapter.ts";
 import type { DiscoverOptions, Viewport } from "./adapter.ts";
+import { affectedPathsFor } from "./affected.ts";
 import { assertSupportedBrowsers, resolveBrowsers } from "./browsers.ts";
 import { logInvalidDesigns } from "./design.ts";
 import { assertModeCaps, enrichStories } from "./enrich.ts";
@@ -25,6 +26,7 @@ import { classifyFailures } from "./failure-sets.ts";
 import { captureAcrossBrowsers } from "./matrix.ts";
 import { parseModesAllowlist } from "./modes.ts";
 import { persistCapture, type PipelineTables } from "./pipeline.ts";
+import type { CaptureProgress } from "./progress.ts";
 import { removeJobScratch } from "./scratch.ts";
 import { fanOutCapture } from "./shards/fan-out.ts";
 import { resolveViewports } from "./sizing.ts";
@@ -108,6 +110,8 @@ export interface CaptureJobInput {
   attempt?: CaptureAttemptRef;
   /** Recorder mirroring phase logs into the attempt's log history. */
   recordLog?: AttemptLogRecorder;
+  /** Reports render and persist progress to the job's lease, apart from logging. */
+  progress?: CaptureProgress | undefined;
 }
 /**
  * Run the full capture for a build: extract, render, persist, and finalize.
@@ -263,6 +267,7 @@ async function runCapturePhases(
               tables: options.tables,
               runner: options.runner,
               recordLog: input.recordLog,
+              progress: input.progress,
               build,
               project,
               stories,
@@ -313,6 +318,7 @@ async function runCapturePhases(
               browsers,
               logger,
               recordLog: input.recordLog,
+              progress: input.progress,
               secret: options.secret,
             },
             blockingFailed,
@@ -345,15 +351,4 @@ async function runCapturePhases(
     });
     throw error;
   }
-}
-
-/**
- * Resolve the affected import paths for a build, or `null` for full capture
- * (affected capture disabled, or no computation was posted).
- */
-function affectedPathsFor(build: Build): string[] | null {
-  if (!build.affectedOnly) {
-    return null;
-  }
-  return BuildModel.affectedPaths(build);
 }

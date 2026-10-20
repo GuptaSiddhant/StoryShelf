@@ -14,6 +14,8 @@ import type { PagePool } from "./pages.ts";
 /** Input for a Puppeteer capture run over a built Storybook directory. */
 export interface PuppeteerRenderInput {
   buildId: string;
+  /** This call\'s cancel handle within the build (a shard id); defaults to the build id. */
+  runId?: string | undefined;
   storybookDir: string;
   stories: StoryEntry[];
   viewports: Viewport[];

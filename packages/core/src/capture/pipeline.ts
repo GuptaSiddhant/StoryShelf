@@ -28,6 +28,7 @@ import {
   type Fingerprint,
 } from "./fingerprint.ts";
 import { assertScreenshotBuffer } from "./guards.ts";
+import type { CaptureProgress } from "./progress.ts";
 
 /** Snapshots persisted at once: each decodes two PNGs for the diff, so unbounded fan-out spikes memory. */
 export const PERSIST_CONCURRENCY = 4;
@@ -90,6 +91,8 @@ export async function persistRendered(
     await mapLimit(group, PERSIST_CONCURRENCY, async (capture) => {
       try {
         await persistSnapshot(ctx, capture);
+        // Each diff is progress: a long, healthy persist phase must not read as a hung job.
+        ctx.progress?.();
       } catch (error) {
         // A failure in one story/viewport must not abort the other persists.
         // Flaky and a11y stories remain non-blocking even on persist failure.
@@ -234,11 +237,11 @@ async function tryPersistInherited(
 /** Persist inherited snapshots; a failure marks the story failed. */
 /** Persist the inherited snapshots (stories reusing their baseline); returns the story ids that failed. */
 export async function persistInherited(ctx: CaptureContext): Promise<ReadonlySet<string>> {
-  const outcomes = await mapLimit(
-    ctx.inherited ?? [],
-    PERSIST_CONCURRENCY,
-    async (inherited) => await tryPersistInherited(ctx, inherited),
-  );
+  const outcomes = await mapLimit(ctx.inherited ?? [], PERSIST_CONCURRENCY, async (inherited) => {
+    const failed = await tryPersistInherited(ctx, inherited);
+    ctx.progress?.();
+    return failed;
+  });
   return new Set(outcomes.filter((id): id is string => id !== null));
 }
 
@@ -316,6 +319,8 @@ export interface CaptureContext {
   logger?: Logger;
   /** Optional per-attempt log recorder (mirrors logger lines into the DB). */
   recordLog?: AttemptLogRecorder;
+  /** Called per snapshot persisted, so the job's lease sees a long diff phase making progress. */
+  progress?: CaptureProgress | undefined;
   /** Server secret for decrypting webhook secrets at send time. */
   secret?: SecretInput;
 }
