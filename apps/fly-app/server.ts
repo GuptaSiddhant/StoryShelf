@@ -4,6 +4,7 @@ import "reflect-metadata";
 import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
+import type { AuthUiConfig, UIConfig } from "@storyshelf/core/config";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { createFigmaDesign, figmaOAuthFromEnv } from "@storyshelf/design-figma";
@@ -16,15 +17,17 @@ import { createLocalStorage } from "@storyshelf/storage-local";
 /**
  * Fly demo server — local adapters only.
  *
- * Runs from TypeScript source via Node 26 --experimental-transform-types
- * + `source` export condition (NODE_OPTIONS=--conditions=source). Uses
- * workspace packages directly (no publish step), so deploys whatever is
- * at the tagged commit.
+ * Bundled by rolldown from workspace sources (`rolldown.config.ts`), so it
+ * deploys whatever is on `main` with no publish step. `nub run dev` runs this
+ * file from source instead.
  *
  * Mirrors apps/dev-server/src/server.ts wiring:
  *  - @storyshelf/db-sqlite → {DATA_DIR}/shelf.db
  *  - @storyshelf/storage-local → DATA_DIR
- *  - @storyshelf/runner-playwright → Chromium via playwright base image
+ *  - @storyshelf/runner-playwright → chrome-headless-shell installed in the image
+ *
+ * Capture stays in-process: the 1-CPU Fly VM is below the threshold where
+ * core would fork a capture child, so a `capture.workerEntry` would never apply.
  */
 import { mkdirSync } from "node:fs";
 import { seedDemo } from "./src/seed-demo.ts";
@@ -38,7 +41,7 @@ const authEmail = env["AUTH_EMAIL"] ?? "admin@example.com";
 const adminToken = env["STORYSHELF_ADMIN_TOKEN"] ?? env["ADMIN_TOKEN"];
 const publicBaseUrl = env["PUBLIC_BASE_URL"];
 
-function buildAuthUi(): Record<string, string> | undefined {
+function buildAuthUi(): AuthUiConfig | undefined {
   const pairs: Array<[string, string | undefined]> = [
     ["title", env["SS_AUTH_TITLE"]],
     ["subtitle", env["SS_AUTH_SUBTITLE"]],
@@ -58,7 +61,7 @@ function buildAuthUi(): Record<string, string> | undefined {
   return Object.keys(out).length === 0 ? undefined : out;
 }
 
-function buildUi(): Record<string, unknown> | undefined {
+function buildUi(): UIConfig | undefined {
   const name = env["SS_BRAND_NAME"];
   const logo = env["SS_LOGO_URL"];
   const auth = buildAuthUi();
@@ -116,7 +119,7 @@ const app = createShelfApp({
           logger: shelfLogger,
         }).adapter
       : undefined,
-  ui: ui as never,
+  ui,
   logger: shelfLogger,
   observability,
   config: {
@@ -150,13 +153,14 @@ seedDemo({ database, storage, captureRunner, logger }).catch((error) => {
   logger.error({ err: error }, "demo seed failed — serving irrespective");
 });
 
-const shutdown = async (): Promise<void> => {
-  await app.lifecycle.teardown();
-  server.close();
-};
-process.on("SIGTERM", () => {
-  shutdown().catch(() => {}); // Intentionally empty — shutdown errors are already logged
-});
-process.on("SIGINT", () => {
-  shutdown().catch(() => {}); // Intentionally empty — shutdown errors are already logged
-});
+// Teardown is idempotent and logs its own errors; close the listener either way.
+for (const signal of ["SIGINT", "SIGTERM"] as const) {
+  process.once(signal, () => {
+    app.lifecycle
+      .teardown()
+      .catch(() => {}) // Intentionally empty — teardown errors are already logged
+      .finally(() => {
+        server.close();
+      });
+  });
+}

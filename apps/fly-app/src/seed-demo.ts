@@ -1,4 +1,4 @@
-import type { Viewport } from "@storyshelf/core/adapter/capture-runner";
+import type { CaptureRunner, Viewport } from "@storyshelf/core/adapter/capture-runner";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import { StorybookAdapter } from "@storyshelf/core/capture";
@@ -50,7 +50,7 @@ function resolveStorybookDir(): string | null {
 export async function seedDemo(options: {
   database: DatabaseAdapter;
   storage: StorageAdapter;
-  captureRunner: { render: (input: unknown) => Promise<unknown> };
+  captureRunner: CaptureRunner;
   logger?: Logger;
 }): Promise<void> {
   const { database, storage, captureRunner, logger } = options;
