@@ -38,12 +38,13 @@ deployment's URL, so a user cannot set `PUBLIC_URL` before the first deploy and 
 
 ### 1. Remote browsers are an option on the existing runners, not new runner packages
 
-`createPlaywrightCaptureRunner` and `createPuppeteerCaptureRunner` gain a `remote` option. With it,
-the runner connects instead of launching:
+`createPlaywrightCaptureRunner` and `createPuppeteerCaptureRunner` gain a `remotes` option: named
+remote browser services, each of which the runner connects to instead of launching a browser:
 
 - **Playwright:** `browserType.connect(endpoint, { headers, exposeNetwork })` for services that
-  speak Playwright's own protocol (all three engines), or `chromium.connectOverCDP(endpoint, {
-headers })` for Chrome-DevTools-only services (Chromium only).
+  speak Playwright's own protocol (all three engines), or
+  `chromium.connectOverCDP(endpoint, { headers })` for Chrome-DevTools-only services (Chromium
+  only).
 - **Puppeteer:** `puppeteer.connect({ browserWSEndpoint, headers })`.
 - Browser recycling (`recycleBrowserEvery`) opens a new remote session instead of relaunching.
 
@@ -51,13 +52,17 @@ Each provider is a **preset**, not a package: a function from credentials and th
 and OS to `{ endpoint, headers, protocol, exposeNetwork? }`. Presets live next to the runner and are
 plain configuration; a provider-specific package is justified only for something a connect
 endpoint cannot do (real devices and real Safari, which go through WebDriver/Appium, ADR-worthy on
-their own). Credentials are stored with the existing encrypted credentials, not environment
-variables on a shared host.
+their own).
+
+Credentials are **operator-level only** for now: passed to the preset in the server's code, from
+the environment or a secret manager, like every other adapter's credentials. Per-project
+credentials (a project owner bringing their own provider account through ADR 0030's user
+connections and the encrypted credentials store) are a later step and out of scope here.
 
 ### 2. A remote browser's environment is measured inside the browser
 
-When `remote` is set the runner reports `CaptureEnvironment` from the browser it drove, never from
-our host:
+For a remote target the runner reports `CaptureEnvironment` from the browser it drove, never
+from our host:
 
 - `browserVersion`: `browser.version()`, which works over a connection.
 - `platform`: the OS the preset requested, confirmed from the page (`navigator.userAgentData` /
@@ -71,7 +76,8 @@ not a change (#203) keeps an omission from reading as a migration.
 
 ### 3. Remote captures are their own engine
 
-A remote capture's engine is named `<engine>@<preset>` (for example `chromium@browserstack`). It
+A remote capture's engine is named `<engine>@<remote>`, where `<remote>` is the key the operator
+gave the service in `remotes` (for example `chromium@browserstack`). It
 gets its own baselines (ADR 0028's per-engine baselines) and never compares against a local
 render of the same engine: different hosts, fonts and GPU paths would turn every comparison into
 noise or, worse, into migrations. Moving a project from local to remote is then an explicit
@@ -79,7 +85,7 @@ noise or, worse, into migrations. Moving a project from local to remote is then 
 
 ### 4. Concurrency is counted in sessions, and session failures are retried
 
-- With `remote`, the page limiter uses a fixed cap from the preset (the plan's parallel-session
+- For a remote target, the page limiter uses a fixed cap from the preset (the plan's parallel-session
   limit) instead of sizing pages from our CPU and memory (`utils/page-limiter.ts`). One render
   call may hold several sessions; shards (ADR 0031 phase 5) map onto sessions naturally.
 - Connection-level failures (a dropped WebSocket, "no capacity", a session that never starts) are
@@ -150,6 +156,162 @@ resolver is the place for links that are relative today; commit statuses are pos
 `target_url` (`/projects/<slug>/builds/<id>`, `core/src/capture/dispatch.ts`), which should be made
 absolute through it (to be confirmed against what GitHub and GitLab accept).
 
+### 7. Local browsers can be turned off
+
+Local browsers stay available when `remotes` is set; a project can mix local and remote targets.
+`local: false` turns them off entirely: the runner never imports a browser launcher, never starts a
+local browser, and advertises only its remote targets. The host then needs no installed browsers
+(`playwright-core` only, no `playwright install`), which removes the browsers' memory and CPU, by
+far the largest part of a capture host's load.
+
+It does not make the host idle. What still runs locally with `local: false`:
+
+- **Diffing.** PNG decode, `pixelmatch` and overlay encode run in the diff worker pool on this
+  host. With local browsers gone the default of CPU count minus one threads is reasonable; the
+  separate compare stage (ADR 0031, not built) is what would move diffing elsewhere.
+- **Parameter extraction.** `extractParameters` opens one page to read Storybook's resolved
+  parameters before rendering (`runner-playwright/src/capture-runner.ts:62`); with `local: false`
+  it runs on the default remote target instead.
+- **Extraction and serving.** Unzipping the build to scratch and, for `exposeNetwork` targets,
+  serving it to the remote browser over the connection.
+- **Screenshot transfer.** Every PNG comes back over the WebSocket and is written to storage.
+
+Projects with no `browsers` setting fall back to `DEFAULT_BROWSER` (`"chromium"`, local) in
+`resolveBrowsers` today; that fallback becomes the runner's `defaultTarget`, so a `local: false`
+runner never silently resolves a project to a local engine it cannot launch. Legacy snapshot and
+baseline rows with no `browser` keep meaning local `chromium`: that is what produced them.
+
+## API
+
+### Operator: configuring the runner
+
+```ts
+import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
+import {
+  azurePlaywright,
+  browserstack,
+  playwrightServer,
+  remote,
+} from "@storyshelf/runner-playwright/remote";
+
+const runner = createPlaywrightCaptureRunner({
+  // Existing local options are unchanged and apply to local targets only.
+  local: true, // default; `false` turns local browsers off (decision 7)
+  defaultTarget: "chromium@grid", // for projects with no `browsers`; default "chromium"
+  remotes: {
+    // The key is the `<remote>` in `<engine>@<remote>`: "chromium@grid", "firefox@grid".
+    grid: playwrightServer({
+      endpoint: "ws://playwright:3000/",
+      exposeNetwork: "<loopback>", // reaches the 127.0.0.1 Storybook server; no signed URL needed
+      sessions: 8, // concurrency cap; replaces CPU/memory-based page sizing
+    }),
+    azure: azurePlaywright({
+      endpoint: process.env.PLAYWRIGHT_SERVICE_URL!,
+      token: process.env.PLAYWRIGHT_SERVICE_ACCESS_TOKEN!,
+      os: "linux",
+      sessions: 20,
+    }),
+    browserstack: browserstack({
+      username: process.env.BROWSERSTACK_USERNAME!,
+      accessKey: process.env.BROWSERSTACK_ACCESS_KEY!,
+      os: { name: "Windows", version: "11" },
+      sessions: 5,
+      // No exposeNetwork: this target needs a signed Storybook URL (decision 5).
+    }),
+  },
+});
+
+createShelfApp({ database, storage, capture: { runner } }); // unchanged
+```
+
+Every preset is sugar over one generic constructor, so a provider without a preset needs no new
+release:
+
+```ts
+remote({
+  connect: (engine: BrowserName) => ({
+    protocol: "playwright", // or "cdp" (Chromium only)
+    endpoint: "wss://…",
+    headers: { authorization: "Bearer …" },
+    exposeNetwork: "<loopback>", // omit when the service cannot route back to us
+  }),
+  engines: ["chromium", "firefox", "webkit"], // which `<engine>@<remote>` targets it offers
+  sessions: 4,
+  platform: "linux-x64", // reported in the fingerprint when the page cannot tell (decision 2)
+});
+```
+
+`createPuppeteerCaptureRunner` accepts the same `local`, `defaultTarget` and `remotes`, with CDP
+endpoints only and no `exposeNetwork`, so every Puppeteer remote target needs a signed URL.
+
+Presets validate eagerly: a CDP-only preset offering `firefox`, a `local: false` runner with no
+remotes, or a `defaultTarget` that is not one of the runner's targets throws when the runner is
+created, not when the first build runs.
+
+### Project: choosing targets
+
+The project's `browsers` setting is a list of **capture targets** instead of engines:
+
+```ts
+type CaptureTarget = BrowserName | `${BrowserName}@${string}`;
+
+// PATCH /api/v1/projects/:slug  { "browsers": ["chromium", "chromium@browserstack", "webkit@grid"] }
+```
+
+- The engine half is checked against `BROWSER_NAMES`, the remote half against the runner's
+  `remotes`; `MAX_BROWSERS` (3) counts targets.
+- Saving a target the runner does not offer is rejected at save time with the list of targets it
+  does offer, as `assertSupportedBrowsers` does for engines today.
+- `snapshots.browser` and baseline keys are text already, so a target needs no schema change; each
+  target gets its own baselines (decision 3).
+
+This is a breaking change, made cleanly rather than with aliases: `BrowserName` stays the type of a
+rendering engine, and everything that stores, compares or validates a project's engines moves to
+`CaptureTarget`. `resolveBrowsers` returns targets; code that launches or connects splits a target
+into its engine and remote with one helper (`parseTarget`).
+
+### Contract between core and the runner
+
+```ts
+interface CaptureRunnerMetadata {
+  // replaces `supportedBrowsers`
+  targets: readonly {
+    target: CaptureTarget;
+    reach: "loopback" | "url"; // how the browser reaches the Storybook (decision 5)
+  }[];
+  defaultTarget: CaptureTarget;
+}
+
+interface RenderRequest {
+  target: CaptureTarget; // replaces `browser`
+  storybookDir: string; // always: the extracted build on this host
+  storybookUrl?: string; // set by core for `reach: "url"` targets: a signed, absolute URL
+  // …existing fields unchanged
+}
+```
+
+For a `reach: "url"` target, core mints the token, resolves the public origin (decision 6) and puts
+`storybookUrl` on the request; the runner navigates there instead of to its loopback server. If any
+configured target needs `url` and no public origin resolves, startup fails naming the setting, so
+builds never fail one by one later.
+
+### Remote workers
+
+A remote worker (`createCaptureWorker`) builds its own runner, so its `remotes` can disagree with
+what the server validates project settings against. There is no worker registry to compare them
+(a worker's heartbeat only extends a job's lease), and this ADR does not add one. Instead:
+
+- When the server has no runner of its own (remote queue), the operator declares the targets the
+  fleet offers in `capture.targets` (a list of `{ target, reach }`, the same shape as the runner
+  metadata), and project settings are validated against that.
+- A worker that receives a job for a target it does not offer fails it at once, without retries,
+  with a message naming the target and the worker's own targets. A misconfigured fleet then shows
+  one clear error per build instead of jobs retrying until they run out of attempts.
+
+A registry where workers report their targets is the better long-term answer and can replace
+`capture.targets` later; it is not needed while credentials are operator-level and the operator
+configures every worker anyway.
+
 ## Consequences
 
 **Positive**
@@ -199,8 +361,9 @@ absolute through it (to be confirmed against what GitHub and GitLab accept).
 
 ## Implementation order
 
-1. Sections 1-4 for Playwright `connect` with `exposeNetwork`, tested against a self-hosted
-   Playwright server (no vendor account, no new public route).
+1. Sections 1-4 and 7 for Playwright `connect` with `exposeNetwork`, with the `CaptureTarget` rename
+   and `local: false`, tested against a self-hosted Playwright server (no vendor account, no new
+   public route).
 2. Section 6 (public origin resolver), which also fixes absolute links for email and commit
    statuses on its own.
 3. Section 5's signed URLs, after a security review; this unlocks Puppeteer and CDP-only services.
