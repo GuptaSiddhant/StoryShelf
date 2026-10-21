@@ -4,6 +4,8 @@
 
 Accepted
 
+Amended in part by ADR 0034 (`capture` becomes `uiTesting`; remote capture means remote browsers, not a worker).
+
 ## Context
 
 The `CaptureRunner` adapter (`run(buildId)`) originally did far more than render. `@storyshelf/runner-playwright`'s `createPlaywrightCaptureRunner({ db, storage, dataDir, logger })` closed over the database and storage and, on `run(buildId)`, loaded the build/project via the models, set the build `capturing`, extracted the uploaded archive from storage, served the statics, rendered every story via `runCapture`, diffed and wrote snapshots/baselines, and set the terminal build status. That made the adapter a mini-orchestrator coupled to server concerns.

@@ -4,6 +4,8 @@
 
 Accepted
 
+Amended in part by ADR 0034 (there is no separate worker package).
+
 ## Context
 
 `@storyshelf/core` grew into two things: a domain layer (adapter interfaces, models, schema, capture pipeline, retention, diff, config, logging) and an HTTP layer (`createShelfApp`, routers, pages, middleware, request store, vendored assets). Remote capture workers (`queue-sqs` today, `runner-remote` tomorrow) need the domain — `executeCaptureJob`, models, adapter types — without pulling Hono, JSX, and the whole page tree into a worker bundle.
