@@ -100,13 +100,13 @@ instance has a runner, and the migration guide says so.
 - **Existing data is hidden, not deleted.** Turning `testing` off on a deployment that has
   snapshots hides them; startup logs it and the System page shows a notice with the count.
 - **Review is not disabled with it.** Comments and approval also exist at build level, so turning
-  `testing` off leaves them working (decision 8: `uiReview`). Only snapshot-level review goes away
+  `testing` off leaves them working (decision 8: `review`). Only snapshot-level review goes away
   with the snapshots.
 - **Builds are accepted automatically on the default branch, and elsewhere only when review is off.**
   With `testing` off, a build on the project's default branch becomes `approved` when it finishes
-  publishing (decisions 9 and 10) whatever the project's `uiReview` setting; a build on any other
-  branch does only if the project has turned `uiReview` off. Nobody reviewed it, so no approval event fires; the `build:created` webhook already
-  announces the upload. With `uiReview` on (the default) the build waits as `pending` for build-level
+  publishing (decisions 9 and 10) whatever the project's `review` setting; a build on any other
+  branch does only if the project has turned `review` off. Nobody reviewed it, so no approval event fires; the `build:created` webhook already
+  announces the upload. With `review` on (the default) the build waits as `pending` for build-level
   approval, the same as a captured build waits for its snapshots. The System page states that `testing` is off,
   so an instance in a fleet that was meant to run checks but was not configured is visible, and the
   CLI's upload output says the Storybook was published but no checks will run.
@@ -262,9 +262,9 @@ route the app registers and fails on any that is not classified, so a new route 
 class; the other boots the app without `testing` and asserts every `testing` route answers 404
 and no `hosting` route does. The same table drives the navigation, the MCP tool list and the OpenAPI
 marker. Build comments are not part of this table's `testing` class: review is a separate concern
-that must work without snapshots, so the table carries a fourth class, `uiReview`. Its routes (comments,
+that must work without snapshots, so the table carries a fourth class, `review`. Its routes (comments,
 reviewer sign-off) answer 404 when the project's review switch is off, and are available with or without
-`testing`. `uiReview` has no instance-level option: it is on by default and a project admin turns it
+`testing`. `review` has no instance-level option: it is on by default and a project admin turns it
 off or on in the project's settings. An instance-level option would be added only if review gains
 operator configuration of its own, such as git hosts. Review's other behaviour (what a comment anchors
 to without snapshots, who may approve, the review status check) is a separate ADR. The one rule this
@@ -291,10 +291,10 @@ does not change where their skeleton comes from.
 - **Build pages.** The list and detail pages exist to show uploads without a capture pipeline: sha,
   branch, author, message, size, labels, the link to the published Storybook, and component and story
   counts from the catalog. Snapshots, statuses and attempts appear only with `testing`; build-level comments and approval do not depend on it.
-- **Without `testing`, default-branch builds, and every build when `uiReview` is off, are accepted when they finish publishing.**
+- **Without `testing`, default-branch builds, and every build when `review` is off, are accepted when they finish publishing.**
   This is required, not cosmetic. The project's Storybook link and the upstream links resolve only
   accepted builds, and retention purges only terminal builds (`approved`, `rejected`, `failed`), so a
-  build left `pending` would never be served and never be purged. With `uiReview` on, a build on another branch stays
+  build left `pending` would never be served and never be purged. With `review` on, a build on another branch stays
   `pending` until someone approves or rejects it at build level, and until then the Storybook and
   upstream links keep resolving the previous accepted build. The default branch is special and is never
   held: the project's Storybook link must always resolve. A build whose publishing fails becomes `failed`. An
@@ -340,7 +340,7 @@ Publishing completes per upload route:
   content-addressed, so there is nothing to extract: publishing completes when the manifest is stored,
   which writes the catalog from the stored `index.json`. Today the manifest route enqueues a capture;
   with `testing` off it sets the build `approved` instead when the build is on the default branch or
-  `uiReview` is off.
+  `review` is off.
 - **Zip route.** A small zip is extracted inline in the request. Size is counted while streaming, since
   a chunked upload has no `Content-Length`. A larger zip is published by a `publish` job on the
   database queue, with the lease, retry and redelivery of decision 4, consumed by any instance on a
@@ -353,7 +353,7 @@ Publishing completes per upload route:
 
 `maxInlineUnzipSize` stays as the inline threshold and gets a safe default, so leaving it unset no
 longer means "never". With `testing` the capture job still backfills the same keys. Publishing ends
-by writing the catalog that decision 9 reads and, when `testing` is off and the build is on the default branch or `uiReview` is off, setting the build
+by writing the catalog that decision 9 reads and, when `testing` is off and the build is on the default branch or `review` is off, setting the build
 `approved` (or `failed` if it could not publish); with `testing` on, the capture pipeline decides the
 status, as now.
 
@@ -507,7 +507,7 @@ with this ADR. The pages to change, and the statement they must carry:
 - Whether per-story design previews without `testing` justify recording parameters some other way.
 - What review means without snapshots: comment anchors, who may approve, the review status check, and
   how a `pending` build with review on is purged when nobody reviews it (decision 8; a follow-up ADR on
-  `uiReview`).
+  `review`).
 - Whether rolling upgrades with mixed versions need support later; this ADR requires a stop-the-world
   upgrade (decision 4).
 
