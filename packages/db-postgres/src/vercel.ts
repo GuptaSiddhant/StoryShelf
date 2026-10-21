@@ -40,7 +40,7 @@ export function createVercelDatabase(options: VercelDatabaseOptions = {}): Datab
   return createDrizzlePgAdapter(db, {
     metadata: {
       name: "Vercel Postgres",
-      version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
+      version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
       description: "Vercel Postgres database adapter (@vercel/postgres + Drizzle)",
       kind: "vercel",
       category: "database",

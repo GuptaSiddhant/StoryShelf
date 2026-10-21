@@ -30,7 +30,7 @@ export const logNotifier: NotifierProvider = {
 export function getMetadata(): NotifierProvider["metadata"] {
   return {
     name: "Log",
-    version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
+    version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
     description: "Chat notifications to the server log (tests and dev)",
     kind: "log",
     category: "notifier",

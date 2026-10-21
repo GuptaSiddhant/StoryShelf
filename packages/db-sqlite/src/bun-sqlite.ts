@@ -53,7 +53,7 @@ export function createBunSqliteDatabase(options: BunSqliteDatabaseOptions): Data
   const adapter = createDrizzleAdapter(db, {
     metadata: {
       name: "Bun SQLite",
-      version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
+      version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
       description: "Bun SQLite database adapter (bun:sqlite + Drizzle)",
       kind: "bun-sqlite",
       category: "database",

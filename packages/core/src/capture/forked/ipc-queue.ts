@@ -29,7 +29,7 @@ interface PendingPoll {
 export class IpcCaptureQueue implements PollableCaptureQueue {
   readonly metadata = {
     name: "IPC Queue (capture child)",
-    version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
+    version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
     description: "Polls jobs from the parent process over IPC",
     kind: "ipc",
     category: "capture-queue",

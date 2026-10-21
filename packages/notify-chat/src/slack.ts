@@ -29,7 +29,7 @@ interface SlackAdapterOptions {
 export function getMetadata(): NotifierProvider["metadata"] {
   return {
     name: "Slack",
-    version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
+    version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
     description: "Chat messages via Slack incoming webhooks",
     kind: "slack-webhook",
     category: "notifier",

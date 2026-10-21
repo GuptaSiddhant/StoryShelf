@@ -65,7 +65,7 @@ export function createPgDatabase(options: PgDatabaseOptions): DatabaseAdapter {
   return createDrizzlePgAdapter(db, {
     metadata: {
       name: "Postgres (pg)",
-      version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
+      version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
       description: "Postgres database adapter (node-postgres + Drizzle)",
       kind: "pg",
       category: "database",

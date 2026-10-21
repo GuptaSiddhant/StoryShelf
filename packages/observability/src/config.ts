@@ -98,7 +98,13 @@ export function resolveObservabilityConfig(
   };
 }
 
-/** Package version injected at build via __PKG_VERSION__. */
+declare const __PKG_VERSION__: string | undefined;
+
+/**
+ * Package version injected at build via the `__PKG_VERSION__` define. Read as a bare identifier
+ * (defines don't replace `globalThis` member reads); the `typeof` guard keeps source-condition
+ * runs, where the identifier is undeclared, from throwing.
+ */
 function packageVersion(): string | undefined {
-  return (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__;
+  return typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : undefined;
 }

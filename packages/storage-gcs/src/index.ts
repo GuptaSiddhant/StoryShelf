@@ -26,7 +26,7 @@ export function createGcsStorage(options: GcsStorageOptions): StorageAdapter {
   return {
     metadata: {
       name: "GCS Storage",
-      version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
+      version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
       description: "Google Cloud Storage adapter",
       kind: "gcs",
       category: "storage",

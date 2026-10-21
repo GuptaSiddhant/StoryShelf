@@ -9,6 +9,8 @@ import type {
 import type { Logger } from "@storyshelf/core/logger";
 import { decodeReceipt, encodeReceipt, parseBody, serializeBody } from "./shared.ts";
 
+declare const __PKG_VERSION__: string | undefined;
+
 /** Options for creating an Azure Storage Queues-backed capture queue. */
 export interface AzureStorageQueuesQueueOptions {
   /** Storage queue name (e.g. `capture-jobs`). */
@@ -112,7 +114,7 @@ function createStorageState(options: AzureStorageQueuesQueueOptions): StorageQue
 function buildStorageMetadata(): PollableCaptureQueue["metadata"] {
   return {
     name: "Azure Storage Queues Queue",
-    version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
+    version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
     description: "Azure Storage Queues capture queue",
     kind: "azure-storage-queues",
     category: "capture-queue",

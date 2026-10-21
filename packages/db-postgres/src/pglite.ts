@@ -43,7 +43,7 @@ export function createPgliteDatabase(options: PgliteDatabaseOptions = {}): Datab
   return createDrizzlePgAdapter(db, {
     metadata: {
       name: "PGlite",
-      version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
+      version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
       description: "PGlite database adapter (embedded Postgres/WASM + Drizzle)",
       kind: "pglite",
       category: "database",

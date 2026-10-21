@@ -16,6 +16,8 @@ import type { Logger } from "@storyshelf/core/logger";
 import { parseBody, serializeBody } from "./shared.ts";
 import type { QueuedBody } from "./shared.ts";
 
+declare const __PKG_VERSION__: string | undefined;
+
 /** Options for creating an Azure Service Bus-backed capture queue. */
 export interface AzureServiceBusQueueOptions {
   /** Service Bus queue name (e.g. `capture-jobs`). */
@@ -134,7 +136,7 @@ function createServiceBusState(options: AzureServiceBusQueueOptions): ServiceBus
 function buildServiceBusMetadata(): PollableCaptureQueue["metadata"] {
   return {
     name: "Azure Service Bus Queue",
-    version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
+    version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
     description: "Azure Service Bus capture queue with dead-lettering",
     kind: "azure-service-bus",
     category: "capture-queue",

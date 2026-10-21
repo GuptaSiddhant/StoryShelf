@@ -57,7 +57,7 @@ export function createD1Database(options: D1DatabaseOptions): DatabaseAdapter {
   return createDrizzleAdapter(db, {
     metadata: {
       name: "Cloudflare D1",
-      version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
+      version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
       description: "Cloudflare D1 database adapter (D1 binding + Drizzle)",
       kind: "d1",
       category: "database",
