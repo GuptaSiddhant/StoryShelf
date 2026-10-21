@@ -265,7 +265,7 @@ reviewer sign-off) answer 404 when the project's review switch is off, and are a
 off or on in the project's settings. An instance-level option would be added only if review gains
 operator configuration of its own, such as git hosts. Review's other behaviour (what a comment anchors
 to without snapshots, who may approve, the review status check) is a separate ADR. The one rule this
-ADR fixes is the auto-accept rule of decision 1: auto-accept applies only when review is off too.
+ADR fixes is the auto-accept rule of decision 1: the default branch is always accepted, other branches only when review is off.
 
 ### 9. The library, component and build pages are built from Storybook metadata, with or without `uiTesting`
 
