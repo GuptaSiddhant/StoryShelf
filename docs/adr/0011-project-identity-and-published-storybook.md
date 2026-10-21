@@ -4,6 +4,8 @@
 
 Accepted
 
+Amended in part by ADR 0033 (a token-authorised read route to a build's static files) and ADR 0034 (hosting-only builds are accepted without review).
+
 ## Context
 
 A company may run several Storybooks across teams — a design system plus multiple apps — some of them in monorepos. Two questions follow:

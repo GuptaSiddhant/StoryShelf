@@ -4,6 +4,8 @@
 
 Accepted
 
+Amended in part by ADR 0034 (a hosting-only build posts no status check).
+
 ## Context
 
 Visual testing only pays off when it *blocks bad merges*. Users want to integrate StoryShelf with GitHub or GitLab so a PR cannot merge until its visual changes have been reviewed and approved in StoryShelf.

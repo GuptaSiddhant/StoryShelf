@@ -4,6 +4,8 @@
 
 Accepted
 
+Amended in part by ADR 0033 (launching a browser is no longer always local).
+
 Amended in part by ADR 0034 (the in-process queue becomes the database queue).
 
 ## Context

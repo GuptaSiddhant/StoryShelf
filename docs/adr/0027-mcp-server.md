@@ -4,6 +4,8 @@
 
 Accepted
 
+Amended in part by ADR 0034 (MCP tools follow the `uiTesting` route classes).
+
 ## Context
 
 AI agents (Claude Code, Cursor, CI bots) review UI changes best when they can read build results directly instead of scraping the UI. ADR 0026 §11 deferred the MCP server and its tools (`get_build_insight`, `get_project_health`) to a follow-up. The REST API (`/api/v1`, OpenAPI-described) already exposes everything needed, with per-project Bearer tokens and exact-match roles (`VIEW_ROLES`, `DEVELOPER_ROLES`, `APPROVER_ROLES`). No MCP dependency exists in the repo.

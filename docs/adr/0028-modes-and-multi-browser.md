@@ -4,6 +4,8 @@
 
 Accepted
 
+Amended in part by ADR 0033 (engine identity becomes a capture target, `<engine>@<name>` for remote browsers).
+
 ## Context
 
 Capture was `story × viewport` on one `project.browser`. Theme/locale globals could not be tested, and covering Firefox or WebKit meant switching the project's only browser (baselines "tracked" it through `infraHash` only). Chromatic solves both with **Modes** (named, with their own baseline and approval) and per-browser snapshots. Issue #128 shipped in four PRs (#143, #144, #146 and the review/settings PR).

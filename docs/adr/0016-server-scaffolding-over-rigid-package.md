@@ -4,6 +4,8 @@
 
 Accepted
 
+Amended in part by ADR 0034 (no worker scaffolding or queue provisioning; the app is the consumer).
+
 ## Context
 
 As new adapters are added (db-turso, storage-s3, auth-oauth, auth-password), the `@storyshelf/node-server` package faces a combinatorial explosion. It hardcodes a specific stack: SQLite + local storage + Playwright + GitHub. Supporting alternative deployments (Turso + S3, or no auth, or no git) requires either:
