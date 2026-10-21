@@ -69,10 +69,11 @@ createShelfApp({ database, storage }); // hosting only: uiTesting is off
   instance. Which routes are gated, and the test that keeps the list honest, is decision 8.
 - **Existing data is hidden, not deleted.** Turning `uiTesting` off on a deployment that has
   snapshots hides them; startup logs it and the System page shows a notice with the count.
-- **Builds are shown as published, not pending.** Without `uiTesting` a build's stored status stays
-  `pending`, which means "no checks have run", not "stuck" (decision 9). The System page states that
-  `uiTesting` is off, so an instance in a fleet that was meant to run checks but was not configured is
-  visible, and the CLI's upload output says the Storybook was published but no checks will run.
+- **Builds are accepted automatically.** With no checks to wait for, a build becomes `approved` when
+  it finishes publishing (decisions 9 and 10). Nobody reviewed it, so no approval event fires; the
+  `build:created` webhook already announces the upload. The System page states that `uiTesting` is off,
+  so an instance in a fleet that was meant to run checks but was not configured is visible, and the
+  CLI's upload output says the Storybook was published but no checks will run.
 
 ### 2. `uiTesting` requires a long-running server
 
@@ -181,11 +182,11 @@ Routers mix kinds of route (`builds` holds uploads next to snapshot listings; `u
 next to the diff page), so the gate is per route, not per router. An audit of today's routers gives
 three classes:
 
-| Class       | Meaning                                                  | Routes                                                                                                                                                                                                                                                                                                                |
-| ----------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `hosting`   | Available with and without `uiTesting`                   | Projects, tokens, members, labels, auth, webhooks; the build routes for upload, zip, dedup, content, manifest and listing; Storybook serving                                                                                                                                                                          |
-| `uiTesting` | 404 without `uiTesting`                                  | Snapshots (list, approve, reject, approve-all, per-mode), baselines export and import, attempts and their logs, status configs, build comments (review), insights (AI triage, which also needs `ai`), the capture and status settings pages, the compute-jobs page, the build diff page, review-next, snapshot groups |
-| `both`      | The page exists in both modes and its sections are gated | Build list and detail (snapshot list, statuses, attempts and approvals only with `uiTesting`), project overview, library and component pages (decision 9)                                                                                                                                                             |
+| Class       | Meaning                                                  | Routes                                                                                                                                                                                                                                                                                                                             |
+| ----------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hosting`   | Available with and without `uiTesting`                   | Projects, tokens, members, labels, auth, webhooks; the build routes for upload, zip, dedup, content, manifest and listing; Storybook serving                                                                                                                                                                                       |
+| `uiTesting` | 404 without `uiTesting`                                  | Snapshots (list, approve, reject, approve-all, per-mode), baselines export and import, attempts and their logs, status configs, build comments (review), insights (AI triage, which also needs `ai`), the capture and status settings pages, the compute-jobs page, build retry, the build diff page, review-next, snapshot groups |
+| `both`      | The page exists in both modes and its sections are gated | Build list and detail (snapshot list, statuses, attempts and approvals only with `uiTesting`), project overview, library and component pages (decision 9)                                                                                                                                                                          |
 
 The classification lives in one route table in code. Two tests keep it honest: one enumerates every
 route the app registers and fails on any that is not classified, so a new route has to declare its
@@ -199,8 +200,12 @@ revisit if comments on a published Storybook turn out to be wanted without snaps
 `index.json` is the primary data source of these pages in both modes. `uiTesting` adds data to them; it
 does not change where their skeleton comes from.
 
-- **Library.** Shows the default branch's latest published build by default, with the branch switcher
-  it has today. Components are grouped by title, each linking to its component page and into the
+- **Library.** Shows accepted builds only: by default the latest accepted build of the default branch,
+  the same source as the project's published Storybook link (`latestApprovedDefault`), with the branch
+  switcher listing the latest accepted build of each branch. Today the library takes the newest build
+  of the branch whatever its status, so this is a change: with `uiTesting`, a pull-request branch
+  appears in the library once its build is approved, and reviewers preview an unreviewed build from its
+  build page. Components are grouped by title, each linking to its component page and into the
   published Storybook (story and docs links), with tags and story counts. There are no screenshots in
   the base view. With `uiTesting` it gains thumbnails, statuses, the health panel and design links.
 - **Component page.** The published story as an iframe preview, the component's stories and docs
@@ -210,9 +215,17 @@ does not change where their skeleton comes from.
   moved-or-deleted detection and per-story design previews.
 - **Build pages.** The list and detail pages exist to show uploads without a capture pipeline: sha,
   branch, author, message, size, labels, the link to the published Storybook, and component and story
-  counts from the catalog. Without `uiTesting`, `pending` is shown as "Published". Snapshots, statuses,
-  attempts and approvals appear only with `uiTesting`. Enabling `uiTesting` later does not capture
-  builds published before it; they can be captured on demand with the existing retry.
+  counts from the catalog. Snapshots, statuses, attempts and approvals appear only with `uiTesting`.
+- **Without `uiTesting`, every build is accepted when it finishes publishing.** This is required, not
+  cosmetic. The project's Storybook link and the upstream links resolve only accepted builds, and
+  retention purges only terminal builds (`approved`, `rejected`, `failed`), so a build left `pending`
+  would never be served and never be purged. A build whose publishing fails becomes `failed`. An
+  accepted build with no attempts is labelled "Published" in the UI, and `approvedCount` stays zero.
+  Enabling `uiTesting` later leaves these builds as they are; they have no snapshots, so they create
+  no baselines, and the next default-branch build bootstraps them as usual. To capture an old build,
+  retry it: the retry route has no status guard, sets `pending` and enqueues the capture. It is a
+  `uiTesting` route, because with `uiTesting` off it would today set `pending` and report "Capture
+  queued" with nothing queued.
 - **Data.** Extraction at publish (decision 10) also writes a compact catalog for the build (entry id,
   title, name, import path, type, tags) next to its statics, and one `build_components` row per
   component (project, build, import path, title, story count, a hash of the component's entries). The
@@ -246,7 +259,9 @@ claim per build, like the finalize claim), so a restart or another instance can 
 "preparing" page and the Storybook route retry it when no claim is live. `maxInlineUnzipSize` stays
 as the threshold between inline and background and gets a safe default, so leaving it unset no longer
 means "never". With `uiTesting` the capture job still backfills the same keys. The claim and retry
-details are settled at implementation. Extraction also writes the catalog that decision 9 reads.
+details are settled at implementation. Extraction also writes the catalog that decision 9 reads, and, when `uiTesting` is off, ends by setting the
+build `approved` (or `failed` if it could not publish). With `uiTesting` on the capture pipeline decides the
+status, as now.
 
 ### 11. Operating details
 
@@ -342,6 +357,9 @@ with this ADR. The pages to change, and the statement they must carry:
   `concurrency` and `compare.threads`, or add instances.
 - Route gating is new work spread across many routers, and the API surface now depends on
   configuration.
+- `approved` no longer implies that a person or a check approved a build: a hosting-only build is
+  `approved` with no snapshots. Clients that read the status (the API, MCP, upstream links) see
+  accepted builds with nothing behind them, which is why the UI labels them "Published".
 - Hosting-only is not first-class until two pieces of real work exist: a publish path independent of
   capture (decision 10) and the catalog, with its `build_components` table, behind the library,
   component and build pages (decision 9).
@@ -371,6 +389,8 @@ with this ADR. The pages to change, and the statement they must carry:
 - Whether Storybook 8 to 10 previews run in a sandboxed iframe without `allow-same-origin` (decision 9).
 - Whether per-story design previews without `uiTesting` justify recording parameters some other way.
 - Whether build comments belong in `hosting` for builds with no snapshots (decision 8).
+- Whether a pull-request branch awaiting review should stay out of the library until accepted, which
+  is how this ADR reads "the library shows accepted builds only" (decision 9).
 
 ## Implementation order
 
