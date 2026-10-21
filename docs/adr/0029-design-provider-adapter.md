@@ -4,6 +4,8 @@
 
 Accepted
 
+Amended in part by ADR 0034 (design providers are held by the app; there are no remote workers).
+
 ## Context
 
 Figma support (#141) landed as Figma-specific code inside core and the app: URL parsing, the REST client, `figma_nodes`/`design_tokens` tables and settings copy. Every other vendor concern is an adapter (ADR 0001: `git-host`, `notifier`, `capture-queue`, …), and the next feature — per-user Figma OAuth — would add yet more vendor code (callback route, token refresh) to core. Operators who do not use Figma also carry it.

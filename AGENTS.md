@@ -190,6 +190,8 @@ This distinction matters for:
 | 0029 | Design Provider Adapter (`@storyshelf/design-figma`; vendor-neutral links, cache and credentials in core) |
 | 0030 | User OAuth Connections (service-neutral "Connect your account": `OAuthClient`, `user_connections`, shared `/connections/:service` flow) |
 | 0032 | Image Engines (`@storyshelf/image` leaf package; opt-in `sharp` codec; pixelmatch stays the comparator) |
+| 0033 | Remote Browsers and Public Origin (runner `browsers` list: local engines declared and verified, remote presets, `<engine>@<name>` targets with own baselines, in-browser fingerprint, `exposeNetwork` or signed Storybook URLs, public-origin resolver) |
+| 0034 | One Deployable (`uiTesting` umbrella option and hosting-only mode; database queue; no separate worker; queue adapters retired; browser farm recipe) |
 
 ## Parallel Development with Worktrees
 

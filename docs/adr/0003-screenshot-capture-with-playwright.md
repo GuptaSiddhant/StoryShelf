@@ -4,6 +4,10 @@
 
 Accepted
 
+Amended in part by ADR 0033 (launching a browser is no longer always local).
+
+Amended in part by ADR 0034 (the in-process queue becomes the database queue).
+
 ## Context
 
 The core missing feature versus Chromatic is automated screenshot capture. Chromatic renders each Storybook story in a controlled cloud browser and captures a pixel-perfect screenshot. StoryBooker required users to provide pre-captured screenshots manually.

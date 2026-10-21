@@ -4,6 +4,10 @@
 
 Proposed
 
+Amended in part by ADR 0033 (platform and fonts for a remote target come from the browser).
+
+Amended in part by ADR 0034 (`capture` becomes `uiTesting` and `compare` nests under it; the in-memory queue goes; shard jobs ride the database queue).
+
 ## Context
 
 The capture path (ADR 0003) and the pixel diff engine (ADR 0004) currently run in a

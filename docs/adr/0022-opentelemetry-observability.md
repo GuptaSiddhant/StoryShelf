@@ -4,6 +4,8 @@
 
 Accepted (2026-09-27)
 
+Amended in part by ADR 0034 (trace context travels in the database job row).
+
 ## Context
 
 ADR 0014 gave StoryShelf structured JSON logs with `reqId` correlation between
