@@ -82,6 +82,11 @@ instance has a runner, and the migration guide says so.
   approval), commit statuses, the capture settings, the compute-jobs page and the features that read
   snapshots (AI triage) are off. No `storyshelf/...` commit status is posted, so a repository that
   requires one must drop that requirement before `uiTesting` is turned off.
+- **Hosting-only is not open access.** The existing auth rules (ADR 0008, 0011) apply unchanged: who
+  may view a published Storybook, the library, component and build pages, and who may upload, comment
+  or approve, is decided by the auth adapter and the project's access settings, with or without
+  `uiTesting`. The route classes of decision 8 gate features, never access; a `hosting` route is
+  not a public route.
 - **`compare` moves under `uiTesting`.** ADR 0031 phase 2 kept it top-level so re-diff works with
   nothing rendering locally; with no separate worker, an instance that needs compare is an instance
   with `uiTesting`.
