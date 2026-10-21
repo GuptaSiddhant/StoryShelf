@@ -40,7 +40,7 @@ import { createPuppeteerCaptureRunner } from "@storyshelf/runner-puppeteer";
 const app = createShelfApp({
   database,
   storage,
-  capture: createPuppeteerCaptureRunner(),
+  testing: { runner: createPuppeteerCaptureRunner() },
 });
 ```
 

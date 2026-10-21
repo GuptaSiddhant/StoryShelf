@@ -132,7 +132,7 @@ describe("retry re-queues capture", () => {
       database: db,
       storage,
       logger: silentLogger,
-      capture: { queue },
+      testing: { queue },
     });
 
     const response = await app.request("/api/v1/projects/test-project/builds/b1/retry", {

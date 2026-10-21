@@ -7,14 +7,14 @@ describe("images.engine", () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
     expect(() =>
-      createShelfApp({ database: db, storage, images: { engine: "magick" as never } }),
+      createShelfApp({ database: db, storage, testing: { images: { engine: "magick" as never } } }),
     ).toThrow(/Unknown image engine "magick"/u);
   });
 
   it("boots ready with the sharp engine", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const app = createShelfApp({ database: db, storage, images: { engine: "sharp" } });
+    const app = createShelfApp({ database: db, storage, testing: { images: { engine: "sharp" } } });
     await app.lifecycle.setup();
     expect((await app.lifecycle.ready).ok).toBe(true);
     await app.lifecycle.teardown();

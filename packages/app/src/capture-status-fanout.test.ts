@@ -197,7 +197,7 @@ describe("status provider fanout", () => {
     const app = createShelfApp({
       database: db,
       storage,
-      capture: { runner, concurrency: 1 },
+      testing: { runner, concurrency: 1 },
       config: { scratchDir, secret: "test-secret", purgeTtlDays: 30 },
       gitHosts: [
         fakeGitProvider("github-a", callsA, tokensA),
@@ -271,7 +271,7 @@ describe("status provider fanout", () => {
     const app = createShelfApp({
       database: db,
       storage,
-      capture: { runner, concurrency: 1 },
+      testing: { runner, concurrency: 1 },
       config: { scratchDir, secret: "test-secret", purgeTtlDays: 30 },
       gitHosts: [
         fakeGitProvider("github-a", callsA, tokensA),

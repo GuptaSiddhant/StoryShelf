@@ -122,7 +122,10 @@ function assembleApp(app: ShelfApp, options: ShelfOptions, scoped: ShelfOptions)
  */
 export function createShelfApp(rawOptions: ShelfOptions): ShelfApp {
   const options = resolveShelfOptions(rawOptions);
-  configureImages({ engine: options.images?.engine, threads: options.compare?.threads });
+  configureImages({
+    engine: options.testing?.images?.engine,
+    threads: options.testing?.compare?.threads,
+  });
   throwOnInvalidAdapters(options);
   const app = new OpenAPIHono<{ Variables: ShelfContext }>() as ShelfApp;
   assembleApp(app, options, instrumentedOptions(options));
@@ -237,7 +240,7 @@ function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
       authEnabled,
       enqueueCapture,
       captureQueue: queue,
-      captureConcurrency: options.capture?.concurrency,
+      captureConcurrency: options.testing?.concurrency,
       gitHosts,
       design,
       notifiers,
@@ -382,7 +385,7 @@ function packageVersion(): string {
 export { createAuthSystemHook } from "./notify.ts";
 export type {
   ShelfOptions,
-  ShelfCaptureOptions,
+  ShelfTestingOptions,
   ShelfCompareOptions,
   ShelfNotificationsOptions,
   ShelfConfig,

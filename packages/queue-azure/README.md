@@ -38,7 +38,7 @@ const queue = createAzureStorageQueuesQueue({
 const app = createShelfApp({
   database,
   storage,
-  capture: { runner: myRenderer, queue },
+  testing: { runner: myRenderer, queue },
 });
 ```
 

@@ -5,6 +5,16 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 
 ## Unreleased
 
+**Breaking: `ShelfOptions.capture` is now `ShelfOptions.testing` (ADR 0006).** The option, its type
+(`ShelfCaptureOptions` is now `ShelfTestingOptions`) and its error messages are renamed, and the
+top-level `compare` and `images` options nest under it, so the shape is `testing: { runner, queue?,
+concurrency?, workerEntry?, shardSize?, mode?, compare?, images? }`. `config.scratchDir` stays where
+it is. There is no alias or boot-time error for the old keys: rename them in your server, and
+`storyshelf server init` now emits `testing: { ... }`. Behaviour is unchanged; `runner` stays
+optional for now. Separately, `packages/app/src/routes/classification.ts` now classifies every
+registered route as `hosting`, `testing`, `review` or `both`, and a test fails on any unclassified
+or stale route (classification only, nothing is gated yet).
+
 **Added: axe-core accessibility checks (ADR 0004 §6).** With `runA11y` on, the Playwright and
 Puppeteer runners now run axe-core over `#storybook-root` before the screenshot instead of the old
 hand-rolled DOM scan (removed, with no fallback). Each violation is one `a11y:` annotation with the

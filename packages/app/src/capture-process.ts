@@ -10,7 +10,7 @@ import {
   type ForkDecision,
   type ForkedJobOutcome,
 } from "@storyshelf/core/capture";
-import type { ShelfCaptureOptions } from "@storyshelf/core/config";
+import type { ShelfTestingOptions } from "@storyshelf/core/config";
 import { DIFF_WORKERS_ENV, IMAGE_ENGINE_ENV } from "@storyshelf/core/diff";
 import type { Logger } from "@storyshelf/core/logger";
 import { detectResources } from "@storyshelf/core/utils";
@@ -29,13 +29,13 @@ export function capturesLocally(queue: CaptureQueue | null | undefined): boolean
  * @throws When `mode` is `"fork"` but the runtime cannot fork.
  */
 export function shouldForkCapture(
-  capture: ShelfCaptureOptions | undefined,
+  testing: ShelfTestingOptions | undefined,
   logger: Logger,
 ): boolean {
-  if (!capture?.workerEntry || capture.mode === "in-process") {
+  if (!testing?.workerEntry || testing.mode === "in-process") {
     return false;
   }
-  if (capture.mode === "fork") {
+  if (testing.mode === "fork") {
     return requireFork();
   }
   const decision = decideForHost();
@@ -47,7 +47,7 @@ export function shouldForkCapture(
 
 function requireFork(): true {
   if (!canForkCaptureChild()) {
-    throw new Error('capture.mode "fork" is set but child processes are unavailable here');
+    throw new Error('testing.mode "fork" is set but child processes are unavailable here');
   }
   return true;
 }
@@ -61,11 +61,11 @@ function decideForHost(): ForkDecision {
 export interface ForkedQueueDeps {
   workerEntry: string;
   concurrency?: number;
-  /** Captures per shard for big builds, handed to the child (`capture.shardSize`). */
+  /** Captures per shard for big builds, handed to the child (`testing.shardSize`). */
   shardSize?: number;
-  /** `images.engine`, handed to the child so it diffs with the same codec. */
+  /** `testing.images.engine`, handed to the child so it diffs with the same codec. */
   imageEngine?: string;
-  /** `compare.threads`, handed to the child's diff pool. */
+  /** `testing.compare.threads`, handed to the child's diff pool. */
   diffThreads?: number;
   /** Takes over if forking stops being viable. */
   fallback: CaptureQueue;

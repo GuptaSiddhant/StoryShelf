@@ -47,7 +47,7 @@ describe("admin system page capture sizing", () => {
       database: db,
       storage,
       logger: silentLogger,
-      capture: { runner: inProcessRunner() },
+      testing: { runner: inProcessRunner() },
     });
     await app.lifecycle.setup();
     const html = await (await app.request("/admin")).text();
@@ -57,14 +57,14 @@ describe("admin system page capture sizing", () => {
     expect(html).toContain("pages per build");
   });
 
-  it("marks an explicit capture.concurrency as configured", async () => {
+  it("marks an explicit testing.concurrency as configured", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
     const app = createShelfApp({
       database: db,
       storage,
       logger: silentLogger,
-      capture: { runner: inProcessRunner(), concurrency: 3 },
+      testing: { runner: inProcessRunner(), concurrency: 3 },
     });
     await app.lifecycle.setup();
     const html = await (await app.request("/admin")).text();

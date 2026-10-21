@@ -29,7 +29,7 @@ import { gitHubHost } from "@storyshelf/git-github";
 const app = createShelfApp({
   database,
   storage,
-  capture: { runner: captureRunner, concurrency: 2 },
+  testing: { runner: captureRunner, concurrency: 2 },
   gitHosts: [gitHubHost],
   auth,
   config: { secret, purgeTtlDays: 30, branchTtlDays: 30, branchGcIntervalMs: 86_400_000 },
@@ -58,7 +58,7 @@ The barrel (`@storyshelf/core`) exports only the router and its types
 (`createShelfApp`, `ShelfOptions`, `ShelfConfig`, `UIConfig`, `ShelfApp`).
 Everything else lives under a subpath:
 
-- `executeCaptureJob({ buildId, reqId }, deps)` (`core/capture`) — the capture **orchestrator**: loads the build, marks it `capturing`, extracts the uploaded archive, discovers stories, partitions them into render vs inherit sets ([affected capture](/concepts/affected-capture/)), delegates rendering to a pure `CaptureRunner`, and persists. Wired into the `Queue` when `capture` is supplied.
+- `executeCaptureJob({ buildId, reqId }, deps)` (`core/capture`) — the capture **orchestrator**: loads the build, marks it `capturing`, extracts the uploaded archive, discovers stories, partitions them into render vs inherit sets ([affected capture](/concepts/affected-capture/)), delegates rendering to a pure `CaptureRunner`, and persists. Wired into the `Queue` when `testing` is supplied.
 - `persistCapture(context)` (`core/capture`) writes screenshots, diffs them against baselines, inherits unaffected stories (`inherited: true`), and finalizes a build from a renderer's captures.
 - `StorybookAdapter.loadDependencyGraph(sourceDir)` (`core/capture`) — optional `StorySourceAdapter` hook reading the build's `preview-stats.json` for affected tracing; sources without it render everything.
 - `Ai`, `AiError` (`core/ai`) — the AI singleton surface behind `ShelfOptions.ai` (not an adapter, like `Auth`); `@storyshelf/ai` implements it. `core/insights` holds the pure evidence builders, redaction, result envelopes and budget math. See the [AI insights guide](/ai/).
@@ -77,6 +77,6 @@ Git integration is a `GitHost` pair:
 
 Packages that implement `GitHostProvider` (e.g. `@storyshelf/git-github` `gitHubHost`) are wired in alongside the router — see [the git-github package](../git-github/).
 
-`ShelfConfig` supports a session secret, published Storybook base domain, capture concurrency, capture viewports, a capture scratch directory (`scratchDir`, required when `capture` is enabled), purge TTL (`purgeTtlDays`), branch GC TTL (`branchTtlDays` 30, `null`=disabled) + interval (`branchGcIntervalMs` 86_400_000 daily), and an optional `adapters` snapshot (`{ [key]: AdapterMetadata }`) auto-populated from each adapter's `metadata` for introspection. The `secret` is also used to encrypt git-provider tokens at rest. `UIConfig` controls the name, logo, and light/dark brand themes. `favicon` is deprecated and ignored — the app serves its own mark so a StoryShelf tab stays recognisable, while `logo` (defaulting to that mark) remains overridable.
+`ShelfConfig` supports a session secret, published Storybook base domain, capture concurrency, capture viewports, a capture scratch directory (`scratchDir`, required when `testing` is enabled), purge TTL (`purgeTtlDays`), branch GC TTL (`branchTtlDays` 30, `null`=disabled) + interval (`branchGcIntervalMs` 86_400_000 daily), and an optional `adapters` snapshot (`{ [key]: AdapterMetadata }`) auto-populated from each adapter's `metadata` for introspection. The `secret` is also used to encrypt git-provider tokens at rest. `UIConfig` controls the name, logo, and light/dark brand themes. `favicon` is deprecated and ignored — the app serves its own mark so a StoryShelf tab stays recognisable, while `logo` (defaulting to that mark) remains overridable.
 
 Choose the default adapters in [deployment](../../guides/deployment/) or see the [CLI guide](../../guides/cli/) for the packaged server entry point.

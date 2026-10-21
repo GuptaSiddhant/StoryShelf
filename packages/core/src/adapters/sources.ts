@@ -7,8 +7,8 @@ export function adapterSourcesOf(options: ShelfOptions): AdapterSetupSources & {
   return {
     database: options.database,
     storage: options.storage,
-    captureRunner: options.capture?.runner,
-    captureQueue: options.capture?.queue,
+    captureRunner: options.testing?.runner,
+    captureQueue: options.testing?.queue,
     gitHosts: options.gitHosts,
     design: options.design,
     notifiers: options.notifications?.notifiers,

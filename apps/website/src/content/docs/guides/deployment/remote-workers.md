@@ -22,7 +22,7 @@ upload ─▶ server ──enqueue──▶ SQS ◀──poll/ack── worker(s
 
 ### Server
 
-Pass the SQS queue as `capture.queue` (see [`@storyshelf/queue-sqs`](/packages/queue-sqs/)):
+Pass the SQS queue as `testing.queue` (see [`@storyshelf/queue-sqs`](/packages/queue-sqs/)):
 
 ```ts
 import { createSqsCaptureQueue } from "@storyshelf/queue-sqs";
@@ -30,14 +30,14 @@ import { createSqsCaptureQueue } from "@storyshelf/queue-sqs";
 const app = createShelfApp({
   database,
   storage,
-  capture: {
+  testing: {
     runner: captureRunner,
     queue: createSqsCaptureQueue({ queueUrl: process.env.QUEUE_URL! }),
   },
 });
 ```
 
-The server no longer runs captures itself, so `capture.concurrency` / `--capture-concurrency` has no effect.
+The server no longer runs captures itself, so `testing.concurrency` / `--capture-concurrency` has no effect.
 
 ### Worker
 

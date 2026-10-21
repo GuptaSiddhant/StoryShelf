@@ -7,7 +7,7 @@ The StoryShelf HTTP app: `createShelfApp()` composes database, storage, capture,
 ```ts
 import { createShelfApp } from "@storyshelf/app";
 
-const app = createShelfApp({ database, storage, capture: { runner: captureRunner } });
+const app = createShelfApp({ database, storage, testing: { runner: captureRunner } });
 await app.lifecycle.init();
 
 serve({ fetch: app.fetch, port: 3000 });

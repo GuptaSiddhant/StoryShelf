@@ -27,7 +27,7 @@ import { createLocalStorage } from "@storyshelf/storage-local";
  *  - @storyshelf/runner-playwright → chrome-headless-shell installed in the image
  *
  * Capture stays in-process: the 1-CPU Fly VM is below the threshold where
- * core would fork a capture child, so a `capture.workerEntry` would never apply.
+ * core would fork a capture child, so a `testing.workerEntry` would never apply.
  */
 import { mkdirSync } from "node:fs";
 import { seedDemo, type SeedAuth } from "./src/seed-demo.ts";
@@ -108,7 +108,7 @@ const emailNotifiers = emailSender
 const app = createShelfApp({
   database,
   storage,
-  capture: { runner: captureRunner },
+  testing: { runner: captureRunner },
   design: [createFigmaDesign({ oauth: figmaOAuthFromEnv() })],
   notifications: {
     notifiers: [...chatNotifiers, ...emailNotifiers],

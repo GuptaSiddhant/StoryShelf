@@ -69,7 +69,7 @@ Billed snapshots = visual snapshots + accessibility snapshots. TurboSnap copies 
 - **Vite-only tracing** — affected capture reads `preview-stats.json` (plus tolerant Webpack shapes). TurboSnap-equivalent skip rates on Vite Storybooks; custom builders without stats fall back to full renders.
 - **Modes differ slightly** — Mode values may only use characters Storybook's `globals` URL arg accepts; baselines are keyed by mode name as in Chromatic.
 - **Accessibility results are annotations only** — Opt-in per project (`runA11y`); the runners inject axe-core into the story page and scan the story root with the WCAG A/AA rules (honouring `parameters.a11y`). Violations are listed per story in the attempt log and never fail or gate a build; there is no accessibility baseline, review workflow or accessibility snapshot billing.
-- **No cloud parallelization** — Concurrency limited by your server resources (`capture.concurrency` option).
+- **No cloud parallelization** — Concurrency limited by your server resources (`testing.concurrency` option).
 - **No built-in flake detection** — Relies on explicit `flakyTest` parameter/tags.
 
 ### StoryShelf advantages (vs Chromatic)

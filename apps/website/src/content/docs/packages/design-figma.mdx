@@ -29,7 +29,7 @@ import { createFigmaDesign } from "@storyshelf/design-figma";
 const app = createShelfApp({
   database,
   storage,
-  capture: { runner: captureRunner },
+  testing: { runner: captureRunner },
   design: [createFigmaDesign()],
   config: {
     secret: process.env.SHELF_SECRET, // also encrypts the Figma token

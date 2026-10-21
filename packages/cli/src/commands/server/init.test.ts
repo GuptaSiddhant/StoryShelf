@@ -311,7 +311,7 @@ describe("runServerInit", () => {
       process.chdir(cwd);
     }
     const code = readFileSync(join(dir, "src", "index.ts"), "utf8");
-    expect(code).toContain("capture: { runner: captureRunner },");
+    expect(code).toContain("testing: { runner: captureRunner },");
   });
 
   it("writes the AWS reference stack and forces postgres/s3/sqs", async () => {
