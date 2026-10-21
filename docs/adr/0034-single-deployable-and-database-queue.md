@@ -55,17 +55,18 @@ createShelfApp({
 createShelfApp({ database, storage }); // hosting only: uiTesting is off
 ```
 
-- **Absent:** Storybook hosting only. Uploads, published Storybooks, projects, tokens and members
-  keep working. Capture, compare (including re-diff), review pages and APIs, baselines (import,
-  export, approval), commit statuses (they are posted by the capture job), the capture settings, the
-  compute-jobs page and the features that read snapshots (AI triage) are off.
+- **Absent:** Storybook hosting only. Uploads, published Storybooks, projects, tokens, members and
+  the library and component pages (built from Storybook metadata, decision 9) keep working. Capture,
+  compare (including re-diff), review pages and APIs, baselines (import, export, approval), commit
+  statuses (they are posted by the capture job), the capture settings, the compute-jobs page and the
+  features that read snapshots (AI triage) are off.
 - **`compare` moves under `uiTesting`.** ADR 0031 phase 2 kept it top-level so re-diff works with
   nothing rendering locally; with no separate worker, an instance that needs compare is an instance
   with `uiTesting`.
-- **Mechanism:** one flag on the store, one guard per route group, the navigation and MCP tools
-  filtered by the same flag. A disabled endpoint returns 404 with a body saying that uiTesting is not
-  enabled on this instance, and the OpenAPI document marks which endpoints need it. The exact list of
-  route groups is settled by an audit during implementation.
+- **Mechanism:** one flag on the store, a `requireUiTesting` guard applied per route, and the same
+  classification driving the navigation, the MCP tool list and the OpenAPI "requires uiTesting"
+  marker. A disabled endpoint returns 404 with a body saying that uiTesting is not enabled on this
+  instance. Which routes are gated, and the test that keeps the list honest, is decision 8.
 - **Existing data is hidden, not deleted.** Turning `uiTesting` off on a deployment that has
   snapshots hides them; startup logs it and the System page shows a notice with the count.
 - **Pending builds are never silent.** When `uiTesting` is off and builds are pending, the System page
@@ -77,8 +78,8 @@ Enabling `uiTesting` requires a long-running server: a container, VM, Fly Machin
 similar. Capture jobs run for minutes in the background, and the job consumer (decision 3) has to
 keep running between requests. Platforms that freeze or end the process after each request (Vercel
 Functions, AWS Lambda, Cloudflare Workers) cannot host it; they can still host Storybook hosting
-only. The app warns at startup when `uiTesting` is set and a known serverless environment variable
-is present (for example `VERCEL`, `AWS_LAMBDA_FUNCTION_NAME`). Consequently the Cloudflare D1
+only. The app refuses to start when `uiTesting` is set and the process is certainly serverless, and warns
+when it only might be (decision 11). Consequently the Cloudflare D1
 preset, a Workers-only binding, cannot back a deployment with `uiTesting`; Turso over the network
 can.
 
@@ -109,10 +110,11 @@ migrations) holds one row per job, including shard jobs:
   fast as the in-memory queue does; other instances find the job on their next poll, which backs off
   when idle and carries jitter. An index on status and visibility time keeps an empty poll cheap.
 - **Retry and failure.** A nack with a delay sets the visibility time; attempts are counted; past the
-  limit the job is `failed` and the build takes the standard terminal path, with its status written
+  limit (`uiTesting.retries`, decision 11) the job is `failed` and the build takes the standard terminal path, with its status written
   to the database, so a job failed by a crash never leaves a build in `capturing`.
-- **Cancel** sets a flag the running instance sees on its next lease renewal and turns into
-  `runner.cancel`, which replaces the in-process direct call and works across instances.
+- **Cancel** sets a flag on the job row, which the running instance reads on a short timer of its own
+  and turns into `runner.cancel`; it works across instances and when the capture is hung (decision
+  11). Cancelling a job that has not started is immediate.
 - **Views.** `status`, `active` and `recent` read the table, so the compute-jobs page shows every
   instance's jobs, not only the connected one's.
 - **Trace propagation** (ADR 0022 section 9) is unchanged: `traceparent` and the request id travel in
@@ -171,6 +173,85 @@ Unverified: whether a bare `run-server` has built-in authentication or a concurr
 ADR 0033's implementation order settles it. The farm's network position matters: a story that calls
 an internal service from the browser needs a farm inside that network.
 
+### 8. Every route is classified, and a test keeps it that way
+
+Routers mix kinds of route (`builds` holds uploads next to snapshot listings; `ui` holds project pages
+next to the diff page), so the gate is per route, not per router. An audit of today's routers gives
+three classes:
+
+| Class       | Meaning                                                  | Routes                                                                                                                                                                                                                                                                                                                |
+| ----------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hosting`   | Available with and without `uiTesting`                   | Projects, tokens, members, labels, auth, webhooks; the build routes for upload, zip, dedup, content, manifest and listing; Storybook serving                                                                                                                                                                          |
+| `uiTesting` | 404 without `uiTesting`                                  | Snapshots (list, approve, reject, approve-all, per-mode), baselines export and import, attempts and their logs, status configs, build comments (review), insights (AI triage, which also needs `ai`), the capture and status settings pages, the compute-jobs page, the build diff page, review-next, snapshot groups |
+| `both`      | The page exists in both modes and its sections are gated | Build detail (snapshot list, statuses and attempts only with `uiTesting`), project overview (build statuses), library and component pages (decision 9)                                                                                                                                                                |
+
+The classification lives in one route table in code. Two tests keep it honest: one enumerates every
+route the app registers and fails on any that is not classified, so a new route has to declare its
+class; the other boots the app without `uiTesting` and asserts every `uiTesting` route answers 404
+and no `hosting` route does. The same table drives the navigation, the MCP tool list and the OpenAPI
+marker. Build comments are classed `uiTesting` because comments are the review step; that is easy to
+revisit if comments on a published Storybook turn out to be wanted without snapshots.
+
+### 9. The library and component pages stay, built from Storybook metadata
+
+Both pages exist in both modes, on the same routes.
+
+- **Without `uiTesting`**, the library is a catalog of the components in the latest published build of
+  the selected branch (the same selection rule as today), grouped by title, listing each component's
+  stories and docs entries with their tags and links into the published Storybook. A component page
+  shows that component's metadata (title, file, stories, docs entries) and the same links. There are
+  no screenshots, statuses, history or design previews.
+- **With `uiTesting`**, the same pages gain the snapshot gallery, status roll-ups, per-build history,
+  moved-or-deleted detection and design previews, as today.
+- **Data source.** The published build's `index.json` (stories and docs entries), read from the
+  persisted statics by the reader the library already uses for docs entries. A build's index never
+  changes, so the parsed catalog is cached in-process by build id in a bounded LRU; there is no schema
+  change. A `build_stories` table is the answer if catalogs of many thousands of entries make parsing
+  slow.
+- **Not available without `uiTesting`:** anything that comes from the running preview and not the
+  index, namely resolved parameters. Design links (ADR 0029) and modes need the runner's
+  `extractParameters`.
+- **Structure.** Each page becomes one view over two data providers: the metadata catalog, always, and
+  the snapshots enrichment, only with `uiTesting`.
+
+### 10. Publishing does not depend on `uiTesting`
+
+Today the statics of a published Storybook are extracted at upload only when `maxInlineUnzipSize` is
+set and the zip is within it; otherwise, in the config's own words, "statics land via capture". A
+hosting-only deployment therefore shows the "preparing" page indefinitely for any larger Storybook, so
+decision 1's promise that published Storybooks keep working is not true without a fix, and decision 9
+needs the same statics.
+
+Extraction becomes part of publishing: it always runs, regardless of `uiTesting` and of size. A small
+zip is extracted inline in the upload request, as now. A larger one is extracted in the background of
+the receiving instance after the upload response. The work is idempotent and claimable (a unique-key
+claim per build, like the finalize claim), so a restart or another instance can retry, and the
+"preparing" page and the Storybook route retry it when no claim is live. `maxInlineUnzipSize` stays
+as the threshold between inline and background and gets a safe default, so leaving it unset no longer
+means "never". With `uiTesting` the capture job still backfills the same keys. The claim and retry
+details are settled at implementation.
+
+### 11. Operating details
+
+- **Polling.** An instance does not poll while all its concurrency slots are busy. Otherwise it polls
+  every 15 s when idle and every 2 s while jobs were recently queued, with jitter; a poll is one
+  indexed query for the oldest visible job and reads at most one row. The enqueuing instance wakes
+  its own consumer directly. The acceptance test for the queue is that an idle instance performs at
+  most one such probe per 15 s and reads no rows.
+- **Cancel.** Leases follow progress, so they cannot carry a cancel for a hung capture. Each running
+  job reads its own row by id every 5 s; the lease renewal write also returns the row. Cancel latency
+  is at most about 5 s.
+- **Retries.** `uiTesting.retries`, default 2 (three attempts in total, as `maxRetries` is today).
+  The backoff, 1 s doubling to a cap of 30 s, is an internal constant. One limit covers failed
+  attempts, lost leases and child crashes, replacing the forked queue's separate `maxCrashRetries`.
+- **Serverless.** Startup refuses when a signal is certain: `AWS_LAMBDA_FUNCTION_NAME` exists only at
+  Lambda runtime. For signals that are not (`VERCEL` is also set during builds, and I know of no
+  runtime-only Vercel variable) it warns, until one is verified. `STORYSHELF_ALLOW_SERVERLESS=1`
+  overrides a wrong refusal.
+- **Forked capture** stays as an opt-in with no new investment (decision 5). It is retired when local
+  engines stop being the recommended path or when metrics show no capture-caused restarts, so child
+  restarts and hang kills are counted first.
+
 ## Amendments to existing ADRs
 
 - **0031 phase 2:** the nested `capture` group is `uiTesting`, and `compare` nests under it instead of
@@ -214,6 +295,8 @@ with this ADR. The pages to change, and the statement they must carry:
 - A migration guide: `capture` to `uiTesting`; a worker deployment to more app instances; queue
   adapters to the database queue; serverless to hosting-only.
 - A "self-hosted browser farm" guide (decision 7).
+- The library and component page docs (the metadata catalog without `uiTesting`, the enrichment
+  with it) and the publishing guide (extraction independent of capture).
 - `docs/architecture.md`, and `AGENTS.md` (layout and ADR index).
 
 ## Consequences
@@ -242,6 +325,8 @@ with this ADR. The pages to change, and the statement they must carry:
   `concurrency` and `compare.threads`, or add instances.
 - Route gating is new work spread across many routers, and the API surface now depends on
   configuration.
+- Hosting-only is not first-class until two pieces of real work exist: a publish path independent of
+  capture (decision 10) and a metadata catalog for the library and component pages (decision 9).
 
 ## Alternatives considered
 
@@ -259,22 +344,27 @@ with this ADR. The pages to change, and the statement they must carry:
 
 ## Open questions
 
-- The exact list of route groups to gate, found by an audit before implementation.
-- Polling load with many instances, and Turso's read billing: measure with the multi-instance test.
-- How cancel latency relates to the lease-renewal interval.
-- Where the retry limit (`maxRetries`, today a worker setting) lives in `uiTesting`.
-- Whether the serverless warning should refuse to start instead of warning.
-- Whether forked capture survives once remote browsers are common (decision 5).
+- How Turso, and other hosted SQLite, meter an idle indexed poll. Measured in step 1 against the
+  acceptance test in decision 11.
+- The details of the publish claim and its retry (decision 10).
+- Whether Vercel exposes a runtime-only signal, so the serverless check can refuse there too.
+- Whether a `build_stories` table is needed for very large catalogs (decision 9).
+- Whether build comments belong in `hosting` for builds with no snapshots (decision 8).
 
 ## Implementation order
 
 1. **The database queue and the consumer loop in core**, behind the existing interfaces, validated by
-   the contract suite and the multi-instance tests (Postgres, MySQL, Turso, local SQLite). Additive:
-   nothing is removed yet.
-2. **`uiTesting`**: the rename, the `compare` move, the gating, the notices and the serverless
-   warning. This is the breaking step.
-3. **Remove the in-memory queue and the boot recovery sweep;** forked capture's parent becomes the
+   the contract suite and the multi-instance tests (Postgres, MySQL, Turso, local SQLite), including
+   the idle-poll acceptance test. Additive: nothing is removed yet.
+2. **Publishing independent of `uiTesting`** (decision 10). Additive, and it fixes a hosting-only gap
+   on its own.
+3. **The route table and the two tests** (decision 8), with every route classified as it behaves
+   today. No behaviour change.
+4. **The metadata catalog for the library and component pages** (decision 9), used in both modes.
+5. **`uiTesting`**: the rename, the `compare` move, the gating, the notices and the serverless check.
+   This is the breaking step.
+6. **Remove the in-memory queue and the boot recovery sweep;** forked capture's parent becomes the
    consumer.
-4. **Retire `@storyshelf/worker` and the four queue adapters** (deprecation rows, `npm deprecate`).
-5. **Documentation** with each of the above, ending with the migration guide. The farm recipe and the
+7. **Retire `@storyshelf/worker` and the four queue adapters** (deprecation rows, `npm deprecate`).
+8. **Documentation** with each of the above, ending with the migration guide. The farm recipe and the
    version-pin test ship with ADR 0033's step 2.

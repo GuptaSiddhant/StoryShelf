@@ -469,9 +469,13 @@ access.
 - Confirm that Storybook 8, 9 and 10 static builds load every asset by relative path, so the
   path-prefix token reaches them all (the three fixtures settle it). `architecture.md` describes
   Storybook as expecting root serving; the path-based build route already works, which suggests
-  relative paths, but it has not been checked against every fixture.
-- Which providers honour `exposeNetwork` beyond Azure and a self-hosted Playwright server.
-- Whether commit-status APIs accept the relative `target_url` posted today.
+  relative paths, but it has not been checked against every fixture. Settled by a short spike: serve each
+  fixture build under a path prefix and load `iframe.html`.
+- Which providers honour `exposeNetwork` beyond Azure and a self-hosted Playwright server. Settled by testing against
+  `run-server`; a provider not shown to support it is treated as `reach: "url"`, the safe default.
+- Whether commit-status APIs accept the relative `target_url` posted today. Checked on a throwaway repository. Either
+  way the fix is to build the link absolute with the public-origin resolver, and to omit `target_url`
+  when no origin is known (I believe GitHub treats it as optional; unverified).
 
 ## Implementation order
 
