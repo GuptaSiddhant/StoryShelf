@@ -61,6 +61,7 @@ The option's shape, with what stays top-level:
 interface UiTestingOptions {
   runner: CaptureRunner; // required: every uiTesting instance can render
   compare?: { threads?: number }; // moved from the top level
+  images?: ShelfImagesOptions; // moved from the top level (ADR 0032)
   concurrency?: number; // jobs this instance runs at once
   shardSize?: number;
   retries?: number; // default 2 (decision 11)
@@ -71,8 +72,10 @@ interface UiTestingOptions {
 }
 ```
 
-`images` and `scratchDir` stay top-level: `images` is deployment-wide (ADR 0032; the AI thumbnails use
-it too) and `scratchDir` serves publishing as well as capture. Today's `capture: { queue }` with no
+`images` moves under `uiTesting` with `compare`: the engine serves diffs, overlays and snapshot
+thumbnails, none of which exist without capture (the AI thumbnails read snapshots, so they are
+`uiTesting` too). `scratchDir` stays an optional field of `config`, defaulting to the OS temp directory,
+because it serves publishing as well as capture. Today's `capture: { queue }` with no
 runner, an instance that only enqueues for external workers, has no equivalent: every `uiTesting`
 instance has a runner, and the migration guide says so.
 
@@ -87,9 +90,9 @@ instance has a runner, and the migration guide says so.
   or approve, is decided by the auth adapter and the project's access settings, with or without
   `uiTesting`. The route classes of decision 8 gate features, never access; a `hosting` route is
   not a public route.
-- **`compare` moves under `uiTesting`.** ADR 0031 phase 2 kept it top-level so re-diff works with
-  nothing rendering locally; with no separate worker, an instance that needs compare is an instance
-  with `uiTesting`.
+- **`compare` and `images` move under `uiTesting`.** ADR 0031 phase 2 kept `compare` top-level so re-diff works
+  with nothing rendering locally; with no separate worker, an instance that needs compare or an image
+  engine is an instance with `uiTesting`.
 - **Mechanism:** one flag on the store, a `requireUiTesting` guard applied per route, and the same
   classification driving the navigation, the MCP tool list and the OpenAPI "requires uiTesting"
   marker. A disabled endpoint returns 404 with a body saying that uiTesting is not enabled on this
@@ -384,7 +387,7 @@ sweep of decision 4 gives them job rows.
 
 ## Amendments to existing ADRs
 
-- **0031 phase 2:** the nested `capture` group is `uiTesting`, and `compare` nests under it instead of
+- **0031 phase 2:** the nested `capture` group is `uiTesting`, and `compare` and `images` nest under it instead of
   staying top-level.
 - **0031 phase 3:** the in-memory fallback queue goes; the forked parent consumes the database queue
   and pushes jobs to the child (decision 5).
@@ -430,7 +433,7 @@ with this ADR. The pages to change, and the statement they must carry:
   guide becomes hosting-only on serverless and `uiTesting` on a long-running server.
 - `packages/worker.mdx` and the four `packages/queue-*.mdx` pages, and those packages' READMEs, with
   deprecation notes.
-- The configuration reference (`capture` becomes `uiTesting`, `compare` nests) and the runner pages
+- The configuration reference (`capture` becomes `uiTesting`, `compare` and `images` nest) and the runner pages
   (the `browsers` list, ADR 0033).
 - A migration guide: `capture` to `uiTesting`; a worker deployment to more app instances; queue
   adapters to the database queue; serverless to hosting-only.
@@ -459,7 +462,7 @@ with this ADR. The pages to change, and the statement they must carry:
 **Negative**
 
 - Capture in a single process gains retries it never had (decision 11).
-- A broad breaking change: the option rename and `compare` move, the worker and four adapters
+- A broad breaking change: the option rename and the `compare` and `images` move, the worker and four adapters
   retired, and serverless plus capture no longer supported. Operators using SQS or Redis queues must
   move to the database queue.
 - New queue code, with the race risks any lease implementation has. It needs the contract suite and
@@ -523,7 +526,7 @@ with this ADR. The pages to change, and the statement they must carry:
 4. **The catalog and the library, component and build pages built from it** (decisions 9 and 10), in
    both modes: publish writes the catalog and `build_components`, and the pages read them, with
    snapshot data layered on when present.
-5. **`uiTesting`**: the rename, the `compare` move, the gating, the notices and the serverless check.
+5. **`uiTesting`**: the rename, the `compare` and `images` move, the gating, the notices and the serverless check.
    This is the breaking step.
 6. **Remove the in-memory queue and the boot recovery sweep** (the migration sweep one release later);
    forked capture's parent becomes the consumer.
