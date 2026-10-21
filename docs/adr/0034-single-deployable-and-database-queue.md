@@ -99,9 +99,10 @@ instance has a runner, and the migration guide says so.
 - **Review is not disabled with it.** Comments and approval also exist at build level, so turning
   `uiTesting` off leaves them working (decision 8: `uiReview`). Only snapshot-level review goes away
   with the snapshots.
-- **Builds are accepted automatically only when review is off too.** A build becomes `approved` when it
-  finishes publishing (decisions 9 and 10) only if `uiTesting` is off and the project has turned
-  `uiReview` off. Nobody reviewed it, so no approval event fires; the `build:created` webhook already
+- **Builds are accepted automatically on the default branch, and elsewhere only when review is off.**
+  With `uiTesting` off, a build on the project's default branch becomes `approved` when it finishes
+  publishing (decisions 9 and 10) whatever the project's `uiReview` setting; a build on any other
+  branch does only if the project has turned `uiReview` off. Nobody reviewed it, so no approval event fires; the `build:created` webhook already
   announces the upload. With `uiReview` on (the default) the build waits as `pending` for build-level
   approval, the same as a captured build waits for its snapshots. The System page states that `uiTesting` is off,
   so an instance in a fleet that was meant to run checks but was not configured is visible, and the
@@ -287,12 +288,13 @@ does not change where their skeleton comes from.
 - **Build pages.** The list and detail pages exist to show uploads without a capture pipeline: sha,
   branch, author, message, size, labels, the link to the published Storybook, and component and story
   counts from the catalog. Snapshots, statuses and attempts appear only with `uiTesting`; build-level comments and approval do not depend on it.
-- **Without `uiTesting` and with `uiReview` off, every build is accepted when it finishes publishing.**
+- **Without `uiTesting`, default-branch builds, and every build when `uiReview` is off, are accepted when they finish publishing.**
   This is required, not cosmetic. The project's Storybook link and the upstream links resolve only
   accepted builds, and retention purges only terminal builds (`approved`, `rejected`, `failed`), so a
-  build left `pending` would never be served and never be purged. With `uiReview` on, the build stays
+  build left `pending` would never be served and never be purged. With `uiReview` on, a build on another branch stays
   `pending` until someone approves or rejects it at build level, and until then the Storybook and
-  upstream links keep resolving the previous accepted build. A build whose publishing fails becomes `failed`. An
+  upstream links keep resolving the previous accepted build. The default branch is special and is never
+  held: the project's Storybook link must always resolve. A build whose publishing fails becomes `failed`. An
   accepted build with no attempts is labelled "Published" in the UI, and `approvedCount` stays zero.
   Enabling `uiTesting` later leaves these builds as they are; they have no snapshots, so they create
   no baselines, and the next default-branch build bootstraps them as usual. To capture an old build,
@@ -334,7 +336,8 @@ Publishing completes per upload route:
 - **File-by-file route (`/dedup`, `/content`, `/manifest`).** The files are already stored
   content-addressed, so there is nothing to extract: publishing completes when the manifest is stored,
   which writes the catalog from the stored `index.json`. Today the manifest route enqueues a capture;
-  with `uiTesting` and `uiReview` off it sets the build `approved` instead.
+  with `uiTesting` off it sets the build `approved` instead when the build is on the default branch or
+  `uiReview` is off.
 - **Zip route.** A small zip is extracted inline in the request. Size is counted while streaming, since
   a chunked upload has no `Content-Length`. A larger zip is published by a `publish` job on the
   database queue, with the lease, retry and redelivery of decision 4, consumed by any instance on a
@@ -347,7 +350,7 @@ Publishing completes per upload route:
 
 `maxInlineUnzipSize` stays as the inline threshold and gets a safe default, so leaving it unset no
 longer means "never". With `uiTesting` the capture job still backfills the same keys. Publishing ends
-by writing the catalog that decision 9 reads and, when `uiTesting` and `uiReview` are off, setting the build
+by writing the catalog that decision 9 reads and, when `uiTesting` is off and the build is on the default branch or `uiReview` is off, setting the build
 `approved` (or `failed` if it could not publish); with `uiTesting` on, the capture pipeline decides the
 status, as now.
 
@@ -404,7 +407,7 @@ sweep of decision 4 gives them job rows.
 - **0027:** MCP tools that read snapshots or comment follow the route classes (decision 8).
 - **0029:** "remote workers take the same list" of design providers no longer applies; the app holds
   them.
-- **0010 and 0011:** a hosting-only build with review off is accepted without review and posts no status check
+- **0010 and 0011:** a hosting-only build on the default branch, or with review off, is accepted without review and posts no status check
   (decision 1).
 - **0002:** no contradiction. Turso remains the way to host Storybooks on serverless platforms; D1
   stays hosting-only (decision 2).
@@ -467,8 +470,8 @@ with this ADR. The pages to change, and the statement they must carry:
   `concurrency` and `compare.threads`, or add instances.
 - Route gating is new work spread across many routers, and the API surface now depends on
   configuration.
-- `approved` no longer implies that a person or a check approved a build: a hosting-only build with review off is
-  `approved` with no snapshots. Clients that read the status (the API, MCP, upstream links) see
+- `approved` no longer implies that a person or a check approved a build: a hosting-only build that is accepted
+  automatically is `approved` with no snapshots. Clients that read the status (the API, MCP, upstream links) see
   accepted builds with nothing behind them, which is why the UI labels them "Published".
 - Hosting-only is not first-class until two pieces of real work exist: a publish path independent of
   capture (decision 10) and the catalog, with its `build_components` table, behind the library,
