@@ -237,6 +237,10 @@ upgrade; every instance is stopped, upgraded and started together.
 There is no `@storyshelf/worker` package. The consumer loop lives in `@storyshelf/core/capture` and
 runs in every app instance with `testing`: poll, a progress-driven lease, retry with backoff, the
 final-attempt rule, cancelling the local run when the lease is lost, and a drain on SIGTERM.
+A slot is taken before polling; a failing job waits `1000 ms * 2^attempts` (at most 30 s) before it
+is claimed again, and `attempt >= maxAttempts` marks the last attempt, which is nacked without
+requeue so the job ends `failed`. A job of a kind without a handler is failed with a clear error.
+The constants are in one file, `consumer/retry.ts`.
 Database and storage credentials are given only to the app, and there is one copy of the
 configuration.
 

@@ -29,7 +29,11 @@
 import { createCaptureWorker } from "./worker.ts";
 
 export { createCaptureWorker } from "./worker.ts";
-export { runCaptureChild, type CaptureChildOptions, type ChildHost } from "./child.ts";
+export {
+  runCaptureChild,
+  type CaptureChildOptions,
+  type ChildHost,
+} from "@storyshelf/core/capture";
 export type { WorkerHandle, WorkerOptions, WorkerTables } from "./worker.ts";
 export { DEFAULT_WORKER_CONFIG, resolveWorkerConfig, type WorkerConfig } from "./config.ts";
 export default createCaptureWorker;

@@ -265,6 +265,23 @@ export class CaptureJobModel {
     return rows.length;
   }
 
+  /**
+   * A build was removed: delete every `capture_jobs` row that points at it (job and attempt rows,
+   * whatever their status). There is no foreign key, so retention does this by hand. Returns the
+   * number of rows removed.
+   */
+  async removeForBuild(buildId: string): Promise<number> {
+    const rows = (await this.#db.list(this.#table, {
+      where: eq(this.#c.buildId, buildId),
+    })) as unknown as CaptureJobRow[];
+    await Promise.all(
+      rows.map(async (row) => {
+        await this.#db.remove(this.#table, row.id);
+      }),
+    );
+    return rows.length;
+  }
+
   async #removeJob(jobId: string): Promise<void> {
     const attempts = await this.attempts(jobId);
     await Promise.all(

@@ -202,6 +202,25 @@ describe("CaptureJobModel", () => {
     expect(await jobs.get("new")).not.toBeNull();
   });
 
+  it("removes every row of a build, job and attempt rows of any status", async () => {
+    const { jobs } = model();
+    const one = await jobs.create(
+      { id: "one", kind: "capture", buildId: "b1", maxAttempts: 2 },
+      T0,
+    );
+    await jobs.claim({ job: one, attempt: 1, owner: "o", leaseUntil: T1 }, T0);
+    await jobs.create({ id: "shard", kind: "capture", buildId: "b1", maxAttempts: 2 }, T0);
+    await jobs.create({ id: "other", kind: "capture", buildId: "b2", maxAttempts: 2 }, T0);
+    await jobs.create({ id: "none", kind: "notify", maxAttempts: 2 }, T0);
+    expect(await jobs.removeForBuild("b1")).toBe(3);
+    expect(await jobs.get("one")).toBeNull();
+    expect(await jobs.get("one:1")).toBeNull();
+    expect(await jobs.get("shard")).toBeNull();
+    expect(await jobs.get("other")).not.toBeNull();
+    expect(await jobs.get("none")).not.toBeNull();
+    expect(await jobs.removeForBuild("b1")).toBe(0);
+  });
+
   it("uses the tables it was given", async () => {
     const { db } = makeDatabase();
     const jobs = new CaptureJobModel(db, { captureJobs: db.tables.captureJobs });

@@ -7,6 +7,8 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 
 **Added: `createDatabaseCaptureQueue` (`@storyshelf/core/capture`), a database queue on the new `capture_jobs` table (ADR 0006); additive, not wired in yet (adapters gain `tables.captureJobs`; `LeaseRenewal` gains `"cancelled"`; queues may add `cancel`/`inspect`).**
 
+**Added: `createCaptureConsumer` (`@storyshelf/core/capture`), the consumer loop for any pollable queue (handler per job kind, slots before polling, retries with backoff, lease by progress, cancel, drain on stop; optional metrics hooks). `runCaptureChild` moves into core and `@storyshelf/worker` re-exports it. Retention purge also drops finished `capture_jobs` rows and a removed build's job rows. Not wired into the app yet.**
+
 **Breaking: `ShelfOptions.capture` is now `ShelfOptions.testing` (ADR 0006).** The option, its type
 (`ShelfCaptureOptions` is now `ShelfTestingOptions`) and its error messages are renamed, and the
 top-level `compare` and `images` options nest under it, so the shape is `testing: { runner, queue?,

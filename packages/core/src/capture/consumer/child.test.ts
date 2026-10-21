@@ -1,13 +1,14 @@
 import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
+import { CAPTURE_CONCURRENCY_ENV, CAPTURE_SHARD_SIZE_ENV } from "../forked/fork.ts";
 
 const dispatch = vi.hoisted(() => ({
   run: vi.fn(),
   tables: [] as unknown[],
   jobOptions: [] as { shardSize?: number; enqueue?: (job: unknown) => Promise<void> }[],
 }));
-vi.mock("@storyshelf/core/capture", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@storyshelf/core/capture")>();
+vi.mock("../dispatch.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../dispatch.ts")>();
   return {
     ...actual,
     createDispatchJob: (deps: {
@@ -18,14 +19,28 @@ vi.mock("@storyshelf/core/capture", async (importOriginal) => {
       dispatch.jobOptions.push(deps.jobOptions);
       return dispatch.run;
     },
-    sweepOrphanedScratch: async () => 0,
   };
+});
+vi.mock("../scratch.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../scratch.ts")>();
+  return { ...actual, sweepOrphanedScratch: async () => 0 };
 });
 
 const { runCaptureChild } = await import("./child.ts");
-const { CAPTURE_CONCURRENCY_ENV, CAPTURE_SHARD_SIZE_ENV } =
-  await import("@storyshelf/core/capture");
 type Host = import("./child.ts").ChildHost;
+
+function makeGate(): { promise: Promise<boolean>; resolve: (value: boolean) => void } {
+  const resolvers: ((value: boolean) => void)[] = [];
+  const promise = new Promise<boolean>((done) => {
+    resolvers.push(done);
+  });
+  return {
+    promise,
+    resolve: (value) => {
+      resolvers[0]?.(value);
+    },
+  };
+}
 
 const sleep = async (ms: number): Promise<void> => {
   await new Promise((resolve) => setTimeout(resolve, ms));
@@ -49,10 +64,13 @@ function fakeHost(env: Record<string, string> = {}) {
   return { host, events, sent, exit };
 }
 
+const silent = { child: () => silent, info() {}, warn() {}, error() {}, debug() {} };
+
 function options(overrides: Record<string, unknown> = {}) {
   const tables = { projects: "p", builds: "b" };
   return {
     db: { tables } as never,
+    logger: silent as never,
     storage: {} as never,
     runner: { cancel: async () => {}, render: vi.fn() } as never,
     scratchDir: ".tmp/child-test",
@@ -75,7 +93,7 @@ describe("runCaptureChild", () => {
     const running = runCaptureChild(options(), host);
 
     await sleep(20);
-    const poll = sent.find((message) => message["type"] === "poll");
+    const poll = sent.find((message) => message.type === "poll");
     expect(poll).toBeDefined();
     events.emit("message", {
       type: "job",
@@ -95,12 +113,12 @@ describe("runCaptureChild", () => {
   });
 
   it("lets an in-flight capture finish before exiting on SIGTERM", async () => {
-    const gate = Promise.withResolvers<boolean>();
+    const gate = makeGate();
     dispatch.run.mockReset().mockImplementation(async () => await gate.promise);
     const { host, events, sent, exit } = fakeHost();
     const running = runCaptureChild(options(), host);
     await sleep(20);
-    const poll = sent.find((message) => message["type"] === "poll");
+    const poll = sent.find((message) => message.type === "poll");
     events.emit("message", {
       type: "job",
       id: poll?.["id"],
@@ -210,7 +228,7 @@ describe("runCaptureChild", () => {
     const { host, events, sent } = fakeHost();
     const running = runCaptureChild(options(), host);
     await sleep(20);
-    const poll = sent.find((message) => message["type"] === "poll");
+    const poll = sent.find((message) => message.type === "poll");
     events.emit("message", {
       type: "job",
       id: poll?.["id"],
@@ -218,7 +236,7 @@ describe("runCaptureChild", () => {
     });
     await sleep(100);
 
-    expect(sent.filter((message) => message["type"] === "progress")).toEqual([
+    expect(sent.filter((message) => message.type === "progress")).toEqual([
       { type: "progress", receipt: "r1" },
     ]);
     events.emit("SIGTERM");

@@ -438,7 +438,7 @@ Capture is CPU/IO-heavy and long-running (minutes to tens of minutes). It must n
 
 `createDatabaseCaptureQueue(db, options)` (`@storyshelf/core/capture`, `core/src/capture/db-queue/`)
 is a `PollableCaptureQueue` on the app's own database; it is additive for now (the app still wires
-the in-memory queue until the cutover, ADR 0006). The claim algorithm needs only one primitive from
+the in-memory queue and nothing runs the consumer until the cutover, ADR 0006). The claim algorithm needs only one primitive from
 the adapter, a unique-key insert whose conflict can be told apart (the `claimFinalize` pattern):
 
 1. **Probe.** One query, `kind = ? AND visible_at <= now AND status IN ('queued','running') ORDER BY
@@ -460,6 +460,22 @@ the adapter, a unique-key insert whose conflict can be told apart (the `claimFin
    lease fails the job too (one limit covers failures and lost leases).
 5. **Cancel.** `cancel(jobId | buildId)` ends a queued job at once and flags a running one on its
    job and attempt rows.
+
+**Consumer** (`createCaptureConsumer`, `core/src/capture/consumer/`). Consumes any
+`PollableCaptureQueue` (this queue, the IPC queue of a forked child, a remote queue) and runs a
+handler per job `kind`: `capture` is wired to `createDispatchJob`; `publish` and `notify` register
+through `handlers`; a job whose kind has no handler is failed with `no handler registered for job
+kind "<kind>"`. A slot is taken before polling (the database queue uses `startPollLoop`, other
+queues a slot loop with the idle backoff of 250 ms doubling to 5 s for queues that return empty at
+once). A failing job is requeued with delay `1000 ms * 2^attempts` (capped at 30 s) until its last
+attempt, `attempt >= maxAttempts` for the database queue (`attempts >= maxRetries` for queues that
+only count deliveries), then nacked without requeue so it ends `failed`; the constants live in
+`consumer/retry.ts`. The lease follows progress (`keepJobLease`): a lost lease or a `cancelled`
+reading stops the run through `runner.cancel(buildId, shard)`; a lost lease writes nothing (the
+new holder settles the job), a cancel ends the job `cancelled`. `stop()` (SIGTERM) stops polling
+and waits for the jobs in flight. Optional `metrics` hooks report each job's outcome and the
+queue's depth and oldest waiting job (a sample costs one read; off unless `queueSample` is given).
+`runCaptureChild` (forked capture) runs this consumer over the IPC queue.
 
 Enqueue wakes this instance's waiting poll at once; other instances find the job on their next
 poll (`startPollLoop`: no poll while all slots are busy, 15 s idle, 2 s after recent work, with
