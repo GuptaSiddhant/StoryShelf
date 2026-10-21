@@ -190,7 +190,7 @@ This distinction matters for:
 | 0029 | Design Provider Adapter (`@storyshelf/design-figma`; vendor-neutral links, cache and credentials in core) |
 | 0030 | User OAuth Connections (service-neutral "Connect your account": `OAuthClient`, `user_connections`, shared `/connections/:service` flow) |
 | 0032 | Image Engines (`@storyshelf/image` leaf package; opt-in `sharp` codec; pixelmatch stays the comparator) |
-| 0033 | Remote Browsers and Public Origin (runner `remotes` + presets, `local: false`, `CaptureTarget` = `<engine>@<remote>` with own baselines, in-browser fingerprint, `exposeNetwork` or signed Storybook URLs, public-origin resolver) |
+| 0033 | Remote Browsers and Public Origin (runner `browsers` list: local engines declared and verified, remote presets, `<engine>@<name>` targets with own baselines, in-browser fingerprint, `exposeNetwork` or signed Storybook URLs, public-origin resolver) |
 
 ## Parallel Development with Worktrees
 
