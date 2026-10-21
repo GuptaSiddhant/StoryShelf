@@ -85,6 +85,16 @@ says whether review is still open; review does not add a second required check. 
 out of the capture pipeline into a small function of build state that both paths call, so a build that
 was never captured can still post one. A project with no git status configured posts nothing.
 
+### 4a. A published-Storybook status on every build
+
+Every build with a commit SHA gets a status under the context `storyshelf/storybook`, whatever `testing`
+and `review` are set to: `success` when publishing finishes, with the published Storybook's URL as its
+target, `failure` if publishing fails. It is informational, not a merge gate, and a repository would not
+mark it required. It gives hosting-only projects the same pull-request link to the Storybook that
+Chromatic's publish check gives. It is posted by the same state-driven function as decision 4. When a
+build has a pull request and the provider supports comments, the existing per-build comment carries the
+same link.
+
 ### 5. The changeset without screenshots
 
 Reviewers need to know what changed. With `testing` off the build page shows a component and story
@@ -126,7 +136,7 @@ a build status.
 - **0034:** decision 1's auto-accept rule is as written there; decision 8's `review` class is defined
   here; the open question about review without snapshots is answered by this ADR.
 - **0010:** the merge gate's status comes from build state, not only from capture. `storyshelf/review`
-  is posted when `testing` is off.
+  is posted when `testing` is off, and `storyshelf/storybook` on every build.
 - **0027:** comments are `review`; the verdict stays out of MCP.
 - **0009:** retention also reclaims the two `pending` cases of decision 6.
 
@@ -167,6 +177,9 @@ a build status.
   with it.
 - A reviewer capability for non-engineers: today `viewer` cannot comment. A role, or per-build
   invitations, may be needed for reviewers who are designers or product managers.
+- Whether git-host statuses and comments become notification channels, and the `isMerged` capture gate
+  is dropped (a follow-up ADR): statuses need durable, ordered delivery, which the inline best-effort
+  notifier of ADR 0024 does not give, but the database queue of ADR 0034 could.
 - Whether the required-approvals count and the retention window are project settings or defaults only.
 - How comments on a story survive when the story is renamed or removed between builds.
 

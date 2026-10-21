@@ -82,9 +82,10 @@ instance has a runner, and the migration guide says so.
 - **Absent:** Storybook hosting only. Uploads, published Storybooks (including their publishing,
   decision 10), projects, tokens, members and the build, library and component pages (decision 9) keep
   working. Capture, compare (including re-diff), review pages and APIs, baselines (import, export,
-  approval), commit statuses, the capture settings, the compute-jobs page and the features that read
-  snapshots (AI triage) are off. No `storyshelf/...` commit status is posted, so a repository that
-  requires one must drop that requirement before `testing` is turned off.
+  approval), the visual commit status, the capture settings, the compute-jobs page and the features that read
+  snapshots (AI triage) are off. The visual status is not posted, so a repository that requires it must drop that
+  requirement before `testing` is turned off. The published-Storybook status and, with review on, the
+  review status are posted (ADR 0035).
 - **Hosting-only is not open access.** The existing auth rules (ADR 0008, 0011) apply unchanged: who
   may view a published Storybook, the library, component and build pages, and who may upload, comment
   or approve, is decided by the auth adapter and the project's access settings, with or without
@@ -410,8 +411,8 @@ sweep of decision 4 gives them job rows.
 - **0027:** MCP tools that read snapshots or comment follow the route classes (decision 8).
 - **0029:** "remote workers take the same list" of design providers no longer applies; the app holds
   them.
-- **0010 and 0011:** a hosting-only build on the default branch, or with review off, is accepted without review and posts no status check
-  (decision 1).
+- **0010 and 0011:** a hosting-only build on the default branch, or with review off, is accepted without review and posts no visual or review status (decision 1); it still posts the
+  published-Storybook status of ADR 0035.
 - **0002:** no contradiction. Turso remains the way to host Storybooks on serverless platforms; D1
   stays hosting-only (decision 2).
 
