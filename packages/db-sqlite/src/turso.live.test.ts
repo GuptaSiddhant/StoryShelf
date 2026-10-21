@@ -10,10 +10,17 @@
  * - `TURSO_DATABASE_URL` — libSQL URL (`libsql://...turso.io` for cloud,
  *   or a `file:` URL for a local libSQL smoke run)
  * - `TURSO_AUTH_TOKEN` — auth token (omit for `file:` URLs).
+ *
+ * The database capture queue's multi-instance suite runs here too, plus the idle-probe check behind
+ * the Turso metering question (ADR 0006, open questions): the poll probe must be an index search
+ * that, on an idle queue, reads no rows. Turso bills rows read, so an idle probe should cost one
+ * request and zero rows; the billed figure itself is only visible in the Turso dashboard.
  */
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import type { Project } from "@storyshelf/core/schema";
+import { databaseQueueMultiInstanceSuite } from "@storyshelf/core/test-helpers";
+import { sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { schema } from "./schema/index.ts";
@@ -91,5 +98,42 @@ describe.skipIf(!LIVE)("turso live (real libSQL, gated on LIVE_CLOUD=1)", () => 
 
     await target.remove(schema.projects, id);
     expect(await target.get(schema.projects, id)).toBeNull();
+  });
+});
+
+describe.skipIf(!LIVE)("turso live: database capture queue", () => {
+  let db: DatabaseAdapter | undefined;
+
+  function liveDb(): DatabaseAdapter {
+    if (!db) {
+      throw new Error("Live Turso harness not initialized");
+    }
+    return db;
+  }
+
+  beforeAll(async () => {
+    const authToken = liveAuthToken();
+    db = authToken
+      ? createTursoDatabase({ url: liveUrl(), authToken })
+      : createTursoDatabase({ url: liveUrl() });
+    await db.lifecycle?.setup({ config: {}, logger: silentLogger });
+  });
+
+  afterAll(async () => {
+    await db?.lifecycle?.teardown();
+  });
+
+  databaseQueueMultiInstanceSuite("Turso (live)", liveDb, { timeoutMs: 120_000 });
+
+  it("probes through the poll index, sorting nothing", async () => {
+    const plan = await liveDb().all<unknown>(sql`
+      EXPLAIN QUERY PLAN
+      SELECT * FROM capture_jobs
+      WHERE kind = 'capture' AND visible_at <= '1970-01-01T00:00:00.000Z'
+        AND status IN ('queued', 'running')
+      ORDER BY visible_at ASC LIMIT 1`);
+    const text = JSON.stringify(plan);
+    expect(text).toMatch(/capture_jobs_poll_idx/u);
+    expect(text).not.toMatch(/TEMP B-TREE/u);
   });
 });

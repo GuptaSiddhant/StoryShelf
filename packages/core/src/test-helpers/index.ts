@@ -11,6 +11,17 @@ export { gitContractSuite } from "./git-contract.ts";
 export { FAKE_PNG, fakeUrl, makeFakeDesign, type FakeDesign } from "./fake-design.ts";
 export { makeDatabase, makeStorage, stubTables, type FakeStorage } from "./fake-adapters.ts";
 export { notifierContractSuite } from "./notifier-contract.ts";
-export { queueContractSuite } from "./queue-contract.ts";
+export {
+  queueContractSuite,
+  type PollableContractOptions,
+  type QueueContractOptions,
+  type QueueFactory,
+} from "./queue-contract.ts";
+export {
+  databaseQueueMultiInstanceSuite,
+  type MultiInstanceOptions,
+  type SharedDatabaseFactory,
+} from "./queue-multi-instance.ts";
+export { createManualClock, type ManualClock } from "./manual-clock.ts";
 export { runnerContractSuite } from "./runner-contract.ts";
 export { storageContractSuite } from "./storage-contract.ts";

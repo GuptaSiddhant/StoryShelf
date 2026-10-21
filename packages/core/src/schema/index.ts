@@ -14,6 +14,14 @@ export type { Build } from "./build.ts";
 /** A capture attempt and its log lines for a single build run. */
 export type { CaptureAttempt, CaptureLog, CaptureLogLevel } from "./capture-attempt.ts";
 export type { CaptureShard, CaptureShardKind, CaptureShardStatus } from "./capture-shard.ts";
+/** Job and attempt rows of the database queue (`capture_jobs`). */
+export type {
+  CaptureAttemptStatus,
+  CaptureJobEntry,
+  CaptureJobKind,
+  CaptureJobRow,
+  CaptureJobStatus,
+} from "./capture-job.ts";
 /** Review comment row as stored in the `comments` table. */
 export type { Comment } from "./comment.ts";
 /** Build label and label type rows. */

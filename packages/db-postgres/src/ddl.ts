@@ -91,6 +91,30 @@ CREATE TABLE IF NOT EXISTS capture_shards (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS capture_shards_build_kind_ordinal_idx ON capture_shards (build_id, kind, ordinal);
 CREATE INDEX IF NOT EXISTS capture_shards_build_id_idx ON capture_shards (build_id);
+CREATE TABLE IF NOT EXISTS capture_jobs (
+  id TEXT PRIMARY KEY,
+  entry TEXT NOT NULL,
+  job_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  build_id TEXT,
+  shard_id TEXT,
+  attempt INTEGER NOT NULL DEFAULT 0,
+  max_attempts INTEGER NOT NULL DEFAULT 3,
+  status TEXT NOT NULL,
+  visible_at TIMESTAMPTZ,
+  owner TEXT,
+  payload TEXT,
+  cancel_requested_at TIMESTAMPTZ,
+  error TEXT,
+  started_at TIMESTAMPTZ,
+  finished_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS capture_jobs_poll_idx ON capture_jobs (kind, visible_at, status);
+CREATE INDEX IF NOT EXISTS capture_jobs_job_id_idx ON capture_jobs (job_id);
+CREATE INDEX IF NOT EXISTS capture_jobs_build_id_idx ON capture_jobs (build_id);
+CREATE INDEX IF NOT EXISTS capture_jobs_entry_created_idx ON capture_jobs (entry, created_at);
 CREATE TABLE IF NOT EXISTS capture_logs (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,

@@ -14,6 +14,7 @@ import {
   captureAttempts as captureAttemptsTable,
   captureLogs as captureLogsTable,
 } from "./capture-attempt.ts";
+import { captureJobs as captureJobsTable } from "./capture-job.ts";
 import { captureShards as captureShardsTable } from "./capture-shard.ts";
 import { comments as commentsTable } from "./comment.ts";
 import { userConnections as userConnectionsTable } from "./connection.ts";
@@ -49,6 +50,7 @@ import { webhooks as webhooksTable } from "./webhook.ts";
 
 export { builds } from "./build.ts";
 export { captureAttempts, captureLogs } from "./capture-attempt.ts";
+export { captureJobs } from "./capture-job.ts";
 export { captureShards } from "./capture-shard.ts";
 export { baselines } from "./baseline.ts";
 export { comments } from "./comment.ts";
@@ -118,6 +120,7 @@ export const schema: {
   captureAttempts: AnyMySqlTable;
   captureLogs: AnyMySqlTable;
   captureShards: AnyMySqlTable;
+  captureJobs: AnyMySqlTable;
   snapshots: AnyMySqlTable;
   baselines: AnyMySqlTable;
   comments: AnyMySqlTable;
@@ -148,6 +151,7 @@ export const schema: {
   captureAttempts: captureAttemptsTable,
   captureLogs: captureLogsTable,
   captureShards: captureShardsTable,
+  captureJobs: captureJobsTable,
   snapshots: snapshotsTable,
   baselines: baselinesTable,
   comments: commentsTable,

@@ -50,10 +50,10 @@ export function createPgliteDatabase(options: PgliteDatabaseOptions = {}): Datab
     },
     tables: schema,
     migrate: async () => {
+      // `exec`, not `query`: the DDL is many statements, which PGlite's prepared `query` rejects.
       await runMigrations(async (sql) => {
-        const result = await client.query(sql);
-        // oxlint-disable-next-line typescript/no-unnecessary-type-assertion -- PGlite Row[] vs unknown[]
-        return result.rows as unknown as unknown[];
+        const results = await client.exec(sql);
+        return results.flatMap((result) => result.rows as unknown[]);
       });
     },
     close: async () => {

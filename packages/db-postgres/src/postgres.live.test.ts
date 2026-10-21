@@ -12,9 +12,14 @@
  * - `DATABASE_URL` — connection string (`postgres://...`, `?sslmode=require`
  *   for managed providers; Supabase pooler needs `prepare: false`, which is
  *   a code option, not a URL flag — use a direct connection for live tests).
+ *
+ * The database capture queue's multi-instance suite runs here too (ADR 0006: the queue is retired
+ * from the external transports only once it passes on Postgres, MySQL and Turso). Its build ids are
+ * unique per run, so the shared database needs no cleanup between runs.
  */
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { createShelfLogger } from "@storyshelf/core/logger";
+import { databaseQueueMultiInstanceSuite } from "@storyshelf/core/test-helpers";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createPostgresDatabase } from "./index.ts";
@@ -86,4 +91,28 @@ describe.skipIf(!LIVE)("postgres live (real Postgres, gated on LIVE_CLOUD=1)", (
     await target.remove(projects, id);
     expect(await target.get(projects, id)).toBeNull();
   });
+});
+
+describe.skipIf(!LIVE)("postgres live: database capture queue", () => {
+  let db: DatabaseAdapter | undefined;
+
+  beforeAll(async () => {
+    db = createPostgresDatabase({ url: liveUrl() });
+    await db.lifecycle?.setup({ config: {}, logger: silentLogger });
+  });
+
+  afterAll(async () => {
+    await db?.lifecycle?.teardown();
+  });
+
+  databaseQueueMultiInstanceSuite(
+    "Postgres (live)",
+    () => {
+      if (!db) {
+        throw new Error("Live Postgres harness not initialized");
+      }
+      return db;
+    },
+    { timeoutMs: 120_000 },
+  );
 });
