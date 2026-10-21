@@ -388,8 +388,28 @@ builds never fail one by one later.
 
 ### Remote workers
 
-Undecided; see Open questions. A remote worker (`createCaptureWorker`) builds its own runner, so its
-`browsers` can disagree with what the server validates project settings against.
+A remote worker (`createCaptureWorker`) builds its own runner, so its `browsers` can disagree with
+what the server validates project settings against. There is no worker registry (a worker's
+heartbeat only extends a job's lease), and this ADR does not add one.
+
+- **The server learns the fleet's targets from the operator.** When the server has no runner of its
+  own (it enqueues to a remote queue), `capture.targets` lists what the fleet offers, in the same
+  shape as the runner's `metadata.targets` (`{ target, reach }`; every entry is `ready`, since the
+  server cannot check a worker's host), and project settings are validated against it at save time.
+  The operator keeps it in step with the workers' `browsers`.
+- **A worker given a target it does not offer fails the job at once, without retries,** with a
+  message naming the target and the targets the worker does offer, so a misconfigured fleet shows
+  one clear error per build instead of jobs retrying until they run out of attempts. This assumes
+  every worker of a fleet offers the same targets (see Open questions).
+- **`sessions` is per runner.** With several workers the operator divides the provider's parallel
+  session limit among them (a plan of 5 with 5 workers means `sessions: 1` each). A shared limit
+  across a fleet (session leases in the database) is not built; add it only if over-provisioning
+  when the fleet scales turns out to be a real problem. A provider refusing a session for capacity
+  is retried with backoff (decision 4), so exceeding the limit costs time, not builds.
+
+A registry where workers report their targets and health is the better long-term answer and could
+replace `capture.targets` later; it is not needed while credentials are operator-level and the
+operator configures every worker anyway.
 
 ## Consequences
 
@@ -455,9 +475,11 @@ Undecided; see Open questions. A remote worker (`createCaptureWorker`) builds it
   relative paths, but it has not been checked against every fixture.
 - Which providers honour `exposeNetwork` beyond Azure and a self-hosted Playwright server.
 - Whether commit-status APIs accept the relative `target_url` posted today.
-- Remote workers: how the server learns the targets a fleet offers when it has no runner of its
-  own, whether workers may differ from each other, and how a provider's session limit is shared
-  across workers. To be settled before the worker section is written.
+- Remote workers: whether workers of one fleet may differ from each other (for example a separate
+  pool that offers Firefox and WebKit). The worker section assumes they do not. Pools that differ
+  need jobs routed to a pool that has every target of the project, which means a queue or routing
+  key per target group and, for a project that spans pools, engine-level jobs instead of shards
+  that keep a story's engines together.
 
 ## Implementation order
 
