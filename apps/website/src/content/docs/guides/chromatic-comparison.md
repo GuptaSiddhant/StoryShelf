@@ -14,7 +14,7 @@ This page compares Chromatic (SaaS) and StoryShelf (self-hosted) factually. No r
 | **Browsers**              | Chrome, Firefox, Safari, Edge (branded, cloud) | Chromium (default), Firefox, WebKit via Playwright (per-project `browser`)                   |
 | **TurboSnap**             | Yes (dependency graph)                         | Yes — affected capture (dependency graph, on by default)                                     |
 | **Modes / Globals**       | Yes                                            | Yes — `parameters.chromatic.modes` / `parameters.storyshelf.modes` ([Modes](/guides/modes/)) |
-| **Accessibility testing** | Yes (aXe)                                      | Basic built-in checks (opt-in), no aXe                                                       |
+| **Accessibility testing** | Yes (aXe)                                      | axe-core checks (opt-in), reported as non-blocking annotations                               |
 | **Interaction tests**     | Yes (`play` functions)                         | Yes (`play` functions)                                                                       |
 | **SSO / Enterprise**      | Enterprise plan                                | Better Auth engine (OIDC/SAML via any IdP)                                                   |
 | **Vendor lock-in**        | Yes (proprietary)                              | No (MIT, open source)                                                                        |
@@ -68,7 +68,7 @@ Billed snapshots = visual snapshots + accessibility snapshots. TurboSnap copies 
 - **Cross-browser gaps** — Chromium (default), Firefox, and WebKit are selectable per project; list up to three with `PATCH /api/v1/projects/:slug` (`browsers`) to capture each build on every engine, with per-engine baselines. No branded Safari/Edge binaries.
 - **Vite-only tracing** — affected capture reads `preview-stats.json` (plus tolerant Webpack shapes). TurboSnap-equivalent skip rates on Vite Storybooks; custom builders without stats fall back to full renders.
 - **Modes differ slightly** — Mode values may only use characters Storybook's `globals` URL arg accepts; baselines are keyed by mode name as in Chromatic.
-- **Limited accessibility testing** — Opt-in per project (`runA11y`); lightweight checks for missing `alt`, button/input labels and link `href`, reported as story failures. No aXe integration, so no WCAG rule coverage.
+- **Accessibility results are annotations only** — Opt-in per project (`runA11y`); the runners inject axe-core into the story page and scan the story root with the WCAG A/AA rules (honouring `parameters.a11y`). Violations are listed per story in the attempt log and never fail or gate a build; there is no accessibility baseline, review workflow or accessibility snapshot billing.
 - **No cloud parallelization** — Concurrency limited by your server resources (`capture.concurrency` option).
 - **No built-in flake detection** — Relies on explicit `flakyTest` parameter/tags.
 
@@ -103,7 +103,7 @@ If migrating from Chromatic:
 - You want zero infrastructure maintenance
 - You need branded Safari/Edge binaries or multi-browser matrices in a single build
 - You rely on TurboSnap's Webpack tracing for a non-Vite builder
-- You need full aXe-level accessibility testing
+- You need accessibility results as a reviewed, baselined gate rather than non-blocking annotations
 - Your team prefers SaaS over self-hosting
 
 **Choose StoryShelf if:**

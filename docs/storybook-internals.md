@@ -340,9 +340,10 @@ and an adapter `screenshotSelector` per view mode.
 
 ### 10.7 Lean on the addons you'd otherwise reimplement (parking-lot)
 
-- **a11y**: today's `checkA11y` is a hand-rolled DOM scan (`capture-runner.ts:339-376`).
-  `addon-a11y` runs axe in the preview and pushes results over the channel; reusing its internals (or
-  swapping to `@axe-core/playwright`) would give real WCAG coverage instead of 4 hand-picked rules.
+- **a11y**: shipped (ADR 0004 §6). The runners inject `axe-core` (owned by `@storyshelf/core`, loaded
+  lazily) with `page.evaluate`, read the current story's `parameters.a11y` from
+  `__STORYBOOK_PREVIEW__.currentRender.story`, and scan `#storybook-root`; `addon-a11y` itself is not
+  needed in the Storybook. Only JSON-serialisable parameters survive the read.
 - **interactions panel**: sidebar/test-status indicators in the manager are driven by
   `STORY_RENDER_PHASE_CHANGED`; the same protocol could one day drive a StoryShelf build-review
   "play trace" panel.

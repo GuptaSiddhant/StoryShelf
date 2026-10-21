@@ -13,6 +13,7 @@
       "pixelmatch",
       "pngjs",
       "adm-zip",
+      "axe-core",
       "unzipper",
       "playwright-core",
       "puppeteer-core",

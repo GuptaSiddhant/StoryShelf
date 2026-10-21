@@ -78,12 +78,8 @@ async function maybeWaitForSelector(
   }
 }
 async function getA11y(ctx: CaptureContext, page: Page): Promise<string[]> {
-  if (!ctx.runA11y) return [];
-  try {
-    return await checkA11y(page);
-  } catch {
-    return [];
-  }
+  // checkA11y reports its own failures as an annotation, so it never throws.
+  return ctx.runA11y ? await checkA11y(page) : [];
 }
 async function settlePage(page: Page, story: StoryEntry): Promise<void> {
   const burst = story.parameters?.burst ?? 1;

@@ -1,99 +1,62 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { checkA11y, inPageA11y } from "./a11y.ts";
+import { describe, expect, it, vi } from "vitest";
+import { checkA11y } from "./a11y.ts";
 
-type A11yFn = typeof inPageA11y;
+const SLIM = {
+  id: "image-alt",
+  impact: "critical",
+  help: "Images must have alternative text",
+  target: "img",
+  count: 2,
+};
 
-/**
- * Rebuild the function from its source in a scope that has no module bindings, the way
- * `page.evaluate` ships it to the browser. Any reference to a module-level helper then throws.
- */
-function asSerialized(fn: A11yFn): A11yFn {
-  // oxlint-disable-next-line typescript/no-implied-eval, eslint/no-new-func -- the point is to rebuild the function from source
-  return new Function(`return (${fn.toString()})`)() as A11yFn;
+function fakePage(...results: unknown[]) {
+  const evaluate = vi.fn();
+  for (const result of results) {
+    if (result instanceof Error) evaluate.mockRejectedValueOnce(result);
+    else evaluate.mockResolvedValueOnce(result);
+  }
+  return { page: { evaluate } as never, evaluate };
 }
 
-interface FakeEl {
-  outerHTML: string;
-  textContent?: string;
-  type?: string;
-  id?: string;
-  hasAttribute: (name: string) => boolean;
-}
-
-function el(outerHTML: string, init: Partial<FakeEl> & { attrs?: string[] } = {}): FakeEl {
-  const { attrs = [], ...rest } = init;
-  return { outerHTML, id: "", ...rest, hasAttribute: (name) => attrs.includes(name) };
-}
-
-function installDom(selectors: Record<string, FakeEl[]>, labelFor: string[] = []): void {
-  const root = { querySelectorAll: (sel: string) => selectors[sel] ?? [] };
-  (globalThis as unknown as Record<string, unknown>)["document"] = {
-    querySelector: (sel: string) => {
-      if (sel === "#storybook-root") return root;
-      const m = /^label\[for="(.*)"\]$/u.exec(sel);
-      return m && labelFor.includes(m[1] ?? "") ? {} : null;
-    },
-  };
-}
-
-afterEach(() => {
-  delete (globalThis as unknown as Record<string, unknown>)["document"];
-});
-
-describe("inPageA11y (as serialized into the page)", () => {
-  const run = asSerialized(inPageA11y);
-
-  it("returns nothing when there is no storybook root", () => {
-    (globalThis as unknown as Record<string, unknown>)["document"] = { querySelector: () => null };
-    expect(run()).toEqual([]);
+describe("checkA11y", () => {
+  it("reads parameters, injects axe, runs it and maps the violations", async () => {
+    const { page, evaluate } = fakePage({ options: { runOnly: ["image-alt"] } }, undefined, [SLIM]);
+    await expect(checkA11y(page)).resolves.toEqual([
+      "image-alt (critical): Images must have alternative text [img] 2 nodes",
+    ]);
+    expect(evaluate).toHaveBeenCalledTimes(3);
+    expect(evaluate.mock.calls[1]?.[0]).toContain("axe");
+    const plan = evaluate.mock.calls[2]?.[1] as {
+      context: string;
+      options: Record<string, unknown>;
+    };
+    expect(plan.context).toBe("#storybook-root");
+    expect(plan.options["runOnly"]).toEqual(["image-alt"]);
   });
 
-  it("is self-contained and reports every violation kind", () => {
-    installDom({
-      "img:not([alt])": [el("<img src=x>")],
-      button: [el("<button></button>", { textContent: " " })],
-      a: [el("<a>x</a>")],
-      "input, select, textarea": [el("<input id=q>", { id: "q", type: "text" })],
-    });
-    expect(run()).toEqual([
-      "img missing alt: <img src=x>",
-      "button missing label: <button></button>",
-      "a missing href: <a>x</a>",
-      "input missing label: <input id=q>",
+  it("is clean when axe finds nothing", async () => {
+    const { page } = fakePage(undefined, undefined, []);
+    await expect(checkA11y(page)).resolves.toEqual([]);
+  });
+
+  it.each([{ disable: true }, { test: "off" }])(
+    "skips the story for %o without injecting axe",
+    async (params) => {
+      const { page, evaluate } = fakePage(params);
+      await expect(checkA11y(page)).resolves.toEqual([]);
+      expect(evaluate).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("reports one visible annotation when injection fails", async () => {
+    const { page } = fakePage(undefined, new Error("Execution context was destroyed"));
+    await expect(checkA11y(page)).resolves.toEqual([
+      "axe unavailable: Execution context was destroyed",
     ]);
   });
 
-  it("accepts labelled elements", () => {
-    installDom(
-      {
-        button: [
-          el("<b1>", { textContent: "Go" }),
-          el("<b2>", { attrs: ["aria-label"] }),
-          el("<b3>", { attrs: ["aria-labelledby"] }),
-        ],
-        a: [el("<a href>", { attrs: ["href"] })],
-        "input, select, textarea": [
-          el("<i1>", { id: "a", type: "text", attrs: ["aria-label"] }),
-          el("<i2>", { id: "b", type: "text" }),
-          el("<i3>", { id: "c", type: "hidden" }),
-          el("<i4>", { id: "", type: "text" }),
-        ],
-      },
-      ["b"],
-    );
-    expect(run()).toEqual([]);
-  });
-
-  it("caps the result at ten violations", () => {
-    installDom({ "img:not([alt])": Array.from({ length: 15 }, () => el("<img>")) });
-    expect(run()).toHaveLength(10);
-  });
-});
-
-describe("checkA11y", () => {
-  it("evaluates the self-contained function in the page", async () => {
-    const evaluate = vi.fn().mockResolvedValue(["x"]);
-    await expect(checkA11y({ evaluate } as never)).resolves.toEqual(["x"]);
-    expect(evaluate).toHaveBeenCalledWith(inPageA11y);
+  it("reports one visible annotation when the run throws", async () => {
+    const { page } = fakePage(undefined, undefined, new Error("boom"));
+    await expect(checkA11y(page)).resolves.toEqual(["axe unavailable: boom"]);
   });
 });

@@ -163,7 +163,7 @@ jobs:
           fi
 
       - name: Build workspace packages
-        run: nubx turbo build --filter=@storyshelf/runner-playwright...
+        run: nubx turbo build --filter=@storyshelf/runner-playwright... --filter=@storyshelf/runner-puppeteer...
 
       - name: Get pnpm store path
         id: pnpm-store
@@ -188,4 +188,13 @@ jobs:
           # not survive `nubx turbo`).
           FIXTURE_DIR: ${{ github.workspace }}/fixtures/${{ matrix.fixture }}
           RUN_INTEGRATION: "1"
+        run: nub run test:integration
+
+      - name: Puppeteer axe check (a11y)
+        if: ${{ !cancelled() }}
+        working-directory: packages/runner-puppeteer
+        env:
+          FIXTURE_DIR: ${{ github.workspace }}/fixtures/${{ matrix.fixture }}
+          # puppeteer-core ships no browser; GitHub's ubuntu runners include Chrome.
+          PUPPETEER_EXECUTABLE_PATH: /usr/bin/google-chrome
         run: nub run test:integration

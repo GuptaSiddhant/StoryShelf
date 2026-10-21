@@ -57,14 +57,24 @@ const worker = createCaptureWorker({
 });
 ```
 
+## Accessibility checks (axe)
+
+With the project's `runA11y` flag on, the runner injects [axe-core](https://github.com/dequelabs/axe-core) (owned and lazily loaded by `@storyshelf/core`, pinned to one version) into each story page after the story settles and before the screenshot, once per story, mode and viewport. It scans `#storybook-root` with the WCAG 2.0/2.1/2.2 A and AA rules and reports one line per violation, worst impact first: rule id, impact, help text, a short selector and the node count. At most 10 lines are kept (`…and N more` for the rest).
+
+- **Annotations only.** The lines are written to the attempt log (`a11y violations found`) and the story is listed as non-blocking; an accessibility result never fails a build.
+- **`parameters.a11y` is honoured.** `disable: true` (and `test: "off"`) skip the story, `config` and `options` (including `rules` and `runOnly`) are applied, and `element` or `context` replace the scanned root. `test: "todo"` and `"error"` still only annotate. Only the JSON-serialisable subset of the parameters can be read from the page: function values (for example a `config.rules[].matches` callback) are dropped.
+- **No silent fallback.** If axe cannot be loaded or run, the story gets one visible `axe unavailable: <reason>` annotation, also non-blocking.
+- **Works over remote browsers.** The axe source is sent to the page as a string, so no file path in the browser process is needed.
+- **Cost.** Measured on the repository's Storybook fixtures with one page at a time on Chromium: about 150 to 160 ms more per story and viewport (a story takes roughly 1.2 to 1.3 s without axe; 10 stories, three timed runs each, Storybook 8 and 10 fixtures). Dense pages cost more, and `color-contrast` dominates.
+
 ## Puppeteer vs Playwright
 
-| Aspect       | `runner-puppeteer`                                                                           | `runner-playwright`                                 |
-| ------------ | -------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| Engine       | `puppeteer-core` + `chrome-headless-shell` (Chromium only)                                   | Playwright (`chromium`/`firefox`/`webkit`/`chrome`) |
-| Selected via | `browser` kept as `chromium`/`chrome` only (other names rejected at the project layer)       | Any `browser` value, per-project                    |
-| Image size   | Smaller — no bundled Firefox/WebKit                                                          | Larger                                              |
-| Capabilities | Same orchestrator-owned controls: `play`, `delay`, `diffThreshold`, `viewports`, a11y, burst | Identical controls                                  |
+| Aspect       | `runner-puppeteer`                                                                                 | `runner-playwright`                                 |
+| ------------ | -------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| Engine       | `puppeteer-core` + `chrome-headless-shell` (Chromium only)                                         | Playwright (`chromium`/`firefox`/`webkit`/`chrome`) |
+| Selected via | `browser` kept as `chromium`/`chrome` only (other names rejected at the project layer)             | Any `browser` value, per-project                    |
+| Image size   | Smaller — no bundled Firefox/WebKit                                                                | Larger                                              |
+| Capabilities | Same orchestrator-owned controls: `play`, `delay`, `diffThreshold`, `viewports`, a11y (axe), burst | Identical controls                                  |
 
 Both runners implement the same pure `CaptureRunner` contract. The orchestrator (`@storyshelf/core`, ADR 0015) owns build loading, archive extraction, story discovery, and persistence and delegates only the screenshotting to the runner, so switching is a one-line factory swap.
 

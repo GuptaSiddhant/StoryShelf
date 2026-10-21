@@ -549,6 +549,9 @@ importers:
       '@storyshelf/image':
         specifier: workspace:*
         version: link:../image
+      axe-core:
+        specifier: 4.13.0
+        version: 4.13.0
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.44.7(@electric-sql/pglite@0.5.8)(@libsql/client@0.18.0)(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@planetscale/database@1.20.2)(@tidbcloud/serverless@0.1.1)(@types/pg@8.11.6)(@vercel/postgres@0.10.0)(better-sqlite3@12.11.1)(kysely@0.29.6)(mysql2@3.24.4(@types/node@26.6.3))(pg@8.23.0)(postgres@3.4.9)
@@ -562,6 +565,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
+      '@types/jsdom':
+        specifier: ^30.0.0
+        version: 30.0.0
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.3
@@ -577,6 +583,9 @@ importers:
       adm-zip:
         specifier: ^0.6.1
         version: 0.6.1
+      jsdom:
+        specifier: ^30.0.1
+        version: 30.1.1
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0
@@ -3917,6 +3926,9 @@ packages:
 
   '@types/js-yaml@4.0.9':
     resolution: {integrity: sha512-k4MGaQl5TGo/iipqb2UDG2UwjXziSWkh0uysQelTlJpX1qGlpUZYm8PnO4DxG1qBomtJUdYJ6qR6xdIah10JLg==}
+
+  '@types/jsdom@30.0.0':
+    resolution: {integrity: sha512-uAHGxujGE0cDaKGdK28zgDotFtNA7MKq5DXl8LrfdxdCI8VHcg15oJz+amHTChPNI5JpgEPQWc2xFdrw3em/nQ==}
 
   '@types/json-schema@7.0.15':
     resolution: {integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==}
@@ -10337,6 +10349,13 @@ snapshots:
       '@types/node': 24.19.0
 
   '@types/js-yaml@4.0.9': {}
+
+  '@types/jsdom@30.0.0':
+    dependencies:
+      '@types/node': 26.6.3
+      '@types/tough-cookie': 4.0.5
+      parse5: 8.0.1
+      undici-types: 8.9.0
 
   '@types/json-schema@7.0.15': {}
 

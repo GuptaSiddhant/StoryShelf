@@ -161,8 +161,32 @@ Review) apply on top of this.
 
 ### 6. Accessibility checks
 
-With `runA11y` the runner runs axe checks in the page before the screenshot. Results are
+With `runA11y` the runner runs [axe-core](https://github.com/dequelabs/axe-core) in the page after
+the story settles and before the screenshot, once per story, mode and viewport. Results are
 annotations and never block the build.
+
+- **Ownership.** `@storyshelf/core` owns `axe-core` (exact pin) and the shared pieces under
+  `capture/a11y/`, re-exported from `@storyshelf/core/capture`: a lazy, cached loader of
+  `axe.min.js`, the `parameters.a11y` to run-plan resolver, the two in-page functions and the pure
+  result mapper. Runners keep only a thin `checkA11y(page)` and have no axe dependency.
+- **Injection.** The axe source is evaluated as a string (`page.evaluate`, a CDP
+  `Runtime.evaluate`), guarded by `typeof globalThis.axe`. Not `addScriptTag`: evaluation is not
+  bound by the page's CSP and works over a `connect`ed browser, since source travels instead of a
+  path. The in-page functions are each one self-contained function (only their source is
+  serialised) and return slim fields only (rule id, impact, help, first target, node count), never
+  raw axe node html.
+- **What is scanned.** `#storybook-root` with the WCAG 2.0/2.1/2.2 A and AA tags. The story's
+  `parameters.a11y` is read from the preview (`disable: true` or `test: "off"` skip it; `config`,
+  `options` and `element`/`context` apply; `test: "todo" | "error"` still only annotate). Only the
+  JSON-serialisable subset is readable; `config.rules[].enabled: false` is mirrored into the run
+  options so it also holds under a tag-based `runOnly`.
+- **Annotation format.** One string per violation, worst impact first:
+  `<rule> (<impact>): <help> [<selector>] <n> node(s)`, at most 10, then `…and N more`. The runner
+  joins them as `a11y: a; b; …` in a render failure, so core's `startsWith("a11y:")` classification
+  and story-id sets are unchanged.
+- **No fallback.** There is no hand-rolled scan. If axe cannot be loaded or run, the result is one
+  visible, non-blocking annotation `a11y: axe unavailable: <reason>` plus a warning log, never a
+  silent pass.
 
 ### 7. Modes are named and come from story parameters
 
