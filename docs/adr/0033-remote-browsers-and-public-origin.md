@@ -3,7 +3,7 @@
 ## Status
 
 Proposed. Companion to ADR 0034 (one deployable, a database queue, no separate worker, and the
-`uiTesting` umbrella option). This ADR assumes it: remote browsers are how rendering scales, and every
+`testing` umbrella option). This ADR assumes it: remote browsers are how rendering scales, and every
 app instance runs the same configuration.
 
 ## Context
@@ -173,7 +173,7 @@ no API, no other build).
   a token can never be confused with a session or any other signature. `secret` is optional today:
   without it every `reach: "url"` target is `unavailable: "no secret"`. During a rotation the token is
   also accepted if it verifies against `previousSecret`.
-- **Expiry.** A per-job token with a default lifetime of 2 hours (`uiTesting.storybookUrlTtl`). The
+- **Expiry.** A per-job token with a default lifetime of 2 hours (`testing.storybookUrlTtl`). The
   render budget is per render call and crash isolation can make dozens of passes, so a lifetime tied to
   one budget would expire mid-render and show up as story failures; a fixed, generous bound is simpler
   and still short.
@@ -323,7 +323,7 @@ const runner = createPlaywrightCaptureRunner({
   ],
 });
 
-createShelfApp({ database, storage, uiTesting: { runner } }); // `capture` is renamed in ADR 0034
+createShelfApp({ database, storage, testing: { runner } }); // `capture` is renamed in ADR 0034
 ```
 
 Every preset is sugar over one generic constructor, so a provider without a preset needs no new
@@ -428,7 +428,7 @@ does fails at once with that reason, so builds never fail one by one with an une
 
 ### Scaling out
 
-There is no separate worker (ADR 0034): every app instance runs the same `uiTesting` configuration,
+There is no separate worker (ADR 0034): every app instance runs the same `testing` configuration,
 so every instance has the same `browsers` list and validates project settings against the runner it
 already holds. Rendering scales on the browser side, not by adding processes that need database
 access.

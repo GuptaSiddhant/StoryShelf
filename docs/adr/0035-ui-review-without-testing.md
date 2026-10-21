@@ -1,4 +1,4 @@
-# ADR 0035: UI Review, with or without `uiTesting`
+# ADR 0035: UI Review, with or without `testing`
 
 ## Status
 
@@ -7,7 +7,7 @@ ADR completes. Amends ADRs 0010 and 0027 in part; see Amendments.
 
 ## Context
 
-ADR 0034 splits StoryShelf's checks (`uiTesting`: render, compare, accessibility, `play` tests) from
+ADR 0034 splits StoryShelf's checks (`testing`: render, compare, accessibility, `play` tests) from
 publishing and hosting. It left review half-defined. Chromatic makes the same split: its UI Tests find
 changes, and its UI Review is where people comment and sign off. What exists today:
 
@@ -19,9 +19,9 @@ changes, and its UI Review is where people comment and sign off. What exists tod
 - **The commit status** is posted by the capture pipeline (`status-fanout`) and answers "are all
   snapshots approved". Nothing posts a status for a build that was never captured.
 
-ADR 0034 decided that a hosting-only build is accepted automatically only when `uiTesting` is off _and_
+ADR 0034 decided that a hosting-only build is accepted automatically only when `testing` is off _and_
 the project has turned `uiReview` off, and that `uiReview` has no instance-level option: it is on by
-default and a project admin switches it. With review on and `uiTesting` off, a build stays `pending`
+default and a project admin switches it. With review on and `testing` off, a build stays `pending`
 until someone approves or rejects it at build level. That needs build-level approval, anchors that do
 not require snapshots, a status check that does not depend on capture, and a notion of what changed
 without screenshots. None of these exist.
@@ -34,14 +34,14 @@ A boolean on the project (`projects.ui_review`, default `true`), edited by proje
 the project API and settings page. There is no `ShelfOptions` field for it. An instance-level option
 would be added only if review gains operator configuration of its own, such as git hosts.
 
-Review works in all four combinations of `uiTesting` and `uiReview`:
+Review works in all four combinations of `testing` and `uiReview`:
 
-| `uiTesting` | `uiReview` | A build                                                                                                                                  |
-| ----------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| off         | off        | Accepted when publishing finishes. No comments, no sign-off, no status check.                                                            |
-| off         | on         | Default branch: accepted when publishing finishes. Other branches: `pending`, comments, build-level verdict, `storyshelf/review` status. |
-| on          | off        | Today's behaviour, with comments and sign-off routes hidden: snapshot approval alone decides.                                            |
-| on          | on         | Today's behaviour plus build and story comments, build-level verdict and the changeset.                                                  |
+| `testing` | `uiReview` | A build                                                                                                                                  |
+| --------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| off       | off        | Accepted when publishing finishes. No comments, no sign-off, no status check.                                                            |
+| off       | on         | Default branch: accepted when publishing finishes. Other branches: `pending`, comments, build-level verdict, `storyshelf/review` status. |
+| on        | off        | Today's behaviour, with comments and sign-off routes hidden: snapshot approval alone decides.                                            |
+| on        | on         | Today's behaviour plus build and story comments, build-level verdict and the changeset.                                                  |
 
 Turning `uiReview` off hides comments and verdicts (hidden, not deleted, like snapshots in ADR 0034).
 It also accepts, in one pass at save time, the project's builds left `pending` that have no attempts
@@ -55,7 +55,7 @@ and no snapshots, so a project that switches review off does not keep a queue no
 to its story; the snapshot view shows story comments for its story. Replies keep `parentId`. Component
 pages list the comments of the build they show.
 
-The comment routes are class `uiReview` (ADR 0034 decision 8), not `uiTesting`. Their roles do not
+The comment routes are class `uiReview` (ADR 0034 decision 8), not `testing`. Their roles do not
 change: `developer` and above write, `viewer` reads.
 
 ### 3. A build-level verdict
@@ -66,10 +66,10 @@ write one, the same roles that approve snapshots, so the merge-gate reasoning of
 
 What decides the build's status:
 
-- **`uiTesting` off.** `approved` once the project's required approvals are present
+- **`testing` off.** `approved` once the project's required approvals are present
   (`projects.review_approvals`, default 1) and no latest verdict is `rejected`; `rejected` when any
   latest verdict is. Otherwise `pending`.
-- **`uiTesting` on.** Unchanged: the snapshot rollup decides, and approving the last snapshot approves
+- **`testing` on.** Unchanged: the snapshot rollup decides, and approving the last snapshot approves
   the build. A build-level verdict is available as a sign-off but does not gate, so captured projects
   see no change in when a build turns green.
 
@@ -78,21 +78,21 @@ build, as snapshot approvals do.
 
 ### 4. The review status check
 
-With `uiTesting` off, build creation posts `pending` and the verdict posts `success` or `failure`,
+With `testing` off, build creation posts `pending` and the verdict posts `success` or `failure`,
 through the same status providers and per-project credentials as today (ADR 0010), under the context
-`storyshelf/review`. With `uiTesting` on the existing status stays the only status and its description
+`storyshelf/review`. With `testing` on the existing status stays the only status and its description
 says whether review is still open; review does not add a second required check. The status poster moves
 out of the capture pipeline into a small function of build state that both paths call, so a build that
 was never captured can still post one. A project with no git status configured posts nothing.
 
 ### 5. The changeset without screenshots
 
-Reviewers need to know what changed. With `uiTesting` off the build page shows a component and story
+Reviewers need to know what changed. With `testing` off the build page shows a component and story
 changeset computed from the catalog (`build_components` hash per component, ADR 0034 decision 9)
 against the baseline build: the latest accepted build of the branch, falling back to the default
 branch, the rule baselines already use. It lists components added, removed and changed (the story set,
 args or source hash differ), each linking to the published story and to its component page. With
-`uiTesting` on, the same list sits above the visual diffs. This is a coarser signal than pixels and is
+`testing` on, the same list sits above the visual diffs. This is a coarser signal than pixels and is
 presented as such: a changed hash means the story's definition changed, not that it looks different.
 `@storyshelf/affected` is not required and is not run.
 
@@ -126,7 +126,7 @@ a build status.
 - **0034:** decision 1's auto-accept rule is as written there; decision 8's `uiReview` class is defined
   here; the open question about review without snapshots is answered by this ADR.
 - **0010:** the merge gate's status comes from build state, not only from capture. `storyshelf/review`
-  is posted when `uiTesting` is off.
+  is posted when `testing` is off.
 - **0027:** comments are `uiReview`; the verdict stays out of MCP.
 - **0009:** retention also reclaims the two `pending` cases of decision 6.
 
@@ -152,16 +152,16 @@ a build status.
 
 - **A separate `uiReview` umbrella option on `ShelfOptions`.** Rejected: review needs no operator
   configuration today, and a project admin already owns the decision.
-- **Review as part of `uiTesting`.** Rejected: it ties sign-off to renderer infrastructure and makes
+- **Review as part of `testing`.** Rejected: it ties sign-off to renderer infrastructure and makes
   hosting-only teams unable to review.
 - **Holding default-branch builds for review.** Rejected: the default branch is special and is always
   accepted automatically, so the project's Storybook link always resolves.
-- **A second required status next to the visual one when `uiTesting` is on.** Rejected: two checks
+- **A second required status next to the visual one when `testing` is on.** Rejected: two checks
   would disagree about "approved".
 
 ## Open questions
 
-- Whether "always accepted" on the default branch also applies when `uiTesting` is on, where snapshot
+- Whether "always accepted" on the default branch also applies when `testing` is on, where snapshot
   approval establishes the baselines; this ADR leaves captured builds as they are.
 - The existing status context name used by the capture path, so `storyshelf/review` is consistent
   with it.
@@ -175,7 +175,7 @@ a build status.
 1. `comments.storyId`, `build_reviews`, `projects.ui_review` and `projects.review_approvals`, with
    migrations for every database package, models and tests.
 2. The status function independent of capture, and `storyshelf/review`.
-3. Verdict routes, build-status derivation with `uiTesting` off, and the auto-accept rule (default
+3. Verdict routes, build-status derivation with `testing` off, and the auto-accept rule (default
    branch always, other branches when `uiReview` is off).
 4. The changeset from the catalog, and the build and component pages' review section.
 5. The route class, its two tests, MCP and OpenAPI markers, webhooks.

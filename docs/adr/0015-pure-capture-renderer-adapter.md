@@ -6,7 +6,7 @@ Accepted
 
 Amended in part by ADR 0033 (`metadata.targets` replaces `supportedBrowsers`; the render request gains `target` and `storybookUrl`).
 
-Amended in part by ADR 0034 (`capture` becomes `uiTesting`; remote capture means remote browsers, not a worker).
+Amended in part by ADR 0034 (`capture` becomes `testing`; remote capture means remote browsers, not a worker).
 
 ## Context
 
