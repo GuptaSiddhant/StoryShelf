@@ -6,6 +6,8 @@ Accepted
 
 Amended in part by ADR 0034 (the app that runs the capture alerts; there are no remote-queue workers).
 
+Amended in part by ADR 0036 (git hosts join the notifier family; state channels are delivered durably).
+
 ## Context
 
 Outbound communication is webhooks-only (`webhooks` table, signed JSON POST per project in `core/adapters/webhook-events.ts`). That is a machine primitive: the consumer owns formatting. Operators asked for human primitives — formatted Slack/Teams messages and email — with project-level channels (admin-owned) and per-user opt-ins, plus site-wide admin alerts (new users, failures, purge). Prior discussion locked scope to email + chat (WhatsApp/push/SMS deferred), `users.email` identity, inline best-effort delivery, Brand + toggles formatting (no custom templates v1), and `notify-email` + `notify-chat` packaging.

@@ -95,6 +95,41 @@ Chromatic's publish check gives. It is posted by the same state-driven function 
 build has a pull request and the provider supports comments, the existing per-build comment carries the
 same link.
 
+### 4b. Reviewers, assignment and comments
+
+- **Who reviews.** The existing `approver` and `admin` roles are the reviewers; there is no separate
+  reviewer role. Assignment is automatic: every approver and admin of the project is a reviewer of
+  every build awaiting review. There is no per-build assignment, no component ownership rule and no
+  "request review from" step.
+- **Being asked.** When a build becomes `pending` with review on, a `review:requested` event goes to the
+  project's approvers and admins through the notification channels and their per-user subscriptions
+  (ADR 0024). Unlike the other topics, which are opt-in, this one is on by default for those roles and
+  can be turned off per user.
+- **Who may comment.** `viewer` cannot comment; `developer`, `approver` and `admin` can. This is the
+  rule for build, story and snapshot comments alike.
+- **Unresolved comments do not block.** A verdict is allowed with open threads. Resolving is a courtesy
+  to the next reader, not a gate, and nothing counts unresolved comments.
+- **A new build needs a new approval.** Verdicts belong to a build (decision 3), so approving build N
+  says nothing about build N+1 on the same branch. The build under review is the latest one on the
+  branch; earlier pending builds fall away under decision 6.
+
+### 4c. Reaching a build that is waiting
+
+A build's own URLs (its page, its published Storybook by build id) answer for anyone who may view the
+project, whatever the build's status. What a pending build is not is the _latest accepted_ build: the
+project's Storybook link and the upstream links keep resolving the previous accepted build until this
+one is approved. So the status target, the pull-request comment and the `review:requested` notification
+all link to the build's own URL, which is how a reviewer reaches a build that is not yet served as the
+project's current Storybook.
+
+### 4d. Design previews in review
+
+When a story carries a design link and a design provider is configured (ADR 0029), the story's review
+view shows the design beside the live story, as the component page does. With `testing` on the link comes
+from the recorded parameters. With `testing` off the catalog comes from `index.json`, which carries no
+story parameters, so the design appears only once the Storybook publishes them some other way; that
+question stays open in ADR 0034. Nothing in review depends on it: the story shows without the design.
+
 ### 5. The changeset without screenshots
 
 Reviewers need to know what changed. With `testing` off the build page shows a component and story
@@ -173,13 +208,10 @@ a build status.
 
 - Whether "always accepted" on the default branch also applies when `testing` is on, where snapshot
   approval establishes the baselines; this ADR leaves captured builds as they are.
-- The existing status context name used by the capture path, so `storyshelf/review` is consistent
-  with it.
-- A reviewer capability for non-engineers: today `viewer` cannot comment. A role, or per-build
-  invitations, may be needed for reviewers who are designers or product managers.
-- Whether git-host statuses and comments become notification channels, and the `isMerged` capture gate
-  is dropped (a follow-up ADR): statuses need durable, ordered delivery, which the inline best-effort
-  notifier of ADR 0024 does not give, but the database queue of ADR 0034 could.
+- Whether `storyshelf/review` and `storyshelf/storybook` should follow the capture status's naming,
+  `storyshelf/<project slug>`, or stay fixed names (a fixed name is easier to mark required).
+- How git-host statuses and comments are delivered is decided in ADR 0036; this ADR defines which
+  statuses and comments exist.
 - Whether the required-approvals count and the retention window are project settings or defaults only.
 - How comments on a story survive when the story is renamed or removed between builds.
 

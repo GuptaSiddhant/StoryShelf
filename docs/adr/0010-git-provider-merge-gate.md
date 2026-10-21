@@ -4,7 +4,7 @@
 
 Accepted
 
-Amended in part by ADRs 0034 and 0035 (statuses come from build state, not only capture; a hosting-only build posts the published-Storybook status and, with review on, the review status).
+Amended in part by ADRs 0034, 0035 and 0036 (statuses come from build state, not only capture; a hosting-only build posts the published-Storybook status and, with review on, the review status).
 
 ## Context
 
