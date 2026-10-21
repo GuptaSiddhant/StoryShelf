@@ -247,8 +247,14 @@ The classification lives in one route table in code. Two tests keep it honest: o
 route the app registers and fails on any that is not classified, so a new route has to declare its
 class; the other boots the app without `uiTesting` and asserts every `uiTesting` route answers 404
 and no `hosting` route does. The same table drives the navigation, the MCP tool list and the OpenAPI
-marker. Build comments are classed `uiTesting` because comments are the review step; that is easy to
-revisit if comments on a published Storybook turn out to be wanted without snapshots.
+marker. Build comments are not part of this table's `uiTesting` class: review is a separate concern
+that must work without snapshots, so the table carries a fourth class, `uiReview`. Its routes (comments,
+reviewer sign-off) answer 404 when the project's review switch is off, and are available with or without
+`uiTesting`. `uiReview` has no instance-level option: it is on by default and a project admin turns it
+off or on in the project's settings. An instance-level option would be added only if review gains
+operator configuration of its own, such as git hosts. The behaviour of review (what a comment anchors
+to without snapshots, whether sign-off can block a merge, how it interacts with the auto-accept rule of
+decision 1) is a separate ADR; until it lands, builds are accepted as decision 1 states.
 
 ### 9. The library, component and build pages are built from Storybook metadata, with or without `uiTesting`
 
@@ -481,7 +487,7 @@ with this ADR. The pages to change, and the statement they must carry:
   the component rows should store more than a hash.
 - Whether Storybook 8 to 10 previews run in a sandboxed iframe without `allow-same-origin` (decision 9).
 - Whether per-story design previews without `uiTesting` justify recording parameters some other way.
-- Whether build comments belong in `hosting` for builds with no snapshots (decision 8).
+- What review means without snapshots, and whether a project's review switch can make builds wait for sign-off instead of auto-accepting (decision 8; a follow-up ADR on `uiReview`).
 - Whether rolling upgrades with mixed versions need support later; this ADR requires a stop-the-world
   upgrade (decision 4).
 
