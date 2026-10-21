@@ -4,7 +4,7 @@
 
 Accepted
 
-Amended in part by ADR 0034 (MCP tools follow the `uiTesting` route classes).
+Amended in part by ADR 0034 (MCP tools follow the `testing` route classes).
 
 ## Context
 

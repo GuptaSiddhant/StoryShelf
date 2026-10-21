@@ -1,4 +1,4 @@
-# ADR 0034: One Deployable: `uiTesting`, a Database Queue, and No Separate Worker
+# ADR 0034: One Deployable: `testing`, a Database Queue, and No Separate Worker
 
 ## Status
 
@@ -32,9 +32,9 @@ Running StoryShelf's checks takes more pieces than it should, and they overlap.
 
 ## Decision
 
-### 1. `uiTesting` is the umbrella option, and absent means hosting only
+### 1. `testing` is the umbrella option, and absent means hosting only
 
-`uiTesting` replaces `capture`. It covers capture (rendering), compare, review, baselines and commit
+`testing` replaces `capture`. It covers capture (rendering), compare, review, baselines and commit
 statuses, because they are stages of one feature. `visualTesting` was rejected as too narrow (it
 also runs `play` tests and accessibility checks), and `test` or `testing` collide with Storybook's
 own test terminology (`subtype: 'test'`, the Vitest addon, this repository's `nub run test`).
@@ -44,7 +44,7 @@ Chromatic's "UI Tests" groups the same three kinds of check, which is the closes
 createShelfApp({
   database,
   storage,
-  uiTesting: {
+  testing: {
     runner: createPlaywrightCaptureRunner({ browsers: ["chromium", "firefox"] }),
     compare: { threads: 2 }, // moves here from the top level
     concurrency: 2,
@@ -52,15 +52,16 @@ createShelfApp({
   },
 });
 
-createShelfApp({ database, storage }); // hosting only: uiTesting is off
+createShelfApp({ database, storage }); // hosting only: testing is off
 ```
 
 The option's shape, with what stays top-level:
 
 ```ts
-interface UiTestingOptions {
-  runner: CaptureRunner; // required: every uiTesting instance can render
+interface TestingOptions {
+  runner: CaptureRunner; // required: every testing instance can render
   compare?: { threads?: number }; // moved from the top level
+  images?: ShelfImagesOptions; // moved from the top level (ADR 0032)
   concurrency?: number; // jobs this instance runs at once
   shardSize?: number;
   retries?: number; // default 2 (decision 11)
@@ -71,46 +72,51 @@ interface UiTestingOptions {
 }
 ```
 
-`images` and `scratchDir` stay top-level: `images` is deployment-wide (ADR 0032; the AI thumbnails use
-it too) and `scratchDir` serves publishing as well as capture. Today's `capture: { queue }` with no
-runner, an instance that only enqueues for external workers, has no equivalent: every `uiTesting`
+`images` moves under `testing` with `compare`: the engine serves diffs, overlays and snapshot
+thumbnails, none of which exist without capture (the AI thumbnails read snapshots, so they are
+`testing` too). `scratchDir` stays an optional field of `config`, defaulting to the OS temp directory,
+because it serves publishing as well as capture. Today's `capture: { queue }` with no
+runner, an instance that only enqueues for external workers, has no equivalent: every `testing`
 instance has a runner, and the migration guide says so.
 
 - **Absent:** Storybook hosting only. Uploads, published Storybooks (including their publishing,
   decision 10), projects, tokens, members and the build, library and component pages (decision 9) keep
   working. Capture, compare (including re-diff), review pages and APIs, baselines (import, export,
-  approval), commit statuses, the capture settings, the compute-jobs page and the features that read
-  snapshots (AI triage) are off. No `storyshelf/...` commit status is posted, so a repository that
-  requires one must drop that requirement before `uiTesting` is turned off.
+  approval), the visual commit status, the capture settings, the compute-jobs page and the features that read
+  snapshots (AI triage) are off. The visual status is not posted, so a repository that requires it must drop that
+  requirement before `testing` is turned off. The published-Storybook status and, with review on, the
+  review status are posted (ADR 0035).
 - **Hosting-only is not open access.** The existing auth rules (ADR 0008, 0011) apply unchanged: who
   may view a published Storybook, the library, component and build pages, and who may upload, comment
   or approve, is decided by the auth adapter and the project's access settings, with or without
-  `uiTesting`. The route classes of decision 8 gate features, never access; a `hosting` route is
+  `testing`. The route classes of decision 8 gate features, never access; a `hosting` route is
   not a public route.
-- **`compare` moves under `uiTesting`.** ADR 0031 phase 2 kept it top-level so re-diff works with
-  nothing rendering locally; with no separate worker, an instance that needs compare is an instance
-  with `uiTesting`.
-- **Mechanism:** one flag on the store, a `requireUiTesting` guard applied per route, and the same
-  classification driving the navigation, the MCP tool list and the OpenAPI "requires uiTesting"
-  marker. A disabled endpoint returns 404 with a body saying that uiTesting is not enabled on this
+- **`compare` and `images` move under `testing`.** ADR 0031 phase 2 kept `compare` top-level so re-diff works
+  with nothing rendering locally; with no separate worker, an instance that needs compare or an image
+  engine is an instance with `testing`.
+- **Mechanism:** one flag on the store, a `requireTesting` guard applied per route, and the same
+  classification driving the navigation, the MCP tool list and the OpenAPI "requires testing"
+  marker. A disabled endpoint returns 404 with a body saying that testing is not enabled on this
   instance. Which routes are gated, and the test that keeps the list honest, is decision 8.
-- **Existing data is hidden, not deleted.** Turning `uiTesting` off on a deployment that has
+- **Existing data is hidden, not deleted.** Turning `testing` off on a deployment that has
   snapshots hides them; startup logs it and the System page shows a notice with the count.
 - **Review is not disabled with it.** Comments and approval also exist at build level, so turning
-  `uiTesting` off leaves them working (decision 8: `uiReview`). Only snapshot-level review goes away
+  `testing` off leaves them working (decision 8: `review`). Only snapshot-level review goes away
   with the snapshots.
 - **Builds are accepted automatically on the default branch, and elsewhere only when review is off.**
-  With `uiTesting` off, a build on the project's default branch becomes `approved` when it finishes
-  publishing (decisions 9 and 10) whatever the project's `uiReview` setting; a build on any other
-  branch does only if the project has turned `uiReview` off. Nobody reviewed it, so no approval event fires; the `build:created` webhook already
-  announces the upload. With `uiReview` on (the default) the build waits as `pending` for build-level
-  approval, the same as a captured build waits for its snapshots. The System page states that `uiTesting` is off,
+  A build on the project's default branch is always accepted, whatever `testing` and the project's
+  `review` setting say: with `testing` off it becomes `approved` when it finishes publishing (decisions
+  9 and 10), and with `testing` on it already does when capture finishes, its changes auto-approved
+  (`diffStatus`, `finalBuildStatus`), unless capture failed. A build on any other branch is accepted
+  automatically with `testing` off only if the project has turned `review` off. Nobody reviewed it, so no approval event fires; the `build:created` webhook already
+  announces the upload. With `review` on (the default) the build waits as `pending` for build-level
+  approval, the same as a captured build waits for its snapshots. The System page states that `testing` is off,
   so an instance in a fleet that was meant to run checks but was not configured is visible, and the
   CLI's upload output says the Storybook was published but no checks will run.
 
-### 2. `uiTesting` requires a long-running server
+### 2. `testing` requires a long-running server
 
-Enabling `uiTesting` requires a long-running server: a container, VM, Fly Machine, Kubernetes pod or
+Enabling `testing` requires a long-running server: a container, VM, Fly Machine, Kubernetes pod or
 similar. Capture jobs run for minutes in the background, and the job consumer (decision 3) has to
 keep running between requests. Platforms that freeze or end the process after each request (Vercel
 Functions, AWS Lambda, Cloudflare Workers) cannot host it; they can still host Storybook hosting
@@ -118,12 +124,12 @@ only. Hosting only on such a platform publishes through the file-by-file upload 
 `/content`, `/manifest`), which stores content-addressed files and needs no extraction or scratch disk.
 A zip upload needs scratch space and, above the inline limit, a long-running instance (decision 10); on
 a host with neither, a zip that cannot be extracted inline is rejected with that explanation instead of
-left pending. The app refuses to start when `uiTesting` is set and the process is certainly serverless, and warns
+left pending. The app refuses to start when `testing` is set and the process is certainly serverless, and warns
 when it only might be (decision 11). Consequently the Cloudflare D1
-preset, a Workers-only binding, cannot back a deployment with `uiTesting`; Turso over the network
+preset, a Workers-only binding, cannot back a deployment with `testing`; Turso over the network
 can.
 
-Every instance with `uiTesting` both enqueues and consumes. An "API only" instance (a `render: false`
+Every instance with `testing` both enqueues and consumes. An "API only" instance (a `render: false`
 flag) was considered for a serverless API in front of a long-lived capture tier, and for scaling web
 and capture separately; neither is needed, because rendering scales in the browser farm (ADR 0033).
 It can be added later if a real case appears.
@@ -131,7 +137,7 @@ It can be added later if a real case appears.
 ### 3. No separate worker
 
 `@storyshelf/worker` is retired. Its consumer loop moves into core and runs in every app instance
-with `uiTesting`: poll, a lease renewed on progress and not on a timer (so a hung capture loses it),
+with `testing`: poll, a lease renewed on progress and not on a timer (so a hung capture loses it),
 retry with backoff, the final-attempt rule, cancelling the local run when the lease is lost, and a
 drain on SIGTERM. Operators provide database and storage credentials only to the app, and there is
 one copy of the configuration.
@@ -161,7 +167,7 @@ migrations) holds one row per job, including shard jobs:
   fast as the in-memory queue does; other instances find the job on their next poll, which backs off
   when idle and carries jitter. An index on status and visibility time keeps an empty poll cheap.
 - **Retry and failure.** A nack with a delay sets the visibility time; attempts are counted; past the
-  limit (`uiTesting.retries`, decision 11) the job is `failed` and the build takes the standard
+  limit (`testing.retries`, decision 11) the job is `failed` and the build takes the standard
   terminal path, with its status written to the database, so a job failed by a crash never leaves a
   build in `capturing`.
 - **Cancel** sets a flag on the job row, which the running instance reads on a short timer of its own
@@ -182,7 +188,7 @@ The in-memory queue is removed from production, along with the boot sweep that r
 in `capturing` (requeue once, then fail): lease expiry and redelivery do that job, and they are safe
 with more than one instance. A small in-memory double may remain in the test helpers.
 
-For one release a migration sweep stays: on the first boot after the upgrade, with `uiTesting` on,
+For one release a migration sweep stays: on the first boot after the upgrade, with `testing` on,
 every build left `capturing` or `pending` with no job row gets one, as the old sweep did for
 `capturing`; then it is removed. Mixed versions are not supported for that upgrade: every instance is
 stopped, upgraded and started together.
@@ -206,7 +212,7 @@ retire forked capture once remote browsers are common is a later decision.
 published version). This happens only after the database queue passes the queue contract suite and a
 multi-instance test on Postgres, MySQL and Turso, and a same-host test on local SQLite. The
 `CaptureQueue` and `PollableCaptureQueue` interfaces and the contract suite stay exported, and
-`uiTesting.queue` accepts one, so anyone can supply a queue.
+`testing.queue` accepts one, so anyone can supply a queue.
 
 This reverses ADR 0031 phase 3's "no database-backed queue": the queue was to stay transport-only so
 that it would not constrain the database adapter. That reasoning assumed a separate worker reached
@@ -248,28 +254,28 @@ next to the diff page), so the gate is per route, not per router. An audit of to
 three classes. The table names representative routes; the route table in code is the full list,
 and the completeness test is what makes it so:
 
-| Class       | Meaning                                                  | Routes                                                                                                                                                                                                                                                                                                                  |
-| ----------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `hosting`   | Available with and without `uiTesting`                   | Projects, tokens, members, labels, auth, webhooks; the build upload (zip, dedup, content, manifest), listing and delete routes; Storybook serving                                                                                                                                                                       |
-| `uiTesting` | 404 without `uiTesting`                                  | Snapshots (list, approve, reject, approve-all, reject-all, rediff, per-mode), snapshot media and design renders, baselines export and import, attempts and their logs, status configs, insights (also needs `ai`), the capture, status and test settings pages, the compute-jobs page, build retry, the build diff page |
-| `both`      | The page exists in both modes and its sections are gated | Build list and detail pages (snapshot list, statuses and attempts only with `uiTesting`; build-level comments and approval in both), library and component pages (decision 9); `/projects/:slug` redirects to the library                                                                                               |
+| Class     | Meaning                                                  | Routes                                                                                                                                                                                                                                                                                                                  |
+| --------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hosting` | Available with and without `testing`                     | Projects, tokens, members, labels, auth, webhooks; the build upload (zip, dedup, content, manifest), listing and delete routes; Storybook serving                                                                                                                                                                       |
+| `testing` | 404 without `testing`                                    | Snapshots (list, approve, reject, approve-all, reject-all, rediff, per-mode), snapshot media and design renders, baselines export and import, attempts and their logs, status configs, insights (also needs `ai`), the capture, status and test settings pages, the compute-jobs page, build retry, the build diff page |
+| `both`    | The page exists in both modes and its sections are gated | Build list and detail pages (snapshot list, statuses and attempts only with `testing`; build-level comments and approval in both), library and component pages (decision 9); `/projects/:slug` redirects to the library                                                                                                 |
 
 The classification lives in one route table in code. Two tests keep it honest: one enumerates every
 route the app registers and fails on any that is not classified, so a new route has to declare its
-class; the other boots the app without `uiTesting` and asserts every `uiTesting` route answers 404
+class; the other boots the app without `testing` and asserts every `testing` route answers 404
 and no `hosting` route does. The same table drives the navigation, the MCP tool list and the OpenAPI
-marker. Build comments are not part of this table's `uiTesting` class: review is a separate concern
-that must work without snapshots, so the table carries a fourth class, `uiReview`. Its routes (comments,
+marker. Build comments are not part of this table's `testing` class: review is a separate concern
+that must work without snapshots, so the table carries a fourth class, `review`. Its routes (comments,
 reviewer sign-off) answer 404 when the project's review switch is off, and are available with or without
-`uiTesting`. `uiReview` has no instance-level option: it is on by default and a project admin turns it
+`testing`. `review` has no instance-level option: it is on by default and a project admin turns it
 off or on in the project's settings. An instance-level option would be added only if review gains
 operator configuration of its own, such as git hosts. Review's other behaviour (what a comment anchors
 to without snapshots, who may approve, the review status check) is a separate ADR. The one rule this
 ADR fixes is the auto-accept rule of decision 1: the default branch is always accepted, other branches only when review is off.
 
-### 9. The library, component and build pages are built from Storybook metadata, with or without `uiTesting`
+### 9. The library, component and build pages are built from Storybook metadata, with or without `testing`
 
-`index.json` is the primary data source of these pages in both modes. `uiTesting` adds data to them; it
+`index.json` is the primary data source of these pages in both modes. `testing` adds data to them; it
 does not change where their skeleton comes from.
 
 - **Library.** Shows the latest build of the selected branch whatever its status, as today: the
@@ -278,28 +284,28 @@ does not change where their skeleton comes from.
   library, and a build still being published shows the preparing state, as an uncaptured build shows
   its empty state today. Components are grouped by title, each linking to its component page and
   into the published Storybook (story and docs links), with tags and story counts. There are no
-  screenshots in the base view. With `uiTesting` it gains thumbnails, statuses, the health panel and
+  screenshots in the base view. With `testing` it gains thumbnails, statuses, the health panel and
   design links.
 - **Component page.** The published story as an iframe preview, the component's stories and docs
   entries, the project-level design links and previews (ADR 0029), and a build history: the builds the
   component appears in and whether its stories changed (added, removed, renamed or moved) since the
-  build before. With `uiTesting` it gains per-story snapshot status and diffs, history with statuses,
+  build before. With `testing` it gains per-story snapshot status and diffs, history with statuses,
   moved-or-deleted detection and per-story design previews.
 - **Build pages.** The list and detail pages exist to show uploads without a capture pipeline: sha,
   branch, author, message, size, labels, the link to the published Storybook, and component and story
-  counts from the catalog. Snapshots, statuses and attempts appear only with `uiTesting`; build-level comments and approval do not depend on it.
-- **Without `uiTesting`, default-branch builds, and every build when `uiReview` is off, are accepted when they finish publishing.**
+  counts from the catalog. Snapshots, statuses and attempts appear only with `testing`; build-level comments and approval do not depend on it.
+- **Without `testing`, default-branch builds, and every build when `review` is off, are accepted when they finish publishing.**
   This is required, not cosmetic. The project's Storybook link and the upstream links resolve only
   accepted builds, and retention purges only terminal builds (`approved`, `rejected`, `failed`), so a
-  build left `pending` would never be served and never be purged. With `uiReview` on, a build on another branch stays
+  build left `pending` would never be served and never be purged. With `review` on, a build on another branch stays
   `pending` until someone approves or rejects it at build level, and until then the Storybook and
   upstream links keep resolving the previous accepted build. The default branch is special and is never
   held: the project's Storybook link must always resolve. A build whose publishing fails becomes `failed`. An
   accepted build with no attempts is labelled "Published" in the UI, and `approvedCount` stays zero.
-  Enabling `uiTesting` later leaves these builds as they are; they have no snapshots, so they create
+  Enabling `testing` later leaves these builds as they are; they have no snapshots, so they create
   no baselines, and the next default-branch build bootstraps them as usual. To capture an old build,
   retry it: the retry route has no status guard, sets `pending` and enqueues the capture. It is a
-  `uiTesting` route, because with `uiTesting` off it would today set `pending` and report "Capture
+  `testing` route, because with `testing` off it would today set `pending` and report "Capture
   queued" with nothing queued.
 - **Data.** Extraction at publish (decision 10) also writes a compact catalog for the build (entry id,
   title, name, import path, type, tags) next to its statics, and one `build_components` row per
@@ -308,13 +314,15 @@ does not change where their skeleton comes from.
   "which builds contain this component, and did it change" with one indexed query. Both are purged
   with the build. Builds published before this change are catalogued lazily on first view, from their
   persisted statics.
-- **Upstream links** resolve a build's stories from its snapshots today; with `uiTesting` off they
+- **Upstream links** resolve a build's stories from its snapshots today; with `testing` off they
   resolve from the catalog, so an accepted build with no snapshots still yields links.
 - **Not in `index.json`:** resolved parameters. Per-story design links (ADR 0029) and modes therefore
-  come only from a capture's `extractParameters`, and without `uiTesting` the component page shows
+  come only from a capture's `extractParameters`, and without `testing` the component page shows
   the project-level design links only. Reading parameters from the embedded preview in the viewer's
   browser was considered and rejected: it depends on Storybook's internal channel across versions 8
-  to 10. Recording them at publish would need a browser, which hosting-only does not have.
+  to 10. Recording them at publish would need a browser, which hosting-only does not have. Parameters that
+  cannot be determined at build time are left empty: without `testing` there are no per-story design
+  links, no modes and no per-story settings, and nothing treats the absence as an error.
 - **Embedding the preview is a security decision.** Path-based Storybook serving puts a customer's
   Storybook JavaScript on the app's own origin (ADR 0011). Opening the Storybook is an explicit action;
   embedding it in the library and component pages would run it on every visit. The embed therefore
@@ -323,7 +331,7 @@ does not change where their skeleton comes from.
   otherwise is click-to-load in a sandboxed iframe with a link out. Whether Storybook 8 to 10 previews run correctly
   in a sandbox without `allow-same-origin` is unverified and is settled before the embed ships.
 
-### 10. Publishing does not depend on `uiTesting`
+### 10. Publishing does not depend on `testing`
 
 Today the statics of a published Storybook are extracted at upload only when `maxInlineUnzipSize` is
 set and the zip is within it; otherwise, in the config's own words, "statics land via capture", and
@@ -336,27 +344,27 @@ Publishing completes per upload route:
 - **File-by-file route (`/dedup`, `/content`, `/manifest`).** The files are already stored
   content-addressed, so there is nothing to extract: publishing completes when the manifest is stored,
   which writes the catalog from the stored `index.json`. Today the manifest route enqueues a capture;
-  with `uiTesting` off it sets the build `approved` instead when the build is on the default branch or
-  `uiReview` is off.
+  with `testing` off it sets the build `approved` instead when the build is on the default branch or
+  `review` is off.
 - **Zip route.** A small zip is extracted inline in the request. Size is counted while streaming, since
   a chunked upload has no `Content-Length`. A larger zip is published by a `publish` job on the
   database queue, with the lease, retry and redelivery of decision 4, consumed by any instance on a
   long-running host with scratch space. So a hosting-only instance on such a host runs the consumer
-  loop for `publish` jobs, and `uiTesting` adds `capture` jobs to it. On a host with no consumer
+  loop for `publish` jobs, and `testing` adds `capture` jobs to it. On a host with no consumer
   (serverless), a zip over the inline limit is rejected at upload with a message pointing to the
   file-by-file route.
 - **Safety.** Extraction enforces caps on entry count and on total uncompressed bytes; the compressed
   size alone is no bound, and this path is now always on.
 
 `maxInlineUnzipSize` stays as the inline threshold and gets a safe default, so leaving it unset no
-longer means "never". With `uiTesting` the capture job still backfills the same keys. Publishing ends
-by writing the catalog that decision 9 reads and, when `uiTesting` is off and the build is on the default branch or `uiReview` is off, setting the build
-`approved` (or `failed` if it could not publish); with `uiTesting` on, the capture pipeline decides the
+longer means "never". With `testing` the capture job still backfills the same keys. Publishing ends
+by writing the catalog that decision 9 reads and, when `testing` is off and the build is on the default branch or `review` is off, setting the build
+`approved` (or `failed` if it could not publish); with `testing` on, the capture pipeline decides the
 status, as now.
 
 Builds already `pending` when this ships need the same treatment, or they stay unserved and unpurged
-forever. With `uiTesting` off, a one-time boot task accepts each `pending` build that has a persisted
-zip or manifest and no attempts, and fails the ones with neither. With `uiTesting` on, the migration
+forever. With `testing` off, a one-time boot task accepts each `pending` build that has a persisted
+zip or manifest and no attempts, and fails the ones with neither. With `testing` on, the migration
 sweep of decision 4 gives them job rows.
 
 ### 11. Operating details
@@ -369,7 +377,7 @@ sweep of decision 4 gives them job rows.
 - **Cancel.** Leases follow progress, so they cannot carry a cancel for a hung capture. Each running
   job reads its own row by id every 5 s; the lease renewal write also returns the row. Cancel latency
   is at most about 5 s.
-- **Retries.** `uiTesting.retries`, default 2 (three attempts in total). That is the worker package's
+- **Retries.** `testing.retries`, default 2 (three attempts in total). That is the worker package's
   default; in-process capture has no retries today and treats every attempt as final, so this adds
   them for the in-process path.
   The backoff, 1 s doubling to a cap of 30 s, is an internal constant. One limit covers failed
@@ -384,7 +392,7 @@ sweep of decision 4 gives them job rows.
 
 ## Amendments to existing ADRs
 
-- **0031 phase 2:** the nested `capture` group is `uiTesting`, and `compare` nests under it instead of
+- **0031 phase 2:** the nested `capture` group is `testing`, and `compare` and `images` nest under it instead of
   staying top-level.
 - **0031 phase 3:** the in-memory fallback queue goes; the forked parent consumes the database queue
   and pushes jobs to the child (decision 5).
@@ -393,7 +401,7 @@ sweep of decision 4 gives them job rows.
 - **0003:** "an in-process queue with configurable concurrency (`--capture-concurrency`)" is replaced
   by the database queue with the same concurrency setting.
 - **0015:** "`createShelfApp` builds the orchestrator internally when `capture` is supplied" becomes
-  `uiTesting`; the `runner-remote` idea of offloading to a worker fleet is realised by remote browsers
+  `testing`; the `runner-remote` idea of offloading to a worker fleet is realised by remote browsers
   (ADR 0033), not by a worker.
 - **0018:** "queue/remote workers depend on core alone: zero HTTP modules in worker bundles" is
   obsolete with no worker package, since the app is the consumer.
@@ -407,8 +415,8 @@ sweep of decision 4 gives them job rows.
 - **0027:** MCP tools that read snapshots or comment follow the route classes (decision 8).
 - **0029:** "remote workers take the same list" of design providers no longer applies; the app holds
   them.
-- **0010 and 0011:** a hosting-only build on the default branch, or with review off, is accepted without review and posts no status check
-  (decision 1).
+- **0010 and 0011:** a hosting-only build on the default branch, or with review off, is accepted without review and posts no visual or review status (decision 1); it still posts the
+  published-Storybook status of ADR 0035.
 - **0002:** no contradiction. Turso remains the way to host Storybooks on serverless platforms; D1
   stays hosting-only (decision 2).
 
@@ -419,26 +427,26 @@ Each amended ADR gets a one-line pointer to this one in the same PR as this ADR.
 The website describes behaviour that still exists, so it changes with the implementation PRs, not
 with this ADR. The pages to change, and the statement they must carry:
 
-> Enabling `uiTesting` requires a long-running server (a container, VM, Fly Machine or Kubernetes
+> Enabling `testing` requires a long-running server (a container, VM, Fly Machine or Kubernetes
 > pod). It cannot run on serverless platforms that freeze or end the process after each request
 > (Vercel Functions, AWS Lambda, Cloudflare Workers), because capture jobs run for minutes in the
 > background and the job consumer must keep running. A serverless deployment can host Storybooks
-> only, by leaving `uiTesting` unset.
+> only, by leaving `testing` unset.
 
 - `concepts/capture.mdx`: the remote capture, queue and forked capture sections, and the statement.
 - `guides/deployment/cloud` (cloud assembly): the serverless API with a separate worker goes; the
-  guide becomes hosting-only on serverless and `uiTesting` on a long-running server.
+  guide becomes hosting-only on serverless and `testing` on a long-running server.
 - `packages/worker.mdx` and the four `packages/queue-*.mdx` pages, and those packages' READMEs, with
   deprecation notes.
-- The configuration reference (`capture` becomes `uiTesting`, `compare` nests) and the runner pages
+- The configuration reference (`capture` becomes `testing`, `compare` and `images` nest) and the runner pages
   (the `browsers` list, ADR 0033).
-- A migration guide: `capture` to `uiTesting`; a worker deployment to more app instances; queue
+- A migration guide: `capture` to `testing`; a worker deployment to more app instances; queue
   adapters to the database queue; serverless to hosting-only.
 - A "self-hosted browser farm" guide (decision 7).
 - `guides/deployment/remote-workers.md`, `aws.md`, `azure.md` and `gcp.md`, `docs/observability.md`
   (the worker and queue sections) and `docs/architecture-diagrams.md`.
 - The CLI's `worker init` and `worker serve` commands and the queue templates in `server init`.
-- The library and component page docs (the metadata catalog without `uiTesting`, the enrichment
+- The library and component page docs (the metadata catalog without `testing`, the enrichment
   with it) and the publishing guide (extraction independent of capture).
 - `docs/architecture.md`, and `AGENTS.md` (layout and ADR index).
 
@@ -454,12 +462,12 @@ with this ADR. The pages to change, and the statement they must carry:
 - One queue with one set of semantics, instead of six, and the live queue view is cross-instance.
 - Five packages fewer (`worker` and the four adapters), less queue bookkeeping in core (the in-memory
   queue, and the IPC queue's job and lease books), and a simpler `capture-setup`.
-- Hosting-only is a clean, documented mode, and `uiTesting` is the single switch for the product.
+- Hosting-only is a clean, documented mode, and `testing` is the single switch for the product.
 
 **Negative**
 
 - Capture in a single process gains retries it never had (decision 11).
-- A broad breaking change: the option rename and `compare` move, the worker and four adapters
+- A broad breaking change: the option rename and the `compare` and `images` move, the worker and four adapters
   retired, and serverless plus capture no longer supported. Operators using SQS or Redis queues must
   move to the database queue.
 - New queue code, with the race risks any lease implementation has. It needs the contract suite and
@@ -501,10 +509,9 @@ with this ADR. The pages to change, and the statement they must carry:
 - The catalog and `build_components` shape (decision 9): its size on very large Storybooks, and whether
   the component rows should store more than a hash.
 - Whether Storybook 8 to 10 previews run in a sandboxed iframe without `allow-same-origin` (decision 9).
-- Whether per-story design previews without `uiTesting` justify recording parameters some other way.
 - What review means without snapshots: comment anchors, who may approve, the review status check, and
   how a `pending` build with review on is purged when nobody reviews it (decision 8; a follow-up ADR on
-  `uiReview`).
+  `review`).
 - Whether rolling upgrades with mixed versions need support later; this ADR requires a stop-the-world
   upgrade (decision 4).
 
@@ -515,15 +522,15 @@ with this ADR. The pages to change, and the statement they must carry:
    interfaces, validated by
    the contract suite and the multi-instance tests (Postgres, MySQL, Turso, local SQLite), including
    the idle-poll acceptance test. Additive: nothing is removed yet.
-2. **Publishing independent of `uiTesting`** (decision 10): `publish` jobs, the manifest route, the
-   extraction caps and the one-time boot task for builds already `pending`. Until step 5 introduces the option, "`uiTesting` is off" reads "there is
+2. **Publishing independent of `testing`** (decision 10): `publish` jobs, the manifest route, the
+   extraction caps and the one-time boot task for builds already `pending`. Until step 5 introduces the option, "`testing` is off" reads "there is
    no `capture` option". Additive, and it fixes a hosting-only gap on its own.
 3. **The route table and the two tests** (decision 8), with every route classified as it behaves
    today. No behaviour change.
 4. **The catalog and the library, component and build pages built from it** (decisions 9 and 10), in
    both modes: publish writes the catalog and `build_components`, and the pages read them, with
    snapshot data layered on when present.
-5. **`uiTesting`**: the rename, the `compare` move, the gating, the notices and the serverless check.
+5. **`testing`**: the rename, the `compare` and `images` move, the gating, the notices and the serverless check.
    This is the breaking step.
 6. **Remove the in-memory queue and the boot recovery sweep** (the migration sweep one release later);
    forked capture's parent becomes the consumer.

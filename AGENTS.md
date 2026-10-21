@@ -191,7 +191,9 @@ This distinction matters for:
 | 0030 | User OAuth Connections (service-neutral "Connect your account": `OAuthClient`, `user_connections`, shared `/connections/:service` flow) |
 | 0032 | Image Engines (`@storyshelf/image` leaf package; opt-in `sharp` codec; pixelmatch stays the comparator) |
 | 0033 | Remote Browsers and Public Origin (runner `browsers` list: local engines declared and verified, remote presets, `<engine>@<name>` targets with own baselines, in-browser fingerprint, `exposeNetwork` or signed Storybook URLs, public-origin resolver) |
-| 0034 | One Deployable (`uiTesting` umbrella option and hosting-only mode; database queue; no separate worker; queue adapters retired; browser farm recipe) |
+| 0034 | One Deployable (`testing` umbrella option and hosting-only mode; database queue; no separate worker; queue adapters retired; browser farm recipe) |
+| 0035 | UI Review, with or without `testing` (per-project `review` switch, build-level verdict, story-anchored comments, review status check, catalog changeset) |
+| 0036 | Git Hosts as Notification Channels (git hosts merge into `notifiers` as `@storyshelf/notify-git` with durable state delivery on the database queue; `isMerged` dropped; configurable status-name prefix) |
 
 ## Parallel Development with Worktrees
 
