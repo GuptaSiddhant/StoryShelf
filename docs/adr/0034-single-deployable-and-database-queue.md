@@ -259,9 +259,9 @@ claim per build, like the finalize claim), so a restart or another instance can 
 "preparing" page and the Storybook route retry it when no claim is live. `maxInlineUnzipSize` stays
 as the threshold between inline and background and gets a safe default, so leaving it unset no longer
 means "never". With `uiTesting` the capture job still backfills the same keys. The claim and retry
-details are settled at implementation. Extraction also writes the catalog that decision 9 reads, and, when `uiTesting` is off, ends by setting the
-build `approved` (or `failed` if it could not publish). With `uiTesting` on the capture pipeline decides the
-status, as now.
+details are settled at implementation. Extraction also writes the catalog that decision 9 reads and,
+when `uiTesting` is off, ends by setting the build `approved` (or `failed` if it could not publish).
+With `uiTesting` on, the capture pipeline decides the status, as now.
 
 ### 11. Operating details
 
