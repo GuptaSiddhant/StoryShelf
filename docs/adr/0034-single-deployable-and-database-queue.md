@@ -94,9 +94,11 @@ instance has a runner, and the migration guide says so.
 - **Review is not disabled with it.** Comments and approval also exist at build level, so turning
   `uiTesting` off leaves them working (decision 8: `uiReview`). Only snapshot-level review goes away
   with the snapshots.
-- **Builds are accepted automatically.** With no checks to wait for, a build becomes `approved` when
-  it finishes publishing (decisions 9 and 10). Nobody reviewed it, so no approval event fires; the
-  `build:created` webhook already announces the upload. The System page states that `uiTesting` is off,
+- **Builds are accepted automatically only when review is off too.** A build becomes `approved` when it
+  finishes publishing (decisions 9 and 10) only if `uiTesting` is off and the project has turned
+  `uiReview` off. Nobody reviewed it, so no approval event fires; the `build:created` webhook already
+  announces the upload. With `uiReview` on (the default) the build waits as `pending` for build-level
+  approval, the same as a captured build waits for its snapshots. The System page states that `uiTesting` is off,
   so an instance in a fleet that was meant to run checks but was not configured is visible, and the
   CLI's upload output says the Storybook was published but no checks will run.
 
@@ -255,9 +257,9 @@ that must work without snapshots, so the table carries a fourth class, `uiReview
 reviewer sign-off) answer 404 when the project's review switch is off, and are available with or without
 `uiTesting`. `uiReview` has no instance-level option: it is on by default and a project admin turns it
 off or on in the project's settings. An instance-level option would be added only if review gains
-operator configuration of its own, such as git hosts. The behaviour of review (what a comment anchors
-to without snapshots, whether sign-off can block a merge, how it interacts with the auto-accept rule of
-decision 1) is a separate ADR; until it lands, builds are accepted as decision 1 states.
+operator configuration of its own, such as git hosts. Review's other behaviour (what a comment anchors
+to without snapshots, who may approve, the review status check) is a separate ADR. The one rule this
+ADR fixes is the auto-accept rule of decision 1: auto-accept applies only when review is off too.
 
 ### 9. The library, component and build pages are built from Storybook metadata, with or without `uiTesting`
 
@@ -280,10 +282,12 @@ does not change where their skeleton comes from.
 - **Build pages.** The list and detail pages exist to show uploads without a capture pipeline: sha,
   branch, author, message, size, labels, the link to the published Storybook, and component and story
   counts from the catalog. Snapshots, statuses and attempts appear only with `uiTesting`; build-level comments and approval do not depend on it.
-- **Without `uiTesting`, every build is accepted when it finishes publishing.** This is required, not
-  cosmetic. The project's Storybook link and the upstream links resolve only accepted builds, and
-  retention purges only terminal builds (`approved`, `rejected`, `failed`), so a build left `pending`
-  would never be served and never be purged. A build whose publishing fails becomes `failed`. An
+- **Without `uiTesting` and with `uiReview` off, every build is accepted when it finishes publishing.**
+  This is required, not cosmetic. The project's Storybook link and the upstream links resolve only
+  accepted builds, and retention purges only terminal builds (`approved`, `rejected`, `failed`), so a
+  build left `pending` would never be served and never be purged. With `uiReview` on, the build stays
+  `pending` until someone approves or rejects it at build level, and until then the Storybook and
+  upstream links keep resolving the previous accepted build. A build whose publishing fails becomes `failed`. An
   accepted build with no attempts is labelled "Published" in the UI, and `approvedCount` stays zero.
   Enabling `uiTesting` later leaves these builds as they are; they have no snapshots, so they create
   no baselines, and the next default-branch build bootstraps them as usual. To capture an old build,
@@ -325,7 +329,7 @@ Publishing completes per upload route:
 - **File-by-file route (`/dedup`, `/content`, `/manifest`).** The files are already stored
   content-addressed, so there is nothing to extract: publishing completes when the manifest is stored,
   which writes the catalog from the stored `index.json`. Today the manifest route enqueues a capture;
-  with `uiTesting` off it sets the build `approved` instead.
+  with `uiTesting` and `uiReview` off it sets the build `approved` instead.
 - **Zip route.** A small zip is extracted inline in the request. Size is counted while streaming, since
   a chunked upload has no `Content-Length`. A larger zip is published by a `publish` job on the
   database queue, with the lease, retry and redelivery of decision 4, consumed by any instance on a
@@ -338,7 +342,7 @@ Publishing completes per upload route:
 
 `maxInlineUnzipSize` stays as the inline threshold and gets a safe default, so leaving it unset no
 longer means "never". With `uiTesting` the capture job still backfills the same keys. Publishing ends
-by writing the catalog that decision 9 reads and, when `uiTesting` is off, setting the build
+by writing the catalog that decision 9 reads and, when `uiTesting` and `uiReview` are off, setting the build
 `approved` (or `failed` if it could not publish); with `uiTesting` on, the capture pipeline decides the
 status, as now.
 
@@ -395,7 +399,7 @@ sweep of decision 4 gives them job rows.
 - **0027:** MCP tools that read snapshots or comment follow the route classes (decision 8).
 - **0029:** "remote workers take the same list" of design providers no longer applies; the app holds
   them.
-- **0010 and 0011:** a hosting-only build is accepted without review and posts no status check
+- **0010 and 0011:** a hosting-only build with review off is accepted without review and posts no status check
   (decision 1).
 - **0002:** no contradiction. Turso remains the way to host Storybooks on serverless platforms; D1
   stays hosting-only (decision 2).
@@ -458,7 +462,7 @@ with this ADR. The pages to change, and the statement they must carry:
   `concurrency` and `compare.threads`, or add instances.
 - Route gating is new work spread across many routers, and the API surface now depends on
   configuration.
-- `approved` no longer implies that a person or a check approved a build: a hosting-only build is
+- `approved` no longer implies that a person or a check approved a build: a hosting-only build with review off is
   `approved` with no snapshots. Clients that read the status (the API, MCP, upstream links) see
   accepted builds with nothing behind them, which is why the UI labels them "Published".
 - Hosting-only is not first-class until two pieces of real work exist: a publish path independent of
@@ -490,7 +494,9 @@ with this ADR. The pages to change, and the statement they must carry:
   the component rows should store more than a hash.
 - Whether Storybook 8 to 10 previews run in a sandboxed iframe without `allow-same-origin` (decision 9).
 - Whether per-story design previews without `uiTesting` justify recording parameters some other way.
-- What review means without snapshots, and whether a project's review switch can make builds wait for sign-off instead of auto-accepting (decision 8; a follow-up ADR on `uiReview`).
+- What review means without snapshots: comment anchors, who may approve, the review status check, and
+  how a `pending` build with review on is purged when nobody reviews it (decision 8; a follow-up ADR on
+  `uiReview`).
 - Whether rolling upgrades with mixed versions need support later; this ADR requires a stop-the-world
   upgrade (decision 4).
 
