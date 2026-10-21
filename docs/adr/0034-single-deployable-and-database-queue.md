@@ -200,14 +200,14 @@ revisit if comments on a published Storybook turn out to be wanted without snaps
 `index.json` is the primary data source of these pages in both modes. `uiTesting` adds data to them; it
 does not change where their skeleton comes from.
 
-- **Library.** Shows accepted builds only: by default the latest accepted build of the default branch,
-  the same source as the project's published Storybook link (`latestApprovedDefault`), with the branch
-  switcher listing the latest accepted build of each branch. Today the library takes the newest build
-  of the branch whatever its status, so this is a change: with `uiTesting`, a pull-request branch
-  appears in the library once its build is approved, and reviewers preview an unreviewed build from its
-  build page. Components are grouped by title, each linking to its component page and into the
-  published Storybook (story and docs links), with tags and story counts. There are no screenshots in
-  the base view. With `uiTesting` it gains thumbnails, statuses, the health panel and design links.
+- **Library.** Shows the latest build of the selected branch whatever its status, as today: the
+  default branch unless another is chosen in the branch switcher, falling back to the default
+  branch's latest build and then to any build. A build under review therefore appears in the
+  library, and a build still being published shows the preparing state, as an uncaptured build shows
+  its empty state today. Components are grouped by title, each linking to its component page and
+  into the published Storybook (story and docs links), with tags and story counts. There are no
+  screenshots in the base view. With `uiTesting` it gains thumbnails, statuses, the health panel and
+  design links.
 - **Component page.** The published story as an iframe preview, the component's stories and docs
   entries, the project-level design links and previews (ADR 0029), and a build history: the builds the
   component appears in and whether its stories changed (added, removed, renamed or moved) since the
@@ -389,8 +389,6 @@ with this ADR. The pages to change, and the statement they must carry:
 - Whether Storybook 8 to 10 previews run in a sandboxed iframe without `allow-same-origin` (decision 9).
 - Whether per-story design previews without `uiTesting` justify recording parameters some other way.
 - Whether build comments belong in `hosting` for builds with no snapshots (decision 8).
-- Whether a pull-request branch awaiting review should stay out of the library until accepted, which
-  is how this ADR reads "the library shows accepted builds only" (decision 9).
 
 ## Implementation order
 
