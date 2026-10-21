@@ -2,7 +2,9 @@
 
 ## Status
 
-Proposed
+Proposed. Companion to ADR 0034 (one deployable, a database queue, no separate worker, and the
+`uiTesting` umbrella option). This ADR assumes it: remote browsers are how rendering scales, and every
+app instance runs the same configuration.
 
 ## Context
 
@@ -149,7 +151,7 @@ The app strips the `/s/<token>` prefix, checks the token, and serves the existin
 derived from `config.secret` for this single purpose (so a token can never be confused with a
 session or another signature). It is verified statelessly, grants read-only access to one build's
 static files and nothing else (no landing page, no API, no other build), and expires shortly after
-the capture's render budget. Remote workers already receive `secret`, so they can mint tokens.
+the capture's render budget. Every app instance has `secret`, so any instance that runs a capture can mint tokens.
 
 Published Storybooks on `publishedBaseDomain` subdomains (ADR 0011) are not used for signed URLs:
 the app only builds those links (`core/src/urls.ts`), it does not serve those hosts itself, so
@@ -175,8 +177,8 @@ commit-status links) asks one resolver, which tries in order:
    script layer), the app stores it, and the page shows it as "detected from your browser" for the
    admin to confirm or replace. The browser's view is used, not the server's: the app does no
    proxy normalization, so behind a TLS-terminating proxy `c.req.url` is the internal
-   `http://host:port`. Background jobs and remote workers read the stored value from the database
-   they already share. This removes the redeploy on every host: the first admin visit to the
+   `http://host:port`. Background jobs, which run inside an app instance, read the stored value from
+   the database. This removes the redeploy on every host: the first admin visit to the
    System page teaches the app its address.
 4. **Nothing found:** features that need an absolute URL are off, with a notice naming the
    setting, rather than guessed.
@@ -286,7 +288,7 @@ const runner = createPlaywrightCaptureRunner({
   ],
 });
 
-createShelfApp({ database, storage, capture: { runner } }); // unchanged
+createShelfApp({ database, storage, uiTesting: { runner } }); // `capture` is renamed in ADR 0034
 ```
 
 Every preset is sugar over one generic constructor, so a provider without a preset needs no new
@@ -386,30 +388,25 @@ For a `reach: "url"` target, core mints the token, resolves the public origin (d
 configured target needs `url` and no public origin resolves, startup fails naming the setting, so
 builds never fail one by one later.
 
-### Remote workers
+### Scaling out
 
-A remote worker (`createCaptureWorker`) builds its own runner, so its `browsers` can disagree with
-what the server validates project settings against. There is no worker registry (a worker's
-heartbeat only extends a job's lease), and this ADR does not add one.
+There is no separate worker (ADR 0034): every app instance runs the same `uiTesting` configuration,
+so every instance has the same `browsers` list and validates project settings against the runner it
+already holds. Rendering scales on the browser side, not by adding processes that need database
+access.
 
-- **The server learns the fleet's targets from the operator.** When the server has no runner of its
-  own (it enqueues to a remote queue), `capture.targets` lists what the fleet offers, in the same
-  shape as the runner's `metadata.targets` (`{ target, reach }`; every entry is `ready`, since the
-  server cannot check a worker's host), and project settings are validated against it at save time.
-  The operator keeps it in step with the workers' `browsers`.
-- **A worker given a target it does not offer fails the job at once, without retries,** with a
-  message naming the target and the targets the worker does offer, so a misconfigured fleet shows
-  one clear error per build instead of jobs retrying until they run out of attempts. This assumes
-  every worker of a fleet offers the same targets (see Open questions).
-- **`sessions` is per runner.** With several workers the operator divides the provider's parallel
-  session limit among them (a plan of 5 with 5 workers means `sessions: 1` each). A shared limit
-  across a fleet (session leases in the database) is not built; add it only if over-provisioning
-  when the fleet scales turns out to be a real problem. A provider refusing a session for capacity
-  is retried with backoff (decision 4), so exceeding the limit costs time, not builds.
-
-A registry where workers report their targets and health is the better long-term answer and could
-replace `capture.targets` later; it is not needed while credentials are operator-level and the
-operator configures every worker anyway.
+- **Pools that differ are presets.** A Firefox and WebKit pool and a Chromium pool are two presets
+  with their own endpoints (`firefox@pool-b`, `chromium@pool-a`). Each target maps to its endpoint,
+  so no job routing is needed, and one job still renders all of a project's engines.
+- **`sessions` is per app instance.** When several instances share one provider plan, the operator
+  divides the provider's parallel-session limit among them. For a self-hosted farm the cap belongs at
+  the farm (Browserless's `CONCURRENT` and `QUEUED`, or a proxy in front of a Playwright server). A
+  shared limit across instances (session leases in the database) is not built; add it only if
+  over-provisioning when the app scales turns out to be a real problem. A provider refusing a
+  session for capacity is retried with backoff (decision 4), so exceeding the limit costs time, not
+  builds.
+- **A target an instance does not offer cannot reach a job,** because instances share one
+  configuration and a settings save for an unknown or unavailable target is refused (decision 7).
 
 ## Consequences
 
@@ -459,10 +456,10 @@ operator configures every worker anyway.
   Puppeteer next to Playwright saves nothing, since Playwright's headless Chromium is also
   chrome-headless-shell; and rendering one engine with two runners lets browser version and fonts
   differ, which the fingerprint reads as a migration.
-- **Per-engine worker pools** (a Firefox pool, a Chromium pool). Not possible today: a job needs a
-  runner that supports all of a project's engines, and a shard keeps a story's engines together so
-  a newly enabled engine can bootstrap from its sibling (ADR 0031 phase 5). It would need
-  engine-level jobs, which reverses that decision.
+- **Per-engine worker pools** (a Firefox pool, a Chromium pool, as separately configured workers).
+  Not needed: pools are presets with their own endpoints (see Scaling out). Routing jobs to pools
+  would need engine-level jobs, which reverses ADR 0031 phase 5's choice to keep a story's engines in
+  one shard so a newly enabled engine can bootstrap from its sibling.
 - **WebdriverIO as the remote runner.** Deferred: the right tool for real devices and real Safari,
   wrong as the default (sessions instead of pages, unpinned browser builds). A future ADR if
   someone needs device coverage.
@@ -475,11 +472,6 @@ operator configures every worker anyway.
   relative paths, but it has not been checked against every fixture.
 - Which providers honour `exposeNetwork` beyond Azure and a self-hosted Playwright server.
 - Whether commit-status APIs accept the relative `target_url` posted today.
-- Remote workers: whether workers of one fleet may differ from each other (for example a separate
-  pool that offers Firefox and WebKit). The worker section assumes they do not. Pools that differ
-  need jobs routed to a pool that has every target of the project, which means a queue or routing
-  key per target group and, for a project that spans pools, engine-level jobs instead of shards
-  that keep a story's engines together.
 
 ## Implementation order
 
