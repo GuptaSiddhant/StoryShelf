@@ -104,9 +104,11 @@ instance has a runner, and the migration guide says so.
   `testing` off leaves them working (decision 8: `review`). Only snapshot-level review goes away
   with the snapshots.
 - **Builds are accepted automatically on the default branch, and elsewhere only when review is off.**
-  With `testing` off, a build on the project's default branch becomes `approved` when it finishes
-  publishing (decisions 9 and 10) whatever the project's `review` setting; a build on any other
-  branch does only if the project has turned `review` off. Nobody reviewed it, so no approval event fires; the `build:created` webhook already
+  A build on the project's default branch is always accepted, whatever `testing` and the project's
+  `review` setting say: with `testing` off it becomes `approved` when it finishes publishing (decisions
+  9 and 10), and with `testing` on it already does when capture finishes, its changes auto-approved
+  (`diffStatus`, `finalBuildStatus`), unless capture failed. A build on any other branch is accepted
+  automatically with `testing` off only if the project has turned `review` off. Nobody reviewed it, so no approval event fires; the `build:created` webhook already
   announces the upload. With `review` on (the default) the build waits as `pending` for build-level
   approval, the same as a captured build waits for its snapshots. The System page states that `testing` is off,
   so an instance in a fleet that was meant to run checks but was not configured is visible, and the
@@ -318,7 +320,9 @@ does not change where their skeleton comes from.
   come only from a capture's `extractParameters`, and without `testing` the component page shows
   the project-level design links only. Reading parameters from the embedded preview in the viewer's
   browser was considered and rejected: it depends on Storybook's internal channel across versions 8
-  to 10. Recording them at publish would need a browser, which hosting-only does not have.
+  to 10. Recording them at publish would need a browser, which hosting-only does not have. Parameters that
+  cannot be determined at build time are left empty: without `testing` there are no per-story design
+  links, no modes and no per-story settings, and nothing treats the absence as an error.
 - **Embedding the preview is a security decision.** Path-based Storybook serving puts a customer's
   Storybook JavaScript on the app's own origin (ADR 0011). Opening the Storybook is an explicit action;
   embedding it in the library and component pages would run it on every visit. The embed therefore
@@ -505,7 +509,6 @@ with this ADR. The pages to change, and the statement they must carry:
 - The catalog and `build_components` shape (decision 9): its size on very large Storybooks, and whether
   the component rows should store more than a hash.
 - Whether Storybook 8 to 10 previews run in a sandboxed iframe without `allow-same-origin` (decision 9).
-- Whether per-story design previews without `testing` justify recording parameters some other way.
 - What review means without snapshots: comment anchors, who may approve, the review status check, and
   how a `pending` build with review on is purged when nobody reviews it (decision 8; a follow-up ADR on
   `review`).

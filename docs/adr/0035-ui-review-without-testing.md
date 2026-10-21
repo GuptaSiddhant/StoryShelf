@@ -69,7 +69,7 @@ What decides the build's status:
 - **`testing` off.** `approved` once the project's required approvals are present
   (`projects.review_approvals`, default 1) and no latest verdict is `rejected`; `rejected` when any
   latest verdict is. Otherwise `pending`.
-- **`testing` on.** Unchanged: the snapshot rollup decides, and approving the last snapshot approves
+- **`testing` on.** Unchanged: on the default branch the build is accepted as it is today; the snapshot rollup decides, and approving the last snapshot approves
   the build. A build-level verdict is available as a sign-off but does not gate, so captured projects
   see no change in when a build turns green.
 
@@ -127,8 +127,8 @@ project's current Storybook.
 When a story carries a design link and a design provider is configured (ADR 0029), the story's review
 view shows the design beside the live story, as the component page does. With `testing` on the link comes
 from the recorded parameters. With `testing` off the catalog comes from `index.json`, which carries no
-story parameters, so the design appears only once the Storybook publishes them some other way; that
-question stays open in ADR 0034. Nothing in review depends on it: the story shows without the design.
+story parameters; they are left empty (ADR 0034 decision 9), so no per-story design is shown. The story
+itself still shows, and nothing in review depends on the design.
 
 ### 5. The changeset without screenshots
 
@@ -206,8 +206,6 @@ a build status.
 
 ## Open questions
 
-- Whether "always accepted" on the default branch also applies when `testing` is on, where snapshot
-  approval establishes the baselines; this ADR leaves captured builds as they are.
 - How git-host statuses and comments are delivered is decided in ADR 0036; this ADR defines which
   statuses and comments exist.
 - Whether the required-approvals count and the retention window are project settings or defaults only.
