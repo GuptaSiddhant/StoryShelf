@@ -97,10 +97,12 @@ StoryShelf/
 ```
 
 **Terminology note:** When working in this repo:
+
 - `"app"` / `"packages/app"` → the **product UI** (Hono JSX + HTMX server, `/api/v1` endpoints, build-review diff pages). Commands: `nub run build`, `nub run lint`, test in `packages/app/`.
 - `"website"` / `"apps/website"` → the **public docs site** (Astro Starlight Markdown docs, SEO, SRI hashes). Commands: `nub run --filter website build`, `nub run --filter website start`. Docs lives in `apps/website/src/content/docs/`.
 
 This distinction matters for:
+
 - Which package to modify (UI vs docs)
 - Which test suite to run (vitest in `packages/` vs hermetic `nub run test` at repo root)
 - Which build command to use
@@ -161,35 +163,36 @@ This distinction matters for:
 
 `docs/architecture.md` is the canonical current-state spec (entity model, interfaces, workflow). ADRs record decisions and rationale, and reference `architecture.md` rather than duplicating schemas or interfaces.
 
-| ADR | Title |
-|-----|-------|
-| 0001 | Adapter Composition Pattern (constructor injection, not AsyncLocalStorage) |
-| 0002 | SQLite + Turso for Database (Drizzle ORM, same schema both drivers) |
-| 0003 | Server-Side Capture (upload Storybook, render asynchronously) |
-| 0004 | Pixel Diff Engine (pixelmatch + pngjs) |
-| 0005 | Storybook-Only for v1 (Ladle/Histoire deferred to v2) |
-| 0006 | Storage Adapter (local filesystem + S3-compatible) |
-| 0007 | Rewrite from Scratch (extract patterns from StoryBooker, not code) |
-| 0008 | Auth as Pluggable Adapter (OAuth/OIDC, shared password, or none) |
-| 0009 | Per-Branch Baselines with Fallback + Retention & Purge |
-| 0010 | Git Provider Merge Gate (status checks now, GitHub App later) |
-| 0011 | Project Identity & Published Storybook (project = Storybook, public access) |
-| 0012 | Fixed Server-Rendered UI (header + sidebar, system theme, three-up diff) |
-| 0013 | Build Labels (project-defined types, search + link templates + stable URLs) |
-| 0014 | Pino as Core Logger (structured logs, transports via factory, request tracing) |
-| 0022 | OpenTelemetry Observability (traces/metrics via `@storyshelf/observability`, logs stay on stdout) |
-| 0015 | Pure Capture Renderer Adapter (capture adapters render only; server orchestrator owns loading/extraction/persistence) |
-| 0016 | Server Scaffolding Over Rigid Package (`storyshelf server init` generates the server; no universal server package) |
-| 0017 | Interaction Testing via Storybook `play` Function (executePlay, flaky/blocked/disabled semantics) |
-| 0018 | Split Core (Domain) from App (HTTP) |
-| 0019 | Shared HTTP Helper in Core (`httpJson`/`HttpError` with timeout + retry; no client libraries) |
-| 0025 | UI Redesign (neutral shell, derived brand tokens, icon sprite, review workspace) |
-| 0026 | AI Epic (`@storyshelf/ai` singleton on Vercel AI SDK, insights first) |
-| 0027 | MCP Server (`@storyshelf/mcp`, thin client over `/api/v1`, stdio + HTTP, read + comment only) |
-| 0028 | Modes and Multi-Browser Capture (named modes from parameters, per-engine baselines, shared approval) |
-| 0029 | Design Provider Adapter (`@storyshelf/design-figma`; vendor-neutral links, cache and credentials in core) |
-| 0030 | User OAuth Connections (service-neutral "Connect your account": `OAuthClient`, `user_connections`, shared `/connections/:service` flow) |
-| 0032 | Image Engines (`@storyshelf/image` leaf package; opt-in `sharp` codec; pixelmatch stays the comparator) |
+| ADR  | Title                                                                                                                                                                                                   |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0001 | Adapter Composition Pattern (constructor injection, not AsyncLocalStorage)                                                                                                                              |
+| 0002 | SQLite + Turso for Database (Drizzle ORM, same schema both drivers)                                                                                                                                     |
+| 0003 | Server-Side Capture (upload Storybook, render asynchronously)                                                                                                                                           |
+| 0004 | Pixel Diff Engine (pixelmatch + pngjs)                                                                                                                                                                  |
+| 0005 | Storybook-Only for v1 (Ladle/Histoire deferred to v2)                                                                                                                                                   |
+| 0006 | Storage Adapter (local filesystem + S3-compatible)                                                                                                                                                      |
+| 0007 | Rewrite from Scratch (extract patterns from StoryBooker, not code)                                                                                                                                      |
+| 0008 | Auth as Pluggable Adapter (OAuth/OIDC, shared password, or none)                                                                                                                                        |
+| 0009 | Per-Branch Baselines with Fallback + Retention & Purge                                                                                                                                                  |
+| 0010 | Git Provider Merge Gate (status checks now, GitHub App later)                                                                                                                                           |
+| 0011 | Project Identity & Published Storybook (project = Storybook, public access)                                                                                                                             |
+| 0012 | Fixed Server-Rendered UI (header + sidebar, system theme, three-up diff)                                                                                                                                |
+| 0013 | Build Labels (project-defined types, search + link templates + stable URLs)                                                                                                                             |
+| 0014 | Pino as Core Logger (structured logs, transports via factory, request tracing)                                                                                                                          |
+| 0022 | OpenTelemetry Observability (traces/metrics via `@storyshelf/observability`, logs stay on stdout)                                                                                                       |
+| 0015 | Pure Capture Renderer Adapter (capture adapters render only; server orchestrator owns loading/extraction/persistence)                                                                                   |
+| 0016 | Server Scaffolding Over Rigid Package (`storyshelf server init` generates the server; no universal server package)                                                                                      |
+| 0017 | Interaction Testing via Storybook `play` Function (executePlay, flaky/blocked/disabled semantics)                                                                                                       |
+| 0018 | Split Core (Domain) from App (HTTP)                                                                                                                                                                     |
+| 0019 | Shared HTTP Helper in Core (`httpJson`/`HttpError` with timeout + retry; no client libraries)                                                                                                           |
+| 0025 | UI Redesign (neutral shell, derived brand tokens, icon sprite, review workspace)                                                                                                                        |
+| 0026 | AI Epic (`@storyshelf/ai` singleton on Vercel AI SDK, insights first)                                                                                                                                   |
+| 0027 | MCP Server (`@storyshelf/mcp`, thin client over `/api/v1`, stdio + HTTP, read + comment only)                                                                                                           |
+| 0028 | Modes and Multi-Browser Capture (named modes from parameters, per-engine baselines, shared approval)                                                                                                    |
+| 0029 | Design Provider Adapter (`@storyshelf/design-figma`; vendor-neutral links, cache and credentials in core)                                                                                               |
+| 0030 | User OAuth Connections (service-neutral "Connect your account": `OAuthClient`, `user_connections`, shared `/connections/:service` flow)                                                                 |
+| 0032 | Image Engines (`@storyshelf/image` leaf package; opt-in `sharp` codec; pixelmatch stays the comparator)                                                                                                 |
+| 0033 | Remote Browsers and Public Origin (`remote` connect option + provider presets, in-browser fingerprint, `<engine>@<preset>` baselines, `exposeNetwork` or signed Storybook URLs, public-origin resolver) |
 
 ## Parallel Development with Worktrees
 
@@ -222,12 +225,12 @@ nubx turbo verify --filter='@storyshelf/core' --force  # verify baseline
 
 ### Wave Assignment (file-disjoint = safe to parallel)
 
-| Wave | Tasks | Concurrent | Notes |
-|------|-------|------------|-------|
-| 1 | P1-1 + P1-2 | 2 | Schema/migrations + middleware/token — 0 file overlap |
-| 2 | P2-3 + P2-4 + P3-2 | 3 | New test files + turbo.json — 0 overlap |
-| 3 | P2-1 + P2-2 + P3-1 | 3 | Config + webhook + queue — serialized on `adapters/` |
-| 4 | P3-3 + P4-* | as needed | Comment validation + future tasks |
+| Wave | Tasks              | Concurrent | Notes                                                 |
+| ---- | ------------------ | ---------- | ----------------------------------------------------- |
+| 1    | P1-1 + P1-2        | 2          | Schema/migrations + middleware/token — 0 file overlap |
+| 2    | P2-3 + P2-4 + P3-2 | 3          | New test files + turbo.json — 0 overlap               |
+| 3    | P2-1 + P2-2 + P3-1 | 3          | Config + webhook + queue — serialized on `adapters/`  |
+| 4    | P3-3 + P4-*        | as needed  | Comment validation + future tasks                     |
 
 ### Finishing a Task
 
@@ -253,6 +256,7 @@ git branch -d task/P1-1-indexes
 All task branches must be **squash-merged** into `main` — never fast-forward or regular merge. This keeps `git log --oneline` clean and each task = one commit.
 
 Format:
+
 ```
 feat(<task-id>): <short description>
 
