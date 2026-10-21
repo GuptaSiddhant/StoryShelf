@@ -55,11 +55,11 @@ createShelfApp({
 createShelfApp({ database, storage }); // hosting only: uiTesting is off
 ```
 
-- **Absent:** Storybook hosting only. Uploads, published Storybooks, projects, tokens, members and
-  the library and component pages (built from Storybook metadata, decision 9) keep working. Capture,
-  compare (including re-diff), review pages and APIs, baselines (import, export, approval), commit
-  statuses (they are posted by the capture job), the capture settings, the compute-jobs page and the
-  features that read snapshots (AI triage) are off.
+- **Absent:** Storybook hosting only. Uploads, published Storybooks, projects, tokens, members and the
+  build, library and component pages (built from Storybook metadata, decision 9) keep working.
+  Capture, compare (including re-diff), review pages and APIs, baselines (import, export, approval),
+  commit statuses (they are posted by the capture job), the capture settings, the compute-jobs page
+  and the features that read snapshots (AI triage) are off.
 - **`compare` moves under `uiTesting`.** ADR 0031 phase 2 kept it top-level so re-diff works with
   nothing rendering locally; with no separate worker, an instance that needs compare is an instance
   with `uiTesting`.
@@ -69,8 +69,10 @@ createShelfApp({ database, storage }); // hosting only: uiTesting is off
   instance. Which routes are gated, and the test that keeps the list honest, is decision 8.
 - **Existing data is hidden, not deleted.** Turning `uiTesting` off on a deployment that has
   snapshots hides them; startup logs it and the System page shows a notice with the count.
-- **Pending builds are never silent.** When `uiTesting` is off and builds are pending, the System page
-  says so, and the CLI's upload output says the Storybook was published but no checks will run.
+- **Builds are shown as published, not pending.** Without `uiTesting` a build's stored status stays
+  `pending`, which means "no checks have run", not "stuck" (decision 9). The System page states that
+  `uiTesting` is off, so an instance in a fleet that was meant to run checks but was not configured is
+  visible, and the CLI's upload output says the Storybook was published but no checks will run.
 
 ### 2. `uiTesting` requires a long-running server
 
@@ -183,7 +185,7 @@ three classes:
 | ----------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `hosting`   | Available with and without `uiTesting`                   | Projects, tokens, members, labels, auth, webhooks; the build routes for upload, zip, dedup, content, manifest and listing; Storybook serving                                                                                                                                                                          |
 | `uiTesting` | 404 without `uiTesting`                                  | Snapshots (list, approve, reject, approve-all, per-mode), baselines export and import, attempts and their logs, status configs, build comments (review), insights (AI triage, which also needs `ai`), the capture and status settings pages, the compute-jobs page, the build diff page, review-next, snapshot groups |
-| `both`      | The page exists in both modes and its sections are gated | Build detail (snapshot list, statuses and attempts only with `uiTesting`), project overview (build statuses), library and component pages (decision 9)                                                                                                                                                                |
+| `both`      | The page exists in both modes and its sections are gated | Build list and detail (snapshot list, statuses, attempts and approvals only with `uiTesting`), project overview, library and component pages (decision 9)                                                                                                                                                             |
 
 The classification lives in one route table in code. Two tests keep it honest: one enumerates every
 route the app registers and fails on any that is not classified, so a new route has to declare its
@@ -192,27 +194,42 @@ and no `hosting` route does. The same table drives the navigation, the MCP tool 
 marker. Build comments are classed `uiTesting` because comments are the review step; that is easy to
 revisit if comments on a published Storybook turn out to be wanted without snapshots.
 
-### 9. The library and component pages stay, built from Storybook metadata
+### 9. The library, component and build pages are built from Storybook metadata, with or without `uiTesting`
 
-Both pages exist in both modes, on the same routes.
+`index.json` is the primary data source of these pages in both modes. `uiTesting` adds data to them; it
+does not change where their skeleton comes from.
 
-- **Without `uiTesting`**, the library is a catalog of the components in the latest published build of
-  the selected branch (the same selection rule as today), grouped by title, listing each component's
-  stories and docs entries with their tags and links into the published Storybook. A component page
-  shows that component's metadata (title, file, stories, docs entries) and the same links. There are
-  no screenshots, statuses, history or design previews.
-- **With `uiTesting`**, the same pages gain the snapshot gallery, status roll-ups, per-build history,
-  moved-or-deleted detection and design previews, as today.
-- **Data source.** The published build's `index.json` (stories and docs entries), read from the
-  persisted statics by the reader the library already uses for docs entries. A build's index never
-  changes, so the parsed catalog is cached in-process by build id in a bounded LRU; there is no schema
-  change. A `build_stories` table is the answer if catalogs of many thousands of entries make parsing
-  slow.
-- **Not available without `uiTesting`:** anything that comes from the running preview and not the
-  index, namely resolved parameters. Design links (ADR 0029) and modes need the runner's
-  `extractParameters`.
-- **Structure.** Each page becomes one view over two data providers: the metadata catalog, always, and
-  the snapshots enrichment, only with `uiTesting`.
+- **Library.** Shows the default branch's latest published build by default, with the branch switcher
+  it has today. Components are grouped by title, each linking to its component page and into the
+  published Storybook (story and docs links), with tags and story counts. There are no screenshots in
+  the base view. With `uiTesting` it gains thumbnails, statuses, the health panel and design links.
+- **Component page.** The published story as an iframe preview, the component's stories and docs
+  entries, the project-level design links and previews (ADR 0029), and a build history: the builds the
+  component appears in and whether its stories changed (added, removed, renamed or moved) since the
+  build before. With `uiTesting` it gains per-story snapshot status and diffs, history with statuses,
+  moved-or-deleted detection and per-story design previews.
+- **Build pages.** The list and detail pages exist to show uploads without a capture pipeline: sha,
+  branch, author, message, size, labels, the link to the published Storybook, and component and story
+  counts from the catalog. Without `uiTesting`, `pending` is shown as "Published". Snapshots, statuses,
+  attempts and approvals appear only with `uiTesting`. Enabling `uiTesting` later does not capture
+  builds published before it; they can be captured on demand with the existing retry.
+- **Data.** Extraction at publish (decision 10) also writes a compact catalog for the build (entry id,
+  title, name, import path, type, tags) next to its statics, and one `build_components` row per
+  component (project, build, import path, title, story count, a hash of the component's entries). The
+  catalog serves the library and component pages, cached in-process by build id; the table answers
+  "which builds contain this component, and did it change" with one indexed query. Both are purged
+  with the build. Builds published before this change are catalogued lazily on first view, from their
+  persisted statics.
+- **Not in `index.json`:** resolved parameters. Per-story design links (ADR 0029) and modes therefore
+  come only from a capture's `extractParameters`, and without `uiTesting` the component page shows
+  the project-level design links only. Reading parameters from the embedded preview in the viewer's
+  browser was considered and rejected: it depends on Storybook's internal channel across versions 8 to 10. Recording them at publish would need a browser, which hosting-only does not have.
+- **Embedding the preview is a security decision.** Path-based Storybook serving puts a customer's
+  Storybook JavaScript on the app's own origin (ADR 0011). Opening the Storybook is an explicit action;
+  embedding it in the library and component pages would run it on every visit. The embed therefore
+  uses the separate published origin (`publishedBaseDomain`) when configured, and otherwise is
+  click-to-load in a sandboxed iframe with a link out. Whether Storybook 8 to 10 previews run correctly
+  in a sandbox without `allow-same-origin` is unverified and is settled before the embed ships.
 
 ### 10. Publishing does not depend on `uiTesting`
 
@@ -229,7 +246,7 @@ claim per build, like the finalize claim), so a restart or another instance can 
 "preparing" page and the Storybook route retry it when no claim is live. `maxInlineUnzipSize` stays
 as the threshold between inline and background and gets a safe default, so leaving it unset no longer
 means "never". With `uiTesting` the capture job still backfills the same keys. The claim and retry
-details are settled at implementation.
+details are settled at implementation. Extraction also writes the catalog that decision 9 reads.
 
 ### 11. Operating details
 
@@ -326,7 +343,8 @@ with this ADR. The pages to change, and the statement they must carry:
 - Route gating is new work spread across many routers, and the API surface now depends on
   configuration.
 - Hosting-only is not first-class until two pieces of real work exist: a publish path independent of
-  capture (decision 10) and a metadata catalog for the library and component pages (decision 9).
+  capture (decision 10) and the catalog, with its `build_components` table, behind the library,
+  component and build pages (decision 9).
 
 ## Alternatives considered
 
@@ -348,7 +366,10 @@ with this ADR. The pages to change, and the statement they must carry:
   acceptance test in decision 11.
 - The details of the publish claim and its retry (decision 10).
 - Whether Vercel exposes a runtime-only signal, so the serverless check can refuse there too.
-- Whether a `build_stories` table is needed for very large catalogs (decision 9).
+- The catalog and `build_components` shape (decision 9): its size on very large Storybooks, and whether
+  the component rows should store more than a hash.
+- Whether Storybook 8 to 10 previews run in a sandboxed iframe without `allow-same-origin` (decision 9).
+- Whether per-story design previews without `uiTesting` justify recording parameters some other way.
 - Whether build comments belong in `hosting` for builds with no snapshots (decision 8).
 
 ## Implementation order
@@ -360,7 +381,9 @@ with this ADR. The pages to change, and the statement they must carry:
    on its own.
 3. **The route table and the two tests** (decision 8), with every route classified as it behaves
    today. No behaviour change.
-4. **The metadata catalog for the library and component pages** (decision 9), used in both modes.
+4. **The catalog and the library, component and build pages built from it** (decisions 9 and 10), in
+   both modes: publish writes the catalog and `build_components`, and the pages read them, with
+   snapshot data layered on when present.
 5. **`uiTesting`**: the rename, the `compare` move, the gating, the notices and the serverless check.
    This is the breaking step.
 6. **Remove the in-memory queue and the boot recovery sweep;** forked capture's parent becomes the
