@@ -80,14 +80,14 @@ build, as snapshot approvals do.
 
 With `testing` off, build creation posts `pending` and the verdict posts `success` or `failure`,
 through the same status providers and per-project credentials as today (ADR 0010), under the context
-`storyshelf/review`. With `testing` on the existing status stays the only status and its description
+`<prefix>/review`, where the prefix is the git channel's configurable name, default `storyshelf` (ADR 0036). With `testing` on the existing status stays the only status and its description
 says whether review is still open; review does not add a second required check. The status poster moves
 out of the capture pipeline into a small function of build state that both paths call, so a build that
 was never captured can still post one. A project with no git status configured posts nothing.
 
 ### 4a. A published-Storybook status on every build
 
-Every build with a commit SHA gets a status under the context `storyshelf/storybook`, whatever `testing`
+Every build with a commit SHA gets a status under the context `<prefix>/storybook`, whatever `testing`
 and `review` are set to: `success` when publishing finishes, with the published Storybook's URL as its
 target, `failure` if publishing fails. It is informational, not a merge gate, and a repository would not
 mark it required. It gives hosting-only projects the same pull-request link to the Storybook that
@@ -208,8 +208,6 @@ a build status.
 
 - Whether "always accepted" on the default branch also applies when `testing` is on, where snapshot
   approval establishes the baselines; this ADR leaves captured builds as they are.
-- Whether `storyshelf/review` and `storyshelf/storybook` should follow the capture status's naming,
-  `storyshelf/<project slug>`, or stay fixed names (a fixed name is easier to mark required).
 - How git-host statuses and comments are delivered is decided in ADR 0036; this ADR defines which
   statuses and comments exist.
 - Whether the required-approvals count and the retention window are project settings or defaults only.

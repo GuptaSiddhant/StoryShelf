@@ -38,9 +38,17 @@ two packages, and is used in one place (`capture/skip-checks.ts`).
   wins: a commit status for `(sha, context)`, and a pull-request comment for `(build)`.
 
 `ShelfOptions.gitHosts` is removed; git providers are listed in `ShelfOptions.notifiers`. This is a
-breaking change, accepted. `git-github` and `git-gitlab` keep their names and now export notifier
-providers, since what they integrate with is a git host. Channels are rows of `notification_channels`;
-a channel's provider decides its delivery.
+breaking change, accepted. Channels are rows of `notification_channels`; a channel's provider decides
+its delivery.
+
+### 1a. One package: `@storyshelf/notify-git`
+
+`@storyshelf/git-github` and `@storyshelf/git-gitlab` fold into a new `@storyshelf/notify-git`, named
+like `notify-chat` and `notify-email`, with `github` and `gitlab` as its providers (and a `log`
+provider for tests and local runs). It is a package, not part of `@storyshelf/core`, because it owns
+the `@octokit` dependencies and core carries none of the provider SDKs (the single-owner rule for
+third-party dependencies). The two old packages are retired and logged in `docs/deprecated.md`; their
+exports are not kept.
 
 ### 2. One table, migrated
 
@@ -50,11 +58,17 @@ not to a topic list. The migration runs at boot for one release, as the other mi
 0034 do, and credentials keep the same encryption and the same `secret` rules. The status settings page
 and the notification channels page become one page.
 
-### 3. Statuses are a function of build state
+### 3. Statuses are a function of build state, with configurable names
 
-A single function maps a build to the list of states its channels should show: the capture status
-(`storyshelf/<project slug>`, when `testing` is on), `storyshelf/review` and `storyshelf/storybook`
-(ADR 0035). It is called on every build transition and when publishing finishes. The transport never
+A single function maps a build to the list of states its channels should show: the testing status
+(when `testing` is on), the review status and the published-Storybook status (ADR 0035).
+
+Their names are `<prefix>/testing`, `<prefix>/review` and `<prefix>/storybook`. The prefix is a field of
+the git channel's config, default `storyshelf`, with no project slug. A repository that holds several
+projects sets a different prefix per channel (`storyshelf-web`, `storyshelf-docs`) so their statuses do
+not collide and each can be marked required on its own. Existing branch protection that requires
+`storyshelf/<slug>` has to be updated once; the migration (decision 2) logs each project's old and new
+name. It is called on every build transition and when publishing finishes. The transport never
 sees an event it must order: it sees "make the host show the current state of this build".
 
 ### 4. Durable, latest-wins delivery
@@ -110,8 +124,8 @@ comment support skips it, as today.
 
 **Negative**
 
-- A breaking change: `ShelfOptions.gitHosts` is removed, the table is migrated, the two packages change
-  their exported shape.
+- A breaking change: `ShelfOptions.gitHosts` is removed, the table is migrated, the two packages are
+  replaced by one, and required-status names change once.
 - Delivery is now asynchronous: a status can lag the build change by a polling interval (ADR 0034 uses
   2 s while busy), where today it is posted inline.
 - Hosting-only instances without a consumer get no durability for statuses.
@@ -127,8 +141,6 @@ comment support skips it, as today.
 
 ## Open questions
 
-- Whether `git-github` and `git-gitlab` should be renamed to match a notifier naming scheme; they are
-  published packages, and the rename buys little.
 - Whether a future GitHub App (ADR 0010 v2) is another provider of the same kind, with check runs as a
   third `state` target, or needs its own contract.
 - Polling cadence and cost for the `notify` jobs on Turso (ADR 0034's metering question).
@@ -136,7 +148,8 @@ comment support skips it, as today.
 
 ## Implementation order
 
-1. The merged provider contract, the `notification_channels` migration and the unified settings page.
+1. The merged provider contract, the `@storyshelf/notify-git` package (moving the two providers, with
+   their tests), the `notification_channels` migration and the unified settings page.
 2. The state function (decision 3) and inline delivery through the new providers, replacing
    `postStatusesForBuild`.
 3. `notify` jobs on the queue, retries, failure surfacing and `sys:notify-failed`.
