@@ -91,6 +91,9 @@ instance has a runner, and the migration guide says so.
   instance. Which routes are gated, and the test that keeps the list honest, is decision 8.
 - **Existing data is hidden, not deleted.** Turning `uiTesting` off on a deployment that has
   snapshots hides them; startup logs it and the System page shows a notice with the count.
+- **Review is not disabled with it.** Comments and approval also exist at build level, so turning
+  `uiTesting` off leaves them working (decision 8: `uiReview`). Only snapshot-level review goes away
+  with the snapshots.
 - **Builds are accepted automatically.** With no checks to wait for, a build becomes `approved` when
   it finishes publishing (decisions 9 and 10). Nobody reviewed it, so no approval event fires; the
   `build:created` webhook already announces the upload. The System page states that `uiTesting` is off,
@@ -237,11 +240,11 @@ next to the diff page), so the gate is per route, not per router. An audit of to
 three classes. The table names representative routes; the route table in code is the full list,
 and the completeness test is what makes it so:
 
-| Class       | Meaning                                                  | Routes                                                                                                                                                                                                                                                                                                                                           |
-| ----------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `hosting`   | Available with and without `uiTesting`                   | Projects, tokens, members, labels, auth, webhooks; the build upload (zip, dedup, content, manifest), listing and delete routes; Storybook serving                                                                                                                                                                                                |
-| `uiTesting` | 404 without `uiTesting`                                  | Snapshots (list, approve, reject, approve-all, reject-all, rediff, per-mode), snapshot media and design renders, baselines export and import, attempts and their logs, status configs, build comments (review), insights (also needs `ai`), the capture, status and test settings pages, the compute-jobs page, build retry, the build diff page |
-| `both`      | The page exists in both modes and its sections are gated | Build list and detail pages (snapshot list, statuses, attempts and approvals only with `uiTesting`), library and component pages (decision 9); `/projects/:slug` redirects to the library                                                                                                                                                        |
+| Class       | Meaning                                                  | Routes                                                                                                                                                                                                                                                                                                                  |
+| ----------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hosting`   | Available with and without `uiTesting`                   | Projects, tokens, members, labels, auth, webhooks; the build upload (zip, dedup, content, manifest), listing and delete routes; Storybook serving                                                                                                                                                                       |
+| `uiTesting` | 404 without `uiTesting`                                  | Snapshots (list, approve, reject, approve-all, reject-all, rediff, per-mode), snapshot media and design renders, baselines export and import, attempts and their logs, status configs, insights (also needs `ai`), the capture, status and test settings pages, the compute-jobs page, build retry, the build diff page |
+| `both`      | The page exists in both modes and its sections are gated | Build list and detail pages (snapshot list, statuses and attempts only with `uiTesting`; build-level comments and approval in both), library and component pages (decision 9); `/projects/:slug` redirects to the library                                                                                               |
 
 The classification lives in one route table in code. Two tests keep it honest: one enumerates every
 route the app registers and fails on any that is not classified, so a new route has to declare its
@@ -276,7 +279,7 @@ does not change where their skeleton comes from.
   moved-or-deleted detection and per-story design previews.
 - **Build pages.** The list and detail pages exist to show uploads without a capture pipeline: sha,
   branch, author, message, size, labels, the link to the published Storybook, and component and story
-  counts from the catalog. Snapshots, statuses, attempts and approvals appear only with `uiTesting`.
+  counts from the catalog. Snapshots, statuses and attempts appear only with `uiTesting`; build-level comments and approval do not depend on it.
 - **Without `uiTesting`, every build is accepted when it finishes publishing.** This is required, not
   cosmetic. The project's Storybook link and the upstream links resolve only accepted builds, and
   retention purges only terminal builds (`approved`, `rejected`, `failed`), so a build left `pending`
