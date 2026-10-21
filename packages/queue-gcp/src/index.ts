@@ -18,6 +18,8 @@ import { enqueuePubSub, pubSubActive, pubSubRecent, pubSubStatus } from "./opera
 import { ackPubSub, extendPubSub, nackPubSub, pollPubSub } from "./poll.ts";
 import type { GcpPubSubQueueOptions } from "./types.ts";
 
+declare const __PKG_VERSION__: string | undefined;
+
 /**
  * Create a GCP Pub/Sub-backed `PollableCaptureQueue`.
  *
@@ -84,7 +86,7 @@ export function createGcpPubSubQueue(options: GcpPubSubQueueOptions): PollableCa
 function buildPubSubMetadata(): PollableCaptureQueue["metadata"] {
   return {
     name: "GCP Pub/Sub Queue",
-    version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
+    version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
     description: "GCP Pub/Sub capture queue with dead-lettering",
     kind: "gcp-pubsub",
     category: "capture-queue",

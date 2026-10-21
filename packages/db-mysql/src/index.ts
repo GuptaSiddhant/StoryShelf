@@ -71,7 +71,7 @@ export function createMysqlDatabase(options: MysqlDatabaseOptions): DatabaseAdap
   return createDrizzleMySqlAdapter(db, {
     metadata: {
       name: "MySQL",
-      version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
+      version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
       description: "MySQL/MariaDB database adapter (mysql2 + Drizzle)",
       kind: "mysql",
       category: "database",

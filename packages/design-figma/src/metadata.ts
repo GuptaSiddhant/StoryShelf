@@ -6,7 +6,7 @@ declare const __PKG_VERSION__: string | undefined;
 export function getMetadata(): DesignProvider["metadata"] {
   return {
     name: "Figma",
-    version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
+    version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
     description: "Figma links, file metadata and rendered previews via the Figma REST API",
     kind: "figma",
     category: "design",

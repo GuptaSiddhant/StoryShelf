@@ -47,7 +47,7 @@ export function createEmailNotifier(
 export function getMetadata(): NotifierProvider["metadata"] {
   return {
     name: "Email",
-    version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
+    version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
     description: "Email notifications over a shared SMTP/HTTP transport",
     kind: "email",
     category: "notifier",

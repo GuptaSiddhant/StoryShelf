@@ -29,7 +29,7 @@ interface TeamsAdapterOptions {
 export function getMetadata(): NotifierProvider["metadata"] {
   return {
     name: "Microsoft Teams",
-    version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
+    version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
     description: "Chat messages via Teams workflow webhooks",
     kind: "teams-workflow",
     category: "notifier",

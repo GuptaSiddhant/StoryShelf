@@ -20,7 +20,7 @@ export function createLocalStorage(dataDir: string): StorageAdapter {
   return {
     metadata: {
       name: "Local Storage",
-      version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
+      version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
       description: "Local filesystem storage adapter",
       kind: "local",
       category: "storage",

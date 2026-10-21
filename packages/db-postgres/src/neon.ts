@@ -51,7 +51,7 @@ export function createNeonDatabase(options: NeonDatabaseOptions): DatabaseAdapte
   return createDrizzlePgAdapter(db, {
     metadata: {
       name: "Neon",
-      version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
+      version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
       description: "Neon Postgres database adapter (serverless driver + Drizzle)",
       kind: "neon",
       category: "database",

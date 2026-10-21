@@ -47,7 +47,7 @@ export function createTursoDatabase(options: TursoDatabaseOptions): DatabaseAdap
   return createDrizzleAdapter(db, {
     metadata: {
       name: "Turso",
-      version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
+      version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
       description: "Turso/libSQL database adapter",
       kind: "turso",
       category: "database",

@@ -41,7 +41,7 @@ export function createSqsCaptureQueue(options: SqsCaptureQueueOptions): Pollable
   return {
     metadata: {
       name: "SQS Queue",
-      version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
+      version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
       description: "SQS-backed capture queue",
       kind: "sqs",
       category: "capture-queue",

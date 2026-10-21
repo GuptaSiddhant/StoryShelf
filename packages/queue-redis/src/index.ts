@@ -37,7 +37,7 @@ export function createRedisCaptureQueue(options: RedisCaptureQueueOptions): Poll
   return {
     metadata: {
       name: "Redis Queue",
-      version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
+      version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
       description: "Redis-backed capture queue",
       kind: "redis",
       category: "capture-queue",

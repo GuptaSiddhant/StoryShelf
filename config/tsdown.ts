@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import type { Plugin } from "rolldown";
 import type { UserConfig } from "tsdown";
 import { generateDenoConfig } from "./deno.ts";
 
@@ -15,6 +16,31 @@ function readVersion(): string {
   }
 }
 
+// Defines replace bare identifiers only, so a `globalThis.__PKG_VERSION__` (or
+// `globalThis["__PKG_VERSION__"]`) read ships unreplaced and always falls back.
+const MEMBER_VERSION_READ = /(?:\.\s*|\[\s*["'`])__PKG_VERSION__/u;
+
+/**
+ * Fails the build on a member read of `__PKG_VERSION__`. Read it as a bare identifier behind a
+ * `typeof` guard instead: `typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0"`.
+ */
+export function pkgVersionGuard(): Plugin {
+  return {
+    name: "storyshelf:pkg-version-guard",
+    transform: {
+      filter: { id: { include: /\/src\/.*\.tsx?$/u } },
+      handler(code, id) {
+        if (MEMBER_VERSION_READ.test(code)) {
+          this.error(
+            `${id}: read __PKG_VERSION__ as a bare identifier (typeof guard), not a member of globalThis`,
+          );
+        }
+        return null;
+      },
+    },
+  };
+}
+
 function getBaseOptions(): Partial<UserConfig> {
   return {
     platform: "node" as const,
@@ -28,6 +54,7 @@ function getBaseOptions(): Partial<UserConfig> {
     clean: !isWatchMode,
     onSuccess: generateDenoConfig,
     define: { __PKG_VERSION__: JSON.stringify(readVersion()) },
+    plugins: [pkgVersionGuard()],
   };
 }
 

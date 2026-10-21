@@ -62,7 +62,7 @@ interface Waiter {
 export class ForkedCaptureQueue implements CaptureQueue {
   readonly metadata = {
     name: "Forked Queue",
-    version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
+    version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
     description: "Parent side of a forked capture child",
     kind: "forked",
     category: "capture-queue",

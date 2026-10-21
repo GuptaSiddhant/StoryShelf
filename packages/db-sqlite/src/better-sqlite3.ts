@@ -55,7 +55,7 @@ export function createBetterSqlite3Database(
   const adapter = createDrizzleAdapter(db, {
     metadata: {
       name: "better-sqlite3",
-      version: (globalThis as unknown as { __PKG_VERSION__?: string }).__PKG_VERSION__ ?? "0.0.0",
+      version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
       description: "better-sqlite3 database adapter (native + Drizzle)",
       kind: "better-sqlite3",
       category: "database",
