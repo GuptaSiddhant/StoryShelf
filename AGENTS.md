@@ -53,7 +53,7 @@ See `docs/repo-structure.md` for the annotated map (workspaces vs fixtures, bund
 StoryShelf/
   packages/
     core/           @storyshelf/core           -- Adapter interfaces, models, capture pipeline, diff, retention (no HTTP)
-    app/            @storyshelf/app         -- Hono app, API routes, server-rendered UI over core (see ADR 0018)
+    app/            @storyshelf/app         -- Hono app, API routes, server-rendered UI over core (see ADR 0001)
     db-sqlite/      @storyshelf/db-sqlite      -- SQLite database adapters (node:sqlite default + turso/better-sqlite3/bun-sqlite/d1 presets via subpaths)
     db-postgres/    @storyshelf/db-postgres     -- Postgres database adapters (postgres.js default + pg/neon/neon-http/vercel/pglite presets via subpaths)
     db-mysql/       @storyshelf/db-mysql        -- MySQL/MariaDB database adapters (mysql2 default + planetscale/tidb presets via subpaths)
@@ -61,8 +61,8 @@ StoryShelf/
     storage-s3/     @storyshelf/storage-s3     -- S3-compatible storage adapter (S3, R2, MinIO)
     storage-azure/  @storyshelf/storage-azure  -- Azure Blob Storage adapter
     storage-gcs/    @storyshelf/storage-gcs    -- Google Cloud Storage adapter
-    image/          @storyshelf/image           -- Pixel diff, overlay rendering and thumbnails on a worker pool; pngjs default codec, optional sharp (leaf package, see ADR 0032)
-    auth/           @storyshelf/auth            -- Better Auth engine (local accounts, OAuth/OIDC, SSO, passkeys; see ADR 0023)
+    image/          @storyshelf/image           -- Pixel diff, overlay rendering and thumbnails on a worker pool; pngjs default codec, optional sharp (leaf package, see ADR 0008)
+    auth/           @storyshelf/auth            -- Better Auth engine (local accounts, OAuth/OIDC, SSO, passkeys; see ADR 0011)
     cli/            storyshelf              -- CLI client (commander; upload/init/create/server/retry/purge, no Playwright)
     runner-playwright/ @storyshelf/runner-playwright -- pure Playwright CaptureRenderer (server-side render; core orchestrator owns capture)
     runner-puppeteer/  @storyshelf/runner-puppeteer  -- Puppeteer CaptureRunner (Chromium via chrome-headless-shell, smaller image)
@@ -70,16 +70,16 @@ StoryShelf/
     affected/       @storyshelf/affected        -- Affected capture: dependency-graph tracing that selects the stories impacted by a change
     git-github/     @storyshelf/git-github      -- GitHub status checks, PR comments, merge-gate helpers (@octokit)
     git-gitlab/     @storyshelf/git-gitlab      -- GitLab commit statuses, MR comments, merge-gate helpers
-    design-figma/   @storyshelf/design-figma    -- Figma design provider: link validation, file metadata, rendered previews (optional; see ADR 0029)
+    design-figma/   @storyshelf/design-figma    -- Figma design provider: link validation, file metadata, rendered previews (optional; see ADR 0018)
     queue-sqs/      @storyshelf/queue-sqs       -- SQS-backed remote CaptureQueue (AWS SDK v3)
     queue-redis/    @storyshelf/queue-redis     -- Redis-backed remote CaptureQueue (ioredis)
     queue-azure/    @storyshelf/queue-azure     -- Azure remote CaptureQueue (Storage Queues or Service Bus)
     queue-gcp/      @storyshelf/queue-gcp       -- GCP remote CaptureQueue (Cloud Pub/Sub)
     notify-chat/    @storyshelf/notify-chat     -- Chat notification providers (Slack and Teams incoming webhooks)
     notify-email/   @storyshelf/notify-email    -- Email notification transport (SMTP, Mailpit, log, HTTP APIs)
-    observability/  @storyshelf/observability  -- OTEL tracing/metrics/log-correlation (single OTEL owner; see ADR 0022)
-    ai/             @storyshelf/ai              -- AI insights engine on the Vercel AI SDK (build triage + project health; see ADR 0026)
-    mcp/            @storyshelf/mcp             -- MCP server for AI agents (stdio + Streamable HTTP; thin client over /api/v1, read + comment only; see ADR 0027)
+    observability/  @storyshelf/observability  -- OTEL tracing/metrics/log-correlation (single OTEL owner; see ADR 0015)
+    ai/             @storyshelf/ai              -- AI insights engine on the Vercel AI SDK (build triage + project health; see ADR 0016)
+    mcp/            @storyshelf/mcp             -- MCP server for AI agents (stdio + Streamable HTTP; thin client over /api/v1, read + comment only; see ADR 0017)
   apps/
     dev-server/     dev-server      -- Local dev server, runs from TS source via `nub run serve` (no build; Playwright capture + optional shared-password auth)
     website/        website         -- Public docs & marketing site (Astro Starlight)
@@ -125,8 +125,8 @@ This distinction matters for:
 - **Tests:** every model, every router, every adapter must have tests (target 100% coverage). `nub run test` is hermetic (no browser); the capture pipeline is covered by a gated `test:integration` suite — see `docs/testing.md`.
 - **No AsyncLocalStorage for models.** Use constructor injection. The store is for router handlers only.
 - **Temp files:** for scratch work, prefer a repo-local `.tmp/` directory over `/tmp` (permissions). `.tmp` is gitignored.
-- **Logging:** pino baked into core via `createShelfLogger()`. Always structured objects, never interpolate into the message (`logger.info({ buildId }, "msg")`); attach errors as an `err` child (`logger.error({ err }, "msg")`); derive scoped children for background work (`logger.child({ buildId })`). Runtime loggers are host-owned: the app/worker binds scoped children onto adapters via the optional `Adapter.setLogger` (factories accept `options.logger` only as an explicit override and must never create their own loggers). Hosted observability (Sentry/PostHog/Datadog/GCP/OTEL) are optional pino `transports`, not separate loggers. See ADR 0014.
-- **HTTP:** outbound calls go through the shared helper (`@storyshelf/core/utils`: `httpJson`/`HttpError`) — timeout plus retry with `Retry-After` built in. Never hand-roll fetch error handling per package, and never add client libraries (`ky`/`ofetch`) — see ADR 0019.
+- **Logging:** pino baked into core via `createShelfLogger()`. Always structured objects, never interpolate into the message (`logger.info({ buildId }, "msg")`); attach errors as an `err` child (`logger.error({ err }, "msg")`); derive scoped children for background work (`logger.child({ buildId })`). Runtime loggers are host-owned: the app/worker binds scoped children onto adapters via the optional `Adapter.setLogger` (factories accept `options.logger` only as an explicit override and must never create their own loggers). Hosted observability (Sentry/PostHog/Datadog/GCP/OTEL) are optional pino `transports`, not separate loggers. See ADR 0015.
+- **HTTP:** outbound calls go through the shared helper (`@storyshelf/core/utils`: `httpJson`/`HttpError`) — timeout plus retry with `Retry-After` built in. Never hand-roll fetch error handling per package, and never add client libraries (`ky`/`ofetch`) — see ADR 0001.
 - **UI:** server-rendered `hono/jsx` + HTMX + `hono/css`. Fixed UI with a `ui` brand config (logo/theme); icon sidebar + slim top bar shell (`ui/shell/`); system theme with manual override; no client framework and no UI adapter — custom UIs consume `/api/v1`. The customer accent is used subtly (derived `color-mix` tokens, never a full-width bar). Icons come from the cached sprite (`<Icon>`, `ui/icons/paths.ts`). HTMX is vendored locally; a small vanilla-JS layer (theme/sidebar/dropdown/toast, review comparison + keyboard) runs once per document — see the `ui-building-blocks` skill (`.agents/skills/`) before touching it.
 - **UI building blocks (strict):** pages compose facade components from `app/src/ui/components.tsx` (`Button`, `Tabs`, `Badge`, `Alert`, `EmptyState`, `Stat`, `Field`, `Card`, `PageHeader`, `HStack`, `VStack`, …) — never raw `btn`/`tabs`/`card` classes, never `style="..."` in `pages/`, never direct family imports. Component styles live colocated via `hono/css` imported from `app/src/ui/css.ts` (custom context: readable `ss-<label>-<hash>` names, one `<style id="storyshelf-css">` mounted in `DocumentLayout`): one labeled `css` template per variant composed via `${base}` extension (never `cx` for variants — it drops labels), `&` nesting for pseudo-states, static values only (brand tokens stay CSS vars). Stack layout uses `HStack`/`VStack`, never utility divs. Inline/table/card actions use `size="sm"`. `app/src/ui/consistency.test.ts` is the ratchet — zero tolerance on classes, imports, and inline styles. See the `ui-building-blocks` skill.
 - **Primary export first:** in every module, the primary exported item (the factory/router/class readers came for — e.g. `createShelfApp`, `createLocalStorage`, model classes) sits as high as possible: doc header, imports, then the primary export before helpers, secondary types, and internal utilities. Skim-reading rule: the file's purpose must be obvious within the first screen.
@@ -163,37 +163,26 @@ This distinction matters for:
 
 | ADR | Title |
 |-----|-------|
-| 0001 | Adapter Composition Pattern (constructor injection, not AsyncLocalStorage) |
-| 0002 | SQLite + Turso for Database (Drizzle ORM, same schema both drivers) |
-| 0003 | Server-Side Capture (upload Storybook, render asynchronously) |
-| 0004 | Pixel Diff Engine (pixelmatch + pngjs) |
-| 0005 | Storybook-Only for v1 (Ladle/Histoire deferred to v2) |
-| 0006 | Storage Adapter (local filesystem + S3-compatible) |
-| 0007 | Rewrite from Scratch (extract patterns from StoryBooker, not code) |
-| 0008 | Auth as Pluggable Adapter (OAuth/OIDC, shared password, or none) |
-| 0009 | Per-Branch Baselines with Fallback + Retention & Purge |
-| 0010 | Git Provider Merge Gate (status checks now, GitHub App later) |
-| 0011 | Project Identity & Published Storybook (project = Storybook, public access) |
-| 0012 | Fixed Server-Rendered UI (header + sidebar, system theme, three-up diff) |
-| 0013 | Build Labels (project-defined types, search + link templates + stable URLs) |
-| 0014 | Pino as Core Logger (structured logs, transports via factory, request tracing) |
-| 0022 | OpenTelemetry Observability (traces/metrics via `@storyshelf/observability`, logs stay on stdout) |
-| 0015 | Pure Capture Renderer Adapter (capture adapters render only; server orchestrator owns loading/extraction/persistence) |
-| 0016 | Server Scaffolding Over Rigid Package (`storyshelf server init` generates the server; no universal server package) |
-| 0017 | Interaction Testing via Storybook `play` Function (executePlay, flaky/blocked/disabled semantics) |
-| 0018 | Split Core (Domain) from App (HTTP) |
-| 0019 | Shared HTTP Helper in Core (`httpJson`/`HttpError` with timeout + retry; no client libraries) |
-| 0025 | UI Redesign (neutral shell, derived brand tokens, icon sprite, review workspace) |
-| 0026 | AI Epic (`@storyshelf/ai` singleton on Vercel AI SDK, insights first) |
-| 0027 | MCP Server (`@storyshelf/mcp`, thin client over `/api/v1`, stdio + HTTP, read + comment only) |
-| 0028 | Modes and Multi-Browser Capture (named modes from parameters, per-engine baselines, shared approval) |
-| 0029 | Design Provider Adapter (`@storyshelf/design-figma`; vendor-neutral links, cache and credentials in core) |
-| 0030 | User OAuth Connections (service-neutral "Connect your account": `OAuthClient`, `user_connections`, shared `/connections/:service` flow) |
-| 0032 | Image Engines (`@storyshelf/image` leaf package; opt-in `sharp` codec; pixelmatch stays the comparator) |
-| 0033 | Remote Browsers and Public Origin (runner `browsers` list: local engines declared and verified, remote presets, `<engine>@<name>` targets with own baselines, in-browser fingerprint, `exposeNetwork` or signed Storybook URLs, public-origin resolver) |
-| 0034 | One Deployable (`testing` umbrella option and hosting-only mode; database queue; no separate worker; queue adapters retired; browser farm recipe) |
-| 0035 | UI Review, with or without `testing` (per-project `review` switch, build-level verdict, story-anchored comments, review status check, catalog changeset) |
-| 0036 | Git Hosts as Notification Channels (git hosts merge into `notifiers` as `@storyshelf/notify-git` with durable state delivery on the database queue; `isMerged` dropped; configurable status-name prefix) |
+| 0001 | Architecture and Conventions (adapter composition, constructor injection, core/app split, server scaffolding, shared HTTP helper, Storybook-only) |
+| 0002 | Database (SQLite default, Postgres/MySQL/Turso presets, Drizzle) |
+| 0003 | Storage and Content-Addressed Assets |
+| 0004 | Capture Pipeline (server-side render, pure renderers, `play` and a11y, modes and multi-browser) |
+| 0005 | Capture Performance and Sharding |
+| 0006 | Testing Option, Hosting-Only Mode and the Database Queue (`testing`, no worker, `capture_jobs`) |
+| 0007 | Remote Browsers and Public Origin (`browsers` list, `<engine>@<name>` targets, signed URLs) |
+| 0008 | Image Diff Engines (pixelmatch, worker pool, optional sharp) |
+| 0009 | Baselines, Approval and Retention |
+| 0010 | Projects, Published Storybook and Labels |
+| 0011 | Authentication and Access (Better Auth engine, roles, OAuth connections) |
+| 0012 | Server-Rendered UI |
+| 0013 | UI Review (per-project `review`, build-level verdict, changeset) |
+| 0014 | Git Hosts and Notifications (`@storyshelf/notify-git`, durable state delivery) |
+| 0015 | Observability and Logging (pino, OpenTelemetry) |
+| 0016 | AI Insights |
+| 0017 | MCP Server |
+| 0018 | Design Providers |
+
+The pre-consolidation ADRs (0001 to 0036) are in `docs/adr/archive/`; `docs/adr/README.md` maps them to the ADRs above.
 
 ## Parallel Development with Worktrees
 
@@ -220,7 +209,7 @@ nubx turbo verify --filter='@storyshelf/core' --force  # verify baseline
 
 ### Worktree Rules
 
-1. **GitHub Issues is the source of truth** — `docs/TASKS.md` is archived (frozen 2026-09-04, issues #1–#25). Manager creates/labels/milestones/assigns issues; agents pick up open issues via `gh issue list --state open`. Task worktrees only touch their issue's `Files to Modify`.
+1. **GitHub Issues is the source of truth** — `docs/archive/TASKS.md` is archived (frozen 2026-09-04, issues #1–#25). Manager creates/labels/milestones/assigns issues; agents pick up open issues via `gh issue list --state open`. Task worktrees only touch their issue's `Files to Modify`.
 2. **`nub.lock` is per-worktree** — never run `nub` installs concurrently in same tree.
 3. **File ownership** — each task branch only modifies files listed in its issue's `Files to Modify`. Check before editing.
 
@@ -250,7 +239,7 @@ git commit -m "feat(p1-1): add query performance indexes
 git branch -d task/P1-1-indexes
 ```
 
-4. **Close the issue** — comment with commit hash and close (`gh issue close <n> --reason completed`), or `Closes #<n>` in the squash commit. Never edit `docs/TASKS.md` (archived).
+4. **Close the issue** — comment with commit hash and close (`gh issue close <n> --reason completed`), or `Closes #<n>` in the squash commit. Never edit `docs/archive/TASKS.md` (archived).
 
 ### Squash Merge Convention
 
