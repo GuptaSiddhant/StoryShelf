@@ -300,7 +300,7 @@ export interface ShelfTestingOptions {
   /** Builds captured at once by the in-process queue; auto-sized from CPU and memory when unset. */
   concurrency?: number;
   /**
-   * Module run in a forked capture child (it calls `runCaptureChild` from `@storyshelf/worker`).
+   * Module run in a forked capture child (it calls `runCaptureChild` from `@storyshelf/core/capture`).
    * Needs `runner`, which serves as the in-process fallback. Ignored when `queue` is a remote queue.
    */
   workerEntry?: string;

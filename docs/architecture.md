@@ -295,6 +295,29 @@ project_members (
   created_at          text NOT NULL,
   UNIQUE(project_id, user_id)
 );
+
+-- Database capture queue (ADR 0006, decision 4): job rows and per-attempt claim rows in one table
+capture_jobs (
+  id                  text PRIMARY KEY,        -- job row: ULID; attempt row: '<job_id>:<attempt>'
+  entry               text NOT NULL,           -- 'job' | 'attempt'
+  job_id              text NOT NULL,           -- the job this row belongs to (a job row's own id)
+  kind                text NOT NULL,           -- 'capture' | 'publish' | 'notify'
+  build_id            text,                    -- notify jobs may have none (no FK: rows outlive nothing)
+  shard_id            text,                    -- capture_shards row of a shard job
+  attempt             integer NOT NULL DEFAULT 0,  -- job: attempts started; attempt row: its number (1..)
+  max_attempts        integer NOT NULL DEFAULT 3,  -- testing.retries + 1
+  status              text NOT NULL,           -- job: queued|running|done|failed|cancelled; attempt: running|done|failed|expired
+  visible_at          text,                    -- queued job: claimable from; running attempt: lease expiry; else NULL
+  owner               text,                    -- instance holding an attempt
+  payload             text,                    -- JSON: reqId, traceparent, kind-specific data
+  cancel_requested_at text,                    -- cancel flag, never cleared
+  error               text,
+  started_at          text,
+  finished_at         text,
+  created_at          text NOT NULL,
+  updated_at          text NOT NULL
+);
+-- capture_jobs_poll_idx (kind, visible_at, status): the poll probe; plus (job_id), (build_id), (entry, created_at)
 ```
 
 ### Key Relationships
@@ -410,6 +433,55 @@ Capture is CPU/IO-heavy and long-running (minutes to tens of minutes). It must n
 - `POST /builds` stores the zip and returns **202 Accepted** immediately.
 - An in-process queue with a **configurable concurrency** (`--capture-concurrency`, default `2`) runs captures.
 - A build stuck in `capturing` across a server restart is requeued **once** at boot (in-process queue only; remote queues redeliver). The interrupted attempt is closed as failed with `Interrupted by server restart`; if the run before it was also interrupted, the build is marked `failed` and a failure git status is posted, so a crash loop cannot repeat captures. See `core/src/capture/recovery.ts`.
+
+#### Database queue (`capture_jobs`)
+
+`createDatabaseCaptureQueue(db, options)` (`@storyshelf/core/capture`, `core/src/capture/db-queue/`)
+is a `PollableCaptureQueue` on the app's own database; it is additive for now (the app still wires
+the in-memory queue and nothing runs the consumer until the cutover, ADR 0006). The claim algorithm needs only one primitive from
+the adapter, a unique-key insert whose conflict can be told apart (the `claimFinalize` pattern):
+
+1. **Probe.** One query, `kind = ? AND visible_at <= now AND status IN ('queued','running') ORDER BY
+   visible_at LIMIT 1`, a range scan of `capture_jobs_poll_idx`. Only candidates have a
+   `visible_at` (a queued job, a running attempt whose lease is its `visible_at`), so an idle probe
+   reads no rows and a busy one reads one.
+2. **Claim.** Insert attempt row `<jobId>:<n+1>` (owner, lease). Exactly one instance wins; the
+   winner re-reads the job (a cancel or a late finish between probe and insert gives the claim
+   back), marks an expired attempt it replaced `expired`, and marks the job row `running`. A loser
+   whose winner died before that mark claims the winner's attempt once its lease expires, and until
+   then moves the job row's `visible_at` behind that lease (never its status).
+3. **Hold.** The holder writes only its own attempt row: `extend` renews the lease (the write
+   returns the row, so `expired` means lost and a cancel flag means cancelled) and reads the job
+   row; `inspect` reads the job row every 5 s without renewing. Leases follow progress, never a
+   timer (`keepJobLease`).
+4. **Finish.** `ack` marks the attempt and the job `done`. `nack` is ignored from a superseded
+   holder; otherwise it requeues with a delay (`visible_at`), or fails the job past `max_attempts`
+   or with `requeue: false`, or ends it `cancelled` when flagged. A final attempt that loses its
+   lease fails the job too (one limit covers failures and lost leases).
+5. **Cancel.** `cancel(jobId | buildId)` ends a queued job at once and flags a running one on its
+   job and attempt rows.
+
+**Consumer** (`createCaptureConsumer`, `core/src/capture/consumer/`). Consumes any
+`PollableCaptureQueue` (this queue, the IPC queue of a forked child, a remote queue) and runs a
+handler per job `kind`: `capture` is wired to `createDispatchJob`; `publish` and `notify` register
+through `handlers`; a job whose kind has no handler is failed with `no handler registered for job
+kind "<kind>"`. A slot is taken before polling (the database queue uses `startPollLoop`, other
+queues a slot loop with the idle backoff of 250 ms doubling to 5 s for queues that return empty at
+once). A failing job is requeued with delay `1000 ms * 2^attempts` (capped at 30 s) until its last
+attempt, `attempt >= maxAttempts` for the database queue (`attempts >= maxRetries` for queues that
+only count deliveries), then nacked without requeue so it ends `failed`; the constants live in
+`consumer/retry.ts`. The lease follows progress (`keepJobLease`): a lost lease or a `cancelled`
+reading stops the run through `runner.cancel(buildId, shard)`; a lost lease writes nothing (the
+new holder settles the job), a cancel ends the job `cancelled`. `stop()` (SIGTERM) stops polling
+and waits for the jobs in flight. Optional `metrics` hooks report each job's outcome and the
+queue's depth and oldest waiting job (a sample costs one read; off unless `queueSample` is given).
+`runCaptureChild` (forked capture) runs this consumer over the IPC queue.
+
+Enqueue wakes this instance's waiting poll at once; other instances find the job on their next
+poll (`startPollLoop`: no poll while all slots are busy, 15 s idle, 2 s after recent work, with
+jitter). Tests: the pollable cases of `queueContractSuite` and `databaseQueueMultiInstanceSuite`
+(`@storyshelf/core/test-helpers`) on the fake database, node:sqlite, PGlite and two OS processes on
+one SQLite file, plus gated live runs on Postgres, MySQL and Turso.
 
 > **Note on Architecture:** The `CaptureQueue` interface is fully asynchronous — `enqueue`, `status`, `active` and `recent` all return `Promise<T>` — so the same contract backs both the in-process `InMemoryCaptureQueue` (Node long-lived server) and remote backends (SQS, Cloudflare Queues, Azure Storage Queues) where execution is left to a separately-assembled worker that polls the queue and runs `executeCaptureJob`. For deploying, scaling, and operating those workers, see the website guide `apps/website/src/content/docs/guides/deployment/remote-workers.md` (published at `/guides/deployment/remote-workers/`).
 

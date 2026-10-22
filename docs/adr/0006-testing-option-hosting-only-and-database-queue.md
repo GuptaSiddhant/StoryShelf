@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted.
+Accepted. Amended with the `capture_jobs` table, the claim algorithm and the poll and cancel
+details (decisions 4 and 11), recorded while implementing the database queue (#212).
 
 Supersedes (archived): ADR 0034.
 
@@ -148,6 +149,57 @@ third-party `DatabaseAdapter` implementations, which is accepted.
   once any attempt row is `done`; a later attempt notices at its next progress touch and stops. Work
   is idempotent per attempt, so a stale holder finishing late costs a duplicate run, not a wrong
   result.
+- **One table, two kinds of row** (`Tables` gains only `captureJobs`). The poll must find both a
+  queued job and an expired lease with one indexed query, so job rows and attempt rows share the
+  table and the indexed visibility column, told apart by `entry`:
+
+  | Column                                                           | Job row (`entry = 'job'`)                                                            | Attempt row (`entry = 'attempt'`)                 |
+  | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------- |
+  | `id`                                                             | job id (ULID)                                                                        | `<jobId>:<attempt>` (the fence)                   |
+  | `job_id`                                                         | its own id                                                                           | the job it belongs to                             |
+  | `kind`                                                           | `capture`, `publish` or `notify`                                                     | copied from the job                               |
+  | `build_id`, `shard_id`                                           | the build (none for some notify jobs); the `capture_shards` row of a shard job       | copied                                            |
+  | `attempt`, `max_attempts`                                        | attempts started; `testing.retries` + 1                                              | its number, from 1                                |
+  | `status`                                                         | `queued`, `running`, `done`, `failed`, `cancelled`                                   | `running`, `done`, `failed`, `expired`            |
+  | `visible_at`                                                     | while `queued`: when it may be claimed (new, or retry after backoff); otherwise null | while `running`: the lease expiry; otherwise null |
+  | `owner`                                                          | null                                                                                 | the instance holding it                           |
+  | `payload`                                                        | JSON: request id, `traceparent`, kind-specific data                                  | null                                              |
+  | `cancel_requested_at`                                            | set by cancel, never cleared                                                         | copied at claim, or set by cancel                 |
+  | `error`, `started_at`, `finished_at`, `created_at`, `updated_at` | last attempt's error; timestamps                                                     | its own                                           |
+
+  There are no foreign keys (notify jobs may have no build); finished rows are purged by retention.
+  Indexes: `(kind, visible_at, status)` for the poll, `(job_id)`, `(build_id)` and
+  `(entry, created_at)` for the views.
+
+- **The claim, step by step.** (1) Probe for the oldest candidate of the polled kind:
+  `WHERE kind = ? AND visible_at <= now AND status IN ('queued', 'running')`, in `visible_at`
+  order, `LIMIT 1`. (2) For a job row, the next attempt is `attempt + 1`; for
+  an expired attempt row, the one after the higher of its number and the job row's. Past
+  `max_attempts` the job is `failed` (a lost lease counts as an attempt; a late `done` on that
+  attempt wins). (3) Insert the attempt row: exactly one instance wins on every database; the losers
+  see the key conflict, told apart from other errors by re-reading the row. (4) The winner re-reads
+  the job row and gives the claim back (marking its attempt `expired`) if the job ended or was
+  cancelled meanwhile; otherwise it marks the attempt it replaced `expired` and the job row
+  `running` (`visible_at` null). (5) A loser whose winner has not marked the job yet checks the
+  winner's lease: once expired (the winner died between steps 3 and 4) it claims the next attempt as
+  for any expired lease; until then it moves the job row's `visible_at` to that lease so the job
+  does not hold the head of the queue. It writes only `visible_at`, never the status, so a winner
+  that already finished keeps its outcome; a job row left `running` with a `visible_at` is cleared
+  when probed.
+- **Holding, finishing and retrying.** Renewal updates only the holder's attempt row and returns it:
+  `expired` means lost, a cancel flag means cancelled; then the job row is read, so a job finished by
+  another attempt (lost) or cancelled is seen at that progress touch. A nack from a holder whose
+  attempt is no longer `running` or no longer the job's current attempt writes nothing to the job,
+  so a stale holder cannot requeue or fail a job another instance runs. Otherwise a nack requeues the
+  job row (`queued`, `visible_at` = now + delay), or fails it past `max_attempts` or with
+  `requeue: false`, or ends it `cancelled` when flagged. An ack marks the attempt and the job `done`
+  (a cancelled job stays cancelled).
+- **Why one indexed query suffices.** `visible_at` is non-null only on rows that are or will be
+  claimable, every write that ends a row's candidacy nulls it, and a late renewal of a retired
+  attempt is nulled again by the renewer. So the probe is one range scan of the index in
+  `visible_at` order that stops at the first row: an idle queue reads no rows, a busy one reads one.
+  A queue that polls several kinds at once (`publish` and `notify` on a hosting-only instance) scans
+  the visible rows of those kinds and sorts them; idle, that is still no rows.
 - **Leases follow progress**, throttled, never on a timer, so a hung capture loses its lease.
 - **Enqueue** inserts the row and wakes the local consumer directly, so a single instance dispatches
   immediately; other instances find the job on their next poll. An index on status and visibility
@@ -157,7 +209,10 @@ third-party `DatabaseAdapter` implementations, which is accepted.
   status written to the database, so a crash never leaves a build in `capturing`.
 - **Cancel** sets a flag on the job row, which the running instance reads (decision 11) and turns
   into `runner.cancel`. It works across instances and for a hung capture. Cancelling a job that has
-  not started is immediate.
+  not started is immediate. `CaptureQueue.cancel(jobId | buildId)` is the queue-level setter (a
+  build id cancels the build's unfinished jobs of the queue's kinds); it also flags the running
+  attempt row, and `LeaseRenewal` gains `"cancelled"`, which `extend` and the new non-renewing
+  `PollableCaptureQueue.inspect` report. The API and UI that call it come with the cutover.
 - **Views.** `status`, `active` and `recent` read the table, so the compute-jobs page shows every
   instance's jobs.
 - **Trace propagation** (ADR 0015, Observability and Logging): `traceparent` and the request id travel
@@ -182,6 +237,10 @@ upgrade; every instance is stopped, upgraded and started together.
 There is no `@storyshelf/worker` package. The consumer loop lives in `@storyshelf/core/capture` and
 runs in every app instance with `testing`: poll, a progress-driven lease, retry with backoff, the
 final-attempt rule, cancelling the local run when the lease is lost, and a drain on SIGTERM.
+A slot is taken before polling; a failing job waits `1000 ms * 2^attempts` (at most 30 s) before it
+is claimed again, and `attempt >= maxAttempts` marks the last attempt, which is nacked without
+requeue so the job ends `failed`. A job of a kind without a handler is failed with a clear error.
+The constants are in one file, `consumer/retry.ts`.
 Database and storage credentials are given only to the app, and there is one copy of the
 configuration.
 
@@ -333,9 +392,14 @@ rows.
 - **Polling.** An instance does not poll while all its concurrency slots are busy. Otherwise it polls
   every 15 s when idle and every 2 s while jobs were recently queued, with jitter; a poll is one
   indexed query for the oldest visible job and reads at most one row. The queue's acceptance test is
-  that an idle instance performs at most one such probe per 15 s and reads no rows.
+  that an idle instance performs at most one such probe per 15 s and reads no rows. "Recently" means
+  a job was found or queued locally in the last 60 s; jitter only lengthens a delay (up to 20 %), so
+  the idle rate never exceeds one probe per 15 s. A local enqueue wakes the waiting poll at once,
+  including one made while the previous probe was in flight. The probe is the query of decision 4.
 - **Cancel.** Each running job reads its own row by id every 5 s, and the lease renewal write also
-  returns the row, so cancel latency is at most about 5 s even for a hung capture.
+  returns the row, so cancel latency is at most about 5 s even for a hung capture. The 5 s read
+  (`inspect`) renews nothing, so a hung capture still loses its lease; renewals come only from
+  progress, throttled to one per 30 s (or a third of the lease). The default lease is 5 minutes.
 - **Retries.** `testing.retries`, default 2 (three attempts in total), on every path including
   in-process capture. The backoff, 1 s doubling to a cap of 30 s, is an internal constant. One limit
   covers failed attempts, lost leases and child crashes.
@@ -391,7 +455,10 @@ rows.
 ## Open questions
 
 - How Turso and other hosted SQLite meter an idle indexed poll, measured against the acceptance test
-  in decision 11.
+  in decision 11. What is established: the probe is an index search that reads no rows when idle
+  (hermetic test on SQLite, and a gated live test of the query plan on Turso), and an idle instance
+  sends at most one probe per 15 s, about 5,800 requests a day. The billed row reads per probe still
+  need a measurement on a Turso account.
 - Whether extraction can stream straight into storage with no scratch disk, which would let a
   serverless host publish a zip too.
 - Whether Vercel exposes a runtime-only signal, so the serverless check can refuse there too.

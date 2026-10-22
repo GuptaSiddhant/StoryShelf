@@ -26,7 +26,7 @@ See the [StoryShelf documentation](https://github.com/GuptaSiddhant/StoryShelf#r
 
 ## Running as a forked child
 
-For a server that captures in a child process (`testing.workerEntry`), call `runCaptureChild` instead of building a queue yourself. It polls the parent over IPC, runs the same capture worker, finishes in-flight captures on `SIGTERM`, and exits at once if the parent goes away:
+For a server that captures in a child process (`testing.workerEntry`), call `runCaptureChild` instead of building a queue yourself. It polls the parent over IPC, runs the core capture consumer (`runCaptureChild` now lives in `@storyshelf/core/capture`; this package re-exports it), finishes in-flight captures on `SIGTERM`, and exits at once if the parent goes away:
 
 ```ts
 import { runCaptureChild } from "@storyshelf/worker";

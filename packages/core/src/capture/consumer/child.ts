@@ -1,29 +1,28 @@
 /**
- * Entry helper for a forked capture child (`testing.workerEntry`): runs the capture worker against
+ * Entry helper for a forked capture child (`testing.workerEntry`): runs the capture consumer against
  * the parent's queue over process IPC.
  *
  * ```ts
  * // capture-worker.ts — the module named by `testing.workerEntry`
- * import { runCaptureChild } from "@storyshelf/worker";
+ * import { runCaptureChild } from "@storyshelf/core/capture";
  * await runCaptureChild({ db, storage, runner, scratchDir });
  * ```
  */
-import type { PollableJob } from "@storyshelf/core/adapter/capture-queue";
-import {
-  CAPTURE_CONCURRENCY_ENV,
-  CAPTURE_SHARD_SIZE_ENV,
-  IpcCaptureQueue,
-} from "@storyshelf/core/capture";
-import type { ChildMessage, ParentPort } from "@storyshelf/core/capture";
-import {
-  createCaptureWorker,
-  type WorkerHandle,
-  type WorkerOptions,
-  type WorkerTables,
-} from "./worker.ts";
+import type { PollableJob } from "../../adapters/capture-queue.ts";
+import { createShelfLogger, type Logger } from "../../logger.ts";
+import type { ParentPort } from "../forked/channel.ts";
+import { CAPTURE_CONCURRENCY_ENV, CAPTURE_SHARD_SIZE_ENV } from "../forked/fork.ts";
+import { IpcCaptureQueue } from "../forked/ipc-queue.ts";
+import type { ChildMessage } from "../forked/protocol.ts";
+import type { CaptureHandlerOptions } from "./capture-handler.ts";
+import { createCaptureConsumer } from "./index.ts";
+import type { CaptureConsumer, CaptureConsumerOptions } from "./types.ts";
 
-/** Worker options minus the queue and its overrides, which the parent supplies over IPC. */
-export type CaptureChildOptions = Omit<WorkerOptions, "queue" | "poll" | "ack" | "nack" | "extend">;
+/** Consumer options minus the queue, which the parent supplies over IPC. */
+export type CaptureChildOptions = Omit<CaptureHandlerOptions, "enqueue" | "logger"> &
+  Pick<CaptureConsumerOptions, "config" | "images" | "compare" | "metrics"> & {
+    logger?: Logger;
+  };
 
 /** The slice of `process` the child uses; injectable so the lifecycle is testable. */
 export interface ChildHost {
@@ -38,7 +37,7 @@ export interface ChildHost {
 }
 
 /**
- * Run the capture worker until the parent stops it.
+ * Run the capture consumer until the parent stops it.
  *
  * - `SIGTERM` / `SIGINT`: stop polling, let in-flight captures finish, exit 0.
  * - Parent gone (`disconnect`): nobody can receive results, so exit at once. Whatever was running
@@ -50,10 +49,10 @@ export async function runCaptureChild(
   options: CaptureChildOptions,
   host: ChildHost = processHost(),
 ): Promise<void> {
-  const { worker, queue } = buildWorker(options, host);
-  wireShutdown({ worker, queue }, host);
+  const { consumer, queue } = buildConsumer(options, host);
+  wireShutdown({ consumer, queue }, host);
   try {
-    await worker.start();
+    await consumer.start();
   } catch (error) {
     options.logger?.error({ err: error }, "capture child failed");
     host.exit(1);
@@ -62,39 +61,42 @@ export async function runCaptureChild(
   host.exit(0);
 }
 
-function buildWorker(
+function buildConsumer(
   options: CaptureChildOptions,
   host: ChildHost,
-): { worker: WorkerHandle; queue: IpcCaptureQueue } {
+): { consumer: CaptureConsumer; queue: IpcCaptureQueue } {
   const { send } = host;
   if (!send) {
     throw new Error("runCaptureChild must run in a forked process; set testing.workerEntry");
   }
   const queue = new IpcCaptureQueue(portOf(host, send));
-  const worker = createCaptureWorker({
-    ...options,
+  const { config, images, compare, metrics, logger, ...capture } = options;
+  const consumer = createCaptureConsumer({
     queue,
+    capture: { ...capture, shardSize: shardSizeOf(options, host.env) },
+    config: { ...config, concurrency: concurrencyOf(options, host.env) },
+    images,
+    compare,
+    metrics,
+    logger: logger ?? createShelfLogger(),
     onProgress: throttled((job) => {
       queue.reportProgress(job);
     }),
-    tables: options.tables ?? tablesOf(options),
-    config: { ...options.config, concurrency: concurrencyOf(options, host.env) },
-    shardSize: shardSizeOf(options, host.env),
   });
-  return { worker, queue };
+  return { consumer, queue };
 }
 
 /** SIGTERM/SIGINT drain gracefully; a vanished parent exits at once. */
 function wireShutdown(
-  parts: { worker: WorkerHandle; queue: IpcCaptureQueue },
+  parts: { consumer: CaptureConsumer; queue: IpcCaptureQueue },
   host: ChildHost,
 ): void {
-  const { worker, queue } = parts;
+  const { consumer, queue } = parts;
   let stopping = false;
   const stop = (): void => {
     if (!stopping) {
       stopping = true;
-      worker.stop().catch(ignore);
+      consumer.stop().catch(ignore);
       // Release a poll parked on the parent so stopping does not wait out the long poll.
       queue.lifecycle.teardown().catch(ignore);
     }
@@ -137,11 +139,6 @@ function portOf(host: ChildHost, send: NonNullable<ChildHost["send"]>): ParentPo
   };
 }
 
-/** The adapter's own table handles: the sqlite defaults would be wrong for Postgres or MySQL. */
-function tablesOf(options: CaptureChildOptions): WorkerTables {
-  return options.db.tables as unknown as WorkerTables;
-}
-
 function concurrencyOf(
   options: CaptureChildOptions,
   env: Record<string, string | undefined>,
@@ -166,7 +163,7 @@ function processHost(): ChildHost {
     send: process.send ? (message) => process.send?.(message) : undefined,
     on: (event, listener) => process.on(event as never, listener as never),
     env: process.env,
-    // A forked child has to end its own process once the worker has drained.
+    // A forked child has to end its own process once the consumer has drained.
     // oxlint-disable-next-line unicorn/no-process-exit
     exit: (code) => process.exit(code),
   };

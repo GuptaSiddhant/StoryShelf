@@ -61,6 +61,9 @@ function matchChunk(chunks: SqlChunk[], row: Record<string, unknown>, table: Tab
   if (text.includes(" >= ")) {
     return !ltMatches(chunks, row, table);
   }
+  if (text.includes(" <= ")) {
+    return lteMatches(chunks, row, table);
+  }
   if (text.includes(" < ")) {
     return ltMatches(chunks, row, table);
   }
@@ -188,6 +191,14 @@ function inArrayMatches(chunks: SqlChunk[], row: Record<string, unknown>, table:
   return values.includes(row[key]);
 }
 /* eslint-enable complexity, max-depth */
+
+/** `column <= value`: the cell is present and not greater than the argument. */
+function lteMatches(chunks: SqlChunk[], row: Record<string, unknown>, table: Table): boolean {
+  if (ltMatches(chunks, row, table)) {
+    return true;
+  }
+  return eqMatches(chunks, row, table);
+}
 
 function ltMatches(chunks: SqlChunk[], row: Record<string, unknown>, table: Table): boolean {
   let columnName: string | undefined;

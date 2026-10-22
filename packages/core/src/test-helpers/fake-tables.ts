@@ -190,6 +190,27 @@ const captureShards = defineTable("capture_shards", {
   updatedAt: "updated_at",
 });
 
+const captureJobs = defineTable("capture_jobs", {
+  id: "id",
+  entry: "entry",
+  jobId: "job_id",
+  kind: "kind",
+  buildId: "build_id",
+  shardId: "shard_id",
+  attempt: "attempt",
+  maxAttempts: "max_attempts",
+  status: "status",
+  visibleAt: "visible_at",
+  owner: "owner",
+  payload: "payload",
+  cancelRequestedAt: "cancel_requested_at",
+  error: "error",
+  startedAt: "started_at",
+  finishedAt: "finished_at",
+  createdAt: "created_at",
+  updatedAt: "updated_at",
+});
+
 const captureLogs = defineTable("capture_logs", {
   id: "id",
   projectId: "project_id",
@@ -440,6 +461,7 @@ export const fakeSchema: Tables = {
   captureAttempts,
   captureLogs,
   captureShards,
+  captureJobs,
   snapshots,
   baselines,
   comments,

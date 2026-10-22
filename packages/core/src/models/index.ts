@@ -28,6 +28,16 @@ export {
   type CaptureAttemptTables,
 } from "./capture-attempt.ts";
 export { CaptureLogModel, type CaptureLogTables } from "./capture-log.ts";
+export {
+  attemptRowId,
+  CaptureJobModel,
+  isTerminalJob,
+  parseAttemptRowId,
+  TERMINAL_JOB_STATUSES,
+  type AttemptClaim,
+  type CaptureJobTables,
+  type NewCaptureJob,
+} from "./capture-job.ts";
 export { CaptureShardModel, type CaptureShardTables } from "./capture-shard.ts";
 export { AiBudgetAlertModel, type AiBudgetAlertTables } from "./ai-budget-alert.ts";
 export { AiUsageModel, type AiUsageInput, type AiUsageTables } from "./ai-usage.ts";

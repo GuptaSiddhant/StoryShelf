@@ -5,6 +5,7 @@ import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { BaselineModel } from "../models/baseline.ts";
 import { BuildModel, type BuildTables } from "../models/build.ts";
+import { CaptureJobModel } from "../models/capture-job.ts";
 import { InsightModel } from "../models/insight.ts";
 import { LabelModel, type LabelTables } from "../models/label.ts";
 import { PackageUsageModel } from "../models/usage.ts";
@@ -77,8 +78,9 @@ export class Retention {
     const removedBuilds = results.filter((r: { removed: boolean }) => r.removed).length;
     const removedFiles = results.reduce((sum: number, r: { files: number }) => sum + r.files, 0);
     await this.sweepScreenshots(project);
+    const removedJobs = await this.purgeFinishedJobs(cutoff);
     this.logger?.info(
-      { projectId: project.id, removedBuilds, removedFiles },
+      { projectId: project.id, removedBuilds, removedFiles, removedJobs },
       "build retention purge complete",
     );
     return { removedBuilds, removedFiles };
@@ -105,8 +107,22 @@ export class Retention {
     }
   }
 
+  /**
+   * Drop finished queue jobs older than the build cutoff (they have no foreign key to a build, and
+   * a finished job is only history); never blocks the purge. Queued and running jobs are kept.
+   */
+  private async purgeFinishedJobs(cutoff: string): Promise<number> {
+    try {
+      return await new CaptureJobModel(this.db).purgeFinished(cutoff);
+    } catch (error) {
+      this.logger?.warn({ err: error }, "capture job purge failed");
+      return 0;
+    }
+  }
+
   private async removeBuild(buildId: string): Promise<boolean> {
     await new InsightModel(this.db).removeForBuild(buildId);
+    await new CaptureJobModel(this.db).removeForBuild(buildId);
     await new PackageUsageModel(this.db).removeForBuild(buildId);
     await new BuildModel(this.db, this.tables as unknown as BuildTables).remove(buildId);
     return true;

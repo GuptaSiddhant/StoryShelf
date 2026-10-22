@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { DatabaseAdapter } from "../adapters/database.ts";
+import { createDatabaseCaptureQueue } from "../capture/db-queue/index.ts";
+import { CaptureJobModel } from "../models/capture-job.ts";
 import { LabelModel } from "../models/label.ts";
 import { PackageUsageModel } from "../models/usage.ts";
 import { createTestProject } from "../test-helpers/create-project.ts";
@@ -292,5 +294,91 @@ describe("Retention", () => {
     await expect(
       retention.purge(project as never, { ttlDays: 30, keepLatestPerBranch: true }),
     ).resolves.toBeDefined();
+  });
+});
+
+async function insertApprovedBuild(db: DatabaseAdapter, id: string, projectId: string, at: string) {
+  await db.insert(db.tables.builds, {
+    id,
+    projectId,
+    gitSha: id,
+    gitBranch: "main",
+    isDefault: false,
+    status: "approved",
+    snapshotCount: 0,
+    changedCount: 0,
+    approvedCount: 0,
+    rejectedCount: 0,
+    createdAt: at,
+    updatedAt: at,
+  });
+}
+
+describe("Retention and the database queue", () => {
+  const DAY = 86_400_000;
+  const old = Date.now() - 60 * DAY;
+
+  it("removes a purged build's job and attempt rows, whatever their status", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const project = await createTestProject(db, db.tables);
+    await insertApprovedBuild(db, "b-old", project.id, new Date(old).toISOString());
+    await insertApprovedBuild(db, "b-new", project.id, new Date().toISOString());
+    const queue = createDatabaseCaptureQueue(db);
+    await queue.enqueue({ buildId: "b-old" });
+    await queue.enqueue({ buildId: "b-old", shard: "s1" });
+    await queue.enqueue({ buildId: "b-new" });
+    const running = await queue.poll();
+    expect(running).not.toBeNull();
+
+    const retention = new Retention(db, storage, retentionTables(db));
+    const result = await retention.purge(project, { ttlDays: 30, keepLatestPerBranch: false });
+
+    expect(result.removedBuilds).toBe(1);
+    const left = (await db.list(db.tables.captureJobs)) as unknown as { buildId: string | null }[];
+    expect(left.length).toBeGreaterThan(0);
+    expect(left.every((row) => row.buildId === "b-new")).toBe(true);
+  });
+
+  it("purges finished jobs older than the cutoff and keeps queued, running and recent ones", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const project = await createTestProject(db, db.tables);
+    const aged = createDatabaseCaptureQueue(db, { kinds: ["notify"], now: () => old });
+    const finished = await aged.enqueueJob({ kind: "notify" });
+    await aged.ack((await aged.poll())!);
+    const running = await aged.enqueueJob({ kind: "notify" });
+    await aged.poll();
+    const waiting = await aged.enqueueJob({ kind: "notify" });
+    const recent = createDatabaseCaptureQueue(db, { kinds: ["publish"] });
+    const fresh = await recent.enqueueJob({ kind: "publish" });
+    await recent.ack((await recent.poll())!);
+
+    const retention = new Retention(db, storage, retentionTables(db));
+    await retention.purge(project, { ttlDays: 30, keepLatestPerBranch: false });
+
+    const model = new CaptureJobModel(db);
+    expect(await model.get(finished)).toBeNull();
+    expect(await model.get(`${finished}:1`)).toBeNull();
+    expect((await model.get(running))?.status).toBe("running");
+    expect((await model.get(waiting))?.status).toBe("queued");
+    expect((await model.get(fresh))?.status).toBe("done");
+  });
+
+  it("does not let a failing job purge block the purge", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const project = await createTestProject(db, db.tables);
+    const original = db.list.bind(db);
+    db.list = (async (table: never, options?: never) => {
+      if (table === db.tables.captureJobs) {
+        throw new Error("jobs table unavailable");
+      }
+      return await original(table, options);
+    }) as typeof db.list;
+
+    const retention = new Retention(db, storage, retentionTables(db));
+    const result = await retention.purge(project, { ttlDays: 30, keepLatestPerBranch: false });
+    expect(result.removedBuilds).toBe(0);
   });
 });

@@ -7,7 +7,7 @@ name: Live Cloud Ancillary
 #
 # Secrets per leg (each live suite additionally gates on its own env, so a
 # leg only exercises the providers whose secrets are present):
-# - db: TURSO_DATABASE_URL (+ optional TURSO_AUTH_TOKEN), DATABASE_URL
+# - db: TURSO_DATABASE_URL (+ optional TURSO_AUTH_TOKEN), DATABASE_URL, MYSQL_DATABASE_URL
 # - queue: REDIS_URL
 # - auth: OIDC_ISSUER (+ OIDC_CLIENT_ID / OIDC_CLIENT_SECRET /
 #   OIDC_REDIRECT_URL, last three have test-safe fallbacks for discovery-only)
@@ -38,6 +38,7 @@ jobs:
       TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
       TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      MYSQL_DATABASE_URL: ${{ secrets.MYSQL_DATABASE_URL }}
       REDIS_URL: ${{ secrets.REDIS_URL }}
       OIDC_ISSUER: ${{ secrets.OIDC_ISSUER }}
       OIDC_CLIENT_ID: ${{ secrets.OIDC_CLIENT_ID }}
@@ -67,8 +68,8 @@ jobs:
           set -e
           case "${{ matrix.suite }}" in
             db)
-              if [ -z "$TURSO_DATABASE_URL" ] && [ -z "$DATABASE_URL" ]; then
-                echo "::error::db leg needs TURSO_DATABASE_URL and/or DATABASE_URL."
+              if [ -z "$TURSO_DATABASE_URL" ] && [ -z "$DATABASE_URL" ] && [ -z "$MYSQL_DATABASE_URL" ]; then
+                echo "::error::db leg needs TURSO_DATABASE_URL, DATABASE_URL and/or MYSQL_DATABASE_URL."
                 exit 1
               fi
               ;;
@@ -95,7 +96,7 @@ jobs:
       - name: Run db suites (hermetic + live)
         if: matrix.suite == 'db'
         # --force: live results must never come from the turbo cache.
-        run: nubx turbo test --filter='@storyshelf/db-sqlite' --filter='@storyshelf/db-postgres' --force
+        run: nubx turbo test --filter='@storyshelf/db-sqlite' --filter='@storyshelf/db-postgres' --filter='@storyshelf/db-mysql' --force
 
       - name: Run queue suite (hermetic + live)
         if: matrix.suite == 'queue'

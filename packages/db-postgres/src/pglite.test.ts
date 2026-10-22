@@ -9,6 +9,10 @@ function createRecordingPGlite() {
       queries.push(text);
       return { rows: [] };
     }),
+    exec: vi.fn(async (text: string) => {
+      queries.push(text);
+      return [{ rows: [] }];
+    }),
     close: vi.fn(async () => {
       closed = true;
     }),
