@@ -12,7 +12,7 @@ const links = sectionLinks(base);
 <nav class="header-links" aria-label="Main">
   {
     links.map((l) => (
-      <a href={l.href} aria-current={l.section === section ? "page" : undefined}>
+      <a href={l.href} aria-current={l.section === section ? "true" : undefined}>
         {l.label}
       </a>
     ))
@@ -33,7 +33,7 @@ const links = sectionLinks(base);
     text-decoration: none;
   }
   .header-links a:hover,
-  .header-links a[aria-current="page"] {
+  .header-links a[aria-current="true"] {
     color: var(--sl-color-white);
   }
   /* The mobile menu footer reuses this slot; the links sit above the menu there instead. */
