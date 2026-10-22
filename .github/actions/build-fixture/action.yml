@@ -1,0 +1,29 @@
+name: Build fixture Storybook
+description: Install a fixture's own pnpm dependencies (store cached) and build its Storybook. Run after setup-workspace.
+
+inputs:
+  fixture:
+    description: Directory name under fixtures/ (for example storybook-9).
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Get pnpm store path
+      id: pnpm-store
+      shell: bash
+      run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+    - name: Cache pnpm store
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.pnpm-store.outputs.path }}
+        key: pnpm-store-${{ inputs.fixture }}-${{ hashFiles(format('fixtures/{0}/pnpm-lock.yaml', inputs.fixture)) }}
+
+    - name: Install fixture
+      shell: bash
+      run: pnpm --dir fixtures/${{ inputs.fixture }} install --frozen-lockfile
+
+    - name: Build fixture Storybook
+      shell: bash
+      run: pnpm --dir fixtures/${{ inputs.fixture }} run build-storybook

@@ -1,0 +1,72 @@
+name: Fly dry run
+
+# Reusable: proves a merge would still deploy to Fly. Builds the Fly image from the same
+# Dockerfile and context as fly.yml (no push), boots it, seeds the demo into it and checks
+# the demo captures. Called by ci.yml and nightly.yml.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  fly:
+    name: fly (image + demo seed dry run)
+    runs-on: ubuntu-latest
+    env:
+      STORYSHELF_URL: http://127.0.0.1:3000
+      STORYSHELF_ADMIN_TOKEN: ci-admin-token
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup workspace
+        uses: ./.github/actions/setup-workspace
+
+      - name: Build the workspace CLI
+        run: nubx turbo build --filter=storyshelf
+
+      - name: Build fixture Storybook
+        uses: ./.github/actions/build-fixture
+        with:
+          fixture: storybook-9
+
+      # Same Dockerfile and build context as fly.yml's `flyctl deploy`, minus the push.
+      - name: Build the Fly image
+        run: docker build -f apps/fly-app/Dockerfile -t storyshelf-fly .
+
+      - name: Boot the image
+        run: |
+          docker run -d --name storyshelf -p 3000:3000 \
+            -e STORYSHELF_ADMIN_TOKEN="$STORYSHELF_ADMIN_TOKEN" storyshelf-fly
+          for i in $(seq 1 30); do
+            curl -fsS "$STORYSHELF_URL/api/v1/health" && exit 0
+            sleep 2
+          done
+          echo "::error::the Fly image did not become healthy"
+          exit 1
+
+      - name: Seed the demo
+        run: apps/fly-app/seed.sh
+
+      - name: Demo captures through the pipeline
+        run: |
+          for i in $(seq 1 90); do
+            status="$(curl -fsS -H "Authorization: Bearer $STORYSHELF_ADMIN_TOKEN" \
+              "$STORYSHELF_URL/api/v1/projects/demo-design-system/builds" | jq -r '[.[].status] | join(" ")')"
+            echo "build statuses: $status"
+            case "$status" in
+              *failed*) echo "::error::a demo build failed"; exit 1 ;;
+              *pending*|*capturing*|*comparing*|"") sleep 5 ;;
+              *) exit 0 ;;
+            esac
+          done
+          echo "::error::demo builds did not settle in time"
+          exit 1
+
+      - name: Re-seed is a no-op
+        run: apps/fly-app/seed.sh | tee reseed.log && grep -q "up to date" reseed.log
+
+      - name: Container logs
+        if: ${{ failure() }}
+        run: docker logs storyshelf

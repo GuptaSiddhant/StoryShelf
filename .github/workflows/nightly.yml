@@ -1,0 +1,27 @@
+name: Nightly
+
+# Drift check (Storybook, pnpm, Playwright and the Fly base images move fast): captures
+# every supported Storybook fixture and dry-runs the Fly image. PRs only run storybook-9
+# (ci.yml). Also runnable on demand.
+on:
+  schedule:
+    - cron: "30 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    name: capture
+    uses: ./.github/workflows/capture.yml
+    with:
+      fixtures: '["storybook-8","storybook-9","storybook-10"]'
+
+  fly:
+    name: fly
+    uses: ./.github/workflows/fly-dry-run.yml

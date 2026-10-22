@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1
 # Fly demo — local adapters, workspace versions, rolldown bundle.
+# Demo data is not baked in: `apps/fly-app/seed.sh` uploads it after deploy (see fly.yml).
 # Build context MUST be repo root: `fly deploy . --config apps/fly-app/fly.toml --dockerfile apps/fly-app/Dockerfile`
 # Turbo 2.11+ prunes nub.lock natively (pnpm v9 format) — output lock is
 # pnpm-lock.yaml, renamed to nub.lock for `nub install --frozen-lockfile`.
@@ -19,7 +20,6 @@ COPY package.json nub.lock nub.jsonc turbo.json ./
 COPY config ./config
 COPY packages ./packages
 COPY apps ./apps
-COPY fixtures/storybook-8 ./fixtures/storybook-8
 RUN nubx --yes turbo@2.11.2 prune fly-app --docker --out-dir out && mv out/json/pnpm-lock.yaml out/json/nub.lock
 
 FROM nub AS builder
@@ -38,10 +38,6 @@ RUN --mount=type=cache,target=/root/.cache/nub,id=nub-cache \
 # Then copy pruned source for bundling (full) — overwrites package.json with full source.
 # Owned by `node`: rolldown writes its bundled config next to rolldown.config.ts and emits dist/.
 COPY --chown=node:node --from=pruner /app/out/full ./
-# Copy only the fixture needed for demo seed — build static inside image so repo stays clean (fixtures/**/storybook-static is gitignored)
-COPY --chown=node:node fixtures/storybook-8 ./fixtures/storybook-8
-# Fixtures are independent pnpm installs (same as CI): honour its pnpm-lock.yaml.
-RUN cd fixtures/storybook-8 && npx -y pnpm@10 install --frozen-lockfile && npx -y pnpm@10 run build-storybook
 # Bundle workspace @storyshelf/* into single mjs; keep native + npm deps external
 RUN nubx rolldown -c apps/fly-app/rolldown.config.ts
 
@@ -51,7 +47,6 @@ WORKDIR /app
 COPY --from=builder /app/apps/fly-app/dist ./dist
 COPY --from=builder /app/apps/fly-app/package.json ./package.json
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/fixtures/storybook-8 ./fixtures/storybook-8
 # Vendored assets (htmx.min.js, mark.svg, ...). The app resolves them as
 # `../assets/<name>` relative to `import.meta.url`, which for the bundled
 # `/app/dist/server.mjs` is `/app/assets/` — a path the bundler does not emit

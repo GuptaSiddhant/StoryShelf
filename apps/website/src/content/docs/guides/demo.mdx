@@ -6,7 +6,7 @@ description: Try StoryShelf at storyshelf.fly.dev — viewer-open, seeded with f
 import { LinkButton } from "@astrojs/starlight/components";
 import Screenshot from "../../../components/Screenshot.astro";
 
-The public demo at **`https://storyshelf.fly.dev`** is a full StoryShelf server (Fly `iad`, SQLite + local storage + Playwright) seeded with the `fixtures/storybook-8` project. It resets on redeploy and is intended for **viewer** triage — anyone can review diffs, only admins can mutate.
+The public demo at **`https://storyshelf.fly.dev`** is a full StoryShelf server (Fly `iad`, SQLite + local storage + Playwright) seeded with the `fixtures/storybook-9` project. It is intended for **viewer** triage — anyone can review diffs, only admins can mutate.
 
 <LinkButton href="https://storyshelf.fly.dev" icon="external">
   Open the live demo
@@ -43,7 +43,7 @@ Open `https://storyshelf.fly.dev` → enter `demo` at the login → browse. If a
 
 ## What’s seeded
 
-- Project `Demo Design System` (slug `demo-design-system`, `acme/design-system`) from `fixtures/storybook-8` — 7 stories, viewports `desktop`/`mobile`.
+- Project `Demo Design System` (slug `demo-design-system`, `acme/design-system`) from `fixtures/storybook-9` — viewports `desktop`/`mobile`.
 - A `reviewing` build (`feature/new-button`) with `changed` snapshots for the diff overlay demo — real Playwright renders (both viewports).
 - The `viewer` account can open the build review (`/projects/demo-design-system/builds/:buildId`) and the published Storybook (`/projects/demo-design-system/storybook`), but **Approve/Reject** and **Settings** require admin.
 

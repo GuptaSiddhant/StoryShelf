@@ -61,3 +61,47 @@ jobs:
           done
           echo "::error::/assets/htmx.js was not served correctly"
           exit 1
+
+  # Demo data goes in through the public API, not the image. Idempotent: `seed.sh`
+  # re-seeds only when the fixture changed (the data lives on the Fly volume).
+  seed:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      # Forks and fresh setups have no secret: skip the seeding instead of failing the run.
+      - name: Check admin token
+        id: token
+        env:
+          STORYSHELF_ADMIN_TOKEN: ${{ secrets.STORYSHELF_ADMIN_TOKEN }}
+        run: |
+          if [ -z "$STORYSHELF_ADMIN_TOKEN" ]; then
+            echo "::notice::STORYSHELF_ADMIN_TOKEN secret is not set; skipping the demo seed."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        if: steps.token.outputs.present == 'true'
+        uses: actions/checkout@v7
+
+      - name: Setup workspace
+        if: steps.token.outputs.present == 'true'
+        uses: ./.github/actions/setup-workspace
+
+      - name: Build the workspace CLI
+        if: steps.token.outputs.present == 'true'
+        run: nubx turbo build --filter=storyshelf
+
+      - name: Build fixture Storybook
+        if: steps.token.outputs.present == 'true'
+        uses: ./.github/actions/build-fixture
+        with:
+          fixture: storybook-9
+
+      - name: Seed demo project
+        if: steps.token.outputs.present == 'true'
+        env:
+          STORYSHELF_URL: https://storyshelf.fly.dev
+          STORYSHELF_ADMIN_TOKEN: ${{ secrets.STORYSHELF_ADMIN_TOKEN }}
+        run: apps/fly-app/seed.sh

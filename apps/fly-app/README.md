@@ -23,7 +23,7 @@ fly deploy . --config apps/fly-app/fly.toml --dockerfile apps/fly-app/Dockerfile
 fly status -a storyshelf
 ```
 
-CI auto-deploys on tag `v*.*.*` via `.github/workflows/fly.yml`.
+`.github/workflows/fly.yml` deploys on every push to `main`. Demo data is seeded by the `seed` job after each deploy (`seed.sh`: builds the fixture, uploads it through the API, and re-seeds only when the fixture changed). It needs the `STORYSHELF_ADMIN_TOKEN` repo secret to match the Fly secret.
 
 ## Notes
 

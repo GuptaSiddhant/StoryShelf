@@ -4,5 +4,5 @@
     "types": ["node"],
     "noEmit": true
   },
-  "include": ["server.ts", "src"]
+  "include": ["server.ts"]
 }
