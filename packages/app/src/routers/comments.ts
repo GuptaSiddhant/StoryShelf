@@ -4,6 +4,7 @@ import type { Comment, Project } from "@storyshelf/core/schema";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
 import { notifyProject } from "../notify.ts";
+import { REVIEW_EVENTS, announceReview } from "../review-events.ts";
 import { getStore } from "../store.ts";
 import { VIEW_ROLES, DEVELOPER_ROLES, buildForProject } from "./builds.handlers.ts";
 import { flashHx } from "./flash.ts";
@@ -82,14 +83,21 @@ export function registerComments(app: ShelfRouter): void {
     const { slug, buildId, commentId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...DEVELOPER_ROLES);
     const build = await buildForProject(project.id, buildId);
-    const comment = await new CommentModel(getStore().db).resolve(commentId);
-    if (comment.buildId !== build.id) {
-      throwNotFound("Comment not found");
-    }
+    const comment = await resolveBuildComment(build.id, commentId);
     hxRefresh(c);
     flashHx(c, "Comment resolved");
     return c.json(comment);
   });
+}
+
+/** Mark a comment of `buildId` resolved; 404 for a comment of another build. */
+export async function resolveBuildComment(buildId: string, commentId: string): Promise<Comment> {
+  const comments = new CommentModel(getStore().db);
+  const found = (await comments.listByBuild(buildId)).find((item) => item.id === commentId);
+  if (!found) {
+    throwNotFound("Comment not found");
+  }
+  return await comments.resolve(commentId);
 }
 
 /** A comment anchors to the build, a story or a snapshot (ADR 0013, decision 2), never two. */
@@ -104,21 +112,26 @@ function assertOneAnchor(body: {
   }
 }
 
+/**
+ * Snapshot comments keep `comment:created`; build and story comments, the review ones, raise
+ * `review:comment` (webhook and notifications, ADR 0013, decision 10). One event per comment.
+ */
 async function announceComment(project: Project, buildId: string, comment: Comment): Promise<void> {
-  await notifyProject(
-    project,
-    "comment:created",
-    {
-      buildId,
-      commentId: comment.id,
-      snapshotId: comment.snapshotId,
-      body: comment.body.slice(0, 500),
-    },
-    `/builds/${buildId}`,
-  );
+  const data = {
+    buildId,
+    commentId: comment.id,
+    snapshotId: comment.snapshotId,
+    storyId: comment.storyId,
+    body: comment.body.slice(0, 500),
+  };
+  if (comment.snapshotId === null) {
+    await announceReview(project, REVIEW_EVENTS.comment, data, buildId);
+    return;
+  }
+  await notifyProject(project, "comment:created", data, `/builds/${buildId}`);
 }
 
-async function createComment(
+export async function createComment(
   project: Project,
   buildId: string,
   body: CommentCreateInput,

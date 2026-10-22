@@ -2,7 +2,6 @@ import { groupComponents } from "@storyshelf/core/capture";
 import { BuildModel } from "@storyshelf/core/models";
 import { CaptureAttemptModel } from "@storyshelf/core/models";
 import { CaptureLogModel } from "@storyshelf/core/models";
-import { CommentModel } from "@storyshelf/core/models";
 import { LabelModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
 import { SnapshotModel } from "@storyshelf/core/models";
@@ -14,6 +13,7 @@ import {
   loadDesignResolutions,
   providerNameFor,
 } from "../routers/design.handlers.ts";
+import { loadReviewSection } from "../routers/review-section.handlers.ts";
 import { catalogOf, getStore, testingEnabled } from "../store.ts";
 import {
   Badge,
@@ -25,16 +25,12 @@ import {
   PageHeader,
   SectionTitle,
   Stat,
-  TextareaField,
   Thumbnail,
   VStack,
   statusTone,
 } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import {
-  reviewComment,
-  reviewCommentBody,
-  reviewCommentHead,
   snapshotCard,
   snapshotCardBody,
   snapshotCardHead,
@@ -45,6 +41,9 @@ import { snapshotVariant } from "./build-diff-model.ts";
 import { StaleBaselineNotice } from "./build-diff-stale.tsx";
 import { LinkedUsage, type LinkedUsageItem } from "./build-diff-usage.tsx";
 import { DesignButtons } from "./design-links.tsx";
+import { ChangesetCard } from "./review-changeset.tsx";
+import { CommentsCard } from "./review-comments.tsx";
+import { VerdictCard } from "./review-verdict.tsx";
 
 /** Map a capture log level to its badge tone. */
 function logTone(level: string): "neutral" | "success" | "warning" | "danger" | "info" {
@@ -74,7 +73,6 @@ export async function renderBuildDetailPage(
     return null;
   }
   const snapshots = await new SnapshotModel(db).listByBuild(build.id);
-  const comments = await new CommentModel(db).listByBuild(build.id);
   const attempts = await new CaptureAttemptModel(db).listByBuild(build.id);
   const logs = new CaptureLogModel(db);
   const attemptLogs = new Map<string, Awaited<ReturnType<typeof logs.listByAttempt>>>();
@@ -95,6 +93,7 @@ export async function renderBuildDetailPage(
       .catch(() => null),
     new LabelModel(db).listForBuild(build.id),
   ]);
+  const review = await loadReviewSection(project, build, catalog);
   const components = catalog ? groupComponents(catalog.entries) : [];
   const storyCount = catalog?.entries.filter((entry) => entry.type === "story").length ?? 0;
 
@@ -291,6 +290,15 @@ export async function renderBuildDetailPage(
         </div>
       ) : null}
 
+      {review ? (
+        <div class="mb-1">
+          <VStack>
+            {testing ? null : <VerdictCard data={review} />}
+            <ChangesetCard data={review} />
+          </VStack>
+        </div>
+      ) : null}
+
       {!testing ? null : snapshots.length === 0 ? (
         <EmptyState
           title="No snapshots yet"
@@ -395,57 +403,14 @@ export async function renderBuildDetailPage(
         </div>
       )}
 
-      <div class="mt-1">
-        <Card>
-          <SectionTitle>Comments</SectionTitle>
-          {comments.length === 0 ? (
-            <Meta>No comments. Add one in the diff review page for a specific snapshot.</Meta>
-          ) : null}
+      {review ? (
+        <div class="mt-1">
           <VStack>
-            {comments.map((comment): HtmlEscapedString | Promise<HtmlEscapedString> => (
-              <div key={comment.id} class={reviewComment}>
-                <div class={reviewCommentHead}>
-                  <strong>{comment.userId ?? "anonymous"}</strong>
-                  <span>· {new Date(comment.createdAt).toLocaleString()}</span>
-                  {comment.snapshotId ? (
-                    <Badge tone="neutral">
-                      {snapshots.find((snapshot) => snapshot.id === comment.snapshotId)
-                        ?.storyName ?? comment.snapshotId.slice(0, 6)}
-                    </Badge>
-                  ) : (
-                    <Badge tone="neutral">build</Badge>
-                  )}
-                  {comment.resolved ? <Badge tone="success">resolved</Badge> : null}
-                </div>
-                <p class={reviewCommentBody}>{comment.body}</p>
-              </div>
-            ))}
+            {testing ? <VerdictCard data={review} /> : null}
+            <CommentsCard data={review} />
           </VStack>
-
-          <form
-            method="post"
-            action={`/api/v1/projects/${project.slug}/builds/${build.id}/comments`}
-            hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/comments`}
-            hx-target="body"
-            class="mt-1 max-w-prose"
-          >
-            <VStack>
-              <TextareaField
-                label="Add build comment"
-                name="body"
-                rows={3}
-                required
-                placeholder="Leave a comment on this build…"
-              />
-              <div>
-                <Button variant="primary" type="submit">
-                  Comment
-                </Button>
-              </div>
-            </VStack>
-          </form>
-        </Card>
-      </div>
+        </div>
+      ) : null}
     </DocumentLayout>
   );
 }

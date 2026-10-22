@@ -90,6 +90,25 @@ describe("OpenAPI spec", () => {
     expect(untagged).toEqual([]);
   });
 
+  it("marks every operation with the class of its route", async () => {
+    const doc = (await (await app().request("/api/v1/openapi.json")).json()) as {
+      paths: Record<string, Record<string, { "x-storyshelf-class"?: string }>>;
+    };
+    const classOf = (path: string, method: string): string | undefined =>
+      doc.paths[path]?.[method]?.["x-storyshelf-class"];
+    expect(classOf("/api/v1/projects", "get")).toBe("hosting");
+    expect(classOf("/api/v1/projects/{slug}/builds/{buildId}/snapshots", "get")).toBe("testing");
+    expect(classOf("/api/v1/projects/{slug}/builds/{buildId}/reviews", "post")).toBe("review");
+    expect(classOf("/api/v1/projects/{slug}/builds/{buildId}/changeset", "get")).toBe("review");
+    expect(classOf("/api/v1/projects/{slug}/builds/{buildId}/comments", "get")).toBe("review");
+    const unmarked = Object.entries(doc.paths).flatMap(([path, operations]) =>
+      Object.entries(operations)
+        .filter(([, operation]) => operation["x-storyshelf-class"] === undefined)
+        .map(([method]) => `${method.toUpperCase()} ${path}`),
+    );
+    expect(unmarked).toEqual([]);
+  });
+
   it("documents project paths with typed responses", async () => {
     const response = await app().request("/api/v1/openapi.json");
     const doc = (await response.json()) as OpenApiDocument;

@@ -30,37 +30,95 @@ The build status flips to `approved` when every `new`/`changed` snapshot is reso
 
 ## Comments
 
-Threaded review comments live on a build or a single snapshot, with **resolve**:
+Threaded review comments live on a build, a story of the build's catalog or a single snapshot, with **resolve**. A comment has exactly one anchor:
 
 - `GET /api/v1/projects/:slug/builds/:id/comments`
-- `POST …/comments { body, snapshotId?, parentId? }`
+- `POST …/comments { body, snapshotId? | storyId?, parentId? }` (`snapshotId` and `storyId` together are refused with 400)
 - `POST …/comments/:commentId/resolve`
 
-Comments persist until the build is purged (see [Retention](/concepts/retention/)). The UI’s diff overlay (baseline | current | diff) is the heat map — red = changed pixels, thresholds from `pixel_threshold` / `max_diff_ratio` or per-story `diffThreshold`.
+`developer`, `approver` and `admin` write; `viewer` reads. Build and story comments show on the build page and story comments also on the story's [component page](#component-pages); the snapshot review page shows the thread of the selected snapshot together with the build comments and the comments on that snapshot's story. The forms in the UI post to the same handlers through page routes under `/projects/:slug/builds/:id/…`, since a browser form cannot send JSON.
 
-## Reviewing without testing
+Comments persist until the build is purged (see [Retention](/concepts/retention/)). The UI's diff overlay (baseline | current | diff) is the heat map: red = changed pixels, thresholds from `pixel_threshold` / `max_diff_ratio` or per-story `diffThreshold`.
 
-A project on a [hosting-only](/concepts/hosting-only/) instance, or any project whose builds carry no snapshots, is reviewed at the build level. Review is a per-project switch (`reviewEnabled`, on by default; see [Project settings](/guides/project-settings/#review)):
+A project can turn comments and verdicts off with its [review switch](#the-review-switch); they are then hidden, not deleted.
+
+## Review without screenshots
+
+Review is the place where people comment on a build and sign it off. It works whether or not a project captures screenshots: a [hosting-only](/concepts/hosting-only/) instance reviews a published Storybook at the build level, and a project with `testing` adds the same comments, changeset and sign-off beside its visual diffs.
+
+### The review switch
+
+Review is a per-project switch (`reviewEnabled`, on by default) edited by project admins in **Settings → General → Review** or with `PATCH /api/v1/projects/:slug`; see [Project settings](/guides/project-settings/#review). With review on, a project has these four combinations:
 
 | `testing` | review | A build                                                                                                                                       |
 | --------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| off       | off    | Accepted when publishing finishes. No verdicts, no review status.                                                                             |
+| off       | off    | Accepted when publishing finishes. No comments, no verdicts, no review status.                                                                |
 | off       | on     | Default branch: accepted when publishing finishes. Other branches: `pending` until verdicts decide it, `<prefix>/review` status.             |
-| on        | off    | Snapshot approval alone decides; the verdict routes answer 404.                                                                               |
-| on        | on     | Snapshot approval decides; a build-level verdict is available as a sign-off and does not gate.                                                |
+| on        | off    | Snapshot approval alone decides; comments and verdict routes answer 404.                                                                      |
+| on        | on     | Snapshot approval decides, plus comments, the changeset and a build-level sign-off that does not gate.                                        |
 
-**Verdicts.** Approvers and admins (the roles that approve snapshots) give a build a verdict, `approved` or `rejected`, with an optional note:
+The default branch is never held, so the project's Storybook link always resolves. A pending build is not the project's latest accepted build: the Storybook link keeps serving the previous accepted build until this one is approved, while the build's own page and its published Storybook (`/projects/:slug/storybook/build/:id/`, or the `/_/:id` short link) open for anyone who may view the project, whatever the build's status.
+
+With review off every review route answers **404** for that project, evaluated on every request (the same routes are marked `x-storyshelf-class: review` in the [OpenAPI document](/guides/api/)). Someone who may not view the project gets the route's usual refusal, so the 404 reveals nothing about a project they cannot see.
+
+### Reviewers
+
+The `approver` and `admin` roles are the reviewers; there is no separate reviewer role, no per-build assignment and no "request review from" step. Every approver and admin of the project reviews every build that waits.
+
+- **Being asked.** When a published build waits for a verdict, a `review:requested` event goes to the project's approvers and admins. Unlike other [notification topics](/guides/notifications/), which are opt-in, this one is on by default for those roles: a reviewer with no subscription receives it by email (when an email transport is wired), and turns it off by saving their notification preferences for the project with **Email me** unticked, or with a topic list that leaves it out. Channels and webhooks receive it like any other event.
+- **Commenting.** `developer` and above comment; `viewer` reads only. Unresolved comments never block a verdict.
+- **A new build needs a new approval.** Verdicts belong to the build, as snapshot approvals do. The build under review is the latest on its branch; earlier pending builds fall away under [retention](#builds-nobody-finishes).
+
+### The build page
+
+A build's page is the review workspace for a project without `testing`, and with `testing` the changeset sits above the visual diffs and the verdict and comments below them:
+
+- **Review card.** The build's standing (`waiting for review`, `approved`, `rejected`), the approvals so far against the requirement, each reviewer's latest verdict with their note, and, for approvers and admins, **Approve build** and **Reject build** with an optional note. With `testing` the card says the verdict is a sign-off only.
+- **Changes in this build.** The components the build added, removed or changed against its baseline, each with a link to the published story and to its component page (see [the changeset](#the-changeset)).
+- **Comments.** Build comments and story comments with their anchor, resolve actions, and a form to add a build comment (`developer` and above).
+
+### Verdicts
+
+Approvers and admins give a build a verdict, `approved` or `rejected`, with an optional note:
 
 - `POST /api/v1/projects/:slug/builds/:id/reviews { verdict, body? }`
 - `GET /api/v1/projects/:slug/builds/:id/reviews` (any viewer): each reviewer's latest verdict, the approvals against the requirement, and the full history.
 
-A reviewer's newest verdict counts, so rewriting one is another `POST`. With `testing` off the build is `approved` once the project's required approvals (`reviewApprovals`, default 1) are present among the reviewers' latest verdicts and none of those is `rejected`; it is `rejected` when any is, and `pending` otherwise (for example when a rejecting reviewer rewrites to an approval and too few approvals remain). Each reviewer counts once. Verdicts belong to the build: a new push is a new build and needs its own approval, and unresolved comments never block a verdict. A failed build answers 409. Verdicts written with a bearer token carry no user and count as a single reviewer, so a project that requires more than one approval needs approvals from signed-in users.
+A reviewer's newest verdict counts, so rewriting one is another `POST`. With `testing` off the build is `approved` once the project's required approvals (`reviewApprovals`, default 1) are present among the reviewers' latest verdicts and none of those is `rejected`; it is `rejected` when any is, and `pending` otherwise (for example when a rejecting reviewer rewrites to an approval and too few approvals remain). Each reviewer counts once. A failed build answers 409. Verdicts written with a bearer token carry no user and count as a single reviewer, so a project that requires more than one approval needs approvals from signed-in users.
 
-A verdict that approves or rejects the build fires the usual `build:approved` / `build:rejected` webhook and notifications. Accepting a build automatically (default branch, or any branch with review off) fires none.
+A verdict that approves or rejects the build fires the usual `build:approved` / `build:rejected` webhook and notifications, and every verdict fires `review:verdict`. Accepting a build automatically (default branch, or any branch with review off) fires no approval event.
 
-**Statuses.** The build's git channels show `<prefix>/review` (`pending`, then `success` or `failure` from the verdict) next to the informational `<prefix>/storybook`; see [Merge gate setup](/guides/merge-gate/).
+### The changeset
 
-Comments by `developer` and above can anchor to the build, to a snapshot, or to a story of the build's catalog (`storyId` in the comment body; an anchor is exactly one of the three).
+Without screenshots the build page says what changed from the Storybook catalog: for each component (a story file) the build's `build_components` hash is compared with the **baseline build**, the latest accepted build of the same branch before it, falling back to the latest accepted build of the default branch. The list shows components **added**, **removed** and **changed** (a changed hash means the component's stories differ: stories added, removed or renamed), the count of unchanged ones, and links to the published story and the component page. `GET /api/v1/projects/:slug/builds/:id/changeset` returns the same data as JSON.
+
+This is a coarser signal than pixels and is shown as such: a changed hash means the definition changed, not that the story looks different. The index a Storybook publishes carries no story arguments or source, so a story whose arguments change but whose id, name and title do not is not listed. A first build with nothing accepted before it lists every component as added.
+
+### Story comments
+
+On a [component page](#component-pages), the **Stories** tab shows the comments of the build the page shows under the previewed story, with a form for `developer` and above. A story comment stays attached to its story if the build is later captured, and the snapshot review page shows the comments of its story. A comment on a story that a later build renames or removes stays with the build it was written on.
+
+### Statuses
+
+The build's git channels show `<prefix>/review` (`pending`, then `success` or `failure` from the verdict) when `testing` is off and review is on, next to the informational `<prefix>/storybook` that links the published Storybook. With `testing` on, `<prefix>/testing` stays the only gating status; review never adds a second required check. See [Merge gate setup](/guides/merge-gate/).
+
+### Events
+
+Review raises three [webhook](/guides/webhooks/) and [notification](/guides/notifications/) topics:
+
+| Event              | When                                                                                          |
+| ------------------ | --------------------------------------------------------------------------------------------- |
+| `review:requested` | A published build waits for a verdict (review on, `testing` off). On by default for approvers and admins. |
+| `review:comment`   | A build or story comment is posted. Snapshot comments keep `comment:created`.                |
+| `review:verdict`   | A reviewer approves or rejects a build.                                                       |
+
+### Builds nobody finishes
+
+A `pending` build waits for a verdict, so it needs an exit. The [retention purge](/concepts/retention/#pending-builds) removes a pending build once its last activity (the upload, or its newest comment or verdict) is older than the retention window (`purgeTtlDays`), including builds a newer build on the same branch replaced. Turning review **off** accepts, in one pass when the setting is saved, the project's pending builds that no capture worked on, so a project that switches review off does not keep a queue nobody will clear.
+
+### For agents
+
+The [MCP server](/ai/mcp/) can read and write comments, including `storyId` comments, but has no tool to give a verdict: an agent cannot sign off a build.
 
 ## Retry & merge gate
 
@@ -73,7 +131,7 @@ When a site admin has enabled AI for the project, the review page shows an advis
 
 ## Component pages
 
-Every story file has a stable page at `/projects/<slug>/components/<path>`. Its **Stories** tab previews the published story and lists the file's stories and docs, and its **History** tab lists the builds that hold it; with `testing` it also has **States**, **Figma** design and **Linked** packages. See [Published Storybook](/concepts/publishing/#the-catalog-and-the-pages-it-feeds). The library, review page and build cards link to it. If a file is renamed or removed, the old URL explains where it moved or which build last had it.
+Every story file has a stable page at `/projects/<slug>/components/<path>`. Its **Stories** tab previews the published story with the story's review comments, and lists the file's stories and docs, and its **History** tab lists the builds that hold it; with `testing` it also has **States**, **Figma** design and **Linked** packages. See [Published Storybook](/concepts/publishing/#the-catalog-and-the-pages-it-feeds). The library, review page and build cards link to it. If a file is renamed or removed, the old URL explains where it moved or which build last had it.
 
 ## Related
 

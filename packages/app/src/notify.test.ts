@@ -1,5 +1,9 @@
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
-import { NotificationChannelModel, NotificationSubscriptionModel } from "@storyshelf/core/models";
+import {
+  MemberModel,
+  NotificationChannelModel,
+  NotificationSubscriptionModel,
+} from "@storyshelf/core/models";
 import { makeDatabase, makeFakeStateNotifier, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
@@ -73,6 +77,41 @@ async function deliver(store: Store): Promise<string> {
     await notifyProject({ id: "p1", slug: "test-project" }, "build:created", {}, "/builds/b1");
   });
   return JSON.stringify(sent);
+}
+
+async function seedUsers(db: ReturnType<typeof makeDatabase>["db"]): Promise<void> {
+  await seedProject(db);
+  const roles = { admin1: "admin", appr1: "approver", appr2: "approver", dev1: "developer" };
+  await Promise.all(
+    Object.entries(roles).map(async ([id, role]) => {
+      await db.insert(db.tables.users, {
+        id,
+        email: `${id}@example.com`,
+        name: id,
+        avatarUrl: null,
+        role: "member",
+        lastLoginAt: null,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        passwordHash: null,
+        displayNameOverride: null,
+        authProvider: "local",
+        disabled: false,
+      });
+      await new MemberModel(db).set("p1", id, role as "admin");
+    }),
+  );
+}
+
+async function recipients(
+  db: ReturnType<typeof makeDatabase>["db"],
+  event: string,
+): Promise<string[]> {
+  const emailed: { channel: { config: { to: string } } }[] = [];
+  await runWithStore(
+    storeFor(db, [recordingProvider("email", emailed)]),
+    async () => await notifyProject({ id: "p1", slug: "test-project" }, event, { buildId: "b1" }),
+  );
+  return emailed.map((item) => item.channel.config.to).toSorted();
 }
 
 describe("notifyProject", () => {
@@ -193,6 +232,39 @@ describe("notifyProject", () => {
     });
     expect(emailed).toHaveLength(1);
     expect(emailed[0]).toMatchObject({ channel: expect.objectContaining({ provider: "email" }) });
+  });
+
+  describe("review:requested (on by default for approvers and admins)", () => {
+    it("reaches approvers and admins without a subscription, never developers", async () => {
+      const { db } = makeDatabase();
+      await seedUsers(db);
+      expect(await recipients(db, "review:requested")).toEqual([
+        "admin1@example.com",
+        "appr1@example.com",
+        "appr2@example.com",
+      ]);
+    });
+
+    it("lets a reviewer opt out by turning their subscription off or narrowing its topics", async () => {
+      const { db } = makeDatabase();
+      await seedUsers(db);
+      const subscriptions = new NotificationSubscriptionModel(db);
+      await subscriptions.upsert("p1", "appr1", { enabled: false });
+      await subscriptions.upsert("p1", "appr2", { events: ["build:approved"] });
+      expect(await recipients(db, "review:requested")).toEqual(["admin1@example.com"]);
+    });
+
+    it("sends a subscribed reviewer one message, and other topics stay opt-in", async () => {
+      const { db } = makeDatabase();
+      await seedUsers(db);
+      await new NotificationSubscriptionModel(db).upsert("p1", "appr1", { via: ["email"] });
+      expect(await recipients(db, "review:requested")).toEqual([
+        "admin1@example.com",
+        "appr1@example.com",
+        "appr2@example.com",
+      ]);
+      expect(await recipients(db, "review:verdict")).toEqual(["appr1@example.com"]);
+    });
   });
 
   it("links to the resolved public origin, and leaves the link out when none is known", async () => {

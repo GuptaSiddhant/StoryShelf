@@ -21,6 +21,7 @@ import {
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import { DEFAULT_SCRATCH_DIR } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
+import type { Build, Project } from "@storyshelf/core/schema";
 import type { JobQueue } from "./job-queue.ts";
 
 /** What request handlers and the consumer use of publishing. */
@@ -48,14 +49,20 @@ export type PublishService = Pick<
  * `captureWillRun` is whether uploads get a capture (`enqueueCapture` exists): capture owns the
  * build status then, and publishing leaves it alone. `delivery.jobs` is the shared queue; a host
  * that polls no `publish` jobs (serverless) has none of the job side. When publishing ends,
- * `delivery.buildState` shows the build's state on its git channels (the `storybook` status).
+ * `delivery.buildState` shows the build's state on its git channels (the `storybook` status) and
+ * `delivery.reviewRequested` asks the reviewers for a verdict on a build that waits for one.
  */
 export function setupPublishing(
   options: ShelfOptions,
   config: ShelfConfig,
   logger: Logger,
   captureWillRun: boolean,
-  delivery: { jobs: JobQueue; buildState: BuildStatePublisher },
+  delivery: {
+    jobs: JobQueue;
+    buildState: BuildStatePublisher;
+    /** Tells the project's reviewers a build waits for a verdict (`review:requested`). */
+    reviewRequested: (project: Project, build: Build) => Promise<void>;
+  },
 ): PublishWiring {
   const { jobs } = delivery;
   const catalog = createCatalogLoader({
@@ -63,13 +70,7 @@ export function setupPublishing(
     storage: options.storage,
     logger: logger.child({ component: "catalog" }),
   });
-  // The Storybook status shows the end of publishing, a transition no build status change marks.
-  const afterPublish: AfterPublishHook[] = [
-    createCatalogHook(catalog),
-    async ({ build }) => {
-      await delivery.buildState.request(build.id);
-    },
-  ];
+  const afterPublish = publishHooks(catalog, captureWillRun, delivery);
   const completer = createPublishCompleter({
     db: options.database,
     captureWillRun,
@@ -99,4 +100,27 @@ export function setupPublishing(
       logger,
     }),
   };
+}
+
+/**
+ * Hooks run after every publish: the catalog, the build's state on its git channels (the Storybook
+ * status shows the end of publishing, a transition no build status change marks) and, without
+ * `testing`, the request for a verdict on a build left `pending` (ADR 0013, decision 4).
+ */
+function publishHooks(
+  catalog: CatalogLoader,
+  captureWillRun: boolean,
+  delivery: Pick<Parameters<typeof setupPublishing>[4], "buildState" | "reviewRequested">,
+): AfterPublishHook[] {
+  return [
+    createCatalogHook(catalog),
+    async ({ build }) => {
+      await delivery.buildState.request(build.id);
+    },
+    async ({ build, project, outcome }) => {
+      if (outcome.ok && !captureWillRun && build.status === "pending") {
+        await delivery.reviewRequested(project, build);
+      }
+    },
+  ];
 }

@@ -18,12 +18,12 @@ It is a thin client over the [REST API](/guides/api/): it uses your existing tok
     triage and project health.
   </Card>
   <Card title="Comment" icon="comment">
-    Add a comment to a build or a snapshot, reply, and resolve threads. Needs a token with the
-    developer role or above.
+    Add a comment to a build, a story or a snapshot, reply, and resolve threads. Needs a token with
+    the developer role or above. A project with review off has no comments.
   </Card>
   <Card title="Never approve" icon="approve-check">
-    There is no approve, reject, retry or generate tool. A human approves in StoryShelf, and agents
-    cannot spend your AI budget.
+    There is no approve, reject, build-verdict, retry or generate tool. A human signs off in
+    StoryShelf, and agents cannot spend your AI budget.
   </Card>
 </CardGrid>
 
@@ -34,7 +34,7 @@ It is a thin client over the [REST API](/guides/api/): it uses your existing tok
 | `list_snapshots`                                  | Changed, new, pending and rejected snapshots with diff pixels and ratio (`includeUnchanged` for all) |
 | `get_capture_logs`                                | Capture attempts and the tail of an attempt's logs                                                   |
 | `get_build_insight`, `get_project_health`         | Latest cached AI triage and health digest (never generates one)                                      |
-| `list_comments`, `add_comment`, `resolve_comment` | Review comments                                                                                      |
+| `list_comments`, `add_comment`, `resolve_comment` | Review comments on a build, a story (`storyId`) or a snapshot                                        |
 
 A `review-build` prompt chains these into a short review summary.
 

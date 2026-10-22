@@ -7,6 +7,7 @@ import type { Build, Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { ComponentCatalogView } from "../routers/component-catalog.handlers.ts";
+import type { ComponentReview } from "../routers/review-section.handlers.ts";
 import {
   Alert,
   Badge,
@@ -84,6 +85,8 @@ export interface ComponentPageData {
   previewable: boolean;
   design: DesignItem[];
   usage: LinkedUsageItem[];
+  /** Story comments of the shown build; null when the project has review off. */
+  review: ComponentReview | null;
   publishedBaseDomain?: string;
 }
 

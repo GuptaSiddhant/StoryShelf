@@ -88,13 +88,16 @@ function DiffReviewGrid(
               design={design}
               publishedBaseDomain={publishedBaseDomain}
             />
-            <DiffComments
-              project={project}
-              build={build}
-              selectedId={selected.id}
-              comments={comments}
-              canReview={canReview}
-            />
+            {project.reviewEnabled === false ? null : (
+              <DiffComments
+                project={project}
+                build={build}
+                selectedId={selected.id}
+                selectedStoryId={selected.storyId}
+                comments={comments}
+                canReview={canReview}
+              />
+            )}
             <DiffActionBar
               project={project}
               build={build}

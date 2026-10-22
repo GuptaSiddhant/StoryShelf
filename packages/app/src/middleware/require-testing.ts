@@ -1,6 +1,6 @@
 import type { Context, Next } from "hono";
 import { matchedRoutes } from "hono/route";
-import { classOfRoute } from "../routes/classification.ts";
+import { classOfRoute, type RouteClass } from "../routes/classification.ts";
 
 /** Body of the 404 a `testing` route answers on a hosting-only instance. */
 export const TESTING_DISABLED_MESSAGE = "Testing is not enabled on this instance.";
@@ -27,14 +27,18 @@ export function requireTesting(enabled: boolean) {
 }
 
 /** The last matched handler that the table classifies (middleware matches come first). */
-function isTestingRoute(c: Context): boolean {
+export function matchedRouteClass(c: Context): RouteClass | undefined {
   const routes = matchedRoutes(c);
   for (let index = routes.length - 1; index >= 0; index -= 1) {
     const route = routes[index];
     const routeClass = route && classOfRoute(route.method, route.path);
     if (routeClass !== undefined) {
-      return routeClass === "testing";
+      return routeClass;
     }
   }
-  return false;
+  return undefined;
+}
+
+function isTestingRoute(c: Context): boolean {
+  return matchedRouteClass(c) === "testing";
 }

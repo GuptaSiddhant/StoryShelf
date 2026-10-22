@@ -48,8 +48,8 @@ Unconfigured servers (no auth adapter) accept all requests.
 | Projects    | `/api/v1/projects`                                                                        | Create and manage Storybook projects                     |
 | Builds      | `/api/v1/projects/{slug}/builds`                                                          | Upload builds, list, retry, review                       |
 | Snapshots   | `/api/v1/projects/{slug}/builds/{id}/snapshots`                                           | Inspect and approve/reject individual screenshots        |
-| Comments    | `/api/v1/projects/{slug}/builds/{id}/comments`                                            | Review discussion threads                                |
-| Reviews     | `/api/v1/projects/{slug}/builds/{id}/reviews`                                             | Build-level verdicts (approver and admin)                |
+| Comments    | `/api/v1/projects/{slug}/builds/{id}/comments`                                            | Review discussion threads (build, story, snapshot)      |
+| Reviews     | `/api/v1/projects/{slug}/builds/{id}/reviews`, `…/changeset`                              | Build-level verdicts (approver and admin), the changeset |
 | Label types | `/api/v1/projects/{slug}/label-types`                                                     | Project-defined build label schemas                      |
 | Members     | `/api/v1/projects/{slug}/members`                                                         | Project-scoped roles                                     |
 | Tokens      | `/api/v1/projects/{slug}/tokens`                                                          | CI access tokens                                         |
@@ -58,6 +58,8 @@ Unconfigured servers (no auth adapter) accept all requests.
 | Admin       | `/api/v1/admin`                                                                           | Site-wide operations (retention purge)                   |
 
 AI agents can use this API through the [MCP server](/ai/mcp/), which wraps the read and comment endpoints.
+
+Every operation in `/api/v1/openapi.json` carries `x-storyshelf-class`: `hosting` (always), `testing` (404 without the `testing` option) or `review` (404 for a project with review off), so a client can tell which routes an instance or project hides.
 
 ## Walkthrough: upload a build
 

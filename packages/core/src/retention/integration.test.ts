@@ -150,7 +150,7 @@ describe("Retention purge integration", () => {
     expect(result.removedBuilds).toBe(2);
   });
 
-  it("skips non-terminal builds", async () => {
+  it("skips builds that are being captured or reviewed", async () => {
     const { storage } = makeStorage();
 
     const rows: Record<string, unknown>[] = [
@@ -160,7 +160,7 @@ describe("Retention purge integration", () => {
         gitSha: "sha-1",
         gitBranch: "main",
         isDefault: true,
-        status: "pending",
+        status: "capturing",
         createdAt: "2026-01-15T00:00:00.000Z",
         updatedAt: "2026-01-15T00:00:00.000Z",
       },
@@ -170,7 +170,7 @@ describe("Retention purge integration", () => {
         gitSha: "sha-2",
         gitBranch: "main",
         isDefault: true,
-        status: "pending",
+        status: "reviewing",
         createdAt: "2026-01-10T00:00:00.000Z",
         updatedAt: "2026-01-10T00:00:00.000Z",
       },
