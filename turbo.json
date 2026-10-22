@@ -1,5 +1,8 @@
 {
   "$schema": "./node_modules/turbo/schema.json",
+  "globalDependencies": ["config/**", "nub.jsonc"],
+  "cacheMaxAge": "7d",
+  "cacheMaxSize": "1GB",
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
@@ -11,27 +14,28 @@
         "STORAGE_S3_REGION",
         "TURSO_DATABASE_URL",
         "TURSO_AUTH_TOKEN"
-      ]
+      ],
+      "inputs": ["$TURBO_DEFAULT$", "!**/*.test.ts", "!**/*.test.tsx", "!README.md", "!LICENSE"]
     },
     "dev": {
       "persistent": true,
       "cache": false
     },
     "fmt": {
-      "outputLogs": "new-only"
+      "outputLogs": "new-only",
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/.oxfmtrc.json"]
     },
     "lint": {
       "dependsOn": ["^build"],
-      "outputLogs": "new-only"
+      "outputLogs": "new-only",
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/.oxlintrc.json"]
     },
     "test": {
-      "dependsOn": ["^build"],
-      "outputs": ["./node_modules/.vite/vitest"]
+      "dependsOn": ["^build"]
     },
     "test:integration": {
       "dependsOn": ["^build"],
-      "cache": false,
-      "outputs": ["./node_modules/.vite/vitest"]
+      "cache": false
     },
     "verify": {
       "dependsOn": ["build", "lint", "test"]

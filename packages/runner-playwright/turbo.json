@@ -1,0 +1,12 @@
+{
+  "$schema": "../../node_modules/turbo/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "test": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/website/src/content/docs/guides/remote-browsers.md"
+      ]
+    }
+  }
+}

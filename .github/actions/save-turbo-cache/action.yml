@@ -1,0 +1,13 @@
+name: Save turbo cache
+description: Save turbo's task cache for later runs. Does nothing outside main. Run last in a job that did setup-workspace.
+
+runs:
+  using: composite
+  steps:
+    # Keys are immutable, so concurrent saves for one commit just warn and keep the first.
+    - name: Save turbo cache
+      if: ${{ github.ref == 'refs/heads/main' }}
+      uses: actions/cache/save@v4
+      with:
+        path: .turbo/cache
+        key: turbo-${{ runner.os }}-${{ github.sha }}
