@@ -4,6 +4,7 @@ import { Converter } from "typedoc";
 
 export const MAIN_MODULE = "Overview";
 
+/** TypeDoc plugin entry: rename the main module once conversion has built the project. */
 export function load(app) {
   app.converter.on(Converter.EVENT_RESOLVE_BEGIN, (context) => {
     for (const child of context.project.children ?? []) {

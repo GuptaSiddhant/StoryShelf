@@ -12,14 +12,17 @@ const SITE = "https://storyshelf.js.org";
 const PACKAGES_DIR = join(import.meta.dirname, "..", "..", "..", "packages");
 const parser = unified().use(remarkParse).use(remarkGfm);
 
+/** The plain text of an mdast node. */
 function textOf(node) {
   if (typeof node.value === "string") return node.value;
   return (node.children ?? []).map((child) => textOf(child)).join("");
 }
 
-/** The nodes under `heading`, up to the next heading of the same or a higher level. */
+/** The nodes under the `##` section named `heading`, up to the next heading of the same or a higher level. */
 function sectionOf(tree, heading, where) {
-  const start = tree.children.findIndex((n) => n.type === "heading" && textOf(n) === heading);
+  const start = tree.children.findIndex(
+    (n) => n.type === "heading" && n.depth === 2 && textOf(n) === heading,
+  );
   if (start === -1) throw new Error(`Section "${heading}" not found in ${where}`);
   const { depth } = tree.children[start];
   const rest = tree.children.slice(start + 1);
@@ -29,7 +32,8 @@ function sectionOf(tree, heading, where) {
 
 /** Absolute site links become site paths (so the link validator sees them); relative ones point at GitHub. */
 function rewriteLink(url, slug) {
-  if (url.startsWith(SITE)) return url.slice(SITE.length) || "/";
+  const site = URL.canParse(url) ? new URL(url) : undefined;
+  if (site?.origin === SITE) return `${site.pathname}${site.search}${site.hash}`;
   if (/^(?:[a-z][a-z0-9+.-]*:|\/|#)/iu.test(url)) return url;
   return `${REPO_BLOB}/packages/${slug}/${url}`;
 }
@@ -49,6 +53,7 @@ function clean(nodes, slug) {
 
 const isReadme = (n) => n.type === "mdxJsxFlowElement" && n.name === "Readme";
 
+/** Replace every `<Readme heading="..." />` below `node` with that README section. */
 function expand(node, tree, slug, where) {
   if (!node.children) return;
   node.children = node.children.flatMap((child) => {
@@ -63,6 +68,7 @@ function expand(node, tree, slug, where) {
   });
 }
 
+/** Remark plugin: expand `<Readme />` markers in package pages from the package README. */
 export default function remarkReadmeSection() {
   return (tree, file) => {
     const slug = basename(file.path ?? "", extname(file.path ?? ""));

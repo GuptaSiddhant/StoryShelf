@@ -22,7 +22,7 @@ await app.lifecycle.setup();
 const server = serve({ fetch: app.fetch, port: 3000 });
 process.on("SIGTERM", () => {
   app.lifecycle
-    .close()
+    .teardown()
     .then(() => server.close())
     .catch(() => {});
 });
