@@ -9,8 +9,8 @@ Beyond diff review, StoryShelf **publishes** the uploaded Storybook build as a b
 
 <Screenshot
   name="library"
-  alt="The story library: every story from a branch's latest build, with Review and Preview links"
-  caption="The library lists every story from a branch's latest build; Preview opens the published Storybook."
+  alt="The story library: every component from a branch's latest build, with Review and Preview links"
+  caption="The library lists every component from a branch's latest build; Preview opens the published Storybook."
 />
 
 ## How a build gets published
@@ -41,6 +41,26 @@ With `testing` off, publishing is the whole life of a build and ends by setting 
 - **Other branches:** published, the build stays `pending`. A later release adds the project setting that accepts these builds without a review; until then they wait for a build-level verdict.
 
 No approval event or webhook fires for this automatic acceptance; `build:created` already announced the upload. Repeating a publish (a job redelivered after a lost lease) never changes a build that has left `pending`. With `testing` on, publishing leaves the status alone and capture sets it.
+
+## The catalog and the pages it feeds
+
+When publishing ends, StoryShelf reads the build's Storybook `index.json` (or `stories.json` on older Storybooks) and keeps a compact **catalog** of it: one entry per story and docs entry with its id, title, name, story file, type and tags. It is stored as `catalog.json` beside the build's files, and one `build_components` row per component (project, build, story file, title, story count and a hash of the component's entries) goes into the database. Both are removed with the build when retention purges it. Test entries (Storybook 10 `subtype: "test"`) are left out, as capture leaves them out.
+
+A build published before the catalog existed is catalogued the first time a page needs it, from its stored Storybook. A build whose Storybook is gone has no catalog, and its pages say so instead of failing.
+
+Three pages read the catalog, with `testing` on or off:
+
+- **Library** (`/projects/<slug>/library`): the components of the **latest build of the selected branch, whatever its status**. A build under review appears, and one still publishing shows a preparing message. Entries are grouped by title; each card links to its [component page](#component-preview), counts its stories, shows its tags and links to the published story and docs. The branch switcher falls back to the default branch's latest build, then to any build.
+- **Component page** (`/projects/<slug>/components/<path>`): a **Stories** tab (a preview of one story, and every story and docs entry of the file) and a **History** tab (the builds that hold the file, and whether its stories changed since the build before on the same branch: added, removed or renamed). If the file moved or was removed, the page says where it went or which build last had it.
+- **Build page** (`/projects/<slug>/builds/<id>`): sha, branch, author, message, labels, the published Storybook link, and component and story counts. An accepted build with no capture attempts is labelled **Published**; its approved count stays zero.
+
+With [`testing`](/concepts/capture/) the same pages gain what a capture adds: thumbnails and statuses on the library cards, the health panel and design links, a **States** tab with review links on the component page, and snapshot counts, attempts and bulk actions on the build page. Without `testing` none of that is shown, and a story's parameters (design links, modes, per-story settings) are simply absent: they are not in `index.json`, and nothing treats their absence as an error.
+
+### Component preview
+
+The Stories tab previews a story **only when you ask**: the page shows a *Load preview* button, and the frame is created on click, so opening a page never runs a published Storybook. The frame is sandboxed with `allow-scripts` only, with no `allow-same-origin`, so the Storybook runs on an opaque origin and cannot read the app's cookies or storage. Every story and docs entry also has an *Open* link to the full Storybook.
+
+Because the frame has an opaque origin, its module scripts are cross-origin requests that carry no cookies. For that reason the published files of a build answer `Access-Control-Allow-Origin: *` when the build is **viewable without credentials**: it is public (see below), or the instance has no sign-in at all. A **private build on an instance with sign-in** cannot be previewed in a frame; its page says so and offers the *Open* link, which uses your session. Storybook 8, 9 and 10 render under this sandbox.
 
 ## URL structure
 

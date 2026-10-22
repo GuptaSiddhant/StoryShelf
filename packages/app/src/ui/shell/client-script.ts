@@ -219,6 +219,21 @@ function filterPart(): string {
     });`;
 }
 
+/** Click-to-load story previews: move the inert frame out of its template (nothing runs before). */
+function previewPart(): string {
+  return `
+    document.addEventListener('click',function(e){
+      var btn=e.target instanceof Element ? e.target.closest('[data-preview-load]') : null;
+      var host=btn ? btn.closest('[data-preview-embed]') : null;
+      var tpl=host ? host.querySelector('template[data-preview-template]') : null;
+      if(!host||!tpl) return;
+      var idle=host.querySelector('[data-preview-idle]');
+      if(idle) idle.hidden=true;
+      host.appendChild(document.importNode(tpl.content,true));
+      tpl.remove();
+    });`;
+}
+
 /** Thin top progress bar while an HTMX request (e.g. snapshot navigation) is in flight. */
 function loadingPart(): string {
   return `
@@ -254,6 +269,7 @@ export function clientScript(): string {
     formPart(),
     copyPart(),
     filterPart(),
+    previewPart(),
     loadingPart(),
     focusPart(),
     reviewScript(),

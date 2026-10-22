@@ -4,6 +4,7 @@ import { createFigmaDesign } from "@storyshelf/design-figma";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
+import { stubRunner } from "../test-runner.ts";
 
 const T0 = "2026-01-01T00:00:00.000Z";
 
@@ -109,6 +110,7 @@ async function seed() {
     logger: pino({ level: "silent" }),
     design: [createFigmaDesign()],
     config: { secret: "s" },
+    testing: { runner: stubRunner() },
   });
   return { db, app };
 }

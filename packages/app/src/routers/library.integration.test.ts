@@ -5,6 +5,7 @@ import { storybookDir } from "@storyshelf/core/utils";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
+import { stubRunner } from "../test-runner.ts";
 
 const silentLogger = pino({ level: "silent" });
 
@@ -72,7 +73,12 @@ async function seededLibraryApp(index: unknown): Promise<ReturnType<typeof creat
   if (index !== null) {
     objects.set(`${storybookDir("p1", "b1")}/index.json`, Buffer.from(JSON.stringify(index)));
   }
-  return createShelfApp({ database: db, storage, logger: silentLogger });
+  return createShelfApp({
+    database: db,
+    storage,
+    logger: silentLogger,
+    testing: { runner: stubRunner() },
+  });
 }
 
 async function twoBranchLibraryApp(): Promise<ReturnType<typeof createShelfApp>> {
@@ -104,7 +110,12 @@ async function twoBranchLibraryApp(): Promise<ReturnType<typeof createShelfApp>>
       }),
     ),
   );
-  return createShelfApp({ database: db, storage, logger: silentLogger });
+  return createShelfApp({
+    database: db,
+    storage,
+    logger: silentLogger,
+    testing: { runner: stubRunner() },
+  });
 }
 
 const indexWithDocs = {

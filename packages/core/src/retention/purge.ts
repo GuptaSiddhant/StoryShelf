@@ -4,6 +4,7 @@ import type { Logger } from "pino";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { BaselineModel } from "../models/baseline.ts";
+import { BuildComponentModel } from "../models/build-component.ts";
 import { BuildModel, type BuildTables } from "../models/build.ts";
 import { CaptureJobModel } from "../models/capture-job.ts";
 import { InsightModel } from "../models/insight.ts";
@@ -123,6 +124,7 @@ export class Retention {
   private async removeBuild(buildId: string): Promise<boolean> {
     await new InsightModel(this.db).removeForBuild(buildId);
     await new CaptureJobModel(this.db).removeForBuild(buildId);
+    await new BuildComponentModel(this.db).removeForBuild(buildId);
     await new PackageUsageModel(this.db).removeForBuild(buildId);
     await new BuildModel(this.db, this.tables as unknown as BuildTables).remove(buildId);
     return true;

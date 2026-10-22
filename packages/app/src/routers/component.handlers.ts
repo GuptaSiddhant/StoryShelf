@@ -9,9 +9,20 @@ import {
 import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
 import type { Context } from "hono";
 import { groupSnapshots } from "../pages/build-diff-model.ts";
-import type { ComponentPageData, ComponentTab } from "../pages/component-detail.tsx";
+import {
+  componentTabs,
+  type CapturedComponent,
+  type ComponentPageData,
+  type ComponentTab,
+} from "../pages/component-detail.tsx";
 import type { DesignItem } from "../pages/design-links.tsx";
-import { getStore } from "../store.ts";
+import { entriesFromSnapshots } from "../pages/library-model.ts";
+import { getStore, testingEnabled } from "../store.ts";
+import {
+  latestProjectBuild,
+  loadCatalogView,
+  type ComponentCatalogView,
+} from "./component-catalog.handlers.ts";
 import {
   designUrlsFor,
   loadDesignResolutions,
@@ -19,15 +30,7 @@ import {
   returnPathOf,
 } from "./design.handlers.ts";
 import { linkedUsageFor } from "./links.handlers.ts";
-
-/** Latest build the library shows: newest on the default branch, else the newest at all. */
-async function latestBuildOf(projectId: string, defaultBranch: string): Promise<Build | undefined> {
-  const builds = new BuildModel(getStore().db);
-  return (
-    (await builds.list(projectId, { branch: defaultBranch }))[0] ??
-    (await builds.list(projectId))[0]
-  );
-}
+import { isAnonymouslyViewable } from "./preview-access.ts";
 
 async function buildsOf(snapshots: readonly Snapshot[]): Promise<Build[]> {
   const model = new BuildModel(getStore().db);
@@ -52,7 +55,7 @@ async function loadDesignTab(
 /** Tab-specific data (design strip or linked packages), loaded only when its tab is open. */
 async function loadTabData(
   c: Context,
-  data: Pick<ComponentPageData, "project" | "shownBuild">,
+  data: { project: Project; shownBuild: Build },
   tab: ComponentTab,
   states: Snapshot[],
 ): Promise<Pick<ComponentPageData, "design" | "usage">> {
@@ -71,56 +74,97 @@ async function loadTabData(
   return { design: [], usage: [] };
 }
 
-/** History, states and tombstone presence of a story file; null when it was never captured. */
-async function loadComponentCore(
-  project: Project,
-  importPath: string,
-): Promise<
-  | (Pick<ComponentPageData, "shownBuild" | "title" | "groups" | "history" | "presence"> & {
-      states: Snapshot[];
-    })
-  | null
-> {
+/** What a story file's captured snapshots give the page; null when it was never captured. */
+interface CapturedLoad {
+  captured: CapturedComponent;
+  /** The shown build's snapshots of the file (they drive the Design and Linked tabs). */
+  states: Snapshot[];
+  /** Title of the newest snapshot (retitles update in place). */
+  title: string;
+}
+
+/** History, states and tombstone presence of a story file from its snapshots. */
+async function loadCaptured(project: Project, importPath: string): Promise<CapturedLoad | null> {
   const { db } = getStore();
   const snapshots = await new SnapshotModel(db).listByImportPath(project.id, importPath);
   const history = componentHistory(snapshots, await buildsOf(snapshots));
   const shownBuild = history[0]?.build;
   if (!shownBuild) return null;
   const states = snapshots.filter((snap) => snap.buildId === shownBuild.id);
-  const latest = await latestBuildOf(project.id, project.gitDefaultBranch);
+  const latest = await latestProjectBuild(project);
   const latestSnapshots = latest ? await new SnapshotModel(db).listByBuild(latest.id) : [];
   const title = states[0]?.storyTitle ?? importPath;
   return {
-    shownBuild,
-    title,
     states,
-    groups: groupSnapshots(states),
-    history,
-    presence: componentPresence(history, latest?.id ?? null, latestSnapshots, title),
+    title,
+    captured: {
+      shownBuild,
+      groups: groupSnapshots(states),
+      history,
+      presence: componentPresence(history, latest?.id ?? null, latestSnapshots, title),
+    },
   };
 }
 
 /**
- * Load a component page by story-file path, or null when the project or file
- * is unknown. Moved/deleted files still load, carrying a tombstone presence.
+ * Load a component page by story-file path, or null when the project or file is unknown. The
+ * catalog gives the page its skeleton in both modes; with `testing`, captured snapshots are layered
+ * on. Moved/deleted files still load, carrying a tombstone presence.
  */
 export async function loadComponentPage(
   c: Context,
   slug: string,
   rawPath: string,
-  tab: ComponentTab,
+  requestedTab: string | undefined,
+  story?: string,
 ): Promise<ComponentPageData | null> {
   const project = await new ProjectModel(getStore().db).getBySlug(slug);
   const importPath = normalizeImportPath(rawPath);
-  const core = project && importPath ? await loadComponentCore(project, importPath) : null;
-  if (!project || !core) return null;
-  const { states, ...rest } = core;
+  if (!project || !importPath) return null;
+  const testing = testingEnabled();
+  const [loaded, catalog] = await Promise.all([
+    testing ? loadCaptured(project, importPath) : Promise.resolve(null),
+    loadCatalogView(project, importPath).catch(() => null),
+  ]);
+  const view = catalog ?? (loaded ? viewOfCaptured(loaded) : null);
+  if (!view) return null;
+  const tab = resolveTab(requestedTab, testing, loaded !== null);
+  const tabData = loaded
+    ? await loadTabData(c, { project, shownBuild: loaded.captured.shownBuild }, tab, loaded.states)
+    : { design: [], usage: [] };
   return {
-    ...rest,
     project,
     importPath,
+    title: loaded?.title ?? view.title,
     tab,
+    testing,
+    catalog: view,
+    captured: loaded?.captured ?? null,
+    story,
+    previewable: isAnonymouslyViewable(view.build, project),
     publishedBaseDomain: getStore().config.publishedBaseDomain,
-    ...(await loadTabData(c, { project, shownBuild: core.shownBuild }, tab, states)),
+    ...tabData,
   };
+}
+
+/** A catalog view for a captured file whose published index is gone: its snapshots stand in. */
+function viewOfCaptured(loaded: CapturedLoad): ComponentCatalogView {
+  return {
+    build: loaded.captured.shownBuild,
+    title: loaded.title,
+    entries: entriesFromSnapshots(loaded.states),
+    history: [],
+    presence: loaded.captured.presence,
+  };
+}
+
+/** The requested tab when this page offers it; else States once captured, Stories otherwise. */
+function resolveTab(
+  requested: string | undefined,
+  testing: boolean,
+  captured: boolean,
+): ComponentTab {
+  const tabs = componentTabs(testing);
+  const found = tabs.find((candidate) => candidate === requested);
+  return found ?? (testing && captured ? "states" : "stories");
 }

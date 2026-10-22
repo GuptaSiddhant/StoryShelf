@@ -6,6 +6,7 @@ import {
 import type { Build, Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
+import type { ComponentCatalogView } from "../routers/component-catalog.handlers.ts";
 import {
   Alert,
   Badge,
@@ -19,6 +20,7 @@ import {
   Table,
   Tabs,
   Thumbnail,
+  VStack,
   statusTone,
 } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
@@ -31,6 +33,7 @@ import {
 import type { SnapshotGroup } from "./build-diff-model.ts";
 import { snapshotImageUrl, snapshotVariant } from "./build-diff-model.ts";
 import { LinkedUsage, type LinkedUsageItem } from "./build-diff-usage.tsx";
+import { ComponentBuilds, StoriesTab } from "./component-stories.tsx";
 import { DesignReferences, DesignStrip, type DesignItem } from "./design-links.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
@@ -38,41 +41,55 @@ import { DesignReferences, DesignStrip, type DesignItem } from "./design-links.t
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
 /** Tabs of the component page. */
-export type ComponentTab = "states" | "history" | "design" | "linked";
-
-export const COMPONENT_TABS: readonly ComponentTab[] = ["states", "history", "design", "linked"];
+export type ComponentTab = "stories" | "states" | "history" | "design" | "linked";
 
 const TAB_LABELS: Record<ComponentTab, string> = {
+  stories: "Stories",
   states: "States",
   history: "History",
   design: "Design",
   linked: "Linked",
 };
 
-/** Data behind the component page. */
-export interface ComponentPageData {
-  project: Project;
-  /** Normalized story-file path (the page's identity). */
-  importPath: string;
-  /** Title of the newest snapshot (retitles update in place). */
-  title: string;
-  tab: ComponentTab;
+/** The tabs a page offers: the catalog's two in both modes, the snapshot ones only with `testing`. */
+export function componentTabs(testing: boolean): readonly ComponentTab[] {
+  return testing ? ["states", "stories", "history", "design", "linked"] : ["stories", "history"];
+}
+
+/** What captured snapshots add to a component (`testing` only; absent until it was captured). */
+export interface CapturedComponent {
   /** Newest build that has the file; its states fill the States/Design/Linked tabs. */
   shownBuild: Build;
   groups: SnapshotGroup[];
   history: ComponentHistoryRow[];
   presence: ComponentPresence;
+}
+
+/** Data behind the component page. */
+export interface ComponentPageData {
+  project: Project;
+  /** Normalized story-file path (the page's identity). */
+  importPath: string;
+  /** Title of the newest snapshot, else the catalog's (retitles update in place). */
+  title: string;
+  tab: ComponentTab;
+  /** Whether the instance has `testing`. */
+  testing: boolean;
+  /** The published Storybook's view of the file: stories, docs entries, build history. */
+  catalog: ComponentCatalogView;
+  captured: CapturedComponent | null;
+  /** Story id the Stories tab previews (the first story when unset or unknown). */
+  story: string | undefined;
+  /** Whether the frame can load: the build is open to anyone who reaches the app. */
+  previewable: boolean;
   design: DesignItem[];
   usage: LinkedUsageItem[];
   publishedBaseDomain?: string;
 }
 
-/** Component detail page: states, history, design and linked packages of one story file. */
+/** Component detail page: stories, states, history, design and linked packages of one story file. */
 export function renderComponentPage(data: ComponentPageData): RenderedContent {
   const { project, importPath, title } = data;
-  const status = worstStatus(data.groups.map((group) => group.primary.status));
-  const viewports = new Set(data.groups.map((group) => group.modeKey)).size;
-  const stories = new Set(data.groups.map((group) => group.storyId)).size;
   return (
     <DocumentLayout
       title={`${title} · Component`}
@@ -86,20 +103,12 @@ export function renderComponentPage(data: ComponentPageData): RenderedContent {
       <PageHeader
         title={title}
         description={<span class="mono">{importPath}</span>}
-        meta={
-          <>
-            <Badge tone={statusTone(status)} icon>
-              {status}
-            </Badge>{" "}
-            {stories} {stories === 1 ? "state" : "states"} · {viewports}{" "}
-            {viewports === 1 ? "mode" : "modes"}
-          </>
-        }
+        meta={<HeaderMeta data={data} />}
       />
       <PresenceNotice data={data} />
       <Tabs
         label="Component sections"
-        tabs={COMPONENT_TABS.map((tab) => ({
+        tabs={componentTabs(data.testing).map((tab) => ({
           label: TAB_LABELS[tab],
           href: `?tab=${tab}`,
           active: data.tab === tab,
@@ -110,10 +119,31 @@ export function renderComponentPage(data: ComponentPageData): RenderedContent {
   );
 }
 
+function HeaderMeta(props: { data: ComponentPageData }): Rendered {
+  const { captured, catalog } = props.data;
+  const stories = catalog.entries.filter((entry) => entry.type === "story").length;
+  const docs = catalog.entries.length - stories;
+  const counts = `${stories} ${stories === 1 ? "story" : "stories"}${docs > 0 ? ` · ${docs} docs` : ""}`;
+  if (!captured) {
+    return <>{counts}</>;
+  }
+  const status = worstStatus(captured.groups.map((group) => group.primary.status));
+  const modes = new Set(captured.groups.map((group) => group.modeKey)).size;
+  return (
+    <>
+      <Badge tone={statusTone(status)} icon>
+        {status}
+      </Badge>{" "}
+      {counts} · {modes} {modes === 1 ? "mode" : "modes"}
+    </>
+  );
+}
+
 function PresenceNotice(props: { data: ComponentPageData }): Rendered | null {
   const { data } = props;
   const urls = createUrlBuilder("/", data.publishedBaseDomain);
-  const { presence, project } = data;
+  const presence = data.captured?.presence ?? data.catalog.presence;
+  const { project } = data;
   if (presence.kind === "moved") {
     return (
       <Alert tone="warning" title="This component moved">
@@ -142,6 +172,7 @@ function PresenceNotice(props: { data: ComponentPageData }): Rendered | null {
 
 function ActiveTab(props: { data: ComponentPageData }): Rendered {
   const { data } = props;
+  if (data.tab === "stories") return <StoriesTab data={data} />;
   if (data.tab === "history") return <HistoryTab data={data} />;
   if (data.tab === "design") return <DesignTab design={data.design} />;
   if (data.tab === "linked") return <LinkedTab data={data} />;
@@ -150,11 +181,20 @@ function ActiveTab(props: { data: ComponentPageData }): Rendered {
 
 function StatesTab(props: { data: ComponentPageData }): Rendered {
   const { data } = props;
-  const { project, shownBuild } = data;
+  const { project, captured } = data;
+  if (!captured) {
+    return (
+      <EmptyState
+        title="Not captured yet"
+        description="No capture has rendered this file's stories. Its stories are listed under Stories."
+      />
+    );
+  }
+  const { shownBuild } = captured;
   const urls = createUrlBuilder("/", data.publishedBaseDomain);
   return (
     <div class={snapshotGrid}>
-      {data.groups.map((group): Rendered => (
+      {captured.groups.map((group): Rendered => (
         <div key={group.key} id={group.storyId}>
           <Card padded={false}>
             <div class={snapshotCardHead}>
@@ -183,11 +223,22 @@ function StatesTab(props: { data: ComponentPageData }): Rendered {
 
 function HistoryTab(props: { data: ComponentPageData }): Rendered {
   const { data } = props;
-  const urls = createUrlBuilder("/", data.publishedBaseDomain);
-  const slug = data.project.slug;
+  return (
+    <VStack>
+      {data.captured ? <CapturedHistory data={data} captured={data.captured} /> : null}
+      <ComponentBuilds data={data} />
+    </VStack>
+  );
+}
+
+function CapturedHistory(props: {
+  data: ComponentPageData;
+  captured: CapturedComponent;
+}): Rendered {
+  const { data, captured } = props;
   return (
     <Card>
-      <SectionTitle>History</SectionTitle>
+      <SectionTitle>Captured builds</SectionTitle>
       <Table>
         <table>
           <thead>
@@ -202,33 +253,42 @@ function HistoryTab(props: { data: ComponentPageData }): Rendered {
             </tr>
           </thead>
           <tbody>
-            {data.history.map((row): Rendered => (
-              <tr key={row.build.id}>
-                <td>
-                  <a href={urls.build(slug, row.build.id)}>{row.build.gitSha.slice(0, 7)}</a>
-                </td>
-                <td>{row.build.gitBranch}</td>
-                <td>
-                  {row.changedStates} / {row.states}
-                </td>
-                <td>
-                  <Badge tone={statusTone(row.status)}>{row.status}</Badge>
-                </td>
-                <td>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    href={`${urls.buildDiff(slug, row.build.id)}?snapshot=${row.snapshotId}`}
-                  >
-                    Review
-                  </Button>
-                </td>
-              </tr>
+            {captured.history.map((row): Rendered => (
+              <CapturedRow key={row.build.id} row={row} data={data} />
             ))}
           </tbody>
         </table>
       </Table>
     </Card>
+  );
+}
+
+function CapturedRow(props: { row: ComponentHistoryRow; data: ComponentPageData }): Rendered {
+  const { row, data } = props;
+  const urls = createUrlBuilder("/", data.publishedBaseDomain);
+  const slug = data.project.slug;
+  return (
+    <tr>
+      <td>
+        <a href={urls.build(slug, row.build.id)}>{row.build.gitSha.slice(0, 7)}</a>
+      </td>
+      <td>{row.build.gitBranch}</td>
+      <td>
+        {row.changedStates} / {row.states}
+      </td>
+      <td>
+        <Badge tone={statusTone(row.status)}>{row.status}</Badge>
+      </td>
+      <td>
+        <Button
+          variant="ghost"
+          size="sm"
+          href={`${urls.buildDiff(slug, row.build.id)}?snapshot=${row.snapshotId}`}
+        >
+          Review
+        </Button>
+      </td>
+    </tr>
   );
 }
 

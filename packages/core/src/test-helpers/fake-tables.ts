@@ -211,6 +211,17 @@ const captureJobs = defineTable("capture_jobs", {
   updatedAt: "updated_at",
 });
 
+const buildComponents = defineTable("build_components", {
+  id: "id",
+  projectId: "project_id",
+  buildId: "build_id",
+  importPath: "import_path",
+  title: "title",
+  storyCount: "story_count",
+  hash: "hash",
+  createdAt: "created_at",
+});
+
 const captureLogs = defineTable("capture_logs", {
   id: "id",
   projectId: "project_id",
@@ -462,6 +473,7 @@ export const fakeSchema: Tables = {
   captureLogs,
   captureShards,
   captureJobs,
+  buildComponents,
   snapshots,
   baselines,
   comments,

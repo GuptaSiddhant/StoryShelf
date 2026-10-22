@@ -5,6 +5,7 @@ import { storybookDir } from "@storyshelf/core/utils";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
+import { stubAuth } from "../stub-auth.ts";
 
 const silentLogger = pino({ level: "silent" });
 
@@ -134,6 +135,41 @@ describe("storybook routes", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("application/javascript");
     expect(await response.text()).toBe("console.log('hi')");
+  });
+
+  it("lets a sandboxed preview frame load the files of a build anyone may view", async () => {
+    const { app } = await seededApp();
+    const response = await app.request("/projects/test-project/storybook/build/b1/iframe.js");
+    expect(response.headers.get("access-control-allow-origin")).toBe("*");
+  });
+
+  it("answers CORS for every build on an instance without sign-in, public or not", async () => {
+    const { db } = makeDatabase();
+    const { storage, objects } = makeStorage();
+    await db.insert(db.tables.projects, mockProject());
+    await db.insert(db.tables.builds, mockBuild({ public: false, gitBranch: "feature/x" }));
+    objects.set(`${storybookDir("p1", "b1")}/iframe.js`, Buffer.from("x"));
+    const app = createShelfApp({ database: db, storage, logger: silentLogger });
+    const response = await app.request("/projects/test-project/storybook/build/b1/iframe.js");
+    expect(response.headers.get("access-control-allow-origin")).toBe("*");
+  });
+
+  it("withholds CORS from a private build under sign-in, where a frame has no cookies", async () => {
+    const { db } = makeDatabase();
+    const { storage, objects } = makeStorage();
+    await db.insert(db.tables.projects, mockProject());
+    await db.insert(db.tables.builds, mockBuild({ public: false, gitBranch: "feature/x" }));
+    objects.set(`${storybookDir("p1", "b1")}/iframe.js`, Buffer.from("x"));
+    const user = { id: "u1", email: "a@example.com", name: "Ada", role: "admin" as const };
+    const app = createShelfApp({
+      database: db,
+      storage,
+      logger: silentLogger,
+      auth: stubAuth(user),
+    });
+    const response = await app.request("/projects/test-project/storybook/build/b1/iframe.js");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("access-control-allow-origin")).toBeNull();
   });
 
   it("serves html assets with an html content type", async () => {

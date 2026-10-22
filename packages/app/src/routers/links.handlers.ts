@@ -8,7 +8,7 @@ import {
 import type { Project } from "@storyshelf/core/schema";
 import type { ProjectRole } from "@storyshelf/core/types";
 import type { LinkedUsageItem } from "../pages/build-diff-usage.tsx";
-import { getStore } from "../store.ts";
+import { catalogOf, getStore } from "../store.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
 
 const VIEW_ROLES: readonly ProjectRole[] = ["viewer", "developer", "approver", "admin"];
@@ -22,19 +22,37 @@ interface ResolvedUpstream {
   stories: { importPath: string; storyId: string }[];
 }
 
-/** Upstream project resolved from its latest approved default build. */
+/**
+ * Upstream project resolved from its latest approved default build: its stories from the build's
+ * snapshots when it has them, from its Storybook catalog otherwise (a hosting-only build).
+ */
 async function resolveUpstream(upstream: Project): Promise<ResolvedUpstream> {
   const build = await new BuildModel(getStore().db).latestApprovedDefault(upstream);
   const snapshots = build ? await new SnapshotModel(getStore().db).listByBuild(build.id) : [];
+  const stories = snapshots.flatMap((snapshot) =>
+    snapshot.storyImportPath
+      ? [{ importPath: snapshot.storyImportPath, storyId: snapshot.storyId }]
+      : [],
+  );
   return {
     slug: upstream.slug,
     buildId: build?.id ?? null,
-    stories: snapshots.flatMap((snapshot) =>
-      snapshot.storyImportPath
-        ? [{ importPath: snapshot.storyImportPath, storyId: snapshot.storyId }]
-        : [],
-    ),
+    stories: stories.length > 0 || !build ? stories : await catalogStories(upstream, build.id),
   };
+}
+
+async function catalogStories(
+  upstream: Project,
+  buildId: string,
+): Promise<ResolvedUpstream["stories"]> {
+  const catalog = await catalogOf()
+    .load(upstream.id, buildId)
+    .catch(() => null);
+  return (catalog?.entries ?? []).flatMap((entry) =>
+    entry.type === "story" && entry.importPath
+      ? [{ importPath: entry.importPath, storyId: entry.id }]
+      : [],
+  );
 }
 
 /** Resolve each linked package once; upstreams the viewer cannot open are omitted. */

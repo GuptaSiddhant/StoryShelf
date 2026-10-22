@@ -5,6 +5,7 @@ import { crc32, deflateSync } from "node:zlib";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
+import { stubRunner } from "../test-runner.ts";
 
 const silentLogger = pino({ level: "silent" });
 const T1 = "2026-01-01T00:00:00.000Z";
@@ -87,7 +88,12 @@ async function setup(snapshotTracking: Tracking = CURRENT_TRACKING) {
     updatedAt: T1,
     ...snapshotTracking,
   });
-  const app = createShelfApp({ database: db, storage, logger: silentLogger });
+  const app = createShelfApp({
+    database: db,
+    storage,
+    logger: silentLogger,
+    testing: { runner: stubRunner() },
+  });
   return { app, db, objects };
 }
 

@@ -1,4 +1,5 @@
-import { isPublicBuild, BuildModel } from "@storyshelf/core/models";
+import { readPublishedFile } from "@storyshelf/core/capture";
+import { BuildModel } from "@storyshelf/core/models";
 import { LabelModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
 import type { Build } from "@storyshelf/core/schema";
@@ -9,6 +10,7 @@ import type { ShelfRouter } from "../app-types.ts";
 import { renderStorybookPage, renderStorybookPreparingPage } from "../pages/storybook.tsx";
 import { getStore } from "../store.ts";
 import { currentProjectRole, notFound } from "./helpers.ts";
+import { isAnonymouslyViewable, previewCorsHeaders } from "./preview-access.ts";
 const VIEW_ROLES: ReadonlySet<string> = new Set(["viewer", "developer", "approver", "admin"]);
 
 function contentTypeFor(path: string): string {
@@ -18,18 +20,14 @@ function contentTypeFor(path: string): string {
 /**
  * Decide whether the current request may view `build`'s published Storybook.
  *
- * Public builds (ADR 0011) are viewable without auth; every other build requires
- * a logged-in session with at least `viewer` membership on the project.
+ * Public builds (ADR 0011), and every build of an instance without sign-in, are viewable without
+ * auth; every other build requires a logged-in session with at least `viewer` membership.
  */
 async function canViewBuild(
   build: Pick<Build, "public" | "gitBranch">,
   project: Project,
 ): Promise<boolean> {
-  if (isPublicBuild(project, build)) {
-    return true;
-  }
-  const { authEnabled } = getStore();
-  if (!authEnabled) {
+  if (isAnonymouslyViewable(build, project)) {
     return true;
   }
   const role = await currentProjectRole(project.id);
@@ -54,29 +52,7 @@ async function readWithManifestFallback(
   buildId: string,
   rel: string,
 ): Promise<Buffer | null> {
-  // Try manifest indirection first (content-addressed)
-  try {
-    const manifestPath = posix.join(storybookDir(projectId, buildId), "manifest.json");
-    if (await getStore().storage.exists(manifestPath)) {
-      const manifestRaw = await getStore().storage.read(manifestPath);
-      const manifest = JSON.parse(manifestRaw.toString("utf8")) as Record<string, string>;
-      const hash = manifest[rel];
-      if (hash) {
-        const contentPath = `content/${hash}`;
-        if (await getStore().storage.exists(contentPath)) {
-          return await getStore().storage.read(contentPath);
-        }
-      }
-    }
-  } catch {
-    // ignore — manifest may not exist for old builds
-  }
-  // Fallback to legacy per-build path
-  const legacyPath = posix.join(storybookDir(projectId, buildId), rel);
-  if (await getStore().storage.exists(legacyPath)) {
-    return await getStore().storage.read(legacyPath);
-  }
-  return null;
+  return await readPublishedFile(getStore().storage, projectId, buildId, rel);
 }
 
 /** Register the published Storybook resolver and static-asset routes. */
@@ -248,6 +224,7 @@ export function registerStorybook(app: ShelfRouter): void {
     return c.body(new Uint8Array(buffer), 200, {
       "content-type": contentTypeFor(rest),
       "cache-control": "public, max-age=31536000, immutable",
+      ...previewCorsHeaders(build, project),
     });
   });
 }

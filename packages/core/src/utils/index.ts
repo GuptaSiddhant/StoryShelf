@@ -19,6 +19,7 @@ export type { HttpRequestOptions, HttpTextOptions } from "./http.ts";
 export { httpBytes, httpJson, httpText } from "./http.ts";
 export {
   baselinePath,
+  catalogPath,
   designRenderPath,
   diffPath,
   modeSegment,

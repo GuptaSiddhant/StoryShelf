@@ -9,6 +9,7 @@
  */
 import type { AnyMySqlTable } from "drizzle-orm/mysql-core";
 import { baselines as baselinesTable } from "./baseline.ts";
+import { buildComponents as buildComponentsTable } from "./build-component.ts";
 import { builds as buildsTable } from "./build.ts";
 import {
   captureAttempts as captureAttemptsTable,
@@ -51,6 +52,7 @@ import { webhooks as webhooksTable } from "./webhook.ts";
 export { builds } from "./build.ts";
 export { captureAttempts, captureLogs } from "./capture-attempt.ts";
 export { captureJobs } from "./capture-job.ts";
+export { buildComponents } from "./build-component.ts";
 export { captureShards } from "./capture-shard.ts";
 export { baselines } from "./baseline.ts";
 export { comments } from "./comment.ts";
@@ -121,6 +123,7 @@ export const schema: {
   captureLogs: AnyMySqlTable;
   captureShards: AnyMySqlTable;
   captureJobs: AnyMySqlTable;
+  buildComponents: AnyMySqlTable;
   snapshots: AnyMySqlTable;
   baselines: AnyMySqlTable;
   comments: AnyMySqlTable;
@@ -152,6 +155,7 @@ export const schema: {
   captureLogs: captureLogsTable,
   captureShards: captureShardsTable,
   captureJobs: captureJobsTable,
+  buildComponents: buildComponentsTable,
   snapshots: snapshotsTable,
   baselines: baselinesTable,
   comments: commentsTable,

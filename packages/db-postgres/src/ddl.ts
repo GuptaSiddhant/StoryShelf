@@ -115,6 +115,18 @@ CREATE INDEX IF NOT EXISTS capture_jobs_poll_idx ON capture_jobs (kind, visible_
 CREATE INDEX IF NOT EXISTS capture_jobs_job_id_idx ON capture_jobs (job_id);
 CREATE INDEX IF NOT EXISTS capture_jobs_build_id_idx ON capture_jobs (build_id);
 CREATE INDEX IF NOT EXISTS capture_jobs_entry_created_idx ON capture_jobs (entry, created_at);
+CREATE TABLE IF NOT EXISTS build_components (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  build_id TEXT NOT NULL REFERENCES builds(id) ON DELETE CASCADE,
+  import_path TEXT NOT NULL,
+  title TEXT NOT NULL,
+  story_count INTEGER NOT NULL DEFAULT 0,
+  hash TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS build_components_build_id_idx ON build_components (build_id);
+CREATE INDEX IF NOT EXISTS build_components_project_import_path_idx ON build_components (project_id, import_path);
 CREATE TABLE IF NOT EXISTS capture_logs (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,

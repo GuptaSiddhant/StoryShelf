@@ -6,6 +6,8 @@
  */
 import {
   createCaptureConsumer,
+  createCatalogHook,
+  createCatalogLoader,
   createDatabaseCaptureQueue,
   createPublishCompleter,
   createPublishHandler,
@@ -13,6 +15,7 @@ import {
   resolvePublishLimits,
   type AfterPublishHook,
   type CaptureConsumer,
+  type CatalogLoader,
   type DatabaseCaptureQueue,
   type ConsumerMetrics,
   type PublishCompleter,
@@ -29,6 +32,8 @@ export interface PublishWiring {
   completer: PublishCompleter;
   /** Hooks run after every publish; the catalog registers here. */
   afterPublish: AfterPublishHook[];
+  /** The Storybook catalog of published builds (cached in memory; catalogues old builds lazily). */
+  catalog: CatalogLoader;
   /** Puts a `publish` job on the queue; undefined when this host runs no consumer. */
   enqueuePublish: ((buildId: string, reqId?: string) => Promise<void>) | undefined;
   /** Runs the queued publish jobs; null when this host runs none. */
@@ -36,7 +41,10 @@ export interface PublishWiring {
 }
 
 /** The request-scoped part of {@link PublishWiring}. */
-export type PublishService = Pick<PublishWiring, "completer" | "afterPublish" | "enqueuePublish">;
+export type PublishService = Pick<
+  PublishWiring,
+  "completer" | "afterPublish" | "catalog" | "enqueuePublish"
+>;
 
 /**
  * Wire publishing for `options` (the instrumented options; `config` is the resolved config).
@@ -50,7 +58,12 @@ export function setupPublishing(
   captureWillRun: boolean,
   env: NodeJS.ProcessEnv = process.env,
 ): PublishWiring {
-  const afterPublish: AfterPublishHook[] = [];
+  const catalog = createCatalogLoader({
+    db: options.database,
+    storage: options.storage,
+    logger: logger.child({ component: "catalog" }),
+  });
+  const afterPublish: AfterPublishHook[] = [createCatalogHook(catalog)];
   const completer = createPublishCompleter({
     db: options.database,
     captureWillRun,
@@ -58,7 +71,7 @@ export function setupPublishing(
     logger,
   });
   if (isServerlessHost(env)) {
-    return { completer, afterPublish, enqueuePublish: undefined, consumer: null };
+    return { completer, afterPublish, catalog, enqueuePublish: undefined, consumer: null };
   }
   // Built on first use: a host that never enqueues or starts the consumer (OpenAPI generation,
   // asset-only tests with stub tables) never touches `capture_jobs`.
@@ -66,6 +79,7 @@ export function setupPublishing(
   return {
     completer,
     afterPublish,
+    catalog,
     enqueuePublish: async (buildId, reqId) => {
       await parts().queue.enqueueJob({ kind: "publish", buildId, ...(reqId ? { reqId } : {}) });
     },
