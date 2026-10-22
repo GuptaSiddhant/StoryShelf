@@ -5,6 +5,15 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 
 ## Unreleased
 
+**Added: axe-core accessibility checks (ADR 0004 §6).** With `runA11y` on, the Playwright and
+Puppeteer runners now run axe-core over `#storybook-root` before the screenshot instead of the old
+hand-rolled DOM scan (removed, with no fallback). Each violation is one `a11y:` annotation with the
+rule id, impact, help text, a short selector and the node count (at most 10, then `…and N more`).
+Stories' `parameters.a11y` is honoured (`disable`, `test: "off"`, `config`, `options`,
+`element`/`context`; JSON-serialisable values only). If axe cannot run, the story gets one
+`axe unavailable` annotation. Results stay non-blocking and never fail a build. `axe-core` (pinned)
+is a dependency of `@storyshelf/core` only; the runners reuse it through `@storyshelf/core/capture`.
+The fixtures gained `Components/Accessibility` stories and the Puppeteer runner a gated axe test.
 **Fixed: environment migrations and the screenshot sweep (ADR 0031 phase 4).** A feature-branch
 build no longer auto-accepts snapshots whose capture environment differs from the baseline's: it
 diffs them, and a difference is `changed` with the environment change shown on the review page.

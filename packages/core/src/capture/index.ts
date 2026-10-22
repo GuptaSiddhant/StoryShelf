@@ -57,6 +57,18 @@ export {
   type EnvironmentChange,
   type Fingerprint,
 } from "./fingerprint.ts";
+export {
+  axeInjectionScript,
+  A11Y_ROOT_SELECTOR,
+  inPageReadA11yParameters,
+  inPageRunAxe,
+  loadAxeSource,
+  mapAxeViolations,
+  MAX_REPORTED_VIOLATIONS,
+  resolveA11yRun,
+  type A11yRunPlan,
+  type SlimViolation,
+} from "./a11y/index.ts";
 export { persistCapture, type CaptureContext } from "./pipeline.ts";
 export { postStatusesForBuild } from "./status-fanout.ts";
 export {

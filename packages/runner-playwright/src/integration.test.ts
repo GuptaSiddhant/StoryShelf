@@ -1,4 +1,5 @@
 import { createShelfApp } from "@storyshelf/app";
+import type { StoryEntry } from "@storyshelf/core/adapter/capture-runner";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import type { Build, Snapshot } from "@storyshelf/core/schema";
@@ -200,6 +201,13 @@ function firstPixelBrightness(png: Buffer): number {
   return (red + green + blue) / 3;
 }
 
+const a11yStory = (name: string): StoryEntry => ({
+  id: `components-accessibility--${name}`,
+  title: "Components/Accessibility",
+  name,
+  type: "story",
+});
+
 describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smoke", () => {
   beforeAll(async () => {
     await createHarness();
@@ -347,8 +355,8 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
     );
     // Disabled story is not counted
     expect(final.snapshotCount).toBeGreaterThan(0);
-    // 7 plain captures + 5 from the Themed modes stories; the disabled story adds none.
-    expect(final.snapshotCount).toBeLessThan(13);
+    // 7 plain captures + 5 from the Themed modes stories + 5 accessibility stories; the disabled story adds none.
+    expect(final.snapshotCount).toBeLessThan(18);
 
     const res = await app.request(`/api/v1/projects/${project.slug}/builds/${final.id}/snapshots`);
     const snapshots = await readJson<Snapshot[]>(res);
@@ -356,6 +364,72 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
     // Stories without a play function (and the flaky ones) are still captured
     expect(ids.has("components-button--primary")).toBe(true);
     expect(ids.has("components-button--disabled")).toBe(false);
+  }, 300_000);
+
+  it("a11y: axe annotates violations, honours parameters.a11y, and never fails the build", async () => {
+    const { app, db, staticDir } = getHarness();
+
+    // Runner level: the annotation text names the rule.
+    const rendered = await createPlaywrightCaptureRunner({ concurrency: 1 }).render({
+      buildId: "a11y-direct",
+      storybookDir: staticDir,
+      stories: [
+        ...["missing-alt", "low-contrast", "clean", "disabled-a11y", "rule-override"].map((name) =>
+          a11yStory(name),
+        ),
+        {
+          id: "components-button--primary",
+          title: "Components/Button",
+          name: "Primary",
+          type: "story",
+        },
+      ],
+      viewports: [{ name: "desktop", width: 1280, height: 720 }],
+      runA11y: true,
+    });
+    const annotation = (id: string): string =>
+      rendered.failures.find((failure) => failure.storyId === id)?.error ?? "";
+    expect(rendered.captures).toHaveLength(6);
+    // Existing fixture stories stay clean.
+    expect(annotation("components-button--primary")).toBe("");
+    expect(annotation("components-accessibility--missing-alt")).toMatch(
+      /^a11y: .*image-alt \(critical\)/u,
+    );
+    expect(annotation("components-accessibility--missing-alt")).toContain("button-name");
+    expect(annotation("components-accessibility--low-contrast")).toContain("color-contrast");
+    expect(annotation("components-accessibility--clean")).toBe("");
+    expect(annotation("components-accessibility--disabled-a11y")).toBe("");
+    // config.rules switches image-alt off; the other violation is still reported.
+    expect(annotation("components-accessibility--rule-override")).toContain("button-name");
+    expect(annotation("components-accessibility--rule-override")).not.toContain("image-alt");
+
+    // Build level: annotation-only, so the build is reviewable, not failed.
+    const projectResponse = await app.request("/api/v1/projects", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "A11y Smoke" }),
+    });
+    const project = await readJson<{ id: string; slug: string }>(projectResponse);
+    await db.update(db.tables.projects, project.id, { runA11y: true });
+    const uploaded = await uploadBuild(app, project.slug, staticDir, {
+      gitSha: "f".repeat(40),
+      gitBranch: "feature/a11y",
+      message: "a11y smoke",
+    });
+    const build = await waitForBuild(app, project.slug, uploaded.id, ["reviewing", "failed"]);
+    expect(build.status).toBe("reviewing");
+    const logs = await readJson<{ message: string; fields: string | null }[]>(
+      await app.request(`/api/v1/projects/${project.slug}/builds/${build.id}/attempts/1/logs`),
+    );
+    const flagged = new Set(
+      logs
+        .filter((line) => line.message.includes("a11y violations found"))
+        .map((line) => (JSON.parse(line.fields ?? "{}") as { storyId?: string }).storyId),
+    );
+    expect(flagged.has("components-accessibility--missing-alt")).toBe(true);
+    expect(flagged.has("components-accessibility--low-contrast")).toBe(true);
+    expect(flagged.has("components-accessibility--clean")).toBe(false);
+    expect(flagged.has("components-accessibility--disabled-a11y")).toBe(false);
   }, 300_000);
 
   it("modes: theme globals produce distinct, correctly sized captures", async () => {

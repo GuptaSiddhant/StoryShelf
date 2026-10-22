@@ -41,7 +41,7 @@ const FEATURE_BRANCH = "feature/new-button";
 const AUTHOR = { authorName: "Alex Doe", authorEmail: "alex@example.com" };
 /** Restyles primary buttons only (their inline background), leaving secondary stories unchanged. */
 const FEATURE_CSS =
-  'button[style*="43, 127, 255"]{background:#7c3aed!important;border-radius:999px!important}';
+  'button[style*="29, 78, 216"]{background:#7c3aed!important;border-radius:999px!important}';
 
 /** Seed (or refresh) the demo project; other projects are never touched. */
 export async function seedDemo(options: SeedDemoOptions): Promise<void> {
@@ -179,7 +179,9 @@ async function seedCredential(
 
 async function findUserByEmail(database: DatabaseAdapter, email: string): Promise<User> {
   const users = (await database.list(database.tables.users)) as unknown as User[];
-  const user = users.find((candidate) => candidate.email.toLowerCase() === email.trim().toLowerCase());
+  const user = users.find(
+    (candidate) => candidate.email.toLowerCase() === email.trim().toLowerCase(),
+  );
   if (!user) {
     throw new Error(`demo seed: no user ${email} to own its upload token`);
   }
