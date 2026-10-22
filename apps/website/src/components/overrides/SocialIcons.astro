@@ -1,22 +1,26 @@
 ---
-/** Header: text links to the docs and the HTTP API reference, then Starlight's social icons. */
+/** Header: text links to the docs, the packages and the HTTP API, then Starlight's social icons. */
 import Default from "@astrojs/starlight/components/SocialIcons.astro";
 
+import { sectionLinks, sectionOf } from "./sections";
+
 const base = import.meta.env.BASE_URL.replace(/\/$/u, "");
-const path = Astro.url.pathname;
-const onApi = path.startsWith(`${base}/api`);
-const links = [
-  { label: "Docs", href: `${base}/guides/getting-started/`, current: !onApi },
-  { label: "HTTP API", href: `${base}/api/`, current: onApi },
-];
+const section = sectionOf(Astro.url.pathname, base);
+const links = sectionLinks(base);
 ---
 
 <nav class="header-links" aria-label="Main">
-  {links.map((l) => <a href={l.href} aria-current={l.current ? "page" : undefined}>{l.label}</a>)}
+  {
+    links.map((l) => (
+      <a href={l.href} aria-current={l.section === section ? "true" : undefined}>
+        {l.label}
+      </a>
+    ))
+  }
 </nav>
 <Default {...Astro.props}><slot /></Default>
 
-<style>
+<style is:global>
   .header-links {
     display: flex;
     gap: 1.25rem;
@@ -29,7 +33,11 @@ const links = [
     text-decoration: none;
   }
   .header-links a:hover,
-  .header-links a[aria-current="page"] {
+  .header-links a[aria-current="true"] {
     color: var(--sl-color-white);
+  }
+  /* The mobile menu footer reuses this slot; the links sit above the menu there instead. */
+  .mobile-preferences .header-links {
+    display: none;
   }
 </style>

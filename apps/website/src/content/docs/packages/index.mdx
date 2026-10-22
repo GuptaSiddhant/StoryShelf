@@ -1,0 +1,55 @@
+---
+title: Packages
+description: Every StoryShelf package, grouped by the slot it fills, with its generated TypeScript API.
+---
+
+StoryShelf is a set of small packages. `createShelfApp` from [`@storyshelf/app`](/packages/app/) composes them: a database, storage, an optional capture runner, and optional authentication, notifications, design links and AI. Each package page has its install line, configuration and, under **API**, the generated TypeScript reference for every export.
+
+## Core
+
+| Package                                                 | What it does                                                                          |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| [`@storyshelf/core`](/packages/core/)                   | Adapter interfaces, models, the capture pipeline, diffing and retention (no HTTP).    |
+| [`@storyshelf/app`](/packages/app/)                     | The Hono app: JSON API under `/api/v1` and the server-rendered UI.                    |
+| [`@storyshelf/affected`](/packages/affected/)           | Affected capture: picks the stories a change impacts by tracing the dependency graph. |
+| [`@storyshelf/image`](/packages/image/)                 | Pixel diffs, diff overlays and thumbnails on a worker pool.                           |
+| [`@storyshelf/observability`](/packages/observability/) | OpenTelemetry tracing, metrics and log correlation.                                   |
+| [`@storyshelf/auth`](/packages/auth/)                   | Local accounts, social login, OIDC, SAML SSO and passkeys.                            |
+| [`@storyshelf/ai`](/packages/ai/)                       | AI insights: build triage and project health.                                         |
+| [`@storyshelf/mcp`](/packages/mcp/)                     | MCP server that lets AI agents read builds and comment on reviews.                    |
+| [`storyshelf`](/packages/cli/)                          | The command-line client: scaffold, upload, create, retry and purge.                   |
+
+## Databases
+
+| Package                                             | What it does                                                         |
+| --------------------------------------------------- | -------------------------------------------------------------------- |
+| [`@storyshelf/db-sqlite`](/packages/db-sqlite/)     | The default. SQLite, with Turso, better-sqlite3, Bun and D1 presets. |
+| [`@storyshelf/db-postgres`](/packages/db-postgres/) | Postgres, with Neon, Vercel, pg and PGlite presets.                  |
+| [`@storyshelf/db-mysql`](/packages/db-mysql/)       | MySQL and MariaDB, with PlanetScale and TiDB presets.                |
+
+## Storage
+
+| Package                                                 | What it does                                         |
+| ------------------------------------------------------- | ---------------------------------------------------- |
+| [`@storyshelf/storage-local`](/packages/storage-local/) | The default. Blobs on the local filesystem.          |
+| [`@storyshelf/storage-s3`](/packages/storage-s3/)       | Amazon S3 and compatible stores (R2, MinIO, Spaces). |
+| [`@storyshelf/storage-azure`](/packages/storage-azure/) | Azure Blob Storage.                                  |
+| [`@storyshelf/storage-gcs`](/packages/storage-gcs/)     | Google Cloud Storage.                                |
+
+## Capture runners
+
+| Package                                                         | What it does                                                          |
+| --------------------------------------------------------------- | --------------------------------------------------------------------- |
+| [`@storyshelf/runner-playwright`](/packages/runner-playwright/) | Renders stories with Playwright: Chromium, Firefox and WebKit.        |
+| [`@storyshelf/runner-puppeteer`](/packages/runner-puppeteer/)   | Renders with Puppeteer and chrome-headless-shell, for smaller images. |
+
+## Design and notifications
+
+| Package                                               | What it does                                                   |
+| ----------------------------------------------------- | -------------------------------------------------------------- |
+| [`@storyshelf/design-figma`](/packages/design-figma/) | Links components to Figma: link checks, metadata and previews. |
+| [`@storyshelf/notify-chat`](/packages/notify-chat/)   | Slack and Microsoft Teams webhook alerts.                      |
+| [`@storyshelf/notify-email`](/packages/notify-email/) | An email transport: SMTP, Mailpit, HTTP APIs.                  |
+| [`@storyshelf/notify-git`](/packages/notify-git/)     | GitHub and GitLab commit statuses and pull-request comments.   |
+
+Looking for the HTTP endpoints instead? See the [HTTP API reference](/api/).

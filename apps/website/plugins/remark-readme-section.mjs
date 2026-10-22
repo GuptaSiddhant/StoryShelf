@@ -53,28 +53,35 @@ function clean(nodes, slug) {
 
 const isReadme = (n) => n.type === "mdxJsxFlowElement" && n.name === "Readme";
 
+/** Whether `node` or any descendant is a `<Readme />` marker. */
+const hasReadme = (node) =>
+  isReadme(node) || (node.children ?? []).some((child) => hasReadme(child));
+
 /** Replace every `<Readme heading="..." />` below `node` with that README section. */
-function expand(node, tree, slug, where) {
+function expand(node, readme, slug, where) {
   if (!node.children) return;
   node.children = node.children.flatMap((child) => {
     if (!isReadme(child)) {
-      expand(child, tree, slug, where);
+      expand(child, readme, slug, where);
       return [child];
     }
     const heading = child.attributes?.find((a) => a.name === "heading")?.value;
     if (typeof heading !== "string")
       throw new Error(`<Readme> needs a heading="..." attribute (${where})`);
-    return clean(sectionOf(tree, heading, where), slug);
+    return clean(sectionOf(readme(), heading, where), slug);
   });
 }
 
 /** Remark plugin: expand `<Readme />` markers in package pages from the package README. */
 export default function remarkReadmeSection() {
   return (tree, file) => {
-    const slug = basename(file.path ?? "", extname(file.path ?? ""));
-    if (!file.path?.includes(`${join("content", "docs", "packages")}`)) return;
+    if (!file.path?.includes(join("content", "docs", "packages"))) return;
+    if (!hasReadme(tree)) return;
+    const slug = basename(file.path, extname(file.path));
     const where = `packages/${slug}/README.md`;
-    const readme = parser.parse(readFileSync(join(PACKAGES_DIR, slug, "README.md"), "utf8"));
+    let parsed;
+    const readme = () =>
+      (parsed ??= parser.parse(readFileSync(join(PACKAGES_DIR, slug, "README.md"), "utf8")));
     expand(tree, readme, slug, where);
   };
 }
