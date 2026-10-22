@@ -8,7 +8,10 @@
 import { LOCAL_SHA_PREFIX } from "@storyshelf/affected";
 import type { UrlBuilder } from "../../urls.ts";
 import { buildCommentMarkdown } from "./build-comment.ts";
-import type { NotifierState } from "./types.ts";
+import type { NotifierState, StateAnnotation } from "./types.ts";
+
+/** Most per-snapshot annotations a build state carries; the rest are counted (`omitted`). */
+export const MAX_ANNOTATIONS = 200;
 
 /** Names of the statuses below a channel's prefix. */
 export type StatusName = "testing" | "review" | "storybook";
@@ -36,6 +39,18 @@ export interface BuildStateBuild {
   rejectedCount: number;
 }
 
+/** The part of a snapshot row the annotations read. */
+export interface BuildStateChange {
+  id: string;
+  /** `changed` or `new`; anything else is not a change to review. */
+  status: string;
+  storyTitle: string;
+  storyName: string;
+  storyImportPath: string | null;
+  viewportName: string;
+  browser?: string | undefined;
+}
+
 /** Inputs of {@link statusesForBuild}. */
 export interface BuildStateInput {
   build: BuildStateBuild;
@@ -46,7 +61,7 @@ export interface BuildStateInput {
    * Absolute links (`createUrlBuilder(publicOrigin)`). A build's state is only ever shown once a
    * public origin is resolved (ADR 0014, decision 11), so every status links and the comment exists.
    */
-  urls: Pick<UrlBuilder, "build" | "storybookBuild">;
+  urls: Pick<UrlBuilder, "build" | "storybookBuild" | "snapshot">;
   flags: BuildStateFlags;
   publishing: PublishingState;
   /**
@@ -54,6 +69,8 @@ export interface BuildStateInput {
    * verdict and the approvals the project requires. Shown on `<prefix>/review` while it waits.
    */
   approvals?: { given: number; required: number } | undefined;
+  /** The build's snapshots; the `changed` and `new` ones become annotations of `<prefix>/testing`. */
+  changes?: readonly BuildStateChange[] | undefined;
 }
 
 /** One commit status to show. */
@@ -65,6 +82,14 @@ export interface DesiredStatus {
   description: string;
   /** What the status links to: the build page, or the published Storybook for `storybook`. */
   url: string;
+  /** True for the Storybook status, which is never a gate. */
+  informational?: boolean;
+  /** Set on a `pending` status: `queued` before capture starts, else `running`. */
+  progress?: "queued" | "running";
+  /** Per-snapshot findings (only `testing`), at most {@link MAX_ANNOTATIONS}. */
+  annotations?: StateAnnotation[];
+  /** Changes beyond the cap. */
+  omitted?: number;
 }
 
 /** The pull-request comment to show. */
@@ -89,10 +114,47 @@ export function statusesForBuild(input: BuildStateInput): BuildStateSet {
   }
   const links = linksOf(input);
   const statuses = [
-    ...gateStatus(input, links.build),
+    ...withAnnotations(gateStatus(input, links.build), input),
     storybookStatus(input.publishing, input.prefix, links),
-  ];
+  ].map((status) => withProgress(status, input.build));
   return { statuses, comment: commentOf(input, statuses, links) };
+}
+
+/** `pending` is `queued` while the build waits to be captured, `running` after. */
+function withProgress(status: DesiredStatus, build: BuildStateBuild): DesiredStatus {
+  if (status.state !== "pending") {
+    return status;
+  }
+  const queued = status.name !== "storybook" && build.status === "pending";
+  return { ...status, progress: queued ? "queued" : "running" };
+}
+
+/** One annotation per changed snapshot, on the `testing` gate. */
+function withAnnotations(gates: DesiredStatus[], input: BuildStateInput): DesiredStatus[] {
+  const changed = (input.changes ?? []).filter((c) => c.status === "changed" || c.status === "new");
+  if (changed.length === 0) {
+    return gates;
+  }
+  const annotations = changed
+    .slice(0, MAX_ANNOTATIONS)
+    .map((change) => annotationOf(change, input));
+  const omitted = changed.length - annotations.length;
+  return gates.map((gate) =>
+    gate.name === "testing" ? { ...gate, annotations, ...(omitted > 0 ? { omitted } : {}) } : gate,
+  );
+}
+
+function annotationOf(change: BuildStateChange, input: BuildStateInput): StateAnnotation {
+  const where = [change.viewportName, change.browser].filter(Boolean).join(", ");
+  const isNew = change.status === "new";
+  const name = `${change.storyTitle} / ${change.storyName}`;
+  return {
+    path: change.storyImportPath?.replace(/^(?:\.\/)+/u, "") ?? ".storybook",
+    title: where === "" ? name : `${name} (${where})`,
+    message: `${isNew ? "New snapshot" : "Visual change"}: review it at ${input.urls.snapshot(input.projectSlug, input.build.id, change.id)}`,
+    url: input.urls.snapshot(input.projectSlug, input.build.id, change.id),
+    level: isNew ? "notice" : "warning",
+  };
 }
 
 function commentOf(
@@ -230,7 +292,7 @@ function reviewOutcome(build: BuildStateBuild, approvals: BuildStateInput["appro
 
 /** Informational: never a gate, linking to the published Storybook once there is one. */
 function storybookStatus(publishing: PublishingState, prefix: string, links: Links): DesiredStatus {
-  const base = { name: "storybook", context: `${prefix}/storybook` } as const;
+  const base = { name: "storybook", context: `${prefix}/storybook`, informational: true } as const;
   if (publishing === "success") {
     return {
       ...base,

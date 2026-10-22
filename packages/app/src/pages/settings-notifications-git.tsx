@@ -9,11 +9,45 @@ import {
   FormActions,
   SectionTitle,
   SelectField,
+  TextareaField,
 } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 import type { NotificationsFormState, SettingsNotifyProvider } from "./settings-notifications.tsx";
 
 /* eslint-disable promise-function-async -- JSX components return HtmlEscapedString */
+
+/** GitHub only: show builds as check runs posted by a GitHub App, not as commit statuses. */
+const GitHubAppFields: FC<{ errors?: Record<string, string> }> = ({ errors }) => (
+  <>
+    <SelectField
+      label="GitHub mode"
+      name="mode"
+      options={[
+        { value: "statuses", label: "Commit statuses (token)" },
+        { value: "checks", label: "Check runs (GitHub App)" },
+      ]}
+      hint={
+        errors?.["mode"] ??
+        "GitHub only. Check runs list each changed snapshot and need a GitHub App installed on the repository; GitLab always uses statuses."
+      }
+    />
+    <Field label="App ID" name="appId" placeholder="123456" error={errors?.["appId"]} />
+    <Field
+      label="Installation ID"
+      name="installationId"
+      placeholder="7654321"
+      error={errors?.["installationId"]}
+    />
+    <TextareaField
+      label="App private key"
+      name="privateKey"
+      rows={4}
+      placeholder="-----BEGIN RSA PRIVATE KEY-----"
+      hint="The PEM key generated for the App. It is stored encrypted and never shown again."
+      error={errors?.["privateKey"]}
+    />
+  </>
+);
 
 /** The repository, prefix and token fields of the git channel form. */
 const GitChannelFields: FC<{ errors?: Record<string, string> }> = ({ errors }) => (
@@ -38,18 +72,18 @@ const GitChannelFields: FC<{ errors?: Record<string, string> }> = ({ errors }) =
       label="Status prefix"
       name="prefix"
       placeholder="storyshelf"
-      hint="Statuses are named <prefix>/testing and <prefix>/storybook. Give each project in a shared repository its own prefix."
+      hint="Statuses (or check runs) are named <prefix>/testing and <prefix>/storybook; require <prefix>/testing in branch protection (`storyshelf protect` prints the rule). Give each project in a shared repository its own prefix."
       error={errors?.["prefix"]}
     />
     <Field
       label="Token"
       name="token"
       type="password"
-      required
       placeholder="ghp_…"
-      hint="A token that can write commit statuses (GitHub: repo:status; GitLab: api)."
+      hint="A token that can write commit statuses (GitHub: repo:status; GitLab: api). Not needed for GitHub checks."
       error={errors?.["token"]}
     />
+    <GitHubAppFields errors={errors} />
   </>
 );
 

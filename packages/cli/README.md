@@ -82,6 +82,13 @@ storyshelf purge --url <url> [--token <admin-token>]
 storyshelf retry --url <url> --slug <slug> --build-id <id> [--token <token>]
 ```
 
+`storyshelf protect` — print, validate and (only with `--apply`) write the branch rule that requires StoryShelf's gate status. Dry run by default; needs an admin token for the git host (`--token`, `GITHUB_TOKEN` or `GITLAB_TOKEN`), and talks to the host directly, not to the StoryShelf server. Exits `1` when the rule is missing the check and nothing was written.
+
+```sh
+storyshelf protect --provider github --repo <owner/repo> [--branch main] [--prefix storyshelf] [--gate testing|review] [--apply]
+storyshelf protect --provider gitlab --repo <group/project> [--host <url>] [--apply]
+```
+
 ### Example CI snippet
 
 ```yaml

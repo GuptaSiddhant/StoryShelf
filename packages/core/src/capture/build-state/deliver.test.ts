@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BuildReviewModel } from "../../models/build-review.ts";
+import { SnapshotModel } from "../../models/snapshot.ts";
 import { storybookDir } from "../../utils/paths.ts";
 import { deliverBuildState, stateTargets } from "./deliver.ts";
 import { statusLog, world } from "./test-world.ts";
@@ -171,5 +172,34 @@ describe("stateTargets", () => {
       w.project.id,
     );
     expect(unreadable).toEqual([]);
+  });
+});
+
+describe("deliverBuildState: annotations", () => {
+  it("annotates the changed snapshots of the testing status with their review links", async () => {
+    const w = await world();
+    const snapshots = new SnapshotModel(w.db);
+    const changed = await snapshots.create(w.project.id, w.build.id, {
+      storyId: "button--primary",
+      storyName: "Primary",
+      storyTitle: "Button",
+      storyImportPath: "./src/Button.stories.tsx",
+      viewportName: "desktop",
+      viewportWidth: 1280,
+      viewportHeight: 800,
+      screenshotPath: "s.png",
+    });
+    await snapshots.setStatus(changed.id, "changed");
+    await w.builds.updateCounts(w.build.id);
+    await w.builds.setStatus(w.build.id, "reviewing");
+    await deliverBuildState(w.deps, { buildId: w.build.id, channelId: w.channelId });
+    const target = w.git.calls[0]?.target;
+    expect(target).toMatchObject({ kind: "status", progress: "running" });
+    expect(target?.kind === "status" ? target.annotations : []).toMatchObject([
+      {
+        path: "src/Button.stories.tsx",
+        url: `https://shelf.example.com/projects/${w.project.slug}/builds/${w.build.id}/diff?snapshot=${changed.id}`,
+      },
+    ]);
   });
 });

@@ -1,7 +1,8 @@
 export { emitNotifications, emitSystemNotification } from "./events.ts";
-export { statusesForBuild } from "./build-state.ts";
+export { MAX_ANNOTATIONS, statusesForBuild } from "./build-state.ts";
 export type {
   BuildStateBuild,
+  BuildStateChange,
   BuildStateFlags,
   BuildStateInput,
   BuildStateSet,
@@ -37,5 +38,6 @@ export type {
   NotifierState,
   NotifierStateTarget,
   SystemEventName,
+  StateAnnotation,
   SystemNotification,
 } from "./types.ts";

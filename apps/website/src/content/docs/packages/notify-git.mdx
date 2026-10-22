@@ -47,10 +47,10 @@ Content-Type: application/json
 }
 ```
 
-- **`config`** — `{ owner, repo, prefix? }` for GitHub. GitLab also takes `host` (default `https://gitlab.com`; set it to your instance URL when self-hosted). `prefix` names the statuses (`<prefix>/testing`, `<prefix>/review`, `<prefix>/storybook`) and defaults to `storyshelf`.
-- **`secret`** — the token. GitHub: `repo:status` scope. GitLab: `api` scope. It is stored AES-256-GCM encrypted with the server `SECRET` and decrypted in memory only when a status is written. It is separate from the CLI project token: the CLI token identifies a build, this token writes to your repository.
+- **`config`** — `{ owner, repo, prefix?, mode?, appId?, installationId? }` for GitHub (`mode` is `statuses` by default; see [GitHub check runs](#github-check-runs)). GitLab also takes `host` (default `https://gitlab.com`; set it to your instance URL when self-hosted). `prefix` names the statuses (`<prefix>/testing`, `<prefix>/review`, `<prefix>/storybook`) and defaults to `storyshelf`.
+- **`secret`** — the token. GitHub: `repo:status` scope. GitLab: `api` scope. In GitHub `checks` mode it is the GitHub App's private key (PEM) instead. It is stored AES-256-GCM encrypted with the server `SECRET` and decrypted in memory only when a status is written. It is separate from the CLI project token: the CLI token identifies a build, this token writes to your repository.
 
-A git channel always belongs to a project (a site-wide channel cannot be git), needs a token, and has a fixed event filter: it follows the build's state rather than a topic list, so the event picker does not apply to it.
+A git channel always belongs to a project (a site-wide channel cannot be git), needs a token (or, in GitHub `checks` mode, the App key), and has a fixed event filter: it follows the build's state rather than a topic list, so the event picker does not apply to it.
 
 ## What gets posted
 
@@ -67,6 +67,32 @@ Without `testing` (a hosting-only instance, see [Hosting only](/concepts/hosting
 On top of the statuses, one **comment** on the pull request (GitHub) or merge request (GitLab) of the commit links the build page and the published Storybook and summarizes the visual tests and snapshot counts. It is keyed by a hidden marker built from the build URL, so it is updated in place, never duplicated. A commit with no open pull request gets no comment.
 
 Builds with a synthetic local identity (uploads without git, see [Without git](/guides/without-git/)) post nothing. Branch protection setup is in [Merge gate setup](/guides/merge-gate/).
+
+### GitHub check runs
+
+A GitHub channel shows a build in one of two ways, set by `mode`:
+
+- **`statuses`** (default): commit statuses, written with a personal or fine-grained token. This is what the table above describes.
+- **`checks`**: **check runs**, written by a **GitHub App** installed on the repository, with no personal access token. `config` takes `appId` and `installationId` (numbers from the App's settings and the installation URL) and the channel's secret is the App's private key. The key is stored encrypted like any channel secret, is never returned by the API or shown again in the UI (the channel list says only that a secret is set), and is scrubbed from logs and error text. [Merge gate setup](/guides/merge-gate/#github-app-checks) walks through creating the App.
+
+Check runs sit beside statuses, not on top of them: a channel uses one mode. They are driven by the same function as the statuses, so each status above becomes a run with the same name (`<prefix>/testing`, `<prefix>/review`, `<prefix>/storybook`), which is also the name you require in branch protection. GitLab has no check runs; a GitLab channel always posts commit statuses.
+
+| Build state                                                    | Check run                |
+| -------------------------------------------------------------- | ------------------------ |
+| Not captured yet                                               | `queued`                 |
+| Capturing, comparing, review open, waiting for a verdict       | `in_progress`            |
+| Approved                                                       | `completed`, `success`   |
+| Rejected, or capture failed                                    | `completed`, `failure`   |
+| Cancelled by a user                                            | `completed`, `cancelled` |
+| Storybook publish failed (`<prefix>/storybook`, informational) | `completed`, `neutral`   |
+
+A run is found by the commit SHA and a stable external id (`storyshelf:<name>`) and **updated** as the build moves, so a commit shows one run per name however many times the state is written. Its details link is the absolute build URL (nothing is posted while no [public origin](/guides/config/#public-origin) is confirmed).
+
+**Annotations.** `<prefix>/testing` lists every `new` or `changed` snapshot as an annotation titled with the story, viewport and browser, anchored at the story file, whose details carry the **review URL of that snapshot** (`…/builds/<id>/diff?snapshot=<id>`). GitHub accepts 50 annotations per request, so they are posted in batches of 50 through check-run updates; at most 200 are posted, and the summary then says `and N more changed snapshots` with a link to the build. A repeated delivery skips the annotations the run already shows. GitHub never removes annotations: after you approve a change its annotation stays on the run, while the run itself completes as `success`.
+
+The App needs these repository permissions: **Checks: read and write** (the check runs), **Pull requests: read and write** (the pull-request comment) and **Contents: read** (to resolve the commit). Commit-status write access is optional and not used in `checks` mode. The Administration permission is only for the [`storyshelf protect`](/guides/cli/client/#storyshelf-protect) helper, which runs with your own admin token, not the App.
+
+Authentication uses no library: the provider signs an RS256 JWT with the key, exchanges it for an installation token through the shared `httpJson` helper, and caches that token per channel until about five minutes before it expires.
 
 ### The prefix
 

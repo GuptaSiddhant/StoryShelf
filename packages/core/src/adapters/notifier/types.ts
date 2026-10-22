@@ -53,6 +53,21 @@ export interface NotificationChannel {
  */
 export type NotifierState = "pending" | "success" | "failure" | "cancelled";
 
+/**
+ * One per-story finding a host that supports it (GitHub check runs) shows beside a status: a
+ * changed snapshot that deep-links to its review page.
+ */
+export interface StateAnnotation {
+  /** The story file the snapshot belongs to (the host anchors the finding there). */
+  path: string;
+  /** Short heading, e.g. `Button / Primary (chromium)`. */
+  title: string;
+  message: string;
+  /** Absolute link to the snapshot's review page. */
+  url: string;
+  level: "notice" | "warning";
+}
+
 /** Where a `state` provider writes: a commit status or a pull-request comment. */
 export type NotifierStateTarget =
   | {
@@ -62,6 +77,14 @@ export type NotifierStateTarget =
       context: string;
       /** Short text beside the status; the provider supplies a default. */
       description?: string;
+      /** For a `pending` state: not started (`queued`) or under way (`running`; the default). */
+      progress?: "queued" | "running";
+      /** Never a merge gate (the Storybook status): a failure is shown as neutral where the host has it. */
+      informational?: boolean;
+      /** Per-snapshot findings of the build; only a host with annotations shows them. */
+      annotations?: StateAnnotation[];
+      /** Changed snapshots beyond `annotations` (cut at the cap); the host says "and N more". */
+      omitted?: number;
     }
   | {
       kind: "comment";

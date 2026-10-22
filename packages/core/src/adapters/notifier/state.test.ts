@@ -110,3 +110,34 @@ describe("writeBuildState", () => {
     expect(warn).toHaveBeenCalled();
   });
 });
+
+describe("writeBuildState: annotations", () => {
+  it("hands progress, annotations and the omitted count to the host", async () => {
+    const fake = makeFakeStateNotifier();
+    const annotation = {
+      path: "a.tsx",
+      title: "t",
+      message: "m",
+      url: "https://shelf/s",
+      level: "warning" as const,
+    };
+    const [first, ...rest] = states.statuses;
+    await writeBuildState(fake.provider, channel(), {
+      sha: "abc",
+      states: {
+        statuses: [
+          { ...first!, progress: "running", annotations: [annotation], omitted: 3 },
+          ...rest,
+        ],
+        comment: null,
+      },
+    });
+    expect(fake.calls[0]?.target).toMatchObject({
+      kind: "status",
+      progress: "running",
+      annotations: [annotation],
+      omitted: 3,
+    });
+    expect(fake.calls[1]?.target).not.toHaveProperty("annotations");
+  });
+});

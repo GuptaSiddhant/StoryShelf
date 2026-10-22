@@ -10,8 +10,10 @@ import { BuildReviewModel } from "../../models/build-review.ts";
 import { BuildModel } from "../../models/build.ts";
 import { NotificationChannelModel } from "../../models/notification-channel.ts";
 import { ProjectModel } from "../../models/project.ts";
+import { SnapshotModel } from "../../models/snapshot.ts";
 import type { Build } from "../../schema/build.ts";
 import type { Project } from "../../schema/project.ts";
+import type { Snapshot } from "../../schema/snapshot.ts";
 import { createUrlBuilder } from "../../urls.ts";
 import { publishingOf } from "../publish/published.ts";
 import type { BuildStateDeps, SkipReason, StateTarget } from "./types.ts";
@@ -64,6 +66,7 @@ export async function writeTo(
     flags: deps.flags(project),
     publishing: await publishingOf(deps.storage, build),
     approvals: await approvalsOf(deps, build, project),
+    changes: await changesOf(deps, build, project),
   });
   if (states.statuses.length === 0) {
     deps.logger.info({ buildId: build.id }, "no commit to show a state on");
@@ -144,4 +147,14 @@ async function approvalsOf(
     given: reviews.filter((review) => review.verdict === "approved").length,
     required: Math.max(1, project.reviewApprovals ?? 1),
   };
+}
+
+/** The build's snapshots for the annotations; read only when `testing` is on and something changed. */
+async function changesOf(
+  deps: BuildStateDeps,
+  build: Build,
+  project: Project,
+): Promise<Snapshot[] | undefined> {
+  const wanted = deps.flags(project).testing && build.changedCount > 0;
+  return wanted ? await new SnapshotModel(deps.db).listByBuild(build.id) : undefined;
 }

@@ -33,6 +33,15 @@ describe("CreateGitChannelCard", () => {
     expect(await render()).toContain("&lt;prefix&gt;/storybook");
   });
 
+  it("offers GitHub App check runs next to commit statuses, with the key as a separate field", async () => {
+    const html = await render();
+    expect(html).toContain("Check runs (GitHub App)");
+    expect(html).toContain('name="appId"');
+    expect(html).toContain('name="installationId"');
+    expect(html).toContain('name="privateKey"');
+    expect(html).toContain("storyshelf protect");
+  });
+
   it("says state is delivered inline on a host with no job consumer", async () => {
     vi.stubEnv("VERCEL", "1");
     expect(await render()).toContain("Statuses are delivered inline");

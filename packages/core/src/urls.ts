@@ -7,6 +7,8 @@ export interface UrlBuilder {
   buildsList(slug: string): string;
   build(slug: string, buildId: string): string;
   buildDiff(slug: string, buildId: string): string;
+  /** Review page of one snapshot: the build's diff page with that snapshot selected. */
+  snapshot(slug: string, buildId: string, snapshotId: string): string;
   library(slug: string): string;
   jobs(slug: string): string;
   labels(slug: string): string;
@@ -38,19 +40,21 @@ export function createUrlBuilder(baseUrl: string, publishedBaseDomain?: string):
     buildsList: (slug) => `${root}/projects/${slug}/builds`,
     build: (slug, buildId) => `${root}/projects/${slug}/builds/${buildId}`,
     buildDiff: (slug, buildId) => `${root}/projects/${slug}/builds/${buildId}/diff`,
+    snapshot: (slug, buildId, snapshotId) =>
+      `${root}/projects/${slug}/builds/${buildId}/diff?snapshot=${encodeURIComponent(snapshotId)}`,
     library: (slug) => `${root}/projects/${slug}/library`,
     jobs: (slug) => `${root}/projects/${slug}/jobs`,
     labels: (slug) => `${root}/projects/${slug}/labels`,
     label: (slug, key, value) =>
-      `${root}/projects/${slug}/labels/${encodeURIComponent(key)}/${encodeURI(value)}`,
+      `${root}/projects/${slug}/labels/${encodeURIComponent(key)}/${encodePath(value)}`,
     component: (slug, importPath) =>
-      `${root}/projects/${slug}/components/${encodeURI(importPath.replace(/^(?:\.\/)+/u, ""))}`,
+      `${root}/projects/${slug}/components/${encodePath(importPath.replace(/^(?:\.\/)+/u, ""))}`,
     storybook: (slug) =>
       publishedBaseDomain
         ? `https://${slug}.${publishedBaseDomain}`
         : `${root}/projects/${slug}/storybook`,
     storybookLabel: (slug, key, value) =>
-      `${root}/projects/${slug}/storybook/${encodeURIComponent(key)}/${encodeURI(value)}`,
+      `${root}/projects/${slug}/storybook/${encodeURIComponent(key)}/${encodePath(value)}`,
     storybookBuild: (slug, buildId) =>
       publishedBaseDomain
         ? `https://${buildId}.${slug}.${publishedBaseDomain}`
@@ -77,4 +81,15 @@ export function safeImageUrl(value: string | undefined): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Encode a value that may hold slashes (a label value, a branch, an import path) as URL path
+ * segments: each segment is escaped (`?`, `#` and `%` included), the slashes stay.
+ */
+function encodePath(value: string): string {
+  return value
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
 }
