@@ -8,7 +8,7 @@ StoryShelf sends formatted notifications for build review events and site-wide a
 ## Concepts
 
 - **Channels** (project admin): where messages go — a Slack workflow webhook, a Teams workflow URL, or an email address — plus an event filter and display toggles. A channel with no project is site-wide and receives `sys:*` admin alerts only. One settings page manages every channel, including git channels.
-- **Delivery kinds**: a provider either sends a **message** once (Slack, Teams, email) or makes a git host show a **state** (GitHub, GitLab commit status and pull-request comment). Git channels follow the build, not a topic list, so they have no event filter and never receive chat messages. See [Git channels](#git-channels-commit-statuses).
+- **Delivery kinds**: a provider either sends a **message** once (Slack, Teams, email) or makes a git host show a **state** (GitHub, GitLab commit status and pull-request comment). Git channels follow the build, not a topic list, so they have no event filter and never receive chat messages. See [Git channels](#git-channels-commit-statuses-and-check-runs).
 - **Subscriptions** (you): per-project opt-in. No row means silence, with one exception: `review:requested` (a published build waits for a verdict) is on by default for the project's approvers and admins, who receive it by email until they opt out by saving their preferences with **Email me** unticked or a topic list that leaves it out. v1 delivers over email to `users.email`; Slack DMs are deferred.
 - **Topics**: project events reuse webhook names (`build:created`, `build:reviewing`, `build:approved`, `build:rejected`, `build:pending` (a verdict sent a build back to pending), `build:cancelled` (a user cancelled the build; never on by default, and a cancel raises no `build:failed`), `baseline:created`, `baseline:updated`, `comment:created`, the review topics `review:requested`, `review:comment` and `review:verdict`, plus `insight:ready` when an AI triage or health digest finishes); admin events are `sys:user-created`, `sys:invite-issued`, `sys:auth-failed`, `sys:capture-failed`, `sys:purge-completed`, `sys:notify-failed`, `sys:ai-budget`.
 
@@ -29,7 +29,7 @@ curl -X POST $SHELF/api/v1/projects/my-app/notification-channels \
 - **A public URL is required.** Every message links to the build or review page, so while the server resolves no [public origin](/guides/config/#public-origin) (`PUBLIC_BASE_URL`, the platform's address, or the origin an admin confirmed on **System**; a detected origin counts only once confirmed) no notification is sent at all, git statuses included. Channels are not marked as failing; **System**, the project's notification settings and your profile show "Notifications are paused until a public URL is set", and the server logs it at start-up. Webhooks carry ids and no links, so they are unaffected.
 - Display toggles: `style` (`compact`|`verbose`), `subjectPrefix`, `includeAuthor`, `includeMessage`, `includeCounts`. Brand (name, logo, links) comes from server `UIConfig` + `publicBaseUrl`.
 
-## Git channels (commit statuses)
+## Git channels (commit statuses and check runs)
 
 A git channel (`github`, `gitlab` from [`@storyshelf/notify-git`](/packages/notify-git/)) belongs to a project and shows the build's state on your repository: commit statuses named `<prefix>/testing` (or `<prefix>/review` without `testing`) and `<prefix>/storybook`, and one pull-request comment per build. It takes the repository as config and the token as its secret:
 
@@ -40,7 +40,7 @@ curl -X POST $SHELF/api/v1/projects/my-app/notification-channels \
   -d '{ "provider": "github", "config": { "owner": "acme", "repo": "widgets", "prefix": "storyshelf-web" }, "secret": "ghp_..." }'
 ```
 
-A site-wide git channel, or one without a token, is a 400. On the settings page, use **Add a git channel**. To block merges until review is approved, see [Merge gate setup](/guides/merge-gate/).
+A GitHub channel can post **check runs** as a GitHub App instead of commit statuses (`"mode": "checks"`, `appId`, `installationId` in `config`, the App's private key as `secret`); see [GitHub check runs](/packages/notify-git/#github-check-runs). GitLab always uses statuses. A site-wide git channel, or one without a token (or key), is a 400. On the settings page, use **Add a git channel**. To block merges until review is approved, see [Merge gate setup](/guides/merge-gate/).
 
 Git delivery is **durable**, unlike messages: each state change is a `notify` job on the database queue that reads the build when it runs and is retried with backoff (five attempts), or delivered inline without durability on a host with no queue consumer. See [Delivery](/packages/notify-git/#delivery). Every channel (message or git) records its **last delivery error and time**: the settings page shows a failing channel with the error, and `GET …/notification-channels` returns `lastError` and `lastErrorAt` (both `null` while the channel delivers cleanly). The next successful delivery clears the error; a git delivery that is given up also raises `sys:notify-failed`.
 

@@ -1,6 +1,6 @@
 ---
 title: CLI — Client
-description: storyshelf init, create, upload, build, doctor, whoami, retry, purge — client-side commands.
+description: storyshelf init, create, upload, build, doctor, whoami, retry, purge, protect — client-side commands.
 ---
 
 import { PackageManagers } from "starlight-package-managers";
@@ -122,5 +122,16 @@ storyshelf purge --url http://localhost:3000 --token $STORYSHELF_ADMIN_TOKEN
 ```
 
 `retry` re-runs capture without a new revision. `purge` triggers retention GC (normally scheduled).
+
+## `storyshelf protect`
+
+Print, validate and (only with `--apply`) write the branch rule that makes StoryShelf gate merges. It talks to GitHub or GitLab directly with an admin token; it does not contact your StoryShelf server.
+
+```bash
+storyshelf protect --provider github --repo acme/widgets [--branch main] [--prefix storyshelf] [--gate testing|review] [--token $GITHUB_TOKEN] [--apply]
+storyshelf protect --provider gitlab --repo group/project [--host https://gitlab.example.com] [--token $GITLAB_TOKEN] [--apply]
+```
+
+It always prints the required check names (`<prefix>/testing`, or `<prefix>/review` with `--gate review`) and the manual steps. With a token (`--token`, or `GITHUB_TOKEN` / `GITLAB_TOKEN`) it also compares them with the branch's rule: the exit code is `1` when something is missing and nothing was written (dry run, the default). `--apply` adds only the missing part. See [Let StoryShelf set the rule](/guides/merge-gate/#let-storyshelf-set-the-rule) for what each host supports.
 
 See [Configuration](/guides/config/) for file/env precedence and [Labels](/concepts/labels/) for `persistent` tagging.

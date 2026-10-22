@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { createUrlBuilder } from "../../urls.ts";
 import {
+  MAX_ANNOTATIONS,
   statusesForBuild,
   type BuildStateBuild,
+  type BuildStateChange,
   type BuildStateFlags,
   type PublishingState,
 } from "./build-state.ts";
@@ -24,6 +26,7 @@ function run(
     flags?: Partial<BuildStateFlags>;
     publishing?: PublishingState;
     approvals?: { given: number; required: number };
+    changes?: BuildStateChange[];
     prefix?: string;
     base?: string;
   } = {},
@@ -36,6 +39,7 @@ function run(
     flags: { testing: true, review: false, ...overrides.flags },
     publishing: overrides.publishing ?? "success",
     approvals: overrides.approvals,
+    changes: overrides.changes,
   });
 }
 
@@ -223,5 +227,70 @@ describe("statusesForBuild: the comment", () => {
     const { comment } = run({ publishing: "pending", flags: { testing: false, review: false } });
     expect(comment?.markdown).not.toContain("Storybook:");
     expect(comment?.markdown).not.toContain("Snapshots:");
+  });
+});
+
+const change = (n: number, overrides: Partial<BuildStateChange> = {}): BuildStateChange => ({
+  id: `S${String(n)}`,
+  status: "changed",
+  storyTitle: "Button",
+  storyName: `Story ${String(n)}`,
+  storyImportPath: "./src/Button.stories.tsx",
+  viewportName: "desktop",
+  browser: "chromium",
+  ...overrides,
+});
+
+describe("statusesForBuild: progress and annotations", () => {
+  it("is queued before capture and running after", () => {
+    expect(gate(run({ build: { status: "pending" } }))?.progress).toBe("queued");
+    expect(gate(run({ build: { status: "capturing" } }))?.progress).toBe("running");
+    expect(gate(run({ build: { status: "reviewing" } }))?.progress).toBe("running");
+    expect(gate(run({ build: { status: "approved" } }))?.progress).toBeUndefined();
+  });
+
+  it("annotates every changed or new snapshot with its review link", () => {
+    const set = run({
+      build: { status: "reviewing" },
+      changes: [
+        change(1),
+        change(2, { status: "new", storyImportPath: null, browser: undefined }),
+        change(3, { status: "approved" }),
+        change(4, { status: "unchanged" }),
+      ],
+    });
+    expect(gate(set)?.annotations).toEqual([
+      {
+        path: "src/Button.stories.tsx",
+        title: "Button / Story 1 (desktop, chromium)",
+        message:
+          "Visual change: review it at https://shelf.example.com/projects/web/builds/b1/diff?snapshot=S1",
+        url: "https://shelf.example.com/projects/web/builds/b1/diff?snapshot=S1",
+        level: "warning",
+      },
+      {
+        path: ".storybook",
+        title: "Button / Story 2 (desktop)",
+        message:
+          "New snapshot: review it at https://shelf.example.com/projects/web/builds/b1/diff?snapshot=S2",
+        url: "https://shelf.example.com/projects/web/builds/b1/diff?snapshot=S2",
+        level: "notice",
+      },
+    ]);
+    expect(gate(set)?.omitted).toBeUndefined();
+  });
+
+  it("caps the annotations and counts the rest", () => {
+    const changes = Array.from({ length: MAX_ANNOTATIONS + 7 }, (_, i) => change(i));
+    const status = gate(run({ build: { status: "reviewing" }, changes }));
+    expect(status?.annotations).toHaveLength(MAX_ANNOTATIONS);
+    expect(status?.omitted).toBe(7);
+  });
+
+  it("annotates only the testing gate, never the storybook status or the review gate", () => {
+    const withTesting = run({ changes: [change(1)] });
+    expect(withTesting.statuses.find((s) => s.name === "storybook")?.annotations).toBeUndefined();
+    const review = run({ flags: { testing: false, review: true }, changes: [change(1)] });
+    expect(gate(review)?.annotations).toBeUndefined();
   });
 });

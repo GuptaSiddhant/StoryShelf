@@ -241,6 +241,53 @@ describe("notifications settings tab", () => {
     expect(html).toContain("build state");
   });
 
+  it("stores a GitHub App channel's private key as its encrypted secret, never echoed", async () => {
+    const seeded = await seed();
+    const app = testApp(seeded, false);
+    const key = "-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----";
+    const saved = await postForm(
+      "/projects/notify-project/settings/notifications",
+      {
+        gitProvider: "github",
+        owner: "acme",
+        repo: "widgets",
+        mode: "checks",
+        appId: "12",
+        installationId: "34",
+        token: "",
+        privateKey: key,
+      },
+      app,
+    );
+    expect(saved.status).toBe(201);
+    const model = new NotificationChannelModel(seeded.db, undefined, secret);
+    const [row] = await model.list("p1");
+    expect(NotificationChannelModel.configOf(row!)).toEqual({
+      owner: "acme",
+      repo: "widgets",
+      mode: "checks",
+      appId: "12",
+      installationId: "34",
+    });
+    expect(row?.secretEncrypted).not.toContain("PRIVATE KEY");
+    expect(model.decryptSecret(row!)).toBe(key);
+    const page = await (
+      await app.request("/projects/notify-project/settings/notifications")
+    ).text();
+    expect(page).not.toContain("BEGIN PRIVATE KEY");
+  });
+
+  it("asks for the private key, not a token, when a checks channel has none", async () => {
+    const app = testApp(await seed(), false);
+    const missing = await postForm(
+      "/projects/notify-project/settings/notifications",
+      { gitProvider: "github", owner: "a", repo: "b", mode: "checks", token: "ghp_ignored" },
+      app,
+    );
+    expect(missing.status).toBe(400);
+    expect(await missing.text()).toContain("A git channel needs a token or private key");
+  });
+
   it("shows a failing git channel's last error on the page", async () => {
     const seeded = await seed();
     const app = testApp(seeded, false);

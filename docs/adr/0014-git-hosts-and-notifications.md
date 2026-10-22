@@ -236,6 +236,39 @@ gets its origin through configuration (`PUBLIC_BASE_URL`, needs a restart) deliv
 state change on. A `notify` job that finds the origin gone when it runs is acknowledged and writes
 nothing.
 
+### 13. GitHub check runs sit beside commit statuses (merge gate v2)
+
+Owner decision (epic #27, issues #32, #33, #35). A GitHub channel shows a build as commit
+statuses (default, `mode: "statuses"`, a token) or as **check runs** (`mode: "checks"`, a GitHub
+App); GitLab keeps statuses, which join the commit's pipeline. There is no third target kind and no
+new provider: both modes are driven by the same pure `statusesForBuild`, which now also says how
+far a `pending` status is (`progress`: `queued` before capture, else `running`), marks the Storybook
+status `informational` and attaches the per-snapshot `annotations` to `<prefix>/testing`. A pure
+mapper in `notify-git` (`github-check-mapper.ts`) turns a desired status into the check-run payload;
+nothing posts from a call site.
+
+- **Credentials** are per channel: `appId` and `installationId` in the channel config, the private key
+  (PEM) as the channel secret, so it is encrypted at rest, never returned by the API or UI, and covered
+  by `redactSecrets` (PEM blocks and JWTs). The provider signs an RS256 JWT with `node:crypto`, trades it
+  for an installation token with `httpJson` and caches it per channel until five minutes before expiry.
+  No PAT, no new dependency.
+- **Lifecycle:** `queued` (build not captured), `in_progress` (capturing, comparing, review open),
+  `completed` with `success`, `failure`, `cancelled` (the `cancelled` build status) or `neutral` (the
+  informational Storybook status failing). A run is found by head SHA and the stable `external_id`
+  `storyshelf:<context>` and updated, never duplicated. The details URL is absolute (decision 12 already
+  pauses delivery without a confirmed origin).
+- **Annotations:** one per `new` or `changed` snapshot, titled by story, viewport and browser,
+  anchored at the story file, with `raw_details` the snapshot's review URL (`UrlBuilder.snapshot`, the
+  diff page with `?snapshot=<id>`). `MAX_ANNOTATIONS` (200) caps the build state, GitHub takes 50
+  per request so they go out in batches of 50 through check-run updates, and the summary says `and N
+more changed snapshots` with the build link. A delivery skips the annotations the run already holds
+  (`output.annotations_count`), so a retry never doubles them; GitHub cannot remove annotations, so one
+  for a change approved later stays on the run.
+- **Branch protection** stays the owner's step, but `storyshelf protect` (CLI) prints the exact required
+  check, validates the branch's rule through the host API and writes only with `--apply` (additive:
+  it adds the missing check, or creates a rule on an unprotected branch; GitLab: the "pipelines must
+  succeed" project setting).
+
 ## Consequences
 
 **Positive**
@@ -249,8 +282,9 @@ nothing.
 
 **Negative**
 
-- The gate depends on the repository owner configuring branch protection, a manual step.
-- A PAT for status writes is a credential to manage and rotate.
+- The gate depends on the repository owner configuring branch protection, a manual step
+  (`storyshelf protect` validates and can write it, decision 13).
+- A PAT for status writes is a credential to manage and rotate (a GitHub App channel avoids it).
 - Status delivery is asynchronous: a status can lag the build change by a queue polling interval.
 - Hosting-only instances without a queue consumer get no durability for statuses.
 - Per-user chat DMs, phone-number channels and custom templates are not supported.
@@ -268,8 +302,7 @@ nothing.
 
 ## Open questions
 
-- Whether a GitHub App (repo-installed, no long-lived PAT, rich check runs with per-snapshot
-  annotations and deep links, auto-reject) is another `state` provider with check runs as a third
-  target, or needs its own contract.
+- Auto-rejecting a pull request when a build is rejected (the check run already ends `failure`).
+- GitHub rulesets and GitLab external status checks are not read by `storyshelf protect`.
 - Polling cadence and cost of `notify` jobs on metered databases such as Turso.
 - Rate limits: GitHub secondary limits on bursts of statuses across many builds.

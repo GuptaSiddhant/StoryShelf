@@ -6,6 +6,7 @@ import type { DoctorOptions } from "./commands/doctor.ts";
 import type { InitOptions } from "./commands/init.ts";
 import type { McpInitOptions } from "./commands/mcp/init.ts";
 import type { McpServeOptions } from "./commands/mcp/serve.ts";
+import type { ProtectOptions } from "./commands/protect.ts";
 import type { PurgeOptions } from "./commands/purge.ts";
 import type { RetryOptions } from "./commands/retry.ts";
 import type { ServerInitOptions } from "./commands/server/init.ts";
@@ -36,6 +37,7 @@ export function createProgram(): Command {
     buildDoctorCommand(),
     buildWhoamiCommand(),
     buildRetryCommand(),
+    buildProtectCommand(),
   ];
   for (const command of commands) {
     program.addCommand(command);
@@ -216,6 +218,22 @@ function buildRetryCommand(): Command {
     .requiredOption("--build-id <id>", "build id")
     .option("--token <token>", "CI token (or STORYSHELF_TOKEN env)")
     .action(run<RetryOptions>(async () => (await import("./commands/retry.ts")).runRetry));
+}
+
+function buildProtectCommand(): Command {
+  return new Command("protect")
+    .description(
+      "Print and validate the required-check rule that makes StoryShelf gate merges (dry run unless --apply)",
+    )
+    .requiredOption("--provider <host>", "git host: github or gitlab")
+    .requiredOption("--repo <repo>", "owner/repo (GitHub) or group/project (GitLab)")
+    .option("--branch <name>", "branch to protect (default main)")
+    .option("--prefix <prefix>", "the channel's status prefix (default storyshelf)")
+    .option("--gate <name>", "testing (default) or review for a project with testing off")
+    .option("--host <url>", "self-managed GitLab host (default https://gitlab.com)")
+    .option("--token <token>", "admin token (or GITHUB_TOKEN / GITLAB_TOKEN env)")
+    .option("--apply", "write the rule; without it nothing is changed")
+    .action(run<ProtectOptions>(async () => (await import("./commands/protect.ts")).runProtect));
 }
 
 if (isMainModule(import.meta.url, process.argv[1])) {
