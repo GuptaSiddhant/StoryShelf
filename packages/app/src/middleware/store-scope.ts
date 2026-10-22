@@ -21,6 +21,7 @@ export interface StoreScopeDeps {
   ui: UIConfig;
   logger: Logger;
   authEnabled: boolean;
+  testing: boolean;
   enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
   captureQueue: CaptureQueue | null;
   publish?: PublishService;
@@ -48,6 +49,7 @@ export function storeScope(deps: StoreScopeDeps) {
         logger: deps.logger,
         user,
         authEnabled: deps.authEnabled,
+        testing: deps.testing,
         sessionId: sessionIdFrom(c),
         enqueueCapture: deps.enqueueCapture,
         captureQueue: deps.captureQueue,

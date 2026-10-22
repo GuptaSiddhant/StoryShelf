@@ -24,6 +24,7 @@ import { PackageManagers } from "starlight-package-managers";
 import { createShelfApp } from "@storyshelf/app";
 
 const app = createShelfApp({ database, storage, testing: { runner: captureRunner } });
+// Leave `testing` out to host Storybooks only: createShelfApp({ database, storage })
 await app.lifecycle.init();
 
 serve({ fetch: app.fetch, port: 3000 });

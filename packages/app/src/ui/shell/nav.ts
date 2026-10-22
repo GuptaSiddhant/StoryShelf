@@ -35,12 +35,16 @@ export interface NavUrls {
   settings(slug: string): string;
 }
 
-/** Entries shown for the current project. */
-export function projectNavItems(urls: NavUrls, slug: string): NavItem[] {
+/**
+ * Entries shown for the current project. Entries for `testing` routes (Jobs) drop out on a
+ * hosting-only instance, where those routes answer 404.
+ */
+export function projectNavItems(urls: NavUrls, slug: string, testing = true): NavItem[] {
+  const jobs: NavItem = { key: "jobs", label: "Jobs", href: urls.jobs(slug), icon: "activity" };
   return [
     { key: "library", label: "Library", href: urls.library(slug), icon: "image" },
     { key: "builds", label: "Builds", href: urls.buildsList(slug), icon: "layers" },
-    { key: "jobs", label: "Jobs", href: urls.jobs(slug), icon: "activity" },
+    ...(testing ? [jobs] : []),
     { key: "labels", label: "Labels", href: urls.labels(slug), icon: "tag" },
     { key: "settings", label: "Settings", href: urls.settings(slug), icon: "settings" },
   ];

@@ -3,12 +3,14 @@ import { ProjectModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
+import { stubRunner } from "../test-runner.ts";
 
 async function get(path: string): Promise<string> {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
   await new ProjectModel(db).create({ name: "Docs" });
   const app = createShelfApp({
+    testing: { runner: stubRunner() },
     database: db,
     storage,
     logger: createShelfLogger({ level: "silent" }),

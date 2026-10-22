@@ -191,6 +191,7 @@ export default defineConfig({
             { label: "Labels", slug: "concepts/labels" },
             { label: "Retention & purge", slug: "concepts/retention" },
             { label: "Published Storybook", slug: "concepts/publishing" },
+            { label: "Hosting only", slug: "concepts/hosting-only" },
             { label: "Roles & tokens", slug: "concepts/roles" },
             { label: "Authentication model", slug: "concepts/auth" },
           ],

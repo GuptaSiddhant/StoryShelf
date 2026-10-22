@@ -3,6 +3,7 @@ import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
 import { getCsrfToken } from "../middleware/csrf.ts";
+import { stubRunner } from "../test-runner.ts";
 
 async function setup() {
   const { db } = makeDatabase();
@@ -17,7 +18,12 @@ async function setup() {
     createdAt: now,
     updatedAt: now,
   });
-  const app = createShelfApp({ database: db, storage, logger: pino({ level: "silent" }) });
+  const app = createShelfApp({
+    testing: { runner: stubRunner() },
+    database: db,
+    storage,
+    logger: pino({ level: "silent" }),
+  });
   const save = async (fields: Record<string, string>) =>
     await app.request("/projects/capture-project/settings/capture", {
       method: "POST",

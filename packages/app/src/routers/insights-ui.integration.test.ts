@@ -7,6 +7,7 @@ import { createShelfApp } from "../index.tsx";
 import { settleInsightJobs } from "../insights/job.ts";
 import { fakeAi } from "../insights/test-support.ts";
 import { getCsrfToken } from "../middleware/csrf.ts";
+import { stubRunner } from "../test-runner.ts";
 
 async function seed(aiProfile: string | null = "default") {
   const { db } = makeDatabase();
@@ -28,6 +29,7 @@ async function seed(aiProfile: string | null = "default") {
 
 const app = (db: unknown, storage: unknown, withAi = true) =>
   createShelfApp({
+    testing: { runner: stubRunner() },
     database: db as never,
     storage: storage as never,
     ...(withAi ? { ai: fakeAi() } : {}),

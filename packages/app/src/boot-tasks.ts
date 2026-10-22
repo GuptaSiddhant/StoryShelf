@@ -2,6 +2,7 @@ import { sweepOrphanedScratch } from "@storyshelf/core/capture";
 import type { ShelfOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 import { checkCredentialsAfterSetup } from "./credentials.ts";
+import { logHostingOnlyMode } from "./hidden-data.ts";
 import { trackBackground, type LifecycleCell } from "./lifecycle.ts";
 import type { ServerRuntime } from "./runtime.ts";
 
@@ -15,6 +16,26 @@ export function runBootTasks(
   recoverAfterSetup(cell, recoverStuck, runtime.logger);
   sweepScratchOnBoot(cell, runtime.config.scratchDir, runtime.logger);
   checkCredentialsAfterSetup(cell, scoped.database, runtime.config, runtime.logger);
+  logHostingOnlyAfterSetup(cell, scoped, runtime.logger);
+}
+
+/** Without `testing`, once adapters are ready, log the mode and any snapshots it hides. */
+function logHostingOnlyAfterSetup(cell: LifecycleCell, scoped: ShelfOptions, logger: Logger): void {
+  if (scoped.testing !== undefined) {
+    return;
+  }
+  trackBackground(
+    cell,
+    cell.ready
+      .then(async (setup) => {
+        if (setup.ok) {
+          await logHostingOnlyMode(scoped.database, logger);
+        }
+      })
+      .catch((error: unknown) => {
+        logger.warn({ err: error }, "could not count the snapshots hosting-only mode hides");
+      }),
+  );
 }
 
 /** Once adapters are ready, requeue-once or fail builds a restart left `capturing`. */

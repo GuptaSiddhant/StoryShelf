@@ -118,6 +118,6 @@ Enterprise Terraform stacks are available per cloud — each scaffolds an app + 
 - [AWS — ECS + S3 + SQS + Postgres + Cognito](./aws/) — `s3_bucket`, `queue_url`, `user_pool_id`
 - [Azure — Container Apps + Blob + Queues/Service Bus + Postgres + Entra](./azure/) — `storage_connection_string`, `entra_application_id`
 - [GCP — Cloud Run + GCS + Pub/Sub + Postgres + Identity Platform](./gcp/) — `run_url`, `gcs_bucket`, `pubsub_topic`
-- [Cloud assembly — all clouds equal](./cloud/) — swap each layer independently across Vercel, Cloudflare Workers, Lambda, Deno, and Bun, plus the serverless worker model and Postgres provider recipes
+- [Cloud assembly — all clouds equal](./cloud/) — swap each layer independently across Vercel, Cloudflare Workers, Lambda, Deno, and Bun, plus serverless hosting only and Postgres provider recipes
 
 For single-host Docker Compose or a bare `npm start` on Fly/Railway/Render/VPS, the [Docker Compose](./docker-compose/) page covers the compose file, subdomains, and auth. The cloud assembly page also includes minimal `Turso + S3` and `Postgres + S3` recipes that run on any `fetch`+`crypto` platform.

@@ -61,6 +61,8 @@ export function createD1Database(options: D1DatabaseOptions): DatabaseAdapter {
       description: "Cloudflare D1 database adapter (D1 binding + Drizzle)",
       kind: "d1",
       category: "database",
+      // A Workers-only binding: no long-running process to consume capture jobs (ADR 0006, decision 3).
+      supportsTesting: false,
     },
     tables: schema,
     migrate: async () => {

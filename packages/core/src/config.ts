@@ -304,7 +304,10 @@ export function validateUiConfig(config: Record<string, unknown>): UIConfig {
 
 /** Testing options: what renders, how jobs are queued, how many run at once, and how screenshots are compared. */
 export interface ShelfTestingOptions {
-  /** Pure renderer. Without one this process does not render (a remote worker may). */
+  /**
+   * Pure renderer. Required unless `queue` is set: with a user-supplied queue a remote worker may
+   * render instead, so this process does not.
+   */
   runner?: CaptureRunner;
   /** Queue adapter; defaults to the in-process queue when a runner is set. */
   queue?: CaptureQueue;
@@ -401,3 +404,4 @@ export interface ObservabilityHandle {
   shutdown(): Promise<void>;
 }
 export { DEFAULT_SCRATCH_DIR, resolveShelfOptions } from "./options.ts";
+export { ALLOW_SERVERLESS_ENV, assertServerless, isServerlessHost } from "./serverless.ts";

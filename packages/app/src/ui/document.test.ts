@@ -3,6 +3,7 @@ import { BuildModel, ProjectModel, SnapshotModel } from "@storyshelf/core/models
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
+import { stubRunner } from "../test-runner.ts";
 
 function styleBlock(html: string): string {
   const match = /<style>(?<css>[\s\S]*)<\/style>/u.exec(html);
@@ -53,6 +54,7 @@ describe("DocumentLayout stylesheet", () => {
     const app = createShelfApp({
       database: db,
       storage,
+      testing: { runner: stubRunner() },
       logger: createShelfLogger({ level: "silent" }),
     });
     const html = await (

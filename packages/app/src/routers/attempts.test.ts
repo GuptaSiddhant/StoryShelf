@@ -5,6 +5,7 @@ import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
 import { describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "../index.tsx";
+import { stubRunner } from "../test-runner.ts";
 
 const silentLogger = pino({ level: "silent" });
 
@@ -68,7 +69,12 @@ async function setupSeeded() {
   await attempts.markFinished(first.id, "failed", "renderer exploded");
   const second = await attempts.startAttempt("p1", "b1", "req-2");
   await attempts.markRunning(second.id);
-  const app = createShelfApp({ database: db, storage, logger: silentLogger });
+  const app = createShelfApp({
+    testing: { runner: stubRunner() },
+    database: db,
+    storage,
+    logger: silentLogger,
+  });
   return { db, app };
 }
 

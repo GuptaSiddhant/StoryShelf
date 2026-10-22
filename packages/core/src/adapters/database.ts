@@ -110,8 +110,19 @@ export interface TxStore {
   count(table: Table, where?: SQL): Promise<number>;
 }
 
+/** Database-specific metadata: the family plus what the backing platform can carry. */
+export interface DatabaseAdapterMetadata {
+  readonly category: "database";
+  /**
+   * `false` when the database cannot back a deployment with `testing` (ADR 0006, decision 3): it
+   * is reachable only from a platform that ends the process after each request (Cloudflare D1).
+   * Unset means it can.
+   */
+  readonly supportsTesting?: boolean;
+}
+
 /** Database abstraction over Drizzle tables, agnostic of dialect and driver. */
-export interface DatabaseAdapter extends Adapter<{ readonly category: "database" }> {
+export interface DatabaseAdapter extends Adapter<DatabaseAdapterMetadata> {
   /** Table handles for this adapter's dialect, enforced with type safety. */
   readonly tables: Tables;
   /** Insert a row and return the inserted record. */
@@ -142,7 +153,7 @@ export interface DatabaseAdapter extends Adapter<{ readonly category: "database"
 
 /** Driver-supplied identity plus lifecycle hooks. */
 export interface DrizzleAdapterOptions {
-  metadata: AdapterMetadata & { readonly category: "database" };
+  metadata: AdapterMetadata & DatabaseAdapterMetadata;
   tables: Tables;
   migrate: () => Promise<void> | void;
   close: () => Promise<void> | void;

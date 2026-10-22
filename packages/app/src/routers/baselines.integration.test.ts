@@ -10,6 +10,7 @@ import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
 import { stubAuth } from "../stub-auth.ts";
+import { stubRunner } from "../test-runner.ts";
 
 const silentLogger = pino({ level: "silent" });
 const NOW = "2026-01-01T00:00:00.000Z";
@@ -57,7 +58,12 @@ async function sqliteSetup() {
   const { storage, objects } = makeStorage();
   await insertProject(db, "p1", "demo");
   await seedBaselines(db, storage);
-  const app = createShelfApp({ database: db, storage, logger: silentLogger });
+  const app = createShelfApp({
+    testing: { runner: stubRunner() },
+    database: db,
+    storage,
+    logger: silentLogger,
+  });
   return { app, db, storage, objects };
 }
 
@@ -154,6 +160,7 @@ describe("baseline export/import API", () => {
     const { storage } = makeStorage();
     await insertProject(db, "p1", "demo");
     const app = createShelfApp({
+      testing: { runner: stubRunner() },
       database: db,
       storage,
       logger: silentLogger,
@@ -202,6 +209,7 @@ describe("baseline export/import permissions", () => {
     await tokens.create("p1", { name: "ok", hash: sha256("ok-token"), userId: users.approver.id });
     await tokens.create("p1", { name: "legacy", hash: sha256("viewer-token"), userId: null });
     const app = createShelfApp({
+      testing: { runner: stubRunner() },
       database: db,
       storage,
       auth: stubAuth(null),

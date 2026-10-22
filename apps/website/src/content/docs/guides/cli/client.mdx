@@ -94,6 +94,8 @@ Affected capture is on by default: the CLI traces `git diff baseline..HEAD` thro
 The CLI does **not** run Playwright. It streams the zipped static build to the server; the server renders and diffs asynchronously (`202`).
 :::
 
+**Servers without `testing`.** An instance that [hosts Storybooks only](/concepts/hosting-only/) reports `testing: false` when the build is created. `storyshelf upload` then skips the affected-capture computation, uploads as usual, and ends with `Testing is off on this server: the Storybook is published, but no captures or visual checks will run.`
+
 **Large Storybooks on hosts without a job consumer.** A zip over the server's `maxInlineUnzipSize` is normally published by a background job. A serverless host runs no consumer, so it answers `413` with a message pointing to the file-by-file route (`/dedup`, `/content`, `/manifest`). `storyshelf upload` handles that by itself: it prints `Zip is over the server's inline publish limit; uploading file by file instead`, hashes the build directory, uploads only the files the server lacks, and posts the manifest, which completes publishing. A `413` for `maxUploadBytes` is not retried this way; raise the limit instead.
 
 ## `storyshelf doctor` / `whoami`

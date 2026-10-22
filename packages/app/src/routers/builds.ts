@@ -88,7 +88,10 @@ export function registerBuilds(app: ShelfRouter): void {
     );
     const build = await createBuildRecord(project, c.req.valid("json"));
     const uploadUrl = `/api/v1/projects/${project.slug}/builds/${build.id}/zip`;
-    return c.json({ build, uploadUrl, baselineSha: build.baselineSha }, 202);
+    return c.json(
+      { build, uploadUrl, baselineSha: build.baselineSha, testing: getStore().testing },
+      202,
+    );
   });
 
   app.openapi(affectedRoute, async (c) => {
@@ -265,7 +268,15 @@ const listBuildsRoute = createRoute({
 });
 
 const buildCreatedSchema = z
-  .object({ build: buildSchema, uploadUrl: z.string(), baselineSha: z.string().nullable() })
+  .object({
+    build: buildSchema,
+    uploadUrl: z.string(),
+    baselineSha: z.string().nullable(),
+    testing: z.boolean().openapi({
+      description:
+        "False when the server has no `testing` option: the build is published but never captured or compared.",
+    }),
+  })
   .openapi("BuildCreated");
 
 const createBuildRoute = createRoute({
