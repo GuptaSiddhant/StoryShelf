@@ -45,6 +45,7 @@ export default defineConfig({
         Hero: "./src/components/overrides/Hero.astro",
         SocialIcons: "./src/components/overrides/SocialIcons.astro",
         Sidebar: "./src/components/overrides/Sidebar.astro",
+        PageTitle: "./src/components/overrides/PageTitle.astro",
       },
       customCss: ["./src/styles/custom.css"],
       editLink: { baseUrl: `${REPO}/edit/main/apps/website/` },
@@ -110,9 +111,18 @@ export default defineConfig({
           items: [
             { label: "Getting started", slug: "guides/getting-started" },
             { label: "Live demo", slug: "guides/demo" },
-            { label: "Compare with Chromatic", slug: "guides/chromatic-comparison" },
-            { label: "Migrate from Chromatic", slug: "guides/chromatic-migration" },
-            { label: "Migrate from Lost Pixel", slug: "guides/lost-pixel-migration" },
+            { label: "How it works", slug: "concepts/how-it-works" },
+            { label: "Common setups", slug: "guides/recipes" },
+            { label: "Troubleshooting & FAQ", slug: "guides/troubleshooting" },
+            {
+              label: "Coming from other tools",
+              collapsed: true,
+              items: [
+                { label: "Compare with Chromatic", slug: "guides/chromatic-comparison" },
+                { label: "Migrate from Chromatic", slug: "guides/chromatic-migration" },
+                { label: "Migrate from Lost Pixel", slug: "guides/lost-pixel-migration" },
+              ],
+            },
           ],
         },
         {
@@ -158,6 +168,7 @@ export default defineConfig({
           collapsed: true,
           items: [
             { label: "Overview", slug: "guides/deployment" },
+            { label: "Sizing & cost", slug: "guides/sizing" },
             { label: "Docker Compose", slug: "guides/deployment/docker-compose" },
             { label: "AWS", slug: "guides/deployment/aws" },
             { label: "Azure", slug: "guides/deployment/azure" },
@@ -172,6 +183,7 @@ export default defineConfig({
           label: "Access",
           collapsed: true,
           items: [
+            { label: "Security & data handling", slug: "guides/security" },
             { label: "Authentication", slug: "guides/auth" },
             { label: "Local accounts", slug: "guides/auth/local" },
             { label: "Social login", slug: "guides/auth/social" },

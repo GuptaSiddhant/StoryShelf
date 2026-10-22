@@ -1,0 +1,96 @@
+---
+/**
+ * The page title, plus "Copy page as Markdown" and "View as Markdown" for the docs pages that have a
+ * Markdown copy (scripts/markdown-export.mjs writes one next to every built page).
+ */
+import Default from "@astrojs/starlight/components/PageTitle.astro";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/u, "");
+const path = Astro.url.pathname.slice(base.length);
+// The generated references and the home page have no Markdown copy.
+const hasMarkdown = path !== "/" && !path.startsWith("/api") && !path.startsWith("/reference");
+---
+
+<Default {...Astro.props}><slot /></Default>
+{
+  hasMarkdown && (
+    <div class="page-actions" data-page-actions>
+      <button type="button" data-copy-markdown>
+        Copy page as Markdown
+      </button>
+      <a href="index.md" rel="alternate" type="text/markdown">
+        View as Markdown
+      </a>
+      <span role="status" aria-live="polite" data-copy-status />
+    </div>
+  )
+}
+
+<script>
+  /** The Markdown of this page: the exported copy, or the visible text in a dev server. */
+  async function markdownOfPage(): Promise<string> {
+    try {
+      const response = await fetch(new URL("index.md", location.href));
+      if (response.ok) return await response.text();
+    } catch {
+      // Fall through to the page text.
+    }
+    const title = document.querySelector("h1")?.textContent ?? document.title;
+    const body = document.querySelector<HTMLElement>(".sl-markdown-content")?.innerText ?? "";
+    return `# ${title}\n\n${body}\n`;
+  }
+
+  for (const actions of document.querySelectorAll("[data-page-actions]")) {
+    const button = actions.querySelector<HTMLButtonElement>("[data-copy-markdown]");
+    const status = actions.querySelector<HTMLElement>("[data-copy-status]");
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const say = (message: string) => {
+      if (status) status.textContent = message;
+      clearTimeout(timer);
+      timer = setTimeout(() => status && (status.textContent = ""), 2500);
+    };
+    button?.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(await markdownOfPage());
+        say("Copied");
+      } catch {
+        say("Couldn't copy: use View as Markdown");
+      }
+    });
+  }
+</script>
+
+<style>
+  .page-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+    margin-top: 0.75rem;
+    font-size: var(--sl-text-sm);
+  }
+  .page-actions button {
+    padding: 0.25rem 0.75rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.375rem;
+    background: transparent;
+    color: var(--sl-color-gray-2);
+    font: inherit;
+    cursor: pointer;
+  }
+  .page-actions button:hover {
+    border-color: var(--sl-color-gray-3);
+    color: var(--sl-color-white);
+  }
+  .page-actions a {
+    color: var(--sl-color-gray-3);
+  }
+  .page-actions [role="status"] {
+    color: var(--sl-color-gray-3);
+  }
+  @media print {
+    .page-actions {
+      display: none;
+    }
+  }
+</style>
