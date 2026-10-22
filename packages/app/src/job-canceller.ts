@@ -1,7 +1,7 @@
 /**
  * Cancelling a build's background jobs (ADR 0006): every job kind of the build shares the
  * `capture_jobs` table, so one cancel by build id on the database queue covers capture, publish and
- * notify jobs; a supplied `testing.queue` is a second transport and is asked too.
+ * notify jobs.
  */
 import type { CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
 

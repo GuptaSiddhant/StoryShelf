@@ -317,9 +317,9 @@ async function pageWith(violations: string | null): Promise<string> {
 describe("review page: accessibility violations", () => {
   it("shows the findings above the comparison and a count in the filmstrip", async () => {
     const html = await pageWith(JSON.stringify([VIOLATION]));
-    expect(html).toContain("Accessibility: 1 found (does not block)");
+    expect(html).toContain("Accessibility: 1 found on chromium (does not block)");
     expect(html).toContain("color-contrast (serious)");
-    expect(html).toContain("a11y 1");
+    expect(html).toContain("a11y 1 (chromium)");
   });
 
   it("shows nothing for a snapshot without findings or with unreadable data", async () => {

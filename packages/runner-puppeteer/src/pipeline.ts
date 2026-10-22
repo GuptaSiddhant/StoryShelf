@@ -97,6 +97,18 @@ function assertReachable(
       { transient: true },
     );
   }
+  if (storybookUrl !== undefined) {
+    assertStorybookRoot(target, storybookUrl);
+  }
+}
+
+/** The URL must be the build's directory root; refused before any browser connects. */
+function assertStorybookRoot(target: CaptureTarget, storybookUrl: string): void {
+  try {
+    storybookBase(storybookUrl);
+  } catch (error) {
+    throw new TargetLaunchError(target, error instanceof Error ? error.message : String(error));
+  }
 }
 
 /** The loopback server, or the URL given; a server that cannot start closes the browser it was for. */
@@ -159,6 +171,7 @@ function buildContext(
     executePlay: input.executePlay,
     playTimeoutMs: input.playTimeoutMs,
     runA11y: input.runA11y,
+    ...(input.logger ? { logger: input.logger } : {}),
     runtimeParams: createRuntimeParamsState(),
     ...(input.reusePages ? { pagePool: new PagePool(browser) } : {}),
   };

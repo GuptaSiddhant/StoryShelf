@@ -2,8 +2,14 @@
  * The deployment's public origin (ADR 0007, decision 6): one resolver for anything that needs an
  * absolute URL in the background (commit-status links, email links, signed Storybook URLs).
  * It tries `config.publicBaseUrl`, then the platform's own address from the environment, then the
- * origin an admin's browser reported. The `Host` of a request is never used: a background job has
- * none, and it can be forged to plant links in emails and commit statuses.
+ * origin an admin's browser reported and an admin confirmed. A reported origin nobody confirmed is
+ * only a suggestion: `resolve()` and `url()` do not return it, so no link, notification or signed
+ * URL is built on it. The `Host` of a request is never used for those: a background job has none,
+ * and it can be forged to plant links in emails and commit statuses.
+ *
+ * The one exception is authentication (OAuth redirect URIs, the OIDC helper): those routes are
+ * interactive and request-bound, so {@link PublicOriginResolver.authOrigin} may answer with the
+ * request's own origin when no origin is confirmed.
  */
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { ShelfConfig } from "../config.ts";
@@ -16,13 +22,11 @@ export const PUBLIC_ORIGIN_KEY = "public_origin";
 /** Where the resolved origin came from. */
 export type PublicOriginSource = "config" | "platform" | "admin";
 
-/** An origin and its provenance. */
+/** An origin that may be used, and its provenance. */
 export interface ResolvedPublicOrigin {
   /** Base URL without a trailing slash. */
   url: string;
   source: PublicOriginSource;
-  /** An admin's stored origin only: `false` until an admin confirmed or entered it. */
-  confirmed: boolean;
 }
 
 /** The origin an admin's browser reported, as stored. */
@@ -33,10 +37,19 @@ export interface StoredPublicOrigin {
 
 /** Resolves the public origin; reads the database at most once per `ttlMs`. */
 export interface PublicOriginResolver {
-  /** The origin to use now, or `null` when nothing resolves. */
+  /**
+   * The origin background code may use now, or `null` when nothing is confirmed: a configured or
+   * platform origin, or one an admin confirmed. A detected, unconfirmed origin never resolves.
+   */
   resolve(): Promise<ResolvedPublicOrigin | null>;
   /** Shorthand for `resolve()` when only the URL matters. */
   url(): Promise<string | undefined>;
+  /**
+   * The origin for an interactive authentication route (OAuth redirect URI, OIDC helper): the
+   * resolved origin, else `requestOrigin`, the address the request itself came in on. Never use
+   * it for a link that outlives the request.
+   */
+  authOrigin(requestOrigin: string): Promise<string>;
   /** The value the System page shows and edits; `null` when no browser reported one. */
   stored(): Promise<StoredPublicOrigin | null>;
   /**
@@ -68,20 +81,20 @@ export function createPublicOriginResolver(options: PublicOriginOptions): Public
     async resolve() {
       const configured = configuredBase(options.config?.publicBaseUrl);
       if (configured !== undefined) {
-        return { url: configured, source: "config", confirmed: true };
+        return { url: configured, source: "config" };
       }
       const platform = detectPublicBaseUrl(options.env ?? process.env);
       if (platform !== undefined) {
-        return { url: platform, source: "platform", confirmed: true };
+        return { url: platform, source: "platform" };
       }
       const stored = await store.read();
-      if (stored === null) {
-        return null;
-      }
-      return { url: stored.origin, source: "admin", confirmed: stored.confirmed };
+      return stored?.confirmed === true ? { url: stored.origin, source: "admin" } : null;
     },
     async url() {
       return (await resolver.resolve())?.url;
+    },
+    async authOrigin(requestOrigin) {
+      return (await resolver.url()) ?? requestOrigin;
     },
     stored: async () => await store.read(),
     report: async (origin, userId) => await store.report(origin, userId),

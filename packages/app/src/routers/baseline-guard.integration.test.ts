@@ -125,6 +125,17 @@ describe("approval guard for changed baselines", () => {
     expect(await new BaselineModel(db).getFor("p1", "a", "desktop", "feature/x")).not.toBeNull();
   });
 
+  it("refuses with 409 on a cancelled build: nothing is promoted to a baseline", async () => {
+    const { app, db } = await setup();
+    await db.update(db.tables.builds, "f1", { status: "cancelled" });
+
+    const response = await post(app, "f1/snapshots/sf1/approve");
+
+    expect(response.status).toBe(409);
+    expect((await new SnapshotModel(db).get("sf1"))?.status).toBe("changed");
+    expect(await new BaselineModel(db).getFor("p1", "a", "desktop", "feature/x")).toBeNull();
+  });
+
   it("refuses with 409 when the baseline changed after the diff", async () => {
     const { app, db } = await setup();
     await moveMainBaseline(db);

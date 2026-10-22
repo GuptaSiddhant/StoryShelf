@@ -47,8 +47,11 @@ export interface NotificationChannel {
   lastError?: string;
 }
 
-/** What a `state` provider shows for a build: pending, passed or failed. */
-export type NotifierState = "pending" | "success" | "failure";
+/**
+ * What a `state` provider shows for a build: pending, passed, failed, or cancelled by a user
+ * (a host without a cancelled state shows it like the nearest failure-class state).
+ */
+export type NotifierState = "pending" | "success" | "failure" | "cancelled";
 
 /** Where a `state` provider writes: a commit status or a pull-request comment. */
 export type NotifierStateTarget =

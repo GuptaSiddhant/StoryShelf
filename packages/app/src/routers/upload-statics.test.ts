@@ -1,4 +1,4 @@
-import type { CaptureJob, PollableCaptureQueue } from "@storyshelf/core/adapter/capture-queue";
+import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { SCRATCH_DIRNAME } from "@storyshelf/core/capture";
 import { BuildModel, CaptureJobModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
@@ -10,6 +10,25 @@ import { join } from "node:path";
 import { pino } from "pino";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "../index.tsx";
+import { stubRunner } from "../test-runner.ts";
+
+vi.mock("../job-queue.ts", async (original) => {
+  const real = await original<typeof import("../job-queue.ts")>();
+  return {
+    ...real,
+    // Enqueue and cancel as usual, but hand no job out: no consumer races the assertions.
+    createJobQueue: (...args: Parameters<typeof real.createJobQueue>) => {
+      const queue = real.createJobQueue(...args);
+      return {
+        ...queue,
+        get: () => ({
+          ...queue.get(),
+          poll: async () => await new Promise<null>((resolve) => setTimeout(resolve, 100, null)),
+        }),
+      };
+    },
+  };
+});
 
 const silentLogger = pino({ level: "silent" });
 
@@ -20,45 +39,10 @@ function storybookZip(): Buffer {
   return zip.toBuffer();
 }
 
-function makeQueue(): { queue: PollableCaptureQueue; jobs: CaptureJob[] } {
-  const jobs: CaptureJob[] = [];
-  const queue: PollableCaptureQueue = {
-    metadata: {
-      name: "Test Queue",
-      version: "0.0.0",
-      description: "Recording test double",
-      kind: "test",
-      category: "capture-queue",
-    },
-    enqueue: async (job: CaptureJob) => {
-      jobs.push(job);
-      await Promise.resolve();
-    },
-    status: async () => {
-      await Promise.resolve();
-      return null;
-    },
-    active: async () => {
-      await Promise.resolve();
-      return [];
-    },
-    recent: async () => {
-      await Promise.resolve();
-      return [];
-    },
-    // Enqueue-only double: nothing is ever delivered.
-    poll: async () => {
-      await Promise.resolve();
-      return null;
-    },
-    ack: async () => {
-      await Promise.resolve();
-    },
-    nack: async () => {
-      await Promise.resolve();
-    },
-  };
-  return { queue, jobs };
+/** Build ids of the capture jobs queued on the app's database. */
+async function queuedCaptures(db: DatabaseAdapter): Promise<string[]> {
+  const rows = await db.list(db.tables.captureJobs);
+  return rows.filter((row) => row["kind"] === "capture").map((row) => String(row["buildId"]));
 }
 
 async function uploadZip(
@@ -151,19 +135,18 @@ describe("upload inline statics", () => {
   it("persists statics inline for small zips", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const { queue, jobs } = makeQueue();
     const app = createShelfApp({
       database: db,
       storage,
       logger: silentLogger,
-      testing: { queue },
+      testing: { runner: stubRunner() },
       config: { scratchDir, maxInlineUnzipSize: 1024 * 1024 },
     });
     const { slug, id: projectId } = await setupProject(app);
     const zip = storybookZip();
     const { buildId, status } = await uploadZip(app, slug, zip, String(zip.length));
     expect(status).toBe(202);
-    expect(jobs.map((job) => job.buildId)).toContain(buildId);
+    expect(await queuedCaptures(db)).toContain(buildId);
     expect(await storage.exists(`${storybookDir(projectId, buildId)}/iframe.html`)).toBe(true);
     // Capture will run, so publishing leaves the status to it (no auto-accept).
     expect((await new BuildModel(db).get(buildId))?.status).toBe("pending");
@@ -177,19 +160,18 @@ describe("upload inline statics", () => {
   it("defers large zips to capture", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const { queue, jobs } = makeQueue();
     const app = createShelfApp({
       database: db,
       storage,
       logger: silentLogger,
-      testing: { queue },
+      testing: { runner: stubRunner() },
       config: { scratchDir, maxInlineUnzipSize: 10 },
     });
     const { slug, id: projectId } = await setupProject(app);
     const zip = storybookZip();
     const { buildId, status } = await uploadZip(app, slug, zip, String(zip.length));
     expect(status).toBe(202);
-    expect(jobs.map((job) => job.buildId)).toContain(buildId);
+    expect(await queuedCaptures(db)).toContain(buildId);
     expect(await storage.exists(`${storybookDir(projectId, buildId)}/iframe.html`)).toBe(false);
   });
 
@@ -313,19 +295,18 @@ describe("upload inline statics", () => {
   it("still returns 202 when inline extraction fails", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const { queue, jobs } = makeQueue();
     const app = createShelfApp({
       database: db,
       storage,
       logger: silentLogger,
-      testing: { queue },
+      testing: { runner: stubRunner() },
       config: { scratchDir, maxInlineUnzipSize: 1024 * 1024 },
     });
     const { slug, id: projectId } = await setupProject(app);
     const garbage = Buffer.from("definitely-not-a-zip");
     const { buildId, status } = await uploadZip(app, slug, garbage, String(garbage.length));
     expect(status).toBe(202);
-    expect(jobs.map((job) => job.buildId)).toContain(buildId);
+    expect(await queuedCaptures(db)).toContain(buildId);
     expect(await storage.exists(`${storybookDir(projectId, buildId)}/iframe.html`)).toBe(false);
     // Capture will backfill, so a failed inline publish leaves the status to it.
     expect((await new BuildModel(db).get(buildId))?.status).toBe("pending");

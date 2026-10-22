@@ -27,7 +27,7 @@ Which engines each build is captured on and which [modes](/guides/modes/) run. *
 With `testing` on, **Settings → Tests** (project admins; `executePlay`, `playTimeoutMs` and `runA11y` on `PATCH /api/v1/projects/:slug`, also accepted on create):
 
 - **Interaction tests** (`executePlay`, default off): run each story's `play` function before the screenshot; a failing `play` blocks the build. See [Interaction testing](/guides/interaction-testing/).
-- **Accessibility checks (axe)** (`runA11y`, default **on**): every captured story is scanned with axe-core (WCAG A/AA and best-practice rules, honouring `parameters.a11y`). Violations are shown with the snapshot in [review](/guides/review/#accessibility-results) and on the component page and never block a build. Turn it off to skip the scan and its cost (about 150 ms per story and viewport). Projects created before this setting existed keep the value their database holds.
+- **Accessibility checks (axe)** (`runA11y`, default **on**): every story captured on the project's primary browser (the first in its list) is scanned with axe-core (WCAG A/AA and best-practice rules, honouring `parameters.a11y`). Violations are shown with the snapshot in [review](/guides/review/#accessibility-results) and on the component page and never block a build. Turn it off to skip the scan and its cost (about 150 ms per story and viewport). Projects created before this setting existed keep the value their database holds.
 
 ## Review
 

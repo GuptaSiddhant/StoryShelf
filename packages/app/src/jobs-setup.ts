@@ -1,10 +1,8 @@
 /**
  * Background jobs of the app (ADR 0006): the one database queue, the handlers of its job kinds
  * (`capture` with `testing`, `publish` on a long-running host, `notify` on a queue of its own) and the one consumer that runs
- * them. A supplied `testing.queue` replaces the database queue for captures and gets its own
- * consumer when this instance renders; publishing stays on the database queue.
+ * them.
  */
-import type { PollableCaptureQueue } from "@storyshelf/core/adapter/capture-queue";
 import {
   DEFAULT_RETRIES,
   NOTIFY_MAX_ATTEMPTS,
@@ -16,7 +14,7 @@ import type { ShelfOptions } from "@storyshelf/core/config";
 import { DEFAULT_SCRATCH_DIR } from "@storyshelf/core/config";
 import type { Build, CaptureJobKind, Project } from "@storyshelf/core/schema";
 import { setupBuildState, type BuildStateWiring } from "./build-state-setup.ts";
-import { setupCapture, type CaptureHandler, type CaptureWiring } from "./capture-setup.ts";
+import { setupCapture, type CaptureWiring } from "./capture-setup.ts";
 import { combineConsumers, jobMetrics, lazyConsumer } from "./consumer-setup.ts";
 import { createJobCanceller, type JobCanceller } from "./job-canceller.ts";
 import { createJobQueue, type JobQueue } from "./job-queue.ts";
@@ -78,13 +76,13 @@ export function setupJobs(
     capturesHere: capture.handler !== null,
     publish: publishing,
     buildState: buildState.publisher,
-    cancelBuildJobs: createJobCanceller([jobs.view, options.testing?.queue]),
+    cancelBuildJobs: createJobCanceller([jobs.view]),
     consumer: combineConsumers(consumersOf(options, runtime, jobs, wiring)),
   };
 }
 
 /**
- * The database queue (captures without a supplied queue, publishing on a long-running host) and,
+ * The database queue (captures with `testing`, publishing on a long-running host) and,
  * on a long-running host, a queue of its own for `notify` jobs: a status must not wait behind a
  * capture that holds every slot for minutes.
  */
@@ -93,7 +91,7 @@ function queuesFor(
   serverless: boolean,
 ): { jobs: JobQueue; notifyJobs: JobQueue | null } {
   const testing = options.testing;
-  const databaseCaptures = testing?.runner !== undefined && testing.queue === undefined;
+  const databaseCaptures = testing?.runner !== undefined;
   const kinds: CaptureJobKind[] = [
     ...(databaseCaptures ? (["capture"] as const) : []),
     ...(serverless ? [] : (["publish"] as const)),
@@ -117,7 +115,6 @@ function consumersOf(
   },
 ): CaptureConsumer[] {
   const { capture, publishing, buildState, notifyJobs } = wiring;
-  const supplied = options.testing?.queue;
   return [
     ...(jobs.kinds.length > 0
       ? [databaseConsumer(options, runtime, jobs, { capture, publishing })]
@@ -125,13 +122,10 @@ function consumersOf(
     ...(buildState.handler !== null && notifyJobs !== null
       ? [notifyConsumer(runtime, notifyJobs, buildState.handler)]
       : []),
-    ...(supplied !== undefined && capture.handler !== null
-      ? [suppliedQueueConsumer(options, runtime, { queue: supplied, handler: capture.handler })]
-      : []),
   ];
 }
 
-/** The consumer of the database queue: captures (without a supplied queue) and publish jobs. */
+/** The consumer of the database queue: capture and publish jobs. */
 function databaseConsumer(
   options: ShelfOptions,
   runtime: ServerRuntime,
@@ -192,29 +186,6 @@ function notifyConsumer(
         await queue.built()?.lifecycle.teardown();
       },
     ],
-  );
-}
-
-/** The consumer of a supplied `testing.queue`: it runs `capture` jobs only. */
-function suppliedQueueConsumer(
-  options: ShelfOptions,
-  runtime: ServerRuntime,
-  supplied: { queue: PollableCaptureQueue; handler: CaptureHandler },
-): CaptureConsumer {
-  const { queue, handler } = supplied;
-  return lazyConsumer(
-    () => ({
-      queue,
-      handlers: { capture: handler },
-      config: {
-        concurrency: options.testing?.concurrency,
-        maxRetries: options.testing?.retries ?? DEFAULT_RETRIES,
-      },
-      scratchDir: runtime.config.scratchDir ?? DEFAULT_SCRATCH_DIR,
-      metrics: jobMetrics(),
-      logger: runtime.logger.child({ component: "capture-consumer" }),
-    }),
-    [async () => await handler.close?.()],
   );
 }
 

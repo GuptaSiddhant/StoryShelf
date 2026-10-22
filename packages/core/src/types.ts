@@ -7,6 +7,7 @@ export const BUILD_STATUSES = [
   "approved",
   "rejected",
   "failed",
+  "cancelled",
 ] as const;
 
 /** Lifecycle status of a build. */
@@ -27,14 +28,19 @@ export type SnapshotStatus = (typeof SNAPSHOT_STATUSES)[number];
 
 /**
  * Build statuses considered terminal for retention purging.
- * Only builds that have finished review (`approved`, `rejected`, `failed`)
+ * Only builds that have finished review (`approved`, `rejected`, `failed`, `cancelled`)
  * are eligible for TTL-based cleanup; `pending`/`reviewing` builds are kept.
  */
-export const TERMINAL_BUILD_STATUSES: readonly BuildStatus[] = ["approved", "rejected", "failed"];
+export const TERMINAL_BUILD_STATUSES: readonly BuildStatus[] = [
+  "approved",
+  "rejected",
+  "failed",
+  "cancelled",
+];
 
 /**
  * Statuses of a build whose capture or compare work may still run: a user may cancel it (the build
- * then fails; there is no separate `cancelled` build status).
+ * then ends `cancelled`, a terminal status no capture write moves it out of again).
  */
 export const CANCELLABLE_BUILD_STATUSES: readonly BuildStatus[] = [
   "pending",

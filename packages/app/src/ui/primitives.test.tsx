@@ -22,6 +22,7 @@ import {
   SubNavLayout,
   Table,
   Thumbnail,
+  statusTone,
 } from "./components.tsx";
 import { Style } from "./css.ts";
 import { iconSpriteHref } from "./icons/sprite.ts";
@@ -334,5 +335,13 @@ describe("alignment guards", () => {
     const html = await render(<Card fill>Body</Card>);
     expect(html).toContain("ss-card-column-");
     expect(html).toMatch(/flex-direction:column/u);
+  });
+});
+
+describe("statusTone", () => {
+  it("shows a cancelled build neutral: neither a failure nor a success", () => {
+    expect(statusTone("cancelled")).toBe("neutral");
+    expect(statusTone("failed")).toBe("danger");
+    expect(statusTone("approved")).toBe("success");
   });
 });

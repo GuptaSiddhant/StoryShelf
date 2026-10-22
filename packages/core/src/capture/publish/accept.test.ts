@@ -45,7 +45,14 @@ describe("publishVerdict", () => {
   });
 
   it("is idempotent: a build that left pending keeps its status", () => {
-    for (const status of ["approved", "failed", "reviewing", "rejected", "capturing"]) {
+    for (const status of [
+      "approved",
+      "failed",
+      "cancelled",
+      "reviewing",
+      "rejected",
+      "capturing",
+    ]) {
       expect(publishVerdict({ ...base, status })).toBe("unchanged");
       expect(publishVerdict({ ...base, status, published: false })).toBe("unchanged");
       expect(publishVerdict({ ...base, status, defaultBranch: false, reviewEnabled: false })).toBe(

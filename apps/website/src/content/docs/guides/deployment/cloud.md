@@ -7,14 +7,14 @@ StoryShelf is **cross-runtime**: the core router (`createShelfApp`) uses only We
 
 ## Mix-and-match layers
 
-| Platform               | Database                                                      | Storage                               | Testing                                  | Auth               | Server entry                   |
-| ---------------------- | ------------------------------------------------------------- | ------------------------------------- | ---------------------------------------- | ------------------ | ------------------------------ |
-| **Vercel**             | `@storyshelf/db-sqlite/turso` (Turso/libSQL)                  | `@storyshelf/storage-s3` (R2/S3)      | Hosting only (no `testing`)              | `@storyshelf/auth` | Hono + `@hono/vercel-edge`     |
-| **Cloudflare Workers** | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage-s3` (R2)         | Hosting only (no `testing`)              | `@storyshelf/auth` | Hono + Workers entry           |
-| **Azure Functions**    | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage-s3` (Azure Blob) | Hosting only (no `testing`)              | `@storyshelf/auth` | Hono + Azure Functions handler |
-| **AWS Lambda**         | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage-s3` (S3)         | Hosting only (no `testing`)              | `@storyshelf/auth` | Hono + Lambda handler          |
-| **Deno Deploy**        | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage-s3` (R2/S3)      | Hosting only (no `testing`)              | `@storyshelf/auth` | Hono + Deno entry              |
-| **Bun**                | `@storyshelf/db-sqlite` or `@storyshelf/db-sqlite/bun-sqlite` | `storage-local` or `storage-s3`       | `testing` (long-running host)            | `@storyshelf/auth` | Hono + Bun.serve               |
+| Platform               | Database                                                      | Storage                               | Testing                       | Auth               | Server entry                   |
+| ---------------------- | ------------------------------------------------------------- | ------------------------------------- | ----------------------------- | ------------------ | ------------------------------ |
+| **Vercel**             | `@storyshelf/db-sqlite/turso` (Turso/libSQL)                  | `@storyshelf/storage-s3` (R2/S3)      | Hosting only (no `testing`)   | `@storyshelf/auth` | Hono + `@hono/vercel-edge`     |
+| **Cloudflare Workers** | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage-s3` (R2)         | Hosting only (no `testing`)   | `@storyshelf/auth` | Hono + Workers entry           |
+| **Azure Functions**    | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage-s3` (Azure Blob) | Hosting only (no `testing`)   | `@storyshelf/auth` | Hono + Azure Functions handler |
+| **AWS Lambda**         | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage-s3` (S3)         | Hosting only (no `testing`)   | `@storyshelf/auth` | Hono + Lambda handler          |
+| **Deno Deploy**        | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage-s3` (R2/S3)      | Hosting only (no `testing`)   | `@storyshelf/auth` | Hono + Deno entry              |
+| **Bun**                | `@storyshelf/db-sqlite` or `@storyshelf/db-sqlite/bun-sqlite` | `storage-local` or `storage-s3`       | `testing` (long-running host) | `@storyshelf/auth` | Hono + Bun.serve               |
 
 ## Serverless: Storybook hosting only
 
@@ -31,8 +31,6 @@ StoryShelf is **cross-runtime**: the core router (`createShelfApp`) uses only We
 - **Override.** `STORYSHELF_ALLOW_SERVERLESS=1` silences both, for a host that looks serverless but keeps a process alive.
 - **Cloudflare D1.** The `@storyshelf/db-sqlite/d1` preset is a Workers-only binding, so it cannot back an instance with `testing.runner`; `createShelfApp` throws at boot. Turso over the network can.
 - **Uploads.** With no consumer on the host, a zip over `maxInlineUnzipSize` is refused with `413`, and `storyshelf upload` falls back to the file-by-file route by itself.
-
-An instance that only hands jobs to a `testing.queue` of your own (no `testing.runner`) renders nothing in its own process, so neither check applies to it. Capture then runs wherever you run a consumer for that queue (`createCaptureConsumer` from `@storyshelf/core/capture`).
 
 ## Minimal Turso + S3 recipe (long-running host with `testing`)
 

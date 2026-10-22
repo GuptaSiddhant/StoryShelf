@@ -60,12 +60,7 @@ function pushAll(targets: ProbeTarget[], adapters: ReadonlyArray<ProbeTarget | u
 
 function targetsOf(sources: AdapterSetupSources): ProbeTarget[] {
   const targets: ProbeTarget[] = [];
-  pushAll(targets, [
-    sources.database,
-    sources.storage,
-    sources.captureRunner,
-    sources.captureQueue,
-  ]);
+  pushAll(targets, [sources.database, sources.storage, sources.captureRunner]);
   pushAll(targets, sources.design ?? []);
   pushAll(targets, sources.notifiers ?? []);
   pushTarget(targets, sources.emailSender);

@@ -24,18 +24,41 @@ afterEach(() => {
 describe("inPageReadA11yParameters (as serialized)", () => {
   const read = asSerialized(inPageReadA11yParameters);
 
-  it("returns the JSON-serialisable subset of the current story's parameters.a11y", () => {
+  it("returns plain data, dropping function values and items that held only one", () => {
     scope["__STORYBOOK_PREVIEW__"] = {
       currentRender: {
         story: {
-          parameters: { a11y: { disable: false, config: { rules: [{ id: "x" }] }, fn: () => 1 } },
+          parameters: {
+            a11y: {
+              disable: false,
+              fn: () => 1,
+              config: { rules: [{ id: "x", matches: () => true }, { matches: () => true }, 3] },
+            },
+          },
         },
       },
     };
-    expect(read()).toEqual({ disable: false, config: { rules: [{ id: "x" }] } });
+    expect(read()).toEqual({
+      params: { disable: false, config: { rules: [{ id: "x" }, 3] } },
+      dropped: 3,
+    });
   });
 
-  it("returns undefined without a preview, without a11y, or when unserialisable", () => {
+  it("keeps empty objects and arrays the author wrote", () => {
+    scope["__STORYBOOK_PREVIEW__"] = {
+      currentRender: { story: { parameters: { a11y: { config: {}, options: { rules: [] } } } } },
+    };
+    expect(read()).toEqual({ params: { config: {}, options: { rules: [] } }, dropped: 0 });
+  });
+
+  it("returns undefined for a parameter that is only a function", () => {
+    scope["__STORYBOOK_PREVIEW__"] = {
+      currentRender: { story: { parameters: { a11y: () => 1 } } },
+    };
+    expect(read()).toBeUndefined();
+  });
+
+  it("returns undefined without a preview, without a11y, or when unreadable", () => {
     expect(read()).toBeUndefined();
     scope["__STORYBOOK_PREVIEW__"] = { currentRender: { story: { parameters: {} } } };
     expect(read()).toBeUndefined();

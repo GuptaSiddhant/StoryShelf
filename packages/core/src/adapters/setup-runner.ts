@@ -52,7 +52,6 @@ function pushAll(
   pushHook(entries, sources.database, hook);
   pushHook(entries, sources.storage, hook);
   pushHook(entries, sources.captureRunner, hook);
-  pushHook(entries, sources.captureQueue, hook);
   for (const provider of sources.design ?? []) {
     pushHook(entries, provider, hook);
   }
@@ -91,7 +90,6 @@ export function bindAdapterLoggers(sources: AdapterSetupSources, logger: Logger)
     sources.database,
     sources.storage,
     sources.captureRunner,
-    sources.captureQueue,
     ...(sources.design ?? []),
     ...(sources.notifiers ?? []),
     sources.emailSender,

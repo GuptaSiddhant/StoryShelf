@@ -63,8 +63,7 @@ that is already merged is captured like any other (there is no `isMerged` check)
   presets.
 - **`@storyshelf/notify-chat`** is zero-dependency, `fetch` only: `slack-webhook`,
   `teams-workflow`, `log` (Mattermost and Discord can follow as renderers).
-- **`@storyshelf/notify-git`** is zero-dependency like `notify-chat` (calls go through `httpJson`, no
-  `@octokit`): `github`, `gitlab`, and a `git-log` provider for tests and local runs (`log` is taken
+- **`@storyshelf/notify-git`** is zero-dependency like `notify-chat` (calls go through `httpJson`): `github`, `gitlab`, and a `git-log` provider for tests and local runs (`log` is taken
   by `notify-chat`, and provider kinds are unique across packages).
 
 They are packages, not part of `@storyshelf/core`, because core carries none of the provider code or
@@ -103,7 +102,11 @@ channel's prefix, absolute links from the resolved public origin and the `testin
 the statuses and the pull-request comment. Its details:
 
 - `testing` is `pending` while the build is captured and while review is open (the description
-  counts the changes left), `success` when approved, `failure` when rejected or capture failed.
+  counts the changes left), `success` when approved, `failure` when rejected or capture failed,
+  `cancelled` (description `Cancelled`) when a user cancelled the build. `review` closes the same
+  way. `NotifierState` gains `cancelled`; the providers map it to the host's nearest state: GitLab
+  `canceled`, GitHub `error` (it has no cancelled commit state). The pull-request comment says
+  `Cancelled` on the gate line.
 - `storybook` is `success` once the build's published Storybook exists (its manifest is the marker,
   because it is written last), `failure` for a `failed` build that never published, and `pending`
   otherwise. Capture failing does not fail it: the Storybook is published independently (ADR 0006).
@@ -188,7 +191,8 @@ retries are non-goals for them. While no public origin resolves they are not sen
 
 One topic catalog serves webhooks and notifiers.
 
-- **Project topics:** `build:*`, `baseline:*`, `comment:created`, `review:requested`,
+- **Project topics:** `build:*` (including `build:cancelled`, raised by a user cancel; never
+  default-on and never `build:failed`), `baseline:*`, `comment:created`, `review:requested`,
   `review:comment`, `review:verdict`, `insight:ready` (ADR 0016 AI Insights).
 - **Admin topics:** `sys:user-created`, `sys:invite-issued`, `sys:auth-failed`,
   `sys:capture-failed`, `sys:purge-completed`, `sys:notify-failed`, `sys:ai-budget` (ADR 0016).
@@ -215,7 +219,7 @@ on by default for a project's approvers and admins and switchable off per user (
 Owner decision (#265): every notification carries or targets an absolute link, so none is sent while
 the public origin resolver (ADR 0007, decision 6) finds no origin. The resolver's own semantics
 decide what "resolved" means: `publicBaseUrl`, the platform address, or the origin an admin's browser
-reported (stored; an unconfirmed report already counts). Covered: git statuses and the pull-request
+confirmed (stored; a report nobody confirmed does not count, ADR 0007). Covered: git statuses and the pull-request
 comment, and every message notification (project events, review events, site-wide `sys:*` alerts) to
 chat, email and log channels and per-user subscriptions. Not covered: signed webhooks, which carry
 ids and no links, and authentication mail (invites, password reset), which is not a notification
@@ -226,7 +230,7 @@ pause is not a delivery failure), the System page, the project notification sett
 page show "Notifications are paused until a public URL is set; set `PUBLIC_BASE_URL` or confirm the
 detected origin", and one `warn` line is logged at boot and the first time a notification is
 skipped. A request dropped while paused is not replayed, with one exception: when an admin confirms
-or reports the first origin on the System page, the state of every recent build still `pending`,
+the first origin on the System page, the state of every recent build still `pending`,
 `capturing`, `comparing` or `reviewing` is requested again (`requestOpenBuildStates`). A host that
 gets its origin through configuration (`PUBLIC_BASE_URL`, needs a restart) delivers from the next
 state change on. A `notify` job that finds the origin gone when it runs is acknowledged and writes

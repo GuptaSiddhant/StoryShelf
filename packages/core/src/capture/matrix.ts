@@ -18,6 +18,7 @@ import { storeScreenshot } from "../utils/screenshot-store.ts";
 import { isFlakyStory, type StoryEntry, type Viewport } from "./adapter.ts";
 import { partitionAffectedStories, type InheritedStory } from "./affected.ts";
 import { mirrorAttemptLog, type AttemptMirror } from "./attempt-logger.ts";
+import { primaryTargetOf, resolveBrowsers } from "./browsers.ts";
 import { assertScreenshotBuffer } from "./guards.ts";
 import { renderIsolating, type IsolationNote, type PassOutcome } from "./isolate.ts";
 import type { PipelineTables } from "./pipeline.ts";
@@ -344,7 +345,7 @@ function renderRequest(
     logger: progress.mirror.logger,
     executePlay: project.executePlay ?? false,
     playTimeoutMs: project.playTimeoutMs ?? 10_000,
-    runA11y: project.runA11y ?? true,
+    runA11y: (project.runA11y ?? true) && browser === primaryTargetOf(resolveBrowsers(project)),
     target: browser,
   };
 }

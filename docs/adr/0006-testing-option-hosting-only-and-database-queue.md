@@ -64,7 +64,6 @@ interface TestingOptions {
   shardSize?: number; // ADR 0005
   retries?: number; // default 2 (decision 11)
   storybookUrlRateLimit?: number; // requests a minute per IP on the signed Storybook URL route (ADR 0007); default 6000
-  queue?: PollableCaptureQueue; // replaces the database queue (decision 6)
   workerEntry?: string; // forked capture (decision 5)
   mode?: "auto" | "in-process" | "fork";
 }
@@ -227,11 +226,24 @@ third-party `DatabaseAdapter` implementations, which is accepted.
   `LeaseRenewal` gains `"cancelled"`, which `extend` and the new non-renewing
   `PollableCaptureQueue.inspect` report. The API and UI are `POST /api/v1/projects/:slug/builds/:id/cancel`
   (class `testing`; developer role and above) and **Cancel build** on the build page, offered while
-  the build is `pending`, `capturing` or `comparing`: the jobs are cancelled first (a supplied
-  `testing.queue` is asked too), open capture attempts end `cancelled`, then the build becomes
-  `failed` (there is no `cancelled` build status) through `announceBuildStatus`, so git channels,
-  webhook and notifications see an ordinary failure. A capture that is still running stops within
-  the 5 s cancel check; until then it may still write a progress status to the build.
+  the build is `pending`, `capturing` or `comparing`: the jobs are cancelled first, open capture attempts end `cancelled`, then the build becomes
+  `cancelled` through `announceBuildStatus`, so git channels (`statusesForBuild` has a case for it:
+  GitLab `canceled`, GitHub `error`, description `Cancelled`, on `<prefix>/testing` or
+  `<prefix>/review` alike), the `build:cancelled` webhook and notification topic (not default-on)
+  report a cancel, never a failure; a user cancel raises no `build:failed` and no `sys:capture-failed`
+  alert. `cancelled` is a build status of its own and **terminal**: `BuildModel.update`/`setStatus`
+  refuse any other status for a cancelled build (the row is returned unchanged, logged at debug),
+  `CaptureAttemptModel.markRunning`/`markFinished` leave an attempt a cancel closed as `cancelled`,
+  `finalizeBuild` skips a cancelled build (counts and orphan baselines untouched), the orchestrator
+  does not start capturing one, and snapshot approval and build verdicts answer 409. A capture that
+  is still running stops within the 5 s cancel check, and whatever it writes until then cannot move
+  the build off `cancelled`, so there is no window of late status writes. The one way out is a retry
+  (`POST …/retry`, `BuildModel.resetStatus`), which resets the build to `pending` as for `failed`.
+  Cancelled builds are purged like failed ones (`TERMINAL_BUILD_STATUSES`) and never published or
+  accepted (`publishVerdict` leaves any status but `pending` alone). The status check and the write
+  are two statements, not one conditional update, so a write landing between them during a cancel is
+  possible in principle; the cancel flow cancels jobs and closes attempts first to keep that window
+  to a single in-flight write.
 - **Views.** `status`, `active` and `recent` read the table, so the compute-jobs page shows every
   instance's jobs.
 - **Trace propagation** (ADR 0015, Observability and Logging): `traceparent` and the request id travel
@@ -273,13 +285,14 @@ and is inside the app's trust boundary. Forked capture receives no new investmen
 and hang kills are counted, and it is retired when local engines stop being the recommended path or
 the metrics show no capture-caused restarts.
 
-### 6. No first-party queue adapters; the interfaces stay
+### 6. No queue adapters and no queue option; the interfaces stay
 
 There are no `queue-sqs`, `queue-redis`, `queue-azure` or `queue-gcp` packages; they are retired
 through the `docs/deprecated.md` process once the database queue passes the queue contract suite, a
-multi-instance test on Postgres, MySQL and Turso, and a same-host test on local SQLite. The
-`CaptureQueue` and `PollableCaptureQueue` interfaces and the contract suite stay exported, and
-`testing.queue` accepts one, so anyone can supply a queue.
+multi-instance test on Postgres, MySQL and Turso, and a same-host test on local SQLite. There is no
+`testing.queue` either: the database queue is the only queue, and `testing` without a `runner`
+throws. The `CaptureQueue` and `PollableCaptureQueue` interfaces and the contract suite stay
+exported, because the database queue and the forked child's queue implement them.
 
 The database queue asks one thing of the adapter, a unique-key insert whose conflict can be told
 apart, which the finalize claim already uses. Reasons for an external queue, weighed:
@@ -448,8 +461,8 @@ rows.
 **Negative**
 
 - A broad breaking change for existing deployments: the option shape, the retired worker and queue
-  packages, and no serverless deployment with `testing`. Operators using SQS or Redis queues move to
-  the database queue or supply their own `PollableCaptureQueue`.
+  packages, the retired `testing.queue` option, and no serverless deployment with `testing`. Operators
+  using SQS or Redis queues move to the database queue.
 - Lease code carries the race risks of any lease implementation and relies on the contract suite and
   multi-instance tests.
 - Database polling and lease writes grow with instance count; unmeasured, and for Turso also a

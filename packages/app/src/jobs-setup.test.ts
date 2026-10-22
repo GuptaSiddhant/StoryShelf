@@ -1,4 +1,3 @@
-import type { PollableCaptureQueue } from "@storyshelf/core/adapter/capture-queue";
 import { createDatabaseCaptureQueue } from "@storyshelf/core/capture";
 import type { ShelfOptions } from "@storyshelf/core/config";
 import { createShelfLogger } from "@storyshelf/core/logger";
@@ -17,29 +16,14 @@ function wire(testing?: ShelfOptions["testing"], env: NodeJS.ProcessEnv = {}) {
   return { db, wiring: setupJobs(options, resolveRuntime(options), env) };
 }
 
-function suppliedQueue(poll = vi.fn(async () => null)): PollableCaptureQueue {
-  return {
-    metadata: { name: "q", version: "0", kind: "sqs", category: "capture-queue" },
-    enqueue: vi.fn(async () => {}),
-    status: vi.fn(async () => null),
-    active: vi.fn(async () => []),
-    recent: vi.fn(async () => []),
-    poll,
-    ack: vi.fn(async () => {}),
-    nack: vi.fn(async () => {}),
-  } as unknown as PollableCaptureQueue;
-}
-
 describe("setupJobs", () => {
-  it("cancels a build's jobs of every kind and its supplied queue's too", async () => {
-    const supplied = { ...suppliedQueue(), cancel: vi.fn(async () => true) };
-    const { db, wiring } = wire({ queue: supplied });
+  it("cancels a build's jobs of every kind", async () => {
+    const { db, wiring } = wire({ runner: stubRunner() });
     const shared = createDatabaseCaptureQueue(db, { kinds: ["notify"] });
     await shared.enqueueJob({ kind: "notify", buildId: "b1" });
     await shared.enqueueJob({ kind: "publish", buildId: "b1" });
     await shared.enqueueJob({ kind: "notify", buildId: "b2" });
     expect(await wiring.cancelBuildJobs("b1")).toBe(true);
-    expect(supplied.cancel).toHaveBeenCalledWith("b1");
     expect((await shared.poll())?.buildId).toBe("b2");
     expect(await shared.poll()).toBeNull();
   });
@@ -81,36 +65,6 @@ describe("setupJobs", () => {
     expect(wiring.capturesHere).toBe(true);
     expect(wiring.publish.enqueuePublish).toBeUndefined();
     expect(wiring.consumer).not.toBeNull();
-  });
-
-  it("a supplied queue without a runner is enqueue-only; publishing still has its consumer", async () => {
-    const queue = suppliedQueue();
-    const { wiring } = wire({ queue });
-    expect(wiring.captureQueue).toBe(queue);
-    expect(wiring.capturesHere).toBe(false);
-    await wiring.enqueueCapture?.("build-1");
-    expect(queue.enqueue).toHaveBeenCalledTimes(1);
-    expect(wiring.consumer).not.toBeNull();
-    await wiring.consumer?.stop();
-  });
-
-  it("a supplied queue with a runner is consumed here too, next to the database queue", async () => {
-    const polled = Promise.withResolvers<null>();
-    const queue = suppliedQueue(
-      vi.fn(async () => {
-        polled.resolve(null);
-        await Promise.resolve();
-        return null;
-      }),
-    );
-    const { wiring } = wire({ queue, runner: stubRunner() });
-    expect(wiring.capturesHere).toBe(true);
-    const running = wiring.consumer?.start();
-    await polled.promise;
-    expect(wiring.consumer?.isRunning()).toBe(true);
-    await wiring.consumer?.stop();
-    await running;
-    expect(wiring.consumer?.isRunning()).toBe(false);
   });
 
   it("starts, serves a database job and drains", async () => {

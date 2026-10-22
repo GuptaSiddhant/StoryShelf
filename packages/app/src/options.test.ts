@@ -39,7 +39,11 @@ describe("createShelfApp testing, compare and notifications options", () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
     expect(() =>
-      createShelfApp({ database: db, storage, testing: { compare: { threads: -2 } } }),
+      createShelfApp({
+        database: db,
+        storage,
+        testing: { runner: runner(), compare: { threads: -2 } },
+      }),
     ).toThrow(/testing\.compare\.threads/u);
   });
 

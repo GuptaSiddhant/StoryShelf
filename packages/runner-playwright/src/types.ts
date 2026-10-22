@@ -81,6 +81,7 @@ export interface CaptureContext extends ScreenshotContext {
   executePlay?: boolean;
   playTimeoutMs?: number;
   runA11y?: boolean;
+  logger?: Logger;
   runtimeParams: RuntimeParamsState;
 }
 

@@ -1,6 +1,6 @@
 /**
  * The capture consumer (ADR 0006, decisions 4 and 11): consumes any `PollableCaptureQueue` (the
- * database queue, the IPC queue of a forked capture child, a remote queue) and runs a handler per
+ * database queue, the IPC queue of a forked capture child) and runs a handler per
  * job `kind`. A slot is taken before polling, a failing job is retried with exponential backoff
  * until its last attempt, the lease is kept by the job's progress, a lost lease or a cancel stops
  * the run, and `stop()` drains the jobs in flight.

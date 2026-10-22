@@ -58,7 +58,7 @@ builds (
   author_name         text,
   message             text,
   public              boolean NOT NULL DEFAULT false,  -- individual build override for public viewing
-  status              text NOT NULL DEFAULT 'pending',  -- pending|capturing|comparing|reviewing|approved|rejected|failed
+  status              text NOT NULL DEFAULT 'pending',  -- pending|capturing|comparing|reviewing|approved|rejected|failed|cancelled
   snapshot_count      integer NOT NULL DEFAULT 0,
   changed_count       integer NOT NULL DEFAULT 0,
   approved_count      integer NOT NULL DEFAULT 0,
@@ -91,7 +91,7 @@ snapshots (
   status              text NOT NULL DEFAULT 'pending',  -- pending|new|unchanged|changed|approved|rejected
   reviewed_by         text,
   reviewed_at         text,
-  a11y_violations     text,                    -- JSON array of the axe violation lines found on this capture (non-blocking); NULL when none
+  a11y_violations     text,                    -- JSON array of the axe violation lines found on this capture (non-blocking); NULL when none or not checked (axe runs on the primary target only; `browser` names the target)
   created_at          text NOT NULL,
   updated_at          text NOT NULL,
   baseline_id         text,                    -- baseline row the diff was computed against (NULL: none, or legacy row)
@@ -337,7 +337,7 @@ capture_jobs (
 -- capture_jobs_poll_idx (kind, visible_at, status): the poll probe; plus (job_id), (build_id), (entry, created_at)
 
 -- Site-wide key-value settings the app learns while running (ADR 0007, decision 6). Key 'public_origin'
--- holds JSON {origin, confirmed}: the origin a site admin's browser reported, written only by a
+-- holds JSON {origin, confirmed}: the origin a site admin's browser reported (confirmed: false until an admin confirms it), written only by a
 -- site-admin, CSRF-protected route
 site_settings (
   id          text PRIMARY KEY,                           -- the setting's key
@@ -482,7 +482,7 @@ Capture is CPU/IO-heavy and long-running (minutes to tens of minutes). It must n
 
 - `POST /builds` stores the zip and returns **202 Accepted** immediately.
 - The job goes on the **database queue** (`capture_jobs`, below). Every instance with `testing` consumes it, with a **configurable concurrency** (`testing.concurrency`, auto-sized by default).
-- A user can cancel a build that is `pending`, `capturing` or `comparing` (`POST …/builds/:id/cancel`, **Cancel build** on the build page): its jobs of every kind are cancelled, a running capture stops within the 5 s cancel check, and the build ends `failed` (there is no `cancelled` build status). The MCP server does not expose it.
+- A user can cancel a build that is `pending`, `capturing` or `comparing` (`POST …/builds/:id/cancel`, **Cancel build** on the build page): its jobs of every kind are cancelled, a running capture stops within the 5 s cancel check, and the build ends `cancelled` (a status of its own, terminal: later status writes from the capture path are refused, a retry resets it; `build:cancelled` is the event, git channels show it as `cancelled`). The MCP server does not expose it.
 - There is no boot sweep. A build left `capturing` by a killed instance is recovered by lease expiry: another instance claims the job again, and if every attempt (`testing.retries + 1`) is lost the job fails and `onExhausted` fails the build (`failCrashedCapture`: the attempt closes, the build becomes `failed`, a failure git status is posted, admins are alerted), so a crash loop cannot repeat captures forever and a second instance can boot without touching the first one's builds.
 
 #### Database queue (`capture_jobs`)
@@ -515,7 +515,7 @@ visible_at LIMIT 1`, a range scan of `capture_jobs_poll_idx`. Only candidates ha
    job and attempt rows; a build id covers every job kind of the build (capture, publish, notify).
 
 **Consumer** (`createCaptureConsumer`, `core/src/capture/consumer/`). Consumes any
-`PollableCaptureQueue` (this queue, the IPC queue of a forked child, a custom `testing.queue`) and runs a
+`PollableCaptureQueue` (this queue and the IPC queue of a forked child) and runs a
 handler per job `kind`: `capture` is wired to `createDispatchJob`; `publish` and `notify` register
 through `handlers`; a job whose kind has no handler is failed with `no handler registered for job
 kind "<kind>"`. A slot is taken before polling (the database queue uses `startPollLoop`, other
@@ -539,7 +539,7 @@ jitter). Tests: the pollable cases of `queueContractSuite` and `databaseQueueMul
 (`@storyshelf/core/test-helpers`) on the fake database, node:sqlite, PGlite and two OS processes on
 one SQLite file, plus gated live runs on Postgres, MySQL and Turso.
 
-> **Note on Architecture:** The `CaptureQueue` interface is fully asynchronous — `enqueue`, `status`, `active` and `recent` all return `Promise<T>` — so the same contract backs the database queue and any queue a deployment supplies as `testing.queue` (a `PollableCaptureQueue`, consumed in the app when there is a runner).
+> **Note on Architecture:** The `CaptureQueue` interface is fully asynchronous — `enqueue`, `status`, `active` and `recent` all return `Promise<T>` — so the same contract backs the database queue and the queue of a forked child. There is no `testing.queue` option: `testing` needs a `runner` and the database queue is the only queue.
 
 ### Story Source Adapter
 
@@ -709,11 +709,11 @@ With `testing` off (ADR 0013, decision 3) the verdicts in `build_reviews` decide
 
 A git channel (a `notification_channels` row whose provider declares `delivery: "state"`, ADR 0014) shows the build's current state on its `git_sha`: commit statuses and one pull-request comment. What it shows is a pure function of the build, `statusesForBuild` (`core/src/adapters/notifier/build-state.ts`), so a build that was never captured posts too:
 
-| Status               | Shown when                                                                 | State                                                                                                                                                  |
-| -------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `<prefix>/testing`   | `testing` is on                                                            | `pending` while captured or while review is open, `success` when all `new`/`changed` snapshots are approved, `failure` when rejected or capture failed |
-| `<prefix>/review`    | `testing` is off and the project has review on (`projects.review_enabled`) | `pending` until the build is decided, `success` once approved by verdicts, `failure` when rejected or failed (see Build-level review)                  |
-| `<prefix>/storybook` | every build with a commit                                                  | `success` linking the published Storybook, `failure` for a failed build that never published, else `pending`; informational                            |
+| Status               | Shown when                                                                 | State                                                                                                                                                                                               |
+| -------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<prefix>/testing`   | `testing` is on                                                            | `pending` while captured or while review is open, `success` when all `new`/`changed` snapshots are approved, `failure` when rejected or capture failed, `cancelled` when a user cancelled the build |
+| `<prefix>/review`    | `testing` is off and the project has review on (`projects.review_enabled`) | `pending` until the build is decided, `success` once approved by verdicts, `failure` when rejected or failed, `cancelled` when cancelled (see Build-level review)                                   |
+| `<prefix>/storybook` | every build with a commit                                                  | `success` linking the published Storybook, `failure` for a failed build that never published, else `pending`; informational                                                                         |
 
 The point of the `testing` status is to **block the merge**: the repo owner marks it as a _required check_ in GitHub branch protection (or a required pipeline/approval rule in GitLab), so a PR cannot merge until StoryShelf reports `success`. This is the v1 primitive.
 
@@ -775,7 +775,7 @@ Screenshots accumulate fast. Everything below the **baseline** is transient; the
 
 ### What is purged
 
-- **Builds in a terminal review state** (`approved`/`rejected`) older than `purge_ttl` (default 30 days).
+- **Builds in a terminal state** (`approved`/`rejected`/`failed`/`cancelled`) older than `purge_ttl` (default 30 days).
 - **Old builds of a branch**: retain the most recent build per branch (it is the branch's "current" state and powers the PR status link); purge older ones past TTL.
 - Builds stuck in `capturing`/`comparing`/`reviewing` are **not** purged (a `reviewing` build must not vanish before review).
 - **`pending` builds** (waiting for a review verdict, ADR 0013 decision 9; `core/src/retention/pending.ts`): purged once their last activity (the build's `updated_at`, its newest comment, its newest `build_reviews` row) is older than `purge_ttl`. A pending build replaced by a newer one on its branch with no attempts, comments or verdicts is "superseded" and leaves at the same window; the latest-per-branch rule does not shield pending builds, and persistent ones are kept. No new status.
@@ -799,7 +799,7 @@ Beyond diff review, StoryShelf publishes the uploaded Storybook build as a brows
 - Each build's `storybook/{buildId}/` statics are served as the browsable Storybook.
 - **Publishing does not depend on `testing`** (ADR 0006, decision 10; `core/src/capture/publish/`). A zip up to `maxInlineUnzipSize` (default 50 MB, counted while the upload streams) is extracted inline in the upload request; a larger one becomes a `publish` job on the database queue (`capture_jobs`), run by a consumer that every instance with a database starts at `lifecycle.setup()` and drains at `teardown()`. The file-by-file route (`/dedup`, `/content`, `/manifest`) needs no extraction and completes publishing when the manifest is stored. On a serverless host (`AWS_LAMBDA_FUNCTION_NAME`, `VERCEL`, `NETLIFY`) no consumer runs and an over-limit zip is refused with `413` pointing to the file-by-file route. Extraction is capped (`maxZipEntries` default 50 000, `maxUnzippedBytes` default 2 GiB, stream-counted) and refuses absolute and `..` paths.
 - **Acceptance when publishing ends** (`publishVerdict`, the single owner of the rule): with no capture to run, a published build on the project's default branch becomes `approved`, a failed publish makes it `failed`, and a non-default build becomes `approved` when the project has review off (`projects.review_enabled = false`) and stays `pending` for a build-level verdict otherwise. No approval event or webhook fires, and a build that left `pending` is never touched again. With a capture to run, publishing leaves the status to capture. `afterPublish` hooks (`PublishCompleter`) run after every publish for later features such as the catalog.
-- **`testing` gates the app** (ADR 0006, decisions 1, 3 and 8). `Store.testing` is `options.testing !== undefined`; `requireTesting` (`app/src/middleware/require-testing.ts`, mounted after `setupGate` and before the CSRF and rate-limit guards) takes the class of the last classified route Hono matched (`classOfRoute`) and answers 404 for `testing` routes when it is off (JSON under `/api/`, text elsewhere). Navigation (`projectNavItems`, settings tabs, the build table's Review button) hides what is off; the System page shows a notice with `countHiddenSnapshots`; `runBootTasks` logs the mode (`logHostingOnlyMode`); the create-build response carries `testing`, which `storyshelf upload` reports. `resolveShelfOptions` requires `runner` or `queue` with `testing` and refuses `testing.runner` on a database whose metadata says `supportsTesting: false` (D1); `assertServerless` (core) refuses `testing.runner` on AWS Lambda and warns on Vercel and Netlify, unless `STORYSHELF_ALLOW_SERVERLESS=1`. A remote-queue-only instance (`queue` without `runner`) is exempt from both checks.
+- **`testing` gates the app** (ADR 0006, decisions 1, 3 and 8). `Store.testing` is `options.testing !== undefined`; `requireTesting` (`app/src/middleware/require-testing.ts`, mounted after `setupGate` and before the CSRF and rate-limit guards) takes the class of the last classified route Hono matched (`classOfRoute`) and answers 404 for `testing` routes when it is off (JSON under `/api/`, text elsewhere). Navigation (`projectNavItems`, settings tabs, the build table's Review button) hides what is off; the System page shows a notice with `countHiddenSnapshots`; `runBootTasks` logs the mode (`logHostingOnlyMode`); the create-build response carries `testing`, which `storyshelf upload` reports. `resolveShelfOptions` requires `runner` with `testing` (`testing: {}` throws; there is no `testing.queue`) and refuses `testing` on a database whose metadata says `supportsTesting: false` (D1); `assertServerless` (core) refuses `testing.runner` on AWS Lambda and warns on Vercel and Netlify, unless `STORYSHELF_ALLOW_SERVERLESS=1`.
 - **The catalog** (`core/src/capture/catalog/`; ADR 0006, decision 9): the first `afterPublish` hook (`createCatalogHook`) reads the published `index.json` (`stories.json` on older Storybooks; test entries left out), writes the `build_components` rows and then `catalog.json` (the marker that cataloguing finished), whatever the build's verdict and with `testing` on or off. `createCatalogLoader` serves a build's catalog from `catalog.json` through an in-process LRU keyed by build id and catalogues a build without one lazily from its persisted statics; a build with no readable index has no catalog and its pages say so. Retention removes the rows with the build and the file with the build's prefix.
 - **Library, component and build pages read the catalog** in both modes; `testing` (`testingEnabled()` in `app/src/store.ts`: `Store.testing`, true when `options.testing` is set) layers snapshot data onto them. The library shows the latest build of the branch whatever its status.
 - **Component preview** (`ui/preview-embed.tsx`): click-to-load, in an `<iframe sandbox="allow-scripts">` (no `allow-same-origin`) created from an inert `<template>` by the shell script, so opening a page never runs a published Storybook. A sandboxed frame has an opaque origin, so its module scripts are cross-origin requests without cookies: published files answer `Access-Control-Allow-Origin: *` exactly when the build is viewable without credentials (public build, or an instance without sign-in); a private build under sign-in is not embedded (the page offers the link out). Storybook 8, 9 and 10 render under this sandbox.
@@ -891,7 +891,7 @@ GET    /api/v1/projects/:projectId/builds
 POST   /api/v1/projects/:projectId/builds          # multipart: storybook zip + sha/branch/message/author -> 202
 GET    /api/v1/projects/:projectId/builds/:buildId
 POST   /api/v1/projects/:projectId/builds/:buildId/retry   # re-run capture (flaky tests)
-POST   /api/v1/projects/:projectId/builds/:buildId/cancel  # cancel the build's jobs of every kind; the build ends failed (class testing)
+POST   /api/v1/projects/:projectId/builds/:buildId/cancel  # cancel the build's jobs of every kind; the build ends cancelled (class testing)
 DELETE /api/v1/projects/:projectId/builds/:buildId
 
 # Snapshots (read-only API, mutations via review endpoints)
@@ -1146,7 +1146,7 @@ StoryShelf ships a **fixed, server-rendered UI** — `hono/jsx` + HTMX + `hono/c
 - **Theme:** follows the system (`prefers-color-scheme`) with a manual light/dark override, persisted in a cookie so the server renders the correct theme on first paint.
 - **Brand config** is passed as `ui: { name, logo, theme }` to `createShelfApp` (see `ShelfOptions`). Env vars (`SS_BRAND_NAME`, `SS_LOGO_URL`) supply defaults so self-hosters can rebrand with a `docker run`, no code. The **favicon is not brandable**: the app always serves its own mark (`app/src/assets/mark.svg`, content-hashed under `/assets/`) so a StoryShelf tab is recognisable; `ui.favicon` is accepted for config compatibility but ignored. `ui.logo` defaults to the same mark.
 - **Auth UI text** lives in `ui.auth` (title, subtitle, password label/placeholder, submit label, `{label}` SSO template, help/footer) with `SS_AUTH_*` env defaults; the sidebar account menu links to the personal `/profile` page (editable display name, local password change, memberships).
-- **Public origin** (ADR 0007, decision 6): one resolver (`createPublicOriginResolver`, `core/src/models/public-origin.ts`) answers every absolute link built in the background (commit-status links, notification review links) and the OAuth callback URLs. It tries `config.publicBaseUrl` (`PUBLIC_BASE_URL`), then the platform's address from its environment (`detectPublicBaseUrl`, `core/src/utils/public-origin.ts`), then the origin a site admin's browser reported (the System page posts `location.origin`; first report wins; stored in `site_settings`; confirm, replace or forget on the System page). The `Host` header is never used for background links; only the interactive `/.well-known/openid-configuration` and OAuth redirect URIs fall back to the request's own address when nothing resolves. Without a resolved origin no notification is sent at all (ADR 0014, decision 11): git statuses and the pull-request comment are neither queued nor delivered, message notifications to chat, email and log channels are skipped, no channel is marked as errored, and the System page and notification settings say so. Webhooks (ids only) and auth mail are unaffected.
+- **Public origin** (ADR 0007, decision 6): one resolver (`createPublicOriginResolver`, `core/src/models/public-origin.ts`) answers every absolute link built in the background (commit-status links, notification review links) and the OAuth callback URLs. It tries `config.publicBaseUrl` (`PUBLIC_BASE_URL`), then the platform's address from its environment (`detectPublicBaseUrl`, `core/src/utils/public-origin.ts`), then the origin a site admin confirmed (the System page posts `location.origin`; the first report is stored in `site_settings` as unconfirmed and is **not used** until an admin confirms it; confirm, replace or forget on the System page). The `Host` header is never used for background links; only authentication, through `PublicOriginResolver.authOrigin(requestOrigin)` (the `/.well-known/openid-configuration` helper and OAuth redirect URIs), falls back to the request's own address when nothing is confirmed. Without a resolved origin no notification is sent at all (ADR 0014, decision 11): git statuses and the pull-request comment are neither queued nor delivered, message notifications to chat, email and log channels are skipped, no channel is marked as errored, and the System page and notification settings say so. Webhooks (ids only) and auth mail are unaffected.
 - **HTMX is vendored locally** (no CDN), so air-gapped deployments work.
 - **Review workspace:** a snapshot filmstrip with filters and progress, and a comparison stage with side-by-side, swipe, onion-skin, diff and flip modes plus zoom; a sticky action bar approves/rejects and auto-advances to the next open snapshot (keyboard: `j`/`k`, `a`/`r`, `1`–`5`, `f`, `t`, `?`). A small vanilla-JS layer (`app/src/ui/shell/*-script.ts`, idempotent across HTMX body swaps) covers the shell and review behaviour. The published-Storybook page is an `<iframe>` of Storybook's own static build.
 

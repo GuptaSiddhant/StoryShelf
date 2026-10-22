@@ -27,6 +27,7 @@ import { captureAcrossBrowsers } from "./matrix.ts";
 import { parseModesAllowlist } from "./modes.ts";
 import { persistCapture, type PipelineTables } from "./pipeline.ts";
 import type { CaptureProgress } from "./progress.ts";
+import type { ExtractionLimits } from "./publish/limits.ts";
 import { removeJobScratch } from "./scratch.ts";
 import { fanOutCapture } from "./shards/fan-out.ts";
 import { resolveViewports } from "./sizing.ts";
@@ -50,6 +51,8 @@ export interface CaptureJobOptions {
   storage: StorageAdapter;
   runner: CaptureRunner;
   scratchDir: string;
+  /** Entry and size caps of the zip extraction (`maxZipEntries`, `maxUnzippedBytes`); built-in defaults when unset. */
+  limits?: ExtractionLimits | undefined;
   viewports?: Viewport[];
   logger?: Logger;
   /** Server secret for decrypting webhook secrets at send time. */
@@ -131,7 +134,7 @@ export async function executeCaptureJob(
   input: CaptureJobInput,
   options: CaptureJobOptions,
 ): Promise<CaptureSummary> {
-  const builds = new BuildModel(options.db, options.tables);
+  const builds = new BuildModel(options.db, options.tables, options.logger);
   const { build, project } = await loadTarget(options, input.buildId);
   return await withSpan(
     "capture.job",
@@ -166,6 +169,10 @@ async function runCapturePhases(
     reqId: input.reqId,
     ...(input.attempt ? { attemptNo: input.attempt.attemptNo } : {}),
   });
+  if (build.status === "cancelled") {
+    logger?.info("build is cancelled; capture skipped");
+    return { storyCount: 0, failedCount: 0 };
+  }
   await builds.setStatus(build.id, "capturing");
 
   const startTime = performance.now();
@@ -191,6 +198,8 @@ async function runCapturePhases(
             options.scratchDir,
             project.id,
             build.id,
+            undefined,
+            options.limits,
           );
         }),
     );
@@ -209,7 +218,13 @@ async function runCapturePhases(
       "capture.persist-statics",
       async () =>
         await withSpan("capture.persist-statics", async () => {
-          await persistStorybookStatics(options.storage, storybookDir, project.id, build.id);
+          await persistStorybookStatics(
+            options.storage,
+            storybookDir,
+            project.id,
+            build.id,
+            options.db,
+          );
         }),
     );
     logger?.info(

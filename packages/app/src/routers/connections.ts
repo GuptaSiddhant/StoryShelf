@@ -40,10 +40,16 @@ function signingSecret(): string {
   return secret;
 }
 
-/** Callback URL; the public origin (ADR 0007) wins, the request's own address is the last resort. */
+/**
+ * Callback URL of an interactive, request-bound flow (ADR 0007): the confirmed public origin wins,
+ * the request's own address is the fallback authentication is allowed.
+ */
 async function redirectUri(c: Context, kind: string): Promise<string> {
   const { publicOrigin, config } = getStore();
-  const base = (await publicOrigin?.url()) ?? config.publicBaseUrl ?? new URL(c.req.url).origin;
+  const requestOrigin = new URL(c.req.url).origin;
+  const base = publicOrigin
+    ? await publicOrigin.authOrigin(requestOrigin)
+    : (config.publicBaseUrl ?? requestOrigin);
   return `${base.replace(/\/+$/u, "")}/connections/${kind}/callback`;
 }
 

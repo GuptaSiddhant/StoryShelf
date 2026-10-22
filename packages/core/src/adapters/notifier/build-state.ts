@@ -28,7 +28,7 @@ export interface BuildStateFlags {
 export interface BuildStateBuild {
   id: string;
   gitSha: string;
-  /** Build status: `pending`, `capturing`, `comparing`, `reviewing`, `approved`, `rejected`, `failed`. */
+  /** Build status: `pending`, `capturing`, `comparing`, `reviewing`, `approved`, `rejected`, `failed`, `cancelled`. */
   status: string;
   snapshotCount: number;
   changedCount: number;
@@ -170,6 +170,13 @@ function reviewClosed(input: BuildStateInput, url: string): DesiredStatus[] {
 
 type Outcome = Pick<DesiredStatus, "state" | "description">;
 
+/**
+ * A user cancelled the build (ADR 0006). It closes both gates the same way: the host shows
+ * `cancelled` where it has the state (GitLab `canceled`, GitHub `error`), so a required status does
+ * not wait for a result that will never come, and nothing says the build failed or was reviewed.
+ */
+const CANCELLED: Outcome = { state: "cancelled", description: "Cancelled" };
+
 /** `pending` until captured, `pending` while review is open, then the review's result. */
 function testingOutcome(build: BuildStateBuild): Outcome {
   switch (build.status) {
@@ -191,6 +198,9 @@ function testingOutcome(build: BuildStateBuild): Outcome {
     case "failed": {
       return { state: "failure", description: "Capture failed" };
     }
+    case "cancelled": {
+      return CANCELLED;
+    }
     default: {
       return { state: "pending", description: "Capturing and comparing screenshots" };
     }
@@ -208,6 +218,9 @@ function reviewOutcome(build: BuildStateBuild, approvals: BuildStateInput["appro
     }
     case "failed": {
       return { state: "failure", description: "Build failed" };
+    }
+    case "cancelled": {
+      return CANCELLED;
     }
     default: {
       return { state: "pending", description: waitingText(approvals) };

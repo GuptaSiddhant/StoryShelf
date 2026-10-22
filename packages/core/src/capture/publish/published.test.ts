@@ -17,6 +17,7 @@ describe("publishingOf", () => {
     const { storage } = makeStorage();
     expect(await publishingOf(storage, build)).toBe("pending");
     expect(await publishingOf(storage, { ...build, status: "failed" })).toBe("failure");
+    expect(await publishingOf(storage, { ...build, status: "cancelled" })).toBe("failure");
   });
 
   it("reads as pending without a storage adapter", async () => {

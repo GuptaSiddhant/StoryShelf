@@ -19,7 +19,7 @@ describe("alreadyAlerted", () => {
   });
 });
 
-async function buildWith(status: "failed" | "capturing") {
+async function buildWith(status: "failed" | "capturing" | "cancelled") {
   const { db } = makeDatabase();
   const project = await new ProjectModel(db).create({ name: `Alerts ${status}` });
   const builds = new BuildModel(db);
@@ -43,6 +43,19 @@ describe("notifyCaptureFailed", () => {
     expect(alreadyAlerted(fresh as never)).toBe(true);
     // A second settle of the same failed build is a no-op.
     await expect(notifyCaptureFailed(options, {}, logger, build.id)).resolves.toBeUndefined();
+  });
+
+  it("stays quiet for a build a user cancelled", async () => {
+    const { db, build } = await buildWith("cancelled");
+    const send = vi.fn(async () => ({ ok: true }));
+    const notifier = {
+      metadata: { name: "n", version: "0", kind: "n", category: "notifier" },
+      send,
+    };
+    const options = { database: db, notifications: { notifiers: [notifier] } } as never;
+    await notifyCaptureFailed(options, {}, logger, build.id);
+    expect(send).not.toHaveBeenCalled();
+    expect(alreadyAlerted((await new BuildModel(db).get(build.id)) as never)).toBe(false);
   });
 
   it("stays quiet for a build that did not fail, or is gone", async () => {

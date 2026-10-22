@@ -10,6 +10,9 @@ export function describeState(state: NotifierState): string {
     case "success": {
       return "Visual tests passed";
     }
+    case "cancelled": {
+      return "Cancelled";
+    }
     default: {
       return "Visual changes detected or tests failed";
     }

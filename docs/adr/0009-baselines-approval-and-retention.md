@@ -103,7 +103,7 @@ Projects, Published Storybook and Labels). Feature-branch baselines go through b
 
 **Purged:**
 
-- Builds in a terminal status (`approved`, `rejected`, `failed`) older than `purge_ttl` (default 30
+- Builds in a terminal status (`approved`, `rejected`, `failed`, `cancelled`) older than `purge_ttl` (default 30
   days).
 - Old builds of a branch: the most recent build per branch is retained (it backs the PR status
   link); older ones are purged past the TTL.

@@ -6,7 +6,6 @@ import {
   InMemorySpanExporter,
   SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
-import type { PollableCaptureQueue } from "@storyshelf/core/adapter/capture-queue";
 import type { ConsumerJob, JobRunContext } from "@storyshelf/core/capture";
 import type { ShelfOptions } from "@storyshelf/core/config";
 import { createShelfLogger } from "@storyshelf/core/logger";
@@ -32,19 +31,6 @@ function runner() {
   } as unknown as import("@storyshelf/core/adapter/capture-runner").CaptureRunner;
 }
 
-function suppliedQueue() {
-  return {
-    metadata: { name: "mock", version: "0.0.0", kind: "mock", category: "capture-queue" as const },
-    enqueue: vi.fn(async () => {}),
-    status: vi.fn(async () => null),
-    active: vi.fn(async () => []),
-    recent: vi.fn(async () => []),
-    poll: vi.fn(async () => null),
-    ack: vi.fn(async () => {}),
-    nack: vi.fn(async () => {}),
-  } as unknown as PollableCaptureQueue;
-}
-
 /** Wire capture for `testing` over a fresh in-memory database. */
 const SCRATCH = { scratchDir: ".tmp/capture-setup-test" };
 
@@ -52,7 +38,7 @@ function wire(testing?: ShelfOptions["testing"], config: { scratchDir?: string }
   const { db } = makeDatabase();
   const { storage } = makeStorage();
   const options = { database: db, storage, testing } as unknown as ShelfOptions;
-  const jobs = createJobQueue(options, testing?.queue ? [] : ["capture"], testing?.retries ?? 2);
+  const jobs = createJobQueue(options, ["capture"], testing?.retries ?? 2);
   return {
     db,
     jobs,
@@ -103,25 +89,6 @@ describe("setupCapture", () => {
     expect(wiring.handler).not.toBeNull();
   });
 
-  it("only enqueues onto a supplied queue when there is no runner (another process consumes)", async () => {
-    const queue = suppliedQueue();
-    const { wiring } = wire({ queue });
-    expect(wiring.queue).toBe(queue);
-    expect(wiring.handler).toBeNull();
-    await wiring.enqueueCapture?.("build-1", "req-1");
-    expect(queue.enqueue).toHaveBeenCalledWith({ buildId: "build-1", reqId: "req-1" });
-  });
-
-  it("replaces the database queue with a supplied one, and runs its jobs here with a runner", async () => {
-    const queue = suppliedQueue();
-    const { wiring, jobs } = wire({ queue, runner: runner() });
-    expect(wiring.queue).toBe(queue);
-    expect(wiring.handler).not.toBeNull();
-    await wiring.enqueueCapture?.("build-1");
-    expect(queue.enqueue).toHaveBeenCalledTimes(1);
-    expect(jobs.built()).toBeUndefined();
-  });
-
   it("propagates the active traceparent on enqueue", async () => {
     const exporter = new InMemorySpanExporter();
     const provider = new BasicTracerProvider({
@@ -132,12 +99,11 @@ describe("setupCapture", () => {
     const manager = new AsyncLocalStorageContextManager();
     context.setGlobalContextManager(manager.enable());
     try {
-      const queue = suppliedQueue();
-      const { wiring } = wire({ queue });
+      const { wiring, jobs } = wire({ runner: runner() });
       await trace.getTracer("test").startActiveSpan("test.enqueue", async () => {
         await wiring.enqueueCapture?.("build-1", "req-1");
       });
-      expect(queue.enqueue).toHaveBeenCalledWith({
+      expect(await jobs.get().poll()).toMatchObject({
         buildId: "build-1",
         reqId: "req-1",
         traceparent: expect.stringMatching(/^00-/u),

@@ -354,9 +354,6 @@ export function validateAdapterSources(sources: AdapterSetupSources): AdapterSet
       slot: "captureRunner",
     });
   }
-  if (sources.captureQueue !== undefined) {
-    checks.push({ adapter: sources.captureQueue, category: "capture-queue", slot: "captureQueue" });
-  }
   const providers: ProviderCheck[] = [
     ...(sources.design ?? []).map((provider, index) => ({
       provider,

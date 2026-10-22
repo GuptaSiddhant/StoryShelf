@@ -1,4 +1,5 @@
 /** Publish a build's stored zip: extract with the caps, persist statics and manifest, clean the scratch. */
+import type { DatabaseAdapter } from "../../adapters/database.ts";
 import type { StorageAdapter } from "../../adapters/storage.ts";
 import type { Logger } from "../../logger.ts";
 import { removeShardScratch } from "../scratch.ts";
@@ -13,6 +14,8 @@ export interface PublishZipOptions {
   storage: StorageAdapter;
   scratchDir: string;
   limits: ExtractionLimits;
+  /** Records the persisted content in `content_refs`, so retention knows who still uses it. */
+  db?: DatabaseAdapter | undefined;
   logger: Logger;
   /** Called between stages (renews a job's lease). */
   touch?: () => void;
@@ -40,7 +43,7 @@ export async function publishStoredZip(
       options.limits,
     );
     options.touch?.();
-    await persistStorybookStatics(storage, dir, projectId, buildId);
+    await persistStorybookStatics(storage, dir, projectId, buildId, options.db);
     options.touch?.();
   } finally {
     await removeShardScratch(scratchDir, projectId, buildId, PUBLISH_SCRATCH_ID, logger);

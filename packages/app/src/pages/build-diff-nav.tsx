@@ -14,7 +14,7 @@ import {
   filmstripList,
   statusDots,
 } from "../ui/styles/review-layout.ts";
-import { a11yViolationsOf } from "./a11y-violations.tsx";
+import { a11yCarrierOf, a11yViolationsOf } from "./a11y-violations.tsx";
 import {
   diffPercent,
   groupSnapshots,
@@ -64,7 +64,8 @@ function FilmItem(props: {
   const snap = group.representative;
   const url = snapshotPageUrl(project, build, snap.id);
   const percent = diffPercent(snap);
-  const a11yCount = a11yViolationsOf(snap).length;
+  const carrier = a11yCarrierOf(snap, group.members);
+  const a11yCount = a11yViolationsOf(carrier).length;
   const tags = [
     group.modeKey === "desktop" ? "" : group.modeKey,
     group.members.length > 1 ? `${group.members.length} browsers` : "",
@@ -91,7 +92,9 @@ function FilmItem(props: {
           <span class={statusDots[statusTone(snap.status)]} aria-hidden="true" />
           {snap.status}
           {percent ? ` · ${percent}` : ""}
-          {a11yCount > 0 ? ` · a11y ${a11yCount}` : ""}
+          {a11yCount > 0
+            ? ` · a11y ${a11yCount}${carrier.browser ? ` (${carrier.browser})` : ""}`
+            : ""}
         </span>
       </span>
     </a>
