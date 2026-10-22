@@ -64,11 +64,19 @@ async function handleUpdateLabelType(c: Context): Promise<Response> {
       400,
     );
   }
+  const template = asString(form.get("linkTemplate"));
+  const linkTemplate = template === undefined || template === "" ? null : template;
+  return await persistLabelUpdate(c, project, key, { name, linkTemplate });
+}
+
+async function persistLabelUpdate(
+  c: Context,
+  project: { id: string; slug: string },
+  key: string,
+  input: { name: string; linkTemplate: string | null },
+): Promise<Response> {
   try {
-    const updated = await new LabelModel(getStore().db).updateType(project.id, key, {
-      name,
-      linkTemplate: asString(form.get("linkTemplate")) || null,
-    });
+    const updated = await new LabelModel(getStore().db).updateType(project.id, key, input);
     if (!updated) {
       throw new Error("Label type not found");
     }
