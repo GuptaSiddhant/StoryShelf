@@ -1,6 +1,6 @@
 // TypeScript API reference: one starlight-typedoc instance per package, generated from the
 // package's public `exports` map (the frozen import surface), never from internal modules.
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createStarlightTypeDocPlugin } from "starlight-typedoc";
 import { MAIN_MODULE } from "./plugins/typedoc-main-module.mjs";
@@ -9,7 +9,7 @@ const mainModulePlugin = join(import.meta.dirname, "plugins", "typedoc-main-modu
 const root = join(import.meta.dirname, "..", "..");
 
 /** Packages documented so far. Add a slug here once its doc comments are worth publishing. */
-const SLUGS = ["core", "app"];
+const SLUGS = ["core", "app", "affected", "image", "observability", "auth", "ai", "mcp"];
 
 /**
  * Subpaths that are not StoryShelf API: the manifest, test-only helpers and the Drizzle
@@ -23,13 +23,27 @@ const SKIPPED = new Set([
   "./orm/sqlite-core",
 ]);
 
-/** The `source` file of every public export, relative to the repo root. */
+/** The source file of an export: its `source` condition, else `./dist/x.js` -> `./src/x.ts` when that exists. */
+function sourceOf(dir, target) {
+  if (typeof target === "object" && typeof target.source === "string") return target.source;
+  const file =
+    typeof target === "string"
+      ? target.replace(/^\.\/dist\/(?<name>.+)\.js$/u, "./src/$<name>.ts")
+      : "";
+  return file.startsWith("./src/") && existsSync(join(root, dir, file)) ? file : undefined;
+}
+
+/** The source file of every public export, as absolute paths. */
 function entryPointsOf(slug) {
   const dir = join("packages", slug);
   const { exports } = JSON.parse(readFileSync(join(root, dir, "package.json"), "utf8"));
-  return Object.entries(exports)
-    .filter(([subpath, target]) => !SKIPPED.has(subpath) && typeof target.source === "string")
-    .map(([, target]) => join(root, dir, target.source));
+  const entries = Object.entries(exports)
+    .filter(([subpath]) => !SKIPPED.has(subpath))
+    .map(([, target]) => sourceOf(dir, target))
+    .filter((file) => file !== undefined)
+    .map((file) => join(root, dir, file));
+  if (entries.length === 0) throw new Error(`typedoc-packages: no source entry points for ${slug}`);
+  return entries;
 }
 
 const instances = SLUGS.map((slug) => {
@@ -41,7 +55,7 @@ const instances = SLUGS.map((slug) => {
       entryPoints: entryPointsOf(slug),
       tsconfig: join(root, "packages", slug, "tsconfig.json"),
       output: `reference/${slug}`,
-      sidebar: { label: `@storyshelf/${slug}`, collapsed: true },
+      sidebar: { label: "API", collapsed: true },
       typeDoc: {
         skipErrorChecking: true,
         plugin: [mainModulePlugin],
@@ -56,8 +70,5 @@ const instances = SLUGS.map((slug) => {
 /** Plugins to register, in `starlight({ plugins })`. */
 export const typeDocPlugins = instances.map((i) => i.plugin);
 
-/** One sidebar group wrapping every package's generated pages (shown on /reference/** only). */
-export const typeDocSidebarGroup = {
-  label: "TypeScript reference",
-  items: instances.map((i) => i.sidebarGroup),
-};
+/** The generated "API" sidebar group of each documented package, by slug. */
+export const typeDocGroups = new Map(instances.map((i) => [i.slug, i.sidebarGroup]));

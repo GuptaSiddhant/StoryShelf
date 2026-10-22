@@ -22,40 +22,11 @@ import { PackageManagers } from "starlight-package-managers";
 
 Pass a database and storage adapter to `createShelfApp` from `@storyshelf/app` (see the [app package](../app/)). Capture, authentication, notifiers (chat, email, git), logging, branding, and server behavior are optional.
 
-```ts
-import { createShelfApp } from "@storyshelf/app";
-import { gitNotifiers } from "@storyshelf/notify-git";
+<Readme heading="Quick start" />
 
-const app = createShelfApp({
-  database,
-  storage,
-  testing: { runner: captureRunner, concurrency: 2 },
-  notifications: { notifiers: gitNotifiers },
-  auth,
-  config: {
-    secret,
-    purgeTtlDays: 30,
-    branchTtlDays: 30,
-    branchGcIntervalMs: 86_400_000,
-  },
-});
+## Deployment targets
 
-serve({ fetch: app.fetch, port: 3000 });
-```
-
-Adapter `setup` hooks kick off in the background when the router is created. Await them before serving for fail-fast startup (or let the first request gate on settlement), and tear down adapters on shutdown:
-
-```ts
-await app.lifecycle.setup();
-
-const server = serve({ fetch: app.fetch, port: 3000 });
-process.on("SIGTERM", () => {
-  app.lifecycle
-    .teardown()
-    .then(() => server.close())
-    .catch(() => {});
-});
-```
+<Readme heading="Deployment targets" />
 
 ## Main APIs
 

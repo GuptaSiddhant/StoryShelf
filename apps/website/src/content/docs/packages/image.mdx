@@ -17,35 +17,15 @@ It is a **leaf package**: it imports nothing else from StoryShelf, and a test ke
 
 - [npm package](https://www.npmjs.com/package/@storyshelf/image) — install tarballs and version history.
 - [JSR package](https://jsr.io/@storyshelf/image) — TypeScript-first registry page.
-- [Public API reference](https://jsr.io/@storyshelf/image/doc) — generated docs for every export; start here to learn the API.
+- [Public API reference](/reference/image/) — generated docs for every export; start here to learn the API. (The same reference is on [JSR](https://jsr.io/@storyshelf/image/doc).)
 - [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/image) — package directory on `main`.
 
 ## Engines
 
-The comparison is always pixelmatch; the **engine** is the PNG codec around it.
-
-| Engine            | Install             | Notes                                       |
-| ----------------- | ------------------- | ------------------------------------------- |
-| `pngjs` (default) | built in            | Pure JavaScript; runs anywhere Node runs.   |
-| `sharp`           | `npm install sharp` | Optional peer; native (libvips) and faster. |
+<Readme heading="Engines" />
 
 Pick one with `createShelfApp({ images: { engine: "sharp" } })` or `STORYSHELF_IMAGE_ENGINE`; see [Image engines](../../guides/image-engines/) for benchmarks and trade-offs.
 
 ## API
 
-```ts
-import {
-  diffImages, // (baseline, current, options, codec?) -> Promise<DiffResult>
-  diffImagesAsync, // same, on the shared worker-thread pool
-  downscalePng, // (png, maxEdge) -> Promise<Uint8Array>, on the configured engine
-  configureImages, // ({ engine?, threads? }) apply testing.images.engine and testing.compare.threads
-  verifyImageEngine, // load the configured engine now; rejects when it cannot load
-  shutdownDiffPool, // stop the pool's workers
-  DEFAULT_DIFF_OPTIONS,
-  type DiffOptions,
-  type DiffResult,
-  type ImageEngine,
-} from "@storyshelf/image";
-```
-
-`configureImages` is process-wide. The option beats `STORYSHELF_IMAGE_ENGINE`, and an unknown engine name throws.
+<Readme heading="API" />

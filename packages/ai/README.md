@@ -19,12 +19,13 @@ import { openai } from "@ai-sdk/openai";
 
 const ai = createAi({
   profiles: { default: { defaultModel: openai("gpt-4o-mini") } },
+  budget: { dailyTokens: 2_000_000 },
 });
 
 const app = createShelfApp({ database, storage, ai });
 ```
 
-Passing `ai` turns AI on site-wide; a site admin then enables it per project by choosing a profile in project settings.
+Passing `ai` turns AI on site-wide; a site admin then enables it per project by choosing a profile in project settings. One export, `createAi`, plus the option types. Everything else is internal.
 
 ## License
 

@@ -4,19 +4,29 @@ import { defineConfig } from "astro/config";
 import starlightImageZoom from "starlight-image-zoom";
 import starlightLinksValidator from "starlight-links-validator";
 import starlightOpenAPI, { openAPISidebarGroups } from "starlight-openapi";
+import remarkReadmeSection from "./plugins/remark-readme-section.mjs";
 import remarkReferenceLinks from "./plugins/remark-reference-links.mjs";
-import { typeDocPlugins, typeDocSidebarGroup } from "./typedoc-packages.mjs";
+import { typeDocGroups, typeDocPlugins } from "./typedoc-packages.mjs";
 
 const SITE = "https://storyshelf.js.org";
 const REPO = "https://github.com/GuptaSiddhant/StoryShelf";
 const OG_IMAGE = `${SITE}/og-image.png`;
 const OG_ALT = "StoryShelf: visual testing for Storybook, with the build review workspace";
 
+/** A package's page, with its generated TypeScript API nested under it when it has one. */
+const packageItem = (slug) => {
+  const overview = { label: `@storyshelf/${slug}`, slug: `packages/${slug}` };
+  const api = typeDocGroups.get(slug);
+  return api
+    ? { label: overview.label, collapsed: true, items: [{ ...overview, label: "Overview" }, api] }
+    : overview;
+};
+
 /** Packages grouped by the adapter slot they fill. */
 const packageGroup = (label, slugs) => ({
   label,
   collapsed: true,
-  items: slugs.map((slug) => ({ label: `@storyshelf/${slug}`, slug: `packages/${slug}` })),
+  items: slugs.map((slug) => packageItem(slug)),
 });
 
 export default defineConfig({
@@ -28,7 +38,7 @@ export default defineConfig({
     "/guides/ai-insights": "/ai/",
     "/guides/ai-testing": "/ai/testing/",
   },
-  markdown: { remarkPlugins: [remarkReferenceLinks] },
+  markdown: { remarkPlugins: [remarkReferenceLinks, remarkReadmeSection] },
   integrations: [
     mermaid({ autoTheme: true }),
     starlight({
@@ -81,7 +91,7 @@ export default defineConfig({
         starlightOpenAPI([
           {
             base: "api",
-            label: "API reference",
+            label: "HTTP API",
             // Generated from the app's routes by `prebuild` / `predev` (see package.json).
             schema: "./public/openapi.json",
             // "GET Create a build" style labels instead of repeating the path per method.
@@ -210,8 +220,6 @@ export default defineConfig({
         },
         // Shown on /api/** only (see components/overrides/Sidebar.astro).
         ...openAPISidebarGroups,
-        // Shown on /reference/** only (same override).
-        typeDocSidebarGroup,
         {
           label: "Packages",
           collapsed: true,
