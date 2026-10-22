@@ -1,4 +1,13 @@
-(function (e, t) {
+/**
+ * htmx 1.9.12, vendored as shipped in `htmx.org@1.9.12/dist/htmx.min.js` (formatted by oxfmt).
+ *
+ * Embedded as a string so it travels inside the compiled JavaScript: there is no file to find
+ * at runtime, whether the app runs from source, from the library build or inside a bundle.
+ * To upgrade, run `nub packages/app/scripts/embed-htmx.ts <path to the new htmx.min.js>`.
+ */
+export const htmxVersion = "1.9.12";
+
+export const htmxSource = String.raw`(function (e, t) {
   if (typeof define === "function" && define.amd) {
     define([], t);
   } else if (typeof module === "object" && module.exports) {
@@ -3302,3 +3311,4 @@
     return Q;
   })();
 });
+`;

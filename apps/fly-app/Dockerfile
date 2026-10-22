@@ -47,11 +47,6 @@ WORKDIR /app
 COPY --from=builder /app/apps/fly-app/dist ./dist
 COPY --from=builder /app/apps/fly-app/package.json ./package.json
 COPY --from=builder /app/node_modules ./node_modules
-# Vendored assets (htmx.min.js, mark.svg, ...). The app resolves them as
-# `../assets/<name>` relative to `import.meta.url`, which for the bundled
-# `/app/dist/server.mjs` is `/app/assets/` — a path the bundler does not emit
-# on its own. Copy the whole directory so new assets don't break boot.
-COPY --from=builder /app/packages/app/src/assets ./assets
 # Install the browser + system deps (node:slim has none) with the app's own
 # hoisted playwright-core, so the browser build always matches the locked
 # version. `chromium.launch()` runs headless, which uses chrome-headless-shell
