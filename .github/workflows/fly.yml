@@ -84,7 +84,7 @@ jobs:
         run: nub ci && nubx turbo build --filter=storyshelf
 
       - name: Build fixture Storybook
-        working-directory: fixtures/storybook-8
+        working-directory: fixtures/storybook-9
         run: pnpm install --frozen-lockfile && pnpm run build-storybook
 
       - name: Seed demo project

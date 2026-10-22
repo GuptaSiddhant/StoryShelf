@@ -2,7 +2,7 @@
 # Seeds the Fly demo project through the public API, like any CI upload: a baseline `main`
 # build plus a `feature/new-button` build with restyled primary buttons, so the review page
 # shows real pixel diffs. Run from the repo root after building packages/cli and
-# fixtures/storybook-8 (needs curl and jq).
+# fixtures/storybook-9 (needs curl and jq).
 #
 #   STORYSHELF_URL=https://storyshelf.fly.dev STORYSHELF_ADMIN_TOKEN=... apps/fly-app/seed.sh
 #
@@ -12,7 +12,7 @@ set -euo pipefail
 
 : "${STORYSHELF_URL:?}" "${STORYSHELF_ADMIN_TOKEN:?}"
 SLUG=demo-design-system
-FIXTURE=fixtures/storybook-8
+FIXTURE=fixtures/storybook-9
 STATIC="$PWD/$FIXTURE/storybook-static"
 VARIANT="$(mktemp -d)"
 # Restyles primary buttons only (their inline background); secondary stories stay unchanged.
