@@ -62,16 +62,20 @@ storyshelf server init
 
 This generates `src/index.ts`, `package.json` and `tsconfig.json` with the correct imports and dependencies.
 
-| Layer         | Package                           | Notes                                        |
-| ------------- | --------------------------------- | -------------------------------------------- |
-| Database      | `@storyshelf/db-sqlite`           | node:sqlite + Drizzle, WAL mode, single file |
-| Storage       | `@storyshelf/storage-local`       | Local filesystem, `--data-dir`               |
-| Capture queue | Database queue (built-in)         | `capture_jobs` in your database, leased      |
-| Auth          | `@storyshelf/auth`                | Local accounts, social, SSO/SAML, passkeys   |
+| Layer         | Package                     | Notes                                        |
+| ------------- | --------------------------- | -------------------------------------------- |
+| Database      | `@storyshelf/db-sqlite`     | node:sqlite + Drizzle, WAL mode, single file |
+| Storage       | `@storyshelf/storage-local` | Local filesystem, `--data-dir`               |
+| Capture queue | Database queue (built-in)   | `capture_jobs` in your database, leased      |
+| Auth          | `@storyshelf/auth`          | Local accounts, social, SSO/SAML, passkeys   |
 
 Swap the database layer for `@storyshelf/db-postgres` (Postgres via `postgres.js` + Drizzle, see [Postgres provider recipes](/packages/db-postgres/#provider-recipes)) or `@storyshelf/db-sqlite/turso` (Turso/libSQL) without changing the rest of the stack.
 
 One `npm start` (or `fly deploy`, `railway up`, `render.com`, etc.) and you're running.
+
+## Remote browsers
+
+Rendering scales on the browser side, not by adding processes: every instance runs the same `testing` configuration, so every instance offers the same targets. To take browsers off the app host, list remote services in the runner's `browsers` (a self-hosted Playwright server, Azure Playwright Workspaces, a CDP service) and the host needs no installed browsers. `sessions` per service is the page cap per instance; divide a provider's parallel-session limit among instances. See [Remote browsers](/guides/remote-browsers/).
 
 ## Sizing memory for capture
 

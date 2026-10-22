@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createPageLimiter } from "./page-limiter.ts";
+import { createSessionGate } from "./session-gate.ts";
 
 async function peakOf(
   limiter: ReturnType<typeof createPageLimiter>,
@@ -30,6 +31,32 @@ describe("createPageLimiter", () => {
     const peak = await peakOf(createPageLimiter({ browser: "chromium" }), 60);
     expect(peak).toBeGreaterThanOrEqual(1);
     expect(peak).toBeLessThanOrEqual(8);
+  });
+
+  it("holds a remote target to its shared session gate, however many limiters run", async () => {
+    const gate = createSessionGate(2);
+    const peaks = await Promise.all([
+      peakOf(createPageLimiter({ gate, concurrency: 50 }), 20),
+      peakOf(createPageLimiter({ gate }), 20),
+    ]);
+    // Each limiter alone could reach 2; together they share the 2 sessions.
+    let active = 0;
+    let peak = 0;
+    const limiters = [createPageLimiter({ gate }), createPageLimiter({ gate })];
+    await Promise.all(
+      limiters.map(
+        async (limiter) =>
+          await limiter.each(Array.from({ length: 10 }), async () => {
+            active += 1;
+            peak = Math.max(peak, active);
+            await new Promise((resolve) => setTimeout(resolve, 2));
+            active -= 1;
+            return false;
+          }),
+      ),
+    );
+    expect(Math.max(...peaks)).toBeLessThanOrEqual(2);
+    expect(peak).toBe(2);
   });
 
   it("completes an empty run", async () => {

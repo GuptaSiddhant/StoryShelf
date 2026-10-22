@@ -69,4 +69,13 @@ describe("createTargetOffers", () => {
     await lifecycle.setup({} as never);
     expect((await lifecycle.health()).ok).toBe(false);
   });
+
+  it("keeps a target offered when its launch failure is transient", async () => {
+    const offers = createTargetOffers(declared);
+    const guarded = offers.guard(async (target) => {
+      throw new TargetLaunchError(target, "service is down", { transient: true });
+    });
+    await expect(guarded("firefox")).rejects.toThrow("service is down");
+    expect(offers.current().map((entry) => entry.status)).toEqual(["ready", "ready"]);
+  });
 });

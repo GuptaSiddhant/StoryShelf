@@ -34,6 +34,23 @@ npx -y playwright@1.63.0 install chromium
 
 The Fly image installs browsers at build time (`playwright install --with-deps chromium`); CI and local runs use the same command.
 
+## Remote browsers
+
+`@storyshelf/runner-playwright/remote` exports `remote`, `playwrightServer`, `azurePlaywright` and `browserstack`: entries for the `browsers` list that connect to a browser on another machine (`browserType.connect`, or `connectOverCDP`) and offer `<engine>@<name>` targets with their own baselines.
+
+```ts
+import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
+import { playwrightServer } from "@storyshelf/runner-playwright/remote";
+
+createPlaywrightCaptureRunner({
+  browsers: [
+    playwrightServer({ name: "grid", endpoint: "ws://playwright:3000/secret-path", sessions: 8 }),
+  ],
+});
+```
+
+With `exposeNetwork` (the `playwrightServer` and Azure default) the remote browser reaches the loopback Storybook server through the connection. The fingerprint is measured inside the browser, `sessions` caps the pages per target across the process, and connection failures are retried with backoff. The farm must run exactly this package's `playwright-core` version (`1.63.0`). See the website's "Remote browsers" guide.
+
 ## How it fits
 
 Core's capture logic is browser-agnostic: the **orchestrator** (`@storyshelf/core/capture`) owns loading, extraction, discovery, and persistence, and delegates only the actual screenshotting to this package's `render(input) => RenderResult`. This package supplies the pure renderer and the ephemeral Storybook static server it needs. It is the only place that depends on `playwright-core` (never full `playwright` — browsers are provisioned separately, see above).

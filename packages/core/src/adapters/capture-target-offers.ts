@@ -14,9 +14,12 @@ export interface TargetOffers {
   current(): readonly RunnerTarget[];
   /**
    * Wrap `launch` so a target the runner does not offer fails with a {@link TargetLaunchError}, and
-   * a launch that fails marks its target unavailable with the launch error as the reason.
+   * a launch that fails marks its target unavailable with the launch error as the reason (not a
+   * transient one: a remote service that is down stays offered).
    */
-  guard<T>(launch: (target: CaptureTarget) => Promise<T>): (target: CaptureTarget) => Promise<T>;
+  guard<T, Rest extends unknown[]>(
+    launch: (target: CaptureTarget, ...rest: Rest) => Promise<T>,
+  ): (target: CaptureTarget, ...rest: Rest) => Promise<T>;
   /** Lifecycle whose `setup` replaces the statuses with what `verify` finds, and `health` reports them. */
   lifecycle(verify: () => Promise<readonly RunnerTarget[]>): AdapterLifecycle;
 }
@@ -39,19 +42,21 @@ export function createTargetOffers(declared: readonly RunnerTarget[]): TargetOff
   return {
     defaultTarget: first.target,
     current: () => targets,
-    guard: (launch) => async (target) => {
-      if (!targets.some((entry) => entry.target === target)) {
-        throw new TargetLaunchError(target, "not offered by this runner");
-      }
-      try {
-        return await launch(target);
-      } catch (error) {
-        if (error instanceof TargetLaunchError) {
-          fail(target, error.reason);
+    guard:
+      (launch) =>
+      async (target, ...rest) => {
+        if (!targets.some((entry) => entry.target === target)) {
+          throw new TargetLaunchError(target, "not offered by this runner");
         }
-        throw error;
-      }
-    },
+        try {
+          return await launch(target, ...rest);
+        } catch (error) {
+          if (error instanceof TargetLaunchError && !error.transient) {
+            fail(target, error.reason);
+          }
+          throw error;
+        }
+      },
     lifecycle: (verify) => ({
       setup: async () => {
         targets = await verify();

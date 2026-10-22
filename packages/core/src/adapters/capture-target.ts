@@ -97,10 +97,20 @@ export class TargetLaunchError extends Error {
   readonly target: CaptureTarget;
   /** Why it did not start, without the target's name. */
   readonly reason: string;
+  /**
+   * The failure may pass (a remote browser service that is down or full): the target is not marked
+   * unavailable for it, though the job still fails at once. A wrong version or credentials do not.
+   */
+  readonly transient: boolean;
 
-  constructor(target: CaptureTarget, reason: string, options?: { cause?: unknown }) {
+  constructor(
+    target: CaptureTarget,
+    reason: string,
+    options?: { cause?: unknown; transient?: boolean },
+  ) {
     super(`Cannot launch ${target}: ${reason}`, options);
     this.target = target;
     this.reason = reason;
+    this.transient = options?.transient ?? false;
   }
 }

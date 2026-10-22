@@ -2,6 +2,7 @@
 
 import type {
   CaptureTarget,
+  RemoteTarget,
   RenderedSnapshot,
   StoryEntry,
   StorySourceAdapter,
@@ -9,6 +10,7 @@ import type {
 } from "@storyshelf/core/adapter/capture-runner";
 import type { StoryParameters } from "@storyshelf/core/capture";
 import type { Logger } from "@storyshelf/core/logger";
+import type { SessionGate } from "@storyshelf/core/utils";
 import type { Browser } from "playwright-core";
 import type { PagePool } from "./pages.ts";
 
@@ -26,6 +28,11 @@ export interface PlaywrightRenderInput {
   runA11y?: boolean;
   /** Target to render on; the runner's default (first) target when absent. */
   target?: CaptureTarget;
+  /**
+   * The build's Storybook at a URL the target's browser can reach (ADR 0007, decision 5), which a
+   * `reach: "url"` target requires; the loopback server is not started when it is given.
+   */
+  storybookUrl?: string;
   /** Max pages rendering at once (default: sized from detected CPU and memory). */
   concurrency?: number;
   /** Per-page navigation/action timeout in ms (default: scaled up on CPU-starved hosts). */
@@ -43,11 +50,21 @@ export interface PlaywrightRenderInput {
 /** Input for the parameter pre-pass (a subset of the render input). */
 export type ExtractInput = Pick<
   PlaywrightRenderInput,
-  "buildId" | "storybookDir" | "stories" | "logger" | "target" | "adapter"
+  "buildId" | "storybookDir" | "stories" | "logger" | "target" | "storybookUrl" | "adapter"
 >;
 
 /** Starts (or connects to) a browser for a target; a failure is a `TargetLaunchError`. */
-export type LaunchTarget = (target: CaptureTarget) => Promise<Browser>;
+export type LaunchTarget = (target: CaptureTarget, logger?: Logger) => Promise<Browser>;
+
+/** What the pipeline needs of a target beyond starting it. */
+export interface TargetDriver {
+  launch: LaunchTarget;
+  /** The remote service entry behind `target`; absent for a local engine. */
+  remote(target: CaptureTarget): RemoteTarget | undefined;
+}
+
+/** The render input as the pipeline runs it: with the session gate of a remote target. */
+export type RunInput = PlaywrightRenderInput & { gate?: SessionGate | undefined };
 
 /** Browser + adapter context shared by screenshot helpers. */
 export interface ScreenshotContext {

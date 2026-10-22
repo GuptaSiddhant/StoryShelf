@@ -1,13 +1,18 @@
 /** Puppeteer capture runner — composition root (factory wiring). */
 
-import { createTargetOffers, type CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
+import {
+  createTargetOffers,
+  type CaptureRunner,
+  type RunnerTarget,
+} from "@storyshelf/core/adapter/capture-runner";
 import { recommendedNavigationTimeoutMs } from "@storyshelf/core/utils";
 import { verifyLocalTargets } from "./availability.ts";
 import { activeRuns, closeBrowser } from "./browser.ts";
+import { connectRemote } from "./connect.ts";
 import { launchLocal } from "./launch.ts";
 import { renderAll } from "./pipeline.ts";
 import { flattenBrowsers, type BrowserEntry, type LocalTarget } from "./targets.ts";
-import type { ActiveRun, PuppeteerRenderInput } from "./types.ts";
+import type { ActiveRun, PuppeteerRenderInput, TargetDriver } from "./types.ts";
 
 declare const __PKG_VERSION__: string | undefined;
 
@@ -15,8 +20,10 @@ declare const __PKG_VERSION__: string | undefined;
 export function createPuppeteerCaptureRunner(
   options: {
     /**
-     * Every target the runner offers, default first (ADR 0007, decision 1): `"chromium"` or
-     * `local(engine, { executablePath })`. Default `["chromium"]`. Chromium-family engines only; bare
+     * Every target the runner offers, default first (ADR 0007, decision 1): `"chromium"`,
+     * `local(engine, { executablePath })`, or remote CDP services from
+     * `@storyshelf/runner-puppeteer/remote` (`cdp(...)`: `<engine>@<name>` targets that need a
+     * Storybook URL they can reach). Default `["chromium"]`. Chromium-family engines only; bare
      * `"chrome"` needs `local("chrome", { executablePath })`.
      */
     browsers?: readonly BrowserEntry[];
@@ -34,18 +41,24 @@ export function createPuppeteerCaptureRunner(
     reusePages?: boolean;
   } = {},
 ): CaptureRunner {
-  const locals = flattenBrowsers(options.browsers ?? ["chromium"], options.executablePath);
-  // Until `lifecycle.setup` verifies them, every declared engine reads as ready.
-  const offers = createTargetOffers(
-    locals.map(({ target }) => ({ target, reach: "loopback", status: "ready" })),
+  const { declared, locals, remotes } = flattenBrowsers(
+    options.browsers ?? ["chromium"],
+    options.executablePath,
   );
-  const launch = offers.guard(
-    async (target) =>
-      await launchLocal(
-        locals.find((entry) => entry.target === target) as LocalTarget,
-        options.args,
-      ),
-  );
+  // Until `lifecycle.setup` verifies them, every declared target reads as ready.
+  const offers = createTargetOffers(declared);
+  const driver: TargetDriver = {
+    launch: offers.guard(async (target, logger) => {
+      const remote = remotes.find((entry) => entry.target === target);
+      return remote
+        ? await connectRemote(remote, logger)
+        : await launchLocal(
+            locals.find((entry) => entry.target === target) as LocalTarget,
+            options.args,
+          );
+    }),
+    remote: (target) => remotes.find((entry) => entry.target === target),
+  };
   const concurrency = options.concurrency ?? envPositiveInt("STORYSHELF_CAPTURE_CONCURRENCY");
   const navigationTimeoutMs =
     options.navigationTimeoutMs ??
@@ -66,7 +79,7 @@ export function createPuppeteerCaptureRunner(
         return offers.current();
       },
     },
-    lifecycle: offers.lifecycle(async () => await Promise.resolve(verifyLocalTargets(locals))),
+    lifecycle: offers.lifecycle(async () => await Promise.resolve(verifyTargets(declared, locals))),
     async render(input: PuppeteerRenderInput) {
       const active: ActiveRun = { cancelled: false, browser: null };
       const remove = activeRuns.add(input.buildId, input.runId, active);
@@ -74,7 +87,7 @@ export function createPuppeteerCaptureRunner(
         return await renderAll(
           { concurrency, navigationTimeoutMs, recycleBrowserEvery, reusePages, ...input },
           active,
-          launch,
+          driver,
           offers.defaultTarget,
         );
       } finally {
@@ -90,6 +103,15 @@ export function createPuppeteerCaptureRunner(
       );
     },
   };
+}
+
+/** Local targets are checked for an executable; a remote one is not probed (that would open a session). */
+function verifyTargets(
+  declared: readonly RunnerTarget[],
+  locals: readonly LocalTarget[],
+): RunnerTarget[] {
+  const checked = new Map(verifyLocalTargets(locals).map((entry) => [entry.target, entry]));
+  return declared.map((entry) => checked.get(entry.target) ?? entry);
 }
 
 function envPositiveInt(name: string): number | undefined {
