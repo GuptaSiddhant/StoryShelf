@@ -21,7 +21,7 @@ export interface PublishFacts {
  * What publishing does to the build's status.
  *
  * - A capture will run: `unchanged`, the capture sets the status.
- * - Not `pending` any more (already accepted, failed or reviewed): `unchanged`, so a repeated
+ * - Not `pending` any more (already accepted, failed, cancelled or reviewed): `unchanged`, so a repeated
  *   publish (job redelivery after a lost lease) changes nothing.
  * - Publish failed: `failed`.
  * - Published on the default branch: `approved`, whatever the review switch says.

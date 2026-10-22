@@ -16,13 +16,13 @@ const cancelBuildRoute = createRoute({
   tags: ["Builds"],
   summary: "Cancel a build",
   description:
-    "Stops the work of a build that has not finished capturing: its queued jobs (capture, publish and notification jobs alike) end cancelled, running ones are signalled and stop within seconds, and the build ends `failed` (there is no separate cancelled status). `testing` class. 409 when the build is not pending, capturing or comparing.",
+    "Stops the work of a build that has not finished capturing: its queued jobs (capture, publish and notification jobs alike) end cancelled, running ones are signalled and stop within seconds, and the build ends `cancelled`, a terminal status that a capture finishing late cannot move (retry resets it like a failed build). It raises `build:cancelled` (webhook and notification topic), never `build:failed` or a capture-failed alert. `testing` class. 409 when the build is not pending, capturing or comparing.",
   path: "/api/v1/projects/{slug}/builds/{buildId}/cancel",
   request: { params: z.object({ slug: z.string(), buildId: z.string() }) },
   responses: {
     200: {
       content: { "application/json": { schema: buildSchema } },
-      description: "The build's jobs were cancelled and the build marked failed",
+      description: "The build's jobs were cancelled and the build marked cancelled",
     },
     409: {
       content: { "application/json": { schema: errorSchema } },
@@ -50,15 +50,16 @@ export function registerBuildCancel(app: ShelfRouter): void {
 }
 
 /**
- * Cancel the build's jobs of every kind, close its open attempts, then fail the build and announce
- * it like any other failure. A capture still running notices the cancel on its next check (within
- * seconds) and stops; the jobs end first so the failure's own notification job is not cancelled.
+ * Cancel the build's jobs of every kind, close its open attempts, then end the build `cancelled` and
+ * announce it. A capture still running notices the cancel on its next check (within seconds) and
+ * stops; whatever it still writes cannot move the build off `cancelled`. The jobs end first so the
+ * cancel's own notification job is not cancelled.
  */
 async function cancelBuild(buildId: string): Promise<Build> {
   const { db, cancelBuildJobs } = getStore();
   await cancelBuildJobs?.(buildId);
   await new CaptureAttemptModel(db).closeOthers(buildId, null, "Cancelled by a user");
-  const updated = await new BuildModel(db).setStatus(buildId, "failed");
-  await announceBuildStatus(buildId, "failed");
+  const updated = await new BuildModel(db).setStatus(buildId, "cancelled");
+  await announceBuildStatus(buildId, "cancelled");
   return updated;
 }

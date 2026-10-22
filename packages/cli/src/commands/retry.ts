@@ -18,7 +18,7 @@ export interface RetryOptions {
 }
 
 /**
- * Retry a failed StoryShelf build.
+ * Retry a failed or cancelled StoryShelf build.
  *
  * @param options - Retry command options.
  */

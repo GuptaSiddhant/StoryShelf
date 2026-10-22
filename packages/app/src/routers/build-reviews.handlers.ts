@@ -17,7 +17,7 @@ import { REVIEW_EVENTS, announceReview } from "../review-events.ts";
 import { getStore } from "../store.ts";
 import { announceBuildStatus } from "./builds.handlers.ts";
 
-/** Statuses the verdicts may move a build between; a failed or capturing build is not theirs to decide. */
+/** Statuses the verdicts may move a build between; a failed, cancelled or capturing build is not theirs to decide. */
 const VERDICT_STATUSES: ReadonlySet<BuildStatus> = new Set(["pending", "approved", "rejected"]);
 
 /** Where a build stands in review. */
@@ -86,7 +86,7 @@ export async function giveVerdict(
 }
 
 /**
- * A verdict needs a build that is not `failed`, whose publishing has ended (a publish that later
+ * A verdict needs a build that is neither `failed` nor `cancelled`, whose publishing has ended (a publish that later
  * failed would otherwise leave an approved build without statics), and, when it has no user (an
  * instance without authentication), a project that needs one approval: the anonymous reviewer is
  * one person, however many verdicts they give.
@@ -96,8 +96,10 @@ async function assertReviewable(
   build: Build,
   userId: string | null,
 ): Promise<void> {
-  if (build.status === "failed") {
-    throw new HTTPException(409, { message: "The build failed; there is nothing to review" });
+  if (build.status === "failed" || build.status === "cancelled") {
+    throw new HTTPException(409, {
+      message: `The build ${build.status === "failed" ? "failed" : "was cancelled"}; there is nothing to review`,
+    });
   }
   if ((await publishingOf(getStore().storage, build)) !== "success") {
     throw new HTTPException(409, {

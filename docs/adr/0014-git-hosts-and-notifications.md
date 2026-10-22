@@ -102,7 +102,11 @@ channel's prefix, absolute links from the resolved public origin and the `testin
 the statuses and the pull-request comment. Its details:
 
 - `testing` is `pending` while the build is captured and while review is open (the description
-  counts the changes left), `success` when approved, `failure` when rejected or capture failed.
+  counts the changes left), `success` when approved, `failure` when rejected or capture failed,
+  `cancelled` (description `Cancelled`) when a user cancelled the build. `review` closes the same
+  way. `NotifierState` gains `cancelled`; the providers map it to the host's nearest state: GitLab
+  `canceled`, GitHub `error` (it has no cancelled commit state). The pull-request comment says
+  `Cancelled` on the gate line.
 - `storybook` is `success` once the build's published Storybook exists (its manifest is the marker,
   because it is written last), `failure` for a `failed` build that never published, and `pending`
   otherwise. Capture failing does not fail it: the Storybook is published independently (ADR 0006).
@@ -187,7 +191,8 @@ retries are non-goals for them. While no public origin resolves they are not sen
 
 One topic catalog serves webhooks and notifiers.
 
-- **Project topics:** `build:*`, `baseline:*`, `comment:created`, `review:requested`,
+- **Project topics:** `build:*` (including `build:cancelled`, raised by a user cancel; never
+  default-on and never `build:failed`), `baseline:*`, `comment:created`, `review:requested`,
   `review:comment`, `review:verdict`, `insight:ready` (ADR 0016 AI Insights).
 - **Admin topics:** `sys:user-created`, `sys:invite-issued`, `sys:auth-failed`,
   `sys:capture-failed`, `sys:purge-completed`, `sys:notify-failed`, `sys:ai-budget` (ADR 0016).

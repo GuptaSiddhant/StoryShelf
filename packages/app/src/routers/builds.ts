@@ -234,7 +234,7 @@ export function registerBuilds(app: ShelfRouter): void {
     const { slug, buildId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...DEVELOPER_ROLES);
     const build = await buildForProject(project.id, buildId);
-    const updated = await new BuildModel(getStore().db).setStatus(build.id, "pending");
+    const updated = await new BuildModel(getStore().db).resetStatus(build.id, "pending");
     await getStore().enqueueCapture?.(build.id, c.get("requestId"));
     hxRefresh(c);
     flashHx(c, "Capture queued");

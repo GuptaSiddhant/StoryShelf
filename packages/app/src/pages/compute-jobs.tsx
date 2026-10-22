@@ -15,6 +15,10 @@ import {
   statusTone,
 } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
+
+/** Build statuses the retry button of the jobs table offers. */
+const RETRYABLE: ReadonlySet<string> = new Set(["failed", "cancelled", "pending"]);
+
 interface QueueView {
   buildId: string;
   status: string;
@@ -154,7 +158,7 @@ export async function renderComputeJobsPage(
                       >
                         View
                       </Button>
-                      {canRetry && (build.status === "failed" || build.status === "pending") ? (
+                      {canRetry && RETRYABLE.has(build.status) ? (
                         <form
                           method="post"
                           action={`/api/v1/projects/${project.slug}/builds/${build.id}/retry`}

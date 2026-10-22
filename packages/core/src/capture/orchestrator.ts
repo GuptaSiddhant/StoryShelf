@@ -134,7 +134,7 @@ export async function executeCaptureJob(
   input: CaptureJobInput,
   options: CaptureJobOptions,
 ): Promise<CaptureSummary> {
-  const builds = new BuildModel(options.db, options.tables);
+  const builds = new BuildModel(options.db, options.tables, options.logger);
   const { build, project } = await loadTarget(options, input.buildId);
   return await withSpan(
     "capture.job",
@@ -169,6 +169,10 @@ async function runCapturePhases(
     reqId: input.reqId,
     ...(input.attempt ? { attemptNo: input.attempt.attemptNo } : {}),
   });
+  if (build.status === "cancelled") {
+    logger?.info("build is cancelled; capture skipped");
+    return { storyCount: 0, failedCount: 0 };
+  }
   await builds.setStatus(build.id, "capturing");
 
   const startTime = performance.now();

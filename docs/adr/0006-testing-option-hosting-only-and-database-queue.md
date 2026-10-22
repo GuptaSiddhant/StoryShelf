@@ -227,9 +227,23 @@ third-party `DatabaseAdapter` implementations, which is accepted.
   `PollableCaptureQueue.inspect` report. The API and UI are `POST /api/v1/projects/:slug/builds/:id/cancel`
   (class `testing`; developer role and above) and **Cancel build** on the build page, offered while
   the build is `pending`, `capturing` or `comparing`: the jobs are cancelled first, open capture attempts end `cancelled`, then the build becomes
-  `failed` (there is no `cancelled` build status) through `announceBuildStatus`, so git channels,
-  webhook and notifications see an ordinary failure. A capture that is still running stops within
-  the 5 s cancel check; until then it may still write a progress status to the build.
+  `cancelled` through `announceBuildStatus`, so git channels (`statusesForBuild` has a case for it:
+  GitLab `canceled`, GitHub `error`, description `Cancelled`, on `<prefix>/testing` or
+  `<prefix>/review` alike), the `build:cancelled` webhook and notification topic (not default-on)
+  report a cancel, never a failure; a user cancel raises no `build:failed` and no `sys:capture-failed`
+  alert. `cancelled` is a build status of its own and **terminal**: `BuildModel.update`/`setStatus`
+  refuse any other status for a cancelled build (the row is returned unchanged, logged at debug),
+  `CaptureAttemptModel.markRunning`/`markFinished` leave an attempt a cancel closed as `cancelled`,
+  `finalizeBuild` skips a cancelled build (counts and orphan baselines untouched), the orchestrator
+  does not start capturing one, and snapshot approval and build verdicts answer 409. A capture that
+  is still running stops within the 5 s cancel check, and whatever it writes until then cannot move
+  the build off `cancelled`, so there is no window of late status writes. The one way out is a retry
+  (`POST …/retry`, `BuildModel.resetStatus`), which resets the build to `pending` as for `failed`.
+  Cancelled builds are purged like failed ones (`TERMINAL_BUILD_STATUSES`) and never published or
+  accepted (`publishVerdict` leaves any status but `pending` alone). The status check and the write
+  are two statements, not one conditional update, so a write landing between them during a cancel is
+  possible in principle; the cancel flow cancels jobs and closes attempts first to keep that window
+  to a single in-flight write.
 - **Views.** `status`, `active` and `recent` read the table, so the compute-jobs page shows every
   instance's jobs.
 - **Trace propagation** (ADR 0015, Observability and Logging): `traceparent` and the request id travel

@@ -28,7 +28,16 @@ export const listBuilds: ToolDef = {
     project,
     branch: z.string().optional().describe("Only builds on this git branch"),
     status: z
-      .enum(["pending", "capturing", "comparing", "reviewing", "approved", "rejected", "failed"])
+      .enum([
+        "pending",
+        "capturing",
+        "comparing",
+        "reviewing",
+        "approved",
+        "rejected",
+        "failed",
+        "cancelled",
+      ])
       .optional(),
     limit: z.number().int().min(1).max(100).default(20).describe("Max builds to return"),
   },

@@ -58,7 +58,7 @@ builds (
   author_name         text,
   message             text,
   public              boolean NOT NULL DEFAULT false,  -- individual build override for public viewing
-  status              text NOT NULL DEFAULT 'pending',  -- pending|capturing|comparing|reviewing|approved|rejected|failed
+  status              text NOT NULL DEFAULT 'pending',  -- pending|capturing|comparing|reviewing|approved|rejected|failed|cancelled
   snapshot_count      integer NOT NULL DEFAULT 0,
   changed_count       integer NOT NULL DEFAULT 0,
   approved_count      integer NOT NULL DEFAULT 0,
@@ -482,7 +482,7 @@ Capture is CPU/IO-heavy and long-running (minutes to tens of minutes). It must n
 
 - `POST /builds` stores the zip and returns **202 Accepted** immediately.
 - The job goes on the **database queue** (`capture_jobs`, below). Every instance with `testing` consumes it, with a **configurable concurrency** (`testing.concurrency`, auto-sized by default).
-- A user can cancel a build that is `pending`, `capturing` or `comparing` (`POST …/builds/:id/cancel`, **Cancel build** on the build page): its jobs of every kind are cancelled, a running capture stops within the 5 s cancel check, and the build ends `failed` (there is no `cancelled` build status). The MCP server does not expose it.
+- A user can cancel a build that is `pending`, `capturing` or `comparing` (`POST …/builds/:id/cancel`, **Cancel build** on the build page): its jobs of every kind are cancelled, a running capture stops within the 5 s cancel check, and the build ends `cancelled` (a status of its own, terminal: later status writes from the capture path are refused, a retry resets it; `build:cancelled` is the event, git channels show it as `cancelled`). The MCP server does not expose it.
 - There is no boot sweep. A build left `capturing` by a killed instance is recovered by lease expiry: another instance claims the job again, and if every attempt (`testing.retries + 1`) is lost the job fails and `onExhausted` fails the build (`failCrashedCapture`: the attempt closes, the build becomes `failed`, a failure git status is posted, admins are alerted), so a crash loop cannot repeat captures forever and a second instance can boot without touching the first one's builds.
 
 #### Database queue (`capture_jobs`)
@@ -709,11 +709,11 @@ With `testing` off (ADR 0013, decision 3) the verdicts in `build_reviews` decide
 
 A git channel (a `notification_channels` row whose provider declares `delivery: "state"`, ADR 0014) shows the build's current state on its `git_sha`: commit statuses and one pull-request comment. What it shows is a pure function of the build, `statusesForBuild` (`core/src/adapters/notifier/build-state.ts`), so a build that was never captured posts too:
 
-| Status               | Shown when                                                                 | State                                                                                                                                                  |
-| -------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `<prefix>/testing`   | `testing` is on                                                            | `pending` while captured or while review is open, `success` when all `new`/`changed` snapshots are approved, `failure` when rejected or capture failed |
-| `<prefix>/review`    | `testing` is off and the project has review on (`projects.review_enabled`) | `pending` until the build is decided, `success` once approved by verdicts, `failure` when rejected or failed (see Build-level review)                  |
-| `<prefix>/storybook` | every build with a commit                                                  | `success` linking the published Storybook, `failure` for a failed build that never published, else `pending`; informational                            |
+| Status               | Shown when                                                                 | State                                                                                                                                                                                               |
+| -------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<prefix>/testing`   | `testing` is on                                                            | `pending` while captured or while review is open, `success` when all `new`/`changed` snapshots are approved, `failure` when rejected or capture failed, `cancelled` when a user cancelled the build |
+| `<prefix>/review`    | `testing` is off and the project has review on (`projects.review_enabled`) | `pending` until the build is decided, `success` once approved by verdicts, `failure` when rejected or failed, `cancelled` when cancelled (see Build-level review)                                   |
+| `<prefix>/storybook` | every build with a commit                                                  | `success` linking the published Storybook, `failure` for a failed build that never published, else `pending`; informational                                                                         |
 
 The point of the `testing` status is to **block the merge**: the repo owner marks it as a _required check_ in GitHub branch protection (or a required pipeline/approval rule in GitLab), so a PR cannot merge until StoryShelf reports `success`. This is the v1 primitive.
 
@@ -775,7 +775,7 @@ Screenshots accumulate fast. Everything below the **baseline** is transient; the
 
 ### What is purged
 
-- **Builds in a terminal review state** (`approved`/`rejected`) older than `purge_ttl` (default 30 days).
+- **Builds in a terminal state** (`approved`/`rejected`/`failed`/`cancelled`) older than `purge_ttl` (default 30 days).
 - **Old builds of a branch**: retain the most recent build per branch (it is the branch's "current" state and powers the PR status link); purge older ones past TTL.
 - Builds stuck in `capturing`/`comparing`/`reviewing` are **not** purged (a `reviewing` build must not vanish before review).
 - **`pending` builds** (waiting for a review verdict, ADR 0013 decision 9; `core/src/retention/pending.ts`): purged once their last activity (the build's `updated_at`, its newest comment, its newest `build_reviews` row) is older than `purge_ttl`. A pending build replaced by a newer one on its branch with no attempts, comments or verdicts is "superseded" and leaves at the same window; the latest-per-branch rule does not shield pending builds, and persistent ones are kept. No new status.
@@ -891,7 +891,7 @@ GET    /api/v1/projects/:projectId/builds
 POST   /api/v1/projects/:projectId/builds          # multipart: storybook zip + sha/branch/message/author -> 202
 GET    /api/v1/projects/:projectId/builds/:buildId
 POST   /api/v1/projects/:projectId/builds/:buildId/retry   # re-run capture (flaky tests)
-POST   /api/v1/projects/:projectId/builds/:buildId/cancel  # cancel the build's jobs of every kind; the build ends failed (class testing)
+POST   /api/v1/projects/:projectId/builds/:buildId/cancel  # cancel the build's jobs of every kind; the build ends cancelled (class testing)
 DELETE /api/v1/projects/:projectId/builds/:buildId
 
 # Snapshots (read-only API, mutations via review endpoints)

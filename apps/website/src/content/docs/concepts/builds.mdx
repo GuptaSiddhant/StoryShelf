@@ -23,6 +23,9 @@ flowchart LR
     D --> F[rejected]
     B --> G[failed]
     C --> G
+    A --> H[cancelled]
+    B --> H
+    C --> H
 ```
 
 | Status                  | Meaning                            |
@@ -33,6 +36,7 @@ flowchart LR
 | `reviewing`             | Diffs ready, needs human review    |
 | `approved` / `rejected` | Review complete                    |
 | `failed`                | Capture or `play` threw (blocking) |
+| `cancelled`             | A user stopped the build           |
 
 Default-branch builds auto-approve and write baselines; feature-branch builds land in `reviewing`.
 
@@ -72,7 +76,7 @@ Progress lines appear only for runners that stream captures (the bundled Playwri
 
 Retry a flaky capture with `POST …/builds/:id/retry` or `storyshelf retry --build-id`.
 
-Stop a build that is `pending`, `capturing` or `comparing` with **Cancel build** on the build page or `POST /api/v1/projects/:slug/builds/:id/cancel` (developer role and above, needs `testing`). Every queued job of the build (capture, publish and notification jobs) is cancelled, a running capture stops within a few seconds, and the build ends `failed`, so git statuses, webhooks and notifications report an ordinary failure; there is no separate cancelled status. Retry it later like any failed build. A build in any other state answers `409`.
+Stop a build that is `pending`, `capturing` or `comparing` with **Cancel build** on the build page or `POST /api/v1/projects/:slug/builds/:id/cancel` (developer role and above, needs `testing`). Every queued job of the build (capture, publish and notification jobs) is cancelled, a running capture stops within a few seconds, and the build ends `cancelled`. `cancelled` is final: a capture that finishes after the cancel cannot move the build, it cannot be reviewed (no verdict, no snapshot approval; both answer `409`), and it is purged like a failed build. Git statuses show it as cancelled (GitLab `canceled`, GitHub `error` with the description `Cancelled`), the pull request comment says so, and the `build:cancelled` webhook and notification topic fire; a cancel raises no `build:failed` and no capture-failed alert. **Retry** resets a cancelled build to `pending` like a failed one. A build in any other state answers `409`.
 
 ## What outlives a build
 

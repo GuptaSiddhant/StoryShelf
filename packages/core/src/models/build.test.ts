@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { DatabaseAdapter } from "../adapters/database.ts";
+import type { Logger } from "../logger.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { BuildModel, isPublicBuild } from "./build.ts";
 import { ProjectModel } from "./project.ts";
@@ -183,5 +184,51 @@ describe("BuildModel latestApprovedDefault", () => {
     const feature = await model.create(project.id, { gitSha: "a", gitBranch: "feature/x" });
     await model.update(feature.id, { status: "approved" });
     expect(await model.latestApprovedDefault(project)).toBeNull();
+  });
+});
+
+async function cancelled() {
+  const { db } = makeDatabase();
+  const model = new BuildModel(db, buildTables(db));
+  const build = await model.create("p1", { gitSha: "abc", gitBranch: "main" });
+  await model.setStatus(build.id, "capturing");
+  await model.setStatus(build.id, "cancelled");
+  return { model, id: build.id };
+}
+
+describe("BuildModel: a cancelled build is terminal", () => {
+  it("refuses every later status write and returns the row as it is", async () => {
+    const { model, id } = await cancelled();
+    const attempts = (["capturing", "failed", "approved", "reviewing"] as const).flatMap(
+      (status) => [model.setStatus(id, status), model.update(id, { status })],
+    );
+    const rows = await Promise.all(attempts);
+    expect(rows.map((row) => row.status)).toEqual(rows.map(() => "cancelled"));
+    expect((await model.get(id))?.status).toBe("cancelled");
+  });
+
+  it("still lets other fields change, and a repeated cancel through", async () => {
+    const { model, id } = await cancelled();
+    expect((await model.update(id, { message: "note" })).message).toBe("note");
+    expect((await model.setStatus(id, "cancelled")).status).toBe("cancelled");
+  });
+
+  it("logs the refused write at debug", async () => {
+    const { db } = makeDatabase();
+    const debug = vi.fn();
+    const model = new BuildModel(db, buildTables(db), { debug } as unknown as Logger);
+    const build = await model.create("p1", { gitSha: "abc", gitBranch: "main" });
+    await model.setStatus(build.id, "cancelled");
+    await model.setStatus(build.id, "failed");
+    expect(debug).toHaveBeenCalledWith(
+      { buildId: build.id, refused: "failed" },
+      "build is cancelled; status write refused",
+    );
+  });
+
+  it("is left only by resetStatus (retry)", async () => {
+    const { model, id } = await cancelled();
+    expect((await model.resetStatus(id, "pending")).status).toBe("pending");
+    expect((await model.setStatus(id, "capturing")).status).toBe("capturing");
   });
 });

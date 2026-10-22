@@ -6,6 +6,7 @@ describe("describeState", () => {
     expect(describeState("pending")).toBe("Visual tests pending");
     expect(describeState("success")).toBe("Visual tests passed");
     expect(describeState("failure")).toBe("Visual changes detected or tests failed");
+    expect(describeState("cancelled")).toBe("Cancelled");
   });
 });
 

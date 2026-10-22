@@ -2,6 +2,7 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import type { Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
+import type { Logger } from "../logger.ts";
 import type { Build } from "../schema/build.ts";
 import type { BuildStatus } from "../types.ts";
 import { ulid } from "../utils/ulid.ts";
@@ -18,9 +19,12 @@ export interface BuildTables {
 export class BuildModel {
   private readonly tables: BuildTables;
   private readonly db: DatabaseAdapter;
+  private readonly logger: Logger | undefined;
 
-  constructor(db: DatabaseAdapter, tables?: BuildTables) {
+  /** `logger` only reports a status write refused by a `cancelled` build, at debug. */
+  constructor(db: DatabaseAdapter, tables?: BuildTables, logger?: Logger) {
     this.db = db;
+    this.logger = logger;
     this.tables = tables ?? {
       builds: db.tables.builds,
       buildLabels: db.tables.buildLabels,
@@ -101,10 +105,26 @@ export class BuildModel {
     return rows[0] ?? null;
   }
 
+  /**
+   * Patch a build. A `cancelled` build is terminal (ADR 0006): a patch that carries another status
+   * is refused, the row is returned as it is, so a capture that ends after a cancel cannot move
+   * the build. Only {@link BuildModel.resetStatus} leaves `cancelled`.
+   */
   async update(
     id: string,
     patch: Partial<Pick<Build, "status" | "public" | "message" | "authorEmail" | "authorName">>,
+    options: { reset?: boolean } = {},
   ): Promise<Build> {
+    if (patch.status !== undefined && patch.status !== "cancelled" && options.reset !== true) {
+      const current = await this.get(id);
+      if (current?.status === "cancelled") {
+        this.logger?.debug(
+          { buildId: id, refused: patch.status },
+          "build is cancelled; status write refused",
+        );
+        return current;
+      }
+    }
     return (await this.db.update(this.tables.builds, id, {
       ...patch,
       updatedAt: new Date().toISOString(),
@@ -113,6 +133,14 @@ export class BuildModel {
 
   async setStatus(id: string, status: BuildStatus): Promise<Build> {
     return await this.update(id, { status });
+  }
+
+  /**
+   * Put a finished build back to `status` for a retry. The one write that leaves `cancelled`
+   * (a user chose it), so it skips the terminal guard of {@link BuildModel.update}.
+   */
+  async resetStatus(id: string, status: BuildStatus): Promise<Build> {
+    return await this.update(id, { status }, { reset: true });
   }
 
   /**

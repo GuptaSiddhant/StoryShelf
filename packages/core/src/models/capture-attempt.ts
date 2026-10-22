@@ -69,6 +69,10 @@ export class CaptureAttemptModel {
   }
 
   async markRunning(id: string): Promise<CaptureAttempt> {
+    const settled = await this.#cancelled(id);
+    if (settled) {
+      return settled;
+    }
     const now = new Date().toISOString();
     return (await this.db.update(this.tables.captureAttempts, id, {
       status: "running",
@@ -83,6 +87,10 @@ export class CaptureAttemptModel {
     error?: string,
     counts?: { storyCount: number; failedCount: number },
   ): Promise<CaptureAttempt> {
+    const settled = status === "cancelled" ? null : await this.#cancelled(id);
+    if (settled) {
+      return settled;
+    }
     const now = new Date().toISOString();
     return (await this.db.update(this.tables.captureAttempts, id, {
       status,
@@ -92,6 +100,18 @@ export class CaptureAttemptModel {
       finishedAt: now,
       updatedAt: now,
     })) as unknown as CaptureAttempt;
+  }
+
+  /**
+   * The attempt row when a cancel already closed it (ADR 0006): a run that ends after a user
+   * cancelled the build must not rewrite the row as `completed` or `failed`. Null otherwise.
+   */
+  async #cancelled(id: string): Promise<CaptureAttempt | null> {
+    const row = (await this.db.get(
+      this.tables.captureAttempts,
+      id,
+    )) as unknown as CaptureAttempt | null;
+    return row?.status === "cancelled" ? row : null;
   }
 
   /**

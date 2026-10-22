@@ -25,6 +25,10 @@ describe("mapState", () => {
     expect(mapState("failure")).toBe("failure");
   });
 
+  it("maps cancelled to error, the host's did-not-complete state", () => {
+    expect(mapState("cancelled")).toBe("error");
+  });
+
   it("maps unknown states to error", () => {
     expect(mapState("bogus" as NotifierState)).toBe("error");
   });

@@ -659,7 +659,11 @@ export async function finalizeBuild(
   flakyFailedStoryIds: ReadonlySet<string> = new Set(),
   a11yFailedStoryIds: ReadonlySet<string> = new Set(),
 ): Promise<void> {
-  const builds = new BuildModel(ctx.db, ctx.tables);
+  const builds = new BuildModel(ctx.db, ctx.tables, ctx.logger);
+  if ((await builds.get(ctx.build.id))?.status === "cancelled") {
+    ctx.logger?.debug({ buildId: ctx.build.id }, "build is cancelled; finalize skipped");
+    return;
+  }
   const build = await builds.updateCounts(ctx.build.id);
   const hasCaptures = storyIds.size > 0;
   const status = finalBuildStatus(ctx.build.isDefault, failedStoryIds.size, hasCaptures, build);

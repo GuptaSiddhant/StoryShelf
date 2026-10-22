@@ -40,6 +40,22 @@ describe("CaptureAttemptModel", () => {
     expect(done.finishedAt).not.toBeNull();
   });
 
+  it("keeps an attempt a cancel closed: a run that ends late cannot rewrite it", async () => {
+    const { db } = makeDatabase();
+    const model = new CaptureAttemptModel(db, attemptTables(db));
+    const attempt = await model.startAttempt("p1", "b1");
+    await model.markRunning(attempt.id);
+    await model.closeOthers("b1", null, "Cancelled by a user");
+    expect((await model.markRunning(attempt.id)).status).toBe("cancelled");
+    const late = await model.markFinished(attempt.id, "completed", undefined, {
+      storyCount: 3,
+      failedCount: 0,
+    });
+    expect(late).toMatchObject({ status: "cancelled", error: "Cancelled by a user" });
+    expect((await model.markFinished(attempt.id, "failed", "boom")).status).toBe("cancelled");
+    expect((await model.getByNo("b1", 1))?.status).toBe("cancelled");
+  });
+
   it("records the terminal error on failure", async () => {
     const { db } = makeDatabase();
     const model = new CaptureAttemptModel(db, attemptTables(db));
