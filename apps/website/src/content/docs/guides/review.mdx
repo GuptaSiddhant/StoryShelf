@@ -41,7 +41,7 @@ Comments persist until the build is purged (see [Retention](/concepts/retention/
 ## Retry & merge gate
 
 - **Flaky capture:** **Retry** on the build page re-enqueues the same build ID (`POST …/builds/:id/retry`) — see [Interaction testing](/guides/interaction-testing/) for `flakyTest` handling.
-- **Merge gate:** each project posts `storyshelf/<slug>` commit status via the git-host adapter (`@storyshelf/git-github` / `@storyshelf/git-gitlab`). Branch protection marks it **required** — `pending` while capturing, `success` when `approved`, `failure` when `rejected` or remained unresolved. A future GitHub App will add per-snapshot check-run annotations (ADR 0010).
+- **Merge gate:** each project posts a `<prefix>/testing` commit status (prefix `storyshelf` by default) through its git channels ([`@storyshelf/notify-git`](/packages/notify-git/)). Branch protection marks it **required** — `pending` while capturing, `success` when `approved`, `failure` when `rejected` or remained unresolved. A future GitHub App will add per-snapshot check-run annotations (ADR 0010).
 
 ## AI triage and project health
 

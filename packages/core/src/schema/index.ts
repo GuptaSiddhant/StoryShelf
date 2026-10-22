@@ -53,7 +53,6 @@ export type { Project, StorybookMeta } from "./project.ts";
 /** Snapshot row capturing a single story at one viewport. */
 export type { Snapshot } from "./snapshot.ts";
 /** Per-project git provider status-check configuration row. */
-export type { ProjectStatusConfig } from "./status-config.ts";
 /** CI token row (stores only the hash). */
 export type { Token } from "./token.ts";
 /** User row for authenticated identities. */

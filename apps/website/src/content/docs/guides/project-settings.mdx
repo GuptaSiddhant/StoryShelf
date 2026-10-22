@@ -5,7 +5,7 @@ description: Configure members, label types, tokens, webhooks, and visibility pe
 
 import Screenshot from "../../../components/Screenshot.astro";
 
-Each project carries its own settings — under `/projects/:slug/settings` (sections: General, Capture, Tests, Labels, Tokens, Webhooks, Notifications, Members, Git status, and AI when the server has AI configured) and via `PATCH /api/v1/projects/:slug`.
+Each project carries its own settings — under `/projects/:slug/settings` (sections: General, Capture, Tests, Labels, Tokens, Webhooks, Notifications (chat, email and git channels), Members, and AI when the server has AI configured) and via `PATCH /api/v1/projects/:slug`.
 
 <Screenshot
   name="project-settings"

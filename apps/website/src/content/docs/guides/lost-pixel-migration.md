@@ -101,4 +101,4 @@ If you need page-level shots, keep a small Playwright test for those pages outsi
 - ☐ CI step replaced; `lostpixel.config.ts` and `.lostpixel/baseline/` deleted
 - ☐ First default-branch build uploaded and baselines established
 - ☐ Thresholds, viewports and per-story delays carried over
-- ☐ Branch protection requires `storyshelf/<project-slug>` ([Merge gate](/guides/merge-gate/))
+- ☐ Branch protection requires `storyshelf/testing` (or your channel prefix) ([Merge gate](/guides/merge-gate/))

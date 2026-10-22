@@ -54,18 +54,6 @@
       "source": "./src/adapters/email-sender.ts",
       "default": "./dist/adapter/email-sender.mjs"
     },
-    "./adapter/git-host": {
-      "source": "./src/adapters/git-host/index.ts",
-      "default": "./dist/adapter/git-host.mjs"
-    },
-    "./adapter/git-host/comments": {
-      "source": "./src/adapters/git-host/comments.ts",
-      "default": "./dist/adapter/git-host/comments.mjs"
-    },
-    "./adapter/git-host/helpers": {
-      "source": "./src/adapters/git-host/helpers.ts",
-      "default": "./dist/adapter/git-host/helpers.mjs"
-    },
     "./adapter/metadata": {
       "source": "./src/adapters/metadata.ts",
       "default": "./dist/adapter/metadata.mjs"
@@ -172,9 +160,6 @@
       "./adapter/database": "./dist/adapter/database.mjs",
       "./adapter/design": "./dist/adapter/design.mjs",
       "./adapter/email-sender": "./dist/adapter/email-sender.mjs",
-      "./adapter/git-host": "./dist/adapter/git-host.mjs",
-      "./adapter/git-host/comments": "./dist/adapter/git-host/comments.mjs",
-      "./adapter/git-host/helpers": "./dist/adapter/git-host/helpers.mjs",
       "./adapter/metadata": "./dist/adapter/metadata.mjs",
       "./adapter/notifier": "./dist/adapter/notifier.mjs",
       "./adapter/oauth": "./dist/adapter/oauth.mjs",

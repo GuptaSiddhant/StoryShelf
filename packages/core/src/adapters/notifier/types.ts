@@ -43,6 +43,35 @@ export interface NotificationChannel {
   secret?: string;
   events: string[];
   enabled: boolean;
+  /** Last delivery error, cleared by the next successful delivery. */
+  lastError?: string;
+}
+
+/** What a `state` provider shows for a build: pending, passed or failed. */
+export type NotifierState = "pending" | "success" | "failure";
+
+/** Where a `state` provider writes: a commit status or a pull-request comment. */
+export type NotifierStateTarget =
+  | {
+      kind: "status";
+      sha: string;
+      /** Full status name on the host, e.g. `storyshelf/testing` (the caller owns the prefix). */
+      context: string;
+      /** Short text beside the status; the provider supplies a default. */
+      description?: string;
+    }
+  | {
+      kind: "comment";
+      sha: string;
+      /** Comment body below the idempotency marker. */
+      markdown: string;
+    };
+
+/** Result of one delivery attempt to a channel, reported to the host for health display. */
+export interface ChannelOutcome {
+  channelId: string;
+  /** Sanitized error text, absent on success. */
+  error?: string;
 }
 
 /** App-level (site-wide) admin alert — no project scope. */

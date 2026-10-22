@@ -135,16 +135,25 @@ describe("validateAdapterSources", () => {
     expect(failures[0]?.error.length).toBeGreaterThan(0);
   });
 
-  it("validates git providers including schema", () => {
+  it("validates state notifier providers including schema", () => {
     const failures = validateAdapterSources({
       database: database() as never,
       storage: storage() as never,
-      gitHosts: [
-        { metadata: { name: "GH", version: "1", kind: "gh", category: "git-host" } } as never,
+      notifiers: [
+        {
+          metadata: {
+            name: "GH",
+            version: "1",
+            kind: "gh",
+            category: "notifier",
+            delivery: "state",
+          },
+        } as never,
       ],
     });
     expect(failures).toHaveLength(1);
-    expect(failures[0]?.category).toBe("git-host");
+    expect(failures[0]?.category).toBe("notifier");
+    expect(failures[0]?.error).toContain("missing methods: create");
   });
 
   it("validates design providers", () => {

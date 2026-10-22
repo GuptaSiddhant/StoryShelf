@@ -2,7 +2,7 @@
 import type { CaptureRunner } from "../../adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "../../adapters/database.ts";
 import type { DesignProvider } from "../../adapters/design.ts";
-import type { GitHostProvider } from "../../adapters/git-host/index.ts";
+import type { NotifierProvider } from "../../adapters/notifier/provider.ts";
 import type { StorageAdapter } from "../../adapters/storage.ts";
 import type { Logger } from "../../logger.ts";
 import type { SecretInput } from "../../utils/encrypt.ts";
@@ -23,7 +23,8 @@ export interface CaptureHandlerOptions {
   logger: Logger;
   /** Puts a shard job on the queue; sharding needs it. Defaults to the consumed queue's `enqueue`. */
   enqueue: (job: ShardJob) => Promise<void>;
-  gitHosts?: GitHostProvider[];
+  /** Notifier providers; `state` channels (git hosts) get the build statuses. */
+  notifiers?: NotifierProvider[];
   /** Design providers validating declared design links during capture. */
   design?: DesignProvider[];
   /** Server secret for webhook decryption. */
@@ -115,12 +116,12 @@ export function captureDispatchDeps(
       builds: t.builds,
       buildLabels: t.buildLabels,
       snapshots: t.snapshots,
-      projectStatusConfigs: t.projectStatusConfigs,
+      notificationChannels: t.notificationChannels,
       captureAttempts: t.captureAttempts,
       captureLogs: t.captureLogs,
     },
     jobOptions,
-    gitHosts: options.gitHosts ?? [],
+    notifiers: options.notifiers ?? [],
     secret: options.secret,
     logger: options.logger,
     maxRetries,

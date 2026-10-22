@@ -1,6 +1,6 @@
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
 import { NotificationChannelModel, NotificationSubscriptionModel } from "@storyshelf/core/models";
-import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
+import { makeDatabase, makeFakeStateNotifier, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { notifyProject, notifySystem } from "./notify.ts";
@@ -60,7 +60,6 @@ function storeFor(db: ReturnType<typeof makeDatabase>["db"], notifiers: Notifier
     authEnabled: false,
     testing: false,
     sessionId: "test",
-    gitHosts: [],
     design: [],
     notifiers,
   };
@@ -97,6 +96,61 @@ describe("notifyProject", () => {
       await notifyProject({ id: "p1", slug: "test-project" }, "build:created", {});
     });
     expect(sent).toHaveLength(0);
+  });
+
+  it("records a failed delivery on the channel and clears it after the next success", async () => {
+    const { db } = makeDatabase();
+    await seedProject(db);
+    const model = new NotificationChannelModel(db, undefined, SECRET);
+    const channel = await model.create({ projectId: "p1", provider: "log", config: {} });
+    let failing = true;
+    const metadata = {
+      name: "log",
+      version: "0.0.0",
+      kind: "log",
+      category: "notifier" as const,
+      schema: {} as never,
+    };
+    const flaky: NotifierProvider = {
+      metadata,
+      create: () => ({
+        metadata,
+        // oxlint-disable-next-line eslint/require-await -- send is async by contract
+        send: async () => {
+          if (failing) {
+            throw new Error("webhook returned 500");
+          }
+        },
+      }),
+    };
+    const run = async (): Promise<void> => {
+      await runWithStore(storeFor(db, [flaky]), async () => {
+        await notifyProject({ id: "p1", slug: "test-project" }, "build:created", {});
+      });
+    };
+
+    await run();
+    expect((await model.get(channel.id))?.lastError).toBe("webhook returned 500");
+
+    failing = false;
+    await run();
+    expect((await model.get(channel.id))?.lastError).toBeNull();
+  });
+
+  it("never sends chat messages to git (state) channels", async () => {
+    const { db } = makeDatabase();
+    await seedProject(db);
+    await new NotificationChannelModel(db, undefined, SECRET).create({
+      projectId: "p1",
+      provider: "fake-git",
+      config: { owner: "acme", repo: "widgets" },
+      secret: "token",
+    });
+    const git = makeFakeStateNotifier("fake-git");
+    await runWithStore(storeFor(db, [git.provider]), async () => {
+      await notifyProject({ id: "p1", slug: "test-project" }, "build:created", {});
+    });
+    expect(git.calls).toHaveLength(0);
   });
 
   it("emails opted-in subscribers only when an email provider is wired", async () => {

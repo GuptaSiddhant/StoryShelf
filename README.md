@@ -47,9 +47,8 @@ packages/
   storage-local/  @storyshelf/storage-local — local filesystem storage
   storage-s3/     @storyshelf/storage-s3    — S3-compatible storage
   auth/         @storyshelf/auth        — Better Auth engine (local / social / SSO / passkeys)
-  git-github/     @storyshelf/git-github    — GitHub commit status / merge gate / PR comments
+  notify-git/     @storyshelf/notify-git    — GitHub/GitLab commit statuses and PR/MR comments as git notification channels
   design-figma/   @storyshelf/design-figma  — Figma design links, metadata and rendered previews
-  git-gitlab/     @storyshelf/git-gitlab    — GitLab commit statuses, MR comments, merge-gate helpers
   cli/            storyshelf              — CLI client (server init, init, create, upload, purge, retry)
   runner-playwright/ @storyshelf/runner-playwright — Playwright capture runner
   runner-puppeteer/ @storyshelf/runner-puppeteer — Puppeteer capture runner

@@ -79,4 +79,55 @@ describe("NotificationChannelModel", () => {
       field: "config",
     });
   });
+
+  it("requires a project and a token for state (git) providers", () => {
+    const git = {
+      metadata: { kind: "github", delivery: "state", schema: z.object({ owner: z.string() }) },
+    } as unknown as NotifierProvider;
+    const config = { owner: "acme" };
+    expect(
+      NotificationChannelModel.validateInput([git], "github", config, {
+        projectId: "p1",
+        hasSecret: true,
+      }),
+    ).toEqual({ ok: true });
+    expect(
+      NotificationChannelModel.validateInput([git], "github", config, {
+        projectId: null,
+        hasSecret: true,
+      }),
+    ).toMatchObject({ ok: false, field: "provider" });
+    expect(
+      NotificationChannelModel.validateInput([git], "github", config, {
+        projectId: "p1",
+        hasSecret: false,
+      }),
+    ).toMatchObject({ ok: false, field: "secret" });
+    expect(NotificationChannelModel.isStateKind([git], "github")).toBe(true);
+    expect(NotificationChannelModel.isStateKind([git], "slack")).toBe(false);
+  });
+
+  it("records the last delivery error with its time and clears it on success", async () => {
+    const { db } = makeDatabase();
+    const created = await model(db).create({ projectId: "p1", provider: "log", config: {} });
+    expect(created.lastError).toBeNull();
+
+    await model(db).recordOutcome(created.id, "HTTP 401: Bad credentials");
+    const failed = await model(db).get(created.id);
+    expect(failed?.lastError).toBe("HTTP 401: Bad credentials");
+    expect(failed?.lastErrorAt).not.toBeNull();
+
+    await model(db).recordOutcome(created.id);
+    const cleared = await model(db).get(created.id);
+    expect(cleared?.lastError).toBeNull();
+    expect(cleared?.lastErrorAt).toBeNull();
+  });
+
+  it("skips the write when a clean channel reports success", async () => {
+    const { db } = makeDatabase();
+    const created = await model(db).create({ projectId: "p1", provider: "log", config: {} });
+    await model(db).recordOutcome(created.id);
+    await model(db).recordOutcome("missing", "boom");
+    expect((await model(db).get(created.id))?.updatedAt).toBe(created.updatedAt);
+  });
 });

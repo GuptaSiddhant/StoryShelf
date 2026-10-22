@@ -196,7 +196,7 @@ describe("runServerInit", () => {
         database: "sqlite",
         storage: "local",
         auth: "oauth",
-        git: "github",
+        git: "git",
         docker: false,
       })
       .mockResolvedValueOnce({
@@ -243,7 +243,7 @@ describe("runServerInit", () => {
         database: "sqlite",
         storage: "local",
         auth: "oauth",
-        git: "github",
+        git: "git",
         docker: false,
       })
       .mockResolvedValueOnce({
@@ -289,7 +289,7 @@ describe("runServerInit", () => {
         database: "sqlite",
         storage: "local",
         auth: "oauth",
-        git: "github",
+        git: "git",
         docker: false,
       })
       .mockResolvedValueOnce({
@@ -454,6 +454,33 @@ describe("runServerInit", () => {
     const code = readFileSync(join(dir, "src", "index.ts"), "utf8");
     expect(code.match(/from "@storyshelf\/auth"/gu)).toHaveLength(1);
     expect(code.match(/from "@storyshelf\/app"/gu)).toHaveLength(1);
+  });
+
+  it("wires the git notifiers from @storyshelf/notify-git, never gitHosts", async () => {
+    await scaffold({ git: "git" });
+    const code = readFileSync(join(dir, "src", "index.ts"), "utf8");
+    expect(code).toContain('import { gitNotifiers } from "@storyshelf/notify-git";');
+    expect(code).toContain("notifications: { notifiers: [...gitNotifiers] },");
+    expect(code).not.toContain("gitHosts");
+    const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
+      dependencies: Record<string, string>;
+    };
+    expect(pkg.dependencies["@storyshelf/notify-git"]).toBe("0.3.2");
+    expect(Object.keys(pkg.dependencies).some((name) => name.includes("git-git"))).toBe(false);
+  });
+
+  it("puts chat, email and git notifiers in one list", async () => {
+    await scaffold({ git: "git", notifications: true });
+    const code = readFileSync(join(dir, "src", "index.ts"), "utf8");
+    expect(code).toContain(
+      "notifications: { notifiers: [...chatNotifiers, ...emailNotifiers, ...gitNotifiers] },",
+    );
+  });
+
+  it("leaves git out when not chosen", async () => {
+    await scaffold({ git: "none" });
+    const code = readFileSync(join(dir, "src", "index.ts"), "utf8");
+    expect(code).not.toContain("notify-git");
   });
 
   it("always declares dataDir: it is the capture scratch directory", async () => {

@@ -1,4 +1,4 @@
-import { NotificationChannelModel, StatusConfigModel, WebhookModel } from "@storyshelf/core/models";
+import { NotificationChannelModel, WebhookModel } from "@storyshelf/core/models";
 import { credentialKeys } from "../credential-keys.ts";
 import { getStore } from "../store.ts";
 
@@ -8,12 +8,6 @@ import { getStore } from "../store.ts";
 export function webhookModel(): WebhookModel {
   const { db, config } = getStore();
   return new WebhookModel(db, undefined, credentialKeys(config));
-}
-
-/** Status-config model for the current request. */
-export function statusConfigModel(): StatusConfigModel {
-  const { db, config } = getStore();
-  return new StatusConfigModel(db, undefined, credentialKeys(config));
 }
 
 /** Notification-channel model for the current request. */

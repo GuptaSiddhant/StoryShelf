@@ -103,7 +103,7 @@ function buildHandler(
     storage: options.storage,
     runner: options.runner,
     scratchDir: options.scratchDir,
-    gitHosts: options.gitHosts,
+    notifiers: options.notifiers,
     design: options.design,
     secret: options.secret,
     viewports: options.viewports,

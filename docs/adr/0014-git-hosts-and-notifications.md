@@ -62,11 +62,12 @@ that is already merged is captured like any other (there is no `isMerged` check)
   presets.
 - **`@storyshelf/notify-chat`** is zero-dependency, `fetch` only: `slack-webhook`,
   `teams-workflow`, `log` (Mattermost and Discord can follow as renderers).
-- **`@storyshelf/notify-git`** owns the `@octokit` dependencies: `github`, `gitlab`, and a `log`
-  provider for tests and local runs.
+- **`@storyshelf/notify-git`** is zero-dependency like `notify-chat` (calls go through `httpJson`, no
+  `@octokit`): `github`, `gitlab`, and a `git-log` provider for tests and local runs (`log` is taken
+  by `notify-chat`, and provider kinds are unique across packages).
 
-They are packages, not part of `@storyshelf/core`, because core carries none of the provider SDKs
-(single owner per third-party dependency, ADR 0001 Architecture and Conventions). Channels needing a
+They are packages, not part of `@storyshelf/core`, because core carries none of the provider code or
+SDKs (single owner per third-party dependency, ADR 0001 Architecture and Conventions). Channels needing a
 different identity (WhatsApp with phone numbers and template approval) would be separate packages.
 
 ### 4. Storage

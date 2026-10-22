@@ -144,7 +144,7 @@ async function postTerminal(
     sha: build.gitSha,
     status,
     url: `/projects/${project.slug}/builds/${build.id}`,
-    providers: deps.gitHosts,
+    notifiers: deps.notifiers,
     secret: deps.secret,
     logger: deps.logger,
   }).catch((error: unknown) => {

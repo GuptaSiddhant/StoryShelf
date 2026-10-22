@@ -67,11 +67,10 @@ StoryShelf/
     runner-playwright/ @storyshelf/runner-playwright -- pure Playwright CaptureRenderer (server-side render; core orchestrator owns capture)
     runner-puppeteer/  @storyshelf/runner-puppeteer  -- Puppeteer CaptureRunner (Chromium via chrome-headless-shell, smaller image)
     affected/       @storyshelf/affected        -- Affected capture: dependency-graph tracing that selects the stories impacted by a change
-    git-github/     @storyshelf/git-github      -- GitHub status checks, PR comments, merge-gate helpers (@octokit)
-    git-gitlab/     @storyshelf/git-gitlab      -- GitLab commit statuses, MR comments, merge-gate helpers
     design-figma/   @storyshelf/design-figma    -- Figma design provider: link validation, file metadata, rendered previews (optional; see ADR 0018)
     notify-chat/    @storyshelf/notify-chat     -- Chat notification providers (Slack and Teams incoming webhooks)
     notify-email/   @storyshelf/notify-email    -- Email notification transport (SMTP, Mailpit, log, HTTP APIs)
+    notify-git/     @storyshelf/notify-git      -- Git notification providers (`state` delivery): GitHub and GitLab commit statuses and PR/MR comments, plus a `git-log` provider (zero dependencies, `httpJson`; see ADR 0014)
     observability/  @storyshelf/observability  -- OTEL tracing/metrics/log-correlation (single OTEL owner; see ADR 0015)
     ai/             @storyshelf/ai              -- AI insights engine on the Vercel AI SDK (build triage + project health; see ADR 0016)
     mcp/            @storyshelf/mcp             -- MCP server for AI agents (stdio + Streamable HTTP; thin client over /api/v1, read + comment only; see ADR 0017)

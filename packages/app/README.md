@@ -1,6 +1,6 @@
 # @storyshelf/app
 
-The StoryShelf HTTP app: `createShelfApp()` composes database, storage, capture, auth, and git-host adapters (all from `@storyshelf/core`) into a complete Hono application — JSON API under `/api/v1` plus server-rendered HTML pages (hono/jsx + HTMX, no client framework).
+The StoryShelf HTTP app: `createShelfApp()` composes database, storage, capture, auth, and notifier (chat, email, git) adapters (all from `@storyshelf/core`) into a complete Hono application — JSON API under `/api/v1` plus server-rendered HTML pages (hono/jsx + HTMX, no client framework).
 
 ## Quick start
 

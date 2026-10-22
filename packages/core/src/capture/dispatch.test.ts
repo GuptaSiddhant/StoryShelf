@@ -10,10 +10,14 @@ import { BuildModel } from "../models/build.ts";
 import { CaptureAttemptModel } from "../models/capture-attempt.ts";
 import { CaptureLogModel } from "../models/capture-log.ts";
 import { CaptureShardModel } from "../models/capture-shard.ts";
+import { NotificationChannelModel } from "../models/notification-channel.ts";
 import { ProjectModel } from "../models/project.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
+import { makeFakeStateNotifier } from "../test-helpers/fake-notifier.ts";
 import { storybookZipPath } from "../utils/paths.ts";
 import { createDispatchJob, type DispatchDeps } from "./dispatch.ts";
+
+const SECRET = "test-secret-0123456789abcdef";
 
 function tables(db: DatabaseAdapter) {
   return {
@@ -22,7 +26,7 @@ function tables(db: DatabaseAdapter) {
     buildLabels: db.tables.buildLabels,
     snapshots: db.tables.snapshots,
     baselines: db.tables.baselines,
-    projectStatusConfigs: db.tables.projectStatusConfigs,
+    notificationChannels: db.tables.notificationChannels,
     captureAttempts: db.tables.captureAttempts,
     captureLogs: db.tables.captureLogs,
     captureShards: db.tables.captureShards,
@@ -136,7 +140,7 @@ function depsFor(
       scratchDir,
       logger: createShelfLogger({ level: "silent" }),
     },
-    gitHosts: [],
+    notifiers: [],
     secret: undefined,
     logger: createShelfLogger({ level: "silent" }),
   };
@@ -166,6 +170,35 @@ describe("createDispatchJob attempt history", () => {
     expect(second.length).toBeGreaterThan(0);
     expect(first.map((row) => row.message)).toContain("capture completed");
     expect(first.map((row) => row.seq)).toEqual(first.map((_, index) => index + 1));
+  });
+
+  it("captures a non-default build like any other and shows its states on git channels", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const { project, build } = await seedBuild(db);
+    await storage.write(storybookZipPath(project.id, build.id), zipWithIndex());
+    await new NotificationChannelModel(db, tables(db), SECRET).create({
+      projectId: project.id,
+      provider: "fake-git",
+      config: { prefix: "storyshelf-web" },
+      secret: "ghp_token",
+    });
+    const git = makeFakeStateNotifier();
+    const deps = {
+      ...depsFor(db, storage, fakeRunner(successRender())),
+      notifiers: [git.provider],
+      secret: SECRET,
+    };
+
+    await createDispatchJob(deps)({ buildId: build.id });
+
+    const [attempt] = await new CaptureAttemptModel(db, tables(db)).listByBuild(build.id);
+    expect(attempt?.status).toBe("completed");
+    const firstStatus = git.calls.find((call) => call.target.kind === "status");
+    expect(firstStatus).toMatchObject({
+      state: "pending",
+      target: { sha: "sha-1", context: "storyshelf-web/testing" },
+    });
   });
 
   it("touches the job lease on every attempt-log line", async () => {

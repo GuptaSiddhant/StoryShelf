@@ -400,7 +400,7 @@ CI machine / local dev                  StoryShelf server
 
 ### Adapter Identity & Lifecycle
 
-Every adapter extends the shared `Adapter<Extra>` base (`core/adapter/metadata`): mandatory `metadata: { name, version, description?, kind, category }` plus an optional `lifecycle` sub-object. `lifecycle` is all or nothing — an adapter either omits it or implements all three hooks (`setup`, `teardown`, `health`). `category` (`database | storage | auth | capture-runner | capture-queue | git-host`) names the concern so metadata reads standalone; `kind` stays an open string (`sqlite`, `local`, `s3`, …) for third-party implementations. All hooks must be idempotent.
+Every adapter extends the shared `Adapter<Extra>` base (`core/adapter/metadata`): mandatory `metadata: { name, version, description?, kind, category }` plus an optional `lifecycle` sub-object. `lifecycle` is all or nothing — an adapter either omits it or implements all three hooks (`setup`, `teardown`, `health`). `category` (`database | storage | capture-runner | capture-queue | design | notifier`) names the concern so metadata reads standalone; `kind` stays an open string (`sqlite`, `local`, `s3`, …) for third-party implementations. All hooks must be idempotent.
 
 `createShelfApp` kicks every `lifecycle.setup` eagerly via `Promise.allSettled` and exposes `app.lifecycle { ready, setup(), teardown() }`: `await app.lifecycle.setup()` before serving for fail-fast startup (database migrations run here — there is no top-level `migrate()`), otherwise the first request gates on settlement (503 with per-adapter failures); `await app.lifecycle.teardown()` on `SIGTERM`/`SIGINT`.
 
@@ -661,14 +661,16 @@ Reviewers and developers can leave **threaded comments** on any snapshot (or on 
 
 ### PR Status Checks & Merge Gate
 
-A status adapter (GitHub/GitLab) sets commit statuses on the `git_sha`:
+A git channel (a `notification_channels` row whose provider declares `delivery: "state"`, ADR 0014) sets commit statuses on the `git_sha`:
 - `pending` when the build is created
 - `success` when all `new`/`changed` stories are approved
 - `failure` when changes are rejected or remain unresolved
 
 The point of the status is to **block the merge**: the repo owner marks StoryShelf's status as a *required check* in GitHub branch protection (or a required pipeline/approval rule in GitLab), so a PR cannot merge until StoryShelf reports `success`. This is the v1 primitive.
 
-Because a repo may host several projects (one per Storybook), each project posts its status under a distinct context (`storyshelf/<project-name>`), so multiple Storybooks on the same commit don't collide.
+A git channel is project-scoped and holds `{ owner, repo, host?, prefix? }` in its config and the token in its encrypted secret column; its event filter is fixed because state channels follow the build, not a topic list. The status is named `<prefix>/testing` (prefix default `storyshelf`, no project slug). Because a repo may host several projects (one per Storybook), each project's channel for that repo takes its own prefix (`storyshelf-web`, `storyshelf-docs`), so multiple Storybooks on the same commit don't collide.
+
+Delivery today is inline and best-effort (`Promise.allSettled`, `postStatusesForBuild` in `core/capture/status-fanout.ts` through `emitBuildState`): the provider is asked to `setState` for `(sha, context)` and for the pull-request comment, idempotently with the latest call winning. A failed delivery is stored on the channel (`last_error`, `last_error_at`), shown on the settings page and cleared by the next success. Durable `notify` jobs on the database queue (ADR 0014 decision 7) are not implemented yet.
 
 The full merge-gate story is v2 (ADR 0010): a GitHub App / GitLab integration that posts rich check runs (per-snapshot annotations deep-linking to the diff), authenticates via a repo-installed App rather than a project token, and can auto-reject the PR when the build is rejected.
 

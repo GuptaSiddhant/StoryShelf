@@ -22,15 +22,6 @@ CREATE TABLE IF NOT EXISTS projects (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS project_status_configs (
-  id TEXT PRIMARY KEY,
-  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-  provider TEXT NOT NULL,
-  config TEXT NOT NULL,
-  token_encrypted TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
 CREATE TABLE IF NOT EXISTS builds (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -303,6 +294,8 @@ CREATE TABLE IF NOT EXISTS notification_channels (
   secret_encrypted TEXT,
   events TEXT,
   enabled INTEGER NOT NULL DEFAULT 1,
+  last_error TEXT,
+  last_error_at TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );

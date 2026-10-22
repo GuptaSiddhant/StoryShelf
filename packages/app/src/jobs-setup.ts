@@ -42,7 +42,7 @@ export function setupJobs(
     ...(isServerlessHost(env) ? [] : (["publish"] as const)),
   ];
   const jobs = createJobQueue(options, kinds, retries);
-  const capture = setupCapture(options, runtime.config, runtime.gitHosts, runtime.logger, jobs);
+  const capture = setupCapture(options, runtime.config, runtime.notifiers, runtime.logger, jobs);
   const publishing = setupPublishing(
     options,
     runtime.config,

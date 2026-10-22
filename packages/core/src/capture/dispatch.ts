@@ -1,5 +1,5 @@
 import type { DatabaseAdapter } from "../adapters/database.ts";
-import type { GitHostProvider } from "../adapters/git-host/index.ts";
+import type { NotifierProvider } from "../adapters/notifier/provider.ts";
 import type { Logger } from "../logger.ts";
 import { BuildModel, type BuildTables } from "../models/build.ts";
 import {
@@ -10,8 +10,8 @@ import {
 } from "../models/capture-attempt.ts";
 import { CaptureLogModel, type CaptureLogTables } from "../models/capture-log.ts";
 import { CaptureShardModel } from "../models/capture-shard.ts";
+import type { NotificationChannelTables } from "../models/notification-channel.ts";
 import { ProjectModel, type ProjectTables } from "../models/project.ts";
-import type { StatusConfigTables } from "../models/status-config.ts";
 import type { Build } from "../schema/build.ts";
 import type { CaptureAttempt } from "../schema/capture-attempt.ts";
 import type { Project } from "../schema/project.ts";
@@ -21,7 +21,7 @@ import { executeCaptureJob, type CaptureJobOptions, type CaptureSummary } from "
 import { leaseProgress, type CaptureProgress } from "./progress.ts";
 import { executeCaptureShard } from "./shards/execute.ts";
 import type { FinalSummary } from "./shards/reduce.ts";
-import { hasApprovedBuildForSha, isAlreadyMerged } from "./skip-checks.ts";
+import { hasApprovedBuildForSha } from "./skip-checks.ts";
 import { postStatusesForBuild } from "./status-fanout.ts";
 
 /** Build the queue's job runner: post pending, apply skip rules, capture, report. */
@@ -63,7 +63,7 @@ async function runBuildJob(
     recordLog,
     progress: leaseProgress(lease),
   };
-  if ((await maybeSkipMerged(ctx)) || (await maybeSkipDuplicate(ctx))) {
+  if (await maybeSkipDuplicate(ctx)) {
     return;
   }
   await runAndReport(ctx, job);
@@ -72,7 +72,7 @@ async function runBuildJob(
 /** Table handles required by dispatch. */
 export type DispatchTables = BuildTables &
   ProjectTables &
-  StatusConfigTables &
+  NotificationChannelTables &
   CaptureAttemptTables &
   CaptureLogTables;
 
@@ -81,7 +81,7 @@ export interface DispatchDeps {
   db: DatabaseAdapter;
   tables: DispatchTables;
   jobOptions: CaptureJobOptions;
-  gitHosts: GitHostProvider[];
+  notifiers: NotifierProvider[];
   secret: SecretInput;
   logger: Logger;
   /** Redeliveries the queue allows a failing job; a shard's last try is its final word. */
@@ -177,7 +177,7 @@ async function postPending(
     sha,
     status: "pending",
     url,
-    providers: deps.gitHosts,
+    notifiers: deps.notifiers,
     secret: deps.secret,
     logger: deps.logger,
   }).catch((error: unknown) => {
@@ -199,7 +199,7 @@ async function postTerminal(
     sha,
     status,
     url,
-    providers: deps.gitHosts,
+    notifiers: deps.notifiers,
     secret: deps.secret,
     logger: deps.logger,
   }).catch((error: unknown) => {
@@ -217,28 +217,6 @@ async function approveWithoutCapture(ctx: JobContext, reason: string): Promise<v
   await finishAttempt(ctx, "completed");
   await new BuildModel(deps.db, deps.tables).setStatus(build.id, "approved").catch(() => {}); // Intentionally empty — fire-and-forget
   await postTerminal(deps, project, pendingUrl, build.gitSha, "success").catch(() => {}); // Intentionally empty — fire-and-forget
-}
-
-async function maybeSkipMerged(ctx: JobContext): Promise<boolean> {
-  const { deps, build, project } = ctx;
-  if (build.isDefault) {
-    return false;
-  }
-  const merged = await isAlreadyMerged({
-    providers: deps.gitHosts,
-    sha: build.gitSha,
-    branch: build.gitBranch,
-    secret: deps.secret,
-    db: deps.db,
-    tables: deps.tables,
-    projectId: project.id,
-    logger: deps.logger,
-  }).catch(() => false);
-  if (merged) {
-    await approveWithoutCapture(ctx, "skipping capture — already merged");
-    return true;
-  }
-  return false;
 }
 
 async function maybeSkipDuplicate(ctx: JobContext): Promise<boolean> {
@@ -326,7 +304,7 @@ async function runAndReport(ctx: JobContext, job: CaptureDispatchJob): Promise<v
       sha: build.gitSha,
       status: "failure",
       url: ctx.pendingUrl,
-      providers: deps.gitHosts,
+      notifiers: deps.notifiers,
       secret: deps.secret,
       logger: deps.logger,
     }).catch(() => {

@@ -3,7 +3,6 @@ import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { encrypt } from "../utils/encrypt.ts";
 import { probeCredentials, reencryptCredentials } from "./credentials.ts";
 import { NotificationChannelModel } from "./notification-channel.ts";
-import { StatusConfigModel } from "./status-config.ts";
 import { WebhookModel } from "./webhook.ts";
 
 const OLD = "old-secret";
@@ -17,10 +16,11 @@ async function seedUnderOld() {
     secret: "whsec_1",
     events: [],
   });
-  const status = await new StatusConfigModel(db, undefined, OLD).create("p1", {
+  const status = await new NotificationChannelModel(db, undefined, OLD).create({
+    projectId: "p1",
     provider: "github",
     config: { owner: "o", repo: "r" },
-    token: "ghp_token",
+    secret: "ghp_token",
   });
   const channel = await new NotificationChannelModel(db, undefined, OLD).create({
     projectId: "p1",
@@ -72,15 +72,12 @@ describe("reencryptCredentials", () => {
     const onlyNew = NEW;
     const webhookRow = await new WebhookModel(db, undefined, onlyNew).get("p1", webhook.id);
     expect(new WebhookModel(db, undefined, onlyNew).decryptSecret(webhookRow!)).toBe("whsec_1");
-    const [statusRow] = await new StatusConfigModel(db, undefined, onlyNew).list("p1");
-    expect(new StatusConfigModel(db, undefined, onlyNew).decryptToken(statusRow!)).toBe(
-      "ghp_token",
-    );
     const channelModel = new NotificationChannelModel(db, undefined, onlyNew);
-    const [channelRow] = await channelModel.list("p1");
+    const rows = await channelModel.list("p1");
+    const statusRow = rows.find((row) => row.id === status.id);
+    const channelRow = rows.find((row) => row.id === channel.id);
+    expect(channelModel.decryptSecret(statusRow!)).toBe("ghp_token");
     expect(channelModel.decryptSecret(channelRow!)).toBe("hook-secret");
-    expect(status.id).toBe(statusRow?.id);
-    expect(channel.id).toBe(channelRow?.id);
   });
 
   it("is idempotent", async () => {

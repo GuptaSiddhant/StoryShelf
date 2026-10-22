@@ -11,6 +11,8 @@ export const notificationChannels = mysqlTable("notification_channels", {
   secretEncrypted: text("secret_encrypted"),
   events: text("events"),
   enabled: boolean("enabled").notNull().default(true),
+  lastError: text("last_error"),
+  lastErrorAt: datetime("last_error_at", { mode: "string", fsp: 3 }),
   createdAt: datetime("created_at", { mode: "string", fsp: 3 }).notNull(),
   updatedAt: datetime("updated_at", { mode: "string", fsp: 3 }).notNull(),
 });
@@ -39,6 +41,8 @@ export interface NotificationChannel {
   secretEncrypted: string | null;
   events: string | null;
   enabled: boolean;
+  lastError: string | null;
+  lastErrorAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

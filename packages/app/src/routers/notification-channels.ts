@@ -23,6 +23,8 @@ function toPublic(row: NotificationChannelRow): {
   hasSecret: boolean;
   events: string[];
   enabled: boolean;
+  lastError: string | null;
+  lastErrorAt: string | null;
   createdAt: string;
   updatedAt: string;
 } {
@@ -34,6 +36,8 @@ function toPublic(row: NotificationChannelRow): {
     hasSecret: row.secretEncrypted !== null,
     events: NotificationChannelModel.eventsOf(row),
     enabled: row.enabled,
+    lastError: row.lastError,
+    lastErrorAt: row.lastErrorAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -104,6 +108,7 @@ export function registerNotificationChannels(app: ShelfRouter): void {
       getStore().notifiers,
       body.provider,
       body.config,
+      { projectId: project.id, hasSecret: body.secret !== undefined },
     );
     if (!valid.ok) {
       return c.json({ message: valid.message }, 400);
@@ -188,6 +193,7 @@ export function registerSystemChannels(app: ShelfRouter): void {
       getStore().notifiers,
       body.provider,
       body.config,
+      { projectId: null, hasSecret: body.secret !== undefined },
     );
     if (!valid.ok) {
       return c.json({ message: valid.message }, 400);

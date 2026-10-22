@@ -7,10 +7,9 @@
 export { designContractSuite, type DesignContractSamples } from "./design-contract.ts";
 export { createTestBuild, createTestProject } from "./create-project.ts";
 export { databaseContractSuite, REQUIRED_TABLES } from "./database-contract.ts";
-export { gitContractSuite } from "./git-contract.ts";
 export { FAKE_PNG, fakeUrl, makeFakeDesign, type FakeDesign } from "./fake-design.ts";
 export { makeDatabase, makeStorage, stubTables, type FakeStorage } from "./fake-adapters.ts";
-export { notifierContractSuite } from "./notifier-contract.ts";
+export { notifierContractSuite, stateNotifierContractSuite } from "./notifier-contract.ts";
 export {
   queueContractSuite,
   type PollableContractOptions,
@@ -25,3 +24,4 @@ export {
 export { createManualClock, type ManualClock } from "./manual-clock.ts";
 export { runnerContractSuite } from "./runner-contract.ts";
 export { storageContractSuite } from "./storage-contract.ts";
+export { makeFakeStateNotifier, type FakeStateNotifier } from "./fake-notifier.ts";

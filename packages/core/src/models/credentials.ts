@@ -1,7 +1,7 @@
 /**
  * Stored-credential inventory and re-encryption for secret rotation.
  *
- * Webhook secrets, git-provider tokens, and notification-channel secrets, and design-provider credentials are
+ * Webhook secrets, notification-channel secrets (chat webhooks and git tokens), and design-provider credentials are
  * encrypted under `ShelfConfig.secret`. After a rotation the old secret stays
  * available as `previousSecret` (decrypt-only); {@link probeCredentials} reports
  * which key each row needs and {@link reencryptCredentials} moves rows to the
@@ -13,7 +13,6 @@ import { decryptWithKey, encrypt, type SecretKeys } from "../utils/encrypt.ts";
 /** Tables that hold encrypted credentials, with the column to read. */
 const SOURCES = [
   { name: "webhooks", table: "webhooks", column: "secretEncrypted" },
-  { name: "git status tokens", table: "projectStatusConfigs", column: "tokenEncrypted" },
   { name: "design credentials", table: "designCredentials", column: "tokenEncrypted" },
   { name: "user connections", table: "userConnections", column: "tokenEncrypted" },
   {

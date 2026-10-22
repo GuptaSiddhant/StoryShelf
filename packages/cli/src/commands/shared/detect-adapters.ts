@@ -18,7 +18,7 @@ export interface DetectedAdapters {
     | "planetscale"
     | "tidb";
   storage?: "local" | "s3" | "azure" | "gcs";
-  git?: "none" | "github" | "gitlab";
+  git?: "none" | "git";
 }
 
 /**
@@ -73,10 +73,8 @@ export function detectInstalledAdapters(dir: string): DetectedAdapters {
     result.storage = "local";
   }
 
-  if (deps.has("@storyshelf/git-github")) {
-    result.git = "github";
-  } else if (deps.has("@storyshelf/git-gitlab")) {
-    result.git = "gitlab";
+  if (deps.has("@storyshelf/notify-git")) {
+    result.git = "git";
   }
 
   return result;

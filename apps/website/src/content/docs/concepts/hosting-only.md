@@ -18,10 +18,10 @@ Uploads (zip, and the file-by-file `/dedup`, `/content`, `/manifest` routes), pu
 
 Routes for capture, compare and baselines answer `404` with `Testing is not enabled on this instance.`:
 
-- snapshots (list, approve, reject, approve-all, reject-all, re-diff, images and diffs), attempts and their logs, baselines export and import, build retry, the affected-capture route and the status-config routes;
-- the build diff page, the compute-jobs page, the project capture, tests, git status and AI settings pages, and the AI insights routes (they read snapshots).
+- snapshots (list, approve, reject, approve-all, reject-all, re-diff, images and diffs), attempts and their logs, baselines export and import, build retry, and the affected-capture route;
+- the build diff page, the compute-jobs page, the project capture, tests and AI settings pages, and the AI insights routes (they read snapshots).
 
-Every route carries a class (`hosting`, `testing`, `review` or `both`) in one table, and a test boots the app without `testing` to check that each `testing` route answers `404` and no `hosting` route does. The navigation hides what is off: the **Jobs** entry and the capture, tests, git status and AI settings tabs.
+Every route carries a class (`hosting`, `testing`, `review` or `both`) in one table, and a test boots the app without `testing` to check that each `testing` route answers `404` and no `hosting` route does. The navigation hides what is off: the **Jobs** entry and the capture, tests and AI settings tabs.
 
 ## Seeing the mode
 

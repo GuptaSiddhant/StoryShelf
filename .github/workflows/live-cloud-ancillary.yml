@@ -96,4 +96,4 @@ jobs:
 
       - name: Run git suites (hermetic + live)
         if: matrix.suite == 'git'
-        run: nubx turbo test --filter='@storyshelf/git-github' --filter='@storyshelf/git-gitlab' --force
+        run: nubx turbo test --filter='@storyshelf/notify-git' --force

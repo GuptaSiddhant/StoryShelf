@@ -126,22 +126,6 @@ function emailSenderReasons(sender: unknown): string[] {
   return reasons;
 }
 
-/** Reasons a git provider lacks its descriptor shape. */
-function gitReasons(provider: unknown): string[] {
-  const record = asRecord(provider);
-  if (!record) {
-    return ["git provider must be an object"];
-  }
-  const reasons = metadataReasons(record, "git-host");
-  if (typeof record["create"] !== "function") {
-    reasons.push("missing methods: create");
-  }
-  if (!hasSchemaParse(provider)) {
-    reasons.push("metadata.schema must be a zod schema");
-  }
-  return reasons;
-}
-
 /** Reasons a design provider lacks its descriptor shape. */
 function designReasons(provider: unknown): string[] {
   const record = asRecord(provider);
@@ -282,20 +266,19 @@ interface SlotCheck {
   slot: string;
 }
 
-/** Descriptor check for provider lists (git hosts, design providers, notifiers). */
+/** Descriptor check for provider lists (design providers, notifiers). */
 interface ProviderCheck {
   provider: unknown;
   index: number;
-  kinds: "git" | "design" | "notifier";
+  kinds: "design" | "notifier";
 }
 
 const PROVIDER_KINDS = {
-  git: { reasons: gitReasons, list: "gitHosts", category: "git-host" },
   design: { reasons: designReasons, list: "design", category: "design" },
   notifier: { reasons: notifierReasons, list: "notifiers", category: "notifier" },
 } as const;
 
-/** Failures for git-host, design or notifier provider lists. */
+/** Failures for design or notifier provider lists. */
 function checkProviders(checks: ProviderCheck[]): AdapterSetupFailure[] {
   const failures: AdapterSetupFailure[] = [];
   for (const check of checks) {
@@ -375,11 +358,6 @@ export function validateAdapterSources(sources: AdapterSetupSources): AdapterSet
     checks.push({ adapter: sources.captureQueue, category: "capture-queue", slot: "captureQueue" });
   }
   const providers: ProviderCheck[] = [
-    ...(sources.gitHosts ?? []).map((provider, index) => ({
-      provider,
-      index,
-      kinds: "git" as const,
-    })),
     ...(sources.design ?? []).map((provider, index) => ({
       provider,
       index,

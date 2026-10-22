@@ -12,6 +12,10 @@ export interface NotificationChannelRow {
   /** JSON array of subscribed events, or null for all. */
   events: string | null;
   enabled: boolean;
+  /** Last delivery error (sanitized), null while the channel delivers cleanly. */
+  lastError: string | null;
+  /** ISO-8601 time of {@link lastError}. */
+  lastErrorAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

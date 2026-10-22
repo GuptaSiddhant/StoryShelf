@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { makeFakeStateNotifier } from "../../test-helpers/fake-notifier.ts";
 import { emitNotifications, emitSystemNotification } from "./events.ts";
 import type { NotifierProvider } from "./provider.ts";
 import type { NotificationChannel } from "./types.ts";
@@ -123,5 +124,48 @@ describe("emitNotifications", () => {
       { notifiers: [provider], channels: [channel()] },
     );
     expect(send).toHaveBeenCalledOnce();
+  });
+
+  it("never sends messages to state channels (git hosts)", async () => {
+    const sent: unknown[] = [];
+    const git = makeFakeStateNotifier("github");
+    const onOutcome = vi.fn();
+    await emitNotifications(
+      { event: "build:created", data: {}, timestamp: new Date().toISOString() },
+      {
+        notifiers: [logProvider(sent), git.provider],
+        channels: [channel({ id: "git", provider: "github" }), channel()],
+        onOutcome,
+      },
+    );
+    expect(sent).toHaveLength(1);
+    expect(git.calls).toHaveLength(0);
+    expect(onOutcome).toHaveBeenCalledTimes(1);
+    expect(onOutcome).toHaveBeenCalledWith({ channelId: "ch1" });
+  });
+
+  it("reports a failed delivery to the host with a sanitized error", async () => {
+    const failing: NotifierProvider = {
+      metadata: {
+        name: "bad",
+        version: "0.0.0",
+        kind: "bad",
+        category: "notifier",
+        schema: {} as never,
+      },
+      create: () => {
+        throw new Error("webhook returned 404");
+      },
+    };
+    const onOutcome = vi.fn();
+    await emitSystemNotification(
+      { event: "sys:user-created", data: {}, timestamp: new Date().toISOString() },
+      {
+        notifiers: [failing],
+        channels: [channel({ projectId: null, provider: "bad" })],
+        onOutcome,
+      },
+    );
+    expect(onOutcome).toHaveBeenCalledWith({ channelId: "ch1", error: "webhook returned 404" });
   });
 });

@@ -1,0 +1,100 @@
+---
+title: "@storyshelf/notify-git"
+description: GitHub and GitLab notification providers for StoryShelf — commit statuses for the merge gate and one pull-request comment per build.
+---
+
+import { PackageManagers } from "starlight-package-managers";
+
+`@storyshelf/notify-git` makes GitHub or GitLab show the current state of a build: a **commit status** you can require in branch protection, and a single **pull-request or merge-request comment** that is rewritten as the build changes. It is a `state` notifier family member, the sibling of [`@storyshelf/notify-chat`](/packages/notify-chat/) and [`@storyshelf/notify-email`](/packages/notify-email/), and it has no runtime dependencies: every call goes through `@storyshelf/core/utils` (`httpJson`), which adds a timeout and retries with `Retry-After`.
+
+## Install
+
+<PackageManagers pkg="@storyshelf/notify-git" />
+
+- [npm package](https://www.npmjs.com/package/@storyshelf/notify-git) — install tarballs and version history.
+- [Source on GitHub](https://github.com/GuptaSiddhant/StoryShelf/tree/main/packages/notify-git) — package directory on `main`.
+
+## Configure
+
+Pass the providers to `createShelfApp`. There is no separate git option: git providers sit in the same `notifications.notifiers` list as chat and email.
+
+```ts
+import { createShelfApp } from "@storyshelf/app";
+import { chatNotifiers } from "@storyshelf/notify-chat";
+import { gitNotifiers } from "@storyshelf/notify-git";
+
+const app = createShelfApp({
+  database,
+  storage,
+  notifications: { notifiers: [...chatNotifiers, ...gitNotifiers] },
+});
+```
+
+`gitNotifiers` aggregates all three providers:
+
+| Provider kind | Writes to                                        | Use for                     |
+| ------------- | ------------------------------------------------ | --------------------------- |
+| `github`      | GitHub commit statuses and pull-request comments | GitHub.com repositories     |
+| `gitlab`      | GitLab commit statuses and merge-request notes   | GitLab.com or self-managed  |
+| `git-log`     | The server log                                   | Tests and local development |
+
+The log provider's kind is `git-log` because `notify-chat` already owns `log`; provider kinds are unique across packages.
+
+## Channels
+
+Providers only make a kind _available_. Project admins then add a **git channel** of that kind in **Project → Settings → Notifications** (the "Add a git channel" card) or through the API:
+
+```http
+POST /api/v1/projects/{slug}/notification-channels
+Content-Type: application/json
+
+{
+  "provider": "github",
+  "config": { "owner": "acme", "repo": "widgets", "prefix": "storyshelf-web" },
+  "secret": "ghp_..."
+}
+```
+
+- **`config`** — `{ owner, repo, prefix? }` for GitHub. GitLab also takes `host` (default `https://gitlab.com`; set it to your instance URL when self-hosted). `prefix` names the statuses and defaults to `storyshelf`.
+- **`secret`** — the token. GitHub: `repo:status` scope. GitLab: `api` scope. It is stored AES-256-GCM encrypted with the server `SECRET` and decrypted in memory only when a status is written. It is separate from the CLI project token: the CLI token identifies a build, this token writes to your repository.
+
+A git channel always belongs to a project (a site-wide channel cannot be git), needs a token, and has a fixed event filter: it follows the build's state rather than a topic list, so the event picker does not apply to it.
+
+## What gets posted
+
+For every build with a commit SHA, each enabled git channel of the build's project gets:
+
+- a **commit status** named `<prefix>/testing`: `pending` while the build is captured, `success` when every new and changed snapshot is approved, `failure` when changes are rejected or capture fails. The status links to the build page;
+- one **comment** on the pull request (GitHub) or merge request (GitLab) of the commit, keyed by a hidden marker built from the build URL so it is updated in place, never duplicated. A commit with no open pull request gets no comment.
+
+Builds with a synthetic local identity (uploads without git, see [Without git](/guides/without-git/)) post nothing. Branch protection setup is in [Merge gate setup](/guides/merge-gate/).
+
+## Delivery
+
+Delivery is inline and best-effort: StoryShelf asks the provider to make the host show the build's current state, once per transition, and a failure never fails the capture or the review action. Writes are idempotent, the latest call wins, and nothing is read from the git host during capture; a build of a commit that is already merged is captured like any other.
+
+When a write fails (a revoked token, a missing scope, an unreachable host), the channel row keeps the last error and its time. The Notifications settings page shows the channel as **failing** with that error until the next successful delivery clears it. The same fields are returned as `lastError` and `lastErrorAt` by the notification-channel API.
+
+## Direct use
+
+Each provider is a `StateNotifierProvider` from `@storyshelf/core/adapter/notifier`. Bind one to a channel and call `setState`:
+
+```ts
+import { gitHubNotifier } from "@storyshelf/notify-git";
+
+const adapter = gitHubNotifier.create({
+  config: { owner: "acme", repo: "widgets" },
+  secret: process.env.GITHUB_TOKEN,
+});
+
+await adapter.setState({
+  channel,
+  target: { kind: "status", sha, context: "storyshelf/testing" },
+  state: "success",
+  url: "https://shelf.example.com/projects/web/builds/01J...",
+});
+```
+
+The status `context` is used verbatim: the caller owns the prefix, the provider adds nothing. A `{ kind: "comment", sha, markdown }` target upserts the review comment instead.
+
+See [Notifications](/guides/notifications/) for channels, subscriptions and events, and [ADR 0014](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/0014-git-hosts-and-notifications.md) for the decision record.

@@ -1,5 +1,8 @@
 import type { EmailSender } from "@storyshelf/core/adapter/email-sender";
-import type { NotifierAdapter, NotifierProvider } from "@storyshelf/core/adapter/notifier";
+import type {
+  MessageNotifierAdapter,
+  MessageNotifierProvider,
+} from "@storyshelf/core/adapter/notifier";
 import type { Logger } from "@storyshelf/core/logger";
 import { emailChannelConfigSchema } from "./types.ts";
 
@@ -18,10 +21,10 @@ export interface EmailNotifierDefaults {
 export function createEmailNotifier(
   sender: EmailSender,
   defaults: EmailNotifierDefaults & { logger?: Logger } = {},
-): NotifierProvider {
+): MessageNotifierProvider {
   return {
     metadata: getMetadata(),
-    create(opts: { config: unknown; secret?: string; logger?: Logger }): NotifierAdapter {
+    create(opts: { config: unknown; secret?: string; logger?: Logger }): MessageNotifierAdapter {
       const config = emailChannelConfigSchema.parse(opts.config);
       const logger = (opts.logger ?? defaults.logger)?.child({ component: "notify-email" });
       return {
@@ -44,7 +47,7 @@ export function createEmailNotifier(
 }
 
 /** Describe the email provider (name, version, config schema). */
-export function getMetadata(): NotifierProvider["metadata"] {
+export function getMetadata(): MessageNotifierProvider["metadata"] {
   return {
     name: "Email",
     version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",

@@ -1,4 +1,7 @@
-import type { NotifierAdapter, NotifierProvider } from "@storyshelf/core/adapter/notifier";
+import type {
+  MessageNotifierAdapter,
+  MessageNotifierProvider,
+} from "@storyshelf/core/adapter/notifier";
 import type { Logger } from "@storyshelf/core/logger";
 import { z } from "zod";
 
@@ -8,9 +11,9 @@ declare const __PKG_VERSION__: string | undefined;
 export const logConfigSchema = z.object({}).loose();
 
 /** Log-only chat provider for tests, dev, and unconfigured servers. */
-export const logNotifier: NotifierProvider = {
+export const logNotifier: MessageNotifierProvider = {
   metadata: getMetadata(),
-  create(opts: { config: unknown; secret?: string; logger?: Logger }): NotifierAdapter {
+  create(opts: { config: unknown; secret?: string; logger?: Logger }): MessageNotifierAdapter {
     logConfigSchema.parse(opts.config);
     const logger = opts.logger?.child({ component: "notify-chat-log" }) ?? opts.logger;
     return {
@@ -27,7 +30,7 @@ export const logNotifier: NotifierProvider = {
 };
 
 /** Describe the log provider (name, version, config schema). */
-export function getMetadata(): NotifierProvider["metadata"] {
+export function getMetadata(): MessageNotifierProvider["metadata"] {
   return {
     name: "Log",
     version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",

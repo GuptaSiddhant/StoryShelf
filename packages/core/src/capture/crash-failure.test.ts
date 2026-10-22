@@ -2,20 +2,24 @@ import AdmZip from "adm-zip";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { CaptureRunner } from "../adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import { createShelfLogger } from "../logger.ts";
 import { BuildModel } from "../models/build.ts";
 import { CaptureAttemptModel } from "../models/capture-attempt.ts";
 import { CaptureShardModel } from "../models/capture-shard.ts";
+import { NotificationChannelModel } from "../models/notification-channel.ts";
 import { ProjectModel } from "../models/project.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
+import { makeFakeStateNotifier } from "../test-helpers/fake-notifier.ts";
 import { storybookZipPath } from "../utils/paths.ts";
 import { failCrashedCapture } from "./crash-failure.ts";
 import type { DispatchDeps } from "./dispatch.ts";
 import { executeCaptureJob, type ShardJob } from "./orchestrator.ts";
 import { executeCaptureShard } from "./shards/execute.ts";
+
+const SECRET = "test-secret-0123456789abcdef";
 
 function tables(db: DatabaseAdapter) {
   return {
@@ -24,7 +28,7 @@ function tables(db: DatabaseAdapter) {
     buildLabels: db.tables.buildLabels,
     snapshots: db.tables.snapshots,
     baselines: db.tables.baselines,
-    projectStatusConfigs: db.tables.projectStatusConfigs,
+    notificationChannels: db.tables.notificationChannels,
     captureAttempts: db.tables.captureAttempts,
     captureLogs: db.tables.captureLogs,
   };
@@ -78,7 +82,13 @@ async function world(stories = 1) {
   const build = await builds.create(project.id, { gitSha: "sha-1", gitBranch: "feature/x" });
   await storage.write(storybookZipPath(project.id, build.id), zipOfStories(stories));
   const queued: ShardJob[] = [];
-  const updateStatus = vi.fn(async () => {});
+  const git = makeFakeStateNotifier();
+  await new NotificationChannelModel(db, tables(db), SECRET).create({
+    projectId: project.id,
+    provider: "fake-git",
+    config: {},
+    secret: "ghp_token",
+  });
   const deps = {
     db,
     tables: tables(db),
@@ -94,12 +104,12 @@ async function world(stories = 1) {
         await Promise.resolve();
       },
     },
-    gitHosts: [{ id: "github", updateStatus, matchesProject: () => true }],
-    secret: undefined,
+    notifiers: [git.provider],
+    secret: SECRET,
     logger: createShelfLogger({ level: "silent" }),
   } as unknown as DispatchDeps;
   const status = async () => (await builds.get(build.id))?.status;
-  return { db, deps, project, builds, build, queued, status };
+  return { db, deps, project, builds, build, queued, status, git };
 }
 
 describe("failCrashedCapture", () => {
@@ -116,6 +126,18 @@ describe("failCrashedCapture", () => {
     expect(await w.status()).toBe("failed");
     const [closed] = await attempts.listByBuild(w.build.id);
     expect(closed).toMatchObject({ status: "failed", error: "exited 3 times" });
+  });
+
+  it("shows the failure on the project's git channel", async () => {
+    const w = await world();
+    await w.builds.setStatus(w.build.id, "capturing");
+
+    await failCrashedCapture(w.deps, { buildId: w.build.id }, "exited 3 times");
+
+    expect(w.git.calls.map((call) => [call.target.kind, call.state])).toEqual([
+      ["status", "failure"],
+      ["comment", "failure"],
+    ]);
   });
 
   it("leaves a build that already ended alone", async () => {

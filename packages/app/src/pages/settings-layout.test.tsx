@@ -31,10 +31,10 @@ describe("project settings layout", () => {
       "Webhooks",
       "Notifications",
       "Members",
-      "Git status",
     ]) {
       expect(html).toContain(label);
     }
+    expect(html).not.toContain("settings/status");
     expect(html).toMatch(
       /href="\/projects\/docs\/settings\/tokens"[^>]*aria-current="page"|aria-current="page"[^>]*href="\/projects\/docs\/settings\/tokens"/u,
     );

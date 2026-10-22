@@ -120,7 +120,7 @@ StoryShelf reads both `chromatic:` and `storyshelf:` parameter keys. **`storyshe
 | **TurboSnap**             | Yes (dependency graph)                    | Yes — affected capture (on by default)     | Similar skip rates on Vite Storybooks; needs `fetch-depth: 0` and `preview-stats.json`              |
 | **Cross-browser**         | Chrome, FF, Safari, Edge (branded, cloud) | Chromium / Firefox / WebKit, one per build | Set in project Settings → General or via API; baselines tracked per browser; no branded Safari/Edge |
 | **Modes/Globals**         | Yes                                       | No                                         | Theme/locale matrices need workarounds                                                              |
-| **A11y testing**          | Yes (aXe)                                 | axe-core checks, opt-in (`runA11y`)        | Results are non-blocking annotations, not a review gate                                                      |
+| **A11y testing**          | Yes (aXe)                                 | axe-core checks, opt-in (`runA11y`)        | Results are non-blocking annotations, not a review gate                                             |
 | **Cloud parallelization** | Automatic                                 | Manual (`testing.concurrency`)             | Limited by your server CPU/memory                                                                   |
 | **Baseline export**       | UI only                                   | API + UI                                   | Cannot bulk-import Chromatic baselines                                                              |
 | **Flake detection**       | Auto-detect                               | Explicit `flakyTest`                       | Manual marking required                                                                             |
@@ -148,7 +148,7 @@ Keep Chromatic running in parallel for 1-2 sprints:
 ## 10. Team onboarding checklist
 
 - ☐ Reviewers know how to approve/reject in StoryShelf UI
-- ☐ GitHub status check renamed from `chromatic` to `storyshelf/<project-slug>`
+- ☐ GitHub status check renamed from `chromatic` to `storyshelf/testing` (or your channel prefix)
 - ☐ Branch protection rules updated to require StoryShelf status
 - ☐ CI secrets rotated (`CHROMATIC_PROJECT_TOKEN` → `STORYSHELF_TOKEN`)
 - ☐ Documentation updated with StoryShelf workflow

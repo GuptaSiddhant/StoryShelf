@@ -11,6 +11,8 @@ export const notificationChannels = sqliteTable("notification_channels", {
   secretEncrypted: text("secret_encrypted"),
   events: text("events"),
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  lastError: text("last_error"),
+  lastErrorAt: text("last_error_at"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
@@ -39,6 +41,8 @@ export interface NotificationChannel {
   secretEncrypted: string | null;
   events: string | null;
   enabled: boolean;
+  lastError: string | null;
+  lastErrorAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

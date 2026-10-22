@@ -2,7 +2,8 @@
 import { eq, isNull } from "drizzle-orm";
 import type { Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
-import type { NotifierProvider } from "../adapters/notifier/provider.ts";
+import { isStateProvider, type NotifierProvider } from "../adapters/notifier/provider.ts";
+import type { NotificationChannel } from "../adapters/notifier/types.ts";
 import type { NotificationChannelRow } from "../schema/notification.ts";
 import { decryptCredential, encrypt, type SecretInput } from "../utils/encrypt.ts";
 import { ulid } from "../utils/ulid.ts";
@@ -12,6 +13,17 @@ import { col } from "./columns.ts";
 export interface NotificationChannelTables {
   notificationChannels: Table;
 }
+
+/** Result of {@link NotificationChannelModel.validateInput}. */
+export type ChannelValidation =
+  | { ok: true }
+  | {
+      ok: false;
+      field: "provider" | "config" | "secret";
+      message: string;
+      /** Per-field problems of an invalid config, keyed by the first path segment. */
+      issues?: { path: string; message: string }[];
+    };
 
 /** Input for creating a notification channel. */
 export interface NotificationChannelCreateInput {
@@ -65,6 +77,8 @@ export class NotificationChannelModel {
       secretEncrypted: input.secret ? encrypt(this.secret, input.secret) : null,
       events: input.events && input.events.length > 0 ? JSON.stringify(input.events) : null,
       enabled: input.enabled ?? true,
+      lastError: null,
+      lastErrorAt: null,
       createdAt: now,
       updatedAt: now,
     })) as unknown as NotificationChannelRow;
@@ -84,6 +98,31 @@ export class NotificationChannelModel {
     await this.db.remove(this.tables.notificationChannels, id);
   }
 
+  /**
+   * Turn a stored row into the send-ready view providers take, with the secret decrypted
+   * in memory. Returns null when the secret cannot be decrypted with the configured keys.
+   */
+  toView(row: NotificationChannelRow): NotificationChannel | null {
+    let secret: string | undefined;
+    try {
+      secret = row.secretEncrypted ? this.decryptSecret(row) : undefined;
+    } catch {
+      return null;
+    }
+    return {
+      id: row.id,
+      projectId: row.projectId,
+      provider: row.provider,
+      config: NotificationChannelModel.configOf(row),
+      secret,
+      events: NotificationChannelModel.eventsOf(row),
+      enabled: row.enabled,
+      ...(row.lastError === null || row.lastError === undefined
+        ? {}
+        : { lastError: row.lastError }),
+    };
+  }
+
   /** Decrypt the secret for a stored row (in memory only, at send time). */
   decryptSecret(row: NotificationChannelRow): string {
     if (!row.secretEncrypted) {
@@ -92,20 +131,50 @@ export class NotificationChannelModel {
     return decryptCredential(this.secret, row.secretEncrypted);
   }
 
-  /** Validate channel input against the matching notifier's schema. */
+  /**
+   * Record the outcome of a delivery attempt: the sanitized error with its time, or
+   * nothing to clear a previous error. Skips the write when the row is already in that state.
+   */
+  async recordOutcome(id: string, error?: string): Promise<void> {
+    const row = await this.get(id);
+    if (!row || (error === undefined && row.lastError === null)) {
+      return;
+    }
+    await this.db.update(this.tables.notificationChannels, id, {
+      lastError: error ?? null,
+      lastErrorAt: error === undefined ? null : new Date().toISOString(),
+    });
+  }
+
+  /**
+   * Validate channel input against the matching notifier's schema. With `scope`, also
+   * enforce what `state` providers (git hosts) need: a project and a token.
+   */
   static validateInput(
     notifiers: readonly NotifierProvider[],
     provider: string,
     config: unknown,
-  ): { ok: true } | { ok: false; field: "provider" | "config"; message: string } {
+    scope?: { projectId: string | null; hasSecret: boolean },
+  ): ChannelValidation {
     const descriptor = notifiers.find((candidate) => candidate.metadata.kind === provider);
     if (!descriptor) {
       return { ok: false, field: "provider", message: `Unknown provider: ${provider}` };
     }
     const parsed = descriptor.metadata.schema.safeParse(config);
-    return parsed.success
-      ? { ok: true }
-      : { ok: false, field: "config", message: parsed.error.message };
+    if (!parsed.success) {
+      const issues = parsed.error.issues.map((issue) => ({
+        path: String(issue.path[0] ?? ""),
+        message: issue.message,
+      }));
+      return { ok: false, field: "config", message: parsed.error.message, issues };
+    }
+    return scope && isStateProvider(descriptor) ? stateScopeProblem(scope) : { ok: true };
+  }
+
+  /** Whether the provider kind delivers state (git hosts), so it needs a project and a token. */
+  static isStateKind(notifiers: readonly NotifierProvider[], provider: string): boolean {
+    const descriptor = notifiers.find((candidate) => candidate.metadata.kind === provider);
+    return descriptor !== undefined && isStateProvider(descriptor);
   }
 
   /** Decode the JSON-serialized event list of a channel. */
@@ -124,6 +193,19 @@ export class NotificationChannelModel {
       return {};
     }
   }
+}
+
+/** Git channels belong to one project and carry their own token. */
+function stateScopeProblem(scope: {
+  projectId: string | null;
+  hasSecret: boolean;
+}): ChannelValidation {
+  if (scope.projectId === null) {
+    return { ok: false, field: "provider", message: "Git channels belong to a project" };
+  }
+  return scope.hasSecret
+    ? { ok: true }
+    : { ok: false, field: "secret", message: "A git channel needs a token" };
 }
 
 /** Decode a JSON event list column (empty = all events). */

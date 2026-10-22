@@ -43,9 +43,9 @@ visual:
 
 StoryShelf posts commit statuses per project. To enable them:
 
-1. Register a git provider on the server (see [@storyshelf/git-github](/packages/git-github/)).
-2. In the project's **Settings → Git status**, pick the provider, enter a token, and save the repo config.
-3. Mark StoryShelf's status check (`storyshelf/<project-slug>` by default) as a required check in your branch protection so PRs can't merge until visual review is approved.
+1. Register the git providers on the server: `notifications: { notifiers: gitNotifiers }` (see [@storyshelf/notify-git](/packages/notify-git/)).
+2. In the project's **Settings → Notifications**, add a git channel: pick the provider, enter the repository, a status prefix and a token.
+3. Mark StoryShelf's status check (`storyshelf/testing` by default) as a required check in your branch protection so PRs can't merge until visual review is approved.
 
 For the full walkthrough (GitHub and GitLab rules, multiple projects, verification), see [Merge gate setup](/guides/merge-gate/).
 

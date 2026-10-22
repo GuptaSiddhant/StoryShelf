@@ -1,7 +1,6 @@
 import type { CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { DesignProvider } from "@storyshelf/core/adapter/design";
-import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import type { Ai } from "@storyshelf/core/ai";
@@ -28,7 +27,6 @@ export interface StoreScopeDeps {
   capturesHere?: boolean;
   publish?: PublishService;
   captureConcurrency?: number;
-  gitHosts: GitHostProvider[];
   design: DesignProvider[];
   notifiers: NotifierProvider[];
   notificationsConfig?: NotificationsConfig;
@@ -58,7 +56,6 @@ export function storeScope(deps: StoreScopeDeps) {
         capturesHere: deps.capturesHere,
         publish: deps.publish,
         captureConcurrency: deps.captureConcurrency,
-        gitHosts: deps.gitHosts,
         design: deps.design,
         notifiers: deps.notifiers,
         notificationsConfig: deps.notificationsConfig,
