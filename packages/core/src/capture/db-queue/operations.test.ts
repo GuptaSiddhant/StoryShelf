@@ -81,14 +81,28 @@ describe("database queue operations", () => {
     expect(new Set(states)).toEqual(new Set(["cancelled", "running"]));
   });
 
-  it("leaves finished jobs and other kinds of a build alone", async () => {
+  it("cancels the jobs of every kind of a build, whichever kinds the queue polls", async () => {
+    const { db, queue: q } = queue();
+    const publish = createDatabaseCaptureQueue(db, { kinds: ["publish"] });
+    const notify = createDatabaseCaptureQueue(db, { kinds: ["notify"] });
+    await publish.enqueueJob({ kind: "publish", buildId: "b1" });
+    await notify.enqueueJob({ kind: "notify", buildId: "b1" });
+    await notify.enqueueJob({ kind: "notify", buildId: "b2" });
+    const running = await publish.poll();
+    expect(await q.cancel("b1")).toBe(true);
+    expect(await publish.inspect(running!)).toBe("cancelled");
+    expect(await notify.poll()).toMatchObject({ buildId: "b2" });
+    expect(await notify.poll()).toBeNull();
+  });
+
+  it("leaves finished jobs of a build alone", async () => {
     const { db, queue: q } = queue();
     const publish = createDatabaseCaptureQueue(db, { kinds: ["publish"] });
     await publish.enqueueJob({ kind: "publish", buildId: "b1" });
+    await publish.ack((await publish.poll())!);
     await q.enqueue({ buildId: "b1" });
     await q.ack((await q.poll())!);
     expect(await q.cancel("b1")).toBe(false);
-    expect((await publish.poll())?.kind).toBe("publish");
   });
 
   it("flags an attempt a claimer inserted while a queued job was being cancelled", async () => {

@@ -31,7 +31,10 @@ export interface JobQueue {
   exhausted: Partial<Record<CaptureJobKind, ExhaustedHandler>>;
 }
 
-/** Create the lazy queue polling `kinds`, with `retries` after a first failed attempt. */
+/**
+ * Create the lazy queue polling `kinds`, with `retries` after a first failed attempt and the lease
+ * of `testing.leaseSeconds`.
+ */
 export function createJobQueue(
   options: ShelfOptions,
   kinds: readonly CaptureJobKind[],
@@ -43,6 +46,9 @@ export function createJobQueue(
     queue ??= createDatabaseCaptureQueue(options.database, {
       kinds: kinds.length > 0 ? kinds : ["capture"],
       retries,
+      ...(options.testing?.leaseSeconds === undefined
+        ? {}
+        : { leaseMs: Math.round(options.testing.leaseSeconds * 1000) }),
       onExhausted: async (job, error) => {
         await exhausted[job.kind]?.(job, error);
       },
@@ -61,5 +67,6 @@ function queueView(get: () => DatabaseCaptureQueue): CaptureQueue {
     status: async (buildId) => await get().status(buildId),
     active: async () => await get().active(),
     recent: async (limit) => await get().recent(limit),
+    cancel: async (id) => await get().cancel(id),
   };
 }

@@ -36,6 +36,8 @@ export interface Store {
   capturesHere?: boolean;
   /** Publishing: completion and the `publish` job queue (absent in hand-built stores). */
   publish?: PublishService;
+  /** Cancels the unfinished jobs of a build, of every kind (absent in hand-built stores). */
+  cancelBuildJobs?: (buildId: string) => Promise<boolean>;
   /** Shows a build's state on its git channels (absent in hand-built stores: delivered inline). */
   buildState?: BuildStatePublisher;
   /** Explicit `testing.concurrency`; unset means sized from the hardware. */

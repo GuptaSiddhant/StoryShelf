@@ -107,6 +107,12 @@ function withRetries(retries: number): () => void {
   };
 }
 
+function lease(leaseSeconds: number): () => void {
+  return () => {
+    resolveShelfOptions({ ...base, testing: { runner, leaseSeconds } });
+  };
+}
+
 function concurrent(concurrency: number): () => void {
   return () => {
     resolveShelfOptions({ ...base, testing: { runner, concurrency } });
@@ -149,6 +155,14 @@ describe("resolveShelfOptions testing process options", () => {
     expect(withRetries(2)).not.toThrow();
     expect(withRetries(-1)).toThrow(/testing\.retries must be a non-negative integer, got -1/u);
     expect(withRetries(1.5)).toThrow(/non-negative integer/u);
+  });
+
+  it("validates leaseSeconds as a positive number", () => {
+    expect(lease(300)).not.toThrow();
+    expect(lease(0.5)).not.toThrow();
+    expect(lease(0)).toThrow(/testing\.leaseSeconds must be a positive number of seconds, got 0/u);
+    expect(lease(-1)).toThrow(/leaseSeconds/u);
+    expect(lease(Number.NaN)).toThrow(/leaseSeconds/u);
   });
 
   it('requires workerEntry for mode "fork"', () => {

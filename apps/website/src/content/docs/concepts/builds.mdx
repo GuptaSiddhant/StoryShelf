@@ -72,6 +72,8 @@ Progress lines appear only for runners that stream captures (the bundled Playwri
 
 Retry a flaky capture with `POST …/builds/:id/retry` or `storyshelf retry --build-id`.
 
+Stop a build that is `pending`, `capturing` or `comparing` with **Cancel build** on the build page or `POST /api/v1/projects/:slug/builds/:id/cancel` (developer role and above, needs `testing`). Every queued job of the build (capture, publish and notification jobs) is cancelled, a running capture stops within a few seconds, and the build ends `failed`, so git statuses, webhooks and notifications report an ordinary failure; there is no separate cancelled status. Retry it later like any failed build. A build in any other state answers `409`.
+
 ## What outlives a build
 
 Builds and snapshots are transient — purged after `purgeTtlDays` (see [Retention](/concepts/retention/)). Baselines are the truth and survive purge. A build bearing a `persistent` label (git tag, e.g. `v1.2.3`) is never purged; see [Baselines & branches](/concepts/baselines/) and [Labels](/concepts/labels/).

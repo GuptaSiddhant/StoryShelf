@@ -1,4 +1,5 @@
 import type { PollableCaptureQueue } from "@storyshelf/core/adapter/capture-queue";
+import { createDatabaseCaptureQueue } from "@storyshelf/core/capture";
 import type { ShelfOptions } from "@storyshelf/core/config";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
@@ -30,6 +31,24 @@ function suppliedQueue(poll = vi.fn(async () => null)): PollableCaptureQueue {
 }
 
 describe("setupJobs", () => {
+  it("cancels a build's jobs of every kind and its supplied queue's too", async () => {
+    const supplied = { ...suppliedQueue(), cancel: vi.fn(async () => true) };
+    const { db, wiring } = wire({ queue: supplied });
+    const shared = createDatabaseCaptureQueue(db, { kinds: ["notify"] });
+    await shared.enqueueJob({ kind: "notify", buildId: "b1" });
+    await shared.enqueueJob({ kind: "publish", buildId: "b1" });
+    await shared.enqueueJob({ kind: "notify", buildId: "b2" });
+    expect(await wiring.cancelBuildJobs("b1")).toBe(true);
+    expect(supplied.cancel).toHaveBeenCalledWith("b1");
+    expect((await shared.poll())?.buildId).toBe("b2");
+    expect(await shared.poll()).toBeNull();
+  });
+
+  it("reports nothing to cancel for a build without unfinished jobs", async () => {
+    const { wiring } = wire({ runner: stubRunner() });
+    expect(await wiring.cancelBuildJobs("none")).toBe(false);
+  });
+
   it("hosting only on a long-running host: publishes through one consumer, captures nothing", () => {
     const { wiring } = wire();
     expect(wiring.captureQueue).toBeNull();

@@ -5,6 +5,7 @@ import { CaptureLogModel } from "@storyshelf/core/models";
 import { LabelModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
 import { SnapshotModel } from "@storyshelf/core/models";
+import { CANCELLABLE_BUILD_STATUSES } from "@storyshelf/core/types";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { loadBaselineView } from "../routers/baseline-guard.ts";
@@ -178,6 +179,18 @@ export async function renderBuildDetailPage(
               >
                 <Button variant="secondary" type="submit">
                   Retry capture
+                </Button>
+              </form>
+            ) : null}
+            {testing && CANCELLABLE_BUILD_STATUSES.includes(build.status) ? (
+              <form
+                method="post"
+                action={`/api/v1/projects/${project.slug}/builds/${build.id}/cancel`}
+                hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/cancel`}
+                hx-target="body"
+              >
+                <Button variant="danger" size="sm" type="submit">
+                  Cancel build
                 </Button>
               </form>
             ) : null}

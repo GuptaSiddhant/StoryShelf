@@ -16,23 +16,57 @@ function fakeQueue(extendResult: LeaseRenewal = "ok", inspectResult: LeaseRenewa
 }
 
 describe("keepJobLease", () => {
-  it("renews only on progress, at most once per throttle interval", async () => {
+  it("renews on progress at most once per throttle interval", async () => {
     const clock = createManualClock();
     const { queue } = fakeQueue();
     const keeper = keepJobLease(queue, job, { now: clock.now, timers: clock.timers });
     keeper.touch();
+    await clock.advance(RENEW_THROTTLE_MS - 1);
+    keeper.touch();
     expect(queue.extend).not.toHaveBeenCalled();
-    await clock.advance(RENEW_THROTTLE_MS);
-    // Time alone never renews: a hung run must lose its lease.
-    expect(queue.extend).not.toHaveBeenCalled();
+    await clock.advance(1);
+    // The heartbeat renewed at the interval; touches right after it are throttled.
     keeper.touch();
     keeper.touch();
     await clock.flush();
     expect(queue.extend).toHaveBeenCalledTimes(1);
-    keeper.touch();
+    keeper.stop();
+    keeper.stop();
+  });
+
+  it("keeps the lease of a silent stage with a heartbeat, until stopped", async () => {
+    const clock = createManualClock();
+    const { queue } = fakeQueue();
+    const keeper = keepJobLease(queue, job, { now: clock.now, timers: clock.timers });
+    // Ten minutes without one touch: twice the lease, and the lease is renewed every 30 s.
+    await clock.advance(600_000);
+    expect(queue.extend).toHaveBeenCalledTimes(20);
+    keeper.stop();
+    await clock.advance(600_000);
+    expect(queue.extend).toHaveBeenCalledTimes(20);
+  });
+
+  it("beats at a third of a short lease", async () => {
+    const clock = createManualClock();
+    const { queue } = fakeQueue();
+    const keeper = keepJobLease(
+      queue,
+      { ...job, leaseMs: 900 },
+      { now: clock.now, timers: clock.timers },
+    );
+    await clock.advance(900);
+    expect(queue.extend).toHaveBeenCalledTimes(3);
+    keeper.stop();
+  });
+
+  it("stops the heartbeat once the lease is lost", async () => {
+    const clock = createManualClock();
+    const { queue } = fakeQueue("lost");
+    const keeper = keepJobLease(queue, job, { now: clock.now, timers: clock.timers });
+    await clock.advance(RENEW_THROTTLE_MS);
+    await expect(keeper.ended).resolves.toBe("lost");
+    await clock.advance(RENEW_THROTTLE_MS * 4);
     expect(queue.extend).toHaveBeenCalledTimes(1);
-    keeper.stop();
-    keeper.stop();
   });
 
   it("derives the throttle from a short lease", async () => {
@@ -93,7 +127,7 @@ describe("keepJobLease", () => {
     const keeper = keepJobLease(queue, job, {
       now: clock.now,
       timers: clock.timers,
-      renewEveryMs: 1,
+      renewEveryMs: 1000,
       logger: { warn } as never,
     });
     await clock.advance(CANCEL_CHECK_MS * 2);

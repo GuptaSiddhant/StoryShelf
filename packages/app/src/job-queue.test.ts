@@ -2,9 +2,9 @@ import { makeDatabase } from "@storyshelf/core/test-helpers";
 import { describe, expect, it, vi } from "vitest";
 import { createJobQueue } from "./job-queue.ts";
 
-function jobsFor(kinds: Parameters<typeof createJobQueue>[1], retries = 2) {
+function jobsFor(kinds: Parameters<typeof createJobQueue>[1], retries = 2, testing?: object) {
   const { db } = makeDatabase();
-  return createJobQueue({ database: db } as never, kinds, retries);
+  return createJobQueue({ database: db, testing } as never, kinds, retries);
 }
 
 describe("createJobQueue", () => {
@@ -29,6 +29,24 @@ describe("createJobQueue", () => {
     expect(await jobs.view.status("b1")).toMatchObject({ buildId: "b1", status: "queued" });
     expect(await jobs.view.active()).toHaveLength(1);
     expect(await jobs.view.recent(5)).toHaveLength(1);
+  });
+
+  it("grants the lease of testing.leaseSeconds, 5 minutes without it", async () => {
+    const custom = jobsFor(["capture"], 2, { leaseSeconds: 90 });
+    await custom.view.enqueue({ buildId: "b1" });
+    expect(await custom.get().poll()).toMatchObject({ leaseMs: 90_000 });
+    const standard = jobsFor(["capture"]);
+    await standard.view.enqueue({ buildId: "b1" });
+    expect(await standard.get().poll()).toMatchObject({ leaseMs: 300_000 });
+  });
+
+  it("cancels every job of a build, of any kind, through the view", async () => {
+    const jobs = jobsFor(["capture"]);
+    await jobs.view.enqueue({ buildId: "b1" });
+    await jobs.get().enqueueJob({ kind: "notify", buildId: "b1" });
+    expect(await jobs.view.cancel?.("b1")).toBe(true);
+    expect(await jobs.get().poll()).toBeNull();
+    expect(await jobs.view.cancel?.("b1")).toBe(false);
   });
 
   it("polls the given kinds and stamps retries + 1 attempts on the jobs", async () => {

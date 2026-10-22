@@ -208,7 +208,7 @@ third-party `DatabaseAdapter` implementations, which is accepted.
   instance polled by a consumer of their own, so a capture holding every slot cannot starve a
   status; the instance that enqueues wakes that consumer at once. The queue views (`status`,
   `active`, `recent`, `cancel` by build) list every polled kind but `notify`.
-- **Leases follow progress**, throttled, never on a timer, so a hung capture loses its lease.
+- **Leases are kept by the holder while its handler is alive**: a heartbeat timer renews the lease every `min(30 s, lease / 3)` and progress renews it too (throttled to the same interval), so a stage that prints nothing for longer than the lease is not redelivered. A holder that dies stops renewing and its lease expires. Both stop on completion, a lost lease and cancel. The lease is `testing.leaseSeconds` (default 300).
 - **Enqueue** inserts the row and wakes the local consumer directly, so a single instance dispatches
   immediately; other instances find the job on their next poll. An index on status and visibility
   time keeps an empty poll cheap.
@@ -222,9 +222,16 @@ third-party `DatabaseAdapter` implementations, which is accepted.
 - **Cancel** sets a flag on the job row, which the running instance reads (decision 11) and turns
   into `runner.cancel`. It works across instances and for a hung capture. Cancelling a job that has
   not started is immediate. `CaptureQueue.cancel(jobId | buildId)` is the queue-level setter (a
-  build id cancels the build's unfinished jobs of the queue's kinds); it also flags the running
-  attempt row, and `LeaseRenewal` gains `"cancelled"`, which `extend` and the new non-renewing
-  `PollableCaptureQueue.inspect` report. The API and UI that call it come with the cutover.
+  build id cancels the build's unfinished jobs of every kind in the table, capture, publish and
+  notify, whichever kinds the queue polls); it also flags the running attempt row, and
+  `LeaseRenewal` gains `"cancelled"`, which `extend` and the new non-renewing
+  `PollableCaptureQueue.inspect` report. The API and UI are `POST /api/v1/projects/:slug/builds/:id/cancel`
+  (class `testing`; developer role and above) and **Cancel build** on the build page, offered while
+  the build is `pending`, `capturing` or `comparing`: the jobs are cancelled first (a supplied
+  `testing.queue` is asked too), open capture attempts end `cancelled`, then the build becomes
+  `failed` (there is no `cancelled` build status) through `announceBuildStatus`, so git channels,
+  webhook and notifications see an ordinary failure. A capture that is still running stops within
+  the 5 s cancel check; until then it may still write a progress status to the build.
 - **Views.** `status`, `active` and `recent` read the table, so the compute-jobs page shows every
   instance's jobs.
 - **Trace propagation** (ADR 0015, Observability and Logging): `traceparent` and the request id travel
@@ -247,7 +254,7 @@ instance is stopped, upgraded and started together.
 ### 5. No separate worker; the consumer runs in the app
 
 There is no `@storyshelf/worker` package. The consumer loop lives in `@storyshelf/core/capture` and
-runs in every app instance with `testing`: poll, a progress-driven lease, retry with backoff, the
+runs in every app instance with `testing`: poll, a heartbeat- and progress-kept lease, retry with backoff, the
 final-attempt rule, cancelling the local run when the lease is lost, and a drain on SIGTERM.
 A slot is taken before polling; a failing job waits `1000 ms * 2^attempts` (at most 30 s) before it
 is claimed again, and `attempt >= maxAttempts` marks the last attempt, which is nacked without
@@ -411,8 +418,11 @@ rows.
   including one made while the previous probe was in flight. The probe is the query of decision 4.
 - **Cancel.** Each running job reads its own row by id every 5 s, and the lease renewal write also
   returns the row, so cancel latency is at most about 5 s even for a hung capture. The 5 s read
-  (`inspect`) renews nothing, so a hung capture still loses its lease; renewals come only from
-  progress, throttled to one per 30 s (or a third of the lease). The default lease is 5 minutes.
+  (`inspect`) renews nothing; renewals come from the heartbeat timer and from progress, each at most
+  once per `min(30 s, lease / 3)`. The default lease is 5 minutes (`testing.leaseSeconds`).
+- **Retry timing.** A requeued job is claimable after its backoff, but the poll loop wakes only on a
+  local enqueue, so a retry runs at the next poll (up to 2 s late while active, 15 s idle), within
+  the cadence above; it does not wake at the earliest `visible_at`.
 - **Retries.** `testing.retries`, default 2 (three attempts in total), on every path including
   in-process capture. The backoff, 1 s doubling to a cap of 30 s, is an internal constant. One limit
   covers failed attempts, lost leases and child crashes.

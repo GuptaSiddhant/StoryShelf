@@ -321,6 +321,13 @@ export interface ShelfTestingOptions {
    */
   retries?: number;
   /**
+   * Lease of a job of the database queue, in seconds (default 300: 5 minutes). A running job
+   * renews it on a heartbeat (every `min(30 s, lease / 3)`) and on progress, so a stage that prints
+   * nothing is not redelivered while its process lives; a crashed holder's job is claimed by
+   * another instance once the lease runs out, so a shorter lease recovers crashes sooner.
+   */
+  leaseSeconds?: number;
+  /**
    * Module run in a forked capture child (it calls `runCaptureChild` from `@storyshelf/core/capture`).
    * The app consumes the queue and pushes each job to the child over IPC. Needs `runner`, which
    * serves as the in-process fallback.
