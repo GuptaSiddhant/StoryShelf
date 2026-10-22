@@ -87,6 +87,7 @@ export async function renderBuildDetailPage(
   const staleCount = Object.keys(drifted).length;
   const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
   const testing = testingEnabled();
+  const cancelled = build.status === "cancelled";
   const published = build.status === "approved" && attempts.length === 0;
   const [catalog, labels] = await Promise.all([
     catalogOf()
@@ -306,7 +307,7 @@ export async function renderBuildDetailPage(
       {review ? (
         <div class="mb-1">
           <VStack>
-            {testing ? null : <VerdictCard data={review} />}
+            {testing || cancelled ? null : <VerdictCard data={review} />}
             <ChangesetCard data={review} />
           </VStack>
         </div>
@@ -419,7 +420,7 @@ export async function renderBuildDetailPage(
       {review ? (
         <div class="mt-1">
           <VStack>
-            {testing ? <VerdictCard data={review} /> : null}
+            {testing && !cancelled ? <VerdictCard data={review} /> : null}
             <CommentsCard data={review} />
           </VStack>
         </div>

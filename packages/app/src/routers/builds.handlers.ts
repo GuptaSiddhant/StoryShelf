@@ -162,7 +162,9 @@ export async function refreshBuild(buildId: string): Promise<void> {
   await new BuildModel(db).updateCounts(buildId);
   const snapshots = await new SnapshotModel(db).listByBuild(buildId);
   const status = rollupStatus(snapshots);
-  if (!(await new BuildModel(db).get(buildId))) return;
+  const build = await new BuildModel(db).get(buildId);
+  // A cancelled build is terminal: its snapshots may still be touched, but no verdict is announced.
+  if (!build || build.status === "cancelled") return;
   await new BuildModel(db).setStatus(buildId, status);
   await announceBuildStatus(buildId, status, { snapshotCount: snapshots.length });
 }
@@ -215,6 +217,9 @@ export async function approveSnapshot(
   const build = await new BuildModel(db).get(snapshot.buildId);
   if (!project || !build) {
     notFound("Project or build not found");
+  }
+  if (build.status === "cancelled") {
+    throw new HTTPException(409, { message: "The build was cancelled; retry it to review it" });
   }
   await assertBaselineCurrent(project, build, snapshot, options.force ?? false);
   await snapshots.review(snapshotId, "approved", userId);

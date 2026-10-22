@@ -310,6 +310,16 @@ describe("hosting-only review", () => {
     expect(await statusOf(booted, id)).toBe("failed");
     await booted.app.lifecycle.teardown();
   });
+
+  it("409s a cancelled build: no sign-offs, and the status stays cancelled", async () => {
+    const booted = await boot();
+    const id = await publish(booted, "feature/x");
+    await new BuildModel(booted.db).setStatus(id, "cancelled");
+    const response = await booted.as("alice")(`/builds/${id}/reviews`, verdict("approved"));
+    expect(response.status).toBe(409);
+    expect(await statusOf(booted, id)).toBe("cancelled");
+    await booted.app.lifecycle.teardown();
+  });
 });
 
 const bearer = (token: string) => ({ authorization: `Bearer ${token}` });

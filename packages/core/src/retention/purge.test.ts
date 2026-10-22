@@ -132,6 +132,41 @@ describe("Retention", () => {
     expect((await db.list(db.tables.builds)).map((row) => row.id)).toEqual(["b-persistent"]);
   });
 
+  it("purges old cancelled builds like failed ones, and keeps reviewing ones", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const old = new Date(Date.now() - 60 * 86_400_000).toISOString();
+    const project = await createTestProject(db, db.tables);
+    const insertBuild = async (id: string, status: string): Promise<unknown> =>
+      await db.insert(db.tables.builds, {
+        id,
+        projectId: project.id,
+        gitSha: id,
+        gitBranch: "main",
+        isDefault: false,
+        status,
+        snapshotCount: 0,
+        changedCount: 0,
+        approvedCount: 0,
+        rejectedCount: 0,
+        createdAt: old,
+        updatedAt: old,
+      });
+    await Promise.all(
+      [
+        ["b-cancelled", "cancelled"],
+        ["b-failed", "failed"],
+        ["b-reviewing", "reviewing"],
+      ].map(async ([id, status]) => await insertBuild(id ?? "", status ?? "")),
+    );
+
+    const retention = new Retention(db, storage, retentionTables(db));
+    const result = await retention.purge(project, { ttlDays: 30, keepLatestPerBranch: false });
+
+    expect(result.removedBuilds).toBe(2);
+    expect((await db.list(db.tables.builds)).map((row) => row.id)).toEqual(["b-reviewing"]);
+  });
+
   it("purges stale baseline branches via TTL", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();

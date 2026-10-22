@@ -51,6 +51,7 @@ describe("statusesForBuild: the testing status", () => {
     ["approved", "success", "Review closed: 1 change approved"],
     ["rejected", "failure", "Review closed: 2 changes rejected"],
     ["failed", "failure", "Capture failed"],
+    ["cancelled", "cancelled", "Cancelled"],
   ])("%s -> %s", (status, state, description) => {
     const set = run({ build: { status, rejectedCount: 2 } });
     expect(gate(set)).toMatchObject({
@@ -83,6 +84,23 @@ describe("statusesForBuild: which statuses exist", () => {
     expect(gate(run({ flags, build: { status: "pending" } }))?.state).toBe("pending");
     expect(gate(run({ flags, build: { status: "rejected" } }))?.state).toBe("failure");
     expect(gate(run({ flags, build: { status: "failed" } }))?.state).toBe("failure");
+    expect(gate(run({ flags, build: { status: "cancelled" } }))).toMatchObject({
+      name: "review",
+      state: "cancelled",
+      description: "Cancelled",
+    });
+  });
+
+  it("closes the pull request comment on a cancelled build, saying so", () => {
+    for (const flags of [
+      { testing: true, review: false },
+      { testing: false, review: true },
+    ]) {
+      const set = run({ flags, build: { status: "cancelled" } });
+      expect(set.comment?.state).toBe("cancelled");
+      expect(set.comment?.markdown).toContain("Cancelled");
+      expect(set.comment?.markdown).not.toContain("failed");
+    }
   });
 
   it("shows approval progress while a build waits for several approvals", () => {
@@ -117,7 +135,7 @@ describe("statusesForBuild: which statuses exist", () => {
 
   it("shows no review status with review off for a build that is not accepted", () => {
     const flags = { testing: false, review: false };
-    for (const status of ["pending", "failed", "rejected"]) {
+    for (const status of ["pending", "failed", "cancelled", "rejected"]) {
       expect(run({ flags, build: { status } }).statuses.map((entry) => entry.name)).toEqual([
         "storybook",
       ]);

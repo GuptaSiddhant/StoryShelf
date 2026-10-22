@@ -12,6 +12,7 @@ StoryShelf posts a **commit status** on the commit it captured, through a **git 
 | Capture started, or review still open  | `pending`          |
 | All `new`/`changed` snapshots approved | `success`          |
 | Changes rejected, or capture failed    | `failure`          |
+| A user cancelled the build             | `cancelled`        |
 
 Without `testing` (a [hosting-only](/concepts/hosting-only/) project) the gate is **`<prefix>/review`**, fed by the build-level verdicts of [Review](/guides/review/#review-without-screenshots):
 
@@ -20,6 +21,7 @@ Without `testing` (a [hosting-only](/concepts/hosting-only/) project) the gate i
 | Waiting for a verdict (default-branch builds are accepted on publish) | `pending`         |
 | Approved: the required approvals are present, no latest rejection     | `success`         |
 | A reviewer's latest verdict is a rejection, or the build failed       | `failure`         |
+| A user cancelled the build                                            | `cancelled`       |
 
 While a build waits for more than one approval, the `pending` description shows the progress, for example `Waiting for approvals: 1 of 2`.
 
@@ -98,6 +100,7 @@ Changing a channel's prefix changes the status name. Update the required check w
 - **Status stays pending after a failure.** After the last attempt the channel shows the error and a `sys:notify-failed` alert goes to the site-wide channels; fix the token or repository, then run the build or review action again to deliver the current state.
 - **Status is on the wrong commit.** The `--sha` was not the PR head (see step 2).
 - **Builds with a local identity** (uploads without git, see [Without git](/guides/without-git/)) never post statuses.
+- **Build cancelled.** A cancelled build shows the state `cancelled` with the description `Cancelled`: GitLab's own `canceled` pipeline state, and on GitHub (which has no cancelled commit state) `error`. A required check in that state does not pass, so the pull request stays blocked until you **Retry** the build or push a new commit.
 - **Capture failed.** A failed capture posts `failure`. Fix the cause and use **Retry** on the build page or `storyshelf retry` to re-run it.
 
 ## Related

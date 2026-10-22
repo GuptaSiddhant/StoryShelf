@@ -15,6 +15,10 @@ describe("mapState", () => {
     expect(mapState("failure")).toBe("failed");
   });
 
+  it("maps cancelled to GitLab's canceled", () => {
+    expect(mapState("cancelled")).toBe("canceled");
+  });
+
   it("maps unknown states to failed", () => {
     expect(mapState("bogus" as NotifierState)).toBe("failed");
   });

@@ -70,7 +70,8 @@ refused. `build_reviews.user_id` stays nullable for one case only: an instance w
 authentication at all records an anonymous verdict, one reviewer, which counts only while the
 project requires one approval (otherwise it is refused with 409). A verdict waits for publishing:
 until the build's Storybook is published (the manifest, the same probe as `<prefix>/storybook`) the
-route answers 409, and a build whose publish failed is `failed`, not reviewable. A verdict that
+route answers 409, and a build whose publish failed is `failed`, and one a user cancelled is `cancelled`, not reviewable
+(409, no verdict card). A verdict that
 sends the build back to `pending` raises `build:pending` like every other move.
 
 A verdict is rewritable. Verdicts belong to the build, as snapshot approvals do: a new push to the

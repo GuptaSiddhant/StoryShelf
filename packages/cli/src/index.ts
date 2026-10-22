@@ -210,7 +210,7 @@ function buildWhoamiCommand(): Command {
 
 function buildRetryCommand(): Command {
   return new Command("retry")
-    .description("Retry a failed StoryShelf build")
+    .description("Retry a failed or cancelled StoryShelf build")
     .requiredOption("--url <url>", "server base URL")
     .requiredOption("--slug <slug>", "project slug")
     .requiredOption("--build-id <id>", "build id")

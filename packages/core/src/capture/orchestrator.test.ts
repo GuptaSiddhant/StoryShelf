@@ -831,6 +831,52 @@ describe("executeCaptureJob", () => {
     expect(failedBuild?.status).toBe("failed");
   });
 
+  it("does not capture a build that was cancelled before the job ran", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const project = await new ProjectModel(db, tables(db)).create({ name: "Orchestrator" });
+    const builds = new BuildModel(db, tables(db));
+    const build = await builds.create(project.id, { gitSha: "sha-abc", gitBranch: "main" });
+    await builds.setStatus(build.id, "cancelled");
+    const { runner, render } = fakeRunner();
+
+    const summary = await executeCaptureJob(
+      { buildId: build.id },
+      { db, tables: tables(db), storage, runner, scratchDir },
+    );
+
+    expect(summary).toEqual({ storyCount: 0, failedCount: 0 });
+    expect(render).not.toHaveBeenCalled();
+    expect((await builds.get(build.id))?.status).toBe("cancelled");
+  });
+
+  it("leaves a build cancelled mid-capture cancelled when the capture finishes late", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const project = await new ProjectModel(db, tables(db)).create({ name: "Orchestrator" });
+    const builds = new BuildModel(db, tables(db));
+    const build = await builds.create(project.id, {
+      gitSha: "sha-abc",
+      gitBranch: "main",
+      isDefault: true,
+    });
+    await storage.write(storybookZipPath(project.id, build.id), zipWithIndex());
+    const inner = fakeRunner();
+    const { runner } = fakeRunner({
+      render: vi.fn(async (input: Parameters<CaptureRunner["render"]>[0]) => {
+        await builds.setStatus(build.id, "cancelled");
+        return await inner.runner.render(input);
+      }),
+    });
+
+    await executeCaptureJob(
+      { buildId: build.id },
+      { db, tables: tables(db), storage, runner, scratchDir },
+    );
+
+    expect((await builds.get(build.id))?.status).toBe("cancelled");
+  });
+
   it("throws when the build does not exist", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();

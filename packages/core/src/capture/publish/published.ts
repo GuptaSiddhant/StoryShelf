@@ -9,7 +9,7 @@ import { storybookDir } from "../../utils/paths.ts";
 
 /**
  * How publishing the build stands. The manifest is written last, so its presence means done. A
- * `failed` build without one failed to publish (or never uploaded); any other build waits. Without
+ * `failed` or `cancelled` build without one did not publish (or never uploaded); any other build waits. Without
  * a storage adapter nothing can be read, so publishing reads as pending.
  */
 export async function publishingOf(
@@ -22,5 +22,5 @@ export async function publishingOf(
   if (published) {
     return "success";
   }
-  return build.status === "failed" ? "failure" : "pending";
+  return build.status === "failed" || build.status === "cancelled" ? "failure" : "pending";
 }
