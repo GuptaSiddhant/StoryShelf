@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { signStorybookToken } from "../utils/storybook-token.ts";
+import { PER_CAPTURE_BUDGET_MS, signStorybookToken } from "../utils/storybook-token.ts";
 import {
-  PER_CAPTURE_BUDGET_MS,
   RENDER_TIMEOUT_MS,
   renderBudgetMs,
   renderWithTimeout,

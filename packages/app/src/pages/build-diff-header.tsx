@@ -10,7 +10,7 @@ import {
   headerTitle,
   reviewHeader,
 } from "../ui/styles/review-layout.ts";
-import { a11ySummaryOf } from "./a11y-violations.tsx";
+import { a11ySummaryOf, a11yUnavailableNote } from "./a11y-violations.tsx";
 import { reviewProgress } from "./build-diff-model.ts";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
@@ -95,6 +95,9 @@ function HeaderTitle({
           <Badge tone="warning" icon>
             a11y {a11y.findings} (does not block)
           </Badge>
+        ) : null}
+        {a11y.unavailable > 0 ? (
+          <Badge tone="neutral">{a11yUnavailableNote(a11y.unavailable)}</Badge>
         ) : null}
       </p>
     </>

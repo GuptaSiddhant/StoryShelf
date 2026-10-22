@@ -2,7 +2,7 @@ import { isCaptureTarget, type CaptureTarget } from "@storyshelf/core/adapter/ca
 import { resolveBrowsers } from "@storyshelf/core/capture";
 import { ProjectModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
-import { MAX_STORYBOOK_URL_TTL, MIN_STORYBOOK_URL_TTL } from "@storyshelf/core/utils";
+import { storybookUrlTtlOverrideError } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
@@ -55,14 +55,9 @@ function readUrlTtl(form: FormData): number | null {
   const raw = asString(form.get("storybookUrlTtlSeconds"));
   if (!raw) return null;
   const seconds = Number(raw);
-  if (
-    !Number.isInteger(seconds) ||
-    seconds < MIN_STORYBOOK_URL_TTL ||
-    seconds > MAX_STORYBOOK_URL_TTL
-  ) {
-    throw new HTTPException(400, {
-      message: `The signed URL lifetime is a whole number of seconds from ${MIN_STORYBOOK_URL_TTL} to ${MAX_STORYBOOK_URL_TTL}`,
-    });
+  const message = storybookUrlTtlOverrideError(seconds);
+  if (message !== undefined) {
+    throw new HTTPException(400, { message });
   }
   return seconds;
 }

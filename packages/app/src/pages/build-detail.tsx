@@ -108,7 +108,6 @@ export async function renderBuildDetailPage(
     grouped.set(key, list);
   }
   const a11y = a11ySummaryOf(snapshots);
-  const inheritedCount = snapshots.filter((snap) => snap.inherited).length;
   const selective = build.affectedOnly && build.affectedImportPaths !== null;
 
   return (
@@ -158,7 +157,8 @@ export async function renderBuildDetailPage(
             {testing && selective ? (
               <>
                 {" "}
-                · {snapshots.length - inheritedCount} rendered, {inheritedCount} inherited
+                · {build.snapshotCount - build.inheritedCount} rendered, {build.inheritedCount}{" "}
+                inherited
               </>
             ) : null}
           </>
@@ -226,6 +226,10 @@ export async function renderBuildDetailPage(
             <>
               <Card>
                 <Stat label="Snapshots" value={snapshots.length} />
+              </Card>
+              <Card>
+                <Stat label="Inherited" value={build.inheritedCount} />
+                <Meta>Reused from the baseline without rendering.</Meta>
               </Card>
               <Card>
                 <Stat label="Changed / new" value={build.changedCount} tone="warning" />

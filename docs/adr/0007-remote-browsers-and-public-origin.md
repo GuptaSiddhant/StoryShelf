@@ -175,7 +175,10 @@ page, no API, no other build).
 - **Expiry.** A token is minted when a render pass starts, with a lifetime derived from that pass:
   its render budget (`renderBudgetMs`, which grows with the number of captures) plus a grace of
   5 minutes, never below 2 hours and never above 24 hours. A project can override it
-  (`projects.storybook_url_ttl_seconds`, 60 to 86400, admin only). There is no instance-wide option
+  (`projects.storybook_url_ttl_seconds`, `MIN_STORYBOOK_URL_TTL_OVERRIDE` (1050: one minimum slice of
+  `MIN_CAPTURES_PER_SLICE` captures at `PER_CAPTURE_BUDGET_MS` each plus the grace) to 86400, admin only;
+  `storybookUrlTtlOverrideError` is the single check behind the project API, the settings form and its
+  hint, so a slice always fits inside its token). There is no instance-wide option
   (the earlier `testing.storybookUrlTtl` is gone).
 - **Where it applies.** The render request and the `extractParameters` input both carry
   `storybookUrl`.

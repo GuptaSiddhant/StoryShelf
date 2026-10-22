@@ -3,11 +3,15 @@ import { redactSecrets } from "./redact.ts";
 import {
   DEFAULT_STORYBOOK_URL_TTL,
   MAX_STORYBOOK_URL_TTL,
+  MIN_CAPTURES_PER_SLICE,
+  MIN_STORYBOOK_URL_TTL_OVERRIDE,
+  PER_CAPTURE_BUDGET_MS,
   STORYBOOK_TOKEN_PREFIX,
   STORYBOOK_URL_TTL_GRACE,
   signStorybookToken,
   storybookTokenPath,
   storybookUrlTtl,
+  storybookUrlTtlOverrideError,
   verifyStorybookToken,
 } from "./storybook-token.ts";
 
@@ -149,5 +153,21 @@ describe("storybookUrlTtl", () => {
     expect(storybookUrlTtl({ override: null, budgetMs: 15 * 60_000 })).toBe(floor);
     expect(storybookUrlTtl({ budgetMs: 4 * 3600_000 })).toBe(4 * 3600 + STORYBOOK_URL_TTL_GRACE);
     expect(storybookUrlTtl({ budgetMs: 100 * 3600_000 })).toBe(MAX_STORYBOOK_URL_TTL);
+  });
+});
+
+describe("storybookUrlTtlOverrideError", () => {
+  it("floors an override at one minimum slice plus the grace", () => {
+    expect(MIN_STORYBOOK_URL_TTL_OVERRIDE).toBe(
+      (MIN_CAPTURES_PER_SLICE * PER_CAPTURE_BUDGET_MS) / 1000 + STORYBOOK_URL_TTL_GRACE,
+    );
+    expect(storybookUrlTtlOverrideError(MIN_STORYBOOK_URL_TTL_OVERRIDE)).toBeUndefined();
+    expect(storybookUrlTtlOverrideError(MAX_STORYBOOK_URL_TTL)).toBeUndefined();
+  });
+
+  it("names the floor when refusing too short, too long or fractional values", () => {
+    for (const bad of [60, MIN_STORYBOOK_URL_TTL_OVERRIDE - 1, MAX_STORYBOOK_URL_TTL + 1, 1500.5]) {
+      expect(storybookUrlTtlOverrideError(bad)).toContain(String(MIN_STORYBOOK_URL_TTL_OVERRIDE));
+    }
   });
 });

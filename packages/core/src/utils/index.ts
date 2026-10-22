@@ -52,7 +52,10 @@ export { storybookBase } from "./storybook-url.ts";
 export {
   DEFAULT_STORYBOOK_URL_TTL,
   MAX_STORYBOOK_URL_TTL,
+  MIN_CAPTURES_PER_SLICE,
   MIN_STORYBOOK_URL_TTL,
+  MIN_STORYBOOK_URL_TTL_OVERRIDE,
+  PER_CAPTURE_BUDGET_MS,
   STORYBOOK_TOKEN_PREFIX,
   STORYBOOK_TOKEN_SOURCE,
   STORYBOOK_URL_TTL_GRACE,
@@ -60,6 +63,7 @@ export {
   signStorybookToken,
   storybookTokenPath,
   storybookUrlTtl,
+  storybookUrlTtlOverrideError,
   verifyStorybookToken,
   type SignStorybookTokenInput,
   type StorybookTokenClaims,

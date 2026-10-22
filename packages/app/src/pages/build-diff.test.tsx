@@ -346,6 +346,23 @@ describe("review page: accessibility violations", () => {
     expect(html).not.toContain('value="a11y"');
   });
 
+  it("keeps an `axe unavailable` entry out of every count and shows it as a neutral note", async () => {
+    const html = await pageWith(JSON.stringify(["axe unavailable: page crashed"]));
+    expect(html).not.toContain("does not block");
+    expect(html).not.toContain("a11y 1");
+    expect(html).not.toContain('value="a11y"');
+    expect(html).not.toContain('data-a11y=""');
+    expect(html).toContain("axe did not run on 1 snapshot.");
+    expect(html).toContain("axe did not run on chromium");
+    expect(html).toContain("page crashed");
+  });
+
+  it("reports an `axe unavailable` entry on the build page without calling it a finding", async () => {
+    const page = await pageWith(JSON.stringify(["axe unavailable: page crashed"]), "");
+    expect(page).toContain("No findings recorded.");
+    expect(page).toContain("axe did not run on 1 snapshot.");
+  });
+
   it("shows nothing for a snapshot without findings or with unreadable data", async () => {
     expect(await pageWith(null)).not.toContain("Accessibility:");
     expect(await pageWith("not json")).not.toContain("Accessibility:");

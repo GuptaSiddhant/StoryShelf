@@ -118,6 +118,7 @@ describe("notifications settings tab", () => {
     expect(html).toContain("My notifications for this project");
     expect(html).toContain("Add a message channel");
     expect(html).toContain("Add a git channel");
+    expect(html).toContain("Build failed");
     expect(html).not.toContain("settings/status");
   });
 

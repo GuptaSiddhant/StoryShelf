@@ -6,7 +6,7 @@ import {
   STORYBOOK_URL_TTL_GRACE,
   verifyStorybookToken,
 } from "../utils/storybook-token.ts";
-import { PER_CAPTURE_BUDGET_MS } from "./render.ts";
+import { PER_CAPTURE_BUDGET_MS } from "../utils/storybook-token.ts";
 import { storybookUrlSource } from "./storybook-urls.ts";
 
 const targets: RunnerTarget[] = [

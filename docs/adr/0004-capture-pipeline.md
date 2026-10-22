@@ -206,7 +206,10 @@ status.
   `a11y N`, and the filmstrip has an `A11y` filter; all are information only and never a status.
 - **No fallback.** There is no hand-rolled scan. If axe cannot be loaded or run, the result is one
   visible, non-blocking annotation `a11y: axe unavailable: <reason>` plus a warning log, never a
-  silent pass.
+  silent pass. The stored `axe unavailable: <reason>` entry is not a finding: the review UI leaves it
+  out of the build total, the header badge, the filter and the per-snapshot counts and shows it as a
+  separate neutral note ("axe did not run on N snapshots", with the reason on the snapshot), so a
+  failed run is visible without inflating the findings.
 
 ### 7. Modes are named and come from story parameters
 

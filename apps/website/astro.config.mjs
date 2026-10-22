@@ -122,6 +122,7 @@ export default defineConfig({
             { label: "Projects", slug: "concepts/projects" },
             { label: "Builds & snapshots", slug: "concepts/builds" },
             { label: "Capture & viewports", slug: "concepts/capture" },
+            { label: "How Storybook works", slug: "concepts/how-storybook-works" },
             { label: "Affected capture", slug: "concepts/affected-capture" },
             { label: "Baselines & branches", slug: "concepts/baselines" },
             { label: "Labels", slug: "concepts/labels" },
