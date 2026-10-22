@@ -1,0 +1,165 @@
+{
+  "v": 5,
+  "entries": {
+    "components-accessibility--missing-alt": {
+      "type": "story",
+      "subtype": "story",
+      "id": "components-accessibility--missing-alt",
+      "name": "Missing Alt",
+      "title": "Components/Accessibility",
+      "importPath": "./src/Accessibility.stories.tsx",
+      "tags": ["dev", "test", "manifest"],
+      "exportName": "MissingAlt"
+    },
+    "components-accessibility--low-contrast": {
+      "type": "story",
+      "subtype": "story",
+      "id": "components-accessibility--low-contrast",
+      "name": "Low Contrast",
+      "title": "Components/Accessibility",
+      "importPath": "./src/Accessibility.stories.tsx",
+      "tags": ["dev", "test", "manifest"],
+      "exportName": "LowContrast"
+    },
+    "components-accessibility--clean": {
+      "type": "story",
+      "subtype": "story",
+      "id": "components-accessibility--clean",
+      "name": "Clean",
+      "title": "Components/Accessibility",
+      "importPath": "./src/Accessibility.stories.tsx",
+      "tags": ["dev", "test", "manifest"],
+      "exportName": "Clean"
+    },
+    "components-accessibility--disabled-a-11-y": {
+      "type": "story",
+      "subtype": "story",
+      "id": "components-accessibility--disabled-a-11-y",
+      "name": "Disabled A 11 Y",
+      "title": "Components/Accessibility",
+      "importPath": "./src/Accessibility.stories.tsx",
+      "tags": ["dev", "test", "manifest"],
+      "exportName": "DisabledA11y"
+    },
+    "components-accessibility--rule-override": {
+      "type": "story",
+      "subtype": "story",
+      "id": "components-accessibility--rule-override",
+      "name": "Rule Override",
+      "title": "Components/Accessibility",
+      "importPath": "./src/Accessibility.stories.tsx",
+      "tags": ["dev", "test", "manifest"],
+      "exportName": "RuleOverride"
+    },
+    "components-button--primary": {
+      "type": "story",
+      "subtype": "story",
+      "id": "components-button--primary",
+      "name": "Primary",
+      "title": "Components/Button",
+      "importPath": "./src/Button.stories.tsx",
+      "componentPath": "./src/Button.tsx",
+      "tags": ["dev", "test", "manifest"],
+      "exportName": "Primary"
+    },
+    "components-button--secondary": {
+      "type": "story",
+      "subtype": "story",
+      "id": "components-button--secondary",
+      "name": "Secondary",
+      "title": "Components/Button",
+      "importPath": "./src/Button.stories.tsx",
+      "componentPath": "./src/Button.tsx",
+      "tags": ["dev", "test", "manifest"],
+      "exportName": "Secondary"
+    },
+    "components-button--disabled": {
+      "type": "story",
+      "subtype": "story",
+      "id": "components-button--disabled",
+      "name": "Disabled",
+      "title": "Components/Button",
+      "importPath": "./src/Button.stories.tsx",
+      "componentPath": "./src/Button.tsx",
+      "tags": ["dev", "test", "manifest", "skip"],
+      "exportName": "Disabled"
+    },
+    "components-button--flaky-tag": {
+      "type": "story",
+      "subtype": "story",
+      "id": "components-button--flaky-tag",
+      "name": "Flaky Tag",
+      "title": "Components/Button",
+      "importPath": "./src/Button.stories.tsx",
+      "componentPath": "./src/Button.tsx",
+      "tags": ["dev", "test", "manifest", "flaky-test", "play-fn"],
+      "exportName": "FlakyTag"
+    },
+    "components-button--flaky-param": {
+      "type": "story",
+      "subtype": "story",
+      "id": "components-button--flaky-param",
+      "name": "Flaky Param",
+      "title": "Components/Button",
+      "importPath": "./src/Button.stories.tsx",
+      "componentPath": "./src/Button.tsx",
+      "tags": ["dev", "test", "manifest", "flaky-test", "play-fn"],
+      "exportName": "FlakyParam"
+    },
+    "components-button--chromatic-flaky": {
+      "type": "story",
+      "subtype": "story",
+      "id": "components-button--chromatic-flaky",
+      "name": "Chromatic Flaky",
+      "title": "Components/Button",
+      "importPath": "./src/Button.stories.tsx",
+      "componentPath": "./src/Button.tsx",
+      "tags": ["dev", "test", "manifest", "flaky-test", "play-fn"],
+      "exportName": "ChromaticFlaky"
+    },
+    "components-button--blocking-failure": {
+      "type": "story",
+      "subtype": "story",
+      "id": "components-button--blocking-failure",
+      "name": "Blocking Failure",
+      "title": "Components/Button",
+      "importPath": "./src/Button.stories.tsx",
+      "componentPath": "./src/Button.tsx",
+      "tags": ["dev", "test", "manifest", "play-fn"],
+      "exportName": "BlockingFailure"
+    },
+    "components-button--with-delay": {
+      "type": "story",
+      "subtype": "story",
+      "id": "components-button--with-delay",
+      "name": "With Delay",
+      "title": "Components/Button",
+      "importPath": "./src/Button.stories.tsx",
+      "componentPath": "./src/Button.tsx",
+      "tags": ["dev", "test", "manifest"],
+      "exportName": "WithDelay"
+    },
+    "components-themed--surface": {
+      "type": "story",
+      "subtype": "story",
+      "id": "components-themed--surface",
+      "name": "Surface",
+      "title": "Components/Themed",
+      "importPath": "./src/Themed.stories.tsx",
+      "componentPath": "./src/Button.tsx",
+      "tags": ["dev", "test", "manifest"],
+      "exportName": "Surface"
+    },
+    "components-themed--chromatic-alias": {
+      "type": "story",
+      "subtype": "story",
+      "id": "components-themed--chromatic-alias",
+      "name": "Chromatic Alias",
+      "title": "Components/Themed",
+      "importPath": "./src/Themed.stories.tsx",
+      "componentPath": "./src/Button.tsx",
+      "tags": ["dev", "test", "manifest"],
+      "exportName": "ChromaticAlias"
+    }
+  }
+}

@@ -15,7 +15,14 @@
         "TURSO_DATABASE_URL",
         "TURSO_AUTH_TOKEN"
       ],
-      "inputs": ["$TURBO_DEFAULT$", "!**/*.test.ts", "!**/*.test.tsx", "!README.md", "!LICENSE"]
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!**/*.test.ts",
+        "!**/*.test.tsx",
+        "!**/__fixtures__/**",
+        "!README.md",
+        "!LICENSE"
+      ]
     },
     "dev": {
       "persistent": true,
