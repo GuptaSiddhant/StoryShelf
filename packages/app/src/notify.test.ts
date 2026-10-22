@@ -58,6 +58,7 @@ function storeFor(db: ReturnType<typeof makeDatabase>["db"], notifiers: Notifier
     logger: pino({ level: "silent" }),
     user: null,
     authEnabled: false,
+    testing: false,
     sessionId: "test",
     gitHosts: [],
     design: [],

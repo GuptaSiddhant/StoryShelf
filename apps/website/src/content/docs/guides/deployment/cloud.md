@@ -7,54 +7,28 @@ StoryShelf is **cross-runtime**: the core router (`createShelfApp`) uses only We
 
 ## Mix-and-match layers
 
-| Platform               | Database                                                      | Storage                               | Capture queue                            | Auth               | Server entry                   |
+| Platform               | Database                                                      | Storage                               | Testing                                  | Auth               | Server entry                   |
 | ---------------------- | ------------------------------------------------------------- | ------------------------------------- | ---------------------------------------- | ------------------ | ------------------------------ |
-| **Vercel**             | `@storyshelf/db-sqlite/turso` (Turso/libSQL)                  | `@storyshelf/storage-s3` (R2/S3)      | Remote `CaptureQueue` (see below)        | `@storyshelf/auth` | Hono + `@hono/vercel-edge`     |
-| **Cloudflare Workers** | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage-s3` (R2)         | Workers Queues `CaptureQueue` impl       | `@storyshelf/auth` | Hono + Workers entry           |
-| **Azure Functions**    | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage-s3` (Azure Blob) | Azure Storage Queues `CaptureQueue` impl | `@storyshelf/auth` | Hono + Azure Functions handler |
-| **AWS Lambda**         | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage-s3` (S3)         | SQS `CaptureQueue` impl                  | `@storyshelf/auth` | Hono + Lambda handler          |
-| **Deno Deploy**        | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage-s3` (R2/S3)      | Custom `CaptureQueue` (Deno KV / HTTP)   | `@storyshelf/auth` | Hono + Deno entry              |
-| **Bun**                | `@storyshelf/db-sqlite` or `@storyshelf/db-sqlite/bun-sqlite` | `storage-local` or `storage-s3`       | `InMemoryCaptureQueue`                   | `@storyshelf/auth` | Hono + Bun.serve               |
+| **Vercel**             | `@storyshelf/db-sqlite/turso` (Turso/libSQL)                  | `@storyshelf/storage-s3` (R2/S3)      | Hosting only (no `testing`)              | `@storyshelf/auth` | Hono + `@hono/vercel-edge`     |
+| **Cloudflare Workers** | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage-s3` (R2)         | Hosting only (no `testing`)              | `@storyshelf/auth` | Hono + Workers entry           |
+| **Azure Functions**    | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage-s3` (Azure Blob) | Hosting only (no `testing`)              | `@storyshelf/auth` | Hono + Azure Functions handler |
+| **AWS Lambda**         | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage-s3` (S3)         | Hosting only (no `testing`)              | `@storyshelf/auth` | Hono + Lambda handler          |
+| **Deno Deploy**        | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage-s3` (R2/S3)      | Hosting only (no `testing`)              | `@storyshelf/auth` | Hono + Deno entry              |
+| **Bun**                | `@storyshelf/db-sqlite` or `@storyshelf/db-sqlite/bun-sqlite` | `storage-local` or `storage-s3`       | `testing` (long-running host)            | `@storyshelf/auth` | Hono + Bun.serve               |
 
-## Worker model (serverless)
+## Serverless: Storybook hosting only
 
-On serverless platforms, the request handler **must not run capture** (isolate freezes after response). Instead:
+`testing` needs a process that keeps running between requests: capture jobs run for minutes in the background. Vercel Functions, AWS Lambda, Netlify Functions and Cloudflare Workers freeze or end the process after each request, so on those platforms StoryShelf **hosts Storybooks only**: leave the `testing` option out. See [Hosting only](/concepts/hosting-only/).
 
-1. **API handler** enqueues via `CaptureQueue.enqueue({ buildId, reqId })` — returns immediately.
-2. **Separate worker** (always-on service, background job, or scheduled function) polls the remote queue and calls `executeCaptureJob({ buildId, reqId }, jobOptions)` for each message.
+- **AWS Lambda.** `createShelfApp` throws at boot when `AWS_LAMBDA_FUNCTION_NAME` is set and `testing.runner` is configured.
+- **Vercel and Netlify.** Boot logs a warning when `testing.runner` is configured (`VERCEL` or `NETLIFY` is set).
+- **Override.** `STORYSHELF_ALLOW_SERVERLESS=1` silences both, for a host that looks serverless but keeps a process alive.
+- **Cloudflare D1.** The `@storyshelf/db-sqlite/d1` preset is a Workers-only binding, so it cannot back an instance with `testing.runner`; `createShelfApp` throws at boot. Turso over the network can.
+- **Uploads.** With no consumer on the host, a zip over `maxInlineUnzipSize` is refused with `413`, and `storyshelf upload` falls back to the file-by-file route by itself.
 
-The `InMemoryCaptureQueue` (default) runs the worker inline — suitable only for long-lived hosts (Node, Bun, Deno, Fly.io, Railway, Render, VPS). For serverless, provide a `CaptureQueue` that pushes to your platform's queue (SQS, Workers Queues, Azure Storage Queues, etc.) and deploy a companion worker.
+An instance that only hands jobs to a remote `testing.queue` (no `testing.runner`) renders nothing in its own process, so neither check applies to it. Capture runs wherever a worker polls that queue; the worker deployment is described in [Remote workers](/guides/deployment/remote-workers/).
 
-```ts
-import type { CaptureQueue, CaptureJob } from "@storyshelf/core/adapter/capture-queue";
-
-export class HttpCaptureQueue implements CaptureQueue {
-  constructor(private readonly endpoint: string) {}
-  async enqueue(job: CaptureJob): Promise<void> {
-    await fetch(this.endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(job),
-    });
-  }
-  async status() { return null; }
-  async active() { return []; }
-  async recent() { return []; }
-}
-
-import { createShelfApp } from "@storyshelf/app";
-import { HttpCaptureQueue } from "./my-queue";
-
-const router = createShelfApp({
-  database: ...,
-  storage: ...,
-  testing: { runner: ..., queue: new HttpCaptureQueue("https://my-worker.example.com/capture") },
-});
-```
-
-> **Note:** Cross-runtime queue integration is currently unit-tested with `InMemoryCaptureQueue`. A real-queue worker test (SQS / Workers Queues / Azure Storage Queues) is tracked separately.
-
-## Minimal Turso + S3 recipe
+## Minimal Turso + S3 recipe (long-running host with `testing`)
 
 ```ts
 import { createShelfApp } from "@storyshelf/app";
@@ -85,7 +59,7 @@ export const app = createShelfApp({
 await app.lifecycle.init();
 ```
 
-This runs on **any** platform that supports Node-compatible `fetch` + `crypto` + `sqlite`/`libsql`.
+Without the `testing` option the same assembly runs on **any** platform that supports Node-compatible `fetch` + `crypto` + `sqlite`/`libsql` (Storybook hosting only). With `testing` it needs a long-running host.
 
 ## Postgres providers
 

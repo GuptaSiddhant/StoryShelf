@@ -48,6 +48,11 @@ describe("createD1Database", () => {
     expect(() => createD1Database({} as never)).toThrow("provide a D1 `client`");
   });
 
+  it("declares that it cannot back testing (no long-running process)", () => {
+    const db = createD1Database({ client: createStubBinding() });
+    expect(db.metadata.supportsTesting).toBe(false);
+  });
+
   it("migrates and round-trips a project", async () => {
     const db = createD1Database({ client: createStubBinding() });
     await initDb(db);

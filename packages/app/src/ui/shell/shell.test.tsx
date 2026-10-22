@@ -4,6 +4,7 @@ import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { describe, expect, it } from "vitest";
 import { assetManifest } from "../../asset-manifest.ts";
 import { createShelfApp } from "../../index.tsx";
+import { stubRunner } from "../../test-runner.ts";
 
 type Db = ReturnType<typeof makeDatabase>["db"];
 
@@ -11,6 +12,7 @@ async function page(
   path: string,
   seed?: (db: Db) => Promise<void>,
   ui?: Record<string, unknown>,
+  testing = true,
 ): Promise<string> {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
@@ -18,6 +20,7 @@ async function page(
   const app = createShelfApp({
     database: db,
     storage,
+    ...(testing ? { testing: { runner: stubRunner() } } : {}),
     ...(ui ? { ui } : {}),
     logger: createShelfLogger({ level: "silent" }),
   });
@@ -55,6 +58,14 @@ describe("app shell", () => {
     expect(html).toContain(">Beta<");
     expect(html).toContain('aria-current="true"');
     expect(html).toContain("All projects");
+  });
+
+  it("hides the Jobs entry on a hosting-only instance", async () => {
+    const html = await page("/projects/alpha/builds", twoProjects, undefined, false);
+    for (const label of ["Library", "Builds", "Labels", "Settings"]) {
+      expect(html).toContain(`<span class="sidebar__label">${label}</span>`);
+    }
+    expect(html).not.toContain('<span class="sidebar__label">Jobs</span>');
   });
 
   it("offers Light, Dark, and System in the theme menu", async () => {

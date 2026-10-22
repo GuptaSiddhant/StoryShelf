@@ -32,6 +32,10 @@ export interface AdminSystemData {
   credentials?: CredentialProbe | null;
   /** True when AI is configured (shows the AI usage link). */
   aiEnabled?: boolean;
+  /** Whether `options.testing` is set; false shows the hosting-only notice. */
+  testing?: boolean;
+  /** Snapshots hidden because `testing` is off (only meaningful when it is). */
+  hiddenSnapshots?: number;
   /** Detected host budget and effective capture concurrency; null when capture runs elsewhere. */
   capture?: CaptureHostSummary | null;
 }
@@ -246,6 +250,25 @@ function CredentialsCard(props: {
   );
 }
 
+/** Notice that `testing` is off, so a misconfigured instance in a fleet is visible (ADR 0006). */
+function HostingOnlyNotice(props: {
+  hiddenSnapshots: number;
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const { hiddenSnapshots } = props;
+  return (
+    <div class="mt-1">
+      <Alert tone="info" title="Testing is off: Storybook hosting only">
+        This instance publishes and serves Storybooks, but does not capture, compare or keep
+        baselines, and no testing status is posted. Set the <code>testing</code> option to turn
+        testing on.
+        {hiddenSnapshots > 0
+          ? ` ${hiddenSnapshots} existing snapshot(s) are hidden, not deleted, and reappear when testing is turned on.`
+          : ""}
+      </Alert>
+    </div>
+  );
+}
+
 /** Site-admin System page: adapter inventory with in-depth health. */
 export function renderAdminSystemPage(data: AdminSystemData): RenderedContent {
   const { report, config, credentials } = data;
@@ -273,6 +296,9 @@ export function renderAdminSystemPage(data: AdminSystemData): RenderedContent {
           </HStack>
         }
       />
+      {data.testing === false ? (
+        <HostingOnlyNotice hiddenSnapshots={data.hiddenSnapshots ?? 0} />
+      ) : null}
       <ServerFacts data={data} />
       {credentials ? (
         <div class="mt-1">

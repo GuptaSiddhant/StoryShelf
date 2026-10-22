@@ -23,6 +23,8 @@ export interface Store {
   authEnabled: boolean;
   /** Raw session cookie value ("default" when anonymous); binds CSRF tokens. */
   sessionId: string;
+  /** `options.testing` is set: capture, compare and baselines run here (ADR 0006). */
+  testing: boolean;
   enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
   captureQueue?: CaptureQueue | null;
   /** Publishing: completion and the `publish` job queue (absent in hand-built stores). */
@@ -56,12 +58,13 @@ export function getStore(): Store {
 }
 
 /**
- * Whether this instance has `testing`: it captures and compares builds, so pages layer snapshot
- * data (screenshots, statuses, design links) onto what the catalog gives them. Without it the same
- * pages render from the published Storybook alone.
+ * Whether this instance has `testing` (`options.testing` is set): it captures and compares builds,
+ * so pages layer snapshot data (screenshots, statuses, design links) onto what the catalog gives
+ * them. Without it the same pages render from the published Storybook alone, and the routes
+ * classified `testing` answer 404 (`requireTesting`).
  */
 export function testingEnabled(store: Store = getStore()): boolean {
-  return store.enqueueCapture !== undefined;
+  return store.testing;
 }
 
 /** The catalog loader pages read; hand-built stores without one get an uncached loader. */

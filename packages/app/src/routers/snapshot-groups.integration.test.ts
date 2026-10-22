@@ -4,6 +4,7 @@ import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
+import { stubRunner } from "../test-runner.ts";
 
 const silentLogger = pino({ level: "silent" });
 const T1 = "2026-01-01T00:00:00.000Z";
@@ -81,7 +82,12 @@ async function setup() {
       });
     }),
   );
-  const app = createShelfApp({ database: db, storage, logger: silentLogger });
+  const app = createShelfApp({
+    testing: { runner: stubRunner() },
+    database: db,
+    storage,
+    logger: silentLogger,
+  });
   return { app, db };
 }
 

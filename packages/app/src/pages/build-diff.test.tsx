@@ -3,6 +3,7 @@ import { BuildModel, ProjectModel, SnapshotModel } from "@storyshelf/core/models
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
+import { stubRunner } from "../test-runner.ts";
 
 interface Seeded {
   html: string;
@@ -48,6 +49,7 @@ async function reviewPage(select: "first" | "none" = "none"): Promise<Seeded> {
   });
   const ids = await seedSnapshots(db, project.id, build.id);
   const app = createShelfApp({
+    testing: { runner: stubRunner() },
     database: db,
     storage,
     logger: createShelfLogger({ level: "silent" }),
@@ -166,6 +168,7 @@ async function multiBrowserPage(query: (ids: Record<string, string>) => string):
   });
   const ids = await seedMultiBrowser(db, project.id, build.id);
   const app = createShelfApp({
+    testing: { runner: stubRunner() },
     database: db,
     storage,
     logger: createShelfLogger({ level: "silent" }),
@@ -236,6 +239,7 @@ async function pageWithMigration(migrated: boolean, branch?: string): Promise<st
   const { storage } = makeStorage();
   const url = await seedMigrated(db, migrated, branch);
   const app = createShelfApp({
+    testing: { runner: stubRunner() },
     database: db,
     storage,
     logger: createShelfLogger({ level: "silent" }),

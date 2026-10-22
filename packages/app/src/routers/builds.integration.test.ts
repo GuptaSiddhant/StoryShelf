@@ -7,6 +7,7 @@ import { Readable } from "node:stream";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
+import { stubRunner } from "../test-runner.ts";
 const silentLogger = pino({ level: "silent" });
 
 const makeBuild = (id: string, gitBranch = "main"): Build => ({
@@ -145,6 +146,7 @@ describe("streaming build upload (JSON + PUT)", () => {
   interface CreatedBody {
     build: Build;
     uploadUrl: string;
+    testing: boolean;
   }
 
   async function setupSeeded(): Promise<{
@@ -185,6 +187,8 @@ describe("streaming build upload (JSON + PUT)", () => {
 
     expect(created.build.gitSha).toBe("sha-1");
     expect(created.build.status).toBe("pending");
+    // setupSeeded boots without `testing`: the response says no checks will run.
+    expect(created.testing).toBe(false);
     expect(created.uploadUrl).toBe(
       `/api/v1/projects/stream-project/builds/${created.build.id}/zip`,
     );
@@ -267,7 +271,7 @@ describe("streaming build upload (JSON + PUT)", () => {
 async function createAffectedBuild(
   app: ReturnType<typeof createShelfApp>,
   gitSha: string,
-): Promise<{ build: Build; uploadUrl: string; baselineSha: string | null }> {
+): Promise<{ build: Build; uploadUrl: string; baselineSha: string | null; testing: boolean }> {
   const response = await app.request("/api/v1/projects/affected-project/builds", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -278,6 +282,7 @@ async function createAffectedBuild(
     build: Build;
     uploadUrl: string;
     baselineSha: string | null;
+    testing: boolean;
   };
 }
 
@@ -302,7 +307,12 @@ describe("affected capture", () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
     await db.insert(db.tables.projects, project);
-    const app = createShelfApp({ database: db, storage, logger: silentLogger });
+    const app = createShelfApp({
+      database: db,
+      storage,
+      testing: { runner: stubRunner() },
+      logger: silentLogger,
+    });
     return { db, app };
   }
 
@@ -311,6 +321,7 @@ describe("affected capture", () => {
     const created = await createAffectedBuild(app, "sha-1");
     expect(created.baselineSha).toBeNull();
     expect(created.build.affectedOnly).toBe(true);
+    expect(created.testing).toBe(true);
   });
 
   it("returns the prior revision as baseline for the next build", async () => {

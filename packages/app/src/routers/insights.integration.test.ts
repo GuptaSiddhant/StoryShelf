@@ -8,6 +8,7 @@ import { createShelfApp } from "../index.tsx";
 import { settleInsightJobs } from "../insights/job.ts";
 import { fakeAi } from "../insights/test-support.ts";
 import { stubAuth } from "../stub-auth.ts";
+import { stubRunner } from "../test-runner.ts";
 
 const admin: AuthUser = { id: "admin_1", email: "a@x.io", name: "A", role: "admin" };
 const dev: AuthUser = { id: "dev_1", email: "d@x.io", name: "D", role: "member" };
@@ -92,6 +93,7 @@ async function seed(aiProfile: string | null = "default") {
 
 function appWith(db: unknown, storage: unknown, ai?: Ai) {
   return createShelfApp({
+    testing: { runner: stubRunner() },
     database: db as never,
     storage: storage as never,
     auth,

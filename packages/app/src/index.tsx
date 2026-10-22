@@ -5,9 +5,10 @@ import {
   adapterSourcesOf,
   validateBootAssembly,
 } from "@storyshelf/core/adapter/setup";
-import { resolveShelfOptions } from "@storyshelf/core/config";
+import { assertServerless, resolveShelfOptions } from "@storyshelf/core/config";
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import { configureImages } from "@storyshelf/core/diff";
+import type { Logger } from "@storyshelf/core/logger";
 /**
  * StoryShelf app: compose database, storage, capture, auth, and git-host
  * adapters into a complete self-hosted visual-testing Hono app.
@@ -26,6 +27,7 @@ import {
   authGate,
   csrf,
   createRateLimiter,
+  requireTesting,
   rateLimitKey,
   requestLogging,
   resolveRequestUser,
@@ -106,9 +108,22 @@ function wireQueues(
   return { queue, enqueueCapture, publish: publishing };
 }
 
+/**
+ * Serverless check (ADR 0006, decision 3): throws on AWS Lambda, warns on Vercel and Netlify. Only
+ * an instance that renders here needs a process that outlives the request; one that just hands
+ * jobs to a remote `testing.queue` does not.
+ */
+function warnOnServerless(options: ShelfOptions, logger: Logger): void {
+  const warning = assertServerless(options.testing?.runner !== undefined);
+  if (warning) {
+    logger.warn(warning);
+  }
+}
+
 /** Attach lifecycle, queue, middleware, routes, and docs to the app. */
 function assembleApp(app: ShelfApp, options: ShelfOptions, scoped: ShelfOptions): void {
   const runtime = resolveRuntime(options);
+  warnOnServerless(options, runtime.logger);
   const cell: LifecycleCell = { ready: Promise.resolve({ ok: true, failures: [] }), settled: null };
   attachLifecycle(app, options, runtime, cell);
   if (runtime.config.serverTiming === true) {
@@ -179,6 +194,8 @@ function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
   // With Hono's Web `Request`/`Response` model.
   app.use("*", requestLogging(logger));
   app.use("*", setupGate(getReady));
+  // Routes classified `testing` answer 404 without `options.testing` (ADR 0006, decision 8).
+  app.use("*", requireTesting(wiring.options.testing !== undefined));
   mountGuards(app, config);
   mountStoreScope(app, wiring);
   app.use("*", authGate());
@@ -256,6 +273,7 @@ function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
       ui,
       logger,
       authEnabled,
+      testing: options.testing !== undefined,
       enqueueCapture,
       captureQueue: queue,
       publish,

@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { checkForTransition } from "../git-status.ts";
 import { createShelfApp } from "../index.tsx";
+import { stubRunner } from "../test-runner.ts";
 
 const T1 = "2026-01-01T00:00:00.000Z";
 const SHA = "b".repeat(40);
@@ -108,6 +109,7 @@ async function setup(storyCount = 2) {
     }),
   );
   const app = createShelfApp({
+    testing: { runner: stubRunner() },
     database: db,
     storage,
     config: { secret: "test-secret" },

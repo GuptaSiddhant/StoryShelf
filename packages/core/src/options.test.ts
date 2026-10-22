@@ -6,7 +6,10 @@ import type { ShelfOptions } from "./config.ts";
 import { DEFAULT_SCRATCH_DIR, resolveShelfOptions } from "./options.ts";
 
 const runner = { metadata: { kind: "r" } } as unknown as CaptureRunner;
-const base = { database: {}, storage: {} } as unknown as ShelfOptions;
+const base = {
+  database: { metadata: { name: "Fake", kind: "fake", category: "database" } },
+  storage: {},
+} as unknown as ShelfOptions;
 
 describe("resolveShelfOptions", () => {
   it("defaults scratchDir for a hosting-only deployment: publishing extracts zips there", () => {
@@ -41,16 +44,39 @@ describe("resolveShelfOptions", () => {
   });
 
   it("validates testing.compare.threads", () => {
-    expect(() => resolveShelfOptions({ ...base, testing: { compare: { threads: -1 } } })).toThrow(
-      /testing\.compare\.threads/u,
-    );
-    expect(() => resolveShelfOptions({ ...base, testing: { compare: { threads: 1.5 } } })).toThrow(
-      /testing\.compare\.threads/u,
-    );
+    expect(() =>
+      resolveShelfOptions({ ...base, testing: { runner, compare: { threads: -1 } } }),
+    ).toThrow(/testing\.compare\.threads/u);
+    expect(() =>
+      resolveShelfOptions({ ...base, testing: { runner, compare: { threads: 1.5 } } }),
+    ).toThrow(/testing\.compare\.threads/u);
     expect(
-      resolveShelfOptions({ ...base, testing: { compare: { threads: 0 } } }).testing?.compare
-        ?.threads,
+      resolveShelfOptions({ ...base, testing: { runner, compare: { threads: 0 } } }).testing
+        ?.compare?.threads,
     ).toBe(0);
+  });
+
+  it("requires a runner or a queue whenever testing is set", () => {
+    expect(() => resolveShelfOptions({ ...base, testing: {} })).toThrow(
+      /testing requires testing\.runner/u,
+    );
+    expect(() => resolveShelfOptions({ ...base, testing: { concurrency: 2 } })).toThrow(
+      /testing requires testing\.runner/u,
+    );
+  });
+
+  it("refuses testing on a database that cannot back it, but hosts on it", () => {
+    const d1 = {
+      ...base,
+      database: { metadata: { name: "Cloudflare D1", supportsTesting: false } },
+    } as unknown as ShelfOptions;
+    expect(() => resolveShelfOptions({ ...d1, testing: { runner } })).toThrow(
+      /Cloudflare D1 database cannot back testing/u,
+    );
+    expect(resolveShelfOptions(d1).testing).toBeUndefined();
+    // A remote-queue-only instance renders nowhere here, so it is not refused.
+    const queue = { metadata: { kind: "q" } } as never;
+    expect(resolveShelfOptions({ ...d1, testing: { queue } }).testing?.queue).toBe(queue);
   });
 
   it("validates notifications.config", () => {

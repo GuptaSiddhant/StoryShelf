@@ -3,6 +3,7 @@ import type { LabelType } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { ProjectGroupMapping } from "@storyshelf/core/schema";
 import type { Token } from "@storyshelf/core/schema";
+import { testingEnabled } from "../store.ts";
 import { PageHeader, SubNavLayout } from "../ui/components.tsx";
 import type { IconName } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
@@ -107,6 +108,9 @@ const TAB_ICONS: Record<SettingsTab, IconName> = {
   ai: "sparkles",
 };
 
+/** Tabs whose pages are `testing` routes: hidden on a hosting-only instance. */
+const TESTING_TABS: ReadonlySet<SettingsTab> = new Set(["capture", "tests", "status", "ai"]);
+
 const SETTINGS_TABS: SettingsTab[] = [
   "general",
   "capture",
@@ -121,6 +125,14 @@ const SETTINGS_TABS: SettingsTab[] = [
   "status",
   "ai",
 ];
+
+/** A tab shows when its page exists: `testing` tabs need testing, and the AI tab needs AI. */
+function settingsTabShown(tab: SettingsTab, data: ProjectSettingsData): boolean {
+  if (TESTING_TABS.has(tab) && !testingEnabled()) {
+    return false;
+  }
+  return tab !== "ai" || data.ai?.available === true;
+}
 
 /** Project-behaviour tabs (general, tests, AI); undefined for any other tab. */
 function renderBehaviourTab(data: ProjectSettingsData, formState?: SettingsFormState): unknown {
@@ -204,7 +216,7 @@ export function renderProjectSettingsPage(
 
       <SubNavLayout
         label="Settings sections"
-        items={SETTINGS_TABS.filter((tab) => tab !== "ai" || data.ai?.available).map((tab) => ({
+        items={SETTINGS_TABS.filter((tab) => settingsTabShown(tab, data)).map((tab) => ({
           label: TAB_LABELS[tab],
           href: tabHref(project, tab),
           icon: TAB_ICONS[tab],

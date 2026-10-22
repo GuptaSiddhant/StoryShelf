@@ -40,7 +40,7 @@ Use SQLite for a single-node deployment or local development. Pair it with [loca
 | `@storyshelf/db-sqlite/turso`          | `@libsql/client`      | `npm install @libsql/client` | Serverless (Turso cloud, Vercel, Lambda); `file:` URLs and embedded replicas work too. |
 | `@storyshelf/db-sqlite/better-sqlite3` | `better-sqlite3`      | `npm install better-sqlite3` | Native sync driver.                                                                    |
 | `@storyshelf/db-sqlite/bun-sqlite`     | `bun:sqlite` builtin  | — (Bun only)                 | Bun runtime.                                                                           |
-| `@storyshelf/db-sqlite/d1`             | D1 binding            | — (Workers only)             | Cloudflare Workers (`env.DB`).                                                         |
+| `@storyshelf/db-sqlite/d1`             | D1 binding            | — (Workers only)             | Cloudflare Workers (`env.DB`). Hosts Storybooks only: it cannot back `testing.runner`.  |
 
 ```ts
 import { createTursoDatabase } from "@storyshelf/db-sqlite/turso";

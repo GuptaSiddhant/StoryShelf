@@ -67,6 +67,8 @@ export interface BuildCreated {
   build: { id: string };
   uploadUrl: string;
   baselineSha?: string | null;
+  /** False when the server has no `testing` option; absent on servers that predate the field. */
+  testing?: boolean;
 }
 
 interface Client {

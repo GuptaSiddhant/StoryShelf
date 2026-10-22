@@ -17,6 +17,7 @@ export const DEFAULT_SCRATCH_DIR: string = join(tmpdir(), "storyshelf");
 export function resolveShelfOptions(options: ShelfOptions): ShelfOptions {
   assertThreads(options.testing?.compare?.threads);
   assertTestingProcess(options.testing);
+  assertTestingBackable(options);
   assertNotificationsConfig(options.notifications?.config);
   if (options.config?.scratchDir !== undefined) {
     return options;
@@ -24,7 +25,31 @@ export function resolveShelfOptions(options: ShelfOptions): ShelfOptions {
   return { ...options, config: { ...options.config, scratchDir: DEFAULT_SCRATCH_DIR } };
 }
 
+/**
+ * A `testing` instance that renders here needs a database a long-running server can keep. An
+ * instance that only hands jobs to a remote `testing.queue` renders nowhere in this process, so
+ * it is left alone (the one deployment shape the earlier `capture` option supported on Workers).
+ */
+function assertTestingBackable(options: ShelfOptions): void {
+  if (options.testing?.runner === undefined) {
+    return;
+  }
+  if (options.database.metadata.supportsTesting === false) {
+    throw new Error(
+      `The ${options.database.metadata.name} database cannot back testing: it is reachable only ` +
+        `from a platform that ends the process after each request, so nothing would run capture ` +
+        `jobs. Remove the testing option to host Storybooks only, or use a network database ` +
+        `(Turso, Postgres, MySQL, SQLite on a volume).`,
+    );
+  }
+}
+
 function assertTestingProcess(testing: ShelfOptions["testing"]): void {
+  if (testing !== undefined && testing.runner === undefined && testing.queue === undefined) {
+    throw new Error(
+      "testing requires testing.runner (or testing.queue to replace the database queue)",
+    );
+  }
   if (testing?.workerEntry !== undefined && testing.runner === undefined) {
     throw new Error("testing.workerEntry requires testing.runner (it is the in-process fallback)");
   }

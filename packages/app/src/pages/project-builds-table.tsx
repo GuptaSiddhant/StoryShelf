@@ -1,7 +1,7 @@
 import type { Build, Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { getStore } from "../store.ts";
+import { getStore, testingEnabled } from "../store.ts";
 import {
   Avatar,
   Badge,
@@ -89,7 +89,8 @@ function BuildActions({
   build: Build;
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
   const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
-  const needsReview = build.status === "reviewing";
+  // The diff page is a testing route; hosting-only instances link to the build page.
+  const needsReview = build.status === "reviewing" && testingEnabled();
   return (
     <HStack wrap={false} justify="end">
       <Button

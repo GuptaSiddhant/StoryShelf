@@ -356,6 +356,38 @@ describe("runUpload affected capture", () => {
     expect(calls.map((call) => call.method)).toEqual(["POST", "PUT"]);
   });
 
+  it("prints a notice and skips the affected post when the server reports testing: false", async () => {
+    writeBuild(dir);
+    const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const { calls } = stubFetch({
+      build: { id: "b1" },
+      uploadUrl: "/x",
+      baselineSha: "abc123",
+      testing: false,
+    });
+
+    await runUpload({ ...baseOptions(), buildDir: "storybook-static" });
+
+    const output = write.mock.calls.map(([chunk]) => String(chunk)).join("");
+    write.mockRestore();
+    expect(output).toContain("Build created: b1");
+    expect(output).toContain("Testing is off on this server");
+    expect(output).not.toContain("Full capture");
+    expect(calls.map((call) => call.method)).toEqual(["POST", "PUT"]);
+  });
+
+  it("prints no notice when the server has testing on", async () => {
+    writeBuild(dir);
+    const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    stubFetch({ build: { id: "b1" }, uploadUrl: "/x", baselineSha: null, testing: true });
+
+    await runUpload({ ...baseOptions(), buildDir: "storybook-static" });
+
+    const output = write.mock.calls.map(([chunk]) => String(chunk)).join("");
+    write.mockRestore();
+    expect(output).not.toContain("Testing is off");
+  });
+
   it("merges config-file and flag untraced globs", async () => {
     git(dir, ["-c", "init.defaultBranch=main", "init"]);
     mkdirSync(join(dir, "src"), { recursive: true });

@@ -278,11 +278,21 @@ async function buildAndPost(
     affectedOnly: collected.affectedOnly,
     labels: parseLabels(collected.label),
   });
-  await reportAffectedCapture(client, created, cwd, collected);
+  const hostingOnly = created.testing === false;
+  if (!hostingOnly) {
+    await reportAffectedCapture(client, created, cwd, collected);
+  }
   await reportPackageUsage(client, created, cwd, collected);
   await uploadBuild(client, created, cwd, collected);
   printLine(`Build created: ${created.build.id}`);
+  if (hostingOnly) {
+    printLine(HOSTING_ONLY_NOTICE);
+  }
 }
+
+/** Printed when the server reports `testing: false` (ADR 0006, decision 1). */
+export const HOSTING_ONLY_NOTICE =
+  "Testing is off on this server: the Storybook is published, but no captures or visual checks will run.";
 
 /** Post which dependency packages each story uses; best effort, never fails the upload. */
 async function reportPackageUsage(

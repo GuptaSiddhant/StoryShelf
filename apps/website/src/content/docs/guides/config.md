@@ -90,6 +90,21 @@ Publishing a Storybook zip is bounded by three options (see [Published Storybook
 
 A zip over a cap, or with an absolute or `..` path, fails the publish. `scratchDir` now always defaults to `<os.tmpdir()>/storyshelf`, since publishing extracts zips there with or without `testing`.
 
+### The `testing` option and hosting only
+
+`createShelfApp` takes one umbrella option, `testing`. Set, it turns on capture, compare, baselines and the `<prefix>/testing` status; absent, the instance **hosts Storybooks only** (see [Hosting only](/concepts/hosting-only/)).
+
+```ts
+createShelfApp({ database, storage }); // hosting only
+createShelfApp({ database, storage, testing: { runner, compare: { threads: 2 }, concurrency: 2 } });
+```
+
+- `testing` needs `runner`, or `queue` to hand jobs to a remote queue; `testing: {}` fails at boot.
+- `compare`, `images`, `concurrency`, `shardSize`, `workerEntry`, `mode` and `queue` all live under `testing`; they are unreachable without it.
+- `config.scratchDir` stays in `config`, because publishing uses it too.
+- Routes for capture, compare and baselines answer `404` without `testing`; the navigation hides them; the System page and `storyshelf upload` say the instance is hosting only.
+- A process that renders (`testing.runner`) needs a long-running host. Boot throws on AWS Lambda (`AWS_LAMBDA_FUNCTION_NAME`), logs a warning on Vercel and Netlify, and throws when the database is the Cloudflare D1 preset. `STORYSHELF_ALLOW_SERVERLESS=1` overrides the host check (not the D1 one).
+
 ### Capture performance tuning
 
 - `testing.concurrency` (a `createShelfApp` option, formerly `config.captureConcurrency`) sets how many builds the in-process queue captures at once.

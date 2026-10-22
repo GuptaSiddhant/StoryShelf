@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "../index.tsx";
 import { getCsrfToken } from "../middleware/csrf.ts";
 import { stubAuth } from "../stub-auth.ts";
+import { stubRunner } from "../test-runner.ts";
 import { signState } from "./oauth-state.ts";
 
 const SECRET = "connections-test-secret";
@@ -72,6 +73,7 @@ async function seed(options: SeedOptions = {}) {
     options.oauth === false ? {} : { oauth: { clientId: "cid", clientSecret: "csecret" } },
   );
   const app = createShelfApp({
+    testing: { runner: stubRunner() },
     database: db,
     storage,
     logger: pino({ level: "silent" }),

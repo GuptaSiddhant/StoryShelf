@@ -257,7 +257,7 @@ export const Sidebar: FC<{ nav?: NavConfig; name: string; logo?: string }> = ({
   name,
   logo,
 }) => {
-  const { user, authEnabled, config } = getStore();
+  const { user, authEnabled, config, testing } = getStore();
   const urls = createUrlBuilder("/", config.publishedBaseDomain);
   const showAdmin = !authEnabled || user?.role === "admin";
   const projects: NavItem = {
@@ -274,7 +274,7 @@ export const Sidebar: FC<{ nav?: NavConfig; name: string; logo?: string }> = ({
         {nav?.projectSlug ? (
           <NavSection
             title="Project"
-            items={projectNavItems(urls, nav.projectSlug)}
+            items={projectNavItems(urls, nav.projectSlug, testing)}
             active={nav.active}
           />
         ) : null}
