@@ -32,7 +32,12 @@ const app = createShelfApp({
   testing: { runner: captureRunner, concurrency: 2 },
   notifications: { notifiers: gitNotifiers },
   auth,
-  config: { secret, purgeTtlDays: 30, branchTtlDays: 30, branchGcIntervalMs: 86_400_000 },
+  config: {
+    secret,
+    purgeTtlDays: 30,
+    branchTtlDays: 30,
+    branchGcIntervalMs: 86_400_000,
+  },
 });
 
 serve({ fetch: app.fetch, port: 3000 });
