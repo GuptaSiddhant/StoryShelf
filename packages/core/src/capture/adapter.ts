@@ -89,6 +89,12 @@ export interface StoryEntry {
   importPath?: string;
   tags?: string[];
   type: "story" | "docs";
+  /**
+   * Set on a Storybook 10 `.test()` entry (index `subtype: "test"`): the id of the story it is
+   * written under. Test entries are never captured; a project that runs tests runs them in the
+   * iframe (ADR 0004, decision 10).
+   */
+  parentId?: string;
   parameters?: StoryParameters;
   /** Figma URL declared via `parameters.design` / `parameters.storyshelf.figma`. */
   designUrl?: string;

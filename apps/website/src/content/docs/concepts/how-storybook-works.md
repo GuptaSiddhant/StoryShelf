@@ -3,7 +3,7 @@ title: How Storybook works
 description: The parts of a built Storybook that StoryShelf relies on — the two apps, the story index, the preview page and play functions — and how they differ across Storybook 8, 9 and 10.
 ---
 
-StoryShelf never runs your Storybook the way you do in development. It takes the **static build**, serves the files, opens one page per story and takes a screenshot. This page explains the pieces of a Storybook that makes possible, so you can tell why a story captures the way it does and what to check when it does not.
+StoryShelf never runs your Storybook the way you do in development. It takes the **static build**, serves the files, opens one page per story and takes a screenshot. This page explains the pieces of Storybook that make captures possible, so you can tell why a story captures the way it does and what to check when it does not.
 
 It describes how StoryShelf uses Storybook 8, 9 and 10 (all three are tested against real builds). Storybook's own internals are not a public API and can change between releases, so StoryShelf keeps its contact surface small, as described in [What StoryShelf relies on](#what-storyshelf-relies-on).
 

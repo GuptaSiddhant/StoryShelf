@@ -12,7 +12,14 @@ import { connectRemote } from "./connect.ts";
 import { launchLocal, loadPlaywright } from "./launch.ts";
 import { extractAll, renderAll } from "./pipeline.ts";
 import { flattenBrowsers, type BrowserEntry, type LocalTarget } from "./targets.ts";
-import type { ActiveRun, ExtractInput, PlaywrightRenderInput, TargetDriver } from "./types.ts";
+import { runTestEntries } from "./tests.ts";
+import type {
+  ActiveRun,
+  ExtractInput,
+  PlaywrightRenderInput,
+  PlaywrightTestsInput,
+  TargetDriver,
+} from "./types.ts";
 
 declare const __PKG_VERSION__: string | undefined;
 
@@ -87,6 +94,20 @@ export function createPlaywrightCaptureRunner(
     },
     async extractParameters(input: ExtractInput) {
       return await extractAll(input, driver, defaultTarget);
+    },
+    async runTests(input: PlaywrightTestsInput) {
+      const active: ActiveRun = { cancelled: false, browser: null };
+      const remove = activeRuns.add(input.buildId, input.runId, active);
+      try {
+        return await runTestEntries(
+          { concurrency, navigationTimeoutMs, ...input },
+          active,
+          driver,
+          defaultTarget,
+        );
+      } finally {
+        remove();
+      }
     },
     async cancel(buildId, runId) {
       await Promise.all(

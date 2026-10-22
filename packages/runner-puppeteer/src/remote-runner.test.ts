@@ -24,6 +24,9 @@ const fake = vi.hoisted(() => {
       state.active -= 1;
     },
     setDefaultTimeout: (): void => {},
+    evaluateOnNewDocument: async (): Promise<void> => {
+      await Promise.resolve();
+    },
     setViewport: async (): Promise<void> => {
       await Promise.resolve();
     },

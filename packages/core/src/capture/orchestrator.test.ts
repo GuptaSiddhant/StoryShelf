@@ -18,6 +18,7 @@ import { storybookDir, storybookZipPath } from "../utils/paths.ts";
 import { verifyStorybookToken } from "../utils/storybook-token.ts";
 import { executeCaptureJob } from "./orchestrator.ts";
 import { buildScratchDir } from "./scratch.ts";
+import { parseTestResults, summarizeTests } from "./tests.ts";
 
 function tables(db: DatabaseAdapter) {
   return {
@@ -917,5 +918,89 @@ describe("executeCaptureJob", () => {
 
     const updatedBuild = await db.get(db.tables.builds, build.id);
     expect(updatedBuild?.status).toBe("failed");
+  });
+
+  describe("Storybook tests", () => {
+    const TEST_ID = `${STORY_ID}:renders`;
+
+    function zipWithTest(): Buffer {
+      const zip = new AdmZip();
+      const entries = {
+        [STORY_ID]: {
+          id: STORY_ID,
+          name: "Primary",
+          title: "Components/Button",
+          importPath: "./Button.stories.tsx",
+          type: "story",
+          subtype: "story",
+        },
+        [TEST_ID]: {
+          id: TEST_ID,
+          name: "renders",
+          title: "Components/Button",
+          importPath: "./Button.stories.tsx",
+          type: "story",
+          subtype: "test",
+          parent: STORY_ID,
+        },
+      };
+      zip.addFile("index.json", Buffer.from(JSON.stringify({ v: 5, entries })));
+      return zip.toBuffer();
+    }
+
+    async function setupTests(runTests: boolean) {
+      const { db, buildId, options } = await setupBrowsers(runTests ? { runTests: true } : {});
+      const build = await new BuildModel(db, tables(db)).get(buildId);
+      await options.storage.write(storybookZipPath(build?.projectId ?? "", buildId), zipWithTest());
+      return { db, buildId, options };
+    }
+
+    it("runs them for a project that turned tests on, and fails the build when one fails", async () => {
+      const { db, buildId, options } = await setupTests(true);
+      const runTests = vi.fn(async () => {
+        await Promise.resolve();
+        return [{ storyId: TEST_ID, status: "failed" as const, error: "boom", durationMs: 3 }];
+      });
+      options.runner.runTests = runTests;
+
+      const summary = await executeCaptureJob({ buildId }, options);
+
+      expect(summary.failedCount).toBe(1);
+      const build = await new BuildModel(db, tables(db)).get(buildId);
+      expect(build?.status).toBe("failed");
+      const stored = parseTestResults(build?.testResults);
+      expect(stored.map((r) => [r.id, r.status, r.error])).toEqual([[TEST_ID, "failed", "boom"]]);
+      // A test is not a story: no snapshot of it, no render of it.
+      expect((await db.list(db.tables.snapshots)).map((row) => row.storyId)).toEqual([STORY_ID]);
+      const rendered = (options.runner.render as ReturnType<typeof vi.fn>).mock.calls[0] as [
+        { stories: { id: string }[] },
+      ];
+      expect(rendered[0].stories.map((s) => s.id)).toEqual([STORY_ID]);
+    });
+
+    it("keeps a build with only passing tests approved and records them", async () => {
+      const { db, buildId, options } = await setupTests(true);
+      options.runner.runTests = async () => {
+        await Promise.resolve();
+        return [{ storyId: TEST_ID, status: "passed" as const, durationMs: 2 }];
+      };
+      await executeCaptureJob({ buildId }, options);
+      const build = await new BuildModel(db, tables(db)).get(buildId);
+      expect(build?.status).toBe("approved");
+      expect(summarizeTests(parseTestResults(build?.testResults))).toEqual({
+        total: 1,
+        passed: 1,
+        failed: 0,
+      });
+    });
+
+    it("does not run them unless the project asks", async () => {
+      const { db, buildId, options } = await setupTests(false);
+      const runTests = vi.fn(async () => []);
+      options.runner.runTests = runTests;
+      await executeCaptureJob({ buildId }, options);
+      expect(runTests).not.toHaveBeenCalled();
+      expect((await new BuildModel(db, tables(db)).get(buildId))?.testResults).toBeFalsy();
+    });
   });
 });

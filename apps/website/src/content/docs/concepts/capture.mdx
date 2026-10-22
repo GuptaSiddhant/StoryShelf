@@ -154,7 +154,9 @@ Nothing deletes a content object directly, because snapshots and baselines share
 
 ## Interaction testing hook
 
-When **Enable interaction tests (play)** is on (per-project), the runner does `waitForSelector(#storybook-root, attached)` → `waitForTimeout(delay ?? 500)` → `page.evaluate(executePlay)` with `playTimeoutMs` before the screenshot. A throwing `play` maps to `failed` (blocking) or warning (flaky) — see [Interaction testing guide](/guides/interaction-testing/).
+Before each screenshot the runner waits until Storybook says the story is done: it listens to the preview's channel from before the story renders and continues on `storyRendered` (or the story's error event), then lets fonts load and two frames paint, then waits `parameters.delay` if the story sets one. A page that never announces it (an older or custom Storybook, or a story stuck rendering) gets the earlier fixed wait instead: `delay ?? 500` ms after `#storybook-root` appears, once a 5 second timeout (or the play timeout, when plays run) has passed. When **Enable interaction tests (play)** is on (per-project), the runner then runs `page.evaluate(executePlay)` with `playTimeoutMs` before the screenshot. A throwing `play` maps to `failed` (blocking) or warning (flaky) — see [Interaction testing guide](/guides/interaction-testing/).
+
+With **Run Storybook tests (.test())** on, the Storybook 10 `.test()` entries run once per build in the same browser, with no screenshot, and a failing one fails the build like a failing `play`; the build page lists them under **Storybook tests**. See [Interaction testing](/guides/interaction-testing/#storybook-10-test-entries).
 
 ## Restarts during a capture
 

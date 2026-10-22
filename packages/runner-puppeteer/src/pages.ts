@@ -2,6 +2,7 @@
 
 import type { Viewport } from "@storyshelf/core/adapter/capture-runner";
 import type { Browser, BrowserContext, Page } from "puppeteer-core";
+import { installSettleRecorder } from "./settle.ts";
 
 /** A page on loan for one capture; `release(false)` discards it instead of reusing it. */
 export interface PageLease {
@@ -17,6 +18,7 @@ export async function acquirePage(
   if (ctx.pagePool) return await ctx.pagePool.acquire(viewport);
   const page = await ctx.browser.newPage();
   await page.setViewport({ width: viewport.width, height: viewport.height });
+  await installSettleRecorder(page);
   return {
     page,
     release: async () => {
@@ -68,7 +70,9 @@ export class PagePool {
 
   private async open(): Promise<Entry> {
     const context = await this.browser.createBrowserContext();
-    return { context, page: await context.newPage() };
+    const page = await context.newPage();
+    await installSettleRecorder(page);
+    return { context, page };
   }
 }
 

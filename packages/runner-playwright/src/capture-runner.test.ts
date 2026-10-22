@@ -44,6 +44,9 @@ const playwright = vi.hoisted(() => {
       });
     },
     setDefaultTimeout: (): void => {},
+    addInitScript: async (): Promise<void> => {
+      await Promise.resolve();
+    },
     setViewportSize: async (): Promise<void> => {
       await Promise.resolve();
     },

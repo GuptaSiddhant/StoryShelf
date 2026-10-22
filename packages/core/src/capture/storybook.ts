@@ -26,6 +26,8 @@ interface StorybookIndex {
       tags?: string[];
       type: string;
       subtype?: string;
+      /** Test entries only: the id of the story the `.test()` is written under. */
+      parent?: string;
       parameters?: StorybookParameters;
     }
   >;
@@ -130,6 +132,12 @@ function pxOf(value: string | number | undefined): number | undefined {
   return match ? Number(match[1]) : undefined;
 }
 
+function toTestEntry(entry: StorybookIndex["entries"][string]): StoryEntry {
+  const test = toStoryEntry(entry);
+  if (entry.parent !== undefined) test.parentId = entry.parent;
+  return test;
+}
+
 function toStoryEntry(
   entry: StorybookIndex["entries"][string],
   parseDesignUrl?: DesignUrlParser,
@@ -159,6 +167,17 @@ export class StorybookAdapter implements StorySourceAdapter {
     return Object.values(index.entries)
       .filter((entry) => entry.type !== "docs" && entry.subtype !== "test")
       .map((entry) => toStoryEntry(entry, options.parseDesignUrl));
+  }
+
+  /**
+   * The `.test()` entries of a Storybook 10 build (index `subtype: "test"`), which {@link discover}
+   * leaves out. Empty for older Storybooks, whose index has no such entries.
+   */
+  async discoverTests(source: string): Promise<StoryEntry[]> {
+    const index = await this.readIndex(source);
+    return Object.values(index.entries)
+      .filter((entry) => entry.subtype === "test" && entry.type !== "docs")
+      .map((entry) => toTestEntry(entry));
   }
 
   // eslint-disable-next-line class-methods-use-this

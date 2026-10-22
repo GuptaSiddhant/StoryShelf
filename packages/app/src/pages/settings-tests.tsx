@@ -11,7 +11,7 @@ import {
 } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
-/** Tests settings tab: play execution toggle and timeout, accessibility checks toggle. */
+/** Tests settings tab: play execution, Storybook 10 test runs, accessibility checks, play timeout. */
 export function renderSettingsTests(
   project: Project,
   isAdmin: boolean,
@@ -35,6 +35,12 @@ export function renderSettingsTests(
           in review and never block a build; a story opts out with{" "}
           <code>parameters: &#123; a11y: &#123; disable: true &#125; &#125;</code>.
         </Meta>
+        <Meta>
+          Storybook 10 <code>.test()</code> entries (<code>story.test("name", async ...)</code>) can
+          run as interaction tests too. They take no screenshot: each runs in the Storybook iframe
+          and is reported as passed or failed on the build. A failing test fails the build like a
+          failing <code>play</code> function. Storybook 8 and 9 builds have none.
+        </Meta>
         <form
           method="post"
           action={`/projects/${project.slug}/settings/tests`}
@@ -50,6 +56,14 @@ export function renderSettingsTests(
             checked={project.executePlay ? true : undefined}
             disabled={!isAdmin}
             hint="When enabled, failing play blocks the build (failed). Flaky stories show warnings but status stays successful."
+          />
+          <CheckField
+            label="Run Storybook tests (.test())"
+            name="runTests"
+            value="true"
+            checked={project.runTests === true ? true : undefined}
+            disabled={!isAdmin}
+            hint="Off by default, because it changes what a build contains. When enabled, each .test() entry runs once on the primary browser and a failing test fails the build (flaky stories excepted)."
           />
           <CheckField
             label="Accessibility checks (axe)"

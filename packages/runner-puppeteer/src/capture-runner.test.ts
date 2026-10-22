@@ -43,6 +43,9 @@ const puppeteer = vi.hoisted(() => {
       });
     },
     setDefaultTimeout: (): void => {},
+    evaluateOnNewDocument: async (): Promise<void> => {
+      await Promise.resolve();
+    },
 
     setViewport: async (): Promise<void> => {
       await Promise.resolve();

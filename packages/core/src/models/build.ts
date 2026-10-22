@@ -157,6 +157,17 @@ export class BuildModel {
   }
 
   /**
+   * Store the results of the build's `.test()` entries (`TestResult[]`, as JSON), or clear them
+   * with null. Written once per capture run, by the run that ran the tests.
+   */
+  async setTestResults(id: string, results: readonly unknown[] | null): Promise<Build> {
+    return (await this.db.update(this.tables.builds, id, {
+      testResults: results === null ? null : JSON.stringify(results),
+      updatedAt: new Date().toISOString(),
+    })) as unknown as Build;
+  }
+
+  /**
    * Parse a build's affected import paths. Returns `null` for full capture
    * (no computation, or an unreadable payload) — callers render everything.
    */

@@ -26,6 +26,11 @@ export interface Build {
   changedFiles: string | null;
   /** JSON array of affected story import paths; null means full capture. */
   affectedImportPaths: string | null;
+  /**
+   * JSON array of the results of the build's Storybook `.test()` entries (`TestResult`); null when
+   * the project does not run tests or the Storybook has none.
+   */
+  testResults?: string | null;
   createdAt: string;
   updatedAt: string;
 }

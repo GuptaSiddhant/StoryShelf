@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS projects (
   execute_play BOOLEAN NOT NULL DEFAULT false,
   play_timeout_ms INTEGER NOT NULL DEFAULT 10000,
   run_a11y BOOLEAN NOT NULL DEFAULT true,
+  run_tests BOOLEAN NOT NULL DEFAULT false,
   browser TEXT NOT NULL DEFAULT 'chromium',
   viewports TEXT,
   browsers TEXT,
@@ -45,6 +46,7 @@ CREATE TABLE IF NOT EXISTS builds (
   baseline_sha TEXT,
   changed_files TEXT,
   affected_import_paths TEXT,
+  test_results TEXT,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );

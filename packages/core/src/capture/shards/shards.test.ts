@@ -13,6 +13,7 @@ import { SnapshotModel } from "../../models/snapshot.ts";
 import { makeDatabase, makeStorage } from "../../test-helpers/fake-adapters.ts";
 import { storybookZipPath } from "../../utils/paths.ts";
 import { executeCaptureJob, type CaptureJobOptions, type ShardJob } from "../orchestrator.ts";
+import { parseTestResults } from "../tests.ts";
 import { executeCaptureShard, type ShardOutcome } from "./execute.ts";
 
 function tables(db: DatabaseAdapter) {
@@ -27,8 +28,9 @@ function tables(db: DatabaseAdapter) {
   };
 }
 
-function zipOfStories(count: number): Buffer {
-  const entries = Object.fromEntries(
+/** A Storybook index of `count` stories, plus a `.test()` entry under the first when asked. */
+function zipOfStories(count: number, withTest = false): Buffer {
+  const entries: Record<string, unknown> = Object.fromEntries(
     Array.from({ length: count }, (_unused, index) => {
       const id = `components-button--story-${String(index).padStart(2, "0")}`;
       return [
@@ -43,10 +45,23 @@ function zipOfStories(count: number): Buffer {
       ];
     }),
   );
+  if (withTest) {
+    entries[`${TEST_PARENT}:works`] = {
+      id: `${TEST_PARENT}:works`,
+      name: "works",
+      title: "Components/Button",
+      importPath: "./B.stories.tsx",
+      type: "story",
+      subtype: "test",
+      parent: TEST_PARENT,
+    };
+  }
   const zip = new AdmZip();
   zip.addFile("index.json", Buffer.from(JSON.stringify({ v: 4, entries })));
   return zip.toBuffer();
 }
+
+const TEST_PARENT = "components-button--story-00";
 
 const png = (tag: string): Buffer =>
   Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from(tag)]);
@@ -706,6 +721,34 @@ describe("sharded capture", () => {
     expect(outcome).toMatchObject({ status: "rendered", finalized: true });
     expect(finalized).toEqual([expect.objectContaining({ error: "updateCounts failed" })]);
     expect(await w.status()).toBe("failed");
+  });
+
+  it("fails a sharded build whose Storybook test failed in the plan stage", async () => {
+    const w = await world({ stories: 25, shardSize: 10 });
+    await w.storage.write(storybookZipPath(w.project.id, w.build.id), zipOfStories(25, true));
+    await w.db.update(w.db.tables.projects, w.project.id, { runTests: true });
+    w.jobOptions.runner.runTests = async () => {
+      await Promise.resolve();
+      return [
+        { storyId: `${TEST_PARENT}:works`, status: "failed" as const, error: "x", durationMs: 1 },
+      ];
+    };
+
+    const summary = await w.plan();
+    expect(summary).toMatchObject({ shards: 3, failedCount: 1 });
+    for (const job of w.queued) {
+      // oxlint-disable-next-line no-await-in-loop -- shards run one after another here
+      await w.runShard(job, true);
+    }
+
+    expect(await w.status()).toBe("failed");
+    const stored = parseTestResults(
+      (await new BuildModel(w.db, tables(w.db)).get(w.build.id))?.testResults,
+    );
+    expect(stored.map((r) => [r.id, r.status])).toEqual([[`${TEST_PARENT}:works`, "failed"]]);
+    expect((await w.snapshots()).map((row) => row["storyId"])).not.toContain(
+      `${TEST_PARENT}:works`,
+    );
   });
 
   it("reports the finalize to the one run that won it, including a failing last shard", async () => {

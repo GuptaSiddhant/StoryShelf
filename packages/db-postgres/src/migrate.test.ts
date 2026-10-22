@@ -55,3 +55,32 @@ describe("runMigrations: pre-browser volume upgrade", () => {
     await client.close();
   }, 60_000);
 });
+
+describe("runMigrations: builds and projects gain later columns", () => {
+  it("adds inherited_count, test_results and run_tests to older tables, with defaults", async () => {
+    const client = new PGlite();
+    const run = runnerFor(client);
+    await runMigrations(run);
+    await client.exec(`
+      INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', now(), now());
+      INSERT INTO builds (id, project_id, git_sha, git_branch, created_at, updated_at)
+        VALUES ('b', 'p', 'abc', 'main', now(), now());
+      ALTER TABLE builds DROP COLUMN inherited_count;
+      ALTER TABLE builds DROP COLUMN test_results;
+      ALTER TABLE projects DROP COLUMN run_tests;
+    `);
+
+    await runMigrations(run);
+    await runMigrations(run); // idempotent
+
+    const build = await client.query<{ inherited_count: number; test_results: string | null }>(
+      "SELECT inherited_count, test_results FROM builds WHERE id = 'b'",
+    );
+    expect(build.rows).toEqual([{ inherited_count: 0, test_results: null }]);
+    const project = await client.query<{ run_tests: boolean }>(
+      "SELECT run_tests FROM projects WHERE id = 'p'",
+    );
+    expect(project.rows).toEqual([{ run_tests: false }]);
+    await client.close();
+  }, 60_000);
+});

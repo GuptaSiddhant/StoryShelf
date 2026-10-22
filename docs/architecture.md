@@ -41,6 +41,7 @@ projects (
   max_diff_ratio      real NOT NULL DEFAULT 0.01,   -- max allowed diff ratio (0-1)
   public_branch_regex text,                    -- branches whose builds are publicly viewable (ADR 0011)
   run_a11y            boolean NOT NULL DEFAULT true,   -- axe accessibility checks during capture; results are shown in review and never block (ADR 0004, decision 6)
+  run_tests           boolean NOT NULL DEFAULT false,  -- run Storybook 10 `.test()` entries as interaction tests during capture (ADR 0004, decision 10)
   review_enabled      boolean NOT NULL DEFAULT true,   -- review on: non-default builds wait for a verdict (ADR 0013, decision 1)
   review_approvals    integer NOT NULL DEFAULT 1,      -- approvals a build needs with `testing` off (ADR 0013, decision 3)
   storybook_url_ttl_seconds integer,           -- lifetime of the signed Storybook URLs of a render; NULL derives it from the build (ADR 0007, decision 5)
@@ -608,7 +609,7 @@ Rendering happens on the server against the user's uploaded static build, in a p
 
 1. **Pinned Playwright image** -- same browser version everywhere (`mcr.microsoft.com/playwright:<pinned>`)
 2. **Disable animations** -- CSS injection: `* { animation: none !important; transition: none !important; }`
-3. **Wait for network idle** -- `page.waitForLoadState("networkidle")`
+3. **Wait for network idle and for Storybook's render-finished event** -- `networkidle` on navigation, then the preview channel's `storyRendered`/`storyFinished` (ADR 0004, decision 9), falling back to `delay ?? 500` ms when the page never signals
 4. **Freeze time** (optional) -- inject a fixed `Date` via `page.addInitScript`
 5. **Embed fonts** (optional) -- ensure same font files in the capture image
 

@@ -28,6 +28,7 @@ export const builds = mysqlTable(
     baselineSha: text("baseline_sha"),
     changedFiles: text("changed_files"),
     affectedImportPaths: text("affected_import_paths"),
+    testResults: text("test_results"),
     createdAt: datetime("created_at", { mode: "string", fsp: 3 }).notNull(),
     updatedAt: datetime("updated_at", { mode: "string", fsp: 3 }).notNull(),
   },
@@ -58,6 +59,7 @@ export interface Build {
   baselineSha: string | null;
   changedFiles: string | null;
   affectedImportPaths: string | null;
+  testResults: string | null;
   createdAt: string;
   updatedAt: string;
 }

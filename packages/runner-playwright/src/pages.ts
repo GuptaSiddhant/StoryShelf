@@ -2,6 +2,7 @@
 
 import type { Viewport } from "@storyshelf/core/adapter/capture-runner";
 import type { Browser, BrowserContext, Page } from "playwright-core";
+import { installSettleRecorder } from "./settle.ts";
 
 /** A page on loan for one capture; `release(false)` discards it instead of reusing it. */
 export interface PageLease {
@@ -18,6 +19,7 @@ export async function acquirePage(
   const page = await ctx.browser.newPage({
     viewport: { width: viewport.width, height: viewport.height },
   });
+  await installSettleRecorder(page);
   return {
     page,
     release: async () => {
@@ -71,7 +73,9 @@ export class PagePool {
     const context = await this.browser.newContext({
       viewport: { width: viewport.width, height: viewport.height },
     });
-    return { context, page: await context.newPage() };
+    const page = await context.newPage();
+    await installSettleRecorder(page);
+    return { context, page };
   }
 }
 

@@ -62,6 +62,7 @@ const projects = defineTable("projects", {
   executePlay: "execute_play",
   playTimeoutMs: "play_timeout_ms",
   runA11y: "run_a11y",
+  runTests: "run_tests",
   browser: "browser",
   viewports: "viewports",
   browsers: "browsers",
@@ -146,6 +147,7 @@ const builds = defineTable("builds", {
   baselineSha: "baseline_sha",
   changedFiles: "changed_files",
   affectedImportPaths: "affected_import_paths",
+  testResults: "test_results",
   createdAt: "created_at",
   updatedAt: "updated_at",
 });

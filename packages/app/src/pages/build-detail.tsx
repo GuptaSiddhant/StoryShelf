@@ -1,4 +1,4 @@
-import { groupComponents } from "@storyshelf/core/capture";
+import { groupComponents, parseTestResults } from "@storyshelf/core/capture";
 import { BuildModel } from "@storyshelf/core/models";
 import { CaptureAttemptModel } from "@storyshelf/core/models";
 import { CaptureLogModel } from "@storyshelf/core/models";
@@ -42,6 +42,7 @@ import { a11ySummaryNote, a11ySummaryOf } from "./a11y-violations.tsx";
 import { snapshotVariant } from "./build-diff-model.ts";
 import { StaleBaselineNotice } from "./build-diff-stale.tsx";
 import { LinkedUsage, type LinkedUsageItem } from "./build-diff-usage.tsx";
+import { TestsCard } from "./build-tests.tsx";
 import { DesignButtons } from "./design-links.tsx";
 import { ChangesetCard } from "./review-changeset.tsx";
 import { CommentsCard } from "./review-comments.tsx";
@@ -281,6 +282,8 @@ export async function renderBuildDetailPage(
           ))}
         </Card>
       ) : null}
+
+      <TestsCard results={parseTestResults(build.testResults)} />
 
       {testing && canReview && (build.status === "reviewing" || build.status === "comparing") ? (
         <div class="mb-1">

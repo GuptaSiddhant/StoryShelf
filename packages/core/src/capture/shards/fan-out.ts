@@ -29,6 +29,8 @@ export interface FanOutInput extends ShardTarget {
   viewports: Viewport[];
   browsers: CaptureTarget[];
   logger: Logger | undefined;
+  /** Test entries that failed in the plan stage (ADR 0004, decision 10): they fail the build. */
+  testFailed?: ReadonlySet<string> | undefined;
   /** Set by the plan stage: whether past timings were available to order the shards by. */
   timed?: boolean;
 }
@@ -96,14 +98,15 @@ async function commitPlan(
     ...partition.inherited.map((inherited) => inherited.story.id),
   ]);
   const fresh = [...(await freshBrowsersOf(ctx))];
-  const rows = await recordPlan(args, slices, { fresh, storyIds, failed: failedInherits });
+  const failed = new Set([...failedInherits, ...(args.testFailed ?? [])]);
+  const rows = await recordPlan(args, slices, { fresh, storyIds, failed });
   await handOut(args, rows);
   await emitAttemptLog(args.input.recordLog, args.logger, "info", "capture planned", {
     shards: rows.length,
     stories: storyIds.size,
     ordering: args.timed ? "longest-first" : "by-capture-count",
   });
-  return { storyCount: storyIds.size, failedCount: failedInherits.size, shards: rows.length };
+  return { storyCount: storyIds.size, failedCount: failed.size, shards: rows.length };
 }
 
 /**

@@ -21,6 +21,7 @@ import {
   isTimeoutError,
   sessionGateFor,
   storybookBase,
+  type SessionGate,
 } from "@storyshelf/core/utils";
 import type { Browser } from "puppeteer-core";
 import { messageOf, safeCloseBrowser, safeCloseServer } from "./browser.ts";
@@ -73,11 +74,15 @@ export async function renderAll(
 }
 
 /** The input with its target resolved, and the session gate when the target is remote. */
-function planRun(
-  rawInput: PuppeteerRenderInput,
+export function planRun<T extends { target?: CaptureTarget | undefined }>(
+  rawInput: T,
   driver: TargetDriver,
   defaultTarget: CaptureTarget,
-): { input: RunInput; name: CaptureTarget; remote: RemoteTarget | undefined } {
+): {
+  input: T & { target: CaptureTarget; gate?: SessionGate | undefined };
+  name: CaptureTarget;
+  remote: RemoteTarget | undefined;
+} {
   const name = rawInput.target ?? defaultTarget;
   const remote = driver.remote(name);
   const gate = remote && sessionGateFor(name, remote.remote.sessions);
@@ -85,7 +90,7 @@ function planRun(
 }
 
 /** A target whose browser cannot route back to this host needs a URL; failing here names why. */
-function assertReachable(
+export function assertReachable(
   target: CaptureTarget,
   remote: RemoteTarget | undefined,
   storybookUrl: string | undefined,
@@ -112,7 +117,7 @@ function assertStorybookRoot(target: CaptureTarget, storybookUrl: string): void 
 }
 
 /** The loopback server, or the URL given; a server that cannot start closes the browser it was for. */
-async function serve(
+export async function serve(
   input: Pick<RunInput, "storybookDir" | "storybookUrl">,
   browser: Browser,
 ): Promise<Serving> {

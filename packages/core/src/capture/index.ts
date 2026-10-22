@@ -43,6 +43,7 @@ export {
   type StoryViewportDefinition,
   type Viewport,
 } from "./adapter.ts";
+export { parseTestResults, summarizeTests, type TestResult, type TestSummary } from "./tests.ts";
 export {
   executeCaptureJob,
   type CaptureAttemptRef,

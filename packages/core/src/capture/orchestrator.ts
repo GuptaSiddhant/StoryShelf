@@ -36,6 +36,7 @@ import { storybookUrlSource } from "./storybook-urls.ts";
 import { StorybookAdapter } from "./storybook.ts";
 import { loadTarget } from "./target.ts";
 import { offeredTargets } from "./targets.ts";
+import { runProjectTests } from "./tests.ts";
 
 /** Table handles required by the orchestrator. */
 export type OrchestratorTables = BuildTables &
@@ -264,6 +265,19 @@ async function runCapturePhases(
     });
     const stories = enriched.filter((s) => !isDisabledStory(s));
     assertModeCaps(stories, viewports);
+    // Opt-in `.test()` runs: a failing test fails the build like a failing play function.
+    const testRun = await runProjectTests({
+      runner: options.runner,
+      builds,
+      build,
+      project,
+      storybookDir,
+      stories: discovered,
+      target: browsers[0] ?? "chromium",
+      storybookUrl,
+      logger,
+      recordLog: input.recordLog,
+    });
 
     // A big build is planned into shards that other workers render; this job's part ends there.
     const fanned = await fanOutCapture({
@@ -275,6 +289,7 @@ async function runCapturePhases(
       viewports,
       browsers,
       logger,
+      testFailed: testRun.blocking,
     });
     if (fanned) {
       await cleanScratch();
@@ -327,6 +342,7 @@ async function runCapturePhases(
       flaky: flakyFailed,
       a11y: a11yFailed,
     } = classifyFailures(stories, result.failures);
+    for (const id of testRun.blocking) blockingFailed.add(id);
 
     const persistStart = performance.now();
     await timed(
