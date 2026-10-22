@@ -28,7 +28,7 @@ async function install(dir: string, file?: string): Promise<void> {
 
 const statusOf = (names: Parameters<typeof flattenBrowsers>[0]) =>
   Object.fromEntries(
-    verifyLocalTargets(flattenBrowsers(names), types()).map((entry) => [
+    verifyLocalTargets(flattenBrowsers(names).locals, types()).map((entry) => [
       entry.target,
       entry.status,
     ]),
@@ -48,7 +48,9 @@ describe("verifyLocalTargets", () => {
   });
 
   it("reaches the Storybook through the loopback server", () => {
-    expect(verifyLocalTargets(flattenBrowsers(["chromium"]), types())[0]?.reach).toBe("loopback");
+    expect(verifyLocalTargets(flattenBrowsers(["chromium"]).locals, types())[0]?.reach).toBe(
+      "loopback",
+    );
   });
 
   it("reads an install marker as installed", async () => {
@@ -81,12 +83,12 @@ describe("verifyLocalTargets", () => {
     const status = statusOf([local("chrome", { channel: "chrome-beta" })]);
     expect(status["chrome"]).toBe("ready");
     const chrome = verifyLocalTargets(
-      flattenBrowsers(["chrome"]),
+      flattenBrowsers(["chrome"]).locals,
       types(),
       (path) => path.includes("Google") || path.includes("google"),
     )[0]?.status;
     expect(chrome).toBe("ready");
-    const missing = verifyLocalTargets(flattenBrowsers(["chrome"]), types(), () => false)[0]
+    const missing = verifyLocalTargets(flattenBrowsers(["chrome"]).locals, types(), () => false)[0]
       ?.status;
     expect(missing).toEqual({ unavailable: expect.stringContaining("playwright install chrome") });
   });
@@ -96,11 +98,15 @@ describe("verifyLocalTargets", () => {
       ...types(),
       firefox: { executablePath: () => join(root, "custom-firefox") },
     };
-    expect(verifyLocalTargets(flattenBrowsers(["firefox"]), custom)[0]?.status).toMatchObject({
+    expect(
+      verifyLocalTargets(flattenBrowsers(["firefox"]).locals, custom)[0]?.status,
+    ).toMatchObject({
       unavailable: expect.any(String),
     });
     await writeFile(join(root, "custom-firefox"), "");
-    expect(verifyLocalTargets(flattenBrowsers(["firefox"]), custom)[0]?.status).toBe("ready");
+    expect(verifyLocalTargets(flattenBrowsers(["firefox"]).locals, custom)[0]?.status).toBe(
+      "ready",
+    );
   });
 
   it("treats the new-headless `chromium` channel as the bundled engine", async () => {

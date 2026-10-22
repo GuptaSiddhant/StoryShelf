@@ -33,6 +33,22 @@ export type {
   TargetStatus,
 } from "./capture-target.ts";
 
+export {
+  defineRemote,
+  isRemoteBrowser,
+  reachOf,
+  remoteTargetsOf,
+  scrubConnection,
+} from "./remote-browser.ts";
+export type {
+  RemoteBrowser,
+  RemoteConnection,
+  RemoteOptions,
+  RemoteProtocol,
+  RemoteSupport,
+  RemoteTarget,
+} from "./remote-browser.ts";
+
 export type { JobStatus } from "./capture-queue.ts";
 export { RenderRuns } from "./render-runs.ts";
 export type { StoryEntry, StorySourceAdapter, Viewport } from "../capture/adapter.ts";
@@ -45,7 +61,10 @@ export type { StoryEntry, StorySourceAdapter, Viewport } from "../capture/adapte
 export interface CaptureEnvironment {
   /** Browser build, as the driver reports it (for example `124.0.6367.29`). */
   browserVersion?: string;
-  /** Host OS and CPU (`process.platform-arch`); text rendering differs between them. */
+  /**
+   * OS and CPU text rendering depends on: the host's `process.platform-arch` for a local browser;
+   * for a remote one what the browser reported (`linux`, `windows`), never the host's.
+   */
   platform?: string;
   /** Device pixel ratio the pages were rendered at. */
   deviceScaleFactor?: number;
@@ -154,6 +173,12 @@ export interface CaptureRunner extends Adapter<{
     /** Target to render on (chromium when absent). */
     target?: CaptureTarget;
     /**
+     * An absolute URL to the build's Storybook that the target's browser can reach, set for a
+     * `reach: "url"` target (ADR 0007, decision 5). The runner navigates there instead of to its
+     * loopback server; a `reach: "url"` target given none fails to start. Never logged.
+     */
+    storybookUrl?: string;
+    /**
      * Optional streaming hand-off. When provided, the runner awaits it with each
      * capture as soon as it is taken, then drops the buffer instead of adding the
      * capture to `RenderResult.captures`, so a large build never holds every
@@ -183,6 +208,8 @@ export interface CaptureRunner extends Adapter<{
     logger?: Logger;
     /** Target to read the parameters on: the project's primary (chromium when absent). */
     target?: CaptureTarget;
+    /** As on `render`: the URL a `reach: "url"` target's browser opens. */
+    storybookUrl?: string;
     adapter?: StorySourceAdapter;
   }): Promise<Record<string, StoryParameters>>;
 

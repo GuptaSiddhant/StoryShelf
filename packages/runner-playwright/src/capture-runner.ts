@@ -1,13 +1,18 @@
 /** Playwright capture runner — composition root (factory wiring). */
 
-import { createTargetOffers, type CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
+import {
+  createTargetOffers,
+  type CaptureRunner,
+  type RunnerTarget,
+} from "@storyshelf/core/adapter/capture-runner";
 import { recommendedNavigationTimeoutMs } from "@storyshelf/core/utils";
 import { verifyLocalTargets } from "./availability.ts";
 import { activeRuns, closeBrowser } from "./browser.ts";
+import { connectRemote } from "./connect.ts";
 import { launchLocal, loadPlaywright } from "./launch.ts";
 import { extractAll, renderAll } from "./pipeline.ts";
 import { flattenBrowsers, type BrowserEntry, type LocalTarget } from "./targets.ts";
-import type { ActiveRun, ExtractInput, PlaywrightRenderInput } from "./types.ts";
+import type { ActiveRun, ExtractInput, PlaywrightRenderInput, TargetDriver } from "./types.ts";
 
 declare const __PKG_VERSION__: string | undefined;
 
@@ -15,9 +20,11 @@ declare const __PKG_VERSION__: string | undefined;
 export function createPlaywrightCaptureRunner(
   options: {
     /**
-     * Every target the runner offers, default first (ADR 0007, decision 1): engine names or
-     * `local(engine, options)`. Default `["chromium"]`; Firefox and WebKit are offered only when
-     * listed, and their binaries provisioned (`playwright install`), which `playwright-core` never does.
+     * Every target the runner offers, default first (ADR 0007, decision 1): engine names,
+     * `local(engine, options)`, or remote services from `@storyshelf/runner-playwright/remote`
+     * (`<engine>@<name>` targets). Default `["chromium"]`; Firefox and WebKit are offered only when
+     * listed, and their binaries provisioned (`playwright install`), which `playwright-core` never
+     * does. A list with no local entry needs no installed browsers.
      */
     browsers?: readonly BrowserEntry[];
     /** Pages rendered at once; falls back to `STORYSHELF_CAPTURE_CONCURRENCY`, then CPU/memory detection. */
@@ -30,15 +37,18 @@ export function createPlaywrightCaptureRunner(
     reusePages?: boolean;
   } = {},
 ): CaptureRunner {
-  const locals = flattenBrowsers(options.browsers ?? ["chromium"]);
-  // Until `lifecycle.setup` verifies them, every declared engine reads as ready.
-  const offers = createTargetOffers(
-    locals.map(({ target }) => ({ target, reach: "loopback", status: "ready" })),
-  );
-  const launch = offers.guard(
-    async (target) =>
-      await launchLocal(locals.find((entry) => entry.target === target) as LocalTarget),
-  );
+  const { declared, locals, remotes } = flattenBrowsers(options.browsers ?? ["chromium"]);
+  // Until `lifecycle.setup` verifies them, every declared target reads as ready.
+  const offers = createTargetOffers(declared);
+  const driver: TargetDriver = {
+    launch: offers.guard(async (target, logger) => {
+      const remote = remotes.find((entry) => entry.target === target);
+      return remote
+        ? await connectRemote(remote, logger)
+        : await launchLocal(locals.find((entry) => entry.target === target) as LocalTarget);
+    }),
+    remote: (target) => remotes.find((entry) => entry.target === target),
+  };
   const defaultTarget = offers.defaultTarget;
   const concurrency = options.concurrency ?? envPositiveInt("STORYSHELF_CAPTURE_CONCURRENCY");
   const navigationTimeoutMs =
@@ -60,7 +70,7 @@ export function createPlaywrightCaptureRunner(
         return offers.current();
       },
     },
-    lifecycle: offers.lifecycle(async () => verifyLocalTargets(locals, await loadPlaywright())),
+    lifecycle: offers.lifecycle(async () => await verifyTargets(declared, locals)),
     async render(input: PlaywrightRenderInput) {
       const active: ActiveRun = { cancelled: false, browser: null };
       const remove = activeRuns.add(input.buildId, input.runId, active);
@@ -68,7 +78,7 @@ export function createPlaywrightCaptureRunner(
         return await renderAll(
           { concurrency, navigationTimeoutMs, recycleBrowserEvery, reusePages, ...input },
           active,
-          launch,
+          driver,
           defaultTarget,
         );
       } finally {
@@ -76,7 +86,7 @@ export function createPlaywrightCaptureRunner(
       }
     },
     async extractParameters(input: ExtractInput) {
-      return await extractAll(input, launch, defaultTarget);
+      return await extractAll(input, driver, defaultTarget);
     },
     async cancel(buildId, runId) {
       await Promise.all(
@@ -87,6 +97,17 @@ export function createPlaywrightCaptureRunner(
       );
     },
   };
+}
+
+/** Local targets are checked for an installed engine; a remote one is not probed (that would open a session). */
+async function verifyTargets(
+  declared: readonly RunnerTarget[],
+  locals: readonly LocalTarget[],
+): Promise<RunnerTarget[]> {
+  const checked = new Map(
+    verifyLocalTargets(locals, await loadPlaywright()).map((entry) => [entry.target, entry]),
+  );
+  return declared.map((entry) => checked.get(entry.target) ?? entry);
 }
 
 function envPositiveInt(name: string): number | undefined {

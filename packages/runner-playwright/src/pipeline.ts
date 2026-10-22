@@ -1,8 +1,11 @@
 /** Render orchestration: static server, browser, and per-story captures. */
 
 import {
+  TargetLaunchError,
   engineOf,
+  type CaptureEnvironment,
   type CaptureTarget,
+  type RemoteTarget,
   type RenderResult,
   type RenderedSnapshot,
   type StoryEntry,
@@ -18,10 +21,13 @@ import {
   createPageLimiter,
   detectCaptureEnvironment,
   isTimeoutError,
+  sessionGateFor,
+  storybookBase,
 } from "@storyshelf/core/utils";
 import type { Browser } from "playwright-core";
 import { messageOf, safeCloseBrowser, safeCloseServer } from "./browser.ts";
 import { PagePool } from "./pages.ts";
+import { measureRemote } from "./remote-environment.ts";
 import { createRuntimeParamsState, extractAllParameters } from "./runtime-params.ts";
 import { captureScreenshot } from "./screenshot.ts";
 import { createStaticServer } from "./static-server.ts";
@@ -29,37 +35,54 @@ import type {
   ActiveRun,
   CaptureContext,
   ExtractInput,
-  LaunchTarget,
   PlaywrightRenderInput,
+  RunInput,
   RuntimeParamsPage,
+  TargetDriver,
 } from "./types.ts";
+
+/** Where the browser finds the Storybook: the loopback server, or the URL core handed over. */
+interface Serving {
+  url: string;
+  close(): Promise<void>;
+}
 
 /** Render all story/viewport combinations for a build. */
 export async function renderAll(
   rawInput: PlaywrightRenderInput,
   active: ActiveRun,
-  launch: LaunchTarget,
+  driver: TargetDriver,
   defaultTarget: CaptureTarget,
 ): Promise<RenderResult> {
-  const name = rawInput.target ?? defaultTarget;
-  const input = { ...rawInput, target: name };
+  const { input, name, remote } = planRun(rawInput, driver, defaultTarget);
+  assertReachable(name, remote, input.storybookUrl);
   // Launch first: a target that will not start must fail before a static server is bound.
-  const browser = await launch(name);
-  const server = await createStaticServer(input.storybookDir).catch(async (error: unknown) => {
-    await safeCloseBrowser(browser);
-    throw error;
-  });
+  const browser = await driver.launch(name, input.logger);
+  const server = await serve(input, browser);
   input.logger?.info(describeSizing({ ...input, browser: engineOf(name) }), "capture sizing");
+  const measured = remote ? await measureRemote(browser, remote.remote, input.logger) : undefined;
   const result = await runWithBrowser(
     input,
     active,
     browser,
     server,
-    async () => await launch(name),
+    async () => await driver.launch(name, input.logger),
   );
   // Echo the target so persisted rows are attributable without the request.
   for (const row of [...result.captures, ...result.failures]) row.browser = name;
-  return { ...result, environment: await detectCaptureEnvironment(browserVersionOf(browser)) };
+  return { ...result, environment: measured ?? (await localEnvironment(browser)) };
+}
+
+/** The input with its target resolved, and the session gate when the target is remote. */
+function planRun(
+  rawInput: PlaywrightRenderInput,
+  driver: TargetDriver,
+  defaultTarget: CaptureTarget,
+): { input: RunInput; name: CaptureTarget; remote: RemoteTarget | undefined } {
+  const name = rawInput.target ?? defaultTarget;
+  const remote = driver.remote(name);
+  const gate = remote && sessionGateFor(name, remote.remote.sessions);
+  return { input: { ...rawInput, target: name, gate }, name, remote };
 }
 
 /**
@@ -68,21 +91,54 @@ export async function renderAll(
  */
 export async function extractAll(
   input: ExtractInput,
-  launch: LaunchTarget,
+  driver: TargetDriver,
   defaultTarget: CaptureTarget,
 ): Promise<Record<string, StoryParameters>> {
   const first = input.stories[0];
   if (!first) return {};
-  const browser = await launch(input.target ?? defaultTarget);
-  const server = await createStaticServer(input.storybookDir).catch(async (error: unknown) => {
-    await safeCloseBrowser(browser);
-    throw error;
-  });
+  const name = input.target ?? defaultTarget;
+  assertReachable(name, driver.remote(name), input.storybookUrl);
+  const browser = await driver.launch(name, input.logger);
+  const server = await serve(input, browser);
   try {
     return await readParameters(browser, server.url, first.id, input.adapter);
   } finally {
     await Promise.all([safeCloseBrowser(browser), safeCloseServer(server)]);
   }
+}
+
+/** A target whose browser cannot route back to this host needs a URL; failing here names why. */
+function assertReachable(
+  target: CaptureTarget,
+  remote: RemoteTarget | undefined,
+  storybookUrl: string | undefined,
+): void {
+  if (remote?.reach === "url" && storybookUrl === undefined) {
+    throw new TargetLaunchError(
+      target,
+      "its browser cannot reach this host, so it needs a Storybook URL (a public origin and a secret to sign it) and none was given",
+      { transient: true },
+    );
+  }
+}
+
+/** The loopback server, or the URL given; a server that cannot start closes the browser it was for. */
+async function serve(
+  input: Pick<RunInput, "storybookDir" | "storybookUrl">,
+  browser: Browser,
+): Promise<Serving> {
+  if (input.storybookUrl !== undefined) {
+    return {
+      url: storybookBase(input.storybookUrl),
+      close: async () => {
+        await Promise.resolve();
+      },
+    };
+  }
+  return await createStaticServer(input.storybookDir).catch(async (error: unknown) => {
+    await safeCloseBrowser(browser);
+    throw error;
+  });
 }
 
 async function readParameters(
@@ -103,11 +159,16 @@ function browserVersionOf(browser: Browser): string | undefined {
   return typeof browser.version === "function" ? browser.version() : undefined;
 }
 
+/** This host's environment: a local browser renders on the machine the runner runs on. */
+async function localEnvironment(browser: Browser): Promise<CaptureEnvironment> {
+  return await detectCaptureEnvironment(browserVersionOf(browser));
+}
+
 async function runWithBrowser(
-  input: PlaywrightRenderInput,
+  input: RunInput,
   active: ActiveRun,
   browser: Browser,
-  server: Awaited<ReturnType<typeof createStaticServer>>,
+  server: Serving,
   relaunch: () => Promise<Browser>,
 ): Promise<RenderResult> {
   active.browser = browser;
@@ -144,7 +205,7 @@ function buildContext(
 }
 
 async function runAllCaptures(
-  input: PlaywrightRenderInput,
+  input: RunInput,
   active: ActiveRun,
   ctx: CaptureContext,
   captures: RenderedSnapshot[],
@@ -159,6 +220,7 @@ async function runAllCaptures(
   const batches = chunk(jobs, input.recycleBrowserEvery ?? DEFAULT_RECYCLE_BROWSER_EVERY);
   const pages = createPageLimiter({
     concurrency: input.concurrency,
+    ...(input.gate === undefined ? {} : { gate: input.gate }),
     browser: engineOf(input.target ?? "chromium"),
     logger: input.logger,
   });
@@ -172,7 +234,7 @@ async function runAllCaptures(
 async function runBatches(
   batches: { story: StoryEntry; viewport: Viewport }[][],
   pages: ReturnType<typeof createPageLimiter>,
-  input: PlaywrightRenderInput,
+  input: RunInput,
   active: ActiveRun,
   ctx: CaptureContext,
   out: {

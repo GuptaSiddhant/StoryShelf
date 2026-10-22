@@ -5,9 +5,14 @@ import type {
   StorySourceAdapter,
   Viewport,
 } from "@storyshelf/core/adapter/capture-runner";
-import type { CaptureTarget, RenderedSnapshot } from "@storyshelf/core/adapter/capture-runner";
+import type {
+  CaptureTarget,
+  RemoteTarget,
+  RenderedSnapshot,
+} from "@storyshelf/core/adapter/capture-runner";
 import type { StoryParameters } from "@storyshelf/core/capture";
 import type { Logger } from "@storyshelf/core/logger";
+import type { SessionGate } from "@storyshelf/core/utils";
 import type { Browser } from "puppeteer-core";
 import type { PagePool } from "./pages.ts";
 
@@ -25,6 +30,12 @@ export interface PuppeteerRenderInput {
   runA11y?: boolean;
   /** Target to render on; the runner's default (first) target when absent. */
   target?: CaptureTarget;
+  /**
+   * The build's Storybook at a URL the target's browser can reach (ADR 0007, decision 5), which
+   * every remote target requires: Puppeteer's remote browsers cannot route back to this host. The
+   * loopback server is not started when it is given.
+   */
+  storybookUrl?: string;
   /** Max pages rendering at once (default: sized from detected CPU and memory). */
   concurrency?: number;
   /** Per-page timeout in ms (default: scaled up on CPU-starved hosts). */
@@ -39,8 +50,18 @@ export interface PuppeteerRenderInput {
   adapter?: StorySourceAdapter;
 }
 
-/** Starts a browser for a target; a failure is a `TargetLaunchError`. */
-export type LaunchTarget = (target: CaptureTarget) => Promise<Browser>;
+/** Starts (or connects to) a browser for a target; a failure is a `TargetLaunchError`. */
+export type LaunchTarget = (target: CaptureTarget, logger?: Logger) => Promise<Browser>;
+
+/** What the pipeline needs of a target beyond starting it. */
+export interface TargetDriver {
+  launch: LaunchTarget;
+  /** The remote service entry behind `target`; absent for a local engine. */
+  remote(target: CaptureTarget): RemoteTarget | undefined;
+}
+
+/** The render input as the pipeline runs it: with the session gate of a remote target. */
+export type RunInput = PuppeteerRenderInput & { gate?: SessionGate | undefined };
 
 /** Browser + adapter context shared by screenshot helpers. */
 export interface ScreenshotContext {

@@ -1,5 +1,13 @@
 /** The runner's `browsers` option: what an operator lists, and the local targets it flattens to. */
-import { isBrowserName, type BrowserName } from "@storyshelf/core/adapter/capture-runner";
+import {
+  isBrowserName,
+  isRemoteBrowser,
+  remoteTargetsOf,
+  type BrowserName,
+  type RemoteBrowser,
+  type RemoteTarget,
+  type RunnerTarget,
+} from "@storyshelf/core/adapter/capture-runner";
 
 /** Options of {@link local}. */
 export interface LocalOptions {
@@ -15,10 +23,11 @@ export interface LocalBrowser {
 }
 
 /**
- * One entry of `browsers`: a bare engine name, or {@link local}. Remote presets join this union
- * with the remote targets (ADR 0007).
+ * One entry of `browsers`: a bare engine name, {@link local}, or a remote service from
+ * `@storyshelf/runner-playwright/remote` (`playwrightServer(...)`, `remote(...)`, ...), which
+ * stands for one target per engine.
  */
-export type BrowserEntry = BrowserName | LocalBrowser;
+export type BrowserEntry = BrowserName | LocalBrowser | RemoteBrowser;
 
 /** A local engine this runner launches. */
 export interface LocalTarget {
@@ -39,27 +48,58 @@ export function local(engine: BrowserName, options: LocalOptions = {}): LocalBro
   return { kind: "local", engine, options };
 }
 
+/** The `browsers` list, flattened: what the runner offers and how to start each target. */
+export interface FlatTargets {
+  /** Every target as the runner declares it, default first (all `ready` until verified). */
+  declared: RunnerTarget[];
+  locals: LocalTarget[];
+  remotes: RemoteTarget[];
+}
+
 /**
- * Flatten the `browsers` list into local targets, first = default. Throws on an empty list, an
- * unknown engine, or two entries producing one target, naming both, so a mistake fails when the
- * runner is created and not when the first build runs.
+ * Flatten the `browsers` list into targets, first = default. Throws on an empty list, an unknown
+ * engine, or two entries producing one target, naming both, so a mistake fails when the runner is
+ * created and not when the first build runs.
  */
-export function flattenBrowsers(entries: readonly BrowserEntry[]): LocalTarget[] {
+export function flattenBrowsers(entries: readonly BrowserEntry[]): FlatTargets {
   if (entries.length === 0) {
     throw new Error("browsers must list at least one target");
   }
-  const seen = new Map<BrowserName, number>();
-  return entries.map((entry, index) => {
-    const { engine, options } = typeof entry === "string" ? local(entry) : entry;
-    const first = seen.get(engine);
-    if (first !== undefined) {
-      throw new Error(
-        `browsers entries ${first + 1} and ${index + 1} both produce the target "${engine}"`,
-      );
+  const seen = new Map<string, number>();
+  const flat: FlatTargets = { declared: [], locals: [], remotes: [] };
+  for (const [index, entry] of entries.entries()) {
+    for (const target of isRemoteBrowser(entry) ? remoteTargetsOf(entry) : [localOf(entry)]) {
+      claim(seen, target.target, index);
+      add(flat, target);
     }
-    seen.set(engine, index);
-    return { target: engine, channel: channelOf(engine, options) };
-  });
+  }
+  return flat;
+}
+
+/** Record that entry `index` produces `target`, refusing a second entry that does. */
+function claim(seen: Map<string, number>, target: string, index: number): void {
+  const first = seen.get(target);
+  if (first !== undefined) {
+    throw new Error(
+      `browsers entries ${first + 1} and ${index + 1} both produce the target "${target}"`,
+    );
+  }
+  seen.set(target, index);
+}
+
+function localOf(entry: BrowserName | LocalBrowser): LocalTarget {
+  const { engine, options } = typeof entry === "string" ? local(entry) : entry;
+  return { target: engine, channel: channelOf(engine, options) };
+}
+
+function add(flat: FlatTargets, target: LocalTarget | RemoteTarget): void {
+  if ("kind" in target) {
+    flat.remotes.push(target);
+    flat.declared.push({ target: target.target, reach: target.reach, status: "ready" });
+  } else {
+    flat.locals.push(target);
+    flat.declared.push({ target: target.target, reach: "loopback", status: "ready" });
+  }
 }
 
 /** Bare `chrome` means Chrome, not the bundled Chromium (ADR 0007, decision 7). */

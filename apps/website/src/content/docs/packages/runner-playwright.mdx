@@ -46,7 +46,32 @@ createPlaywrightCaptureRunner({
 - `playwright-core` never downloads browsers. Provision them once per machine or image, pinned to the `playwright-core` version: `npx -y playwright@<version> install --with-deps chromium firefox webkit`.
 - Declaring an engine does not prove it is installed. When the server starts, the runner checks each target without launching anything (the install marker next to Playwright's `executablePath()`, or the system Chrome for a channel), and reports it as `ready` or `unavailable` with a reason on **System → Capture browsers**. A launch that fails anyway marks its target unavailable and fails the job at once with the launch error, instead of being retried as a story crash.
 
-Remote browsers (a Playwright server, hosted browser services) are a later step of ADR 0007; this runner launches local engines only.
+### Remote browsers
+
+An entry can also be a **remote service**, from the `/remote` subpath: the runner then connects to a browser on another machine instead of launching one, and offers `<engine>@<name>` targets (`chromium@grid`) with their own baselines.
+
+```ts
+import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
+import { azurePlaywright, playwrightServer } from "@storyshelf/runner-playwright/remote";
+
+createPlaywrightCaptureRunner({
+  browsers: [
+    playwrightServer({ name: "grid", endpoint: "ws://playwright:3000/storyshelf", sessions: 8 }),
+    azurePlaywright({
+      endpoint: process.env.PLAYWRIGHT_SERVICE_URL!,
+      token: process.env.PLAYWRIGHT_SERVICE_ACCESS_TOKEN!,
+      sessions: 20,
+    }),
+  ],
+});
+```
+
+- `playwrightServer`, `azurePlaywright`, `browserstack` and the generic `remote({ name, engines, connect, sessions })` use `browserType.connect` (all three engines); a `connect` that answers `protocol: "cdp"` uses `chromium.connectOverCDP` (Chromium only, lower fidelity). Every preset is plain configuration: no vendor SDK is installed.
+- `exposeNetwork: "<loopback>"` routes the remote browser's requests for the host's loopback Storybook server back through the connection (a self-hosted Playwright server, Azure). A service that cannot is a `reach: "url"` target and needs a signed Storybook URL.
+- The target's environment (browser version, platform, device scale factor, fonts digest) is measured inside the browser, never from the host. Page concurrency is the service's `sessions`, shared per target across the process; connection failures are retried with backoff before the render sees them.
+- With no local entry in `browsers` the host needs no installed browsers (only `playwright-core`).
+
+See [Remote browsers](/guides/remote-browsers/) for the farm guide, the presets and what bare `run-server` does and does not guard.
 
 Hand the pure renderer to `createShelfApp({ testing: { runner }, config: { scratchDir } })`; the router builds the orchestrator that loads the build, extracts the uploaded archive into `scratchDir`, discovers stories, calls `runner.render(...)`, and persists. The factory takes no dependencies. A pino `Logger` is an optional per-render input: the orchestrator derives a `logger.child({ buildId, reqId })` and passes it into each `render` call so per-build work is traced and correlated with the HTTP request that triggered it.
 
@@ -72,4 +97,4 @@ With the project's `runA11y` flag on, the runner injects [axe-core](https://gith
 
 ## How it fits
 
-It is the only package that depends on `playwright`. Core's capture logic is browser-agnostic: the **orchestrator** owns loading, extraction, discovery, and persistence and delegates only the screenshotting to this package's `render(input) => RenderResult`. The server is the assembly point where this renderer (or a future alternative, e.g. a remote runner) is wired in behind the pure `CaptureRunner` interface.
+It is the only package that depends on `playwright`. Core's capture logic is browser-agnostic: the **orchestrator** owns loading, extraction, discovery, and persistence and delegates only the screenshotting to this package's `render(input) => RenderResult`. The server is the assembly point where this renderer is wired in behind the pure `CaptureRunner` interface.

@@ -1,8 +1,11 @@
 /** Render orchestration: static server, browser, and per-story captures. */
 
 import {
+  TargetLaunchError,
   engineOf,
+  type CaptureEnvironment,
   type CaptureTarget,
+  type RemoteTarget,
   type RenderResult,
   type RenderedSnapshot,
   type StoryEntry,
@@ -16,49 +19,116 @@ import {
   createPageLimiter,
   detectCaptureEnvironment,
   isTimeoutError,
+  sessionGateFor,
+  storybookBase,
 } from "@storyshelf/core/utils";
 import type { Browser } from "puppeteer-core";
 import { messageOf, safeCloseBrowser, safeCloseServer } from "./browser.ts";
 import { PagePool } from "./pages.ts";
+import { measureRemote } from "./remote-environment.ts";
 import { createRuntimeParamsState } from "./runtime-params.ts";
 import { captureScreenshot } from "./screenshot.ts";
 import { createStaticServer } from "./static-server.ts";
-import type { ActiveRun, CaptureContext, LaunchTarget, PuppeteerRenderInput } from "./types.ts";
+import type {
+  ActiveRun,
+  CaptureContext,
+  PuppeteerRenderInput,
+  RunInput,
+  TargetDriver,
+} from "./types.ts";
+
+/** Where the browser finds the Storybook: the loopback server, or the URL core handed over. */
+interface Serving {
+  url: string;
+  close(): Promise<void>;
+}
 
 /** Render all story/viewport combinations for a build. */
 export async function renderAll(
   rawInput: PuppeteerRenderInput,
   active: ActiveRun,
-  launch: LaunchTarget,
+  driver: TargetDriver,
   defaultTarget: CaptureTarget,
 ): Promise<RenderResult> {
-  const name = rawInput.target ?? defaultTarget;
-  const input = { ...rawInput, target: name };
+  const { input, name, remote } = planRun(rawInput, driver, defaultTarget);
+  assertReachable(name, remote, input.storybookUrl);
   // Launch first: a target that will not start must fail before a static server is bound.
-  const browser = await launch(name);
-  const server = await createStaticServer(input.storybookDir).catch(async (error: unknown) => {
-    await safeCloseBrowser(browser);
-    throw error;
-  });
-  const version = typeof browser.version === "function" ? await browser.version() : undefined;
+  const browser = await driver.launch(name, input.logger);
+  const server = await serve(input, browser);
   input.logger?.info(describeSizing({ ...input, browser: engineOf(name) }), "capture sizing");
+  // Measured while the browser is open: Puppeteer cannot read the version of a closed one.
+  const environment = remote
+    ? await measureRemote(browser, remote.remote, input.logger)
+    : await localEnvironment(browser);
   const result = await runWithBrowser(
     input,
     active,
     browser,
     server,
-    async () => await launch(name),
+    async () => await driver.launch(name, input.logger),
   );
   // Echo the target so persisted rows are attributable without the request.
   for (const row of [...result.captures, ...result.failures]) row.browser = name;
-  return { ...result, environment: await detectCaptureEnvironment(version) };
+  return { ...result, environment };
+}
+
+/** The input with its target resolved, and the session gate when the target is remote. */
+function planRun(
+  rawInput: PuppeteerRenderInput,
+  driver: TargetDriver,
+  defaultTarget: CaptureTarget,
+): { input: RunInput; name: CaptureTarget; remote: RemoteTarget | undefined } {
+  const name = rawInput.target ?? defaultTarget;
+  const remote = driver.remote(name);
+  const gate = remote && sessionGateFor(name, remote.remote.sessions);
+  return { input: { ...rawInput, target: name, gate }, name, remote };
+}
+
+/** A target whose browser cannot route back to this host needs a URL; failing here names why. */
+function assertReachable(
+  target: CaptureTarget,
+  remote: RemoteTarget | undefined,
+  storybookUrl: string | undefined,
+): void {
+  if (remote?.reach === "url" && storybookUrl === undefined) {
+    throw new TargetLaunchError(
+      target,
+      "its browser cannot reach this host, so it needs a Storybook URL (a public origin and a secret to sign it) and none was given",
+      { transient: true },
+    );
+  }
+}
+
+/** The loopback server, or the URL given; a server that cannot start closes the browser it was for. */
+async function serve(
+  input: Pick<RunInput, "storybookDir" | "storybookUrl">,
+  browser: Browser,
+): Promise<Serving> {
+  if (input.storybookUrl !== undefined) {
+    return {
+      url: storybookBase(input.storybookUrl),
+      close: async () => {
+        await Promise.resolve();
+      },
+    };
+  }
+  return await createStaticServer(input.storybookDir).catch(async (error: unknown) => {
+    await safeCloseBrowser(browser);
+    throw error;
+  });
+}
+
+/** This host's environment: a local browser renders on the machine the runner runs on. */
+async function localEnvironment(browser: Browser): Promise<CaptureEnvironment> {
+  const version = typeof browser.version === "function" ? await browser.version() : undefined;
+  return await detectCaptureEnvironment(version);
 }
 
 async function runWithBrowser(
-  input: PuppeteerRenderInput,
+  input: RunInput,
   active: ActiveRun,
   browser: Browser,
-  server: Awaited<ReturnType<typeof createStaticServer>>,
+  server: Serving,
   relaunch: () => Promise<Browser>,
 ): Promise<RenderResult> {
   active.browser = browser;
@@ -95,7 +165,7 @@ function buildContext(
 }
 
 async function runAllCaptures(
-  input: PuppeteerRenderInput,
+  input: RunInput,
   active: ActiveRun,
   ctx: CaptureContext,
   captures: RenderedSnapshot[],
@@ -110,6 +180,7 @@ async function runAllCaptures(
   const batches = chunk(jobs, input.recycleBrowserEvery ?? DEFAULT_RECYCLE_BROWSER_EVERY);
   const pages = createPageLimiter({
     concurrency: input.concurrency,
+    ...(input.gate === undefined ? {} : { gate: input.gate }),
     browser: engineOf(input.target ?? "chromium"),
     logger: input.logger,
   });
@@ -123,7 +194,7 @@ async function runAllCaptures(
 async function runBatches(
   batches: { story: StoryEntry; viewport: Viewport }[][],
   pages: ReturnType<typeof createPageLimiter>,
-  input: PuppeteerRenderInput,
+  input: RunInput,
   active: ActiveRun,
   ctx: CaptureContext,
   out: {

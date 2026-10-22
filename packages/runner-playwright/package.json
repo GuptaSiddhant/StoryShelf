@@ -34,11 +34,16 @@
       "source": "./src/index.ts",
       "default": "./dist/index.mjs"
     },
+    "./remote": {
+      "source": "./src/remote/index.ts",
+      "default": "./dist/remote/index.mjs"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
     "exports": {
       ".": "./dist/index.mjs",
+      "./remote": "./dist/remote/index.mjs",
       "./package.json": "./package.json"
     },
     "access": "public"
@@ -49,7 +54,7 @@
     "fmt": "oxfmt ./src",
     "lint": "oxlint --type-aware --type-check ./src",
     "test": "vitest run",
-    "test:integration": "RUN_INTEGRATION=1 vitest run integration.test.ts passkey.integration.test.ts",
+    "test:integration": "RUN_INTEGRATION=1 vitest run integration.test.ts passkey.integration.test.ts remote.integration.test.ts",
     "prepublishOnly": "nub run build"
   },
   "dependencies": {

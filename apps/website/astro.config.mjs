@@ -121,6 +121,7 @@ export default defineConfig({
                 { label: "Baseline portability", slug: "guides/portability" },
                 { label: "Configuration", slug: "guides/config" },
                 { label: "Image engines", slug: "guides/image-engines" },
+                { label: "Remote browsers", slug: "guides/remote-browsers" },
                 { label: "CLI overview", slug: "guides/cli" },
                 { label: "CLI client", slug: "guides/cli/client" },
                 { label: "CLI server", slug: "guides/cli/server" },

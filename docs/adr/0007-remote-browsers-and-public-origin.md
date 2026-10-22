@@ -494,11 +494,32 @@ access.
 
 Landed so far: the runner `browsers` list with bare engines and `local()`, `CaptureTarget`, the
 installed-engine check and the `chrome` fix (decisions 1, 3 and 7, #225), and the public-origin
-resolver with `site_settings` (decision 6, #227). Remote connect, presets, in-browser fingerprints,
-session limits, `exposeNetwork` and signed URLs (decisions 2, 4 and 5, #226 and #228) are not built;
-`RunnerTarget.reach` is `"loopback"` for every local target and the seam for `"url"` targets is
-`offeredTargets` (`core/src/capture/targets.ts`), which marks them `unavailable` until a `secret` and
-a public origin exist. Choices the text left open:
+resolver with `site_settings` (decision 6, #227); remote connect, presets, in-browser
+fingerprints, session limits, retries and `exposeNetwork` (decisions 1 to 5, #226). Signed URLs
+(decision 5, #228) are not built: `RunnerTarget.reach` is `"url"` for a remote target that cannot
+route back, the seam is `offeredTargets` (`core/src/capture/targets.ts`), which marks such targets
+`unavailable` until a `secret` and a public origin exist, and the runners accept `storybookUrl` on
+`render` and `extractParameters` for core to fill. Choices the text left open:
+
+- **Where the code is.** `defineRemote` and the `RemoteBrowser` shape live in core
+  (`adapters/remote-browser.ts`) so both runners validate alike; the presets are in the runners'
+  `./remote` subpaths (`remote`, `playwrightServer`, `azurePlaywright`, `browserstack`; `cdp` for
+  Puppeteer). `sessions` defaults to 1 and `playwrightServer` defaults `exposeNetwork` to
+  `"<loopback>"`. A `RemoteOptions` also takes `connectRetries` (3), `connectBackoffMs` (500) and
+  `connectTimeoutMs` (30 000).
+- **The fonts digest does not use `document.fonts.check`.** It answers `true` for a family that does
+  not exist, so it cannot tell installed fonts from missing ones. The probe measures text in a canvas
+  against the generic family it would fall back to, over a fixed list of 44 families, in a blank page.
+- **A failed connect is `transient` or not.** A service that is down (refused, timed out, no
+  capacity) fails the job at once but leaves the target offered; refused credentials and a version
+  mismatch mark it `unavailable` like a failed local launch.
+- **`storybookUrl` is the build's Storybook root**, with or without a trailing `/iframe.html`; the
+  runner reduces either to the directory `iframe.html` is served under (`storybookBase`).
+- **Spike results (a bare `playwright run-server`, 1.63).** No authentication: the `--path` is the only
+  gate and a wrong path is refused at the handshake with `400`. `--max-clients` queues a connection over
+  the cap instead of refusing it, so a full farm shows up as a connect timeout. A version mismatch is
+  refused with `428` and a message naming both versions (major and minor). `exposeNetwork:
+"<loopback>"` works against it, so a self-hosted server is a `reach: "loopback"` target.
 
 - **Which settings saves are checked.** A save refuses only targets the project does not already
   have, so an unrelated settings save never fails because an engine it already names went away; the
@@ -521,10 +542,10 @@ a public origin exist. Choices the text left open:
   token reaches them all. The path-based build route already works, which suggests relative paths,
   but it has not been checked against every fixture. Settled by serving each fixture build under a
   path prefix and loading `iframe.html`.
-- Which providers honour `exposeNetwork` beyond Azure and a self-hosted Playwright server. Settled by
-  testing against `run-server`; a provider not shown to support it is treated as `reach: "url"`, the
-  safe default.
-- Whether a bare `playwright run-server` has built-in authentication or a concurrency cap. Settled by
-  the same test.
+- Which providers honour `exposeNetwork` beyond Azure and a self-hosted Playwright server. A self-hosted
+  `run-server` does (tested); Azure is taken from its documentation; a provider not shown to support it
+  is treated as `reach: "url"`, the safe default.
+- ~~Whether a bare `playwright run-server` has built-in authentication or a concurrency cap.~~ Settled
+  (see the spike results above): no authentication, and a cap that queues.
 - Whether GitHub and GitLab treat `target_url` as optional when no public origin is known
   (unverified).
