@@ -14,6 +14,7 @@ import { ProjectModel } from "../models/project.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { makeFakeStateNotifier } from "../test-helpers/fake-notifier.ts";
 import { storybookZipPath } from "../utils/paths.ts";
+import { createBuildStatePublisher } from "./build-state/publisher.ts";
 import { failCrashedCapture } from "./crash-failure.ts";
 import type { DispatchDeps } from "./dispatch.ts";
 import { executeCaptureJob, type ShardJob } from "./orchestrator.ts";
@@ -104,8 +105,17 @@ async function world(stories = 1) {
         await Promise.resolve();
       },
     },
-    notifiers: [git.provider],
-    secret: SECRET,
+    buildState: createBuildStatePublisher({
+      deps: {
+        db,
+        storage,
+        notifiers: [git.provider],
+        secret: SECRET,
+        config: {},
+        flags: () => ({ testing: true, review: false }),
+        logger: createShelfLogger({ level: "silent" }),
+      },
+    }),
     logger: createShelfLogger({ level: "silent" }),
   } as unknown as DispatchDeps;
   const status = async () => (await builds.get(build.id))?.status;
@@ -134,8 +144,14 @@ describe("failCrashedCapture", () => {
 
     await failCrashedCapture(w.deps, { buildId: w.build.id }, "exited 3 times");
 
-    expect(w.git.calls.map((call) => [call.target.kind, call.state])).toEqual([
-      ["status", "failure"],
+    expect(
+      w.git.calls.map((call) => [
+        call.target.kind === "status" ? call.target.context : call.target.kind,
+        call.state,
+      ]),
+    ).toEqual([
+      ["storyshelf/testing", "failure"],
+      ["storyshelf/storybook", "failure"],
       ["comment", "failure"],
     ]);
   });

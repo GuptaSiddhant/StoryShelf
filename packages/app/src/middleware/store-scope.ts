@@ -4,6 +4,7 @@ import type { DesignProvider } from "@storyshelf/core/adapter/design";
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import type { Ai } from "@storyshelf/core/ai";
+import type { BuildStatePublisher } from "@storyshelf/core/capture";
 import type { NotificationsConfig, ShelfConfig, UIConfig } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 import type { AuthUser } from "@storyshelf/core/types";
@@ -26,6 +27,7 @@ export interface StoreScopeDeps {
   /** This instance runs the capture jobs itself (the retry and compute-jobs UI applies). */
   capturesHere?: boolean;
   publish?: PublishService;
+  buildState?: BuildStatePublisher;
   captureConcurrency?: number;
   design: DesignProvider[];
   notifiers: NotifierProvider[];
@@ -55,6 +57,7 @@ export function storeScope(deps: StoreScopeDeps) {
         captureQueue: deps.captureQueue,
         capturesHere: deps.capturesHere,
         publish: deps.publish,
+        buildState: deps.buildState,
         captureConcurrency: deps.captureConcurrency,
         design: deps.design,
         notifiers: deps.notifiers,

@@ -25,6 +25,28 @@ describe("database queue operations", () => {
     expect(new Set(shards)).toEqual(new Set(["own", "s1"]));
   });
 
+  it("lets a job state its own attempts, and keeps notify jobs out of the views", async () => {
+    const { db } = makeDatabase();
+    const q = createDatabaseCaptureQueue(db, { kinds: ["capture", "notify"], retries: 2 });
+    await q.enqueueJob({ kind: "capture", buildId: "b1" });
+    await q.enqueueJob({ kind: "notify", buildId: "b1", maxAttempts: 5, data: { channelId: "c" } });
+    expect((await q.active()).map((entry) => entry.buildId)).toEqual(["b1"]);
+    expect(await q.recent(10)).toHaveLength(1);
+    expect(await q.status("b1")).toMatchObject({ status: "queued" });
+    const first = await q.poll();
+    const second = await q.poll();
+    const notify = [first, second].find((job) => job?.kind === "notify");
+    expect(notify).toMatchObject({ maxAttempts: 5, data: { channelId: "c" } });
+    expect([first, second].find((job) => job?.kind === "capture")?.maxAttempts).toBe(3);
+  });
+
+  it("shows notify jobs when they are the only kind polled", async () => {
+    const { db } = makeDatabase();
+    const q = createDatabaseCaptureQueue(db, { kinds: ["notify"] });
+    await q.enqueueJob({ kind: "notify", buildId: "b1" });
+    expect(await q.active()).toHaveLength(1);
+  });
+
   it("returns the job id from enqueueJob and wakes a waiting poll", async () => {
     const { queue: q } = queue();
     const waiting = q.poll({ waitMs: 60_000 });

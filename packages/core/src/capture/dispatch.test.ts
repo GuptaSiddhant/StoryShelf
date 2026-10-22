@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CaptureRunner } from "../adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
+import type { NotifierProvider } from "../adapters/notifier/provider.ts";
 import { createShelfLogger } from "../logger.ts";
 import { BuildModel } from "../models/build.ts";
 import { CaptureAttemptModel } from "../models/capture-attempt.ts";
@@ -15,6 +16,7 @@ import { ProjectModel } from "../models/project.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { makeFakeStateNotifier } from "../test-helpers/fake-notifier.ts";
 import { storybookZipPath } from "../utils/paths.ts";
+import { createBuildStatePublisher } from "./build-state/publisher.ts";
 import { createDispatchJob, type DispatchDeps } from "./dispatch.ts";
 
 const SECRET = "test-secret-0123456789abcdef";
@@ -140,10 +142,27 @@ function depsFor(
       scratchDir,
       logger: createShelfLogger({ level: "silent" }),
     },
-    notifiers: [],
-    secret: undefined,
+    buildState: buildStateFor(db, storage, []),
     logger: createShelfLogger({ level: "silent" }),
   };
+}
+
+function buildStateFor(
+  db: ReturnType<typeof makeDatabase>["db"],
+  storage: ReturnType<typeof makeStorage>["storage"],
+  notifiers: NotifierProvider[],
+) {
+  return createBuildStatePublisher({
+    deps: {
+      db,
+      storage,
+      notifiers,
+      secret: SECRET,
+      config: {},
+      flags: () => ({ testing: true, review: false }),
+      logger: createShelfLogger({ level: "silent" }),
+    },
+  });
 }
 
 describe("createDispatchJob attempt history", () => {
@@ -186,8 +205,7 @@ describe("createDispatchJob attempt history", () => {
     const git = makeFakeStateNotifier();
     const deps = {
       ...depsFor(db, storage, fakeRunner(successRender())),
-      notifiers: [git.provider],
-      secret: SECRET,
+      buildState: buildStateFor(db, storage, [git.provider]),
     };
 
     await createDispatchJob(deps)({ buildId: build.id });

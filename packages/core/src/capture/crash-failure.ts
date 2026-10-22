@@ -11,7 +11,6 @@ import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 import type { DispatchDeps } from "./dispatch.ts";
 import { reduceBuild, type FinalSummary } from "./shards/reduce.ts";
-import { postStatusesForBuild } from "./status-fanout.ts";
 
 /** What {@link failCrashedCapture} did. */
 export type CrashFailureOutcome =
@@ -56,7 +55,7 @@ async function failBuild(
   }
   await closeOpenAttempts(deps, buildId, error);
   await new BuildModel(deps.db, deps.tables).setStatus(buildId, "failed");
-  await postTerminal(deps, loaded, "failure");
+  await deps.buildState.request(buildId);
   return "failed";
 }
 
@@ -94,19 +93,7 @@ async function closeFinalized(
       summary,
     );
   }
-  const finished = await new BuildModel(deps.db, deps.tables).get(loaded.build.id);
-  const state = terminalState(finished?.status);
-  if (state) {
-    await postTerminal(deps, loaded, state);
-  }
-}
-
-/** The check state for a finished build; a build waiting for review keeps its pending status. */
-function terminalState(status: string | undefined): "success" | "failure" | null {
-  if (status === "approved") {
-    return "success";
-  }
-  return status === "failed" || status === "rejected" ? "failure" : null;
+  await deps.buildState.request(loaded.build.id);
 }
 
 async function load(
@@ -130,24 +117,4 @@ async function closeOpenAttempts(
   await Promise.all(
     open.map(async (attempt) => await attempts.markFinished(attempt.id, "failed", error)),
   );
-}
-
-async function postTerminal(
-  deps: DispatchDeps,
-  { build, project }: { build: Build; project: Project },
-  status: "success" | "failure",
-): Promise<void> {
-  await postStatusesForBuild({
-    db: deps.db,
-    tables: deps.tables,
-    project,
-    sha: build.gitSha,
-    status,
-    url: `/projects/${project.slug}/builds/${build.id}`,
-    notifiers: deps.notifiers,
-    secret: deps.secret,
-    logger: deps.logger,
-  }).catch((error: unknown) => {
-    deps.logger.error({ err: error, buildId: build.id }, "failed to post terminal status");
-  });
 }

@@ -13,6 +13,7 @@ import { createShelfApp } from "./index.tsx";
 
 const STORY_ID = "components-button--primary";
 const SHA = "a".repeat(40);
+const BASE = "https://shelf.example.com";
 
 interface StatusCall {
   context: string;
@@ -28,6 +29,22 @@ function statusCalls(git: FakeStateNotifier): StatusCall[] {
       ? [{ context: call.target.context, sha: call.target.sha, state: call.state, url: call.url }]
       : [],
   );
+}
+
+/** The last state shown under each status name, once delivery has caught up with `wanted`. */
+async function finalStates(
+  git: FakeStateNotifier,
+  wanted: Record<string, string>,
+): Promise<Record<string, StatusCall>> {
+  const latest = (): Record<string, StatusCall> =>
+    Object.fromEntries(statusCalls(git).map((call) => [call.context, call]));
+  await vi.waitFor(() => {
+    const states = latest();
+    expect(Object.fromEntries(Object.entries(states).map(([k, v]) => [k, v.state]))).toEqual(
+      wanted,
+    );
+  });
+  return latest();
 }
 
 /** Add a git channel for the project through the notification-channel API. */
@@ -184,7 +201,7 @@ describe("git channel status fan-out", () => {
       database: db,
       storage,
       testing: { runner, concurrency: 1 },
-      config: { scratchDir, secret: "test-secret", purgeTtlDays: 30 },
+      config: { scratchDir, secret: "test-secret", purgeTtlDays: 30, publicBaseUrl: BASE },
       notifications: { notifiers: [gitA.provider, gitB.provider] },
       logger: pino({ level: "silent" }),
     });
@@ -212,15 +229,19 @@ describe("git channel status fan-out", () => {
       wanted: "approved",
     });
 
-    const url = `/projects/${project.slug}/builds/${createdBuild.id}`;
-    expect(statusCalls(gitA)).toEqual([
-      { context: "storyshelf/testing", sha: SHA, state: "pending", url },
-      { context: "storyshelf/testing", sha: SHA, state: "success", url },
-    ]);
-    expect(statusCalls(gitB)).toEqual([
-      { context: "storyshelf-docs/testing", sha: SHA, state: "pending", url },
-      { context: "storyshelf-docs/testing", sha: SHA, state: "success", url },
-    ]);
+    const url = `${BASE}/projects/${project.slug}/builds/${createdBuild.id}`;
+    const storybook = `${BASE}/projects/${project.slug}/storybook/build/${createdBuild.id}/`;
+    const a = await finalStates(gitA, {
+      "storyshelf/testing": "success",
+      "storyshelf/storybook": "success",
+    });
+    expect(a["storyshelf/testing"]).toMatchObject({ sha: SHA, url });
+    expect(a["storyshelf/storybook"]).toMatchObject({ sha: SHA, url: storybook });
+    const b = await finalStates(gitB, {
+      "storyshelf-docs/testing": "success",
+      "storyshelf-docs/storybook": "success",
+    });
+    expect(b["storyshelf-docs/testing"]).toMatchObject({ sha: SHA, url });
     expect(new Set(gitA.secrets)).toEqual(new Set(["token-a"]));
     expect(new Set(gitB.secrets)).toEqual(new Set(["token-b"]));
     expect(updatedBuild.status).toBe("approved");
@@ -241,7 +262,7 @@ describe("git channel status fan-out", () => {
       database: db,
       storage,
       testing: { runner, concurrency: 1 },
-      config: { scratchDir, secret: "test-secret", purgeTtlDays: 30 },
+      config: { scratchDir, secret: "test-secret", purgeTtlDays: 30, publicBaseUrl: BASE },
       notifications: { notifiers: [gitA.provider, gitB.provider] },
       logger: pino({ level: "silent" }),
     });
@@ -258,44 +279,80 @@ describe("git channel status fan-out", () => {
 
     await upTo({ app, slug: project.slug, buildId: createdBuild.id, wanted: "failed" });
 
-    expect(statusCalls(gitA).map((call) => [call.context, call.sha, call.state])).toEqual([
-      ["storyshelf/testing", SHA, "pending"],
-      ["storyshelf/testing", SHA, "failure"],
-    ]);
+    const states = await finalStates(gitA, {
+      "storyshelf/testing": "failure",
+      "storyshelf/storybook": "success",
+    });
+    expect(states["storyshelf/testing"]).toMatchObject({ sha: SHA });
     expect(statusCalls(gitB)).toEqual([]);
   });
 
-  it("shows a failing channel's last error in the channel list, and clears it on success", async () => {
+  it("shows a build that was never captured: only the Storybook status, once it is published", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const { runner } = fakeRunner();
-    const failing = makeFakeStateNotifier("github-a", "HTTP 401: Bad credentials");
+    const git = makeFakeStateNotifier("github-a");
     const app = createShelfApp({
       database: db,
       storage,
-      testing: { runner, concurrency: 1 },
-      config: { scratchDir, secret: "test-secret", purgeTtlDays: 30 },
-      notifications: { notifiers: [failing.provider] },
+      config: { scratchDir, secret: "test-secret", publicBaseUrl: BASE },
+      notifications: { notifiers: [git.provider] },
       logger: pino({ level: "silent" }),
     });
     const project = (await (
       await app.request("/api/v1/projects", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: "Fanout health" }),
+        body: JSON.stringify({ name: "Hosting only" }),
       })
     ).json()) as { id: string; slug: string };
-    await addGitChannel(app, project.slug, { provider: "github-a", secret: "bad-token" });
+    await addGitChannel(app, project.slug, { provider: "github-a", secret: "token-a" });
 
-    const createdBuild = await uploadBuild(app, project.slug);
-    await upTo({ app, slug: project.slug, buildId: createdBuild.id, wanted: "approved" });
+    const build = await uploadBuild(app, project.slug);
 
-    const list = await app.request(`/api/v1/projects/${project.slug}/notification-channels`);
-    const [channel] = (await list.json()) as {
-      lastError: string | null;
-      lastErrorAt: string | null;
-    }[];
-    expect(channel?.lastError).toBe("HTTP 401: Bad credentials");
-    expect(channel?.lastErrorAt).not.toBeNull();
+    const states = await finalStates(git, { "storyshelf/storybook": "success" });
+    expect(states["storyshelf/storybook"]).toMatchObject({
+      sha: SHA,
+      url: `${BASE}/projects/${project.slug}/storybook/build/${build.id}/`,
+    });
+  });
+
+  it("on a host with no consumer, delivers inline and shows a refused status as the channel's last error", async () => {
+    vi.stubEnv("VERCEL", "1");
+    try {
+      const { db } = makeDatabase();
+      const { storage } = makeStorage();
+      const { runner } = fakeRunner();
+      const failing = makeFakeStateNotifier("github-a", "HTTP 401: Bad credentials");
+      const app = createShelfApp({
+        database: db,
+        storage,
+        testing: { runner, concurrency: 1 },
+        config: { scratchDir, secret: "test-secret", purgeTtlDays: 30, publicBaseUrl: BASE },
+        notifications: { notifiers: [failing.provider] },
+        logger: pino({ level: "silent" }),
+      });
+      const project = (await (
+        await app.request("/api/v1/projects", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ name: "Fanout health" }),
+        })
+      ).json()) as { id: string; slug: string };
+      await addGitChannel(app, project.slug, { provider: "github-a", secret: "bad-token" });
+
+      await uploadBuild(app, project.slug);
+
+      await vi.waitFor(async () => {
+        const list = await app.request(`/api/v1/projects/${project.slug}/notification-channels`);
+        const [channel] = (await list.json()) as {
+          lastError: string | null;
+          lastErrorAt: string | null;
+        }[];
+        expect(channel?.lastError).toBe("HTTP 401: Bad credentials");
+        expect(channel?.lastErrorAt).not.toBeNull();
+      });
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

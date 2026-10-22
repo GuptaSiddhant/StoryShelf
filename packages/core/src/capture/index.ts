@@ -69,7 +69,7 @@ export {
   type SlimViolation,
 } from "./a11y/index.ts";
 export { persistCapture, type CaptureContext } from "./pipeline.ts";
-export { postStatusesForBuild } from "./status-fanout.ts";
+export * from "./build-state/index.ts";
 export {
   rediffBuild,
   REDIFFABLE_BUILD_STATUSES,

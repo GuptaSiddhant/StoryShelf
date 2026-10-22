@@ -55,25 +55,40 @@ Content-Type: application/json
 }
 ```
 
-- **`config`** — `{ owner, repo, prefix? }` for GitHub. GitLab also takes `host` (default `https://gitlab.com`; set it to your instance URL when self-hosted). `prefix` names the statuses and defaults to `storyshelf`.
+- **`config`** — `{ owner, repo, prefix? }` for GitHub. GitLab also takes `host` (default `https://gitlab.com`; set it to your instance URL when self-hosted). `prefix` names the statuses (`<prefix>/testing`, `<prefix>/storybook`) and defaults to `storyshelf`.
 - **`secret`** — the token. GitHub: `repo:status` scope. GitLab: `api` scope. It is stored AES-256-GCM encrypted with the server `SECRET` and decrypted in memory only when a status is written. It is separate from the CLI project token: the CLI token identifies a build, this token writes to your repository.
 
 A git channel always belongs to a project (a site-wide channel cannot be git), needs a token, and has a fixed event filter: it follows the build's state rather than a topic list, so the event picker does not apply to it.
 
 ## What gets posted
 
-For every build with a commit SHA, each enabled git channel of the build's project gets:
+For every build with a commit SHA, each enabled git channel of the build's project shows the build's **current state**. One function derives it from the build, so a build that was never captured still gets its statuses, and showing the same state twice changes nothing:
 
-- a **commit status** named `<prefix>/testing`: `pending` while the build is captured, `success` when every new and changed snapshot is approved, `failure` when changes are rejected or capture fails. The status links to the build page;
-- one **comment** on the pull request (GitHub) or merge request (GitLab) of the commit, keyed by a hidden marker built from the build URL so it is updated in place, never duplicated. A commit with no open pull request gets no comment.
+| Status               | Posted when                       | Meaning                                                                                                                                                                                                  |
+| -------------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<prefix>/testing`   | `testing` is on                   | `pending` while the build is captured and while review is open (its description says how many changes are left), `success` when every new and changed snapshot is approved, `failure` when changes are rejected or capture fails. |
+| `<prefix>/storybook` | every build with a commit SHA     | `pending` until publishing finishes, then `success` linking to the published Storybook, or `failure` when the build failed without a published Storybook. Informational: do not require it.                         |
+
+Without `testing` (a hosting-only instance, see [Hosting only](/concepts/hosting-only/)) only `<prefix>/storybook` is posted. Statuses link to the build page with an absolute URL built from `publicBaseUrl`; set it, or the links are relative paths a git host cannot follow.
+
+On top of the statuses, one **comment** on the pull request (GitHub) or merge request (GitLab) of the commit links the build page and the published Storybook and summarizes the visual tests and snapshot counts. It is keyed by a hidden marker built from the build URL, so it is updated in place, never duplicated. A commit with no open pull request gets no comment.
 
 Builds with a synthetic local identity (uploads without git, see [Without git](/guides/without-git/)) post nothing. Branch protection setup is in [Merge gate setup](/guides/merge-gate/).
 
+### The prefix
+
+The status name is `<prefix>/<status>`; the channel's `prefix` defaults to `storyshelf` and carries no project slug. A repository that holds several projects gives each project's channel its own prefix (`storyshelf-web`, `storyshelf-docs`), so their statuses do not collide and each can be required on its own. The prefix may contain letters, digits, dots, dashes and underscores.
+
 ## Delivery
 
-Delivery is inline and best-effort: StoryShelf asks the provider to make the host show the build's current state, once per transition, and a failure never fails the capture or the review action. Writes are idempotent, the latest call wins, and nothing is read from the git host during capture; a build of a commit that is already merged is captured like any other.
+State delivery is **durable and latest-wins**. Every build transition and the end of publishing queue one `notify` job per git channel on the [database queue](/concepts/hosting-only/), next to `capture` and `publish` jobs, with a consumer of its own so a status never waits behind a running capture.
 
-When a write fails (a revoked token, a missing scope, an unreachable host), the channel row keeps the last error and its time. The Notifications settings page shows the channel as **failing** with that error until the next successful delivery clears it. The same fields are returned as `lastError` and `lastErrorAt` by the notification-channel API.
+- A job names a channel and a build, not a status. When it runs it reads the build as it is _then_ and writes that, so a retried, delayed or reordered job can never post a stale status. A request for a channel and build that already has a job waiting is folded into it.
+- A refused write (a revoked token, a missing scope, an unreachable host) is retried up to five attempts in total, waiting 10 s, 20 s, 40 s and 80 s between them. Outbound calls also have the shared HTTP helper's timeout and `Retry-After` handling.
+- After the last attempt the failure is logged, the channel row keeps the **last error and its time**, and a [`sys:notify-failed`](/guides/notifications/#site-wide-admin-alerts) event goes to the site-wide channels. The Notifications settings page shows the channel as **failing** with that error until the next successful delivery clears it; the notification-channel API returns the same fields as `lastError` and `lastErrorAt`.
+- Writes are idempotent and nothing is read from the git host during capture; a build of a commit that is already merged is captured like any other.
+
+A status can lag the build change by a queue polling interval. On a host with **no queue consumer** (a hosting-only instance on a serverless platform) there is nothing to retry from, so the state is delivered **inline** in the request or publish path, without durability: a failure is recorded on the channel and the next transition writes the current state again. Chat and email channels are not part of this: messages are sent inline and best-effort, and a failure never fails the triggering action.
 
 ## Direct use
 
@@ -89,12 +104,12 @@ const adapter = gitHubNotifier.create({
 
 await adapter.setState({
   channel,
-  target: { kind: "status", sha, context: "storyshelf/testing" },
+  target: { kind: "status", sha, context: "storyshelf/testing", description: "Review closed" },
   state: "success",
   url: "https://shelf.example.com/projects/web/builds/01J...",
 });
 ```
 
-The status `context` is used verbatim: the caller owns the prefix, the provider adds nothing. A `{ kind: "comment", sha, markdown }` target upserts the review comment instead.
+The status `context` is used verbatim: the caller owns the prefix, the provider adds nothing. StoryShelf derives the contexts, descriptions and links itself; direct use is for custom hosts. A `{ kind: "comment", sha, markdown }` target upserts the review comment instead.
 
 See [Notifications](/guides/notifications/) for channels, subscriptions and events, and [ADR 0014](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/0014-git-hosts-and-notifications.md) for the decision record.

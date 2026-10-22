@@ -141,7 +141,7 @@ async function endOf(keeper: JobLeaseKeeper): Promise<Race> {
 /** The handler returned: ack, or retry / fail on its error. */
 async function settle(
   rt: JobRuntime,
-  held: { job: ConsumerJob; logger: Logger },
+  held: { job: ConsumerJob; handler: KindHandler; logger: Logger },
   raced: Race & { kind: "settled" },
 ): Promise<JobOutcome> {
   if (!("error" in raced)) {
@@ -155,7 +155,7 @@ async function settle(
 /** The handler threw: requeue with backoff, or fail the job on its last attempt. */
 async function retryOrFail(
   rt: JobRuntime,
-  held: { job: ConsumerJob; logger: Logger },
+  held: { job: ConsumerJob; handler: KindHandler; logger: Logger },
   error: unknown,
 ): Promise<JobOutcome> {
   const { job, logger } = held;
@@ -173,10 +173,15 @@ async function retryOrFail(
 /** Put the job back with the next backoff delay. */
 async function requeue(
   rt: JobRuntime,
-  held: { job: ConsumerJob; logger: Logger },
+  held: { job: ConsumerJob; handler: KindHandler; logger: Logger },
   failure: { error: unknown; message: string; attempts: number },
 ): Promise<void> {
-  const delayMs = backoffDelayMs(failure.attempts, rt.backoffMs ?? DEFAULT_BACKOFF_MS);
+  const { backoff } = held.handler;
+  const delayMs = backoffDelayMs(
+    failure.attempts,
+    backoff?.baseMs ?? rt.backoffMs ?? DEFAULT_BACKOFF_MS,
+    backoff?.maxMs,
+  );
   await rt.queue.nack(held.job, { requeue: true, delayMs, error: failure.message });
   held.logger.warn(
     { err: failure.error, attempts: failure.attempts, delayMs },

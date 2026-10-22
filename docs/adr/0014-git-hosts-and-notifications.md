@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted
+Accepted. Amended with the details of the statuses function and the `notify` job kind (decisions 5
+and 7), recorded while implementing them (#221, #222).
 
 Supersedes (archived): ADR 0010, ADR 0024, ADR 0036
 
@@ -97,6 +98,22 @@ sees "make the host show the current state of this build".
 | `<prefix>/review`    | `testing` is off and review is on | `pending` on creation, `success` or `failure` from the build-level verdict.                                                                                               |
 | `<prefix>/storybook` | every build with a commit SHA     | `success` when publishing finishes, targeting the published Storybook; `failure` if publishing fails. Informational, not a gate.                                          |
 
+The function (`statusesForBuild`, in the notifier module of core) is pure: it takes the build, the
+channel's prefix, absolute links from `publicBaseUrl` and the `testing` and review flags, and returns
+the statuses and the pull-request comment. Its details:
+
+- `testing` is `pending` while the build is captured and while review is open (the description
+  counts the changes left), `success` when approved, `failure` when rejected or capture failed.
+- `storybook` is `success` once the build's published Storybook exists (its manifest is the marker,
+  because it is written last), `failure` for a `failed` build that never published, and `pending`
+  otherwise. Capture failing does not fail it: the Storybook is published independently (ADR 0006).
+- A build without a commit SHA, or with a synthetic local identity, shows nothing.
+- Links are absolute when `publicBaseUrl` is set; without it they are relative paths, which a git
+  host cannot follow.
+- `review` is part of the function and is posted only when `testing` is off and the review flag is
+  on. The flag has no source until the project review setting exists, so it is off and only
+  `testing` and `storybook` are posted.
+
 Which statuses exist and what decides them is defined in ADR 0013 UI Review. The prefix is a field
 of the git channel's config, default `storyshelf`, with no project slug. A repository that holds
 several projects sets a different prefix per channel (`storyshelf-web`, `storyshelf-docs`) so their
@@ -121,6 +138,27 @@ Mode and the Database Queue), a job kind beside `capture` and `publish`:
   channel row shows the last error and time on the settings page, and a `sys:notify-failed` admin
   event fires through the system notification channel.
 - Leases, fencing and redelivery are the queue's; there is no second implementation.
+
+Details of the job kind:
+
+- **Where it runs.** `notify` jobs have a queue instance and a consumer of their own (four
+  deliveries at once), next to the main one: a status must not wait behind a capture that holds
+  every slot for minutes. Their rows live in `capture_jobs` like any other job, and the queue views
+  (`status`, `active`, `recent`, `cancel`) leave them out so they do not bury a build's capture and
+  publish jobs.
+- **Enqueue.** Every build transition and the end of publishing request the build's state. A
+  request queues one job per enabled git channel unless a job for the same `(channel, build)` is
+  still waiting: that one reads the state when it runs. A running job may have read an older state,
+  so a new one queues behind it. A forked capture child queues its jobs on the database queue; the
+  parent's consumer runs them.
+- **Retries.** A job allows five attempts and the retry delay doubles from 10 s to at most five
+  minutes (a job states its own attempts and its handler its own backoff; the capture defaults are
+  untouched). The consumer retries, the handler only fails.
+- **Failure.** The last attempt, or a last attempt that lost its lease, records the sanitized error
+  and its time on the channel row and raises `sys:notify-failed` (channel, project, build, error)
+  to the site-wide channels. Those deliver messages, which are not retried through `notify`, and a
+  git channel is always project-scoped, so a failing alert cannot raise another. A successful
+  delivery clears the error. A channel or build that no longer exists is dropped and the job acked.
 
 On a host with no queue consumer (a hosting-only instance on a serverless platform), state is
 delivered inline in the request or publish path, through the shared HTTP helper's timeout and retry

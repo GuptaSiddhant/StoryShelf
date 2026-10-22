@@ -307,7 +307,7 @@ sequenceDiagram
         Orc->>DB: baselines upsert
     end
 
-    Orc->>Git: setState(sha, success/failure/pending, <prefix>/testing)
+    Orc->>Git: notify job per git channel: setState(sha, <prefix>/testing and <prefix>/storybook, comment)
     Orc->>Git: sendWebhooks(project webhooks, events)
     Orc->>Orc: scratchDir cleanup
 ```

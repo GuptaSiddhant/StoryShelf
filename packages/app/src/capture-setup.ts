@@ -14,6 +14,7 @@ import {
   DEFAULT_RETRIES,
   failCrashedCapture,
   isFinalAttempt,
+  type BuildStatePublisher,
   type CaptureHandlerOptions,
   type ConsumerJob,
   type KindHandler,
@@ -58,7 +59,7 @@ function enqueuerFor(queue: CaptureQueue): (buildId: string, reqId?: string) => 
 export function setupCapture(
   options: ShelfOptions,
   config: ShelfConfig,
-  notifiers: NotifierProvider[],
+  delivery: { notifiers: NotifierProvider[]; buildState: BuildStatePublisher },
   logger: Logger,
   jobs: JobQueue,
 ): CaptureWiring {
@@ -71,7 +72,7 @@ export function setupCapture(
   if (testing.runner === undefined) {
     return { queue, enqueueCapture, handler: null };
   }
-  const handlerOptions = captureHandlerOptions(options, config, notifiers, logger, {
+  const handlerOptions = captureHandlerOptions(options, config, delivery, logger, {
     runner: testing.runner,
     enqueue: async (job) => {
       await queue.enqueue(job);
@@ -100,7 +101,7 @@ export function setupCapture(
 function captureHandlerOptions(
   options: ShelfOptions,
   config: ShelfConfig,
-  notifiers: NotifierProvider[],
+  delivery: { notifiers: NotifierProvider[]; buildState: BuildStatePublisher },
   logger: Logger,
   parts: { runner: CaptureRunner; enqueue: CaptureHandlerOptions["enqueue"] },
 ): CaptureHandlerOptions {
@@ -115,7 +116,9 @@ function captureHandlerOptions(
     secret: credentialKeys(config),
     design: options.design,
     shardSize: options.testing?.shardSize,
-    notifiers,
+    notifiers: delivery.notifiers,
+    buildState: delivery.buildState,
+    config,
     enqueue: parts.enqueue,
     maxRetries: options.testing?.retries,
   };
