@@ -26,6 +26,18 @@ Project admins then add a git channel on the project's **Notifications** setting
 
 A git channel is project-scoped and its event filter is fixed: it follows the build's state, not a topic list.
 
+## Providers
+
+`gitNotifiers` aggregates all three providers:
+
+| Provider kind | Writes to                                        | Use for                     |
+| ------------- | ------------------------------------------------ | --------------------------- |
+| `github`      | GitHub commit statuses and pull-request comments | GitHub.com repositories     |
+| `gitlab`      | GitLab commit statuses and merge-request notes   | GitLab.com or self-managed  |
+| `git-log`     | The server log                                   | Tests and local development |
+
+The log provider's kind is `git-log` because `notify-chat` already owns `log`; provider kinds are unique across packages.
+
 ## Delivery contract
 
 A `state` provider (`metadata.delivery: "state"`) creates an adapter with one method, `setState({ channel, target, state, url })`:
@@ -35,6 +47,28 @@ A `state` provider (`metadata.delivery: "state"`) creates an adapter with one me
 - `state`: `pending`, `success` or `failure`.
 
 Writes are idempotent and the latest call wins. A rejected write throws, and the host records the error on the channel row. Nothing is read from the git host during capture.
+
+## Direct use
+
+Each provider is a `StateNotifierProvider` from `@storyshelf/core/adapter/notifier`. Bind one to a channel and call `setState`:
+
+```ts
+import { gitHubNotifier } from "@storyshelf/notify-git";
+
+const adapter = gitHubNotifier.create({
+  config: { owner: "acme", repo: "widgets" },
+  secret: process.env.GITHUB_TOKEN,
+});
+
+await adapter.setState({
+  channel,
+  target: { kind: "status", sha, context: "storyshelf/testing", description: "Review closed" },
+  state: "success",
+  url: "https://shelf.example.com/projects/web/builds/01J...",
+});
+```
+
+The status `context` is used verbatim: the caller owns the prefix, the provider adds nothing. StoryShelf derives the contexts, descriptions and links itself; direct use is for custom hosts. A `{ kind: "comment", sha, markdown }` target upserts the review comment instead.
 
 ## Development
 

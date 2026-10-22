@@ -16,23 +16,10 @@ import { PackageManagers } from "starlight-package-managers";
 
 ## Tools
 
-Read tools cover projects, builds, snapshots and AI insights. The write tools are the review comments, which are `review` routes of the API:
-
-| Tool              | What it does                                                                                                   |
-| ----------------- | -------------------------------------------------------------------------------------------------------------- |
-| `list_comments`   | Build comments, story comments and per-snapshot threads of a build.                                            |
-| `add_comment`     | Adds a comment to a build, optionally anchored to a story (`storyId`) or a snapshot (`snapshotId`), or a reply. Needs a token with `developer` or above. |
-| `resolve_comment` | Marks a comment resolved.                                                                                      |
-
-A project with [review](/guides/review/#review-without-screenshots) off has no comments: these tools fail with 404 for it. Build verdicts (`POST …/reviews`) are deliberately not exposed.
+<Readme heading="Tools" />
 
 ## Usage
 
-```sh
-STORYSHELF_URL=https://shelf.example.com STORYSHELF_TOKEN=... storyshelf-mcp          # stdio
-STORYSHELF_URL=https://shelf.example.com storyshelf-mcp --http --port 3333             # HTTP at /mcp
-```
-
-Or scaffold a project with `storyshelf mcp init` and run it with `storyshelf mcp serve`.
+<Readme heading="Usage" />
 
 The `@storyshelf/mcp/http` subpath exports `createMcpHttpHandler` (a `Request` to `Response` handler) and `serveHttp` (a Node server) for embedding.

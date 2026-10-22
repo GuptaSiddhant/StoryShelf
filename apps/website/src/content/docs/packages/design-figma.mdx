@@ -15,42 +15,17 @@ import { PackageManagers } from "starlight-package-managers";
 
 - [npm package](https://www.npmjs.com/package/@storyshelf/design-figma) — install tarballs and version history.
 - [JSR package](https://jsr.io/@storyshelf/design-figma) — TypeScript-first registry page.
-- [Public API reference](https://jsr.io/@storyshelf/design-figma/doc) — generated docs for every export; start here to learn the API.
+- [Public API reference](/reference/design-figma/) — generated docs for every export; start here to learn the API. (The same reference is on [JSR](https://jsr.io/@storyshelf/design-figma/doc).)
 - [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/design-figma) — package directory on `main`.
 
 ## Register the provider
 
-Pass `createFigmaDesign()` in the `design` array of `createShelfApp`:
-
-```ts
-import { createShelfApp } from "@storyshelf/app";
-import { createFigmaDesign } from "@storyshelf/design-figma";
-
-const app = createShelfApp({
-  database,
-  storage,
-  testing: { runner: captureRunner },
-  design: [createFigmaDesign()],
-  config: {
-    secret: process.env.SHELF_SECRET, // also encrypts the Figma token
-  },
-});
-```
-
-Without a provider, StoryShelf extracts and shows no design links. See [Design links](/guides/design-links/) for how stories, mappings and the access token work.
+<Readme heading="Quick start" />
 
 ## Let members connect their own account
 
-Without a project token, a member can connect their own Figma account (like Jira or Linear integrations) and see previews, names and stale-design warnings with their own access. Register an OAuth app in Figma (**Settings → OAuth apps**; a private app works within your organization), add the redirect URL `<publicBaseUrl>/connections/figma/callback` and the `file_content:read` scope, then:
-
-```ts
-import { createFigmaDesign, figmaOAuthFromEnv } from "@storyshelf/design-figma";
-
-design: [createFigmaDesign({ oauth: figmaOAuthFromEnv() })], // FIGMA_CLIENT_ID / FIGMA_CLIENT_SECRET
-```
-
-This needs authentication enabled and `config.secret` (it signs the connect flow and encrypts tokens). A project token, when set, always takes precedence; a member's token is used only while they view a page, and what it fetches is shown only to them.
+<Readme heading="Let members connect their own account" />
 
 ## Accepted links
 
-`https://www.figma.com/{file|design|board|proto|make}/<key>/…`, optionally with `node-id`. Embed, community and Figma Sites links are rejected.
+<Readme heading="Accepted links" />

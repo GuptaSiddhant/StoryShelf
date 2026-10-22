@@ -29,9 +29,12 @@
   "devDependencies": {
     "axe-core": "^4.13.0",
     "playwright-core": "1.63.0",
+    "remark-gfm": "4.0.1",
+    "remark-parse": "11.0.0",
     "starlight-typedoc": "0.21.5",
     "typedoc": "0.28.20",
     "typedoc-plugin-markdown": "4.14.1",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "unified": "11.0.5"
   }
 }

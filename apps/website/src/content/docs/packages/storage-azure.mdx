@@ -15,49 +15,14 @@ import { PackageManagers } from "starlight-package-managers";
 
 - [npm package](https://www.npmjs.com/package/@storyshelf/storage-azure) — install tarballs and version history.
 - [JSR package](https://jsr.io/@storyshelf/storage-azure) — TypeScript-first registry page.
-- [Public API reference](https://jsr.io/@storyshelf/storage-azure/doc) — generated docs for every export; start here to learn the API.
+- [Public API reference](/reference/storage-azure/) — generated docs for every export; start here to learn the API. (The same reference is on [JSR](https://jsr.io/@storyshelf/storage-azure/doc).)
 - [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/storage-azure) — package directory on `main`.
 
 ## Configure
 
-```ts
-import { createAzureStorage } from "@storyshelf/storage-azure";
+<Readme heading="Quick start" />
 
-const storage = createAzureStorage({
-  container: "my-shelf",
-  prefix: "storyshelf/",
-  connectionString: process.env.AZURE_STORAGE_CONNECTION,
-});
-
-// or with explicit account credentials
-const storage = createAzureStorage({
-  container: "my-shelf",
-  accountName: "myaccount",
-  accountKey: process.env.AZURE_ACCOUNT_KEY!,
-  accountUrl: "https://myaccount.blob.core.windows.net",
-  sasToken: process.env.AZURE_SAS_TOKEN, // with or without leading ?
-});
-
-// or bring your own client (tests, custom retry, Azurite emulator)
-import { BlobServiceClient } from "@azure/storage-blob";
-const storage = createAzureStorage({
-  container: "my-shelf",
-  client: BlobServiceClient.fromConnectionString(connStr).getContainerClient("my-shelf"),
-});
-```
-
-| Option                       | Required | Notes                                                  |
-| ---------------------------- | -------- | ------------------------------------------------------ |
-| `container`                  | yes      | Blob container name                                    |
-| `prefix`                     | no       | Key prefix applied to every object                     |
-| `client`                     | no       | Pre-built `ContainerClient`; skips client construction |
-| `connectionString`           | no\*     | Storage connection string                              |
-| `accountName` / `accountKey` | no\*     | Explicit credentials pair                              |
-| `accountUrl` / `sasToken`    | no\*     | URL + SAS form (emulator, fine-grained SAS)            |
-
-`*` At least one auth form is needed unless `client` is supplied.
-
-The adapter implements `StorageAdapter`: `read`, `write`, `delete`, `exists`, `list(prefix)`, plus `readStream`/`writeStream`. `azureKey(prefix, path)` is re-exported when code needs to construct an object key.
+<Readme heading="API" />
 
 ## When to use it
 

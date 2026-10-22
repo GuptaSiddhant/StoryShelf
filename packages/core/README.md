@@ -38,6 +38,20 @@ const app = createShelfApp({
 serve({ fetch: app.fetch, port: 3000 });
 ```
 
+Adapter `setup` hooks kick off in the background when the router is created. Await them before serving for fail-fast startup (or let the first request gate on settlement), and tear down adapters on shutdown:
+
+```ts
+await app.lifecycle.setup();
+
+const server = serve({ fetch: app.fetch, port: 3000 });
+process.on("SIGTERM", () => {
+  app.lifecycle
+    .teardown()
+    .then(() => server.close())
+    .catch(() => {});
+});
+```
+
 ## API
 
 ### `createShelfApp(options: ShelfOptions): Hono`
@@ -114,7 +128,7 @@ Import from `core/capture`, `core/diff`, and the model entries — never from th
 - `computeChangeset`, `changesetOf`, `findChangesetBaseline`, `acceptPendingWithoutWork` (`core/models`) — the catalog changeset of a build (components added, removed and changed against its baseline build, ADR 0013 decision 8) and the pass that accepts a project's idle pending builds when review is turned off. `Retention.purge` (`core/retention`) also removes `pending` builds idle past the retention window.
 - `createDatabaseCaptureQueue(db, options)` (`core/capture`) — a `PollableCaptureQueue` on the app's own database (`capture_jobs`; ADR 0006): per-attempt claim rows fence concurrent instances, leases follow progress, retries back off, `cancel(jobId | buildId)` reaches the holder within 5 s. Not wired into the app yet. `startPollLoop` and `keepJobLease` are the consumer-side helpers.
 - `createCaptureConsumer({ queue, capture, handlers, config })` (`core/capture`) — the consumer loop over any `PollableCaptureQueue`: a handler per job kind (`capture` runs the core dispatch), a slot before each poll, retries with exponential backoff and the final-attempt rule, lease kept by progress, cancel and lease loss stop the run, `stop()` drains. `runCaptureChild` (forked capture) runs it over IPC.
-- `diffImages(baseline: Buffer, current: Buffer, options: DiffOptions): Promise<DiffResult>` (`core/diff`) — pixelmatch-based diff (async since 0.7: the optional `sharp` codec is async). Re-exported from `@storyshelf/image`, which owns the image engines; also exports `diffImagesAsync` (worker pool), `configureImages({ engine, threads })`, `DiffOptions`, `DiffResult`. `configureDiffPool` remains as a deprecated alias.
+- `diffImages(baseline: Buffer, current: Buffer, options: DiffOptions): Promise<DiffResult>` (`core/diff`) — pixelmatch-based diff (async since 0.7: the optional `sharp` codec is async). An optional fourth `codec` argument selects the PNG codec and defaults to `pngjs`. Re-exported from `@storyshelf/image`, which owns the image engines; also exports `diffImagesAsync` (worker pool), `configureImages({ engine, threads })`, `DiffOptions`, `DiffResult`. `configureDiffPool` remains as a deprecated alias.
 - Models, schema, and row types back every entity; retention runs inside the router (`Retention.purge` for builds + `Retention.purgeStaleBranches` for branch GC via `retention-timer.ts` daily sweep). (Models are private implementation details with no public entry — reach row types via `core/schema`.)
 
 ### Helpers

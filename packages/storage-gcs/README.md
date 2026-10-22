@@ -64,6 +64,20 @@ interface GcsStorageOptions {
 }
 ```
 
+Options at a glance:
+
+| Option        | Required | Notes                                                    |
+| ------------- | -------- | -------------------------------------------------------- |
+| `bucket`      | yes      | GCS bucket name                                          |
+| `prefix`      | no       | Key prefix for every object                              |
+| `client`      | no       | Pre-built `Storage` client (tests, custom endpoint)      |
+| `projectId`   | no       | GCP project ID (defaults to ADC)                         |
+| `keyFilename` | no       | Path to service-account JSON                             |
+| `credentials` | no       | Inline service-account object                            |
+| `apiEndpoint` | no       | Custom endpoint (emulator, e.g. `http://localhost:9090`) |
+
+Auth otherwise uses Application Default Credentials.
+
 ### `createGcsStorage(options: GcsStorageOptions): StorageAdapter`
 
 Creates a `StorageAdapter` backed by the configured GCS bucket. The returned adapter implements every method of the `StorageAdapter` interface (`read`, `write`, `delete`, `exists`, `list(prefix)`, `readStream`, `writeStream`).

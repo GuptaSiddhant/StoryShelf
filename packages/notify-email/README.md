@@ -25,7 +25,16 @@ const app = createShelfApp({
 });
 ```
 
-Presets: `smtpPreset` (corporate relay, Postfix, SES-over-SMTP), `mailpitPreset` (local dev, `localhost:1025`), `logPreset` (tests/unconfigured), `httpPreset` (Resend/Postmark-style JSON endpoint). See [Notifications](/guides/notifications/).
+## Presets
+
+| Preset          | Use for                                                                                                          |
+| --------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `smtpPreset`    | A corporate relay, Postfix, or SES over SMTP. `smtpPresetFromEnv` reads the settings from environment variables. |
+| `mailpitPreset` | Local development against Mailpit (`localhost:1025`).                                                            |
+| `httpPreset`    | A Resend- or Postmark-style JSON HTTP endpoint.                                                                  |
+| `logPreset`     | Tests and unconfigured setups — messages are written to the log.                                                 |
+
+See [Notifications](https://storyshelf.js.org/guides/notifications/) for how email channels, subscriptions, and auth mail fit together.
 
 ## Install notes
 

@@ -16,33 +16,14 @@ import { PackageManagers } from "starlight-package-managers";
 
 ## Configure
 
-Pass the providers to `createShelfApp`:
+<Readme heading="Quick start" />
 
-```ts
-import { createShelfApp } from "@storyshelf/app";
-import { chatNotifiers } from "@storyshelf/notify-chat";
-
-const app = createShelfApp({ database, storage, notifications: { notifiers: chatNotifiers } });
-```
-
-`chatNotifiers` aggregates all three providers. To wire only some, import them individually:
-
-```ts
-import { slackWebhookNotifier } from "@storyshelf/notify-chat/slack";
-import { teamsWorkflowNotifier } from "@storyshelf/notify-chat/teams";
-import { logNotifier } from "@storyshelf/notify-chat/log";
-```
+<Readme heading="Subpaths" />
 
 ## Providers
 
-| Provider kind    | Posts to                       | Use for                                   |
-| ---------------- | ------------------------------ | ----------------------------------------- |
-| `slack-webhook`  | A Slack incoming webhook URL   | Build and admin alerts in a Slack channel |
-| `teams-workflow` | A Teams workflow (webhook) URL | The same, in Microsoft Teams              |
-| `log`            | The server log                 | Tests and local development               |
+<Readme heading="Providers" />
 
 ## Channels
 
-Providers only make a kind _available_. Project admins then add **channels** of that kind — in **Settings → Notifications** or via the API — each with an event filter and display toggles. A webhook URL is a channel secret: it is encrypted at rest (AES-256-GCM) and decrypted in memory only when a message is sent.
-
-See [Notifications](/guides/notifications/) for channels, subscriptions, and the events you can subscribe to.
+<Readme heading="Channels" />

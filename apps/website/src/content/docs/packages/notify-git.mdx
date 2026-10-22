@@ -30,15 +30,7 @@ const app = createShelfApp({
 });
 ```
 
-`gitNotifiers` aggregates all three providers:
-
-| Provider kind | Writes to                                        | Use for                     |
-| ------------- | ------------------------------------------------ | --------------------------- |
-| `github`      | GitHub commit statuses and pull-request comments | GitHub.com repositories     |
-| `gitlab`      | GitLab commit statuses and merge-request notes   | GitLab.com or self-managed  |
-| `git-log`     | The server log                                   | Tests and local development |
-
-The log provider's kind is `git-log` because `notify-chat` already owns `log`; provider kinds are unique across packages.
+<Readme heading="Providers" />
 
 ## Channels
 
@@ -95,24 +87,6 @@ A status can lag the build change by a queue polling interval. On a host with **
 
 ## Direct use
 
-Each provider is a `StateNotifierProvider` from `@storyshelf/core/adapter/notifier`. Bind one to a channel and call `setState`:
-
-```ts
-import { gitHubNotifier } from "@storyshelf/notify-git";
-
-const adapter = gitHubNotifier.create({
-  config: { owner: "acme", repo: "widgets" },
-  secret: process.env.GITHUB_TOKEN,
-});
-
-await adapter.setState({
-  channel,
-  target: { kind: "status", sha, context: "storyshelf/testing", description: "Review closed" },
-  state: "success",
-  url: "https://shelf.example.com/projects/web/builds/01J...",
-});
-```
-
-The status `context` is used verbatim: the caller owns the prefix, the provider adds nothing. StoryShelf derives the contexts, descriptions and links itself; direct use is for custom hosts. A `{ kind: "comment", sha, markdown }` target upserts the review comment instead.
+<Readme heading="Direct use" />
 
 See [Notifications](/guides/notifications/) for channels, subscriptions and events, and [ADR 0014](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/0014-git-hosts-and-notifications.md) for the decision record.
