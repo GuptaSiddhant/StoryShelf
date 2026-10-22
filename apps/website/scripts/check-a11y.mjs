@@ -73,7 +73,10 @@ async function audit(browser, base, mode, path) {
 
 const server = await serve();
 const base = `http://127.0.0.1:${server.address().port}`;
-const browser = await chromium.launch();
+// Accessibility must hold in any browser, so CI audits with the runner's own Chrome
+// (A11Y_BROWSER_CHANNEL=chrome) instead of installing Playwright's pinned Chromium.
+const channel = process.env["A11Y_BROWSER_CHANNEL"];
+const browser = await chromium.launch(channel ? { channel } : {});
 const failures = [];
 for (const mode of MODES) {
   for (const path of PAGES) failures.push(...(await audit(browser, base, mode, path)));

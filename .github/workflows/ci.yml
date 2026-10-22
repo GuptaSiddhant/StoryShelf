@@ -115,29 +115,16 @@ jobs:
       - name: Setup workspace
         uses: ./.github/actions/setup-workspace
 
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-1.63.0-chromium-${{ runner.os }}
-
-      - name: Install Playwright chromium
-        # Shared by the docs accessibility check and the capture tests. System
-        # libraries are installed (apt, ~15s) only when chromium cannot launch.
-        working-directory: packages/runner-playwright
-        run: |
-          nubx playwright-core install chromium
-          if ! node --input-type=module -e "const { chromium } = await import('playwright-core'); await (await chromium.launch()).close()"; then
-            echo "chromium failed to launch; installing system dependencies"
-            nubx playwright-core install-deps chromium
-          fi
-
       - name: Verify (build + lint + link check)
         # `website#verify` builds the docs site and runs its link check (dist/ stays for a11y).
         run: nubx turbo verify --force --filter=website
 
       - name: Check website accessibility (axe, light/dark/mobile)
         working-directory: apps/website
+        env:
+          # The runner's preinstalled Chrome: the docs must be accessible in any browser, so
+          # no pinned Playwright Chromium is needed (the capture job keeps its pinned builds).
+          A11Y_BROWSER_CHANNEL: chrome
         run: nub run check:a11y
 
   capture:
