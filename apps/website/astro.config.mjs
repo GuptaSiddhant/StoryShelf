@@ -210,6 +210,7 @@ export default defineConfig({
             { label: "CLI overview", slug: "guides/cli" },
             { label: "CLI client", slug: "guides/cli/client" },
             { label: "CLI server", slug: "guides/cli/server" },
+            { label: "CLI package", slug: "packages/cli" },
             { label: "Changelog", slug: "changelog" },
           ],
         },
@@ -238,7 +239,6 @@ export default defineConfig({
               "ai",
               "mcp",
             ]),
-            { label: "storyshelf (CLI)", slug: "packages/cli" },
             packageGroup("Databases", ["db-sqlite", "db-postgres", "db-mysql"]),
             packageGroup("Storage", [
               "storage-local",
