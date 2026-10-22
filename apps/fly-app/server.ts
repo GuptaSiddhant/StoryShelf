@@ -30,7 +30,6 @@ import { createLocalStorage } from "@storyshelf/storage-local";
  * core would fork a capture child, so a `testing.workerEntry` would never apply.
  */
 import { mkdirSync } from "node:fs";
-import { seedDemo, type SeedAuth } from "./src/seed-demo.ts";
 
 const env = process.env;
 const dataDir = env["DATA_DIR"] ?? "/data";
@@ -76,14 +75,6 @@ function buildUi(): UIConfig | undefined {
   };
 }
 const ui = buildUi();
-
-/** How the demo seed authenticates its own uploads. */
-function seedAuth(): SeedAuth {
-  if (adminToken) {
-    return { kind: "admin-token", token: adminToken };
-  }
-  return authPassword && secret ? { kind: "user", email: authEmail } : { kind: "none" };
-}
 
 mkdirSync(dataDir, { recursive: true });
 
@@ -154,15 +145,6 @@ if (authPassword && secret) {
 const server = serve({ fetch: app.fetch, port }, () => {
   logger.info({ port, dataDir }, "StoryShelf fly server listening");
 });
-
-// Seed the demo project through the real upload + capture pipeline, in the background so the
-// health check passes meanwhile. Idempotent per fixture; other projects are never touched.
-// oxlint-disable-next-line unicorn/prefer-top-level-await -- background seed after serve, must not block health check
-seedDemo({ app, database, storage, logger, scratchDir: dataDir, auth: seedAuth() }).catch(
-  (error: unknown) => {
-    logger.error({ err: error }, "demo seed failed — serving irrespective");
-  },
-);
 
 // Teardown is idempotent and logs its own errors; close the listener either way.
 for (const signal of ["SIGINT", "SIGTERM"] as const) {

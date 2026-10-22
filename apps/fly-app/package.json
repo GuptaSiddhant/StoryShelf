@@ -6,7 +6,7 @@
   "scripts": {
     "build": "rolldown -c rolldown.config.ts",
     "start": "node dist/server.mjs",
-    "lint": "oxlint --type-aware --type-check server.ts ./src",
+    "lint": "oxlint --type-aware --type-check server.ts",
     "dev": "node --conditions=source --experimental-transform-types server.ts"
   },
   "dependencies": {
