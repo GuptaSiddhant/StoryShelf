@@ -8,13 +8,15 @@ import {
   CheckField,
   Field,
   FormActions,
-  HStack,
   Meta,
+  RelativeTime,
   SectionTitle,
   SelectField,
   Table,
+  VStack,
 } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
+import { CreateGitChannelCard } from "./settings-notifications-git.tsx";
 
 /** Notification topic catalog (mirrors the webhook event names). */
 export const NOTIFICATION_TOPICS: { event: string; label: string }[] = [
@@ -27,14 +29,26 @@ export const NOTIFICATION_TOPICS: { event: string; label: string }[] = [
   { event: "comment:created", label: "Comment posted" },
 ];
 
+/** A wired provider as offered by the create forms. */
+export interface SettingsNotifyProvider {
+  kind: string;
+  name: string;
+  /** `message` providers send a message once; `state` providers (git hosts) show a build's state. */
+  delivery: "message" | "state";
+}
+
 /** Channel row as rendered in the notifications settings tab. */
 export interface SettingsNotificationChannel {
   id: string;
   provider: string;
+  delivery: "message" | "state";
   config: Record<string, unknown>;
   hasSecret: boolean;
   events: string[];
   enabled: boolean;
+  /** Last delivery error, null while the channel delivers cleanly. */
+  lastError: string | null;
+  lastErrorAt: string | null;
 }
 
 /** The viewer's own subscription for this project (null when opted out). */
@@ -100,8 +114,18 @@ const MyNotificationsCard: FC<{
   );
 };
 
-/** Human-readable channel target (email address or masked webhook host). */
+/** A config value as text; anything but a string reads as empty. */
+function textOf(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+/** Human-readable channel target (git repository, email address or masked webhook host). */
 function targetOf(channel: SettingsNotificationChannel): string {
+  if (channel.delivery === "state") {
+    const where = `${textOf(channel.config["owner"])}/${textOf(channel.config["repo"])}`;
+    const prefix = textOf(channel.config["prefix"]);
+    return prefix ? `${where} (${prefix})` : where;
+  }
   const to = channel.config["to"];
   if (typeof to === "string" && to) {
     return to;
@@ -109,12 +133,37 @@ function targetOf(channel: SettingsNotificationChannel): string {
   return channel.hasSecret ? `${channel.provider} webhook` : "—";
 }
 
-/** One channel table row with the admin delete action. */
-const ChannelRow: FC<{ project: Project; channel: SettingsNotificationChannel }> = ({
-  project,
-  channel,
-}) => (
-  <tr>
+/** What a channel reacts to: its topic filter, or the build state for git channels. */
+function reactsTo(channel: SettingsNotificationChannel): string {
+  if (channel.delivery === "state") {
+    return "build state";
+  }
+  return channel.events.length === 0 ? "all events" : channel.events.join(", ");
+}
+
+/** Delivery health: failing with the last error and time, or ok. */
+const ChannelHealth: FC<{ channel: SettingsNotificationChannel }> = ({ channel }) =>
+  channel.lastError === null ? (
+    <Badge tone="success">ok</Badge>
+  ) : (
+    <VStack>
+      <Badge tone="danger">failing</Badge>
+      <Meta as="span">
+        <span class="truncate max-w-cell" title={channel.lastError}>
+          {channel.lastError}
+        </span>
+        {channel.lastErrorAt ? <RelativeTime value={channel.lastErrorAt} /> : null}
+      </Meta>
+    </VStack>
+  );
+
+/** One channel table row; the delete action renders for admins only. */
+const ChannelRow: FC<{
+  project: Project;
+  channel: SettingsNotificationChannel;
+  isAdmin: boolean;
+}> = ({ project, channel, isAdmin }) => (
+  <tr key={channel.id}>
     <td>
       <Badge tone="neutral">{channel.provider}</Badge>
     </td>
@@ -122,34 +171,31 @@ const ChannelRow: FC<{ project: Project; channel: SettingsNotificationChannel }>
       {targetOf(channel)}
     </td>
     <td>
-      {channel.events.length === 0 ? (
-        <Meta as="span">all events</Meta>
-      ) : (
-        <HStack>
-          {channel.events.map((event) => (
-            <Badge tone="neutral">{event}</Badge>
-          ))}
-        </HStack>
-      )}
+      <Meta as="span">{reactsTo(channel)}</Meta>
     </td>
     <td>
-      <form
-        method="post"
-        action={`/projects/${project.slug}/settings/notifications/${channel.id}/delete`}
-        hx-post={`/projects/${project.slug}/settings/notifications/${channel.id}/delete`}
-        hx-target="body"
-        hx-confirm="Remove this notification channel?"
-      >
-        {csrfField()}
-        <Button variant="ghost" size="sm" type="submit">
-          Delete
-        </Button>
-      </form>
+      <ChannelHealth channel={channel} />
+    </td>
+    <td>
+      {isAdmin ? (
+        <form
+          method="post"
+          action={`/projects/${project.slug}/settings/notifications/${channel.id}/delete`}
+          hx-post={`/projects/${project.slug}/settings/notifications/${channel.id}/delete`}
+          hx-target="body"
+          hx-confirm="Remove this channel?"
+        >
+          {csrfField()}
+          <Button variant="ghost" size="sm" type="submit">
+            Delete
+          </Button>
+        </form>
+      ) : null}
     </td>
   </tr>
 );
 
-/** Channel list card (delete action renders for admins only). */
+/** Channel list card: chat, email and git channels side by side, each with its delivery health. */
 const ChannelsCard: FC<{
   project: Project;
   channels: SettingsNotificationChannel[];
@@ -158,8 +204,10 @@ const ChannelsCard: FC<{
   <Card>
     <SectionTitle>Channels</SectionTitle>
     <Meta>
-      Project admins route build events to Slack, Teams, or email. Secrets are stored encrypted and
-      decrypted only in memory at send time.
+      Project admins route build events to Slack, Teams or email, and show each build's state on
+      GitHub or GitLab as a commit status. Secrets and tokens are stored encrypted and decrypted
+      only in memory at delivery time. Git channels follow the build state, not a topic list, and
+      their delivery is best-effort: a failure shows here, and the next build state retries it.
     </Meta>
     <Table>
       <table>
@@ -167,33 +215,17 @@ const ChannelsCard: FC<{
           <tr>
             <th>Provider</th>
             <th>Target</th>
-            <th>Events</th>
+            <th>Reacts to</th>
+            <th>Delivery</th>
             <th>
               <span class="visually-hidden">Actions</span>
             </th>
           </tr>
         </thead>
         <tbody>
-          {channels.map((channel) =>
-            isAdmin ? (
-              <ChannelRow project={project} channel={channel} />
-            ) : (
-              <tr key={channel.id}>
-                <td>
-                  <Badge tone="neutral">{channel.provider}</Badge>
-                </td>
-                <td class="truncate max-w-cell" title={targetOf(channel)}>
-                  {targetOf(channel)}
-                </td>
-                <td>
-                  <Meta as="span">
-                    {channel.events.length === 0 ? "all events" : channel.events.join(", ")}
-                  </Meta>
-                </td>
-                <td>{null}</td>
-              </tr>
-            ),
-          )}
+          {channels.map((channel) => (
+            <ChannelRow project={project} channel={channel} isAdmin={isAdmin} />
+          ))}
         </tbody>
       </table>
     </Table>
@@ -204,11 +236,11 @@ const ChannelsCard: FC<{
 /** Channel creation card (admins only). */
 const CreateChannelCard: FC<{
   project: Project;
-  providers: string[];
+  providers: SettingsNotifyProvider[];
   formState?: NotificationsFormState;
 }> = ({ project, providers, formState }) => (
   <Card>
-    <SectionTitle level={3}>Create channel</SectionTitle>
+    <SectionTitle level={3}>Add a message channel</SectionTitle>
     <form
       method="post"
       action={`/projects/${project.slug}/settings/notifications`}
@@ -219,7 +251,7 @@ const CreateChannelCard: FC<{
       <SelectField
         label="Provider"
         name="provider"
-        options={providers.map((provider) => ({ value: provider, label: provider }))}
+        options={providers.map((provider) => ({ value: provider.kind, label: provider.name }))}
         hint={formState?.errors?.["provider"]}
       />
       <Field
@@ -254,22 +286,27 @@ const CreateChannelCard: FC<{
   </Card>
 );
 
-/** Notifications settings tab: channel list, create form, and my preferences. */
+/** Notifications settings tab: channel list, create forms, and my preferences. */
 export function renderSettingsNotifications(
   project: Project,
   channels: SettingsNotificationChannel[],
-  providers: string[],
+  providers: SettingsNotifyProvider[],
   mySubscription: SettingsMySubscription | null,
   isAdmin: boolean,
   formState?: NotificationsFormState,
 ): unknown {
+  const messageProviders = providers.filter((provider) => provider.delivery === "message");
+  const gitProviders = providers.filter((provider) => provider.delivery === "state");
   return (
     <div class="grid max-w-form">
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
       <MyNotificationsCard project={project} mySubscription={mySubscription} />
       <ChannelsCard project={project} channels={channels} isAdmin={isAdmin} />
-      {isAdmin ? (
-        <CreateChannelCard project={project} providers={providers} formState={formState} />
+      {isAdmin && messageProviders.length > 0 ? (
+        <CreateChannelCard project={project} providers={messageProviders} formState={formState} />
+      ) : null}
+      {isAdmin && gitProviders.length > 0 ? (
+        <CreateGitChannelCard project={project} providers={gitProviders} formState={formState} />
       ) : null}
     </div>
   );

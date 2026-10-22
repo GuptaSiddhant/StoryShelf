@@ -5,7 +5,7 @@ description: StoryShelf's HTTP app — Hono app, API routes, and server-rendered
 
 import { PackageManagers } from "starlight-package-managers";
 
-`@storyshelf/app` is the HTTP app for StoryShelf. `createShelfApp()` composes database, storage, capture, auth, and git-host adapters (all from `@storyshelf/core`) into a Hono application: a JSON API under `/api/v1` plus server-rendered HTML pages (hono/jsx + HTMX, no client framework).
+`@storyshelf/app` is the HTTP app for StoryShelf. `createShelfApp()` composes database, storage, capture, auth, and notifier (chat, email, git) adapters (all from `@storyshelf/core`) into a Hono application: a JSON API under `/api/v1` plus server-rendered HTML pages (hono/jsx + HTMX, no client framework).
 
 ## Install
 

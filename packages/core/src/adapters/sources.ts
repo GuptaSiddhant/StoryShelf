@@ -9,7 +9,6 @@ export function adapterSourcesOf(options: ShelfOptions): AdapterSetupSources & {
     storage: options.storage,
     captureRunner: options.testing?.runner,
     captureQueue: options.testing?.queue,
-    gitHosts: options.gitHosts,
     design: options.design,
     notifiers: options.notifications?.notifiers,
     emailSender: options.notifications?.emailSender,

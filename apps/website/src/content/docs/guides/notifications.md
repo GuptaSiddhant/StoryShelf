@@ -1,13 +1,14 @@
 ---
 title: Notifications
-description: Human-facing project and admin alerts over email and chat (Slack, Teams) — channels, subscriptions, and site-wide system events.
+description: Human-facing project and admin alerts over email and chat (Slack, Teams), git statuses on GitHub and GitLab, channels, subscriptions, and site-wide system events.
 ---
 
 StoryShelf sends formatted notifications for build review events and site-wide admin alerts. Webhooks stay the machine primitive (signed JSON for custom receivers); notifications are the human primitive (server-formatted email and chat messages).
 
 ## Concepts
 
-- **Channels** (project admin): where messages go — a Slack workflow webhook, a Teams workflow URL, or an email address — plus an event filter and display toggles. A channel with no project is site-wide and receives `sys:*` admin alerts only.
+- **Channels** (project admin): where messages go — a Slack workflow webhook, a Teams workflow URL, or an email address — plus an event filter and display toggles. A channel with no project is site-wide and receives `sys:*` admin alerts only. One settings page manages every channel, including git channels.
+- **Delivery kinds**: a provider either sends a **message** once (Slack, Teams, email) or makes a git host show a **state** (GitHub, GitLab commit status and pull-request comment). Git channels follow the build, not a topic list, so they have no event filter and never receive chat messages. See [Git channels](#git-channels-commit-statuses).
 - **Subscriptions** (you): per-project opt-in. No row means silence. v1 delivers over email to `users.email`; Slack DMs are deferred.
 - **Topics**: project events reuse webhook names (`build:created`, `build:reviewing`, `build:approved`, `build:rejected`, `baseline:created`, `baseline:updated`, `comment:created`, plus `insight:ready` when an AI triage or health digest finishes); admin events are `sys:user-created`, `sys:invite-issued`, `sys:auth-failed`, `sys:capture-failed`, `sys:purge-completed`, `sys:ai-budget`.
 
@@ -22,10 +23,25 @@ curl -X POST $SHELF/api/v1/projects/my-app/notification-channels \
   -d '{ "provider": "slack-webhook", "events": ["build:reviewing"], "config": { "style": "compact" }, "secret": "https://hooks.slack.com/..." }'
 ```
 
-- `provider` — `slack-webhook` | `teams-workflow` | `email` (must be wired in `ShelfOptions.notifications.notifiers`; unknown kinds are a 400).
+- `provider` — `slack-webhook` | `teams-workflow` | `email`, or a git provider (see below); it must be wired in `ShelfOptions.notifications.notifiers`, and unknown kinds are a 400.
 - `events` — allowlist or empty for all; `enabled` toggles delivery without deleting.
 - Secrets (webhook URLs, SMTP passwords) are stored AES-256-GCM encrypted with server `SECRET` and decrypted only in memory at send time.
 - Display toggles: `style` (`compact`|`verbose`), `subjectPrefix`, `includeAuthor`, `includeMessage`, `includeCounts`. Brand (name, logo, links) comes from server `UIConfig` + `publicBaseUrl`.
+
+## Git channels (commit statuses)
+
+A git channel (`github`, `gitlab` from [`@storyshelf/notify-git`](/packages/notify-git/)) belongs to a project and shows the build's state on your repository: a commit status named `<prefix>/testing` and one pull-request comment per build. It takes the repository as config and the token as its secret:
+
+```sh
+curl -X POST $SHELF/api/v1/projects/my-app/notification-channels \
+  -H "Authorization: Bearer $STORYSHELF_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{ "provider": "github", "config": { "owner": "acme", "repo": "widgets", "prefix": "storyshelf-web" }, "secret": "ghp_..." }'
+```
+
+A site-wide git channel, or one without a token, is a 400. On the settings page, use **Add a git channel**. To block merges until review is approved, see [Merge gate setup](/guides/merge-gate/).
+
+Git delivery is inline and best-effort too, and every channel (message or git) records its **last delivery error and time**: the settings page shows a failing channel with the error, and `GET …/notification-channels` returns `lastError` and `lastErrorAt` (both `null` while the channel delivers cleanly). The next successful delivery clears the error.
 
 ## Manage your subscriptions
 
@@ -36,7 +52,7 @@ User preferences require auth; with auth disabled only admin channels operate.
 
 ## Site-wide admin alerts
 
-Site admins manage project-less channels (`POST /api/v1/admin/notification-channels`) subscribed to `sys:*`. Delivery is inline best-effort (`Promise.allSettled`, failures logged, never blocks captures or requests).
+Site admins manage project-less channels (`POST /api/v1/admin/notification-channels`) subscribed to `sys:*`. Delivery is inline best-effort (`Promise.allSettled`, failures logged and recorded on the channel, never blocks captures or requests).
 
 ## Email transport
 

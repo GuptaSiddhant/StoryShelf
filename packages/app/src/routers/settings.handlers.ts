@@ -1,6 +1,6 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { DesignProvider } from "@storyshelf/core/adapter/design";
-import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
+import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
 import {
   credentialDaysLeft,
   DesignCredentialModel,
@@ -13,7 +13,6 @@ import { NotificationChannelModel } from "@storyshelf/core/models";
 import { NotificationSubscriptionModel } from "@storyshelf/core/models";
 import { ProjectGroupMappingModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
-import { StatusConfigModel } from "@storyshelf/core/models";
 import { TokenModel } from "@storyshelf/core/models";
 import { WebhookModel } from "@storyshelf/core/models";
 import type { LabelType } from "@storyshelf/core/schema";
@@ -37,8 +36,8 @@ import type { SettingsMember } from "../pages/settings-members.tsx";
 import type {
   SettingsMySubscription,
   SettingsNotificationChannel,
+  SettingsNotifyProvider,
 } from "../pages/settings-notifications.tsx";
-import type { SettingsStatusConfig } from "../pages/settings-status.tsx";
 import type { SettingsWebhook } from "../pages/settings-webhooks.tsx";
 import { getStore } from "../store.ts";
 import { notFound } from "./helpers.ts";
@@ -55,10 +54,8 @@ export interface SettingsData {
   groupMappings: ProjectGroupMapping[];
   webhooks: SettingsWebhook[];
   notificationChannels: SettingsNotificationChannel[];
-  notifyProviders: string[];
+  notifyProviders: SettingsNotifyProvider[];
   mySubscription: SettingsMySubscription | null;
-  statusConfigs: SettingsStatusConfig[];
-  gitHosts: GitHostProvider[];
   isAdmin: boolean;
 }
 
@@ -81,23 +78,6 @@ async function loadWebhookSummaries(
     id: webhook.id,
     url: webhook.url,
     events: WebhookModel.eventsOf(webhook),
-  }));
-}
-
-/** Status-config summaries for the settings UI. */
-async function loadStatusConfigSummaries(
-  db: DatabaseAdapter,
-  secret: SecretInput,
-  projectId: string,
-): Promise<SettingsStatusConfig[]> {
-  const statusConfigsDb = await new StatusConfigModel(db, undefined, secret).list(projectId);
-  return statusConfigsDb.map((row) => ({
-    id: row.id,
-    provider: row.provider,
-    config: JSON.parse(row.config) as Record<string, unknown>,
-    hasToken: row.tokenEncrypted.length > 0,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
   }));
 }
 
@@ -146,20 +126,32 @@ async function loadGroupMappings(
   return await new ProjectGroupMappingModel(db).list(projectId);
 }
 
+/** Delivery kind of a stored channel's provider (unwired providers read as messages). */
+function deliveryOf(
+  notifiers: readonly NotifierProvider[],
+  provider: string,
+): SettingsNotificationChannel["delivery"] {
+  return NotificationChannelModel.isStateKind(notifiers, provider) ? "state" : "message";
+}
+
 /** Channel summaries for the settings UI. */
 async function loadNotificationChannels(
   db: DatabaseAdapter,
   secret: SecretInput,
   projectId: string,
+  notifiers: readonly NotifierProvider[],
 ): Promise<SettingsNotificationChannel[]> {
   const rows = await new NotificationChannelModel(db, undefined, secret).list(projectId);
   return rows.map((row) => ({
     id: row.id,
     provider: row.provider,
+    delivery: deliveryOf(notifiers, row.provider),
     config: NotificationChannelModel.configOf(row),
     hasSecret: row.secretEncrypted !== null,
     events: NotificationChannelModel.eventsOf(row),
     enabled: row.enabled,
+    lastError: row.lastError,
+    lastErrorAt: row.lastErrorAt,
   }));
 }
 
@@ -189,25 +181,25 @@ async function loadNotificationSection(
   secret: SecretInput,
   projectId: string,
   userId: string | undefined,
-  notifiers: { metadata: { kind: string } }[],
+  notifiers: readonly NotifierProvider[],
 ): Promise<{
   notificationChannels: SettingsNotificationChannel[];
-  notifyProviders: string[];
+  notifyProviders: SettingsNotifyProvider[];
   mySubscription: SettingsMySubscription | null;
 }> {
-  const notificationChannels = await loadNotificationChannels(db, secret, projectId);
+  const notificationChannels = await loadNotificationChannels(db, secret, projectId, notifiers);
   const mySubscription = await loadMySubscription(db, projectId, userId);
-  return {
-    notificationChannels,
-    notifyProviders: notifiers.map((candidate) => candidate.metadata.kind),
-    mySubscription,
-  };
+  const notifyProviders = notifiers.map((candidate) => ({
+    kind: candidate.metadata.kind,
+    name: candidate.metadata.name,
+    delivery: deliveryOf(notifiers, candidate.metadata.kind),
+  }));
+  return { notificationChannels, notifyProviders, mySubscription };
 }
 
-/** Roster, tokens, webhooks, and status configs for the settings UI. */
+/** Roster, tokens and webhooks for the settings UI. */
 async function loadInventorySection(
   db: DatabaseAdapter,
-  secret: SecretInput,
   projectId: string,
 ): Promise<{
   labelTypes: LabelType[];
@@ -215,13 +207,11 @@ async function loadInventorySection(
   groupMappings: ProjectGroupMapping[];
   tokens: Omit<Token, "hash">[];
   webhooks: SettingsWebhook[];
-  statusConfigs: SettingsStatusConfig[];
 }> {
   const { labelTypes, members, groupMappings } = await loadMembersSection(db, projectId);
   const tokens = await loadTokenSummaries(db, projectId);
   const webhooks = await loadWebhookSummaries(db, projectId);
-  const statusConfigs = await loadStatusConfigSummaries(db, secret, projectId);
-  return { labelTypes, members, groupMappings, tokens, webhooks, statusConfigs };
+  return { labelTypes, members, groupMappings, tokens, webhooks };
 }
 
 /** Package links plus the other projects that can be picked as upstream. */
@@ -309,16 +299,8 @@ async function loadSettingsData(slug: string): Promise<SettingsData | null> {
   if (!project) {
     return null;
   }
-  const {
-    db,
-    config,
-    user,
-    authEnabled,
-    gitHosts,
-    design: designProviders,
-    notifiers,
-  } = getStore();
-  const inventory = await loadInventorySection(db, credentialKeys(config), project.id);
+  const { db, config, user, authEnabled, design: designProviders, notifiers } = getStore();
+  const inventory = await loadInventorySection(db, project.id);
   const notifications = await loadNotificationSection(
     db,
     credentialKeys(config),
@@ -329,7 +311,7 @@ async function loadSettingsData(slug: string): Promise<SettingsData | null> {
   const isAdmin = isProjectAdmin(authEnabled, user, inventory.members);
   const linksSection = await loadLinksSection(db, project);
   const design = await loadDesignSection(db, credentialKeys(config), designProviders, project.id);
-  return { project, ...inventory, ...notifications, ...linksSection, design, gitHosts, isAdmin };
+  return { project, ...inventory, ...notifications, ...linksSection, design, isAdmin };
 }
 
 /** Render the project settings page for the given tab, optionally with form state. */
@@ -358,8 +340,6 @@ export async function renderSettingsPage(
       notificationChannels: data.notificationChannels,
       notifyProviders: data.notifyProviders,
       mySubscription: data.mySubscription,
-      statusConfigs: data.statusConfigs,
-      gitHosts: data.gitHosts,
       isAdmin: data.isAdmin,
       ai: aiSettingsData(c),
     },

@@ -1,6 +1,5 @@
 import type { DesignProvider } from "@storyshelf/core/adapter/design";
-import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
-import type { AdapterMetadata, GitAdapterMetadata } from "@storyshelf/core/adapter/metadata";
+import type { AdapterMetadata } from "@storyshelf/core/adapter/metadata";
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
 import type { ShelfConfig, ShelfOptions, UIConfig } from "@storyshelf/core/config";
 import { validateConfig, validateUiConfig } from "@storyshelf/core/config";
@@ -10,22 +9,18 @@ import { createShelfLogger } from "@storyshelf/core/logger";
 /**
  * Resolved server runtime derived from {@link ShelfOptions}.
  * Holds the validated config, UI branding, structured logger, and
- * computed helpers like whether auth is enabled and which git hosts are wired.
+ * computed helpers like whether auth is enabled and which notifiers are wired.
  */
 export interface ServerRuntime {
   config: ShelfConfig;
   ui: UIConfig;
   logger: Logger;
   authEnabled: boolean;
-  gitHosts: GitHostProvider[];
   design: DesignProvider[];
   notifiers: NotifierProvider[];
 }
 
-function addOptionalSnapshots(
-  snap: Record<string, AdapterMetadata | GitAdapterMetadata>,
-  options: ShelfOptions,
-): void {
+function addOptionalSnapshots(snap: Record<string, AdapterMetadata>, options: ShelfOptions): void {
   if (options.testing?.runner) {
     snap["captureRunner"] = options.testing.runner.metadata;
   }
@@ -40,19 +35,14 @@ function addOptionalSnapshots(
  * the running configuration at a glance.
  *
  * @param options - Router options containing the wired adapters
- * @returns Metadata map keyed by adapter category (e.g. `database`, `git:github`)
+ * @returns Metadata map keyed by adapter category (e.g. `database`, `notify:github`)
  */
-export function buildAdapterSnapshot(
-  options: ShelfOptions,
-): Record<string, AdapterMetadata | GitAdapterMetadata> {
-  const snap: Record<string, AdapterMetadata | GitAdapterMetadata> = {
+export function buildAdapterSnapshot(options: ShelfOptions): Record<string, AdapterMetadata> {
+  const snap: Record<string, AdapterMetadata> = {
     database: options.database.metadata,
     storage: options.storage.metadata,
   };
   addOptionalSnapshots(snap, options);
-  for (const p of options.gitHosts ?? []) {
-    snap[`git:${p.metadata.kind}`] = p.metadata;
-  }
   for (const p of options.design ?? []) {
     snap[`design:${p.metadata.kind}`] = p.metadata;
   }
@@ -72,7 +62,6 @@ export function resolveRuntime(options: ShelfOptions): ServerRuntime {
   const ui = options.ui ? validateUiConfig(options.ui as unknown as Record<string, unknown>) : {};
   const logger = options.logger ?? createShelfLogger();
   const authEnabled = options.auth !== undefined;
-  const gitHosts = options.gitHosts ?? [];
   const design = options.design ?? [];
   const notifiers = options.notifications?.notifiers ?? [];
   // Adapter introspection — auto-populate config.adapters if not supplied
@@ -82,5 +71,5 @@ export function resolveRuntime(options: ShelfOptions): ServerRuntime {
         ...rawConfig,
         adapters: buildAdapterSnapshot(options),
       };
-  return { config, ui, logger, authEnabled, gitHosts, design, notifiers };
+  return { config, ui, logger, authEnabled, design, notifiers };
 }

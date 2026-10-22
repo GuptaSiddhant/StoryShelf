@@ -1,7 +1,9 @@
 import type { Logger } from "../../logger.ts";
+import { sanitizeErrorText } from "../../utils/redact.ts";
 import { formatNotification, formatSystemNotification } from "./format.ts";
-import type { NotifierProvider } from "./provider.ts";
+import { isStateProvider, type NotifierProvider } from "./provider.ts";
 import type {
+  ChannelOutcome,
   NotificationBrand,
   NotificationChannel,
   NotificationEvent,
@@ -14,6 +16,8 @@ export interface EmitNotificationsOptions {
   channels?: NotificationChannel[];
   brand?: NotificationBrand;
   logger?: Logger;
+  /** Called once per attempted channel so the host can record or clear its last error. */
+  onOutcome?: (outcome: ChannelOutcome) => Promise<void> | void;
 }
 
 /** Check an event against a channel's allowlist (empty = all). */
@@ -22,6 +26,15 @@ function subscribed(channel: NotificationChannel, event: string): boolean {
     return false;
   }
   return channel.events.length === 0 || channel.events.includes(event);
+}
+
+/** `state` channels (git hosts) follow build state, never the message fan-out. */
+function isMessageChannel(
+  notifiers: NotifierProvider[] | undefined,
+  channel: NotificationChannel,
+): boolean {
+  const provider = providerFor(notifiers, channel.provider);
+  return provider === undefined || !isStateProvider(provider);
 }
 
 /** Resolve a provider for a channel kind, or undefined when unwired. */
@@ -42,8 +55,31 @@ async function deliver(
   if (!provider) {
     throw new Error(`notifier missing: ${channel.provider}`);
   }
+  if (isStateProvider(provider)) {
+    throw new Error(`notifier ${channel.provider} delivers state, not messages`);
+  }
   const sender = provider.create({ config: channel.config, secret: channel.secret });
   await sender.send({ channel, formatted });
+}
+
+/** Deliver to one channel, report the outcome and swallow the failure (logged). */
+async function deliverReported(
+  options: EmitNotificationsOptions,
+  channel: NotificationChannel,
+  formatted: ReturnType<typeof formatNotification>,
+  failure: string,
+): Promise<void> {
+  let problem: string | undefined;
+  try {
+    await deliver(options.notifiers, channel, formatted);
+  } catch (error) {
+    options.logger?.warn({ err: error, channelId: channel.id }, failure);
+    problem = sanitizeErrorText(error instanceof Error ? error.message : String(error), 500);
+  }
+  await options.onOutcome?.({
+    channelId: channel.id,
+    ...(problem === undefined ? {} : { error: problem }),
+  });
 }
 
 /**
@@ -54,17 +90,16 @@ export async function emitNotifications(
   event: NotificationEvent,
   options: EmitNotificationsOptions = {},
 ): Promise<void> {
-  const targets = (options.channels ?? []).filter((channel) => subscribed(channel, event.event));
+  const targets = (options.channels ?? []).filter(
+    (channel) => subscribed(channel, event.event) && isMessageChannel(options.notifiers, channel),
+  );
   if (targets.length === 0) {
     return;
   }
+  const formatted = formatNotification(event, options.brand);
   await Promise.allSettled(
     targets.map(async (channel) => {
-      try {
-        await deliver(options.notifiers, channel, formatNotification(event, options.brand));
-      } catch (error) {
-        options.logger?.warn({ err: error, channelId: channel.id }, "notification failed");
-      }
+      await deliverReported(options, channel, formatted, "notification failed");
     }),
   );
 }
@@ -78,18 +113,18 @@ export async function emitSystemNotification(
   options: EmitNotificationsOptions = {},
 ): Promise<void> {
   const targets = (options.channels ?? []).filter(
-    (channel) => channel.projectId === null && subscribed(channel, event.event),
+    (channel) =>
+      channel.projectId === null &&
+      subscribed(channel, event.event) &&
+      isMessageChannel(options.notifiers, channel),
   );
   if (targets.length === 0) {
     return;
   }
+  const formatted = formatSystemNotification(event, options.brand);
   await Promise.allSettled(
     targets.map(async (channel) => {
-      try {
-        await deliver(options.notifiers, channel, formatSystemNotification(event, options.brand));
-      } catch (error) {
-        options.logger?.warn({ err: error, channelId: channel.id }, "system notification failed");
-      }
+      await deliverReported(options, channel, formatted, "system notification failed");
     }),
   );
 }

@@ -1,4 +1,3 @@
-import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import type { LabelType } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { ProjectGroupMapping } from "@storyshelf/core/schema";
@@ -22,8 +21,8 @@ import {
   renderSettingsNotifications,
   type SettingsMySubscription,
   type SettingsNotificationChannel,
+  type SettingsNotifyProvider,
 } from "./settings-notifications.tsx";
-import { renderSettingsStatus, type SettingsStatusConfig } from "./settings-status.tsx";
 import { renderSettingsTests } from "./settings-tests.tsx";
 import { renderSettingsTokens } from "./settings-tokens.tsx";
 import { renderSettingsWebhooks, type SettingsWebhook } from "./settings-webhooks.tsx";
@@ -40,7 +39,6 @@ export type SettingsTab =
   | "webhooks"
   | "notifications"
   | "members"
-  | "status"
   | "ai";
 
 /** Data required to render the project settings page with its active tab. */
@@ -56,10 +54,8 @@ export interface ProjectSettingsData {
   groupMappings: ProjectGroupMapping[];
   webhooks: SettingsWebhook[];
   notificationChannels: SettingsNotificationChannel[];
-  notifyProviders: string[];
+  notifyProviders: SettingsNotifyProvider[];
   mySubscription: SettingsMySubscription | null;
-  statusConfigs: SettingsStatusConfig[];
-  gitHosts: GitHostProvider[];
   isAdmin: boolean;
   /** AI availability and the profile choices (omitted ⇒ AI off). */
   ai?: SettingsAiData;
@@ -89,7 +85,6 @@ const TAB_LABELS: Record<SettingsTab, string> = {
   webhooks: "Webhooks",
   notifications: "Notifications",
   members: "Members",
-  status: "Git status",
   ai: "AI",
 };
 
@@ -104,12 +99,11 @@ const TAB_ICONS: Record<SettingsTab, IconName> = {
   webhooks: "webhook",
   notifications: "bell",
   members: "users",
-  status: "git-branch",
   ai: "sparkles",
 };
 
 /** Tabs whose pages are `testing` routes: hidden on a hosting-only instance. */
-const TESTING_TABS: ReadonlySet<SettingsTab> = new Set(["capture", "tests", "status", "ai"]);
+const TESTING_TABS: ReadonlySet<SettingsTab> = new Set(["capture", "tests", "ai"]);
 
 const SETTINGS_TABS: SettingsTab[] = [
   "general",
@@ -122,7 +116,6 @@ const SETTINGS_TABS: SettingsTab[] = [
   "webhooks",
   "notifications",
   "members",
-  "status",
   "ai",
 ];
 
@@ -177,14 +170,6 @@ function renderActiveTab(data: ProjectSettingsData, formState?: SettingsFormStat
       project,
       data.members,
       data.groupMappings,
-      data.isAdmin,
-      formState,
-    );
-  if (activeTab === "status")
-    return renderSettingsStatus(
-      project,
-      data.statusConfigs,
-      data.gitHosts,
       data.isAdmin,
       formState,
     );

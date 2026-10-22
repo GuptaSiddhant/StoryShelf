@@ -7,7 +7,6 @@ import { registerLabelSettings } from "./settings-labels.ts";
 import { registerLinkSettings } from "./settings-links.ts";
 import { registerMemberSettings } from "./settings-members.ts";
 import { registerNotificationSettings } from "./settings-notifications.ts";
-import { registerStatusSettings } from "./settings-status.ts";
 import { registerTokenSettings } from "./settings-tokens.ts";
 import { registerWebhookSettings } from "./settings-webhooks.ts";
 
@@ -19,7 +18,6 @@ export function registerSettingsPages(app: ShelfRouter): void {
   registerWebhookSettings(app);
   registerNotificationSettings(app);
   registerMemberSettings(app);
-  registerStatusSettings(app);
   registerAiSettings(app);
 }
 

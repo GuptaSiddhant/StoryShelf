@@ -39,7 +39,6 @@ import {
 import { projectGroupMappings as projectGroupMappingsTable } from "./project-group-mapping.ts";
 import { projects as projectsTable } from "./project.ts";
 import { snapshots as snapshotsTable } from "./snapshot.ts";
-import { projectStatusConfigs as projectStatusConfigsTable } from "./status-config.ts";
 import { tokens as tokensTable } from "./token.ts";
 import {
   buildPackageUsage as buildPackageUsageTable,
@@ -66,7 +65,6 @@ export { notificationChannels, notificationSubscriptions } from "./notification.
 export { projectGroupMappings } from "./project-group-mapping.ts";
 export { projects } from "./project.ts";
 export { snapshots } from "./snapshot.ts";
-export { projectStatusConfigs } from "./status-config.ts";
 export { tokens } from "./token.ts";
 export { users } from "./user.ts";
 export { userInviteTokens } from "./user-invite.ts";
@@ -94,7 +92,6 @@ export type { ProjectGroupMapping } from "./project-group-mapping.ts";
 /** Project row and its embedded Storybook metadata. */
 export type { Project, StorybookMeta } from "./project.ts";
 /** Per-project git provider status-check configuration row. */
-export type { ProjectStatusConfig } from "./status-config.ts";
 /** Snapshot row capturing a single story at one viewport. */
 export type { Snapshot } from "./snapshot.ts";
 /** CI token row (stores only the hash). */
@@ -115,7 +112,6 @@ export type { ContentRef } from "./content-refs.ts";
 /** Full Drizzle schema object passed to the database client. */
 export const schema: {
   projects: AnySQLiteTable;
-  projectStatusConfigs: AnySQLiteTable;
   builds: AnySQLiteTable;
   captureAttempts: AnySQLiteTable;
   captureLogs: AnySQLiteTable;
@@ -147,7 +143,6 @@ export const schema: {
   contentRefs: AnySQLiteTable;
 } = {
   projects: projectsTable,
-  projectStatusConfigs: projectStatusConfigsTable,
   builds: buildsTable,
   captureAttempts: captureAttemptsTable,
   captureLogs: captureLogsTable,

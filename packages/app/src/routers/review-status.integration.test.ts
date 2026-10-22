@@ -1,13 +1,7 @@
-import type {
-  CheckStatus,
-  GitHostAdapter,
-  GitHostProvider,
-} from "@storyshelf/core/adapter/git-host";
 import type { Build, Project } from "@storyshelf/core/schema";
-import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
-import { pino, type Logger } from "pino";
+import { makeDatabase, makeFakeStateNotifier, makeStorage } from "@storyshelf/core/test-helpers";
+import { pino } from "pino";
 import { describe, expect, it } from "vitest";
-import { z } from "zod";
 import { checkForTransition } from "../git-status.ts";
 import { createShelfApp } from "../index.tsx";
 import { stubRunner } from "../test-runner.ts";
@@ -18,29 +12,7 @@ const SHA = "b".repeat(40);
 interface StatusCall {
   context: string;
   gitSha: string;
-  status: CheckStatus;
-}
-
-function fakeProvider(calls: StatusCall[]): GitHostProvider {
-  const base: GitHostProvider = {
-    metadata: {
-      name: "Fake",
-      version: "0.0.0",
-      kind: "fake-host",
-      category: "git-host",
-      schema: z.object({ owner: z.string(), repo: z.string() }),
-    },
-    create(_opts: { config: unknown; token: string; logger?: Logger }): GitHostAdapter {
-      return {
-        metadata: base.metadata,
-        setStatus: async (opts): Promise<void> => {
-          calls.push({ context: opts.context, gitSha: opts.gitSha, status: opts.status });
-          await Promise.resolve();
-        },
-      };
-    },
-  };
-  return base;
+  status: string;
 }
 
 const project: Project = {
@@ -85,7 +57,7 @@ const build = {
 async function setup(storyCount = 2) {
   const { db } = makeDatabase();
   const { storage, objects } = makeStorage();
-  const calls: StatusCall[] = [];
+  const git = makeFakeStateNotifier("fake-host");
   await db.insert(db.tables.projects, project);
   await db.insert(db.tables.builds, build);
   await Promise.all(
@@ -113,57 +85,64 @@ async function setup(storyCount = 2) {
     database: db,
     storage,
     config: { secret: "test-secret" },
-    gitHosts: [fakeProvider(calls)],
+    notifications: { notifiers: [git.provider] },
     logger: pino({ level: "silent" }),
   });
-  const created = await app.request("/api/v1/projects/gate/status-configs", {
+  const created = await app.request("/api/v1/projects/gate/notification-channels", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       provider: "fake-host",
       config: { owner: "acme", repo: "widgets" },
-      token: "t",
+      secret: "t",
     }),
   });
   expect(created.status).toBe(201);
   const post = async (path: string) =>
     await app.request(`/api/v1/projects/gate/builds/f1/${path}`, { method: "POST" });
-  return { post, calls };
+  /** The commit statuses shown so far (the comment writes are not part of this gate). */
+  const statuses = (): StatusCall[] =>
+    git.calls.flatMap((call) =>
+      call.target.kind === "status"
+        ? [{ context: call.target.context, gitSha: call.target.sha, status: call.state }]
+        : [],
+    );
+  return { post, statuses };
 }
 
 describe("git status after a human review", () => {
   it("posts success once every snapshot is approved, not before", async () => {
-    const { post, calls } = await setup();
+    const { post, statuses } = await setup();
 
     await post("snapshots/s0/approve");
-    expect(calls).toEqual([]);
+    expect(statuses()).toEqual([]);
 
     await post("snapshots/s1/approve");
-    expect(calls).toEqual([{ context: "storyshelf/gate", gitSha: SHA, status: "success" }]);
+    expect(statuses()).toEqual([{ context: "storyshelf/testing", gitSha: SHA, status: "success" }]);
   });
 
   it("posts failure when a snapshot is rejected and the review completes", async () => {
-    const { post, calls } = await setup();
+    const { post, statuses } = await setup();
     await post("snapshots/s0/approve");
     await post("snapshots/s1/reject");
-    expect(calls.map((call) => call.status)).toEqual(["failure"]);
+    expect(statuses().map((call) => call.status)).toEqual(["failure"]);
   });
 
   it("posts success for approve-all and a shared story/mode approval", async () => {
     const all = await setup();
     await all.post("approve-all");
-    expect(all.calls.map((call) => call.status)).toEqual(["success"]);
+    expect(all.statuses().map((call) => call.status)).toEqual(["success"]);
 
     const grouped = await setup(1);
     await grouped.post("stories/story-0/modes/desktop/approve");
-    expect(grouped.calls.map((call) => call.status)).toEqual(["success"]);
+    expect(grouped.statuses().map((call) => call.status)).toEqual(["success"]);
   });
 
   it("does not re-post when the outcome did not change", async () => {
-    const { post, calls } = await setup(1);
+    const { post, statuses } = await setup(1);
     await post("snapshots/s0/approve");
     await post("snapshots/s0/approve").catch(() => null);
-    expect(calls).toHaveLength(1);
+    expect(statuses()).toHaveLength(1);
   });
 });
 

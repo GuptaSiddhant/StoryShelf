@@ -1,5 +1,5 @@
 import { NotificationChannelModel } from "@storyshelf/core/models";
-import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
+import { makeDatabase, makeFakeStateNotifier, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -16,6 +16,8 @@ const memberAuth = stubAuth(null, {
     return cookie.includes("storyshelf_session=ok") ? member : null;
   },
 });
+
+const repoSchema = z.object({ owner: z.string().min(1), repo: z.string().min(1) });
 
 function stubProvider(kind: string) {
   const metadata = {
@@ -75,7 +77,13 @@ function testApp(seeded: Seeded, auth: boolean): ReturnType<typeof createShelfAp
     database: seeded.db,
     storage: seeded.storage,
     ...(auth ? { auth: memberAuth } : {}),
-    notifications: { notifiers: [stubProvider("email"), stubProvider("log")] },
+    notifications: {
+      notifiers: [
+        stubProvider("email"),
+        stubProvider("log"),
+        makeFakeStateNotifier("github", undefined, repoSchema).provider,
+      ],
+    },
     logger: pino({ level: "silent" }),
     config: { secret },
   });
@@ -104,7 +112,9 @@ describe("notifications settings tab", () => {
     expect(page.status).toBe(200);
     const html = await page.text();
     expect(html).toContain("My notifications for this project");
-    expect(html).toContain("Create channel");
+    expect(html).toContain("Add a message channel");
+    expect(html).toContain("Add a git channel");
+    expect(html).not.toContain("settings/status");
   });
 
   it("creates an email channel from the form", async () => {
@@ -180,5 +190,92 @@ describe("notifications settings tab", () => {
       headers: { cookie: "storyshelf_session=ok" },
     });
     expect(await page.text()).toContain('value="build:approved" checked');
+  });
+
+  it("creates a git channel with the token as its secret and no event filter", async () => {
+    const seeded = await seed();
+    const app = testApp(seeded, false);
+    const saved = await postForm(
+      "/projects/notify-project/settings/notifications",
+      {
+        gitProvider: "github",
+        owner: "acme",
+        repo: "widgets",
+        prefix: "storyshelf-web",
+        host: "",
+        token: "ghp_secret",
+      },
+      app,
+    );
+    expect(saved.status).toBe(201);
+    const model = new NotificationChannelModel(seeded.db, undefined, secret);
+    const [row] = await model.list("p1");
+    expect(row?.provider).toBe("github");
+    expect(NotificationChannelModel.configOf(row!)).toEqual({
+      owner: "acme",
+      repo: "widgets",
+      prefix: "storyshelf-web",
+    });
+    expect(row?.events).toBeNull();
+    expect(row?.secretEncrypted).not.toContain("ghp_secret");
+    expect(model.decryptSecret(row!)).toBe("ghp_secret");
+    const page = await app.request("/projects/notify-project/settings/notifications");
+    const html = await page.text();
+    expect(html).toContain("acme/widgets (storyshelf-web)");
+    expect(html).toContain("build state");
+  });
+
+  it("shows a failing git channel's last error on the page", async () => {
+    const seeded = await seed();
+    const app = testApp(seeded, false);
+    await postForm(
+      "/projects/notify-project/settings/notifications",
+      { gitProvider: "github", owner: "acme", repo: "widgets", token: "t" },
+      app,
+    );
+    const model = new NotificationChannelModel(seeded.db, undefined, secret);
+    const [row] = await model.list("p1");
+    await model.recordOutcome(row!.id, "HTTP 401: Bad credentials");
+    const html = await (
+      await app.request("/projects/notify-project/settings/notifications")
+    ).text();
+    expect(html).toContain("failing");
+    expect(html).toContain("HTTP 401: Bad credentials");
+  });
+
+  it("reports git form problems on the fields they concern", async () => {
+    const seeded = await seed();
+    const app = testApp(seeded, false);
+    const path = "/projects/notify-project/settings/notifications";
+    const noOwner = await postForm(
+      path,
+      { gitProvider: "github", repo: "widgets", token: "t" },
+      app,
+    );
+    expect(noOwner.status).toBe(400);
+    const noToken = await postForm(path, { gitProvider: "github", owner: "a", repo: "b" }, app);
+    expect(noToken.status).toBe(400);
+    expect(await noToken.text()).toContain("A git channel needs a token");
+    const unknown = await postForm(
+      path,
+      { gitProvider: "email", owner: "a", repo: "b", token: "t" },
+      app,
+    );
+    expect(unknown.status).toBe(400);
+    expect(await unknown.text()).toContain("Unknown git provider: email");
+    expect(
+      await new NotificationChannelModel(seeded.db, undefined, secret).list("p1"),
+    ).toHaveLength(0);
+  });
+
+  it("does not let the message form create a git channel", async () => {
+    const seeded = await seed();
+    const app = testApp(seeded, false);
+    const bad = await postForm(
+      "/projects/notify-project/settings/notifications",
+      { provider: "github", target: "ghp_token" },
+      app,
+    );
+    expect(bad.status).toBe(400);
   });
 });

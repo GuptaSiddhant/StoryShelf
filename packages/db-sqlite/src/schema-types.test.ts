@@ -28,8 +28,6 @@ import { projects } from "./schema/project.ts";
 import type { Project } from "./schema/project.ts";
 import { snapshots } from "./schema/snapshot.ts";
 import type { Snapshot } from "./schema/snapshot.ts";
-import { projectStatusConfigs } from "./schema/status-config.ts";
-import type { ProjectStatusConfig } from "./schema/status-config.ts";
 import { tokens } from "./schema/token.ts";
 import type { Token } from "./schema/token.ts";
 import { buildPackageUsage, projectLinks } from "./schema/usage.ts";
@@ -46,7 +44,6 @@ import type { Webhook } from "./schema/webhook.ts";
  */
 it("row interfaces match drizzle inference exactly", () => {
   expectTypeOf<Project>().toEqualTypeOf<typeof projects.$inferSelect>();
-  expectTypeOf<ProjectStatusConfig>().toEqualTypeOf<typeof projectStatusConfigs.$inferSelect>();
   expectTypeOf<Build>().toEqualTypeOf<typeof builds.$inferSelect>();
   expectTypeOf<CaptureAttempt>().toEqualTypeOf<typeof captureAttempts.$inferSelect>();
   expectTypeOf<CaptureLog>().toEqualTypeOf<typeof captureLogs.$inferSelect>();
@@ -79,7 +76,6 @@ it("row interfaces match drizzle inference exactly", () => {
 
 const DDL_TABLES = [
   "projects",
-  "project_status_configs",
   "builds",
   "capture_attempts",
   "capture_logs",

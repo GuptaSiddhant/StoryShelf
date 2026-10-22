@@ -8,6 +8,7 @@ import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
 import {
   emitNotifications,
   emitSystemNotification,
+  type ChannelOutcome,
   type NotificationBrand,
   type NotificationChannel,
   type SystemEventName,
@@ -20,7 +21,6 @@ import {
   UserModel,
 } from "@storyshelf/core/models";
 import type { NotificationSubscriptionRow } from "@storyshelf/core/schema";
-import type { NotificationChannelRow } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import { credentialKeys } from "./credential-keys.ts";
 import { getStore } from "./store.ts";
@@ -70,36 +70,34 @@ function brandFor(
   };
 }
 
-/** Convert a stored row to a send-ready view (null when undecryptable). */
-function toView(
-  row: NotificationChannelRow,
-  model: NotificationChannelModel,
-): NotificationChannel | null {
-  let secret: string | undefined;
-  try {
-    secret = row.secretEncrypted ? model.decryptSecret(row) : undefined;
-  } catch {
-    return null;
-  }
-  return {
-    id: row.id,
-    projectId: row.projectId,
-    provider: row.provider,
-    config: NotificationChannelModel.configOf(row),
-    secret,
-    events: NotificationChannelModel.eventsOf(row),
-    enabled: row.enabled,
-  };
-}
-
 /** Load stored channels as send-ready views (skips undecryptable secrets). */
 async function loadChannels(
   deps: Pick<NotifyDeps, "db" | "config">,
   projectId: string | null,
 ): Promise<NotificationChannel[]> {
-  const model = new NotificationChannelModel(deps.db, undefined, credentialKeys(deps.config));
+  const model = channelModel(deps);
   const rows = projectId === null ? await model.listSystem() : await model.list(projectId);
-  return rows.filter((row) => row.enabled).flatMap((row) => toView(row, model) ?? []);
+  return rows.filter((row) => row.enabled).flatMap((row) => model.toView(row) ?? []);
+}
+
+/** The channel model bound to the server secret. */
+function channelModel(deps: Pick<NotifyDeps, "db" | "config">): NotificationChannelModel {
+  return new NotificationChannelModel(deps.db, undefined, credentialKeys(deps.config));
+}
+
+/** Record each delivery outcome on its channel row (the last error shown in settings). */
+function recordOutcomes(
+  deps: Pick<NotifyDeps, "db" | "config" | "logger">,
+): (outcome: ChannelOutcome) => Promise<void> {
+  const model = channelModel(deps);
+  return async (outcome) => {
+    if (outcome.channelId.startsWith("sub:")) {
+      return;
+    }
+    await model.recordOutcome(outcome.channelId, outcome.error).catch((error: unknown) => {
+      deps.logger.warn({ err: error, channelId: outcome.channelId }, "failed to record outcome");
+    });
+  };
 }
 
 /** Subscriptions matching an event (enabled + allowlist). */
@@ -181,6 +179,7 @@ export async function notifyProjectWith(
       channels: [...channels, ...targets],
       brand: brandFor(deps.ui, deps.notificationsConfig, reviewUrl),
       logger: deps.logger,
+      onOutcome: recordOutcomes(deps),
     },
   );
 }
@@ -214,6 +213,7 @@ export async function notifySystemWith(
       channels: await loadChannels(deps, null),
       brand: brandFor(deps.ui, deps.notificationsConfig),
       logger: deps.logger,
+      onOutcome: recordOutcomes(deps),
     },
   );
 }

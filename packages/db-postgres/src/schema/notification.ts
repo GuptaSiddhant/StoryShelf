@@ -11,6 +11,8 @@ export const notificationChannels = pgTable("notification_channels", {
   secretEncrypted: text("secret_encrypted"),
   events: text("events"),
   enabled: boolean("enabled").notNull().default(true),
+  lastError: text("last_error"),
+  lastErrorAt: timestamp("last_error_at", { withTimezone: true, mode: "string" }),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull(),
 });
@@ -39,6 +41,8 @@ export interface NotificationChannel {
   secretEncrypted: string | null;
   events: string | null;
   enabled: boolean;
+  lastError: string | null;
+  lastErrorAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

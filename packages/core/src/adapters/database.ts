@@ -13,7 +13,6 @@ import type { Adapter, AdapterMetadata } from "./metadata.ts";
 /** Type-safe table map enforced on every DatabaseAdapter. */
 export interface Tables {
   projects: Table;
-  projectStatusConfigs: Table;
   builds: Table;
   captureAttempts: Table;
   captureLogs: Table;

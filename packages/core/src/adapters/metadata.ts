@@ -1,7 +1,6 @@
 /**
  * Adapter metadata: identity, family, and health contracts shared by all adapters.
  */
-import type { z } from "zod";
 import type { ShelfConfig } from "../config.ts";
 import type { Logger } from "../logger.ts";
 
@@ -17,7 +16,6 @@ export type AdapterCategory =
   | "storage"
   | "capture-runner"
   | "capture-queue"
-  | "git-host"
   | "design"
   | "notifier";
 
@@ -33,13 +31,6 @@ export interface AdapterMetadata {
   readonly kind: string;
   /** Adapter family — which concern this adapter supplies. */
   readonly category: AdapterCategory;
-}
-
-/** Git-specific metadata extension (adds logo + validation schema). */
-export interface GitAdapterMetadata extends AdapterMetadata {
-  readonly category: "git-host";
-  readonly logo?: string;
-  readonly schema: z.ZodType;
 }
 
 /** Context passed to an adapter's `setup` on server startup. */

@@ -311,28 +311,6 @@ export const webhookCreatedSchema = z
   })
   .openapi("WebhookCreated");
 
-/** OpenAPI schema for a git status-check configuration. */
-export const statusConfigSchema = z
-  .object({
-    id: z.string(),
-    projectId: z.string(),
-    provider: z.string(),
-    config: z.record(z.string(), z.unknown()),
-    hasToken: z.boolean(),
-    createdAt: z.string(),
-    updatedAt: z.string(),
-  })
-  .openapi("StatusConfig");
-
-/** OpenAPI schema for creating a git status-check configuration. */
-export const statusConfigCreateSchema = z
-  .object({
-    provider: z.string().min(1),
-    config: z.record(z.string(), z.unknown()),
-    token: z.string().min(1),
-  })
-  .openapi("StatusConfigCreateInput");
-
 /** OpenAPI schema for a public notification channel (secret omitted). */
 export const notificationChannelSchema = z
   .object({
@@ -343,6 +321,8 @@ export const notificationChannelSchema = z
     hasSecret: z.boolean(),
     events: z.array(z.string()),
     enabled: z.boolean(),
+    lastError: z.string().nullable(),
+    lastErrorAt: z.string().nullable(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })

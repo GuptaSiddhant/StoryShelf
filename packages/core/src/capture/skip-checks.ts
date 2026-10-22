@@ -1,10 +1,5 @@
 import type { DatabaseAdapter } from "../adapters/database.ts";
-import type { GitHostProvider } from "../adapters/git-host/index.ts";
-import type { Logger } from "../logger.ts";
 import { BuildModel, type BuildTables } from "../models/build.ts";
-import { StatusConfigModel, type StatusConfigTables } from "../models/status-config.ts";
-import type { ProjectStatusConfig } from "../schema/status-config.ts";
-import type { SecretInput } from "../utils/encrypt.ts";
 
 /** Skip capture when another approved build already covers the same commit. */
 export async function hasApprovedBuildForSha(
@@ -16,66 +11,4 @@ export async function hasApprovedBuildForSha(
 ): Promise<boolean> {
   const approved = await new BuildModel(db, tables).list(projectId, { status: "approved" });
   return approved.some((build) => build.gitSha === sha && build.id !== excludeBuildId);
-}
-
-/** Inputs for checking whether a commit is already merged upstream. */
-export interface MergeCheck {
-  providers: GitHostProvider[];
-  sha: string;
-  branch: string;
-  secret: SecretInput;
-  db: DatabaseAdapter;
-  tables: StatusConfigTables;
-  projectId: string;
-  logger?: Logger;
-}
-
-async function checkRowMerged(
-  parsed: { provider: GitHostProvider; config: unknown; token: string },
-  sha: string,
-  branch: string,
-  logger?: Logger,
-): Promise<boolean> {
-  const adapter = parsed.provider.create({ config: parsed.config, token: parsed.token, logger });
-  if (!adapter.isMerged) {
-    return false;
-  }
-  try {
-    return await adapter.isMerged({ sha, branch });
-  } catch {
-    // Ignore provider errors — do not skip on failure
-    return false;
-  }
-}
-
-/** Check one status-config row for an upstream merge. */
-async function checkRow(
-  model: StatusConfigModel,
-  row: ProjectStatusConfig,
-  providers: GitHostProvider[],
-  sha: string,
-  branch: string,
-  logger?: Logger,
-): Promise<boolean> {
-  const resolved = model.resolveRow(row, providers);
-  if (!resolved.ok) {
-    return false;
-  }
-  return await checkRowMerged(resolved, sha, branch, logger);
-}
-
-/** True when any configured provider reports the commit already merged. */
-export async function isAlreadyMerged(opts: MergeCheck): Promise<boolean> {
-  if (opts.providers.length === 0) {
-    return false;
-  }
-  const model = new StatusConfigModel(opts.db, opts.tables, opts.secret);
-  const rows = await model.list(opts.projectId);
-  for (const row of rows) {
-    // eslint-disable-next-line no-await-in-loop -- short-circuit on first merged status
-    if (await checkRow(model, row, opts.providers, opts.sha, opts.branch, opts.logger)) {
-      return true;
-    }
-  }
-  return false;
 }

@@ -10,7 +10,7 @@ import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import { configureImages } from "@storyshelf/core/diff";
 import type { Logger } from "@storyshelf/core/logger";
 /**
- * StoryShelf app: compose database, storage, capture, auth, and git-host
+ * StoryShelf app: compose database, storage, capture, auth, and notifier
  * adapters into a complete self-hosted visual-testing Hono app.
  */
 import {
@@ -56,7 +56,6 @@ import {
 import { registerNotificationSubscriptions } from "./routers/notification-subscriptions.ts";
 import { registerProfile } from "./routers/profile.ts";
 import { registerProjects } from "./routers/projects.ts";
-import { registerStatusConfigs } from "./routers/status-configs.ts";
 import { registerStorybook } from "./routers/storybook.ts";
 import { registerTokens } from "./routers/tokens.ts";
 import { registerUiPages } from "./routers/ui.ts";
@@ -245,7 +244,6 @@ function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
     captureQueue,
     capturesHere,
     publish,
-    gitHosts,
     design,
     notifiers,
   } = wiring;
@@ -264,7 +262,6 @@ function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
       capturesHere,
       publish,
       captureConcurrency: options.testing?.concurrency,
-      gitHosts,
       design,
       notifiers,
       notificationsConfig: options.notifications?.config,
@@ -278,7 +275,6 @@ function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
 function registerApiRoutes(app: ShelfRouter, health: HealthDeps): void {
   registerProjectRoutes(app);
   registerNotificationRoutes(app);
-  registerStatusConfigs(app);
   registerHealth(app, health);
   registerAdmin(app);
 }
@@ -376,9 +372,8 @@ function registerDocs(app: ShelfRouter): void {
       { name: "Webhooks", description: "Signed webhook deliveries for build events." },
       {
         name: "Notifications",
-        description: "Email and chat notification channels and subscriptions.",
+        description: "Email, chat and git notification channels and subscriptions.",
       },
-      { name: "Git status", description: "Commit-status integrations for GitHub and GitLab." },
       { name: "Admin", description: "Site-wide administration." },
     ],
   });

@@ -1,4 +1,7 @@
-import type { NotifierAdapter, NotifierProvider } from "@storyshelf/core/adapter/notifier";
+import type {
+  MessageNotifierAdapter,
+  MessageNotifierProvider,
+} from "@storyshelf/core/adapter/notifier";
 import type { Logger } from "@storyshelf/core/logger";
 import { httpText } from "@storyshelf/core/utils";
 import { chatTogglesSchema, type ChatToggles } from "./types.ts";
@@ -11,9 +14,9 @@ declare const __PKG_VERSION__: string | undefined;
 export const teamsWorkflowConfigSchema = chatTogglesSchema;
 
 /** Teams workflow-webhook chat provider (Adaptive Card message). */
-export const teamsWorkflowNotifier: NotifierProvider = {
+export const teamsWorkflowNotifier: MessageNotifierProvider = {
   metadata: getMetadata(),
-  create(opts: { config: unknown; secret?: string; logger?: Logger }): NotifierAdapter {
+  create(opts: { config: unknown; secret?: string; logger?: Logger }): MessageNotifierAdapter {
     const config = teamsWorkflowConfigSchema.parse(opts.config);
     return createTeamsAdapter({ config, webhookUrl: opts.secret, logger: opts.logger });
   },
@@ -26,7 +29,7 @@ interface TeamsAdapterOptions {
 }
 
 /** Describe the Teams provider (name, version, config schema). */
-export function getMetadata(): NotifierProvider["metadata"] {
+export function getMetadata(): MessageNotifierProvider["metadata"] {
   return {
     name: "Microsoft Teams",
     version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
@@ -38,7 +41,7 @@ export function getMetadata(): NotifierProvider["metadata"] {
   };
 }
 
-function createTeamsAdapter(options: TeamsAdapterOptions): NotifierAdapter {
+function createTeamsAdapter(options: TeamsAdapterOptions): MessageNotifierAdapter {
   const logger = options.logger?.child({ component: "notify-chat-teams" });
   return {
     metadata: getMetadata(),

@@ -3,7 +3,7 @@ title: Rotating the server secret
 description: Change SECRET without losing stored webhook, git and notification credentials.
 ---
 
-`SECRET` encrypts three kinds of stored credentials (AES-256-GCM): webhook signing secrets, git-provider tokens, and notification-channel secrets. Changing it without a plan leaves those rows unreadable, so StoryShelf keeps the old value as a **decrypt-only fallback** while you migrate.
+`SECRET` encrypts three kinds of stored credentials (AES-256-GCM): webhook signing secrets, design-provider credentials and user connection tokens, and notification-channel secrets (chat webhook URLs and git tokens). Changing it without a plan leaves those rows unreadable, so StoryShelf keeps the old value as a **decrypt-only fallback** while you migrate.
 
 ## Procedure
 
@@ -31,7 +31,7 @@ A credential that neither secret can decrypt is never silent:
 - The server logs an error at boot with the table and row id (never the value).
 - The System page shows the **Unreadable** count with an alert.
 - `POST /api/v1/health` reports a failed `credentials` entry, so the overall status is `degraded`.
-- Git status posts for an undecryptable token are skipped, with a logged error that points at `SECRET` / `SECRET_PREVIOUS`.
+- A channel whose secret cannot be decrypted (including a git channel's token) is skipped at delivery, with a logged warning.
 
 Fix it by setting `SECRET_PREVIOUS` to the secret that row was encrypted with, or recreate the webhook, token or channel.
 

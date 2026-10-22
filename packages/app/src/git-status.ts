@@ -1,11 +1,11 @@
-import type { CheckStatus } from "@storyshelf/core/adapter/git-host";
-/** Mirror review outcomes to the git host's commit status (the merge gate). */
+/** Mirror review outcomes to the git channels' commit status (the merge gate). */
+import type { NotifierState } from "@storyshelf/core/adapter/notifier";
 import { postStatusesForBuild } from "@storyshelf/core/capture";
 import type { Build, Project } from "@storyshelf/core/schema";
 import { credentialKeys } from "./credential-keys.ts";
 import { getStore } from "./store.ts";
 
-const CHECK_FOR: Record<string, CheckStatus | undefined> = {
+const CHECK_FOR: Record<string, NotifierState | undefined> = {
   approved: "success",
   rejected: "failure",
   reviewing: "pending",
@@ -17,7 +17,7 @@ function isTerminal(status: string): boolean {
 }
 
 /** The check state to post for a build moving `previous` → `next`, or null when nothing changes. */
-export function checkForTransition(previous: string, next: string): CheckStatus | null {
+export function checkForTransition(previous: string, next: string): NotifierState | null {
   if (previous === next) return null;
   if (isTerminal(next) || (next === "reviewing" && isTerminal(previous))) {
     return CHECK_FOR[next] ?? null;
@@ -26,7 +26,7 @@ export function checkForTransition(previous: string, next: string): CheckStatus 
 }
 
 /**
- * Post the `storyshelf/<slug>` status after a human review changes a build's
+ * Post the `<prefix>/testing` status after a human review changes a build's
  * outcome. The capture consumer only posts `pending` and the capture-time result;
  * a `reviewing` build would otherwise stay pending on the PR after approval.
  * Provider errors never fail the review action.
@@ -39,15 +39,15 @@ export async function postReviewStatus(
 ): Promise<void> {
   const status = checkForTransition(previous, next);
   if (!status) return;
-  const { db, gitHosts, config, logger } = getStore();
+  const { db, notifiers, config, logger } = getStore();
   await postStatusesForBuild({
     db,
-    tables: { projectStatusConfigs: db.tables.projectStatusConfigs },
+    tables: { notificationChannels: db.tables.notificationChannels },
     project,
     sha: build.gitSha,
     status,
     url: `/projects/${project.slug}/builds/${build.id}`,
-    providers: gitHosts,
+    notifiers,
     secret: credentialKeys(config),
     logger,
   }).catch((error: unknown) => {

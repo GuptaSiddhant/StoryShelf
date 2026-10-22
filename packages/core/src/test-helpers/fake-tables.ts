@@ -72,16 +72,6 @@ const projects = defineTable("projects", {
   updatedAt: "updated_at",
 });
 
-const projectStatusConfigs = defineTable("project_status_configs", {
-  id: "id",
-  projectId: "project_id",
-  provider: "provider",
-  config: "config",
-  tokenEncrypted: "token_encrypted",
-  createdAt: "created_at",
-  updatedAt: "updated_at",
-});
-
 const designLinks = defineTable("design_links", {
   id: "id",
   projectId: "project_id",
@@ -443,6 +433,8 @@ const notificationChannels = defineTable("notification_channels", {
   secretEncrypted: "secret_encrypted",
   events: "events",
   enabled: "enabled",
+  lastError: "last_error",
+  lastErrorAt: "last_error_at",
   createdAt: "created_at",
   updatedAt: "updated_at",
 });
@@ -467,7 +459,6 @@ const contentRefs = defineTable("content_refs", {
 /** Stub schema bundled into the `Tables` map every fake serves. */
 export const fakeSchema: Tables = {
   projects,
-  projectStatusConfigs,
   builds,
   captureAttempts,
   captureLogs,

@@ -195,7 +195,6 @@
         "packages/app/src/routers/helpers.ts",
         "packages/app/src/routers/labels.ts",
         "packages/app/src/routers/snapshots.ts",
-        "packages/app/src/routers/status-configs.ts",
         "packages/app/src/routers/storybook.ts",
         "packages/app/src/routers/ui.ts",
         "packages/app/src/ui/document.tsx",

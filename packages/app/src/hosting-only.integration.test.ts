@@ -74,7 +74,7 @@ describe("hosting-only navigation", () => {
     const { slug } = await seedSnapshot(db);
     const hosting = boot(db, false);
     const html = await (await hosting.request(`/projects/${slug}/settings/tokens`)).text();
-    for (const hidden of ["settings/capture", "settings/tests", "settings/status", "settings/ai"]) {
+    for (const hidden of ["settings/capture", "settings/tests", "settings/ai"]) {
       expect(html).not.toContain(`/projects/${slug}/${hidden}"`);
     }
     expect(html).toContain(`/projects/${slug}/settings/tokens"`);

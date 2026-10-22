@@ -1,48 +1,32 @@
 import { LOCAL_SHA_PREFIX } from "@storyshelf/affected";
 import type { Logger } from "pino";
 import type { DatabaseAdapter } from "../adapters/database.ts";
-import { buildCommentMarkdown } from "../adapters/git-host/helpers.ts";
-import type { CheckStatus, GitHostProvider } from "../adapters/git-host/index.ts";
+import type { NotifierProvider } from "../adapters/notifier/provider.ts";
+import { emitBuildState } from "../adapters/notifier/state.ts";
+import type { NotificationChannel, NotifierState } from "../adapters/notifier/types.ts";
 import {
-  StatusConfigModel,
-  type ResolvedStatusRow,
-  type StatusConfigTables,
-} from "../models/status-config.ts";
+  NotificationChannelModel,
+  type NotificationChannelTables,
+} from "../models/notification-channel.ts";
 import type { Project } from "../schema/project.ts";
 import type { SecretInput } from "../utils/encrypt.ts";
 
-const UNRESOLVED_MESSAGES = {
-  "no-provider": "no provider registered for status config",
-  "invalid-config": "invalid status config",
-  "undecryptable-token": "failed to decrypt status token",
-} as const;
+/** Name of the status a build's capture and review outcome is posted under (`<prefix>/testing`). */
+const TESTING_STATUS = "testing";
 
-/** Log why a status-config row could not be used. */
-function logUnresolved(
-  logger: Logger | undefined,
-  provider: string,
-  failure: Exclude<ResolvedStatusRow, { ok: true }>,
-): void {
-  const error = "error" in failure ? failure.error : undefined;
-  logger?.warn(
-    { ...(error === undefined ? {} : { err: error }), provider },
-    UNRESOLVED_MESSAGES[failure.reason],
-  );
-}
-
-/** Post build check statuses (and review comments) to every configured git provider. */
+/** Post a build's state (commit status and review comment) to every enabled git channel of its project. */
 async function postStatusesForBuild(opts: {
   db: DatabaseAdapter;
-  tables: StatusConfigTables;
+  tables: NotificationChannelTables;
   project: Project;
   sha: string;
-  status: CheckStatus;
+  status: NotifierState;
   url: string;
-  providers: GitHostProvider[];
+  notifiers: NotifierProvider[];
   secret: SecretInput;
   logger?: Logger;
 }): Promise<void> {
-  if (opts.providers.length === 0) {
+  if (opts.notifiers.length === 0) {
     return;
   }
   if (opts.sha.startsWith(LOCAL_SHA_PREFIX)) {
@@ -52,34 +36,41 @@ async function postStatusesForBuild(opts: {
     );
     return;
   }
-  const model = new StatusConfigModel(opts.db, opts.tables, opts.secret);
-  const rows = await model.list(opts.project.id);
-  const ctx = `storyshelf/${opts.project.slug}`;
-  await Promise.allSettled(
-    rows.map(async (row) => {
-      const resolved = model.resolveRow(row, opts.providers);
-      if (!resolved.ok) {
-        logUnresolved(opts.logger, row.provider, resolved);
-        return;
-      }
-      const { provider, config: parsed, token } = resolved;
-      const adapter = provider.create({ config: parsed, token, logger: opts.logger });
-      await adapter.setStatus({
-        context: ctx,
-        gitSha: opts.sha,
-        status: opts.status,
-        url: opts.url,
+  const model = new NotificationChannelModel(opts.db, opts.tables, opts.secret);
+  const channels = await readableChannels(model, opts.project.id, opts.logger);
+  await emitBuildState({
+    notifiers: opts.notifiers,
+    channels,
+    sha: opts.sha,
+    state: opts.status,
+    url: opts.url,
+    status: TESTING_STATUS,
+    logger: opts.logger,
+    onOutcome: async (outcome) => {
+      await model.recordOutcome(outcome.channelId, outcome.error).catch((error: unknown) => {
+        opts.logger?.warn({ err: error, channelId: outcome.channelId }, "failed to record outcome");
       });
-      if (adapter.upsertComment) {
-        const markdown = buildCommentMarkdown(opts.status, opts.url, ctx);
-        await adapter
-          .upsertComment({ sha: opts.sha, url: opts.url, status: opts.status, markdown })
-          .catch((error: unknown) => {
-            opts.logger?.warn({ err: error, provider: row.provider }, "failed to upsert comment");
-          });
-      }
-    }),
-  );
+    },
+  });
+}
+
+/** The project's channels as send-ready views; a channel whose token cannot be decrypted is logged and skipped. */
+async function readableChannels(
+  model: NotificationChannelModel,
+  projectId: string,
+  logger: Logger | undefined,
+): Promise<NotificationChannel[]> {
+  const rows = await model.list(projectId);
+  return rows.flatMap((row) => {
+    const view = model.toView(row);
+    if (view === null) {
+      logger?.warn(
+        { channelId: row.id, provider: row.provider },
+        "failed to decrypt channel secret",
+      );
+    }
+    return view === null ? [] : [view];
+  });
 }
 
 export { postStatusesForBuild };

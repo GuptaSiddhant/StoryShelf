@@ -1,7 +1,6 @@
 import type { CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { DesignProvider } from "@storyshelf/core/adapter/design";
-import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import type { Ai } from "@storyshelf/core/ai";
@@ -33,7 +32,6 @@ export interface Store {
   publish?: PublishService;
   /** Explicit `testing.concurrency`; unset means sized from the hardware. */
   captureConcurrency?: number;
-  gitHosts: GitHostProvider[];
   /** Design providers (Figma, …); empty when none is wired. */
   design: DesignProvider[];
   notifiers: NotifierProvider[];

@@ -147,13 +147,13 @@ describe("detectInstalledAdapters", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("detects github git provider", () => {
+  it("detects the git notification provider package", () => {
     const dir = makeTmp();
     writeFileSync(
       join(dir, "package.json"),
-      JSON.stringify({ dependencies: { "@storyshelf/git-github": "0.3.2" } }),
+      JSON.stringify({ dependencies: { "@storyshelf/notify-git": "0.3.2" } }),
     );
-    expect(detectInstalledAdapters(dir).git).toBe("github");
+    expect(detectInstalledAdapters(dir).git).toBe("git");
     rmSync(dir, { recursive: true, force: true });
   });
 

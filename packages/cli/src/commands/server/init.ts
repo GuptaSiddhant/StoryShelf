@@ -56,7 +56,7 @@ type DatabaseChoice =
   | "tidb";
 type StorageChoice = "local" | "s3" | "azure" | "gcs";
 type AuthChoice = "none" | "password" | "oauth";
-type GitChoice = "none" | "github" | "gitlab";
+type GitChoice = "none" | "git";
 type DeployTarget = "local" | "docker" | "aws" | "azure" | "gcp";
 
 /** DB peer SDK pins (must match db-* peerDependencies). */
@@ -139,12 +139,6 @@ const AUTH_PACKAGE: Record<AuthChoice, string | null> = {
   oauth: "@storyshelf/auth",
 };
 
-const GIT_PACKAGE: Record<GitChoice, string | null> = {
-  none: null,
-  github: "@storyshelf/git-github",
-  gitlab: "@storyshelf/git-gitlab",
-};
-
 const DB_IMPORT: Record<DatabaseChoice, string> = {
   sqlite: `import { createSqliteDatabase } from "@storyshelf/db-sqlite";`,
   turso: `import { createTursoDatabase } from "@storyshelf/db-sqlite/turso";`,
@@ -206,6 +200,19 @@ const STORAGE_INIT: Record<StorageChoice, string> = {
   gcs: `createGcsStorage({ bucket: process.env.GCS_BUCKET! })`,
 };
 
+/** Whether the generated server wires the git providers (commit statuses on GitHub/GitLab). */
+function wantsGit(answers: Answers): boolean {
+  return answers.git !== "none";
+}
+
+/** The provider lists the generated `notifications.notifiers` spreads, in wiring order. */
+function notifierSpreads(answers: Answers): string[] {
+  return [
+    ...(wantsNotifications(answers) ? ["...chatNotifiers", "...emailNotifiers"] : []),
+    ...(wantsGit(answers) ? ["...gitNotifiers"] : []),
+  ];
+}
+
 /** Whether the generated server wires notification providers (opt-in). */
 function wantsNotifications(answers: Answers): boolean {
   return answers.notifications ?? false;
@@ -264,9 +271,8 @@ function buildImports(answers: Answers): string[] {
       imports.push(`import { keycloakPreset } from "@storyshelf/auth";`);
     }
   }
-  if (answers.git !== "none") {
-    const host = answers.git === "github" ? "gitHubHost" : "gitLabHost";
-    imports.push(`import { ${host} } from "${GIT_PACKAGE[answers.git]}";`);
+  if (wantsGit(answers)) {
+    imports.push(`import { gitNotifiers } from "@storyshelf/notify-git";`);
   }
   if (wantsDesign(answers)) {
     imports.push(
@@ -320,8 +326,9 @@ function buildRouterLines(answers: Answers): string[] {
     `  testing: { runner: captureRunner },`,
   );
 
-  if (wantsNotifications(answers)) {
-    lines.push(`  notifications: { notifiers: [...chatNotifiers, ...emailNotifiers] },`);
+  const notifiers = notifierSpreads(answers);
+  if (notifiers.length > 0) {
+    lines.push(`  notifications: { notifiers: [${notifiers.join(", ")}] },`);
   }
 
   if (answers.auth === "password") {
@@ -386,10 +393,6 @@ function buildRouterLines(answers: Answers): string[] {
       `    ],`,
       `  }).adapter,`,
     );
-  }
-  if (answers.git !== "none") {
-    const host = answers.git === "github" ? "gitHubHost" : "gitLabHost";
-    lines.push(`  gitHosts: [${host}],`);
   }
   if (wantsDesign(answers)) {
     lines.push(`  design: [createFigmaDesign({ oauth: figmaOAuthFromEnv() })],`);
@@ -493,8 +496,8 @@ function buildDeps(answers: Answers): Record<string, string> {
   if (answers.auth !== "none") {
     deps[AUTH_PACKAGE[answers.auth] ?? ""] = __PKG_VERSION__ ?? "0.0.0";
   }
-  if (answers.git !== "none") {
-    deps[GIT_PACKAGE[answers.git] ?? ""] = __PKG_VERSION__ ?? "0.0.0";
+  if (wantsGit(answers)) {
+    deps["@storyshelf/notify-git"] = __PKG_VERSION__ ?? "0.0.0";
   }
   if (wantsDesign(answers)) {
     deps["@storyshelf/design-figma"] = __PKG_VERSION__ ?? "0.0.0";

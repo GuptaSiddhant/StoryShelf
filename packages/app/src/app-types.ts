@@ -1,7 +1,6 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import type { CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
-import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
 import type { AdapterSetupResult } from "@storyshelf/core/adapter/setup";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
@@ -21,7 +20,6 @@ export interface ShelfContext {
   authEnabled: boolean;
   enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
   captureQueue: CaptureQueue | null;
-  gitHosts: GitHostProvider[];
   notifiers: NotifierProvider[];
 }
 

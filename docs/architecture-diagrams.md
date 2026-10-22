@@ -64,7 +64,7 @@ flowchart TB
     subgraph Router["HTTP — packages/app"]
         hono["createShelfApp\npackages/app/src/index.tsx:44\nOpenAPIHono"]
         mw["Middleware\nrequestId / requestLogging\nsetupGate / rateLimit / csrf\nstoreScope / authGate"]
-        routes["Routers\nprojects / builds / snapshots\nlabels / tokens / members\nwebhooks / status-configs / admin\nhealth / media / storybook / ui"]
+        routes["Routers\nprojects / builds / snapshots\nlabels / tokens / members\nwebhooks / notification-channels / admin\nhealth / media / storybook / ui"]
         pages["Pages + UI\npages/*.tsx (hono/jsx)\nui/DocumentLayout + HTMX\nassets/htmx (vendored)"]
         openapi["OpenAPI\n/api/v1/openapi.json\n/api/v1/docs (Swagger UI)"]
     end
@@ -97,9 +97,8 @@ flowchart TB
         qmem["Database queue (capture_jobs)\ncore/capture (default)"]
     end
 
-    subgraph GitAdapters["Git Host Adapters"]
-        ghub["@storyshelf/git-github\nOctokit"]
-        glab["@storyshelf/git-gitlab"]
+    subgraph GitAdapters["Git Notifiers"]
+        ghub["@storyshelf/notify-git\nGitHub / GitLab / git-log (state delivery)"]
     end
 
     subgraph Apps["Apps (deployables)"]
@@ -129,7 +128,6 @@ flowchart TB
     ss3 --> adapters
     aengine --> adapters
     ghub --> adapters
-    glab --> adapters
     devsrv --> hono
     flyapp --> hono
     website -. docs .-> hono
@@ -140,7 +138,7 @@ flowchart TB
     classDef app fill:#e6f4ea,stroke:#34a853;
     classDef fixture fill:#f3e8fd,stroke:#9c27b0,stroke-dasharray: 5 5;
     class Core,hono,mw,routes,pages,openapi,capture,diff,retention,models,schema,utils,adapters core;
-    class dbsqlite,slocal,ss3,aengine,runner,qmem,ghub,glab adapter;
+    class dbsqlite,slocal,ss3,aengine,runner,qmem,ghub adapter;
     class devsrv,flyapp,website,cli app;
     class f8,f9,f10 fixture;
 ```
@@ -161,7 +159,7 @@ flowchart LR
         runner2["captureRunner?: CaptureRunner"]
         queue["captureQueue?: CaptureQueue"]
         auth["auth?: Auth"]
-        githosts["gitHosts?: GitHostProvider[]"]
+        notifiers["notifications?.notifiers: NotifierProvider[]\n(chat, email, git)"]
         logger["logger?: Logger (pino)"]
         ui["ui?: UIConfig"]
         config["config?: ShelfConfig"]
@@ -226,7 +224,7 @@ sequenceDiagram
     MW->>MW: setupGate(getReady) — 503 if setup failed
     MW->>MW: rateLimit (/api/v1/*, 100/min)
     MW->>MW: csrf() (/projects/:slug/settings/*)
-    MW->>Store: storeScope({ db, storage, config, ui, logger, authEnabled, enqueueCapture, queue, gitHosts, resolveUser })
+    MW->>Store: storeScope({ db, storage, config, ui, logger, authEnabled, enqueueCapture, queue, notifiers, resolveUser })
     Note over Store: Constructor injection for models<br/>new BuildsModel(db, storage)
     MW->>MW: authGate() — session / token check
     MW->>Handler: c.get('store') → { db, storage, ... }
@@ -254,7 +252,7 @@ sequenceDiagram
     participant FS as StorageAdapter<br/>local / S3
     participant Runner as CaptureRunner<br/>runner-playwright
     participant Diff as Diff Engine<br/>core/diff (pixelmatch)
-    participant Git as GitHostProvider
+    participant Git as Git notifier (state delivery)
 
     CI->>CLI: storyshelf upload --token=xxx
     CLI->>CLI: build Storybook (if needed) → zip
@@ -309,7 +307,7 @@ sequenceDiagram
         Orc->>DB: baselines upsert
     end
 
-    Orc->>Git: setCommitStatus(sha, success/failure/pending, storyshelf/project-name)
+    Orc->>Git: setState(sha, success/failure/pending, <prefix>/testing)
     Orc->>Git: sendWebhooks(project webhooks, events)
     Orc->>Orc: scratchDir cleanup
 ```

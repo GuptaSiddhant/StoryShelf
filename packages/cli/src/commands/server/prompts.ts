@@ -169,11 +169,10 @@ export const INFRA_PROMPTS: Prompt[] = [
   {
     type: "select",
     name: "git",
-    message: "Which git provider?",
+    message: "Post build statuses to a git host?",
     choices: [
-      { title: "None", value: "none" },
-      { title: "GitHub", value: "github" },
-      { title: "GitLab", value: "gitlab" },
+      { title: "No", value: "none" },
+      { title: "Yes: GitHub or GitLab (configure channels in project settings)", value: "git" },
     ],
   },
   {
@@ -210,11 +209,10 @@ const AUTH_SELECT: SelectPrompt = {
 const GIT_SELECT: SelectPrompt = {
   type: "select",
   name: "git",
-  message: "Which git provider?",
+  message: "Post build statuses to a git host?",
   choices: [
-    { title: "None", value: "none" },
-    { title: "GitHub", value: "github" },
-    { title: "GitLab", value: "gitlab" },
+    { title: "No", value: "none" },
+    { title: "Yes: GitHub or GitLab (configure channels in project settings)", value: "git" },
   ],
 };
 

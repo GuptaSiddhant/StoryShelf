@@ -9,7 +9,7 @@ metadata:
 
 # Adapter Layout — One Concern Per File
 
-Adapters are the most-read code in this repo. A module earns a split when it exceeds **~150 lines** or holds **3+ distinct concerns** (client construction, lifecycle, serialization, operations, streaming, error mapping). Copy the per-kind layout below; copy the exemplar packages (`storage-s3`, `git-github`, `runner-playwright`) — never invent a new shape.
+Adapters are the most-read code in this repo. A module earns a split when it exceeds **~150 lines** or holds **3+ distinct concerns** (client construction, lifecycle, serialization, operations, streaming, error mapping). Copy the per-kind layout below; copy the exemplar packages (`storage-s3`, `notify-git`, `runner-playwright`) — never invent a new shape.
 
 ## When to use me
 
@@ -42,6 +42,10 @@ Do not use for website docs, product UI, or CLI commands (different shapes) — 
 | `errors.ts`     | Not-found guards + stream/collect helpers                                                                           |
 | `index.ts`      | **Hybrid composition root**: doc header, imports, factory wiring first, `Options` + key-helper re-exports at bottom |
 
+### Notifiers (`notify-*`)
+
+One file per concern, prefixed by the host when a package serves several: `<host>-api.ts` (base URL, headers, path joins), `<host>-config.ts` (zod schema for the channel config), `<host>-mapper.ts` (state/status mapping, pure), `<host>-status.ts` / `<host>-comment.ts` / `<host>-pr.ts` (operations), `<host>.ts` (provider descriptor + `create`, the composition root). Shared helpers live unprefixed (`state-adapter.ts`, `describe.ts`, `review-comment.ts`, `version.ts`). A provider declares `metadata.delivery` (`message` sends once, `state` shows a named state); `index.ts` lists the providers in one array (`gitNotifiers`, `chatNotifiers`) and re-exports the config schemas. Provider kinds must be unique across every notifier package wired into one app (`git-log`, not `log`).
+
 ### Runners (`runner-*`)
 
 Extract pure stages, keep the factory file as root: `types.ts`, `browser.ts` (launch/close + run map), `runtime-params.ts`, `pipeline.ts` (orchestration), `screenshot.ts`, `play.ts`, `a11y.ts`. The existing `<name>.ts` factory file becomes the composition root; the barrel `index.ts` stays untouched.
@@ -49,7 +53,7 @@ Extract pure stages, keep the factory file as root: `types.ts`, `browser.ts` (la
 ## Rules
 
 1. **Public surface frozen.** The package `exports` map does not change; new modules stay internal. The only exportable helpers are pre-existing ones (e.g. `s3Key`-style key joins, the `db-*` preset subpaths). A new subpath needs package-owner approval.
-2. **Move tests with the code, and cover the contract.** Each new module gets colocated `<module>.test.ts`; move existing cases (and their fake-client harnesses) into it. Indirect coverage is allowed only for pure mappers (git-github `mapper.ts` precedent). Never leave a suite testing through the old file path. Minimum per module:
+2. **Move tests with the code, and cover the contract.** Each new module gets colocated `<module>.test.ts`; move existing cases (and their fake-client harnesses) into it. Indirect coverage is allowed only for pure mappers (notify-git `github-mapper.ts` precedent). Never leave a suite testing through the old file path. Minimum per module:
    - `client.ts`: construction defaults + injected-vs-owned handles.
    - `lifecycle.ts` (or `index.ts` for single-file adapters): `setup` idempotent x2, `health` ok/fail, `teardown` x2 no-throw (see `docs/testing.md` §2a).
    - `operations.ts`/`streams.ts`/`keys.ts`/`errors.ts`: happy-path round-trip, not-found/error mapping, safety guard (traversal / malformed input).

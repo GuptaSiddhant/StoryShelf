@@ -7,7 +7,7 @@
  */
 import type { CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
 import type { CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
-import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
+import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
 import {
   captureDispatchDeps,
   createCaptureHandler,
@@ -58,7 +58,7 @@ function enqueuerFor(queue: CaptureQueue): (buildId: string, reqId?: string) => 
 export function setupCapture(
   options: ShelfOptions,
   config: ShelfConfig,
-  gitHosts: GitHostProvider[],
+  notifiers: NotifierProvider[],
   logger: Logger,
   jobs: JobQueue,
 ): CaptureWiring {
@@ -71,7 +71,7 @@ export function setupCapture(
   if (testing.runner === undefined) {
     return { queue, enqueueCapture, handler: null };
   }
-  const handlerOptions = captureHandlerOptions(options, config, gitHosts, logger, {
+  const handlerOptions = captureHandlerOptions(options, config, notifiers, logger, {
     runner: testing.runner,
     enqueue: async (job) => {
       await queue.enqueue(job);
@@ -100,7 +100,7 @@ export function setupCapture(
 function captureHandlerOptions(
   options: ShelfOptions,
   config: ShelfConfig,
-  gitHosts: GitHostProvider[],
+  notifiers: NotifierProvider[],
   logger: Logger,
   parts: { runner: CaptureRunner; enqueue: CaptureHandlerOptions["enqueue"] },
 ): CaptureHandlerOptions {
@@ -115,7 +115,7 @@ function captureHandlerOptions(
     secret: credentialKeys(config),
     design: options.design,
     shardSize: options.testing?.shardSize,
-    gitHosts,
+    notifiers,
     enqueue: parts.enqueue,
     maxRetries: options.testing?.retries,
   };

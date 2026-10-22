@@ -5,9 +5,10 @@ import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
 import { notificationChannelModel } from "./scoped-models.ts";
+import { createGitChannel } from "./settings-git-channel.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
 
-/** Notifications settings (channels plus my preferences). */
+/** Notifications settings (message and git channels plus my preferences). */
 export function registerNotificationSettings(app: ShelfRouter): void {
   app.get("/projects/:slug/settings/notifications", async (c) =>
     c.html(await renderSettingsPage(c, "notifications")),
@@ -42,6 +43,18 @@ function parseChecks(form: FormData, name: string): string[] {
 async function handleCreateChannel(c: Context): Promise<Response> {
   const project = await findProject(c.req.param("slug") ?? "");
   const form = await c.req.formData();
+  const gitProvider = asString(form.get("gitProvider"));
+  return gitProvider
+    ? await createGitChannel(c, project, gitProvider, form)
+    : await createMessageChannel(c, project, form);
+}
+
+/** The message-channel form: a provider and a target (email address or webhook URL). */
+async function createMessageChannel(
+  c: Context,
+  project: Project,
+  form: FormData,
+): Promise<Response> {
   const provider = asString(form.get("provider"));
   const target = asString(form.get("target"));
   if (provider && target) {
@@ -129,7 +142,7 @@ async function handleDeleteChannel(c: Context): Promise<Response> {
     );
   }
   await model.remove(channel.id);
-  flash(c, "Notification channel removed");
+  flash(c, "Channel removed");
   return c.html((await renderSettingsPage(c, "notifications")) ?? "");
 }
 
