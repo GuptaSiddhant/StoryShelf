@@ -9,7 +9,9 @@ name: CI
 # no separate Node setup step.
 #
 # Website: the docs build, link check and accessibility check run only when
-# apps/website/ changed (manual runs always run them).
+# apps/website/ changed (manual runs always run them). The `changes` job also skips
+# `capture` and `fly` for PRs that only touch docs, the website or the fixtures this run
+# does not use.
 on:
   pull_request:
   push:
@@ -24,24 +26,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verify:
-    name: verify
+  # Cheap first job: decides what the rest of the run needs. Anything it cannot work out
+  # (manual run, failed diff) runs everything.
+  changes:
+    name: changes
     runs-on: ubuntu-latest
+    outputs:
+      website: ${{ steps.detect.outputs.website }}
+      heavy: ${{ steps.detect.outputs.heavy }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
           # 2 is enough to diff a PR's merge commit against its base, or a push
-          # against its parent, for the website change check below.
+          # against its parent.
           fetch-depth: 2
 
-      - name: Detect website changes
-        id: changes
+      - name: Detect changed areas
+        id: detect
         env:
           EVENT: ${{ github.event_name }}
           BEFORE: ${{ github.event.before }}
+          # Paths that cannot change the Fly image or the capture tests: the docs site, docs,
+          # markdown, and the fixtures the PR run does not use.
+          IGNORABLE: '^(apps/website/|docs/|fixtures/storybook-(8|10)/|\.github/ISSUE_TEMPLATE/)|\.md$'
         run: |
           website=true
+          heavy=true
           case "$EVENT" in
             pull_request)
               # HEAD is the PR merge commit: first parent is the base branch tip.
@@ -52,18 +63,23 @@ jobs:
                 && git diff --name-only "$BEFORE" HEAD > changed.txt || rm -f changed.txt
               ;;
           esac
-          # Anything else (schedule, manual run, or a diff that failed) runs everything.
+          # Anything else (manual run, or a diff that failed) runs everything.
           if [ -f changed.txt ]; then
-            if grep -qE '^apps/website/' changed.txt; then website=true; else website=false; fi
             echo "changed files:"; cat changed.txt
+            if grep -qE '^apps/website/' changed.txt; then website=true; else website=false; fi
+            if grep -vqE "$IGNORABLE" changed.txt; then heavy=true; else heavy=false; fi
           fi
           echo "website=$website" >> "$GITHUB_OUTPUT"
-          if [ "$website" = "true" ]; then
-            echo "verify_args=" >> "$GITHUB_OUTPUT"
-          else
-            echo "verify_args=--filter=!website" >> "$GITHUB_OUTPUT"
-            echo "apps/website/ unchanged: skipping the website build and its checks"
-          fi
+          echo "heavy=$heavy" >> "$GITHUB_OUTPUT"
+          echo "website=$website heavy=$heavy"
+
+  verify:
+    name: verify
+    needs: changes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
 
       - name: Setup workspace
         uses: ./.github/actions/setup-workspace
@@ -86,7 +102,15 @@ jobs:
           fi
 
       - name: Verify (build + lint + test)
-        run: nubx turbo verify --force ${{ steps.changes.outputs.verify_args }}
+        env:
+          WEBSITE: ${{ needs.changes.outputs.website }}
+        run: |
+          if [ "$WEBSITE" != "true" ]; then
+            echo "apps/website/ unchanged: skipping the website build and its checks"
+            nubx turbo verify --force --filter='!website'
+          else
+            nubx turbo verify --force
+          fi
 
       - name: App smoke test (boot once, curl health/API/HTML/htmx)
         if: ${{ !cancelled() }}
@@ -105,17 +129,19 @@ jobs:
 
       - name: Check website links
         # dist/ is already built by website#verify (dependsOn build) above.
-        if: ${{ !cancelled() && steps.changes.outputs.website == 'true' }}
+        if: ${{ !cancelled() && needs.changes.outputs.website == 'true' }}
         working-directory: apps/website
         run: nub run check:links
 
       - name: Check website accessibility (axe, light/dark/mobile)
-        if: ${{ !cancelled() && steps.changes.outputs.website == 'true' }}
+        if: ${{ !cancelled() && needs.changes.outputs.website == 'true' }}
         working-directory: apps/website
         run: nub run check:a11y
 
   capture:
     name: capture
+    needs: changes
+    if: ${{ needs.changes.outputs.heavy == 'true' }}
     uses: ./.github/workflows/capture.yml
     with:
       # The fixture the Fly demo runs on; nightly.yml covers every supported version.
@@ -123,4 +149,6 @@ jobs:
 
   fly:
     name: fly
+    needs: changes
+    if: ${{ needs.changes.outputs.heavy == 'true' }}
     uses: ./.github/workflows/fly-dry-run.yml
