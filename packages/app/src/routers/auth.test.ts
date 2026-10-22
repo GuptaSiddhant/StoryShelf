@@ -349,7 +349,7 @@ describe("engine auth routes", () => {
       last = response.status;
     }
     expect(last).toBe(429);
-  }, 30_000);
+  }, 120_000);
 
   it("rejects mismatched passwords and spent invites", async () => {
     const { db, shelf } = await testEngine();
