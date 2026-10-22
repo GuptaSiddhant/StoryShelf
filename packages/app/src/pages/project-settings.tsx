@@ -71,6 +71,8 @@ export interface SettingsFormState {
   errors?: Record<string, string>;
   globalError?: string;
   secret?: string;
+  /** Label type key whose edit form is open (labels tab). */
+  editKey?: string;
 }
 
 function tabHref(project: Project, tab: SettingsTab): string {

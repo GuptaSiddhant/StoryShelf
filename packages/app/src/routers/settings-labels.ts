@@ -8,9 +8,10 @@ import { asString, findProject, renderSettingsPage } from "./settings.handlers.t
 /** Label-type settings (create custom types, delete removable ones). */
 export function registerLabelSettings(app: ShelfRouter): void {
   app.get("/projects/:slug/settings/labels", async (c) =>
-    c.html(await renderSettingsPage(c, "labels")),
+    c.html(await renderSettingsPage(c, "labels", { editKey: c.req.query("edit") })),
   );
   app.post("/projects/:slug/settings/labels", handleCreateLabelType);
+  app.post("/projects/:slug/settings/labels/:key", handleUpdateLabelType);
   app.post("/projects/:slug/settings/labels/:key/delete", handleDeleteLabelType);
 }
 
@@ -49,6 +50,42 @@ async function persistLabelType(
     const message = error instanceof Error ? error.message : "Failed to create label";
     return c.html((await renderSettingsPage(c, "labels", { globalError: message })) ?? "", 400);
   }
+}
+
+async function handleUpdateLabelType(c: Context): Promise<Response> {
+  const project = await findProject(c.req.param("slug") ?? "");
+  const key = c.req.param("key") ?? "";
+  const form = await c.req.formData();
+  const name = asString(form.get("labelName"));
+  if (!name) {
+    return c.html(
+      (await renderSettingsPage(c, "labels", { globalError: "Name is required", editKey: key })) ??
+        "",
+      400,
+    );
+  }
+  const template = asString(form.get("linkTemplate"));
+  const linkTemplate = template === undefined || template === "" ? null : template;
+  return await persistLabelUpdate(c, project, key, { name, linkTemplate });
+}
+
+async function persistLabelUpdate(
+  c: Context,
+  project: { id: string; slug: string },
+  key: string,
+  input: { name: string; linkTemplate: string | null },
+): Promise<Response> {
+  try {
+    const updated = await new LabelModel(getStore().db).updateType(project.id, key, input);
+    if (!updated) {
+      throw new Error("Label type not found");
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to update label";
+    return c.html((await renderSettingsPage(c, "labels", { globalError: message })) ?? "", 400);
+  }
+  flash(c, "Label type saved");
+  return hxRedirect(c, `/projects/${project.slug}/settings/labels`);
 }
 
 async function handleDeleteLabelType(c: Context): Promise<Response> {
