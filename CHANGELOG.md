@@ -5,6 +5,8 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 
 ## Unreleased
 
+**Added: the Storybook catalog, and library, component and build pages that render from it (ADR 0006, decision 9; #215).** When publishing ends, the build's `index.json` is read into a compact `catalog.json` (next to the build's files) and one `build_components` row per component (project, build, story file, title, story count, hash; new table in all three database packages, purged with the build). A build published before the catalog existed is catalogued on first view. The library shows the components of the latest build of the selected branch whatever its status; the component page gains a **Stories** tab (a click-to-load preview, sandboxed with `allow-scripts` only, and every story and docs entry) and a catalog **History** (added, removed, renamed); the build page shows component and story counts and labels an accepted build with no attempts **Published**. All of it works without `testing`; with it the pages gain thumbnails, statuses, States, design and linked packages, and snapshot sections. Published Storybook files answer `Access-Control-Allow-Origin: *` for builds viewable without credentials (public builds, instances without sign-in) so the sandboxed frame can load; private builds under sign-in are not embedded. Upstream links fall back to the catalog when a build has no snapshots.
+
 **Added: publishing independent of capture (ADR 0006, decision 10; #213).** An instance without `testing` now
 publishes Storybooks of any size. A zip up to `maxInlineUnzipSize` (now defaulting to 50 MB, counted while the
 upload streams instead of read from `Content-Length`) is extracted inline; a larger zip becomes a `publish` job

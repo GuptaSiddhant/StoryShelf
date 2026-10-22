@@ -11,11 +11,7 @@ import { loadInsightPanel } from "../insights/panel.ts";
 import { renderBuildDetailPage } from "../pages/build-detail.tsx";
 import type { LinkedUsageItem } from "../pages/build-diff-usage.tsx";
 import { renderBuildDiffPage, selectedSnapshot } from "../pages/build-diff.tsx";
-import {
-  renderComponentPage,
-  COMPONENT_TABS,
-  type ComponentTab,
-} from "../pages/component-detail.tsx";
+import { renderComponentPage } from "../pages/component-detail.tsx";
 import { renderComputeJobsPage, renderActiveQueue } from "../pages/compute-jobs.tsx";
 import { renderLabelDetailPage, renderLabelsPage } from "../pages/label-detail.tsx";
 import { renderLibraryPage } from "../pages/library.tsx";
@@ -247,8 +243,7 @@ export function registerUiPages(app: ShelfRouter): void {
     const slug = c.req.param("slug");
     const base = `/projects/${slug}/components/`;
     const path = c.req.path.startsWith(base) ? decodeRest(c.req.path.slice(base.length)) : "";
-    const tab = COMPONENT_TABS.find((candidate) => candidate === c.req.query("tab")) ?? "states";
-    const data = await loadComponentPage(c, slug, path, tab satisfies ComponentTab);
+    const data = await loadComponentPage(c, slug, path, c.req.query("tab"), c.req.query("story"));
     return data ? c.html(renderComponentPage(data)) : c.notFound();
   });
 

@@ -318,6 +318,20 @@ capture_jobs (
   updated_at          text NOT NULL
 );
 -- capture_jobs_poll_idx (kind, visible_at, status): the poll probe; plus (job_id), (build_id), (entry, created_at)
+
+-- Components of a published build (ADR 0006, decision 9): one row per story file, written from the
+-- build's Storybook index when publishing ends (or lazily on first view of an older build)
+build_components (
+  id           text PRIMARY KEY,                          -- ULID
+  project_id   text NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  build_id     text NOT NULL REFERENCES builds(id) ON DELETE CASCADE,
+  import_path  text NOT NULL,                             -- story file without './'; '' when the index names none
+  title        text NOT NULL,
+  story_count  integer NOT NULL DEFAULT 0,                -- story entries; docs entries are not counted
+  hash         text NOT NULL,                             -- SHA-256 over the component's entries (id, name, type, title)
+  created_at   text NOT NULL
+);
+-- build_components_build_id_idx (build_id), build_components_project_import_path_idx (project_id, import_path)
 ```
 
 ### Key Relationships
@@ -355,6 +369,7 @@ data/                                    # --data-dir flag (default: ./data)
         storybook/                       # extracted Storybook static build (served for capture + preview)
           index.json
           static/
+        catalog.json                     # compact catalog of the build's index.json (entries: id, title, name, import path, type, tags)
     baselines/
       {branch}/
         {storyId}/{mode}.png             # canonical approved screenshot (default branch NEVER TTL'd; feature branches TTL'd via branchTtlDays 30d daily GC)
@@ -728,6 +743,9 @@ Beyond diff review, StoryShelf publishes the uploaded Storybook build as a brows
 - Each build's `storybook/{buildId}/` statics are served as the browsable Storybook.
 - **Publishing does not depend on `testing`** (ADR 0006, decision 10; `core/src/capture/publish/`). A zip up to `maxInlineUnzipSize` (default 50 MB, counted while the upload streams) is extracted inline in the upload request; a larger one becomes a `publish` job on the database queue (`capture_jobs`), run by a consumer that every instance with a database starts at `lifecycle.setup()` and drains at `teardown()`. The file-by-file route (`/dedup`, `/content`, `/manifest`) needs no extraction and completes publishing when the manifest is stored. On a serverless host (`AWS_LAMBDA_FUNCTION_NAME`, `VERCEL`, `NETLIFY`) no consumer runs and an over-limit zip is refused with `413` pointing to the file-by-file route. Extraction is capped (`maxZipEntries` default 50 000, `maxUnzippedBytes` default 2 GiB, stream-counted) and refuses absolute and `..` paths.
 - **Acceptance when publishing ends** (`publishVerdict`, the single owner of the rule): with no capture to run, a published build on the project's default branch becomes `approved`, a failed publish makes it `failed`, and a non-default build stays `pending` (the review-off acceptance arrives with the per-project review setting). No approval event or webhook fires, and a build that left `pending` is never touched again. With a capture to run, publishing leaves the status to capture. `afterPublish` hooks (`PublishCompleter`) run after every publish for later features such as the catalog.
+- **The catalog** (`core/src/capture/catalog/`; ADR 0006, decision 9): the first `afterPublish` hook (`createCatalogHook`) reads the published `index.json` (`stories.json` on older Storybooks; test entries left out), writes the `build_components` rows and then `catalog.json` (the marker that cataloguing finished), whatever the build's verdict and with `testing` on or off. `createCatalogLoader` serves a build's catalog from `catalog.json` through an in-process LRU keyed by build id and catalogues a build without one lazily from its persisted statics; a build with no readable index has no catalog and its pages say so. Retention removes the rows with the build and the file with the build's prefix.
+- **Library, component and build pages read the catalog** in both modes; `testing` (`testingEnabled()` in `app/src/store.ts`: the instance has an `enqueueCapture`) layers snapshot data onto them. The library shows the latest build of the branch whatever its status.
+- **Component preview** (`ui/preview-embed.tsx`): click-to-load, in an `<iframe sandbox="allow-scripts">` (no `allow-same-origin`) created from an inert `<template>` by the shell script, so opening a page never runs a published Storybook. A sandboxed frame has an opaque origin, so its module scripts are cross-origin requests without cookies: published files answer `Access-Control-Allow-Origin: *` exactly when the build is viewable without credentials (public build, or an instance without sign-in); a private build under sign-in is not embedded (the page offers the link out). Storybook 8, 9 and 10 render under this sandbox.
 - The **published** Storybook for a project is the most recent build whose branch is public. A build is public iff `builds.public = true` or `builds.git_branch` matches `projects.public_branch_regex` (e.g. `^main$`, `^release-`).
 - **Access control:** a public build is viewable **without auth**. Every other Storybook requires auth and at least `viewer` membership on the project (ADR 0008).
 - **Retention:** published builds follow the same purge rules as any other build. Because retention keeps the most recent build per branch, the latest public build on a branch survives purge; if it is purged, the published URL falls back to the next-most-recent public build (or 404 until a new build lands).
@@ -753,11 +771,19 @@ Subdomains serve the Storybook at the domain **root**, so no asset-path rewritin
 
 ## Component Page
 
-`GET /projects/:slug/components/<importPath>` (wildcard segment, slashes kept, leading `./` stripped; `urls.component()`) is the stable, purge-proof page of a **component = a story file**. Keying by `import_path` means a retitle updates the page in place and duplicate titles across files never collide. It reads `snapshots` through the `(project_id, story_import_path)` index — no new tables.
+`GET /projects/:slug/components/<importPath>` (wildcard segment, slashes kept, leading `./` stripped; `urls.component()`) is the stable, purge-proof page of a **component = a story file**. Keying by `import_path` means a retitle updates the page in place and duplicate titles across files never collide. Its skeleton comes from the catalog (`build_components` through the `(project_id, import_path)` index, and the build's `catalog.json`) in both modes; with `testing` it also reads `snapshots` through the `(project_id, story_import_path)` index.
 
-- **Tabs** (`?tab=`): **States** (one card per story, `#<storyId>` anchors, linking to its `diff?snapshot=`), **History** (one row per build with any state of the file: states changed, worst-status roll-up, link to that build's diff), **Design** (the design strip and reference panes; empty state without a link), **Linked** (packages the states use, from `build_package_usage`).
-- **Tombstones:** a file missing from the latest default-branch build resolves by its last-seen title to `moved to <newPath>`, else shows `last seen in build X`; a file that was never captured is a real 404.
-- **Link-ins:** library title groups, the review viewer (`View component`, anchored at the story), build cards, the Figma popover, and #123 usage badges (`Story →` to the upstream project's component page).
+- **Tabs** (`?tab=`): **Stories** (a click-to-load preview of one story, `?story=<id>`, and every story and docs entry of the file with links into the published Storybook), **History** (the builds that hold the file from `build_components`: story count and whether its stories changed since the build before on the same branch, with added, removed and renamed counts from the two catalogs; with `testing` also one row per captured build with states changed and worst status, linking to that build's diff). With `testing` also **States** (one card per story, `#<storyId>` anchors, linking to its `diff?snapshot=`), **Design** (the design strip and reference panes; empty state without a link) and **Linked** (packages the states use, from `build_package_usage`). The page opens on States once the file was captured, else on Stories.
+- **Tombstones:** a file missing from the latest default-branch build resolves by its last-seen title to `moved to <newPath>`, else shows `last seen in build X`; a file no build holds is a real 404. Without `testing` the answer comes from the catalog rows of the latest build; with `testing` and captured snapshots, from the snapshots.
+- **Link-ins:** library title groups, the review viewer (`View component`, anchored at the story), build cards, the Figma popover, and #123 usage badges (`Story →` to the upstream project's component page; the upstream's stories come from its snapshots, or from its catalog when it has none).
+
+## Library Page
+
+`GET /projects/:slug/library` lists the components of the **latest build of the selected branch, whatever its status** (default branch unless the branch switcher says otherwise, then the default branch's latest, then any build). Entries are grouped by title; each card links to its component page, shows tags (Storybook's own `dev`/`test`/`autodocs`… tags are hidden) and story counts, and links into the published Storybook (story and docs). A build with no catalog and no snapshots shows a preparing (pending) or no-stories message. With `testing` the cards gain thumbnails and statuses (stories without a snapshot stay listed), and the page the health panel and design links; a captured build whose index is gone is listed from its snapshots.
+
+## Build Page
+
+`GET /projects/:slug/builds/:id` shows sha, branch, author, message, labels, the published Storybook link and component and story counts from the catalog. Snapshot counts, attempts, bulk actions and the snapshot grid appear only with `testing`. An accepted build with no capture attempts is labelled **Published** (`approvedCount` stays zero).
 
 ## Design Sources
 

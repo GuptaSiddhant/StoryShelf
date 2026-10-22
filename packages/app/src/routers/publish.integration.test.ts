@@ -1,4 +1,4 @@
-import { BuildModel, CaptureJobModel } from "@storyshelf/core/models";
+import { BuildComponentModel, BuildModel, CaptureJobModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import AdmZip from "adm-zip";
 import { createHash } from "node:crypto";
@@ -17,13 +17,19 @@ import { createShelfApp } from "../index.tsx";
 
 const silentLogger = pino({ level: "silent" });
 const IFRAME = "<html><body>storybook</body></html>";
+const INDEX = JSON.stringify({
+  v: 5,
+  entries: {
+    "a--x": { type: "story", id: "a--x", title: "A", name: "X", importPath: "./A.stories.tsx" },
+  },
+});
 
 type App = ReturnType<typeof createShelfApp>;
 
 function storybookZip(): Buffer {
   const zip = new AdmZip();
   zip.addFile("iframe.html", Buffer.from(IFRAME));
-  zip.addFile("index.json", Buffer.from(JSON.stringify({ v: 4, entries: {} })));
+  zip.addFile("index.json", Buffer.from(INDEX));
   return zip.toBuffer();
 }
 
@@ -77,6 +83,13 @@ async function statusOf(db: ReturnType<typeof makeDatabase>["db"], id: string): 
   return (await new BuildModel(db).get(id))?.status ?? "missing";
 }
 
+async function componentTitles(
+  db: ReturnType<typeof makeDatabase>["db"],
+  buildId: string,
+): Promise<string[]> {
+  return (await new BuildComponentModel(db).listByBuild(buildId)).map((row) => row.title);
+}
+
 async function served(app: App, slug: string, buildId: string, file: string): Promise<Response> {
   return await app.request(`/projects/${slug}/storybook/build/${buildId}/${file}`);
 }
@@ -92,6 +105,7 @@ describe("publishing without testing", () => {
     const iframe = await served(app, project.slug, build.id, "iframe.html");
     expect(iframe.status).toBe(200);
     expect(await iframe.text()).toBe(IFRAME);
+    expect(await componentTitles(db, build.id)).toEqual(["A"]);
     await app.lifecycle.teardown();
   });
 
@@ -118,6 +132,9 @@ describe("publishing without testing", () => {
       async () => {
         expect(await statusOf(db, main.id)).toBe("approved");
         expect((await served(app, project.slug, feature.id, "iframe.html")).status).toBe(200);
+        // the catalog hook runs right after the verdict
+        expect(await componentTitles(db, main.id)).toEqual(["A"]);
+        expect(await componentTitles(db, feature.id)).toEqual(["A"]);
       },
       { timeout: 10_000, interval: 25 },
     );
@@ -178,6 +195,24 @@ describe("publishing without testing", () => {
     expect(await statusOf(db, build.id)).toBe("approved");
     expect(await (await served(app, project.slug, build.id, "iframe.html")).text()).toBe(IFRAME);
     vi.unstubAllEnvs();
+  });
+
+  it("catalogues a file-by-file build when its manifest is stored", async () => {
+    const { app, db, project } = await boot();
+    const build = await createBuild(app, project.slug, "main");
+    const base = `/api/v1/projects/${project.slug}/builds/${build.id}`;
+    const hash = createHash("sha256").update(INDEX).digest("hex");
+    const form = new FormData();
+    form.set(hash, new File([Buffer.from(INDEX)], hash));
+    await app.request(`${base}/content`, { method: "POST", body: form });
+    await app.request(`${base}/manifest`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ files: [{ rel: "index.json", hash, size: INDEX.length }] }),
+    });
+    expect(await componentTitles(db, build.id)).toEqual(["A"]);
+    const library = await (await app.request(`/projects/${project.slug}/library`)).text();
+    expect(library).toContain("1 component");
   });
 
   it("leaves a file-by-file build on a non-default branch pending", async () => {

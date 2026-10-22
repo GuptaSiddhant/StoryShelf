@@ -1,7 +1,9 @@
+import { groupComponents } from "@storyshelf/core/capture";
 import { BuildModel } from "@storyshelf/core/models";
 import { CaptureAttemptModel } from "@storyshelf/core/models";
 import { CaptureLogModel } from "@storyshelf/core/models";
 import { CommentModel } from "@storyshelf/core/models";
+import { LabelModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
 import { SnapshotModel } from "@storyshelf/core/models";
 import { createUrlBuilder } from "@storyshelf/core/urls";
@@ -12,7 +14,7 @@ import {
   loadDesignResolutions,
   providerNameFor,
 } from "../routers/design.handlers.ts";
-import { getStore } from "../store.ts";
+import { catalogOf, getStore, testingEnabled } from "../store.ts";
 import {
   Badge,
   Button,
@@ -85,6 +87,16 @@ export async function renderBuildDetailPage(
   const designs = await loadDesignResolutions(project, snapshots).catch(() => new Map());
   const staleCount = Object.keys(drifted).length;
   const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const testing = testingEnabled();
+  const published = build.status === "approved" && attempts.length === 0;
+  const [catalog, labels] = await Promise.all([
+    catalogOf()
+      .load(project.id, build.id)
+      .catch(() => null),
+    new LabelModel(db).listForBuild(build.id),
+  ]);
+  const components = catalog ? groupComponents(catalog.entries) : [];
+  const storyCount = catalog?.entries.filter((entry) => entry.type === "story").length ?? 0;
 
   const grouped = new Map<string, typeof snapshots>();
   for (const snap of snapshots) {
@@ -110,19 +122,27 @@ export async function renderBuildDetailPage(
         title={
           <>
             {build.gitBranch} <Meta as="span">· {build.gitSha.slice(0, 7)}</Meta>{" "}
-            <Badge tone={statusTone(build.status)}>{build.status}</Badge>
-            {selective ? (
+            <Badge tone={statusTone(build.status)}>{published ? "Published" : build.status}</Badge>
+            {testing && selective ? (
               <>
                 {" "}
                 <Badge tone="info">affected capture</Badge>
               </>
             ) : null}
-            {!build.affectedOnly ? (
+            {testing && !build.affectedOnly ? (
               <>
                 {" "}
                 <Badge tone="neutral">full capture</Badge>
               </>
             ) : null}
+            {labels.map((label): HtmlEscapedString | Promise<HtmlEscapedString> => (
+              <span key={`${label.typeKey}:${label.value}`}>
+                {" "}
+                <Badge tone="neutral">
+                  {label.typeKey}: {label.value}
+                </Badge>
+              </span>
+            ))}
           </>
         }
         description={
@@ -132,7 +152,7 @@ export async function renderBuildDetailPage(
               ? `· ${build.authorName}${build.authorEmail ? ` <${build.authorEmail}>` : ""}`
               : ""}{" "}
             · {new Date(build.createdAt).toLocaleString()}
-            {selective ? (
+            {testing && selective ? (
               <>
                 {" "}
                 · {snapshots.length - inheritedCount} rendered, {inheritedCount} inherited
@@ -142,27 +162,31 @@ export async function renderBuildDetailPage(
         }
         actions={
           <>
-            <Button variant="primary" href={urls.buildDiff(project.slug, build.id)}>
-              Review diffs
-            </Button>
-            <Button variant="ghost" href={urls.short(build.id)}>
+            {testing ? (
+              <Button variant="primary" href={urls.buildDiff(project.slug, build.id)}>
+                Review diffs
+              </Button>
+            ) : null}
+            <Button variant={testing ? "ghost" : "primary"} href={urls.short(build.id)}>
               View Storybook
             </Button>
-            <form
-              method="post"
-              action={`/api/v1/projects/${project.slug}/builds/${build.id}/retry`}
-              hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/retry`}
-              hx-target="body"
-            >
-              <Button variant="secondary" type="submit">
-                Retry capture
-              </Button>
-            </form>
+            {testing ? (
+              <form
+                method="post"
+                action={`/api/v1/projects/${project.slug}/builds/${build.id}/retry`}
+                hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/retry`}
+                hx-target="body"
+              >
+                <Button variant="secondary" type="submit">
+                  Retry capture
+                </Button>
+              </form>
+            ) : null}
           </>
         }
       />
 
-      {staleCount > 0 ? (
+      {testing && staleCount > 0 ? (
         <StaleBaselineNotice
           project={project}
           build={build}
@@ -173,19 +197,33 @@ export async function renderBuildDetailPage(
 
       <div class="mb-1">
         <div class="grid grid--3">
-          <Card>
-            <Stat label="Snapshots" value={snapshots.length} />
-          </Card>
-          <Card>
-            <Stat label="Changed / new" value={build.changedCount} tone="warning" />
-          </Card>
-          <Card>
-            <Stat label="Approved / unchanged" value={build.approvedCount} tone="success" />
-          </Card>
+          {catalog ? (
+            <>
+              <Card>
+                <Stat label="Components" value={components.length} />
+              </Card>
+              <Card>
+                <Stat label="Stories" value={storyCount} />
+              </Card>
+            </>
+          ) : null}
+          {testing ? (
+            <>
+              <Card>
+                <Stat label="Snapshots" value={snapshots.length} />
+              </Card>
+              <Card>
+                <Stat label="Changed / new" value={build.changedCount} tone="warning" />
+              </Card>
+              <Card>
+                <Stat label="Approved / unchanged" value={build.approvedCount} tone="success" />
+              </Card>
+            </>
+          ) : null}
         </div>
       </div>
 
-      {attempts.length > 0 ? (
+      {testing && attempts.length > 0 ? (
         <Card>
           <SectionTitle>Capture attempts</SectionTitle>
           {attempts.map((attempt, index): HtmlEscapedString | Promise<HtmlEscapedString> => (
@@ -217,7 +255,7 @@ export async function renderBuildDetailPage(
         </Card>
       ) : null}
 
-      {canReview && (build.status === "reviewing" || build.status === "comparing") ? (
+      {testing && canReview && (build.status === "reviewing" || build.status === "comparing") ? (
         <div class="mb-1">
           <Card>
             <HStack>
@@ -253,7 +291,7 @@ export async function renderBuildDetailPage(
         </div>
       ) : null}
 
-      {snapshots.length === 0 ? (
+      {!testing ? null : snapshots.length === 0 ? (
         <EmptyState
           title="No snapshots yet"
           description="Capture is pending or failed. Try retrying capture."

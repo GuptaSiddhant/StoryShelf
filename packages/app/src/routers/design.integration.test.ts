@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "../index.tsx";
 import { getCsrfToken } from "../middleware/csrf.ts";
 import { stubAuth } from "../stub-auth.ts";
+import { stubRunner } from "../test-runner.ts";
 
 const SECRET = "design-test-secret";
 const figma = createFigmaDesign();
@@ -59,6 +60,7 @@ async function seed() {
   await snap("card-default", "Card");
   await snap("tag-default", "Tag", { designUrl: "https://www.figma.com/design/TAG/Kit" });
   const app = createShelfApp({
+    testing: { runner: stubRunner() },
     database: db,
     storage,
     logger: pino({ level: "silent" }),
@@ -354,6 +356,7 @@ describe("design settings authorization", () => {
     );
     await new MemberModel(db).set("p1", dev.id, "developer");
     const app = createShelfApp({
+      testing: { runner: stubRunner() },
       database: db,
       storage,
       auth,
@@ -565,6 +568,7 @@ async function bare() {
     updatedAt: NOW,
   } as never);
   const app = createShelfApp({
+    testing: { runner: stubRunner() },
     database: db,
     storage,
     logger: pino({ level: "silent" }),

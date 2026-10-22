@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import { createDatabaseCaptureQueue } from "../capture/db-queue/index.ts";
+import { BuildComponentModel } from "../models/build-component.ts";
 import { CaptureJobModel } from "../models/capture-job.ts";
 import { LabelModel } from "../models/label.ts";
 import { PackageUsageModel } from "../models/usage.ts";
@@ -338,6 +339,26 @@ describe("Retention and the database queue", () => {
     const left = (await db.list(db.tables.captureJobs)) as unknown as { buildId: string | null }[];
     expect(left.length).toBeGreaterThan(0);
     expect(left.every((row) => row.buildId === "b-new")).toBe(true);
+  });
+
+  it("removes a purged build's component rows and keeps those of builds it keeps", async () => {
+    const { db } = makeDatabase();
+    const { storage, objects } = makeStorage();
+    const project = await createTestProject(db, db.tables);
+    await insertApprovedBuild(db, "b-old", project.id, new Date(old).toISOString());
+    await insertApprovedBuild(db, "b-new", project.id, new Date().toISOString());
+    const components = new BuildComponentModel(db);
+    const row = { importPath: "src/A.stories.tsx", title: "A", storyCount: 1, hash: "h" };
+    await components.replaceForBuild(project.id, "b-old", [row]);
+    await components.replaceForBuild(project.id, "b-new", [row]);
+    objects.set(`${project.id}/builds/b-old/catalog.json`, Buffer.from("{}"));
+
+    const retention = new Retention(db, storage, retentionTables(db));
+    await retention.purge(project, { ttlDays: 30, keepLatestPerBranch: false });
+
+    expect(await components.listByBuild("b-old")).toEqual([]);
+    expect(await components.listByBuild("b-new")).toHaveLength(1);
+    expect(objects.has(`${project.id}/builds/b-old/catalog.json`)).toBe(false);
   });
 
   it("purges finished jobs older than the cutoff and keeps queued, running and recent ones", async () => {

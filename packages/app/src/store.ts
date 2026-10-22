@@ -5,6 +5,7 @@ import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import type { Ai } from "@storyshelf/core/ai";
+import { createCatalogLoader, type CatalogLoader } from "@storyshelf/core/capture";
 import type { NotificationsConfig, ShelfConfig, UIConfig } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 import type { AuthUser } from "@storyshelf/core/types";
@@ -52,4 +53,21 @@ export function getStore(): Store {
     throw new Error("Store not available. Use runWithStore().");
   }
   return store;
+}
+
+/**
+ * Whether this instance has `testing`: it captures and compares builds, so pages layer snapshot
+ * data (screenshots, statuses, design links) onto what the catalog gives them. Without it the same
+ * pages render from the published Storybook alone.
+ */
+export function testingEnabled(store: Store = getStore()): boolean {
+  return store.enqueueCapture !== undefined;
+}
+
+/** The catalog loader pages read; hand-built stores without one get an uncached loader. */
+export function catalogOf(store: Store = getStore()): CatalogLoader {
+  return (
+    store.publish?.catalog ??
+    createCatalogLoader({ db: store.db, storage: store.storage, logger: store.logger })
+  );
 }

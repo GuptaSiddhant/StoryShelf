@@ -36,6 +36,8 @@ flowchart LR
 
 Default-branch builds auto-approve and write baselines; feature-branch builds land in `reviewing`.
 
+Without `testing` nothing is captured: a published default-branch build becomes `approved` when publishing ends and is labelled **Published** on its page, which shows component and story counts from the [catalog](/concepts/publishing/#the-catalog-and-the-pages-it-feeds) instead of snapshot counts.
+
 **Snapshots** track the diff result:
 
 | Status                  | Meaning                                                                |

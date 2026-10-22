@@ -1,213 +1,113 @@
 // oxlint-disable typescript/promise-function-async -- Hono JSX may return Promise<HtmlEscapedString>
-import { BuildModel } from "@storyshelf/core/models";
-import { ProjectModel } from "@storyshelf/core/models";
-import { SnapshotModel } from "@storyshelf/core/models";
-import type { Build } from "@storyshelf/core/schema";
-import type { Project } from "@storyshelf/core/schema";
-import type { Snapshot } from "@storyshelf/core/schema";
+import { BuildModel, ProjectModel, SnapshotModel } from "@storyshelf/core/models";
+import type { Build, Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
-import { storybookDir } from "@storyshelf/core/utils";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { posix } from "node:path";
 import { loadHealthPanel, type HealthPanelData } from "../insights/health-panel.ts";
+import { catalogOf, getStore, testingEnabled } from "../store.ts";
 import {
-  loadDesignResolutions,
-  designUrlsFor,
-  loadDesignPreviews,
-  loadProjectDesignLinks,
-  providerNameFor,
-} from "../routers/design.handlers.ts";
-import { getStore } from "../store.ts";
-import {
-  Badge,
   Button,
-  Card,
-  CardSection,
   EmptyState,
   FilterInput,
   HStack,
   Meta,
   PageHeader,
-  SectionTitle,
   SelectField,
-  VStack,
   statusTone,
+  Badge,
 } from "../ui/components.tsx";
-import { css } from "../ui/css.ts";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
-import {
-  diffPaneImg,
-  snapshotCard,
-  snapshotCardBody,
-  snapshotCardHead,
-  snapshotCardMeta,
-  snapshotGrid,
-} from "../ui/styles/review.ts";
-import { groupSnapshots } from "./build-diff-model.ts";
-import {
-  DesignButtons,
-  ProjectDesignLinks,
-  type DesignPreviewInfo,
-  type ProjectDesignLink,
-} from "./design-links.tsx";
+import { ProjectDesignLinks } from "./design-links.tsx";
 import { HealthSlot } from "./health-panel.tsx";
+import { LibraryGrid } from "./library-grid.tsx";
+import { entriesFromSnapshots, groupLibrary, type LibraryGroup } from "./library-model.ts";
+import { loadSnapshotLayer, type SnapshotLayer } from "./library-snapshots.tsx";
 
-/** Snapshot image with library height cap, extending the shared diff pane image. */
-const snapshotImg = css`
-  /* snapshot-img */
-  ${diffPaneImg}
-  max-height: 240px;
-  object-fit: contain;
-`;
+type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
-/** Library page: gallery grouped by title from latest build on selected branch. */
+/**
+ * Library page (ADR 0006, decision 9): the components of the latest build of the selected branch,
+ * whatever its status, from the build's Storybook catalog. With `testing` the cards gain
+ * screenshots, statuses and design links, and the page the health panel.
+ */
 export async function renderLibraryPage(
   slug: string,
   branch?: string,
 ): Promise<RenderedContent | null> {
-  const { db, storage } = getStore();
-  const project = await new ProjectModel(db).getBySlug(slug);
+  const project = await new ProjectModel(getStore().db).getBySlug(slug);
   if (!project) return null;
-  const build = await getLibraryBuild(db, project, branch);
+  const build = await getLibraryBuild(project, branch);
   if (!build) return renderEmptyLibrary(project);
-  const snapshots = await new SnapshotModel(db).listByBuild(build.id);
-  if (snapshots.length === 0) return renderEmptySnapshots(project, build);
-  const [branches, docsByStory, health, design] = await Promise.all([
-    distinctBranches(db, project.id),
-    docsEntriesByStory(storage, project.id, build.id, snapshots),
-    loadHealthPanel(project),
-    loadLibraryDesign(project, snapshots).catch(() => NO_LIBRARY_DESIGN),
-  ]);
-  return renderLibraryGrid(project, build, snapshots, { branches, docsByStory, health, design });
-}
-
-/** Library design data: per-snapshot component links plus project-level file links. */
-interface LibraryDesign {
-  bySnapshot: Map<string, string[]>;
-  previews: Map<string, DesignPreviewInfo>;
-  projectLinks: ProjectDesignLink[];
-}
-
-/** Rendered when design data cannot be loaded: the library works without design links. */
-const NO_LIBRARY_DESIGN: LibraryDesign = {
-  bySnapshot: new Map(),
-  previews: new Map(),
-  projectLinks: [],
-};
-
-async function loadLibraryDesign(project: Project, snapshots: Snapshot[]): Promise<LibraryDesign> {
-  const [resolutions, projectLinks] = await Promise.all([
-    loadDesignResolutions(project, snapshots),
-    loadProjectDesignLinks(project),
-  ]);
-  const bySnapshot = new Map(
-    snapshots.map((snap) => [snap.id, designUrlsFor(resolutions, snap)] as const),
+  const data = await loadLibraryData(project, build);
+  if (data.groups.length === 0) return renderNoStories(project, build);
+  return (
+    <DocumentLayout
+      title="Library"
+      nav={{ active: "library", projectSlug: project.slug, projectName: project.name }}
+    >
+      <LibraryHeader
+        project={project}
+        build={build}
+        components={data.groups.length}
+        stories={data.groups.reduce((total, group) => total + group.stories.length, 0)}
+        branches={data.branches}
+      />
+      {data.layer && data.layer.design.projectLinks.length > 0 ? (
+        <ProjectDesignLinks links={data.layer.design.projectLinks} />
+      ) : null}
+      <HealthSlot project={project} data={data.health} />
+      <LibraryGrid groups={data.groups} project={project} build={build} layer={data.layer} />
+      <div data-filter-empty hidden>
+        <Meta center>No stories match your filter.</Meta>
+      </div>
+    </DocumentLayout>
   );
-  const previews = await loadDesignPreviews(project, [...bySnapshot.values()].flat());
-  return { bySnapshot, previews, projectLinks };
 }
 
-async function getLibraryBuild(
-  db: ReturnType<typeof getStore>["db"],
-  project: Project,
-  branch?: string,
-): Promise<Build | null> {
-  const buildModel = new BuildModel(db);
+/** Everything the library renders of a build: catalog groups, branches, and the `testing` layer. */
+interface LibraryData {
+  groups: LibraryGroup[];
+  branches: string[];
+  layer: SnapshotLayer | null;
+  health: HealthPanelData | null;
+}
+
+async function loadLibraryData(project: Project, build: Build): Promise<LibraryData> {
+  const testing = testingEnabled();
+  const [catalog, snapshots, branches] = await Promise.all([
+    catalogOf().load(project.id, build.id),
+    testing ? new SnapshotModel(getStore().db).listByBuild(build.id) : Promise.resolve([]),
+    distinctBranches(project.id),
+  ]);
+  const entries = catalog?.entries ?? entriesFromSnapshots(snapshots);
+  return {
+    groups: groupLibrary(entries),
+    branches,
+    layer: snapshots.length > 0 ? await loadSnapshotLayer(project, snapshots) : null,
+    health: testing ? await loadHealthPanel(project) : null,
+  };
+}
+
+/** Latest build of the branch (default branch when none is chosen), whatever its status. */
+async function getLibraryBuild(project: Project, branch?: string): Promise<Build | null> {
+  const buildModel = new BuildModel(getStore().db);
   const trimmed = branch?.trim();
   const target = trimmed === undefined || trimmed === "" ? project.gitDefaultBranch : trimmed;
-  const byBranch = await buildModel.list(project.id, { branch: target });
+  const byBranch = await buildModel.list(project.id, { branch: target, limit: 1 });
   if (byBranch[0]) return byBranch[0];
   if (target !== project.gitDefaultBranch) {
-    const defaults = await buildModel.list(project.id, { branch: project.gitDefaultBranch });
+    const defaults = await buildModel.list(project.id, {
+      branch: project.gitDefaultBranch,
+      limit: 1,
+    });
     if (defaults[0]) return defaults[0];
   }
-  const all = await buildModel.list(project.id);
-  return all[0] ?? null;
+  return (await buildModel.list(project.id, { limit: 1 }))[0] ?? null;
 }
 
-async function distinctBranches(
-  db: ReturnType<typeof getStore>["db"],
-  projectId: string,
-): Promise<string[]> {
-  const buildsList = await new BuildModel(db).list(projectId);
+async function distinctBranches(projectId: string): Promise<string[]> {
+  const buildsList = await new BuildModel(getStore().db).list(projectId);
   return [...new Set(buildsList.map((b) => b.gitBranch))].toSorted((a, b) => a.localeCompare(b));
-}
-
-/** Storybook index entries (only the docs subset we need). */
-interface LibraryIndexEntry {
-  id?: string;
-  type?: string;
-}
-
-/**
- * Map snapshot story ids to their component's docs entry id. Reads the build's
- * Storybook index from storage and returns an empty map when statics are
- * purged or the build has no docs entries, so the Library never links to a
- * docs page that does not exist.
- */
-async function docsEntriesByStory(
-  storage: ReturnType<typeof getStore>["storage"],
-  projectId: string,
-  buildId: string,
-  snapshots: Snapshot[],
-): Promise<Map<string, string>> {
-  const prefixes = await readDocsPrefixes(storage, projectId, buildId);
-  const byStory = new Map<string, string>();
-  for (const snap of snapshots) {
-    const docsId = docsEntryId(prefixes, snap.storyId);
-    if (docsId) byStory.set(snap.storyId, docsId);
-  }
-  return byStory;
-}
-
-async function readDocsPrefixes(
-  storage: ReturnType<typeof getStore>["storage"],
-  projectId: string,
-  buildId: string,
-): Promise<Set<string>> {
-  const candidates = await Promise.all(
-    ["index.json", "stories.json"].map((name) =>
-      readIndexEntries(storage, projectId, buildId, name),
-    ),
-  );
-  const prefixes = new Set<string>();
-  for (const entries of candidates) {
-    if (entries) {
-      for (const entry of Object.values(entries)) {
-        if (entry?.type === "docs" && typeof entry.id === "string" && entry.id.endsWith("--docs")) {
-          prefixes.add(entry.id.slice(0, -"--docs".length));
-        }
-      }
-      return prefixes;
-    }
-  }
-  return prefixes;
-}
-
-async function readIndexEntries(
-  storage: ReturnType<typeof getStore>["storage"],
-  projectId: string,
-  buildId: string,
-  name: string,
-): Promise<Record<string, LibraryIndexEntry> | null> {
-  try {
-    const raw = await storage.read(posix.join(storybookDir(projectId, buildId), name));
-    const parsed = JSON.parse(raw.toString("utf8")) as {
-      entries?: Record<string, LibraryIndexEntry>;
-    };
-    return parsed.entries ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function docsEntryId(prefixes: Set<string>, storyId: string): string | undefined {
-  for (const prefix of prefixes) {
-    if (storyId.startsWith(`${prefix}--`) || storyId === prefix) {
-      return `${prefix}--docs`;
-    }
-  }
-  return undefined;
 }
 
 function renderEmptyLibrary(project: Project): RenderedContent {
@@ -227,8 +127,10 @@ function renderEmptyLibrary(project: Project): RenderedContent {
   );
 }
 
-function renderEmptySnapshots(project: Project, build: Build): RenderedContent {
+/** A build with nothing to list: still publishing, failed, or its Storybook is gone. */
+function renderNoStories(project: Project, build: Build): RenderedContent {
   const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const preparing = build.status === "pending";
   return (
     <DocumentLayout
       title="Library"
@@ -243,8 +145,12 @@ function renderEmptySnapshots(project: Project, build: Build): RenderedContent {
         }
       />
       <EmptyState
-        title="No stories in latest build"
-        description="The latest build has no snapshots yet."
+        title={preparing ? "Preparing the library" : "No stories in the latest build"}
+        description={
+          preparing
+            ? "The latest build is still being published. Reload in a moment."
+            : "The latest build has no readable Storybook index, so there is nothing to list."
+        }
         action={
           <Button variant="secondary" href={urls.build(project.slug, build.id)}>
             View build
@@ -255,85 +161,27 @@ function renderEmptySnapshots(project: Project, build: Build): RenderedContent {
   );
 }
 
-function groupByTitle(snapshots: Snapshot[]): Map<string, Snapshot[]> {
-  const map = new Map<string, Snapshot[]>();
-  for (const snap of snapshots) {
-    const key = snap.storyTitle || "Untitled";
-    const list = map.get(key) ?? [];
-    list.push(snap);
-    map.set(key, list);
-  }
-  return map;
-}
-
-function distinctViewports(snapshots: Snapshot[]): string[] {
-  return [...new Set(snapshots.map((s) => s.viewportName))].toSorted();
-}
-
-/** Everything the library grid renders besides the build and its snapshots. */
-interface LibraryContext {
+function LibraryHeader(props: {
+  project: Project;
+  build: Build;
+  components: number;
+  stories: number;
   branches: string[];
-  docsByStory: Map<string, string>;
-  health: HealthPanelData | null;
-  design: LibraryDesign;
-}
-
-/** One snapshot per story/mode: the primary engine's (other browsers are review detail). */
-function primaryEngineSnapshots(snapshots: Snapshot[]): Snapshot[] {
-  return groupSnapshots(snapshots).map((group) => group.primary);
-}
-
-function renderLibraryGrid(
-  project: Project,
-  build: Build,
-  allSnapshots: Snapshot[],
-  context: LibraryContext,
-): RenderedContent {
-  const { branches, health } = context;
-  const snapshots = primaryEngineSnapshots(allSnapshots);
-  const byTitle = groupByTitle(snapshots);
-  const viewportNames = distinctViewports(snapshots);
-  const multi = viewportNames.length > 1;
-  return (
-    <DocumentLayout
-      title="Library"
-      nav={{ active: "library", projectSlug: project.slug, projectName: project.name }}
-    >
-      {renderLibraryHeader(project, build, snapshots.length, branches)}
-      {context.design.projectLinks.length > 0 ? (
-        <ProjectDesignLinks links={context.design.projectLinks} />
-      ) : null}
-      <HealthSlot project={project} data={health} />
-      {multi ? (
-        <Card>
-          <Meta as="span">Viewports: {viewportNames.join(" · ")}</Meta>
-        </Card>
-      ) : null}
-      {renderTitleList(byTitle, project, build, multi, context)}
-      <div data-filter-empty hidden>
-        <Meta center>No stories match your filter.</Meta>
-      </div>
-    </DocumentLayout>
-  );
-}
-
-function renderLibraryHeader(
-  project: Project,
-  build: Build,
-  storyCount: number,
-  branches: string[],
-): HtmlEscapedString | Promise<HtmlEscapedString> {
+}): Rendered {
+  const { project, build } = props;
   const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
   return (
     <PageHeader
       title="Library"
       description={
         <>
-          {storyCount} stories · Latest build{" "}
+          {props.components} {props.components === 1 ? "component" : "components"} · {props.stories}{" "}
+          {props.stories === 1 ? "story" : "stories"} · Latest build{" "}
           <a href={urls.build(project.slug, build.id)}>
             {build.gitBranch} · {build.gitSha.slice(0, 7)}
           </a>{" "}
-          · {new Date(build.createdAt).toLocaleString()} · {build.status}
+          · {new Date(build.createdAt).toLocaleString()}{" "}
+          <Badge tone={statusTone(build.status)}>{build.status}</Badge>
         </>
       }
       actions={
@@ -342,220 +190,28 @@ function renderLibraryHeader(
           <Button variant="ghost" size="sm" icon="external-link" href={urls.short(build.id)}>
             View Storybook
           </Button>
-          {renderBranchPicker(project, build, branches)}
+          <BranchPicker project={project} build={build} branches={props.branches} />
         </HStack>
       }
     />
   );
 }
 
-function renderBranchPicker(
-  project: Project,
-  build: Build,
-  branches: string[],
-): HtmlEscapedString | Promise<HtmlEscapedString> {
+function BranchPicker(props: { project: Project; build: Build; branches: string[] }): Rendered {
   return (
-    <form method="get" action={`/projects/${project.slug}/library`}>
+    <form method="get" action={`/projects/${props.project.slug}/library`}>
       <HStack>
         <SelectField
           label="Branch"
           name="branch"
           layout="inline"
-          value={build.gitBranch}
-          options={branches.map((b) => ({ value: b, label: b }))}
+          value={props.build.gitBranch}
+          options={props.branches.map((b) => ({ value: b, label: b }))}
         />
         <Button variant="secondary" type="submit">
           View
         </Button>
       </HStack>
     </form>
-  );
-}
-
-function renderTitleList(
-  byTitle: Map<string, Snapshot[]>,
-  project: Project,
-  build: Build,
-  multi: boolean,
-  context: LibraryContext,
-): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const titles = [...byTitle.keys()].toSorted((a, b) => a.localeCompare(b));
-  return (
-    <VStack>
-      {titles.map((title) =>
-        renderTitleGroup(title, byTitle.get(title) ?? [], project, build, multi, context),
-      )}
-    </VStack>
-  );
-}
-
-/** Component page URL of a title group (its first story file), when the index carries one. */
-function componentHref(project: Project, group: Snapshot[]): string | undefined {
-  const importPath = group.find((snap) => snap.storyImportPath)?.storyImportPath;
-  return importPath
-    ? createUrlBuilder("/", getStore().config.publishedBaseDomain).component(
-        project.slug,
-        importPath,
-      )
-    : undefined;
-}
-
-function renderTitleGroup(
-  title: string,
-  group: Snapshot[],
-  project: Project,
-  build: Build,
-  hasMultipleViewports: boolean,
-  context: LibraryContext,
-): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const byViewport = groupByViewport(group);
-  const vNames = [...byViewport.keys()].toSorted();
-  return (
-    <Card
-      key={title}
-      padded={false}
-      data-filter-item
-      data-filter-text={`${title} ${group.map((snap) => snap.storyName).join(" ")}`}
-    >
-      <CardSection divider>
-        <SectionTitle>
-          {componentHref(project, group) ? (
-            <a href={componentHref(project, group)}>{title}</a>
-          ) : (
-            title
-          )}
-        </SectionTitle>
-        <Meta as="span">{group.length} stories</Meta>
-      </CardSection>
-      <CardSection>
-        <VStack>
-          {vNames.map((vName) =>
-            renderViewportGroup(
-              vName,
-              byViewport.get(vName) ?? [],
-              project,
-              build,
-              hasMultipleViewports,
-              context,
-            ),
-          )}
-        </VStack>
-      </CardSection>
-    </Card>
-  );
-}
-
-function groupByViewport(group: Snapshot[]): Map<string, Snapshot[]> {
-  const map = new Map<string, Snapshot[]>();
-  for (const snap of group) {
-    const list = map.get(snap.viewportName) ?? [];
-    list.push(snap);
-    map.set(snap.viewportName, list);
-  }
-  return map;
-}
-
-function renderViewportGroup(
-  vName: string,
-  snaps: Snapshot[],
-  project: Project,
-  build: Build,
-  hasMultipleViewports: boolean,
-  context: LibraryContext,
-): HtmlEscapedString | Promise<HtmlEscapedString> {
-  return (
-    <div key={vName}>
-      {hasMultipleViewports ? <SectionTitle level={3}>{vName}</SectionTitle> : null}
-      <div class={snapshotGrid}>
-        {snaps
-          .toSorted((a, b) => a.storyName.localeCompare(b.storyName))
-          .map((snap) => renderSnapshotCard(snap, project, build, context))}
-      </div>
-    </div>
-  );
-}
-
-function renderSnapshotCard(
-  snap: Snapshot,
-  project: Project,
-  build: Build,
-  context: LibraryContext,
-): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const docsId = context.docsByStory.get(snap.storyId);
-  return (
-    <div
-      key={snap.id}
-      class={snapshotCard}
-      data-filter-item
-      data-filter-text={`${snap.storyTitle} ${snap.storyName}`}
-    >
-      <div class={snapshotCardHead}>
-        <strong>{snap.storyName}</strong>
-        <span class={snapshotCardMeta}>
-          <Badge tone={statusTone(snap.status)}>{snap.status}</Badge> {snap.viewportWidth}×
-          {snap.viewportHeight}
-        </span>
-      </div>
-      <div class={snapshotCardBody}>
-        <img
-          class={snapshotImg}
-          src={`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots/${snap.id}/image`}
-          alt={`${snap.storyTitle} / ${snap.storyName}`}
-          loading="lazy"
-        />
-        <HStack>
-          {renderCardActions(snap, project, build, docsId)}
-          <DesignButtons
-            urls={context.design.bySnapshot.get(snap.id) ?? []}
-            providerName={providerNameFor}
-            previews={context.design.previews}
-            componentHref={componentHref(project, [snap])}
-          />
-        </HStack>
-      </div>
-    </div>
-  );
-}
-
-function renderCardActions(
-  snap: Snapshot,
-  project: Project,
-  build: Build,
-  docsId: string | undefined,
-): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
-  return (
-    <>
-      <Button
-        variant="secondary"
-        size="sm"
-        icon="columns"
-        href={`${urls.buildDiff(project.slug, build.id)}?snapshot=${snap.id}`}
-      >
-        Review
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        icon="external-link"
-        href={`${urls.storybookBuild(project.slug, build.id)}/?storyId=${encodeURIComponent(snap.storyId)}`}
-        target="_blank"
-        rel="noopener"
-      >
-        Preview
-      </Button>
-      {docsId ? (
-        <Button
-          variant="ghost"
-          size="sm"
-          icon="book"
-          href={`/projects/${project.slug}/storybook/build/${build.id}/?storyId=${encodeURIComponent(docsId)}&viewMode=docs`}
-          target="_blank"
-          rel="noopener"
-        >
-          Docs
-        </Button>
-      ) : null}
-    </>
   );
 }

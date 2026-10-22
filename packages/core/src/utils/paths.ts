@@ -99,3 +99,9 @@ export function storybookZipPath(projectId: string, buildId: string): string {
   assertSegments([projectId, buildId]);
   return `${projectId}/builds/${buildId}/storybook.zip`;
 }
+
+/** Storage path of a build's persisted catalog (ADR 0006, decision 9), next to its `storybook/` statics. */
+export function catalogPath(projectId: string, buildId: string): string {
+  assertSegments([projectId, buildId]);
+  return `${projectId}/builds/${buildId}/catalog.json`;
+}

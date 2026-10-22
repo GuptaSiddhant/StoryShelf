@@ -1,5 +1,12 @@
 import type { ShelfOptions } from "@storyshelf/core/config";
-import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
+import { BuildComponentModel } from "@storyshelf/core/models";
+import {
+  createTestBuild,
+  createTestProject,
+  makeDatabase,
+  makeStorage,
+} from "@storyshelf/core/test-helpers";
+import { storybookDir } from "@storyshelf/core/utils";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { setupPublishing } from "./publish-setup.ts";
@@ -17,7 +24,7 @@ describe("setupPublishing", () => {
     const wiring = setupPublishing(options(), {}, logger, false, {});
     expect(wiring.enqueuePublish).toBeTypeOf("function");
     expect(wiring.consumer?.isRunning()).toBe(false);
-    expect(wiring.afterPublish).toEqual([]);
+    expect(wiring.afterPublish).toHaveLength(1);
   });
 
   it("wires no consumer and no job queue on a serverless host", () => {
@@ -34,5 +41,26 @@ describe("setupPublishing", () => {
     await wiring.consumer?.stop();
     await started;
     expect(wiring.consumer?.isRunning()).toBe(false);
+  });
+
+  it.each([
+    ["a long-running host", {}],
+    ["a serverless host", { VERCEL: "1" }],
+  ])("catalogues a build when its publishing completes, on %s", async (_name, env) => {
+    const opts = options();
+    const project = await createTestProject(opts.database, opts.database.tables);
+    const build = await createTestBuild(opts.database, opts.database.tables, project.id);
+    const index = {
+      entries: { "a--x": { id: "a--x", title: "A", name: "X", importPath: "./A.tsx" } },
+    };
+    await opts.storage.write(
+      `${storybookDir(project.id, build.id)}/index.json`,
+      Buffer.from(JSON.stringify(index)),
+    );
+    const wiring = setupPublishing(opts, {}, logger, false, env);
+    await wiring.completer.complete(build.id, { ok: true });
+    const rows = await new BuildComponentModel(opts.database).listByBuild(build.id);
+    expect(rows.map((row) => row.title)).toEqual(["A"]);
+    expect((await wiring.catalog.load(project.id, build.id))?.entries).toHaveLength(1);
   });
 });
