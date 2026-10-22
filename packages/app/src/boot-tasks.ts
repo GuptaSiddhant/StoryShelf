@@ -3,17 +3,20 @@ import type { ShelfOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 import { checkCredentialsAfterSetup } from "./credentials.ts";
 import { logHostingOnlyMode } from "./hidden-data.ts";
-import { trackBackground, type LifecycleCell } from "./lifecycle.ts";
+import { startConsumer, trackBackground, type LifecycleCell } from "./lifecycle.ts";
 import type { ServerRuntime } from "./runtime.ts";
 
-/** Boot-time checks that run once adapters are ready: stuck-capture recovery and credential state. */
+/**
+ * Boot-time work that runs once adapters are ready: the job consumer starts (there is no boot sweep
+ * of builds left `capturing`: leases expire and jobs are redelivered, so a second instance can
+ * start without touching a first one's builds), and the credential state is checked.
+ */
 export function runBootTasks(
   cell: LifecycleCell,
   scoped: ShelfOptions,
   runtime: ServerRuntime,
-  recoverStuck: (() => Promise<unknown>) | undefined,
 ): void {
-  recoverAfterSetup(cell, recoverStuck, runtime.logger);
+  startConsumerAfterSetup(cell, runtime.logger);
   sweepScratchOnBoot(cell, runtime.config.scratchDir, runtime.logger);
   checkCredentialsAfterSetup(cell, scoped.database, runtime.config, runtime.logger);
   logHostingOnlyAfterSetup(cell, scoped, runtime.logger);
@@ -38,25 +41,18 @@ function logHostingOnlyAfterSetup(cell: LifecycleCell, scoped: ShelfOptions, log
   );
 }
 
-/** Once adapters are ready, requeue-once or fail builds a restart left `capturing`. */
-function recoverAfterSetup(
-  cell: LifecycleCell,
-  recoverStuck: (() => Promise<unknown>) | undefined,
-  logger: Logger,
-): void {
-  if (!recoverStuck) {
-    return;
-  }
+/** Once adapters are ready, start the consumer, so a host that never calls `setup()` still runs jobs. */
+function startConsumerAfterSetup(cell: LifecycleCell, logger: Logger): void {
   trackBackground(
     cell,
     cell.ready
-      .then(async (setup) => {
+      .then((setup) => {
         if (setup.ok) {
-          await recoverStuck();
+          startConsumer(cell, logger);
         }
       })
       .catch((error: unknown) => {
-        logger.error({ err: error }, "stuck capture recovery failed");
+        logger.error({ err: error }, "job consumer failed to start");
       }),
   );
 }

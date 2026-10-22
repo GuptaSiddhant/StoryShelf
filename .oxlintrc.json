@@ -178,7 +178,6 @@
       "files": [
         "packages/core/src/capture/orchestrator.ts",
         "packages/core/src/capture/pipeline.ts",
-        "packages/core/src/capture/queue.ts",
         "packages/core/src/capture/status-fanout.ts",
         "packages/app/src/middleware/csrf.ts",
         "packages/app/src/middleware/rate-limit.ts",

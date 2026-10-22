@@ -1,6 +1,6 @@
 import type { Logger } from "pino";
 import { z } from "zod";
-import type { CaptureQueue } from "./adapters/capture-queue.ts";
+import type { PollableCaptureQueue } from "./adapters/capture-queue.ts";
 import type { CaptureRunner } from "./adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "./adapters/database.ts";
 import type { DesignProvider } from "./adapters/design.ts";
@@ -305,24 +305,34 @@ export function validateUiConfig(config: Record<string, unknown>): UIConfig {
 /** Testing options: what renders, how jobs are queued, how many run at once, and how screenshots are compared. */
 export interface ShelfTestingOptions {
   /**
-   * Pure renderer. Required unless `queue` is set: with a user-supplied queue a remote worker may
-   * render instead, so this process does not.
+   * Pure renderer. Required unless `queue` is set: with a user-supplied queue a remote consumer
+   * may render instead, so this process does not.
    */
   runner?: CaptureRunner;
-  /** Queue adapter; defaults to the in-process queue when a runner is set. */
-  queue?: CaptureQueue;
-  /** Builds captured at once by the in-process queue; auto-sized from CPU and memory when unset. */
+  /**
+   * Replaces the database queue for `capture` jobs (ADR 0006, decision 6). With `runner` it is
+   * consumed by this instance like the database queue; without one it is enqueue-only and
+   * something else consumes it. Publish jobs stay on the database queue.
+   */
+  queue?: PollableCaptureQueue;
+  /** Jobs this instance runs at once; auto-sized from CPU and memory when unset. */
   concurrency?: number;
   /**
+   * Retries after a first failed attempt before a capture job fails for good (default 2: three
+   * attempts). One limit covers failed attempts, lost leases and forked-child crashes.
+   */
+  retries?: number;
+  /**
    * Module run in a forked capture child (it calls `runCaptureChild` from `@storyshelf/core/capture`).
-   * Needs `runner`, which serves as the in-process fallback. Ignored when `queue` is a remote queue.
+   * The app consumes the queue and pushes each job to the child over IPC. Needs `runner`, which
+   * serves as the in-process fallback.
    */
   workerEntry?: string;
   /**
    * Split a big build across the queue: captures (story x viewport x engine) per shard. A build of
    * up to twice this size still renders in one piece. Unset keeps every build in one job. Needs
-   * `runner`. With `workerEntry` the forked child plans and renders shards, and the parent hands
-   * them out over IPC.
+   * `runner`. With `workerEntry` the forked child plans and renders shards and puts them on the
+   * database queue itself.
    */
   shardSize?: number;
   /**

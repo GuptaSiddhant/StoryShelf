@@ -66,7 +66,7 @@ This generates `src/index.ts`, `package.json` and `tsconfig.json` with the corre
 | ------------- | --------------------------------- | -------------------------------------------- |
 | Database      | `@storyshelf/db-sqlite`           | node:sqlite + Drizzle, WAL mode, single file |
 | Storage       | `@storyshelf/storage-local`       | Local filesystem, `--data-dir`               |
-| Capture queue | `InMemoryCaptureQueue` (built-in) | Async, concurrency-limited, in-process       |
+| Capture queue | Database queue (built-in)         | `capture_jobs` in your database, leased      |
 | Auth          | `@storyshelf/auth`                | Local accounts, social, SSO/SAML, passkeys   |
 
 Swap the database layer for `@storyshelf/db-postgres` (Postgres via `postgres.js` + Drizzle, see [Postgres provider recipes](/packages/db-postgres/#provider-recipes)) or `@storyshelf/db-sqlite/turso` (Turso/libSQL) without changing the rest of the stack.

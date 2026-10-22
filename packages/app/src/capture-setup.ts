@@ -1,257 +1,171 @@
-import type { CaptureQueue, PollableJob } from "@storyshelf/core/adapter/capture-queue";
+/**
+ * Capture wiring (ADR 0006, decisions 4 to 6): where uploads queue their capture, and the handler
+ * of `capture` jobs. Captures queue on the shared database queue, or on `testing.queue` when one
+ * is supplied. The handler runs them in this process, or in a forked child the parent pushes jobs
+ * to (`testing.workerEntry`). The consumer that polls the queue and calls the handler is built
+ * in `jobs-setup.ts`; with no `testing.runner` there is no handler and some other process consumes.
+ */
+import type { CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
 import type { CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
 import type { GitHostProvider } from "@storyshelf/core/adapter/git-host";
 import {
-  createDispatchJob,
+  captureDispatchDeps,
+  createCaptureHandler,
+  DEFAULT_RETRIES,
   failCrashedCapture,
-  InMemoryCaptureQueue,
-  recoverStuckCaptures,
-} from "@storyshelf/core/capture";
-import type {
-  CaptureDispatchJob,
-  CaptureJobOptions,
-  DispatchDeps,
-  ForkedJobOutcome,
-  RecoveryDeps,
-  RecoveryResult,
+  isFinalAttempt,
+  type CaptureHandlerOptions,
+  type ConsumerJob,
+  type KindHandler,
 } from "@storyshelf/core/capture";
 import { DEFAULT_SCRATCH_DIR } from "@storyshelf/core/config";
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
-import { BuildModel } from "@storyshelf/core/models";
-import { recommendedBuildConcurrency } from "@storyshelf/core/utils";
-import { captureMetrics, currentTraceparent } from "@storyshelf/observability";
-import { createForkedQueue, shouldForkCapture } from "./capture-process.ts";
+import { currentTraceparent } from "@storyshelf/observability";
+import { notifyCaptureFailed } from "./capture-alerts.ts";
+import { createForkedHandler, shouldForkCapture } from "./capture-process.ts";
 import { credentialKeys } from "./credential-keys.ts";
-import { notifySystemWith } from "./notify.ts";
-import { CAPTURE_LEASE_MS, createStalledHandler } from "./stalled-capture.ts";
+import type { JobQueue } from "./job-queue.ts";
 
-/**
- * Wiring for the capture queue: the queue instance (if any) and a helper
- * to enqueue a build for rendering. When no `captureRunner` is configured
- * both are null/undefined and builds remain `pending` until a runner is added.
- */
-export interface QueueWiring {
+/** The `capture` handler, with a way to stop a forked child once the consumer has drained. */
+export interface CaptureHandler extends KindHandler {
+  close?: () => Promise<void>;
+}
+
+/** What uploads and the consumer need of capture. */
+export interface CaptureWiring {
+  /** Where captures queue: the database queue, `testing.queue`, or null without `testing`. */
   queue: CaptureQueue | null;
+  /** Queues a capture for a build; undefined without `testing`. */
   enqueueCapture: ((buildId: string, reqId?: string) => Promise<void>) | undefined;
-  /**
-   * Boot sweep for builds a restart left in `capturing` (requeue once, else fail).
-   * Only set for the in-process queue; remote queues redeliver on their own.
-   */
-  recoverStuck?: () => Promise<RecoveryResult>;
+  /** Runs `capture` jobs here; null when no runner is set (another process consumes the queue). */
+  handler: CaptureHandler | null;
 }
 
-/** Enqueue a build, continuing the active request trace when present. */
-async function enqueueJob(queue: CaptureQueue, buildId: string, reqId?: string): Promise<void> {
-  const traceparent = currentTraceparent();
-  await queue.enqueue({ buildId, reqId, ...(traceparent ? { traceparent } : {}) });
-}
-
-/** Wrap the dispatch job with duration + outcome metrics. */
-async function timedRunJob(
-  runJob: (job: CaptureDispatchJob) => Promise<void>,
-  job: CaptureDispatchJob,
-): Promise<void> {
-  const instruments = captureMetrics();
-  const start = performance.now();
-  try {
-    await runJob(job);
-  } catch (error) {
-    instruments.jobsFailed.add(1);
-    instruments.jobDuration.record(performance.now() - start);
-    throw error;
-  }
-  instruments.jobsCompleted.add(1);
-  instruments.jobDuration.record(performance.now() - start);
-}
-
-/**
- * Builds already alerted about, keyed by the build's last update. A sharded build settles one job
- * per shard and every one of them sees the failed build; only the first alerts. A retry rewrites
- * the build, so its next failure is a new key.
- */
-const alerted = new Set<string>();
-
-export function alreadyAlerted(build: { id: string; updatedAt: string }): boolean {
-  const key = `${build.id}@${build.updatedAt}`;
-  if (alerted.has(key)) {
-    return true;
-  }
-  alerted.add(key);
-  return false;
-}
-
-/** Alert admins when an in-process capture leaves its build failed. */
-async function notifyCaptureFailed(
-  options: ShelfOptions,
-  config: ShelfConfig,
-  logger: Logger,
-  buildId: string,
-): Promise<void> {
-  const build = await new BuildModel(options.database).get(buildId);
-  if (build?.status !== "failed" || alreadyAlerted(build)) {
-    return;
-  }
-  await notifySystemWith(
-    {
-      db: options.database,
-      config,
-      ui: options.ui ?? {},
-      logger,
-      notifiers: options.notifications?.notifiers ?? [],
-      notificationsConfig: options.notifications?.config,
-    },
-    "sys:capture-failed",
-    { buildId, projectId: build.projectId, gitBranch: build.gitBranch },
-  );
-}
-
-/**
- * Settle hook for jobs that ran in a forked child. A job the parent failed because the child kept
- * crashing on it was never recorded by the child, so its build (or shard) is failed here first, the
- * way an in-process failure would be; then admins are alerted from the build's own status.
- */
-export function forkedSettleHook(
-  dispatch: DispatchDeps,
-  notify: (buildId: string) => Promise<void>,
-): (job: PollableJob, outcome: ForkedJobOutcome) => Promise<void> {
-  return async (job, outcome) => {
-    if (outcome.crashed) {
-      await failCrashedCapture(dispatch, job, outcome.error ?? "capture worker crashed");
-    }
-    await notify(job.buildId);
-  };
-}
-
-/** The in-process queue, or a forked child fronting it when `testing.workerEntry` and the host allow. */
-function pickProcessQueue(
-  options: ShelfOptions,
-  config: ShelfConfig,
-  logger: Logger,
-  inProcess: CaptureQueue,
-  dispatch: DispatchDeps,
-): CaptureQueue {
-  const workerEntry = options.testing?.workerEntry;
-  if (!workerEntry || !shouldForkCapture(options.testing, logger)) {
-    return inProcess;
-  }
-  return createForkedQueue({
-    workerEntry,
-    concurrency: options.testing?.concurrency,
-    shardSize: options.testing?.shardSize,
-    imageEngine: options.testing?.images?.engine,
-    diffThreads: options.testing?.compare?.threads,
-    fallback: inProcess,
-    // Notifications stay in this process; the build's own status says whether the capture failed.
-    onSettled: forkedSettleHook(dispatch, async (buildId) => {
-      await notifyCaptureFailed(options, config, logger, buildId);
-    }),
-    logger,
-  });
-}
-
-/** Bind an enqueue hook to a queue. */
+/** Queue a build, continuing the active request trace when present. */
 function enqueuerFor(queue: CaptureQueue): (buildId: string, reqId?: string) => Promise<void> {
   return async (buildId, reqId) => {
-    await enqueueJob(queue, buildId, reqId);
+    const traceparent = currentTraceparent();
+    await queue.enqueue({ buildId, reqId, ...(traceparent ? { traceparent } : {}) });
   };
 }
 
 /**
- * Assemble the capture queue and its enqueue hook. A supplied (remote) queue
- * wins and any runner is ignored server-side: an external worker captures.
- * With only a runner, captures run in-process. With neither, builds stay
- * `pending` until a runner is added.
+ * Wire capture for `options`. A supplied `testing.queue` replaces the database queue; with a
+ * runner this instance consumes it, without one it only enqueues. Shard jobs go back onto the
+ * same queue the capture came from.
  */
-export function setupCaptureQueue(
+export function setupCapture(
   options: ShelfOptions,
   config: ShelfConfig,
   gitHosts: GitHostProvider[],
   logger: Logger,
-): QueueWiring {
-  const { queue: remote, runner } = options.testing ?? {};
-  if (remote) {
-    return { queue: remote, enqueueCapture: enqueuerFor(remote) };
+  jobs: JobQueue,
+): CaptureWiring {
+  const testing = options.testing;
+  if (testing === undefined) {
+    return { queue: null, enqueueCapture: undefined, handler: null };
   }
-  if (!runner) {
-    return { queue: null, enqueueCapture: undefined };
+  const queue = testing.queue ?? jobs.view;
+  const enqueueCapture = enqueuerFor(queue);
+  if (testing.runner === undefined) {
+    return { queue, enqueueCapture, handler: null };
   }
-  return setupInProcessQueue(options, config, gitHosts, logger, runner);
+  const handlerOptions = captureHandlerOptions(options, config, gitHosts, logger, {
+    runner: testing.runner,
+    enqueue: async (job) => {
+      await queue.enqueue(job);
+    },
+  });
+  const retries = options.testing?.retries ?? DEFAULT_RETRIES;
+  const dispatch = captureDispatchDeps(handlerOptions, retries);
+  const failed = async (job: ConsumerJob, error: string): Promise<void> => {
+    await failCrashedCapture(dispatch, job, error);
+    await notifyCaptureFailed(options, config, logger, job.buildId);
+  };
+  jobs.exhausted.capture = failed;
+  const inProcess = createCaptureHandler(handlerOptions);
+  const handler = shouldForkCapture(testing, logger)
+    ? forkedHandler(options, { fallback: inProcess, retries, onCrashed: failed, logger })
+    : inProcess;
+  return {
+    queue,
+    enqueueCapture,
+    handler: alerting(handler, retries, async (buildId) => {
+      await notifyCaptureFailed(options, config, logger, buildId);
+    }),
+  };
 }
 
-/** In-process queue (optionally forked) running the dispatch job with recovery and stall handling. */
-function setupInProcessQueue(
+function captureHandlerOptions(
   options: ShelfOptions,
   config: ShelfConfig,
   gitHosts: GitHostProvider[],
   logger: Logger,
-  runner: CaptureRunner,
-): QueueWiring {
-  // `normalizeShelfOptions` defaults scratchDir whenever a runner is set.
-  const scratchDir = config.scratchDir ?? DEFAULT_SCRATCH_DIR;
-  const captureQueueRef: { current: CaptureQueue | null } = { current: null };
-  const jobOptions: CaptureJobOptions = {
+  parts: { runner: CaptureRunner; enqueue: CaptureHandlerOptions["enqueue"] },
+): CaptureHandlerOptions {
+  return {
     db: options.database,
-    tables: {
-      projects: options.database.tables.projects,
-      builds: options.database.tables.builds,
-      buildLabels: options.database.tables.buildLabels,
-      snapshots: options.database.tables.snapshots,
-      baselines: options.database.tables.baselines,
-      captureAttempts: options.database.tables.captureAttempts,
-      captureLogs: options.database.tables.captureLogs,
-    },
     storage: options.storage,
-    runner,
-    scratchDir,
+    runner: parts.runner,
+    // `resolveShelfOptions` defaults scratchDir; the fallback covers hand-built configs.
+    scratchDir: config.scratchDir ?? DEFAULT_SCRATCH_DIR,
     viewports: config.viewports,
     logger,
     secret: credentialKeys(config),
     design: options.design,
     shardSize: options.testing?.shardSize,
-    // The queue is built below, from these options; shards go back onto it.
-    enqueue: async (job) => {
-      await captureQueueRef.current?.enqueue(job);
-    },
-  };
-  const dispatchDeps: DispatchDeps = {
-    db: options.database,
-    tables: {
-      projects: options.database.tables.projects,
-      builds: options.database.tables.builds,
-      buildLabels: options.database.tables.buildLabels,
-      snapshots: options.database.tables.snapshots,
-      projectStatusConfigs: options.database.tables.projectStatusConfigs,
-      captureAttempts: options.database.tables.captureAttempts,
-      captureLogs: options.database.tables.captureLogs,
-    },
-    jobOptions,
     gitHosts,
-    secret: credentialKeys(config),
-    logger,
+    enqueue: parts.enqueue,
+    maxRetries: options.testing?.retries,
   };
-  const runJob = createDispatchJob(dispatchDeps);
-  const recovery: RecoveryDeps = {
-    deps: dispatchDeps,
-    enqueue: async (buildId) => {
-      await enqueueCapture(buildId);
-    },
-  };
-  const inProcessQueue = new InMemoryCaptureQueue({
-    concurrency: options.testing?.concurrency ?? recommendedBuildConcurrency(),
-    logger,
-    leaseMs: CAPTURE_LEASE_MS,
-    onStalled: createStalledHandler({ runner, recovery, logger }),
-    runJob: async (job: CaptureDispatchJob, lease): Promise<void> => {
-      await timedRunJob(async (dispatched) => await runJob(dispatched, lease), job);
-      // In-process completions only: remote-queue workers own their own
-      // alerting (the server never sees those outcomes).
-      await notifyCaptureFailed(options, config, logger, job.buildId);
-    },
+}
+
+function forkedHandler(
+  options: ShelfOptions,
+  parts: {
+    fallback: KindHandler;
+    retries: number;
+    onCrashed: (job: ConsumerJob, error: string) => Promise<void>;
+    logger: Logger;
+  },
+): CaptureHandler {
+  const testing = options.testing;
+  return createForkedHandler({
+    workerEntry: testing?.workerEntry ?? "",
+    shardSize: testing?.shardSize,
+    imageEngine: testing?.images?.engine,
+    diffThreads: testing?.compare?.threads,
+    ...parts,
   });
-  const captureQueue = pickProcessQueue(options, config, logger, inProcessQueue, dispatchDeps);
-  captureQueueRef.current = captureQueue;
-  const enqueueCapture = enqueuerFor(captureQueue);
-  const recoverStuck = async (): Promise<RecoveryResult> => await recoverStuckCaptures(recovery);
-  return { queue: captureQueue, enqueueCapture, recoverStuck };
+}
+
+/**
+ * Alert admins when a capture left its build failed: after a run that ended, and after a final
+ * attempt that threw (the build may then already be failed by a crash hook). Alerts stay in this
+ * process whichever process rendered.
+ */
+function alerting(
+  inner: CaptureHandler,
+  retries: number,
+  alert: (buildId: string) => Promise<void>,
+): CaptureHandler {
+  return {
+    accepts: (job) => inner.accepts?.(job) !== false,
+    run: async (job, context) => {
+      try {
+        await inner.run(job, context);
+      } catch (error) {
+        if (isFinalAttempt(job, retries)) {
+          await alert(job.buildId);
+        }
+        throw error;
+      }
+      await alert(job.buildId);
+    },
+    cancel: async (job) => {
+      await inner.cancel?.(job);
+    },
+    ...(inner.close ? { close: inner.close } : {}),
+  };
 }

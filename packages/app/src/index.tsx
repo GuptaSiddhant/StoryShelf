@@ -21,7 +21,7 @@ import {
 import { requestId } from "hono/request-id";
 import type { ShelfApp, ShelfContext, ShelfRouter } from "./app-types.ts";
 import { runBootTasks } from "./boot-tasks.ts";
-import { setupCaptureQueue, type QueueWiring } from "./capture-setup.ts";
+import { setupJobs, type JobsWiring } from "./jobs-setup.ts";
 import { attachLifecycle, type LifecycleCell } from "./lifecycle.ts";
 import {
   authGate,
@@ -35,7 +35,6 @@ import {
 } from "./middleware/index.ts";
 import { serverTiming } from "./middleware/server-timing.ts";
 import { setupGate, type MiddlewareWiring } from "./middleware/setup-gate.ts";
-import { setupPublishing, type PublishService } from "./publish-setup.ts";
 import { registerAdminPages } from "./routers/admin-pages.ts";
 import { registerAdmin } from "./routers/admin.ts";
 import { registerAssets } from "./routers/assets.ts";
@@ -85,27 +84,12 @@ function instrumentedOptions(options: ShelfOptions): ShelfOptions {
   };
 }
 
-/** Wire the capture queue and publishing, and run the boot tasks that need them. */
-function wireQueues(
-  scoped: ShelfOptions,
-  runtime: ServerRuntime,
-  cell: LifecycleCell,
-): QueueWiring & { publish: PublishService } {
-  const { queue, enqueueCapture, recoverStuck } = setupCaptureQueue(
-    scoped,
-    runtime.config,
-    runtime.gitHosts,
-    runtime.logger,
-  );
-  const publishing = setupPublishing(
-    scoped,
-    runtime.config,
-    runtime.logger,
-    enqueueCapture !== undefined,
-  );
-  cell.publishConsumer = publishing.consumer;
-  runBootTasks(cell, scoped, runtime, recoverStuck);
-  return { queue, enqueueCapture, publish: publishing };
+/** Wire the job queue, its handlers and its consumer, and run the boot tasks that need them. */
+function wireQueues(scoped: ShelfOptions, runtime: ServerRuntime, cell: LifecycleCell): JobsWiring {
+  const jobs = setupJobs(scoped, runtime);
+  cell.consumer = jobs.consumer;
+  runBootTasks(cell, scoped, runtime);
+  return jobs;
 }
 
 /**
@@ -258,7 +242,8 @@ function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
     logger,
     authEnabled,
     enqueueCapture,
-    queue,
+    captureQueue,
+    capturesHere,
     publish,
     gitHosts,
     design,
@@ -275,7 +260,8 @@ function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
       authEnabled,
       testing: options.testing !== undefined,
       enqueueCapture,
-      captureQueue: queue,
+      captureQueue,
+      capturesHere,
       publish,
       captureConcurrency: options.testing?.concurrency,
       gitHosts,

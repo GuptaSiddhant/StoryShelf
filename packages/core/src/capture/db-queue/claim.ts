@@ -158,4 +158,17 @@ async function exhaust(
   await retire(rt, stale);
   await rt.model.finishJob(job.jobId, "failed", now, LEASE_EXHAUSTED_ERROR);
   rt.logger?.warn({ jobId: job.jobId, attempts: job.attempt }, "job failed: lease exhausted");
+  await reportExhausted(rt, job);
+}
+
+/** Tell the host a job ended without any holder to record it; its failure never blocks the poll. */
+async function reportExhausted(rt: QueueRuntime, job: CaptureJobRow): Promise<void> {
+  if (rt.onExhausted === undefined) {
+    return;
+  }
+  try {
+    await rt.onExhausted(toDatabaseJob(job, job.attempt, rt.leaseMs), LEASE_EXHAUSTED_ERROR);
+  } catch (error) {
+    rt.logger?.error({ err: error, jobId: job.jobId }, "exhausted-job hook failed");
+  }
 }

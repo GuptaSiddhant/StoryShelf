@@ -1,5 +1,4 @@
-import type { CaptureJob, CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
-import type { CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
+import type { CaptureJob, PollableCaptureQueue } from "@storyshelf/core/adapter/capture-queue";
 import { SCRATCH_DIRNAME } from "@storyshelf/core/capture";
 import { BuildModel, CaptureJobModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
@@ -21,9 +20,9 @@ function storybookZip(): Buffer {
   return zip.toBuffer();
 }
 
-function makeQueue(): { queue: CaptureQueue; jobs: CaptureJob[] } {
+function makeQueue(): { queue: PollableCaptureQueue; jobs: CaptureJob[] } {
   const jobs: CaptureJob[] = [];
-  const queue: CaptureQueue = {
+  const queue: PollableCaptureQueue = {
     metadata: {
       name: "Test Queue",
       version: "0.0.0",
@@ -47,22 +46,19 @@ function makeQueue(): { queue: CaptureQueue; jobs: CaptureJob[] } {
       await Promise.resolve();
       return [];
     },
+    // Enqueue-only double: nothing is ever delivered.
+    poll: async () => {
+      await Promise.resolve();
+      return null;
+    },
+    ack: async () => {
+      await Promise.resolve();
+    },
+    nack: async () => {
+      await Promise.resolve();
+    },
   };
   return { queue, jobs };
-}
-
-/** Non-rendering runner double: enqueue works, nothing executes. */
-function makeRunner(): CaptureRunner {
-  return {
-    metadata: { name: "Test Runner", version: "0.0.0", kind: "test", category: "capture-runner" },
-    render: async () => {
-      await Promise.resolve();
-      return { captures: [], failures: [] };
-    },
-    cancel: async () => {
-      await Promise.resolve();
-    },
-  };
 }
 
 async function uploadZip(
@@ -160,7 +156,7 @@ describe("upload inline statics", () => {
       database: db,
       storage,
       logger: silentLogger,
-      testing: { queue, runner: makeRunner() },
+      testing: { queue },
       config: { scratchDir, maxInlineUnzipSize: 1024 * 1024 },
     });
     const { slug, id: projectId } = await setupProject(app);
@@ -186,7 +182,7 @@ describe("upload inline statics", () => {
       database: db,
       storage,
       logger: silentLogger,
-      testing: { queue, runner: makeRunner() },
+      testing: { queue },
       config: { scratchDir, maxInlineUnzipSize: 10 },
     });
     const { slug, id: projectId } = await setupProject(app);
@@ -322,7 +318,7 @@ describe("upload inline statics", () => {
       database: db,
       storage,
       logger: silentLogger,
-      testing: { queue, runner: makeRunner() },
+      testing: { queue },
       config: { scratchDir, maxInlineUnzipSize: 1024 * 1024 },
     });
     const { slug, id: projectId } = await setupProject(app);

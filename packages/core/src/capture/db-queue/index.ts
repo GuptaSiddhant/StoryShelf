@@ -34,6 +34,15 @@ import { createWakeSignal } from "./wake.ts";
 
 declare const __PKG_VERSION__: string | undefined;
 
+/** What the database queue reports about itself; hosts show it before the queue is built. */
+export const DATABASE_QUEUE_METADATA = {
+  name: "Database Queue",
+  version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
+  description: "Capture queue on the app database (capture_jobs)",
+  kind: "database",
+  category: "capture-queue",
+} as const;
+
 /** A `PollableCaptureQueue` over `db`'s `capture_jobs` table. */
 export function createDatabaseCaptureQueue(
   db: DatabaseAdapter,
@@ -41,13 +50,7 @@ export function createDatabaseCaptureQueue(
 ): DatabaseCaptureQueue {
   const rt = resolveRuntime(db, options);
   return {
-    metadata: {
-      name: "Database Queue",
-      version: typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0",
-      description: "Capture queue on the app database (capture_jobs)",
-      kind: "database",
-      category: "capture-queue",
-    },
+    metadata: DATABASE_QUEUE_METADATA,
     lifecycle: buildQueueLifecycle(rt),
     setLogger(bound: Logger): void {
       rt.logger ??= bound;
@@ -92,8 +95,16 @@ function resolveRuntime(db: DatabaseAdapter, options: DatabaseCaptureQueueOption
     wake: createWakeSignal(options.timers),
     pollVersion: 0,
   };
+  return withHooks(rt, options);
+}
+
+/** The optional logger and exhausted-job hook, when given. */
+function withHooks(rt: QueueRuntime, options: DatabaseCaptureQueueOptions): QueueRuntime {
   if (options.logger !== undefined) {
     rt.logger = options.logger;
+  }
+  if (options.onExhausted !== undefined) {
+    rt.onExhausted = options.onExhausted;
   }
   return rt;
 }

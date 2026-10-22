@@ -1,35 +1,48 @@
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import type { ConsumerJob, JobRunContext } from "../consumer/types.ts";
 import type { ChildProcessHandle } from "./channel.ts";
 import { canForkCaptureChild, forkCaptureChild } from "./fork.ts";
-import { ForkedCaptureQueue, type ForkedCaptureQueueOptions } from "./forked-queue.ts";
+import {
+  createForkedCaptureHandler,
+  type ForkedCaptureHandler,
+  type ForkedCaptureOptions,
+} from "./forked-capture.ts";
 
 const ENTRY = fileURLToPath(new URL("../../test-helpers/ipc-echo-child.ts", import.meta.url));
 
-async function until(check: () => Promise<boolean>, timeoutMs = 15_000): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  /* oxlint-disable eslint/no-await-in-loop -- polling loop */
-  while (!(await check())) {
-    if (Date.now() > deadline) {
-      throw new Error("condition not reached in time");
-    }
-    await new Promise((resolve) => setTimeout(resolve, 25));
-  }
-  /* oxlint-enable eslint/no-await-in-loop */
-}
+const job = (buildId: string, extra: Partial<ConsumerJob> = {}): ConsumerJob => ({
+  buildId,
+  receipt: `${buildId}:1`,
+  attempts: 0,
+  ...extra,
+});
 
-function realQueue(overrides: Partial<ForkedCaptureQueueOptions> = {}) {
+const context = (): JobRunContext => ({ logger: {} as never, touch: () => {} });
+
+function real(overrides: Partial<ForkedCaptureOptions> = {}): {
+  handler: ForkedCaptureHandler;
+  handles: ChildProcessHandle[];
+  inProcess: string[];
+} {
   const handles: ChildProcessHandle[] = [];
-  const queue = new ForkedCaptureQueue({
+  const inProcess: string[] = [];
+  const handler = createForkedCaptureHandler({
     spawn: () => {
       const handle = forkCaptureChild({ entry: ENTRY });
       handles.push(handle);
       return handle;
     },
+    fallback: {
+      run: async (j) => {
+        inProcess.push(j.buildId);
+        await Promise.resolve();
+      },
+    },
     restartDelayMs: 20,
     ...overrides,
   });
-  return { queue, handles };
+  return { handler, handles, inProcess };
 }
 
 describe("forkCaptureChild (real child process)", () => {
@@ -37,83 +50,80 @@ describe("forkCaptureChild (real child process)", () => {
     expect(canForkCaptureChild()).toBe(true);
   });
 
-  it("runs jobs in a real child over IPC", async () => {
-    const { queue } = realQueue();
+  it("runs pushed jobs in a real child over IPC", async () => {
+    const { handler } = real();
     try {
-      await queue.enqueue({ buildId: "ok-1" });
-      await queue.enqueue({ buildId: "fail-1" });
-      await until(async () => (await queue.status("fail-1"))?.status === "failed");
-      expect((await queue.status("ok-1"))?.status).toBe("completed");
+      await handler.run(job("ok-1"), context());
+      await expect(handler.run(job("fail-1"), context())).rejects.toThrow("fail-1 failed");
     } finally {
-      await queue.lifecycle.teardown();
+      await handler.close();
     }
   }, 30_000);
 
-  it("survives the child crashing: restarts it and fails a poison job after the retries", async () => {
-    const { queue, handles } = realQueue({ maxCrashRetries: 1, crashLimit: 10 });
+  it("survives the child crashing: the run fails, the next one gets a restarted child", async () => {
+    const { handler, handles } = real({ crashLimit: 10 });
     try {
-      await queue.enqueue({ buildId: "crash-1" });
-      await until(async () => (await queue.status("crash-1"))?.status === "failed");
-      expect((await queue.status("crash-1"))?.error).toMatch(/exited \(code 1\) 2 times/u);
+      await expect(handler.run(job("crash-1"), context())).rejects.toThrow(/exited \(code 1\)/u);
+      await handler.run(job("ok-after-crash"), context());
       expect(handles.length).toBeGreaterThanOrEqual(2);
-
-      // The restarted child still works.
-      await queue.enqueue({ buildId: "ok-after-crash" });
-      await until(async () => (await queue.status("ok-after-crash"))?.status === "completed");
     } finally {
-      await queue.lifecycle.teardown();
+      await handler.close();
     }
   }, 40_000);
 
-  it("kills a hung child, restarts it, and fails the job that hung it", async () => {
-    const { queue, handles } = realQueue({ leaseMs: 300, maxCrashRetries: 1, crashLimit: 10 });
+  it("kills a hung child and fails the job that hung it", async () => {
+    const { handler, handles } = real({ leaseMs: 1500, crashLimit: 10 });
     try {
-      await queue.enqueue({ buildId: "hang-1" });
-      await until(async () => (await queue.status("hang-1"))?.status === "failed", 30_000);
-      expect((await queue.status("hang-1"))?.error).toMatch(/2 times/u);
+      await expect(handler.run(job("hang-1"), context())).rejects.toThrow(/no progress/u);
+      await handler.run(job("ok-after-hang"), context());
       expect(handles.length).toBeGreaterThanOrEqual(2);
-
-      await queue.enqueue({ buildId: "ok-after-hang" });
-      await until(async () => (await queue.status("ok-after-hang"))?.status === "completed");
     } finally {
-      await queue.lifecycle.teardown();
+      await handler.close();
     }
   }, 60_000);
 
   it("does not kill a slow child that keeps reporting progress", async () => {
-    const { queue, handles } = realQueue({ leaseMs: 300 });
+    const { handler, handles } = real({ leaseMs: 1500 });
     try {
-      await queue.enqueue({ buildId: "slow-1" });
-      await until(async () => (await queue.status("slow-1"))?.status === "completed");
+      await handler.run(job("slow-1"), context());
       expect(handles).toHaveLength(1);
     } finally {
-      await queue.lifecycle.teardown();
+      await handler.close();
     }
   }, 30_000);
 
-  it("stops the child on teardown", async () => {
-    const { queue, handles } = realQueue();
-    await queue.enqueue({ buildId: "ok-1" });
-    await until(async () => (await queue.status("ok-1"))?.status === "completed");
+  it("stops the child on close", async () => {
+    const { handler, handles } = real();
+    await handler.run(job("ok-1"), context());
     const exited = new Promise<{ code: number | null; signal: string | null }>((resolve) => {
       handles[0]?.onExit(resolve);
     });
-    await queue.lifecycle.teardown();
+    await handler.close();
     const info = await exited;
     expect(info.code === 0 || info.signal === "SIGTERM").toBe(true);
   }, 30_000);
 
-  it("reports a missing entry as a crash instead of hanging", async () => {
-    const queue = new ForkedCaptureQueue({
+  it("treats a missing entry as a crash loop and falls back in-process", async () => {
+    const inProcess: string[] = [];
+    const handler = createForkedCaptureHandler({
       spawn: () => forkCaptureChild({ entry: "/no/such/module.ts" }),
-      maxCrashRetries: 0,
+      fallback: {
+        run: async (j) => {
+          inProcess.push(j.buildId);
+          await Promise.resolve();
+        },
+      },
+      crashLimit: 1,
       restartDelayMs: 20,
     });
     try {
-      await queue.enqueue({ buildId: "b1" });
-      await until(async () => (await queue.status("b1"))?.status === "failed");
+      // The run the broken child died under fails (the consumer retries it); the loop trips.
+      await expect(handler.run(job("b1"), context())).rejects.toThrow(/exited/u);
+      expect(handler.tripped).toBe(true);
+      await handler.run(job("b1", { receipt: "b1:2", attempts: 1 }), context());
+      expect(inProcess).toEqual(["b1"]);
     } finally {
-      await queue.lifecycle.teardown();
+      await handler.close();
     }
   }, 30_000);
 });

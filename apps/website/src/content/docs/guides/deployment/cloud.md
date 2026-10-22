@@ -35,7 +35,6 @@ import { createShelfApp } from "@storyshelf/app";
 import { createTursoDatabase } from "@storyshelf/db-sqlite/turso";
 import { createS3Storage } from "@storyshelf/storage-s3";
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
-import { InMemoryCaptureQueue } from "@storyshelf/core/capture";
 
 const database = createTursoDatabase({
   url: process.env.TURSO_URL!,
@@ -49,14 +48,13 @@ const storage = createS3Storage({
   secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
 });
 const capture = createPlaywrightCaptureRunner();
-const queue = new InMemoryCaptureQueue({ concurrency: 2 });
 
 export const app = createShelfApp({
-  database, storage, testing: { runner: capture, queue },
+  database, storage, testing: { runner: capture, concurrency: 2 },
   config: { scratchDir: "/tmp/scratch" },
   auth: ...,
 });
-await app.lifecycle.init();
+await app.lifecycle.setup();
 ```
 
 Without the `testing` option the same assembly runs on **any** platform that supports Node-compatible `fetch` + `crypto` + `sqlite`/`libsql` (Storybook hosting only). With `testing` it needs a long-running host.

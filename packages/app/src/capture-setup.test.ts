@@ -6,27 +6,25 @@ import {
   InMemorySpanExporter,
   SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
+import type { PollableCaptureQueue } from "@storyshelf/core/adapter/capture-queue";
+import type { ConsumerJob, JobRunContext } from "@storyshelf/core/capture";
+import type { ShelfOptions } from "@storyshelf/core/config";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { BuildModel, ProjectModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
-import { alreadyAlerted, forkedSettleHook, setupCaptureQueue } from "./capture-setup.ts";
+import { alreadyAlerted } from "./capture-alerts.ts";
+import { setupCapture } from "./capture-setup.ts";
+import { createJobQueue } from "./job-queue.ts";
 
-function makeLogger() {
-  return createShelfLogger({ level: "silent" });
-}
+const ECHO_CHILD = fileURLToPath(
+  new URL("../../core/src/test-helpers/ipc-echo-child.ts", import.meta.url),
+);
 
-function makeQueue() {
-  return {
-    metadata: { name: "mock", version: "0.0.0", kind: "mock", category: "capture-queue" as const },
-    enqueue: vi.fn(async () => {}),
-    status: vi.fn(async () => null),
-    active: vi.fn(async () => []),
-    recent: vi.fn(async () => []),
-  } as unknown as import("@storyshelf/core/adapter/capture-queue").CaptureQueue;
-}
+const logger = createShelfLogger({ level: "silent" });
 
-function makeRunner() {
+function runner() {
   return {
     metadata: { name: "mock", version: "0.0.0", kind: "mock", category: "capture-runner" as const },
     render: vi.fn(async () => ({ captures: [], failures: [] })),
@@ -34,139 +32,79 @@ function makeRunner() {
   } as unknown as import("@storyshelf/core/adapter/capture-runner").CaptureRunner;
 }
 
-describe("alreadyAlerted", () => {
-  it("lets only the first of several settles of one failed build through", () => {
-    const build = { id: "b-alert", updatedAt: "2026-10-19T10:00:00.000Z" };
-    expect(alreadyAlerted(build)).toBe(false);
-    // Every other shard of the same failed build settles against the same build row.
-    expect(alreadyAlerted(build)).toBe(true);
-    expect(alreadyAlerted({ ...build })).toBe(true);
+function suppliedQueue() {
+  return {
+    metadata: { name: "mock", version: "0.0.0", kind: "mock", category: "capture-queue" as const },
+    enqueue: vi.fn(async () => {}),
+    status: vi.fn(async () => null),
+    active: vi.fn(async () => []),
+    recent: vi.fn(async () => []),
+    poll: vi.fn(async () => null),
+    ack: vi.fn(async () => {}),
+    nack: vi.fn(async () => {}),
+  } as unknown as PollableCaptureQueue;
+}
+
+/** Wire capture for `testing` over a fresh in-memory database. */
+const SCRATCH = { scratchDir: ".tmp/capture-setup-test" };
+
+function wire(testing?: ShelfOptions["testing"], config: { scratchDir?: string } = SCRATCH) {
+  const { db } = makeDatabase();
+  const { storage } = makeStorage();
+  const options = { database: db, storage, testing } as unknown as ShelfOptions;
+  const jobs = createJobQueue(options, testing?.queue ? [] : ["capture"], testing?.retries ?? 2);
+  return { db, jobs, wiring: setupCapture(options, config, [], logger, jobs), options };
+}
+
+const runContext = (): JobRunContext => ({ logger: {} as never, touch: () => {} });
+
+describe("setupCapture", () => {
+  it("wires nothing without testing", () => {
+    const { wiring } = wire();
+    expect(wiring).toEqual({ queue: null, enqueueCapture: undefined, handler: null });
   });
 
-  it("alerts again when a retry fails the build anew", () => {
-    expect(alreadyAlerted({ id: "b-retry", updatedAt: "2026-10-19T10:00:00.000Z" })).toBe(false);
-    expect(alreadyAlerted({ id: "b-retry", updatedAt: "2026-10-19T11:30:00.000Z" })).toBe(false);
+  it("queues captures on the database queue and runs them here when there is a runner", async () => {
+    const { wiring, jobs } = wire({ runner: runner() });
+    expect(wiring.queue?.metadata.kind).toBe("database");
+    expect(wiring.handler).not.toBeNull();
+    await wiring.enqueueCapture?.("build-1", "req-1");
+    expect(await jobs.get().poll()).toMatchObject({
+      kind: "capture",
+      buildId: "build-1",
+      reqId: "req-1",
+      maxAttempts: 3,
+    });
   });
-});
 
-describe("setupCaptureQueue", () => {
-  it("returns null when no queue and no runner", () => {
-    const { db } = makeDatabase();
-    const { storage } = makeStorage();
-    const result = setupCaptureQueue(
-      { database: db as never, storage: storage as never },
-      {},
-      [],
-      makeLogger(),
-    );
-    expect(result.queue).toBeNull();
-    expect(result.enqueueCapture).toBeUndefined();
+  it("stamps testing.retries on the jobs", async () => {
+    const { wiring, jobs } = wire({ runner: runner(), retries: 0 });
+    await wiring.enqueueCapture?.("build-1");
+    expect(await jobs.get().poll()).toMatchObject({ maxAttempts: 1 });
   });
 
   it("falls back to the default scratch dir when none is configured", () => {
-    const { db } = makeDatabase();
-    const { storage } = makeStorage();
-    const result = setupCaptureQueue(
-      { database: db as never, storage: storage as never, testing: { runner: makeRunner() } },
-      {},
-      [],
-      makeLogger(),
-    );
-    expect(result.queue?.metadata.kind).toBe("memory");
+    const { wiring } = wire({ runner: runner() }, {} as never);
+    expect(wiring.handler).not.toBeNull();
   });
 
-  it("creates InMemory queue when runner and scratchDir provided", () => {
-    const { db } = makeDatabase();
-    const { storage } = makeStorage();
-    const result = setupCaptureQueue(
-      { database: db as never, storage: storage as never, testing: { runner: makeRunner() } },
-      { scratchDir: "/tmp" },
-      [],
-      makeLogger(),
-    );
-    expect(result.queue).not.toBeNull();
-    expect(result.queue?.metadata.kind).toBe("memory");
-    expect(result.enqueueCapture).toBeDefined();
-  });
-
-  it("returns supplied queue when only queue provided", async () => {
-    const { db } = makeDatabase();
-    const { storage } = makeStorage();
-    const queue = makeQueue();
-    const result = setupCaptureQueue(
-      { database: db as never, storage: storage as never, testing: { queue } },
-      {},
-      [],
-      makeLogger(),
-    );
-    expect(result.queue).toBe(queue);
-    expect(result.enqueueCapture).toBeDefined();
-    await result.enqueueCapture?.("build-1", "req-1");
+  it("only enqueues onto a supplied queue when there is no runner (another process consumes)", async () => {
+    const queue = suppliedQueue();
+    const { wiring } = wire({ queue });
+    expect(wiring.queue).toBe(queue);
+    expect(wiring.handler).toBeNull();
+    await wiring.enqueueCapture?.("build-1", "req-1");
     expect(queue.enqueue).toHaveBeenCalledWith({ buildId: "build-1", reqId: "req-1" });
   });
 
-  it("returns supplied queue when both queue and runner provided without scratchDir", () => {
-    const { db } = makeDatabase();
-    const { storage } = makeStorage();
-    const queue = makeQueue();
-    const result = setupCaptureQueue(
-      {
-        database: db as never,
-        storage: storage as never,
-        testing: { queue, runner: makeRunner() },
-      },
-      {},
-      [],
-      makeLogger(),
-    );
-    expect(result.queue).toBe(queue);
-  });
-
-  it("prefers supplied queue over InMemory when both provided with scratchDir", () => {
-    const { db } = makeDatabase();
-    const { storage } = makeStorage();
-    const queue = makeQueue();
-    const result = setupCaptureQueue(
-      {
-        database: db as never,
-        storage: storage as never,
-        testing: { queue, runner: makeRunner() },
-      },
-      { scratchDir: "/tmp" },
-      [],
-      makeLogger(),
-    );
-    expect(result.queue).toBe(queue);
-    expect(result.queue?.metadata.kind).toBe("mock");
-  });
-
-  it("returns null enqueue when no queue and no runner after queue check", () => {
-    const { db } = makeDatabase();
-    const { storage } = makeStorage();
-    // Exercise the second no-runner guard (after queue check)
-    const result = setupCaptureQueue(
-      { database: db as never, storage: storage as never },
-      { scratchDir: "/tmp" },
-      [],
-      makeLogger(),
-    );
-    expect(result.queue).toBeNull();
-  });
-
-  it("respects testing.concurrency", () => {
-    const { db } = makeDatabase();
-    const { storage } = makeStorage();
-    const result = setupCaptureQueue(
-      {
-        database: db as never,
-        storage: storage as never,
-        testing: { runner: makeRunner(), concurrency: 5 },
-      },
-      { scratchDir: "/tmp" },
-      [],
-      makeLogger(),
-    );
-    expect(result.queue).not.toBeNull();
+  it("replaces the database queue with a supplied one, and runs its jobs here with a runner", async () => {
+    const queue = suppliedQueue();
+    const { wiring, jobs } = wire({ queue, runner: runner() });
+    expect(wiring.queue).toBe(queue);
+    expect(wiring.handler).not.toBeNull();
+    await wiring.enqueueCapture?.("build-1");
+    expect(queue.enqueue).toHaveBeenCalledTimes(1);
+    expect(jobs.built()).toBeUndefined();
   });
 
   it("propagates the active traceparent on enqueue", async () => {
@@ -179,17 +117,10 @@ describe("setupCaptureQueue", () => {
     const manager = new AsyncLocalStorageContextManager();
     context.setGlobalContextManager(manager.enable());
     try {
-      const { db } = makeDatabase();
-      const { storage } = makeStorage();
-      const queue = makeQueue();
-      const result = setupCaptureQueue(
-        { database: db as never, storage: storage as never, testing: { queue } },
-        {},
-        [],
-        makeLogger(),
-      );
+      const queue = suppliedQueue();
+      const { wiring } = wire({ queue });
       await trace.getTracer("test").startActiveSpan("test.enqueue", async () => {
-        await result.enqueueCapture?.("build-1", "req-1");
+        await wiring.enqueueCapture?.("build-1", "req-1");
       });
       expect(queue.enqueue).toHaveBeenCalledWith({
         buildId: "build-1",
@@ -204,83 +135,65 @@ describe("setupCaptureQueue", () => {
     }
   });
 
-  it("exposes a stuck-build sweep only for the in-process queue", async () => {
-    const { db } = makeDatabase();
-    const { storage } = makeStorage();
-    const inProcess = setupCaptureQueue(
-      { database: db as never, storage: storage as never, testing: { runner: makeRunner() } },
-      { scratchDir: "/tmp" },
-      [],
-      makeLogger(),
-    );
-    const remote = setupCaptureQueue(
-      { database: db as never, storage: storage as never, testing: { queue: makeQueue() } },
-      {},
-      [],
-      makeLogger(),
-    );
-    expect(inProcess.recoverStuck).toBeDefined();
-    expect(remote.recoverStuck).toBeUndefined();
-  });
-
-  it("requeues a build left capturing by a restart", async () => {
-    const { db } = makeDatabase();
-    const { storage } = makeStorage();
-    const project = await new ProjectModel(db as never).create({ name: "Stuck" });
-    const builds = new BuildModel(db as never);
+  it("fails a build whose capture job lost its last lease, and alerts", async () => {
+    const { db, jobs } = wire({ runner: runner() });
+    const project = await new ProjectModel(db).create({ name: "Exhausted" });
+    const builds = new BuildModel(db);
     const build = await builds.create(project.id, { gitSha: "sha", gitBranch: "feature/x" });
     await builds.setStatus(build.id, "capturing");
-    const { recoverStuck } = setupCaptureQueue(
-      { database: db as never, storage: storage as never, testing: { runner: makeRunner() } },
-      { scratchDir: "/tmp" },
-      [],
-      makeLogger(),
+    await jobs.exhausted.capture?.(
+      { buildId: build.id, kind: "capture" } as never,
+      "lease expired on the final attempt",
     );
-
-    const result = await recoverStuck?.();
-
-    expect(result).toEqual({ requeued: [build.id], failed: [] });
+    const failed = await builds.get(build.id);
+    expect(failed?.status).toBe("failed");
+    expect(alreadyAlerted(failed as never)).toBe(true);
   });
 });
 
-async function crashedBuild() {
-  const { db } = makeDatabase();
-  const project = await new ProjectModel(db as never).create({ name: "Crashed" });
-  const builds = new BuildModel(db as never);
-  const build = await builds.create(project.id, { gitSha: "sha", gitBranch: "feature/x" });
-  await builds.setStatus(build.id, "capturing");
-  const dispatch = {
-    db,
-    tables: db.tables,
-    jobOptions: {},
-    gitHosts: [],
-    secret: undefined,
-    logger: makeLogger(),
-  } as never;
-  return { builds, build, dispatch };
-}
+const forked = () => wire({ runner: runner(), workerEntry: ECHO_CHILD, mode: "fork" });
+const job = (buildId: string, extra: Partial<ConsumerJob> = {}): ConsumerJob => ({
+  buildId,
+  receipt: `${buildId}:1`,
+  attempts: 0,
+  ...extra,
+});
 
-describe("forkedSettleHook", () => {
-  it("fails the build of a job the child kept crashing on, then notifies", async () => {
-    const { builds, build, dispatch } = await crashedBuild();
-    const seen: (string | undefined)[] = [];
-    const hook = forkedSettleHook(dispatch, async (buildId) => {
-      seen.push((await builds.get(buildId))?.status);
-    });
+describe("the forked capture handler", () => {
+  it("is chosen when forking is forced, and a real child runs the pushed jobs", async () => {
+    const { wiring } = forked();
+    try {
+      expect(wiring.handler?.close).toBeTypeOf("function");
+      await wiring.handler?.run(job("ok-1"), runContext());
+      await expect(wiring.handler?.run(job("fail-1"), runContext())).rejects.toThrow(
+        "fail-1 failed",
+      );
+    } finally {
+      await wiring.handler?.close?.();
+    }
+  }, 30_000);
 
-    await hook({ buildId: build.id }, { status: "failed", error: "exited 3 times", crashed: true });
+  it("alerts for a build the capture left failed, and on a last attempt that threw", async () => {
+    const { wiring, db } = forked();
+    const project = await new ProjectModel(db).create({ name: "Alerting" });
+    const builds = new BuildModel(db);
+    const failedBuild = await builds.create(project.id, { gitSha: "a", gitBranch: "feature/x" });
+    await builds.setStatus(failedBuild.id, "failed");
+    const lastBuild = await builds.create(project.id, { gitSha: "b", gitBranch: "feature/y" });
+    await builds.setStatus(lastBuild.id, "failed");
+    try {
+      await wiring.handler?.run(job(failedBuild.id), runContext());
+      expect(alreadyAlerted((await builds.get(failedBuild.id)) as never)).toBe(true);
+      const last = job(`fail-${lastBuild.id}`, { attempt: 3, maxAttempts: 3, attempts: 2 });
+      await expect(wiring.handler?.run(last, runContext())).rejects.toThrow(/failed/u);
+    } finally {
+      await wiring.handler?.close?.();
+    }
+  }, 30_000);
 
-    expect(seen).toEqual(["failed"]); // the alert reads the status the hook just wrote
-  });
-
-  it("leaves the build to the child's own outcome otherwise", async () => {
-    const { builds, build, dispatch } = await crashedBuild();
-    const notify = vi.fn(async () => {});
-    await forkedSettleHook(dispatch, notify)(
-      { buildId: build.id },
-      { status: "failed", error: "x" },
-    );
-    expect((await builds.get(build.id))?.status).toBe("capturing");
-    expect(notify).toHaveBeenCalledWith(build.id);
+  it("keeps the in-process handler's own validation of what it accepts", () => {
+    const { wiring } = forked();
+    expect(wiring.handler?.accepts?.(job("b1"))).toBe(true);
+    expect(wiring.handler?.accepts?.(job(""))).toBe(false);
   });
 });

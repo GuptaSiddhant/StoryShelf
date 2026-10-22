@@ -1,10 +1,9 @@
 /**
  * Server-side capture runtime: story discovery, rendering orchestration,
- * persistence, and the in-process queue.
+ * persistence, the database job queue and the consumer that runs its jobs.
  *
  * Pure renderers implement `CaptureRunner` (see `core/adapter/capture-runner`);
- * everything here drives them. Remote workers reuse `executeCaptureJob`
- * against any `CaptureQueue` backend.
+ * everything here drives them.
  */
 export {
   assertBrowserCount,
@@ -77,19 +76,11 @@ export {
   type RediffDeps,
   type RediffResult,
 } from "./rediff.ts";
-export {
-  INTERRUPTED_ERROR,
-  recoverStalledCapture,
-  recoverStuckCaptures,
-  STALLED_ERROR,
-  type RecoveryDeps,
-  type RecoveryResult,
-} from "./recovery.ts";
 export { failCrashedCapture, type CrashFailureOutcome } from "./crash-failure.ts";
 export { ProgressLease, type JobLease } from "./job-lease.ts";
-export { InMemoryCaptureQueue, type InMemoryCaptureQueueOptions } from "./queue.ts";
 export {
   createDatabaseCaptureQueue,
+  DATABASE_QUEUE_METADATA,
   DEFAULT_LEASE_MS,
   DEFAULT_RETRIES,
   LEASE_EXHAUSTED_ERROR,
@@ -119,6 +110,7 @@ export {
 export { startPollLoop, type PollLoop, type PollLoopOptions } from "./db-queue/poll-loop.ts";
 export {
   backoffDelayMs,
+  captureDispatchDeps,
   createCaptureConsumer,
   createCaptureHandler,
   DEFAULT_BACKOFF_MS,
@@ -145,7 +137,7 @@ export {
   type QueueSample,
   type RetryConfig,
 } from "./consumer/index.ts";
-export { runCaptureChild, type CaptureChildOptions, type ChildHost } from "./consumer/child.ts";
+export { runCaptureChild, type CaptureChildOptions, type ChildHost } from "./forked/child.ts";
 export type { LeaseRenewal, PollableCaptureQueue, PollableJob } from "../adapters/capture-queue.ts";
 export {
   STORYBOOK_BUILTIN_VIEWPORTS,
@@ -166,14 +158,13 @@ export {
   type SizingOptions,
 } from "./sizing.ts";
 export {
-  ForkedCaptureQueue,
-  type ForkedCaptureQueueOptions,
-  type ForkedJobOutcome,
-} from "./forked/forked-queue.ts";
-export { IpcCaptureQueue } from "./forked/ipc-queue.ts";
+  createForkedCaptureHandler,
+  type ForkedCaptureHandler,
+  type ForkedCaptureOptions,
+} from "./forked/forked-capture.ts";
 export {
   canForkCaptureChild,
-  CAPTURE_CONCURRENCY_ENV,
+  CAPTURE_RETRIES_ENV,
   CAPTURE_SHARD_SIZE_ENV,
   CAPTURE_WORKER_ROLE,
   forkCaptureChild,

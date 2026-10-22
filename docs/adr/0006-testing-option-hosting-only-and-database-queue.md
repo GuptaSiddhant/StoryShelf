@@ -3,7 +3,8 @@
 ## Status
 
 Accepted. Amended with the `capture_jobs` table, the claim algorithm and the poll and cancel
-details (decisions 4 and 11), recorded while implementing the database queue (#212).
+details (decisions 4 and 11), recorded while implementing the database queue (#212), and with the
+cutover details (decisions 4 and 5), recorded while moving the app onto it (#217).
 
 Supersedes (archived): ADR 0034.
 
@@ -206,7 +207,11 @@ third-party `DatabaseAdapter` implementations, which is accepted.
   time keeps an empty poll cheap.
 - **Retry and failure.** A nack with a delay sets the visibility time; attempts are counted; past
   `testing.retries` the job is `failed` and the build takes the standard terminal path with its
-  status written to the database, so a crash never leaves a build in `capturing`.
+  status written to the database, so a crash never leaves a build in `capturing`. A job whose
+  final attempt loses its lease has no running handler to write that path, so the queue calls the
+  host's `onExhausted(job, error)` hook (any instance that finds the job may call it, so it is
+  idempotent): the app fails the build of a `capture` job (`failCrashedCapture`, then the admin
+  alert) and completes a `publish` job as failed.
 - **Cancel** sets a flag on the job row, which the running instance reads (decision 11) and turns
   into `runner.cancel`. It works across instances and for a hung capture. Cancelling a job that has
   not started is immediate. `CaptureQueue.cancel(jobId | buildId)` is the queue-level setter (a
@@ -228,9 +233,9 @@ There is no in-memory production queue and no boot sweep that requeues builds le
 lease expiry and redelivery recover work and are safe with many instances. A small in-memory double
 may remain in test helpers.
 
-**Upgrade.** For one release a migration sweep runs on the first boot with `testing` on: every build
-left `capturing` or `pending` with no job row gets one. Mixed versions are not supported for that
-upgrade; every instance is stopped, upgraded and started together.
+**Upgrade.** No migration sweep ships: a build left `capturing` or `pending` by an earlier version
+with no job row stays as it is, and is retried by hand. Mixed versions are not supported; every
+instance is stopped, upgraded and started together.
 
 ### 5. No separate worker; the consumer runs in the app
 
@@ -245,9 +250,10 @@ Database and storage credentials are given only to the app, and there is one cop
 configuration.
 
 **Forked capture** stays as an opt-in for operators who run local engines on one machine. The parent
-is the consumer of the database queue and pushes each leased job to the child over IPC; the child's
-progress messages renew the lease, which the parent writes; the child never reads the queue (no
-`poll` or `enqueue` in the protocol). `runCaptureChild` is exported from `@storyshelf/core/capture`.
+is the consumer of the database queue and pushes each leased job to the child over IPC (`run`, and
+`cancel` to stop a render); the child's `progress` messages renew the lease, which the parent
+writes, and `done` or `failed` settle it; the child never reads the queue (no `poll` or `enqueue`
+in the protocol) and inserts the shard jobs of a big build itself. `runCaptureChild` is exported from `@storyshelf/core/capture`.
 The child runs the whole pipeline, so it holds the same database, storage and runner configuration
 and is inside the app's trust boundary. Forked capture receives no new investment; child restarts
 and hang kills are counted, and it is retired when local engines stop being the recommended path or

@@ -95,7 +95,7 @@ flowchart TB
     subgraph CaptureAdapters["Capture Adapters"]
         runner["@storyshelf/runner-playwright\npure CaptureRunner"]
         qsqs["@storyshelf/queue-sqs\nSQS CaptureQueue"]
-        qmem["InMemoryCaptureQueue\ncore/capture (default)"]
+        qmem["Database queue (capture_jobs)\ncore/capture (default)"]
     end
 
     subgraph GitAdapters["Git Host Adapters"]
@@ -185,7 +185,7 @@ flowchart LR
 
     subgraph Wiring["Wiring\npackages/app/src/index.tsx:74"]
         mw2["wireMiddleware\nrequestId / requestLogging\nrateLimit / csrf\nstoreScope(AsyncLocalStorage)\nauthGate"]
-        qsetup["setupCaptureQueue\npackages/app/src/capture-setup.ts:14\nInMemoryCaptureQueue | SQS"]
+        qsetup["setupJobs\npackages/app/src/jobs-setup.ts\ndatabase queue | testing.queue"]
     end
 
     subgraph Routes2["registerAllRoutes"]
@@ -765,7 +765,7 @@ flowchart TB
         PW["Chromium (Playwright) — in-process capture"]
         SQLite["SQLite — node:sqlite (WAL)<br/>@storyshelf/db-sqlite"]
         FS["Filesystem — @storyshelf/storage-local<br/>VOLUME /app/data"]
-        Queue2["InMemoryCaptureQueue<br/>concurrency 2"]
+        Queue2["Database queue<br/>concurrency 2"]
     end
 
     Compose["docker-compose.yml<br/>ports 3000:3000<br/>env: SECRET, CAPTURE_CONCURRENCY,<br/>PURGE_TTL_DAYS, OIDC_*/AUTH_PASSWORD"]
@@ -802,13 +802,13 @@ flowchart TB
     Worker --> Turso
     Worker --> S3
 
-    note2["CaptureQueue interface is Promise-based<br/>so InMemory and remote share the same contract<br/>packages/core/src/adapters/capture-queue.ts:38"]
+    note2["CaptureQueue interface is Promise-based<br/>so the database queue and a supplied queue share the same contract<br/>packages/core/src/adapters/capture-queue.ts:38"]
 
     classDef cloud fill:#fef7e0,stroke:#fbbc04;
     class Edge,Turso,S3,QRemote,Worker cloud;
 ```
 
-`createShelfApp` returns a plain `FetchHandler` — works on any runtime; only the in-process queue constrains Node (`architecture.md:247`).
+`createShelfApp` returns a plain `FetchHandler` — works on any runtime; only the capture consumer constrains Node (`architecture.md:247`).
 
 ### 13c. Dev (hot-restart from source, no build)
 

@@ -1,32 +1,28 @@
 /**
- * Publishing wiring (ADR 0006, decision 10): the completer every upload route ends in, the
- * `publish` job queue and its consumer. The consumer runs on every instance with a database, so
- * a hosting-only instance can publish large zips; it is not started on serverless hosts, where an
- * over-limit zip is refused instead. Capture's own queue is wired elsewhere (`capture-setup.ts`).
+ * Publishing wiring (ADR 0006, decision 10): the completer every upload route ends in, and the
+ * `publish` job kind on the shared database queue. Its handler runs on every instance with a
+ * database, so a hosting-only instance can publish large zips; it is absent on serverless hosts,
+ * where an over-limit zip is refused instead. The consumer that calls the handler is built in
+ * `jobs-setup.ts`, together with the capture handler.
  */
 import {
-  createCaptureConsumer,
   createCatalogHook,
   createCatalogLoader,
-  createDatabaseCaptureQueue,
   createPublishCompleter,
   createPublishHandler,
   extractionLimitsOf,
   resolvePublishLimits,
   type AfterPublishHook,
-  type CaptureConsumer,
   type CatalogLoader,
-  type DatabaseCaptureQueue,
-  type ConsumerMetrics,
+  type KindHandler,
   type PublishCompleter,
 } from "@storyshelf/core/capture";
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import { DEFAULT_SCRATCH_DIR } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
-import { captureMetrics } from "@storyshelf/observability";
-import { isServerlessHost } from "./serverless.ts";
+import type { JobQueue } from "./job-queue.ts";
 
-/** What request handlers and the lifecycle use of publishing. */
+/** What request handlers and the consumer use of publishing. */
 export interface PublishWiring {
   /** Applies the acceptance rule and the hooks when a publish ends. */
   completer: PublishCompleter;
@@ -36,8 +32,8 @@ export interface PublishWiring {
   catalog: CatalogLoader;
   /** Puts a `publish` job on the queue; undefined when this host runs no consumer. */
   enqueuePublish: ((buildId: string, reqId?: string) => Promise<void>) | undefined;
-  /** Runs the queued publish jobs; null when this host runs none. */
-  consumer: CaptureConsumer | null;
+  /** Runs `publish` jobs; null when this host runs none. */
+  handler: KindHandler | null;
 }
 
 /** The request-scoped part of {@link PublishWiring}. */
@@ -49,14 +45,15 @@ export type PublishService = Pick<
 /**
  * Wire publishing for `options` (the instrumented options; `config` is the resolved config).
  * `captureWillRun` is whether uploads get a capture (`enqueueCapture` exists): capture owns the
- * build status then, and publishing leaves it alone.
+ * build status then, and publishing leaves it alone. `jobs` is the shared queue; a host that
+ * polls no `publish` jobs (serverless) has none of the job side.
  */
 export function setupPublishing(
   options: ShelfOptions,
   config: ShelfConfig,
   logger: Logger,
   captureWillRun: boolean,
-  env: NodeJS.ProcessEnv = process.env,
+  jobs: JobQueue,
 ): PublishWiring {
   const catalog = createCatalogLoader({
     db: options.database,
@@ -70,88 +67,27 @@ export function setupPublishing(
     afterPublish,
     logger,
   });
-  if (isServerlessHost(env)) {
-    return { completer, afterPublish, catalog, enqueuePublish: undefined, consumer: null };
+  if (!jobs.kinds.includes("publish")) {
+    return { completer, afterPublish, catalog, enqueuePublish: undefined, handler: null };
   }
-  // Built on first use: a host that never enqueues or starts the consumer (OpenAPI generation,
-  // asset-only tests with stub tables) never touches `capture_jobs`.
-  const parts = lazily(() => buildQueueAndConsumer(options, config, logger, completer));
+  // A publish whose last attempt lost its lease has no running handler to fail the build.
+  jobs.exhausted.publish = async (job, error): Promise<void> => {
+    await completer.complete(job.buildId, { ok: false, error });
+  };
   return {
     completer,
     afterPublish,
     catalog,
-    enqueuePublish: async (buildId, reqId) => {
-      await parts().queue.enqueueJob({ kind: "publish", buildId, ...(reqId ? { reqId } : {}) });
+    enqueuePublish: async (buildId, reqId): Promise<void> => {
+      await jobs.get().enqueueJob({ kind: "publish", buildId, ...(reqId ? { reqId } : {}) });
     },
-    consumer: lazyConsumer(parts),
-  };
-}
-
-function lazily<T>(make: () => T): { (): T; built: () => T | undefined } {
-  let value: T | undefined;
-  const get = (): T => (value ??= make());
-  return Object.assign(get, { built: () => value });
-}
-
-interface QueueAndConsumer {
-  queue: DatabaseCaptureQueue;
-  consumer: CaptureConsumer;
-}
-
-function buildQueueAndConsumer(
-  options: ShelfOptions,
-  config: ShelfConfig,
-  logger: Logger,
-  completer: PublishCompleter,
-): QueueAndConsumer {
-  const queue = createDatabaseCaptureQueue(options.database, { kinds: ["publish"] });
-  const scratchDir = config.scratchDir ?? DEFAULT_SCRATCH_DIR;
-  const handler = createPublishHandler({
-    db: options.database,
-    storage: options.storage,
-    scratchDir,
-    limits: extractionLimitsOf(resolvePublishLimits(config)),
-    completer,
-    logger,
-  });
-  const consumer = createCaptureConsumer({
-    queue,
-    handlers: { publish: handler },
-    scratchDir,
-    config: { concurrency: 1 },
-    metrics: publishMetrics(),
-    logger: logger.child({ component: "publish-consumer" }),
-  });
-  return { queue, consumer };
-}
-
-/** A consumer that is built when first started; stopping one never started is a no-op. */
-function lazyConsumer(parts: ReturnType<typeof lazily<QueueAndConsumer>>): CaptureConsumer {
-  return {
-    start: async () => {
-      await parts().consumer.start();
-    },
-    stop: async () => {
-      const built = parts.built();
-      await built?.consumer.stop();
-      await built?.queue.lifecycle.teardown();
-    },
-    isRunning: () => parts.built()?.consumer.isRunning() ?? false,
-  };
-}
-
-/** Publish jobs count on the capture job instruments, told apart by `job.kind`. */
-function publishMetrics(): ConsumerMetrics {
-  return {
-    jobFinished: (event) => {
-      const instruments = captureMetrics();
-      const attributes = { "job.kind": event.kind };
-      instruments.jobDuration.record(event.durationMs, attributes);
-      if (event.outcome === "completed") {
-        instruments.jobsCompleted.add(1, attributes);
-      } else if (event.outcome === "failed") {
-        instruments.jobsFailed.add(1, attributes);
-      }
-    },
+    handler: createPublishHandler({
+      db: options.database,
+      storage: options.storage,
+      scratchDir: config.scratchDir ?? DEFAULT_SCRATCH_DIR,
+      limits: extractionLimitsOf(resolvePublishLimits(config)),
+      completer,
+      logger,
+    }),
   };
 }

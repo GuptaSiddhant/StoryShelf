@@ -63,7 +63,7 @@ Everything else lives under a subpath:
 - `StorybookAdapter.loadDependencyGraph(sourceDir)` (`core/capture`) — optional `StorySourceAdapter` hook reading the build's `preview-stats.json` for affected tracing; sources without it render everything.
 - `Ai`, `AiError` (`core/ai`) — the AI singleton surface behind `ShelfOptions.ai` (not an adapter, like `Auth`); `@storyshelf/ai` implements it. `core/insights` holds the pure evidence builders, redaction, result envelopes and budget math. See the [AI insights guide](/ai/).
 - `diffImages(baseline, current, options)` (`core/diff`) performs the pixel-level comparison.
-- `InMemoryCaptureQueue` (`core/capture`) manages capture concurrency and job status.
+- `createDatabaseCaptureQueue(db, options)` (`core/capture`) is the job queue on the app's own database (`capture_jobs`), and `createCaptureConsumer({ queue, capture, handlers, config })` the consumer that runs its jobs, with a handler per job kind.
 - `createUrlBuilder(baseUrl, publishedBaseDomain?)` (`core/urls`) builds application and published Storybook URLs.
 
 ## Adapter contracts

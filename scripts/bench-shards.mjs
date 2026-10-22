@@ -6,7 +6,7 @@
  *   node scripts/bench-shards.mjs --storybook <built storybook dir> [--scenario <name>]...
  *                                 [--repeat 2] [--out results.json]
  *
- * Runs a real capture (db-sqlite, local storage, Playwright, the in-memory queue) of one built
+ * Runs a real capture (db-sqlite, local storage, Playwright, the database queue and its consumer) of one built
  * Storybook under several configurations and reports wall-clock from enqueue to a finished build,
  * peak resident memory of this process and the browsers it launched, shard timings and a
  * correctness check: the build must end approved with exactly one snapshot per story, otherwise
@@ -36,7 +36,9 @@ const execFileAsync = promisify(execFile);
 const { createSqliteDatabase } = await load("packages/db-sqlite/dist/index.mjs");
 const { createLocalStorage } = await load("packages/storage-local/dist/index.mjs");
 const { createPlaywrightCaptureRunner } = await load("packages/runner-playwright/dist/index.mjs");
-const { InMemoryCaptureQueue, createDispatchJob } = await load("packages/core/dist/capture.mjs");
+const { createCaptureConsumer, createDatabaseCaptureQueue } = await load(
+  "packages/core/dist/capture.mjs",
+);
 const { BuildModel, ProjectModel, CaptureShardModel, SnapshotModel } = await load(
   "packages/core/dist/models.mjs",
 );
@@ -197,27 +199,22 @@ async function runScenario(scenario, runIndex) {
   const runner = createPlaywrightCaptureRunner({ concurrency: scenario.pages });
   const project = await new ProjectModel(db, tablesOf(db)).create({ name: "Bench" });
 
-  const jobOptions = {
-    db,
-    tables: tablesOf(db),
-    storage,
-    runner,
-    scratchDir: join(dir, "scratch"),
+  // The database queue and the consumer the app runs, with one attempt per job.
+  const queue = createDatabaseCaptureQueue(db, { retries: 0 });
+  const consumer = createCaptureConsumer({
+    queue,
+    capture: {
+      db,
+      storage,
+      runner,
+      scratchDir: join(dir, "scratch"),
+      shardSize: scenario.shardSize,
+      gitHosts: [],
+    },
+    config: { concurrency: scenario.workers, maxRetries: 0 },
     logger,
-    shardSize: scenario.shardSize,
-  };
-  let queue;
-  jobOptions.enqueue = async (job) => await queue.enqueue(job);
-  const runJob = createDispatchJob({
-    db,
-    tables: tablesOf(db),
-    jobOptions,
-    gitHosts: [],
-    secret: undefined,
-    logger,
-    maxRetries: 0,
   });
-  queue = new InMemoryCaptureQueue({ concurrency: scenario.workers, runJob, logger });
+  const consuming = consumer.start();
   const setup = { queue, db, peakMb: 0 };
 
   const results = [];
@@ -227,6 +224,9 @@ async function runScenario(scenario, runIndex) {
       results.push(await runBuild(setup, build));
     }
   } finally {
+    await consumer.stop();
+    await consuming;
+    await queue.lifecycle.teardown();
     await runner.lifecycle?.teardown?.();
     await db.lifecycle?.teardown?.();
   }

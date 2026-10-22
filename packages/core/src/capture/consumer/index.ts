@@ -183,7 +183,11 @@ function registry(options: CaptureConsumerOptions, logger: Logger): Map<string, 
   return map;
 }
 
-export { createCaptureHandler, type CaptureHandlerOptions } from "./capture-handler.ts";
+export {
+  captureDispatchDeps,
+  createCaptureHandler,
+  type CaptureHandlerOptions,
+} from "./capture-handler.ts";
 export { idleDelayMs, isFastEmptyPoll, MIN_BLOCKING_POLL_MS } from "./idle.ts";
 export {
   DEFAULT_SAMPLE_MS,

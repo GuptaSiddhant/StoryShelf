@@ -1,13 +1,7 @@
 import { createShelfLogger } from "@storyshelf/core/logger";
-import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
-import { capturesLocally, childEnvOf, shouldForkCapture } from "./capture-process.ts";
-import { setupCaptureQueue } from "./capture-setup.ts";
-
-const ECHO_CHILD = fileURLToPath(
-  new URL("../../core/src/test-helpers/ipc-echo-child.ts", import.meta.url),
-);
+import { childEnvOf, createForkedHandler, shouldForkCapture } from "./capture-process.ts";
 
 const logger = createShelfLogger({ level: "silent" });
 
@@ -19,35 +13,27 @@ function runner() {
   } as unknown as import("@storyshelf/core/adapter/capture-runner").CaptureRunner;
 }
 
-const queueOf = (kind: string) => ({ metadata: { kind } }) as never;
-
 describe("childEnvOf", () => {
-  it("hands the image engine and diff threads to the child, with the other settings", () => {
-    expect(
-      childEnvOf({ concurrency: 3, shardSize: 40, imageEngine: "sharp", diffThreads: 2 }),
-    ).toEqual({
-      STORYSHELF_CAPTURE_CONCURRENCY: "3",
-      STORYSHELF_CAPTURE_SHARD_SIZE: "40",
-      STORYSHELF_IMAGE_ENGINE: "sharp",
-      STORYSHELF_DIFF_WORKERS: "2",
-    });
+  it("hands the image engine, diff threads and retries to the child, with the shard size", () => {
+    expect(childEnvOf({ retries: 3, shardSize: 40, imageEngine: "sharp", diffThreads: 2 })).toEqual(
+      {
+        STORYSHELF_CAPTURE_RETRIES: "3",
+        STORYSHELF_CAPTURE_SHARD_SIZE: "40",
+        STORYSHELF_IMAGE_ENGINE: "sharp",
+        STORYSHELF_DIFF_WORKERS: "2",
+      },
+    );
   });
 
-  it("sets nothing for options that were not given", () => {
-    expect(childEnvOf({})).toEqual({});
+  it("always hands down the retries, and nothing for options that were not given", () => {
+    expect(childEnvOf({ retries: 0 })).toEqual({ STORYSHELF_CAPTURE_RETRIES: "0" });
   });
 
   it("keeps a diff thread count of 0 (main-thread diffs)", () => {
-    expect(childEnvOf({ diffThreads: 0 })).toEqual({ STORYSHELF_DIFF_WORKERS: "0" });
-  });
-});
-
-describe("capturesLocally", () => {
-  it("is true for the in-process and forked queues only", () => {
-    expect(capturesLocally(queueOf("memory"))).toBe(true);
-    expect(capturesLocally(queueOf("forked"))).toBe(true);
-    expect(capturesLocally(queueOf("sqs"))).toBe(false);
-    expect(capturesLocally(null)).toBe(false);
+    expect(childEnvOf({ retries: 2, diffThreads: 0 })).toEqual({
+      STORYSHELF_CAPTURE_RETRIES: "2",
+      STORYSHELF_DIFF_WORKERS: "0",
+    });
   });
 });
 
@@ -84,91 +70,50 @@ describe("shouldForkCapture", () => {
   });
 });
 
-function setup(capture: Record<string, unknown>) {
-  const { db } = makeDatabase();
-  const { storage } = makeStorage();
-  return setupCaptureQueue(
-    { database: db as never, storage: storage as never, testing: capture as never },
-    { scratchDir: ".tmp/capture-process-test" },
-    [],
-    logger,
+describe("createForkedHandler", () => {
+  const ECHO_CHILD = fileURLToPath(
+    new URL("../../core/src/test-helpers/ipc-echo-child.ts", import.meta.url),
   );
-}
+  const context = { logger: {} as never, touch: () => {} };
 
-describe("setupCaptureQueue process model", () => {
-  it("uses the in-process queue without a workerEntry", () => {
-    expect(setup({ runner: runner() }).queue?.metadata.kind).toBe("memory");
-  });
-
-  it("uses the in-process queue in in-process mode even with a workerEntry", () => {
-    const result = setup({ runner: runner(), workerEntry: ECHO_CHILD, mode: "in-process" });
-    expect(result.queue?.metadata.kind).toBe("memory");
-  });
-
-  it("uses a forked queue when forced, and a real child processes jobs", async () => {
-    const result = setup({ runner: runner(), workerEntry: ECHO_CHILD, mode: "fork" });
-    const queue = result.queue;
+  it("pushes jobs to a real child, and closes it", async () => {
+    const handler = createForkedHandler({
+      workerEntry: ECHO_CHILD,
+      retries: 2,
+      fallback: { run: async () => {} },
+      onCrashed: async () => {},
+      logger,
+    });
     try {
-      expect(queue?.metadata.kind).toBe("forked");
-      await result.enqueueCapture?.("ok-1");
-      const deadline = Date.now() + 15_000;
-      // oxlint-disable-next-line eslint/no-await-in-loop -- polling loop
-      while ((await queue?.status("ok-1"))?.status !== "completed") {
-        if (Date.now() > deadline) {
-          throw new Error("job was not completed by the forked child");
-        }
-        // oxlint-disable-next-line eslint/no-await-in-loop -- polling loop
-        await new Promise((resolve) => setTimeout(resolve, 25));
-      }
+      await handler.run({ buildId: "ok-1", receipt: "ok-1:1" }, context);
+      expect(handler.tripped).toBe(false);
     } finally {
-      await queue?.lifecycle?.teardown();
+      await handler.close();
     }
   }, 30_000);
 
-  it("lets the forked child hand shards back to be delivered to it", async () => {
-    const result = setup({
-      runner: runner(),
+  it("writes the failure itself when the child kills the last attempt", async () => {
+    const onCrashed = vi.fn(async () => {});
+    const handler = createForkedHandler({
       workerEntry: ECHO_CHILD,
-      mode: "fork",
-      shardSize: 10,
+      retries: 0,
+      fallback: { run: async () => {} },
+      onCrashed,
+      logger,
     });
-    const queue = result.queue;
     try {
-      await result.enqueueCapture?.("fan-1");
-      const deadline = Date.now() + 15_000;
-      const settled = async (): Promise<string[]> =>
-        (await queue?.recent(10))
-          ?.filter((entry) => entry.status === "completed")
-          .map((entry) => entry.shard ?? "plan")
-          .toSorted() ?? [];
-      // oxlint-disable-next-line eslint/no-await-in-loop -- polling loop
-      while ((await settled()).length < 3) {
-        if (Date.now() > deadline) {
-          throw new Error("the child's shards were not delivered back to it");
-        }
-        // oxlint-disable-next-line eslint/no-await-in-loop -- polling loop
-        await new Promise((resolve) => setTimeout(resolve, 25));
-      }
-      expect(await settled()).toEqual(["fan-1:render:1", "fan-1:render:2", "plan"]);
+      await expect(
+        handler.run(
+          { buildId: "crash-1", receipt: "crash-1:1", attempt: 1, maxAttempts: 1 },
+          context,
+        ),
+      ).rejects.toThrow(/exited/u);
+      expect(onCrashed).toHaveBeenCalledWith(
+        expect.objectContaining({ buildId: "crash-1" }),
+        expect.stringContaining("exited"),
+      );
     } finally {
-      await queue?.lifecycle?.teardown();
+      await handler.close();
     }
   }, 30_000);
-
-  it("prefers a supplied queue over forking", () => {
-    const supplied = {
-      metadata: { name: "q", version: "0", kind: "sqs", category: "capture-queue" },
-      enqueue: vi.fn(),
-      status: vi.fn(),
-      active: vi.fn(),
-      recent: vi.fn(),
-    };
-    const result = setup({
-      runner: runner(),
-      queue: supplied,
-      workerEntry: ECHO_CHILD,
-      mode: "fork",
-    });
-    expect(result.queue).toBe(supplied);
-  });
 });

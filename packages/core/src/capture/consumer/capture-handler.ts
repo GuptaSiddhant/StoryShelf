@@ -51,7 +51,7 @@ export function createCaptureHandler(options: CaptureHandlerOptions): KindHandle
     if (existing !== undefined) {
       return existing;
     }
-    const created = createDispatchJob(dispatchDeps(options, retries));
+    const created = createDispatchJob(captureDispatchDeps(options, retries));
     dispatches.set(retries, created);
     return created;
   };
@@ -81,7 +81,11 @@ function toDispatchJob(job: ConsumerJob): CaptureDispatchJob {
   };
 }
 
-function dispatchDeps(options: CaptureHandlerOptions, maxRetries: number): DispatchDeps {
+/** The dispatch dependencies the handler runs captures with; the host reuses them to write failures the pipeline never got to. */
+export function captureDispatchDeps(
+  options: CaptureHandlerOptions,
+  maxRetries: number,
+): DispatchDeps {
   const t = options.db.tables;
   const jobOptions: CaptureJobOptions = {
     db: options.db,

@@ -99,15 +99,16 @@ createShelfApp({ database, storage }); // hosting only
 createShelfApp({ database, storage, testing: { runner, compare: { threads: 2 }, concurrency: 2 } });
 ```
 
-- `testing` needs `runner`, or `queue` to hand jobs to a remote queue; `testing: {}` fails at boot.
-- `compare`, `images`, `concurrency`, `shardSize`, `workerEntry`, `mode` and `queue` all live under `testing`; they are unreachable without it.
+- `testing` needs `runner`, or `queue` to hand jobs to a queue that something else consumes; `testing: {}` fails at boot.
+- `compare`, `images`, `concurrency`, `retries`, `shardSize`, `workerEntry`, `mode` and `queue` all live under `testing`; they are unreachable without it.
+- Captures queue on the database (`capture_jobs`), and every instance with `testing` consumes them. `testing.retries` (default `2`, so three attempts) is the one retry limit for failed attempts, lost leases and forked-child crashes; `testing.queue` replaces the database queue and must be a `PollableCaptureQueue`, consumed in this process when `runner` is set. See [Capture](/concepts/capture/#the-job-queue).
 - `config.scratchDir` stays in `config`, because publishing uses it too.
 - Routes for capture, compare and baselines answer `404` without `testing`; the navigation hides them; the System page and `storyshelf upload` say the instance is hosting only.
 - A process that renders (`testing.runner`) needs a long-running host. Boot throws on AWS Lambda (`AWS_LAMBDA_FUNCTION_NAME`), logs a warning on Vercel and Netlify, and throws when the database is the Cloudflare D1 preset. `STORYSHELF_ALLOW_SERVERLESS=1` overrides the host check (not the D1 one).
 
 ### Capture performance tuning
 
-- `testing.concurrency` (a `createShelfApp` option, formerly `config.captureConcurrency`) sets how many builds the in-process queue captures at once.
+- `testing.concurrency` (a `createShelfApp` option, formerly `config.captureConcurrency`) sets how many jobs this instance runs at once.
 - The Playwright and Puppeteer runners' own `concurrency` option pins how many pages render at once. Left unset, the runner starts from a CPU/memory-sized budget (Firefox and WebKit pages count as two Chromium slots) and adapts: it raises the limit while capture latency and event-loop lag stay flat, halves it on timeouts, and logs every change as `capture concurrency adjusted`.
 - `testing.compare.threads` (a `createShelfApp` option) or `STORYSHELF_DIFF_WORKERS` sets how many worker threads compare screenshots (default: CPU count minus one, minimum 1; the option wins over the variable). `0` diffs on the main thread. The pool serves both capture and the re-diff endpoint, so it matters on servers that never render.
 
