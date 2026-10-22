@@ -2,7 +2,7 @@
  * Per-scope timing recorder: aggregate millisecond sums under shared names.
  *
  * Framework- and telemetry-free (ALS + numbers only) so any host — the Hono
- * app, the remote worker, or a third-party server — can open a scope. The
+ * app, the forked capture child, or a third-party server — can open a scope. The
  * app folds request scopes into `Server-Timing`; background scopes surface
  * as log lines and attempt history. Without an open scope every call is a
  * cheap no-op, keeping unit tests and sleeping workers silent.

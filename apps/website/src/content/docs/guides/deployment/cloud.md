@@ -1,6 +1,6 @@
 ---
 title: Cloud assembly
-description: Assemble StoryShelf for any cloud — swap database, storage, queue, and auth per target.
+description: Assemble StoryShelf for any cloud — swap database, storage and auth per target, and choose between hosting only and testing.
 ---
 
 StoryShelf is **cross-runtime**: the core router (`createShelfApp`) uses only Web-standard APIs (`Request`, `Response`, `fetch`, `ReadableStream`, `crypto`, `URL`). There is no Node coupling in the core, so you can deploy on any platform that runs JavaScript.
@@ -18,6 +18,12 @@ StoryShelf is **cross-runtime**: the core router (`createShelfApp`) uses only We
 
 ## Serverless: Storybook hosting only
 
+> Enabling `testing` requires a long-running server (a container, VM, Fly Machine or Kubernetes
+> pod). It cannot run on serverless platforms that freeze or end the process after each request
+> (Vercel Functions, AWS Lambda, Cloudflare Workers), because capture jobs run for minutes in the
+> background and the job consumer must keep running. A serverless deployment can host Storybooks
+> only, by leaving `testing` unset.
+
 `testing` needs a process that keeps running between requests: capture jobs run for minutes in the background. Vercel Functions, AWS Lambda, Netlify Functions and Cloudflare Workers freeze or end the process after each request, so on those platforms StoryShelf **hosts Storybooks only**: leave the `testing` option out. See [Hosting only](/concepts/hosting-only/).
 
 - **AWS Lambda.** `createShelfApp` throws at boot when `AWS_LAMBDA_FUNCTION_NAME` is set and `testing.runner` is configured.
@@ -26,7 +32,7 @@ StoryShelf is **cross-runtime**: the core router (`createShelfApp`) uses only We
 - **Cloudflare D1.** The `@storyshelf/db-sqlite/d1` preset is a Workers-only binding, so it cannot back an instance with `testing.runner`; `createShelfApp` throws at boot. Turso over the network can.
 - **Uploads.** With no consumer on the host, a zip over `maxInlineUnzipSize` is refused with `413`, and `storyshelf upload` falls back to the file-by-file route by itself.
 
-An instance that only hands jobs to a remote `testing.queue` (no `testing.runner`) renders nothing in its own process, so neither check applies to it. Capture runs wherever a worker polls that queue; the worker deployment is described in [Remote workers](/guides/deployment/remote-workers/).
+An instance that only hands jobs to a `testing.queue` of your own (no `testing.runner`) renders nothing in its own process, so neither check applies to it. Capture then runs wherever you run a consumer for that queue (`createCaptureConsumer` from `@storyshelf/core/capture`).
 
 ## Minimal Turso + S3 recipe (long-running host with `testing`)
 

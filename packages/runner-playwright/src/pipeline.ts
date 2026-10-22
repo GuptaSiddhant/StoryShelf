@@ -128,8 +128,8 @@ async function runWithBrowser(
 
 /**
  * Playwright is loaded on first render, not at import: it costs ~150 ms and tens
- * of MB, which a server that only serves reviews (or hands renders to a remote
- * worker) should not pay at boot.
+ * of MB, which a server that only serves reviews or hosts Storybooks should not pay at
+ * boot.
  */
 async function launchBrowser(name: BrowserName): Promise<Browser> {
   const playwright = await import("playwright-core");

@@ -35,23 +35,23 @@ Every adapter package must satisfy this matrix. New adapters ship with all
 rows; existing adapters backfill on touch. The `adapter-layout` skill enforces
 the file placement (colocated `<module>.test.ts`, move cases with the code).
 
-| Requirement | Storage (`storage-*`) | Queue (`queue-*`) | DB (`db-*`) | Runner / git / auth / notify |
-|---|---|---|---|---|
-| `metadata` | `kind` + `category` asserted once per factory | same | same | same |
-| `lifecycle` all-or-nothing | `setup` creates root (idempotent x2), `health.ok` true then false after `rm -rf`, `teardown` x2 no-throw | `setup` probes remote (fake client records 1 call), `health` maps ok/fail, `teardown` no-op for injected client + destroys owned client x2 | `migrate` twice + `ping` ok, `close` x2 no-throw | same shape; runners assert browser launch/close |
-| Happy-path operations | `write/read/exists/delete/list` round-trip + recursive `list` + missing prefix `[]` | `enqueue` returns id + `poll/ack/nack` round-trip via fake transport | CRUD per table + unique-constraint + foreign-key violation | render/post/comment round-trip via fake transport |
-| Not-found / error mapping | `read`/`readStream` missing → throw; `writeStream` failure deletes partial | `ack` unknown id → throw; malformed body → `nack` without crash | missing row → `undefined`, not throw | HTTP 4xx mapped to typed error, 5xx retried per `httpJson` |
-| Safety | path-traversal (`../escape`) rejected on `read/write/list` | poison payload never blocks `poll` loop; delay clamps honored | SQL injection via values rejected (params, never concat) | webhook HMAC verified before mutation |
-| Streams / codec where applicable | `writeStream/readStream` byte-identical + partial cleanup on failure | `codec` serialize/parse round-trip + version-mismatch throw | N/A (or bulk-import performance smoke) | runner screenshot bytes equal fixture hash |
-| Live (`*.live.test.ts`, `LIVE_CLOUD=1` gated) | real bucket round-trip with `live/<run-id>/` prefix | real enqueue/poll/ack with per-run ids | real migrate + CRUD, teardown drops test rows | real API against throwaway repo/SHA |
+| Requirement | Storage (`storage-*`) | DB (`db-*`) | Runner / git / auth / notify |
+|---|---|---|---|
+| `metadata` | `kind` + `category` asserted once per factory | same | same |
+| `lifecycle` all-or-nothing | `setup` creates root (idempotent x2), `health.ok` true then false after `rm -rf`, `teardown` x2 no-throw | `migrate` twice + `ping` ok, `close` x2 no-throw | same shape; runners assert browser launch/close |
+| Happy-path operations | `write/read/exists/delete/list` round-trip + recursive `list` + missing prefix `[]` | CRUD per table + unique-constraint + foreign-key violation | render/post/comment round-trip via fake transport |
+| Not-found / error mapping | `read`/`readStream` missing → throw; `writeStream` failure deletes partial | missing row → `undefined`, not throw | HTTP 4xx mapped to typed error, 5xx retried per `httpJson` |
+| Safety | path-traversal (`../escape`) rejected on `read/write/list` | SQL injection via values rejected (params, never concat) | webhook HMAC verified before mutation |
+| Streams / codec where applicable | `writeStream/readStream` byte-identical + partial cleanup on failure | N/A (or bulk-import performance smoke) | runner screenshot bytes equal fixture hash |
+| Live (`*.live.test.ts`, `LIVE_CLOUD=1` gated) | real bucket round-trip with `live/<run-id>/` prefix | real migrate + CRUD, teardown drops test rows | real API against throwaway repo/SHA |
 
 Rules:
 
-- Fake the transport, never the adapter: inject fake S3/SQS/Redis/pg clients,
+- Fake the transport, never the adapter: inject fake S3/pg clients,
   temp dirs, or `:memory:` DBs. No network in `nub run test`.
 - Prove conformance with the published suites: `storageContractSuite` /
   `databaseContractSuite` from `@storyshelf/core/test-helpers` (one line in
-  the package's own test file; queue/runner/git suites follow in later phases).
+  the package's own test file). `queueContractSuite` covers the database queue and any custom `testing.queue`; runner/git suites follow in later phases).
 - Core validates untrusted input at the boundary: storage path segments
   (`paths.ts`), screenshot bytes (`capture/guards.ts`: PNG magic + 25 MiB cap),
   list limits (`clampListLimit`, max 1000).
@@ -88,17 +88,16 @@ Rules:
 
 ## Live cloud tests (gated: `LIVE_CLOUD=1`)
 
-Strictly real providers — no injected fake clients, no emulators (Service Bus
-and Pub/Sub have no local emulators in this harness by design). Hermetic
+Strictly real providers — no injected fake clients, no emulators. Hermetic
 `turbo test` never touches the network: live files `skipIf(LIVE_CLOUD !== "1")`
 and construct adapters inside `beforeAll`, so skipped runs don't even read
 cloud env vars. Live results must never come from the turbo cache — always
 run with `--force`. Nightly + manual dispatch per provider:
 
-- `.github/workflows/live-cloud-aws.yml` — S3 + SQS
-- `.github/workflows/live-cloud-azure.yml` — Blob + Storage Queues + Service Bus (matrix)
-- `.github/workflows/live-cloud-gcp.yml` — GCS + Pub/Sub
-- `.github/workflows/live-cloud-ancillary.yml` — Turso + Postgres + Redis + OAuth + GitHub + GitLab (matrix `db`/`queue`/`auth`/`git`; long-lived resources, no scaffold)
+- `.github/workflows/live-cloud-aws.yml` — S3
+- `.github/workflows/live-cloud-azure.yml` — Blob
+- `.github/workflows/live-cloud-gcp.yml` — GCS
+- `.github/workflows/live-cloud-ancillary.yml` — Turso + Postgres + MySQL + OAuth + GitHub + GitLab (matrix `db`/`auth`/`git`; long-lived resources, no scaffold)
 
 Each workflow also validates its terraform scaffold generator (`fmt` +
 `init -backend=false` + `validate`, mirroring the CLI's
@@ -110,16 +109,12 @@ contract pinned by `terraform-*.test.ts` — renames break CI.
 | Target | Terraform output | Env / secret |
 |---|---|---|
 | AWS | `s3_bucket` | `S3_BUCKET` (+ `AWS_REGION`) |
-| AWS | `queue_url` | `QUEUE_URL` |
 | AWS | `db_endpoint` | `DATABASE_URL` (`?sslmode=require`) |
 | AWS | `user_pool_id` / `app_client_id` | `COGNITO_*` / `OIDC_*` (phase 4) |
 | Azure | `storage_connection_string` | `AZURE_STORAGE_CONNECTION` |
-| Azure | `servicebus_connection_string` | `AZURE_SERVICE_BUS_CONNECTION` |
-| Azure | `queue_name` (`capture-jobs`) | `LIVE_AZURE_QUEUE` |
 | Azure | (container, pre-provisioned) | `LIVE_AZURE_CONTAINER` |
 | Azure | `database_url` | `DATABASE_URL` (phase 4) |
 | GCP | `gcs_bucket` | `LIVE_GCS_BUCKET` |
-| GCP | `pubsub_topic` / `pubsub_subscription` | `LIVE_PUBSUB_TOPIC` / `LIVE_PUBSUB_SUBSCRIPTION` |
 | GCP | (project) | `GCP_PROJECT_ID` |
 | GCP | (service-account key JSON) | `GCP_SERVICE_ACCOUNT_JSON` |
 
@@ -145,8 +140,8 @@ in CI).
 3. **Run** (from the repo root, or per package):
    ```sh
    export PATH="$HOME/.nub/bin:$PATH"
-   LIVE_CLOUD=1 S3_BUCKET=... QUEUE_URL=... \
-     nubx turbo test --filter='@storyshelf/storage-s3' --filter='@storyshelf/queue-sqs' --force
+   LIVE_CLOUD=1 S3_BUCKET=... \
+     nubx turbo test --filter='@storyshelf/storage-s3' --force
    ```
    Per-package equivalent: `cd packages/storage-s3 && LIVE_CLOUD=1 S3_BUCKET=... ./node_modules/.bin/vitest run`.
 4. **Teardown:** suites delete their own keys/messages (unique
@@ -154,26 +149,23 @@ in CI).
    infrastructure is yours — `terraform destroy -var
    "project=shelf-manual-<name>" -auto-approve` when done.
 5. **Costs:** live suites are a handful of API calls; the spend is idle
-   infrastructure (RDS, Cloud SQL, Service Bus namespace). Destroy promptly.
+   infrastructure (RDS, Cloud SQL, Postgres Flexible Server). Destroy promptly.
 
 ### Phase 4 (ancillary: `.github/workflows/live-cloud-ancillary.yml`)
 
 No terraform scaffold covers these — resources are long-lived and shared,
-isolation is per-run. Matrix legs: `db`, `queue`, `auth`, `git` (nightly +
+isolation is per-run. Matrix legs: `db`, `auth`, `git` (nightly +
 manual dispatch, `--force` so results never come from cache).
 
 | Suite | Resource to provision (one-time, manual) | Env |
 |---|---|---|
 | Turso | Turso database (`turso db create shelf-live-test`) | `TURSO_DATABASE_URL` (`libsql://…`), `TURSO_AUTH_TOKEN` |
 | Postgres | Any wire-compatible DB (Neon/Supabase free tier is enough; use a direct connection, not the pooler) | `DATABASE_URL` (`?sslmode=require` for managed) |
-| Redis | Upstash/ElastiCache/Memorystore (or local `redis://localhost:6379` for a smoke run) | `REDIS_URL` |
 | OAuth | OIDC app with a redirect URL (Auth0 free tenant; Keycloak/Entra/Okta/Cognito work too) — discovery-only, no interactive login | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_REDIRECT_URL` |
 | GitHub | Test repo + PAT with `repo:status`; reserve a throwaway SHA (statuses are immutable) | `LIVE_GH_TOKEN`, `LIVE_GH_OWNER`, `LIVE_GH_REPO`, `LIVE_GH_SHA` |
 | GitLab | Test project + token with `api` scope; reserve a throwaway SHA | `LIVE_GL_TOKEN`, `LIVE_GL_OWNER`, `LIVE_GL_REPO`, `LIVE_GL_SHA`, optional `LIVE_GL_HOST` |
 
-Isolation: unique row ids/slugs (DBs, removed afterwards), unique Redis
-keys (`shelf:live:<run>:<uuid>` — `{key}`, `{key}:processing`,
-`{key}:delayed`), unique status contexts (`storyshelf/live-<run-id>`).
+Isolation: unique row ids/slugs (DBs, removed afterwards), unique status contexts (`storyshelf/live-<run-id>`).
 Suites gate on their own env (`skipIf`), so a leg exercises exactly the
 providers whose secrets are present; each leg fail-fasts when none of its
 secrets are set. Local run example:

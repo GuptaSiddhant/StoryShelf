@@ -33,7 +33,6 @@ async function scaffold(answers: Record<string, unknown>): Promise<void> {
     storage: "local",
     auth: "none",
     git: "none",
-    queue: "memory",
     docker: false,
     ...answers,
   });
@@ -62,7 +61,6 @@ describe("runServerInit", () => {
       storage: "local",
       auth: "none",
       git: "none",
-      queue: "memory",
       docker: false,
     });
 
@@ -93,7 +91,6 @@ describe("runServerInit", () => {
       storage: "local",
       auth: "none",
       git: "none",
-      queue: "memory",
       docker: false,
     });
 
@@ -118,7 +115,6 @@ describe("runServerInit", () => {
       storage: "local",
       auth: "none",
       git: "none",
-      queue: "memory",
       docker: false,
     });
 
@@ -138,145 +134,44 @@ describe("runServerInit", () => {
     expect(pkg.dependencies["better-sqlite3"]).toBeDefined();
   });
 
-  it("scaffolds src/index.ts with in-memory queue", async () => {
-    vi.mocked(prompts).mockResolvedValue({
-      name: "my-server",
-      dir: "./my-server",
-      database: "sqlite",
-      storage: "local",
-      auth: "none",
-      git: "none",
-      queue: "memory",
-      docker: false,
-    });
-
-    const cwd = process.cwd();
-    process.chdir(tmpRoot);
-    try {
-      await runServerInit({});
-    } finally {
-      process.chdir(cwd);
-    }
-
+  it("scaffolds one server that runs captures itself on the database queue", async () => {
+    await scaffold({});
     expect(existsSync(join(dir, "src", "index.ts"))).toBe(true);
+    expect(existsSync(join(dir, "src", "worker.ts"))).toBe(false);
     const code = readFileSync(join(dir, "src", "index.ts"), "utf8");
     expect(code).toContain("createShelfApp");
     expect(code).toContain("createPlaywrightCaptureRunner");
-    expect(code).not.toContain("createSqsCaptureQueue");
-    const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
-      dependencies: Record<string, string>;
-    };
-    expect(pkg.dependencies["@storyshelf/runner-playwright"]).toBeDefined();
-    expect(pkg.dependencies["@storyshelf/queue-sqs"]).toBeUndefined();
-  });
-
-  it("scaffolds server with SQS queue and colocated worker", async () => {
-    // Phased flow: phase-1 answers, advanced toggle, phase-2 adapters, worker confirm
-    const main = {
-      name: "my-server",
-      dir: "./my-server",
-      deployTarget: "docker",
-      database: "turso",
-      storage: "s3",
-      auth: "none",
-      git: "none",
-      queue: "sqs",
-      docker: false,
-    };
-    vi.mocked(prompts)
-      .mockResolvedValueOnce({ ...main })
-      .mockResolvedValueOnce({ advancedAdapters: true })
-      .mockResolvedValueOnce({ ...main })
-      .mockResolvedValueOnce({ includeWorker: true });
-
-    const cwd = process.cwd();
-    process.chdir(tmpRoot);
-    try {
-      await runServerInit({});
-    } finally {
-      process.chdir(cwd);
-    }
-
-    expect(existsSync(join(dir, "src", "index.ts"))).toBe(true);
-    expect(existsSync(join(dir, "src", "worker.ts"))).toBe(true);
-    const serverCode = readFileSync(join(dir, "src", "index.ts"), "utf8");
-    expect(serverCode).toContain("createSqsCaptureQueue");
-    expect(serverCode).not.toContain("createPlaywrightCaptureRunner");
-    const workerCode = readFileSync(join(dir, "src", "worker.ts"), "utf8");
-    expect(workerCode).toContain("createCaptureWorker");
-    expect(workerCode).toContain("createPlaywrightCaptureRunner");
+    expect(code).toContain("testing: { runner: captureRunner },");
+    expect(code).toContain("scratchDir: dataDir,");
+    expect(code).not.toMatch(/queue/iu);
     const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
       dependencies: Record<string, string>;
       scripts: Record<string, string>;
     };
-    expect(pkg.dependencies["@storyshelf/queue-sqs"]).toBeDefined();
-    expect(pkg.dependencies["@storyshelf/worker"]).toBeDefined();
-    expect(pkg.scripts["worker"]).toBeDefined();
+    expect(pkg.dependencies["@storyshelf/runner-playwright"]).toBeDefined();
+    expect(Object.keys(pkg.dependencies).filter((name) => /queue|worker/u.test(name))).toEqual([]);
+    expect(pkg.scripts["worker"]).toBeUndefined();
   });
 
-  it("scaffolds SQS server without worker when declined", async () => {
-    const main = {
-      name: "my-server",
-      dir: "./my-server",
-      deployTarget: "docker",
-      database: "sqlite",
-      storage: "local",
-      auth: "none",
-      git: "none",
-      queue: "sqs",
-      docker: false,
-    };
-    vi.mocked(prompts)
-      .mockResolvedValueOnce({ ...main })
-      .mockResolvedValueOnce({ advancedAdapters: false })
-      .mockResolvedValueOnce({ ...main })
-      .mockResolvedValueOnce({ includeWorker: false });
-
-    const cwd = process.cwd();
-    process.chdir(tmpRoot);
-    try {
-      await runServerInit({});
-    } finally {
-      process.chdir(cwd);
-    }
-
-    expect(existsSync(join(dir, "src", "index.ts"))).toBe(true);
-    expect(existsSync(join(dir, "src", "worker.ts"))).toBe(false);
+  it("asks no queue or worker question: prompts run only for the project, target and adapters", async () => {
+    await scaffold({ deployTarget: "docker" });
+    const asked = vi
+      .mocked(prompts)
+      .mock.calls.flatMap(([questions]) => (Array.isArray(questions) ? questions : [questions]))
+      .map((question) => (question as { name?: string }).name);
+    expect(asked).not.toContain("queue");
+    expect(asked).not.toContain("includeWorker");
+    expect(asked).toContain("database");
   });
 
-  it("generates slim Dockerfile and worker compose when with worker and docker", async () => {
-    const main = {
-      name: "my-server",
-      dir: "./my-server",
-      deployTarget: "docker",
-      database: "postgres",
-      storage: "local",
-      auth: "none",
-      git: "none",
-      queue: "sqs",
-      docker: true,
-    };
-    vi.mocked(prompts)
-      .mockResolvedValueOnce({ ...main })
-      .mockResolvedValueOnce({ advancedAdapters: false })
-      .mockResolvedValueOnce({ ...main })
-      .mockResolvedValueOnce({ includeWorker: true });
-
-    const cwd = process.cwd();
-    process.chdir(tmpRoot);
-    try {
-      await runServerInit({});
-    } finally {
-      process.chdir(cwd);
-    }
-
+  it("generates one Playwright image and a postgres-only compose for docker", async () => {
+    await scaffold({ deployTarget: "docker", docker: true, database: "postgres" });
     expect(existsSync(join(dir, "Dockerfile"))).toBe(true);
-    expect(existsSync(join(dir, "Dockerfile.worker"))).toBe(true);
-    expect(existsSync(join(dir, "compose.yaml"))).toBe(true);
+    expect(existsSync(join(dir, "Dockerfile.worker"))).toBe(false);
     const compose = readFileSync(join(dir, "compose.yaml"), "utf8");
-    expect(compose).toContain("worker:");
     expect(compose).toContain("postgres:");
-    const dockerfile = readFileSync(join(dir, "Dockerfile.worker"), "utf8");
+    expect(compose).not.toContain("worker:");
+    const dockerfile = readFileSync(join(dir, "Dockerfile"), "utf8");
     expect(dockerfile).toContain("mcr.microsoft.com/playwright");
   });
 
@@ -292,29 +187,7 @@ describe("runServerInit", () => {
     expect(existsSync(dir)).toBe(false);
   });
 
-  it("defaults queue to memory when not answered", async () => {
-    vi.mocked(prompts).mockResolvedValue({
-      name: "my-server",
-      dir: "./my-server",
-      database: "sqlite",
-      storage: "local",
-      auth: "none",
-      git: "none",
-      // queue intentionally omitted
-      docker: false,
-    });
-    const cwd = process.cwd();
-    process.chdir(tmpRoot);
-    try {
-      await runServerInit({});
-    } finally {
-      process.chdir(cwd);
-    }
-    const code = readFileSync(join(dir, "src", "index.ts"), "utf8");
-    expect(code).toContain("testing: { runner: captureRunner },");
-  });
-
-  it("writes the AWS reference stack and forces postgres/s3/sqs", async () => {
+  it("writes the AWS reference stack and forces postgres/s3", async () => {
     vi.mocked(prompts)
       .mockResolvedValueOnce({
         name: "my-server",
@@ -324,7 +197,6 @@ describe("runServerInit", () => {
         storage: "local",
         auth: "oauth",
         git: "github",
-        queue: "memory",
         docker: false,
       })
       .mockResolvedValueOnce({
@@ -344,9 +216,11 @@ describe("runServerInit", () => {
     const serverCode = readFileSync(join(dir, "src", "index.ts"), "utf8");
     expect(serverCode).toContain("createPostgresDatabase");
     expect(serverCode).toContain("createS3Storage");
-    expect(serverCode).toContain("createSqsCaptureQueue");
     expect(serverCode).toContain("cognitoPreset");
-    expect(existsSync(join(dir, "src", "worker.ts"))).toBe(true);
+    expect(serverCode).toContain("testing: { runner: captureRunner },");
+    expect(existsSync(join(dir, "src", "worker.ts"))).toBe(false);
+    expect(existsSync(join(dir, "terraform", "queue.tf"))).toBe(false);
+    expect(existsSync(join(dir, "Dockerfile.worker"))).toBe(false);
     expect(existsSync(join(dir, "terraform", "database.tf"))).toBe(true);
     const databaseTf = readFileSync(join(dir, "terraform", "database.tf"), "utf8");
     expect(databaseTf).toContain("aws_dsql_cluster");
@@ -360,7 +234,7 @@ describe("runServerInit", () => {
     expect(pkg.scripts["docker:up"]).toBeUndefined();
   });
 
-  it("writes the Azure reference stack and forces postgres/azure/service-bus", async () => {
+  it("writes the Azure reference stack and forces postgres/azure", async () => {
     vi.mocked(prompts)
       .mockResolvedValueOnce({
         name: "my-server",
@@ -370,12 +244,10 @@ describe("runServerInit", () => {
         storage: "local",
         auth: "oauth",
         git: "github",
-        queue: "memory",
         docker: false,
       })
       .mockResolvedValueOnce({
         azureLocation: "westeurope",
-        azureQueueBackend: "service-bus",
         domainName: "",
         entraTenantId: "",
       });
@@ -390,16 +262,11 @@ describe("runServerInit", () => {
     const serverCode = readFileSync(join(dir, "src", "index.ts"), "utf8");
     expect(serverCode).toContain("createPostgresDatabase");
     expect(serverCode).toContain("createAzureStorage");
-    expect(serverCode).toContain("createAzureServiceBusQueue");
-    expect(serverCode).toContain("AZURE_SERVICE_BUS_CONNECTION");
     expect(serverCode).not.toContain("cognitoPreset");
     expect(serverCode).toContain("OIDC_ISSUER");
-    expect(existsSync(join(dir, "src", "worker.ts"))).toBe(true);
-    const workerCode = readFileSync(join(dir, "src", "worker.ts"), "utf8");
-    expect(workerCode).toContain("createAzureServiceBusQueue");
-    expect(existsSync(join(dir, "terraform", "queue.tf"))).toBe(true);
-    const queueTf = readFileSync(join(dir, "terraform", "queue.tf"), "utf8");
-    expect(queueTf).toContain("azurerm_servicebus_queue");
+    expect(serverCode).toContain("testing: { runner: captureRunner },");
+    expect(existsSync(join(dir, "src", "worker.ts"))).toBe(false);
+    expect(existsSync(join(dir, "terraform", "queue.tf"))).toBe(false);
     expect(existsSync(join(dir, "terraform", "terraform.tfvars.example"))).toBe(true);
     const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
       dependencies: Record<string, string>;
@@ -407,14 +274,13 @@ describe("runServerInit", () => {
     };
     expect(pkg.dependencies["@storyshelf/db-postgres"]).toBeDefined();
     expect(pkg.dependencies["@storyshelf/storage-azure"]).toBeDefined();
-    expect(pkg.dependencies["@storyshelf/queue-azure"]).toBeDefined();
-    expect(pkg.dependencies["@azure/service-bus"]).toBe("^7.9.5");
+    expect(pkg.dependencies["@azure/service-bus"]).toBeUndefined();
     expect(pkg.scripts["infra:plan"]).toBeDefined();
     expect(pkg.scripts["infra:apply"]).toBeDefined();
     expect(pkg.scripts["docker:up"]).toBeUndefined();
   });
 
-  it("writes the GCP reference stack and forces postgres/gcs/pubsub", async () => {
+  it("writes the GCP reference stack and forces postgres/gcs", async () => {
     vi.mocked(prompts)
       .mockResolvedValueOnce({
         name: "my-server",
@@ -424,7 +290,6 @@ describe("runServerInit", () => {
         storage: "local",
         auth: "oauth",
         git: "github",
-        queue: "memory",
         docker: false,
       })
       .mockResolvedValueOnce({
@@ -444,15 +309,10 @@ describe("runServerInit", () => {
     const serverCode = readFileSync(join(dir, "src", "index.ts"), "utf8");
     expect(serverCode).toContain("createPostgresDatabase");
     expect(serverCode).toContain("createGcsStorage");
-    expect(serverCode).toContain("createGcpPubSubQueue");
-    expect(serverCode).toContain("GOOGLE_CLOUD_PROJECT");
+    expect(serverCode).toContain("testing: { runner: captureRunner },");
     expect(serverCode).not.toContain("cognitoPreset");
-    expect(existsSync(join(dir, "src", "worker.ts"))).toBe(true);
-    const workerCode = readFileSync(join(dir, "src", "worker.ts"), "utf8");
-    expect(workerCode).toContain("createGcpPubSubQueue");
-    expect(existsSync(join(dir, "terraform", "queue.tf"))).toBe(true);
-    const queueTf = readFileSync(join(dir, "terraform", "queue.tf"), "utf8");
-    expect(queueTf).toContain("google_pubsub_subscription");
+    expect(existsSync(join(dir, "src", "worker.ts"))).toBe(false);
+    expect(existsSync(join(dir, "terraform", "queue.tf"))).toBe(false);
     expect(existsSync(join(dir, "terraform", "terraform.tfvars.example"))).toBe(true);
     const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
       dependencies: Record<string, string>;
@@ -460,8 +320,7 @@ describe("runServerInit", () => {
     };
     expect(pkg.dependencies["@storyshelf/db-postgres"]).toBeDefined();
     expect(pkg.dependencies["@storyshelf/storage-gcs"]).toBeDefined();
-    expect(pkg.dependencies["@storyshelf/queue-gcp"]).toBeDefined();
-    expect(pkg.dependencies["@google-cloud/pubsub"]).toBe("^6.1.0");
+    expect(pkg.dependencies["@google-cloud/pubsub"]).toBeUndefined();
     expect(pkg.scripts["infra:plan"]).toBeDefined();
     expect(pkg.scripts["infra:apply"]).toBeDefined();
     expect(pkg.scripts["docker:up"]).toBeUndefined();
@@ -476,7 +335,6 @@ describe("runServerInit", () => {
       storage: "local",
       auth: "oauth",
       git: "none",
-      queue: "memory",
       docker: false,
     });
     const cwd = process.cwd();
@@ -513,20 +371,6 @@ describe("runServerInit", () => {
     expect(existsSync(join(dir, "compose.yaml"))).toBe(true);
   });
 
-  it("generates compose with a worker service for a remote queue", async () => {
-    await scaffold({
-      deployTarget: "docker",
-      docker: true,
-      database: "postgres",
-      storage: "s3",
-      queue: "sqs",
-      includeWorker: true,
-    });
-    const compose = readFileSync(join(dir, "compose.yaml"), "utf8");
-    expect(compose.indexOf("  worker:")).toBeLessThan(compose.indexOf("\nvolumes:"));
-    expect(existsSync(join(dir, "Dockerfile.worker"))).toBe(true);
-  });
-
   it("copies the src directory in the Dockerfile and runs src/index.ts", async () => {
     await scaffold({ deployTarget: "docker", docker: true });
     const dockerfile = readFileSync(join(dir, "Dockerfile"), "utf8");
@@ -553,14 +397,13 @@ describe("runServerInit", () => {
   });
 
   it("runs entries with plain node (no experimental flag) and requires Node 24+", async () => {
-    await scaffold({ includeWorker: true, queue: "sqs", database: "postgres", storage: "s3" });
+    await scaffold({ database: "postgres", storage: "s3" });
     const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
       scripts: Record<string, string>;
       engines: Record<string, string>;
     };
     expect(pkg.scripts["start"]).toBe("node src/index.ts");
     expect(pkg.scripts["dev"]).toBe("node --watch src/index.ts");
-    expect(pkg.scripts["worker"]).toBe("node src/worker.ts");
     // Node 26 rejects --experimental-transform-types; Node 24+ strips types unflagged.
     expect(JSON.stringify(pkg.scripts)).not.toContain("experimental");
     expect(pkg.engines["node"]).toBe(">=24");
@@ -613,11 +456,11 @@ describe("runServerInit", () => {
     expect(code.match(/from "@storyshelf\/app"/gu)).toHaveLength(1);
   });
 
-  it("only declares dataDir when the stack reads it", async () => {
-    await scaffold({ database: "postgres", storage: "s3", queue: "sqs", includeWorker: false });
-    expect(readFileSync(join(dir, "src", "index.ts"), "utf8")).not.toContain("dataDir");
-    await scaffold({});
-    expect(readFileSync(join(dir, "src", "index.ts"), "utf8")).toContain("dataDir");
+  it("always declares dataDir: it is the capture scratch directory", async () => {
+    await scaffold({ database: "postgres", storage: "s3" });
+    const code = readFileSync(join(dir, "src", "index.ts"), "utf8");
+    expect(code).toContain('const dataDir = process.env.DATA_DIR || "./data";');
+    expect(code).toContain("scratchDir: dataDir,");
   });
 
   it("wires notifications when enabled", async () => {
@@ -628,7 +471,6 @@ describe("runServerInit", () => {
       storage: "local",
       auth: "password",
       git: "none",
-      queue: "memory",
       docker: false,
       notifications: true,
     });
@@ -659,7 +501,6 @@ describe("runServerInit", () => {
       storage: "local",
       auth: "password",
       git: "none",
-      queue: "memory",
       docker: false,
       notifications: false,
     });
@@ -686,7 +527,6 @@ describe("runServerInit", () => {
       storage: "local",
       auth: "none",
       git: "none",
-      queue: "memory",
       docker: false,
       notifications: false,
     };
@@ -721,7 +561,6 @@ describe("runServerInit", () => {
       storage: "local",
       auth: "none",
       git: "none",
-      queue: "memory",
       docker: false,
       notifications: false,
     };
@@ -748,8 +587,8 @@ describe("runServerInit", () => {
     expect(code).toContain("createTursoDatabase");
   });
 
-  it("wires the Figma design provider into the server and worker when asked", async () => {
-    await scaffold({ design: true, includeWorker: true, queue: "sqs" });
+  it("wires the Figma design provider into the server when asked", async () => {
+    await scaffold({ design: true });
     const server = readFileSync(join(dir, "src/index.ts"), "utf8");
     expect(server).toContain(
       'import { createFigmaDesign, figmaOAuthFromEnv } from "@storyshelf/design-figma";',
@@ -761,8 +600,6 @@ describe("runServerInit", () => {
       }
     ).dependencies;
     expect(deps["@storyshelf/design-figma"]).toBeDefined();
-    const worker = readFileSync(join(dir, "src/worker.ts"), "utf8");
-    expect(worker).toContain("design: [createFigmaDesign()],");
   });
 
   it("leaves design links out by default", async () => {

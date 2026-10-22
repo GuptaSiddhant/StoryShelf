@@ -5,10 +5,10 @@ import { TERRAFORM_REQUIRED_VERSION } from "./terraform-aws.ts";
  *
  * Pure string builders — no runtime dependencies. Emitted by
  * `storyshelf server init` when the deploy target is `gcp`, alongside the
- * standard `src/index.ts` / `src/worker.ts` / `package.json` files.
+ * standard `src/index.ts` / `package.json` files.
  *
- * Reference stack: Cloud Run (app + worker) + GCS bucket (storybook
- * bundles) + Pub/Sub topic + pull subscription with dead-lettering +
+ * Reference stack: one Cloud Run service (serves the UI and consumes capture
+ * jobs from the database queue) + GCS bucket (storybook bundles) +
  * Cloud SQL Postgres + Secret Manager + Identity Platform tenant (only
  * when `identity_tenant` is set) + Cloud DNS (only when `domain_name`
  * is set, with automatic managed TLS via the domain mapping).
@@ -43,8 +43,6 @@ export const GCP_TERRAFORM_OUTPUT_KEYS: readonly string[] = [
   "database_url",
   "gcs_bucket",
   "identity_tenant_id",
-  "pubsub_subscription",
-  "pubsub_topic",
   "run_url",
 ];
 
@@ -114,7 +112,6 @@ locals {
   apis = toset([
     "run.googleapis.com",
     "sqladmin.googleapis.com",
-    "pubsub.googleapis.com",
     "storage.googleapis.com",
     "secretmanager.googleapis.com",
     "dns.googleapis.com",
@@ -133,6 +130,8 @@ resource "google_project_service" "apis" {
 export function generateGcpApp(): string {
   return `${header()}# App with public ingress. Image is a placeholder: build and push
 # the scaffolded Dockerfile (Artifact Registry) and update it before apply.
+# The same service consumes capture jobs from the database and renders with
+# Playwright, so CPU stays allocated between requests (cpu_idle = false).
 resource "google_cloud_run_v2_service" "app" {
   name     = "\${local.slug}-app"
   location = var.location
@@ -146,36 +145,7 @@ resource "google_cloud_run_v2_service" "app" {
       }
 
       resources {
-        limits = {
-          cpu    = "1"
-          memory = "2Gi"
-        }
-      }
-    }
-
-    scaling {
-      min_instance_count = 1
-      max_instance_count = 3
-    }
-  }
-
-  ingress = "INGRESS_TRAFFIC_ALL"
-}
-`;
-}
-
-export function generateGcpWorker(): string {
-  return `${header()}# Worker polls the capture queue and renders with Playwright.
-# Internal ingress only: it makes outbound calls (queue, database, storage).
-resource "google_cloud_run_v2_service" "worker" {
-  name     = "\${local.slug}-worker"
-  location = var.location
-
-  template {
-    containers {
-      image = "storyshelf-worker:latest"
-
-      resources {
+        cpu_idle = false
         limits = {
           cpu    = "2"
           memory = "4Gi"
@@ -189,7 +159,7 @@ resource "google_cloud_run_v2_service" "worker" {
     }
   }
 
-  ingress = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+  ingress = "INGRESS_TRAFFIC_ALL"
 }
 `;
 }
@@ -259,34 +229,6 @@ resource "google_storage_bucket" "storybook" {
       age           = 30
       matches_prefix = ["builds/"]
     }
-  }
-}
-`;
-}
-
-export function generateGcpQueue(): string {
-  return `${header()}# Pull subscription with dead-lettering: past max deliveries the
-# message moves to the DLQ topic — the GCP analog of SQS + DLQ. The
-# subscription name matches the scaffolded worker default. Grant the
-# runtime service account Pub/Sub roles post-apply (see README).
-resource "google_pubsub_topic" "capture" {
-  name = "\${local.slug}-capture"
-}
-
-resource "google_pubsub_topic" "capture_dlq" {
-  name = "\${local.slug}-capture-dlq"
-}
-
-resource "google_pubsub_subscription" "capture" {
-  name  = "capture-jobs"
-  topic = google_pubsub_topic.capture.id
-
-  ack_deadline_seconds       = 300
-  message_retention_duration = "604800s"
-
-  dead_letter_policy {
-    dead_letter_topic     = google_pubsub_topic.capture_dlq.id
-    max_delivery_attempts = 5
   }
 }
 `;
@@ -409,14 +351,6 @@ output "gcs_bucket" {
   value = google_storage_bucket.storybook.name
 }
 
-output "pubsub_topic" {
-  value = google_pubsub_topic.capture.id
-}
-
-output "pubsub_subscription" {
-  value = google_pubsub_subscription.capture.id
-}
-
 output "database_url" {
   value     = "postgresql://shelfadmin:\${random_password.db.result}@\${google_sql_database_instance.main.public_ip_address}:5432/shelf?sslmode=require"
   sensitive = true
@@ -444,7 +378,6 @@ function generateGcpEnvTable(): string {
   return `| Output | Env var | Adapter |
 |---|---|---|
 | \`gcs_bucket\` (+ \`GOOGLE_CLOUD_PROJECT\`) | \`GCS_BUCKET\` | \`storage-gcs\` |
-| \`pubsub_topic\` / \`pubsub_subscription\` | topic \`capture-jobs\` + subscription (baked into scaffold) | \`queue-gcp\` |
 | \`database_url\` | \`DATABASE_URL\` | \`db-postgres\` |
 | \`identity_tenant_id\` | \`OIDC_ISSUER\` (tenant issuer URL) / \`OIDC_CLIENT_ID\` | \`auth\` (keycloak recipe) |
 | Secret Manager | \`SECRET\` / \`OIDC_CLIENT_SECRET\` / \`ADMIN_TOKEN\` | sessions / OIDC / bootstrap |
@@ -467,7 +400,7 @@ terraform destroy -var "project=$PROJECT" -auto-approve
 \`\`\`
 
 Cost notes: Cloud SQL runs the shared-core \`db-f1-micro\` tier and the
-worker scales to a single instance; the bucket uses
+app keeps a single instance running; the bucket uses
 \`force_destroy\` so teardown succeeds on non-empty buckets. Prefer a
 fresh unique prefix per run.
 `;
@@ -489,8 +422,8 @@ terraform plan -out=tfplan   # review before applying
 terraform apply tfplan
 \`\`\`
 
-Grant the runtime service account Pub/Sub (publisher/subscriber), Cloud
-SQL Client, and Secret Manager accessor roles post-apply — Terraform
+Grant the runtime service account the Cloud SQL Client and Secret
+Manager accessor roles post-apply — Terraform
 creates the resources, IAM bindings stay with your org policy.
 
 ## Wire outputs into env
@@ -515,10 +448,9 @@ const GCP_FILES: ReadonlyArray<readonly [string, (options: GcpTerraformOptions) 
   ["terraform/versions.tf", () => generateGcpVersions()],
   ["terraform/variables.tf", () => generateGcpVariables()],
   ["terraform/main.tf", () => generateGcpMain()],
-  ["terraform/compute.tf", () => `${generateGcpApp()}${generateGcpWorker()}`],
+  ["terraform/compute.tf", () => generateGcpApp()],
   ["terraform/database.tf", () => generateGcpDatabase()],
   ["terraform/storage.tf", () => generateGcpStorage()],
-  ["terraform/queue.tf", () => generateGcpQueue()],
   ["terraform/identity.tf", () => generateGcpIdentity()],
   ["terraform/secrets.tf", () => generateGcpSecrets()],
   ["terraform/dns.tf", () => generateGcpDns()],

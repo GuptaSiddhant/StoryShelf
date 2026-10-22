@@ -7,7 +7,6 @@ import {
   generateAzureIdentity,
   generateAzureMonitoring,
   generateAzureOutputs,
-  generateAzureQueue,
   generateAzureReadme,
   generateAzureSecrets,
   generateAzureStorage,
@@ -15,14 +14,12 @@ import {
   generateAzureTfvarsExample,
   generateAzureVariables,
   generateAzureVersions,
-  generateAzureWorker,
   type AzureTerraformOptions,
 } from "./terraform-azure.ts";
 
 const options: AzureTerraformOptions = {
   project: "acme-shelf",
   location: "eastus",
-  queueBackend: "storage-queues",
 };
 
 /** Frozen output contract parsed by CI — renames break live-cloud.yml. */
@@ -31,8 +28,6 @@ const FROZEN_OUTPUT_KEYS = [
   "database_url",
   "entra_application_id",
   "entra_tenant_id",
-  "queue_name",
-  "servicebus_connection_string",
   "storage_connection_string",
 ];
 
@@ -59,34 +54,26 @@ describe("Azure Terraform modules", () => {
     const variables = generateAzureVariables();
     expect(variables).toContain('variable "project"');
     expect(variables).toContain('variable "location"');
-    expect(variables).toContain('variable "queue_backend"');
     expect(variables).toContain('variable "domain_name"');
     expect(variables).toContain('variable "entra_tenant_id"');
   });
 
   it("runs compute on Container Apps, not VMs or Functions", () => {
-    const compute = `${generateAzureMonitoring()}${generateAzureApp()}${generateAzureWorker()}`;
+    const compute = `${generateAzureMonitoring()}${generateAzureApp()}`;
     expect(compute).toContain('resource "azurerm_container_app_environment" "main"');
     expect(compute).toContain('resource "azurerm_container_app" "app"');
-    expect(compute).toContain('resource "azurerm_container_app" "worker"');
+    // One app: it also consumes capture jobs from the database queue.
+    expect(compute).not.toContain('resource "azurerm_container_app" "worker"');
+    expect(compute).toContain("min_replicas = 1");
     expect(compute).not.toContain("linux_virtual_machine");
     expect(compute).not.toContain("linux_function_app");
   });
 
-  it("provisions Blob storage plus a gated Storage Queues backend", () => {
+  it("provisions Blob storage and no queue resources", () => {
     const storage = generateAzureStorage();
     expect(storage).toContain('resource "azurerm_storage_account" "main"');
     expect(storage).toContain('resource "azurerm_storage_container" "storybook"');
-    expect(storage).toContain('resource "azurerm_storage_queue" "capture"');
-    expect(storage).toContain('var.queue_backend == "storage-queues" ? 1 : 0');
-  });
-
-  it("provisions a gated Service Bus backend with dead-lettering", () => {
-    const queue = generateAzureQueue();
-    expect(queue).toContain('resource "azurerm_servicebus_namespace" "main"');
-    expect(queue).toContain('resource "azurerm_servicebus_queue" "capture"');
-    expect(queue).toContain("max_delivery_count");
-    expect(queue).toContain('var.queue_backend == "service-bus" ? 1 : 0');
+    expect(storage).not.toContain("azurerm_storage_queue");
   });
 
   it("uses burstable Postgres Flexible Server", () => {
@@ -117,12 +104,9 @@ describe("Azure Terraform modules", () => {
     expect(dns).toContain("azurerm_dns_cname_record");
   });
 
-  it("emits a frozen output contract for both backends", () => {
+  it("emits a frozen output contract", () => {
     expect(outputNames(generateAzureOutputs())).toEqual(FROZEN_OUTPUT_KEYS);
     expect([...AZURE_TERRAFORM_OUTPUT_KEYS].toSorted()).toEqual(FROZEN_OUTPUT_KEYS);
-    const serviceBus = generateAzureTerraformFiles({ ...options, queueBackend: "service-bus" });
-    expect(outputNames(serviceBus["terraform/outputs.tf"] ?? "")).toEqual(FROZEN_OUTPUT_KEYS);
-    expect(serviceBus["terraform/queue.tf"]).toContain("azurerm_servicebus_queue");
   });
 
   it("references no non-Azure provider", () => {
@@ -142,7 +126,6 @@ describe("Azure Terraform modules", () => {
       "terraform/compute.tf",
       "terraform/database.tf",
       "terraform/storage.tf",
-      "terraform/queue.tf",
       "terraform/identity.tf",
       "terraform/secrets.tf",
       "terraform/dns.tf",
@@ -155,23 +138,19 @@ describe("Azure Terraform modules", () => {
     expect(files["terraform/README.md"]).toContain("terraform plan");
     expect(files["terraform/README.md"]).toContain("AZURE_STORAGE_CONNECTION");
     expect(files["terraform/README.md"]).toContain("terraform destroy");
-    expect(files["terraform/terraform.tfvars.example"]).toContain("queue_backend");
+    expect(Object.keys(files)).not.toContain("terraform/queue.tf");
+    expect(Object.values(files).join("\n").toLowerCase()).not.toMatch(/servicebus|queue|worker/u);
   });
 });
 
 describe("Azure Terraform README", () => {
   it("documents plan-before-apply, az login, and the CI profile", () => {
-    const readme = generateAzureReadme("acme-shelf", "service-bus");
+    const readme = generateAzureReadme("acme-shelf");
     expect(readme).toContain("plan -out=tfplan");
     expect(readme).toContain("az login");
-    expect(readme).toContain("AZURE_SERVICE_BUS_CONNECTION");
+    expect(readme).toContain("AZURE_STORAGE_CONNECTION");
     expect(readme).toContain("CI test profile");
     expect(readme).toContain("shelf-ci-");
-  });
-
-  it("documents the Storage Queues env var for that backend", () => {
-    const readme = generateAzureReadme("acme-shelf", "storage-queues");
-    expect(readme).toContain("AZURE_STORAGE_CONNECTION");
   });
 });
 
@@ -180,7 +159,6 @@ describe("Azure Terraform tfvars example", () => {
     const example = generateAzureTfvarsExample();
     expect(example).toContain("project");
     expect(example).toContain("location");
-    expect(example).toContain("queue_backend");
     expect(example).toContain("domain_name");
     expect(example).toContain("entra_tenant_id");
   });

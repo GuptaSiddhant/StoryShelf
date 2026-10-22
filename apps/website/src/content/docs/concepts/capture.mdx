@@ -12,6 +12,16 @@ Capture is server-side. The CLI uploads a zipped static Storybook; the server ex
   alt="A build's overview: snapshot stats, bulk actions, and a card per snapshot"
 />
 
+## Requires a long-running server
+
+> Enabling `testing` requires a long-running server (a container, VM, Fly Machine or Kubernetes
+> pod). It cannot run on serverless platforms that freeze or end the process after each request
+> (Vercel Functions, AWS Lambda, Cloudflare Workers), because capture jobs run for minutes in the
+> background and the job consumer must keep running. A serverless deployment can host Storybooks
+> only, by leaving `testing` unset.
+
+There is no separate worker to deploy: the instance that takes the upload also renders it. Without `testing` the instance only [hosts Storybooks](/concepts/hosting-only/).
+
 ## Pipeline
 
 ```mermaid
@@ -49,7 +59,7 @@ Two runners ship — switch with one import:
 | Playwright | `@storyshelf/runner-playwright` | `chromium` (default), `firefox`, `webkit`, `chrome`               |
 | Puppeteer  | `@storyshelf/runner-puppeteer`  | `chromium`/`chrome` only, `chrome-headless-shell` — smaller image |
 
-Per-project engine lives in **Settings → General → Capture browser** or `PATCH /api/v1/projects/:slug { browser }`. Set `browsers` (up to 3, primary first) to capture every build on each engine in turn; baselines, diffs and storage paths are kept per engine (`<mode>~<browser>` for non-Chromium). Every snapshot records an `infraHash`: a hash of its **capture fingerprint** (engine, browser build, host platform, device scale factor, installed fonts, viewport and sizing defaults), with the components kept on the baseline so a change can be named. When a component of the fingerprint differs from the baseline's (a browser upgrade, a different base image, new fonts), the same code would render differently. On the default branch StoryShelf does not diff: the snapshot is accepted as an **environment migration**, the review page says what changed, and the baseline is updated to the new rendering. On other branches the snapshot is still diffed, and a difference needs review as usual; the review page notes that it may come from the environment. Components a capture did not report are treated as unknown, not changed, and a viewport size change (it comes from story parameters) always diffs. A baseline recorded before fingerprints is compared normally and given its fingerprint on the next default-branch capture. A real regression landing on the default branch in the same build as an environment change is not caught, so upgrade the browser in its own commit, and keep capture workers on the same image, architecture and fonts. A newly added engine has no baselines yet, so its first snapshots are auto-accepted where the primary engine's snapshot of the same story and mode is clean, and queued for review as `new` otherwise.
+Per-project engine lives in **Settings → General → Capture browser** or `PATCH /api/v1/projects/:slug { browser }`. Set `browsers` (up to 3, primary first) to capture every build on each engine in turn; baselines, diffs and storage paths are kept per engine (`<mode>~<browser>` for non-Chromium). Every snapshot records an `infraHash`: a hash of its **capture fingerprint** (engine, browser build, host platform, device scale factor, installed fonts, viewport and sizing defaults), with the components kept on the baseline so a change can be named. When a component of the fingerprint differs from the baseline's (a browser upgrade, a different base image, new fonts), the same code would render differently. On the default branch StoryShelf does not diff: the snapshot is accepted as an **environment migration**, the review page says what changed, and the baseline is updated to the new rendering. On other branches the snapshot is still diffed, and a difference needs review as usual; the review page notes that it may come from the environment. Components a capture did not report are treated as unknown, not changed, and a viewport size change (it comes from story parameters) always diffs. A baseline recorded before fingerprints is compared normally and given its fingerprint on the next default-branch capture. A real regression landing on the default branch in the same build as an environment change is not caught, so upgrade the browser in its own commit, and keep every instance that captures on the same image, architecture and fonts. A newly added engine has no baselines yet, so its first snapshots are auto-accepted where the primary engine's snapshot of the same story and mode is clean, and queued for review as `new` otherwise.
 
 ## Viewports & sizing
 
@@ -92,33 +102,33 @@ The server stays the consumer of the queue: it holds the concurrency slots and t
 
 A crash counts against the job like any failed attempt (one limit, `testing.retries`), and the child is restarted for the next job. A crash is charged only to the job that caused it; jobs that shared a crashed child are pushed again without a charge, one at a time, so a repeat crash names its culprit. After repeated crashes (3 in 5 minutes) or a failed fork, capture falls back to running in the server process. A child that hangs without dying is caught too: if a running job goes a whole lease (5 minutes) without progress, the server kills the child and treats it like a crash.
 
-`testing.mode` controls this: `auto` (default) forks only when `workerEntry` is set and the host has at least 2 CPUs and 2 GB; `in-process` never forks; `fork` always forks and fails at boot if it cannot. `testing.runner` is still required, since it serves the fallback. On `SIGTERM` the server stops polling, lets the jobs in flight finish, then stops the child; the child itself also lets its current captures finish on `SIGTERM` and exits at once if the server disappears. Forked capture is an opt-in for hosts that run local browsers; the browser farm is the way to scale out.
+`testing.mode` controls this: `auto` (default) forks only when `workerEntry` is set and the host has at least 2 CPUs and 2 GB; `in-process` never forks; `fork` always forks and fails at boot if it cannot. `testing.runner` is still required, since it serves the fallback. On `SIGTERM` the server stops polling, lets the jobs in flight finish, then stops the child; the child itself also lets its current captures finish on `SIGTERM` and exits at once if the server disappears. Forked capture is an opt-in for hosts that run local browsers; to capture more at once, run more instances against the same database.
 
 ## Sharding big builds
 
-A build with thousands of captures does not have to render in one job. Set `testing.shardSize` (in-process server) or `shardSize` (`createCaptureWorker`) to the number of captures (story × viewport × browser engine) one shard should hold:
+A build with thousands of captures does not have to render in one job. Set `testing.shardSize` to the number of captures (story × viewport × browser engine) one shard should hold:
 
 ```ts
 createShelfApp({ ..., testing: { runner, shardSize: 500 } });
 ```
 
-The build's own job becomes a **plan**: it decides what to render, records the shards in `capture_shards` and puts one queue job per shard on the queue. Any worker can take a shard; the one that finishes the last shard claims the finalize (a unique insert, so exactly one worker wins), runs the build's diffing wrap-up and sets the final status. A build of up to twice `shardSize` captures still renders as one piece, so small Storybooks pay no overhead.
+The build's own job becomes a **plan**: it decides what to render, records the shards in `capture_shards` and puts one queue job per shard on the queue. Any instance can take a shard; the one that finishes the last shard claims the finalize (a unique insert, so exactly one instance wins), runs the build's diffing wrap-up and sets the final status. A build of up to twice `shardSize` captures still renders as one piece, so small Storybooks pay no overhead.
 
 Details worth knowing:
 
-- All of a story's engines stay in one shard, so engine bootstrapping never races across workers.
+- All of a story's engines stay in one shard, so engine bootstrapping never races across shards.
 - Shards are balanced by what each story cost last time, not just by how many captures they hold — see [Shard ordering](#shard-ordering).
 - A story that crashes the browser is failed on its own and the rest of its shard is still captured — see [Crashing stories](#crashing-stories).
 - A shard that cannot render at all is retried by the queue like any job; once its retries are used up it fails every story in it and the build ends `failed`.
 - Re-running a build starts from a clean slate: old shard rows are replaced by the new plan.
-- Remote queues need no changes beyond carrying the optional `shard` field in the message body; a message with only `buildId` still means "the whole build".
+- A custom `testing.queue` carries the optional `shard` field with the job; a job with only `buildId` still means "the whole build".
 - With `testing.workerEntry` the forked child plans the build and inserts its shard jobs into the database queue itself; the server picks them up like any other job and pushes them back to the child. The server passes `testing.shardSize` and `testing.retries` to the child; set `shardSize` in the entry module only to override it. On a single host this buys retries and isolation per shard rather than speed.
 
 ## Shard ordering
 
 Shards of equal capture count are not shards of equal duration: a story with a heavy `play` function or a slow data mock can cost many times what a plain one does, so a shard that collects a few of them straggles and sets the whole build's finish time.
 
-StoryShelf records how long each capture took (`snapshots.duration_ms`, reported by the runner) and the next build's plan uses it. Stories are packed longest-first — the dearest placed first, each into the shard with the least work that still has room — and the shards are handed to the queue heaviest first, so the slow work starts while there are still workers free. A story nothing is known about is priced at the average cost of one capture, and the capture ceiling still applies, so shards stay about `shardSize`.
+StoryShelf records how long each capture took (`snapshots.duration_ms`, reported by the runner) and the next build's plan uses it. Stories are packed longest-first — the dearest placed first, each into the shard with the least work that still has room — and the shards are handed to the queue heaviest first, so the slow work starts while there are still instances free. A story nothing is known about is priced at the average cost of one capture, and the capture ceiling still applies, so shards stay about `shardSize`.
 
 The timings come from the newest of the last few builds that recorded any. A fresh project, a runner that reports no durations, or a retention purge that removed the timed builds simply means no timings: the plan then slices by capture count in story order, exactly as it did before.
 
@@ -152,9 +162,11 @@ When **Enable interaction tests (play)** is on (per-project), the runner does `w
 
 A server that is stopped or killed while a build is `capturing` does not strand it. Every capture job holds a lease that its progress renews; when the lease runs out, the next instance that polls claims the job again (and retires the dead attempt). The new attempt starts from the start of the capture: the previous attempt is recorded as failed and the build runs again. If every allowed attempt (`testing.retries + 1`) is lost, the job fails, the build is marked `failed` and its git status reports failure, so a crash loop never repeats captures forever. A graceful stop (`SIGTERM`) drains first: the instance stops polling and lets the jobs in flight finish. The Compute jobs page lets you retry a failed build.
 
-## Remote capture
+## Scaling out
 
-Rendering scales out in the browser farm, not by adding a second deployable: every instance with `testing` runs the consumer itself. For a queue of your own (`testing.queue`) with a separate consumer process, omit `testing.runner` here and the instance only enqueues; with `testing.runner` set it consumes that queue as well. See [Cloud assembly](/guides/deployment/cloud/).
+Capture scales by adding instances, not by adding a second kind of deployable: every instance with `testing` enqueues and consumes on the shared database queue, so a second container pointed at the same database and storage takes its share of jobs. See [Deployment](/guides/deployment/) and [Docker Compose](/guides/deployment/docker-compose/).
+
+A queue of your own (`testing.queue`) is for hosts that already have one. Omit `testing.runner` and this instance only enqueues, leaving the consumer to a process you run yourself with `createCaptureConsumer` from `@storyshelf/core/capture`; with `testing.runner` set it consumes that queue as well.
 
 ## Related
 
@@ -162,4 +174,4 @@ Rendering scales out in the browser farm, not by adding a second deployable: eve
 - [Projects](/concepts/projects/) — slug, `git_default_branch`, thresholds
 - [Builds & snapshots](/concepts/builds/) — statuses
 - [Retention](/concepts/retention/) — what survives
-- Packages: [runner-playwright](/packages/runner-playwright/), [runner-puppeteer](/packages/runner-puppeteer/), [worker](/packages/worker/)
+- Packages: [runner-playwright](/packages/runner-playwright/), [runner-puppeteer](/packages/runner-puppeteer/)

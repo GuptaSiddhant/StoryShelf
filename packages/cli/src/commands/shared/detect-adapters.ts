@@ -18,7 +18,6 @@ export interface DetectedAdapters {
     | "planetscale"
     | "tidb";
   storage?: "local" | "s3" | "azure" | "gcs";
-  queue?: "memory" | "sqs" | "redis" | "azure-storage-queues" | "azure-service-bus" | "gcp-pubsub";
   git?: "none" | "github" | "gitlab";
 }
 
@@ -26,7 +25,7 @@ export interface DetectedAdapters {
  * Detect installed adapter choices from a project's package.json.
  *
  * Reads `dependencies` and `devDependencies` keys and maps them to the prompt
- * choices used by `server init` / `worker init`. Missing or malformed
+ * choices used by `server init`. Missing or malformed
  * package.json returns an empty object.
  *
  * @param dir - Absolute path to the scaffolded project directory.
@@ -72,20 +71,6 @@ export function detectInstalledAdapters(dir: string): DetectedAdapters {
     result.storage = "s3";
   } else if (deps.has("@storyshelf/storage-local")) {
     result.storage = "local";
-  }
-
-  if (deps.has("@storyshelf/queue-azure")) {
-    // One package serves both backends — disambiguate via the installed SDK.
-    result.queue = deps.has("@azure/service-bus") ? "azure-service-bus" : "azure-storage-queues";
-  } else if (deps.has("@storyshelf/queue-gcp")) {
-    result.queue = "gcp-pubsub";
-  } else if (deps.has("@storyshelf/queue-sqs")) {
-    result.queue = "sqs";
-  } else if (deps.has("@storyshelf/queue-redis")) {
-    result.queue = "redis";
-  } else if (deps.has("@storyshelf/worker")) {
-    // worker present implies a queue; default to memory if no explicit queue dep but worker present
-    // leave queue undefined so caller defaults to memory
   }
 
   if (deps.has("@storyshelf/git-github")) {
@@ -171,7 +156,7 @@ function detectMysqlFlavor(
 
 function readGeneratedSources(dir: string): string {
   let sources = "";
-  for (const file of ["src/index.ts", "src/worker.ts", "server.ts", "worker.ts"]) {
+  for (const file of ["src/index.ts", "server.ts"]) {
     try {
       sources += readFileSync(join(dir, file), "utf8");
     } catch {

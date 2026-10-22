@@ -16,7 +16,7 @@ Developer pushes code
   → CLI builds Storybook (if needed), zips the static build
   → CLI uploads the zip + metadata (sha, branch, message, author) to StoryShelf server
   → Server creates a build, stores the zip, and enqueues capture (async, returns 202)
-  → Capture worker: unzip → serve statics → render every story via Playwright
+  → The server's job consumer: unzip → serve statics → render every story via Playwright
   → Server runs pixel diff against per-branch baselines (fallback to default branch)
   → Default-branch builds auto-approve and become the new baselines
   → PR gets a status check linking to the review UI
@@ -439,7 +439,7 @@ interface CaptureRunner {
 
 Because renderers are pure, the server-side **orchestrator** owns everything else (`capture/orchestrator.ts`): it loads the build/project, marks the build `capturing`, extracts the uploaded archive to a scratch dir (capped by entry count and uncompressed bytes, with path-traversal protection), discovers stories, delegates rendering to the pure `CaptureRunner`, then persists snapshots/diffs/baselines (see `capture/pipeline.ts`) and finalizes the build. The orchestrator is wired into the queue by `createShelfApp` when `ShelfOptions.testing` is set (it holds `runner`, `queue`, `concurrency`, `workerEntry`, `shardSize`, `mode`, `compare` and `images`; absent means hosting only) and requires a `ShelfConfig.scratchDir`.
 
-One local renderer in v1 — `@storyshelf/runner-playwright` (the server already has Playwright via the base image). The interface is kept thin so v2 can add a **remote** runner (offload capture to a worker fleet via a queue) without changing the pipeline or orchestration — a future `@storyshelf/runner-remote` implements the same pure `CaptureRunner` interface and plugs in at the `serve` assembly point the same way.
+One local renderer in v1 — `@storyshelf/runner-playwright` (the server already has Playwright via the base image). The interface is kept thin so another renderer (for example a remote browser, ADR 0007) can plug in without changing the pipeline or orchestration: it implements the same pure `CaptureRunner` interface.
 
 ### Capture Queue
 
@@ -477,7 +477,7 @@ the adapter, a unique-key insert whose conflict can be told apart (the `claimFin
    job and attempt rows.
 
 **Consumer** (`createCaptureConsumer`, `core/src/capture/consumer/`). Consumes any
-`PollableCaptureQueue` (this queue, the IPC queue of a forked child, a remote queue) and runs a
+`PollableCaptureQueue` (this queue, the IPC queue of a forked child, a custom `testing.queue`) and runs a
 handler per job `kind`: `capture` is wired to `createDispatchJob`; `publish` and `notify` register
 through `handlers`; a job whose kind has no handler is failed with `no handler registered for job
 kind "<kind>"`. A slot is taken before polling (the database queue uses `startPollLoop`, other
@@ -793,7 +793,7 @@ Subdomains serve the Storybook at the domain **root**, so no asset-path rewritin
 
 Design links attach to a **component (story file)**, never to a single state or to a build label. A state's design button appears iff its file resolves a link; there is no project-default or label fallback on snapshots. The vendor specifics live behind the **`DesignProvider` adapter** (ADR 0029, `@storyshelf/core/adapter/design`); core owns everything else. Servers opt in with `design: [createFigmaDesign()]` (`@storyshelf/design-figma`); with no provider wired, no design links are extracted or shown.
 
-- **Provider contract:** `parseUrl(raw) → DesignRef | null` (`{fileKey, nodeId, url}`), `create({credential}) → DesignClient` with `fetchMetas(fileKey, refs)` and `fetchRenders(fileKey, nodeIds)` (batched per file; API failures map to a `DesignState` per ref instead of throwing). Metadata (`credentialLabel`, `credentialHelp`, `urlHint`, `credentialMaxAgeDays`) drives the Design settings copy. Remote capture workers take the same list (`createCaptureWorker({ design })`) so declared links are validated during capture.
+- **Provider contract:** `parseUrl(raw) → DesignRef | null` (`{fileKey, nodeId, url}`), `create({credential}) → DesignClient` with `fetchMetas(fileKey, refs)` and `fetchRenders(fileKey, nodeIds)` (batched per file; API failures map to a `DesignState` per ref instead of throwing). Metadata (`credentialLabel`, `credentialHelp`, `urlHint`, `credentialMaxAgeDays`) drives the Design settings copy. The capture consumer in the app uses the same list, so declared links are validated during capture.
 - **Story parameters:** `parameters.storyshelf.figma` (plain URL string) wins over the Storybook `design` addon shape (`string | {url} | {type,url} | {type,url}[]`, first URL wins). `extractDesignUrl()` runs at discovery with the configured providers' parser and stores the result on `StoryEntry.designUrl` → `snapshots.design_url`, keeping `StoryParameters` capture-clean. Links no provider accepts are dropped and logged; capture never fails.
 - **Resolution (read time, per file):** manual mapping (`design_links` by normalized `import_path`) > story parameters. States of one file are deduped; if they disagree the distinct set is shown rather than guessing. Keying by `import_path` survives new builds, not file renames: after a story file is renamed or moved, update its mapping (the component page shows where it moved).
 - **Design settings tab:** project file links (library header), the manual component-mapping table, and one credential card per configured provider (admin-only, write-only, encrypted, rotated via `previousSecret`). The tab shows days left against the provider's maximum credential age and the last health (`ok` / `unauthorized` / `forbidden`). Without a provider the tab explains how to configure one.
@@ -1022,14 +1022,6 @@ StoryShelf/
         viewport.ts       # default viewports
       package.json
 
-    queue-redis/
-      src/
-        index.ts          # Redis CaptureQueue (ioredis, BLMOVE, delayed ZSET)
-      package.json
-    queue-sqs/
-      src/
-        index.ts          # SQS CaptureQueue (AWS SDK v3, SQS long-poll)
-      package.json
     observability/
       src/
         index.ts          # runtime-agnostic OTEL entrypoint (api only; Deno-safe)
@@ -1056,7 +1048,7 @@ StoryShelf/
 | **Screenshot capture** | Playwright (server-side) | Industry standard. Deterministic rendering in a pinned image. `toHaveScreenshot` battle-tested |
 | **Pixel diff** | pixelmatch + pngjs | Same libraries Playwright uses internally. Fast, reliable, widely adopted |
 | **Server UI** | hono/jsx + HTMX + hono/css | Server-rendered, fixed UI with brand theming; no client framework or build step |
-| **Capture queue** | In-process queue + concurrency limit | v1 has no external queue dependency; interface allows remote runners in v2 |
+| **Capture queue** | The application database (`capture_jobs`) + one in-app consumer | No extra infrastructure; every instance enqueues and consumes (ADR 0006) |
 | **Linting** | oxlint + oxfmt | Fast, strict, Rust-based. Same as StoryBooker |
 | **Testing** | vitest | Fast, TypeScript-native, ESM-first |
 | **Bundler** | tsdown | Fast, simple, ESM output. Same as StoryBooker |
@@ -1182,7 +1174,7 @@ See `docs/website.md`. The public site (`apps/website/`, Astro Starlight) hosts 
    Any uncertainty (shallow clone, missing stats/history, global-file change) falls
    back to a full render, and `--full` opts out per run.
 2. **Git-provider merge gate (GitHub App / GitLab)** -- rich check runs, per-snapshot annotations, and auto-reject on review rejection. v1 has the primitive (required commit status); the full integration is ADR 0010.
-3. **Remote capture runners** -- offload capture to a worker fleet (SQS/HTTP). The `CaptureRunner` interface anticipates this.
+3. **Remote browsers** -- render in a browser farm (ADR 0007). The `CaptureRunner` interface anticipates this.
 4. **`parameters.chromatic` equivalents** -- `modes` are implemented (named modes from `parameters.chromatic.modes` / `parameters.storyshelf.modes`, ADR 0028); an args matrix is not. Per-story `delay`, `disableSnapshot`, `flakyTest`, `autoCrop`/sizing are implemented; `waitForReady` covers the basic "wait for data" case.
 5. **Ladle / Histoire / custom pages** -- the `StorySourceAdapter` interface anticipates them.
 6. **Per-story viewport presets** -- a story's Storybook `defaultViewport` is captured **in addition to** the project's global list (union, deduped by name; issue #82), including inline `parameters.viewport.viewports`. Global defaults remain the project-level surface.

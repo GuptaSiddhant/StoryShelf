@@ -3,10 +3,10 @@
  *
  * Pure string builders — no runtime dependencies. Emitted by
  * `storyshelf server init` when the deploy target is `aws`, alongside the
- * standard `src/index.ts` / `src/worker.ts` / `package.json` files.
+ * standard `src/index.ts` / `package.json` files.
  *
- * Reference stack: S3 (storage) + SQS + DLQ (capture queue) + Postgres
- * (RDS default, Aurora DSQL option) + ECS Fargate app/worker + ALB +
+ * Reference stack: S3 (storage) + Postgres (RDS default, Aurora DSQL
+ * option; the database also holds the capture queue) + ECS Fargate app + ALB +
  * Cognito (auth) + Secrets Manager + CloudWatch. VPC is created unless
  * `vpcId` is supplied; Route 53 + ACM apply only when `domainName` is set.
  */
@@ -151,18 +151,12 @@ resource "aws_security_group" "ecs" {
 `;
 }
 
-/** Private data-plane endpoints (S3, SQS) off the public internet. */
+/** Private data-plane endpoints (S3) off the public internet. */
 export function generateAwsEndpoints(): string {
-  return `${header()}# VPC endpoints keep data-plane traffic (S3, SQS) off the public internet.
+  return `${header()}# VPC endpoints keep data-plane traffic (S3) off the public internet.
 resource "aws_vpc_endpoint" "s3" {
   vpc_id       = local.vpc_id
   service_name = "com.amazonaws.\${var.region}.s3"
-}
-
-resource "aws_vpc_endpoint" "sqs" {
-  vpc_id            = local.vpc_id
-  service_name      = "com.amazonaws.\${var.region}.sqs"
-  security_group_ids = [aws_security_group.ecs.id]
 }
 `;
 }
@@ -214,22 +208,6 @@ resource "aws_s3_bucket_lifecycle_configuration" "storybook" {
       days = 30
     }
   }
-}
-`;
-}
-
-export function generateAwsQueue(): string {
-  return `${header()}resource "aws_sqs_queue" "capture_dlq" {
-  name = "\${var.project}-capture-dlq"
-}
-
-resource "aws_sqs_queue" "capture" {
-  name                       = "\${var.project}-capture"
-  visibility_timeout_seconds = 300
-  redrive_policy = jsonencode({
-    deadLetterTargetArn = aws_sqs_queue.capture_dlq.arn
-    maxReceiveCount     = 3
-  })
 }
 `;
 }
@@ -302,8 +280,8 @@ resource "aws_cognito_identity_provider" "saml" {
 }
 
 export function generateAwsCompute(): string {
-  return `${header()}# ECS Fargate: long-lived app + worker services. Playwright/Chromium
-# renders on Fargate — Lambda's 15-minute limit and /tmp caps rule it out.
+  return `${header()}# ECS Fargate: one long-lived app service; it also consumes capture jobs from the
+# database. Playwright/Chromium renders on Fargate — Lambda's 15-minute limit and /tmp caps rule it out.
 resource "aws_lb" "main" {
   name               = "\${var.project}-alb"
   load_balancer_type = "application"
@@ -320,9 +298,6 @@ resource "aws_cloudwatch_log_group" "app" {
   retention_in_days = 30
 }
 
-resource "aws_cloudwatch_log_group" "worker" {
-  name              = "/ecs/\${var.project}-worker"
-  retention_in_days = 30
 }
 `;
 }
@@ -382,10 +357,6 @@ output "alb_dns_name" {
 
 output "s3_bucket" {
   value = aws_s3_bucket.storybook.id
-}
-
-output "queue_url" {
-  value = aws_sqs_queue.capture.url
 }
 
 output "db_endpoint" {
@@ -455,7 +426,6 @@ terraform output -json   # or: npm run infra:outputs
 | Output | Env var | Adapter |
 |---|---|---|
 | \`s3_bucket\` | \`S3_BUCKET\` (+ \`AWS_REGION\`) | \`storage-s3\` |
-| \`queue_url\` | \`QUEUE_URL\` | \`queue-sqs\` |
 | \`db_endpoint\` | \`DATABASE_URL\` (\`?sslmode=require\`) | \`db-postgres\` |
 | \`user_pool_id\` / \`app_client_id\` | \`COGNITO_DOMAIN\` / \`COGNITO_REGION\` / \`COGNITO_USER_POOL_ID\` / \`OIDC_CLIENT_ID\` | \`auth\` (cognito social) |
 | Secrets Manager | \`SECRET\` / \`OIDC_CLIENT_SECRET\` / \`ADMIN_TOKEN\` | sessions / OIDC / bootstrap |
@@ -491,7 +461,6 @@ const AWS_FILES: ReadonlyArray<readonly [string, (options: AwsTerraformOptions) 
     () => `${generateAwsVpc()}${generateAwsSecurity()}${generateAwsEndpoints()}`,
   ],
   ["terraform/storage.tf", () => generateAwsStorage()],
-  ["terraform/queue.tf", () => generateAwsQueue()],
   ["terraform/identity.tf", () => generateAwsIdentity()],
   ["terraform/compute.tf", () => generateAwsCompute()],
   ["terraform/secrets.tf", () => generateAwsSecrets()],

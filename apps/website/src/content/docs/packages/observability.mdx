@@ -45,8 +45,7 @@ await app.lifecycle.setup();
 // on SIGTERM: await app.lifecycle.teardown(); (flushes the SDK)
 ```
 
-`storyshelf server init` scaffolds exactly this preamble (plus the worker
-equivalent). Two entrypoints by design: the root is `@opentelemetry/api`
+`storyshelf server init` scaffolds exactly this preamble . Two entrypoints by design: the root is `@opentelemetry/api`
 only (cross-runtime, Deno-safe); `./node` holds the Node SDK lifecycle and
 must never be imported under Deno (`OTEL_DENO=true` uses Deno's native OTEL
 instead).

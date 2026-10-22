@@ -23,7 +23,6 @@ describe("createProgram", () => {
       "server",
       "upload",
       "whoami",
-      "worker",
     ]);
     expect(zipLibraryLoaded).not.toHaveBeenCalled();
   });

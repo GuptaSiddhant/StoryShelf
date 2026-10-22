@@ -15,17 +15,9 @@ import {
   generateTsconfig,
   SCAFFOLD_DEV_DEPENDENCIES,
   SERVER_ENTRY,
-  WORKER_ENTRY,
   writeScaffoldFile,
 } from "../shared/scaffold.ts";
-import {
-  generateComposeYaml,
-  generateComposeYamlWithWorker,
-  generateDockerfile,
-  generateDockerignore,
-  generateSlimServerDockerfile,
-  generateWorkerDockerfile,
-} from "./docker.ts";
+import { generateComposeYaml, generateDockerfile, generateDockerignore } from "./docker.ts";
 import {
   ADVANCED_ADAPTERS_PROMPT,
   DEPLOY_TARGET_PROMPT,
@@ -65,20 +57,8 @@ type DatabaseChoice =
 type StorageChoice = "local" | "s3" | "azure" | "gcs";
 type AuthChoice = "none" | "password" | "oauth";
 type GitChoice = "none" | "github" | "gitlab";
-type QueueChoice =
-  | "memory"
-  | "sqs"
-  | "redis"
-  | "azure-storage-queues"
-  | "azure-service-bus"
-  | "gcp-pubsub";
 type DeployTarget = "local" | "docker" | "aws" | "azure" | "gcp";
 
-/** Azure SDK pins (must match @storyshelf/queue-azure peerDependencies). */
-const AZURE_STORAGE_QUEUE_SDK = "^12.31.0";
-const AZURE_SERVICE_BUS_SDK = "^7.9.5";
-/** Pub/Sub SDK pin (must match @storyshelf/queue-gcp peerDependencies). */
-const GCP_PUBSUB_SDK = "^6.1.0";
 /** DB peer SDK pins (must match db-* peerDependencies). */
 const LIBSQL_CLIENT_SDK = "^0.15.0";
 const BETTER_SQLITE3_SDK = "^12.0.0";
@@ -92,18 +72,6 @@ const TIDBCLOUD_SDK = "^0.1.0";
 /** Email peer SDK pin (must match @storyshelf/notify-email peerDependencies). */
 const NODEMAILER_SDK = "^10.0.12";
 
-/** npm peer SDK for the chosen Azure queue backend. */ function azureSdkDep(
-  queue: "azure-storage-queues" | "azure-service-bus",
-): {
-  name: string;
-  version: string;
-} {
-  if (queue === "azure-service-bus") {
-    return { name: "@azure/service-bus", version: AZURE_SERVICE_BUS_SDK };
-  }
-  return { name: "@azure/storage-queue", version: AZURE_STORAGE_QUEUE_SDK };
-}
-
 interface Answers {
   name: string;
   dir: string;
@@ -111,9 +79,7 @@ interface Answers {
   storage: StorageChoice;
   auth: AuthChoice;
   git: GitChoice;
-  queue: QueueChoice;
   docker: boolean;
-  includeWorker?: boolean;
   /** Email + chat notification wiring. Absent in older mocked answers. */
   notifications?: boolean;
   /** Figma design links via `@storyshelf/design-figma` (opt-in). Absent means off. */
@@ -131,17 +97,11 @@ interface Answers {
   samlMetadataUrl?: string;
   /** Azure-only follow-ups (asked when deployTarget is `azure`). */
   azureLocation?: string;
-  azureQueueBackend?: "storage-queues" | "service-bus";
   entraTenantId?: string;
   /** GCP-only follow-ups (asked when deployTarget is `gcp`). */
   gcpProjectId?: string;
   gcpLocation?: string;
   identityTenant?: string;
-}
-
-/** Remote queues need a separately-assembled worker; memory runs in-process. */
-function isRemoteQueue(queue: QueueChoice): boolean {
-  return queue !== "memory";
 }
 
 /** Normalize the deploy target, preserving pre-target answers. */
@@ -183,15 +143,6 @@ const GIT_PACKAGE: Record<GitChoice, string | null> = {
   none: null,
   github: "@storyshelf/git-github",
   gitlab: "@storyshelf/git-gitlab",
-};
-
-const QUEUE_PACKAGE: Record<QueueChoice, string | null> = {
-  memory: null,
-  sqs: "@storyshelf/queue-sqs",
-  redis: "@storyshelf/queue-redis",
-  "azure-storage-queues": "@storyshelf/queue-azure",
-  "azure-service-bus": "@storyshelf/queue-azure",
-  "gcp-pubsub": "@storyshelf/queue-gcp",
 };
 
 const DB_IMPORT: Record<DatabaseChoice, string> = {
@@ -260,12 +211,12 @@ function wantsNotifications(answers: Answers): boolean {
   return answers.notifications ?? false;
 }
 
-/** Whether the generated server/worker wire the Figma design provider (opt-in). */
+/** Whether the generated server wires the Figma design provider (opt-in). */
 function wantsDesign(answers: Answers): boolean {
   return answers.design ?? false;
 }
 
-/** Whether the generated server/worker wire OpenTelemetry (opt-in). */
+/** Whether the generated server wires OpenTelemetry (opt-in). */
 function wantsObservability(answers: Answers): boolean {
   return answers.observability ?? false;
 }
@@ -292,6 +243,7 @@ function buildImports(answers: Answers): string[] {
     `import { createShelfApp } from "@storyshelf/app";`,
     DB_IMPORT[answers.database],
     STORAGE_IMPORT[answers.storage],
+    `import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";`,
   ];
   if (wantsObservability(answers)) {
     imports.push(
@@ -299,26 +251,6 @@ function buildImports(answers: Answers): string[] {
       `import { otelLogMixin } from "@storyshelf/observability";`,
       `import { initObservabilityFromEnv } from "@storyshelf/observability/node";`,
     );
-  }
-
-  if (answers.queue === "sqs") {
-    imports.push(`import { createSqsCaptureQueue } from "@storyshelf/queue-sqs";`);
-  }
-  if (answers.queue === "redis") {
-    imports.push(`import { createRedisCaptureQueue } from "@storyshelf/queue-redis";`);
-  }
-  if (answers.queue === "azure-storage-queues") {
-    imports.push(
-      `import { createAzureStorageQueuesQueue } from "@storyshelf/queue-azure/storage-queues";`,
-    );
-  }
-  if (answers.queue === "azure-service-bus") {
-    imports.push(
-      `import { createAzureServiceBusQueue } from "@storyshelf/queue-azure/service-bus";`,
-    );
-  }
-  if (answers.queue === "gcp-pubsub") {
-    imports.push(`import { createGcpPubSubQueue } from "@storyshelf/queue-gcp";`);
   }
 
   if (answers.auth === "password") {
@@ -350,9 +282,6 @@ function buildImports(answers: Answers): string[] {
       imports.push(`import { createAuthSystemHook } from "@storyshelf/app";`);
     }
   }
-  if (answers.queue === "memory") {
-    imports.push(`import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";`);
-  }
   return mergeImports(imports);
 }
 
@@ -361,31 +290,8 @@ function buildAdapterLines(answers: Answers): string[] {
     ...dbPrelude(answers.database),
     `const database = ${DB_INIT[answers.database]};`,
     `const storage = ${STORAGE_INIT[answers.storage]};`,
+    `const captureRunner = createPlaywrightCaptureRunner();`,
   ];
-  if (answers.queue === "sqs") {
-    lines.push(`const captureQueue = createSqsCaptureQueue({ queueUrl: process.env.QUEUE_URL! });`);
-  }
-  if (answers.queue === "redis") {
-    lines.push(`const captureQueue = createRedisCaptureQueue({ url: process.env.REDIS_URL! });`);
-  }
-  if (answers.queue === "azure-storage-queues") {
-    lines.push(
-      `const captureQueue = createAzureStorageQueuesQueue({ queueName: "capture-jobs", connectionString: process.env.AZURE_STORAGE_CONNECTION! });`,
-    );
-  }
-  if (answers.queue === "azure-service-bus") {
-    lines.push(
-      `const captureQueue = createAzureServiceBusQueue({ queueName: "capture-jobs", connectionString: process.env.AZURE_SERVICE_BUS_CONNECTION! });`,
-    );
-  }
-  if (answers.queue === "gcp-pubsub") {
-    lines.push(
-      `const captureQueue = createGcpPubSubQueue({ topic: "capture-jobs", subscription: "capture-jobs-worker", projectId: process.env.GOOGLE_CLOUD_PROJECT! });`,
-    );
-  }
-  if (answers.queue === "memory") {
-    lines.push(`const captureRunner = createPlaywrightCaptureRunner();`);
-  }
   if (wantsNotifications(answers)) {
     lines.push(
       `// SMTP sender from SMTP_* env (undefined keeps invites out-of-band).`,
@@ -407,13 +313,12 @@ function buildRouterLines(answers: Answers): string[] {
         ``,
       ]
     : [];
-  lines.push(`const app = createShelfApp({`, `  database,`, `  storage,`);
-
-  if (isRemoteQueue(answers.queue)) {
-    lines.push(`  testing: { queue: captureQueue },`);
-  } else {
-    lines.push(`  testing: { runner: captureRunner },`);
-  }
+  lines.push(
+    `const app = createShelfApp({`,
+    `  database,`,
+    `  storage,`,
+    `  testing: { runner: captureRunner },`,
+  );
 
   if (wantsNotifications(answers)) {
     lines.push(`  notifications: { notifiers: [...chatNotifiers, ...emailNotifiers] },`);
@@ -498,7 +403,7 @@ function buildRouterLines(answers: Answers): string[] {
     `    secret: process.env.SECRET,`,
     `    previousSecret: process.env.SECRET_PREVIOUS || undefined,`,
     `    migrateCredentialsOnBoot: process.env.SECRET_MIGRATE === "true",`,
-    ...(answers.queue === "memory" ? [`    scratchDir: dataDir,`] : []),
+    `    scratchDir: dataDir,`,
     `  },`,
     `});`,
     ``,
@@ -519,20 +424,11 @@ function buildRouterLines(answers: Answers): string[] {
   return lines;
 }
 
-/** Whether the generated server reads `dataDir` (local sqlite/storage or in-process scratch). */
-function usesDataDir(answers: Answers): boolean {
-  return (
-    answers.queue === "memory" ||
-    DB_INIT[answers.database].includes("dataDir") ||
-    STORAGE_INIT[answers.storage].includes("dataDir")
-  );
-}
-
 function generateServer(answers: Answers): string {
   return [
     ...buildImports(answers),
     ``,
-    ...(usesDataDir(answers) ? [`const dataDir = process.env.DATA_DIR || "./data";`] : []),
+    `const dataDir = process.env.DATA_DIR || "./data";`,
     `const port = Number(process.env.PORT) || 3000;`,
     ``,
     ...buildAdapterLines(answers),
@@ -546,87 +442,6 @@ function generateServer(answers: Answers): string {
     `for (const signal of ["SIGINT", "SIGTERM"] as const) {`,
     `  process.once(signal, () => {`,
     `    app.lifecycle.teardown().finally(() => server.close());`,
-    `  });`,
-    `}`,
-    ``,
-  ].join("\n");
-}
-
-function workerQueueImport(queue: QueueChoice): string {
-  if (queue === "redis") {
-    return `import { createRedisCaptureQueue } from "@storyshelf/queue-redis";`;
-  }
-  if (queue === "azure-storage-queues") {
-    return `import { createAzureStorageQueuesQueue } from "@storyshelf/queue-azure/storage-queues";`;
-  }
-  if (queue === "azure-service-bus") {
-    return `import { createAzureServiceBusQueue } from "@storyshelf/queue-azure/service-bus";`;
-  }
-  if (queue === "gcp-pubsub") {
-    return `import { createGcpPubSubQueue } from "@storyshelf/queue-gcp";`;
-  }
-  return `import { createSqsCaptureQueue } from "@storyshelf/queue-sqs";`;
-}
-
-function workerQueueInit(queue: QueueChoice): string {
-  if (queue === "redis") {
-    return `const queue = createRedisCaptureQueue({ url: process.env.REDIS_URL! });`;
-  }
-  if (queue === "azure-storage-queues") {
-    return `const queue = createAzureStorageQueuesQueue({ queueName: "capture-jobs", connectionString: process.env.AZURE_STORAGE_CONNECTION! });`;
-  }
-  if (queue === "azure-service-bus") {
-    return `const queue = createAzureServiceBusQueue({ queueName: "capture-jobs", connectionString: process.env.AZURE_SERVICE_BUS_CONNECTION! });`;
-  }
-  if (queue === "gcp-pubsub") {
-    return `const queue = createGcpPubSubQueue({ topic: "capture-jobs", subscription: "capture-jobs-worker", projectId: process.env.GOOGLE_CLOUD_PROJECT! });`;
-  }
-  return `const queue = createSqsCaptureQueue({ queueUrl: process.env.QUEUE_URL! });`;
-}
-
-function generateWorkerFile(answers: Answers): string {
-  const observability = wantsObservability(answers);
-  return [
-    workerQueueImport(answers.queue),
-    `import { createCaptureWorker } from "@storyshelf/worker";`,
-    ...(observability
-      ? [`import { initObservabilityFromEnv } from "@storyshelf/observability/node";`]
-      : []),
-    `import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";`,
-    ...(wantsDesign(answers)
-      ? [`import { createFigmaDesign } from "@storyshelf/design-figma";`]
-      : []),
-    DB_IMPORT[answers.database],
-    STORAGE_IMPORT[answers.storage],
-    ``,
-    ...(observability
-      ? [
-          `// Noop unless OTEL_EXPORTER_OTLP_ENDPOINT is set.`,
-          `const observability = await initObservabilityFromEnv();`,
-          ``,
-        ]
-      : []),
-    `const dataDir = process.env.DATA_DIR || "./data";`,
-    ...dbPrelude(answers.database),
-    workerQueueInit(answers.queue),
-    ``,
-    `const worker = createCaptureWorker({`,
-    `  queue,`,
-    `  db: ${DB_INIT[answers.database]},`,
-    `  storage: ${STORAGE_INIT[answers.storage]},`,
-    `  runner: createPlaywrightCaptureRunner(),`,
-    `  scratchDir: dataDir,`,
-    ...(wantsDesign(answers) ? [`  design: [createFigmaDesign()],`] : []),
-    `  config: { concurrency: Number(process.env.WORKER_CONCURRENCY) || undefined },`,
-    `});`,
-    ``,
-    `await worker.start();`,
-    ``,
-    `for (const signal of ["SIGINT", "SIGTERM"] as const) {`,
-    `  process.once(signal, () => {`,
-    observability
-      ? `    worker.stop().finally(() => observability.shutdown());`
-      : `    void worker.stop();`,
     `  });`,
     `}`,
     ``,
@@ -674,32 +489,7 @@ function buildDeps(answers: Answers): Record<string, string> {
   if (answers.storage !== "local") {
     deps[STORAGE_PACKAGE[answers.storage]] = __PKG_VERSION__ ?? "0.0.0";
   }
-  if (answers.queue === "sqs" || answers.queue === "redis") {
-    const queuePkg =
-      answers.queue === "redis" ? "@storyshelf/queue-redis" : "@storyshelf/queue-sqs";
-    deps[queuePkg] = __PKG_VERSION__ ?? "0.0.0";
-    if (answers.includeWorker) {
-      deps["@storyshelf/worker"] = __PKG_VERSION__ ?? "0.0.0";
-      deps["@storyshelf/runner-playwright"] = __PKG_VERSION__ ?? "0.0.0";
-    }
-  } else if (answers.queue === "azure-storage-queues" || answers.queue === "azure-service-bus") {
-    deps["@storyshelf/queue-azure"] = __PKG_VERSION__ ?? "0.0.0";
-    const sdk = azureSdkDep(answers.queue);
-    deps[sdk.name] = sdk.version;
-    if (answers.includeWorker) {
-      deps["@storyshelf/worker"] = __PKG_VERSION__ ?? "0.0.0";
-      deps["@storyshelf/runner-playwright"] = __PKG_VERSION__ ?? "0.0.0";
-    }
-  } else if (answers.queue === "gcp-pubsub") {
-    deps["@storyshelf/queue-gcp"] = __PKG_VERSION__ ?? "0.0.0";
-    deps["@google-cloud/pubsub"] = GCP_PUBSUB_SDK;
-    if (answers.includeWorker) {
-      deps["@storyshelf/worker"] = __PKG_VERSION__ ?? "0.0.0";
-      deps["@storyshelf/runner-playwright"] = __PKG_VERSION__ ?? "0.0.0";
-    }
-  } else {
-    deps["@storyshelf/runner-playwright"] = __PKG_VERSION__ ?? "0.0.0";
-  }
+  deps["@storyshelf/runner-playwright"] = __PKG_VERSION__ ?? "0.0.0";
   if (answers.auth !== "none") {
     deps[AUTH_PACKAGE[answers.auth] ?? ""] = __PKG_VERSION__ ?? "0.0.0";
   }
@@ -714,13 +504,6 @@ function buildDeps(answers: Answers): Record<string, string> {
     deps["@storyshelf/notify-email"] = __PKG_VERSION__ ?? "0.0.0";
     deps["nodemailer"] = NODEMAILER_SDK;
   }
-  // Queue dep when sqs
-  if (answers.queue !== "memory") {
-    const queuePkg = QUEUE_PACKAGE[answers.queue];
-    if (queuePkg) {
-      deps[queuePkg] = __PKG_VERSION__ ?? "0.0.0";
-    }
-  }
 
   return deps;
 }
@@ -733,12 +516,9 @@ function addInfraScripts(scripts: Record<string, string>): void {
   scripts["infra:outputs"] = "terraform -chdir=terraform output -json";
 }
 
-/** Whether the Docker setup needs compose: more than one service (Postgres or a worker). */
+/** Whether the Docker setup needs compose: more than one service (Postgres). */
 function needsCompose(answers: Answers): boolean {
-  return (
-    answers.database === "postgres" ||
-    (isRemoteQueue(answers.queue) && Boolean(answers.includeWorker))
-  );
+  return answers.database === "postgres";
 }
 
 /** `docker:*` npm scripts: compose when several services, plain `docker` for one container. */
@@ -774,11 +554,6 @@ function generatePackageJson(answers: Answers): string {
     devDependencies: SCAFFOLD_DEV_DEPENDENCIES,
   };
 
-  if (answers.includeWorker) {
-    pkg.scripts["worker"] = `node ${WORKER_ENTRY}`;
-    pkg.scripts["worker:dev"] = `node --watch ${WORKER_ENTRY}`;
-  }
-
   if (resolveDeployTarget(answers) === "docker") {
     Object.assign(pkg.scripts, dockerScripts(answers));
   }
@@ -797,11 +572,6 @@ function generatePackageJson(answers: Answers): string {
 async function writeFiles(outDir: string, answers: Answers): Promise<void> {
   await writeScaffoldFile(outDir, SERVER_ENTRY, generateServer(answers));
   printLine(`Created ${SERVER_ENTRY}`);
-
-  if (answers.includeWorker) {
-    await writeScaffoldFile(outDir, WORKER_ENTRY, generateWorkerFile(answers));
-    printLine(`Created ${WORKER_ENTRY}`);
-  }
 
   await writeFile(join(outDir, "package.json"), generatePackageJson(answers));
   await writeFile(join(outDir, "tsconfig.json"), generateTsconfig());
@@ -843,7 +613,6 @@ async function writeAzureTerraformFiles(outDir: string, answers: Answers): Promi
   const files = generateAzureTerraformFiles({
     project: answers.name,
     location: answers.azureLocation ?? "eastus",
-    queueBackend: answers.azureQueueBackend ?? "storage-queues",
     ...(answers.domainName ? { domainName: answers.domainName } : {}),
     ...(answers.entraTenantId ? { entraTenantId: answers.entraTenantId } : {}),
   });
@@ -875,22 +644,10 @@ async function writeDockerFiles(outDir: string, answers: Answers): Promise<void>
     return;
   }
   const created = ["Dockerfile", ".dockerignore"];
-  const workerSplit = isRemoteQueue(answers.queue) && answers.includeWorker;
-  // Server is slim when the queue is remote; the worker image has Playwright.
-  await writeFile(
-    join(outDir, "Dockerfile"),
-    workerSplit ? generateSlimServerDockerfile() : generateDockerfile(),
-  );
+  await writeFile(join(outDir, "Dockerfile"), generateDockerfile());
   await writeFile(join(outDir, ".dockerignore"), generateDockerignore());
-  if (workerSplit) {
-    await writeFile(join(outDir, "Dockerfile.worker"), generateWorkerDockerfile());
-    created.splice(1, 0, "Dockerfile.worker");
-  }
   if (needsCompose(answers)) {
-    const compose = workerSplit
-      ? generateComposeYamlWithWorker(answers.database)
-      : generateComposeYaml(answers.database);
-    await writeFile(join(outDir, "compose.yaml"), compose);
+    await writeFile(join(outDir, "compose.yaml"), generateComposeYaml(answers.database));
     created.push("compose.yaml");
   }
   printLine(`Created ${created.join(", ")}`);
@@ -907,7 +664,7 @@ function printNextSteps(answers: Answers, runner: PackageRunner): void {
     printLine(`  terraform -chdir=terraform plan -out=tfplan   # review before applying`);
     printLine(`  terraform -chdir=terraform apply tfplan       # or: npm run infra:apply`);
     printLine(`  # wire outputs into env (terraform output -json / npm run infra:outputs):`);
-    printLine(`  #   S3_BUCKET / AWS_REGION, QUEUE_URL, DATABASE_URL, COGNITO_* credentials`);
+    printLine(`  #   S3_BUCKET / AWS_REGION, DATABASE_URL, COGNITO_* credentials`);
     printLine(`  npm install`);
     printLine(`  npm start`);
     return;
@@ -919,9 +676,7 @@ function printNextSteps(answers: Answers, runner: PackageRunner): void {
     printLine(`  terraform -chdir=terraform plan -out=tfplan   # review before applying`);
     printLine(`  terraform -chdir=terraform apply tfplan       # or: npm run infra:apply`);
     printLine(`  # wire outputs into env (terraform output -json / npm run infra:outputs):`);
-    printLine(
-      `  #   AZURE_STORAGE_CONNECTION (+ AZURE_SERVICE_BUS_CONNECTION), DATABASE_URL, OIDC_* credentials`,
-    );
+    printLine(`  #   AZURE_STORAGE_CONNECTION, DATABASE_URL, OIDC_* credentials`);
     printLine(`  npm install`);
     printLine(`  npm start`);
     return;
@@ -941,13 +696,9 @@ function printNextSteps(answers: Answers, runner: PackageRunner): void {
 
   if (target === "docker") {
     if (needsCompose(answers)) {
-      printLine(`  npm run docker:up      # builds + starts app (+ worker)`);
+      printLine(`  npm run docker:up      # builds + starts the app`);
       printLine(`  npm run docker:logs    # follow logs`);
       printLine(`  npm run docker:down    # tear down`);
-      if (answers.includeWorker) {
-        printLine(`  # or separately:`);
-        printLine(`  # docker compose up storyshelf worker`);
-      }
     } else {
       printLine(`  npm run docker:build   # builds the image`);
       printLine(`  npm run docker:run     # runs it on :3000 (data in a named volume)`);
@@ -957,10 +708,6 @@ function printNextSteps(answers: Answers, runner: PackageRunner): void {
 
   printLine(`  ${installCommand(runner)}`);
   printLine(`  ${startCommand(runner)}`);
-  if (answers.includeWorker) {
-    printLine(`  # in another terminal:`);
-    printLine(`  npx storyshelf worker serve --dir .`);
-  }
 }
 
 function promptInitial(choices: { value: string }[], value?: string): number | undefined {
@@ -982,7 +729,7 @@ function promptInitial(choices: { value: string }[], value?: string): number | u
  * @param _options - Reserved for future CLI flags; currently prompts for all choices interactively
  */
 export async function runServerInit(_options: ServerInitOptions): Promise<void> {
-  // Try to autofill from existing package.json (standalone worker dir or re-init)
+  // Try to autofill from existing package.json (re-init)
   const cwdPkg = detectInstalledAdapters(process.cwd());
 
   // Phase 1 (curated path): project + deploy target first. Legacy single-call
@@ -1033,18 +780,10 @@ export async function runServerInit(_options: ServerInitOptions): Promise<void> 
     const legacyInfra = { ...phase1 };
     Object.assign(answers, legacyInfra);
   }
-  // Default queue to memory if not answered (prompts initial unset)
-  if (!answers.queue) {
-    answers.queue = "memory";
-  }
-
-  // AWS target: fixed enterprise reference stack (Postgres + S3 + SQS +
-  // colocated worker). Dockerfiles still generate for ECR image builds.
+  // AWS target: fixed enterprise reference stack (Postgres + S3). Dockerfiles still generate for ECR image builds.
   if (resolveDeployTarget(answers) === "aws") {
     answers.database = "postgres";
     answers.storage = "s3";
-    answers.queue = "sqs";
-    answers.includeWorker = true;
     answers.docker = true;
     const awsAnswers = ((await prompts(AWS_INFRA_PROMPTS)) as Record<string, unknown>) ?? {};
     answers.awsRegion = (awsAnswers["awsRegion"] as string | undefined) ?? "us-east-1";
@@ -1053,59 +792,29 @@ export async function runServerInit(_options: ServerInitOptions): Promise<void> 
     answers.samlMetadataUrl = (awsAnswers["samlMetadataUrl"] as string | undefined) ?? undefined;
   }
 
-  // Azure target: fixed enterprise reference stack (Postgres + Blob +
-  // Storage Queues/Service Bus + colocated worker). Dockerfiles still
+  // Azure target: fixed enterprise reference stack (Postgres + Blob). Dockerfiles still
   // generate for ACR image builds.
   if (resolveDeployTarget(answers) === "azure") {
     answers.database = "postgres";
     answers.storage = "azure";
-    answers.includeWorker = true;
     answers.docker = true;
     const azureAnswers = ((await prompts(AZURE_INFRA_PROMPTS)) as Record<string, unknown>) ?? {};
     answers.azureLocation = (azureAnswers["azureLocation"] as string | undefined) ?? "eastus";
-    const backend = azureAnswers["azureQueueBackend"] as
-      | "storage-queues"
-      | "service-bus"
-      | undefined;
-    answers.azureQueueBackend = backend ?? "storage-queues";
-    answers.queue =
-      answers.azureQueueBackend === "service-bus" ? "azure-service-bus" : "azure-storage-queues";
     answers.domainName = (azureAnswers["domainName"] as string | undefined) ?? undefined;
     answers.entraTenantId = (azureAnswers["entraTenantId"] as string | undefined) ?? undefined;
   }
 
-  // GCP target: fixed enterprise reference stack (Postgres + GCS +
-  // Pub/Sub + colocated worker). Dockerfiles still generate for
+  // GCP target: fixed enterprise reference stack (Postgres + GCS). Dockerfiles still generate for
   // Artifact Registry image builds.
   if (resolveDeployTarget(answers) === "gcp") {
     answers.database = "postgres";
     answers.storage = "gcs";
-    answers.queue = "gcp-pubsub";
-    answers.includeWorker = true;
     answers.docker = true;
     const gcpAnswers = ((await prompts(GCP_INFRA_PROMPTS)) as Record<string, unknown>) ?? {};
     answers.gcpProjectId = (gcpAnswers["gcpProjectId"] as string | undefined) ?? undefined;
     answers.gcpLocation = (gcpAnswers["gcpLocation"] as string | undefined) ?? "us-central1";
     answers.domainName = (gcpAnswers["domainName"] as string | undefined) ?? undefined;
     answers.identityTenant = (gcpAnswers["identityTenant"] as string | undefined) ?? undefined;
-  }
-
-  // Hybrid: if queue is remote, ask whether to generate worker alongside
-  if (
-    resolveDeployTarget(answers) !== "aws" &&
-    resolveDeployTarget(answers) !== "azure" &&
-    resolveDeployTarget(answers) !== "gcp" &&
-    isRemoteQueue(answers.queue)
-  ) {
-    const workerAnswer =
-      ((await prompts({
-        type: "confirm",
-        name: "includeWorker",
-        message: "Generate worker service alongside server?",
-        initial: true,
-      } as never)) as Record<string, unknown>) ?? {};
-    const includeWorkerValue = workerAnswer["includeWorker"] as boolean | undefined;
-    answers.includeWorker = includeWorkerValue ?? true;
   }
 
   const outDir = resolve(answers.dir);

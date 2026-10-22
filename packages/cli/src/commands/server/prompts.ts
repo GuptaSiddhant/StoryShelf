@@ -49,13 +49,13 @@ export const DEPLOY_TARGET_PROMPT: SelectPrompt = {
   choices: [
     { title: "Local (bare node)", value: "local" },
     { title: "Docker (compose)", value: "docker" },
-    { title: "AWS (ECS + S3 + SQS + Postgres + Cognito)", value: "aws" },
+    { title: "AWS (ECS + S3 + Postgres + Cognito)", value: "aws" },
     {
-      title: "Azure (Container Apps + Blob + Queues/Service Bus + Postgres + Entra)",
+      title: "Azure (Container Apps + Blob + Postgres + Entra)",
       value: "azure",
     },
     {
-      title: "Google Cloud (Cloud Run + GCS + Pub/Sub + Postgres + Identity Platform)",
+      title: "Google Cloud (Cloud Run + GCS + Postgres + Identity Platform)",
       value: "gcp",
     },
   ],
@@ -96,24 +96,6 @@ export const ADVANCED_STORAGE_CHOICES: PromptChoice[] = [
   { title: "GCS (Google Cloud Storage)", value: "gcs" },
 ];
 
-export const CURATED_QUEUE_CHOICES: PromptChoice[] = [
-  { title: "In-memory (single server)", value: "memory" },
-  { title: "Redis (self-hosted, Docker Compose)", value: "redis" },
-];
-
-export const ADVANCED_QUEUE_CHOICES: PromptChoice[] = [
-  { title: "SQS (AWS remote worker)", value: "sqs" },
-  {
-    title: "Azure Storage Queues (Azurite-local, remote worker)",
-    value: "azure-storage-queues",
-  },
-  {
-    title: "Azure Service Bus (native dead-lettering, remote worker)",
-    value: "azure-service-bus",
-  },
-  { title: "GCP Pub/Sub (emulator-local, remote worker)", value: "gcp-pubsub" },
-];
-
 /** Opt-in to the full adapter matrix on the local/docker path. */
 export const ADVANCED_ADAPTERS_PROMPT: ConfirmPrompt = {
   type: "confirm",
@@ -134,13 +116,6 @@ export function storageChoices(advanced: boolean): PromptChoice[] {
   return advanced
     ? [...CURATED_STORAGE_CHOICES, ...ADVANCED_STORAGE_CHOICES]
     : [...CURATED_STORAGE_CHOICES];
-}
-
-/** Capture-queue choices for the local/docker path. */
-export function queueChoices(advanced: boolean): PromptChoice[] {
-  return advanced
-    ? [...CURATED_QUEUE_CHOICES, ...ADVANCED_QUEUE_CHOICES]
-    : [...CURATED_QUEUE_CHOICES];
 }
 
 /**
@@ -199,25 +174,6 @@ export const INFRA_PROMPTS: Prompt[] = [
       { title: "None", value: "none" },
       { title: "GitHub", value: "github" },
       { title: "GitLab", value: "gitlab" },
-    ],
-  },
-  {
-    type: "select",
-    name: "queue",
-    message: "Which capture queue?",
-    choices: [
-      { title: "In-memory (single server)", value: "memory" },
-      { title: "Redis (self-hosted, Docker Compose)", value: "redis" },
-      { title: "SQS (AWS remote worker)", value: "sqs" },
-      {
-        title: "Azure Storage Queues (Azurite-local, remote worker)",
-        value: "azure-storage-queues",
-      },
-      {
-        title: "Azure Service Bus (native dead-lettering, remote worker)",
-        value: "azure-service-bus",
-      },
-      { title: "GCP Pub/Sub (emulator-local, remote worker)", value: "gcp-pubsub" },
     ],
   },
   {
@@ -311,71 +267,12 @@ export function localInfraPrompts(advanced: boolean): Prompt[] {
     },
     AUTH_SELECT,
     GIT_SELECT,
-    {
-      type: "select",
-      name: "queue",
-      message: "Which capture queue?",
-      choices: queueChoices(advanced),
-    },
     DOCKER_CONFIRM,
     NOTIFICATIONS_CONFIRM,
     DESIGN_CONFIRM,
     OBSERVABILITY_CONFIRM,
   ];
 }
-
-export const WORKER_INFRA_PROMPTS: Prompt[] = [
-  {
-    type: "select",
-    name: "database",
-    message: "Which database?",
-    choices: [
-      { title: "SQLite (node:sqlite, local)", value: "sqlite" },
-      { title: "Turso (libSQL, serverless)", value: "turso" },
-      { title: "better-sqlite3 (native, local)", value: "better-sqlite3" },
-      { title: "Bun SQLite (bun:sqlite)", value: "bun-sqlite" },
-      { title: "Cloudflare D1 (serverless edge)", value: "d1" },
-      { title: "Postgres (postgres.js, default)", value: "postgres" },
-      { title: "Postgres pg (node-postgres)", value: "pg" },
-      { title: "Neon (serverless Postgres)", value: "neon" },
-      { title: "Neon HTTP (fetch)", value: "neon-http" },
-      { title: "Vercel Postgres", value: "vercel" },
-      { title: "PGlite (embedded)", value: "pglite" },
-      { title: "MySQL / MariaDB", value: "mysql" },
-      { title: "PlanetScale", value: "planetscale" },
-      { title: "TiDB Serverless", value: "tidb" },
-    ],
-  },
-  {
-    type: "select",
-    name: "storage",
-    message: "Which storage?",
-    choices: [
-      { title: "Local filesystem", value: "local" },
-      { title: "S3-compatible", value: "s3" },
-      { title: "GCS (Google Cloud Storage)", value: "gcs" },
-    ],
-  },
-  {
-    type: "select",
-    name: "queue",
-    message: "Which queue?",
-    choices: [
-      { title: "SQS (AWS)", value: "sqs" },
-      { title: "Redis (self-hosted)", value: "redis" },
-      { title: "Azure Storage Queues", value: "azure-storage-queues" },
-      { title: "Azure Service Bus", value: "azure-service-bus" },
-      { title: "GCP Pub/Sub", value: "gcp-pubsub" },
-      { title: "In-memory (local dev only)", value: "memory" },
-    ],
-  },
-  {
-    type: "confirm",
-    name: "docker",
-    message: "Generate Docker files?",
-    initial: true,
-  },
-];
 
 /** Follow-up prompts for the GCP deploy target (single prompts call). */
 export const GCP_INFRA_PROMPTS: Prompt[] = [
@@ -412,15 +309,6 @@ export const AZURE_INFRA_PROMPTS: Prompt[] = [
     name: "azureLocation",
     message: "Azure region?",
     initial: "eastus",
-  },
-  {
-    type: "select",
-    name: "azureQueueBackend",
-    message: "Azure capture queue backend?",
-    choices: [
-      { title: "Storage Queues (Azurite-testable, visibility-timeout)", value: "storage-queues" },
-      { title: "Service Bus (native dead-lettering, SQS + DLQ parity)", value: "service-bus" },
-    ],
   },
   {
     type: "text",

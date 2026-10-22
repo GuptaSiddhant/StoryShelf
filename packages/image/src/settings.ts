@@ -50,7 +50,7 @@ export function configuredThreadCount(): number | undefined {
 /**
  * Load the engine's dependencies now, so a missing `sharp` fails at boot with a clear message
  * instead of on the first diff. The default engine is a hard dependency with nothing to verify,
- * so it returns at once and never delays startup (or the first poll of a capture worker).
+ * so it returns at once and never delays startup (or the first capture).
  */
 export async function verifyImageEngine(): Promise<ImageEngine> {
   const engine = currentImageEngine();

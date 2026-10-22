@@ -22,8 +22,8 @@ nub run serve
 
 Upload a build and you will see one trace per upload: the HTTP request span
 parenting the async `capture.job` span (`extract → render → persist`), with
-every log line carrying the same `trace_id`. Remote workers continue the
-same trace via the queue payload.
+every log line carrying the same `trace_id`. The consumer continues
+the same trace via the job row.
 
 ## Configuration
 

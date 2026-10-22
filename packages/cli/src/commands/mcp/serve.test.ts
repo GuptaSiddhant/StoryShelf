@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { SpawnOptions, SpawnProcess } from "../worker/serve.ts";
+import type { SpawnOptions, SpawnProcess } from "../server/serve.ts";
 import { resolveMcpFile, runMcpServe } from "./serve.ts";
 
 let dir: string;

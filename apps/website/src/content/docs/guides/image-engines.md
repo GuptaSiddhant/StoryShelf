@@ -29,7 +29,7 @@ Where the engine applies:
 
 - **The server** (`createShelfApp`) uses `testing.images.engine` for diffs, overlays, and AI thumbnails.
 - **A forked capture child** inherits it from the server (and `testing.compare.threads` too), so you set it once.
-- **A remote worker** is a separate process: give `createCaptureWorker` the same `images` / `compare` options, or set `STORYSHELF_IMAGE_ENGINE` in its environment. See [Remote workers](/guides/deployment/remote-workers/).
+- **Every other instance** reads its own `testing.images` option, or `STORYSHELF_IMAGE_ENGINE` from its environment, so give all instances behind one database the same value.
 
 With `sharp`, each diff-pool worker thread limits libvips to one thread, so a busy server is not oversubscribed.
 

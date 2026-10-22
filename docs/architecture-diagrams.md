@@ -94,7 +94,6 @@ flowchart TB
 
     subgraph CaptureAdapters["Capture Adapters"]
         runner["@storyshelf/runner-playwright\npure CaptureRunner"]
-        qsqs["@storyshelf/queue-sqs\nSQS CaptureQueue"]
         qmem["Database queue (capture_jobs)\ncore/capture (default)"]
     end
 
@@ -125,7 +124,6 @@ flowchart TB
     capture --> retention
     capture --> runner
     capture --> qmem
-    capture -. alternative .-> qsqs
     dbsqlite --> schema
     slocal --> adapters
     ss3 --> adapters
@@ -142,7 +140,7 @@ flowchart TB
     classDef app fill:#e6f4ea,stroke:#34a853;
     classDef fixture fill:#f3e8fd,stroke:#9c27b0,stroke-dasharray: 5 5;
     class Core,hono,mw,routes,pages,openapi,capture,diff,retention,models,schema,utils,adapters core;
-    class dbsqlite,slocal,ss3,aengine,runner,qsqs,qmem,ghub,glab adapter;
+    class dbsqlite,slocal,ss3,aengine,runner,qmem,ghub,glab adapter;
     class devsrv,flyapp,website,cli app;
     class f8,f9,f10 fixture;
 ```
@@ -251,7 +249,7 @@ sequenceDiagram
     participant CI as CI / Developer
     participant CLI as storyshelf CLI<br/>packages/cli/src/commands/upload.ts
     participant API as POST /api/v1/projects/:id/builds<br/>packages/app/src/routers/builds.ts
-    participant Q as CaptureQueue<br/>core/capture / queue-sqs
+    participant Q as CaptureQueue<br/>core/capture (database queue)
     participant Orc as Orchestrator<br/>core/capture/orchestrator.ts:32
     participant FS as StorageAdapter<br/>local / S3
     participant Runner as CaptureRunner<br/>runner-playwright
@@ -784,7 +782,7 @@ flowchart TB
 
 No Docker socket mount, no repo cloning; capture runs via the image's own browsers.
 
-### 13b. Serverless / Cloud
+### 13b. Hosting only on serverless (no `testing`)
 
 ```mermaid
 flowchart TB
@@ -792,20 +790,16 @@ flowchart TB
         Edge["Edge — Vercel / Cloudflare Workers<br/>Hono FetchHandler (Web Request/Response)"]
         Turso["Turso — @libsql/client + Drizzle<br/>@storyshelf/db-sqlite/turso"]
         S3["S3 / R2 — @storyshelf/storage-s3"]
-        QRemote["Remote Queue — SQS / Cloudflare Queues<br/>@storyshelf/queue-sqs"]
-        Worker["Worker Fleet — polls queue<br/>executeCaptureJob() + @storyshelf/runner-playwright"]
     end
 
     Edge --> Turso
     Edge --> S3
-    Edge --> QRemote --> Worker
-    Worker --> Turso
-    Worker --> S3
 
-    note2["CaptureQueue interface is Promise-based<br/>so the database queue and a supplied queue share the same contract<br/>packages/core/src/adapters/capture-queue.ts:38"]
+    note2["No testing option: no capture queue, no consumer, no renderer.<br/>Zips publish through /dedup, /content and /manifest;<br/>captures need a long-running server (13a, ADR 0006)"]
+    Edge -.-> note2
 
     classDef cloud fill:#fef7e0,stroke:#fbbc04;
-    class Edge,Turso,S3,QRemote,Worker cloud;
+    class Edge,Turso,S3 cloud;
 ```
 
 `createShelfApp` returns a plain `FetchHandler` — works on any runtime; only the capture consumer constrains Node (`architecture.md:247`).

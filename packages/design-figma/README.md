@@ -30,8 +30,6 @@ const app = createShelfApp({
 
 Without a provider, StoryShelf shows no design links. With it, stories link to Figma through `parameters.storyshelf.figma` or the Storybook `design` addon, and project admins manage mappings and the access token under **Settings → Design**.
 
-Remote capture workers need the same provider (`createCaptureWorker({ design: [createFigmaDesign()] })`) so declared links are validated during capture.
-
 ## Accepted links
 
 `https://www.figma.com/{file|design|board|proto|make}/<key>/…` with an optional `node-id`. Embed, community and Figma Sites links are rejected.

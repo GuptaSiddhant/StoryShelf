@@ -103,14 +103,14 @@ describe("detectInstalledAdapters", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("detects bun-sqlite via the worker.ts subpath import", () => {
+  it("detects bun-sqlite via the server.ts subpath import", () => {
     const dir = makeTmp();
     writeFileSync(
       join(dir, "package.json"),
       JSON.stringify({ dependencies: { "@storyshelf/db-sqlite": "0.3.2" } }),
     );
     writeFileSync(
-      join(dir, "worker.ts"),
+      join(dir, "server.ts"),
       'import { createBunSqliteDatabase } from "@storyshelf/db-sqlite/bun-sqlite";',
     );
     expect(detectInstalledAdapters(dir).database).toBe("bun-sqlite");
@@ -127,46 +127,6 @@ describe("detectInstalledAdapters", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("detects sqs queue", () => {
-    const dir = makeTmp();
-    writeFileSync(
-      join(dir, "package.json"),
-      JSON.stringify({ dependencies: { "@storyshelf/queue-sqs": "0.3.2" } }),
-    );
-    expect(detectInstalledAdapters(dir).queue).toBe("sqs");
-    rmSync(dir, { recursive: true, force: true });
-  });
-
-  it("detects azure storage queues via the storage SDK", () => {
-    const dir = makeTmp();
-    writeFileSync(
-      join(dir, "package.json"),
-      JSON.stringify({
-        dependencies: {
-          "@storyshelf/queue-azure": "0.3.2",
-          "@azure/storage-queue": "^12.31.0",
-        },
-      }),
-    );
-    expect(detectInstalledAdapters(dir).queue).toBe("azure-storage-queues");
-    rmSync(dir, { recursive: true, force: true });
-  });
-
-  it("detects azure service bus via the service bus SDK", () => {
-    const dir = makeTmp();
-    writeFileSync(
-      join(dir, "package.json"),
-      JSON.stringify({
-        dependencies: {
-          "@storyshelf/queue-azure": "0.3.2",
-          "@azure/service-bus": "^7.9.5",
-        },
-      }),
-    );
-    expect(detectInstalledAdapters(dir).queue).toBe("azure-service-bus");
-    rmSync(dir, { recursive: true, force: true });
-  });
-
   it("detects azure blob storage", () => {
     const dir = makeTmp();
     writeFileSync(
@@ -174,16 +134,6 @@ describe("detectInstalledAdapters", () => {
       JSON.stringify({ dependencies: { "@storyshelf/storage-azure": "0.3.2" } }),
     );
     expect(detectInstalledAdapters(dir).storage).toBe("azure");
-    rmSync(dir, { recursive: true, force: true });
-  });
-
-  it("detects gcp pubsub queue", () => {
-    const dir = makeTmp();
-    writeFileSync(
-      join(dir, "package.json"),
-      JSON.stringify({ dependencies: { "@storyshelf/queue-gcp": "0.3.2" } }),
-    );
-    expect(detectInstalledAdapters(dir).queue).toBe("gcp-pubsub");
     rmSync(dir, { recursive: true, force: true });
   });
 

@@ -5,7 +5,7 @@ description: StoryShelf's domain layer — adapters, models, capture pipeline, a
 
 import { PackageManagers } from "starlight-package-managers";
 
-`@storyshelf/core` is the domain layer at the center of StoryShelf. It provides adapter contracts, models, the server-side capture pipeline, pixel diff engine, and retention jobs — with no HTTP dependency, so queue workers and remote runners import it without pulling a server. The HTTP server lives in [@storyshelf/app](../app/).
+`@storyshelf/core` is the domain layer at the center of StoryShelf. It provides adapter contracts, models, the server-side capture pipeline, pixel diff engine, and retention jobs — with no HTTP dependency, so the capture consumer and forked capture child import it without pulling a server. The HTTP server lives in [@storyshelf/app](../app/).
 
 ## Install
 

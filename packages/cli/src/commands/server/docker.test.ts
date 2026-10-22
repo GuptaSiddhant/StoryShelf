@@ -1,13 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  generateComposeYaml,
-  generateComposeYamlWithWorker,
-  generateDockerfile,
-  generateDockerignore,
-  generateSlimServerDockerfile,
-  generateWorkerDockerfile,
-  generateWorkerComposeSnippet,
-} from "./docker.ts";
+import { generateComposeYaml, generateDockerfile, generateDockerignore } from "./docker.ts";
 
 describe("generateDockerfile", () => {
   it("installs production dependencies and copies src on a Playwright image", () => {
@@ -22,44 +14,19 @@ describe("generateDockerfile", () => {
   });
 
   it("does not bundle: no esbuild, no dist output", () => {
-    for (const dockerfile of [
-      generateDockerfile(),
-      generateSlimServerDockerfile(),
-      generateWorkerDockerfile(),
-    ]) {
-      expect(dockerfile).not.toContain("esbuild");
-      expect(dockerfile).not.toContain("dist/");
-    }
+    const dockerfile = generateDockerfile();
+    expect(dockerfile).not.toContain("esbuild");
+    expect(dockerfile).not.toContain("dist/");
   });
 
   it("uses a pinned Playwright image, never latest", () => {
     const dockerfile = generateDockerfile();
     expect(dockerfile).not.toContain("playwright:latest");
-    const image = /FROM (?<image>mcr\S+)/u.exec(generateWorkerDockerfile())?.groups?.["image"];
-    expect(image).toBeDefined();
-    expect(dockerfile).toContain(`FROM ${image}`);
+    expect(dockerfile).toMatch(/FROM mcr\.microsoft\.com\/playwright:v\d+\.\d+\.\d+-\w+/u);
   });
 
   it("copies the lockfile when present", () => {
     expect(generateDockerfile()).toContain("COPY package*.json ./");
-  });
-});
-
-describe("generateSlimServerDockerfile", () => {
-  it("runs src/index.ts on plain node without a browser", () => {
-    const dockerfile = generateSlimServerDockerfile();
-    expect(dockerfile).toContain("FROM node:24-alpine");
-    expect(dockerfile).not.toContain("playwright");
-    expect(dockerfile).toContain('"src/index.ts"');
-  });
-});
-
-describe("generateWorkerDockerfile", () => {
-  it("runs src/worker.ts on the Playwright base", () => {
-    const dockerfile = generateWorkerDockerfile();
-    expect(dockerfile).toContain("mcr.microsoft.com/playwright");
-    expect(dockerfile).toContain('CMD ["node", "src/worker.ts"]');
-    expect(dockerfile).not.toContain("EXPOSE");
   });
 });
 
@@ -88,42 +55,5 @@ describe("generateComposeYaml", () => {
     const yaml = generateComposeYaml("postgres");
     expect(yaml).toContain("postgres:");
     expect(yaml).toContain("postgres-data:");
-  });
-});
-
-describe("generateWorkerComposeSnippet", () => {
-  it("contains worker service with queue env", () => {
-    const snippet = generateWorkerComposeSnippet();
-    expect(snippet).toContain("worker:");
-    expect(snippet).toContain("QUEUE_URL");
-    expect(snippet).toContain("WORKER_CONCURRENCY");
-  });
-});
-
-describe("generateComposeYamlWithWorker", () => {
-  it("combines base compose with worker snippet", () => {
-    const yaml = generateComposeYamlWithWorker("sqlite");
-    expect(yaml).toContain("storyshelf:");
-    expect(yaml).toContain("worker:");
-  });
-
-  it("preserves postgres service when with worker", () => {
-    const yaml = generateComposeYamlWithWorker("postgres");
-    expect(yaml).toContain("postgres:");
-    expect(yaml).toContain("worker:");
-  });
-
-  it("declares the worker as a service, before the top-level volumes block", () => {
-    const yaml = generateComposeYamlWithWorker("postgres");
-    expect(yaml.indexOf("  worker:")).toBeGreaterThan(yaml.indexOf("  postgres:"));
-    expect(yaml.indexOf("  worker:")).toBeLessThan(yaml.indexOf("\nvolumes:"));
-    expect(yaml.indexOf("\nvolumes:")).toBe(yaml.lastIndexOf("\nvolumes:"));
-  });
-
-  it("gives the worker its database and waits for postgres", () => {
-    const worker = generateWorkerComposeSnippet("postgres");
-    expect(worker).toContain("DATABASE_URL=postgres://");
-    expect(worker).toContain("postgres:\n        condition: service_healthy");
-    expect(generateWorkerComposeSnippet("sqlite")).not.toContain("DATABASE_URL");
   });
 });

@@ -5,11 +5,11 @@ import { TERRAFORM_REQUIRED_VERSION } from "./terraform-aws.ts";
  *
  * Pure string builders — no runtime dependencies. Emitted by
  * `storyshelf server init` when the deploy target is `azure`, alongside the
- * standard `src/index.ts` / `src/worker.ts` / `package.json` files.
+ * standard `src/index.ts` / `package.json` files.
  *
- * Reference stack: Container Apps (app + worker) + Azure Blob Storage
- * (storybook bundles) + Storage Queues or Service Bus (capture queue,
- * selected by `queue_backend`) + Postgres Flexible Server + Key Vault +
+ * Reference stack: one Container App (serves the UI and consumes capture
+ * jobs from the database queue) + Azure Blob Storage (storybook bundles) +
+ * Postgres Flexible Server + Key Vault +
  * Microsoft Entra app (only when `entra_tenant_id` is set) + DNS zone
  * (only when `domain_name` is set). Hostname binding + managed TLS is a
  * post-apply step (see the generated README); the scaffold stops at the
@@ -17,11 +17,8 @@ import { TERRAFORM_REQUIRED_VERSION } from "./terraform-aws.ts";
  *
  * Output contract (stable keys, parsed by CI — see `AZURE_TERRAFORM_OUTPUT_KEYS`):
  * keys are always present; values are `""` when the resource is not
- * provisioned for the selected backend / optional inputs.
+ * provisioned for the optional inputs.
  */
-
-/** Queue backends supported by the Azure Terraform scaffold. */
-export type AzureQueueBackend = "storage-queues" | "service-bus";
 
 /** Options for the Azure Terraform scaffold. */
 export interface AzureTerraformOptions {
@@ -29,8 +26,6 @@ export interface AzureTerraformOptions {
   project: string;
   /** Azure region, e.g. `eastus`. */
   location: string;
-  /** Capture queue backend. Baked at scaffold time (not a variable). */
-  queueBackend: AzureQueueBackend;
   /** Public domain for the app. Empty leaves DNS out entirely. */
   domainName?: string;
   /** Entra tenant ID for the app registration. Empty skips identity. */
@@ -49,8 +44,6 @@ export const AZURE_TERRAFORM_OUTPUT_KEYS: readonly string[] = [
   "database_url",
   "entra_application_id",
   "entra_tenant_id",
-  "queue_name",
-  "servicebus_connection_string",
   "storage_connection_string",
 ];
 
@@ -94,17 +87,6 @@ variable "location" {
   description = "Azure region for all resources."
   type        = string
   default     = "eastus"
-}
-
-variable "queue_backend" {
-  description = "Capture queue backend: Storage Queues or Service Bus."
-  type        = string
-  default     = "storage-queues"
-
-  validation {
-    condition     = contains(["storage-queues", "service-bus"], var.queue_backend)
-    error_message = "queue_backend must be storage-queues or service-bus."
-  }
 }
 
 variable "domain_name" {
@@ -156,7 +138,9 @@ resource "azurerm_container_app_environment" "main" {
 
 export function generateAzureApp(): string {
   return `${header()}# App with external ingress. Image is a placeholder: push the
-# scaffolded Dockerfile to ACR and update it before applying.
+# scaffolded Dockerfile to ACR and update it before applying. The same
+# app consumes capture jobs from the database and renders with Playwright,
+# so it keeps one replica running and gets browser-sized resources.
 resource "azurerm_container_app" "app" {
   name                         = "\${local.slug}-app"
   container_app_environment_id = azurerm_container_app_environment.main.id
@@ -164,11 +148,13 @@ resource "azurerm_container_app" "app" {
   revision_mode                = "Single"
 
   template {
+    min_replicas = 1
+
     container {
       name   = "app"
       image  = "storyshelf:latest"
-      cpu    = 1
-      memory = "2Gi"
+      cpu    = 2
+      memory = "4Gi"
     }
   }
 
@@ -179,29 +165,6 @@ resource "azurerm_container_app" "app" {
     traffic_weight {
       latest_revision = true
       percentage      = 100
-    }
-  }
-}
-`;
-}
-
-export function generateAzureWorker(): string {
-  return `${header()}# Worker polls the capture queue and renders with Playwright.
-# No ingress: it only makes outbound calls (queue, database, storage).
-resource "azurerm_container_app" "worker" {
-  name                         = "\${local.slug}-worker"
-  container_app_environment_id = azurerm_container_app_environment.main.id
-  resource_group_name          = azurerm_resource_group.main.name
-  revision_mode                = "Single"
-
-  template {
-    min_replicas = 1
-
-    container {
-      name   = "worker"
-      image  = "storyshelf-worker:latest"
-      cpu    = 2
-      memory = "4Gi"
     }
   }
 }
@@ -246,9 +209,7 @@ resource "azurerm_postgresql_flexible_server_database" "shelf" {
 }
 
 export function generateAzureStorage(): string {
-  return `${header()}# Blob container for storybook bundles + the Storage Queues
-# backend (created only when var.queue_backend selects it). The queue
-# name matches the scaffolded server default ("capture-jobs").
+  return `${header()}# Blob container for storybook bundles.
 resource "azurerm_storage_account" "main" {
   name                     = "\${local.alphanum}shlf"
   resource_group_name      = azurerm_resource_group.main.name
@@ -261,34 +222,6 @@ resource "azurerm_storage_account" "main" {
 resource "azurerm_storage_container" "storybook" {
   name               = "storybook"
   storage_account_id = azurerm_storage_account.main.id
-}
-
-resource "azurerm_storage_queue" "capture" {
-  count              = var.queue_backend == "storage-queues" ? 1 : 0
-  name               = "capture-jobs"
-  storage_account_id = azurerm_storage_account.main.id
-}
-`;
-}
-
-export function generateAzureQueue(): string {
-  return `${header()}# Service Bus backend (created only when var.queue_backend
-# selects it). max_delivery_count dead-letters poison messages to the
-# built-in DLQ sub-queue — the Azure analog of the SQS + DLQ pattern.
-resource "azurerm_servicebus_namespace" "main" {
-  count               = var.queue_backend == "service-bus" ? 1 : 0
-  name                = "\${local.slug}-sb"
-  location            = azurerm_resource_group.main.location
-  resource_group_name = azurerm_resource_group.main.name
-  sku                 = "Standard"
-}
-
-resource "azurerm_servicebus_queue" "capture" {
-  count                                = var.queue_backend == "service-bus" ? 1 : 0
-  name                                 = "capture-jobs"
-  namespace_id                         = azurerm_servicebus_namespace.main[0].id
-  max_delivery_count                   = 3
-  dead_lettering_on_message_expiration = true
 }
 `;
 }
@@ -385,7 +318,7 @@ resource "azurerm_dns_cname_record" "app" {
 export function generateAzureOutputs(): string {
   return `${header()}# Outputs feed directly into the scaffolded server's env. Keys are
 # a stable contract parsed by CI — do not rename (tests pin the set).
-# Values are "" when the resource is not provisioned for this backend.
+# Values are "" when the optional resource is not provisioned.
 output "app_fqdn" {
   value = azurerm_container_app.app.latest_revision_fqdn
 }
@@ -393,15 +326,6 @@ output "app_fqdn" {
 output "storage_connection_string" {
   value     = azurerm_storage_account.main.primary_connection_string
   sensitive = true
-}
-
-output "servicebus_connection_string" {
-  value     = var.queue_backend == "service-bus" ? azurerm_servicebus_namespace.main[0].default_primary_connection_string : ""
-  sensitive = true
-}
-
-output "queue_name" {
-  value = "capture-jobs"
 }
 
 output "database_url" {
@@ -425,22 +349,15 @@ export function generateAzureTfvarsExample(): string {
 #   terraform plan -var "project=shelf-ci-$GITHUB_RUN_ID"
 project         = "my-storyshelf"
 location        = "eastus"
-queue_backend   = "storage-queues" # or "service-bus"
 domain_name     = ""
 entra_tenant_id = ""
 `;
 }
 
-function generateAzureEnvTable(queueBackend: AzureQueueBackend): string {
-  const queueRow =
-    queueBackend === "service-bus"
-      ? "| `servicebus_connection_string` | `AZURE_SERVICE_BUS_CONNECTION` | `queue-azure` (service-bus) |"
-      : "| `storage_connection_string` | `AZURE_STORAGE_CONNECTION` | `queue-azure` (storage-queues) + `storage-azure` |";
+function generateAzureEnvTable(): string {
   return `| Output | Env var | Adapter |
 |---|---|---|
 | \`storage_connection_string\` | \`AZURE_STORAGE_CONNECTION\` | \`storage-azure\` (Blob container) |
-${queueRow}
-| \`queue_name\` | (baked into scaffold as \`"capture-jobs"\`) | \`queue-azure\` |
 | \`database_url\` | \`DATABASE_URL\` | \`db-postgres\` |
 | \`entra_application_id\` / \`entra_tenant_id\` | \`OIDC_CLIENT_ID\` / \`OIDC_ISSUER\` (\`https://login.microsoftonline.com/{tenant}/v2.0\`) | \`auth\` (keycloak recipe) |
 | Key Vault | \`SECRET\` / \`OIDC_CLIENT_SECRET\` / \`ADMIN_TOKEN\` | sessions / OIDC / bootstrap |
@@ -463,13 +380,13 @@ terraform destroy -var "project=$PROJECT" -auto-approve
 \`\`\`
 
 Cost notes: Postgres Flexible is the B1ms burstable SKU, Container Apps
-run on consumption, and the worker scales to a single replica. Key Vault
+run on consumption, and the app keeps a single replica running. Key Vault
 uses 7-day soft-delete so re-running with the same project name within a
 week reuses the vault (prefer a fresh unique prefix per run).
 `;
 }
 
-export function generateAzureReadme(project: string, queueBackend: AzureQueueBackend): string {
+export function generateAzureReadme(project: string): string {
   return `# ${project} on Azure
 
 Scaffolded by \`storyshelf server init --target azure\`.
@@ -490,7 +407,7 @@ terraform apply tfplan
 terraform output -json   # or: npm run infra:outputs
 \`\`\`
 
-${generateAzureEnvTable(queueBackend)}
+${generateAzureEnvTable()}
 \`\`\`sh
 npm install
 npm start
@@ -513,13 +430,9 @@ const AZURE_FILES: ReadonlyArray<readonly [string, (options: AzureTerraformOptio
   ["terraform/versions.tf", () => generateAzureVersions()],
   ["terraform/variables.tf", () => generateAzureVariables()],
   ["terraform/main.tf", () => generateAzureMain()],
-  [
-    "terraform/compute.tf",
-    () => `${generateAzureMonitoring()}${generateAzureApp()}${generateAzureWorker()}`,
-  ],
+  ["terraform/compute.tf", () => `${generateAzureMonitoring()}${generateAzureApp()}`],
   ["terraform/database.tf", () => generateAzureDatabase()],
   ["terraform/storage.tf", () => generateAzureStorage()],
-  ["terraform/queue.tf", () => generateAzureQueue()],
   ["terraform/identity.tf", () => generateAzureIdentity()],
   ["terraform/secrets.tf", () => generateAzureSecrets()],
   ["terraform/dns.tf", () => generateAzureDns()],
@@ -533,6 +446,6 @@ export function generateAzureTerraformFiles(options: AzureTerraformOptions): Ter
   for (const [path, generate] of AZURE_FILES) {
     files[path] = generate(options);
   }
-  files["terraform/README.md"] = generateAzureReadme(options.project, options.queueBackend);
+  files["terraform/README.md"] = generateAzureReadme(options.project);
   return files;
 }

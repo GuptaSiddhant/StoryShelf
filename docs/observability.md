@@ -60,7 +60,7 @@ persist), with every log line carrying the same `trace_id`.
 | Span | Where | Attributes |
 |---|---|---|
 | `http.server` | Every request (`@hono/otel`) | `http.method/route/status`, `storyshelf.req_id`, `enduser.id` |
-| `capture.job` | One per capture (server or worker) | `storyshelf.build_id`, `storyshelf.req_id`, `storyshelf.attempt_no` |
+| `capture.job` | One per capture | `storyshelf.build_id`, `storyshelf.req_id`, `storyshelf.attempt_no` |
 | `capture.extract` / `capture.persist-statics` / `capture.render` / `capture.persist` | Orchestrator phases | `storyshelf.render_count` (render) |
 | `db.insert/get/list/…` | Instrumented database adapter | `db.table` |
 | `storage.read/write/…` | Instrumented storage adapter | `storage.path` |
@@ -68,9 +68,9 @@ persist), with every log line carrying the same `trace_id`.
 | `invoke_agent {model}` / `chat {model}` | The AI SDK's `@ai-sdk/otel` GenAI spans, nested under `ai.summarize` | `gen_ai.*` usage attributes (prompts, images and outputs are never recorded) |
 | `http.client` | Outbound `httpJson` (git hosts, webhooks, OIDC) | `http.request.method`, `url.full` (query redacted), `http.retry.count` |
 
-Span names never contain IDs, paths, or branch names. Remote workers
-continue the enqueueing request's trace via the `traceparent` job field, so
-an upload's trace spans the HTTP request **and** the worker process.
+Span names never contain IDs, paths, or branch names. The consumer
+continues the enqueueing request's trace via the `traceparent` job field, so
+an upload's trace spans the HTTP request **and** the capture job.
 
 ## Metric catalog
 

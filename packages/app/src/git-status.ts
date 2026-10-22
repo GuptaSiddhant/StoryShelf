@@ -27,7 +27,7 @@ export function checkForTransition(previous: string, next: string): CheckStatus 
 
 /**
  * Post the `storyshelf/<slug>` status after a human review changes a build's
- * outcome. The capture worker only posts `pending` and the capture-time result;
+ * outcome. The capture consumer only posts `pending` and the capture-time result;
  * a `reviewing` build would otherwise stay pending on the PR after approval.
  * Provider errors never fail the review action.
  */

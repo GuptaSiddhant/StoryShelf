@@ -1,8 +1,8 @@
 /**
  * W3C trace-context propagation helpers.
  *
- * Queue payloads carry the `traceparent` string (see `CaptureJob`) so a
- * remote worker can continue the enqueueing request's trace; outbound HTTP
+ * Queue payloads carry the `traceparent` string (see `CaptureJob`) so the
+ * consumer can continue the enqueueing request's trace; outbound HTTP
  * injects the same header via {@link injectTraceContext}.
  */
 import { context, propagation, type Context } from "@opentelemetry/api";
