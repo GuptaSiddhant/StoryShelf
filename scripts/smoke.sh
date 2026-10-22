@@ -49,9 +49,12 @@ for _ in $(seq 1 30); do
   sleep 2
 done
 
+# Never `grep -q` on the right of a pipe here: it exits at the first match, curl's
+# next write then fails (exit 23) and `pipefail` fails the pipeline, at random,
+# on any response larger than one write. Plain grep reads it all.
 curl -fsS --max-time 10 "$BASE/api/v1/health" >/dev/null
-curl -fsS --max-time 10 "$BASE/api/v1/projects" | grep -q '\[\]'
-curl -fsS --max-time 10 "$BASE/" | grep -qi 'html'
-curl -fsS --max-time 10 "$BASE/assets/htmx.js" | grep -q 'htmx'
+curl -fsS --max-time 10 "$BASE/api/v1/projects" | grep '\[\]' >/dev/null
+curl -fsS --max-time 10 "$BASE/" | grep -i 'html' >/dev/null
+curl -fsS --max-time 10 "$BASE/assets/htmx.js" | grep 'htmx' >/dev/null
 
 echo "Smoke OK: health + projects + root + htmx.js on :$PORT"
