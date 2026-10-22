@@ -8,6 +8,7 @@ import type { MatrixInput } from "../matrix.ts";
 import type { CaptureJobOptions } from "../orchestrator.ts";
 import type { CaptureContext } from "../pipeline.ts";
 import type { CaptureProgress } from "../progress.ts";
+import { storybookUrlSource } from "../storybook-urls.ts";
 
 /** The build being captured and the adapters to capture it with. */
 export interface ShardTarget {
@@ -75,6 +76,7 @@ export function matrixInputOf(
     browsers: parts.browsers,
     affectedPaths: parts.affectedPaths,
     renderTimeoutMs: options.renderTimeoutMs,
+    storybookUrl: storybookUrlSource(options, target.build),
     logger: parts.logger ?? options.logger,
     recordLog: parts.recordLog,
     progress: parts.progress,

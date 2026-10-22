@@ -95,6 +95,12 @@ function shardSized(shardSize: number, extra = {}): () => void {
   };
 }
 
+function ttl(storybookUrlTtl: number): () => void {
+  return () => {
+    resolveShelfOptions({ ...base, testing: { runner, storybookUrlTtl } });
+  };
+}
+
 function withRetries(retries: number): () => void {
   return () => {
     resolveShelfOptions({ ...base, testing: { runner, retries } });
@@ -122,6 +128,14 @@ describe("resolveShelfOptions testing process options", () => {
     expect(() => resolveShelfOptions({ ...base, testing: { shardSize: 10 } })).toThrow(
       /requires testing\.runner/u,
     );
+  });
+
+  it("validates storybookUrlTtl as seconds within bounds", () => {
+    expect(ttl(7200)).not.toThrow();
+    expect(ttl(60)).not.toThrow();
+    expect(ttl(59)).toThrow(/storybookUrlTtl/u);
+    expect(ttl(86_401)).toThrow(/storybookUrlTtl/u);
+    expect(ttl(100.5)).toThrow(/storybookUrlTtl/u);
   });
 
   it("validates concurrency as a positive integer", () => {

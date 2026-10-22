@@ -47,6 +47,10 @@ Enable with `passkeys: {}` — RP ID and origin derive from `baseURL`. Users enr
 
 First-seen engine users are upserted as `member` and group-synced per project; existing roles are never demoted. Project roles are `viewer`/`developer`/`approver`/`admin`; site `admin` bypasses project checks. See [Roles](../roles/).
 
+## Reads without a session
+
+Besides public builds, one route reads a build without a session: `GET /s/<token>/<file>`, the signed Storybook URL a remote browser opens when it cannot route back to the server ([Remote browsers](/guides/remote-browsers/#signed-storybook-urls)). The token is an HMAC under a key derived from `secret`, names one project and one build, expires (2 hours by default, never more than 24) and grants the build's static files only: no pages, no API, no other build. The route exists only with `testing`, answers every refusal with the same `404`, and the token is kept out of logs and traces. Rotating `secret` without `previousSecret` ends every outstanding URL at once.
+
 ## Pins
 
 `better-auth@1.7.6`, `@better-auth/passkey@1.7.6`, `@better-auth/sso@1.7.6` — see the [changelog](https://www.better-auth.com/docs/changelog).

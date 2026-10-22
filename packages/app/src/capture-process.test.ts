@@ -14,6 +14,13 @@ function runner() {
 }
 
 describe("childEnvOf", () => {
+  it("hands the Storybook URL lifetime to the child", () => {
+    expect(childEnvOf({ retries: 0, storybookUrlTtl: 600 })).toEqual({
+      STORYSHELF_CAPTURE_RETRIES: "0",
+      STORYSHELF_CAPTURE_STORYBOOK_URL_TTL: "600",
+    });
+  });
+
   it("hands the image engine, diff threads and retries to the child, with the shard size", () => {
     expect(childEnvOf({ retries: 3, shardSize: 40, imageEngine: "sharp", diffThreads: 2 })).toEqual(
       {

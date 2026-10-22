@@ -1,5 +1,6 @@
 import pino from "pino";
 import type { Logger } from "pino";
+import { redactSecrets } from "./utils/redact.ts";
 
 /**
  * Create the structured JSON logger used across StoryShelf.
@@ -31,9 +32,29 @@ export function createShelfLogger(options: LoggerOptions = {}): Logger {
       level: options.level ?? process.env["LOG_LEVEL"] ?? "info",
       base: { env: options.env ?? process.env["NODE_ENV"] },
       mixin: options.mixin,
+      serializers: { err: redactedError },
     },
     transport,
   );
+}
+
+/**
+ * Pino's error serializer, with secrets scrubbed from the message and stack: a runner's error can
+ * quote the signed Storybook URL it failed to open (ADR 0007, decision 5).
+ */
+function redactedError(err: unknown): unknown {
+  const serialized: unknown = pino.stdSerializers.err(err as Error);
+  if (serialized === null || typeof serialized !== "object") {
+    return serialized;
+  }
+  const record = serialized as Record<string, unknown>;
+  for (const key of ["message", "stack"]) {
+    const value = record[key];
+    if (typeof value === "string") {
+      record[key] = redactSecrets(value);
+    }
+  }
+  return record;
 }
 
 /** Pino logger type shared across StoryShelf. */

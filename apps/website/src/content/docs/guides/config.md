@@ -101,7 +101,8 @@ createShelfApp({ database, storage, testing: { runner, compare: { threads: 2 }, 
 
 - Enabling `testing` requires a long-running server (a container, VM, Fly Machine or Kubernetes pod); a serverless deployment can host Storybooks only, by leaving `testing` unset. See [Capture](/concepts/capture/#requires-a-long-running-server) and [Hosting only](/concepts/hosting-only/).
 - `testing` needs `runner`, or `queue` to hand jobs to a queue that something else consumes; `testing: {}` fails at boot.
-- `compare`, `images`, `concurrency`, `retries`, `shardSize`, `workerEntry`, `mode` and `queue` all live under `testing`; they are unreachable without it.
+- `testing.storybookUrlTtl` (seconds, default `7200`, from `60` to `86400`) is how long the signed Storybook URL given to a remote browser that cannot route back stays valid; it needs a `secret` and a [public origin](#public-origin). See [Signed Storybook URLs](/guides/remote-browsers/#signed-storybook-urls).
+- `compare`, `images`, `concurrency`, `retries`, `shardSize`, `storybookUrlTtl`, `workerEntry`, `mode` and `queue` all live under `testing`; they are unreachable without it.
 - Captures queue on the database (`capture_jobs`), and every instance with `testing` consumes them. `testing.retries` (default `2`, so three attempts) is the one retry limit for failed attempts, lost leases and forked-child crashes; `testing.queue` replaces the database queue and must be a `PollableCaptureQueue`, consumed in this process when `runner` is set. See [Capture](/concepts/capture/#the-job-queue).
 - `config.scratchDir` stays in `config`, because publishing uses it too.
 - Routes for capture, compare and baselines answer `404` without `testing`; the navigation hides them; the System page and `storyshelf upload` say the instance is hosting only.
@@ -119,7 +120,7 @@ createShelfApp({ database, storage, testing: { runner, compare: { threads: 2 }, 
 
 ### Public origin
 
-Links built in the background (commit statuses, notification emails, and later the signed Storybook URLs that [remote browsers](/guides/remote-browsers/) without a route back need) need the address people reach the server at. StoryShelf resolves it from a chain and never from the `Host` or `X-Forwarded-Host` of a request, which can be forged:
+Links built in the background (commit statuses, notification emails, and the [signed Storybook URLs](/guides/remote-browsers/#signed-storybook-urls) that remote browsers without a route back open) need the address people reach the server at. StoryShelf resolves it from a chain and never from the `Host` or `X-Forwarded-Host` of a request, which can be forged:
 
 1. `publicBaseUrl` (`PUBLIC_BASE_URL` in the scaffolds), when set.
 2. The platform's own address, read from its environment: Heroku (`HEROKU_APP_DEFAULT_DOMAIN_NAME`, needs the `runtime-dyno-metadata` Labs feature), Railway (`RAILWAY_PUBLIC_DOMAIN`), Vercel (`VERCEL_PROJECT_PRODUCTION_URL`, `VERCEL_URL`), Netlify (`URL`), Render (`RENDER_EXTERNAL_URL`), Fly.io (`FLY_APP_NAME`), Azure App Service (`WEBSITE_HOSTNAME`), Azure Container Apps (`CONTAINER_APP_NAME` with `CONTAINER_APP_ENV_DNS_SUFFIX`) and DigitalOcean App Platform (`APP_URL`). Cloud Run, AWS App Runner, Lambda function URLs and Cloudflare Workers publish none. This is the platform's domain, a working fallback but the wrong link behind a custom domain.

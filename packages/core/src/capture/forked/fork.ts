@@ -12,6 +12,9 @@ export const CAPTURE_RETRIES_ENV = "STORYSHELF_CAPTURE_RETRIES";
 /** Environment variable carrying the parent's `testing.shardSize` to the child, which plans big builds with it. */
 export const CAPTURE_SHARD_SIZE_ENV = "STORYSHELF_CAPTURE_SHARD_SIZE";
 
+/** Environment variable carrying the parent's `testing.storybookUrlTtl` (seconds) to the child, which mints signed Storybook URLs. */
+export const CAPTURE_STORYBOOK_URL_TTL_ENV = "STORYSHELF_CAPTURE_STORYBOOK_URL_TTL";
+
 /** Grace between SIGTERM and SIGKILL when the parent stops a child. */
 const KILL_ESCALATION_MS = 30_000;
 

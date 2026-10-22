@@ -15,6 +15,7 @@ export {
   resolveBrowsers,
 } from "./browsers.ts";
 export { offeredTargets, type TargetPrerequisites } from "./targets.ts";
+export { storybookUrlSource, type StorybookUrlSource } from "./storybook-urls.ts";
 export {
   buildGlobalsParam,
   filterModes,
@@ -169,6 +170,7 @@ export {
   canForkCaptureChild,
   CAPTURE_RETRIES_ENV,
   CAPTURE_SHARD_SIZE_ENV,
+  CAPTURE_STORYBOOK_URL_TTL_ENV,
   CAPTURE_WORKER_ROLE,
   forkCaptureChild,
   type ForkOptions,

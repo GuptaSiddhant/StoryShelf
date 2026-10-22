@@ -2,6 +2,7 @@ import AdmZip from "adm-zip";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import pino from "pino";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   TargetLaunchError,
@@ -14,6 +15,7 @@ import { BuildModel } from "../models/build.ts";
 import { ProjectModel } from "../models/project.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { storybookDir, storybookZipPath } from "../utils/paths.ts";
+import { verifyStorybookToken } from "../utils/storybook-token.ts";
 import { executeCaptureJob } from "./orchestrator.ts";
 import { buildScratchDir } from "./scratch.ts";
 
@@ -552,6 +554,72 @@ describe("executeCaptureJob", () => {
       };
       await executeCaptureJob({ buildId }, resolved);
       expect(render).toHaveBeenCalledTimes(1);
+    });
+
+    it("gives a URL target a signed Storybook URL for its renders and parameter pass, and nothing is logged", async () => {
+      const { db, buildId, render, options } = await setupBrowsers({
+        browsers: '["chromium@cdp","chromium"]',
+      });
+      const lines: string[] = [];
+      const logger = pino({ level: "trace" }, { write: (chunk: string) => lines.push(chunk) });
+      const extract = vi.fn(async () => await Promise.resolve({}));
+      (options.runner as { extractParameters?: unknown }).extractParameters = extract;
+      (options.runner.metadata as { targets?: RunnerTarget[] }).targets = [
+        { target: "chromium@cdp", reach: "url", status: "ready" },
+        { target: "chromium", reach: "loopback", status: "ready" },
+      ];
+      await executeCaptureJob(
+        { buildId },
+        {
+          ...options,
+          logger,
+          secret: "s3cret-s3cret-s3cret",
+          publicOrigin: async () => await Promise.resolve("https://shelf.example.com"),
+        },
+      );
+      const urls = render.mock.calls.map(
+        (call) => (call[0] as { storybookUrl?: string }).storybookUrl,
+      );
+      expect(urls[0]).toMatch(/^https:\/\/shelf\.example\.com\/s\/[\w-]+\.[\w-]+\/$/u);
+      expect(urls[1]).toBeUndefined();
+      expect(
+        (extract.mock.calls[0] as unknown as [{ storybookUrl?: string }])[0].storybookUrl,
+      ).toMatch(/\/s\//u);
+      const project = await db.list(db.tables.projects);
+      const token = /\/s\/([^/]+)\//u.exec(urls[0] ?? "")?.[1] ?? "";
+      expect(verifyStorybookToken(token, ["s3cret-s3cret-s3cret"])).toMatchObject({
+        ok: true,
+        claims: { projectId: project[0]?.id, buildId },
+      });
+      expect(lines.join("")).not.toContain(token);
+    });
+
+    it("scrubs a signed URL a runner quotes in its failure", async () => {
+      const { db, buildId, options } = await setupBrowsers({ browsers: '["chromium@cdp"]' });
+      (options.runner.metadata as { targets?: RunnerTarget[] }).targets = [
+        { target: "chromium@cdp", reach: "url", status: "ready" },
+      ];
+      (options.runner as { render: unknown }).render = vi.fn(
+        async (input: { storybookUrl?: string }) => {
+          await Promise.resolve();
+          throw new Error(`goto failed: ${input.storybookUrl}iframe.html`);
+        },
+      );
+      await expect(
+        executeCaptureJob(
+          { buildId },
+          {
+            ...options,
+            secret: "s3cret-s3cret-s3cret",
+            publicOrigin: async () => await Promise.resolve("https://shelf.example.com"),
+          },
+        ),
+      ).rejects.toThrow(/goto failed/u);
+      const build = await new BuildModel(db, tables(db)).get(buildId);
+      expect(build?.status).toBe("failed");
+      expect(JSON.stringify(await db.list(db.tables.captureAttempts))).not.toMatch(
+        /\/s\/[\w-]{20,}/u,
+      );
     });
 
     it("does not isolate or retry a launch failure: the job fails with its reason", async () => {

@@ -1,4 +1,5 @@
 import type { Logger } from "@storyshelf/core/logger";
+import { redactSecrets } from "@storyshelf/core/utils";
 import type { Context, Next } from "hono";
 
 /** Hono middleware logging request start/end with duration. */
@@ -7,14 +8,17 @@ export function requestLogging(logger: Logger) {
   return async (c: Context, next: Next): Promise<Response | void> => {
     const started = performance.now();
     const id = c.get("requestId");
-    logger.info({ reqId: id, method: c.req.method, url: c.req.path }, "request start");
+    logger.info(
+      { reqId: id, method: c.req.method, url: redactSecrets(c.req.path) },
+      "request start",
+    );
     await next();
     const userId = c.get("userId") as string | null | undefined;
     logger.info(
       {
         reqId: id,
         method: c.req.method,
-        url: c.req.path,
+        url: redactSecrets(c.req.path),
         status: c.res.status,
         durationMs: Math.round(performance.now() - started),
         ...(userId ? { userId } : {}),

@@ -4,6 +4,7 @@
  * so this exercises connect, `exposeNetwork` to the loopback Storybook server, the in-browser
  * fingerprint and per-target baselines. Gated by `RUN_INTEGRATION=1` like the rest.
  */
+import { serve } from "@hono/node-server";
 import { createShelfApp } from "@storyshelf/app";
 import { TargetLaunchError, type StoryEntry } from "@storyshelf/core/adapter/capture-runner";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
@@ -279,3 +280,89 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("remote capture through 
     );
   }, 600_000);
 });
+
+describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")(
+  "remote capture over a signed Storybook URL",
+  () => {
+    let tmp = "";
+    let app: ReturnType<typeof createShelfApp> | null = null;
+    let listener: ReturnType<typeof serve> | null = null;
+    let browser: { close: () => Promise<void> } | null = null;
+
+    beforeAll(async () => {
+      staticDir = await ensureFixtureBuilt();
+      const { chromium } = await import("playwright-core");
+      const debugPort = await freePort();
+      browser = await chromium.launch({ args: [`--remote-debugging-port=${debugPort}`] });
+      const appPort = await freePort();
+      tmp = await mkdtemp(join(tmpdir(), "storyshelf-signed-"));
+      const dataDir = join(tmp, "data");
+      await mkdir(dataDir, { recursive: true });
+      const cdp = remote({
+        name: "cdp",
+        engines: ["chromium"],
+        sessions: 2,
+        connect: () => ({ protocol: "cdp", endpoint: `http://127.0.0.1:${debugPort}` }),
+      });
+      app = createShelfApp({
+        database: createSqliteDatabase(join(tmp, "shelf.db")),
+        storage: createLocalStorage(dataDir),
+        testing: {
+          runner: createPlaywrightCaptureRunner({ browsers: [cdp] }),
+          concurrency: 1,
+        },
+        config: {
+          scratchDir: dataDir,
+          secret: "signed-url-integration-secret-0123456789",
+          publicBaseUrl: `http://127.0.0.1:${appPort}`,
+        },
+      });
+      await app.lifecycle.setup();
+      listener = serve({ fetch: app.fetch, port: appPort, hostname: "127.0.0.1" });
+    }, 300_000);
+
+    afterAll(async () => {
+      listener?.close();
+      await browser?.close();
+      await app?.lifecycle.teardown();
+      await rm(tmp, { recursive: true, force: true });
+    });
+
+    it("renders a Storybook the browser can only reach through /s/<token>/", async () => {
+      const shelf = app as NonNullable<typeof app>;
+      const created = await shelf.request("/api/v1/projects", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Signed Smoke" }),
+      });
+      const project = await readJson<{ id: string; slug: string }>(created);
+      const patched = await shelf.request(`/api/v1/projects/${project.slug}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ browsers: ["chromium@cdp"] }),
+      });
+      expect(patched.status).toBe(200);
+      const uploaded = await uploadBuild(shelf, project.slug, staticDir, {
+        gitSha: "c".repeat(40),
+        gitBranch: "feature/signed",
+        message: "signed url smoke",
+      });
+      const done = await waitForBuild(shelf, project.slug, uploaded.id, [
+        "reviewing",
+        "approved",
+      ]).catch(async (error: unknown) => {
+        const attempts = await shelf.request(
+          `/api/v1/projects/${project.slug}/builds/${uploaded.id}/attempts`,
+        );
+        throw new Error(`${String(error)}: ${await attempts.text()}`);
+      });
+      const snapshots = await readJson<Snapshot[]>(
+        await shelf.request(`/api/v1/projects/${project.slug}/builds/${done.id}/snapshots`),
+      );
+      expect(snapshots.length).toBeGreaterThan(0);
+      expect(new Set(snapshots.map((snapshot) => snapshot.browser))).toEqual(
+        new Set(["chromium@cdp"]),
+      );
+    }, 600_000);
+  },
+);

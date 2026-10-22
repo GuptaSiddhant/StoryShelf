@@ -31,6 +31,7 @@ import { removeJobScratch } from "./scratch.ts";
 import { fanOutCapture } from "./shards/fan-out.ts";
 import { resolveViewports } from "./sizing.ts";
 import { extractStorybookToScratch, persistStorybookStatics } from "./statics.ts";
+import { storybookUrlSource } from "./storybook-urls.ts";
 import { StorybookAdapter } from "./storybook.ts";
 import { loadTarget } from "./target.ts";
 import { offeredTargets } from "./targets.ts";
@@ -57,6 +58,11 @@ export interface CaptureJobOptions {
   design?: DesignProvider[];
   /** The resolved public origin (ADR 0007, decision 6); targets that need a URL wait for it. */
   publicOrigin?: (() => Promise<string | undefined>) | undefined;
+  /**
+   * Lifetime in seconds of the signed Storybook URL a `reach: "url"` target is given (ADR 0007,
+   * decision 5; default 2 hours, `testing.storybookUrlTtl`). Minted afresh for every render pass.
+   */
+  storybookUrlTtl?: number | undefined;
   /** Render budget override (tests use a short fuse). */
   renderTimeoutMs?: number | undefined;
   /**
@@ -235,6 +241,7 @@ async function runCapturePhases(
         hasSecret: options.secret !== undefined,
       }),
     );
+    const storybookUrl = storybookUrlSource(options, build);
     const enriched = await enrichStories({
       runner: options.runner,
       buildId: build.id,
@@ -243,6 +250,7 @@ async function runCapturePhases(
       target: browsers[0] ?? "chromium",
       allowlist: parseModesAllowlist(project.modesAllowlist),
       logger,
+      storybookUrl,
     });
     const stories = enriched.filter((s) => !isDisabledStory(s));
     assertModeCaps(stories, viewports);
@@ -285,6 +293,7 @@ async function runCapturePhases(
               browsers,
               affectedPaths: affectedPathsFor(build),
               renderTimeoutMs: options.renderTimeoutMs,
+              storybookUrl,
               logger,
             }),
           { "storyshelf.browsers": browsers.join(",") },

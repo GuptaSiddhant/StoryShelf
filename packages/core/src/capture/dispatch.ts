@@ -13,6 +13,7 @@ import { ProjectModel, type ProjectTables } from "../models/project.ts";
 import type { Build } from "../schema/build.ts";
 import type { CaptureAttempt } from "../schema/capture-attempt.ts";
 import type { Project } from "../schema/project.ts";
+import { redactSecrets } from "../utils/redact.ts";
 import type { BuildStatePublisher } from "./build-state/types.ts";
 import type { JobLease } from "./job-lease.ts";
 import { executeCaptureJob, type CaptureJobOptions, type CaptureSummary } from "./orchestrator.ts";
@@ -148,10 +149,8 @@ async function finishAttempt(
 
 /** Full error text for an attempt row (message plus stack when available). */
 function errorText(reason: unknown): string {
-  if (reason instanceof Error) {
-    return reason.stack ?? reason.message;
-  }
-  return String(reason);
+  // A runner's error can quote the signed Storybook URL it failed to open.
+  return redactSecrets(reason instanceof Error ? (reason.stack ?? reason.message) : String(reason));
 }
 
 async function approveWithoutCapture(ctx: JobContext, reason: string): Promise<void> {

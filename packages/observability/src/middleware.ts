@@ -7,7 +7,8 @@
  * inside the span, since `@hono/otel` finalizes after `next()` returns.
  */
 import { httpInstrumentationMiddleware } from "@hono/otel";
-import { context, trace } from "@opentelemetry/api";
+import { context, trace, type Span } from "@opentelemetry/api";
+import { redactSecrets } from "@storyshelf/core/utils";
 import type { Context, MiddlewareHandler } from "hono";
 import type { HttpMiddlewareOptions } from "./types.ts";
 
@@ -17,6 +18,7 @@ function enrichSpan(c: Context): void {
   if (!span) {
     return;
   }
+  redactUrl(c, span);
   const reqId = c.get("requestId") as string | undefined;
   if (reqId) {
     span.setAttribute("storyshelf.req_id", reqId);
@@ -24,6 +26,14 @@ function enrichSpan(c: Context): void {
   const userId = c.get("userId") as string | null | undefined;
   if (userId) {
     span.setAttribute("enduser.id", userId);
+  }
+}
+
+/** A signed Storybook URL carries its token in the path (ADR 0007): the span must not keep it. */
+function redactUrl(c: Context, span: Span): void {
+  const url = redactSecrets(c.req.url);
+  if (url !== c.req.url) {
+    span.setAttribute("url.full", url);
   }
 }
 

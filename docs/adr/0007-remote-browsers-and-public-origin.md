@@ -460,7 +460,8 @@ access.
 - Provider browser builds move. The fingerprint catches it, but every move is a baseline migration on
   the default branch; pinning the browser version in the preset is the operator's job.
 - The signed-URL route is a new way to read a private Storybook from outside. It is narrow (one
-  build, static files, short expiry) but needs its own security review before it ships.
+  build, static files, short expiry) and was written for review: the points to check are listed in
+  the implementation notes (#228).
 - The customer's Storybook, possibly unreleased UI, is rendered by a third party. Remote capture is
   opt-in per project.
 - Playwright `connect` requires compatible client and server versions, which ties `playwright-core`
@@ -496,10 +497,9 @@ Landed so far: the runner `browsers` list with bare engines and `local()`, `Capt
 installed-engine check and the `chrome` fix (decisions 1, 3 and 7, #225), and the public-origin
 resolver with `site_settings` (decision 6, #227); remote connect, presets, in-browser
 fingerprints, session limits, retries and `exposeNetwork` (decisions 1 to 5, #226). Signed URLs
-(decision 5, #228) are not built: `RunnerTarget.reach` is `"url"` for a remote target that cannot
-route back, the seam is `offeredTargets` (`core/src/capture/targets.ts`), which marks such targets
-`unavailable` until a `secret` and a public origin exist, and the runners accept `storybookUrl` on
-`render` and `extractParameters` for core to fill. Choices the text left open:
+(decision 5, #228): `RunnerTarget.reach` is `"url"` for a remote target that cannot route back,
+`offeredTargets` (`core/src/capture/targets.ts`) marks such targets `unavailable` until a `secret` and
+a public origin exist, and core now mints the URL (see "Signed URLs" below). Choices the text left open:
 
 - **Where the code is.** `defineRemote` and the `RemoteBrowser` shape live in core
   (`adapters/remote-browser.ts`) so both runners validate alike; the presets are in the runners'
@@ -521,6 +521,26 @@ route back, the seam is `offeredTargets` (`core/src/capture/targets.ts`), which 
   refused with `428` and a message naming both versions (major and minor). `exposeNetwork:
 "<loopback>"` works against it, so a self-hosted server is a `reach: "loopback"` target.
 
+- **Signed URLs (#228).** The URL core hands a runner is the directory root
+  `<publicOrigin>/s/<token>/`, not the `.../projects/<slug>/storybook/build/<buildId>/iframe.html`
+  shape sketched in decision 5: the token already names the project and the build, so a slug in the
+  path is one more thing to check against it and nothing to gain. `GET /s/<token>/<file>` is its own
+  route (`app/src/routers/signed-storybook.ts`), not a branch of the build route, and shares only
+  `readPublishedFile` with it. Token payload `<projectId>:<buildId>:<expiresAtSeconds>`; the
+  signature is checked in constant time before the payload is read; a token claiming more than 24 h
+  (`MAX_STORYBOOK_URL_TTL`) is refused even when signed. `testing.storybookUrlTtl` is in seconds
+  (60 to 86400, default 7200) and reaches a forked child through an environment variable. The route
+  is classified `testing`: a hosting-only instance does not serve it. `previousSecret` verifies a
+  token and never signs one. A token is minted when a render pass starts (and for the parameter
+  pre-pass), never at enqueue time, so queued shards and retries are not handed a stale one. A render
+  pass whose budget outlasts the lifetime (more than about 480 captures at the 15 s allowance, with
+  the default two hours) fails its later pages with `404`s: raise `storybookUrlTtl`. Refusals are all
+  one `404` with `Cache-Control: private, no-store`; the reason is in the debug log only. The token
+  is scrubbed from the request log, the OTEL `url.full` attribute, attempt logs, failure text and the
+  pino `err` serializer by `redactSecrets`. Not covered: the provider's own recordings (documented),
+  and a runner that logs the URL itself. Rate limiting is not applied: a render makes thousands of
+  asset requests, and a refused token costs one HMAC and no database read.
+
 - **Which settings saves are checked.** A save refuses only targets the project does not already
   have, so an unrelated settings save never fails because an engine it already names went away; the
   build of such a project still fails at once (`assertSupportedBrowsers`).
@@ -538,10 +558,11 @@ route back, the seam is `offeredTargets` (`core/src/capture/targets.ts`), which 
 
 ## Open questions
 
-- Whether Storybook 8, 9 and 10 static builds load every asset by relative path, so the path-prefix
-  token reaches them all. The path-based build route already works, which suggests relative paths,
-  but it has not been checked against every fixture. Settled by serving each fixture build under a
-  path prefix and loading `iframe.html`.
+- ~~Whether Storybook 8, 9 and 10 static builds load every asset by relative path, so the path-prefix
+  token reaches them all.~~ Settled (#228): the gated test `remote capture over a signed Storybook URL`
+  (`runner-playwright/src/remote.integration.test.ts`) captures a build of each fixture (8, 9, 10)
+  through a CDP browser that can only open `<origin>/s/<token>/iframe.html`, so every asset loaded by
+  relative path under the token prefix.
 - Which providers honour `exposeNetwork` beyond Azure and a self-hosted Playwright server. A self-hosted
   `run-server` does (tested); Azure is taken from its documentation; a provider not shown to support it
   is treated as `reach: "url"`, the safe default.
