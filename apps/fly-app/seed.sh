@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Seeds the Fly demo project through the public API, like any CI upload: a baseline `main`
 # build plus a `feature/new-button` build with restyled primary buttons, so the review page
-# shows real pixel diffs. Run from the repo root after building fixtures/storybook-8.
+# shows real pixel diffs. Run from the repo root after building packages/cli and
+# fixtures/storybook-8 (needs curl and jq).
 #
 #   STORYSHELF_URL=https://storyshelf.fly.dev STORYSHELF_ADMIN_TOKEN=... apps/fly-app/seed.sh
 #
@@ -15,7 +16,9 @@ STATIC="$PWD/$FIXTURE/storybook-static"
 VARIANT="$(mktemp -d)"
 # Restyles primary buttons only (their inline background); secondary stories stay unchanged.
 FEATURE_CSS='button[style*="29, 78, 216"]{background:#7c3aed!important;border-radius:999px!important}'
-CLI=(npx -y storyshelf@latest)
+# The workspace CLI (built in the job), so it always matches the server on this commit.
+CLI=(node "$PWD/packages/cli/dist/index.js")
+AUTH=(-H "Authorization: Bearer $STORYSHELF_ADMIN_TOKEN" -H "content-type: application/json")
 AUTHOR=(--author-name "Alex Doe" --author-email alex@example.com)
 
 if curl -fsS -H "Authorization: Bearer $STORYSHELF_ADMIN_TOKEN" \
@@ -24,10 +27,11 @@ if curl -fsS -H "Authorization: Bearer $STORYSHELF_ADMIN_TOKEN" \
   exit 0
 fi
 
-# `create` prints the project's CI token; scope the uploads to it.
-CI_TOKEN="$(cd "$FIXTURE" && "${CLI[@]}" create --url "$STORYSHELF_URL" --name "Demo Design System" |
-  sed -n 's/^CI token: //p')"
-[ -n "$CI_TOKEN" ] || { echo "::error::could not read the CI token from 'storyshelf create'"; exit 1; }
+# Create the project with fixed metadata and a CI token scoped to it.
+curl -fsS "${AUTH[@]}" -X POST "$STORYSHELF_URL/api/v1/projects" -o /dev/null \
+  -d '{"name":"Demo Design System","gitRepository":"acme/design-system","gitDefaultBranch":"main"}'
+CI_TOKEN="$(curl -fsS "${AUTH[@]}" -X POST "$STORYSHELF_URL/api/v1/projects/$SLUG/tokens" \
+  -d '{"name":"demo-seed"}' | jq -er .token)"
 
 upload() { # <dir> <branch> <message>
   (cd "$FIXTURE" && "${CLI[@]}" upload --url "$STORYSHELF_URL" --slug "$SLUG" --token "$CI_TOKEN" \
