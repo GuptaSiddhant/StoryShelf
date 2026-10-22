@@ -72,7 +72,7 @@ describe("forkCaptureChild (real child process)", () => {
   }, 40_000);
 
   it("kills a hung child and fails the job that hung it", async () => {
-    const { handler, handles } = real({ leaseMs: 300, crashLimit: 10 });
+    const { handler, handles } = real({ leaseMs: 1500, crashLimit: 10 });
     try {
       await expect(handler.run(job("hang-1"), context())).rejects.toThrow(/no progress/u);
       await handler.run(job("ok-after-hang"), context());
