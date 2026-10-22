@@ -9,7 +9,29 @@ const mainModulePlugin = join(import.meta.dirname, "plugins", "typedoc-main-modu
 const root = join(import.meta.dirname, "..", "..");
 
 /** Packages documented so far. Add a slug here once its doc comments are worth publishing. */
-const SLUGS = ["core", "app", "affected", "image", "observability", "auth", "ai", "mcp"];
+const SLUGS = [
+  "core",
+  "app",
+  "affected",
+  "image",
+  "observability",
+  "auth",
+  "ai",
+  "mcp",
+  "db-sqlite",
+  "db-postgres",
+  "db-mysql",
+  "storage-local",
+  "storage-s3",
+  "storage-azure",
+  "storage-gcs",
+  "runner-playwright",
+  "runner-puppeteer",
+  "design-figma",
+  "notify-chat",
+  "notify-email",
+  "notify-git",
+];
 
 /**
  * Subpaths that are not StoryShelf API: the manifest, test-only helpers and the Drizzle

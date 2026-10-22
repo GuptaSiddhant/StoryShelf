@@ -15,25 +15,14 @@ import { PackageManagers } from "starlight-package-managers";
 
 - [npm package](https://www.npmjs.com/package/@storyshelf/storage-s3) — install tarballs and version history.
 - [JSR package](https://jsr.io/@storyshelf/storage-s3) — TypeScript-first registry page.
-- [Public API reference](https://jsr.io/@storyshelf/storage-s3/doc) — generated docs for every export; start here to learn the API.
+- [Public API reference](/reference/storage-s3/) — generated docs for every export; start here to learn the API. (The same reference is on [JSR](https://jsr.io/@storyshelf/storage-s3/doc).)
 - [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/storage-s3) — package directory on `main`.
 
 ## Configure
 
-```ts
-import { createS3Storage } from "@storyshelf/storage-s3";
+<Readme heading="Quick start" />
 
-const storage = createS3Storage({
-  bucket: "my-shelf",
-  prefix: "storyshelf",
-  endpoint: process.env.S3_ENDPOINT,
-  region: "us-east-1",
-});
-```
-
-`bucket` is required. `prefix`, `endpoint`, and `region` are optional; the default region is `us-east-1`. The client uses path-style requests for compatibility with non-AWS providers. `s3Key(prefix, path)` is available when code needs to construct an object key.
-
-The adapter implements `StorageAdapter`: `read`, `write`, `delete`, `exists`, and `list(prefix)`.
+<Readme heading="API" />
 
 ## When to use it
 

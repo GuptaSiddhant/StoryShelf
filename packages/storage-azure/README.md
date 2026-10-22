@@ -75,6 +75,19 @@ interface AzureStorageOptions {
 }
 ```
 
+Options at a glance:
+
+| Option                       | Required | Notes                                                  |
+| ---------------------------- | -------- | ------------------------------------------------------ |
+| `container`                  | yes      | Blob container name                                    |
+| `prefix`                     | no       | Key prefix applied to every object                     |
+| `client`                     | no       | Pre-built `ContainerClient`; skips client construction |
+| `connectionString`           | no\*     | Storage connection string                              |
+| `accountName` / `accountKey` | no\*     | Explicit credentials pair                              |
+| `accountUrl` / `sasToken`    | no\*     | URL + SAS form (emulator, fine-grained SAS)            |
+
+`*` At least one auth form is needed unless `client` is supplied.
+
 ### `createAzureStorage(options: AzureStorageOptions): StorageAdapter`
 
 Creates a `StorageAdapter` backed by the configured Azure container. The returned adapter implements every method of the `StorageAdapter` interface (`read`, `write`, `delete`, `exists`, `list(prefix)`, `readStream`, `writeStream`).

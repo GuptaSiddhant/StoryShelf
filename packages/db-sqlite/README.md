@@ -25,26 +25,26 @@ const database = createSqliteDatabase("./data/shelf.db");
 
 const storage = createLocalStorage("./data");
 const app = createShelfApp({ database, storage });
-await app.lifecycle.init();
+await app.lifecycle.setup();
 ```
 
 ## API
 
 ### `createSqliteDatabase(path: string): DatabaseAdapter`
 
-Opens (or creates) a SQLite database at `path` and returns a `DatabaseAdapter`. The connection enables WAL journal mode and a 5s busy timeout. Schema migrations run inside the adapter's `lifecycle.init` (via `await app.lifecycle.init()`); teardown via `lifecycle.close` (idempotent).
+Opens (or creates) a SQLite database at `path` and returns a `DatabaseAdapter`. The connection enables WAL journal mode and a 5s busy timeout. Schema migrations run inside the adapter's `lifecycle.setup` (via `await app.lifecycle.setup()`); teardown via `lifecycle.teardown` (idempotent).
 
 The returned adapter implements every method of the `DatabaseAdapter` interface (`insert`, `update`, `get`, `remove`, `list`, `count`, `all`) plus `metadata`/`lifecycle` from the shared `Adapter` base.
 
 ## Presets (same schema, different driver)
 
-| Subpath                                | Driver                | Install                  | When                                                                                   |
-| -------------------------------------- | --------------------- | ------------------------ | -------------------------------------------------------------------------------------- |
-| `@storyshelf/db-sqlite` (root)         | `node:sqlite` builtin | —                        | Default. Single-node VPS/Docker. Zero config.                                          |
-| `@storyshelf/db-sqlite/turso`          | `@libsql/client`      | `nub add @libsql/client` | Serverless (Turso cloud, Vercel, Lambda); `file:` URLs and embedded replicas work too. |
-| `@storyshelf/db-sqlite/better-sqlite3` | `better-sqlite3`      | `nub add better-sqlite3` | Native sync driver (needs `allowBuilds` for the postinstall).                          |
-| `@storyshelf/db-sqlite/bun-sqlite`     | `bun:sqlite` builtin  | — (Bun only)             | Bun runtime.                                                                           |
-| `@storyshelf/db-sqlite/d1`             | D1 binding            | — (Workers only)         | Cloudflare Workers (`env.DB`).                                                         |
+| Subpath                                | Driver                | Install                      | When                                                                                   |
+| -------------------------------------- | --------------------- | ---------------------------- | -------------------------------------------------------------------------------------- |
+| `@storyshelf/db-sqlite` (root)         | `node:sqlite` builtin | —                            | Default. Single-node VPS/Docker. Zero config.                                          |
+| `@storyshelf/db-sqlite/turso`          | `@libsql/client`      | `npm install @libsql/client` | Serverless (Turso cloud, Vercel, Lambda); `file:` URLs and embedded replicas work too. |
+| `@storyshelf/db-sqlite/better-sqlite3` | `better-sqlite3`      | `npm install better-sqlite3` | Native sync driver (needs `allowBuilds` for the postinstall).                          |
+| `@storyshelf/db-sqlite/bun-sqlite`     | `bun:sqlite` builtin  | — (Bun only)                 | Bun runtime.                                                                           |
+| `@storyshelf/db-sqlite/d1`             | D1 binding            | — (Workers only)             | Cloudflare Workers (`env.DB`). Hosts Storybooks only: it cannot back `testing.runner`. |
 
 ```ts
 import { createTursoDatabase } from "@storyshelf/db-sqlite/turso";
