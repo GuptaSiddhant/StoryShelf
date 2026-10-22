@@ -65,7 +65,7 @@ flowchart TB
         hono["createShelfApp\npackages/app/src/index.tsx:44\nOpenAPIHono"]
         mw["Middleware\nrequestId / requestLogging\nsetupGate / rateLimit / csrf\nstoreScope / authGate"]
         routes["Routers\nprojects / builds / snapshots\nlabels / tokens / members\nwebhooks / notification-channels / admin\nhealth / media / storybook / ui"]
-        pages["Pages + UI\npages/*.tsx (hono/jsx)\nui/DocumentLayout + HTMX\nassets/htmx (vendored)"]
+        pages["Pages + UI\npages/*.tsx (hono/jsx)\nui/DocumentLayout + HTMX\nassets/htmx (embedded)"]
         openapi["OpenAPI\n/api/v1/openapi.json\n/api/v1/docs (Swagger UI)"]
     end
 
@@ -543,9 +543,10 @@ erDiagram
 ```
 
 **Invariants:**
-* `UNIQUE(build_id, story_id, viewport_name)` on snapshots; `UNIQUE(project_id, story_id, viewport_name, branch)` on baselines; `UNIQUE(project_id, user_id)` on members; `UNIQUE(build_id, type_key, value)` on build_labels.
-* Baselines store canonical files — builds are transient and purged without losing truth (`architecture.md:225`).
-* `persistent` label type is built-in, non-removable; `branch` is seeded; `build` is reserved (`architecture.md:488`).
+
+- `UNIQUE(build_id, story_id, viewport_name)` on snapshots; `UNIQUE(project_id, story_id, viewport_name, branch)` on baselines; `UNIQUE(project_id, user_id)` on members; `UNIQUE(build_id, type_key, value)` on build_labels.
+- Baselines store canonical files — builds are transient and purged without losing truth (`architecture.md:225`).
+- `persistent` label type is built-in, non-removable; `branch` is seeded; `build` is reserved (`architecture.md:488`).
 
 ---
 
@@ -630,10 +631,10 @@ flowchart LR
     class p1,p2,p3,sub pub;
 ```
 
-* HTML and published routes use `slug`; JSON uses ULID (`architecture.md:507`).
-* `/storybook` and `/storybook/:key/:value` are resolvers (302) — assets served only under `/storybook/build/:buildId/...` to avoid `key/value` vs `assets/foo.js` collision (`architecture.md:477`).
-* `public` = `builds.public` OR `branch` matches `projects.public_branch_regex`; otherwise auth + `viewer` membership required (ADR 0011).
-* `linkRoute()` switches between path and subdomain forms based on `publishedBaseDomain`.
+- HTML and published routes use `slug`; JSON uses ULID (`architecture.md:507`).
+- `/storybook` and `/storybook/:key/:value` are resolvers (302) — assets served only under `/storybook/build/:buildId/...` to avoid `key/value` vs `assets/foo.js` collision (`architecture.md:477`).
+- `public` = `builds.public` OR `branch` matches `projects.public_branch_regex`; otherwise auth + `viewer` membership required (ADR 0011).
+- `linkRoute()` switches between path and subdomain forms based on `publishedBaseDomain`.
 
 ---
 
@@ -892,27 +893,28 @@ Uses same libs Playwright does internally (`architecture.md:424`); overlay store
 
 ## Appendix: Diagram Index & Maintenance
 
-| # | Diagram | Type | Source Entities |
-|---|---------|------|----------------|
-| 1 | System Context | flowchart | `architecture.md:11` workflow |
-| 2 | Package Map | flowchart | `package.json` workspaces, `repo-structure.md` |
-| 3 | Adapter Composition | flowchart | `packages/app/src/index.tsx:44`, `core/config.ts:146` |
-| 4 | Middleware Chain | sequence | `packages/app/src/index.tsx:74`, `app/middleware/*` |
-| 5 | Capture Pipeline | sequence | `core/capture/orchestrator.ts:32`, `runner-playwright` |
-| 6 | Baseline Resolution | flowchart | `architecture.md:363`, ADR 0009 |
-| 7 | State Machine | stateDiagram | `architecture.md:55,81` |
-| 8 | ER Model | erDiagram | `architecture.md:31`, `core/schema/*` |
-| 9 | Storage Layout | flowchart | `architecture.md:204`, `core/utils/paths.ts` |
-| 10 | URL Model | flowchart | `architecture.md:471`, `core/urls.ts` |
-| 11 | Labels | flowchart | `architecture.md:490`, `core/schema/label.ts` |
-| 12 | Retention | flowchart | `core/retention/purge.ts:30`, ADR 0009 |
-| 13 | Lifecycle/Health | flowchart | `app/lifecycle.ts:33`, `architecture.md:250` |
-| 14 | Deployment | flowchart ×3 | `architecture.md:732`, `docs/adr/*` |
-| 15 | Auth/RBAC | flowchart | `architecture.md:199`, ADR 0008 |
-| 16 | Diff Engine | flowchart | `core/diff`, `architecture.md:405` |
+| #   | Diagram             | Type         | Source Entities                                        |
+| --- | ------------------- | ------------ | ------------------------------------------------------ |
+| 1   | System Context      | flowchart    | `architecture.md:11` workflow                          |
+| 2   | Package Map         | flowchart    | `package.json` workspaces, `repo-structure.md`         |
+| 3   | Adapter Composition | flowchart    | `packages/app/src/index.tsx:44`, `core/config.ts:146`  |
+| 4   | Middleware Chain    | sequence     | `packages/app/src/index.tsx:74`, `app/middleware/*`    |
+| 5   | Capture Pipeline    | sequence     | `core/capture/orchestrator.ts:32`, `runner-playwright` |
+| 6   | Baseline Resolution | flowchart    | `architecture.md:363`, ADR 0009                        |
+| 7   | State Machine       | stateDiagram | `architecture.md:55,81`                                |
+| 8   | ER Model            | erDiagram    | `architecture.md:31`, `core/schema/*`                  |
+| 9   | Storage Layout      | flowchart    | `architecture.md:204`, `core/utils/paths.ts`           |
+| 10  | URL Model           | flowchart    | `architecture.md:471`, `core/urls.ts`                  |
+| 11  | Labels              | flowchart    | `architecture.md:490`, `core/schema/label.ts`          |
+| 12  | Retention           | flowchart    | `core/retention/purge.ts:30`, ADR 0009                 |
+| 13  | Lifecycle/Health    | flowchart    | `app/lifecycle.ts:33`, `architecture.md:250`           |
+| 14  | Deployment          | flowchart ×3 | `architecture.md:732`, `docs/adr/*`                    |
+| 15  | Auth/RBAC           | flowchart    | `architecture.md:199`, ADR 0008                        |
+| 16  | Diff Engine         | flowchart    | `core/diff`, `architecture.md:405`                     |
 
 **When to update:**
-* New adapter → §2 and §3.
-* New entity/column → §8 + `architecture.md:31`.
-* Capture flow change → §5 (keep in sync with `core/capture/orchestrator.ts:32`).
-* Deployment option → §13.
+
+- New adapter → §2 and §3.
+- New entity/column → §8 + `architecture.md:31`.
+- Capture flow change → §5 (keep in sync with `core/capture/orchestrator.ts:32`).
+- Deployment option → §13.
