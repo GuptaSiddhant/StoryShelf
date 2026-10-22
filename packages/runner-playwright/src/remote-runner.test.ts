@@ -26,6 +26,9 @@ const fake = vi.hoisted(() => {
       state.active -= 1;
     },
     setDefaultTimeout: (): void => {},
+    addInitScript: async (): Promise<void> => {
+      await Promise.resolve();
+    },
     setViewportSize: async (): Promise<void> => {
       await Promise.resolve();
     },

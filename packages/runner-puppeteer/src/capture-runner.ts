@@ -12,7 +12,13 @@ import { connectRemote } from "./connect.ts";
 import { launchLocal } from "./launch.ts";
 import { renderAll } from "./pipeline.ts";
 import { flattenBrowsers, type BrowserEntry, type LocalTarget } from "./targets.ts";
-import type { ActiveRun, PuppeteerRenderInput, TargetDriver } from "./types.ts";
+import { runTestEntries } from "./tests.ts";
+import type {
+  ActiveRun,
+  PuppeteerRenderInput,
+  PuppeteerTestsInput,
+  TargetDriver,
+} from "./types.ts";
 
 declare const __PKG_VERSION__: string | undefined;
 
@@ -86,6 +92,20 @@ export function createPuppeteerCaptureRunner(
       try {
         return await renderAll(
           { concurrency, navigationTimeoutMs, recycleBrowserEvery, reusePages, ...input },
+          active,
+          driver,
+          offers.defaultTarget,
+        );
+      } finally {
+        remove();
+      }
+    },
+    async runTests(input: PuppeteerTestsInput) {
+      const active: ActiveRun = { cancelled: false, browser: null };
+      const remove = activeRuns.add(input.buildId, input.runId, active);
+      try {
+        return await runTestEntries(
+          { concurrency, navigationTimeoutMs, ...input },
           active,
           driver,
           offers.defaultTarget,

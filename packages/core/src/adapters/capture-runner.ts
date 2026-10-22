@@ -125,6 +125,16 @@ export interface RenderResult {
   environment?: CaptureEnvironment;
 }
 
+/** What a runner reports for one Storybook `.test()` entry it ran in the iframe. */
+export interface TestOutcome {
+  /** The test entry's id (`<story id>:<test name slug>`). */
+  storyId: string;
+  status: "passed" | "failed";
+  /** Why it failed: the assertion, render error or timeout message. */
+  error?: string;
+  durationMs: number;
+}
+
 /**
  * A pure capture renderer.
  *
@@ -214,6 +224,29 @@ export interface CaptureRunner extends Adapter<{
     storybookUrl?: string;
     adapter?: StorySourceAdapter;
   }): Promise<Record<string, StoryParameters>>;
+
+  /**
+   * Optional: run Storybook 10 `.test()` entries (index `subtype: "test"`) as interaction tests.
+   * Each entry's iframe URL renders the story it is written under and runs the test body as the
+   * play function; the runner reports pass or fail per entry from Storybook's own events, and
+   * takes no screenshot. A runner without it leaves projects that turn tests on with a warning.
+   * Cancellable with `cancel`, like `render`.
+   */
+  runTests?(input: {
+    buildId: string;
+    runId?: string | undefined;
+    storybookDir: string;
+    /** The test entries to run (`StoryEntry.parentId` is set). */
+    tests: StoryEntry[];
+    logger?: Logger;
+    /** Timeout for one test (render plus body) in ms. */
+    playTimeoutMs?: number;
+    /** Target to run on: the project's primary (chromium when absent). */
+    target?: CaptureTarget;
+    /** As on `render`: the URL a `reach: "url"` target's browser opens. */
+    storybookUrl?: string;
+    adapter?: StorySourceAdapter;
+  }): Promise<TestOutcome[]>;
 
   /**
    * Cancel in-flight renders of a build: the ones started with `runId`, or every one of the build

@@ -14,6 +14,7 @@ export const projects = mysqlTable("projects", {
   executePlay: boolean("execute_play").notNull().default(false),
   playTimeoutMs: int("play_timeout_ms").notNull().default(10_000),
   runA11y: boolean("run_a11y").notNull().default(true),
+  runTests: boolean("run_tests").notNull().default(false),
   browser: text("browser").notNull().default("chromium"),
   viewports: text("viewports"),
   browsers: text("browsers"),
@@ -41,6 +42,7 @@ export interface Project {
   executePlay: boolean;
   playTimeoutMs: number;
   runA11y?: boolean;
+  runTests?: boolean;
   browser?: string;
   viewports?: string | null;
   browsers?: string | null;

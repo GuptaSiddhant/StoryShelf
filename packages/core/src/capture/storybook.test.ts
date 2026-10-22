@@ -68,6 +68,42 @@ describe("StorybookAdapter.discover", () => {
     });
   });
 
+  it("lists the `.test()` entries apart, with the story each belongs to", async () => {
+    const adapter = new StorybookAdapter();
+    const index = {
+      v: 5,
+      entries: {
+        a: { id: "a", title: "A", name: "A", type: "story", subtype: "story", tags: ["dev"] },
+        "a:works": {
+          id: "a:works",
+          title: "A",
+          name: "works",
+          type: "story",
+          subtype: "test",
+          parent: "a",
+          tags: ["dev", "test-fn"],
+        },
+        "a:orphan": { id: "a:orphan", title: "A", name: "orphan", type: "story", subtype: "test" },
+        d: { id: "d", title: "D", name: "D", type: "docs", subtype: "test" },
+      },
+    };
+    await withIndex(index, async (dir) => {
+      const tests = await adapter.discoverTests(dir);
+      expect(tests.map((t) => [t.id, t.name, t.parentId])).toEqual([
+        ["a:works", "works", "a"],
+        ["a:orphan", "orphan", undefined],
+      ]);
+      expect(tests[0]?.tags).toEqual(["dev", "test-fn"]);
+    });
+  });
+
+  it("finds no tests on a Storybook whose index has none", async () => {
+    const index = { v: 5, entries: { a: { id: "a", title: "A", name: "A", type: "story" } } };
+    await withIndex(index, async (dir) => {
+      expect(await new StorybookAdapter().discoverTests(dir)).toEqual([]);
+    });
+  });
+
   it("merges chromatic and storyshelf parameters (storyshelf wins)", async () => {
     const adapter = new StorybookAdapter();
     const index = {

@@ -1,8 +1,8 @@
 /** Admin alerts for captures that leave their build failed; the app, not the capture child, sends them. */
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
-import { BuildModel } from "@storyshelf/core/models";
-import { notifySystemWith } from "./notify.ts";
+import { BuildModel, ProjectModel } from "@storyshelf/core/models";
+import { notifyProjectWith, notifySystemWith } from "./notify.ts";
 
 /**
  * Builds already alerted about, keyed by the build's last update. A sharded build settles one job
@@ -32,17 +32,29 @@ export async function notifyCaptureFailed(
   if (build?.status !== "failed" || alreadyAlerted(build)) {
     return;
   }
-  await notifySystemWith(
-    {
-      db: options.database,
-      config,
-      ui: options.ui ?? {},
-      logger,
-      notifiers: options.notifications?.notifiers ?? [],
-      notificationsConfig: options.notifications?.config,
-      publicOrigin: publicOrigin ? { url: publicOrigin } : undefined,
-    },
-    "sys:capture-failed",
-    { buildId, projectId: build.projectId, gitBranch: build.gitBranch },
-  );
+  const deps = {
+    db: options.database,
+    config,
+    ui: options.ui ?? {},
+    logger,
+    notifiers: options.notifications?.notifiers ?? [],
+    notificationsConfig: options.notifications?.config,
+    publicOrigin: publicOrigin ? { url: publicOrigin } : undefined,
+  };
+  await notifySystemWith(deps, "sys:capture-failed", {
+    buildId,
+    projectId: build.projectId,
+    gitBranch: build.gitBranch,
+  });
+  // Subscribers of the project's `build:failed` topic hear of a failed capture too.
+  const project = await new ProjectModel(options.database).get(build.projectId);
+  if (project) {
+    await notifyProjectWith(
+      deps,
+      project,
+      "build:failed",
+      { buildId, status: "failed" },
+      `/builds/${buildId}`,
+    );
+  }
 }

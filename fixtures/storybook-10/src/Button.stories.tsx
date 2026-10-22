@@ -1,5 +1,4 @@
 import preview from "../.storybook/preview";
-
 import { Button } from "./Button";
 
 const meta = preview.meta({
@@ -66,11 +65,21 @@ export const WithDelay = meta.story({
   parameters: { storyshelf: { delay: 100 } },
 });
 
-// CSF-Next test — should be filtered by StoryShelf (subtype:'test')
+// CSF-Next tests (`story.test(...)` as a bare statement: the indexer ignores an exported call).
+// They are index entries with `subtype: "test"`; capture leaves them out, and a project with
+// `runTests` on runs them in the iframe as interaction tests.
 import { expect } from "storybook/test";
 
-export const DisabledTest = Disabled.test("should be disabled", async ({ canvas, userEvent }: any) => {
-  const button = await canvas.findByRole("button");
-  await userEvent.click(button);
-  await expect(button).toBeInTheDocument();
+Primary.test("renders its label", async ({ canvas }) => {
+  await expect(canvas.getByRole("button")).toHaveTextContent("Button");
+});
+
+Secondary.test("clicks without error", async ({ canvas, userEvent }) => {
+  await userEvent.click(canvas.getByRole("button"));
+  await expect(canvas.getByRole("button")).toBeInTheDocument();
+});
+
+// Fails on purpose (the "fails" test of the integration suite); inert unless a project runs tests.
+Secondary.test("fails on purpose", async ({ canvas }) => {
+  await expect(canvas.getByRole("button")).toHaveTextContent("Not the label");
 });

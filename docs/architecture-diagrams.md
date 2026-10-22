@@ -280,7 +280,7 @@ sequenceDiagram
         Runner->>Runner: chromium.launch() (pinned image)
         loop story × viewport
             Runner->>Runner: page.goto(buildUrl(origin, story.id))
-            Runner->>Runner: waitForReady(page) + networkidle
+            Runner->>Runner: waitForReady(page) + networkidle + Storybook render-finished event
             Runner->>Runner: optional play() execution
             Runner->>Runner: locator(#storybook-root).screenshot(animations: disabled)
         end

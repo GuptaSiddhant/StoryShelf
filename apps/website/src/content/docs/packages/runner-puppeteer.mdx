@@ -28,6 +28,14 @@ For what the runner reads from a built Storybook (the preview page, the story in
 
 <Readme heading="Concurrency and memory" />
 
+## Render-settled signalling
+
+Before each screenshot the runner waits for Storybook's own render-finished event, not a fixed sleep. A small script, registered before the page's scripts run, listens on the preview's channel (`__STORYBOOK_ADDONS_CHANNEL__`, through its public `on` method; nothing is patched) and records `storyRendered`, `storyFinished` and the story error events, the render phase, and any error the story or its `play` function raised. The capture resumes on the first terminal event, lets fonts load and two frames paint, then honours `parameters.delay` if the story sets one. With no channel on the page the runner falls back at once, and when the channel stays silent it falls back after 5 seconds (or the play timeout when plays run and it is longer) to `delay ?? 500` ms after `#storybook-root` appears. A story that errors while rendering or playing is still photographed and logged with its last render phase and Storybook's message. Screenshots of stable stories are byte-identical to the fixed-wait capture, and a build renders about 30 % faster.
+
+## Storybook 10 tests
+
+`runTests` (the optional `CaptureRunner.runTests`) opens each `.test()` entry's iframe URL on the project's primary target, waits for the same signal, and reports `passed` or `failed` with Storybook's message and a duration; it takes no screenshot. The orchestrator calls it once per build when the project's **Run Storybook tests (.test())** setting is on. See [Interaction testing](/guides/interaction-testing/#storybook-10-test-entries).
+
 ## Accessibility checks (axe)
 
 With the project's `runA11y` flag on (the default; a project admin turns it off under Settings > Tests, or `runA11y: false` in the API), the runner injects [axe-core](https://github.com/dequelabs/axe-core) (owned and lazily loaded by `@storyshelf/core`, pinned to one version) into each story page after the story settles and before the screenshot, once per story, mode and viewport. It scans `#storybook-root` with the WCAG 2.0/2.1/2.2 A and AA rules plus axe's `best-practice` rules (for example `heading-order`) and reports one line per violation, worst impact first: rule id, impact, help text, a short selector and the node count. At most 10 lines are kept (`…and N more` for the rest).

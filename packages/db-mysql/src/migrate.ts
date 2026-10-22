@@ -48,6 +48,11 @@ const BUILD_BASELINE_SHA_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS ba
 const BUILD_CHANGED_FILES_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS changed_files TEXT";
 const BUILD_AFFECTED_PATHS_ALTER =
   "ALTER TABLE builds ADD COLUMN IF NOT EXISTS affected_import_paths TEXT";
+const BUILD_INHERITED_COUNT_ALTER =
+  "ALTER TABLE builds ADD COLUMN IF NOT EXISTS inherited_count INTEGER NOT NULL DEFAULT 0";
+const BUILD_TEST_RESULTS_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS test_results TEXT";
+const RUN_TESTS_ALTER =
+  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS run_tests BOOLEAN NOT NULL DEFAULT false";
 const WEBHOOK_SECRET_ALTER =
   "ALTER TABLE webhooks ADD COLUMN IF NOT EXISTS secret_encrypted TEXT NOT NULL DEFAULT ''";
 const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN IF EXISTS secret";
@@ -118,10 +123,17 @@ async function migrateProjectExtras(run: MigrationRunner): Promise<void> {
   await execIgnore(run, PROJECT_AI_PROFILE_ALTER);
   await migrateSnapshotColumns(run);
   await migrateBaselineColumns(run);
+  await migrateBuildColumns(run);
+  await execIgnore(run, RUN_TESTS_ALTER);
+}
+
+async function migrateBuildColumns(run: MigrationRunner): Promise<void> {
   await execIgnore(run, BUILD_AFFECTED_ONLY_ALTER);
   await execIgnore(run, BUILD_BASELINE_SHA_ALTER);
   await execIgnore(run, BUILD_CHANGED_FILES_ALTER);
   await execIgnore(run, BUILD_AFFECTED_PATHS_ALTER);
+  await execIgnore(run, BUILD_INHERITED_COUNT_ALTER);
+  await execIgnore(run, BUILD_TEST_RESULTS_ALTER);
 }
 
 /** Run the full migration set through any row-query runner. */

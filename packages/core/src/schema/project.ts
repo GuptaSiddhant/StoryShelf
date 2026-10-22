@@ -13,6 +13,11 @@ export interface Project {
   playTimeoutMs: number;
   /** Run axe accessibility checks during capture; on by default (annotations never block). */
   runA11y?: boolean;
+  /**
+   * Run the Storybook 10 `.test()` entries as interaction tests during capture (ADR 0004,
+   * decision 11); off by default because it changes what a build contains.
+   */
+  runTests?: boolean;
   browser?: string;
   viewports?: string | null;
   /** JSON list of browsers to capture (null: legacy single `browser`). */

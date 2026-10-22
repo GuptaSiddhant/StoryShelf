@@ -7,6 +7,7 @@ import { checkA11y } from "./a11y.ts";
 import { acquirePage } from "./pages.ts";
 import { runPlay } from "./play.ts";
 import { runtimeParametersForStory } from "./runtime-params.ts";
+import { awaitPaint, settleTimeoutOf, waitForSettled, type SettleReport } from "./settle.ts";
 import type { CaptureContext, RuntimeParamsPage } from "./types.ts";
 
 /** Capture a screenshot for one story/viewport, returning buffer + a11y violations. */
@@ -34,7 +35,7 @@ async function runCapture(
   viewport: Viewport,
 ): Promise<{ screenshot: Buffer; a11yViolations: string[]; story: StoryEntry }> {
   const story = await navigateAndEnrich(ctx, page, inputStory, viewport);
-  await maybeWaitForSelector(ctx, page, story);
+  await waitUntilReady(ctx, page, story);
   if (ctx.executePlay) await runPlay(page, story.id, ctx.playTimeoutMs ?? 10_000);
   const a11yViolations = await getA11y(ctx, page);
   await settlePage(page, story);
@@ -60,14 +61,23 @@ async function navigateAndEnrich(
   const params = await runtimeParametersForStory(ctx.runtimeParams, rpPage, story.id);
   return params ? { ...story, parameters: params } : story;
 }
-async function maybeWaitForSelector(
-  ctx: CaptureContext,
-  page: Page,
-  story: StoryEntry,
-): Promise<void> {
+/**
+ * Wait until the story is ready to be photographed: the selector exists, then Storybook says the
+ * render (and its play function) finished, then an explicit `parameters.delay` runs on top. A page
+ * that never signals (no channel, or no event before the timeout) gets today's fixed wait instead:
+ * `delay ?? 500` ms.
+ */
+async function waitUntilReady(ctx: CaptureContext, page: Page, story: StoryEntry): Promise<void> {
   if (!ctx.adapter.screenshotSelector) return;
   await page.waitForSelector(ctx.adapter.screenshotSelector, { visible: false });
-  await delay(story.parameters?.delay ?? 500);
+  const report = await waitForSettled(page, settleTimeoutOf(ctx));
+  if (report.settled) {
+    await awaitPaint(page);
+    if (story.parameters?.delay !== undefined) await delay(story.parameters.delay);
+  } else {
+    await delay(story.parameters?.delay ?? 500);
+  }
+  logSettle(ctx, story, report);
   if (story.parameters?.pauseAnimationAtEnd) {
     await page.evaluate(() => {
       const doc = globalThis.document as unknown as {
@@ -75,6 +85,18 @@ async function maybeWaitForSelector(
       };
       for (const anim of doc.getAnimations()) anim.pause();
     });
+  }
+}
+
+/** One line per story that did not render cleanly: where it stopped, and what Storybook said. */
+function logSettle(ctx: CaptureContext, story: StoryEntry, report: SettleReport): void {
+  const problem = report.renderError ?? report.playError ?? report.unhandled?.[0];
+  if (report.settled && problem === undefined) return;
+  const detail = { storyId: story.id, phase: report.phase, waitedMs: report.elapsedMs, problem };
+  if (!report.settled && report.hooked) {
+    ctx.logger?.warn(detail, "story did not signal that it finished rendering; used a fixed wait");
+  } else if (problem !== undefined) {
+    ctx.logger?.warn(detail, "story reported an error while rendering");
   }
 }
 async function getA11y(ctx: CaptureContext, page: Page): Promise<string[]> {

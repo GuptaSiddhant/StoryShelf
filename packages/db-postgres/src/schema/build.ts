@@ -28,6 +28,7 @@ export const builds = pgTable(
     baselineSha: text("baseline_sha"),
     changedFiles: text("changed_files"),
     affectedImportPaths: text("affected_import_paths"),
+    testResults: text("test_results"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull(),
   },
@@ -58,6 +59,7 @@ export interface Build {
   baselineSha: string | null;
   changedFiles: string | null;
   affectedImportPaths: string | null;
+  testResults: string | null;
   createdAt: string;
   updatedAt: string;
 }

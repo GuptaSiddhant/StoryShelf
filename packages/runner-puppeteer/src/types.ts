@@ -50,6 +50,25 @@ export interface PuppeteerRenderInput {
   adapter?: StorySourceAdapter;
 }
 
+/** Input for running Storybook 10 `.test()` entries (`CaptureRunner.runTests`). */
+export interface PuppeteerTestsInput {
+  buildId: string;
+  runId?: string | undefined;
+  storybookDir: string;
+  /** The test entries to run (`StoryEntry.parentId` is set). */
+  tests: StoryEntry[];
+  logger?: Logger;
+  /** Timeout for one test (render plus body) in ms (default 10 s). */
+  playTimeoutMs?: number;
+  target?: CaptureTarget;
+  storybookUrl?: string;
+  /** Max pages running at once (default: sized from detected CPU and memory). */
+  concurrency?: number;
+  /** Per-page navigation timeout in ms. */
+  navigationTimeoutMs?: number;
+  adapter?: StorySourceAdapter;
+}
+
 /** Starts (or connects to) a browser for a target; a failure is a `TargetLaunchError`. */
 export type LaunchTarget = (target: CaptureTarget, logger?: Logger) => Promise<Browser>;
 
@@ -78,6 +97,8 @@ export interface CaptureContext extends ScreenshotContext {
   executePlay?: boolean;
   playTimeoutMs?: number;
   runA11y?: boolean;
+  /** How long to wait for Storybook's render-finished event before the fixed wait (see `settle.ts`). */
+  settleTimeoutMs?: number;
   logger?: Logger;
   runtimeParams: RuntimeParamsState;
 }

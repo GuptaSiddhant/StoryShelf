@@ -69,6 +69,8 @@ Rules:
 - **Visual (all fixtures, matrix in CI):** Runs the real capture pipeline (`@storyshelf/runner-playwright`) against a built Storybook fixture in `fixtures/storybook-8` (default, 7 stories), `fixtures/storybook-9`, and `fixtures/storybook-10` (each independent `pnpm` install, built on demand `pnpm install && pnpm run build-storybook`; `storybook-static/` is `.gitignored`). Override locally with `FIXTURE_DIR=fixtures/storybook-9`. Requires Playwright browsers (one-time provision: `npx -y playwright@1.63.0 install chromium`). Gated so `turbo test` stays browser-free.
 - **Interaction (`play`, only oldest):** When a project has `executePlay: true`, the same suite runs `play` functions before screenshots. Tested only against `fixtures/storybook-8` (oldest) unless a major changes the `play` channel — then add a single `play` smoke for that major. Verified: `BlockingFailure` → whole build `failed`, `FlakyTag`/`FlakyParam` (`flaky-test`) → non-blocking `reviewing` with warning, `Disabled` (`skip`/`disableSnapshot`) → not counted.
 
+- **Settled signalling and `.test()` runs (`settle.integration.test.ts` in both runners):** on any fixture, a render waits for Storybook's own event (no fallback warning, identical re-captures, the play error of a flaky story is reported), falls back to the fixed wait on a page with no channel (immediately) and on a silent channel (after the 5 s timeout), and `runTests` reports pass or fail per `.test()` entry. Only `fixtures/storybook-10` has test entries (`renders its label` and `clicks without error` pass, `fails on purpose` fails; written as bare `Primary.test(...)` statements, because the indexer ignores an exported call), so the Playwright suite also runs a build with `runTests` on (the failing test fails the build, results are stored, no snapshot is taken for a test) and one with it off (nothing stored). On Storybook 8 and 9 the same tests assert the no-op. The failing test needs no tag: it is inert unless a project turns `runTests` on, which only these tests do. Puppeteer: set `PUPPETEER_EXECUTABLE_PATH`.
+
 ## File conventions
 
 - **Unit:** colocated `*.test.ts` next to sources (hermetic — tmp dirs, fake adapters, mocked `fetch`; never a browser, network, or Storybook build).
@@ -81,7 +83,7 @@ Rules:
 
 - `fixtures/storybook-8` — SB 8.6 Vite React (default, 7 stories; own pnpm install, `6008`)
 - `fixtures/storybook-9` — SB 9 Vite React (`6009`, no `addon-essentials`, `features: {backgrounds,controls,viewport}`)
-- `fixtures/storybook-10` — SB 10 ESM + CSF-Next (filters `subtype:'test'`, `6010`, `definePreview`/`preview.meta`/`meta.story` + `experimentalTestSyntax`)
+- `fixtures/storybook-10` — SB 10 ESM + CSF-Next (`.test()` entries with `subtype:'test'`, run only with `runTests`; `6010`, `definePreview`/`preview.meta`/`meta.story` + `experimentalTestSyntax`)
 - All fixtures are deterministic (system fonts, no network) and share the same `Button` stories (including `play`/`flaky-test`/`disableSnapshot`/`delay` variants). `storybook-static/` is built on demand, not committed.
 - PNG fixtures for the diff engine.
 - `index.json` fixtures for `discover()`.

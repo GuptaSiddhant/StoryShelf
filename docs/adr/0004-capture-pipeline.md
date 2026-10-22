@@ -139,8 +139,8 @@ the `storyshelf` key wins.
 Projects carry `execute_play` (default off) and `play_timeout_ms` (default 10000, range 1000 to
 30000), set on the project's Tests settings tab by a project admin.
 
-- **Off:** the runner ignores `play` and waits for the network to settle plus a short fixed delay
-  before the screenshot.
+- **Off:** the runner ignores `play` and waits for the network to settle plus Storybook's own
+  render-finished signal (decision 9) before the screenshot.
 - **On:** the runner executes each story's `play` function before the screenshot. The screenshot
   after `play` is the visual baseline.
 - **A `play` failure blocks the build** (`failed`). There is no reviewer waive in the review UI.
@@ -254,6 +254,63 @@ single `browser` column. A target is an engine name (`chromium`, `firefox`, `web
   target rows.
 - A failure on any target fails the story, since failures are keyed per story.
 
+### 9. Render-settled signalling
+
+The runner waits for Storybook's render-finished event instead of a clock. Storybook stays a black
+box: the only contract is `iframe.html` and the public `Channel.on` API of the preview's channel
+(`window.__STORYBOOK_ADDONS_CHANNEL__`, else `__STORYBOOK_PREVIEW__.channel`); no internal
+postMessage protocol and nothing is patched.
+
+- **Recorder before render.** A script registered before the page's own scripts (`addInitScript` /
+  `evaluateOnNewDocument`) hooks the channel as soon as iframe.html creates it and records
+  `storyRendered`, `storyFinished` (SB 8.5 and later), `storyThrewException`, `storyErrored`,
+  `storyMissing`, `storyRenderPhaseChanged`, `playFunctionThrewException` and
+  `unhandledErrorsWhilePlaying`. Events that fired before the capture asked are therefore not
+  missed. Storybook 9 and 10 emit `storyRendered` after the play function, also when it threw;
+  Storybook 8 emits `storyThrewException` instead; all three emit `storyFinished`.
+- **Settled** means any terminal event arrived. The screenshot then waits for `document.fonts.ready`
+  and two painted frames (capped at 250 ms), and then for `parameters.delay` when the story sets
+  one, counted from the signal. A story without `delay` no longer sleeps a fixed 500 ms.
+- **Fallback.** A page with no channel falls back at once, and a page whose channel never announces
+  the render falls back after the wait (5 s, or the play timeout when plays run, whichever is
+  longer) to the earlier behaviour: `delay ?? 500` ms after the selector appears. Custom adapters
+  that never call it work unchanged.
+- **Diagnostics.** A story that errors while rendering or playing is still photographed (the error
+  overlay is the snapshot, as before) and one warn line names the last render phase and Storybook's
+  message; a story that never signals logs the phase it was stuck in. This is logging only: no
+  schema, status or failure changes.
+- On the three fixtures every screenshot is byte-identical to the fixed-wait capture, and a build
+  renders about 30 % faster on a 15-story run.
+
+### 10. Storybook 10 `.test()` entries as interaction tests
+
+Storybook 10's `story.test("name", fn)` produces index entries with `subtype: "test"`, the id
+`<story id>:<test name slug>` and `parent` naming the story. Capture leaves them out (`discover`).
+With `projects.run_tests` on (default off, because it changes what a build contains; Settings >
+Tests, `runTests` on the project API), the orchestrator runs them once per build:
+
+- **Entry point.** Opening `iframe.html?id=<test id>&viewMode=story` renders the parent story and
+  runs the test body as that entry's play function, so no call into the store is needed: the runner
+  observes the same channel events as decision 9 and reads the verdict from them. A failing body
+  emits `playFunctionThrewException` (and phase `errored`); `storyFinished.status` stays `success`
+  for such a throw on Storybook 9 and 10, so it is not the signal.
+- **Runner contract.** `CaptureRunner.runTests?(input): TestOutcome[]` (optional, like
+  `extractParameters`): pass or fail per entry with the failure message, no screenshot. Playwright
+  and Puppeteer implement it on the project's primary target; a test that does not finish within
+  the play timeout fails with its last phase.
+- **Same lane as `play`.** A failing test is a blocking failure of its own id, exactly like a
+  throwing `play`: it fails the build (`failed`), a test of a `flaky-test` story does not, no
+  snapshot or baseline is written and no build status is added. The tests of a `skip` or
+  `disableSnapshot` story are skipped.
+- **Where the results live.** One nullable JSON column, `builds.test_results` (a `TestResult[]`:
+  id, title, name, parent id, status, error, duration), written once by the plan step of the capture
+  job (before sharding, so a sharded build needs no merge) and cleared when a later run of the
+  build has none. The build page shows a Tests card (failures first with their message, passes
+  behind a disclosure) and the API's `Build` carries the JSON. No table, no new status, no webhook
+  or notification topic; MCP and the CLI do not expose it.
+- Tests run for every build regardless of affected capture, and a Storybook before 10 has no test
+  entries, so the setting is a no-op there.
+
 ## Consequences
 
 **Positive**
@@ -276,6 +333,9 @@ single `browser` column. A target is an engine name (`chromium`, `firefox`, `web
 - Puppeteer renders only Chromium and only sees index-declared modes.
 - Baselines of a removed mode are not pruned.
 - Shared approval differs from Chromatic, which reviews browsers separately.
+- Settled signalling depends on Storybook's public channel event names; a Storybook that renames
+  them falls back to the fixed wait (slower, not wrong).
+- A build's `.test()` results are overwritten by every capture run of it, not kept per attempt.
 
 ## Alternatives considered
 
@@ -292,4 +352,6 @@ single `browser` column. A target is an engine name (`chromium`, `firefox`, `web
 | Canonical query string as mode identity                             | Any value change creates a new baseline; diverges from Chromatic                          |
 | Copy chromium baselines to a new target                             | Font and anti-aliasing differences make every story diff                                  |
 | Render targets in parallel                                          | Memory multiplies per engine                                                              |
+| Call `play` through the story store for `.test()` entries           | The iframe URL of a test entry already runs it; store internals differ per version        |
+| A `build_tests` table or a build status for tests                   | A JSON column and the existing failure lane carry what the build page needs               |
 | Separate approval per target                                        | Review load scales with targets; token bumps become unreviewable                          |

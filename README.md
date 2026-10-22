@@ -61,7 +61,7 @@ apps/
 fixtures/
   storybook-8/    storybook-fixture -- SB 8.6 Vite React (default, 7 stories; own pnpm install)
   storybook-9/    storybook-fixture -- SB 9 Vite React
-  storybook-10/   storybook-fixture -- SB 10 ESM + CSF-Next (filters subtype:'test')
+  storybook-10/   storybook-fixture -- SB 10 ESM + CSF-Next (`.test()` entries, `subtype:'test'`, run only with `runTests`)
 docs/                                       — architecture, ADRs, testing, website plan
 ```
 
