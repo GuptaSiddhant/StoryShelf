@@ -1,11 +1,12 @@
-import { BROWSER_NAMES, type BrowserName } from "@storyshelf/core/adapter/capture-runner";
-import { MAX_BROWSERS } from "@storyshelf/core/capture";
+import { isCaptureTarget, type CaptureTarget } from "@storyshelf/core/adapter/capture-runner";
+import { resolveBrowsers } from "@storyshelf/core/capture";
 import { ProjectModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
+import { assertTargetsSelectable } from "../targets.ts";
 import { toProjectPatch } from "./capture-config.ts";
 import { flash } from "./flash.ts";
 import { hxRedirect } from "./htmx.ts";
@@ -19,18 +20,24 @@ export function registerCaptureSettings(app: ShelfRouter): void {
   app.post("/projects/:slug/settings/capture", handleCaptureUpdate);
 }
 
-function isBrowser(value: string): value is BrowserName {
-  return (BROWSER_NAMES as readonly string[]).includes(value);
+const EXTRA_PREFIX = "extra_";
+
+/** Primary target first, then the ticked extras; throws 400 when the form is malformed. */
+function readBrowsers(form: FormData): CaptureTarget[] {
+  const primary = asString(form.get("browser")) ?? "chromium";
+  if (!isCaptureTarget(primary)) throw badBrowser(primary);
+  const extras = [...form.entries()].flatMap(([key, value]) =>
+    key.startsWith(EXTRA_PREFIX) && value === key.slice(EXTRA_PREFIX.length)
+      ? [key.slice(EXTRA_PREFIX.length)]
+      : [],
+  );
+  const bad = extras.find((extra) => !isCaptureTarget(extra));
+  if (bad !== undefined) throw badBrowser(bad);
+  return [...new Set([primary, ...(extras as CaptureTarget[])])];
 }
 
-/** Primary engine first, then the ticked extras; null when the form is malformed. */
-function readBrowsers(form: FormData): BrowserName[] | string {
-  const primary = asString(form.get("browser")) ?? "chromium";
-  if (!isBrowser(primary)) return `Unknown browser "${primary}"`;
-  const extras = BROWSER_NAMES.filter((name) => form.get(`extra_${name}`) === name);
-  const all = [primary, ...extras];
-  const unique = [...new Set(all)] as BrowserName[];
-  return unique.length > MAX_BROWSERS ? `Choose at most ${MAX_BROWSERS} browsers` : unique;
+function badBrowser(value: string): HTTPException {
+  return new HTTPException(400, { message: `Unknown browser "${value}"` });
 }
 
 /** Mode names, one per line (blank lines and surrounding space ignored). */
@@ -49,7 +56,7 @@ async function reject(c: Context, message: string): Promise<Response> {
 async function saveCapture(
   project: Project,
   form: FormData,
-  browsers: BrowserName[],
+  browsers: CaptureTarget[],
 ): Promise<void> {
   const patch = toProjectPatch({
     browsers: browsers.length > 1 ? browsers : null,
@@ -62,9 +69,9 @@ async function saveCapture(
 async function handleCaptureUpdate(c: Context): Promise<Response> {
   const project = await findProject(c.req.param("slug") ?? "");
   const form = await c.req.formData();
-  const browsers = readBrowsers(form);
-  if (typeof browsers === "string") return await reject(c, browsers);
   try {
+    const browsers = readBrowsers(form);
+    await assertTargetsSelectable(browsers, resolveBrowsers(project));
     await saveCapture(project, form, browsers);
   } catch (error) {
     if (error instanceof HTTPException) return await reject(c, error.message);

@@ -24,6 +24,7 @@ export type {
 } from "./capture-job.ts";
 /** Component row of a published build (`build_components`). */
 export type { BuildComponent } from "./build-component.ts";
+export type { SiteSetting } from "./site-setting.ts";
 /** Review comment row as stored in the `comments` table. */
 export type { Comment } from "./comment.ts";
 /** Build label and label type rows. */

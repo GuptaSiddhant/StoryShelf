@@ -1,0 +1,154 @@
+import { createShelfLogger } from "@storyshelf/core/logger";
+import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
+import { describe, expect, it } from "vitest";
+import { createShelfApp } from "../index.tsx";
+import { stubAuth } from "../stub-auth.ts";
+
+const silent = createShelfLogger({ level: "silent" });
+const ORIGIN = "https://shelf.example.com";
+
+async function seedApp(options: {
+  config?: Record<string, unknown>;
+  role?: "admin" | "member" | null;
+}) {
+  const { db } = makeDatabase();
+  const { storage } = makeStorage();
+  const role = options.role === undefined ? "admin" : options.role;
+  const app = createShelfApp({
+    database: db,
+    storage,
+    logger: silent,
+    config: { secret: "origin-test-secret", ...options.config },
+    ...(role ? { auth: stubAuth({ id: "u1", email: "a@b.c", name: "A", role }) } : {}),
+  });
+  await app.lifecycle.setup();
+  return app;
+}
+
+async function csrfFrom(app: Awaited<ReturnType<typeof seedApp>>): Promise<string> {
+  const html = await (await app.request("/admin")).text();
+  return /name="csrf-token" content="([^"]+)"/u.exec(html)?.[1] ?? "";
+}
+
+function report(
+  app: Awaited<ReturnType<typeof seedApp>>,
+  token: string,
+  body: unknown,
+  origin = ORIGIN,
+) {
+  return app.request("/admin/public-origin/report", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-csrf-token": token, origin },
+    body: JSON.stringify(body),
+  });
+}
+
+function form(
+  app: Awaited<ReturnType<typeof seedApp>>,
+  path: string,
+  token: string,
+  origin?: string,
+) {
+  return app.request(path, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      csrf_token: token,
+      ...(origin === undefined ? {} : { origin }),
+    }).toString(),
+  });
+}
+
+describe("public origin on the System page", () => {
+  it("warns that nothing is known and asks the page to report its origin", async () => {
+    const app = await seedApp({});
+    const html = await (await app.request("/admin")).text();
+    expect(html).toContain("No public origin is known");
+    expect(html).toContain('data-report-origin="/admin/public-origin/report"');
+  });
+
+  it("learns the origin from the first report and shows it as detected, unconfirmed", async () => {
+    const app = await seedApp({});
+    const token = await csrfFrom(app);
+    expect((await report(app, token, { origin: ORIGIN })).status).toBe(201);
+    expect(
+      (
+        await report(
+          app,
+          token,
+          { origin: "https://other.example.com" },
+          "https://other.example.com",
+        )
+      ).status,
+    ).toBe(200);
+    const html = await (await app.request("/admin")).text();
+    expect(html).toContain(ORIGIN);
+    expect(html).toContain("detected from your browser");
+    expect(html).toContain("unconfirmed");
+    expect(html).not.toContain("other.example.com");
+  });
+
+  it("rejects a report that disagrees with the Origin header, or is not an origin", async () => {
+    const app = await seedApp({});
+    const token = await csrfFrom(app);
+    expect((await report(app, token, { origin: ORIGIN }, "https://evil.example.com")).status).toBe(
+      400,
+    );
+    expect(
+      (await report(app, token, { origin: "javascript:alert(1)" }, "javascript:alert(1)")).status,
+    ).toBe(400);
+    expect((await report(app, token, {})).status).toBe(400);
+  });
+
+  it("stops asking once the configuration or the platform answers", async () => {
+    const app = await seedApp({ config: { publicBaseUrl: "https://configured.example.com" } });
+    const html = await (await app.request("/admin")).text();
+    expect(html).toContain("configured.example.com");
+    expect(html).toContain("configured (PUBLIC_BASE_URL)");
+    expect(html).not.toContain("data-report-origin");
+  });
+
+  it("lets an admin confirm, replace and forget the stored origin", async () => {
+    const app = await seedApp({});
+    const token = await csrfFrom(app);
+    await report(app, token, { origin: ORIGIN });
+    expect(
+      (await form(app, "/admin/public-origin", token, "https://shelf.acme.io")).status,
+    ).toBeLessThan(400);
+    let html = await (await app.request("/admin")).text();
+    expect(html).toContain("https://shelf.acme.io");
+    expect(html).not.toContain("unconfirmed");
+    await form(app, "/admin/public-origin/clear", token);
+    html = await (await app.request("/admin")).text();
+    expect(html).toContain("No public origin is known");
+  });
+
+  it("refuses an origin with a path or another scheme", async () => {
+    const app = await seedApp({});
+    const token = await csrfFrom(app);
+    await form(app, "/admin/public-origin", token, "https://shelf.acme.io/path");
+    await form(app, "/admin/public-origin", token, "ftp://shelf.acme.io");
+    expect(await (await app.request("/admin")).text()).toContain("No public origin is known");
+  });
+
+  it("needs a CSRF token and a site admin", async () => {
+    const app = await seedApp({});
+    const noToken = await app.request("/admin/public-origin/report", {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: ORIGIN },
+      body: JSON.stringify({ origin: ORIGIN }),
+    });
+    expect(noToken.status).toBe(403);
+    const member = await seedApp({ role: "member" });
+    expect([401, 403]).toContain((await form(member, "/admin/public-origin", "x", ORIGIN)).status);
+  });
+
+  it("learns nothing without authentication", async () => {
+    const app = await seedApp({ role: null });
+    const html = await (await app.request("/admin")).text();
+    expect(html).toContain("turn authentication on");
+    expect(html).not.toContain("data-report-origin");
+    const token = await csrfFrom(app);
+    expect((await report(app, token, { origin: ORIGIN })).status).toBe(204);
+  });
+});

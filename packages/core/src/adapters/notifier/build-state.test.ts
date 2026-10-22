@@ -170,3 +170,19 @@ describe("statusesForBuild: the comment", () => {
     expect(comment?.markdown).not.toContain("Snapshots:");
   });
 });
+
+describe("statusesForBuild without a public origin", () => {
+  it("drops every link and the comment", () => {
+    const set = statusesForBuild({
+      build: build(),
+      projectSlug: "web",
+      prefix: "storyshelf",
+      urls: null,
+      flags: { testing: true, review: false },
+      publishing: "success",
+    });
+    expect(set.statuses.map((status) => status.url)).toEqual([undefined, undefined]);
+    expect(set.statuses.map((status) => status.state)).toEqual(["pending", "success"]);
+    expect(set.comment).toBeNull();
+  });
+});

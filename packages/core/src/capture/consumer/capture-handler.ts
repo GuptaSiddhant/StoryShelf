@@ -6,6 +6,7 @@ import type { NotifierProvider } from "../../adapters/notifier/provider.ts";
 import type { StorageAdapter } from "../../adapters/storage.ts";
 import type { ShelfConfig } from "../../config.ts";
 import type { Logger } from "../../logger.ts";
+import { createPublicOriginResolver } from "../../models/public-origin.ts";
 import type { SecretInput } from "../../utils/encrypt.ts";
 import { createBuildStatePublisher } from "../build-state/publisher.ts";
 import type { BuildStatePublisher } from "../build-state/types.ts";
@@ -35,6 +36,11 @@ export interface CaptureHandlerOptions {
   buildState?: BuildStatePublisher;
   /** Links in statuses are absolute from `publicBaseUrl`; published Storybooks use `publishedBaseDomain`. */
   config?: Pick<ShelfConfig, "publicBaseUrl" | "publishedBaseDomain">;
+  /**
+   * The resolved public origin (ADR 0007, decision 6): status links and URL-reaching targets use it.
+   * Default: `config.publicBaseUrl`, then the platform's address, then the origin an admin stored.
+   */
+  publicOrigin?: () => Promise<string | undefined>;
   /** Design providers validating declared design links during capture. */
   design?: DesignProvider[];
   /** Server secret for webhook decryption. */
@@ -98,6 +104,7 @@ export function captureDispatchDeps(
   maxRetries: number,
 ): DispatchDeps {
   const t = options.db.tables;
+  const publicOrigin = originOf(options);
   const jobOptions: CaptureJobOptions = {
     db: options.db,
     tables: {
@@ -116,6 +123,7 @@ export function captureDispatchDeps(
     logger: options.logger,
     secret: options.secret,
     design: options.design,
+    publicOrigin,
     shardSize: options.shardSize,
     enqueue: options.enqueue,
   };
@@ -130,14 +138,17 @@ export function captureDispatchDeps(
       captureLogs: t.captureLogs,
     },
     jobOptions,
-    buildState: options.buildState ?? inlineBuildState(options),
+    buildState: options.buildState ?? inlineBuildState(options, publicOrigin),
     logger: options.logger,
     maxRetries,
   };
 }
 
 /** Inline delivery of captured builds' states through the handler's own adapters. */
-function inlineBuildState(options: CaptureHandlerOptions): BuildStatePublisher {
+function inlineBuildState(
+  options: CaptureHandlerOptions,
+  publicOrigin: () => Promise<string | undefined>,
+): BuildStatePublisher {
   return createBuildStatePublisher({
     deps: {
       db: options.db,
@@ -145,8 +156,18 @@ function inlineBuildState(options: CaptureHandlerOptions): BuildStatePublisher {
       notifiers: options.notifiers ?? [],
       secret: options.secret,
       config: options.config ?? {},
+      publicOrigin,
       flags: () => ({ testing: true, review: false }),
       logger: options.logger,
     },
   });
+}
+
+/** The host's origin resolver, else one built from the database and `config.publicBaseUrl`. */
+function originOf(options: CaptureHandlerOptions): () => Promise<string | undefined> {
+  if (options.publicOrigin !== undefined) {
+    return options.publicOrigin;
+  }
+  const resolver = createPublicOriginResolver({ db: options.db, config: options.config });
+  return async () => await resolver.url();
 }

@@ -1,9 +1,10 @@
-import { BROWSER_NAMES } from "@storyshelf/core/adapter/capture-runner";
+import { resolveBrowsers } from "@storyshelf/core/capture";
 import { ProjectModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
+import { assertTargetsSelectable } from "../targets.ts";
 import { flash } from "./flash.ts";
 import { hxRedirect } from "./htmx.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
@@ -52,18 +53,14 @@ async function handleGeneralUpdate(c: Context): Promise<Response> {
     );
   }
   const fields: GeneralFields = { ...readGeneralFields(form), name: name.trim() };
-  if (
-    fields.browser !== undefined &&
-    !(BROWSER_NAMES as readonly string[]).includes(fields.browser)
-  ) {
-    return c.html(
-      (await renderSettingsPage(c, "general", {
-        globalError: `Invalid browser "${fields.browser}". Choose one of: ${BROWSER_NAMES.join(", ")}.`,
-      })) ?? "",
-      400,
-    );
-  }
   return await persistGeneralUpdate(c, project, slug, fields);
+}
+
+/** Refuse, with 400 and the reason, a browser the runner cannot render (ADR 0007, decision 7). */
+async function assertBrowserChoice(project: Project, browser: string | undefined): Promise<void> {
+  if (browser !== undefined) {
+    await assertTargetsSelectable([browser], resolveBrowsers(project));
+  }
 }
 
 async function persistGeneralUpdate(
@@ -73,6 +70,7 @@ async function persistGeneralUpdate(
   fields: GeneralFields,
 ): Promise<Response> {
   try {
+    await assertBrowserChoice(project, fields.browser);
     await new ProjectModel(getStore().db).update(project.id, {
       name: fields.name,
       gitRepository: fields.gitRepository ?? undefined,

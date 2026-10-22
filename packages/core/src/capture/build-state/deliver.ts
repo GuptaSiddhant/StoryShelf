@@ -56,11 +56,12 @@ export async function writeTo(
   target: StateTarget,
 ): Promise<void> {
   const { build, project } = loaded;
+  const origin = deps.publicOrigin ? await deps.publicOrigin() : deps.config.publicBaseUrl;
   const states = statusesForBuild({
     build,
     projectSlug: project.slug,
     prefix: channelPrefix(target.channel),
-    urls: createUrlBuilder(deps.config.publicBaseUrl ?? "", deps.config.publishedBaseDomain),
+    urls: origin ? createUrlBuilder(origin, deps.config.publishedBaseDomain) : null,
     flags: deps.flags(project),
     publishing: await publishingOf(deps, build),
   });

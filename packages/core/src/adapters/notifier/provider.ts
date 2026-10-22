@@ -58,8 +58,11 @@ export interface SetStateInput {
   /** What to make the host show: a commit status or a pull-request comment. */
   target: NotifierStateTarget;
   state: NotifierState;
-  /** Link back to the build page; also keys the pull-request comment. */
-  url: string;
+  /**
+   * Link back to the build page; also keys the pull-request comment. Absent while no public origin
+   * is known (ADR 0007): a status then has no link and a comment is not written.
+   */
+  url?: string | undefined;
   logger?: Logger;
 }
 

@@ -1,7 +1,7 @@
 /** Shared types for the Playwright capture runner. */
 
 import type {
-  BrowserName,
+  CaptureTarget,
   RenderedSnapshot,
   StoryEntry,
   StorySourceAdapter,
@@ -24,7 +24,8 @@ export interface PlaywrightRenderInput {
   executePlay?: boolean;
   playTimeoutMs?: number;
   runA11y?: boolean;
-  browser?: BrowserName;
+  /** Target to render on; the runner's default (first) target when absent. */
+  target?: CaptureTarget;
   /** Max pages rendering at once (default: sized from detected CPU and memory). */
   concurrency?: number;
   /** Per-page navigation/action timeout in ms (default: scaled up on CPU-starved hosts). */
@@ -42,8 +43,11 @@ export interface PlaywrightRenderInput {
 /** Input for the parameter pre-pass (a subset of the render input). */
 export type ExtractInput = Pick<
   PlaywrightRenderInput,
-  "buildId" | "storybookDir" | "stories" | "logger" | "browser" | "adapter"
+  "buildId" | "storybookDir" | "stories" | "logger" | "target" | "adapter"
 >;
+
+/** Starts (or connects to) a browser for a target; a failure is a `TargetLaunchError`. */
+export type LaunchTarget = (target: CaptureTarget) => Promise<Browser>;
 
 /** Browser + adapter context shared by screenshot helpers. */
 export interface ScreenshotContext {

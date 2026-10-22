@@ -42,8 +42,11 @@ export interface BuildStateInput {
   projectSlug: string;
   /** The channel's status-name prefix, without a trailing slash. */
   prefix: string;
-  /** Absolute links (`createUrlBuilder(publicBaseUrl)`); without a base URL they are relative paths. */
-  urls: Pick<UrlBuilder, "build" | "storybookBuild">;
+  /**
+   * Absolute links (`createUrlBuilder(publicOrigin)`). `null` when no public origin is known: the
+   * statuses then carry no link and there is no pull-request comment, whose job is to link (ADR 0007).
+   */
+  urls: Pick<UrlBuilder, "build" | "storybookBuild"> | null;
   flags: BuildStateFlags;
   publishing: PublishingState;
 }
@@ -55,8 +58,8 @@ export interface DesiredStatus {
   context: string;
   state: NotifierState;
   description: string;
-  /** What the status links to: the build page, or the published Storybook for `storybook`. */
-  url: string;
+  /** What the status links to: the build page, or the published Storybook for `storybook`; absent without a public origin. */
+  url?: string | undefined;
 }
 
 /** The pull-request comment to show. */
@@ -81,22 +84,27 @@ export function statusesForBuild(input: BuildStateInput): BuildStateSet {
   }
   const links = linksOf(input);
   const statuses = [
-    ...gateStatus(input, links.build),
+    ...gateStatus(input, links?.build),
     storybookStatus(input.publishing, input.prefix, links),
   ];
-  const gate = statuses.find((status) => status.name !== "storybook");
+  return { statuses, comment: links === null ? null : commentOf(input, statuses, links) };
+}
+
+function commentOf(
+  input: BuildStateInput,
+  statuses: DesiredStatus[],
+  links: Links,
+): DesiredComment {
+  const gates = statuses.filter((status) => status.name !== "storybook");
   return {
-    statuses,
-    comment: {
-      url: links.build,
-      state: gate?.state ?? "success",
-      markdown: buildCommentMarkdown({
-        buildUrl: links.build,
-        storybookUrl: input.publishing === "success" ? links.storybook : undefined,
-        gates: statuses.filter((status) => status.name !== "storybook"),
-        counts: input.flags.testing || input.flags.review ? input.build : undefined,
-      }),
-    },
+    url: links.build,
+    state: gates[0]?.state ?? "success",
+    markdown: buildCommentMarkdown({
+      buildUrl: links.build,
+      storybookUrl: input.publishing === "success" ? links.storybook : undefined,
+      gates,
+      counts: input.flags.testing || input.flags.review ? input.build : undefined,
+    }),
   };
 }
 
@@ -105,8 +113,12 @@ interface Links {
   storybook: string;
 }
 
-function linksOf(input: BuildStateInput): Links {
+/** The links to show, or `null` without a public origin. */
+function linksOf(input: BuildStateInput): Links | null {
   const { urls, projectSlug, build } = input;
+  if (urls === null) {
+    return null;
+  }
   return {
     build: urls.build(projectSlug, build.id),
     storybook: `${urls.storybookBuild(projectSlug, build.id).replace(/\/+$/u, "")}/`,
@@ -114,7 +126,7 @@ function linksOf(input: BuildStateInput): Links {
 }
 
 /** `testing` when it is on; `review` when only review is on; none for a hosting-only build. */
-function gateStatus(input: BuildStateInput, url: string): DesiredStatus[] {
+function gateStatus(input: BuildStateInput, url: string | undefined): DesiredStatus[] {
   const { flags, build, prefix } = input;
   if (flags.testing) {
     return [{ name: "testing", context: `${prefix}/testing`, url, ...testingOutcome(build) }];
@@ -173,14 +185,18 @@ function reviewOutcome(build: BuildStateBuild): Outcome {
 }
 
 /** Informational: never a gate, linking to the published Storybook once there is one. */
-function storybookStatus(publishing: PublishingState, prefix: string, links: Links): DesiredStatus {
+function storybookStatus(
+  publishing: PublishingState,
+  prefix: string,
+  links: Links | null,
+): DesiredStatus {
   const base = { name: "storybook", context: `${prefix}/storybook` } as const;
   if (publishing === "success") {
     return {
       ...base,
       state: "success",
       description: "Storybook published",
-      url: links.storybook,
+      url: links?.storybook,
     };
   }
   if (publishing === "failure") {
@@ -188,10 +204,10 @@ function storybookStatus(publishing: PublishingState, prefix: string, links: Lin
       ...base,
       state: "failure",
       description: "Storybook could not be published",
-      url: links.build,
+      url: links?.build,
     };
   }
-  return { ...base, state: "pending", description: "Publishing Storybook", url: links.build };
+  return { ...base, state: "pending", description: "Publishing Storybook", url: links?.build };
 }
 
 function openCount(build: BuildStateBuild): number {

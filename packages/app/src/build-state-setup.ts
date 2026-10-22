@@ -41,6 +41,7 @@ export function setupBuildState(
     notifiers: runtime.notifiers,
     secret: credentialKeys(runtime.config),
     config: runtime.config,
+    publicOrigin: async () => await runtime.publicOrigin.url(),
     // Review is per project; the review setting feeds `review` once it exists.
     flags: () => ({ testing: options.testing !== undefined, review: false }),
     logger: runtime.logger.child({ component: "build-state" }),

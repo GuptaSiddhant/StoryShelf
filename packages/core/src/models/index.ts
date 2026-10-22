@@ -107,3 +107,13 @@ export {
   type ReencryptResult,
   type UnreadableCredential,
 } from "./credentials.ts";
+export { SiteSettingsModel, type SiteSettingsTables } from "./site-settings.ts";
+export {
+  PUBLIC_ORIGIN_KEY,
+  createPublicOriginResolver,
+  type PublicOriginOptions,
+  type PublicOriginResolver,
+  type PublicOriginSource,
+  type ResolvedPublicOrigin,
+  type StoredPublicOrigin,
+} from "./public-origin.ts";

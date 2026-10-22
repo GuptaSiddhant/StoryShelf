@@ -29,6 +29,8 @@ describe("engine weights", () => {
   it("counts Firefox and WebKit as two Chromium slots", () => {
     expect(engineWeight("chromium")).toBe(1);
     expect(engineWeight("chrome")).toBe(1);
+    expect(engineWeight("firefox@grid")).toBe(2);
+    expect(engineWeight("chromium@grid")).toBe(1);
     expect(engineWeight("firefox")).toBe(2);
     expect(engineWeight("webkit")).toBe(2);
     expect(engineWeight()).toBe(1);

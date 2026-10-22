@@ -32,10 +32,12 @@ export function detectResources(): HostResources {
 /**
  * Cost of one page in Chromium-page slots. Firefox and WebKit pages cost about twice a Chromium
  * page in CPU time (ray.run cross-browser benchmarks: Firefox +71%, WebKit +60%; some Playwright
- * reports show WebKit worse), so they get half the page budget.
+ * reports show WebKit worse), so they get half the page budget. Takes a capture target too.
  */
 export function engineWeight(browser?: string): number {
-  return browser === "firefox" || browser === "webkit" ? 2 : 1;
+  // A target is `<engine>[@<name>]`; the engine decides the page cost.
+  const engine = browser?.split("@")[0];
+  return engine === "firefox" || engine === "webkit" ? 2 : 1;
 }
 
 /**

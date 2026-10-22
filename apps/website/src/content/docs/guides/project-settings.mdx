@@ -14,13 +14,13 @@ Each project carries its own settings — under `/projects/:slug/settings` (sect
 
 ## General
 
-Name, `git_repository` (`owner/repo`), `git_default_branch` (baseline fallback, default `main`), diff thresholds (`pixel_threshold` 0–1, `max_diff_ratio` 0–1), capture browser (`chromium`/`firefox`/`webkit`/`chrome`), viewports, and `public_branch_regex` for published Storybook access (see [Published Storybook](/concepts/publishing/)).
+Name, `git_repository` (`owner/repo`), `git_default_branch` (baseline fallback, default `main`), diff thresholds (`pixel_threshold` 0–1, `max_diff_ratio` 0–1), capture browser (a target the capture runner offers: `chromium`, `firefox`, `webkit`, `chrome`, or `<engine>@<name>`), viewports, and `public_branch_regex` for published Storybook access (see [Published Storybook](/concepts/publishing/)).
 
 `PATCH /api/v1/projects/:slug` is site-admin or project-admin only; `GET /api/v1/projects/:slug` respects `viewer`+ membership.
 
 ## Capture
 
-Which engines each build is captured on and which [modes](/guides/modes/) run. **Browsers**: a primary engine plus up to two more (`browsers` via `PATCH`, primary first); each engine keeps its own baselines, and one approval covers a story and mode on all of them. **Mode allowlist**: mode names to run (`modesAllowlist`); empty runs every mode declared in your stories' parameters.
+Which engines each build is captured on and which [modes](/guides/modes/) run. **Browsers**: a primary target plus up to two more (`browsers` via `PATCH`, primary first), chosen from the targets the runner has ready (unavailable ones are listed with the reason and refused on save); each target keeps its own baselines, and one approval covers a story and mode on all of them. **Mode allowlist**: mode names to run (`modesAllowlist`); empty runs every mode declared in your stories' parameters.
 
 ## Label types
 

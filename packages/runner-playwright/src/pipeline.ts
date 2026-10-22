@@ -1,12 +1,13 @@
 /** Render orchestration: static server, browser, and per-story captures. */
 
-import type {
-  BrowserName,
-  RenderResult,
-  RenderedSnapshot,
-  StoryEntry,
-  StorySourceAdapter,
-  Viewport,
+import {
+  engineOf,
+  type CaptureTarget,
+  type RenderResult,
+  type RenderedSnapshot,
+  type StoryEntry,
+  type StorySourceAdapter,
+  type Viewport,
 } from "@storyshelf/core/adapter/capture-runner";
 import { StorybookAdapter, resolveStoryViewports } from "@storyshelf/core/capture";
 import type { StoryParameters } from "@storyshelf/core/capture";
@@ -28,41 +29,35 @@ import type {
   ActiveRun,
   CaptureContext,
   ExtractInput,
+  LaunchTarget,
   PlaywrightRenderInput,
   RuntimeParamsPage,
 } from "./types.ts";
-
-/**
- * Low-memory Chromium flags. Deliberately excludes rendering-affecting flags
- * (`--disable-gpu`, `--single-process`): they can shift pixels or crash pages,
- * which would show up as false visual diffs.
- */
-const CHROMIUM_ARGS = [
-  "--disable-dev-shm-usage",
-  "--disable-extensions",
-  "--disable-background-networking",
-  "--mute-audio",
-];
 
 /** Render all story/viewport combinations for a build. */
 export async function renderAll(
   rawInput: PlaywrightRenderInput,
   active: ActiveRun,
-  defaultBrowser: BrowserName,
+  launch: LaunchTarget,
+  defaultTarget: CaptureTarget,
 ): Promise<RenderResult> {
-  const name = rawInput.browser ?? defaultBrowser;
-  const input = { ...rawInput, browser: name };
-  const server = await createStaticServer(input.storybookDir);
-  const browser = await launchBrowser(name);
-  input.logger?.info(describeSizing(input), "capture sizing");
+  const name = rawInput.target ?? defaultTarget;
+  const input = { ...rawInput, target: name };
+  // Launch first: a target that will not start must fail before a static server is bound.
+  const browser = await launch(name);
+  const server = await createStaticServer(input.storybookDir).catch(async (error: unknown) => {
+    await safeCloseBrowser(browser);
+    throw error;
+  });
+  input.logger?.info(describeSizing({ ...input, browser: engineOf(name) }), "capture sizing");
   const result = await runWithBrowser(
     input,
     active,
     browser,
     server,
-    async () => await launchBrowser(name),
+    async () => await launch(name),
   );
-  // Echo the engine so persisted rows are attributable without the request.
+  // Echo the target so persisted rows are attributable without the request.
   for (const row of [...result.captures, ...result.failures]) row.browser = name;
   return { ...result, environment: await detectCaptureEnvironment(browserVersionOf(browser)) };
 }
@@ -73,12 +68,16 @@ export async function renderAll(
  */
 export async function extractAll(
   input: ExtractInput,
-  defaultBrowser: BrowserName,
+  launch: LaunchTarget,
+  defaultTarget: CaptureTarget,
 ): Promise<Record<string, StoryParameters>> {
   const first = input.stories[0];
   if (!first) return {};
-  const server = await createStaticServer(input.storybookDir);
-  const browser = await launchBrowser(input.browser ?? defaultBrowser);
+  const browser = await launch(input.target ?? defaultTarget);
+  const server = await createStaticServer(input.storybookDir).catch(async (error: unknown) => {
+    await safeCloseBrowser(browser);
+    throw error;
+  });
   try {
     return await readParameters(browser, server.url, first.id, input.adapter);
   } finally {
@@ -126,19 +125,6 @@ async function runWithBrowser(
   }
 }
 
-/**
- * Playwright is loaded on first render, not at import: it costs ~150 ms and tens
- * of MB, which a server that only serves reviews or hosts Storybooks should not pay at
- * boot.
- */
-async function launchBrowser(name: BrowserName): Promise<Browser> {
-  const playwright = await import("playwright-core");
-  if (name === "firefox") return await playwright.firefox.launch();
-  if (name === "webkit") return await playwright.webkit.launch();
-  // Containers ship a tiny /dev/shm; Chromium crashes (looks like OOM) unless it uses /tmp.
-  return await playwright.chromium.launch({ args: CHROMIUM_ARGS });
-}
-
 function buildContext(
   browser: Browser,
   baseUrl: string,
@@ -173,7 +159,7 @@ async function runAllCaptures(
   const batches = chunk(jobs, input.recycleBrowserEvery ?? DEFAULT_RECYCLE_BROWSER_EVERY);
   const pages = createPageLimiter({
     concurrency: input.concurrency,
-    browser: input.browser,
+    browser: engineOf(input.target ?? "chromium"),
     logger: input.logger,
   });
   try {

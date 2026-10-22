@@ -1,3 +1,4 @@
+import type { RunnerTarget } from "@storyshelf/core/adapter/capture-runner";
 import type { LabelType } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import type { ProjectGroupMapping } from "@storyshelf/core/schema";
@@ -59,6 +60,8 @@ export interface ProjectSettingsData {
   isAdmin: boolean;
   /** AI availability and the profile choices (omitted ⇒ AI off). */
   ai?: SettingsAiData;
+  /** What the capture runner offers (ADR 0007); omitted when it publishes no list. */
+  targets?: readonly RunnerTarget[] | undefined;
 }
 
 /** Form state shared by the settings tabs (field errors, global error, one-time secret). */
@@ -130,8 +133,10 @@ function settingsTabShown(tab: SettingsTab, data: ProjectSettingsData): boolean 
 /** Project-behaviour tabs (general, tests, AI); undefined for any other tab. */
 function renderBehaviourTab(data: ProjectSettingsData, formState?: SettingsFormState): unknown {
   const { project, activeTab } = data;
-  if (activeTab === "general") return renderSettingsGeneral(project, formState, data.isAdmin);
-  if (activeTab === "capture") return renderSettingsCapture(project, data.isAdmin, formState);
+  if (activeTab === "general")
+    return renderSettingsGeneral(project, formState, data.isAdmin, data.targets);
+  if (activeTab === "capture")
+    return renderSettingsCapture(project, data.isAdmin, formState, data.targets);
   if (activeTab === "ai") return renderSettingsAi(project, data.ai, formState);
   return activeTab === "tests" ? renderSettingsTests(project, data.isAdmin, formState) : undefined;
 }

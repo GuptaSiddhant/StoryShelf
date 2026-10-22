@@ -1,6 +1,6 @@
 /** What every stage of a sharded capture works against. */
 import type { Logger } from "pino";
-import type { BrowserName } from "../../adapters/capture-runner.ts";
+import type { CaptureTarget } from "../../adapters/capture-runner.ts";
 import type { Build } from "../../schema/build.ts";
 import type { Project } from "../../schema/project.ts";
 import type { Viewport } from "../adapter.ts";
@@ -21,7 +21,7 @@ export function contextOf(
   target: ShardTarget,
   parts: {
     viewports: Viewport[];
-    browsers: BrowserName[];
+    browsers: CaptureTarget[];
     captures?: CaptureContext["captures"];
     inherited?: NonNullable<CaptureContext["inherited"]>;
     freshBrowsers?: ReadonlySet<string>;
@@ -52,7 +52,7 @@ export function matrixInputOf(
   parts: {
     stories: MatrixInput["stories"];
     viewports: Viewport[];
-    browsers: BrowserName[];
+    browsers: CaptureTarget[];
     storybookDir: string;
     affectedPaths: string[] | null;
     logger?: Logger | undefined;

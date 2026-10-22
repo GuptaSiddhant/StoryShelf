@@ -24,7 +24,8 @@ export async function postCommitStatus(
     context: string;
     state: NotifierState;
     description: string;
-    url: string;
+    /** Absent while no public origin is known. */
+    url?: string | undefined;
   },
 ): Promise<void> {
   const state = mapState(input.state);
@@ -35,7 +36,7 @@ export async function postCommitStatus(
       headers: githubHeaders(repo.token),
       json: {
         state,
-        target_url: input.url,
+        ...(input.url === undefined ? {} : { target_url: input.url }),
         description: input.description,
         context: input.context,
       },

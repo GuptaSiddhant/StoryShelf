@@ -82,6 +82,7 @@ const DDL_TABLES = [
   "capture_shards",
   "capture_jobs",
   "build_components",
+  "site_settings",
   "snapshots",
   "baselines",
   "comments",

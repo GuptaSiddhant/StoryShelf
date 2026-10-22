@@ -1,4 +1,8 @@
-import type { StoryEntry, Viewport } from "@storyshelf/core/adapter/capture-runner";
+import {
+  TargetLaunchError,
+  type StoryEntry,
+  type Viewport,
+} from "@storyshelf/core/adapter/capture-runner";
 import { maxPageConcurrency, recommendedPageConcurrency } from "@storyshelf/core/utils";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -10,6 +14,7 @@ import {
   createRuntimeParamsState,
   runtimeParametersForStory,
 } from "./capture-runner.ts";
+import { local } from "./targets.ts";
 
 const playwright = vi.hoisted(() => {
   let closed = false;
@@ -18,6 +23,8 @@ const playwright = vi.hoisted(() => {
   let lastBrowser: typeof browser | null = null;
   let hangNextGoto = true;
   let extractResult: unknown;
+  const launchOptions: unknown[] = [];
+  let launchFailure: Error | null = null;
   const makePage = () => ({
     goto: async (): Promise<void> => {
       if (closed) {
@@ -97,7 +104,11 @@ const playwright = vi.hoisted(() => {
   return {
     browser,
     chromium: {
-      launch: async (): Promise<typeof browser> => {
+      launch: async (options?: unknown): Promise<typeof browser> => {
+        launchOptions.push(options);
+        if (launchFailure !== null) {
+          throw launchFailure;
+        }
         launches += 1;
         closed = false;
         browser.closed = false;
@@ -108,6 +119,11 @@ const playwright = vi.hoisted(() => {
     },
     lastBrowser: (): typeof browser | null => lastBrowser,
     launchCount: (): number => launches,
+    hangingPages: (): number => pendingGotos.length,
+    launchOptions,
+    failLaunches: (error: Error | null): void => {
+      launchFailure = error;
+    },
     stats,
     configureHang: (hang: boolean): void => {
       hangNextGoto = hang;
@@ -119,8 +135,12 @@ const playwright = vi.hoisted(() => {
 });
 
 vi.mock("playwright-core", () => ({
-  chromium: playwright.chromium,
-  firefox: playwright.chromium,
+  chromium: {
+    ...playwright.chromium,
+    executablePath: () => "/nowhere/chromium-1/chrome-linux/chrome",
+  },
+  firefox: { ...playwright.chromium, executablePath: () => "/nowhere/firefox-1/firefox/firefox" },
+  webkit: { ...playwright.chromium, executablePath: () => "/nowhere/webkit-1/pw_run.sh" },
 }));
 
 const STORIES: StoryEntry[] = [
@@ -160,8 +180,9 @@ describe("createPlaywrightCaptureRunner.render", () => {
       viewports: VIEWPORTS,
     });
 
-    await new Promise((resolve) => {
-      setTimeout(resolve, 20);
+    // Cancel once a page is stuck in `goto`, however long a loaded host takes to get there.
+    await vi.waitFor(() => {
+      expect(playwright.hangingPages()).toBeGreaterThan(0);
     });
     await expect(runner.cancel("build-1")).resolves.toBeUndefined();
     const result = await renderPromise;
@@ -403,18 +424,32 @@ describe("createPlaywrightCaptureRunner.render", () => {
     const info = vi.fn();
     playwright.configureHang(false);
     const logger = { info, debug: vi.fn(), warn: vi.fn(), error: vi.fn() } as never;
-    await createPlaywrightCaptureRunner({}).render({
+    await createPlaywrightCaptureRunner({ browsers: ["chromium", "firefox"] }).render({
       buildId: "build-1",
       storybookDir,
       stories: STORIES,
       viewports: VIEWPORTS,
-      browser: "firefox",
+      target: "firefox",
       logger,
     });
     expect(info).toHaveBeenCalledWith(
       expect.objectContaining({ pages: recommendedPageConcurrency(undefined, "firefox") }),
       "capture sizing",
     );
+  }, 30_000);
+
+  it("echoes the target on every row it produces", async () => {
+    playwright.configureHang(false);
+    const result = await createPlaywrightCaptureRunner({
+      browsers: ["chromium", "firefox"],
+    }).render({
+      buildId: "build-1",
+      storybookDir,
+      stories: STORIES,
+      viewports: VIEWPORTS,
+      target: "firefox",
+    });
+    expect(result.captures.map((capture) => capture.browser)).toEqual(["firefox"]);
   }, 30_000);
 
   it("enriches parameters from the runtime preview once per run", async () => {
@@ -568,4 +603,113 @@ describe("createPlaywrightCaptureRunner.render", () => {
       runner.extractParameters?.({ buildId: "build-1", storybookDir, stories: [] }),
     ).resolves.toEqual({});
   }, 30_000);
+});
+
+const input = () => ({
+  buildId: "build-1",
+  storybookDir,
+  stories: STORIES,
+  viewports: VIEWPORTS,
+});
+
+describe("createPlaywrightCaptureRunner targets (ADR 0007)", () => {
+  it("offers chromium only by default, ready, reaching the loopback server", () => {
+    expect(createPlaywrightCaptureRunner().metadata.targets).toEqual([
+      { target: "chromium", reach: "loopback", status: "ready" },
+    ]);
+  });
+
+  it("lists every declared target, default first, and rejects bad lists when created", () => {
+    const runner = createPlaywrightCaptureRunner({
+      browsers: ["webkit", local("chrome"), "firefox"],
+    });
+    expect(runner.metadata.targets?.map((entry) => entry.target)).toEqual([
+      "webkit",
+      "chrome",
+      "firefox",
+    ]);
+    expect(() => createPlaywrightCaptureRunner({ browsers: [] })).toThrow(/at least one/u);
+    expect(() => createPlaywrightCaptureRunner({ browsers: ["firefox", "firefox"] })).toThrow(
+      /entries 1 and 2 both produce the target "firefox"/u,
+    );
+  });
+
+  it("renders on the first target when the request names none", async () => {
+    playwright.configureHang(false);
+    const result = await createPlaywrightCaptureRunner({
+      browsers: ["firefox", "chromium"],
+    }).render(input());
+    expect(result.captures.map((capture) => capture.browser)).toEqual(["firefox"]);
+  }, 30_000);
+
+  it("launches bare chrome with the chrome channel, bundled chromium with none", async () => {
+    playwright.configureHang(false);
+    const runner = createPlaywrightCaptureRunner({ browsers: ["chromium", "chrome"] });
+    const before = playwright.launchOptions.length;
+    await runner.render({ ...input(), target: "chrome" });
+    await runner.render({ ...input(), target: "chromium" });
+    const [chrome, chromium] = playwright.launchOptions.slice(before) as {
+      channel?: string;
+      args: string[];
+    }[];
+    expect(chrome?.channel).toBe("chrome");
+    expect(chromium).not.toHaveProperty("channel");
+    expect(chromium?.args).toContain("--disable-dev-shm-usage");
+  }, 30_000);
+
+  it("passes a local() channel through", async () => {
+    playwright.configureHang(false);
+    const runner = createPlaywrightCaptureRunner({
+      browsers: [local("chrome", { channel: "chrome-beta" })],
+    });
+    const before = playwright.launchOptions.length;
+    await runner.render(input());
+    expect((playwright.launchOptions[before] as { channel?: string }).channel).toBe("chrome-beta");
+  }, 30_000);
+
+  it("fails a render for a target it does not offer", async () => {
+    const runner = createPlaywrightCaptureRunner();
+    await expect(runner.render({ ...input(), target: "firefox" })).rejects.toThrow(
+      /Cannot launch firefox: not offered by this runner/u,
+    );
+    await expect(runner.render({ ...input(), target: "chromium@grid" })).rejects.toBeInstanceOf(
+      TargetLaunchError,
+    );
+  });
+
+  it("fails at once when the browser will not launch, and marks the target unavailable", async () => {
+    const runner = createPlaywrightCaptureRunner({ browsers: ["chromium", "firefox"] });
+    playwright.failLaunches(
+      new Error("Executable doesn't exist at /x/firefox\nrun playwright install"),
+    );
+    try {
+      await expect(runner.render({ ...input(), target: "firefox" })).rejects.toThrow(
+        new TargetLaunchError("firefox", "Executable doesn't exist at /x/firefox"),
+      );
+    } finally {
+      playwright.failLaunches(null);
+    }
+    expect(runner.metadata.targets).toEqual([
+      { target: "chromium", reach: "loopback", status: "ready" },
+      {
+        target: "firefox",
+        reach: "loopback",
+        status: { unavailable: "Executable doesn't exist at /x/firefox" },
+      },
+    ]);
+  });
+
+  it("verifies installed engines in setup and reports them in health", async () => {
+    const runner = createPlaywrightCaptureRunner({ browsers: ["chromium", "firefox"] });
+    await runner.lifecycle?.setup({} as never);
+    const statuses = runner.metadata.targets?.map((entry) => entry.status);
+    expect(statuses).toEqual([
+      { unavailable: expect.stringContaining("declared, not installed") },
+      { unavailable: expect.stringContaining("declared, not installed") },
+    ]);
+    const health = await runner.lifecycle?.health();
+    expect(health?.ok).toBe(false);
+    expect(health?.detail).toContain("firefox: declared, not installed");
+    await expect(runner.lifecycle?.teardown()).resolves.toBeUndefined();
+  });
 });

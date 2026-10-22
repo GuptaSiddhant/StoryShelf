@@ -54,12 +54,27 @@ With the project's `runA11y` flag on, the runner injects [axe-core](https://gith
 - **Works over remote browsers.** The axe source is sent to the page as a string, so no file path in the browser process is needed.
 - **Cost.** Measured on the repository's Storybook fixtures with one page at a time on Chromium: about 150 to 160 ms more per story and viewport (a story takes roughly 1.2 to 1.3 s without axe; 10 stories, three timed runs each, Storybook 8 and 10 fixtures). Dense pages cost more, and `color-contrast` dominates.
 
+## Browsers
+
+`browsers` lists the targets the runner offers, default first (ADR 0007); omitted it is `["chromium"]`.
+
+```ts
+import { createPuppeteerCaptureRunner, local } from "@storyshelf/runner-puppeteer";
+
+createPuppeteerCaptureRunner({
+  executablePath: "/usr/bin/chromium", // what the bare "chromium" entry launches
+  browsers: ["chromium", local("chrome", { executablePath: "/usr/bin/google-chrome" })],
+});
+```
+
+`puppeteer-core` ships no browser, so a target is `ready` only when it has an executable that exists (the entry's own, the runner's `executablePath` for `chromium`, or `PUPPETEER_EXECUTABLE_PATH`); otherwise it is `unavailable` with that reason on **System → Capture browsers**. Bare `"chrome"` without its own `executablePath` throws when the runner is created, and `local("firefox")` and `local("webkit")` throw too: this runner drives Chromium-family engines only. A launch that fails marks its target unavailable and fails the job at once.
+
 ## Puppeteer vs Playwright
 
 | Aspect       | `runner-puppeteer`                                                                                 | `runner-playwright`                                 |
 | ------------ | -------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
 | Engine       | `puppeteer-core` + `chrome-headless-shell` (Chromium only)                                         | Playwright (`chromium`/`firefox`/`webkit`/`chrome`) |
-| Selected via | `browser` kept as `chromium`/`chrome` only (other names rejected at the project layer)             | Any `browser` value, per-project                    |
+| Selected via | `browsers` runner option (Chromium family only); projects pick from what it offers                 | `browsers` runner option; projects pick from it     |
 | Image size   | Smaller — no bundled Firefox/WebKit                                                                | Larger                                              |
 | Capabilities | Same orchestrator-owned controls: `play`, `delay`, `diffThreshold`, `viewports`, a11y (axe), burst | Identical controls                                  |
 

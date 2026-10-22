@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
+import type { RunnerTarget } from "../adapters/capture-runner.ts";
 import {
   assertBrowserCount,
   assertSupportedBrowsers,
   MAX_BROWSERS,
   parseBrowsers,
+  refusalFor,
   resolveBrowsers,
 } from "./browsers.ts";
 
@@ -41,15 +43,62 @@ describe("resolveBrowsers", () => {
   });
 });
 
-describe("assertSupportedBrowsers", () => {
-  it("passes when the runner declares nothing or covers the list", () => {
-    expect(() => assertSupportedBrowsers(["firefox"])).not.toThrow();
-    expect(() => assertSupportedBrowsers(["chromium"], ["chromium", "firefox"])).not.toThrow();
+describe("targets", () => {
+  it("parses and dedupes remote targets next to engines", () => {
+    expect(parseBrowsers('["chromium","chromium@grid","chromium@grid","webkit@bs-mac"]')).toEqual([
+      "chromium",
+      "chromium@grid",
+      "webkit@bs-mac",
+    ]);
   });
 
-  it("names the unsupported engines", () => {
-    expect(() => assertSupportedBrowsers(["chromium", "firefox"], ["chromium"])).toThrow(
-      /does not support browser\(s\): firefox/u,
+  it("rejects a target whose name or engine is not valid", () => {
+    expect(parseBrowsers('["chromium@"]')).toBeNull();
+    expect(parseBrowsers('["chromium@Grid"]')).toBeNull();
+    expect(parseBrowsers('["chromium@-x"]')).toBeNull();
+    expect(parseBrowsers('["chromium@a/b"]')).toBeNull();
+    expect(parseBrowsers('["opera@grid"]')).toBeNull();
+  });
+
+  it("resolves a single remote target from the legacy column", () => {
+    expect(resolveBrowsers({ browser: "firefox@pool-b" })).toEqual(["firefox@pool-b"]);
+  });
+});
+
+describe("refusalFor", () => {
+  const offered: RunnerTarget[] = [
+    { target: "chromium", reach: "loopback", status: "ready" },
+    { target: "firefox", reach: "loopback", status: { unavailable: "declared, not installed" } },
+  ];
+
+  it("accepts anything when the runner publishes no list", () => {
+    expect(refusalFor("webkit")).toBeNull();
+  });
+
+  it("accepts a ready target, names an unavailable one and lists what is offered", () => {
+    expect(refusalFor("chromium", offered)).toBeNull();
+    expect(refusalFor("firefox", offered)).toBe("firefox is unavailable: declared, not installed");
+    expect(refusalFor("webkit@grid", offered)).toBe(
+      "webkit@grid is not offered by this capture runner (offered: chromium, firefox)",
+    );
+    expect(refusalFor("chromium", [])).toContain("(offered: none)");
+  });
+});
+
+describe("assertSupportedBrowsers", () => {
+  const offered: RunnerTarget[] = [
+    { target: "chromium", reach: "loopback", status: "ready" },
+    { target: "chromium@grid", reach: "loopback", status: "ready" },
+  ];
+
+  it("passes when the runner declares nothing or covers the list", () => {
+    expect(() => assertSupportedBrowsers(["firefox"])).not.toThrow();
+    expect(() => assertSupportedBrowsers(["chromium", "chromium@grid"], offered)).not.toThrow();
+  });
+
+  it("names every target the runner cannot render", () => {
+    expect(() => assertSupportedBrowsers(["chromium", "firefox", "webkit"], offered)).toThrow(
+      /firefox is not offered.*; webkit is not offered/u,
     );
   });
 });

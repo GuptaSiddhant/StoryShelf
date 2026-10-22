@@ -19,7 +19,7 @@ interface StatusCall {
   context: string;
   sha: string;
   state: string;
-  url: string;
+  url: string | undefined;
 }
 
 /** The commit statuses a fake git notifier was asked to show, in order. */

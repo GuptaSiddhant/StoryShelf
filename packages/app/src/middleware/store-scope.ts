@@ -1,4 +1,5 @@
 import type { CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
+import type { CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { DesignProvider } from "@storyshelf/core/adapter/design";
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
@@ -7,6 +8,7 @@ import type { Ai } from "@storyshelf/core/ai";
 import type { BuildStatePublisher } from "@storyshelf/core/capture";
 import type { NotificationsConfig, ShelfConfig, UIConfig } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
+import type { PublicOriginResolver } from "@storyshelf/core/models";
 import type { AuthUser } from "@storyshelf/core/types";
 import type { Context, Next } from "hono";
 import type { PublishService } from "../publish-setup.ts";
@@ -29,6 +31,8 @@ export interface StoreScopeDeps {
   publish?: PublishService;
   buildState?: BuildStatePublisher;
   captureConcurrency?: number;
+  runner?: Pick<CaptureRunner, "metadata"> | undefined;
+  publicOrigin?: PublicOriginResolver | undefined;
   design: DesignProvider[];
   notifiers: NotifierProvider[];
   notificationsConfig?: NotificationsConfig;
@@ -59,6 +63,8 @@ export function storeScope(deps: StoreScopeDeps) {
         publish: deps.publish,
         buildState: deps.buildState,
         captureConcurrency: deps.captureConcurrency,
+        runner: deps.runner,
+        publicOrigin: deps.publicOrigin,
         design: deps.design,
         notifiers: deps.notifiers,
         notificationsConfig: deps.notificationsConfig,

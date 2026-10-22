@@ -7,8 +7,9 @@ import { countHiddenSnapshots } from "../hidden-data.ts";
 import { insightDepsFromStore } from "../insights/deps.ts";
 import { buildUsageReport } from "../insights/usage-report.ts";
 import { renderAdminAiPage } from "../pages/admin-ai.tsx";
-import { renderAdminSystemPage } from "../pages/admin-system.tsx";
+import { renderAdminSystemPage, type AdminSystemData } from "../pages/admin-system.tsx";
 import { getStore } from "../store.ts";
+import { runnerTargets } from "../targets.ts";
 import { flash } from "./flash.ts";
 import { collectHealthReport } from "./health-report.ts";
 import { requireSiteAdmin } from "./helpers.ts";
@@ -47,6 +48,7 @@ export function registerAdminPages(app: ShelfRouter, deps: AdminPageDeps, auth?:
         aiEnabled: getStore().ai !== undefined,
         testing,
         hiddenSnapshots: testing ? 0 : await countHiddenSnapshots(db),
+        ...(await captureView()),
         // Only a host that runs capture jobs is sized here; a remote consumer sizes itself.
         capture: capturesHere === true ? describeCaptureHost(captureConcurrency) : null,
       }),
@@ -79,4 +81,23 @@ export function registerAdminPages(app: ShelfRouter, deps: AdminPageDeps, auth?:
 function reencryptMessage(result: { reencrypted: number; failed: number }): string {
   const base = `Re-encrypted ${result.reencrypted} credential(s)`;
   return result.failed > 0 ? `${base}; ${result.failed} failed — see server logs` : base;
+}
+
+/** The System page's capture browsers and public origin (ADR 0007). */
+async function captureView(): Promise<Pick<AdminSystemData, "targets" | "publicOrigin">> {
+  return { targets: await runnerTargets(), publicOrigin: await publicOriginView() };
+}
+
+/** What the System page shows about the public origin: what resolves, and what a browser reported. */
+async function publicOriginView(): Promise<AdminSystemData["publicOrigin"]> {
+  const { publicOrigin, authEnabled } = getStore();
+  if (publicOrigin === undefined) {
+    return undefined;
+  }
+  return {
+    resolved: await publicOrigin.resolve(),
+    stored: await publicOrigin.stored(),
+    // Only a deployment with admins can learn an origin from one.
+    learns: authEnabled,
+  };
 }

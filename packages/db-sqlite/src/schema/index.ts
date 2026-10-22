@@ -38,6 +38,7 @@ import {
 } from "./notification.ts";
 import { projectGroupMappings as projectGroupMappingsTable } from "./project-group-mapping.ts";
 import { projects as projectsTable } from "./project.ts";
+import { siteSettings as siteSettingsTable } from "./site-setting.ts";
 import { snapshots as snapshotsTable } from "./snapshot.ts";
 import { tokens as tokensTable } from "./token.ts";
 import {
@@ -52,6 +53,7 @@ export { builds } from "./build.ts";
 export { captureAttempts, captureLogs } from "./capture-attempt.ts";
 export { captureJobs } from "./capture-job.ts";
 export { buildComponents } from "./build-component.ts";
+export { siteSettings } from "./site-setting.ts";
 export { captureShards } from "./capture-shard.ts";
 export { baselines } from "./baseline.ts";
 export { comments } from "./comment.ts";
@@ -118,6 +120,7 @@ export const schema: {
   captureShards: AnySQLiteTable;
   captureJobs: AnySQLiteTable;
   buildComponents: AnySQLiteTable;
+  siteSettings: AnySQLiteTable;
   snapshots: AnySQLiteTable;
   baselines: AnySQLiteTable;
   comments: AnySQLiteTable;
@@ -149,6 +152,7 @@ export const schema: {
   captureShards: captureShardsTable,
   captureJobs: captureJobsTable,
   buildComponents: buildComponentsTable,
+  siteSettings: siteSettingsTable,
   snapshots: snapshotsTable,
   baselines: baselinesTable,
   comments: commentsTable,

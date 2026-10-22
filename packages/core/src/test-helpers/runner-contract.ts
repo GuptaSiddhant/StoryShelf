@@ -8,6 +8,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { CaptureRunner } from "../adapters/capture-runner.ts";
+import { isCaptureTarget } from "../adapters/capture-target.ts";
 
 /** Build the adapter under test (sync or async factories both work). */
 export type RunnerFactory = () => CaptureRunner | Promise<CaptureRunner>;
@@ -19,6 +20,19 @@ export function runnerContractSuite(label: string, make: RunnerFactory): void {
       const runner = await make();
       expect(runner.metadata.category).toBe("capture-runner");
       expect(runner.metadata.kind.length).toBeGreaterThan(0);
+    });
+
+    it("lists its targets as unique, valid capture targets, default first", async () => {
+      const targets = (await make()).metadata.targets;
+      if (targets === undefined) {
+        return;
+      }
+      expect(targets.length).toBeGreaterThan(0);
+      for (const entry of targets) {
+        expect(isCaptureTarget(entry.target), entry.target).toBe(true);
+        expect(["loopback", "url"]).toContain(entry.reach);
+      }
+      expect(new Set(targets.map((entry) => entry.target)).size).toBe(targets.length);
     });
 
     it("exposes render and cancel", async () => {

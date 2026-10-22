@@ -1,3 +1,4 @@
+import { isCaptureTarget, type RunnerTarget } from "@storyshelf/core/adapter/capture-runner";
 import type { Project } from "@storyshelf/core/schema";
 import {
   Alert,
@@ -10,6 +11,7 @@ import {
   SelectField,
 } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
+import { targetChoices } from "./target-choices.ts";
 
 /** Form state for the settings tabs (field errors and global error). */
 export interface SettingsFormState {
@@ -22,9 +24,12 @@ export function renderSettingsGeneral(
   project: Project,
   formState: SettingsFormState | undefined,
   isAdmin: boolean,
+  /** What the runner offers; omitted when it publishes no list. */
+  offered?: readonly RunnerTarget[],
 ): unknown {
   const errors = formState?.errors ?? {};
   const browser = project.browser ?? "chromium";
+  const targets = targetChoices(offered, isCaptureTarget(browser) ? [browser] : []);
   return (
     <div class="grid max-w-form">
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
@@ -73,13 +78,12 @@ export function renderSettingsGeneral(
             name="browser"
             value={browser}
             disabled={!isAdmin}
-            options={[
-              { value: "chromium", label: "Chromium (default)" },
-              { value: "firefox", label: "Firefox" },
-              { value: "webkit", label: "WebKit (Safari engine)" },
-              { value: "chrome", label: "Chrome (Chromium engine)" },
-            ]}
-            hint="Rendering engine for captures. Baselines are kept per browser, so switching starts a fresh baseline for the new one. Firefox and WebKit need Playwright system dependencies installed on the server."
+            options={targets.choices}
+            hint={`Where captures render. Baselines are kept per target, so switching starts a fresh baseline for the new one.${
+              targets.unavailable.length > 0
+                ? ` Not selectable on this server: ${targets.unavailable.join("; ")}.`
+                : ""
+            }`}
           />
           <Field
             label="Public branch regex"

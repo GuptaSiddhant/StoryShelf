@@ -8,7 +8,30 @@ import type {
   StorySourceAdapter,
   Viewport,
 } from "../capture/adapter.ts";
+import type { CaptureTarget, RunnerTarget } from "./capture-target.ts";
 import type { Adapter } from "./metadata.ts";
+
+export { createTargetOffers, type TargetOffers } from "./capture-target-offers.ts";
+export {
+  BROWSER_NAMES,
+  DEFAULT_BROWSER,
+  TARGET_NAME_PATTERN,
+  TargetLaunchError,
+  engineOf,
+  isBrowserName,
+  isCaptureTarget,
+  parseTarget,
+  tryParseTarget,
+  unavailableReason,
+} from "./capture-target.ts";
+export type {
+  BrowserName,
+  CaptureTarget,
+  ParsedTarget,
+  RunnerTarget,
+  TargetReach,
+  TargetStatus,
+} from "./capture-target.ts";
 
 export type { JobStatus } from "./capture-queue.ts";
 export { RenderRuns } from "./render-runs.ts";
@@ -40,8 +63,8 @@ export interface RenderedSnapshot {
   viewport?: Viewport;
   /** PNG screenshot bytes. */
   screenshot: Buffer;
-  /** Engine that produced the screenshot (the request's `browser`); chromium when absent. */
-  browser?: BrowserName;
+  /** Target that produced the screenshot (the request's `target`); chromium when absent. */
+  browser?: CaptureTarget;
   /**
    * Wall-clock milliseconds the renderer spent on this capture, when it measured it. Recorded per
    * snapshot and read back as the per-story cost a shard plan orders its work by (ADR 0031).
@@ -67,8 +90,8 @@ export interface RenderFailure {
   viewportName: string;
   /** Error message. */
   error: string;
-  /** Engine the failure happened on; chromium when absent. */
-  browser?: BrowserName;
+  /** Target the failure happened on; chromium when absent. */
+  browser?: CaptureTarget;
 }
 
 /** The outcome of a render request. */
@@ -92,17 +115,13 @@ export interface RenderResult {
  * orchestrator's job (see `capture/orchestrator.ts`), keeping every adapter
  * implementation free of server concerns.
  */
-export type BrowserName = "chromium" | "firefox" | "webkit" | "chrome";
-
-/** Browser names accepted for capture rendering (Chromium default). */
-export const BROWSER_NAMES = ["chromium", "firefox", "webkit", "chrome"] as const;
-
-/** Engine that legacy rows and single-browser projects belong to. */
-export const DEFAULT_BROWSER: BrowserName = "chromium";
-
 export interface CaptureRunner extends Adapter<{
   readonly category: "capture-runner";
-  readonly supportedBrowsers?: readonly BrowserName[];
+  /**
+   * Every target the runner offers, default first (ADR 0007, decision 1), with whether each can
+   * render now. A runner that omits it offers any target.
+   */
+  readonly targets?: readonly RunnerTarget[];
 }> {
   /**
    * Render configured viewports for the given stories of an extracted
@@ -132,8 +151,8 @@ export interface CaptureRunner extends Adapter<{
     playTimeoutMs?: number;
     /** Whether to run a11y checks (axe) before screenshot; annotated as non-blocking. */
     runA11y?: boolean;
-    /** Browser to use for rendering (chromium default). */
-    browser?: BrowserName;
+    /** Target to render on (chromium when absent). */
+    target?: CaptureTarget;
     /**
      * Optional streaming hand-off. When provided, the runner awaits it with each
      * capture as soon as it is taken, then drops the buffer instead of adding the
@@ -162,7 +181,8 @@ export interface CaptureRunner extends Adapter<{
     storybookDir: string;
     stories: StoryEntry[];
     logger?: Logger;
-    browser?: BrowserName;
+    /** Target to read the parameters on: the project's primary (chromium when absent). */
+    target?: CaptureTarget;
     adapter?: StorySourceAdapter;
   }): Promise<Record<string, StoryParameters>>;
 

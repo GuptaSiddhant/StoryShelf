@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { resolveBrowsers } from "@storyshelf/core/capture";
 import { LabelModel } from "@storyshelf/core/models";
 import { MemberModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
@@ -7,6 +8,7 @@ import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
+import { assertTargetsSelectable } from "../targets.ts";
 import { toProjectPatch } from "./capture-config.ts";
 import { forbidden, requireSiteAdmin, resolveAuthorizedProject } from "./helpers.ts";
 import {
@@ -153,6 +155,10 @@ export function registerProjects(app: ShelfRouter): void {
     const project = await resolveAuthorizedProject(c, slug, ...ADMIN_ROLES);
     const body = c.req.valid("json");
     assertAiProfileChange(c, body.aiProfile);
+    await assertTargetsSelectable(
+      body.browsers ?? (body.browser === undefined ? [] : [body.browser]),
+      resolveBrowsers(project),
+    );
     const updated = await new ProjectModel(getStore().db).update(project.id, toProjectPatch(body));
     return c.json(updated);
   });

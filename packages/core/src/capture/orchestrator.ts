@@ -33,6 +33,7 @@ import { resolveViewports } from "./sizing.ts";
 import { extractStorybookToScratch, persistStorybookStatics } from "./statics.ts";
 import { StorybookAdapter } from "./storybook.ts";
 import { loadTarget } from "./target.ts";
+import { offeredTargets } from "./targets.ts";
 
 /** Table handles required by the orchestrator. */
 export type OrchestratorTables = BuildTables &
@@ -54,6 +55,8 @@ export interface CaptureJobOptions {
   secret?: SecretInput;
   /** Design providers validating declared design links; none ⇒ links are not extracted. */
   design?: DesignProvider[];
+  /** The resolved public origin (ADR 0007, decision 6); targets that need a URL wait for it. */
+  publicOrigin?: (() => Promise<string | undefined>) | undefined;
   /** Render budget override (tests use a short fuse). */
   renderTimeoutMs?: number | undefined;
   /**
@@ -225,13 +228,19 @@ async function runCapturePhases(
     const rawViewports = (project as unknown as { viewports?: string | null }).viewports;
     const viewports = resolveViewports(rawViewports, DEFAULT_VIEWPORTS, options.viewports);
     const browsers = resolveBrowsers(project);
-    assertSupportedBrowsers(browsers, options.runner.metadata.supportedBrowsers);
+    assertSupportedBrowsers(
+      browsers,
+      offeredTargets(options.runner, {
+        publicOrigin: await options.publicOrigin?.(),
+        hasSecret: options.secret !== undefined,
+      }),
+    );
     const enriched = await enrichStories({
       runner: options.runner,
       buildId: build.id,
       storybookDir,
       stories: discovered.filter((s) => !isDisabledStory(s)),
-      browser: browsers[0] ?? "chromium",
+      target: browsers[0] ?? "chromium",
       allowlist: parseModesAllowlist(project.modesAllowlist),
       logger,
     });

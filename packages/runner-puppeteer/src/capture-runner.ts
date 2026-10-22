@@ -1,9 +1,12 @@
 /** Puppeteer capture runner — composition root (factory wiring). */
 
-import type { BrowserName, CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
+import { createTargetOffers, type CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
 import { recommendedNavigationTimeoutMs } from "@storyshelf/core/utils";
+import { verifyLocalTargets } from "./availability.ts";
 import { activeRuns, closeBrowser } from "./browser.ts";
+import { launchLocal } from "./launch.ts";
 import { renderAll } from "./pipeline.ts";
+import { flattenBrowsers, type BrowserEntry, type LocalTarget } from "./targets.ts";
 import type { ActiveRun, PuppeteerRenderInput } from "./types.ts";
 
 declare const __PKG_VERSION__: string | undefined;
@@ -11,9 +14,15 @@ declare const __PKG_VERSION__: string | undefined;
 /** Create a CaptureRunner that renders Storybook stories with Puppeteer (Chromium via chrome-headless-shell). */
 export function createPuppeteerCaptureRunner(
   options: {
-    browser?: BrowserName;
-    supportedBrowsers?: readonly BrowserName[];
+    /**
+     * Every target the runner offers, default first (ADR 0007, decision 1): `"chromium"` or
+     * `local(engine, { executablePath })`. Default `["chromium"]`. Chromium-family engines only; bare
+     * `"chrome"` needs `local("chrome", { executablePath })`.
+     */
+    browsers?: readonly BrowserEntry[];
+    /** The executable bare entries launch (`puppeteer-core` ships no browser). */
     executablePath?: string;
+    /** Launch flags for local engines; replaces the default sandbox and low-memory flags. */
     args?: string[];
     /** Pages rendered at once; falls back to `STORYSHELF_CAPTURE_CONCURRENCY`, then CPU/memory detection. */
     concurrency?: number;
@@ -25,6 +34,18 @@ export function createPuppeteerCaptureRunner(
     reusePages?: boolean;
   } = {},
 ): CaptureRunner {
+  const locals = flattenBrowsers(options.browsers ?? ["chromium"], options.executablePath);
+  // Until `lifecycle.setup` verifies them, every declared engine reads as ready.
+  const offers = createTargetOffers(
+    locals.map(({ target }) => ({ target, reach: "loopback", status: "ready" })),
+  );
+  const launch = offers.guard(
+    async (target) =>
+      await launchLocal(
+        locals.find((entry) => entry.target === target) as LocalTarget,
+        options.args,
+      ),
+  );
   const concurrency = options.concurrency ?? envPositiveInt("STORYSHELF_CAPTURE_CONCURRENCY");
   const navigationTimeoutMs =
     options.navigationTimeoutMs ??
@@ -41,8 +62,11 @@ export function createPuppeteerCaptureRunner(
       description: "Puppeteer capture runner (chrome-headless-shell)",
       kind: "puppeteer",
       category: "capture-runner",
-      supportedBrowsers: options.supportedBrowsers ?? ["chromium", "chrome"],
+      get targets() {
+        return offers.current();
+      },
     },
+    lifecycle: offers.lifecycle(async () => await Promise.resolve(verifyLocalTargets(locals))),
     async render(input: PuppeteerRenderInput) {
       const active: ActiveRun = { cancelled: false, browser: null };
       const remove = activeRuns.add(input.buildId, input.runId, active);
@@ -50,7 +74,8 @@ export function createPuppeteerCaptureRunner(
         return await renderAll(
           { concurrency, navigationTimeoutMs, recycleBrowserEvery, reusePages, ...input },
           active,
-          options,
+          launch,
+          offers.defaultTarget,
         );
       } finally {
         remove();
