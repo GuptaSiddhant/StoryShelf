@@ -40,6 +40,7 @@ projects (
   pixel_threshold     real NOT NULL DEFAULT 0.1,    -- per-pixel color distance (0-1)
   max_diff_ratio      real NOT NULL DEFAULT 0.01,   -- max allowed diff ratio (0-1)
   public_branch_regex text,                    -- branches whose builds are publicly viewable (ADR 0011)
+  run_a11y            boolean NOT NULL DEFAULT true,   -- axe accessibility checks during capture; results are shown in review and never block (ADR 0004, decision 6)
   review_enabled      boolean NOT NULL DEFAULT true,   -- review on: non-default builds wait for a verdict (ADR 0013, decision 1)
   review_approvals    integer NOT NULL DEFAULT 1,      -- approvals a build needs with `testing` off (ADR 0013, decision 3)
   storybook_url_ttl_seconds integer,           -- lifetime of the signed Storybook URLs of a render; NULL derives it from the build (ADR 0007, decision 5)
@@ -90,6 +91,7 @@ snapshots (
   status              text NOT NULL DEFAULT 'pending',  -- pending|new|unchanged|changed|approved|rejected
   reviewed_by         text,
   reviewed_at         text,
+  a11y_violations     text,                    -- JSON array of the axe violation lines found on this capture (non-blocking); NULL when none
   created_at          text NOT NULL,
   updated_at          text NOT NULL,
   baseline_id         text,                    -- baseline row the diff was computed against (NULL: none, or legacy row)

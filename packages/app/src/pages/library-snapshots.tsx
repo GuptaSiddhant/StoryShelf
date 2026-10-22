@@ -20,6 +20,7 @@ import {
   snapshotCardMeta,
   snapshotGrid,
 } from "../ui/styles/review.ts";
+import { A11yViolationsDetails } from "./a11y-violations.tsx";
 import { groupSnapshots } from "./build-diff-model.ts";
 import { DesignButtons, type DesignPreviewInfo, type ProjectDesignLink } from "./design-links.tsx";
 
@@ -134,6 +135,7 @@ function SnapshotCardItem(props: {
           alt={`${snap.storyTitle} / ${snap.storyName}`}
           loading="lazy"
         />
+        <A11yViolationsDetails snapshot={snap} />
         <SnapshotActions {...props} />
       </div>
     </div>

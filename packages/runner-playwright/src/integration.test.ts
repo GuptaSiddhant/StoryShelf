@@ -232,16 +232,21 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
   }, 300_000);
 
   it("a11y: axe annotates violations, honours parameters.a11y, and never fails the build", async () => {
-    const { app, db, staticDir } = getHarness();
+    const { app, staticDir } = getHarness();
 
     // Runner level: the annotation text names the rule.
     const rendered = await createPlaywrightCaptureRunner({ concurrency: 1 }).render({
       buildId: "a11y-direct",
       storybookDir: staticDir,
       stories: [
-        ...["missing-alt", "low-contrast", "clean", "disabled-a11y", "rule-override"].map((name) =>
-          a11yStory(name),
-        ),
+        ...[
+          "missing-alt",
+          "low-contrast",
+          "clean",
+          "disabled-a11y",
+          "rule-override",
+          "best-practice",
+        ].map((name) => a11yStory(name)),
         {
           id: "components-button--primary",
           title: "Components/Button",
@@ -254,7 +259,7 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
     });
     const annotation = (id: string): string =>
       rendered.failures.find((failure) => failure.storyId === id)?.error ?? "";
-    expect(rendered.captures).toHaveLength(6);
+    expect(rendered.captures).toHaveLength(7);
     // Existing fixture stories stay clean.
     expect(annotation("components-button--primary")).toBe("");
     expect(annotation("components-accessibility--missing-alt")).toMatch(
@@ -262,6 +267,8 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
     );
     expect(annotation("components-accessibility--missing-alt")).toContain("button-name");
     expect(annotation("components-accessibility--low-contrast")).toContain("color-contrast");
+    // The default run set includes best-practice rules (#243).
+    expect(annotation("components-accessibility--best-practice")).toContain("heading-order");
     expect(annotation("components-accessibility--clean")).toBe("");
     expect(annotation("components-accessibility--disabled-a11y")).toBe("");
     // config.rules switches image-alt off; the other violation is still reported.
@@ -274,8 +281,11 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name: "A11y Smoke" }),
     });
-    const project = await readJson<{ id: string; slug: string }>(projectResponse);
-    await db.update(db.tables.projects, project.id, { runA11y: true });
+    const project = await readJson<{ id: string; slug: string; runA11y?: boolean }>(
+      projectResponse,
+    );
+    // Accessibility checks are on by default: nothing switches them on here.
+    expect(project.runA11y).toBe(true);
     const uploaded = await uploadBuild(app, project.slug, staticDir, {
       gitSha: "f".repeat(40),
       gitBranch: "feature/a11y",
@@ -295,6 +305,21 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
     expect(flagged.has("components-accessibility--low-contrast")).toBe(true);
     expect(flagged.has("components-accessibility--clean")).toBe(false);
     expect(flagged.has("components-accessibility--disabled-a11y")).toBe(false);
+
+    // The findings are persisted on the snapshot for the review UI.
+    const snapshots = await readJson<Snapshot[]>(
+      await app.request(`/api/v1/projects/${project.slug}/builds/${build.id}/snapshots`),
+    );
+    const violationsOf = (storyId: string): string[] => {
+      const raw = snapshots.find((snap) => snap.storyId === storyId)?.a11yViolations;
+      return raw ? (JSON.parse(raw) as string[]) : [];
+    };
+    expect(violationsOf("components-accessibility--missing-alt").join(" ")).toContain("image-alt");
+    expect(violationsOf("components-accessibility--best-practice").join(" ")).toContain(
+      "heading-order",
+    );
+    expect(violationsOf("components-accessibility--clean")).toEqual([]);
+    expect(violationsOf("components-button--primary")).toEqual([]);
   }, 300_000);
 
   it("modes: theme globals produce distinct, correctly sized captures", async () => {

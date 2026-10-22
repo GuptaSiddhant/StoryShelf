@@ -281,3 +281,49 @@ describe("review page: capture environment migration", () => {
     expect(html).not.toContain("No diff:");
   });
 });
+
+const VIOLATION =
+  "color-contrast (serious): Elements must meet minimum color contrast [button] 1 node(s)";
+
+async function pageWith(violations: string | null): Promise<string> {
+  const { db } = makeDatabase();
+  const { storage } = makeStorage();
+  const project = await new ProjectModel(db).create({ name: "Docs" });
+  const build = await new BuildModel(db).create(project.id, {
+    gitSha: "abc1234def",
+    gitBranch: "feature/x",
+  });
+  const snap = await new SnapshotModel(db).create(project.id, build.id, {
+    storyId: "button--primary",
+    storyName: "Primary",
+    storyTitle: "Button",
+    viewportName: "desktop",
+    viewportWidth: 1280,
+    viewportHeight: 720,
+    screenshotPath: "shots/primary.png",
+    a11yViolations: violations,
+  });
+  await new SnapshotModel(db).update(snap.id, { status: "changed" });
+  const app = createShelfApp({
+    testing: { runner: stubRunner() },
+    database: db,
+    storage,
+    logger: createShelfLogger({ level: "silent" }),
+  });
+  const url = `/projects/${project.slug}/builds/${build.id}/diff?snapshot=${snap.id}`;
+  return await (await app.request(url)).text();
+}
+
+describe("review page: accessibility violations", () => {
+  it("shows the findings above the comparison and a count in the filmstrip", async () => {
+    const html = await pageWith(JSON.stringify([VIOLATION]));
+    expect(html).toContain("Accessibility: 1 found (does not block)");
+    expect(html).toContain("color-contrast (serious)");
+    expect(html).toContain("a11y 1");
+  });
+
+  it("shows nothing for a snapshot without findings or with unreadable data", async () => {
+    expect(await pageWith(null)).not.toContain("Accessibility:");
+    expect(await pageWith("not json")).not.toContain("Accessibility:");
+  });
+});

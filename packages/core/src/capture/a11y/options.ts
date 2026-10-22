@@ -3,10 +3,15 @@
 /** The story root axe scans unless `parameters.a11y.element`/`context` says otherwise. */
 export const A11Y_ROOT_SELECTOR = "#storybook-root";
 
-/** WCAG rule tags scanned by default; `parameters.a11y.options.runOnly` replaces them. */
+/**
+ * Rule tags scanned by default: WCAG A/AA plus axe's `best-practice` rules; `parameters.a11y.options.runOnly`
+ * replaces them. The page-level best-practice rules (`region`, `landmark-one-main`,
+ * `page-has-heading-one`) need the whole document in scope and so stay silent for the default
+ * scan of `#storybook-root`; no rule is switched off by default (checked in a real browser).
+ */
 const DEFAULT_RUN_ONLY = {
   type: "tag",
-  values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"],
+  values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"],
 };
 
 /** What to hand to `axe.configure` / `axe.run` in the page (JSON-serialisable). */

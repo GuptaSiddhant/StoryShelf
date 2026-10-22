@@ -344,7 +344,7 @@ function renderRequest(
     logger: progress.mirror.logger,
     executePlay: project.executePlay ?? false,
     playTimeoutMs: project.playTimeoutMs ?? 10_000,
-    runA11y: project.runA11y ?? false,
+    runA11y: project.runA11y ?? true,
     target: browser,
   };
 }

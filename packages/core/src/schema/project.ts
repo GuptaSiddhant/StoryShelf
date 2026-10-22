@@ -11,6 +11,7 @@ export interface Project {
   storybookMeta: string | null | undefined;
   executePlay: boolean;
   playTimeoutMs: number;
+  /** Run axe accessibility checks during capture; on by default (annotations never block). */
   runA11y?: boolean;
   browser?: string;
   viewports?: string | null;

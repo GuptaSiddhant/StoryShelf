@@ -163,6 +163,11 @@ function primaryBrowser(ctx: CaptureContext): string {
   return runBrowsers(ctx)[0] ?? DEFAULT_BROWSER;
 }
 
+/** The capture's axe violation texts as the JSON stored on the snapshot; null when there are none. */
+function a11yJsonOf(capture: { a11y?: string[] }): string | null {
+  return capture.a11y && capture.a11y.length > 0 ? JSON.stringify(capture.a11y) : null;
+}
+
 function browserOf(capture: { browser?: string }): string {
   return capture.browser ?? DEFAULT_BROWSER;
 }
@@ -387,6 +392,7 @@ async function createWithoutBaseline(
   const snapshot = await snapshots.create(ctx.project.id, ctx.build.id, {
     browser,
     durationMs: capture.durationMs ?? null,
+    a11yViolations: a11yJsonOf(capture),
     storyId: capture.story.id,
     storyName: capture.story.name,
     storyTitle: capture.story.title,
@@ -495,6 +501,7 @@ function snapshotInput(input: BaselineCapture): Parameters<SnapshotModel["create
   return {
     browser: browserOf(capture),
     durationMs: capture.durationMs ?? null,
+    a11yViolations: a11yJsonOf(capture),
     storyId: capture.story.id,
     storyName: capture.story.name,
     storyTitle: capture.story.title,

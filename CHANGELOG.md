@@ -65,6 +65,17 @@ optional for now. Separately, `packages/app/src/routes/classification.ts` now cl
 registered route as `hosting`, `testing`, `review` or `both`, and a test fails on any unclassified
 or stale route (classification only, nothing is gated yet).
 
+**Changed: accessibility checks are on by default and visible in review (ADR 0004 §6).** `runA11y`
+now defaults to on for new projects (no migration: an existing database keeps the stored value) and
+a project admin can turn it off in Settings > Tests or with `runA11y` on the project API (create,
+read, PATCH, OpenAPI). The axe findings are no longer only in the runner log: each capture's
+violation lines are stored on its snapshot (`snapshots.a11y_violations`, JSON array, new nullable
+column in the DDL; exposed as `a11yViolations` in the snapshot API) and shown on the snapshot review
+page, in the filmstrip and on the component page. They still never block a build or change a
+status. The default rule set is now the WCAG A/AA tags plus axe's `best-practice` tag (an explicit
+`parameters.a11y.options.runOnly` still replaces it); the page-level best-practice rules do not fire
+for the default `#storybook-root` scan, so no rule is disabled. The MCP server and the CLI do not
+mirror other project settings and do not expose it. Fixtures gained a `BestPractice` story.
 **Added: axe-core accessibility checks (ADR 0004 §6).** With `runA11y` on, the Playwright and
 Puppeteer runners now run axe-core over `#storybook-root` before the screenshot instead of the old
 hand-rolled DOM scan (removed, with no fallback). Each violation is one `a11y:` annotation with the

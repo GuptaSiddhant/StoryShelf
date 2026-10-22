@@ -64,6 +64,7 @@ describe.skipIf(!LIVE)("mysql live (real MySQL, gated on LIVE_CLOUD=1)", () => {
     const found = (await liveDb().get(schema.projects, id)) as Project | null;
     expect(found?.slug).toBe(slug);
     expect(found?.storybookUrlTtlSeconds ?? null).toBeNull();
+    expect(found?.runA11y).toBe(true);
     await liveDb().update(schema.projects, id, { storybookUrlTtlSeconds: 14_400 });
     const updated = (await liveDb().get(schema.projects, id)) as Project | null;
     expect(updated?.storybookUrlTtlSeconds).toBe(14_400);

@@ -131,6 +131,7 @@ describe("createTursoDatabase", () => {
     })) as Project;
     expect(project.executePlay).toBe(false);
     expect(project.playTimeoutMs).toBe(10_000);
+    expect(project.runA11y).toBe(true);
     expect(project.browser).toBe("chromium");
 
     const listed = await db.list(schema.projects);
