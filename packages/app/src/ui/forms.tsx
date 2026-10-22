@@ -301,31 +301,34 @@ export const CheckField: FC<{
 export const TextareaField: FC<{
   label: string;
   name: string;
+  /** DOM id when several forms on a page post the same field name (defaults to `name`). */
+  id?: string;
   value?: string;
   placeholder?: string;
   rows?: number;
   required?: boolean;
   hint?: string;
   error?: string;
-}> = ({ label, name, value, placeholder, rows = 3, required, hint, error }) => {
+}> = ({ label, name, id, value, placeholder, rows = 3, required, hint, error }) => {
+  const domId = id ?? name;
   return (
     <div class={fieldWrap}>
-      <label class={fieldLabel} for={name}>
+      <label class={fieldLabel} for={domId}>
         {label}
       </label>
       <textarea
         class={error ? fieldTextareaError : fieldTextarea}
-        id={name}
+        id={domId}
         name={name}
         placeholder={placeholder}
         rows={rows}
         required={required}
         aria-invalid={error ? "true" : undefined}
-        aria-describedby={fieldDescribedBy(name, error, hint)}
+        aria-describedby={fieldDescribedBy(domId, error, hint)}
       >
         {value}
       </textarea>
-      <FieldAssistant name={name} error={error} hint={hint} />
+      <FieldAssistant name={domId} error={error} hint={hint} />
     </div>
   );
 };

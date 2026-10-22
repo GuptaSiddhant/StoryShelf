@@ -16,6 +16,7 @@ import {
   VStack,
 } from "../ui/components.tsx";
 import type { ComponentPageData } from "./component-detail.tsx";
+import { StoryComments } from "./review-comments.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -37,6 +38,15 @@ export function StoriesTab(props: { data: ComponentPageData }): Rendered {
   return (
     <VStack>
       {selected ? <PreviewCard data={data} story={selected} /> : null}
+      {selected && data.review ? (
+        <StoryComments
+          project={data.project}
+          build={data.catalog.build}
+          storyId={selected.id}
+          comments={data.review.comments}
+          canComment={data.review.canComment}
+        />
+      ) : null}
       <Card padded={false}>
         <Table>
           <table>

@@ -21,6 +21,7 @@ function options(): ShelfOptions {
 }
 
 const buildState = { request: vi.fn(async () => {}) };
+const reviewRequested = vi.fn(async () => {});
 
 function jobsFor(opts: ShelfOptions, serverless: boolean) {
   return createJobQueue(opts, serverless ? [] : ["publish"], 2);
@@ -32,10 +33,11 @@ describe("setupPublishing", () => {
     const wiring = setupPublishing(opts, {}, logger, false, {
       jobs: jobsFor(opts, false),
       buildState,
+      reviewRequested,
     });
     expect(wiring.enqueuePublish).toBeTypeOf("function");
     expect(wiring.handler?.run).toBeTypeOf("function");
-    expect(wiring.afterPublish).toHaveLength(2);
+    expect(wiring.afterPublish).toHaveLength(3);
   });
 
   it("wires no job side on a host that polls no publish jobs (serverless)", () => {
@@ -43,6 +45,7 @@ describe("setupPublishing", () => {
     const wiring = setupPublishing(opts, {}, logger, false, {
       jobs: jobsFor(opts, true),
       buildState,
+      reviewRequested,
     });
     expect(wiring.enqueuePublish).toBeUndefined();
     expect(wiring.handler).toBeNull();
@@ -51,7 +54,11 @@ describe("setupPublishing", () => {
   it("queues a publish job on the shared database queue", async () => {
     const opts = options();
     const jobs = jobsFor(opts, false);
-    const wiring = setupPublishing(opts, {}, logger, false, { jobs: jobs, buildState });
+    const wiring = setupPublishing(opts, {}, logger, false, {
+      jobs: jobs,
+      buildState,
+      reviewRequested,
+    });
     await wiring.enqueuePublish?.("b1", "req-1");
     expect(await jobs.view.active()).toEqual([expect.objectContaining({ buildId: "b1" })]);
     expect(await jobs.get().poll()).toMatchObject({ kind: "publish", buildId: "b1" });
@@ -62,7 +69,7 @@ describe("setupPublishing", () => {
     const project = await createTestProject(opts.database, opts.database.tables);
     const build = await createTestBuild(opts.database, opts.database.tables, project.id);
     const jobs = jobsFor(opts, false);
-    setupPublishing(opts, {}, logger, false, { jobs: jobs, buildState });
+    setupPublishing(opts, {}, logger, false, { jobs: jobs, buildState, reviewRequested });
     await jobs.exhausted.publish?.(
       { buildId: build.id, kind: "publish" } as never,
       "lease expired on the final attempt",
@@ -89,6 +96,7 @@ describe("setupPublishing", () => {
     const wiring = setupPublishing(opts, {}, logger, false, {
       jobs: jobsFor(opts, serverless),
       buildState,
+      reviewRequested,
     });
     await wiring.completer.complete(build.id, { ok: true });
     const rows = await new BuildComponentModel(opts.database).listByBuild(build.id);
@@ -106,8 +114,43 @@ describe("setupPublishing: build state", () => {
     const wiring = setupPublishing(opts, {}, logger, false, {
       jobs: jobsFor(opts, false),
       buildState: { request },
+      reviewRequested,
     });
     await wiring.completer.complete(build.id, { ok: true });
     expect(request).toHaveBeenCalledWith(build.id);
+  });
+});
+
+async function publish(
+  captureWillRun: boolean,
+  projectPatch: Record<string, unknown>,
+  branch: string,
+  outcome: { ok: true } | { ok: false; error: string },
+): Promise<number> {
+  const opts = options();
+  const project = await createTestProject(opts.database, opts.database.tables, projectPatch);
+  const build = await createTestBuild(opts.database, opts.database.tables, project.id, {
+    gitBranch: branch,
+  });
+  const requested = vi.fn(async () => {});
+  const wiring = setupPublishing(opts, {}, logger, captureWillRun, {
+    jobs: jobsFor(opts, false),
+    buildState,
+    reviewRequested: requested,
+  });
+  await wiring.completer.complete(build.id, outcome);
+  return requested.mock.calls.length;
+}
+
+describe("setupPublishing: review requests", () => {
+  it("asks the reviewers when a published build waits for a verdict", async () => {
+    expect(await publish(false, {}, "feat", { ok: true })).toBe(1);
+  });
+
+  it("stays silent for an accepted build, a failed publish, review off and testing", async () => {
+    expect(await publish(false, {}, "main", { ok: true })).toBe(0);
+    expect(await publish(false, {}, "feat", { ok: false, error: "x" })).toBe(0);
+    expect(await publish(false, { reviewEnabled: false }, "feat", { ok: true })).toBe(0);
+    expect(await publish(true, {}, "feat", { ok: true })).toBe(0);
   });
 });

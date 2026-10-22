@@ -1,4 +1,7 @@
-/** Build-level verdicts (ADR 0013, decision 3): giving one and reading where a build stands. */
+/**
+ * Build-level verdicts (ADR 0013, decision 3): giving one and reading where a build stands. The
+ * routes are classed `review`, so `requireReview` answers 404 for a project with review off.
+ */
 import {
   BuildModel,
   BuildReviewModel,
@@ -9,9 +12,9 @@ import type { Build, BuildReview, Project } from "@storyshelf/core/schema";
 import type { BuildStatus, ReviewVerdict } from "@storyshelf/core/types";
 import { HTTPException } from "hono/http-exception";
 import { requestBuildState } from "../git-status.ts";
+import { REVIEW_EVENTS, announceReview } from "../review-events.ts";
 import { getStore } from "../store.ts";
 import { announceBuildStatus } from "./builds.handlers.ts";
-import { notFound } from "./helpers.ts";
 
 /** Statuses the verdicts may move a build between; a failed or capturing build is not theirs to decide. */
 const VERDICT_STATUSES: ReadonlySet<BuildStatus> = new Set(["pending", "approved", "rejected"]);
@@ -23,13 +26,6 @@ export interface ReviewState {
   approvals: number;
   latest: BuildReview[];
   history: BuildReview[];
-}
-
-/** Review is a project switch: a project with it off has no verdict routes (ADR 0013, decision 1). */
-export function assertReviewEnabled(project: Project): void {
-  if (project.reviewEnabled === false) {
-    notFound("Review is off for this project");
-  }
 }
 
 /** The verdicts of a build and what they make of it. */
@@ -49,7 +45,7 @@ export async function reviewStateOf(project: Project, build: Build): Promise<Rev
  * Record `userId`'s verdict and let the verdicts decide the build. With `testing` on the verdict is
  * stored as a sign-off and the snapshot rollup keeps deciding. Every write asks for the build's
  * state to be shown on its git channels; a status the verdicts moved to `approved` or `rejected`
- * is announced like any other (webhook and notifications).
+ * is announced like any other (webhook and notifications). Every verdict raises `review:verdict`.
  */
 export async function giveVerdict(
   project: Project,
@@ -67,6 +63,19 @@ export async function giveVerdict(
     input.body,
   );
   const status = await decideBuild(project, build);
+  await announceReview(
+    project,
+    REVIEW_EVENTS.verdict,
+    {
+      buildId: build.id,
+      gitBranch: build.gitBranch,
+      verdict: review.verdict,
+      userId,
+      body: review.body?.slice(0, 500) ?? null,
+      status: status ?? build.status,
+    },
+    build.id,
+  );
   // Only a decision is news; a build sent back to `pending` just shows its new state on the host.
   if (status === null || status === "pending") {
     await requestBuildState(build.id);

@@ -5,7 +5,7 @@ description: MCP server for AI agents — stdio and Streamable HTTP, a thin clie
 
 import { PackageManagers } from "starlight-package-managers";
 
-`@storyshelf/mcp` is the [MCP server](/ai/mcp/): it lets AI agents read builds, snapshot diffs and AI triage and comment on reviews, using your existing API tokens. It never approves or rejects. See [ADR 0027](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/0027-mcp-server.md).
+`@storyshelf/mcp` is the [MCP server](/ai/mcp/): it lets AI agents read builds, snapshot diffs and AI triage and comment on reviews, using your existing API tokens. It never approves or rejects: an agent cannot sign off a build, so there is no snapshot-approval tool and no build-verdict tool. See [ADR 0017](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/0017-mcp-server.md).
 
 ## Install
 
@@ -13,6 +13,18 @@ import { PackageManagers } from "starlight-package-managers";
 
 - [npm package](https://www.npmjs.com/package/@storyshelf/mcp) — install tarballs and version history.
 - [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/mcp) — package directory on `main`.
+
+## Tools
+
+Read tools cover projects, builds, snapshots and AI insights. The write tools are the review comments, which are `review` routes of the API:
+
+| Tool              | What it does                                                                                                   |
+| ----------------- | -------------------------------------------------------------------------------------------------------------- |
+| `list_comments`   | Build comments, story comments and per-snapshot threads of a build.                                            |
+| `add_comment`     | Adds a comment to a build, optionally anchored to a story (`storyId`) or a snapshot (`snapshotId`), or a reply. Needs a token with `developer` or above. |
+| `resolve_comment` | Marks a comment resolved.                                                                                      |
+
+A project with [review](/guides/review/#review-without-screenshots) off has no comments: these tools fail with 404 for it. Build verdicts (`POST …/reviews`) are deliberately not exposed.
 
 ## Usage
 

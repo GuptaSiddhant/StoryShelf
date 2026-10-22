@@ -6,7 +6,9 @@ import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
 import { assertTargetsSelectable } from "../targets.ts";
 import { flash } from "./flash.ts";
+import { resolveAuthorizedProject } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
+import { runSwitchOffPass } from "./review-switch-off.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
 /** General project settings (name, repo, thresholds) and danger-zone delete. */
 export function registerGeneralSettings(app: ShelfRouter): void {
@@ -16,6 +18,7 @@ export function registerGeneralSettings(app: ShelfRouter): void {
   );
   app.post("/projects/:slug/settings", handleGeneralUpdate);
   app.post("/projects/:slug/settings/tests", handleTestsUpdate);
+  app.post("/projects/:slug/settings/review", handleReviewUpdate);
   app.post("/projects/:slug/delete", handleDeleteProject);
 }
 
@@ -151,4 +154,50 @@ async function handleDeleteProject(c: Context): Promise<Response> {
   await new ProjectModel(getStore().db).remove(project.id);
   flash(c, `Deleted ${project.name}`);
   return hxRedirect(c, "/projects");
+}
+
+/** Largest approval count the form and the API accept. */
+const MAX_APPROVALS = 20;
+
+/**
+ * Review settings (ADR 0013, decision 1): the switch and the approvals a build needs. Project
+ * admins only. The route is classed `hosting`, not `review`: a review route answers 404 while
+ * review is off, and this is the form that turns it back on. Turning review off accepts the
+ * project's pending builds that no capture worked on, in one pass.
+ */
+async function handleReviewUpdate(c: Context): Promise<Response> {
+  const slug = c.req.param("slug") ?? "";
+  const project = await resolveAuthorizedProject(c, slug, "admin");
+  const form = await c.req.formData();
+  const approvals = approvalsOf(form, project);
+  if (approvals === null) {
+    return c.html(
+      (await renderSettingsPage(c, "general", {
+        errors: { reviewApprovals: `Enter a whole number from 1 to ${MAX_APPROVALS}` },
+      })) ?? "",
+      400,
+    );
+  }
+  const updated = await new ProjectModel(getStore().db).update(project.id, {
+    reviewEnabled: form.get("reviewEnabled") === "true",
+    reviewApprovals: approvals,
+  });
+  const accepted = await runSwitchOffPass(project, updated);
+  flash(c, reviewSavedMessage(accepted));
+  return hxRedirect(c, `/projects/${slug}/settings`);
+}
+
+/** The approvals count of the form (the current one when blank); null when it is not 1 to 20. */
+function approvalsOf(form: FormData, project: Project): number | null {
+  const raw = asString(form.get("reviewApprovals"));
+  const approvals = raw ? Number(raw) : (project.reviewApprovals ?? 1);
+  return Number.isInteger(approvals) && approvals >= 1 && approvals <= MAX_APPROVALS
+    ? approvals
+    : null;
+}
+
+function reviewSavedMessage(accepted: number): string {
+  return accepted > 0
+    ? `Review settings saved; accepted ${accepted} pending build${accepted === 1 ? "" : "s"}`
+    : "Review settings saved";
 }

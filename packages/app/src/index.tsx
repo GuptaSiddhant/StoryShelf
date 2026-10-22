@@ -27,6 +27,7 @@ import {
   authGate,
   csrf,
   createRateLimiter,
+  requireReview,
   requireTesting,
   rateLimitKey,
   requestLogging,
@@ -57,11 +58,13 @@ import {
 import { registerNotificationSubscriptions } from "./routers/notification-subscriptions.ts";
 import { registerProfile } from "./routers/profile.ts";
 import { registerProjects } from "./routers/projects.ts";
+import { registerReviewForms } from "./routers/review-forms.ts";
 import { registerStorybook } from "./routers/storybook.ts";
 import { registerTokens } from "./routers/tokens.ts";
 import { registerUiPages } from "./routers/ui.ts";
 import { registerWebhooks } from "./routers/webhooks.ts";
 import { registerWellKnown } from "./routers/well-known.ts";
+import { markRouteClasses } from "./routes/openapi-classes.ts";
 import { resolveRuntime, type ServerRuntime } from "./runtime.ts";
 
 /**
@@ -161,6 +164,9 @@ const CSRF_PATHS = [
   "/admin/public-origin",
   "/admin/public-origin/*",
   "/projects/:slug/builds/:buildId/insights/generate",
+  "/projects/:slug/builds/:buildId/comments",
+  "/projects/:slug/builds/:buildId/comments/*",
+  "/projects/:slug/builds/:buildId/reviews",
   "/projects/:slug/insights/health/generate",
 ] as const;
 
@@ -185,6 +191,8 @@ function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
   mountGuards(app, config);
   mountStoreScope(app, wiring);
   app.use("*", authGate());
+  // Routes classified `review` answer 404 for a project with review off (ADR 0013, decision 10).
+  app.use("*", requireReview());
 }
 
 const MINUTE = 60_000;
@@ -330,6 +338,7 @@ function registerPageRoutes(app: ShelfRouter, options: ShelfOptions, health: Hea
   registerAdminPages(app, health, options.auth);
   registerPublicOriginRoutes(app);
   registerUiPages(app);
+  registerReviewForms(app);
   registerInsightFragments(app);
 }
 
@@ -339,53 +348,65 @@ function registerAllRoutes(app: ShelfRouter, options: ShelfOptions, health: Heal
   registerPageRoutes(app, options, health);
 }
 
+/** The OpenAPI document's info and tag catalog. */
+const OPENAPI_CONFIG = {
+  openapi: "3.0.0",
+  info: {
+    title: "StoryShelf API",
+    description:
+      "REST API for the StoryShelf visual testing platform. JSON endpoints live under /api/v1; HTML pages are served at /.",
+    version: "1.0.0",
+  },
+  tags: [
+    {
+      name: "Projects",
+      description: "Create and manage projects (one project is one Storybook).",
+    },
+    {
+      name: "Builds",
+      description: "Upload Storybook builds, inspect capture attempts, retry, and delete.",
+    },
+    {
+      name: "Review",
+      description:
+        "Approve or reject snapshots, bulk actions, re-diff, build verdicts, the build changeset and review comments.",
+    },
+    { name: "Labels", description: "Typed build labels and their link templates." },
+    {
+      name: "Links",
+      description:
+        "Link packages to the projects that publish them and see where stories use them.",
+    },
+    { name: "Baselines", description: "Export and import baselines as a portable zip." },
+    {
+      name: "Members",
+      description: "Project members, roles, and identity-provider group mappings.",
+    },
+    {
+      name: "Insights",
+      description: "AI build triage and project health (advisory only; needs AI configured).",
+    },
+    { name: "Tokens", description: "API tokens used by the CLI and CI." },
+    { name: "Webhooks", description: "Signed webhook deliveries for build events." },
+    {
+      name: "Notifications",
+      description: "Email, chat and git notification channels and subscriptions.",
+    },
+    { name: "Admin", description: "Site-wide administration." },
+  ],
+} as const;
+
 /** Register the OpenAPI document and interactive docs page. */
 function registerDocs(app: ShelfRouter): void {
-  app.doc("/api/v1/openapi.json", {
-    openapi: "3.0.0",
-    info: {
-      title: "StoryShelf API",
-      description:
-        "REST API for the StoryShelf visual testing platform. JSON endpoints live under /api/v1; HTML pages are served at /.",
-      version: "1.0.0",
-    },
-    tags: [
-      {
-        name: "Projects",
-        description: "Create and manage projects (one project is one Storybook).",
-      },
-      {
-        name: "Builds",
-        description: "Upload Storybook builds, inspect capture attempts, retry, and delete.",
-      },
-      {
-        name: "Review",
-        description: "Approve or reject snapshots, bulk actions, re-diff, and review comments.",
-      },
-      { name: "Labels", description: "Typed build labels and their link templates." },
-      {
-        name: "Links",
-        description:
-          "Link packages to the projects that publish them and see where stories use them.",
-      },
-      { name: "Baselines", description: "Export and import baselines as a portable zip." },
-      {
-        name: "Members",
-        description: "Project members, roles, and identity-provider group mappings.",
-      },
-      {
-        name: "Insights",
-        description: "AI build triage and project health (advisory only; needs AI configured).",
-      },
-      { name: "Tokens", description: "API tokens used by the CLI and CI." },
-      { name: "Webhooks", description: "Signed webhook deliveries for build events." },
-      {
-        name: "Notifications",
-        description: "Email, chat and git notification channels and subscriptions.",
-      },
-      { name: "Admin", description: "Site-wide administration." },
-    ],
-  });
+  // Every operation carries the class of its route (`x-storyshelf-class`), so a client can tell
+  // what an instance hides: `testing` routes 404 without `testing`, `review` ones with review off.
+  app.get("/api/v1/openapi.json", (c) =>
+    c.json(
+      markRouteClasses(
+        app.getOpenAPIDocument({ ...OPENAPI_CONFIG, tags: [...OPENAPI_CONFIG.tags] }),
+      ),
+    ),
+  );
   app.get("/api/v1/docs", swaggerUI({ url: "/api/v1/openapi.json" }));
 }
 

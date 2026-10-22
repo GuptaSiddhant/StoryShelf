@@ -40,7 +40,7 @@ describe("StoryShelf MCP server", () => {
         "add_comment",
       ]),
     );
-    expect(names.some((n) => /approve|reject|retry|generate/u.test(n))).toBe(false);
+    expect(names.some((n) => /approve|reject|retry|generate|verdict|review_/u.test(n))).toBe(false);
     expect(tools.find((tool) => tool.name === "add_comment")?.annotations?.readOnlyHint).toBe(
       false,
     );
@@ -72,6 +72,19 @@ describe("StoryShelf MCP server", () => {
     expect(post).toHaveBeenCalledWith("/projects/web/builds/b1/comments", {
       body: "LGTM",
       snapshotId: "s1",
+    });
+  });
+
+  it("posts a story comment", async () => {
+    const post = vi.fn().mockResolvedValue({ id: "c2" });
+    const client = await connect(fakeClient({ post }));
+    await client.callTool({
+      name: "add_comment",
+      arguments: { buildId: "b1", body: "Focus ring?", storyId: "button--primary" },
+    });
+    expect(post).toHaveBeenCalledWith("/projects/web/builds/b1/comments", {
+      body: "Focus ring?",
+      storyId: "button--primary",
     });
   });
 

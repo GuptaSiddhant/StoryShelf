@@ -31,6 +31,7 @@ import {
 } from "./design.handlers.ts";
 import { linkedUsageFor } from "./links.handlers.ts";
 import { isAnonymouslyViewable } from "./preview-access.ts";
+import { loadComponentReview } from "./review-section.handlers.ts";
 
 async function buildsOf(snapshots: readonly Snapshot[]): Promise<Build[]> {
   const model = new BuildModel(getStore().db);
@@ -143,6 +144,7 @@ export async function loadComponentPage(
     story,
     previewable: isAnonymouslyViewable(view.build, project),
     publishedBaseDomain: getStore().config.publishedBaseDomain,
+    review: await loadComponentReview(project, view.build),
     ...tabData,
   };
 }

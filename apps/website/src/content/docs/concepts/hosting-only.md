@@ -33,7 +33,7 @@ Existing snapshots are **hidden, not deleted**: they reappear when `testing` is 
 
 ## Which builds are accepted
 
-A published build on the project's default branch becomes `approved` when publishing finishes, and so does a build on any other branch when the project has review off. With review on (the default) a build on another branch stays `pending` until an approver or admin gives it a build-level verdict; see [Review](/guides/review/#reviewing-without-testing). With `testing` on, capture sets the status. See [Published Storybook](/concepts/publishing/).
+A published build on the project's default branch becomes `approved` when publishing finishes, and so does a build on any other branch when the project has review off. With review on (the default) a build on another branch stays `pending` until an approver or admin gives it a build-level verdict; see [Review](/guides/review/#review-without-screenshots). With `testing` on, capture sets the status. See [Published Storybook](/concepts/publishing/).
 
 ## Serverless platforms
 

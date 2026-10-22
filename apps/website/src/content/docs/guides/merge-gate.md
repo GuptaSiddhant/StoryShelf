@@ -13,7 +13,7 @@ StoryShelf posts a **commit status** on the commit it captured, through a **git 
 | All `new`/`changed` snapshots approved | `success`          |
 | Changes rejected, or capture failed    | `failure`          |
 
-Without `testing` (a [hosting-only](/concepts/hosting-only/) project) the gate is **`<prefix>/review`**, fed by the build-level verdicts of [Review](/guides/review/#reviewing-without-testing):
+Without `testing` (a [hosting-only](/concepts/hosting-only/) project) the gate is **`<prefix>/review`**, fed by the build-level verdicts of [Review](/guides/review/#review-without-screenshots):
 
 | Build state (`testing` off, review on)                                 | `<prefix>/review` |
 | ---------------------------------------------------------------------- | ----------------- |

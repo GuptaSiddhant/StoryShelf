@@ -55,7 +55,17 @@ export {
   latestVerdicts,
   type ReviewStatusInput,
 } from "./build-review-status.ts";
+export {
+  changesetOf,
+  computeChangeset,
+  findChangesetBaseline,
+  type BuildChangeset,
+  type Changeset,
+  type ChangedComponent,
+  type ChangesetComponent,
+} from "./changeset.ts";
 export { CommentModel, type CommentCreateInput } from "./comment.ts";
+export { acceptPendingWithoutWork } from "./review-switch-off.ts";
 export {
   componentHistory,
   componentPresence,

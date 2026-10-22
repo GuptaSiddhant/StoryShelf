@@ -1,9 +1,11 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import type { ShelfRouter } from "../app-types.ts";
 import { getStore } from "../store.ts";
-import { assertReviewEnabled, giveVerdict, reviewStateOf } from "./build-reviews.handlers.ts";
+import { giveVerdict, reviewStateOf } from "./build-reviews.handlers.ts";
 import { APPROVER_ROLES, VIEW_ROLES, buildForProject } from "./builds.handlers.ts";
+import { flashHx } from "./flash.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
+import { hxRefresh } from "./htmx.ts";
 import {
   buildReviewCreateSchema,
   buildReviewSchema,
@@ -59,7 +61,6 @@ export function registerBuildReviews(app: ShelfRouter): void {
   app.openapi(getReviewsRoute, async (c) => {
     const { slug, buildId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...VIEW_ROLES);
-    assertReviewEnabled(project);
     const build = await buildForProject(project.id, buildId);
     return c.json(await reviewStateOf(project, build));
   });
@@ -67,9 +68,11 @@ export function registerBuildReviews(app: ShelfRouter): void {
   app.openapi(createReviewRoute, async (c) => {
     const { slug, buildId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...APPROVER_ROLES);
-    assertReviewEnabled(project);
     const build = await buildForProject(project.id, buildId);
     const userId = getStore().user?.id ?? null;
-    return c.json(await giveVerdict(project, build, userId, c.req.valid("json")), 201);
+    const review = await giveVerdict(project, build, userId, c.req.valid("json"));
+    hxRefresh(c);
+    flashHx(c, "Verdict recorded");
+    return c.json(review, 201);
   });
 }

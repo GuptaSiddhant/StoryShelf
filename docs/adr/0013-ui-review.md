@@ -186,6 +186,11 @@ These two cases are part of the retention rule of ADR 0009. They add no build st
 
 ## Open questions
 
-- Whether the required-approvals count and the retention window are project settings or defaults
-  only.
-- How comments on a story survive when the story is renamed or removed between builds.
+- How comments on a story survive when the story is renamed or removed between builds. (Today a
+  story comment stays with the build it was written on; nothing follows a renamed story.)
+
+Resolved in implementation: the required-approvals count is a project setting
+(`projects.review_approvals`, edited next to the switch); the retention window of a pending build
+is the project's build retention window (`purgeTtlDays`), not a separate setting. The review
+switch form is the one `hosting`-class route of the review surface, because a `review` route
+answers 404 while review is off and the form must be able to turn it back on.

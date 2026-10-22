@@ -12,6 +12,7 @@ import { LabelModel, type LabelTables } from "../models/label.ts";
 import { PackageUsageModel } from "../models/usage.ts";
 import type { Project } from "../schema/project.ts";
 import { TERMINAL_BUILD_STATUSES } from "../types.ts";
+import { pendingCandidates } from "./pending.ts";
 import { sweepScreenshotContent } from "./screenshot-sweep.ts";
 
 export {
@@ -52,24 +53,7 @@ export class Retention {
 
   async purge(project: Project, options: PurgeOptions): Promise<PurgeResult> {
     const cutoff = new Date(Date.now() - options.ttlDays * 86_400_000).toISOString();
-    const candidates = await this.db.list(this.tables.builds, {
-      where: and(
-        eq(col(this.tables.builds, "projectId"), project.id),
-        inArray(col(this.tables.builds, "status"), [...TERMINAL_BUILD_STATUSES]),
-        lt(col(this.tables.builds, "updatedAt"), cutoff),
-      ),
-    });
-
-    const keep = options.keepLatestPerBranch
-      ? await this.latestPerBranch(project.id)
-      : new Set<string>();
-    const persistent = await new LabelModel(
-      this.db,
-      this.tables as unknown as LabelTables,
-    ).persistentBuildIds(project.id);
-    const buildIds = candidates
-      .map((build) => (build as { id: string }).id)
-      .filter((buildId) => !keep.has(buildId) && !persistent.has(buildId));
+    const { buildIds, pending } = await this.selectBuilds(project, options, cutoff);
     const results = await Promise.all(
       buildIds.map(async (buildId) => ({
         files: await this.deleteBuildFiles(project.id, buildId),
@@ -81,10 +65,46 @@ export class Retention {
     await this.sweepScreenshots(project);
     const removedJobs = await this.purgeFinishedJobs(cutoff);
     this.logger?.info(
-      { projectId: project.id, removedBuilds, removedFiles, removedJobs },
+      { projectId: project.id, removedBuilds, removedFiles, removedJobs, removedPending: pending },
       "build retention purge complete",
     );
     return { removedBuilds, removedFiles };
+  }
+
+  /**
+   * The builds a purge removes: terminal builds past the window (minus the latest per branch when
+   * asked), and pending builds idle past it (ADR 0013, decision 9). Persistent builds stay.
+   */
+  private async selectBuilds(
+    project: Project,
+    options: PurgeOptions,
+    cutoff: string,
+  ): Promise<{ buildIds: string[]; pending: number }> {
+    const candidates = await this.db.list(this.tables.builds, {
+      where: and(
+        eq(col(this.tables.builds, "projectId"), project.id),
+        inArray(col(this.tables.builds, "status"), [...TERMINAL_BUILD_STATUSES]),
+        lt(col(this.tables.builds, "updatedAt"), cutoff),
+      ),
+    });
+    const keep = options.keepLatestPerBranch
+      ? await this.latestPerBranch(project.id)
+      : new Set<string>();
+    const persistent = await new LabelModel(
+      this.db,
+      this.tables as unknown as LabelTables,
+    ).persistentBuildIds(project.id);
+    const terminal = candidates
+      .map((build) => (build as { id: string }).id)
+      .filter((buildId) => !keep.has(buildId));
+    // Pending builds leave on their own clock; "the latest on a branch" does not shield them.
+    const pending = (await pendingCandidates(this.db, project.id, cutoff)).map(
+      (candidate) => candidate.buildId,
+    );
+    return {
+      buildIds: [...terminal, ...pending].filter((buildId) => !persistent.has(buildId)),
+      pending: pending.length,
+    };
   }
 
   /** Reclaim screenshots no snapshot or baseline references any more; never blocks the purge. */

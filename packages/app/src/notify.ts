@@ -16,6 +16,7 @@ import {
 import type { NotificationsConfig, ShelfConfig, UIConfig } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 import {
+  MemberModel,
   NotificationChannelModel,
   NotificationSubscriptionModel,
   UserModel,
@@ -93,7 +94,7 @@ function recordOutcomes(
 ): (outcome: ChannelOutcome) => Promise<void> {
   const model = channelModel(deps);
   return async (outcome) => {
-    if (outcome.channelId.startsWith("sub:")) {
+    if (outcome.channelId.startsWith("sub:") || outcome.channelId.startsWith("default:")) {
       return;
     }
     await model.recordOutcome(outcome.channelId, outcome.error).catch((error: unknown) => {
@@ -140,6 +141,50 @@ async function targetsForSub(
     }));
 }
 
+/** Topics that reach a project's approvers and admins unless they opted out (ADR 0013, decision 4). */
+const DEFAULT_ON_EVENTS: ReadonlySet<string> = new Set(["review:requested"]);
+
+/** Roles that review builds: the default recipients of {@link DEFAULT_ON_EVENTS}. */
+const REVIEWER_ROLES: ReadonlySet<string> = new Set(["approver", "admin"]);
+
+/**
+ * Reviewers with no subscription row for the project: a default-on topic reaches them by email.
+ * Anyone with a row decides for themselves (`enabled` off or a topic list without the event opts
+ * out), so a row never adds a second message here.
+ */
+async function defaultTargets(
+  db: DatabaseAdapter,
+  projectId: string,
+  rows: NotificationSubscriptionRow[],
+  wired: ReadonlySet<string>,
+): Promise<NotificationChannel[]> {
+  if (!wired.has("email")) {
+    return [];
+  }
+  const subscribed = new Set(rows.map((row) => row.userId));
+  const members = (await new MemberModel(db).list(projectId)).filter(
+    (member) => REVIEWER_ROLES.has(member.role) && !subscribed.has(member.userId),
+  );
+  const targets = await Promise.all(
+    members.map(async (member): Promise<NotificationChannel[]> => {
+      const user = await new UserModel(db).get(member.userId);
+      return !user || user.disabled
+        ? []
+        : [
+            {
+              id: `default:${projectId}:${member.userId}`,
+              projectId,
+              provider: "email",
+              config: { to: user.email },
+              events: [],
+              enabled: true,
+            },
+          ];
+    }),
+  );
+  return targets.flat();
+}
+
 /** Per-subscriber targets for an event (only kinds that are wired). */
 async function subscriberTargets(
   db: DatabaseAdapter,
@@ -151,7 +196,10 @@ async function subscriberTargets(
   const nested = await Promise.all(
     matchingSubs(rows, event).map(async (sub) => await targetsForSub(db, sub, wired)),
   );
-  return nested.flat();
+  const defaults = DEFAULT_ON_EVENTS.has(event)
+    ? await defaultTargets(db, projectId, rows, wired)
+    : [];
+  return [...nested.flat(), ...defaults];
 }
 
 /**

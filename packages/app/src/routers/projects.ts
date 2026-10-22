@@ -11,6 +11,7 @@ import { getStore } from "../store.ts";
 import { assertTargetsSelectable } from "../targets.ts";
 import { toProjectPatch } from "./capture-config.ts";
 import { forbidden, requireSiteAdmin, resolveAuthorizedProject } from "./helpers.ts";
+import { runSwitchOffPass } from "./review-switch-off.ts";
 import {
   badRequest,
   forbidden as forbiddenResponse,
@@ -160,6 +161,7 @@ export function registerProjects(app: ShelfRouter): void {
       resolveBrowsers(project),
     );
     const updated = await new ProjectModel(getStore().db).update(project.id, toProjectPatch(body));
+    await runSwitchOffPass(project, updated);
     return c.json(updated);
   });
 

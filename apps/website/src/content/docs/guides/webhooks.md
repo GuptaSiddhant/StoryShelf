@@ -17,7 +17,7 @@ curl -X POST $SHELF/api/v1/projects/my-app/webhooks \
 ```
 
 - `url` — HTTPS endpoint (must be reachable from the server).
-- `events` — JSON array filter or `null` for all events.
+- `events` — JSON array filter or `null` for all events. Review adds `review:requested`, `review:comment` and `review:verdict` (see [Review](/guides/review/#events)).
 - `secret` — HMAC secret; stored AES-256-GCM encrypted with server `SECRET`.
 
 Manage via `GET /api/v1/projects/:slug/webhooks` and `DELETE`. See `POST /api/v1/projects/:slug/webhooks` in the OpenAPI.

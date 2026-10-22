@@ -31,7 +31,13 @@ timeline
 
 Retention keeps **the most recent build per branch** even past TTL — it’s the branch’s “current state” and powers label/PR links.
 
-Non-terminal builds (`pending`/`capturing`/`comparing`/`reviewing`) are never purged.
+Builds that are being captured or reviewed (`capturing`/`comparing`/`reviewing`) are never purged. A `pending` build is handled by its own rule below.
+
+## Pending builds
+
+A build left `pending` waits for a [review verdict](/guides/review/#review-without-screenshots) (or for its capture to start), so the terminal-status rule never reaches it and it would otherwise accumulate. A `pending` build is purged once its **last activity** is older than `purgeTtlDays`: the later of its upload (last update), its newest comment and its newest verdict. A comment or verdict therefore keeps a build under review alive, and a build that a newer build on the same branch replaced, with no attempts, comments or verdicts, leaves at the same window. "The latest build per branch" does not shield a pending build: a branch that nobody reviews stops holding one after the window. Persistent builds are never purged. Purging a build removes its comments and verdicts with it.
+
+Turning a project's review off accepts its pending builds that no capture worked on, in one pass when the setting is saved (see [Project settings](/guides/project-settings/#review)).
 
 ## Orphan & branch GC
 
@@ -62,5 +68,6 @@ Uploads ≤ `maxInlineUnzipSize` (default 50 MB) are extracted inline so the pub
 
 - [Baselines & branches](/concepts/baselines/) — which screenshot is expected
 - [Builds & snapshots](/concepts/builds/) — build lifecycle
+- [Review](/guides/review/) — comments, verdicts and what happens to builds nobody finishes
 - [Labels](/concepts/labels/) — `persistent` label from git tags
 - [Deployment — retention notes](/guides/deployment/) — `public_branch_regex` publishing

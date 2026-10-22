@@ -38,10 +38,13 @@ async function seedSnapshots(db: Db, projectId: string, buildId: string): Promis
   return (await snapshots.listByBuild(buildId)).map((snap) => snap.id);
 }
 
-async function reviewPage(select: "first" | "none" = "none"): Promise<Seeded> {
+async function reviewPage(
+  select: "first" | "none" = "none",
+  reviewEnabled = true,
+): Promise<Seeded> {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
-  const project = await new ProjectModel(db).create({ name: "Docs" });
+  const project = await new ProjectModel(db).create({ name: "Docs", reviewEnabled });
   const build = await new BuildModel(db).create(project.id, {
     gitSha: "abc1234def",
     gitBranch: "feature/x",
@@ -68,6 +71,11 @@ describe("review workspace page", () => {
     expect(html).toContain("data-compare");
     expect(html).toContain('role="toolbar"');
     expect(html).toContain("<dialog");
+  });
+
+  it("shows the snapshot's comment thread, and none when the project has review off", async () => {
+    expect((await reviewPage("first")).html).toContain("Add comment");
+    expect((await reviewPage("first", false)).html).not.toContain("Add comment");
   });
 
   it("filters the filmstrip to items needing review by default", async () => {

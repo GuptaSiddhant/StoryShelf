@@ -11,6 +11,7 @@ import {
   TextareaField,
   VStack,
 } from "../ui/components.tsx";
+import { csrfField } from "../ui/csrf-field.tsx";
 import {
   reviewComment,
   reviewCommentActions,
@@ -25,36 +26,45 @@ export interface DiffCommentsProps {
   project: Project;
   build: Build;
   selectedId: string;
+  /** Story of the selected snapshot: its story comments show here too (ADR 0013, decision 2). */
+  selectedStoryId?: string;
   comments: Comment[];
   canReview: boolean;
 }
 
-interface CommentCardProps {
+/** One comment's props: where it sits, and what its head shows beside the author. */
+export interface CommentCardProps {
   project: Project;
   build: Build;
   comment: Comment;
   canReview: boolean;
+  /** What the comment is anchored to (a story badge), shown in its head. */
+  anchor?: unknown;
 }
 
 /** One comment with an optional resolve action. */
-function CommentCard(props: CommentCardProps): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { project, build, comment, canReview } = props;
+export function CommentCard(
+  props: CommentCardProps,
+): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const { project, build, comment, canReview, anchor } = props;
   return (
     <div key={comment.id} class={reviewComment}>
       <div class={reviewCommentHead}>
         <strong>{comment.userId ?? "anonymous"}</strong>
         <span>· {new Date(comment.createdAt).toLocaleString()}</span>
+        {anchor ?? null}
         {comment.resolved ? <Badge tone="success">resolved</Badge> : null}
       </div>
       <p class={reviewCommentBody}>{comment.body}</p>
       {!comment.resolved && canReview ? (
         <form
           method="post"
-          action={`/api/v1/projects/${project.slug}/builds/${build.id}/comments/${comment.id}/resolve`}
-          hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/comments/${comment.id}/resolve`}
+          action={`/projects/${project.slug}/builds/${build.id}/comments/${comment.id}/resolve`}
+          hx-post={`/projects/${project.slug}/builds/${build.id}/comments/${comment.id}/resolve`}
           hx-target="body"
           class={reviewCommentActions}
         >
+          {csrfField()}
           <Button variant="ghost" size="sm" type="submit">
             Mark resolved
           </Button>
@@ -76,11 +86,12 @@ function CommentForm(props: CommentFormProps): HtmlEscapedString | Promise<HtmlE
   return (
     <form
       method="post"
-      action={`/api/v1/projects/${project.slug}/builds/${build.id}/comments`}
-      hx-post={`/api/v1/projects/${project.slug}/builds/${build.id}/comments`}
+      action={`/projects/${project.slug}/builds/${build.id}/comments`}
+      hx-post={`/projects/${project.slug}/builds/${build.id}/comments`}
       hx-target="body"
       class="mt-1"
     >
+      {csrfField()}
       <VStack>
         <input type="hidden" name="snapshotId" value={selectedId} />
         <TextareaField
@@ -104,8 +115,10 @@ function CommentForm(props: CommentFormProps): HtmlEscapedString | Promise<HtmlE
 export function DiffComments(
   props: DiffCommentsProps,
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { project, build, selectedId, comments, canReview } = props;
-  const visible = comments.filter((c) => !c.snapshotId || c.snapshotId === selectedId);
+  const { project, build, selectedId, selectedStoryId, comments, canReview } = props;
+  const visible = comments.filter((c) =>
+    c.snapshotId ? c.snapshotId === selectedId : !c.storyId || c.storyId === selectedStoryId,
+  );
   return (
     <Card>
       <SectionTitle level={3}>Comments</SectionTitle>

@@ -14,12 +14,13 @@ import {
 } from "@storyshelf/core/capture";
 import type { ShelfOptions } from "@storyshelf/core/config";
 import { DEFAULT_SCRATCH_DIR } from "@storyshelf/core/config";
-import type { CaptureJobKind } from "@storyshelf/core/schema";
+import type { Build, CaptureJobKind, Project } from "@storyshelf/core/schema";
 import { setupBuildState, type BuildStateWiring } from "./build-state-setup.ts";
 import { setupCapture, type CaptureHandler, type CaptureWiring } from "./capture-setup.ts";
 import { combineConsumers, jobMetrics, lazyConsumer } from "./consumer-setup.ts";
 import { createJobQueue, type JobQueue } from "./job-queue.ts";
 import { setupPublishing, type PublishService, type PublishWiring } from "./publish-setup.ts";
+import { announceReviewWith, REVIEW_EVENTS, reviewRequestedData } from "./review-events.ts";
 import type { ServerRuntime } from "./runtime.ts";
 import { isServerlessHost } from "./serverless.ts";
 
@@ -61,7 +62,11 @@ export function setupJobs(
     runtime.config,
     runtime.logger,
     capture.enqueueCapture !== undefined,
-    { jobs, buildState: buildState.publisher },
+    {
+      jobs,
+      buildState: buildState.publisher,
+      reviewRequested: reviewRequestedFor(options, runtime),
+    },
   );
   const wiring = { capture, publishing, buildState, notifyJobs };
   return {
@@ -207,4 +212,28 @@ function suppliedQueueConsumer(
     }),
     [async () => await handler.close?.()],
   );
+}
+
+/** Tells the project's reviewers a published build waits for a verdict (webhook and notifications). */
+function reviewRequestedFor(
+  options: ShelfOptions,
+  runtime: ServerRuntime,
+): (project: Project, build: Build) => Promise<void> {
+  return async (project, build) => {
+    await announceReviewWith(
+      {
+        db: options.database,
+        config: runtime.config,
+        ui: runtime.ui,
+        logger: runtime.logger,
+        notifiers: runtime.notifiers,
+        notificationsConfig: options.notifications?.config,
+        publicOrigin: runtime.publicOrigin,
+      },
+      project,
+      REVIEW_EVENTS.requested,
+      reviewRequestedData(build),
+      build.id,
+    );
+  };
 }
