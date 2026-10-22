@@ -171,10 +171,11 @@ async function createHarness(): Promise<void> {
   await mkdir(dataDir, { recursive: true });
   const db = createSqliteDatabase(join(tmp, "shelf.db"));
   const storage = createLocalStorage(dataDir);
+  const runner = createPlaywrightCaptureRunner({ browsers: ["chromium", "firefox"] });
   const app = createShelfApp({
     database: db,
     storage,
-    testing: { runner: createPlaywrightCaptureRunner(), concurrency: 1 },
+    testing: { runner, concurrency: 1 },
     config: { scratchDir: dataDir, purgeTtlDays: 30 },
   });
   await app.lifecycle.setup();
@@ -485,6 +486,18 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
     );
     expect(approve.status).toBe(200);
   }, 300_000);
+
+  it("reports which declared engines are installed, never launching to find out", async () => {
+    const runner = createPlaywrightCaptureRunner({ browsers: ["chromium", "firefox", "webkit"] });
+    await runner.lifecycle?.setup({} as never);
+    const targets = runner.metadata.targets ?? [];
+    expect(targets.map((entry) => entry.target)).toEqual(["chromium", "firefox", "webkit"]);
+    // Chromium is what these tests render with, so it is installed; the others say which they are.
+    expect(targets[0]?.status).toBe("ready");
+    for (const entry of targets) {
+      expect(entry.status === "ready" || entry.status.unavailable.length > 0).toBe(true);
+    }
+  });
 
   it("browsers: per-engine snapshots, shared approval and stable re-capture", async () => {
     const { app, storage, staticDir } = getHarness();

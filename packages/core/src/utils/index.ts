@@ -55,6 +55,7 @@ export {
   type HostResources,
 } from "./resources.ts";
 export { MIME_TYPES, mimeFor } from "./mime.ts";
+export { detectPublicBaseUrl, normalizeOrigin, type Env } from "./public-origin.ts";
 export { isBlockedTarget, isPathSafe, isSafeSegment } from "./path-security.ts";
 export { redactSecrets, sanitizeErrorText } from "./redact.ts";
 export { addTiming, roundedTimings, runWithTimings, timed, type TimingMap } from "./timing.ts";

@@ -1,10 +1,12 @@
 /** Render orchestration: static server, browser, and per-story captures. */
 
-import type {
-  RenderResult,
-  RenderedSnapshot,
-  StoryEntry,
-  Viewport,
+import {
+  engineOf,
+  type CaptureTarget,
+  type RenderResult,
+  type RenderedSnapshot,
+  type StoryEntry,
+  type Viewport,
 } from "@storyshelf/core/adapter/capture-runner";
 import { StorybookAdapter, resolveStoryViewports } from "@storyshelf/core/capture";
 import {
@@ -16,31 +18,39 @@ import {
   isTimeoutError,
 } from "@storyshelf/core/utils";
 import type { Browser } from "puppeteer-core";
-import puppeteer from "puppeteer-core";
 import { messageOf, safeCloseBrowser, safeCloseServer } from "./browser.ts";
 import { PagePool } from "./pages.ts";
 import { createRuntimeParamsState } from "./runtime-params.ts";
 import { captureScreenshot } from "./screenshot.ts";
 import { createStaticServer } from "./static-server.ts";
-import type { ActiveRun, CaptureContext, PuppeteerRenderInput } from "./types.ts";
+import type { ActiveRun, CaptureContext, LaunchTarget, PuppeteerRenderInput } from "./types.ts";
 
 /** Render all story/viewport combinations for a build. */
 export async function renderAll(
-  input: PuppeteerRenderInput,
+  rawInput: PuppeteerRenderInput,
   active: ActiveRun,
-  runnerOptions: { executablePath?: string; args?: string[] },
+  launch: LaunchTarget,
+  defaultTarget: CaptureTarget,
 ): Promise<RenderResult> {
-  const server = await createStaticServer(input.storybookDir);
-  const browser = await launchBrowser(runnerOptions);
+  const name = rawInput.target ?? defaultTarget;
+  const input = { ...rawInput, target: name };
+  // Launch first: a target that will not start must fail before a static server is bound.
+  const browser = await launch(name);
+  const server = await createStaticServer(input.storybookDir).catch(async (error: unknown) => {
+    await safeCloseBrowser(browser);
+    throw error;
+  });
   const version = typeof browser.version === "function" ? await browser.version() : undefined;
-  input.logger?.info(describeSizing(input), "capture sizing");
+  input.logger?.info(describeSizing({ ...input, browser: engineOf(name) }), "capture sizing");
   const result = await runWithBrowser(
     input,
     active,
     browser,
     server,
-    async () => await launchBrowser(runnerOptions),
+    async () => await launch(name),
   );
+  // Echo the target so persisted rows are attributable without the request.
+  for (const row of [...result.captures, ...result.failures]) row.browser = name;
   return { ...result, environment: await detectCaptureEnvironment(version) };
 }
 
@@ -64,27 +74,6 @@ async function runWithBrowser(
     // ctx.browser is the latest one: recycling replaces the browser mid-run.
     await Promise.all([safeCloseBrowser(ctx.browser), safeCloseServer(server)]);
   }
-}
-
-/**
- * Sandbox flags for containers plus low-memory flags. Rendering-affecting flags
- * (`--disable-gpu`, `--single-process`) are excluded: they can shift pixels.
- */
-const DEFAULT_ARGS = [
-  "--no-sandbox",
-  "--disable-setuid-sandbox",
-  "--disable-dev-shm-usage",
-  "--disable-extensions",
-  "--disable-background-networking",
-  "--mute-audio",
-];
-
-async function launchBrowser(opts: { executablePath?: string; args?: string[] }): Promise<Browser> {
-  return await puppeteer.launch({
-    headless: true,
-    executablePath: opts.executablePath,
-    args: opts.args ?? DEFAULT_ARGS,
-  });
 }
 
 function buildContext(
@@ -121,7 +110,7 @@ async function runAllCaptures(
   const batches = chunk(jobs, input.recycleBrowserEvery ?? DEFAULT_RECYCLE_BROWSER_EVERY);
   const pages = createPageLimiter({
     concurrency: input.concurrency,
-    browser: input.browser,
+    browser: engineOf(input.target ?? "chromium"),
     logger: input.logger,
   });
   try {

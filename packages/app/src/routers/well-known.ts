@@ -28,14 +28,22 @@ function ssoProviders(auth: Auth, origin: string): SsoProviderLink[] {
     }));
 }
 
-function requestOrigin(c: Context): string {
-  return getStore().config.publicBaseUrl ?? new URL(c.req.url).origin;
+/**
+ * The deployment's public origin (ADR 0007, decision 6). Only while none resolves does this
+ * interactive, request-bound document fall back to the address the request came in on.
+ */
+async function requestOrigin(c: Context): Promise<string> {
+  return (
+    (await getStore().publicOrigin?.url()) ??
+    getStore().config.publicBaseUrl ??
+    new URL(c.req.url).origin
+  );
 }
 
 /** Register public relying-party helper documents (no auth required). */
 export function registerWellKnown(app: ShelfRouter, auth: Auth): void {
-  app.get("/.well-known/openid-configuration", (c) => {
-    const origin = requestOrigin(c);
+  app.get("/.well-known/openid-configuration", async (c) => {
+    const origin = await requestOrigin(c);
     const providers = ssoProviders(auth, origin);
     return c.json(
       {

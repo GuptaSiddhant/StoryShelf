@@ -20,6 +20,11 @@ export interface BuildStateDeps {
   secret: SecretInput;
   /** Absolute links come from `publicBaseUrl`; the published-Storybook domain from `publishedBaseDomain`. */
   config: Pick<ShelfConfig, "publicBaseUrl" | "publishedBaseDomain">;
+  /**
+   * The resolved public origin (ADR 0007, decision 6). Without it `config.publicBaseUrl` is used;
+   * with neither, statuses carry no link and no pull-request comment is written.
+   */
+  publicOrigin?: (() => Promise<string | undefined>) | undefined;
   /** Which statuses a project's builds show: `testing` from the server options, review from the project. */
   flags: (project: Project) => BuildStateFlags;
   logger: Logger;

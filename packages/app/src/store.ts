@@ -1,4 +1,5 @@
 import type { CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
+import type { CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { DesignProvider } from "@storyshelf/core/adapter/design";
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
@@ -11,6 +12,7 @@ import {
 } from "@storyshelf/core/capture";
 import type { NotificationsConfig, ShelfConfig, UIConfig } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
+import type { PublicOriginResolver } from "@storyshelf/core/models";
 import type { AuthUser } from "@storyshelf/core/types";
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { PublishService } from "./publish-setup.ts";
@@ -38,6 +40,10 @@ export interface Store {
   buildState?: BuildStatePublisher;
   /** Explicit `testing.concurrency`; unset means sized from the hardware. */
   captureConcurrency?: number;
+  /** The capture runner (`options.testing.runner`); its targets decide which browsers a project may pick. */
+  runner?: Pick<CaptureRunner, "metadata"> | undefined;
+  /** The public origin: configured, detected from the platform, or reported by an admin (ADR 0007). */
+  publicOrigin?: PublicOriginResolver | undefined;
   /** Design providers (Figma, …); empty when none is wired. */
   design: DesignProvider[];
   notifiers: NotifierProvider[];

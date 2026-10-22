@@ -5,6 +5,12 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 
 ## Unreleased
 
+**Added: capture targets and the runner's `browsers` list (ADR 0007, decisions 1, 3 and 7; #225).** A project's `browser`/`browsers`, a snapshot's `browser` and every baseline key hold a **capture target**: an engine (`chromium`) or `<engine>@<name>` for a remote browser (`CaptureTarget`, `parseTarget`, `engineOf`, `TARGET_NAME_PATTERN` in `@storyshelf/core/adapter/capture-runner`). `createPlaywrightCaptureRunner` and `createPuppeteerCaptureRunner` take `browsers` (bare engine names and `local(engine, options)`, default `["chromium"]`, first = default); duplicates, an empty list, an unknown engine, `local("firefox")` on Puppeteer and bare `"chrome"` on Puppeteer without an `executablePath` throw when the runner is created. At startup each local target is checked without launching anything and reported as `ready` or `unavailable` with a reason in `metadata.targets` (`RunnerTarget`: `target`, `reach`, `status`); **System → Capture browsers** lists them. The project API (`browser`, `browsers`), the General and Capture settings and the capture itself take targets: saving a target the runner does not offer or that is unavailable is refused with `400` and the reason, and a build of a project that already names one fails at once. A launch that fails marks its target unavailable and fails the job with the launch error (`TargetLaunchError`) instead of being isolated and retried as a story crash. The render input carries `target` instead of `browser`. Bare `"chrome"` is real Chrome (Playwright `chrome` channel), no longer bundled Chromium. Remote targets are not implemented yet (#226, #228).
+
+**Breaking: the Playwright runner offers only Chromium unless told otherwise (ADR 0007, decision 1; #225).** The runner's `browser` and `supportedBrowsers` options are replaced by `browsers`, and `CaptureRunnerMetadata.supportedBrowsers` by `targets`. A server whose projects use Firefox or WebKit must list them (`browsers: ["chromium", "firefox", "webkit"]`) and provision the binaries (`playwright install`); until then the System page shows them as unavailable and their builds fail with that reason.
+
+**Added: the public origin is resolved, not guessed (ADR 0007, decision 6; #227).** One resolver (`createPublicOriginResolver`, `@storyshelf/core/models`) answers every absolute link built in the background: `publicBaseUrl`, then the platform's own address (`detectPublicBaseUrl(env)`, `@storyshelf/core/utils`: Heroku, Railway, Vercel, Netlify, Render, Fly.io, Azure App Service and Container Apps, DigitalOcean), then the origin a site admin's browser reported, kept in the new `site_settings` table (`siteSettings` in `Tables`; DDL and Drizzle schema in the SQLite, Postgres and MySQL packages). **System → Public origin** shows what resolves, lets an admin confirm, replace or forget the stored value (`POST /admin/public-origin`, `/clear`, and `/report` for the page's own script; site-admin and CSRF protected, and the report must carry the browser's own `Origin`). Commit-status links and the pull-request comment use it, and are omitted while no origin is known (`target_url` is not sent); notification review links and the OAuth callback and `/.well-known/openid-configuration` helper use it too. The `Host` header is never used for background links.
+
 **Added: build state on git channels is a function of the build, delivered by durable `notify` jobs (ADR 0014, decisions 5 to 7; #221, #222).** One pure function, `statusesForBuild` (`@storyshelf/core/adapter/notifier`), maps a build, the channel's prefix and the `testing`/review flags to the states a git channel shows: `<prefix>/testing` (`pending` while capture runs and review is open, `success` when approved, `failure` when rejected or capture failed, the description saying whether review is open), `<prefix>/storybook` for every build with a commit (informational: `success` linking the published Storybook once its manifest exists, `failure` for a failed build that never published) and one pull-request comment per build with links to the build and the Storybook plus a summary. `<prefix>/review` is in the function for the review setting to feed (`flags.review`) and is not posted yet. A build that was never captured posts its statuses (a hosting-only instance posts `<prefix>/storybook` when publishing ends), and links are absolute from `publicBaseUrl`. Every transition (build creation, capture start and end, crash failure, review outcome) and the end of publishing call one publisher (`BuildStatePublisher.request(buildId)`), which queues a `notify` job per git channel on the database queue: the job names a channel and a build, reads the build when it runs (a retried or reordered job cannot post a stale state), is folded into a job already waiting for the same pair, and is retried with backoff (five attempts: 10 s, 20 s, 40 s, 80 s). A given-up delivery records the error on the channel and raises the new `sys:notify-failed` admin event. `notify` jobs run on a queue and consumer of their own (four at once), so a status never waits behind a capture, and stay out of the queue views. A host with no queue consumer (serverless) delivers inline without durability. `postStatusesForBuild`, `emitBuildState`, `statusContext` and the app's `postReviewStatus` are removed; `DispatchDeps` carries `buildState` instead of `notifiers` and `secret`. `QueueJobInput.maxAttempts` and `KindHandler.backoff` let a job kind state its own attempts and retry delay.
 
 **Breaking: git hosts are notification channels; `@storyshelf/git-github` and `@storyshelf/git-gitlab` are replaced by `@storyshelf/notify-git` (ADR 0014; #220, #223).** The notifier contract has two delivery kinds: `message` providers (Slack, Teams, email) `send` once, `state` providers (GitHub, GitLab, and a `git-log` provider for tests and dev) `setState` a commit status or a pull-request comment, idempotently. `ShelfOptions.gitHosts`, `GitHostProvider`, `GitHostAdapter`, the `@storyshelf/core/adapter/git-host*` subpaths and the `git-host` adapter category are gone: list `gitNotifiers` from `@storyshelf/notify-git` in `notifications.notifiers`. The `project_status_configs` table, `StatusConfigModel` and the `/api/v1/projects/{slug}/status-configs` routes are deleted with no copy of existing rows: configure each project again as a git channel (`notification_channels`: config `{ owner, repo, host?, prefix? }`, the token as the encrypted secret) on the project's Notifications settings page, which now manages chat, email and git channels together (the separate "Git status" tab is gone). Statuses are named `<prefix>/testing` (prefix defaults to `storyshelf`, no project slug and no second `storyshelf/` added by the provider), so update required statuses in branch protection and give each project that shares a repository its own prefix. `notification_channels` gains `last_error` and `last_error_at`: a failed delivery is shown on the settings page and in the channel API, and cleared by the next success (new columns reach existing Postgres and MySQL databases only when recreated). `isMerged` is dropped: a build of a commit that is already merged is captured like any other. Message fan-out never sends to `state` channels.
@@ -79,6 +85,7 @@ Remote workers take the same `images`/`compare` options on `createCaptureWorker`
 capture children inherit them from the server. See the "Image engines" guide.
 
 **Upgrading (image engine):**
+
 - `diffImages` and `buildTriageEvidence` now return Promises (the `sharp` codec is async): `await`
   them. Code that read `diffImages(...).passed` synchronously now reads `undefined`.
 - `configureDiffPool({ threads })` is deprecated in favour of `configureImages({ engine, threads })`;
@@ -89,6 +96,7 @@ the optional `@storyshelf/design-figma` package behind a new `DesignProvider` ad
 (ADR 0029).
 
 **Upgrading:**
+
 - Install `@storyshelf/design-figma` and pass `design: [createFigmaDesign()]` to
   `createShelfApp` — and to `createCaptureWorker` on remote workers. Without a provider no
   design links are extracted or shown. `storyshelf server init` asks about it; the dev server and
@@ -112,16 +120,20 @@ only on their own visits, and what it fetches is shown only to them.
 cache scope (`design_nodes.viewer_id`).
 
 **Fixes**
+
 - The Puppeteer runner now runs `play` functions on Storybook 8, 9 and 10 (it failed with `Cannot call fromId/raw() unless you call cacheAllCSFFiles() first`), by loading just the story and running its `playFunction` with the mounted render's context, as the Playwright runner already does.
 
 **Attempt logs**
+
 - The build attempt log no longer stops at "partitioned" during a render. Per browser engine it now records the partition counts, the runner's `info`/`warn`/`error` lines (`capture sizing`, `browser recycled`, `render failed for story`, a11y warnings; debug stays out), `captured N/M screenshots` every 10 screenshots, and a `render pass finished` summary. Lines are written serially so order and sequence numbers stay correct under parallel rendering.
 
 **Streaming and page reuse**
+
 - Screenshots are written to storage as each is captured (new optional `onCapture` on `CaptureRunner.render`; both bundled runners support it), so memory no longer grows with the number of stories. Runners that ignore it keep working unchanged.
 - Opt-in page reuse (`reusePages` / `STORYSHELF_REUSE_PAGES=1`) for both runners: pooled pages in their own contexts, reset between captures, discarded after a failure. Screenshots were byte-identical with reuse on and off on the bundled fixtures.
 
 **Capture memory**
+
 - Capture no longer opens a browser page for every story and viewport at once, which ran 500-story Storybooks out of memory on 1 GB hosts. Pages render with bounded concurrency, and snapshot persisting is capped at 4 at a time.
 - Capture concurrency defaults are sized from the CPU and memory the process can use, container limits included (0.5 vCPU / 1 GB renders one page at a time; `ShelfConfig.captureConcurrency` defaults to 1 build unless the host has ≥ 2 CPUs and ≥ 3 GB). Override with `concurrency` on `createPlaywrightCaptureRunner` or `STORYSHELF_CAPTURE_CONCURRENCY`.
 - Page navigation timeout scales up on CPU-starved hosts (60 s under 2 CPUs, 90 s under 1 CPU; override with `navigationTimeoutMs` or `STORYSHELF_NAVIGATION_TIMEOUT_MS`), so slow Storybook loads are not reported as failures.
@@ -146,6 +158,7 @@ scaffolded projects keep working and are not rewritten; regenerate to get the
 new layout and fixed Dockerfiles.
 
 **CLI startup**
+
 - Command modules and their dependencies (the zip library, prompts) now load only
   when that command runs, so `storyshelf -h`, `whoami` and the rest start in
   about 10 ms over bare Node instead of about 55 ms.
@@ -155,6 +168,7 @@ new layout and fixed Dockerfiles.
   installs less.
 
 **Node 24 is the minimum**
+
 - Every published package declares `engines.node >=24` (none did before), the
   release check fails if one does not, and the docs, README and CI example now
   say Node 24 instead of 22 or 20.
@@ -162,6 +176,7 @@ new layout and fixed Dockerfiles.
   `node:lts-alpine`.
 
 **First-run and release safety**
+
 - `@storyshelf/db-sqlite` creates the database file's directory (all file-based
   presets), so a fresh scaffold or an empty Docker volume boots instead of
   failing with `unable to open database file`.
@@ -178,6 +193,7 @@ new layout and fixed Dockerfiles.
   failed release can be re-run (the JSR job already did this).
 
 **CI**
+
 - The whole pipeline now runs on Node 24, the minimum supported version
   (`devEngines.runtime` is `24.x`; it was `>=24`, which CI resolved to the
   newest Node). The smoke test asserts the Node major so the default cannot
@@ -186,6 +202,7 @@ new layout and fixed Dockerfiles.
   `apps/website/` changed (scheduled and manual runs always run everything).
 
 **`storyshelf server init` scaffold**
+
 - Entry code now lives in `src/index.ts` (and `src/worker.ts`) so you can split
   logic into more files; `tsconfig.json`, `@types/node` and a `typecheck` script
   are generated so the editor resolves types. `storyshelf server serve` /
@@ -198,7 +215,7 @@ new layout and fixed Dockerfiles.
   `docker:run` scripts instead.
 - Fixes: the generated Docker images could not run. They bundled the server
   with esbuild into one ESM file, which crashes at startup (`Dynamic require of
-  "util" is not supported` from a CommonJS dependency) and cannot find the
+"util" is not supported` from a CommonJS dependency) and cannot find the
   vendored assets `@storyshelf/app` reads from disk; the `CMD` also pointed at
   a path the bundle was never copied to, and the build copied a `playwright`
   package that is never installed. Images now install production dependencies
@@ -210,12 +227,14 @@ new layout and fixed Dockerfiles.
   `src/index.ts`; existing projects keep working and are not rewritten.
 
 **Packaging**
+
 - `@storyshelf/app` no longer imports `@storyshelf/auth`, so a server that opted
   out of auth bundles and installs without it (it failed to resolve before). The
   shared `Auth` contract plus `MIN_PASSWORD_LENGTH` and `unsignedToken` come
   from `@storyshelf/core/auth`; `@storyshelf/auth` re-exports them.
 
 **Server runtime**
+
 - `@storyshelf/runner-playwright` loads `playwright-core` on the first render
   instead of at import, taking ~220 ms of CPU and tens of MB off server boot
   (and off servers that hand renders to a remote worker).
@@ -237,6 +256,7 @@ notifications, affected capture, OpenTelemetry observability, the redesigned UI,
 and the sqlite/postgres/mysql adapter preset families.
 
 **Affected capture** (`@storyshelf/affected`)
+
 - New package: git diff + Storybook stats-graph tracing (with `untraced`
   globs) selects the stories a change can reach. The capture pipeline renders
   only those and **inherits the rest unchanged from baselines**; new stories
@@ -250,6 +270,7 @@ and the sqlite/postgres/mysql adapter preset families.
   editor completion.
 
 **Auth engine: Better Auth** (ADR 0023)
+
 - `@storyshelf/auth` is now a Better Auth engine: password + OIDC presets,
   invite-only local accounts, profile and sessions, passkeys, SAML/SSO, and
   IdP group sync. Config-as-code, boot validation and mode logging.
@@ -259,6 +280,7 @@ and the sqlite/postgres/mysql adapter preset families.
   well-known routes, and a personal profile page with a display-name override.
 
 **Notifications** (ADR 0024)
+
 - New notifier adapter family: `@storyshelf/notify-chat` (Slack, Teams, log)
   and `@storyshelf/notify-email` (SMTP, Mailpit, HTTP, log; `nodemailer` is an
   optional peer). Per-provider subpaths keep installs small.
@@ -268,6 +290,7 @@ and the sqlite/postgres/mysql adapter preset families.
 - **Action required after upgrade:** run DB migrations for the new tables.
 
 **Database presets**
+
 - `@storyshelf/db-turso` is folded into `@storyshelf/db-sqlite` (deprecated):
   presets `turso`, `better-sqlite3`, `bun-sqlite`, `d1`.
 - Postgres presets (`pg`, `neon`, `neon-http`, `vercel`, `pglite`) and MySQL
@@ -277,6 +300,7 @@ and the sqlite/postgres/mysql adapter preset families.
   `@libsql/client` 0.18; Node >= 24 is now accepted.
 
 **Storage and capture**
+
 - Content-hash dedup of Storybook assets (`content/<hash>` + per-build
   manifest, `content_refs` table, 7-day GC grace), with `dedup`/`content`/
   `manifest` API endpoints. **Action required:** run DB migrations.
@@ -289,6 +313,7 @@ and the sqlite/postgres/mysql adapter preset families.
   index.
 
 **Operations**
+
 - Site-admin **System** page with adapter inventory, live health and safe
   server config; boot-time validation of adapter implementations fails fast.
 - Server secret rotation for encrypted credentials (#107).
@@ -298,6 +323,7 @@ and the sqlite/postgres/mysql adapter preset families.
 - Adapter errors, health and the merge gate redact secrets.
 
 **Publishing and packaging**
+
 - Every package is published to npm (trusted publishing + provenance) and JSR
   from `release.yml`. The JSR job skips versions that already exist, so it is
   safe to re-run.
@@ -309,8 +335,8 @@ and the sqlite/postgres/mysql adapter preset families.
   `queue-gcp`, `queue-redis`, `runner-puppeteer`, `storage-azure`,
   `storage-gcs`, `worker` (npm). LICENSE and README added where missing.
 
-
 **Brand mark: logo, favicon and social assets**
+
 - New StoryShelf mark (a bookshelf whose three shelves and books form an `S`).
   Ships as `app/src/assets/mark.svg`, served content-hashed under `/assets/`.
 - The app now **always** links its own favicon so a StoryShelf tab is
@@ -323,10 +349,12 @@ and the sqlite/postgres/mysql adapter preset families.
   1200x630 `og-image.png` (previously a cropped screenshot).
 
 **Review page: draggable wipe handle and pixel-level zoom** (#40)
+
 - The Swipe comparison now has a draggable handle on the divider (mouse, touch and pen); the slider below stays as the keyboard/screen-reader control and stays in sync.
 - Zoom gains a 400% level, and zoomed-in screenshots render with `image-rendering: pixelated` so individual pixels are visible. `+`/`-` step the zoom; `f` still cycles.
 
 **UI redesign: shell, review workspace, icon sprite** (ADR 0025)
+
 - New app shell: full-height icon sidebar (collapsible rail, mobile drawer),
   slim neutral top bar with project switcher, theme menu, account menu and
   toasts. The customer accent now tints (brand mark, active nav, primary
@@ -360,6 +388,7 @@ and the sqlite/postgres/mysql adapter preset families.
   re-registered on every HTMX body swap.
 
 **Observability: OpenTelemetry tracing, metrics, log correlation**
+
 - New `@storyshelf/observability` package (single owner of all OTEL deps):
   env-driven SDK init (`initObservabilityFromEnv`, noop without
   `OTEL_EXPORTER_OTLP_ENDPOINT`), `@hono/otel` request spans with
@@ -378,6 +407,7 @@ and the sqlite/postgres/mysql adapter preset families.
   feature — this package never sends data to StoryShelf.
 
 **Auth: admin-token bootstrap, user-bound tokens**
+
 - New `ShelfConfig.adminToken` (`STORYSHELF_ADMIN_TOKEN`/`ADMIN_TOKEN` env):
   bearer grants site-admin API access before any user exists. Distinct from
   `secret` (session signing); never mints sessions.
@@ -390,6 +420,7 @@ and the sqlite/postgres/mysql adapter preset families.
   approve/reject/manage flows; run DB migrations for the new `user_id` column.
 
 **Auth: site-viewer auditor, OIDC team sync**
+
 - New site `viewer` role: read-only visibility into all projects without
   membership; explicit membership takes precedence. Request logs carry the
   user id on request end for read attribution.
@@ -404,16 +435,19 @@ and the sqlite/postgres/mysql adapter preset families.
   and the new `project_group_mappings` table.
 
 **New adapters**
+
 - `@storyshelf/queue-redis` — Redis-backed remote capture queue (`ioredis`).
 - `@storyshelf/storage-azure` — Azure Blob Storage adapter.
 - `@storyshelf/storage-gcs` — Google Cloud Storage adapter.
 
 **Adapter lifecycle**
+
 - `AdapterLifecycle` is now mandatory and all-or-nothing: every adapter
   implements `setup`/`teardown`/`health`. Storage `health` results no longer
   report `latencyMs` (they return `{ ok }`).
 
 **JSR**
+
 - `@storyshelf/app` ships the `hono/jsx` import map so JSX rendering resolves on
   deno/JSR consumers.
 
@@ -440,12 +474,14 @@ and the sqlite/postgres/mysql adapter preset families.
 ## 0.5.2 — Docs, screenshots, cloud targets (2026-09-23)
 
 **Cloud deploy targets**
+
 - `storyshelf server init` gained AWS, Azure, and GCP Terraform reference stacks.
 - New adapters: `@storyshelf/storage-azure`, `@storyshelf/storage-gcs`,
   `@storyshelf/queue-azure` (Storage Queues + Service Bus), plus GCP Pub/Sub.
 - Opt-in live-cloud test suites and CI workflows for AWS, Azure, and GCP.
 
 **Capture & UI**
+
 - Per-project capture browser switch; selectable Playwright or Puppeteer runner.
 - Per-story viewports from the Storybook viewport config; runtime preview
   fallback for story parameters; `waitForReady` hook honoured.
@@ -455,9 +491,11 @@ and the sqlite/postgres/mysql adapter preset families.
 - Refreshed UI theme; stylesheet served unescaped so fonts and selectors survive.
 
 **Auth**
+
 - Tiered shared passwords (admin/viewer) for the demo deployment.
 
 **Docs**
+
 - Core concepts section, grouped guides, Chromatic comparison and migration
   guides, screenshots across the site, `storyshelf.js.org` as canonical domain.
 
@@ -469,12 +507,14 @@ and the sqlite/postgres/mysql adapter preset families.
 ## 0.5.0 — Rename to `app`, per-project browsers (2026-09-06)
 
 **Breaking rename**
+
 - `@storyshelf/router` → `@storyshelf/app`; `createShelfRouter` →
   `createShelfApp` (ADR 0018 was the split, this release makes the name
   permanent). Migrate imports and the `createShelfRouter(...)` call.
 - The old `@storyshelf/router` name is deprecated on npm/JSR.
 
 **Capture**
+
 - Per-project browser and viewport configuration (`core`, `db`, `runner`).
 - A11y annotation support, `staticServer` utils, and browsers metadata
   (`core`, `runner`).
@@ -482,12 +522,14 @@ and the sqlite/postgres/mysql adapter preset families.
 ## 0.4.0 — `db-postgres`, worker, HTTP helper (2026-09-06)
 
 **New packages**
+
 - `@storyshelf/db-postgres` — Postgres adapter for managed providers; the CLI
   gained `create server`/`init` support for a Postgres option with a local
   Docker Compose service.
 - `@storyshelf/worker` — remote capture worker with SQS queue and hybrid CLI.
 
 **Domain split (ADR 0018)**
+
 - `@storyshelf/router` (the HTTP layer) is split out of `@storyshelf/core`;
   core stays domain-only. Renamed `app` in 0.5.0.
 - Models are dialect-agnostic over the widened `DatabaseAdapter` (tables as
@@ -495,16 +537,19 @@ and the sqlite/postgres/mysql adapter preset families.
   under `core/src/db`.
 
 **Retention & purging**
+
 - TTL branch GC: daily sweep removes stale baselines; orphan baseline storage
   objects are deleted on GC.
 
 **HTTP & logging**
+
 - Shared `httpJson`/`HttpError` helper in `core` (timeout + retry with
   `Retry-After`); fetch-based git providers (ADR 0019).
 - Single pino owner in core (`createShelfLogger`), env-driven level default
   (ADR 0014).
 
 **CLI**
+
 - New `build`, `doctor`, `whoami`, `upload --dry-run`, `server serve`,
   `jsr archive/unarchive` commands.
 - Drops `zod` for hand-rolled config validation; publishes npm-clean on npm
@@ -512,9 +557,10 @@ and the sqlite/postgres/mysql adapter preset families.
 - Detects the user's package runner for builds and scaffolding.
 
 **Tooling & hygiene**
+
 - oxfmt/oxlint pre-commit hooks with conventional-commit gate.
 - LICENSE (MIT) + npm/JSR keywords on publishable packages; `primary export
-  first` lint enforced; dense router/core modules broken down into helpers.
+first` lint enforced; dense router/core modules broken down into helpers.
 - Topological publish order derived from manifests; GitHub Release split into
   its own job; OIDC check runs early.
 
@@ -534,6 +580,7 @@ and the sqlite/postgres/mysql adapter preset families.
 ## 0.3.0 — Streaming uploads + webhook secrets (2026-09-06)
 
 **Webhook secrets encrypted at rest (#45)**
+
 - `webhooks.secret` (plaintext) is replaced by `secret_encrypted` (AES-256-GCM
   under `ShelfConfig.secret`). The legacy column is dropped by migration —
   pre-existing plaintext secrets are **discarded, not migrated**.
@@ -545,6 +592,7 @@ and the sqlite/postgres/mysql adapter preset families.
   #59 lifecycle); `emitWebhookEvent` takes the secret as its final argument.
 
 **Streaming uploads replace multipart (#53)**
+
 - `POST /api/v1/projects/:slug/builds` accepts only `application/json` and
   returns `{ build, uploadUrl }`; the bundle streams via
   `PUT …/builds/:buildId/zip` (new `StorageAdapter.writeStream/readStream`;
@@ -558,6 +606,7 @@ and the sqlite/postgres/mysql adapter preset families.
 - Small zips persist Storybook statics inline at upload time.
 
 **Adapters**
+
 - Mandatory metadata category plus adapter lifecycle and two-tier health.
 
 ## 0.2.0 — Repository restructure (2026-09-05)
@@ -566,6 +615,7 @@ Internal reorganization with a small, documented public-surface cleanup. See
 `docs/migration-0.2.md` for the import-path changes.
 
 **Public surface (`@storyshelf/core`)**
+
 - Barrel is router-only: `createShelfRouter` + option/config/app types. All
   values moved to subpaths (new entries: `core/logger`, `core/capture`,
   `core/adapter/capture-queue`, `core/paths`, `core/urls`, `core/diff`).
@@ -573,6 +623,7 @@ Internal reorganization with a small, documented public-surface cleanup. See
   entry and may change without notice.
 
 **Core layout (`@storyshelf/core`)**
+
 - `schema/` per-entity directory replaces `schema.ts` + `schema-tables.ts` (one module
   per entity, mirroring `models/`; DDL drift-guard test added).
 - Barrel (`@storyshelf/core`) now also exports `models/*`, `middleware/*`, and the
@@ -587,6 +638,7 @@ Internal reorganization with a small, documented public-surface cleanup. See
   colocated with its implementation.
 
 **Adapters**
+
 - New `createDrizzleAdapter` factory (`core/adapter/database`); `db-sqlite` and
   `db-turso` are thin driver shims. Adapter tests gained exact type inference.
 - `db-sqlite` runs on the `node:sqlite` builtin via `drizzle-orm/sqlite-proxy`
@@ -596,6 +648,7 @@ Internal reorganization with a small, documented public-surface cleanup. See
   `git-github` / `git-gitlab` comment modules are thin provider bindings.
 
 **Apps**
+
 - `dev-server` and `fly-app` stay separate launchers owning their own adapter
   wiring, so deployments can diverge (locals vs Turso/S3). Shared code lives in
   `packages/`, not `apps/` (a shared-assembly experiment was evaluated and
@@ -603,12 +656,14 @@ Internal reorganization with a small, documented public-surface cleanup. See
   release script only versions `packages/`).
 
 **CLI (`@storyshelf/cli`)**
+
 - `create`/`init`/`upload` accept an optional `cwd` (test seam, backward compatible).
 - Command test suite added (config, create, upload, init, retry, purge).
 - All file-wide `oxlint-disable` headers removed (`index`, `config`, `create`,
   `init`, `upload` refactored into small helpers).
 
 **Repo hygiene**
+
 - `docs/repo-structure.md` added (annotated map; bundler rule: tsdown for libs,
   rolldown for apps); `AGENTS.md` / `README.md` drift fixed.
 - `.oxlintrc.json`: deleted the `packages/core/src/**` wildcard and the hardcoded

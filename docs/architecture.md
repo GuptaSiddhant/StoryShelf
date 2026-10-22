@@ -76,7 +76,7 @@ snapshots (
   design_url          text,                    -- Figma URL the story declares (parameters.storyshelf.figma / design); NULL when none
   viewport_name       text NOT NULL DEFAULT 'desktop',  -- mode key (viewport name or mode-name slug)
   mode                text,                    -- JSON of the Storybook globals the mode applied (display/capture only)
-  browser             text NOT NULL DEFAULT 'chromium',  -- engine that captured it
+  browser             text NOT NULL DEFAULT 'chromium',  -- capture target that rendered it: an engine, or '<engine>@<name>' for a remote browser (ADR 0007)
   viewport_width      integer NOT NULL DEFAULT 1280,
   viewport_height     integer NOT NULL DEFAULT 720,
   screenshot_path     text NOT NULL,           -- storage path to current screenshot
@@ -319,6 +319,17 @@ capture_jobs (
 );
 -- capture_jobs_poll_idx (kind, visible_at, status): the poll probe; plus (job_id), (build_id), (entry, created_at)
 
+-- Site-wide key-value settings the app learns while running (ADR 0007, decision 6). Key 'public_origin'
+-- holds JSON {origin, confirmed}: the origin a site admin's browser reported, written only by a
+-- site-admin, CSRF-protected route
+site_settings (
+  id          text PRIMARY KEY,                           -- the setting's key
+  value       text NOT NULL,
+  updated_by  text,                                       -- user id behind the write, NULL for none
+  created_at  text NOT NULL,
+  updated_at  text NOT NULL
+);
+
 -- Components of a published build (ADR 0006, decision 9): one row per story file, written from the
 -- build's Storybook index when publishing ends (or lazily on first view of an older build)
 build_components (
@@ -376,6 +387,7 @@ data/                                    # --data-dir flag (default: ./data)
 ```
 
 **Design decisions:**
+
 - **Local filesystem is the default.** One `docker run` to self-host. No cloud accounts needed.
 - **Cloud adapters are drop-in alternatives.** S3-compatible (R2, MinIO, AWS S3, Spaces), Google Cloud Storage (GCS + emulator), and Azure Blob Storage (Azurite) — same `StorageAdapter` interface, four implementations.
 - **No "container" abstraction.** Just paths. Storage adapter is `read/write/delete/exists/list` over a flat path namespace.
@@ -414,24 +426,26 @@ Capture adapters are **pure renderers** (ADR 0015). They render screenshots from
 
 ```typescript
 interface RenderedSnapshot {
-  story: StoryEntry;        // echoed back from the render request
+  story: StoryEntry; // echoed back from the render request
   viewportName: string;
-  screenshot: Buffer;       // PNG bytes
+  screenshot: Buffer; // PNG bytes
 }
 
 interface CaptureRunner {
   render(input: {
     buildId: string;
-    runId?: string;         // this call's cancel handle (a shard id); defaults to buildId
-    storybookDir: string;   // already-extracted Storybook root
+    runId?: string; // this call's cancel handle (a shard id); defaults to buildId
+    storybookDir: string; // already-extracted Storybook root
     stories: StoryEntry[];
     viewports: Viewport[];
     logger?: Logger;
-    onCapture?: (capture: RenderedSnapshot) => Promise<void>;  // optional streaming hand-off
-  }): Promise<RenderResult>;  // { captures, failures }
-  cancel(buildId: string, runId?: string): Promise<void>;  // one run, or every run of the build
+    onCapture?: (capture: RenderedSnapshot) => Promise<void>; // optional streaming hand-off
+  }): Promise<RenderResult>; // { captures, failures }
+  cancel(buildId: string, runId?: string): Promise<void>; // one run, or every run of the build
 }
 ```
+
+**Capture targets and what a runner offers (ADR 0007).** A project's `browsers`, a snapshot's `browser` and every baseline key hold a **capture target**: an engine (`chromium`) or `<engine>@<name>` for a remote browser, which has its own baselines and is never compared with a local render. A runner declares its targets in `metadata.targets` (`RunnerTarget`: `target`, `reach` `loopback | url`, `status` `ready | { unavailable: reason }`), default first. The runners take them from a `browsers` option (bare engine names and `local(engine, options)`, default `["chromium"]`) and verify each local target at startup without launching it (`createTargetOffers`, `core/src/adapters/capture-target-offers.ts`). `render` and `extractParameters` take `target`. The orchestrator refuses, at capture time, a target the runner does not offer or that is unavailable (`assertSupportedBrowsers`), and the app refuses it when a project setting is saved. `reach: "url"` targets (signed Storybook URLs, not built yet) read as `unavailable` while there is no `secret` or public origin (`offeredTargets`, `core/src/capture/targets.ts`). A launch or connect failure is a `TargetLaunchError`: the target is marked unavailable and the job fails with its reason, never through crash isolation.
 
 **Streaming captures.** The orchestrator passes `onCapture`: a runner that supports it hands over each screenshot as soon as it is taken and omits it from `RenderResult.captures`. The orchestrator validates the PNG and writes it straight to storage (`capture/matrix.ts`), keeping only metadata marked `stored`, so memory holds the pages in flight instead of every screenshot of the build. Persisting then skips the write and diffs from storage as before. Runners that ignore `onCapture` keep returning buffers and take the original path. A rejected `onCapture` becomes a render failure for that story and viewport.
 
@@ -457,7 +471,7 @@ there is no in-memory queue). The claim algorithm needs only one primitive from
 the adapter, a unique-key insert whose conflict can be told apart (the `claimFinalize` pattern):
 
 1. **Probe.** One query, `kind = ? AND visible_at <= now AND status IN ('queued','running') ORDER BY
-   visible_at LIMIT 1`, a range scan of `capture_jobs_poll_idx`. Only candidates have a
+visible_at LIMIT 1`, a range scan of `capture_jobs_poll_idx`. Only candidates have a
    `visible_at` (a queued job, a running attempt whose lease is its `visible_at`), so an idle probe
    reads no rows and a busy one reads one.
 2. **Claim.** Insert attempt row `<jobId>:<n+1>` (owner, lease). Exactly one instance wins; the
@@ -505,7 +519,7 @@ one SQLite file, plus gated live runs on Postgres, MySQL and Turso.
 
 ### Story Source Adapter
 
-> Want to understand what happens *inside* the Storybook StoryShelf captures — the iframe, the
+> Want to understand what happens _inside_ the Storybook StoryShelf captures — the iframe, the
 > channel/postMessage protocol, `#storybook-root`, `play` functions, and the index files `discover()`
 > reads? See [`storybook-internals.md`](./storybook-internals.md), a study guide mapping Storybook's
 > internals to this interface and chapter 10 for what the capture pipeline could do next.
@@ -515,7 +529,7 @@ interface StorySourceAdapter {
   name: string;
   discover(source: string): Promise<StoryEntry[]>;
   buildUrl(baseUrl: string, storyId: string): string;
-  screenshotSelector?: string;  // default: "#storybook-root"
+  screenshotSelector?: string; // default: "#storybook-root"
   waitForReady?(page: Page): Promise<void>;
 }
 
@@ -539,7 +553,7 @@ async function capture(buildId: string): Promise<void> {
   const storybookDir = await extractStorybook(buildId);
 
   // 2. Serve it over HTTP (Storybook needs an origin to fetch JS/assets)
-  const server = await serveStatic(storybookDir);   // http://127.0.0.1:<port>
+  const server = await serveStatic(storybookDir); // http://127.0.0.1:<port>
 
   // 3. Discover stories from index.json
   const stories = await storybookAdapter.discover(storybookDir);
@@ -610,14 +624,14 @@ This is what "per-branch acceptance with fallback to default" means: accepting a
 A snapshot's diff is frozen at capture time, but baselines move (a merge to the default branch
 re-baselines; another build on the same branch may be approved first). Each snapshot therefore records
 `baseline_id` + `baseline_version` (the baseline's `updated_at`), and the app compares them with the
-baseline that applies *now* (own branch, else default):
+baseline that applies _now_ (own branch, else default):
 
-| Status | Meaning |
-|---|---|
-| `current` | Same baseline the diff used |
-| `stale` | A different or updated baseline now applies (or a new story gained one) |
-| `removed` | The baseline the diff used no longer exists |
-| `unknown` | Legacy row without tracking; never blocks review |
+| Status    | Meaning                                                                 |
+| --------- | ----------------------------------------------------------------------- |
+| `current` | Same baseline the diff used                                             |
+| `stale`   | A different or updated baseline now applies (or a new story gained one) |
+| `removed` | The baseline the diff used no longer exists                             |
+| `unknown` | Legacy row without tracking; never blocks review                        |
 
 - **Approval guard.** Approving a `stale`/`removed` snapshot returns `409 baseline_changed` instead of
   overwriting a baseline the reviewer did not see; `?force=true` overrides it (logged). Bulk approve skips
@@ -663,13 +677,13 @@ Reviewers and developers can leave **threaded comments** on any snapshot (or on 
 
 A git channel (a `notification_channels` row whose provider declares `delivery: "state"`, ADR 0014) shows the build's current state on its `git_sha`: commit statuses and one pull-request comment. What it shows is a pure function of the build, `statusesForBuild` (`core/src/adapters/notifier/build-state.ts`), so a build that was never captured posts too:
 
-| Status | Shown when | State |
-|---|---|---|
-| `<prefix>/testing` | `testing` is on | `pending` while captured or while review is open, `success` when all `new`/`changed` snapshots are approved, `failure` when rejected or capture failed |
-| `<prefix>/review` | `testing` is off and review is on (not posted yet: no review flag exists) | build-level verdict |
-| `<prefix>/storybook` | every build with a commit | `success` linking the published Storybook, `failure` for a failed build that never published, else `pending`; informational |
+| Status               | Shown when                                                                | State                                                                                                                                                  |
+| -------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `<prefix>/testing`   | `testing` is on                                                           | `pending` while captured or while review is open, `success` when all `new`/`changed` snapshots are approved, `failure` when rejected or capture failed |
+| `<prefix>/review`    | `testing` is off and review is on (not posted yet: no review flag exists) | build-level verdict                                                                                                                                    |
+| `<prefix>/storybook` | every build with a commit                                                 | `success` linking the published Storybook, `failure` for a failed build that never published, else `pending`; informational                            |
 
-The point of the `testing` status is to **block the merge**: the repo owner marks it as a *required check* in GitHub branch protection (or a required pipeline/approval rule in GitLab), so a PR cannot merge until StoryShelf reports `success`. This is the v1 primitive.
+The point of the `testing` status is to **block the merge**: the repo owner marks it as a _required check_ in GitHub branch protection (or a required pipeline/approval rule in GitLab), so a PR cannot merge until StoryShelf reports `success`. This is the v1 primitive.
 
 A git channel is project-scoped and holds `{ owner, repo, host?, prefix? }` in its config and the token in its encrypted secret column; its event filter is fixed because state channels follow the build, not a topic list. The prefix defaults to `storyshelf` and carries no project slug. Because a repo may host several projects (one per Storybook), each project's channel for that repo takes its own prefix (`storyshelf-web`, `storyshelf-docs`), so multiple Storybooks on the same commit don't collide. Links are absolute from `publicBaseUrl`. The comment (build and Storybook links, visual and snapshot summary) is keyed by the build URL.
 
@@ -681,8 +695,8 @@ The full merge-gate story is v2 (ADR 0010): a GitHub App / GitLab integration th
 
 ```typescript
 interface DiffOptions {
-  pixelThreshold: number;      // 0-1, per-pixel color distance (default: 0.1)
-  maxDiffRatio: number;        // 0-1, max allowed diff ratio (default: 0.01)
+  pixelThreshold: number; // 0-1, per-pixel color distance (default: 0.1)
+  maxDiffRatio: number; // 0-1, max allowed diff ratio (default: 0.01)
   includeAntialiasing: boolean;
   failOnSizeChange: boolean;
 }
@@ -691,7 +705,7 @@ interface DiffResult {
   passed: boolean;
   diffPixels: number;
   diffRatio: number;
-  diffImage: Buffer;           // PNG overlay showing changed pixels in red
+  diffImage: Buffer; // PNG overlay showing changed pixels in red
   baselineDimensions: { width: number; height: number };
   currentDimensions: { width: number; height: number };
   sizeChanged: boolean;
@@ -703,6 +717,7 @@ Uses `pixelmatch` for pixel comparison and a PNG codec for decode/encode: `pngjs
 ### Diff Overlay
 
 The diff image is an overlay where:
+
 - Unchanged pixels are shown at 50% opacity
 - Changed pixels are highlighted in red
 - This gives a visual "heat map" of what changed
@@ -763,9 +778,9 @@ Beyond diff review, StoryShelf publishes the uploaded Storybook build as a brows
 
 A published Storybook is addressed by **build** or **label** (`build` is a reserved segment, not a valid label key):
 
-- `GET /projects/:slug/storybook`                      latest published on the default branch
-- `GET /projects/:slug/storybook/:key/:value`          latest build bearing that label (`:value` is a wildcard; values are URL-encoded)
-- `GET /projects/:slug/storybook/build/:buildId/...`   a specific build — the canonical path that serves assets
+- `GET /projects/:slug/storybook` latest published on the default branch
+- `GET /projects/:slug/storybook/:key/:value` latest build bearing that label (`:value` is a wildcard; values are URL-encoded)
+- `GET /projects/:slug/storybook/build/:buildId/...` a specific build — the canonical path that serves assets
 
 `/storybook` and `/storybook/:key/:value` are **resolvers** that 302-redirect to `/storybook/build/<id>/`; Storybook files (`iframe.html`, `index.json`, `assets/*.js`, `sb-manager/*`, …) are served only under `/storybook/build/:buildId/...`. This keeps label resolution from colliding with static-file serving — Storybook emits nested paths like `assets/foo.js` that are otherwise indistinguishable from a `key/value` label. The public/auth check from ADR 0011 applies to all three.
 
@@ -773,7 +788,7 @@ A published Storybook is addressed by **build** or **label** (`build` is a reser
 
 For sharing, a published Storybook can also be served on a **per-project subdomain** — opt-in via `publishedBaseDomain` (e.g. `stories.example.com`) plus a wildcard DNS record (`*.stories.example.com`) and a wildcard TLS cert:
 
-- `:slug.stories.example.com`          → latest published Storybook on the default branch
+- `:slug.stories.example.com` → latest published Storybook on the default branch
 - `:buildId.:slug.stories.example.com` → a specific build
 
 Subdomains serve the Storybook at the domain **root**, so no asset-path rewriting is needed (Storybook's static build expects root serving). They serve **published Storybooks only** — the review UI stays on the main domain at `/projects/:slug/...`. Label values are not exposed as subdomains (DNS labels cannot contain `/`); labels remain on the path-based URLs above. Without `publishedBaseDomain`, the path-based URLs are the only published surface (and stay the default for `localhost` and hosts without a wildcard record). The `linkRoute()` builder switches between path and subdomain forms based on config.
@@ -819,7 +834,7 @@ Builds carry **labels** — typed values that identify related builds and link o
   - `jira` → `https://myorg.atlassian.net/browse/{value}`
   - `linear` → `https://linear.app/myorg/issue/{value}`
   - `figma` → `https://www.figma.com/file/{value}`
-  The review page renders label values as clickable links.
+    The review page renders label values as clickable links.
 - **Attached at upload time.** The CLI attaches labels via `--label key=value` (repeatable), and always attaches `branch=<git_branch>` (a seeded label type). CI templates populate `pr` (GitHub) or `mr` (GitLab) automatically, and `jira`/`linear`/`figma` from explicit flags or branch/commit-message patterns. Unknown keys are auto-created as `custom` type.
 - **Persistent builds.** `persistent` is a built-in, **non-removable** label type: a build bearing it is never purged. The CLI detects git tags on the uploaded commit (`git tag --points-at <sha>`) and attaches one `persistent` label per tag (value = tag name, e.g. `v1.2.3`), so release/tag builds survive retention automatically.
 - **Search:** `GET /builds?label=pr:123`.
@@ -1044,46 +1059,46 @@ StoryShelf/
 
 ## Tech Stack
 
-| Concern | Choice | Rationale |
-|---------|--------|-----------|
-| **Runtime** | Node.js 24+ | Minimum supported version (`engines.node >=24`): unflagged TypeScript type stripping, `node:sqlite`; also Playwright's best-supported runtime |
-| **HTTP framework** | Hono (OpenAPIHono) | Type-safe routes, OpenAPI spec generation, edge-compatible |
-| **Database** | SQLite via `node:sqlite` + Drizzle ORM (local, default). Presets in the same package: Turso/libSQL via `@libsql/client` (serverless), better-sqlite3 (native), bun:sqlite (Bun), D1 binding (Workers). | Zero-config on VPS/Docker. Same schema, same queries, different driver. |
-| **Storage** | Local filesystem (default). S3-compatible (R2, MinIO, S3), GCS, Azure Blob as alternatives. | Local for Docker/VPS. S3/GCS/Azure for cloud. Same adapter interface, four implementations. |
-| **Screenshot capture** | Playwright (server-side) | Industry standard. Deterministic rendering in a pinned image. `toHaveScreenshot` battle-tested |
-| **Pixel diff** | pixelmatch + pngjs | Same libraries Playwright uses internally. Fast, reliable, widely adopted |
-| **Server UI** | hono/jsx + HTMX + hono/css | Server-rendered, fixed UI with brand theming; no client framework or build step |
-| **Capture queue** | The application database (`capture_jobs`) + one in-app consumer | No extra infrastructure; every instance enqueues and consumes (ADR 0006) |
-| **Linting** | oxlint + oxfmt | Fast, strict, Rust-based. Same as StoryBooker |
-| **Testing** | vitest | Fast, TypeScript-native, ESM-first |
-| **Bundler** | tsdown | Fast, simple, ESM output. Same as StoryBooker |
-| **Task runner** | turbo | Monorepo build orchestration. Same as StoryBooker |
-| **Package manager** | nub/nubx | Proven in StoryBooker. Monorepo-aware, works with turbo |
-| **CLI framework** | commander.js | Lightweight, well-typed, no magic |
-| **Auth** | Better Auth engine (`@storyshelf/auth`, mounted at `/api/auth/*`): descriptor-driven login (password, social, SSO/SAML, passkey), invite-only local accounts, device/passkey management on `/profile`. Custom login text via `UIConfig.auth`; RP helpers under `/.well-known/`. No auth by default. | Enterprise teams plug in their IdP (Keycloak, Okta, Entra, SAML). CLI uses API tokens (separate from user auth). See ADR 0023. |
-| **Schema validation** | zod | Runtime validation for API inputs. Drizzle uses it for schema |
-| **Date/time** | Built-in `Date` + ISO strings | No luxury date library needed |
-| **IDs** | ULID | Sortable, collision-resistant, URL-safe |
+| Concern                | Choice                                                                                                                                                                                                                                                                                              | Rationale                                                                                                                                     |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Runtime**            | Node.js 24+                                                                                                                                                                                                                                                                                         | Minimum supported version (`engines.node >=24`): unflagged TypeScript type stripping, `node:sqlite`; also Playwright's best-supported runtime |
+| **HTTP framework**     | Hono (OpenAPIHono)                                                                                                                                                                                                                                                                                  | Type-safe routes, OpenAPI spec generation, edge-compatible                                                                                    |
+| **Database**           | SQLite via `node:sqlite` + Drizzle ORM (local, default). Presets in the same package: Turso/libSQL via `@libsql/client` (serverless), better-sqlite3 (native), bun:sqlite (Bun), D1 binding (Workers).                                                                                              | Zero-config on VPS/Docker. Same schema, same queries, different driver.                                                                       |
+| **Storage**            | Local filesystem (default). S3-compatible (R2, MinIO, S3), GCS, Azure Blob as alternatives.                                                                                                                                                                                                         | Local for Docker/VPS. S3/GCS/Azure for cloud. Same adapter interface, four implementations.                                                   |
+| **Screenshot capture** | Playwright (server-side)                                                                                                                                                                                                                                                                            | Industry standard. Deterministic rendering in a pinned image. `toHaveScreenshot` battle-tested                                                |
+| **Pixel diff**         | pixelmatch + pngjs                                                                                                                                                                                                                                                                                  | Same libraries Playwright uses internally. Fast, reliable, widely adopted                                                                     |
+| **Server UI**          | hono/jsx + HTMX + hono/css                                                                                                                                                                                                                                                                          | Server-rendered, fixed UI with brand theming; no client framework or build step                                                               |
+| **Capture queue**      | The application database (`capture_jobs`) + one in-app consumer                                                                                                                                                                                                                                     | No extra infrastructure; every instance enqueues and consumes (ADR 0006)                                                                      |
+| **Linting**            | oxlint + oxfmt                                                                                                                                                                                                                                                                                      | Fast, strict, Rust-based. Same as StoryBooker                                                                                                 |
+| **Testing**            | vitest                                                                                                                                                                                                                                                                                              | Fast, TypeScript-native, ESM-first                                                                                                            |
+| **Bundler**            | tsdown                                                                                                                                                                                                                                                                                              | Fast, simple, ESM output. Same as StoryBooker                                                                                                 |
+| **Task runner**        | turbo                                                                                                                                                                                                                                                                                               | Monorepo build orchestration. Same as StoryBooker                                                                                             |
+| **Package manager**    | nub/nubx                                                                                                                                                                                                                                                                                            | Proven in StoryBooker. Monorepo-aware, works with turbo                                                                                       |
+| **CLI framework**      | commander.js                                                                                                                                                                                                                                                                                        | Lightweight, well-typed, no magic                                                                                                             |
+| **Auth**               | Better Auth engine (`@storyshelf/auth`, mounted at `/api/auth/*`): descriptor-driven login (password, social, SSO/SAML, passkey), invite-only local accounts, device/passkey management on `/profile`. Custom login text via `UIConfig.auth`; RP helpers under `/.well-known/`. No auth by default. | Enterprise teams plug in their IdP (Keycloak, Okta, Entra, SAML). CLI uses API tokens (separate from user auth). See ADR 0023.                |
+| **Schema validation**  | zod                                                                                                                                                                                                                                                                                                 | Runtime validation for API inputs. Drizzle uses it for schema                                                                                 |
+| **Date/time**          | Built-in `Date` + ISO strings                                                                                                                                                                                                                                                                       | No luxury date library needed                                                                                                                 |
+| **IDs**                | ULID                                                                                                                                                                                                                                                                                                | Sortable, collision-resistant, URL-safe                                                                                                       |
 
 ### What Changed from StoryBooker
 
-| StoryBooker | StoryShelf | Why |
-|-------------|-----------|-----|
-| Capture = upload pre-captured screenshots | Capture = upload Storybook build, server renders | Deterministic rendering without cloning repos |
-| No ORM (raw adapter calls) | Drizzle ORM | Type-safe schema, migrations, query builder |
-| LocalFileDatabase (JSON) | SQLite + Turso | ACID on VPS/Docker. Turso for serverless |
-| AsyncLocalStorage for models | Constructor injection | Models take adapters as constructor args |
-| 7 compute adapters (5 untested) | 1 CaptureRunner + database queue | Capture is a fixed pipeline, not user-defined jobs |
-| Build ID = git SHA | ULID + `git_sha` column | Re-runs, squash/merge-safe |
-| Stringified DynamoDB values | SQLite native types | Proper booleans, numbers, JSON columns |
-| Per-project S3 buckets | Local filesystem + S3 option | Local default. S3-compatible for cloud |
-| 1 project = 1 repo | 1 project = 1 Storybook (many per repo) | Monorepos with multiple Storybooks |
-| 4 fixed variants (storybook, testReport, coverage, screenshots) | Snapshots table (per story x viewport) | Per-story tracking for visual testing |
-| `tagIds: "a,b"` comma-separated | Project-defined label types + `build_labels` join | Typed, configurable, link templates, stable-URL resolution |
-| `compute.jobs[]` nested in Project | No jobs table in v1 | Capture is a fixed pipeline |
-| `latestBuildId` on Project | `baselines` per branch | Baseline is per branch, not per project |
-| Dual-mode HTML/JSON routes | Separate `/api/v1` and `/` routes | Eliminates content-type sniffing bugs |
-| No auth (open API) | Auth singleton (`@storyshelf/auth`) | Enterprise IdP integration. Default: none for local dev. |
+| StoryBooker                                                     | StoryShelf                                        | Why                                                        |
+| --------------------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------- |
+| Capture = upload pre-captured screenshots                       | Capture = upload Storybook build, server renders  | Deterministic rendering without cloning repos              |
+| No ORM (raw adapter calls)                                      | Drizzle ORM                                       | Type-safe schema, migrations, query builder                |
+| LocalFileDatabase (JSON)                                        | SQLite + Turso                                    | ACID on VPS/Docker. Turso for serverless                   |
+| AsyncLocalStorage for models                                    | Constructor injection                             | Models take adapters as constructor args                   |
+| 7 compute adapters (5 untested)                                 | 1 CaptureRunner + database queue                  | Capture is a fixed pipeline, not user-defined jobs         |
+| Build ID = git SHA                                              | ULID + `git_sha` column                           | Re-runs, squash/merge-safe                                 |
+| Stringified DynamoDB values                                     | SQLite native types                               | Proper booleans, numbers, JSON columns                     |
+| Per-project S3 buckets                                          | Local filesystem + S3 option                      | Local default. S3-compatible for cloud                     |
+| 1 project = 1 repo                                              | 1 project = 1 Storybook (many per repo)           | Monorepos with multiple Storybooks                         |
+| 4 fixed variants (storybook, testReport, coverage, screenshots) | Snapshots table (per story x viewport)            | Per-story tracking for visual testing                      |
+| `tagIds: "a,b"` comma-separated                                 | Project-defined label types + `build_labels` join | Typed, configurable, link templates, stable-URL resolution |
+| `compute.jobs[]` nested in Project                              | No jobs table in v1                               | Capture is a fixed pipeline                                |
+| `latestBuildId` on Project                                      | `baselines` per branch                            | Baseline is per branch, not per project                    |
+| Dual-mode HTML/JSON routes                                      | Separate `/api/v1` and `/` routes                 | Eliminates content-type sniffing bugs                      |
+| No auth (open API)                                              | Auth singleton (`@storyshelf/auth`)               | Enterprise IdP integration. Default: none for local dev.   |
 
 ## Server UI
 
@@ -1095,7 +1110,7 @@ StoryShelf ships a **fixed, server-rendered UI** — `hono/jsx` + HTMX + `hono/c
 - **Theme:** follows the system (`prefers-color-scheme`) with a manual light/dark override, persisted in a cookie so the server renders the correct theme on first paint.
 - **Brand config** is passed as `ui: { name, logo, theme }` to `createShelfApp` (see `ShelfOptions`). Env vars (`SS_BRAND_NAME`, `SS_LOGO_URL`) supply defaults so self-hosters can rebrand with a `docker run`, no code. The **favicon is not brandable**: the app always serves its own mark (`app/src/assets/mark.svg`, content-hashed under `/assets/`) so a StoryShelf tab is recognisable; `ui.favicon` is accepted for config compatibility but ignored. `ui.logo` defaults to the same mark.
 - **Auth UI text** lives in `ui.auth` (title, subtitle, password label/placeholder, submit label, `{label}` SSO template, help/footer) with `SS_AUTH_*` env defaults; the sidebar account menu links to the personal `/profile` page (editable display name, local password change, memberships).
-- **Public base URL** (`config.publicBaseUrl`, `PUBLIC_BASE_URL`) pins the issuer in the `/.well-known/openid-configuration` relying-party helper; otherwise the request origin is used.
+- **Public origin** (ADR 0007, decision 6): one resolver (`createPublicOriginResolver`, `core/src/models/public-origin.ts`) answers every absolute link built in the background (commit-status links, notification review links) and the OAuth callback URLs. It tries `config.publicBaseUrl` (`PUBLIC_BASE_URL`), then the platform's address from its environment (`detectPublicBaseUrl`, `core/src/utils/public-origin.ts`), then the origin a site admin's browser reported (the System page posts `location.origin`; first report wins; stored in `site_settings`; confirm, replace or forget on the System page). The `Host` header is never used for background links; only the interactive `/.well-known/openid-configuration` and OAuth redirect URIs fall back to the request's own address when nothing resolves. Without a resolved origin statuses carry no link and no pull-request comment is written.
 - **HTMX is vendored locally** (no CDN), so air-gapped deployments work.
 - **Review workspace:** a snapshot filmstrip with filters and progress, and a comparison stage with side-by-side, swipe, onion-skin, diff and flip modes plus zoom; a sticky action bar approves/rejects and auto-advances to the next open snapshot (keyboard: `j`/`k`, `a`/`r`, `1`–`5`, `f`, `t`, `?`). A small vanilla-JS layer (`app/src/ui/shell/*-script.ts`, idempotent across HTMX body swaps) covers the shell and review behaviour. The published-Storybook page is an `<iframe>` of Storybook's own static build.
 
@@ -1179,7 +1194,7 @@ See `docs/website.md`. The public site (`apps/website/`, Astro Starlight) hosts 
    Any uncertainty (shallow clone, missing stats/history, global-file change) falls
    back to a full render, and `--full` opts out per run.
 2. **Git-provider merge gate (GitHub App / GitLab)** -- rich check runs, per-snapshot annotations, and auto-reject on review rejection. v1 has the primitive (required commit status); the full integration is ADR 0010.
-3. **Remote browsers** -- render in a browser farm (ADR 0007). The `CaptureRunner` interface anticipates this.
+3. **Remote browsers** -- render in a browser farm (ADR 0007). The runner `browsers` list, `CaptureTarget` and the public origin are in place; remote connect presets and signed Storybook URLs are not built yet.
 4. **`parameters.chromatic` equivalents** -- `modes` are implemented (named modes from `parameters.chromatic.modes` / `parameters.storyshelf.modes`, ADR 0028); an args matrix is not. Per-story `delay`, `disableSnapshot`, `flakyTest`, `autoCrop`/sizing are implemented; `waitForReady` covers the basic "wait for data" case.
 5. **Ladle / Histoire / custom pages** -- the `StorySourceAdapter` interface anticipates them.
 6. **Per-story viewport presets** -- a story's Storybook `defaultViewport` is captured **in addition to** the project's global list (union, deduped by name; issue #82), including inline `parameters.viewport.viewports`. Global defaults remain the project-level surface.

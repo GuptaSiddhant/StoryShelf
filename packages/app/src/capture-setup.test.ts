@@ -59,7 +59,11 @@ function wire(testing?: ShelfOptions["testing"], config: { scratchDir?: string }
     wiring: setupCapture(
       options,
       config,
-      { notifiers: [], buildState: { request: async () => {} } },
+      {
+        notifiers: [],
+        buildState: { request: async () => {} },
+        publicOrigin: async () => await Promise.resolve("https://shelf.example.com"),
+      },
       logger,
       jobs,
     ),

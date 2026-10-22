@@ -1,7 +1,18 @@
 import { z } from "@hono/zod-openapi";
-import { BROWSER_NAMES } from "@storyshelf/core/adapter/capture-runner";
+import { BROWSER_NAMES, TARGET_NAME_PATTERN } from "@storyshelf/core/adapter/capture-runner";
 import { WebhookModel } from "@storyshelf/core/models";
 import { BUILD_STATUSES, PROJECT_ROLES, SNAPSHOT_STATUSES } from "@storyshelf/core/types";
+
+/** A capture target: an engine (`chromium`) or a remote one, `<engine>@<name>` (ADR 0007). */
+const captureTargetSchema = z
+  .string()
+  .regex(
+    new RegExp(
+      `^(?:${BROWSER_NAMES.join("|")})(?:@${TARGET_NAME_PATTERN.source.slice(1, -1)})?$`,
+      "u",
+    ),
+    "Expected an engine (chromium, firefox, webkit, chrome) or <engine>@<name>",
+  );
 
 const storybookMetaSchema = z.record(z.string(), z.unknown()).nullable().optional();
 
@@ -21,7 +32,7 @@ export const projectSchema = z
     playTimeoutMs: z.number(),
     // Stored rows predate enum validation, so the response stays a plain string.
     browser: z.string().optional(),
-    /** JSON array of engines to capture, primary first; null = just `browser`. */
+    /** JSON array of capture targets, primary first, primary first; null = just `browser`. */
     browsers: z.string().nullable().optional(),
     /** JSON array of mode names to capture; null = every declared mode. */
     modesAllowlist: z.string().nullable().optional(),
@@ -56,10 +67,10 @@ export const projectUpdateSchema = z
     storybookMeta: storybookMetaSchema,
     executePlay: z.boolean().optional(),
     playTimeoutMs: z.number().int().min(1000).max(30_000).optional(),
-    /** Single engine; clears `browsers`. */
-    browser: z.enum(BROWSER_NAMES).optional(),
-    /** Engines to capture, primary first (max 3); null returns to single `browser`. */
-    browsers: z.array(z.enum(BROWSER_NAMES)).min(1).max(3).nullable().optional(),
+    /** Single capture target; clears `browsers`. */
+    browser: captureTargetSchema.optional(),
+    /** Capture targets, primary first (max 3); null returns to single `browser`. */
+    browsers: z.array(captureTargetSchema).min(1).max(3).nullable().optional(),
     /** Mode names to capture; null runs every declared mode. */
     modesAllowlist: z.array(z.string().min(1)).max(50).nullable().optional(),
     /** Site admins only: a configured AI profile name, or null to turn AI off. */

@@ -48,7 +48,11 @@ export function setupJobs(
   const capture = setupCapture(
     options,
     runtime.config,
-    { notifiers: runtime.notifiers, buildState: buildState.publisher },
+    {
+      notifiers: runtime.notifiers,
+      buildState: buildState.publisher,
+      publicOrigin: async () => await runtime.publicOrigin.url(),
+    },
     runtime.logger,
     jobs,
   );

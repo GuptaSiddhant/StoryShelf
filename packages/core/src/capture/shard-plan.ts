@@ -1,10 +1,10 @@
 /** Splitting a build's render work into shards (ADR 0031 phase 5). Pure: no I/O, no clock. */
-import type { BrowserName } from "../adapters/capture-runner.ts";
+import type { CaptureTarget } from "../adapters/capture-runner.ts";
 import type { StoryEntry, Viewport } from "./adapter.ts";
 
 /** What one engine has to render this build (after affected-capture partitioning). */
 export interface EngineWork {
-  browser: BrowserName;
+  browser: CaptureTarget;
   stories: StoryEntry[];
 }
 

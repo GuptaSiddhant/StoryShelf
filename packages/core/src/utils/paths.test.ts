@@ -33,4 +33,17 @@ describe("browser-aware paths", () => {
     expect(baselinePath("p", "main", "s", "dark")).toBe("p/baselines/main/s/dark.png");
     expect(() => baselinePath("p", "main", "s", "dark", "../x")).toThrow(/Unsafe/u);
   });
+
+  it("gives a remote target its own path: the full `<engine>@<name>` is the suffix", () => {
+    expect(modeSegment("dark", "chromium@grid")).toBe("dark~chromium@grid");
+    expect(screenshotPath("p", "b", "s", "dark", "chromium@grid")).toBe(
+      "p/builds/b/screenshots/s/dark~chromium@grid.png",
+    );
+    expect(diffPath("p", "b", "s", "dark", "webkit@bs-mac")).toBe(
+      "p/builds/b/diffs/s/dark~webkit@bs-mac.png",
+    );
+    expect(baselinePath("p", "main", "s", "dark", "chromium@grid")).toBe(
+      "p/baselines/main/s/dark~chromium@grid.png",
+    );
+  });
 });

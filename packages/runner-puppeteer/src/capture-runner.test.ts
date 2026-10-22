@@ -1,4 +1,8 @@
-import type { StoryEntry, Viewport } from "@storyshelf/core/adapter/capture-runner";
+import {
+  TargetLaunchError,
+  type StoryEntry,
+  type Viewport,
+} from "@storyshelf/core/adapter/capture-runner";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -9,6 +13,7 @@ import {
   createRuntimeParamsState,
   runtimeParametersForStory,
 } from "./capture-runner.ts";
+import { local } from "./targets.ts";
 
 const puppeteer = vi.hoisted(() => {
   let closed = false;
@@ -17,6 +22,8 @@ const puppeteer = vi.hoisted(() => {
   let lastBrowser: typeof browser | null = null;
   let hangNextGoto = true;
   let extractResult: unknown;
+  const launchOptions: unknown[] = [];
+  let launchFailure: Error | null = null;
   const makePage = () => ({
     goto: async (): Promise<void> => {
       if (closed) {
@@ -98,7 +105,11 @@ const puppeteer = vi.hoisted(() => {
   };
   return {
     browser,
-    launch: async (): Promise<typeof browser> => {
+    launch: async (options?: unknown): Promise<typeof browser> => {
+      launchOptions.push(options);
+      if (launchFailure !== null) {
+        throw launchFailure;
+      }
       launches += 1;
       closed = false;
       browser.closed = false;
@@ -108,7 +119,12 @@ const puppeteer = vi.hoisted(() => {
     },
     lastBrowser: (): typeof browser | null => lastBrowser,
     launchCount: (): number => launches,
+    launchOptions,
+    failLaunches: (error: Error | null): void => {
+      launchFailure = error;
+    },
     stats,
+    hangingPages: (): number => pendingGotos.length,
     configureHang: (hang: boolean): void => {
       hangNextGoto = hang;
     },
@@ -157,8 +173,9 @@ describe("createPuppeteerCaptureRunner.render", () => {
       viewports: VIEWPORTS,
     });
 
-    await new Promise((resolve) => {
-      setTimeout(resolve, 20);
+    // Cancel once a page is stuck in `goto`, however long a loaded host takes to get there.
+    await vi.waitFor(() => {
+      expect(puppeteer.hangingPages()).toBeGreaterThan(0);
     });
     await expect(runner.cancel("build-1")).resolves.toBeUndefined();
     const result = await renderPromise;
@@ -449,4 +466,92 @@ describe("createPuppeteerCaptureRunner.render", () => {
     expect(result.captures).toHaveLength(1);
     expect(result.captures.map((c) => c.viewportName)).toEqual(["desktop"]);
   }, 30_000);
+});
+
+const input = () => ({
+  buildId: "build-1",
+  storybookDir,
+  stories: STORIES,
+  viewports: VIEWPORTS,
+});
+
+describe("createPuppeteerCaptureRunner targets (ADR 0007)", () => {
+  it("offers chromium only by default, ready, reaching the loopback server", () => {
+    expect(createPuppeteerCaptureRunner().metadata.targets).toEqual([
+      { target: "chromium", reach: "loopback", status: "ready" },
+    ]);
+  });
+
+  it("lists declared targets, default first, and fails when created on a bad list", () => {
+    const runner = createPuppeteerCaptureRunner({
+      browsers: [local("chrome", { executablePath: "/usr/bin/google-chrome" }), "chromium"],
+    });
+    expect(runner.metadata.targets?.map((entry) => entry.target)).toEqual(["chrome", "chromium"]);
+    expect(() => createPuppeteerCaptureRunner({ browsers: [] })).toThrow(/at least one/u);
+    expect(() => createPuppeteerCaptureRunner({ browsers: ["chrome"] })).toThrow(
+      /"chrome" needs an executablePath/u,
+    );
+    expect(() =>
+      createPuppeteerCaptureRunner({ executablePath: "/usr/bin/chromium", browsers: ["chrome"] }),
+    ).toThrow(/"chrome" needs an executablePath/u);
+    expect(() => createPuppeteerCaptureRunner({ browsers: [local("firefox")] })).toThrow(
+      /Chromium-family engines only/u,
+    );
+    expect(() => createPuppeteerCaptureRunner({ browsers: ["chromium", "chromium"] })).toThrow(
+      /entries 1 and 2 both produce the target "chromium"/u,
+    );
+  });
+
+  it("launches each target's own executable and shares the runner's flags", async () => {
+    puppeteer.configureHang(false);
+    const runner = createPuppeteerCaptureRunner({
+      executablePath: "/usr/bin/chromium",
+      args: ["--no-sandbox"],
+      browsers: ["chromium", local("chrome", { executablePath: "/usr/bin/google-chrome" })],
+    });
+    const before = puppeteer.launchOptions.length;
+    await runner.render({ ...input(), target: "chrome" });
+    await runner.render({ ...input(), target: "chromium" });
+    expect(puppeteer.launchOptions.slice(before)).toEqual([
+      { headless: true, executablePath: "/usr/bin/google-chrome", args: ["--no-sandbox"] },
+      { headless: true, executablePath: "/usr/bin/chromium", args: ["--no-sandbox"] },
+    ]);
+  }, 30_000);
+
+  it("echoes the target on every row and refuses a target it does not offer", async () => {
+    puppeteer.configureHang(false);
+    const runner = createPuppeteerCaptureRunner();
+    const result = await runner.render(input());
+    expect(result.captures.map((capture) => capture.browser)).toEqual(["chromium"]);
+    await expect(runner.render({ ...input(), target: "chromium@grid" })).rejects.toBeInstanceOf(
+      TargetLaunchError,
+    );
+  }, 30_000);
+
+  it("fails at once when the browser will not launch, and marks the target unavailable", async () => {
+    const runner = createPuppeteerCaptureRunner();
+    puppeteer.failLaunches(new Error("Failed to launch the browser process!\nlong log tail"));
+    try {
+      await expect(runner.render(input())).rejects.toThrow(
+        "Cannot launch chromium: Failed to launch the browser process!",
+      );
+    } finally {
+      puppeteer.failLaunches(null);
+    }
+    expect(runner.metadata.targets?.[0]?.status).toEqual({
+      unavailable: "Failed to launch the browser process!",
+    });
+  });
+
+  it("verifies executables in setup and reports a missing one in health", async () => {
+    const runner = createPuppeteerCaptureRunner({ executablePath: "/definitely/not/here" });
+    await runner.lifecycle?.setup({} as never);
+    expect(runner.metadata.targets?.[0]?.status).toEqual({
+      unavailable: "executable not found at /definitely/not/here",
+    });
+    expect(await runner.lifecycle?.health()).toEqual({
+      ok: false,
+      detail: "chromium: executable not found at /definitely/not/here",
+    });
+  });
 });

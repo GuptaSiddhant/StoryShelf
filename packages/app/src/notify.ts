@@ -19,6 +19,7 @@ import {
   NotificationChannelModel,
   NotificationSubscriptionModel,
   UserModel,
+  type PublicOriginResolver,
 } from "@storyshelf/core/models";
 import type { NotificationSubscriptionRow } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
@@ -34,20 +35,21 @@ export interface NotifyDeps {
   notifiers: NotifierProvider[];
   /** Brand/sender settings (`notifications.config`). */
   notificationsConfig?: NotificationsConfig;
+  /** The public origin resolver; absent ⇒ `config.publicBaseUrl` only. */
+  publicOrigin?: Pick<PublicOriginResolver, "url"> | undefined;
 }
 
-/** Review URL for a project page (absolute when `publicBaseUrl` is set). */
-export function reviewUrlFor(slug: string, suffix: string): string | undefined {
-  return reviewUrlForWith(getStore().config.publicBaseUrl, slug, suffix);
-}
-
-/** Review URL from an explicit base URL (background use). */
-function reviewUrlForWith(
-  publicBaseUrl: string | undefined,
+/**
+ * Absolute review URL for a project page, from the resolved public origin (ADR 0007, decision 6);
+ * `undefined` while none is known, so notification links that need one are omitted.
+ */
+async function reviewUrlForWith(
+  deps: Pick<NotifyDeps, "config" | "publicOrigin">,
   slug: string,
   suffix: string,
-): string | undefined {
-  const base = publicBaseUrl?.replace(/\/+$/u, "");
+): Promise<string | undefined> {
+  const origin = (await deps.publicOrigin?.url()) ?? deps.config.publicBaseUrl;
+  const base = origin?.replace(/\/+$/u, "");
   if (!base) {
     return undefined;
   }
@@ -167,7 +169,7 @@ export async function notifyProjectWith(
     return;
   }
   const reviewUrl = reviewSuffix
-    ? reviewUrlForWith(deps.config.publicBaseUrl, project.slug, reviewSuffix)
+    ? await reviewUrlForWith(deps, project.slug, reviewSuffix)
     : undefined;
   const wired = new Set(deps.notifiers.map((candidate) => candidate.metadata.kind));
   const channels = await loadChannels(deps, project.id);

@@ -1,13 +1,12 @@
 /** Playwright capture runner — composition root (factory wiring). */
 
-import {
-  BROWSER_NAMES,
-  type BrowserName,
-  type CaptureRunner,
-} from "@storyshelf/core/adapter/capture-runner";
+import { createTargetOffers, type CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
 import { recommendedNavigationTimeoutMs } from "@storyshelf/core/utils";
+import { verifyLocalTargets } from "./availability.ts";
 import { activeRuns, closeBrowser } from "./browser.ts";
+import { launchLocal, loadPlaywright } from "./launch.ts";
 import { extractAll, renderAll } from "./pipeline.ts";
+import { flattenBrowsers, type BrowserEntry, type LocalTarget } from "./targets.ts";
 import type { ActiveRun, ExtractInput, PlaywrightRenderInput } from "./types.ts";
 
 declare const __PKG_VERSION__: string | undefined;
@@ -15,8 +14,12 @@ declare const __PKG_VERSION__: string | undefined;
 /** Create a CaptureRunner that renders Storybook stories with Playwright. */
 export function createPlaywrightCaptureRunner(
   options: {
-    browser?: BrowserName;
-    supportedBrowsers?: readonly BrowserName[];
+    /**
+     * Every target the runner offers, default first (ADR 0007, decision 1): engine names or
+     * `local(engine, options)`. Default `["chromium"]`; Firefox and WebKit are offered only when
+     * listed, and their binaries provisioned (`playwright install`), which `playwright-core` never does.
+     */
+    browsers?: readonly BrowserEntry[];
     /** Pages rendered at once; falls back to `STORYSHELF_CAPTURE_CONCURRENCY`, then CPU/memory detection. */
     concurrency?: number;
     /** Per-page timeout in ms; falls back to `STORYSHELF_NAVIGATION_TIMEOUT_MS`, then CPU detection. */
@@ -27,7 +30,16 @@ export function createPlaywrightCaptureRunner(
     reusePages?: boolean;
   } = {},
 ): CaptureRunner {
-  const defaultBrowser = options.browser ?? "chromium";
+  const locals = flattenBrowsers(options.browsers ?? ["chromium"]);
+  // Until `lifecycle.setup` verifies them, every declared engine reads as ready.
+  const offers = createTargetOffers(
+    locals.map(({ target }) => ({ target, reach: "loopback", status: "ready" })),
+  );
+  const launch = offers.guard(
+    async (target) =>
+      await launchLocal(locals.find((entry) => entry.target === target) as LocalTarget),
+  );
+  const defaultTarget = offers.defaultTarget;
   const concurrency = options.concurrency ?? envPositiveInt("STORYSHELF_CAPTURE_CONCURRENCY");
   const navigationTimeoutMs =
     options.navigationTimeoutMs ??
@@ -44,8 +56,11 @@ export function createPlaywrightCaptureRunner(
       description: "Playwright capture runner",
       kind: "playwright",
       category: "capture-runner",
-      supportedBrowsers: options.supportedBrowsers ?? BROWSER_NAMES,
+      get targets() {
+        return offers.current();
+      },
     },
+    lifecycle: offers.lifecycle(async () => verifyLocalTargets(locals, await loadPlaywright())),
     async render(input: PlaywrightRenderInput) {
       const active: ActiveRun = { cancelled: false, browser: null };
       const remove = activeRuns.add(input.buildId, input.runId, active);
@@ -53,14 +68,15 @@ export function createPlaywrightCaptureRunner(
         return await renderAll(
           { concurrency, navigationTimeoutMs, recycleBrowserEvery, reusePages, ...input },
           active,
-          defaultBrowser,
+          launch,
+          defaultTarget,
         );
       } finally {
         remove();
       }
     },
     async extractParameters(input: ExtractInput) {
-      return await extractAll(input, defaultBrowser);
+      return await extractAll(input, launch, defaultTarget);
     },
     async cancel(buildId, runId) {
       await Promise.all(

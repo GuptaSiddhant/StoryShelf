@@ -2,11 +2,12 @@
 import { currentImageEngine } from "@storyshelf/image";
 import type { Logger } from "pino";
 import type {
-  BrowserName,
   CaptureRunner,
+  CaptureTarget,
   RenderFailure,
   RenderedSnapshot,
 } from "../adapters/capture-runner.ts";
+import { TargetLaunchError } from "../adapters/capture-target.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import type { AttemptLogRecorder } from "../models/capture-attempt.ts";
@@ -36,7 +37,7 @@ export interface MatrixInput {
   stories: StoryEntry[];
   viewports: Viewport[];
   storybookDir: string;
-  browsers: readonly BrowserName[];
+  browsers: readonly CaptureTarget[];
   affectedPaths: string[] | null;
   /** Explicit render budget; unset scales with the number of captures. */
   renderTimeoutMs?: number | undefined;
@@ -145,7 +146,7 @@ export async function renderWork(
  */
 async function isolatedPass(
   input: MatrixInput,
-  browser: BrowserName,
+  browser: CaptureTarget,
   mirror: AttemptMirror,
   toRender: StoryEntry[],
   inherited: InheritedStory[],
@@ -170,7 +171,7 @@ async function isolatedPass(
 /** One render pass that never throws: a crash comes back beside whatever it captured first. */
 async function attemptPass(
   input: MatrixInput,
-  browser: BrowserName,
+  browser: CaptureTarget,
   mirror: AttemptMirror,
   stories: StoryEntry[],
 ): Promise<PassOutcome> {
@@ -179,6 +180,10 @@ async function attemptPass(
     const pass = await renderPass(input, browser, mirror, stories, [], spooled);
     return { captures: pass.captures, failures: pass.failures };
   } catch (error) {
+    // The browser never started: no story is at fault, so it is not isolated or retried.
+    if (error instanceof TargetLaunchError) {
+      throw error;
+    }
     mirror.log("warn", "render pass crashed, isolating the story at fault", {
       browser,
       stories: stories.length,
@@ -190,7 +195,7 @@ async function attemptPass(
 }
 
 /** Record how a crash was narrowed down on the attempt log. */
-function isolationNote(mirror: AttemptMirror, browser: BrowserName): IsolationNote {
+function isolationNote(mirror: AttemptMirror, browser: CaptureTarget): IsolationNote {
   return (event, fields) => {
     if (event === "poisoned") {
       mirror.log("error", "story crashed the browser on its own", { browser, ...fields });
@@ -219,7 +224,7 @@ function fillEnvironment(captures: RenderedSnapshot[]): RenderedSnapshot[] {
   return captures;
 }
 
-async function captureOnBrowser(input: MatrixInput, browser: BrowserName): Promise<MatrixResult> {
+async function captureOnBrowser(input: MatrixInput, browser: CaptureTarget): Promise<MatrixResult> {
   const mirror = mirrorAttemptLog(input.logger, input.recordLog, flakyDowngrade(input.stories));
   try {
     return await passOnBrowser(input, browser, mirror);
@@ -244,7 +249,7 @@ function flakyDowngrade(
 
 async function passOnBrowser(
   input: MatrixInput,
-  browser: BrowserName,
+  browser: CaptureTarget,
   mirror: AttemptMirror,
 ): Promise<MatrixResult> {
   const { project, build } = input;
@@ -278,7 +283,7 @@ async function passOnBrowser(
  */
 async function renderPass(
   input: MatrixInput,
-  browser: BrowserName,
+  browser: CaptureTarget,
   mirror: AttemptMirror,
   toRender: StoryEntry[],
   inherited: InheritedStory[],
@@ -311,7 +316,7 @@ async function renderPass(
 /** The render call for one engine; captures stream into `spooled` as they are taken. */
 function renderRequest(
   input: MatrixInput,
-  browser: BrowserName,
+  browser: CaptureTarget,
   stories: StoryEntry[],
   spooled: RenderedSnapshot[],
   progress: { mirror: AttemptMirror; expected: number },
@@ -332,7 +337,7 @@ function renderRequest(
     executePlay: project.executePlay ?? false,
     playTimeoutMs: project.playTimeoutMs ?? 10_000,
     runA11y: project.runA11y ?? false,
-    browser,
+    target: browser,
   };
 }
 
@@ -342,7 +347,7 @@ const PROGRESS_EVERY = 10;
 /** Record "captured N/M" every few screenshots so a long render keeps showing movement. */
 function logProgress(
   progress: { mirror: AttemptMirror; expected: number },
-  browser: BrowserName,
+  browser: CaptureTarget,
   captured: number,
 ): void {
   if (captured % PROGRESS_EVERY !== 0) return;
@@ -359,7 +364,7 @@ function logProgress(
  */
 async function spoolCapture(
   input: MatrixInput,
-  browser: BrowserName,
+  browser: CaptureTarget,
   capture: RenderedSnapshot,
 ): Promise<RenderedSnapshot> {
   assertScreenshotBuffer(capture.screenshot);
@@ -383,6 +388,9 @@ function withEnvironment(
 }
 
 /** Copy each row with its engine (runners may reuse result objects across calls). */
-function tagged<T extends { browser?: string | undefined }>(rows: T[], browser: BrowserName): T[] {
+function tagged<T extends { browser?: string | undefined }>(
+  rows: T[],
+  browser: CaptureTarget,
+): T[] {
   return rows.map((row) => Object.assign({}, row, { browser }));
 }

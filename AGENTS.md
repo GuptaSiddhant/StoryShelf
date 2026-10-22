@@ -52,7 +52,7 @@ See `docs/repo-structure.md` for the annotated map (workspaces vs fixtures, bund
 ```
 StoryShelf/
   packages/
-    core/           @storyshelf/core           -- Adapter interfaces, models, capture pipeline, publishing (`capture/publish/`: capped extraction, acceptance rule, `publish` job handler), Storybook catalog (`capture/catalog/`: index parsing, `build_components` rows, `catalog.json`, lazy loader), the database job queue (`capture/db-queue/`) and its consumer (`capture/consumer/`), forked capture (`capture/forked/`: the parent-side handler and `runCaptureChild`), diff, retention (no HTTP)
+    core/           @storyshelf/core           -- Adapter interfaces (capture targets: `adapters/capture-target*.ts`), models (incl. the public-origin resolver and `site_settings`), capture pipeline, publishing (`capture/publish/`: capped extraction, acceptance rule, `publish` job handler), Storybook catalog (`capture/catalog/`: index parsing, `build_components` rows, `catalog.json`, lazy loader), the database job queue (`capture/db-queue/`) and its consumer (`capture/consumer/`), forked capture (`capture/forked/`: the parent-side handler and `runCaptureChild`), diff, retention (no HTTP)
     app/            @storyshelf/app         -- Hono app, API routes, server-rendered UI over core (see ADR 0001)
     db-sqlite/      @storyshelf/db-sqlite      -- SQLite database adapters (node:sqlite default + turso/better-sqlite3/bun-sqlite/d1 presets via subpaths)
     db-postgres/    @storyshelf/db-postgres     -- Postgres database adapters (postgres.js default + pg/neon/neon-http/vercel/pglite presets via subpaths)
@@ -64,8 +64,8 @@ StoryShelf/
     image/          @storyshelf/image           -- Pixel diff, overlay rendering and thumbnails on a worker pool; pngjs default codec, optional sharp (leaf package, see ADR 0008)
     auth/           @storyshelf/auth            -- Better Auth engine (local accounts, OAuth/OIDC, SSO, passkeys; see ADR 0011)
     cli/            storyshelf              -- CLI client (commander; upload/init/create/server/retry/purge, no Playwright)
-    runner-playwright/ @storyshelf/runner-playwright -- pure Playwright CaptureRenderer (server-side render; core orchestrator owns capture)
-    runner-puppeteer/  @storyshelf/runner-puppeteer  -- Puppeteer CaptureRunner (Chromium via chrome-headless-shell, smaller image)
+    runner-playwright/ @storyshelf/runner-playwright -- pure Playwright CaptureRenderer (server-side render; core orchestrator owns capture; `browsers` option = local targets)
+    runner-puppeteer/  @storyshelf/runner-puppeteer  -- Puppeteer CaptureRunner (Chromium via chrome-headless-shell, smaller image; `browsers` option, needs an `executablePath`)
     affected/       @storyshelf/affected        -- Affected capture: dependency-graph tracing that selects the stories impacted by a change
     design-figma/   @storyshelf/design-figma    -- Figma design provider: link validation, file metadata, rendered previews (optional; see ADR 0018)
     notify-chat/    @storyshelf/notify-chat     -- Chat notification providers (Slack and Teams incoming webhooks)
@@ -91,10 +91,12 @@ StoryShelf/
 ```
 
 **Terminology note:** When working in this repo:
+
 - `"app"` / `"packages/app"` → the **product UI** (Hono JSX + HTMX server, `/api/v1` endpoints, build-review diff pages). Commands: `nub run build`, `nub run lint`, test in `packages/app/`.
 - `"website"` / `"apps/website"` → the **public docs site** (Astro Starlight Markdown docs, SEO, SRI hashes). Commands: `nub run --filter website build`, `nub run --filter website start`. Docs lives in `apps/website/src/content/docs/`.
 
 This distinction matters for:
+
 - Which package to modify (UI vs docs)
 - Which test suite to run (vitest in `packages/` vs hermetic `nub run test` at repo root)
 - Which build command to use
@@ -117,6 +119,8 @@ This distinction matters for:
 - **Forms:** HTMX with `hx-post` and `HX-Redirect` header for navigation after POST.
 - **API prefix:** all JSON endpoints under `/api/v1`. HTML pages at `/`.
 - **Route classification:** every route the app registers is classified `hosting | testing | review | both` (ADR 0006, decision 8) in `app/src/routes/` (`api-routes.ts` for `/api/v1`, `page-routes.ts` for pages/auth/Storybook; key `"METHOD /hono-pattern"`, exactly as `app.routes` reports it). New route ⇒ classify it there; `routes/classification.test.ts` fails on unclassified routes and on stale entries. A new `app.all(...)` handler must be listed too (unlisted `ALL` entries count as middleware). `requireTesting` (`app/src/middleware/require-testing.ts`) answers 404 for every `testing` route when `options.testing` is absent (`Store.testing`, `testingEnabled()`); a test boots without `testing` and checks every class.
+- **Capture targets (ADR 0007):** a project's `browser`/`browsers`, a snapshot's `browser` and every baseline key hold a `CaptureTarget` (an engine, or `<engine>@<name>`), never a bare `BrowserName` (that is the type of a rendering engine only). Split a target with `parseTarget`/`engineOf` (`core/adapters/capture-target.ts`), validate with `isCaptureTarget`; the render input is `target`, not `browser`. A runner publishes `metadata.targets` (`RunnerTarget`: `ready`/`unavailable` + reason) from its `browsers` option via `createTargetOffers`; check availability with `refusalFor`/`offeredTargets` (`core/capture`), and in the app through `runnerTargets()`/`assertTargetsSelectable()` (`app/src/targets.ts`) on every save of a project's browsers. A launch failure is a `TargetLaunchError` (not isolated, not retried as a story crash).
+- **Public origin (ADR 0007):** never read `config.publicBaseUrl` or a request's `Host` to build an absolute link. Background code asks `createPublicOriginResolver(...)` (`core/models`; the app holds it as `Store.publicOrigin`/`runtime.publicOrigin`, jobs get a `publicOrigin: () => Promise<string | undefined>`); with no origin a status has no link (`urls: null` in `statusesForBuild`) and no comment. Only request-bound interactive routes (OAuth redirect URI, the OIDC helper) may fall back to the request's own origin. The stored value lives in `site_settings` and is written only by the site-admin CSRF routes in `routers/admin-public-origin.ts`.
 - **Hosting only:** no `testing` option ⇒ no capture, compare or baselines (ADR 0006). Gate by route class, never by ad-hoc `if`; UI that links to a `testing` route must check `testingEnabled()` (nav, settings tabs and the build table already do). `assertServerless` (core) refuses `testing.runner` on AWS Lambda and warns on Vercel/Netlify (`STORYSHELF_ALLOW_SERVERLESS=1` overrides); database adapters that cannot back `testing` set `metadata.supportsTesting: false` (D1).
 - **Build state on git channels:** never post a status from a call site. A build's statuses and PR comment are the pure `statusesForBuild` (`core/adapters/notifier/build-state.ts`); every transition calls `BuildStatePublisher.request(buildId)` (`core/capture/build-state/`; in the app `requestBuildState` in `git-status.ts`, `setupBuildState` in `build-state-setup.ts`), which queues one `notify` job per git channel (own queue and consumer in `jobs-setup.ts`; inline when there is no consumer). A new status is a new case in the function, not a new caller. The `notify` handler reads the build when it runs and throws on a refused write so the consumer retries it. See ADR 0014, decisions 5 to 7.
 - **Tests:** every model, every router, every adapter must have tests (target 100% coverage). `nub run test` is hermetic (no browser); the capture pipeline is covered by a gated `test:integration` suite — see `docs/testing.md`.
@@ -161,26 +165,26 @@ This distinction matters for:
 
 `docs/architecture.md` is the canonical current-state spec (entity model, interfaces, workflow). ADRs record decisions and rationale, and reference `architecture.md` rather than duplicating schemas or interfaces.
 
-| ADR | Title |
-|-----|-------|
+| ADR  | Title                                                                                                                                             |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 0001 | Architecture and Conventions (adapter composition, constructor injection, core/app split, server scaffolding, shared HTTP helper, Storybook-only) |
-| 0002 | Database (SQLite default, Postgres/MySQL/Turso presets, Drizzle) |
-| 0003 | Storage and Content-Addressed Assets |
-| 0004 | Capture Pipeline (server-side render, pure renderers, `play` and a11y, modes and multi-browser) |
-| 0005 | Capture Performance and Sharding |
-| 0006 | Testing Option, Hosting-Only Mode and the Database Queue (`testing`, no worker package, `capture_jobs`) |
-| 0007 | Remote Browsers and Public Origin (`browsers` list, `<engine>@<name>` targets, signed URLs) |
-| 0008 | Image Diff Engines (pixelmatch, worker pool, optional sharp) |
-| 0009 | Baselines, Approval and Retention |
-| 0010 | Projects, Published Storybook and Labels |
-| 0011 | Authentication and Access (Better Auth engine, roles, OAuth connections) |
-| 0012 | Server-Rendered UI |
-| 0013 | UI Review (per-project `review`, build-level verdict, changeset) |
-| 0014 | Git Hosts and Notifications (`@storyshelf/notify-git`, durable state delivery) |
-| 0015 | Observability and Logging (pino, OpenTelemetry) |
-| 0016 | AI Insights |
-| 0017 | MCP Server |
-| 0018 | Design Providers |
+| 0002 | Database (SQLite default, Postgres/MySQL/Turso presets, Drizzle)                                                                                  |
+| 0003 | Storage and Content-Addressed Assets                                                                                                              |
+| 0004 | Capture Pipeline (server-side render, pure renderers, `play` and a11y, modes and multi-browser)                                                   |
+| 0005 | Capture Performance and Sharding                                                                                                                  |
+| 0006 | Testing Option, Hosting-Only Mode and the Database Queue (`testing`, no worker package, `capture_jobs`)                                           |
+| 0007 | Remote Browsers and Public Origin (`browsers` list, `<engine>@<name>` targets, signed URLs)                                                       |
+| 0008 | Image Diff Engines (pixelmatch, worker pool, optional sharp)                                                                                      |
+| 0009 | Baselines, Approval and Retention                                                                                                                 |
+| 0010 | Projects, Published Storybook and Labels                                                                                                          |
+| 0011 | Authentication and Access (Better Auth engine, roles, OAuth connections)                                                                          |
+| 0012 | Server-Rendered UI                                                                                                                                |
+| 0013 | UI Review (per-project `review`, build-level verdict, changeset)                                                                                  |
+| 0014 | Git Hosts and Notifications (`@storyshelf/notify-git`, durable state delivery)                                                                    |
+| 0015 | Observability and Logging (pino, OpenTelemetry)                                                                                                   |
+| 0016 | AI Insights                                                                                                                                       |
+| 0017 | MCP Server                                                                                                                                        |
+| 0018 | Design Providers                                                                                                                                  |
 
 The pre-consolidation ADRs (0001 to 0036) are in `docs/adr/archive/`; `docs/adr/README.md` maps them to the ADRs above.
 
@@ -215,12 +219,12 @@ nubx turbo verify --filter='@storyshelf/core' --force  # verify baseline
 
 ### Wave Assignment (file-disjoint = safe to parallel)
 
-| Wave | Tasks | Concurrent | Notes |
-|------|-------|------------|-------|
-| 1 | P1-1 + P1-2 | 2 | Schema/migrations + middleware/token — 0 file overlap |
-| 2 | P2-3 + P2-4 + P3-2 | 3 | New test files + turbo.json — 0 overlap |
-| 3 | P2-1 + P2-2 + P3-1 | 3 | Config + webhook + queue — serialized on `adapters/` |
-| 4 | P3-3 + P4-* | as needed | Comment validation + future tasks |
+| Wave | Tasks              | Concurrent | Notes                                                 |
+| ---- | ------------------ | ---------- | ----------------------------------------------------- |
+| 1    | P1-1 + P1-2        | 2          | Schema/migrations + middleware/token — 0 file overlap |
+| 2    | P2-3 + P2-4 + P3-2 | 3          | New test files + turbo.json — 0 overlap               |
+| 3    | P2-1 + P2-2 + P3-1 | 3          | Config + webhook + queue — serialized on `adapters/`  |
+| 4    | P3-3 + P4-*        | as needed  | Comment validation + future tasks                     |
 
 ### Finishing a Task
 
@@ -246,6 +250,7 @@ git branch -d task/P1-1-indexes
 All task branches must be **squash-merged** into `main` — never fast-forward or regular merge. This keeps `git log --oneline` clean and each task = one commit.
 
 Format:
+
 ```
 feat(<task-id>): <short description>
 

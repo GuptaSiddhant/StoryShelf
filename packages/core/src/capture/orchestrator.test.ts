@@ -3,7 +3,12 @@ import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { CaptureRunner, RenderResult } from "../adapters/capture-runner.ts";
+import {
+  TargetLaunchError,
+  type CaptureRunner,
+  type RenderResult,
+  type RunnerTarget,
+} from "../adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import { BuildModel } from "../models/build.ts";
 import { ProjectModel } from "../models/project.ts";
@@ -470,7 +475,7 @@ describe("executeCaptureJob", () => {
       await executeCaptureJob({ buildId }, options);
 
       expect(render).toHaveBeenCalledTimes(2);
-      const engines = render.mock.calls.map((call) => (call[0] as { browser: string }).browser);
+      const engines = render.mock.calls.map((call) => (call[0] as { target: string }).target);
       expect(engines).toEqual(["chromium", "firefox"]);
       const rows = await db.list(db.tables.snapshots);
       expect(rows.map((row) => row.browser)).toEqual(
@@ -483,12 +488,79 @@ describe("executeCaptureJob", () => {
       const { db, buildId, render, options } = await setupBrowsers({
         browsers: '["chromium","firefox"]',
       });
-      (options.runner.metadata as { supportedBrowsers?: string[] }).supportedBrowsers = [
-        "chromium",
+      (options.runner.metadata as { targets?: RunnerTarget[] }).targets = [
+        { target: "chromium", reach: "loopback", status: "ready" },
       ];
-      await expect(executeCaptureJob({ buildId }, options)).rejects.toThrow(/firefox/u);
+      await expect(executeCaptureJob({ buildId }, options)).rejects.toThrow(
+        /firefox is not offered by this capture runner \(offered: chromium\)/u,
+      );
       expect(render).not.toHaveBeenCalled();
       expect((await new BuildModel(db, tables(db)).get(buildId))?.status).toBe("failed");
+    });
+
+    it("fails the build at once, with the reason, for a target that is unavailable", async () => {
+      const { db, buildId, render, options } = await setupBrowsers({
+        browsers: '["chromium","firefox"]',
+      });
+      (options.runner.metadata as { targets?: RunnerTarget[] }).targets = [
+        { target: "chromium", reach: "loopback", status: "ready" },
+        {
+          target: "firefox",
+          reach: "loopback",
+          status: { unavailable: "declared, not installed" },
+        },
+      ];
+      await expect(executeCaptureJob({ buildId }, options)).rejects.toThrow(
+        /firefox is unavailable: declared, not installed/u,
+      );
+      expect(render).not.toHaveBeenCalled();
+      expect((await new BuildModel(db, tables(db)).get(buildId))?.status).toBe("failed");
+    });
+
+    it("renders remote targets under their own names, each with its own snapshots", async () => {
+      const { db, buildId, render, options } = await setupBrowsers({
+        browsers: '["chromium","chromium@grid"]',
+      });
+      (options.runner.metadata as { targets?: RunnerTarget[] }).targets = [
+        { target: "chromium", reach: "loopback", status: "ready" },
+        { target: "chromium@grid", reach: "loopback", status: "ready" },
+      ];
+      await executeCaptureJob({ buildId }, options);
+      expect(render.mock.calls.map((call) => (call[0] as { target: string }).target)).toEqual([
+        "chromium",
+        "chromium@grid",
+      ]);
+      const rows = await db.list(db.tables.snapshots);
+      expect(rows.map((row) => row.browser)).toEqual(
+        expect.arrayContaining(["chromium", "chromium@grid"]),
+      );
+      expect(rows).toHaveLength(2);
+    });
+
+    it("keeps a URL target unavailable until a secret and a public origin exist", async () => {
+      const { buildId, render, options } = await setupBrowsers({ browsers: '["chromium@cdp"]' });
+      (options.runner.metadata as { targets?: RunnerTarget[] }).targets = [
+        { target: "chromium@cdp", reach: "url", status: "ready" },
+      ];
+      await expect(executeCaptureJob({ buildId }, options)).rejects.toThrow(/no secret/u);
+      const withSecret = { ...options, secret: "s3cret-s3cret-s3cret" };
+      await expect(executeCaptureJob({ buildId }, withSecret)).rejects.toThrow(/no public origin/u);
+      expect(render).not.toHaveBeenCalled();
+      const resolved = {
+        ...withSecret,
+        publicOrigin: async () => await Promise.resolve("https://shelf.example.com"),
+      };
+      await executeCaptureJob({ buildId }, resolved);
+      expect(render).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not isolate or retry a launch failure: the job fails with its reason", async () => {
+      const { buildId, render, options } = await setupBrowsers({ browsers: '["firefox"]' });
+      render.mockRejectedValue(new TargetLaunchError("firefox", "executable does not exist"));
+      await expect(executeCaptureJob({ buildId }, options)).rejects.toThrow(
+        /Cannot launch firefox: executable does not exist/u,
+      );
+      expect(render).toHaveBeenCalledTimes(1);
     });
 
     it("rejects more than three engines", async () => {

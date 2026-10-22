@@ -5,7 +5,7 @@ import type {
   StorySourceAdapter,
   Viewport,
 } from "@storyshelf/core/adapter/capture-runner";
-import type { BrowserName, RenderedSnapshot } from "@storyshelf/core/adapter/capture-runner";
+import type { CaptureTarget, RenderedSnapshot } from "@storyshelf/core/adapter/capture-runner";
 import type { StoryParameters } from "@storyshelf/core/capture";
 import type { Logger } from "@storyshelf/core/logger";
 import type { Browser } from "puppeteer-core";
@@ -23,7 +23,8 @@ export interface PuppeteerRenderInput {
   executePlay?: boolean;
   playTimeoutMs?: number;
   runA11y?: boolean;
-  browser?: BrowserName;
+  /** Target to render on; the runner's default (first) target when absent. */
+  target?: CaptureTarget;
   /** Max pages rendering at once (default: sized from detected CPU and memory). */
   concurrency?: number;
   /** Per-page timeout in ms (default: scaled up on CPU-starved hosts). */
@@ -37,6 +38,9 @@ export interface PuppeteerRenderInput {
   /** Test/extension seam: story source adapter (defaults to `StorybookAdapter`). */
   adapter?: StorySourceAdapter;
 }
+
+/** Starts a browser for a target; a failure is a `TargetLaunchError`. */
+export type LaunchTarget = (target: CaptureTarget) => Promise<Browser>;
 
 /** Browser + adapter context shared by screenshot helpers. */
 export interface ScreenshotContext {

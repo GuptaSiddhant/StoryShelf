@@ -5,6 +5,7 @@ import type { ShelfConfig, ShelfOptions, UIConfig } from "@storyshelf/core/confi
 import { validateConfig, validateUiConfig } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 import { createShelfLogger } from "@storyshelf/core/logger";
+import { createPublicOriginResolver, type PublicOriginResolver } from "@storyshelf/core/models";
 
 /**
  * Resolved server runtime derived from {@link ShelfOptions}.
@@ -18,6 +19,8 @@ export interface ServerRuntime {
   authEnabled: boolean;
   design: DesignProvider[];
   notifiers: NotifierProvider[];
+  /** The public origin for links built in the background (ADR 0007, decision 6). */
+  publicOrigin: PublicOriginResolver;
 }
 
 function addOptionalSnapshots(snap: Record<string, AdapterMetadata>, options: ShelfOptions): void {
@@ -71,5 +74,6 @@ export function resolveRuntime(options: ShelfOptions): ServerRuntime {
         ...rawConfig,
         adapters: buildAdapterSnapshot(options),
       };
-  return { config, ui, logger, authEnabled, design, notifiers };
+  const publicOrigin = createPublicOriginResolver({ db: options.database, config });
+  return { config, ui, logger, authEnabled, design, notifiers, publicOrigin };
 }

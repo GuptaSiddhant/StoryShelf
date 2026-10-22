@@ -212,6 +212,14 @@ const buildComponents = defineTable("build_components", {
   createdAt: "created_at",
 });
 
+const siteSettings = defineTable("site_settings", {
+  id: "id",
+  value: "value",
+  updatedBy: "updated_by",
+  createdAt: "created_at",
+  updatedAt: "updated_at",
+});
+
 const captureLogs = defineTable("capture_logs", {
   id: "id",
   projectId: "project_id",
@@ -465,6 +473,7 @@ export const fakeSchema: Tables = {
   captureShards,
   captureJobs,
   buildComponents,
+  siteSettings,
   snapshots,
   baselines,
   comments,

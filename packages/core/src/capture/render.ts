@@ -1,7 +1,7 @@
 /** Render one engine's pass with a budget; shared by the orchestrator's browser loop. */
 import type { Logger } from "pino";
 import type {
-  BrowserName,
+  CaptureTarget,
   CaptureRunner,
   RenderResult,
   RenderedSnapshot,
@@ -37,7 +37,7 @@ export interface RenderRequest {
   executePlay: boolean;
   playTimeoutMs: number;
   runA11y: boolean;
-  browser: BrowserName;
+  target: CaptureTarget;
   onCapture?: (capture: RenderedSnapshot) => Promise<void>;
 }
 

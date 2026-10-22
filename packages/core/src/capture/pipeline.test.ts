@@ -1,6 +1,6 @@
 import { PNG } from "pngjs";
 import { describe, expect, it } from "vitest";
-import type { RenderedSnapshot } from "../adapters/capture-runner.ts";
+import type { CaptureTarget, RenderedSnapshot } from "../adapters/capture-runner.ts";
 import type { Baseline } from "../schema/baseline.ts";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
@@ -75,7 +75,7 @@ function captureFor(story: StoryEntry, screenshot: Buffer): RenderedSnapshot {
   return { story, viewportName: DEFAULT_VIEWPORT.name, screenshot };
 }
 
-function captureOn(browser: "chromium" | "firefox", shot: Buffer): RenderedSnapshot {
+function captureOn(browser: CaptureTarget, shot: Buffer): RenderedSnapshot {
   return { ...captureFor(storyOf("a"), shot), browser };
 }
 
@@ -148,6 +148,37 @@ describe("persistCapture", () => {
         expect(path).toMatch(/^p1\/content\/[0-9a-f]{64}\.png$/u);
         expect(objects.has(path)).toBe(true);
       }
+    });
+
+    it("keeps a remote target apart from a local render of the same engine (ADR 0007)", async () => {
+      const { ctx } = await makeContext({
+        captures: [captureOn("chromium", RED), captureOn("chromium@grid", GREEN)],
+        isDefault: false,
+      });
+      await ctx.db.insert(ctx.db.tables.baselines, {
+        id: "local",
+        projectId: "p1",
+        storyId: "a",
+        viewportName: "mobile",
+        browser: "chromium",
+        branch: "main",
+        screenshotPath: "/b/local.png",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      });
+      await ctx.storage.write("/b/local.png", RED);
+
+      await persistCapture({ ...ctx, browsers: ["chromium", "chromium@grid"] });
+
+      const rows = await ctx.db.list(ctx.db.tables.snapshots);
+      const status = Object.fromEntries(rows.map((row) => [row.browser, row.status]));
+      // The grid render differs from the local baseline but is never compared with it: its own
+      // first capture bootstraps from the clean local one.
+      expect(status).toEqual({ chromium: "unchanged", "chromium@grid": "approved" });
+      const baselines = await ctx.db.list(ctx.db.tables.baselines);
+      expect(baselines.map((row) => row.browser)).toEqual(
+        expect.arrayContaining(["chromium", "chromium@grid"]),
+      );
     });
 
     it("diffs each engine only against its own baseline", async () => {

@@ -65,6 +65,16 @@ function storeFor(db: ReturnType<typeof makeDatabase>["db"], notifiers: Notifier
   };
 }
 
+/** What a project event's notification carries, as JSON, when delivered from `store`. */
+async function deliver(store: Store): Promise<string> {
+  const sent: unknown[] = [];
+  const wired = { ...store, notifiers: [recordingProvider("log", sent)] };
+  await runWithStore(wired, async () => {
+    await notifyProject({ id: "p1", slug: "test-project" }, "build:created", {}, "/builds/b1");
+  });
+  return JSON.stringify(sent);
+}
+
 describe("notifyProject", () => {
   it("delivers project events to stored channels", async () => {
     const { db } = makeDatabase();
@@ -183,6 +193,25 @@ describe("notifyProject", () => {
     });
     expect(emailed).toHaveLength(1);
     expect(emailed[0]).toMatchObject({ channel: expect.objectContaining({ provider: "email" }) });
+  });
+
+  it("links to the resolved public origin, and leaves the link out when none is known", async () => {
+    const { db } = makeDatabase();
+    await seedProject(db);
+    await new NotificationChannelModel(db, undefined, SECRET).create({
+      projectId: "p1",
+      provider: "log",
+      config: {},
+      events: ["build:created"],
+    });
+    const detected = { url: async () => await Promise.resolve("https://detected.example.com/") };
+    expect(await deliver({ ...storeFor(db, []), publicOrigin: detected as never })).toContain(
+      "https://detected.example.com/projects/test-project/builds/b1",
+    );
+    const none = { url: async () => await Promise.resolve("") };
+    expect(await deliver({ ...storeFor(db, []), publicOrigin: none as never })).not.toContain(
+      "/projects/test-project/builds/b1",
+    );
   });
 
   it("is a no-op without wired notifiers", async () => {

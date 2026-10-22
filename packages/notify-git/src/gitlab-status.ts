@@ -26,7 +26,8 @@ export async function postCommitStatus(
     context: string;
     state: NotifierState;
     description: string;
-    url: string;
+    /** Absent while no public origin is known. */
+    url?: string | undefined;
   },
 ): Promise<void> {
   const base = apiBase(project.host);
@@ -39,7 +40,7 @@ export async function postCommitStatus(
       headers: gitlabHeaders(project.token),
       json: {
         state,
-        target_url: input.url,
+        ...(input.url === undefined ? {} : { target_url: input.url }),
         description: input.description,
         name: input.context,
         context: input.context,

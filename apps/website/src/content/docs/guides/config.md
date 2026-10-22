@@ -80,7 +80,7 @@ Each upload resolves `packagePath` (`relative(cwd, dirname(.storybook))`) and is
 ## Server config vs client config
 
 - **Client file** (`.storybook/storyshelf.json`): `slug`, `url`, `buildDir`, `buildCommand`, `buildScriptName`, `skip`, `affectedOnly`, `untraced` — per-Storybook, committed, non-secret.
-- **Server `ShelfConfig` / DB `projects`** (`core/src/config.ts:48`, `core/src/schema.ts:5`): `secret` (see [rotating it](/guides/deployment/secret-rotation/)), `previousSecret`, `migrateCredentialsOnBoot`, `scratchDir` (default `<os.tmpdir()>/storyshelf`), `purgeTtlDays`, `branchTtlDays`, `branchGcIntervalMs`, `maxUploadBytes`, `maxInlineUnzipSize`, `maxZipEntries`, `maxUnzippedBytes`, `viewports`, `browser` (per-project capture engine: `chromium`/`firefox`/`webkit`/`chrome`), `pixel_threshold`, `storybook_meta` (`framework/addons/storiesGlobs/packagePath` auto-detected at `create`).
+- **Server `ShelfConfig` / DB `projects`** (`core/src/config.ts:48`, `core/src/schema.ts:5`): `secret` (see [rotating it](/guides/deployment/secret-rotation/)), `previousSecret`, `migrateCredentialsOnBoot`, `scratchDir` (default `<os.tmpdir()>/storyshelf`), `purgeTtlDays`, `branchTtlDays`, `branchGcIntervalMs`, `maxUploadBytes`, `maxInlineUnzipSize`, `maxZipEntries`, `maxUnzippedBytes`, `viewports`, `browser` (per-project capture target: an engine the runner offers, or `<engine>@<name>`), `pixel_threshold`, `storybook_meta` (`framework/addons/storiesGlobs/packagePath` auto-detected at `create`).
 
 Publishing a Storybook zip is bounded by three options (see [Published Storybook](/concepts/publishing/)):
 
@@ -116,6 +116,16 @@ createShelfApp({ database, storage, testing: { runner, compare: { threads: 2 }, 
 ### Image engine
 
 - `testing.images.engine` (a `createShelfApp` option) or `STORYSHELF_IMAGE_ENGINE` picks the PNG library for diffs, diff overlays, and AI thumbnails: `"pngjs"` (default, pure JavaScript, runs anywhere) or `"sharp"` (native, faster on large screenshots; install the optional `sharp` package). The option wins over the variable. An unknown name fails at startup, and so does `"sharp"` without the package installed. See [Image engines](/guides/image-engines/).
+
+### Public origin
+
+Links built in the background (commit statuses, notification emails, and later signed Storybook URLs for remote browsers) need the address people reach the server at. StoryShelf resolves it from a chain and never from the `Host` or `X-Forwarded-Host` of a request, which can be forged:
+
+1. `publicBaseUrl` (`PUBLIC_BASE_URL` in the scaffolds), when set.
+2. The platform's own address, read from its environment: Heroku (`HEROKU_APP_DEFAULT_DOMAIN_NAME`, needs the `runtime-dyno-metadata` Labs feature), Railway (`RAILWAY_PUBLIC_DOMAIN`), Vercel (`VERCEL_PROJECT_PRODUCTION_URL`, `VERCEL_URL`), Netlify (`URL`), Render (`RENDER_EXTERNAL_URL`), Fly.io (`FLY_APP_NAME`), Azure App Service (`WEBSITE_HOSTNAME`), Azure Container Apps (`CONTAINER_APP_NAME` with `CONTAINER_APP_ENV_DNS_SUFFIX`) and DigitalOcean App Platform (`APP_URL`). Cloud Run, AWS App Runner, Lambda function URLs and Cloudflare Workers publish none. This is the platform's domain, a working fallback but the wrong link behind a custom domain.
+3. The address a site admin opened **System** with. The page reports its `location.origin`, the server stores the first one it hears in `site_settings`, and **System → Public origin** shows it as "detected from your browser" for the admin to confirm, replace or forget. With authentication off there is no admin, so nothing is learnt.
+
+So a first deploy needs no redeploy to learn its URL: open **System** once. While nothing resolves, commit statuses have no link and no pull-request comment is written (it exists to link), and capture targets that reach the Storybook by URL stay unavailable. The OAuth callback URLs (`/connections/<service>/callback`) and the `/.well-known/openid-configuration` helper use the same origin, and fall back to the request's own address only when none resolves. Pin `PUBLIC_BASE_URL` when a custom domain fronts the app.
 
 ## Validation
 

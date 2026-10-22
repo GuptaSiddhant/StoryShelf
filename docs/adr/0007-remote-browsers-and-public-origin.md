@@ -490,6 +490,31 @@ access.
   wrong as the default (sessions instead of pages, unpinned browser builds). A future ADR if device
   coverage is needed.
 
+## Implementation notes
+
+Landed so far: the runner `browsers` list with bare engines and `local()`, `CaptureTarget`, the
+installed-engine check and the `chrome` fix (decisions 1, 3 and 7, #225), and the public-origin
+resolver with `site_settings` (decision 6, #227). Remote connect, presets, in-browser fingerprints,
+session limits, `exposeNetwork` and signed URLs (decisions 2, 4 and 5, #226 and #228) are not built;
+`RunnerTarget.reach` is `"loopback"` for every local target and the seam for `"url"` targets is
+`offeredTargets` (`core/src/capture/targets.ts`), which marks them `unavailable` until a `secret` and
+a public origin exist. Choices the text left open:
+
+- **Which settings saves are checked.** A save refuses only targets the project does not already
+  have, so an unrelated settings save never fails because an engine it already names went away; the
+  build of such a project still fails at once (`assertSupportedBrowsers`).
+- **A stored, unconfirmed origin is used.** The origin an admin's browser reported resolves at once
+  (marked "unconfirmed" on the System page) so a first deploy learns its URL without a second step;
+  confirming it only records that an admin looked. The first report wins, and a later visit through
+  another domain never replaces it. A report must carry the browser's own `Origin` header, equal to
+  the reported origin.
+- **Interactive routes keep a last resort.** The OAuth redirect URI and the OIDC helper document
+  fall back to the request's own origin when nothing resolves, because they are answered to a
+  browser that is present; background links never do.
+- **Platform variables.** `detectPublicBaseUrl` reads Heroku, Railway, Vercel, Netlify (with
+  `NETLIFY=true`), Render, Fly.io, Azure App Service and Container Apps, and DigitalOcean (`APP_URL`
+  with `DIGITALOCEAN_APP_ID`); the table is pinned in `utils/public-origin.test.ts`.
+
 ## Open questions
 
 - Whether Storybook 8, 9 and 10 static builds load every asset by relative path, so the path-prefix

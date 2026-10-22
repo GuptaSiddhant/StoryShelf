@@ -8,10 +8,13 @@
 export {
   assertBrowserCount,
   assertSupportedBrowsers,
+  listTargets,
   MAX_BROWSERS,
   parseBrowsers,
+  refusalFor,
   resolveBrowsers,
 } from "./browsers.ts";
+export { offeredTargets, type TargetPrerequisites } from "./targets.ts";
 export {
   buildGlobalsParam,
   filterModes,

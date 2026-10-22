@@ -17,6 +17,28 @@ function csrfPart(): string {
     });`;
 }
 
+/**
+ * System page: report the origin the admin opened it with, so a deployment learns its public URL
+ * without a redeploy (ADR 0007, decision 6). The server keeps the first report and answers 201 only
+ * when it stored a new one, which is when the page reloads to show it.
+ */
+function originPart(): string {
+  return `
+    function reportOrigin(){
+      var el=document.querySelector('[data-report-origin]');
+      if(!el || el.getAttribute('data-reported')) return;
+      el.setAttribute('data-reported','1');
+      var meta=document.querySelector('meta[name="csrf-token"]');
+      fetch(el.getAttribute('data-report-origin'),{
+        method:'POST',
+        credentials:'same-origin',
+        headers:{'content-type':'application/json','x-csrf-token':meta ? meta.getAttribute('content') : ''},
+        body:JSON.stringify({origin:location.origin})
+      }).then(function(r){ if(r.status===201) location.reload(); }).catch(function(){});
+    }
+    inits.push(reportOrigin);`;
+}
+
 /** Theme menu: apply, persist, and mark the current choice. */
 function themePart(): string {
   return `
@@ -262,6 +284,7 @@ function focusPart(): string {
 export function clientScript(): string {
   const parts = [
     csrfPart(),
+    originPart(),
     themePart(),
     sidebarPart(),
     dropdownPart(),

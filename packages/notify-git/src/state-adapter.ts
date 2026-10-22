@@ -15,7 +15,8 @@ export interface StateWriter {
     context: string;
     state: NotifierState;
     description: string;
-    url: string;
+    /** Absent while no public origin is known: the status has no link. */
+    url?: string | undefined;
   }): Promise<void>;
   /** Create or update the single review comment of the build keyed by `url`. */
   comment(input: { sha: string; url: string; markdown: string }): Promise<unknown>;
@@ -38,6 +39,10 @@ export function createStateAdapter(
           description: target.description ?? describeState(state),
           url,
         });
+        return;
+      }
+      if (url === undefined) {
+        // The comment is keyed by the build's link; without a public origin there is none.
         return;
       }
       logger?.debug({ sha: target.sha }, "upserting review comment");

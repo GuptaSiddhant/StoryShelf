@@ -43,6 +43,14 @@ export interface CaptureWiring {
   handler: CaptureHandler | null;
 }
 
+/** What a capture hands its results to. */
+interface Delivery {
+  notifiers: NotifierProvider[];
+  buildState: BuildStatePublisher;
+  /** The resolved public origin (ADR 0007): status links and targets that need a URL use it. */
+  publicOrigin: () => Promise<string | undefined>;
+}
+
 /** Queue a build, continuing the active request trace when present. */
 function enqueuerFor(queue: CaptureQueue): (buildId: string, reqId?: string) => Promise<void> {
   return async (buildId, reqId) => {
@@ -59,7 +67,7 @@ function enqueuerFor(queue: CaptureQueue): (buildId: string, reqId?: string) => 
 export function setupCapture(
   options: ShelfOptions,
   config: ShelfConfig,
-  delivery: { notifiers: NotifierProvider[]; buildState: BuildStatePublisher },
+  delivery: Delivery,
   logger: Logger,
   jobs: JobQueue,
 ): CaptureWiring {
@@ -101,7 +109,7 @@ export function setupCapture(
 function captureHandlerOptions(
   options: ShelfOptions,
   config: ShelfConfig,
-  delivery: { notifiers: NotifierProvider[]; buildState: BuildStatePublisher },
+  delivery: Delivery,
   logger: Logger,
   parts: { runner: CaptureRunner; enqueue: CaptureHandlerOptions["enqueue"] },
 ): CaptureHandlerOptions {
@@ -118,6 +126,7 @@ function captureHandlerOptions(
     shardSize: options.testing?.shardSize,
     notifiers: delivery.notifiers,
     buildState: delivery.buildState,
+    publicOrigin: delivery.publicOrigin,
     config,
     enqueue: parts.enqueue,
     maxRetries: options.testing?.retries,

@@ -1,3 +1,4 @@
+import type { RunnerTarget } from "@storyshelf/core/adapter/capture-runner";
 import type { ShelfConfig } from "@storyshelf/core/config";
 import type { CredentialProbe } from "@storyshelf/core/models";
 import type { CaptureHostSummary } from "@storyshelf/core/utils";
@@ -18,6 +19,8 @@ import {
 } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
+import { PublicOriginCard, type PublicOriginView } from "./admin-system-origin.tsx";
+import { CaptureTargetsCard } from "./admin-system-targets.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -38,6 +41,10 @@ export interface AdminSystemData {
   hiddenSnapshots?: number;
   /** Detected host budget and effective capture concurrency; null when capture runs elsewhere. */
   capture?: CaptureHostSummary | null;
+  /** The browsers the capture runner offers (ADR 0007); omitted without a runner list. */
+  targets?: readonly RunnerTarget[] | undefined;
+  /** The public origin and where it came from; omitted when the store has no resolver. */
+  publicOrigin?: PublicOriginView | undefined;
 }
 
 function healthTone(state: string): "success" | "info" | "danger" | "neutral" {
@@ -269,6 +276,27 @@ function HostingOnlyNotice(props: {
   );
 }
 
+/** The public origin and the capture browsers (ADR 0007), when the instance has them. */
+function CaptureCards(props: {
+  data: AdminSystemData;
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const { publicOrigin, targets } = props.data;
+  return (
+    <>
+      {publicOrigin ? (
+        <div class="mt-1">
+          <PublicOriginCard origin={publicOrigin} />
+        </div>
+      ) : null}
+      {targets && targets.length > 0 ? (
+        <div class="mt-1">
+          <CaptureTargetsCard targets={targets} />
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 /** Site-admin System page: adapter inventory with in-depth health. */
 export function renderAdminSystemPage(data: AdminSystemData): RenderedContent {
   const { report, config, credentials } = data;
@@ -300,6 +328,7 @@ export function renderAdminSystemPage(data: AdminSystemData): RenderedContent {
         <HostingOnlyNotice hiddenSnapshots={data.hiddenSnapshots ?? 0} />
       ) : null}
       <ServerFacts data={data} />
+      <CaptureCards data={data} />
       {credentials ? (
         <div class="mt-1">
           <CredentialsCard probe={credentials} config={config} />

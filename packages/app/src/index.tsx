@@ -36,6 +36,7 @@ import {
 import { serverTiming } from "./middleware/server-timing.ts";
 import { setupGate, type MiddlewareWiring } from "./middleware/setup-gate.ts";
 import { registerAdminPages } from "./routers/admin-pages.ts";
+import { registerPublicOriginRoutes } from "./routers/admin-public-origin.ts";
 import { registerAdmin } from "./routers/admin.ts";
 import { registerAssets } from "./routers/assets.ts";
 import { registerEngineAuth } from "./routers/auth.ts";
@@ -157,6 +158,8 @@ const CSRF_PATHS = [
   "/connections/*",
   "/profile",
   "/admin/credentials/*",
+  "/admin/public-origin",
+  "/admin/public-origin/*",
   "/projects/:slug/builds/:buildId/insights/generate",
   "/projects/:slug/insights/health/generate",
 ] as const;
@@ -247,6 +250,7 @@ function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
     buildState,
     design,
     notifiers,
+    publicOrigin,
   } = wiring;
   app.use(
     "*",
@@ -264,6 +268,8 @@ function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
       publish,
       buildState,
       captureConcurrency: options.testing?.concurrency,
+      runner: options.testing?.runner,
+      publicOrigin,
       design,
       notifiers,
       notificationsConfig: options.notifications?.config,
@@ -322,6 +328,7 @@ function registerPageRoutes(app: ShelfRouter, options: ShelfOptions, health: Hea
   registerAssets(app);
   registerStorybook(app);
   registerAdminPages(app, health, options.auth);
+  registerPublicOriginRoutes(app);
   registerUiPages(app);
   registerInsightFragments(app);
 }

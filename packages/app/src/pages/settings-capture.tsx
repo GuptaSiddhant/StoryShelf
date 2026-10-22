@@ -1,3 +1,4 @@
+import { isCaptureTarget, type RunnerTarget } from "@storyshelf/core/adapter/capture-runner";
 import { MAX_BROWSERS, parseBrowsers, parseModesAllowlist } from "@storyshelf/core/capture";
 import type { Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
@@ -13,23 +14,18 @@ import {
   TextareaField,
 } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
+import { targetChoices, type TargetChoices } from "./target-choices.ts";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
-
-const ENGINES = [
-  { value: "chromium", label: "Chromium" },
-  { value: "firefox", label: "Firefox" },
-  { value: "webkit", label: "WebKit (Safari engine)" },
-  { value: "chrome", label: "Chrome (Chromium engine)" },
-];
 
 /** Primary engine select plus one checkbox per additional engine. */
 function BrowserFields(props: {
   primary: string;
   extras: string[];
   disabled: boolean;
+  targets: TargetChoices;
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { primary, extras, disabled } = props;
+  const { primary, extras, disabled, targets } = props;
   return (
     <>
       <SelectField
@@ -37,10 +33,10 @@ function BrowserFields(props: {
         name="browser"
         value={primary}
         disabled={disabled}
-        options={ENGINES}
+        options={targets.choices}
         hint="Used for the published preview and to bootstrap other engines."
       />
-      {ENGINES.map((engine) => (
+      {targets.choices.map((engine) => (
         <CheckField
           key={engine.value}
           label={`Also capture on ${engine.label}`}
@@ -50,6 +46,9 @@ function BrowserFields(props: {
           disabled={disabled}
         />
       ))}
+      {targets.unavailable.length > 0 ? (
+        <Meta>Not selectable on this server: {targets.unavailable.join("; ")}.</Meta>
+      ) : null}
     </>
   );
 }
@@ -59,9 +58,15 @@ export function renderSettingsCapture(
   project: Project,
   isAdmin: boolean,
   formState?: { globalError?: string },
+  /** What the runner offers; omitted when it publishes no list. */
+  offered?: readonly RunnerTarget[],
 ): unknown {
   const browsers = parseBrowsers(project.browsers) ?? [project.browser ?? "chromium"];
   const [primary = "chromium", ...extras] = browsers;
+  const targets = targetChoices(
+    offered,
+    browsers.filter((entry) => isCaptureTarget(entry)),
+  );
   const allowlist = parseModesAllowlist(project.modesAllowlist) ?? [];
   const action = `/projects/${project.slug}/settings/capture`;
   return (
@@ -70,14 +75,14 @@ export function renderSettingsCapture(
       <Card>
         <SectionTitle>Browsers</SectionTitle>
         <Meta>
-          Every build is captured on each selected engine, one after another, with a baseline per
-          engine. One approval covers a story and mode on all engines; use{" "}
+          Every build is captured on each selected target, one after another, with a baseline per
+          target. One approval covers a story and mode on all engines; use{" "}
           <em>Only this browser</em> in the review for an engine-specific decision. Up to{" "}
-          {MAX_BROWSERS} engines. A newly added engine starts from its first build.
+          {MAX_BROWSERS} targets. A newly added target starts from its first build.
         </Meta>
         <form method="post" action={action} hx-post={action} hx-target="body" hx-swap="outerHTML">
           {csrfField()}
-          <BrowserFields primary={primary} extras={extras} disabled={!isAdmin} />
+          <BrowserFields primary={primary} extras={extras} disabled={!isAdmin} targets={targets} />
           <TextareaField
             label="Mode allowlist"
             name="modesAllowlist"

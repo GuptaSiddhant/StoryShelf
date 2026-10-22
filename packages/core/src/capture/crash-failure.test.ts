@@ -111,7 +111,7 @@ async function world(stories = 1) {
         storage,
         notifiers: [git.provider],
         secret: SECRET,
-        config: {},
+        config: { publicBaseUrl: "https://shelf.example.com" },
         flags: () => ({ testing: true, review: false }),
         logger: createShelfLogger({ level: "silent" }),
       },

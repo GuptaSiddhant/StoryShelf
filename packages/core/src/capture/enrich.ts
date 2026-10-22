@@ -1,6 +1,6 @@
 /** Orchestrator pre-pass: learn each story's modes before building the capture matrix. */
 import type { Logger } from "pino";
-import type { BrowserName, CaptureRunner } from "../adapters/capture-runner.ts";
+import type { CaptureTarget, CaptureRunner } from "../adapters/capture-runner.ts";
 import type { StoryEntry, Viewport } from "./adapter.ts";
 import { filterModes, MAX_MODES_PER_STORY } from "./modes.ts";
 import { resolveStoryViewports } from "./storybook.ts";
@@ -11,7 +11,7 @@ export interface EnrichInput {
   buildId: string;
   storybookDir: string;
   stories: StoryEntry[];
-  browser: BrowserName;
+  target: CaptureTarget;
   allowlist: readonly string[] | null;
   logger: Logger | undefined;
 }
@@ -57,7 +57,7 @@ async function extractSafely(
       buildId: input.buildId,
       storybookDir: input.storybookDir,
       stories: input.stories,
-      browser: input.browser,
+      target: input.target,
       ...(input.logger ? { logger: input.logger } : {}),
     });
   } catch (error) {

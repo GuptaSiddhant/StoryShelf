@@ -1,6 +1,6 @@
 /** The plan stage: decide what to render, record it as shards, and hand the shards to the queue. */
 import type { Logger } from "pino";
-import type { BrowserName } from "../../adapters/capture-runner.ts";
+import type { CaptureTarget } from "../../adapters/capture-runner.ts";
 import { CaptureAttemptModel, emitAttemptLog } from "../../models/capture-attempt.ts";
 import { CaptureShardModel } from "../../models/capture-shard.ts";
 import { SnapshotModel } from "../../models/snapshot.ts";
@@ -27,7 +27,7 @@ export interface FanOutInput extends ShardTarget {
   input: CaptureJobInput;
   stories: MatrixInput["stories"];
   viewports: Viewport[];
-  browsers: BrowserName[];
+  browsers: CaptureTarget[];
   logger: Logger | undefined;
   /** Set by the plan stage: whether past timings were available to order the shards by. */
   timed?: boolean;

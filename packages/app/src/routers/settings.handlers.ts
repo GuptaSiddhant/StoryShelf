@@ -40,6 +40,7 @@ import type {
 } from "../pages/settings-notifications.tsx";
 import type { SettingsWebhook } from "../pages/settings-webhooks.tsx";
 import { getStore } from "../store.ts";
+import { runnerTargets } from "../targets.ts";
 import { notFound } from "./helpers.ts";
 import { isSiteAdmin } from "./insights.handlers.ts";
 /** Aggregated data for rendering a settings tab. */
@@ -342,6 +343,7 @@ export async function renderSettingsPage(
       mySubscription: data.mySubscription,
       isAdmin: data.isAdmin,
       ai: aiSettingsData(c),
+      targets: await runnerTargets(),
     },
     formState,
   );

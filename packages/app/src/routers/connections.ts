@@ -40,12 +40,14 @@ function signingSecret(): string {
   return secret;
 }
 
-function redirectUri(c: Context, kind: string): string {
-  const base = getStore().config.publicBaseUrl ?? new URL(c.req.url).origin;
+/** Callback URL; the public origin (ADR 0007) wins, the request's own address is the last resort. */
+async function redirectUri(c: Context, kind: string): Promise<string> {
+  const { publicOrigin, config } = getStore();
+  const base = (await publicOrigin?.url()) ?? config.publicBaseUrl ?? new URL(c.req.url).origin;
   return `${base.replace(/\/+$/u, "")}/connections/${kind}/callback`;
 }
 
-function handleStart(c: Context): Response {
+async function handleStart(c: Context): Promise<Response> {
   const service = serviceOf(c);
   const user = sessionUser();
   const kind = service.metadata.kind;
@@ -61,7 +63,10 @@ function handleStart(c: Context): Response {
     maxAge: 600,
     secure: new URL(c.req.url).protocol === "https:",
   });
-  return c.redirect(service.oauth.authorizeUrl({ state, redirectUri: redirectUri(c, kind) }), 302);
+  return c.redirect(
+    service.oauth.authorizeUrl({ state, redirectUri: await redirectUri(c, kind) }),
+    302,
+  );
 }
 
 async function handleCallback(c: Context): Promise<Response> {
@@ -95,7 +100,10 @@ async function completeConnect(
 ): Promise<void> {
   const kind = service.metadata.kind;
   try {
-    const tokens = await service.oauth.exchangeCode({ code, redirectUri: redirectUri(c, kind) });
+    const tokens = await service.oauth.exchangeCode({
+      code,
+      redirectUri: await redirectUri(c, kind),
+    });
     await connectionModel().connect(userId, kind, tokens);
     flash(c, `${service.metadata.name} connected`);
   } catch (error) {
