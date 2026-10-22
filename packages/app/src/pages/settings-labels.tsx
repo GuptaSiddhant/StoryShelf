@@ -19,8 +19,9 @@ export function renderSettingsLabels(
   project: Project,
   labelTypes: LabelType[],
   isAdmin: boolean,
-  formState?: { globalError?: string },
+  formState?: { globalError?: string; editKey?: string },
 ): unknown {
+  const editing = isAdmin ? labelTypes.find((item) => item.key === formState?.editKey) : undefined;
   return (
     <div class="grid max-w-form">
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
@@ -51,6 +52,16 @@ export function renderSettingsLabels(
                   <td>{labelType.name}</td>
                   <td class="truncate max-w-cell">{labelType.linkTemplate ?? "—"}</td>
                   <td>
+                    {isAdmin && labelType.key !== "persistent" ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        href={`/projects/${project.slug}/settings/labels?edit=${labelType.key}`}
+                        aria-label={`Edit ${labelType.key}`}
+                      >
+                        Edit
+                      </Button>
+                    ) : null}
                     {isAdmin && labelType.key !== "persistent" && labelType.key !== "branch" ? (
                       <form
                         method="post"
@@ -79,6 +90,36 @@ export function renderSettingsLabels(
         </Table>
         {labelTypes.length === 0 ? <Meta>No label types configured.</Meta> : null}
       </Card>
+
+      {editing ? (
+        <Card>
+          <SectionTitle level={3}>Edit label type: {editing.key}</SectionTitle>
+          <form
+            method="post"
+            action={`/projects/${project.slug}/settings/labels/${editing.key}`}
+            hx-post={`/projects/${project.slug}/settings/labels/${editing.key}`}
+            hx-target="body"
+          >
+            {csrfField()}
+            <Field label="Name" name="labelName" required value={editing.name} />
+            <Field
+              label="Link template"
+              name="linkTemplate"
+              value={editing.linkTemplate ?? ""}
+              placeholder="https://jira.example.com/browse/{value}"
+              hint="Placeholders: {value}, {repo}, {branch}. Leave empty for no link."
+            />
+            <FormActions>
+              <Button variant="primary" type="submit">
+                Save label type
+              </Button>
+              <Button variant="ghost" href={`/projects/${project.slug}/settings/labels`}>
+                Cancel
+              </Button>
+            </FormActions>
+          </form>
+        </Card>
+      ) : null}
 
       {isAdmin ? (
         <Card>

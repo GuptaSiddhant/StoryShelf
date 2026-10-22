@@ -35,6 +35,17 @@ describe("LabelModel", () => {
     expect(types.length).toBe(2);
   });
 
+  it("seeds default link templates for pr and mr only", async () => {
+    const { db } = makeDatabase();
+    const model = new LabelModel(db);
+    await model.seedFor("p1");
+    const types = await model.listTypes("p1");
+    const templates = Object.fromEntries(types.map((t) => [t.key, t.linkTemplate ?? null]));
+    expect(templates["pr"]).toBe("https://github.com/{repo}/pull/{value}");
+    expect(templates["mr"]).toBe("https://gitlab.com/{repo}/-/merge_requests/{value}");
+    expect(templates["jira"]).toBeNull();
+  });
+
   it("removes a label type", async () => {
     const { db } = makeDatabase();
     const model = new LabelModel(db, {
