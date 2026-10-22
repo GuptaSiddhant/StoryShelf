@@ -30,3 +30,43 @@ describe("component url", () => {
     );
   });
 });
+
+describe("snapshot url", () => {
+  const urls = createUrlBuilder("https://shelf.example.com/");
+
+  it("opens the build's diff page with the snapshot selected", () => {
+    expect(urls.snapshot("app", "B1", "S1")).toBe(
+      "https://shelf.example.com/projects/app/builds/B1/diff?snapshot=S1",
+    );
+  });
+
+  it("round-trips an id that needs escaping", () => {
+    const url = new URL(urls.snapshot("app", "B1", "a b&c=d#e"));
+    expect(url.pathname).toBe("/projects/app/builds/B1/diff");
+    expect(url.searchParams.get("snapshot")).toBe("a b&c=d#e");
+    expect(url.hash).toBe("");
+  });
+});
+
+describe("label and branch encoding", () => {
+  const urls = createUrlBuilder("https://shelf.example.com");
+  const values = ["feat/new thing", "release/1.0#rc?x", "100%", "plain"];
+
+  it.each(values)("round-trips the label value %s through the path", (value) => {
+    for (const url of [
+      urls.label("app", "branch", value),
+      urls.storybookLabel("app", "branch", value),
+    ]) {
+      const parsed = new URL(url);
+      expect(parsed.search).toBe("");
+      expect(parsed.hash).toBe("");
+      const tail = parsed.pathname.split("/branch/")[1] ?? "";
+      expect(
+        tail
+          .split("/")
+          .map((part) => decodeURIComponent(part))
+          .join("/"),
+      ).toBe(value);
+    }
+  });
+});

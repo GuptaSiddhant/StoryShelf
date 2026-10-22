@@ -205,7 +205,7 @@ function stateScopeProblem(scope: {
   }
   return scope.hasSecret
     ? { ok: true }
-    : { ok: false, field: "secret", message: "A git channel needs a token" };
+    : { ok: false, field: "secret", message: "A git channel needs a token or private key" };
 }
 
 /** Decode a JSON event list column (empty = all events). */

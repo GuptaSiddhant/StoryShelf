@@ -39,3 +39,10 @@ describe("sanitizeErrorText", () => {
     expect(out).not.toContain("s3cret");
   });
 });
+
+describe("redactSecrets: app tokens", () => {
+  it("scrubs a signed JWT", () => {
+    const jwt = "eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiIxMjM0NTYifQ.c2lnbmF0dXJl";
+    expect(redactSecrets(`bad credentials ${jwt}`)).toBe("bad credentials [redacted]");
+  });
+});

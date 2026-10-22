@@ -3,7 +3,7 @@ title: Merge gate setup
 description: Block PRs and MRs until StoryShelf visual review is approved — required status checks for GitHub and GitLab.
 ---
 
-StoryShelf posts a **commit status** on the commit it captured, through a **git channel** of the project. The gate only blocks merges once you mark that status as _required_ on your git provider, and that last step is manual: StoryShelf never edits branch protection for you ([ADR 0014](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/0014-git-hosts-and-notifications.md)).
+StoryShelf posts a **commit status** on the commit it captured, through a **git channel** of the project. The gate only blocks merges once you mark that status as _required_ on your git provider, and that last step is yours: StoryShelf only changes branch protection when you run [`storyshelf protect --apply`](#let-storyshelf-set-the-rule) with an admin token ([ADR 0014](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/0014-git-hosts-and-notifications.md)). On GitHub the same name can also be a **check run** posted by a GitHub App, with one annotation per changed snapshot ([GitHub App checks](#github-app-checks)).
 
 ## How the gate works
 
@@ -42,6 +42,23 @@ Do this once per project. See the [CI guide](/guides/ci/#merge-gate) for the sho
 
 The token is stored encrypted with the server `SECRET`, in the channel's secret like a chat webhook URL. It is separate from the CLI project token: the CLI token identifies a build, the status token writes to your repo.
 
+### GitHub App checks
+
+Optional, GitHub only. Instead of a token that writes commit statuses, a **GitHub App** installed on the repository posts **check runs** named `<prefix>/testing`: the run follows the build (`queued`, `in_progress`, then `success`, `failure` or `cancelled`) and lists each changed snapshot as an annotation that links to its review page. There is no personal access token to rotate. See [GitHub check runs](/packages/notify-git/#github-check-runs) for the exact mapping. GitLab keeps commit statuses.
+
+1. Create the App: **Settings → Developer settings → GitHub Apps → New GitHub App** (on your organization for a shared repository). Name it, set any homepage URL, **uncheck Webhook → Active** (StoryShelf polls nothing and receives no webhooks from it) and set the repository permissions:
+   - **Checks: Read and write** (the check runs)
+   - **Pull requests: Read and write** (the pull-request comment)
+   - **Contents: Read-only** (to resolve the commit)
+   - **Commit statuses: Read and write** only if you also want a channel in `statuses` mode on the same App (optional)
+   - **Administration: Read and write** only if you want the App's installation to be able to run [`storyshelf protect`](#let-storyshelf-set-the-rule) (optional: the helper normally uses your own admin token)
+2. Under **Where can this GitHub App be installed?** pick _Only on this account_.
+3. Create the App and note its **App ID**. Under **Private keys** choose **Generate a private key** and keep the downloaded `.pem` file.
+4. Open **Install App**, install it on the repository (or organization) and copy the **installation ID** from the URL of the installation's settings page (`…/settings/installations/<installation id>`).
+5. In **Project → Settings → Notifications → Add a git channel** choose GitHub, set **GitHub mode** to _Check runs (GitHub App)_, enter owner, repository, prefix, **App ID**, **Installation ID** and paste the whole PEM into **App private key**. Leave the token empty. Through the API: `"config": { "owner": "acme", "repo": "widgets", "mode": "checks", "appId": "123456", "installationId": "7654321" }` and the PEM as `"secret"`.
+
+The private key is stored encrypted with the server `SECRET`, is never returned by the API or shown in the UI again, and is removed from logs and error text; to rotate it, add the channel again with a new key and delete the old one. A required check keeps its name, so branch protection (below) is the same in either mode.
+
 ## 2. Upload the PR head commit
 
 The status goes to the SHA you pass to `storyshelf upload --sha`. It has to be the commit the PR or MR is on.
@@ -79,6 +96,28 @@ On GitLab, `$CI_COMMIT_SHA` is already the MR head for branch pipelines (see the
 
 StoryShelf posts a GitLab _commit status_ named `<prefix>/testing` on the MR head commit. Whether your "Pipelines must succeed" setting counts it depends on how the status attaches to the pipeline, so confirm the behavior on your instance with the check in step 4 before relying on it.
 
+## Let StoryShelf set the rule
+
+Marking the check required is a manual step that is easy to skip, so the CLI can print it, validate it and, only when you ask, write it:
+
+```sh
+# Dry run: prints the steps and compares them with the branch's current rule. Nothing is changed.
+GITHUB_TOKEN=<admin token> storyshelf protect --provider github --repo acme/widgets --branch main
+
+# Same checks for a project with its own prefix, or one without testing (the gate is <prefix>/review)
+storyshelf protect --provider github --repo acme/widgets --prefix storyshelf-web [--gate review]
+
+# Write the missing part
+storyshelf protect --provider github --repo acme/widgets --apply
+```
+
+Without a token the command only prints the exact required check names and the manual steps. With one it also reads the branch's rule and exits with a non-zero code when the rule lacks the check, so it can run in CI as a drift check.
+
+- **GitHub** (token with repository administration: `repo` for a classic token, **Administration: write** for a fine-grained one). It reads `…/branches/<branch>/protection/required_status_checks`. With `--apply` it adds only the missing check to a rule that already requires some (existing checks and every other setting stay), or creates a rule on an unprotected branch that requires the check and nothing else. A protected branch that requires no status checks is reported but not changed: add the check by hand. Rulesets (**Rules → Rulesets**) are not read; use the manual steps there.
+- **GitLab** (`GITLAB_TOKEN` with `api` scope and the Maintainer role; `--host https://gitlab.example.com` for self-managed). GitLab has no per-status required list: statuses on the MR head commit join its pipeline, so the gate is the project setting **Pipelines must succeed**. The command checks it (and that the branch is protected) and, with `--apply`, turns the setting on. It does not protect the branch for you.
+
+See [`storyshelf protect`](/guides/cli/client/#storyshelf-protect) for every flag.
+
 ## Several projects in one repo
 
 One project is one Storybook, and a monorepo can host many. The status name has no project slug, so two channels for the same repository with the same prefix would write to **one** status and the last write would win: one project could turn the other green. Give each project its **own prefix** on its git channel (the same repository and token can be reused): a repo with `web` and `docs` Storybooks uses `storyshelf-web` and `storyshelf-docs`, which post `storyshelf-web/testing` and `storyshelf-docs/testing`. Add **each** one as a required check. A PR that changes only `web` still needs `storyshelf-docs/testing` reported, so upload every project's Storybook in CI even when little changed. [Affected capture](/concepts/affected-capture/) keeps unchanged builds cheap.
@@ -97,6 +136,7 @@ Changing a channel's prefix changes the status name. Update the required check w
 
 - **Status never appears.** Check **Project → Settings → Notifications** has a git channel for this project and that its provider is registered on the server. A channel whose last delivery failed shows as **failing** with the error (a revoked token, a missing scope, an unreachable host) until the next build state is delivered successfully; fix the token or the repository and re-run the build or review action. Rotating the server `SECRET` makes stored tokens undecryptable (the server logs `failed to decrypt channel secret`); re-save them.
 - **Status is late.** Statuses are delivered by `notify` jobs, so one can lag the build by a queue polling interval, and a refused write is retried with backoff (five attempts in total). A hosting-only instance on a serverless platform delivers inline instead, without retries: the next transition writes the current state again.
+- **Check run stays queued or is missing (GitHub App).** The App must be installed on this repository and have **Checks: Read and write**; a refused write shows on the channel as failing with the GitHub error. Check the App ID, the installation ID and that the whole PEM (including the `BEGIN`/`END` lines) was pasted.
 - **Status stays pending after a failure.** After the last attempt the channel shows the error and a `sys:notify-failed` alert goes to the site-wide channels; fix the token or repository, then run the build or review action again to deliver the current state.
 - **Status is on the wrong commit.** The `--sha` was not the PR head (see step 2).
 - **Builds with a local identity** (uploads without git, see [Without git](/guides/without-git/)) never post statuses.

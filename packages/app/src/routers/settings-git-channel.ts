@@ -8,11 +8,14 @@ import { notificationChannelModel } from "./scoped-models.ts";
 import { asString, renderSettingsPage } from "./settings.handlers.ts";
 
 const CONFIG_FIELDS = ["owner", "repo", "host", "prefix"] as const;
+/** Only the GitHub provider reads these: how it shows a build and the App that posts check runs. */
+const GITHUB_FIELDS = ["mode", "appId", "installationId"] as const;
 
 /** The provider config from the form; blank optional fields are left out. */
-function gitConfig(form: FormData): Record<string, string> {
+function gitConfig(provider: string, form: FormData): Record<string, string> {
   const config: Record<string, string> = {};
-  for (const field of CONFIG_FIELDS) {
+  const fields = provider === "github" ? [...CONFIG_FIELDS, ...GITHUB_FIELDS] : CONFIG_FIELDS;
+  for (const field of fields) {
     const value = asString(form.get(field));
     if (value) {
       config[field] = value;
@@ -28,10 +31,11 @@ async function formError(c: Context, errors: Record<string, string>): Promise<Re
 
 /** Map a failed validation to the form fields it concerns. */
 function fieldErrors(
+  secretField: "token" | "privateKey",
   checked: Extract<ReturnType<typeof NotificationChannelModel.validateInput>, { ok: false }>,
 ): Record<string, string> {
   if (checked.field === "secret") {
-    return { token: checked.message };
+    return { [secretField]: checked.message };
   }
   if (checked.field === "provider") {
     return { gitProvider: checked.message };
@@ -50,9 +54,14 @@ export async function createGitChannel(
   provider: string,
   form: FormData,
 ): Promise<Response> {
-  const config = gitConfig(form);
-  const token = asString(form.get("token"));
-  const problem = gitChannelProblem(project, provider, config, token);
+  const config = gitConfig(provider, form);
+  // A GitHub App channel keeps its private key where other channels keep a token.
+  const checks = config["mode"] === "checks";
+  const token = asString(form.get(checks ? "privateKey" : "token"));
+  const problem = gitChannelProblem(project, provider, config, {
+    token,
+    secretField: checks ? "privateKey" : "token",
+  });
   if (problem) {
     return await formError(c, problem);
   }
@@ -71,7 +80,7 @@ function gitChannelProblem(
   project: Project,
   provider: string,
   config: Record<string, string>,
-  token: string | undefined,
+  secret: { token: string | undefined; secretField: "token" | "privateKey" },
 ): Record<string, string> | null {
   const { notifiers } = getStore();
   if (!NotificationChannelModel.isStateKind(notifiers, provider)) {
@@ -79,7 +88,7 @@ function gitChannelProblem(
   }
   const checked = NotificationChannelModel.validateInput(notifiers, provider, config, {
     projectId: project.id,
-    hasSecret: Boolean(token),
+    hasSecret: Boolean(secret.token),
   });
-  return checked.ok ? null : fieldErrors(checked);
+  return checked.ok ? null : fieldErrors(secret.secretField, checked);
 }

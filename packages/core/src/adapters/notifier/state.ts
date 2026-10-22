@@ -29,7 +29,16 @@ export async function writeBuildState(
     states.statuses.map(async (status) => {
       await adapter.setState({
         channel,
-        target: { kind: "status", sha, context: status.context, description: status.description },
+        target: {
+          kind: "status",
+          sha,
+          context: status.context,
+          description: status.description,
+          ...(status.informational === true ? { informational: true } : {}),
+          ...(status.progress === undefined ? {} : { progress: status.progress }),
+          ...(status.annotations === undefined ? {} : { annotations: status.annotations }),
+          ...(status.omitted === undefined ? {} : { omitted: status.omitted }),
+        },
         state: status.state,
         url: status.url,
         logger,

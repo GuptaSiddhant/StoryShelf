@@ -1,6 +1,7 @@
 /** Shared `setState` routing for providers that write commit statuses and review comments. */
 import type {
   NotifierState,
+  StateAnnotation,
   StateNotifierAdapter,
   StateNotifierMetadata,
 } from "@storyshelf/core/adapter/notifier";
@@ -17,6 +18,13 @@ export interface StateWriter {
     description: string;
     /** Absent while no public origin is known: the status has no link. */
     url?: string | undefined;
+    /** For a `pending` state: not started (`queued`) or under way. */
+    progress?: "queued" | "running" | undefined;
+    /** Never a gate: a host with a neutral outcome shows a failure as neutral. */
+    informational?: boolean | undefined;
+    annotations?: StateAnnotation[] | undefined;
+    /** Changed snapshots left out of `annotations`. */
+    omitted?: number | undefined;
   }): Promise<void>;
   /** Create or update the single review comment of the build keyed by `url`. */
   comment(input: { sha: string; url: string; markdown: string }): Promise<unknown>;
@@ -38,6 +46,10 @@ export function createStateAdapter(
           state,
           description: target.description ?? describeState(state),
           url,
+          progress: target.progress,
+          informational: target.informational,
+          annotations: target.annotations,
+          omitted: target.omitted,
         });
         return;
       }
@@ -51,10 +63,14 @@ export function createStateAdapter(
   };
 }
 
-/** The channel's token, or an error naming the provider when the channel has none. */
-export function requireToken(secret: string | undefined, provider: string): string {
+/** The channel's secret (token or private key), or an error naming the provider when the channel has none. */
+export function requireToken(
+  secret: string | undefined,
+  provider: string,
+  what = "a token",
+): string {
   if (!secret) {
-    throw new Error(`${provider} channel needs a token`);
+    throw new Error(`${provider} channel needs ${what}`);
   }
   return secret;
 }
