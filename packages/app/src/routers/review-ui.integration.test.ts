@@ -368,6 +368,24 @@ describe("the build page without testing", () => {
     await booted.stop();
   });
 
+  it("tells the reviewer a build that is still publishing cannot be reviewed yet", async () => {
+    const booted = await boot();
+    const created = await booted.api("dev", "/builds", {
+      method: "POST",
+      body: JSON.stringify({ gitSha: SHA, gitBranch: "feature/x" }),
+    });
+    const { build } = (await created.json()) as { build: { id: string } };
+    const posted = await booted.page("alice", `/builds/${build.id}/reviews`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ verdict: "approved" }).toString(),
+    });
+    expect(posted.status).toBe(409);
+    expect(await posted.text()).toContain("still publishing");
+    expect((await new BuildModel(booted.db).get(build.id))?.status).toBe("pending");
+    await booted.stop();
+  });
+
   it("takes a comment from the form", async () => {
     const booted = await boot();
     const id = await publish(booted, "feature/x");
@@ -586,6 +604,23 @@ describe("review events", () => {
     await vi.waitFor(() => expect(events(booted)).toContain("review:requested"));
     expect(id).toBeTruthy();
     expect(events(booted)).toContain("review:requested on feature/x");
+    await booted.stop();
+  });
+
+  it("raises build:pending when a rewritten verdict sends the build back to pending", async () => {
+    const booted = await boot({ project: { reviewApprovals: 2 } });
+    await withChannel(booted);
+    const id = await publish(booted, "feature/x");
+    const give = async (verdict: string) =>
+      await booted.api("alice", `/builds/${id}/reviews`, {
+        method: "POST",
+        body: JSON.stringify({ verdict }),
+      });
+    await give("rejected");
+    await vi.waitFor(() => expect(events(booted)).toContain("build:rejected"));
+    expect(events(booted)).not.toContain("build:pending");
+    await give("approved");
+    await vi.waitFor(() => expect(events(booted)).toContain("build:pending"));
     await booted.stop();
   });
 

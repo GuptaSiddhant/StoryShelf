@@ -64,6 +64,15 @@ What decides the build's status:
   A build-level verdict is available as a sign-off but does not gate, so enabling review does not
   change when a captured build turns green.
 
+A verdict is attributed to a user: the session user, or the owner of the API token that posted it.
+With authentication on, a caller that is no user (the bootstrap admin token, an ownerless token) is
+refused. `build_reviews.user_id` stays nullable for one case only: an instance with no
+authentication at all records an anonymous verdict, one reviewer, which counts only while the
+project requires one approval (otherwise it is refused with 409). A verdict waits for publishing:
+until the build's Storybook is published (the manifest, the same probe as `<prefix>/storybook`) the
+route answers 409, and a build whose publish failed is `failed`, not reviewable. A verdict that
+sends the build back to `pending` raises `build:pending` like every other move.
+
 A verdict is rewritable. Verdicts belong to the build, as snapshot approvals do: a new push to the
 branch does not carry a verdict over.
 
@@ -90,7 +99,10 @@ Review defines which git-host statuses exist; ADR 0014 defines their names and h
 delivered. The prefix is the git channel's configurable name, default `storyshelf`.
 
 - **`<prefix>/review`.** Posted when `testing` is off and review is on: `pending` when the build is
-  created, `success` or `failure` from the verdict. With `testing` on, `<prefix>/testing` stays the
+  created, `success` or `failure` from the verdict; while several approvals are required the
+  description shows the progress (`Waiting for approvals: 1 of 2`). With review off, an accepted
+  build shows a final `success` (`Review is off`), so the switch-off pass does not leave a
+  `pending` status on a pull request. With `testing` on, `<prefix>/testing` stays the
   only gating status and its description says whether review is still open; review never adds a
   second required check.
 - **`<prefix>/storybook`.** Posted on every build with a commit SHA, whatever `testing` and `review`
@@ -194,3 +206,10 @@ Resolved in implementation: the required-approvals count is a project setting
 is the project's build retention window (`purgeTtlDays`), not a separate setting. The review
 switch form is the one `hosting`-class route of the review surface, because a `review` route
 answers 404 while review is off and the form must be able to turn it back on.
+
+Decided after implementation (owner review of #269 and #271): verdicts are attributed to users
+(token owner), anonymous verdicts exist only without authentication and only with one required
+approval, verdicts wait for publishing, `build:pending` is an event, `<prefix>/review` shows approval
+progress and closes with `Review is off`. The `Review is off` status is a pure function of the
+accepted build and the review flag, so it shows for every accepted build of a review-off project,
+not only those that had a `pending` status.

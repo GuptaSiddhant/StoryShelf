@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { BuildReviewModel } from "../../models/build-review.ts";
 import { storybookDir } from "../../utils/paths.ts";
 import { deliverBuildState, stateTargets } from "./deliver.ts";
 import { statusLog, world } from "./test-world.ts";
@@ -81,6 +82,36 @@ describe("deliverBuildState", () => {
       { buildId: w.build.id, channelId: w.channelId },
     );
     expect(statusLog(w.git)).toEqual([["storyshelf/storybook", "pending"]]);
+  });
+
+  it("shows approval progress on the review status", async () => {
+    const w = await world();
+    await w.db.update(w.db.tables.projects, w.project.id, { reviewApprovals: 2 });
+    await new BuildReviewModel(w.db).add(w.build.id, "u1", "approved");
+    await new BuildReviewModel(w.db).add(w.build.id, "u2", "approved");
+    await new BuildReviewModel(w.db).add(w.build.id, "u2", "rejected");
+    await deliverBuildState(
+      { ...w.deps, flags: () => ({ testing: false, review: true }) },
+      { buildId: w.build.id, channelId: w.channelId },
+    );
+    expect(w.git.calls[0]).toMatchObject({
+      state: "pending",
+      target: { description: "Waiting for approvals: 1 of 2" },
+    });
+  });
+
+  it("closes the review status after the switch-off pass accepted the build", async () => {
+    const w = await world();
+    await w.builds.setStatus(w.build.id, "approved");
+    await deliverBuildState(
+      { ...w.deps, flags: () => ({ testing: false, review: false }) },
+      { buildId: w.build.id, channelId: w.channelId },
+    );
+    expect(statusLog(w.git)).toEqual([
+      ["storyshelf/review", "success"],
+      ["storyshelf/storybook", "pending"],
+    ]);
+    expect(w.git.calls[0]?.target).toMatchObject({ description: "Review is off" });
   });
 
   it("writes nothing for a local identity", async () => {

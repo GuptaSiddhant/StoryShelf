@@ -23,6 +23,7 @@ function run(
     build?: Partial<BuildStateBuild>;
     flags?: Partial<BuildStateFlags>;
     publishing?: PublishingState;
+    approvals?: { given: number; required: number };
     prefix?: string;
     base?: string;
   } = {},
@@ -34,6 +35,7 @@ function run(
     urls: createUrlBuilder(overrides.base ?? "https://shelf.example.com/"),
     flags: { testing: true, review: false, ...overrides.flags },
     publishing: overrides.publishing ?? "success",
+    approvals: overrides.approvals,
   });
 }
 
@@ -81,6 +83,45 @@ describe("statusesForBuild: which statuses exist", () => {
     expect(gate(run({ flags, build: { status: "pending" } }))?.state).toBe("pending");
     expect(gate(run({ flags, build: { status: "rejected" } }))?.state).toBe("failure");
     expect(gate(run({ flags, build: { status: "failed" } }))?.state).toBe("failure");
+  });
+
+  it("shows approval progress while a build waits for several approvals", () => {
+    const flags = { testing: false, review: true };
+    const waiting = (given: number, required: number) =>
+      gate(run({ flags, build: { status: "pending" }, approvals: { given, required } }));
+    expect(waiting(1, 2)).toMatchObject({
+      state: "pending",
+      description: "Waiting for approvals: 1 of 2",
+    });
+    expect(waiting(0, 3)?.description).toBe("Waiting for approvals: 0 of 3");
+    expect(waiting(0, 1)?.description).toBe("Waiting for a review verdict");
+    expect(gate(run({ flags, build: { status: "pending" } }))?.description).toBe(
+      "Waiting for a review verdict",
+    );
+  });
+
+  it("closes the review status with a success once review is off and the build is accepted", () => {
+    const flags = { testing: false, review: false };
+    const set = run({ flags, build: { status: "approved" } });
+    expect(set.statuses.map((status) => status.context)).toEqual([
+      "storyshelf/review",
+      "storyshelf/storybook",
+    ]);
+    expect(gate(set)).toMatchObject({
+      state: "success",
+      description: "Review is off",
+      url: "https://shelf.example.com/projects/web/builds/b1",
+    });
+    expect(set.comment?.state).toBe("success");
+  });
+
+  it("shows no review status with review off for a build that is not accepted", () => {
+    const flags = { testing: false, review: false };
+    for (const status of ["pending", "failed", "rejected"]) {
+      expect(run({ flags, build: { status } }).statuses.map((entry) => entry.name)).toEqual([
+        "storybook",
+      ]);
+    }
   });
 
   it("prefers testing when both are on", () => {

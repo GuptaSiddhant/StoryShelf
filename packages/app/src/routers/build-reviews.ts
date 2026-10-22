@@ -1,10 +1,9 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import type { ShelfRouter } from "../app-types.ts";
-import { getStore } from "../store.ts";
 import { giveVerdict, reviewStateOf } from "./build-reviews.handlers.ts";
 import { APPROVER_ROLES, VIEW_ROLES, buildForProject } from "./builds.handlers.ts";
 import { flashHx } from "./flash.ts";
-import { resolveAuthorizedProject } from "./helpers.ts";
+import { resolveAuthorizedProject, resolveReviewer } from "./helpers.ts";
 import { hxRefresh } from "./htmx.ts";
 import {
   buildReviewCreateSchema,
@@ -40,7 +39,7 @@ const createReviewRoute = createRoute({
   tags: ["Review"],
   summary: "Approve or reject a build",
   description:
-    "Give the build a verdict (approver and admin). A reviewer rewrites their verdict by posting again; the newest counts. With `testing` off the verdicts decide the build: `approved` once the project's required approvals are present and no reviewer's latest verdict is `rejected`, `rejected` when any is. With `testing` on the verdict is a sign-off and the snapshot rollup keeps deciding. 404 when the project has review off; 409 for a failed build.",
+    "Give the build a verdict (approver and admin). A reviewer rewrites their verdict by posting again; the newest counts. With `testing` off the verdicts decide the build: `approved` once the project's required approvals are present and no reviewer's latest verdict is `rejected`, `rejected` when any is. With `testing` on the verdict is a sign-off and the snapshot rollup keeps deciding. The verdict is attributed to the signed-in user, or to the user who owns the API token; a caller that is no user (the bootstrap admin token) gets 403, and only an instance with no authentication at all records an anonymous verdict, which counts when the project needs one approval (409 otherwise). 404 when the project has review off; 409 for a failed build, while the build is still publishing, or for an anonymous verdict the project cannot count.",
   path: "/api/v1/projects/{slug}/builds/{buildId}/reviews",
   request: {
     params,
@@ -53,6 +52,7 @@ const createReviewRoute = createRoute({
     },
     ...forbiddenResponse,
     ...notFound,
+    ...unauthorized,
   },
 });
 
@@ -69,7 +69,7 @@ export function registerBuildReviews(app: ShelfRouter): void {
     const { slug, buildId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...APPROVER_ROLES);
     const build = await buildForProject(project.id, buildId);
-    const userId = getStore().user?.id ?? null;
+    const userId = await resolveReviewer(c);
     const review = await giveVerdict(project, build, userId, c.req.valid("json"));
     hxRefresh(c);
     flashHx(c, "Verdict recorded");

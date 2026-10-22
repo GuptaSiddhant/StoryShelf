@@ -326,7 +326,7 @@ describe("git channel status fan-out", () => {
     });
   });
 
-  it("shows only the Storybook status when the project has review off", async () => {
+  it("shows the Storybook status and the closing review status when the project has review off", async () => {
     const { app, git, project } = await hostingOnly();
     const off = await app.request(`/api/v1/projects/${project.slug}`, {
       method: "PATCH",
@@ -337,7 +337,7 @@ describe("git channel status fan-out", () => {
 
     await uploadBuild(app, project.slug);
 
-    await finalStates(git, { "storyshelf/storybook": "success" });
+    await finalStates(git, { "storyshelf/review": "success", "storyshelf/storybook": "success" });
   });
 
   it("on a host with no consumer, delivers inline and shows a refused status as the channel's last error", async () => {

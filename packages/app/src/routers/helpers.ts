@@ -183,6 +183,35 @@ export async function resolveAuthorizedProject(
   return found;
 }
 
+/**
+ * Who a verdict is attributed to (ADR 0013, decision 3): the session user, or the user who owns
+ * the bearer token. `null` only when the instance has no auth adapter at all (one anonymous
+ * reviewer). With auth on, a caller that cannot be traced to a user (the bootstrap admin token, a
+ * token without an owner) is refused.
+ */
+export async function resolveReviewer(c: Context): Promise<string | null> {
+  const { authEnabled, user, db } = getStore();
+  if (!authEnabled) {
+    return null;
+  }
+  if (user) {
+    return user.id;
+  }
+  const header = c.req.header("authorization");
+  if (!header?.startsWith("Bearer ")) {
+    return unauthorized();
+  }
+  const token = requestHasAdminToken(c)
+    ? null
+    : await new TokenModel(db).findByHash(sha256(header.slice("Bearer ".length)));
+  if (!token?.userId || !(await new UserModel(db).get(token.userId))) {
+    throw new HTTPException(403, {
+      message: "A verdict needs a user: use a token created by the reviewer or sign in",
+    });
+  }
+  return token.userId;
+}
+
 /** Require a site-level admin (or permit when auth is disabled). */
 export function requireSiteAdmin(c: Context): void {
   if (!getStore().authEnabled) {

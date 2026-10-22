@@ -34,7 +34,7 @@ With `testing` on, **Settings → Tests** (project admins; `executePlay`, `playT
 Under **General → Review**, or `reviewEnabled` and `reviewApprovals` on `PATCH /api/v1/projects/:slug` (project admins):
 
 - **Review builds before they are accepted** (`reviewEnabled`, default on). With review on, a build on a non-default branch of a project without `testing` waits as `pending` for a build-level verdict, and comments, story comments, the changeset and the verdict controls are available. With review off the build is accepted when publishing ends and the review routes answer 404 for the project (nothing is deleted; turning review on again shows it all). Saving the form or the API call that turns review off also accepts the project's `pending` builds that no capture worked on, in one pass, and raises no approval event.
-- **Approvals required** (`reviewApprovals`, default 1, 1 to 20): how many reviewers must approve a build before it is approved when `testing` is off. A rejection always rejects.
+- **Approvals required** (`reviewApprovals`, default 1, 1 to 20): how many reviewers must approve a build before it is approved when `testing` is off. A rejection always rejects. On an instance without authentication, verdicts count as one anonymous reviewer, so a value above 1 cannot be met there (see [Review](/guides/review/#verdicts)).
 
 The default branch is never held. The review form is reachable while review is off, so a project can always turn it back on. See [Review](/guides/review/#review-without-screenshots).
 

@@ -49,6 +49,11 @@ export interface BuildStateInput {
   urls: Pick<UrlBuilder, "build" | "storybookBuild"> | null;
   flags: BuildStateFlags;
   publishing: PublishingState;
+  /**
+   * Approval progress of the build-level review: the approvals among each reviewer's latest
+   * verdict and the approvals the project requires. Shown on `<prefix>/review` while it waits.
+   */
+  approvals?: { given: number; required: number } | undefined;
 }
 
 /** One commit status to show. */
@@ -132,9 +137,38 @@ function gateStatus(input: BuildStateInput, url: string | undefined): DesiredSta
     return [{ name: "testing", context: `${prefix}/testing`, url, ...testingOutcome(build) }];
   }
   if (flags.review) {
-    return [{ name: "review", context: `${prefix}/review`, url, ...reviewOutcome(build) }];
+    return [
+      {
+        name: "review",
+        context: `${prefix}/review`,
+        url,
+        ...reviewOutcome(build, input.approvals),
+      },
+    ];
   }
-  return [];
+  return reviewClosed(input, url);
+}
+
+/**
+ * Review is off and the build is accepted: a final `success`, so a `<prefix>/review` status left
+ * `pending` by the time review was on (the switch-off pass accepts such builds) does not stay on
+ * the pull request. The function sees no history, so every accepted build of a project with review
+ * off shows it, and a host that requires the status never waits for one that will not come.
+ */
+function reviewClosed(input: BuildStateInput, url: string | undefined): DesiredStatus[] {
+  if (input.build.status !== "approved") {
+    return [];
+  }
+  const { prefix } = input;
+  return [
+    {
+      name: "review",
+      context: `${prefix}/review`,
+      url,
+      state: "success",
+      description: "Review is off",
+    },
+  ];
 }
 
 type Outcome = Pick<DesiredStatus, "state" | "description">;
@@ -167,7 +201,7 @@ function testingOutcome(build: BuildStateBuild): Outcome {
 }
 
 /** The build-level verdict: `pending` until given, then `success` or `failure`. */
-function reviewOutcome(build: BuildStateBuild): Outcome {
+function reviewOutcome(build: BuildStateBuild, approvals: BuildStateInput["approvals"]): Outcome {
   switch (build.status) {
     case "approved": {
       return { state: "success", description: "Build approved" };
@@ -179,7 +213,7 @@ function reviewOutcome(build: BuildStateBuild): Outcome {
       return { state: "failure", description: "Build failed" };
     }
     default: {
-      return { state: "pending", description: "Waiting for a review verdict" };
+      return { state: "pending", description: waitingText(approvals) };
     }
   }
 }
@@ -208,6 +242,14 @@ function storybookStatus(
     };
   }
   return { ...base, state: "pending", description: "Publishing Storybook", url: links?.build };
+}
+
+/** `1 of 2 approvals` when the project needs several; a single approval just waits for a verdict. */
+function waitingText(approvals: BuildStateInput["approvals"]): string {
+  if (approvals === undefined || approvals.required <= 1) {
+    return "Waiting for a review verdict";
+  }
+  return `Waiting for approvals: ${String(approvals.given)} of ${String(approvals.required)}`;
 }
 
 function openCount(build: BuildStateBuild): number {
