@@ -56,13 +56,14 @@ export async function publishUpload(
 }
 
 async function publishInline(build: Build): Promise<void> {
-  const { storage, config, logger, publish } = getStore();
+  const { storage, config, logger, publish, db } = getStore();
   try {
     await publishStoredZip(
       {
         storage,
         scratchDir: config.scratchDir ?? DEFAULT_SCRATCH_DIR,
         limits: extractionLimitsOf(resolvePublishLimits(config)),
+        db,
         logger,
       },
       { projectId: build.projectId, buildId: build.id },

@@ -99,8 +99,7 @@ function wireQueues(scoped: ShelfOptions, runtime: ServerRuntime, cell: Lifecycl
 
 /**
  * Serverless check (ADR 0006, decision 3): throws on AWS Lambda, warns on Vercel and Netlify. Only
- * an instance that renders here needs a process that outlives the request; one that just hands
- * jobs to a remote `testing.queue` does not.
+ * an instance with `testing` needs a process that outlives the request.
  */
 function warnOnServerless(options: ShelfOptions, logger: Logger): void {
   const warning = assertServerless(options.testing?.runner !== undefined);

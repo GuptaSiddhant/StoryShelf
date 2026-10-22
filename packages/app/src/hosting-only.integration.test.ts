@@ -1,5 +1,5 @@
 import { BuildModel, ProjectModel, SnapshotModel } from "@storyshelf/core/models";
-import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
+import { makeDatabase, makeFakeStateNotifier, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { countHiddenSnapshots } from "./hidden-data.ts";
@@ -88,6 +88,23 @@ describe("hosting-only navigation", () => {
   });
 });
 
+describe("hosting-only git channels", () => {
+  it("offers the git channel form: a hosting-only instance still shows the Storybook status", async () => {
+    const { db } = makeDatabase();
+    const { slug } = await seedSnapshot(db);
+    const { storage } = makeStorage();
+    const app = createShelfApp({
+      database: db,
+      storage,
+      logger: pino({ level: "silent" }),
+      notifications: { notifiers: [makeFakeStateNotifier("github-a").provider] },
+    });
+    const html = await (await app.request(`/projects/${slug}/settings/notifications`)).text();
+    expect(html).toContain("Add a git channel");
+    await app.lifecycle.teardown();
+  });
+});
+
 describe("hosting-only startup log", () => {
   it("warns with the hidden snapshot count", async () => {
     const { db } = makeDatabase();
@@ -163,16 +180,6 @@ describe("serverless and database boot checks", () => {
     const { db } = makeDatabase();
     expect(() => boot(db, true)).toThrow(/AWS Lambda/u);
     expect(() => boot(db, false)).not.toThrow();
-    // Handing jobs to a remote queue renders nothing in this process.
-    const { storage } = makeStorage();
-    const queue = {
-      metadata: { name: "remote", version: "0.0.0", kind: "remote", category: "capture-queue" },
-      enqueue: async () => {},
-      status: async () => null,
-      active: async () => [],
-      recent: async () => [],
-    } as never;
-    expect(() => createShelfApp({ database: db, storage, testing: { queue } })).not.toThrow();
     vi.stubEnv("STORYSHELF_ALLOW_SERVERLESS", "1");
     expect(() => boot(db, true)).not.toThrow();
   });

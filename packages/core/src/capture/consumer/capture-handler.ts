@@ -12,6 +12,7 @@ import { createBuildStatePublisher } from "../build-state/publisher.ts";
 import type { BuildStatePublisher } from "../build-state/types.ts";
 import { createDispatchJob, type CaptureDispatchJob, type DispatchDeps } from "../dispatch.ts";
 import type { CaptureJobOptions, ShardJob } from "../orchestrator.ts";
+import { extractionLimitsOf, resolvePublishLimits } from "../publish/limits.ts";
 import { DEFAULT_MAX_RETRIES, retriesOf } from "./retry.ts";
 import type { ConsumerJob, KindHandler } from "./types.ts";
 
@@ -35,7 +36,10 @@ export interface CaptureHandlerOptions {
    */
   buildState?: BuildStatePublisher;
   /** Links in statuses are absolute from `publicBaseUrl`; published Storybooks use `publishedBaseDomain`. */
-  config?: Pick<ShelfConfig, "publicBaseUrl" | "publishedBaseDomain">;
+  config?: Pick<
+    ShelfConfig,
+    "publicBaseUrl" | "publishedBaseDomain" | "maxZipEntries" | "maxUnzippedBytes"
+  >;
   /**
    * The resolved public origin (ADR 0007, decision 6): status links and URL-reaching targets use it.
    * Default: `config.publicBaseUrl`, then the platform's address, then the origin an admin stored.
@@ -119,6 +123,7 @@ export function captureDispatchDeps(
     storage: options.storage,
     runner: options.runner,
     scratchDir: options.scratchDir,
+    limits: extractionLimitsOf(resolvePublishLimits(options.config)),
     viewports: options.viewports,
     logger: options.logger,
     secret: options.secret,

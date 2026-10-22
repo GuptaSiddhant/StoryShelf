@@ -67,6 +67,7 @@ const STORIES: StoryEntry[] = [
 ];
 const VIEWPORTS = [{ name: "desktop", width: 1280, height: 720 }];
 const URL_BASE = "https://app.example/_s/tok/projects/p/storybook/build/b";
+const URL_ROOT = `${URL_BASE}/`;
 
 let storybookDir = "";
 let tmp = "";
@@ -120,7 +121,7 @@ describe("a remote CDP target", () => {
 
   it("connects with the headers and renders from the URL it was given, not the loopback server", async () => {
     const result = await createPuppeteerCaptureRunner({ browsers: [farm()] }).render(
-      input({ storybookUrl: `${URL_BASE}/iframe.html` }),
+      input({ storybookUrl: URL_ROOT }),
     );
     expect(fake.state.connects[0]).toMatchObject({
       browserWSEndpoint: "wss://farm.example/?token=sekret-key",
@@ -136,17 +137,25 @@ describe("a remote CDP target", () => {
     ]);
   });
 
+  it("refuses a Storybook URL that is not the directory root, before any connection", async () => {
+    const runner = createPuppeteerCaptureRunner({ browsers: [farm()] });
+    await expect(runner.render(input({ storybookUrl: `${URL_BASE}/iframe.html` }))).rejects.toThrow(
+      /directory root/u,
+    );
+    expect(fake.state.connects).toEqual([]);
+  });
+
   it("looks a Chrome with remote debugging up by its HTTP address", async () => {
     await createPuppeteerCaptureRunner({
       browsers: [farm({ endpoint: "http://chrome:9222" })],
-    }).render(input({ storybookUrl: URL_BASE }));
+    }).render(input({ storybookUrl: URL_ROOT }));
     expect(fake.state.connects[0]).toMatchObject({ browserURL: "http://chrome:9222" });
     expect(fake.state.connects[0]).not.toHaveProperty("browserWSEndpoint");
   });
 
   it("reports the environment measured in the browser", async () => {
     const result = await createPuppeteerCaptureRunner({ browsers: [farm()] }).render(
-      input({ storybookUrl: URL_BASE }),
+      input({ storybookUrl: URL_ROOT }),
     );
     expect(result.environment).toEqual({
       browserVersion: "HeadlessChrome/131.0.1",
@@ -164,7 +173,7 @@ describe("a remote CDP target", () => {
     const stories = Array.from({ length: 6 }, (_, index) => ({ ...STORIES[0]!, id: `s-${index}` }));
     await Promise.all(
       ["x", "y", "z"].map(
-        async (buildId) => await runner.render(input({ buildId, stories, storybookUrl: URL_BASE })),
+        async (buildId) => await runner.render(input({ buildId, stories, storybookUrl: URL_ROOT })),
       ),
     );
     expect(fake.state.peak).toBe(2);
@@ -174,7 +183,7 @@ describe("a remote CDP target", () => {
     const runner = createPuppeteerCaptureRunner({ browsers: [farm()] });
     fake.state.failure = new Error("connect ECONNREFUSED wss://farm.example/?token=sekret-key");
     const error: unknown = await runner
-      .render(input({ storybookUrl: URL_BASE }))
+      .render(input({ storybookUrl: URL_ROOT }))
       .catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(TargetLaunchError);
     expect((error as TargetLaunchError).transient).toBe(true);
@@ -189,7 +198,7 @@ describe("a remote CDP target", () => {
     fake.state.failure = new Error(
       "Unexpected server response: 401 for wss://farm.example/?token=sekret-key",
     );
-    await expect(runner.render(input({ storybookUrl: URL_BASE }))).rejects.toThrow(
+    await expect(runner.render(input({ storybookUrl: URL_ROOT }))).rejects.toThrow(
       /Cannot launch chromium@farm: Unexpected server response: 401 for \[redacted\]/u,
     );
     expect(fake.state.connects).toHaveLength(1);

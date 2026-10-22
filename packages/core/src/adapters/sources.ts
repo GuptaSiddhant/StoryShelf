@@ -8,7 +8,6 @@ export function adapterSourcesOf(options: ShelfOptions): AdapterSetupSources & {
     database: options.database,
     storage: options.storage,
     captureRunner: options.testing?.runner,
-    captureQueue: options.testing?.queue,
     design: options.design,
     notifiers: options.notifications?.notifiers,
     emailSender: options.notifications?.emailSender,

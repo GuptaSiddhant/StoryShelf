@@ -5,6 +5,6 @@
  * root and map the slim result to `a11y:` annotation strings. Results never block a build.
  */
 export { axeInjectionScript, loadAxeSource, resetAxeSourceCache } from "./axe-source.ts";
-export { inPageReadA11yParameters, inPageRunAxe } from "./in-page.ts";
+export { inPageReadA11yParameters, inPageRunAxe, type A11yParametersRead } from "./in-page.ts";
 export { mapAxeViolations, MAX_REPORTED_VIOLATIONS, type SlimViolation } from "./map.ts";
 export { A11Y_ROOT_SELECTOR, resolveA11yRun, type A11yRunPlan } from "./options.ts";

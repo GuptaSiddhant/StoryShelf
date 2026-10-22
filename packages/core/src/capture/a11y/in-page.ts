@@ -7,11 +7,22 @@
 import type { SlimViolation } from "./map.ts";
 import type { A11yRunPlan } from "./options.ts";
 
+/** What {@link inPageReadA11yParameters} found: the plain-data `parameters.a11y` and what was dropped. */
+export interface A11yParametersRead {
+  params: unknown;
+  /** Function values (and items that held nothing else) left out because a page cannot hand them over. */
+  dropped: number;
+}
+
 /**
- * Read the current story's `parameters.a11y` from the running Storybook preview. Only the
- * JSON-serialisable subset survives (functions are dropped). Returns undefined when unreadable.
+ * Read the current story's `parameters.a11y` from the running Storybook preview as plain data.
+ * Functions (`config.rules[].matches`, custom checks) cannot cross into the runner, so they are
+ * dropped, and an object or array item that held nothing else goes with them (an emptied rule item
+ * would otherwise reset to axe's default). Returns undefined when there is no `a11y` parameter or it
+ * cannot be read at all (cyclic).
  */
-export function inPageReadA11yParameters(): unknown {
+// oxlint-disable-next-line eslint/max-statements -- must stay one self-contained function (see above)
+export function inPageReadA11yParameters(): A11yParametersRead | undefined {
   const win = globalThis as unknown as {
     // oxlint-disable-next-line eslint/no-underscore-dangle -- Storybook global
     __STORYBOOK_PREVIEW__?: {
@@ -21,9 +32,28 @@ export function inPageReadA11yParameters(): unknown {
   // oxlint-disable-next-line eslint/no-underscore-dangle -- Storybook global
   const a11y = win.__STORYBOOK_PREVIEW__?.currentRender?.story?.parameters?.a11y;
   if (a11y === undefined) return undefined;
+  const state = { dropped: 0 };
+  const DROP = Symbol("drop");
+  const clean = (value: unknown, depth: number): unknown => {
+    if (depth > 32) throw new Error("too deep");
+    if (typeof value === "function" || typeof value === "symbol" || value === undefined) {
+      state.dropped += 1;
+      return DROP;
+    }
+    if (value === null || typeof value !== "object") return value;
+    const before = state.dropped;
+    const entries: [string, unknown][] = Array.isArray(value)
+      ? value.map((item, index): [string, unknown] => [String(index), item])
+      : Object.entries(value);
+    const kept = entries
+      .map(([key, item]): [string, unknown] => [key, clean(item, depth + 1)])
+      .filter(([, item]) => item !== DROP);
+    if (kept.length === 0 && entries.length > 0 && state.dropped > before) return DROP;
+    return Array.isArray(value) ? kept.map(([, item]) => item) : Object.fromEntries(kept);
+  };
   try {
-    // oxlint-disable-next-line unicorn/prefer-structured-clone -- JSON drops functions; structuredClone throws on them
-    return JSON.parse(JSON.stringify(a11y)) as unknown;
+    const params = clean(a11y, 0);
+    return params === DROP ? undefined : { params, dropped: state.dropped };
   } catch {
     return undefined;
   }

@@ -26,7 +26,7 @@ describe("attachLifecycle", () => {
     const options = {
       database: fakeAdapter("postgres", setLoggerDb),
       storage: fakeAdapter("local"),
-      captureQueue: fakeAdapter("sqs", setLoggerQueue),
+      captureRunner: fakeAdapter("sqs", setLoggerQueue),
     } as unknown as ShelfOptions;
     const runtime = {
       config: { branchTtlDays: null },

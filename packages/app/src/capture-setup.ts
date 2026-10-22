@@ -1,9 +1,8 @@
 /**
  * Capture wiring (ADR 0006, decisions 4 to 6): where uploads queue their capture, and the handler
- * of `capture` jobs. Captures queue on the shared database queue, or on `testing.queue` when one
- * is supplied. The handler runs them in this process, or in a forked child the parent pushes jobs
+ * of `capture` jobs. Captures queue on the shared database queue. The handler runs them in this process, or in a forked child the parent pushes jobs
  * to (`testing.workerEntry`). The consumer that polls the queue and calls the handler is built
- * in `jobs-setup.ts`; with no `testing.runner` there is no handler and some other process consumes.
+ * in `jobs-setup.ts`.
  */
 import type { CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
 import type { CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
@@ -35,11 +34,11 @@ export interface CaptureHandler extends KindHandler {
 
 /** What uploads and the consumer need of capture. */
 export interface CaptureWiring {
-  /** Where captures queue: the database queue, `testing.queue`, or null without `testing`. */
+  /** Where captures queue: the database queue, or null without `testing`. */
   queue: CaptureQueue | null;
   /** Queues a capture for a build; undefined without `testing`. */
   enqueueCapture: ((buildId: string, reqId?: string) => Promise<void>) | undefined;
-  /** Runs `capture` jobs here; null when no runner is set (another process consumes the queue). */
+  /** Runs `capture` jobs here; null without `testing`. */
   handler: CaptureHandler | null;
 }
 
@@ -60,9 +59,8 @@ function enqueuerFor(queue: CaptureQueue): (buildId: string, reqId?: string) => 
 }
 
 /**
- * Wire capture for `options`. A supplied `testing.queue` replaces the database queue; with a
- * runner this instance consumes it, without one it only enqueues. Shard jobs go back onto the
- * same queue the capture came from.
+ * Wire capture for `options`: `testing` always has a runner, so this instance consumes the
+ * captures it queues. Shard jobs go back onto the same queue the capture came from.
  */
 export function setupCapture(
   options: ShelfOptions,
@@ -75,11 +73,8 @@ export function setupCapture(
   if (testing === undefined) {
     return { queue: null, enqueueCapture: undefined, handler: null };
   }
-  const queue = testing.queue ?? jobs.view;
+  const queue = jobs.view;
   const enqueueCapture = enqueuerFor(queue);
-  if (testing.runner === undefined) {
-    return { queue, enqueueCapture, handler: null };
-  }
   const handlerOptions = captureHandlerOptions(options, config, delivery, logger, {
     runner: testing.runner,
     enqueue: async (job) => {

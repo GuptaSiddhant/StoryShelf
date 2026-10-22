@@ -3,7 +3,7 @@ import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { Badge, Button, CompareStage, Segmented, VStack, statusTone } from "../ui/components.tsx";
 import { viewerHead, viewerMeta, viewerTitle } from "../ui/styles/review-layout.ts";
-import { A11yViolationsNotice } from "./a11y-violations.tsx";
+import { A11yViolationsNotice, a11yCarrierOf } from "./a11y-violations.tsx";
 import { EnvironmentChangeSnapshotNotice } from "./build-diff-environment.tsx";
 import {
   diffPercent,
@@ -113,7 +113,7 @@ export function DiffViewer(props: DiffViewerProps): HtmlEscapedString | Promise<
       <BrowserTabs project={project} build={build} selected={selected} siblings={siblings} />
       {drifted ? <StaleSnapshotNotice status={drifted} /> : null}
       <EnvironmentChangeSnapshotNotice snapshot={selected} migrated={build.isDefault} />
-      <A11yViolationsNotice snapshot={selected} />
+      <A11yViolationsNotice snapshot={a11yCarrierOf(selected, siblings)} />
       {usage && usage.length > 0 ? (
         <LinkedUsage usage={usage} publishedBaseDomain={publishedBaseDomain} />
       ) : null}

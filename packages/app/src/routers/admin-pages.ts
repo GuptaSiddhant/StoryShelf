@@ -50,7 +50,7 @@ export function registerAdminPages(app: ShelfRouter, deps: AdminPageDeps, auth?:
         testing,
         hiddenSnapshots: testing ? 0 : await countHiddenSnapshots(db),
         ...(await captureView()),
-        // Only a host that runs capture jobs is sized here; a remote consumer sizes itself.
+        // Only a host that runs capture jobs (one with `testing`) is sized here.
         capture: capturesHere === true ? describeCaptureHost(captureConcurrency) : null,
       }),
     );
@@ -101,7 +101,7 @@ async function captureView(): Promise<
   };
 }
 
-/** What the System page shows about the public origin: what resolves, and what a browser reported. */
+/** What the System page shows about the public origin: what resolves (confirmed), and what a browser reported. */
 async function publicOriginView(): Promise<AdminSystemData["publicOrigin"]> {
   const { publicOrigin, authEnabled } = getStore();
   if (publicOrigin === undefined) {

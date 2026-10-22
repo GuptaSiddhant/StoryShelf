@@ -22,13 +22,6 @@ describe("resolveShelfOptions", () => {
     expect(resolved.config?.scratchDir).toBe(DEFAULT_SCRATCH_DIR);
   });
 
-  it("defaults scratchDir for a queue-only deployment too", () => {
-    const queue = { metadata: { kind: "q" } } as never;
-    expect(resolveShelfOptions({ ...base, testing: { queue } }).config?.scratchDir).toBe(
-      DEFAULT_SCRATCH_DIR,
-    );
-  });
-
   it("keeps the other config keys when defaulting scratchDir", () => {
     const resolved = resolveShelfOptions({ ...base, config: { maxInlineUnzipSize: 10 } });
     expect(resolved.config).toEqual({ maxInlineUnzipSize: 10, scratchDir: DEFAULT_SCRATCH_DIR });
@@ -56,11 +49,11 @@ describe("resolveShelfOptions", () => {
     ).toBe(0);
   });
 
-  it("requires a runner or a queue whenever testing is set", () => {
-    expect(() => resolveShelfOptions({ ...base, testing: {} })).toThrow(
+  it("requires a runner whenever testing is set", () => {
+    expect(() => resolveShelfOptions({ ...base, testing: {} as never })).toThrow(
       /testing requires testing\.runner/u,
     );
-    expect(() => resolveShelfOptions({ ...base, testing: { concurrency: 2 } })).toThrow(
+    expect(() => resolveShelfOptions({ ...base, testing: { concurrency: 2 } as never })).toThrow(
       /testing requires testing\.runner/u,
     );
   });
@@ -74,9 +67,6 @@ describe("resolveShelfOptions", () => {
       /Cloudflare D1 database cannot back testing/u,
     );
     expect(resolveShelfOptions(d1).testing).toBeUndefined();
-    // A remote-queue-only instance renders nowhere here, so it is not refused.
-    const queue = { metadata: { kind: "q" } } as never;
-    expect(resolveShelfOptions({ ...d1, testing: { queue } }).testing?.queue).toBe(queue);
   });
 
   it("validates notifications.config", () => {
@@ -122,7 +112,7 @@ function concurrent(concurrency: number): () => void {
 describe("resolveShelfOptions testing process options", () => {
   it("requires a runner alongside workerEntry", () => {
     expect(() =>
-      resolveShelfOptions({ ...base, testing: { workerEntry: "/app/capture-worker.ts" } }),
+      resolveShelfOptions({ ...base, testing: { workerEntry: "/app/capture-worker.ts" } as never }),
     ).toThrow(/requires testing\.runner/u);
   });
 
@@ -131,7 +121,7 @@ describe("resolveShelfOptions testing process options", () => {
     expect(shardSized(0)).toThrow(/positive integer/u);
     expect(shardSized(1.5)).toThrow(/positive integer/u);
     expect(shardSized(10, { workerEntry: "/app/w.ts" })).not.toThrow();
-    expect(() => resolveShelfOptions({ ...base, testing: { shardSize: 10 } })).toThrow(
+    expect(() => resolveShelfOptions({ ...base, testing: { shardSize: 10 } as never })).toThrow(
       /requires testing\.runner/u,
     );
   });

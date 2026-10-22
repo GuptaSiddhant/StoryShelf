@@ -92,8 +92,8 @@ describe("public origin on the System page", () => {
     ).toBe(200);
     const html = await (await app.request("/admin")).text();
     expect(html).toContain(ORIGIN);
-    expect(html).toContain("detected from your browser");
-    expect(html).toContain("unconfirmed");
+    expect(html).toContain("Public origin detected, not confirmed");
+    expect(html).toContain("Confirm it to enable");
     expect(html).not.toContain("other.example.com");
   });
 
@@ -126,7 +126,8 @@ describe("public origin on the System page", () => {
     ).toBeLessThan(400);
     let html = await (await app.request("/admin")).text();
     expect(html).toContain("https://shelf.acme.io");
-    expect(html).not.toContain("unconfirmed");
+    expect(html).toContain("confirmed by an admin");
+    expect(html).not.toContain("not confirmed");
     await form(app, "/admin/public-origin/clear", token);
     html = await (await app.request("/admin")).text();
     expect(html).toContain("No public origin is known");
@@ -211,5 +212,16 @@ describe("notifications without a public origin", () => {
       expect(git.calls.length).toBeGreaterThan(0);
     });
     expect(git.calls[0]?.url).toBe(`${ORIGIN}/projects/${project.slug}/builds/${build.id}`);
+  });
+
+  it("stays paused after a report: a detected origin counts only once confirmed", async () => {
+    const git = makeFakeStateNotifier();
+    const app = await seedApp({ notifiers: [git.provider] });
+    const token = await csrfFrom(app);
+    expect((await report(app, token, { origin: ORIGIN })).status).toBe(201);
+    expect(await (await app.request("/admin")).text()).toContain(paused);
+    expect(git.calls).toHaveLength(0);
+    await form(app, "/admin/public-origin", token, ORIGIN);
+    expect(await (await app.request("/admin")).text()).not.toContain(paused);
   });
 });

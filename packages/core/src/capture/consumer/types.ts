@@ -57,7 +57,7 @@ export interface ConsumerConfig extends RetryConfig {
 
 /** Options of {@link createCaptureConsumer}. */
 export interface CaptureConsumerOptions {
-  /** Queue to consume: the database queue, the IPC queue of a forked child, or a remote queue. */
+  /** Queue to consume: the database queue, or the IPC queue of a forked child. */
   queue: PollableCaptureQueue;
   /** Capture jobs: wires the `capture` kind to the core dispatch (shorthand for `handlers.capture`). */
   capture?: Omit<CaptureHandlerOptions, "enqueue" | "logger"> &

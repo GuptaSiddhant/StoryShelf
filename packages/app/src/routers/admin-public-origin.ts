@@ -42,13 +42,16 @@ async function handleReport(c: Context): Promise<Response> {
   const before = await publicOrigin.stored();
   const wasResolved = (await publicOrigin.url()) !== undefined;
   const stored = await publicOrigin.report(reported, user?.id);
-  resumeIfResolved(wasResolved);
+  await resumeIfResolved(wasResolved);
   return c.json(stored, before === null ? 201 : 200);
 }
 
-/** Notifications were paused and an origin now resolves: re-request the state of open builds. */
-function resumeIfResolved(wasResolved: boolean): void {
-  if (!wasResolved) {
+/**
+ * Notifications were paused and an origin now resolves (an admin confirmed one; a mere report
+ * resolves nothing): re-request the state of open builds.
+ */
+async function resumeIfResolved(wasResolved: boolean): Promise<void> {
+  if (!wasResolved && (await getStore().publicOrigin?.url()) !== undefined) {
     requestOpenBuildStatesNow().catch(() => 0);
   }
 }
@@ -60,7 +63,7 @@ async function storeTyped(c: Context): Promise<string> {
   try {
     const wasResolved = (await publicOrigin?.url()) !== undefined;
     await publicOrigin?.set(typeof origin === "string" ? origin : "", user?.id);
-    resumeIfResolved(wasResolved);
+    await resumeIfResolved(wasResolved);
     return "Public origin saved";
   } catch (error) {
     return error instanceof Error ? error.message : "Invalid origin";

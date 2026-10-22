@@ -11,10 +11,16 @@ export {
   listTargets,
   MAX_BROWSERS,
   parseBrowsers,
+  primaryTargetOf,
   refusalFor,
   resolveBrowsers,
 } from "./browsers.ts";
-export { offeredTargets, type TargetPrerequisites } from "./targets.ts";
+export {
+  NO_ORIGIN_REASON,
+  NO_SECRET_REASON,
+  offeredTargets,
+  type TargetPrerequisites,
+} from "./targets.ts";
 export { storybookUrlSource, type StorybookUrlSource } from "./storybook-urls.ts";
 export {
   buildGlobalsParam,
