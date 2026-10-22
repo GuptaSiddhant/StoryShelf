@@ -22,6 +22,8 @@ export const builds = mysqlTable(
     changedCount: int("changed_count").notNull().default(0),
     approvedCount: int("approved_count").notNull().default(0),
     rejectedCount: int("rejected_count").notNull().default(0),
+    /** Snapshots inherited from the baseline without rendering (affected capture). */
+    inheritedCount: int("inherited_count").notNull().default(0),
     affectedOnly: boolean("affected_only").notNull().default(true),
     baselineSha: text("baseline_sha"),
     changedFiles: text("changed_files"),
@@ -51,6 +53,7 @@ export interface Build {
   changedCount: number;
   approvedCount: number;
   rejectedCount: number;
+  inheritedCount: number;
   affectedOnly: boolean;
   baselineSha: string | null;
   changedFiles: string | null;

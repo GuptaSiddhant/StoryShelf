@@ -71,6 +71,7 @@ describe("BuildModel", () => {
       viewportHeight: 720,
       screenshotPath: "/path",
       status: "approved",
+      inherited: true,
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z",
     });
@@ -95,6 +96,7 @@ describe("BuildModel", () => {
     expect(updatedBuild.snapshotCount).toBe(2);
     expect(updatedBuild.approvedCount).toBe(1);
     expect(updatedBuild.changedCount).toBe(1);
+    expect(updatedBuild.inheritedCount).toBe(1);
   });
 
   it("removes a build", async () => {

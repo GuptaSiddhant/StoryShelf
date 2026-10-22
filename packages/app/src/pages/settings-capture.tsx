@@ -1,7 +1,7 @@
 import { isCaptureTarget, type RunnerTarget } from "@storyshelf/core/adapter/capture-runner";
 import { MAX_BROWSERS, parseBrowsers, parseModesAllowlist } from "@storyshelf/core/capture";
 import type { Project } from "@storyshelf/core/schema";
-import { MAX_STORYBOOK_URL_TTL, MIN_STORYBOOK_URL_TTL } from "@storyshelf/core/utils";
+import { MAX_STORYBOOK_URL_TTL, MIN_STORYBOOK_URL_TTL_OVERRIDE } from "@storyshelf/core/utils";
 import type { HtmlEscapedString } from "hono/utils/html";
 import {
   Alert,
@@ -83,12 +83,12 @@ function UrlLifetimeField(props: {
       name="storybookUrlTtlSeconds"
       type="number"
       step="1"
-      min={String(MIN_STORYBOOK_URL_TTL)}
+      min={String(MIN_STORYBOOK_URL_TTL_OVERRIDE)}
       max={String(MAX_STORYBOOK_URL_TTL)}
       value={project.storybookUrlTtlSeconds ? String(project.storybookUrlTtlSeconds) : ""}
       placeholder="Derived from the stories"
       disabled={disabled}
-      hint={`How long the URL given to a remote browser that cannot reach this server stays valid (${MIN_STORYBOOK_URL_TTL} to ${MAX_STORYBOOK_URL_TTL}). Empty derives it from the build's size: at least 2 hours, at most 24.`}
+      hint={`How long the URL given to a remote browser that cannot reach this server stays valid (${MIN_STORYBOOK_URL_TTL_OVERRIDE} to ${MAX_STORYBOOK_URL_TTL}; the floor is one slice of captures plus a grace, so a render never outlives its URL). Empty derives it from the build's size: at least 2 hours, at most 24.`}
     />
   );
 }

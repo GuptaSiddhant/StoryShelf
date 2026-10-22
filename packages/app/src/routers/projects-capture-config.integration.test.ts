@@ -90,11 +90,14 @@ describe("PATCH /projects/:slug signed URL lifetime", () => {
     expect(cleared.storybookUrlTtlSeconds).toBeNull();
   });
 
-  it("rejects a lifetime outside 60 to 86400 whole seconds", async () => {
+  it("rejects a lifetime below the slice floor (1050), above 86400 or not whole", async () => {
     const { patch } = await setup();
     const responses = await Promise.all(
-      [59, 86_401, 90.5, "7200"].map(async (bad) => await patch({ storybookUrlTtlSeconds: bad })),
+      [59, 1049, 86_401, 90.5, "7200"].map(
+        async (bad) => await patch({ storybookUrlTtlSeconds: bad }),
+      ),
     );
-    expect(responses.map((response) => response.status)).toEqual([400, 400, 400, 400]);
+    expect(responses.map((response) => response.status)).toEqual([400, 400, 400, 400, 400]);
+    expect(await responses[1]?.text()).toContain("1050");
   });
 });

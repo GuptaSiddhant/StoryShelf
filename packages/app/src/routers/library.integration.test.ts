@@ -44,6 +44,7 @@ function mockBuild(overrides: Partial<Build> = {}): Build {
     changedCount: 0,
     approvedCount: 0,
     rejectedCount: 0,
+    inheritedCount: 0,
     affectedOnly: true,
     baselineSha: null,
     changedFiles: null,

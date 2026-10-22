@@ -141,6 +141,7 @@ const builds = defineTable("builds", {
   changedCount: "changed_count",
   approvedCount: "approved_count",
   rejectedCount: "rejected_count",
+  inheritedCount: "inherited_count",
   affectedOnly: "affected_only",
   baselineSha: "baseline_sha",
   changedFiles: "changed_files",

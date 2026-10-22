@@ -29,6 +29,7 @@ const makeBuild = (id: string, gitBranch = "main"): Build => ({
   changedCount: 0,
   approvedCount: 0,
   rejectedCount: 0,
+  inheritedCount: 0,
   createdAt: `2026-01-0${id.at(-1)}T00:00:00.000Z`,
   updatedAt: `2026-01-0${id.at(-1)}T00:00:00.000Z`,
 });

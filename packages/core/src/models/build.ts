@@ -167,18 +167,20 @@ export class BuildModel {
   async updateCounts(id: string): Promise<Build> {
     const rows = (await this.db.list(this.tables.snapshots, {
       where: eq(col(this.tables.snapshots, "buildId"), id),
-    })) as unknown as { status: string }[];
+    })) as unknown as { status: string; inherited: boolean }[];
     const snapshotCount = rows.length;
     const changedCount = rows.filter((s) => s.status === "changed" || s.status === "new").length;
     const approvedCount = rows.filter(
       (s) => s.status === "approved" || s.status === "unchanged",
     ).length;
     const rejectedCount = rows.filter((s) => s.status === "rejected").length;
+    const inheritedCount = rows.filter((s) => s.inherited).length;
     return (await this.db.update(this.tables.builds, id, {
       snapshotCount,
       changedCount,
       approvedCount,
       rejectedCount,
+      inheritedCount,
       updatedAt: new Date().toISOString(),
     })) as unknown as Build;
   }

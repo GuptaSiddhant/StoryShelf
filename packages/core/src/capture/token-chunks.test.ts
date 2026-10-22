@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CaptureRunner, RenderResult } from "../adapters/capture-runner.ts";
+import { MIN_CAPTURES_PER_SLICE } from "../utils/storybook-token.ts";
 import type { StoryEntry } from "./adapter.ts";
 import type { RenderRequest } from "./render.ts";
 import type { StorybookUrlSource } from "./storybook-urls.ts";
-import { MIN_CAPTURES_PER_SLICE, renderInSlices } from "./token-chunks.ts";
+import { renderInSlices } from "./token-chunks.ts";
 
 const env = (name: string) => ({ browserVersion: name }) as never;
 

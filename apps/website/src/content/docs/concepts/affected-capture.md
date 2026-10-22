@@ -21,7 +21,7 @@ flowchart LR
 2. **Changed files.** The CLI diffs `baselineSha..HEAD` (plus staged and untracked files) to get the repo-relative change list.
 3. **Trace.** The change list is traced through the bundler dependency graph (`preview-stats.json` in the built Storybook) down to story files. New stories — files with no baseline — always render regardless of the trace.
 4. **Record.** The CLI posts `{ baselineSha, changedFiles, affectedImportPaths }` to `POST …/builds/:id/affected` before uploading the bundle, so the computation is auditable on the build row.
-5. **Partition.** The orchestrator splits discovered stories into render vs inherit sets, renders only the affected ones, and creates `unchanged` snapshots for the rest that reuse the baseline screenshot (`inherited: true`). Counts include inherited snapshots; `changedCount` excludes them.
+5. **Partition.** The orchestrator splits discovered stories into render vs inherit sets, renders only the affected ones, and creates `unchanged` snapshots for the rest that reuse the baseline screenshot (`inherited: true`). Counts include inherited snapshots; `changedCount` excludes them. The build stores how many it inherited as `inheritedCount`.
 
 ## Opting out
 
@@ -85,7 +85,8 @@ storyshelf upload --stats-file ./stats/preview-stats.json
 
 ## What you see in the UI
 
-- The build page shows an `affected capture` badge (or `full capture` when opted out) plus `N rendered, M inherited` counts.
+- The build page shows an `affected capture` badge (or `full capture` when opted out) plus `N rendered, M inherited` counts, and an **Inherited** stat next to the other counts. The numbers are the ones stored on the build (`snapshotCount`, `inheritedCount`), also served by the API.
+- The project's **Builds** page shows **Inherited from baseline**: the average, over the project's last 20 builds that hold snapshots, of each build's `inheritedCount / snapshotCount`. It is computed from the stored counts only, so it reads no snapshots. A high number means affected capture is skipping most of your Storybook; a number near zero means most changes reach most stories (a shared import, for example), and [the trace](#tuning-the-trace) is worth a look.
 - Inherited snapshots carry an `inherited` badge and `unchanged` status — they need no review.
 - Capture attempt logs include an `affected capture partitioned` line with `{ rendered, inherited, total }`.
 

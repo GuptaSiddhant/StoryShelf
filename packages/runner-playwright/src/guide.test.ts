@@ -39,7 +39,7 @@ describe("the self-hosted farm guide", () => {
     const {
       DEFAULT_STORYBOOK_URL_TTL,
       MAX_STORYBOOK_URL_TTL,
-      MIN_STORYBOOK_URL_TTL,
+      MIN_STORYBOOK_URL_TTL_OVERRIDE,
       STORYBOOK_TOKEN_PREFIX,
     } = await import("@storyshelf/core/utils");
     const guide = await readFile(GUIDE, "utf8");
@@ -48,7 +48,7 @@ describe("the self-hosted farm guide", () => {
     expect(guide).toContain(`at least ${DEFAULT_STORYBOOK_URL_TTL / 3600} hours`);
     expect(guide).toContain(`at most ${MAX_STORYBOOK_URL_TTL / 3600} hours`);
     expect(guide).toContain(`${STORYBOOK_TOKEN_PREFIX}<token>/`);
-    expect(guide).toContain(`from ${MIN_STORYBOOK_URL_TTL} to ${MAX_STORYBOOK_URL_TTL}`);
+    expect(guide).toContain(`from ${MIN_STORYBOOK_URL_TTL_OVERRIDE} to ${MAX_STORYBOOK_URL_TTL}`);
     expect(guide).toContain(`${MAX_STORYBOOK_URL_TTL / 3600} hours is refused`);
   });
 });

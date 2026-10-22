@@ -4,18 +4,18 @@
 > follows Storybook's source (`storybookjs/storybook`, branch `next`, which matches the
 > consolidated `code/core/src` layout of v9+, and is semantically identical to the v8/9/10 the
 > fixtures build). It maps every internal to a StoryShelf touch-point and ends with a chapter on
-> what StoryShelf *could* do with Storybook internals that it doesn't yet.
+> what StoryShelf _could_ do with Storybook internals that it doesn't yet.
 
 ## 0. The one core idea: Storybook is two apps glued by a message bus
 
 Every Storybook is **two completely separate web applications**:
 
-| | Manager | Preview |
-|---|---|---|
-| What it is | The UI chrome: sidebar, toolbar, panels, addons | The canvas that renders your stories |
-| Entry point | `index.html` (bundle in `sb-manager/`) | `iframe.html` (bundle in `iframe.html` + `assets/*.js`) |
-| Runs in | The top-level window | An `<iframe id="storybook-preview-iframe">` |
-| Owns | Story index, selection state, addon UI | CSF modules, decorators, args, renderers, `play` |
+|             | Manager                                         | Preview                                                 |
+| ----------- | ----------------------------------------------- | ------------------------------------------------------- |
+| What it is  | The UI chrome: sidebar, toolbar, panels, addons | The canvas that renders your stories                    |
+| Entry point | `index.html` (bundle in `sb-manager/`)          | `iframe.html` (bundle in `iframe.html` + `assets/*.js`) |
+| Runs in     | The top-level window                            | An `<iframe id="storybook-preview-iframe">`             |
+| Owns        | Story index, selection state, addon UI          | CSF modules, decorators, args, renderers, `play`        |
 
 They share **no runtime state** — no globals, no shared DOM, no module scope. The only duct between
 them is a **Channel**: an event bus with pluggable transports. In the browser that transport is
@@ -23,7 +23,7 @@ them is a **Channel**: an event bus with pluggable transports. In the browser th
 arbitrary user component code; in refs it may even be a different origin).
 
 StoryShelf exploits exactly that isolation — it serves `iframe.html` with no manager at all and
-captures it server-side. Everything in chapters 1–6 is the machinery *behind* the single URL
+captures it server-side. Everything in chapters 1–6 is the machinery _behind_ the single URL
 `iframe.html?id=<storyId>&viewMode=story` that `StorybookAdapter.buildUrl` produces.
 
 ## 1. The Channel (`code/core/src/channels/`)
@@ -32,7 +32,7 @@ captures it server-side. Everything in chapters 1–6 is the machinery *behind* 
 
 A fancier `EventEmitter`: `channel.on(type, cb)`, `channel.emit(type, ...args)`, plus `once`, `off`,
 and `isAsync`. The unit of protocol is the `ChannelEvent`: `{ type, args, from, source?, refId? }`.
-`ChannelTransport` is the seam that decides *how* an event physically crosses a boundary. One
+`ChannelTransport` is the seam that decides _how_ an event physically crosses a boundary. One
 `Channel` can own several transports (postMessage + websocket + telemetry) and never knows which is
 in play.
 
@@ -52,20 +52,20 @@ From `channels/postmessage/index.ts` (`PostMessageTransport`). **Sending:**
 
 ```ts
 const data = stringify(
-  { key: 'storybook-channel', event, refId: query.get('refId') },
+  { key: "storybook-channel", event, refId: query.get("refId") },
   { maxDepth: 25 },
 );
-frames.forEach((f) => f.postMessage(data, '*'));
+frames.forEach((f) => f.postMessage(data, "*"));
 ```
 
 Four details matter:
 
 1. **`key: 'storybook-channel'`** — a namespace prefix. A page can host multiple Storybooks (or
    refs); a receiver ignores any message without this key.
-2. **`telejson` serialization** — *not* `JSON.stringify`. `telejson` round-trips `Date`, `RegExp`,
+2. **`telejson` serialization** — _not_ `JSON.stringify`. `telejson` round-trips `Date`, `RegExp`,
    `Map`, `Set`, `Error`, `Symbol`, `undefined`, circular refs — capped at `maxDepth`. Addon payloads
    with exotic values survive the wire.
-3. **`target: '*'`** — no origin on send. The "security model" is: the *receiver* stamps and checks
+3. **`target: '*'`** — no origin on send. The "security model" is: the _receiver_ stamps and checks
    `event.source` and ignores cross-origin noise.
 4. **`refId`** — for **composed Storybooks** (one Storybook embedding another as a ref), events carry
    the source ref so the manager can route them. Read from the URL's `?refId=`.
@@ -79,9 +79,9 @@ Four details matter:
 
 ```ts
 const { key, event, refId } = parse(data, CHANNEL_OPTIONS);
-if (key === 'storybook-channel') {
+if (key === "storybook-channel") {
   event.refId = refId;
-  event.source = page === 'preview' ? rawEvent.origin : getEventSourceUrl(rawEvent, refId);
+  event.source = page === "preview" ? rawEvent.origin : getEventSourceUrl(rawEvent, refId);
   this.handler(event);
 }
 ```
@@ -99,18 +99,18 @@ through v10. Only the package location moved.
 
 `code/core/src/core-events/index.ts` is the canonical list (~100 named events). The most instructive:
 
-| Event | Direction | Meaning |
-|---|---|---|
-| `SET_CURRENT_STORY` | manager → preview | "render story `X` in viewMode `Y`" |
-| `FORCE_RE_RENDER` / `FORCE_REMOUNT` | manager → preview | re-render / fully remount |
-| `UPDATE_GLOBALS` | manager → preview | set global args (theme, locale, background…) |
-| `GLOBALS_UPDATED` / `SET_GLOBALS` | preview → manager | acknowledge / announce globals |
-| `UPDATE_STORY_ARGS` | manager → preview | live-edit a story's args (controls panel) |
-| `STORY_RENDER_PHASE_CHANGED` | preview → manager | `loading → rendering → playing → play-failed → completed` |
-| `STORY_RENDERED` | preview → manager | story painted in `#storybook-root` |
-| `STORY_ERRORED` / `STORY_THREW_EXCEPTION` | preview → manager | render / exception failure |
-| `PLAY_FUNCTION_THREW_EXCEPTION` | preview → manager | `play()` rejected — **StoryShelf subscribes to this** |
-| `STORY_FINISHED` | preview → manager | render + play fully settled (v9+) |
+| Event                                     | Direction         | Meaning                                                          |
+| ----------------------------------------- | ----------------- | ---------------------------------------------------------------- |
+| `SET_CURRENT_STORY`                       | manager → preview | "render story `X` in viewMode `Y`"                               |
+| `FORCE_RE_RENDER` / `FORCE_REMOUNT`       | manager → preview | re-render / fully remount                                        |
+| `UPDATE_GLOBALS`                          | manager → preview | set global args (theme, locale, background…)                     |
+| `GLOBALS_UPDATED` / `SET_GLOBALS`         | preview → manager | acknowledge / announce globals                                   |
+| `UPDATE_STORY_ARGS`                       | manager → preview | live-edit a story's args (controls panel)                        |
+| `STORY_RENDER_PHASE_CHANGED`              | preview → manager | `loading → rendering → playing → play-failed → completed`        |
+| `STORY_RENDERED`                          | preview → manager | story painted in `#storybook-root`                               |
+| `STORY_ERRORED` / `STORY_THREW_EXCEPTION` | preview → manager | render / exception failure                                       |
+| `PLAY_FUNCTION_THREW_EXCEPTION`           | preview → manager | `play()` rejected — **StoryShelf subscribes to this**            |
+| `STORY_FINISHED`                          | preview → manager | render + play fully settled (present in the 8, 9 and 10 bundles) |
 
 **The canonical trace — click a story in the sidebar:**
 
@@ -120,7 +120,7 @@ through v10. Only the package location moved.
 3. Preview emits `STORY_RENDER_PHASE_CHANGED` + `STORY_RENDERED` back down.
 4. The manager updates the outer URL, sidebar highlight, and addon panels.
 
-Selection state is **never shared**, it travels as messages in both directions. That exchange *is* the
+Selection state is **never shared**, it travels as messages in both directions. That exchange _is_ the
 design.
 
 ## 4. Preview boot and the render pipeline
@@ -162,7 +162,7 @@ implements `renderToCanvas({ storyFn, showMain, showError, forceRemount }, canva
 `code/renderers/*/src/render.ts` — and renders into the element **`#storybook-root`**.
 
 > This is the handshake with StoryShelf: `#storybook-root` is the `screenshotSelector`
-> (`core/src/capture/storybook.ts:35`) and the `canvasElement` passed into `play({ canvasElement })`.
+> (`StorybookAdapter` in `core/src/capture/storybook.ts`) and the `canvasElement` passed into `play({ canvasElement })`.
 
 ### The `StoryRender` state machine (`preview-web/render/StoryRender.ts`)
 
@@ -177,16 +177,18 @@ the channel.
 Flow: phase `rendering` → `playing` → run `play({ canvasElement })` → on throw emit
 `PLAY_FUNCTION_THREW_EXCEPTION` → phase `play-failed` → then `STORY_FINISHED` with the error.
 
-**Read `packages/runner-playwright/src/capture-runner.ts:206-266` with this in mind.** In one
+**Read `packages/runner-playwright/src/play.ts` (`inPagePlay`) with this in mind.** In one
 `page.evaluate` it:
 
-1. reads `window.__STORYBOOK_PREVIEW__` (the `PreviewWeb` instance),
+1. reads `window.__STORYBOOK_PREVIEW__` (the `PreviewWeb` instance) and returns when it is absent,
 2. subscribes `preview.channel.on('playFunctionThrewException', handler)` — reading the preview side
    of the protocol directly,
-3. prefers `preview.executePlay(storyId)` — a **custom StoryShelf preview addition** (injected into
-   the client build, see ADR 0017 `Links`),
-4. falls back to `preview.storyStore.fromId(storyId).play({ canvasElement })` — reaching into the
-   store for the `PreparedStory.play`.
+3. runs the play function: `preview.executePlay(storyId)` when the preview has one (none of the
+   built fixtures 8/9/10 does; the method is a leftover of older Storybook previews, not a StoryShelf
+   addition), otherwise `storyStoreValue.loadStory({ storyId })` and the loaded story's
+   `playFunction` with the context of the render already mounted (`preview.storyRenders`), and as a
+   last resort `storyStore.fromId(storyId).play({ canvasElement })`,
+4. races the work against `playTimeoutMs` and rethrows an exception the channel reported.
 
 `storyStore.storyIndex.entries` is the in-browser twin of the `stories.json`/`index.json` StoryShelf
 reads offline: same shape (`id, name, title, importPath, type, subtype, tags`). That is why the
@@ -196,15 +198,15 @@ adapter can be presence-based instead of version-detecting.
 
 - The manager bundle (`code/core/src/manager/`) builds the React UI from the story index + render
   events.
-- **Addons register in *both* apps**: a manager-side panel + an optional preview-side decorator /
+- **Addons register in _both_ apps**: a manager-side panel + an optional preview-side decorator /
   preview module, glued by the channel. Study `addon-interactions` (play steps driven by
   `STORY_RENDER_PHASE_CHANGED`) or `addon-a11y` (checks in preview, reports to manager) as the
   canonical pair.
 - `manager-api` (`useChannel`, `useParameter`, `addons`, `selectStory`) is the documented bridge.
 
-**Why StoryShelf ships no postMessage bridge:** capture is server-side and talks to *neither* app
+**Why StoryShelf ships no postMessage bridge:** capture is server-side and talks to _neither_ app
 over the channel. It navigates the bare preview iframe and reads the DOM. PostMessage only matters
-when the *manager* is alive to send it; to drive a story without a manager, you poke
+when the _manager_ is alive to send it; to drive a story without a manager, you poke
 `__STORYBOOK_PREVIEW__` directly — which is exactly what the runner does.
 
 ## 7. The server channel (dev mode only)
@@ -222,11 +224,11 @@ heartbeat and event buffering until `isReady`. A static production build has **n
   `@storybook/addons`.
 - **v8+**: packages consolidated; import shims like `storybook/internal/channels`;
   `features.buildStoriesJson` → the `STORYBOOK_BUILD_STORIES_JSON` env the CLI injects at
-  `cli/src/commands/storybook-build.ts:66` so v8 emits `stories.json`.
-- **v9/v10**: `open-service` — an *internal*, schema-driven service subsystem relaying state between
+  `cli/src/commands/storybook-build.ts` so v8 emits `stories.json`.
+- **v9/v10**: `open-service` — an _internal_, schema-driven service subsystem relaying state between
   manager/preview/server over the channel (`code/core/src/shared/open-service/`); it is an internal
   Storybook feature, **not** a stable external integration API (all services are marked
-  `internal: true`). `STORY_FINISHED` replaces/augments older render events; **CSF-Next** `.test()`
+  `internal: true`). `STORY_FINISHED` exists in the 8, 9 and 10 preview bundles alike (it is not a v9 addition); **CSF-Next** `.test()`
   stories appear in the index as `subtype: 'test'` — which is why StoryShelf's `discover()` filters
   them out. Storybook's `addon-vitest` / `addon-test` turn `.test()` stories into real browser tests
   via Vitest + portable stories; `@storybook/test-runner` does the same against a running/published
@@ -241,21 +243,21 @@ cd fixtures/storybook-8 && pnpm run build-storybook && pnpm dlx serve storybook-
 Open the top-level console and the iframe's console, run:
 
 ```js
-addEventListener('message', (e) => console.log('SB-channel:', e.data));
+addEventListener("message", (e) => console.log("SB-channel:", e.data));
 ```
 
 Click stories and watch the `{"key":"storybook-channel","event":{...}}` envelopes. Then introspect
 the globals StoryShelf runs off:
 
 ```js
-window.__STORYBOOK_ADDONS_CHANNEL__   // .transports, .emit(), .on()
-window.__STORYBOOK_PREVIEW__          // .channel, .storyStore.storyIndex.entries, .storyStore.fromId('<id>').play, .extract()
+window.__STORYBOOK_ADDONS_CHANNEL__; // .transports, .emit(), .on()
+window.__STORYBOOK_PREVIEW__; // .channel, .storyStore.storyIndex.entries, .storyStore.fromId('<id>').play, .extract()
 ```
 
 Force a re-render through the bus:
 
 ```js
-window.__STORYBOOK_ADDONS_CHANNEL__.emit('updateGlobals', { globals: { /* any global */ } });
+window.__STORYBOOK_ADDONS_CHANNEL__.emit("updateGlobals", { globals: {/* any global */} });
 ```
 
 Watch `sb-manager/` vs `assets/*.js` split in the Network tab; with `storybook dev`, watch the
@@ -269,14 +271,11 @@ effort/impact estimate.
 
 ### 10.1 Close the documented-but-unimplemented gaps (low effort, high integrity)
 
-- **Runtime parameter fallback.** ADR 0017 and the website guide promise
-  `page.evaluate(() => __STORYBOOK_PREVIEW__.extract()[id].parameters)` as the fallback for SB 8
-  builds without `buildStoriesJson`. The runners don't implement it today — only
-  `files stories.json / index.json` are read. The fallback page-evaluates once per story *only* when
-  `stories.json` is absent, so it's cheap. This is the single most obvious correctness debt.
-- **`waitForReady(page)`.** ADR 0005's `StorySourceAdapter` declares an optional `waitForReady`
-  hook that is never implemented or called. Framework-specific providers could use it to gate the
-  screenshot on something more precise than `networkidle + delay`.
+- **Runtime parameter fallback: shipped.** The fixtures' `index.json` (format 5, Storybook 8, 9 and 10) carries no `parameters`, so the runners read them with `__STORYBOOK_PREVIEW__.extract()` once
+  per run (`runtime-params.ts`) whenever the index entry has none.
+- **`waitForReady(page)`.** `StorySourceAdapter` declares an optional `waitForReady` hook and both
+  runners call it after navigation, but `StorybookAdapter` does not implement it. A hook could gate
+  the screenshot on something more precise than `networkidle + delay`.
 
 ### 10.2 Render-settled signalling instead of fixed sleeps (medium effort, high fidelity)
 
@@ -289,7 +288,7 @@ render-finished signal rather than a clock:
   a magic 500 ms: faster for fast stories, correct for slow ones, and immune to `networkidle` flakery
   on long-polling previews.
 - The phase trail (`STORY_RENDER_PHASE_CHANGED`) plus `UNHANDLED_ERRORS_WHILE_PLAYING` gives much
-  richer failure diagnostics than today's "play failed: <message>" — StoryShelf could record *where*
+  richer failure diagnostics than today's "play failed: <message>" — StoryShelf could record _where_
   in the interaction run a story failed.
 
 ### 10.3 Drive stories like the manager (modes / args / globals) — modes shipped (ADR 0028)
@@ -312,21 +311,20 @@ but needs its own identity story in the baseline key.
 
 ### 10.4 Per-story viewports from Storybook's own parameters (low effort)
 
-`stories.json` carries full `parameters` per story, including `parameters.viewport.defaultViewport`
-and `parameters.backgrounds.values`. StoryShelf only reads the `chromatic`/`storyshelf` sub-keys
-today. Honoring `parameters.viewport` would make captures match what the developer sees in Storybook,
-and resolves the deferred "per-story viewports" item (ADR 0017 "Alternatives considered") without an
-explicit schema: map the named viewport to a size from the index's viewport addon data.
+Story parameters (from `extract()`, since the index has none) include `parameters.viewport.defaultViewport`
+and `parameters.backgrounds.values`. StoryShelf reads the `chromatic`/`storyshelf` sub-keys and, since
+`resolveStoryViewports`, the story's `parameters.viewport` default (inline definitions, then Storybook's
+minimal built-in set), so captures match what the developer sees. Open: `parameters.backgrounds`.
 
-### 10.5 Run CSF-Next `.test()` stories as interaction tests (medium — aligns with ADR 0017)
+### 10.5 Run CSF-Next `.test()` stories as interaction tests (medium — aligns with the interaction-testing scope of ADR 0004)
 
-`discover()` filters `subtype === 'test'`. Those stories *are* tests written in the file (CSF-Next,
+`discover()` filters `subtype === 'test'`. Those stories _are_ tests written in the file (CSF-Next,
 fixtures/storybook-10) — the very "one less CI job" StoryShelf already sells for `play`. A dedicated
 "run tests" mode could execute `.test()` stories in the iframe (Storybook runs them through the
 portable-stories pipeline, so the exact in-page entry point needs verifying — it may not be
 `storyStore.fromId().play()` like a classic story) and report pass/fail alongside snapshots, giving
 Storybook-10 users interaction-test CI without adding Vitest. The assertion runtime (`expect` from `@storybook/test`) throws like any `play` throw,
-so the failure plumbing already exists. Caveat: `.test()` bodies are the *whole* test (no separate
+so the failure plumbing already exists. Caveat: `.test()` bodies are the _whole_ test (no separate
 snapshot target), so this is a status report, not a screenshot — it needs a new build status lane,
 not a snapshot row.
 
@@ -348,26 +346,27 @@ and an adapter `screenshotSelector` per view mode.
   `STORY_RENDER_PHASE_CHANGED`; the same protocol could one day drive a StoryShelf build-review
   "play trace" panel.
 
-### 10.8 Do *not* reach for (honest limits)
+### 10.8 Do _not_ reach for (honest limits)
 
 - **`open-service`**: the schema-driven state service in v9/10 is internal (`internal: true` on every
   core service) and explicitly unstable. It powers Storybook's own docgen/change-detection, not third
   parties. Watching it is smart; building on it would be building on sand.
 - **The postMessage channel as a StoryShelf transport**: StoryShelf captures server-side and never
-  runs a manager. The channel is only reachable *inside* the page (as a passive listener, which it
+  runs a manager. The channel is only reachable _inside_ the page (as a passive listener, which it
   already does) — there is no manager peer to relay to.
 
 ## Appendix — StoryShelf ↔ Storybook cheat sheet
 
-| StoryShelf code | Storybook internal it touches |
-|---|---|
-| `StorybookAdapter.buildUrl` (`core/src/capture/storybook.ts:53`) | Skips manager; standalone preview URL routing |
-| `screenshotSelector = "#storybook-root"` | `renderToCanvas` paint target / `play.canvasElement` |
-| `readIndex` → `stories.json`/`index.json` | The story index the manager also consumes |
-| `__STORYBOOK_PREVIEW__` (`runner-*/capture-runner.ts`) | `PreviewWeb` instance |
-| `.channel.on('playFunctionThrewException')` | Preview→manager protocol, read in-page |
-| `.executePlay(storyId)` | Custom StoryShelf preview augmentation |
-| `.storyStore.fromId(id).play({ canvasElement })` | `StoryStore` → `PreparedStory.play` |
-| CLI `STORYBOOK_BUILD_STORIES_JSON=true` | Forces v8 to emit `stories.json` |
-| `discover()` filters `subtype === 'test'` | CSF-Next `.test()` story marking |
-| `parameters.*` (chromatic/storyshelf keys) | Story index `parameters` section |
+| StoryShelf code                                                   | Storybook internal it touches                                        |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `StorybookAdapter.buildUrl` (`core/src/capture/storybook.ts`)     | Skips manager; standalone preview URL routing                        |
+| `screenshotSelector = "#storybook-root"`                          | `renderToCanvas` paint target / `play.canvasElement`                 |
+| `readIndex` → `stories.json`/`index.json`                         | The story index the manager also consumes                            |
+| `__STORYBOOK_PREVIEW__` (`runner-*/play.ts`, `runtime-params.ts`) | `PreviewWeb` instance                                                |
+| `.channel.on('playFunctionThrewException')`                       | Preview→manager protocol, read in-page                               |
+| `.executePlay(storyId)`                                           | Used only when a preview offers it (none of 8/9/10 does)             |
+| `.storyStoreValue.loadStory({ storyId })` → `playFunction`        | `StoryStore` → prepared story's play function (the path 8/9/10 take) |
+| `.storyStore.fromId(id).play({ canvasElement })`                  | Last-resort fallback                                                 |
+| CLI `STORYBOOK_BUILD_STORIES_JSON=true`                           | Forces v8 to emit `stories.json`                                     |
+| `discover()` filters `subtype === 'test'`                         | CSF-Next `.test()` story marking                                     |
+| `parameters.*` (chromatic/storyshelf keys)                        | Story index `parameters` section                                     |

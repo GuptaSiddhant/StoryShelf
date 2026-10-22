@@ -26,6 +26,7 @@ export const NOTIFICATION_TOPICS: { event: string; label: string }[] = [
   { event: "build:approved", label: "Build approved" },
   { event: "build:rejected", label: "Build rejected" },
   { event: "build:pending", label: "Build sent back to pending" },
+  { event: "build:failed", label: "Build failed" },
   { event: "build:cancelled", label: "Build cancelled" },
   { event: "baseline:created", label: "Baseline created" },
   { event: "baseline:updated", label: "Baseline updated" },
