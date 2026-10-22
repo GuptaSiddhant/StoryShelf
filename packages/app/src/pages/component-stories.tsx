@@ -3,6 +3,7 @@ import type { CatalogEntry } from "@storyshelf/core/capture";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { CatalogHistoryRow } from "../routers/component-catalog.handlers.ts";
+import { isSignedPreviewBase, PREVIEW_TOKEN_REFRESH } from "../routers/preview-base.ts";
 import {
   Badge,
   Button,
@@ -78,6 +79,26 @@ function selectedStory(data: ComponentPageData): CatalogEntry | undefined {
   return stories.find((entry) => entry.id === data.story) ?? stories[0];
 }
 
+const previewPath = (story: CatalogEntry): string =>
+  `/iframe.html?id=${encodeURIComponent(story.id)}&viewMode=story`;
+
+/** A frame under a signed URL asks for a new token before the old one expires. */
+function refreshOf(
+  data: ComponentPageData,
+  story: CatalogEntry,
+): { refresh?: { url: string; path: string; seconds: number } } {
+  if (data.previewBase === null || !isSignedPreviewBase(data.previewBase)) {
+    return {};
+  }
+  return {
+    refresh: {
+      url: `/api/v1/projects/${data.project.slug}/builds/${data.catalog.build.id}/preview-token`,
+      path: previewPath(story),
+      seconds: PREVIEW_TOKEN_REFRESH,
+    },
+  };
+}
+
 function PreviewCard(props: { data: ComponentPageData; story: CatalogEntry }): Rendered {
   const { data, story } = props;
   return (
@@ -90,8 +111,9 @@ function PreviewCard(props: { data: ComponentPageData; story: CatalogEntry }): R
         </Meta>
       ) : (
         <PreviewEmbed
-          src={`${data.previewBase}/iframe.html?id=${encodeURIComponent(story.id)}&viewMode=story`}
+          src={`${data.previewBase}${previewPath(story)}`}
           title={`${story.title} / ${story.name}`}
+          {...refreshOf(data, story)}
         />
       )}
     </Card>

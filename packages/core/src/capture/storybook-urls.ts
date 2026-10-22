@@ -21,10 +21,18 @@ export interface StorybookUrlPass {
 }
 
 /** Gives the URL a target's browser opens, or `undefined` when it needs none (or none can be made). */
-export type StorybookUrlSource = (
+export type StorybookUrlSource = ((
   target: CaptureTarget,
   pass?: StorybookUrlPass,
-) => Promise<string | undefined>;
+) => Promise<string | undefined>) & {
+  /**
+   * The lifetime in seconds a token minted for a pass of this budget gets (the project's override
+   * or the derived, capped one). A pass that outlasts it is rendered in slices, each with a fresh
+   * token (`renderInSlices`). `undefined` for a target that needs no signed URL (it is never
+   * sliced), and absent on a source that has no such limit.
+   */
+  ttlSeconds?: (target: CaptureTarget, budgetMs: number) => number | undefined;
+};
 
 /** What minting needs of a capture job. */
 export interface StorybookUrlOptions {
@@ -44,12 +52,17 @@ export function storybookUrlSource(
     project: Pick<Project, "storybookUrlTtlSeconds">;
   },
 ): StorybookUrlSource {
-  return async (target, pass = {}) => {
+  const source: StorybookUrlSource = async (target, pass = {}) => {
     const origin = needsUrl(options.runner, target) ? await options.publicOrigin?.() : undefined;
     return origin !== undefined && options.secret
       ? `${origin}${mint(options.secret, subject, pass)}`
       : undefined;
   };
+  source.ttlSeconds = (target, budgetMs): number | undefined =>
+    needsUrl(options.runner, target)
+      ? storybookUrlTtl({ override: subject.project.storybookUrlTtlSeconds, budgetMs })
+      : undefined;
+  return source;
 }
 
 /** The path of a fresh token for one pass of the build. */

@@ -99,3 +99,26 @@ describe("storybookUrlSource", () => {
     ).toBeUndefined();
   });
 });
+
+describe("storybookUrlSource lifetime", () => {
+  const offered = {
+    metadata: {
+      targets: [
+        { target: "chromium@remote", reach: "url" },
+        { target: "chromium", reach: "local" },
+      ],
+    },
+  } as never;
+  const source = storybookUrlSource(
+    { runner: offered, secret: "s" },
+    { build: { id: "b", projectId: "p" }, project: { storybookUrlTtlSeconds: 7200 } },
+  );
+
+  it("reports the lifetime a pass of a budget would get for a signed-URL target", () => {
+    expect(source.ttlSeconds?.("chromium@remote", 1000)).toBe(7200);
+  });
+
+  it("reports none for a target that needs no signed URL, so it is never sliced", () => {
+    expect(source.ttlSeconds?.("chromium", 1000)).toBeUndefined();
+  });
+});

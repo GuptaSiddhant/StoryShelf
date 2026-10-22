@@ -44,10 +44,26 @@ const previewFrame = css`
 /**
  * A published story in a sandboxed frame that loads on click. The frame is inert markup (a
  * `<template>`) until the visitor asks for it, so opening a page never runs the customer's
- * Storybook; the shell script moves the frame in on click.
+ * Storybook; the shell script moves the frame in on click and, for a signed URL, re-points it
+ * to a fresh token before the current one expires.
  */
-export const PreviewEmbed: FC<{ src: string; title: string }> = ({ src, title }) => (
-  <div class={previewHost} data-preview-embed>
+export const PreviewEmbed: FC<{
+  src: string;
+  title: string;
+  /** For a frame under a signed URL: where to ask for a fresh root, the path after it, how often. */
+  refresh?: { url: string; path: string; seconds: number };
+}> = ({ src, title, refresh }) => (
+  <div
+    class={previewHost}
+    data-preview-embed
+    {...(refresh
+      ? {
+          "data-preview-refresh-url": refresh.url,
+          "data-preview-path": refresh.path,
+          "data-preview-refresh-seconds": String(refresh.seconds),
+        }
+      : {})}
+  >
     <div class={previewIdle} data-preview-idle>
       <Button variant="secondary" size="sm" icon="image" data-preview-load>
         Load preview

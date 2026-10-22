@@ -285,7 +285,7 @@ describe("review page: capture environment migration", () => {
 const VIOLATION =
   "color-contrast (serious): Elements must meet minimum color contrast [button] 1 node(s)";
 
-async function pageWith(violations: string | null): Promise<string> {
+async function pageWith(violations: string | null, view: "diff" | "" = "diff"): Promise<string> {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
   const project = await new ProjectModel(db).create({ name: "Docs" });
@@ -310,7 +310,10 @@ async function pageWith(violations: string | null): Promise<string> {
     storage,
     logger: createShelfLogger({ level: "silent" }),
   });
-  const url = `/projects/${project.slug}/builds/${build.id}/diff?snapshot=${snap.id}`;
+  const url =
+    view === "diff"
+      ? `/projects/${project.slug}/builds/${build.id}/diff?snapshot=${snap.id}`
+      : `/projects/${project.slug}/builds/${build.id}`;
   return await (await app.request(url)).text();
 }
 
@@ -320,6 +323,27 @@ describe("review page: accessibility violations", () => {
     expect(html).toContain("Accessibility: 1 found on chromium (does not block)");
     expect(html).toContain("color-contrast (serious)");
     expect(html).toContain("a11y 1 (chromium)");
+  });
+
+  it("sums the findings in the header and offers an a11y filter on the snapshot list", async () => {
+    const html = await pageWith(JSON.stringify([VIOLATION, "label (critical): x"]));
+    expect(html).toContain("a11y 2 (does not block)");
+    expect(html).toMatch(/data-filter-switch[\s\S]*A11y 1/u);
+    expect(html).toContain('data-filter="a11y"');
+    expect(html).toContain("data-a11y");
+  });
+
+  it("shows the build's total on the build page as information only", async () => {
+    const html = await pageWith(JSON.stringify([VIOLATION]), "");
+    expect(html).toContain("Accessibility findings");
+    expect(html).toContain("On 1 snapshot. Information only; they never change the status.");
+    expect(await pageWith(null, "")).toContain("No findings recorded. Information only.");
+  });
+
+  it("offers no a11y filter and no header count when nothing was found", async () => {
+    const html = await pageWith(null);
+    expect(html).not.toContain("does not block");
+    expect(html).not.toContain('value="a11y"');
   });
 
   it("shows nothing for a snapshot without findings or with unreadable data", async () => {

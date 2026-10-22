@@ -203,6 +203,30 @@ describe("component page without testing", () => {
     expect(html).not.toContain("needs a sign-in");
   });
 
+  it("lets a frame under a signed URL ask for a fresh token, and answers only viewers who may open the build", async () => {
+    const secret = "preview-secret-preview-secret";
+    const { app, project, b2 } = await seed({ auth: true, testing: true, secret });
+    const html = await page(app, "src/Button.stories.tsx");
+    expect(html).toContain(`data-preview-refresh-url="/api/v1/projects/app/builds/${b2.id}/preview-token"`);
+    expect(html).toContain("data-preview-refresh-seconds=");
+    const response = await app.request(`/api/v1/projects/app/builds/${b2.id}/preview-token`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    const { base } = (await response.json()) as { base: string };
+    const token = /^\/_s\/([^/]+)$/u.exec(base)?.[1];
+    expect(verifyStorybookToken(token, secret)).toMatchObject({
+      ok: true,
+      claims: { projectId: project.id, buildId: b2.id },
+    });
+    expect((await app.request("/api/v1/projects/app/builds/nope/preview-token")).status).toBe(404);
+  });
+
+  it("offers no refresh for a frame that needs no token", async () => {
+    const { app, b2 } = await seed({ auth: true, publicBuilds: true });
+    expect(await page(app, "src/Button.stories.tsx")).not.toContain("data-preview-refresh-url");
+    expect((await app.request(`/api/v1/projects/app/builds/${b2.id}/preview-token`)).status).toBe(404);
+  });
+
   it("offers no frame for a private build when there is no testing to serve a signed URL", async () => {
     const { app } = await seed({
       auth: true,

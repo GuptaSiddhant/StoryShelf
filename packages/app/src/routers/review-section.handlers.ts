@@ -1,5 +1,5 @@
 /** Data behind the review section of the build page (ADR 0013): verdicts, changeset and comments. */
-import type { Catalog } from "@storyshelf/core/capture";
+import { publishingOf, type Catalog } from "@storyshelf/core/capture";
 import { changesetOf, CommentModel, UserModel, type BuildChangeset } from "@storyshelf/core/models";
 import type { Build, Comment, Project } from "@storyshelf/core/schema";
 import { getStore } from "../store.ts";
@@ -29,6 +29,8 @@ export interface ReviewSectionData extends ReviewCapabilities {
   names: ReadonlyMap<string, string>;
   /** Whether the snapshot rollup decides the build, so the verdict is a sign-off only. */
   testing: boolean;
+  /** Whether the build's Storybook is published; a verdict waits for `success` (ADR 0013). */
+  publishing: Awaited<ReturnType<typeof publishingOf>>;
 }
 
 /** Whether review is on for the project (a row without the column counts as on). */
@@ -58,11 +60,12 @@ export async function loadReviewSection(
     return null;
   }
   const { db, testing } = getStore();
-  const [state, changeset, comments, capabilities] = await Promise.all([
+  const [state, changeset, comments, capabilities, publishing] = await Promise.all([
     reviewStateOf(project, build),
     changesetOf(db, project, build),
     new CommentModel(db).listByBuild(build.id),
     reviewCapabilities(project),
+    publishingOrPending(build),
   ]);
   const shown = comments.filter((comment) => comment.snapshotId === null);
   return {
@@ -74,8 +77,18 @@ export async function loadReviewSection(
     comments: shown,
     names: await namesOf([...state.latest, ...shown].map((item) => item.userId)),
     testing,
+    publishing,
     ...capabilities,
   };
+}
+
+/** How publishing stands; a storage probe that fails reads as the storage-independent state. */
+async function publishingOrPending(build: Build): Promise<ReviewSectionData["publishing"]> {
+  try {
+    return await publishingOf(getStore().storage, build);
+  } catch {
+    return await publishingOf(undefined, build);
+  }
 }
 
 /** Display names of the given users; ids that no longer resolve show as the id. */

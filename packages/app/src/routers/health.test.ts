@@ -103,6 +103,7 @@ describe("health endpoints", () => {
     expect(body.status).toBe("ok");
     expect(body.uptimeSecs).toBeGreaterThanOrEqual(0);
     expect(typeof body.version).toBe("string");
+    expect((body as { testing?: boolean }).testing).toBe(false);
   });
 
   it("GET /api/v1/health stays 200 after failed setup", async () => {

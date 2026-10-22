@@ -149,7 +149,7 @@ async function boot(options: { testing?: boolean; project?: Record<string, unkno
       ...init,
       headers: { "x-csrf-token": getCsrfToken("s", id), ...(init.headers as object) },
     });
-  return { app, db, api, page, sent, stop: async () => await app.lifecycle.teardown() };
+  return { app, db, storage, api, page, sent, stop: async () => await app.lifecycle.teardown() };
 }
 
 type Booted = Awaited<ReturnType<typeof boot>>;
@@ -383,6 +383,19 @@ describe("the build page without testing", () => {
     expect(posted.status).toBe(409);
     expect(await posted.text()).toContain("still publishing");
     expect((await new BuildModel(booted.db).get(build.id))?.status).toBe("pending");
+    const html = await (await booted.page("alice", `/builds/${build.id}`)).text();
+    expect(html).toContain("Waiting for the Storybook to publish");
+    expect(html).not.toContain("Approve build");
+    await booted.stop();
+  });
+
+  it("still renders the build page when the storage probe fails", async () => {
+    const booted = await boot();
+    const id = await publish(booted, "feature/x");
+    vi.spyOn(booted.storage, "exists").mockRejectedValue(new Error("storage down"));
+    const response = await booted.page("alice", `/builds/${id}`);
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain("Waiting for the Storybook to publish");
     await booted.stop();
   });
 
@@ -445,12 +458,8 @@ describe("the build page without testing", () => {
 describe("the build page with testing", () => {
   it("puts the changeset above the snapshots and the verdict below them", async () => {
     const booted = await boot({ testing: true });
-    const created = await booted.api("dev", "/builds", {
-      method: "POST",
-      body: JSON.stringify({ gitSha: SHA, gitBranch: "feature/z" }),
-    });
-    const { build } = (await created.json()) as { build: { id: string } };
-    const html = await (await booted.page("alice", `/builds/${build.id}`)).text();
+    const id = await publish(booted, "feature/z");
+    const html = await (await booted.page("alice", `/builds/${id}`)).text();
     const changes = html.indexOf("Changes in this build");
     const empty = html.indexOf("No snapshots yet");
     const verdict = html.indexOf("Approve build");

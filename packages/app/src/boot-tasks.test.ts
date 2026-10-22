@@ -1,5 +1,6 @@
 import type { ShelfOptions } from "@storyshelf/core/config";
 import { createShelfLogger } from "@storyshelf/core/logger";
+import { BuildModel, ProjectModel } from "@storyshelf/core/models";
 import { makeDatabase } from "@storyshelf/core/test-helpers";
 import { describe, expect, it, vi } from "vitest";
 import { runBootTasks } from "./boot-tasks.ts";
@@ -26,6 +27,7 @@ function boot(
     logger?: ServerRuntime["logger"];
     notifiers?: unknown[];
     origin?: string;
+    buildState?: { request: (id: string) => Promise<void> };
   } = {},
 ) {
   const { db } = makeDatabase();
@@ -43,8 +45,13 @@ function boot(
     notifiers: extra.notifiers ?? [],
     publicOrigin: { url: async () => await Promise.resolve(extra.origin) },
   } as unknown as ServerRuntime;
-  runBootTasks(cell, { database: db } as unknown as ShelfOptions, runtime);
-  return { cell, fake };
+  runBootTasks(
+    cell,
+    { database: db } as unknown as ShelfOptions,
+    runtime,
+    extra.buildState as never,
+  );
+  return { cell, fake, db };
 }
 
 describe("runBootTasks", () => {
@@ -89,5 +96,54 @@ describe("runBootTasks", () => {
     const none = boot({ ok: true }, { logger: spy });
     await Promise.all([...(withOrigin.cell.background ?? []), ...(none.cell.background ?? [])]);
     expect(warn).not.toHaveBeenCalled();
+  });
+});
+
+async function replay(extra: Parameters<typeof boot>[1], ok = true) {
+  const request = vi.fn(async () => {});
+  const { db } = makeDatabase();
+  const project = await new ProjectModel(db).create({ name: "Docs" });
+  const open = await new BuildModel(db).create(project.id, {
+    gitSha: "a".repeat(40),
+    gitBranch: "x",
+  });
+  const done = await new BuildModel(db).create(project.id, {
+    gitSha: "b".repeat(40),
+    gitBranch: "y",
+  });
+  await new BuildModel(db).setStatus(done.id, "approved");
+  const cell: LifecycleCell = {
+    ready: Promise.resolve({ ok, failures: [] }),
+    settled: null,
+    consumer: null,
+  };
+  runBootTasks(
+    cell,
+    { database: db } as unknown as ShelfOptions,
+    {
+      config: {},
+      logger,
+      notifiers: extra?.notifiers ?? [{}],
+      publicOrigin: { url: async () => await Promise.resolve(extra?.origin) },
+    } as unknown as ServerRuntime,
+    { request } as never,
+  );
+  await Promise.all(cell.background ?? []);
+  return { request, open };
+}
+
+describe("runBootTasks: git state replay", () => {
+  it("asks again for the open builds once an origin resolves", async () => {
+    const { request, open } = await replay({ origin: "https://shelf.example" });
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(request).toHaveBeenCalledWith(open.id);
+  });
+
+  it("replays nothing without a resolved origin, notifiers or a finished setup", async () => {
+    expect((await replay({})).request).not.toHaveBeenCalled();
+    expect(
+      (await replay({ origin: "https://x.example", notifiers: [] })).request,
+    ).not.toHaveBeenCalled();
+    expect((await replay({ origin: "https://x.example" }, false)).request).not.toHaveBeenCalled();
   });
 });

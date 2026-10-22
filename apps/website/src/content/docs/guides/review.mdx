@@ -14,7 +14,7 @@ Every build lands in `reviewing` once diffing finishes (default-branch builds au
 
 The review page is a workspace:
 
-- **Filmstrip** (left): a thumbnail per snapshot with its status and diff size, filterable to _Needs review_, _All_ or _Done_. The header shows how many changes you have reviewed.
+- **Filmstrip** (left): a thumbnail per snapshot with its status and diff size, filterable to _Needs review_, _All_, _Done_ or, when axe found something, _A11y_. The header shows how many changes you have reviewed.
 - **Comparison** (centre): _Side by side_, _Swipe_ (drag the round handle on the divider, or use the slider beneath), _Onion skin_ (blend baseline and current), _Diff_ (the overlay alone) and _Flip_ (toggle between baseline and current), with _Fit / 100% / 200% / 400%_ zoom — zoomed-in images are drawn as crisp pixels so you can inspect individual changed pixels. Panes scroll together, and your mode and zoom are remembered.
 - **Action bar** (pinned at the bottom): previous/next, **Approve** and **Reject**. Deciding a snapshot moves you straight to the next one that still needs review.
 
@@ -73,13 +73,13 @@ The `approver` and `admin` roles are the reviewers; there is no separate reviewe
 
 A build's page is the review workspace for a project without `testing`, and with `testing` the changeset sits above the visual diffs and the verdict and comments below them:
 
-- **Review card.** The build's standing (`waiting for review`, `approved`, `rejected`), the approvals so far against the requirement, each reviewer's latest verdict with their note, and, for approvers and admins, **Approve build** and **Reject build** with an optional note. With `testing` the card says the verdict is a sign-off only.
+- **Review card.** While the build's Storybook is still publishing, the card shows "Waiting for the Storybook to publish" instead of the verdict buttons (the server refuses a verdict until then). The build's standing (`waiting for review`, `approved`, `rejected`), the approvals so far against the requirement, each reviewer's latest verdict with their note, and, for approvers and admins, **Approve build** and **Reject build** with an optional note. With `testing` the card says the verdict is a sign-off only.
 - **Changes in this build.** The components the build added, removed or changed against its baseline, each with a link to the published story and to its component page (see [the changeset](#the-changeset)).
 - **Comments.** Build comments and story comments with their anchor, resolve actions, and a form to add a build comment (`developer` and above).
 
 ### Accessibility results
 
-With `testing` on and the project's accessibility checks on (`runA11y`, the default), the axe findings of each capture are stored on its snapshot (`a11yViolations`, a JSON array of one line per violation: rule id, impact, help, a short selector, node count). The snapshot review page lists them in a warning note above the comparison, the filmstrip entry shows `a11y N` with the browser it was found on, and the component page lists them on each snapshot card. axe runs on the project's primary browser target only (the first one in its list), so the findings carry that browser's name wherever they are shown, and the other browsers of the same story show the same note. They are information for the reviewer: a violation never changes a snapshot's or a build's status and never blocks a merge. See [the runners](/packages/runner-playwright/#accessibility-checks-axe) for what is scanned.
+With `testing` on and the project's accessibility checks on (`runA11y`, the default), the axe findings of each capture are stored on its snapshot (`a11yViolations`, a JSON array of one line per violation: rule id, impact, help, a short selector, node count). The snapshot review page lists them in a warning note above the comparison, the filmstrip entry shows `a11y N` with the browser it was found on, and the component page lists them on each snapshot card. axe runs on the project's primary browser target only (the first one in its list), so the findings carry that browser's name wherever they are shown, and the other browsers of the same story show the same note. They are information for the reviewer: a violation never changes a snapshot's or a build's status and never blocks a merge. The build page shows the total as **Accessibility findings** (and the review page header as `a11y N`), and the filmstrip filter _A11y_ lists the snapshots that carry findings. See [the runners](/packages/runner-playwright/#accessibility-checks-axe) for what is scanned.
 
 ### Verdicts
 

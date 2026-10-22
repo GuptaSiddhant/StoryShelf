@@ -9,6 +9,8 @@ STORYSHELF_URL=https://shelf.example.com STORYSHELF_TOKEN=... STORYSHELF_SLUG=we
 STORYSHELF_URL=https://shelf.example.com npx @storyshelf/mcp --http --port 3333                           # HTTP at /mcp
 ```
 
+The tools that read snapshots, capture logs or AI insights are advertised only when the instance has `testing` (read from `GET /api/v1/health`).
+
 Over HTTP each client sends its own `Authorization: Bearer <token>`, which is forwarded to the StoryShelf API. Or scaffold with `storyshelf mcp init`.
 
 ## Tools

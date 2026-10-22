@@ -241,19 +241,67 @@ function filterPart(): string {
     });`;
 }
 
-/** Click-to-load story previews: move the inert frame out of its template (nothing runs before). */
+/**
+ * Click-to-load story previews: move the inert frame out of its template (nothing runs before). A
+ * frame under a signed URL first asks for a fresh root, so a page left open for hours does not mount
+ * an expired token; it keeps the rendered one when that request fails. Afterwards the root is renewed
+ * every `data-preview-refresh-seconds`; a failed renewal is retried a few times a minute apart.
+ */
 function previewPart(): string {
   return `
     document.addEventListener('click',function(e){
       var btn=e.target instanceof Element ? e.target.closest('[data-preview-load]') : null;
       var host=btn ? btn.closest('[data-preview-embed]') : null;
       var tpl=host ? host.querySelector('template[data-preview-template]') : null;
-      if(!host||!tpl) return;
+      if(!host||!tpl||host.getAttribute('data-preview-loading')) return;
+      host.setAttribute('data-preview-loading','1');
       var idle=host.querySelector('[data-preview-idle]');
-      if(idle) idle.hidden=true;
-      host.appendChild(document.importNode(tpl.content,true));
-      tpl.remove();
+      var path=host.getAttribute('data-preview-path');
+      var fresh=fetchPreviewBase(host).catch(function(){ return null; });
+      fresh.then(function(base){
+        var content=document.importNode(tpl.content,true);
+        var frame=content.querySelector('iframe');
+        if(frame&&base&&path) frame.src=base+path;
+        if(idle) idle.hidden=true;
+        host.appendChild(content);
+        tpl.remove();
+        keepPreviewFresh(host);
+      });
     });`;
+}
+
+/** Fetch a fresh signed root for a preview host and keep it renewed (see {@link previewPart}). */
+function previewRefreshPart(): string {
+  return `
+    function fetchPreviewBase(host){
+      var url=host.getAttribute('data-preview-refresh-url');
+      if(!url) return Promise.resolve(null);
+      return fetch(url,{headers:{accept:'application/json'}}).then(function(r){
+        if(!r.ok) throw new Error('preview-token');
+        return r.json();
+      }).then(function(body){ return body&&body.base ? body.base : null; });
+    }
+    function keepPreviewFresh(host){
+      var url=host.getAttribute('data-preview-refresh-url');
+      var path=host.getAttribute('data-preview-path');
+      var seconds=Number(host.getAttribute('data-preview-refresh-seconds'));
+      if(!url||!path||!(seconds>0)) return;
+      var RETRY_MS=60000, MAX_RETRIES=3;
+      function renew(tries){
+        var frame=host.querySelector('iframe');
+        if(!host.isConnected||!frame) return;
+        fetchPreviewBase(host).then(function(base){
+          if(base) frame.src=base+path;
+          else throw new Error('preview-token');
+        }).catch(function(){
+          if(tries<MAX_RETRIES) setTimeout(function(){ renew(tries+1); },RETRY_MS);
+        });
+      }
+      var timer=setInterval(function(){
+        if(!host.isConnected||!host.querySelector('iframe')){ clearInterval(timer); return; }
+        renew(0);
+      },seconds*1000);
+    }`;
 }
 
 /** Thin top progress bar while an HTMX request (e.g. snapshot navigation) is in flight. */
@@ -293,6 +341,7 @@ export function clientScript(): string {
     copyPart(),
     filterPart(),
     previewPart(),
+    previewRefreshPart(),
     loadingPart(),
     focusPart(),
     reviewScript(),

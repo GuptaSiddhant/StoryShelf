@@ -201,7 +201,9 @@ status.
   joins them as `a11y: a; b; …` in a render failure, so core's `startsWith("a11y:")` classification
   and story-id sets are unchanged. The runner also attaches the strings to the `RenderedSnapshot`
   (`a11y`), the pipeline stores them as JSON on that capture's snapshot row, and the review page,
-  filmstrip and component page read them from there (`pages/a11y-violations.tsx`).
+  filmstrip and component page read them from there (`pages/a11y-violations.tsx`). The build page
+  shows the total (`a11ySummaryOf`: findings and snapshots carrying them), the review header shows
+  `a11y N`, and the filmstrip has an `A11y` filter; all are information only and never a status.
 - **No fallback.** There is no hand-rolled scan. If axe cannot be loaded or run, the result is one
   visible, non-blocking annotation `a11y: axe unavailable: <reason>` plus a warning log, never a
   silent pass.

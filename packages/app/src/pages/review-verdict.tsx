@@ -46,9 +46,24 @@ export function VerdictCard(props: { data: ReviewSectionData }): Rendered {
           </HStack>
         ))}
       </VStack>
-      {data.canVerdict && data.build.status !== "failed" ? <VerdictForm data={data} /> : null}
+      <VerdictControls data={data} />
     </Card>
   );
+}
+
+/**
+ * The form for a reviewer once the build can take a verdict; while its Storybook is still
+ * publishing a notice stands in (the server refuses a verdict until then, ADR 0013, decision 3).
+ */
+function VerdictControls(props: { data: ReviewSectionData }): Rendered | null {
+  const { data } = props;
+  if (!data.canVerdict || data.build.status === "failed") {
+    return null;
+  }
+  if (data.publishing === "pending") {
+    return <Meta>Waiting for the Storybook to publish. You can give a verdict once it has.</Meta>;
+  }
+  return data.publishing === "success" ? <VerdictForm data={data} /> : null;
 }
 
 /** The reviewer's controls: an optional note and the two verdicts. */
