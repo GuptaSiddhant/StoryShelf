@@ -2,7 +2,6 @@ import type { AdapterSetupResult, AdapterSetupSources } from "@storyshelf/core/a
 import type { Auth } from "@storyshelf/core/auth";
 import { describeCaptureHost } from "@storyshelf/core/utils";
 import type { ShelfRouter } from "../app-types.ts";
-import { capturesLocally } from "../capture-process.ts";
 import { loadCredentialProbe, reencryptWithCurrent } from "../credentials.ts";
 import { countHiddenSnapshots } from "../hidden-data.ts";
 import { insightDepsFromStore } from "../insights/deps.ts";
@@ -27,7 +26,7 @@ export interface AdminPageDeps {
 export function registerAdminPages(app: ShelfRouter, deps: AdminPageDeps, auth?: Auth): void {
   app.get("/admin", async (c) => {
     requireSiteAdmin(c);
-    const { authEnabled, config, db, captureQueue, captureConcurrency, testing } = getStore();
+    const { authEnabled, config, db, capturesHere, captureConcurrency, testing } = getStore();
     const credentials = await loadCredentialProbe(db, config);
     const report = await collectHealthReport(
       deps.sources,
@@ -48,8 +47,8 @@ export function registerAdminPages(app: ShelfRouter, deps: AdminPageDeps, auth?:
         aiEnabled: getStore().ai !== undefined,
         testing,
         hiddenSnapshots: testing ? 0 : await countHiddenSnapshots(db),
-        // Only an in-process queue captures on this host; remote queues size themselves elsewhere.
-        capture: capturesLocally(captureQueue) ? describeCaptureHost(captureConcurrency) : null,
+        // Only a host that runs capture jobs is sized here; a remote consumer sizes itself.
+        capture: capturesHere === true ? describeCaptureHost(captureConcurrency) : null,
       }),
     );
   });

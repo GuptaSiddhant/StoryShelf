@@ -27,6 +27,8 @@ export interface Store {
   testing: boolean;
   enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
   captureQueue?: CaptureQueue | null;
+  /** This instance runs capture jobs itself, so retry and the compute-jobs controls apply. */
+  capturesHere?: boolean;
   /** Publishing: completion and the `publish` job queue (absent in hand-built stores). */
   publish?: PublishService;
   /** Explicit `testing.concurrency`; unset means sized from the hardware. */

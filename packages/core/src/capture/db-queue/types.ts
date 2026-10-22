@@ -28,6 +28,12 @@ export interface DatabaseCaptureQueueOptions {
   timers?: QueueTimers;
   /** Explicit logger override; the host normally binds one through `setLogger`. */
   logger?: Logger;
+  /**
+   * Called after a job failed because its last attempt lost its lease: nothing was running to
+   * record the failure, so the host writes it (a build left `capturing`). May run on every
+   * instance that finds the job, so it must be idempotent; a throw is logged and ignored.
+   */
+  onExhausted?: (job: DatabaseJob, error: string) => Promise<void>;
 }
 
 /** Default lease per attempt: long enough for a slow stage, short enough to recover a crash. */
@@ -91,6 +97,7 @@ export interface QueueRuntime {
   /** Wake version read when the latest poll began. */
   pollVersion: number;
   logger?: Logger;
+  onExhausted?: DatabaseCaptureQueueOptions["onExhausted"];
 }
 
 /** The capture-shaped job `enqueue` takes, re-exported for the modules. */

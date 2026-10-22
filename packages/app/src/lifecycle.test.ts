@@ -202,7 +202,7 @@ function lifecycleOf(consumer: ReturnType<typeof fakeConsumer> | null) {
   const cell: LifecycleCell = {
     ready: Promise.resolve({ ok: true, failures: [] }),
     settled: null,
-    publishConsumer: consumer,
+    consumer,
   };
   const app = {} as ShelfRouter;
   attachLifecycle(app, options, runtime, cell);
@@ -210,7 +210,7 @@ function lifecycleOf(consumer: ReturnType<typeof fakeConsumer> | null) {
     .lifecycle;
 }
 
-describe("publish consumer lifecycle", () => {
+describe("job consumer lifecycle", () => {
   it("starts after setup, once, and drains on teardown", async () => {
     const consumer = fakeConsumer();
     const lifecycle = lifecycleOf(consumer);

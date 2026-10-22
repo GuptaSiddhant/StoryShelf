@@ -446,14 +446,14 @@ One local renderer in v1 — `@storyshelf/runner-playwright` (the server already
 Capture is CPU/IO-heavy and long-running (minutes to tens of minutes). It must not block the upload request:
 
 - `POST /builds` stores the zip and returns **202 Accepted** immediately.
-- An in-process queue with a **configurable concurrency** (`--capture-concurrency`, default `2`) runs captures.
-- A build stuck in `capturing` across a server restart is requeued **once** at boot (in-process queue only; remote queues redeliver). The interrupted attempt is closed as failed with `Interrupted by server restart`; if the run before it was also interrupted, the build is marked `failed` and a failure git status is posted, so a crash loop cannot repeat captures. See `core/src/capture/recovery.ts`.
+- The job goes on the **database queue** (`capture_jobs`, below). Every instance with `testing` consumes it, with a **configurable concurrency** (`testing.concurrency`, auto-sized by default).
+- There is no boot sweep. A build left `capturing` by a killed instance is recovered by lease expiry: another instance claims the job again, and if every attempt (`testing.retries + 1`) is lost the job fails and `onExhausted` fails the build (`failCrashedCapture`: the attempt closes, the build becomes `failed`, a failure git status is posted, admins are alerted), so a crash loop cannot repeat captures forever and a second instance can boot without touching the first one's builds.
 
 #### Database queue (`capture_jobs`)
 
 `createDatabaseCaptureQueue(db, options)` (`@storyshelf/core/capture`, `core/src/capture/db-queue/`)
-is a `PollableCaptureQueue` on the app's own database; it is additive for now (the app still wires
-the in-memory queue and nothing runs the consumer until the cutover, ADR 0006). The claim algorithm needs only one primitive from
+is a `PollableCaptureQueue` on the app's own database and the app's only production queue (ADR 0006;
+there is no in-memory queue). The claim algorithm needs only one primitive from
 the adapter, a unique-key insert whose conflict can be told apart (the `claimFinalize` pattern):
 
 1. **Probe.** One query, `kind = ? AND visible_at <= now AND status IN ('queued','running') ORDER BY
@@ -490,7 +490,10 @@ reading stops the run through `runner.cancel(buildId, shard)`; a lost lease writ
 new holder settles the job), a cancel ends the job `cancelled`. `stop()` (SIGTERM) stops polling
 and waits for the jobs in flight. Optional `metrics` hooks report each job's outcome and the
 queue's depth and oldest waiting job (a sample costs one read; off unless `queueSample` is given).
-`runCaptureChild` (forked capture) runs this consumer over the IPC queue.
+
+**In the app** (`packages/app/src/jobs-setup.ts`). One lazily built database queue carries every job kind and one consumer runs them: the `capture` handler (`capture-setup.ts`: `createCaptureHandler`, wrapped to alert admins when a capture leaves its build failed), the `publish` handler (`publish-setup.ts`) and later `notify`. The consumer starts when adapters are ready and `teardown()` drains it. `DatabaseCaptureQueueOptions.onExhausted` is the one hook the queue offers its host: a job whose final attempt lost its lease has no running handler to record the failure, so the host writes it (the crash path of the capture handler for `capture`, the publish completer for `publish`). A supplied `testing.queue` replaces the database queue for captures and, with a `runner`, gets its own consumer; without a `runner` it is enqueue-only.
+
+**Forked capture** (`testing.workerEntry`, `core/src/capture/forked/`, opt-in, no new investment). The parent is the consumer: `createForkedCaptureHandler` is its `capture` handler, which pushes each leased job to a child over IPC (`{ type: "run", runId, job }`, and `cancel`) and waits for `progress`, `done` or `failed`. Progress renews the lease the consumer keeps; there are no `poll`, `enqueue`, `ack` or `nack` messages, and the concurrency slots live in the parent. The child (`runCaptureChild`) runs `createCaptureHandler` over the same database, storage and runner, and inserts shard jobs into the database queue itself. A child crash fails the run of the job it took down (charged against `testing.retries` like any attempt; runs that shared the crashed child are pushed again uncharged, one at a time); a child that makes no progress for a lease is killed; three crashes in five minutes, or a failed fork, hand everything to the in-process handler.
 
 Enqueue wakes this instance's waiting poll at once; other instances find the job on their next
 poll (`startPollLoop`: no poll while all slots are busy, 15 s idle, 2 s after recent work, with
@@ -498,7 +501,7 @@ jitter). Tests: the pollable cases of `queueContractSuite` and `databaseQueueMul
 (`@storyshelf/core/test-helpers`) on the fake database, node:sqlite, PGlite and two OS processes on
 one SQLite file, plus gated live runs on Postgres, MySQL and Turso.
 
-> **Note on Architecture:** The `CaptureQueue` interface is fully asynchronous — `enqueue`, `status`, `active` and `recent` all return `Promise<T>` — so the same contract backs both the in-process `InMemoryCaptureQueue` (Node long-lived server) and remote backends (SQS, Cloudflare Queues, Azure Storage Queues) where execution is left to a separately-assembled worker that polls the queue and runs `executeCaptureJob`. For deploying, scaling, and operating those workers, see the website guide `apps/website/src/content/docs/guides/deployment/remote-workers.md` (published at `/guides/deployment/remote-workers/`).
+> **Note on Architecture:** The `CaptureQueue` interface is fully asynchronous — `enqueue`, `status`, `active` and `recent` all return `Promise<T>` — so the same contract backs the database queue and any queue a deployment supplies as `testing.queue` (a `PollableCaptureQueue`, consumed in the app when there is a runner).
 
 ### Story Source Adapter
 
@@ -1073,7 +1076,7 @@ StoryShelf/
 | No ORM (raw adapter calls) | Drizzle ORM | Type-safe schema, migrations, query builder |
 | LocalFileDatabase (JSON) | SQLite + Turso | ACID on VPS/Docker. Turso for serverless |
 | AsyncLocalStorage for models | Constructor injection | Models take adapters as constructor args |
-| 7 compute adapters (5 untested) | 1 CaptureRunner + in-process queue | Capture is a fixed pipeline, not user-defined jobs |
+| 7 compute adapters (5 untested) | 1 CaptureRunner + database queue | Capture is a fixed pipeline, not user-defined jobs |
 | Build ID = git SHA | ULID + `git_sha` column | Re-runs, squash/merge-safe |
 | Stringified DynamoDB values | SQLite native types | Proper booleans, numbers, JSON columns |
 | Per-project S3 buckets | Local filesystem + S3 option | Local default. S3-compatible for cloud |

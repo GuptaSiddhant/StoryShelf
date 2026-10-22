@@ -2,12 +2,10 @@ import type { AdapterSetupResult } from "@storyshelf/core/adapter/setup";
 import type { ShelfOptions } from "@storyshelf/core/config";
 import { sanitizeErrorText } from "@storyshelf/core/utils";
 import type { Context, Next } from "hono";
-import type { QueueWiring } from "../capture-setup.ts";
-import type { PublishService } from "../publish-setup.ts";
+import type { JobsWiring } from "../jobs-setup.ts";
 import type { ServerRuntime } from "../runtime.ts";
 
-export interface MiddlewareWiring extends ServerRuntime, QueueWiring {
-  publish: PublishService;
+export interface MiddlewareWiring extends ServerRuntime, Omit<JobsWiring, "consumer"> {
   options: ShelfOptions;
   getReady: () => Promise<AdapterSetupResult>;
 }

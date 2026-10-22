@@ -24,6 +24,8 @@ export interface StoreScopeDeps {
   testing: boolean;
   enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
   captureQueue: CaptureQueue | null;
+  /** This instance runs the capture jobs itself (the retry and compute-jobs UI applies). */
+  capturesHere?: boolean;
   publish?: PublishService;
   captureConcurrency?: number;
   gitHosts: GitHostProvider[];
@@ -53,6 +55,7 @@ export function storeScope(deps: StoreScopeDeps) {
         sessionId: sessionIdFrom(c),
         enqueueCapture: deps.enqueueCapture,
         captureQueue: deps.captureQueue,
+        capturesHere: deps.capturesHere,
         publish: deps.publish,
         captureConcurrency: deps.captureConcurrency,
         gitHosts: deps.gitHosts,

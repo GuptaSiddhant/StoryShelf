@@ -6,8 +6,8 @@ import type { ParentMessage } from "./protocol.ts";
 /** Environment variable the forked child sees; set to this value so a module can tell it is the child. */
 export const CAPTURE_WORKER_ROLE = "capture-worker";
 
-/** Environment variable carrying the parent's `testing.concurrency` to the child, which sizes itself with it. */
-export const CAPTURE_CONCURRENCY_ENV = "STORYSHELF_CAPTURE_CONCURRENCY";
+/** Environment variable carrying the parent's `testing.retries` to the child, which stamps it on the shard jobs it queues. */
+export const CAPTURE_RETRIES_ENV = "STORYSHELF_CAPTURE_RETRIES";
 
 /** Environment variable carrying the parent's `testing.shardSize` to the child, which plans big builds with it. */
 export const CAPTURE_SHARD_SIZE_ENV = "STORYSHELF_CAPTURE_SHARD_SIZE";

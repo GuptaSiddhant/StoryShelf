@@ -1,26 +1,20 @@
-/** Chooses between in-process and forked capture, and builds the forked queue. */
-import type { CaptureQueue, PollableJob } from "@storyshelf/core/adapter/capture-queue";
+/** Chooses between in-process and forked capture, and builds the forked handler. */
 import {
   canForkCaptureChild,
-  CAPTURE_CONCURRENCY_ENV,
+  CAPTURE_RETRIES_ENV,
   CAPTURE_SHARD_SIZE_ENV,
+  createForkedCaptureHandler,
   decideCaptureProcess,
-  ForkedCaptureQueue,
   forkCaptureChild,
   type ForkDecision,
-  type ForkedJobOutcome,
+  type ForkedCaptureHandler,
+  type KindHandler,
+  type ConsumerJob,
 } from "@storyshelf/core/capture";
 import type { ShelfTestingOptions } from "@storyshelf/core/config";
 import { DIFF_WORKERS_ENV, IMAGE_ENGINE_ENV } from "@storyshelf/core/diff";
 import type { Logger } from "@storyshelf/core/logger";
 import { detectResources } from "@storyshelf/core/utils";
-import { CAPTURE_LEASE_MS } from "./stalled-capture.ts";
-
-/** True when the capture runs in a process this server owns, so its queue can retry and cancel. */
-export function capturesLocally(queue: CaptureQueue | null | undefined): boolean {
-  const kind = queue?.metadata.kind;
-  return kind === "memory" || kind === "forked";
-}
 
 /**
  * Whether to fork a capture child. `mode: "fork"` forces it (and fails if it cannot); `auto` forks
@@ -57,30 +51,29 @@ function decideForHost(): ForkDecision {
   return decideCaptureProcess({ cpus, memoryBytes, canFork: canForkCaptureChild() });
 }
 
-/** Dependencies for {@link createForkedQueue}. */
-export interface ForkedQueueDeps {
+/** Dependencies for {@link createForkedHandler}. */
+export interface ForkedHandlerDeps {
   workerEntry: string;
-  concurrency?: number;
   /** Captures per shard for big builds, handed to the child (`testing.shardSize`). */
   shardSize?: number;
   /** `testing.images.engine`, handed to the child so it diffs with the same codec. */
   imageEngine?: string;
   /** `testing.compare.threads`, handed to the child's diff pool. */
   diffThreads?: number;
+  /** `testing.retries`, handed to the child, which stamps it on the shard jobs it queues. */
+  retries: number;
   /** Takes over if forking stops being viable. */
-  fallback: CaptureQueue;
-  onSettled: (job: PollableJob, outcome: ForkedJobOutcome) => Promise<void>;
+  fallback: KindHandler;
+  /** A job the child kept killing on its last attempt: write its failure. */
+  onCrashed: (job: ConsumerJob, error: string) => Promise<void>;
   logger: Logger;
 }
 
 /** Settings the parent hands to a forked child through its environment. */
 export function childEnvOf(
-  deps: Pick<ForkedQueueDeps, "concurrency" | "shardSize" | "imageEngine" | "diffThreads">,
+  deps: Pick<ForkedHandlerDeps, "shardSize" | "imageEngine" | "diffThreads" | "retries">,
 ): Record<string, string> {
-  const env: Record<string, string> = {};
-  if (deps.concurrency !== undefined) {
-    env[CAPTURE_CONCURRENCY_ENV] = String(deps.concurrency);
-  }
+  const env: Record<string, string> = { [CAPTURE_RETRIES_ENV]: String(deps.retries) };
   if (deps.shardSize !== undefined) {
     env[CAPTURE_SHARD_SIZE_ENV] = String(deps.shardSize);
   }
@@ -93,16 +86,14 @@ export function childEnvOf(
   return env;
 }
 
-/** The parent-side queue for a forked capture child, with the in-process queue as its fallback. */
-export function createForkedQueue(deps: ForkedQueueDeps): ForkedCaptureQueue {
+/** The `capture` handler that runs jobs in a forked child, with the in-process handler as its fallback. */
+export function createForkedHandler(deps: ForkedHandlerDeps): ForkedCaptureHandler {
   const env = childEnvOf(deps);
-  return new ForkedCaptureQueue({
+  return createForkedCaptureHandler({
     spawn: () => forkCaptureChild({ entry: deps.workerEntry, env }),
     fallback: deps.fallback,
-    leaseMs: CAPTURE_LEASE_MS,
-    onSettled: async (job, outcome) => {
-      await deps.onSettled(job, outcome);
-    },
+    maxRetries: deps.retries,
+    onCrashed: deps.onCrashed,
     logger: deps.logger,
   });
 }

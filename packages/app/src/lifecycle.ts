@@ -29,10 +29,12 @@ export interface LifecycleCell {
   background?: Promise<unknown>[];
   /** Override of {@link BACKGROUND_DRAIN_MS} (tests). */
   drainMs?: number;
-  /** Consumer of `publish` jobs (null on hosts that run none); started by `setup()`, drained by `teardown()`. */
-  publishConsumer?: CaptureConsumer | null;
+  /** The job consumer (null on hosts that run none); started once adapters are ready, drained by `teardown()`. */
+  consumer?: CaptureConsumer | null;
   /** The running consumer session, settled once it was stopped and drained. */
-  publishRun?: Promise<void>;
+  consumerRun?: Promise<void>;
+  /** Teardown ran: the consumer stays stopped (a late "adapters are ready" must not restart it). */
+  consumerStopped?: boolean;
 }
 
 /** Longest teardown waits for background boot tasks before closing adapters anyway. */
@@ -43,21 +45,22 @@ export function trackBackground(cell: LifecycleCell, task: Promise<unknown>): vo
   (cell.background ??= []).push(task);
 }
 
-/** Start the `publish` consumer once adapters are set up; a no-op when none exists or it runs. */
-function startPublishConsumer(cell: LifecycleCell, logger: Logger): void {
-  const consumer = cell.publishConsumer;
-  if (!consumer || consumer.isRunning()) {
+/** Start the job consumer once adapters are set up; a no-op when none exists or it runs. */
+export function startConsumer(cell: LifecycleCell, logger: Logger): void {
+  const consumer = cell.consumer;
+  if (!consumer || consumer.isRunning() || cell.consumerStopped) {
     return;
   }
-  cell.publishRun = consumer.start().catch((error: unknown) => {
-    logger.error({ err: error }, "publish consumer stopped");
+  cell.consumerRun = consumer.start().catch((error: unknown) => {
+    logger.error({ err: error }, "job consumer stopped");
   });
 }
 
-/** Stop polling and wait for the publish jobs in flight to finish. */
-async function stopPublishConsumer(cell: LifecycleCell): Promise<void> {
-  await cell.publishConsumer?.stop();
-  await cell.publishRun;
+/** Stop polling and wait for the jobs in flight to finish (the SIGTERM drain). */
+async function stopConsumer(cell: LifecycleCell): Promise<void> {
+  cell.consumerStopped = true;
+  await cell.consumer?.stop();
+  await cell.consumerRun;
 }
 
 /** Wait for tracked boot tasks, bounded so a hung task can never block shutdown. */
@@ -263,11 +266,12 @@ function createLifecycle(
       if (!result.ok) {
         throw new AdapterLifecycleError("setup", result.failures);
       }
-      startPublishConsumer(cell, logger);
+      cell.consumerStopped = false;
+      startConsumer(cell, logger);
     },
     teardown: async () => {
       timer?.stop();
-      await stopPublishConsumer(cell);
+      await stopConsumer(cell);
       await drainBackground(cell);
       await settleInsightJobs();
       await options.ai?.teardown();

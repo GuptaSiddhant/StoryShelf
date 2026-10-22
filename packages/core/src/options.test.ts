@@ -95,6 +95,12 @@ function shardSized(shardSize: number, extra = {}): () => void {
   };
 }
 
+function withRetries(retries: number): () => void {
+  return () => {
+    resolveShelfOptions({ ...base, testing: { runner, retries } });
+  };
+}
+
 function concurrent(concurrency: number): () => void {
   return () => {
     resolveShelfOptions({ ...base, testing: { runner, concurrency } });
@@ -123,6 +129,13 @@ describe("resolveShelfOptions testing process options", () => {
     expect(concurrent(0)).toThrow(/testing\.concurrency must be a positive integer, got 0/u);
     expect(concurrent(2.5)).toThrow(/positive integer/u);
     expect(concurrent(-1)).toThrow(/positive integer/u);
+  });
+
+  it("validates retries as a non-negative integer", () => {
+    expect(withRetries(0)).not.toThrow();
+    expect(withRetries(2)).not.toThrow();
+    expect(withRetries(-1)).toThrow(/testing\.retries must be a non-negative integer, got -1/u);
+    expect(withRetries(1.5)).toThrow(/non-negative integer/u);
   });
 
   it('requires workerEntry for mode "fork"', () => {

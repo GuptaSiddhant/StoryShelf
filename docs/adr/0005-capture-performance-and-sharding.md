@@ -192,14 +192,20 @@ local engines on one machine: capture runs in a child process of the app.
 - **Parent consumes, child renders.** The parent is the consumer of the database queue and pushes
   each leased job to the child over IPC as plain JSON (never adapter instances). The child's
   progress messages renew the lease, which the parent writes. The child never reads the queue.
-  `runCaptureChild` is exported from `@storyshelf/core/capture`.
+  `runCaptureChild` is exported from `@storyshelf/core/capture`. The protocol is `run` and `cancel`
+  from the parent (`cancel` makes the child call `runner.cancel` when the lease is lost or the job
+  cancelled) and `progress`, `done` and `failed` from the child; the parent's `capture` handler
+  (`createForkedCaptureHandler`) is registered on the app's one consumer. The child inserts the
+  shard jobs a big build fans out into straight into the database queue, with the parent's
+  `testing.retries` (`STORYSHELF_CAPTURE_RETRIES`).
 - **Child bootstrap.** Adapters are live objects the user composes, so the child re-runs the user's
   module graph: `testing.workerEntry` when set, otherwise `process.argv[1]` with
   `STORYSHELF_ROLE=capture-worker` and a role guard above all import-time side effects (so it does
   not bind the port or run migrations). The child passes `tables` explicitly. The parent passes
   `testing.compare.threads` as `STORYSHELF_DIFF_WORKERS` and `testing.shardSize` as
-  `STORYSHELF_CAPTURE_SHARD_SIZE` (the entry module's own `shardSize` wins).
-  `testing.concurrency` must be a positive integer.
+  `STORYSHELF_CAPTURE_SHARD_SIZE` (the entry module's own `shardSize` wins). The concurrency slots
+  live in the parent (`testing.concurrency`, a positive integer); the child runs whatever it is
+  pushed.
 - **The child is inside the app's trust boundary:** it holds the same database, storage and runner
   configuration. Notifications stay in the parent; the child reports outcomes.
 - **Fallback to in-process capture** when `availableParallelism() < 2`, memory is below the
@@ -212,8 +218,8 @@ local engines on one machine: capture runs in a child process of the app.
   - A crash is charged only to the job that caused it (the hung receipt, or the only job in
     flight). Jobs that shared the crashed child go back uncharged and each runs alone next, so a
     repeat crash names its culprit.
-  - A job failed for crashing the child is settled with `crashed: true`, and the parent writes the
-    failure the child could not: the build fails, or the shard row fails and the build is reduced as
+  - A job whose last attempt crashed the child is failed by the parent's crash hook, which writes
+    the failure the child could not: the build fails, or the shard row fails and the build is reduced as
     on any other shard's end. One limit, `testing.retries`, covers failed attempts, lost leases and
     child crashes.
   - A concurrency slot is taken before a job is leased, so no job is held that cannot start.

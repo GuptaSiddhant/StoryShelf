@@ -133,7 +133,7 @@ describe("retry re-queues capture", () => {
       status: vi.fn(async () => null),
       active: vi.fn(async () => []),
       recent: vi.fn(async () => []),
-    } as unknown as import("@storyshelf/core/adapter/capture-queue").CaptureQueue;
+    } as unknown as import("@storyshelf/core/adapter/capture-queue").PollableCaptureQueue;
     const app = createShelfApp({
       database: db,
       storage,

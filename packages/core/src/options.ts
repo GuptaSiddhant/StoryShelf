@@ -58,9 +58,17 @@ function assertTestingProcess(testing: ShelfOptions["testing"]): void {
   }
   assertShardSize(testing);
   assertConcurrency(testing?.concurrency);
+  assertRetries(testing?.retries);
 }
 
-/** `0` would deadlock the in-process queue, and the forked child would silently ignore it. */
+/** Retries are counted after the first attempt: `0` runs a job once. */
+function assertRetries(retries: number | undefined): void {
+  if (retries !== undefined && (!Number.isInteger(retries) || retries < 0)) {
+    throw new Error(`testing.retries must be a non-negative integer, got ${String(retries)}`);
+  }
+}
+
+/** `0` would deadlock the consumer. */
 function assertConcurrency(concurrency: number | undefined): void {
   if (concurrency !== undefined && (!Number.isInteger(concurrency) || concurrency < 1)) {
     throw new Error(`testing.concurrency must be a positive integer, got ${String(concurrency)}`);

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { CaptureJobModel } from "../../models/capture-job.ts";
 import { makeDatabase } from "../../test-helpers/fake-database.ts";
 import { claimCandidate, claimNext, LEASE_EXHAUSTED_ERROR } from "./claim.ts";
@@ -78,6 +78,50 @@ describe("claimNext", () => {
       error: LEASE_EXHAUSTED_ERROR,
     });
     expect((await rt.model.get("j1:2"))?.status).toBe("expired");
+  });
+
+  it("tells the host when a job is failed by an exhausted lease, and survives the hook throwing", async () => {
+    const { rt, clock } = runtime();
+    const onExhausted = vi.fn(async () => {});
+    rt.onExhausted = onExhausted;
+    await enqueue(rt);
+    await claimNext(rt);
+    clock.now += 1001;
+    await claimNext(rt);
+    clock.now += 1001;
+    await claimNext(rt);
+    expect(onExhausted).toHaveBeenCalledTimes(1);
+    expect(onExhausted).toHaveBeenCalledWith(
+      expect.objectContaining({ jobId: "j1", kind: "capture", buildId: "b1" }),
+      LEASE_EXHAUSTED_ERROR,
+    );
+
+    await enqueue(rt, "j2");
+    rt.onExhausted = async () => {
+      await Promise.resolve();
+      throw new Error("hook broke");
+    };
+    await claimNext(rt);
+    clock.now += 1001;
+    await claimNext(rt);
+    clock.now += 1001;
+    expect(await claimNext(rt)).toBeNull();
+    expect((await rt.model.get("j2"))?.status).toBe("failed");
+  });
+
+  it("does not tell the host about a job a late holder finished", async () => {
+    const { rt, clock } = runtime();
+    const onExhausted = vi.fn(async () => {});
+    rt.onExhausted = onExhausted;
+    await enqueue(rt);
+    await claimNext(rt);
+    clock.now += 1001;
+    await claimNext(rt);
+    clock.now += 1001;
+    const stale = (await rt.model.nextCandidate(["capture"], iso(clock.now)))!;
+    await rt.model.finishAttempt("j1:2", "done", iso(clock.now));
+    await claimCandidate(rt, stale);
+    expect(onExhausted).not.toHaveBeenCalled();
   });
 
   it("lets a late finisher of the final attempt win over exhaustion", async () => {

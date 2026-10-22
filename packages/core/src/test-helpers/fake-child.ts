@@ -1,4 +1,4 @@
-/** In-memory stand-ins for the forked capture channel, so queue tests need no real process. */
+/** In-memory stand-ins for the forked capture channel, so forked capture tests need no real process. */
 import type { ChildProcessHandle, ParentPort } from "../capture/forked/channel.ts";
 import type { ChildMessage, ParentMessage } from "../capture/forked/protocol.ts";
 
@@ -42,10 +42,10 @@ export class FakeChild implements ChildProcessHandle {
     }
   }
 
-  /** Jobs the parent has delivered so far. */
-  delivered(): Extract<ParentMessage, { type: "job" }>[] {
+  /** Jobs the parent has pushed so far. */
+  pushed(): Extract<ParentMessage, { type: "run" }>[] {
     return this.sent.filter(
-      (message): message is Extract<ParentMessage, { type: "job" }> => message.type === "job",
+      (message): message is Extract<ParentMessage, { type: "run" }> => message.type === "run",
     );
   }
 }
