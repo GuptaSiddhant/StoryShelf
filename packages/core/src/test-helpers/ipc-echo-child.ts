@@ -1,7 +1,7 @@
 /**
  * A minimal capture child for the real-fork tests: answers the jobs the parent pushes over process
  * IPC, by build id. `crash*` exits non-zero, `fail*` reports a failure, `hang*` goes silent forever,
- * `slow*` takes ~400 ms while reporting progress, anything else is done at once.
+ * `slow*` takes ~2 s while reporting progress, anything else is done at once.
  */
 import type { ChildMessage, ParentMessage } from "../capture/forked/protocol.ts";
 
@@ -23,9 +23,9 @@ async function handle(message: ParentMessage): Promise<void> {
   }
   if (job.buildId.startsWith("slow")) {
     // Long but healthy: keeps reporting progress, then finishes.
-    for (let step = 0; step < 8; step += 1) {
+    for (let step = 0; step < 20; step += 1) {
       // oxlint-disable-next-line eslint/no-await-in-loop -- paced progress is the point
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 100));
       send({ type: "progress", runId });
     }
   }

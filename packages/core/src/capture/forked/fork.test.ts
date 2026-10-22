@@ -83,7 +83,7 @@ describe("forkCaptureChild (real child process)", () => {
   }, 60_000);
 
   it("does not kill a slow child that keeps reporting progress", async () => {
-    const { handler, handles } = real({ leaseMs: 300 });
+    const { handler, handles } = real({ leaseMs: 1500 });
     try {
       await handler.run(job("slow-1"), context());
       expect(handles).toHaveLength(1);
