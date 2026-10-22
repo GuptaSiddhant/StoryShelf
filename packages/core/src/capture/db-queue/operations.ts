@@ -58,8 +58,8 @@ export async function recentEntries(rt: QueueRuntime, limit: number): Promise<Qu
 }
 
 /**
- * Cancel a job (by job id, any kind) or every unfinished job of this queue's kinds for a build (by
- * build id). A queued job ends `cancelled` at once; a running one is flagged on its job row and on
+ * Cancel a job (by job id) or every unfinished job of a build (by build id), of every kind that
+ * shares the table (capture, publish and notify), whichever kinds this queue polls. A queued job ends `cancelled` at once; a running one is flagged on its job row and on
  * its current attempt row, so the holder sees it on its next renewal or cancel check.
  */
 export async function cancelJobs(rt: QueueRuntime, id: string): Promise<boolean> {
@@ -80,7 +80,7 @@ async function targetsOf(rt: QueueRuntime, id: string): Promise<CaptureJobRow[]>
   if (row?.entry === "job") {
     return [row];
   }
-  return (await rt.model.listForBuild(id)).filter((job) => viewKinds(rt).includes(job.kind));
+  return await rt.model.listForBuild(id);
 }
 
 async function cancelOne(rt: QueueRuntime, row: CaptureJobRow): Promise<void> {

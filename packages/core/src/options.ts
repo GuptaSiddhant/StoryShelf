@@ -64,6 +64,7 @@ function assertTestingProcess(testing: ShelfOptions["testing"]): void {
 function assertTestingNumbers(testing: ShelfOptions["testing"]): void {
   assertConcurrency(testing?.concurrency);
   assertRetries(testing?.retries);
+  assertLeaseSeconds(testing?.leaseSeconds);
   assertStorybookUrlRateLimit(testing?.storybookUrlRateLimit);
 }
 
@@ -80,6 +81,15 @@ function assertStorybookUrlRateLimit(limit: number | undefined): void {
 function assertRetries(retries: number | undefined): void {
   if (retries !== undefined && (!Number.isInteger(retries) || retries < 0)) {
     throw new Error(`testing.retries must be a non-negative integer, got ${String(retries)}`);
+  }
+}
+
+/** A lease must be a positive length: `0` would expire every job at once. */
+function assertLeaseSeconds(seconds: number | undefined): void {
+  if (seconds !== undefined && (!Number.isFinite(seconds) || seconds <= 0)) {
+    throw new Error(
+      `testing.leaseSeconds must be a positive number of seconds, got ${String(seconds)}`,
+    );
   }
 }
 

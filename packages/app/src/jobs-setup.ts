@@ -18,6 +18,7 @@ import type { Build, CaptureJobKind, Project } from "@storyshelf/core/schema";
 import { setupBuildState, type BuildStateWiring } from "./build-state-setup.ts";
 import { setupCapture, type CaptureHandler, type CaptureWiring } from "./capture-setup.ts";
 import { combineConsumers, jobMetrics, lazyConsumer } from "./consumer-setup.ts";
+import { createJobCanceller, type JobCanceller } from "./job-canceller.ts";
 import { createJobQueue, type JobQueue } from "./job-queue.ts";
 import { setupPublishing, type PublishService, type PublishWiring } from "./publish-setup.ts";
 import { announceReviewWith, REVIEW_EVENTS, reviewRequestedData } from "./review-events.ts";
@@ -34,6 +35,8 @@ export interface JobsWiring {
   publish: PublishService;
   /** Asks for a build's current state to be shown on its git channels (ADR 0014). */
   buildState: BuildStatePublisher;
+  /** Cancels every unfinished job of a build, of any kind (capture, publish, notify). */
+  cancelBuildJobs: JobCanceller;
   /** Runs every handler this instance has; null when it consumes nothing. */
   consumer: CaptureConsumer | null;
 }
@@ -75,6 +78,7 @@ export function setupJobs(
     capturesHere: capture.handler !== null,
     publish: publishing,
     buildState: buildState.publisher,
+    cancelBuildJobs: createJobCanceller([jobs.view, options.testing?.queue]),
     consumer: combineConsumers(consumersOf(options, runtime, jobs, wiring)),
   };
 }

@@ -16,7 +16,7 @@ import type { WakeSignal } from "./wake.ts";
 export interface DatabaseCaptureQueueOptions {
   /** Job kinds this instance polls (default `["capture"]`); enqueue accepts every kind. */
   kinds?: readonly CaptureJobKind[];
-  /** Lease granted per attempt, renewed by progress (default {@link DEFAULT_LEASE_MS}). */
+  /** Lease granted per attempt, renewed by a heartbeat and by progress (default {@link DEFAULT_LEASE_MS}, 5 min; `testing.leaseSeconds`). */
   leaseMs?: number;
   /** Retries after the first attempt (`testing.retries`, default 2: three attempts in total). */
   retries?: number;
@@ -76,7 +76,7 @@ export interface DatabaseCaptureQueue extends PollableCaptureQueue {
   extend(job: PollableJob): Promise<LeaseRenewal>;
   /** Put a job of any kind on the queue; resolves to its job id. */
   enqueueJob(job: QueueJobInput): Promise<string>;
-  /** Cancel a job by job id, or every unfinished job of this queue's kinds for a build by build id. */
+  /** Cancel a job by job id, or every unfinished job of a build (every kind) by build id. */
   cancel(id: string): Promise<boolean>;
   /** Read the job's state without renewing its lease (the 5 s cancel check). */
   inspect(job: PollableJob): Promise<LeaseRenewal>;

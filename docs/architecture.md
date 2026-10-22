@@ -482,6 +482,7 @@ Capture is CPU/IO-heavy and long-running (minutes to tens of minutes). It must n
 
 - `POST /builds` stores the zip and returns **202 Accepted** immediately.
 - The job goes on the **database queue** (`capture_jobs`, below). Every instance with `testing` consumes it, with a **configurable concurrency** (`testing.concurrency`, auto-sized by default).
+- A user can cancel a build that is `pending`, `capturing` or `comparing` (`POST …/builds/:id/cancel`, **Cancel build** on the build page): its jobs of every kind are cancelled, a running capture stops within the 5 s cancel check, and the build ends `failed` (there is no `cancelled` build status). The MCP server does not expose it.
 - There is no boot sweep. A build left `capturing` by a killed instance is recovered by lease expiry: another instance claims the job again, and if every attempt (`testing.retries + 1`) is lost the job fails and `onExhausted` fails the build (`failCrashedCapture`: the attempt closes, the build becomes `failed`, a failure git status is posted, admins are alerted), so a crash loop cannot repeat captures forever and a second instance can boot without touching the first one's builds.
 
 #### Database queue (`capture_jobs`)
@@ -502,14 +503,16 @@ visible_at LIMIT 1`, a range scan of `capture_jobs_poll_idx`. Only candidates ha
    then moves the job row's `visible_at` behind that lease (never its status).
 3. **Hold.** The holder writes only its own attempt row: `extend` renews the lease (the write
    returns the row, so `expired` means lost and a cancel flag means cancelled) and reads the job
-   row; `inspect` reads the job row every 5 s without renewing. Leases follow progress, never a
-   timer (`keepJobLease`).
+   row; `inspect` reads the job row every 5 s without renewing. `keepJobLease` renews on a heartbeat
+   timer (`min(30 s, lease / 3)`) and on progress while the handler is alive, so a silent stage
+   keeps its lease and a dead holder's lease expires; the lease is `testing.leaseSeconds`
+   (default 300).
 4. **Finish.** `ack` marks the attempt and the job `done`. `nack` is ignored from a superseded
    holder; otherwise it requeues with a delay (`visible_at`), or fails the job past `max_attempts`
    or with `requeue: false`, or ends it `cancelled` when flagged. A final attempt that loses its
    lease fails the job too (one limit covers failures and lost leases).
 5. **Cancel.** `cancel(jobId | buildId)` ends a queued job at once and flags a running one on its
-   job and attempt rows.
+   job and attempt rows; a build id covers every job kind of the build (capture, publish, notify).
 
 **Consumer** (`createCaptureConsumer`, `core/src/capture/consumer/`). Consumes any
 `PollableCaptureQueue` (this queue, the IPC queue of a forked child, a custom `testing.queue`) and runs a
@@ -520,7 +523,7 @@ queues a slot loop with the idle backoff of 250 ms doubling to 5 s for queues th
 once). A failing job is requeued with delay `1000 ms * 2^attempts` (capped at 30 s) until its last
 attempt (a handler may state its own `backoff`, and a job its own `maxAttempts`), `attempt >= maxAttempts` for the database queue (`attempts >= maxRetries` for queues that
 only count deliveries), then nacked without requeue so it ends `failed`; the constants live in
-`consumer/retry.ts`. The lease follows progress (`keepJobLease`): a lost lease or a `cancelled`
+`consumer/retry.ts`. The lease is kept by heartbeat and progress (`keepJobLease`): a lost lease or a `cancelled`
 reading stops the run through `runner.cancel(buildId, shard)`; a lost lease writes nothing (the
 new holder settles the job), a cancel ends the job `cancelled`. `stop()` (SIGTERM) stops polling
 and waits for the jobs in flight; the runners launch browsers with `handleSIGINT`/`handleSIGTERM`/`handleSIGHUP` off, so the signal does not close a browser under a capture that is still draining (each render closes its own). Optional `metrics` hooks report each job's outcome and the
@@ -888,6 +891,7 @@ GET    /api/v1/projects/:projectId/builds
 POST   /api/v1/projects/:projectId/builds          # multipart: storybook zip + sha/branch/message/author -> 202
 GET    /api/v1/projects/:projectId/builds/:buildId
 POST   /api/v1/projects/:projectId/builds/:buildId/retry   # re-run capture (flaky tests)
+POST   /api/v1/projects/:projectId/builds/:buildId/cancel  # cancel the build's jobs of every kind; the build ends failed (class testing)
 DELETE /api/v1/projects/:projectId/builds/:buildId
 
 # Snapshots (read-only API, mutations via review endpoints)

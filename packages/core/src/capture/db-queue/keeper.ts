@@ -1,7 +1,10 @@
 /**
- * The holder's side of a lease: renewals follow progress (throttled), never a timer, so a hung run
- * loses its lease; a separate timer only reads the job's state every 5 s, so cancel and takeover
- * are seen within that interval even while the run is hung.
+ * The holder's side of a lease: while the handler is alive the lease is renewed by a heartbeat
+ * timer (every `min(30 s, lease / 3)`) and by progress (throttled to the same interval), so a stage
+ * that prints nothing for longer than the lease is not redelivered. A holder that dies stops
+ * renewing and its lease expires. A separate timer reads the job's state every 5 s, so cancel and
+ * takeover are seen within that interval even while the run is hung. The heartbeat stops with the
+ * keeper: on completion, on a lost lease and on cancel.
  */
 import type {
   LeaseRenewal,
@@ -68,9 +71,11 @@ export function keepJobLease(
     },
   };
   const stopChecks = startChecks(queue, job, state, options);
+  const stopBeat = startHeartbeat(queue, job, state, { ...options, now });
   const stop = (): void => {
     state.stopped = true;
     stopChecks();
+    stopBeat();
   };
   promise.then(stop, stop);
   return {
@@ -96,6 +101,21 @@ function startChecks(
     if (!state.stopped) {
       report(state, inspect(job), options.logger, job).catch(() => {});
     }
+  });
+}
+
+/** Renew on a timer, so a silent stage keeps its lease; progress renewals count toward the interval. */
+function startHeartbeat(
+  queue: Pick<PollableCaptureQueue, "extend">,
+  job: PollableJob,
+  state: KeeperState,
+  options: LeaseKeeperOptions & { now: () => number },
+): () => void {
+  if (queue.extend === undefined) {
+    return () => {};
+  }
+  return repeatEvery(options.timers ?? REAL_TIMERS, renewInterval(job, options), () => {
+    renewIfDue(queue, job, state, options);
   });
 }
 

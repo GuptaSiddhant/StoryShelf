@@ -1,5 +1,5 @@
 /**
- * Run one claimed job to its end: pick the handler by kind, keep the lease by progress, then settle
+ * Run one claimed job to its end: pick the handler by kind, keep the lease (heartbeat and progress), then settle
  * the job on the queue (ack, retry with backoff, fail, or leave it to whoever owns it now).
  */
 import type { PollableCaptureQueue } from "../../adapters/capture-queue.ts";

@@ -84,6 +84,7 @@ describe("build page without testing", () => {
     for (const gone of [
       "Review diffs",
       "Retry capture",
+      "Cancel build",
       "No snapshots yet",
       "Capture attempts",
       "Changed / new",
@@ -117,6 +118,22 @@ describe("build page without testing", () => {
 });
 
 describe("build page with testing", () => {
+  it.each(["pending", "capturing", "comparing"])(
+    "offers Cancel build while the build is %s",
+    async (status) => {
+      const { app, build } = await seed({ testing: true, status });
+      expect(await page(app, build.id)).toContain("Cancel build");
+    },
+  );
+
+  it.each(["reviewing", "approved", "rejected", "failed"])(
+    "offers no Cancel build once the build is %s",
+    async (status) => {
+      const { app, build } = await seed({ testing: true, status });
+      expect(await page(app, build.id)).not.toContain("Cancel build");
+    },
+  );
+
   it("keeps the snapshot sections and adds the catalog counts", async () => {
     const { app, build } = await seed({ testing: true });
     const html = await page(app, build.id);

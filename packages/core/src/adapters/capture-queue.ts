@@ -80,7 +80,7 @@ export interface CaptureQueue extends Adapter<{ readonly category: "capture-queu
   /** The most recent queue entries, newest first. */
   recent(limit: number): Promise<QueueEntry[]>;
   /**
-   * Cancel by job id, or every unfinished job of a build by build id. Optional. A job that has not
+   * Cancel by job id, or every unfinished job of a build by build id (every job kind of the build on the database queue). Optional. A job that has not
    * started ends `cancelled` at once; a running one is flagged, and its holder sees `"cancelled"`
    * from `extend`/`inspect`. Resolves true when anything matched.
    */
@@ -110,8 +110,8 @@ export interface PollableCaptureQueue extends CaptureQueue {
    */
   extend?(job: PollableJob): Promise<LeaseRenewal>;
   /**
-   * Read the job's state without renewing its lease: the holder's periodic cancel check, which must
-   * not keep a hung run alive. Optional; same outcomes as `extend`.
+   * Read the job's state without renewing its lease: the holder's periodic cancel check.
+   * Optional; same outcomes as `extend`.
    */
   inspect?(job: PollableJob): Promise<LeaseRenewal>;
 }

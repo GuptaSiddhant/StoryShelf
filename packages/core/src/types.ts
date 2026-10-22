@@ -32,6 +32,16 @@ export type SnapshotStatus = (typeof SNAPSHOT_STATUSES)[number];
  */
 export const TERMINAL_BUILD_STATUSES: readonly BuildStatus[] = ["approved", "rejected", "failed"];
 
+/**
+ * Statuses of a build whose capture or compare work may still run: a user may cancel it (the build
+ * then fails; there is no separate `cancelled` build status).
+ */
+export const CANCELLABLE_BUILD_STATUSES: readonly BuildStatus[] = [
+  "pending",
+  "capturing",
+  "comparing",
+];
+
 /** All site-wide user roles. */
 export const SITE_ROLES = ["admin", "member", "viewer"] as const;
 

@@ -56,6 +56,7 @@ export const API_ROUTE_CLASSES: Readonly<Record<string, RouteClass>> = {
   // testing
   "POST /api/v1/projects/:slug/builds/:buildId/affected": "testing",
   "POST /api/v1/projects/:slug/builds/:buildId/retry": "testing",
+  "POST /api/v1/projects/:slug/builds/:buildId/cancel": "testing",
   "GET /api/v1/projects/:slug/builds/:buildId/snapshots": "testing",
   "POST /api/v1/projects/:slug/builds/:buildId/snapshots/:snapshotId/approve": "testing",
   "POST /api/v1/projects/:slug/builds/:buildId/snapshots/:snapshotId/reject": "testing",

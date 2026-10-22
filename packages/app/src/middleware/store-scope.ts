@@ -29,6 +29,7 @@ export interface StoreScopeDeps {
   /** This instance runs the capture jobs itself (the retry and compute-jobs UI applies). */
   capturesHere?: boolean;
   publish?: PublishService;
+  cancelBuildJobs?: (buildId: string) => Promise<boolean>;
   buildState?: BuildStatePublisher;
   captureConcurrency?: number;
   runner?: Pick<CaptureRunner, "metadata"> | undefined;
@@ -61,6 +62,7 @@ export function storeScope(deps: StoreScopeDeps) {
         captureQueue: deps.captureQueue,
         capturesHere: deps.capturesHere,
         publish: deps.publish,
+        cancelBuildJobs: deps.cancelBuildJobs,
         buildState: deps.buildState,
         captureConcurrency: deps.captureConcurrency,
         runner: deps.runner,
