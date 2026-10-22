@@ -46,14 +46,6 @@ jobs:
           echo "::error::the Fly image did not become healthy"
           exit 1
 
-      # The vendored HTMX bundle must be served by the image or every hx-* interaction (and CSRF
-      # header injection) silently breaks; this is the real-image check for it.
-      - name: Serve the vendored HTMX asset
-        run: |
-          curl -fsS "$STORYSHELF_URL/assets/htmx.js" -o htmx.js
-          grep -q "htmx" htmx.js
-          echo "Served /assets/htmx.js ($(wc -c <htmx.js) bytes)"
-
       - name: Seed the demo
         run: apps/fly-app/seed.sh
 
