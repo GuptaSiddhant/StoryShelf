@@ -11,10 +11,14 @@ export const sectionLinks = (base: string): { section: Section; label: string; h
 /** Hand-written pages that sit in the HTTP API menu next to the generated reference. */
 const API_GUIDES = ["/guides/api", "/guides/webhooks"];
 
+/** Package pages that live in the Docs menu instead (the CLI is documented under "CLI & changelog"). */
+const DOCS_PACKAGES = ["/packages/cli"];
+
 /** Which menu a page belongs to, from its path. */
 export function sectionOf(pathname: string, base: string): Section {
   const path = pathname.slice(base.length);
   if (path.startsWith("/api") || API_GUIDES.some((guide) => path.startsWith(guide))) return "api";
+  if (DOCS_PACKAGES.some((page) => path.startsWith(page))) return "docs";
   if (path.startsWith("/packages") || path.startsWith("/reference")) return "packages";
   return "docs";
 }
