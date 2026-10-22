@@ -6,7 +6,8 @@
 #
 #   STORYSHELF_URL=https://storyshelf.fly.dev STORYSHELF_ADMIN_TOKEN=... apps/fly-app/seed.sh
 #
-# Skips when the project already exists (delete it in the UI to re-seed).
+# Idempotent: build SHAs derive from the fixture's index.json, so an unchanged fixture is a
+# no-op and a changed one deletes the demo project and seeds it again.
 set -euo pipefail
 
 : "${STORYSHELF_URL:?}" "${STORYSHELF_ADMIN_TOKEN:?}"
@@ -21,10 +22,20 @@ CLI=(node "$PWD/packages/cli/dist/index.js")
 AUTH=(-H "Authorization: Bearer $STORYSHELF_ADMIN_TOKEN" -H "content-type: application/json")
 AUTHOR=(--author-name "Alex Doe" --author-email alex@example.com)
 
-if curl -fsS -H "Authorization: Bearer $STORYSHELF_ADMIN_TOKEN" \
-  "$STORYSHELF_URL/api/v1/projects/$SLUG" >/dev/null 2>&1; then
-  echo "Project $SLUG already seeded; nothing to do."
-  exit 0
+sha_for() { printf '%s:%s' "$1" "$(sha256sum "$STATIC/index.json" | cut -c1-64)" | sha256sum | cut -c1-40; }
+MAIN_SHA="$(sha_for main)"
+FEATURE_SHA="$(sha_for feature/new-button)"
+
+# Seeded = both builds exist on the server and neither failed.
+if BUILDS="$(curl -fsS "${AUTH[@]}" "$STORYSHELF_URL/api/v1/projects/$SLUG/builds" 2>/dev/null)"; then
+  if jq -e --arg a "$MAIN_SHA" --arg b "$FEATURE_SHA" \
+    '[.[] | select(.status != "failed") | .gitSha] | (index($a) != null) and (index($b) != null)' \
+    <<<"$BUILDS" >/dev/null; then
+    echo "Demo project is up to date; nothing to do."
+    exit 0
+  fi
+  echo "Demo project is stale; recreating it."
+  curl -fsS "${AUTH[@]}" -X DELETE "$STORYSHELF_URL/api/v1/projects/$SLUG" -o /dev/null
 fi
 
 # Create the project with fixed metadata and a CI token scoped to it.
@@ -33,13 +44,12 @@ curl -fsS "${AUTH[@]}" -X POST "$STORYSHELF_URL/api/v1/projects" -o /dev/null \
 CI_TOKEN="$(curl -fsS "${AUTH[@]}" -X POST "$STORYSHELF_URL/api/v1/projects/$SLUG/tokens" \
   -d '{"name":"demo-seed"}' | jq -er .token)"
 
-upload() { # <dir> <branch> <message>
+upload() { # <dir> <branch> <sha> <message>
   (cd "$FIXTURE" && "${CLI[@]}" upload --url "$STORYSHELF_URL" --slug "$SLUG" --token "$CI_TOKEN" \
-    --build-dir "$1" --branch "$2" --sha "$(printf '%s:%s' "$2" "$(sha256sum "$STATIC/index.json" | cut -c1-40)" | sha256sum | cut -c1-40)" \
-    --message "$3" "${AUTHOR[@]}")
+    --build-dir "$1" --branch "$2" --sha "$3" --message "$4" "${AUTHOR[@]}")
 }
 
-upload "$STATIC" main "chore: design system baseline"
+upload "$STATIC" main "$MAIN_SHA" "chore: design system baseline"
 cp -r "$STATIC/." "$VARIANT"
 sed -i "s|</head>|<style>$FEATURE_CSS</style></head>|" "$VARIANT/iframe.html"
-upload "$VARIANT" feature/new-button "feat: rounded primary button in the new brand colour"
+upload "$VARIANT" feature/new-button "$FEATURE_SHA" "feat: rounded primary button in the new brand colour"

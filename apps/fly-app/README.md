@@ -23,7 +23,7 @@ fly deploy . --config apps/fly-app/fly.toml --dockerfile apps/fly-app/Dockerfile
 fly status -a storyshelf
 ```
 
-`.github/workflows/fly.yml` deploys on every push to `main`. Demo data is seeded separately by `seed.sh` (the `seed` job; run it from the workflow with `seed: true`, needs the `STORYSHELF_ADMIN_TOKEN` repo secret to match the Fly secret).
+`.github/workflows/fly.yml` deploys on every push to `main`. Demo data is seeded by the `seed` job after each deploy (`seed.sh`: builds the fixture, uploads it through the API, and re-seeds only when the fixture changed). It needs the `STORYSHELF_ADMIN_TOKEN` repo secret to match the Fly secret.
 
 ## Notes
 

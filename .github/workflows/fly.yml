@@ -7,11 +7,6 @@ on:
     branches:
       - main
   workflow_dispatch:
-    inputs:
-      seed:
-        description: Seed the demo project (skipped when it already exists)
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -67,10 +62,9 @@ jobs:
           echo "::error::/assets/htmx.js was not served correctly"
           exit 1
 
-  # Demo data goes in through the public API, not the image. Manual only: the data
-  # lives on the Fly volume and survives deploys.
+  # Demo data goes in through the public API, not the image. Idempotent: `seed.sh`
+  # re-seeds only when the fixture changed (the data lives on the Fly volume).
   seed:
-    if: github.event_name == 'workflow_dispatch' && inputs.seed
     needs: deploy
     runs-on: ubuntu-latest
     steps:
