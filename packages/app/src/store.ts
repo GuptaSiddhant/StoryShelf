@@ -23,7 +23,7 @@ export interface Store {
   sessionId: string;
   enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
   captureQueue?: CaptureQueue | null;
-  /** Explicit `capture.concurrency`; unset means sized from the hardware. */
+  /** Explicit `testing.concurrency`; unset means sized from the hardware. */
   captureConcurrency?: number;
   gitHosts: GitHostProvider[];
   /** Design providers (Figma, …); empty when none is wired. */

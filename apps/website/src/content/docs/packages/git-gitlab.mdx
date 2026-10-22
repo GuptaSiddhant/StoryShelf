@@ -29,7 +29,7 @@ import { gitLabHost } from "@storyshelf/git-gitlab";
 const app = createShelfApp({
   database,
   storage,
-  capture: { runner: captureRunner },
+  testing: { runner: captureRunner },
   gitHosts: [gitLabHost],
   config: {
     secret: process.env.SHELF_SECRET,

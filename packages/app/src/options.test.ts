@@ -14,14 +14,14 @@ function runner(): CaptureRunner {
   } as unknown as CaptureRunner;
 }
 
-describe("createShelfApp capture, compare and notifications options", () => {
-  it("boots hosting-only with no capture options at all", () => {
+describe("createShelfApp testing, compare and notifications options", () => {
+  it("boots hosting-only with no testing options at all", () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
     expect(() => createShelfApp({ database: db, storage, logger })).not.toThrow();
   });
 
-  it("boots with the nested capture, compare and notifications options", () => {
+  it("boots with the nested testing, compare and notifications options", () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
     expect(() =>
@@ -29,19 +29,18 @@ describe("createShelfApp capture, compare and notifications options", () => {
         database: db,
         storage,
         logger,
-        capture: { runner: runner(), concurrency: 2 },
-        compare: { threads: 0 },
+        testing: { runner: runner(), concurrency: 2, compare: { threads: 0 } },
         notifications: { notifiers: [], config: { fromEmail: "shelf@example.com" } },
       }),
     ).not.toThrow();
   });
 
-  it("rejects an invalid compare.threads", () => {
+  it("rejects an invalid testing.compare.threads", () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    expect(() => createShelfApp({ database: db, storage, compare: { threads: -2 } })).toThrow(
-      /compare\.threads/u,
-    );
+    expect(() =>
+      createShelfApp({ database: db, storage, testing: { compare: { threads: -2 } } }),
+    ).toThrow(/testing\.compare\.threads/u);
   });
 
   it("rejects an invalid notifications.config", () => {

@@ -31,7 +31,7 @@ const queue = createGcpPubSubQueue({
 const app = createShelfApp({
   database,
   storage,
-  capture: { runner: myRenderer, queue },
+  testing: { runner: myRenderer, queue },
 });
 ```
 

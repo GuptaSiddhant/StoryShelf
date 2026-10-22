@@ -291,8 +291,8 @@ export function validateUiConfig(config: Record<string, unknown>): UIConfig {
   return result.data;
 }
 
-/** Capture options: what renders, how jobs are queued, and how many run at once. */
-export interface ShelfCaptureOptions {
+/** Testing options: what renders, how jobs are queued, how many run at once, and how screenshots are compared. */
+export interface ShelfTestingOptions {
   /** Pure renderer. Without one this process does not render (a remote worker may). */
   runner?: CaptureRunner;
   /** Queue adapter; defaults to the in-process queue when a runner is set. */
@@ -317,6 +317,10 @@ export interface ShelfCaptureOptions {
    * boot if it cannot.
    */
   mode?: "auto" | "in-process" | "fork";
+  /** Screenshot comparison, shared by capture and the re-diff endpoint. */
+  compare?: ShelfCompareOptions;
+  /** Image library selection; see {@link ShelfImagesOptions}. */
+  images?: ShelfImagesOptions;
 }
 
 /** Notification options: who can deliver, over which transport, with what branding. */
@@ -354,14 +358,10 @@ export interface ShelfOptions {
   database: DatabaseAdapter;
   storage: StorageAdapter;
   /**
-   * Capture (render + diff in the background). Absent means Storybook hosting only: no renderer,
-   * no queue, and the capture tuning below is unreachable rather than silently ignored.
+   * Testing (render + diff in the background). Absent means Storybook hosting only: no renderer,
+   * no queue, and the tuning below is unreachable rather than silently ignored.
    */
-  capture?: ShelfCaptureOptions;
-  /** Screenshot comparison, shared by capture and the re-diff endpoint (which needs it even when nothing renders here). */
-  compare?: ShelfCompareOptions;
-  /** Image library selection; see {@link ShelfImagesOptions}. */
-  images?: ShelfImagesOptions;
+  testing?: ShelfTestingOptions;
   auth?: Auth;
   /** AI insights surface (ADR 0026). Set ⇒ AI on site-wide; absent ⇒ off. */
   ai?: Ai;

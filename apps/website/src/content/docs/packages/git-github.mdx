@@ -29,7 +29,7 @@ import { gitHubHost } from "@storyshelf/git-github";
 const app = createShelfApp({
   database,
   storage,
-  capture: { runner: captureRunner },
+  testing: { runner: captureRunner },
   gitHosts: [gitHubHost],
   config: {
     secret: process.env.SHELF_SECRET, // also encrypts status tokens

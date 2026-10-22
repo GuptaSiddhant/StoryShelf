@@ -108,7 +108,7 @@ This distinction matters for:
 
 ## Architecture in five sentences
 
-1. Consumers call `createShelfApp({ database, storage, capture, ... })` -- every concern is an independent adapter interface.
+1. Consumers call `createShelfApp({ database, storage, testing, ... })` -- every concern is an independent adapter interface.
 2. Models use **constructor injection** (not AsyncLocalStorage) -- `new BuildsModel(db, storage)`.
 3. **Capture is server-side** -- the CLI uploads the built Storybook; the server renders stories with Playwright asynchronously (no repo cloning). Baselines are **per-branch with fallback to the default branch**.
 4. Diffs use **pixelmatch** -- configurable thresholds, overlay images stored on disk. Builds are transient and purged; baselines are permanent.
@@ -122,6 +122,7 @@ This distinction matters for:
 - **URLs:** type-safe URL builder using `linkRoute()` pattern from StoryBooker.
 - **Forms:** HTMX with `hx-post` and `HX-Redirect` header for navigation after POST.
 - **API prefix:** all JSON endpoints under `/api/v1`. HTML pages at `/`.
+- **Route classification:** every route the app registers is classified `hosting | testing | review | both` (ADR 0006, decision 8) in `app/src/routes/` (`api-routes.ts` for `/api/v1`, `page-routes.ts` for pages/auth/Storybook; key `"METHOD /hono-pattern"`, exactly as `app.routes` reports it). New route ⇒ classify it there; `routes/classification.test.ts` fails on unclassified routes and on stale entries. A new `app.all(...)` handler must be listed too (unlisted `ALL` entries count as middleware). The table only describes routes for now; gating by class arrives with the `testing` option work.
 - **Tests:** every model, every router, every adapter must have tests (target 100% coverage). `nub run test` is hermetic (no browser); the capture pipeline is covered by a gated `test:integration` suite — see `docs/testing.md`.
 - **No AsyncLocalStorage for models.** Use constructor injection. The store is for router handlers only.
 - **Temp files:** for scratch work, prefer a repo-local `.tmp/` directory over `/tmp` (permissions). `.tmp` is gitignored.

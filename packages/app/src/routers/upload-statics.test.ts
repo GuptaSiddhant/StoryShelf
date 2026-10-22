@@ -124,7 +124,7 @@ describe("upload inline statics", () => {
       database: db,
       storage,
       logger: silentLogger,
-      capture: { queue, runner: makeRunner() },
+      testing: { queue, runner: makeRunner() },
       config: { scratchDir, maxInlineUnzipSize: 1024 * 1024 },
     });
     const { slug, id: projectId } = await setupProject(app);
@@ -148,7 +148,7 @@ describe("upload inline statics", () => {
       database: db,
       storage,
       logger: silentLogger,
-      capture: { queue, runner: makeRunner() },
+      testing: { queue, runner: makeRunner() },
       config: { scratchDir, maxInlineUnzipSize: 10 },
     });
     const { slug, id: projectId } = await setupProject(app);
@@ -199,7 +199,7 @@ describe("upload inline statics", () => {
       database: db,
       storage,
       logger: silentLogger,
-      capture: { queue, runner: makeRunner() },
+      testing: { queue, runner: makeRunner() },
       config: { scratchDir, maxInlineUnzipSize: 1024 * 1024 },
     });
     const { slug, id: projectId } = await setupProject(app);

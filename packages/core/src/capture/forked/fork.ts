@@ -6,10 +6,10 @@ import type { ParentMessage } from "./protocol.ts";
 /** Environment variable the forked child sees; set to this value so a module can tell it is the child. */
 export const CAPTURE_WORKER_ROLE = "capture-worker";
 
-/** Environment variable carrying the parent's `capture.concurrency` to the child, which sizes itself with it. */
+/** Environment variable carrying the parent's `testing.concurrency` to the child, which sizes itself with it. */
 export const CAPTURE_CONCURRENCY_ENV = "STORYSHELF_CAPTURE_CONCURRENCY";
 
-/** Environment variable carrying the parent's `capture.shardSize` to the child, which plans big builds with it. */
+/** Environment variable carrying the parent's `testing.shardSize` to the child, which plans big builds with it. */
 export const CAPTURE_SHARD_SIZE_ENV = "STORYSHELF_CAPTURE_SHARD_SIZE";
 
 /** Grace between SIGTERM and SIGKILL when the parent stops a child. */
@@ -32,7 +32,7 @@ export function canForkCaptureChild(): boolean {
 
 /** Options for {@link forkCaptureChild}. */
 export interface ForkOptions {
-  /** Module to run in the child (`capture.workerEntry`); absolute path or `file:` URL. */
+  /** Module to run in the child (`testing.workerEntry`); absolute path or `file:` URL. */
   entry: string;
   /** Extra environment for the child, on top of this process's. */
   env?: Record<string, string>;

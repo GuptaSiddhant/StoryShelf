@@ -62,7 +62,7 @@ Rules:
 
 ### 3. Integration (vitest, CI-always)
 
-`createShelfApp({ database, storage, capture: <fake> })` drives the full `upload → capture → diff → review → approve` flow over HTTP. Capture is a fake runner here (a real one needs a browser).
+`createShelfApp({ database, storage, testing: { runner: <fake> } })` drives the full `upload → capture → diff → review → approve` flow over HTTP. Capture is a fake runner here (a real one needs a browser).
 
 ### 4. Browser integration (gated: `nub run test:integration`)
 

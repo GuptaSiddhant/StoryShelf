@@ -123,7 +123,7 @@ export function forkedSettleHook(
   };
 }
 
-/** The in-process queue, or a forked child fronting it when `capture.workerEntry` and the host allow. */
+/** The in-process queue, or a forked child fronting it when `testing.workerEntry` and the host allow. */
 function pickProcessQueue(
   options: ShelfOptions,
   config: ShelfConfig,
@@ -131,16 +131,16 @@ function pickProcessQueue(
   inProcess: CaptureQueue,
   dispatch: DispatchDeps,
 ): CaptureQueue {
-  const workerEntry = options.capture?.workerEntry;
-  if (!workerEntry || !shouldForkCapture(options.capture, logger)) {
+  const workerEntry = options.testing?.workerEntry;
+  if (!workerEntry || !shouldForkCapture(options.testing, logger)) {
     return inProcess;
   }
   return createForkedQueue({
     workerEntry,
-    concurrency: options.capture?.concurrency,
-    shardSize: options.capture?.shardSize,
-    imageEngine: options.images?.engine,
-    diffThreads: options.compare?.threads,
+    concurrency: options.testing?.concurrency,
+    shardSize: options.testing?.shardSize,
+    imageEngine: options.testing?.images?.engine,
+    diffThreads: options.testing?.compare?.threads,
     fallback: inProcess,
     // Notifications stay in this process; the build's own status says whether the capture failed.
     onSettled: forkedSettleHook(dispatch, async (buildId) => {
@@ -169,7 +169,7 @@ export function setupCaptureQueue(
   gitHosts: GitHostProvider[],
   logger: Logger,
 ): QueueWiring {
-  const { queue: remote, runner } = options.capture ?? {};
+  const { queue: remote, runner } = options.testing ?? {};
   if (remote) {
     return { queue: remote, enqueueCapture: enqueuerFor(remote) };
   }
@@ -208,7 +208,7 @@ function setupInProcessQueue(
     logger,
     secret: credentialKeys(config),
     design: options.design,
-    shardSize: options.capture?.shardSize,
+    shardSize: options.testing?.shardSize,
     // The queue is built below, from these options; shards go back onto it.
     enqueue: async (job) => {
       await captureQueueRef.current?.enqueue(job);
@@ -238,7 +238,7 @@ function setupInProcessQueue(
     },
   };
   const inProcessQueue = new InMemoryCaptureQueue({
-    concurrency: options.capture?.concurrency ?? recommendedBuildConcurrency(),
+    concurrency: options.testing?.concurrency ?? recommendedBuildConcurrency(),
     logger,
     leaseMs: CAPTURE_LEASE_MS,
     onStalled: createStalledHandler({ runner, recovery, logger }),

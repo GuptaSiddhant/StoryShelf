@@ -22,7 +22,7 @@ import { PackageManagers } from "starlight-package-managers";
 
 ## Register the queue
 
-Pass the Pub/Sub queue as the `capture.queue` option of `createShelfApp`:
+Pass the Pub/Sub queue as the `testing.queue` option of `createShelfApp`:
 
 ```ts
 import { createShelfApp } from "@storyshelf/app";
@@ -37,7 +37,7 @@ const queue = createGcpPubSubQueue({
 const app = createShelfApp({
   database,
   storage,
-  capture: { queue },
+  testing: { queue },
 });
 ```
 

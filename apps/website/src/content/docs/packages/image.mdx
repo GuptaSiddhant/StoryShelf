@@ -38,7 +38,7 @@ import {
   diffImages, // (baseline, current, options, codec?) -> Promise<DiffResult>
   diffImagesAsync, // same, on the shared worker-thread pool
   downscalePng, // (png, maxEdge) -> Promise<Uint8Array>, on the configured engine
-  configureImages, // ({ engine?, threads? }) apply images.engine and compare.threads
+  configureImages, // ({ engine?, threads? }) apply testing.images.engine and testing.compare.threads
   verifyImageEngine, // load the configured engine now; rejects when it cannot load
   shutdownDiffPool, // stop the pool's workers
   DEFAULT_DIFF_OPTIONS,

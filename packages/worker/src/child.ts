@@ -1,9 +1,9 @@
 /**
- * Entry helper for a forked capture child (`capture.workerEntry`): runs the capture worker against
+ * Entry helper for a forked capture child (`testing.workerEntry`): runs the capture worker against
  * the parent's queue over process IPC.
  *
  * ```ts
- * // capture-worker.ts — the module named by `capture.workerEntry`
+ * // capture-worker.ts — the module named by `testing.workerEntry`
  * import { runCaptureChild } from "@storyshelf/worker";
  * await runCaptureChild({ db, storage, runner, scratchDir });
  * ```
@@ -68,7 +68,7 @@ function buildWorker(
 ): { worker: WorkerHandle; queue: IpcCaptureQueue } {
   const { send } = host;
   if (!send) {
-    throw new Error("runCaptureChild must run in a forked process; set capture.workerEntry");
+    throw new Error("runCaptureChild must run in a forked process; set testing.workerEntry");
   }
   const queue = new IpcCaptureQueue(portOf(host, send));
   const worker = createCaptureWorker({
@@ -152,7 +152,7 @@ function concurrencyOf(
   );
 }
 
-/** The module's own `shardSize`, else the parent's `capture.shardSize` handed down in the environment. */
+/** The module's own `shardSize`, else the parent's `testing.shardSize` handed down in the environment. */
 function shardSizeOf(
   options: CaptureChildOptions,
   env: Record<string, string | undefined>,

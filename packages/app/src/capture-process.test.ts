@@ -88,7 +88,7 @@ function setup(capture: Record<string, unknown>) {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
   return setupCaptureQueue(
-    { database: db as never, storage: storage as never, capture: capture as never },
+    { database: db as never, storage: storage as never, testing: capture as never },
     { scratchDir: ".tmp/capture-process-test" },
     [],
     logger,

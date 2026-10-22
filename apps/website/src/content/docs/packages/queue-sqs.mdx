@@ -20,7 +20,7 @@ import { PackageManagers } from "starlight-package-managers";
 
 ## Register the queue
 
-Pass the SQS-backed queue as the `capture.queue` option of `createShelfApp`:
+Pass the SQS-backed queue as the `testing.queue` option of `createShelfApp`:
 
 ```ts
 import { createShelfApp } from "@storyshelf/app";
@@ -33,7 +33,7 @@ const queue = createSqsCaptureQueue({
 const app = createShelfApp({
   database,
   storage,
-  capture: { runner: myRenderer, queue },
+  testing: { runner: myRenderer, queue },
 });
 ```
 

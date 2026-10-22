@@ -26,7 +26,7 @@ See the [StoryShelf documentation](https://github.com/GuptaSiddhant/StoryShelf#r
 
 ## Running as a forked child
 
-For a server that captures in a child process (`capture.workerEntry`), call `runCaptureChild` instead of building a queue yourself. It polls the parent over IPC, runs the same capture worker, finishes in-flight captures on `SIGTERM`, and exits at once if the parent goes away:
+For a server that captures in a child process (`testing.workerEntry`), call `runCaptureChild` instead of building a queue yourself. It polls the parent over IPC, runs the same capture worker, finishes in-flight captures on `SIGTERM`, and exits at once if the parent goes away:
 
 ```ts
 import { runCaptureChild } from "@storyshelf/worker";
@@ -34,7 +34,7 @@ import { runCaptureChild } from "@storyshelf/worker";
 await runCaptureChild({ db, storage, runner, scratchDir });
 ```
 
-It uses the database adapter's own tables and sizes concurrency from the parent's `capture.concurrency`.
+It uses the database adapter's own tables and sizes concurrency from the parent's `testing.concurrency`.
 
 ## License
 

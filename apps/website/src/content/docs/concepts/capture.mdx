@@ -55,14 +55,14 @@ Per-project engine lives in **Settings → General → Capture browser** or `PAT
 
 Global viewports live in `ShelfConfig.viewports` (or project settings). Per-story `parameters.viewport` adds to the union (deduped by name). The runner auto-crops small components (≈60% whitespace) with 16px padding and clamp (`minWidth`/`maxWidth` etc.), and falls back to `fullPage` on overflow — see `core/capture/sizing.ts`.
 
-Configure via server config or project patch. The queue then fans out `stories × viewports` renders at `capture.concurrency`.
+Configure via server config or project patch. The queue then fans out `stories × viewports` renders at `testing.concurrency`.
 
 ## Capturing in a child process
 
-By default the server renders in its own process, so a browser crash or a runaway capture shares a process with the web UI. Set `capture.workerEntry` to run captures in a forked child instead:
+By default the server renders in its own process, so a browser crash or a runaway capture shares a process with the web UI. Set `testing.workerEntry` to run captures in a forked child instead:
 
 ```ts
-// capture-worker.ts — the module named by capture.workerEntry
+// capture-worker.ts — the module named by testing.workerEntry
 import { runCaptureChild } from "@storyshelf/worker";
 
 await runCaptureChild({ db: database, storage, runner, scratchDir });
@@ -72,20 +72,20 @@ await runCaptureChild({ db: database, storage, runner, scratchDir });
 const app = createShelfApp({
   database,
   storage,
-  capture: { runner, workerEntry: new URL("./capture-worker.ts", import.meta.url).pathname },
+  testing: { runner, workerEntry: new URL("./capture-worker.ts", import.meta.url).pathname },
 });
 ```
 
 The server keeps the queue and its status; the child pulls jobs over IPC and shares the server's database and storage. If the child crashes, its in-flight jobs are requeued and the child restarts; a job that crashes it repeatedly is failed. After repeated crashes (3 in 5 minutes) or a failed fork, capture falls back to the in-process queue. A child that hangs without dying is caught too: the child reports progress as a capture logs, and if a running job goes 10 minutes without any, the server kills the child and treats it like a crash (the job is redelivered, and fails if it keeps hanging the child).
 
-`capture.mode` controls this: `auto` (default) forks only when `workerEntry` is set and the host has at least 2 CPUs and 2 GB; `in-process` never forks; `fork` always forks and fails at boot if it cannot. `capture.runner` is still required, since it serves the fallback. `SIGTERM` lets the child finish its current captures; if the server disappears, the child exits at once.
+`testing.mode` controls this: `auto` (default) forks only when `workerEntry` is set and the host has at least 2 CPUs and 2 GB; `in-process` never forks; `fork` always forks and fails at boot if it cannot. `testing.runner` is still required, since it serves the fallback. `SIGTERM` lets the child finish its current captures; if the server disappears, the child exits at once.
 
 ## Sharding big builds
 
-A build with thousands of captures does not have to render in one job. Set `capture.shardSize` (in-process server) or `shardSize` (`createCaptureWorker`) to the number of captures (story × viewport × browser engine) one shard should hold:
+A build with thousands of captures does not have to render in one job. Set `testing.shardSize` (in-process server) or `shardSize` (`createCaptureWorker`) to the number of captures (story × viewport × browser engine) one shard should hold:
 
 ```ts
-createShelfApp({ ..., capture: { runner, shardSize: 500 } });
+createShelfApp({ ..., testing: { runner, shardSize: 500 } });
 ```
 
 The build's own job becomes a **plan**: it decides what to render, records the shards in `capture_shards` and puts one queue job per shard on the queue. Any worker can take a shard; the one that finishes the last shard claims the finalize (a unique insert, so exactly one worker wins), runs the build's diffing wrap-up and sets the final status. A build of up to twice `shardSize` captures still renders as one piece, so small Storybooks pay no overhead.
@@ -98,7 +98,7 @@ Details worth knowing:
 - A shard that cannot render at all is retried by the queue like any job; once its retries are used up it fails every story in it and the build ends `failed`.
 - Re-running a build starts from a clean slate: old shard rows are replaced by the new plan.
 - Remote queues need no changes beyond carrying the optional `shard` field in the message body; a message with only `buildId` still means "the whole build".
-- With `capture.workerEntry` the forked child plans the build and hands its shards back to the server over the process channel, which delivers them to the same child. The server passes `capture.shardSize` to the child; set `shardSize` in the entry module only to override it. One child still renders one shard at a time per its concurrency, so on a single host this buys retries and isolation per shard rather than speed — spread shards over several machines with a remote queue.
+- With `testing.workerEntry` the forked child plans the build and hands its shards back to the server over the process channel, which delivers them to the same child. The server passes `testing.shardSize` to the child; set `shardSize` in the entry module only to override it. One child still renders one shard at a time per its concurrency, so on a single host this buys retries and isolation per shard rather than speed — spread shards over several machines with a remote queue.
 
 ## Shard ordering
 

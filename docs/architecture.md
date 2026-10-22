@@ -399,7 +399,7 @@ interface CaptureRunner {
 
 ### Capture Orchestrator
 
-Because renderers are pure, the server-side **orchestrator** owns everything else (`capture/orchestrator.ts`): it loads the build/project, marks the build `capturing`, extracts the uploaded archive to a scratch dir (with path-traversal protection), discovers stories, delegates rendering to the pure `CaptureRunner`, then persists snapshots/diffs/baselines (see `capture/pipeline.ts`) and finalizes the build. The orchestrator is wired into the queue by `createShelfApp` and requires a `ShelfConfig.scratchDir`.
+Because renderers are pure, the server-side **orchestrator** owns everything else (`capture/orchestrator.ts`): it loads the build/project, marks the build `capturing`, extracts the uploaded archive to a scratch dir (with path-traversal protection), discovers stories, delegates rendering to the pure `CaptureRunner`, then persists snapshots/diffs/baselines (see `capture/pipeline.ts`) and finalizes the build. The orchestrator is wired into the queue by `createShelfApp` when `ShelfOptions.testing` is set (it holds `runner`, `queue`, `concurrency`, `workerEntry`, `shardSize`, `mode`, `compare` and `images`; absent means hosting only) and requires a `ShelfConfig.scratchDir`.
 
 One local renderer in v1 — `@storyshelf/runner-playwright` (the server already has Playwright via the base image). The interface is kept thin so v2 can add a **remote** runner (offload capture to a worker fleet via a queue) without changing the pipeline or orchestration — a future `@storyshelf/runner-remote` implements the same pure `CaptureRunner` interface and plugs in at the `serve` assembly point the same way.
 
@@ -603,7 +603,7 @@ interface DiffResult {
 }
 ```
 
-Uses `pixelmatch` for pixel comparison and a PNG codec for decode/encode: `pngjs` by default, or opt-in `sharp` (`images.engine`, ADR 0032). The engine lives in `@storyshelf/image` (a leaf package), re-exported from `core/diff`.
+Uses `pixelmatch` for pixel comparison and a PNG codec for decode/encode: `pngjs` by default, or opt-in `sharp` (`testing.images.engine`, ADR 0032). The engine lives in `@storyshelf/image` (a leaf package), re-exported from `core/diff`.
 
 ### Diff Overlay
 
@@ -844,6 +844,7 @@ StoryShelf/
       src/
         index.tsx         # createShelfApp entry point (ShelfApp/ShelfRouter)
         routers/          # API + UI routes (incl. health, OpenAPI)
+        routes/           # route classification table (hosting/testing/review/both) + completeness test
         pages/            # UI page components (server-rendered JSX)
         ui/               # DocumentLayout, theme, components, styles
         middleware/       # request id/logging/gate/rate-limit/scope/auth

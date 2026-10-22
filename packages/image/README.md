@@ -15,7 +15,7 @@ Two codecs decode and encode the PNGs; the comparison itself is always pixelmatc
 Most users never import this package; set the engine on `createShelfApp`:
 
 ```ts
-createShelfApp({ ..., images: { engine: "sharp" } });
+createShelfApp({ ..., testing: { runner, images: { engine: "sharp" } } });
 ```
 
 or set `STORYSHELF_IMAGE_ENGINE=sharp`. The option wins over the variable.

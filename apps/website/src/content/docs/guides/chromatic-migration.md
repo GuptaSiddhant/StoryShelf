@@ -121,7 +121,7 @@ StoryShelf reads both `chromatic:` and `storyshelf:` parameter keys. **`storyshe
 | **Cross-browser**         | Chrome, FF, Safari, Edge (branded, cloud) | Chromium / Firefox / WebKit, one per build | Set in project Settings → General or via API; baselines tracked per browser; no branded Safari/Edge |
 | **Modes/Globals**         | Yes                                       | No                                         | Theme/locale matrices need workarounds                                                              |
 | **A11y testing**          | Yes (aXe)                                 | axe-core checks, opt-in (`runA11y`)        | Results are non-blocking annotations, not a review gate                                                      |
-| **Cloud parallelization** | Automatic                                 | Manual (`capture.concurrency`)             | Limited by your server CPU/memory                                                                   |
+| **Cloud parallelization** | Automatic                                 | Manual (`testing.concurrency`)             | Limited by your server CPU/memory                                                                   |
 | **Baseline export**       | UI only                                   | API + UI                                   | Cannot bulk-import Chromatic baselines                                                              |
 | **Flake detection**       | Auto-detect                               | Explicit `flakyTest`                       | Manual marking required                                                                             |
 

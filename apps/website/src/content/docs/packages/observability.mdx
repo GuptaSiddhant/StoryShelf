@@ -35,7 +35,7 @@ const observability = await initObservabilityFromEnv();
 const app = createShelfApp({
   database,
   storage,
-  capture: { runner: captureRunner },
+  testing: { runner: captureRunner },
   logger: createShelfLogger({ mixin: otelLogMixin }),
   observability,
   config: { scratchDir: dataDir },
