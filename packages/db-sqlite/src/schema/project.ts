@@ -20,6 +20,8 @@ export const projects = sqliteTable("projects", {
   modesAllowlist: text("modes_allowlist"),
   automigrate: integer("automigrate", { mode: "boolean" }).notNull().default(false),
   aiProfile: text("ai_profile"),
+  reviewEnabled: integer("review_enabled", { mode: "boolean" }).notNull().default(true),
+  reviewApprovals: integer("review_approvals").notNull().default(1),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
@@ -44,6 +46,8 @@ export interface Project {
   modesAllowlist: string | null;
   automigrate: boolean;
   aiProfile: string | null;
+  reviewEnabled: boolean;
+  reviewApprovals: number;
   createdAt: string;
   updatedAt: string;
 }

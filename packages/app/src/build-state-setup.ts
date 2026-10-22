@@ -16,6 +16,7 @@ import {
 } from "@storyshelf/core/capture";
 import type { ShelfOptions } from "@storyshelf/core/config";
 import { ProjectModel } from "@storyshelf/core/models";
+import { buildStateFlags } from "./build-state-flags.ts";
 import { credentialKeys } from "./credential-keys.ts";
 import type { JobQueue } from "./job-queue.ts";
 import { notifySystemWith } from "./notify.ts";
@@ -42,8 +43,7 @@ export function setupBuildState(
     secret: credentialKeys(runtime.config),
     config: runtime.config,
     publicOrigin: async () => await runtime.publicOrigin.url(),
-    // Review is per project; the review setting feeds `review` once it exists.
-    flags: () => ({ testing: options.testing !== undefined, review: false }),
+    flags: (project) => buildStateFlags(options.testing !== undefined, project),
     logger: runtime.logger.child({ component: "build-state" }),
   };
   if (jobs === null) {

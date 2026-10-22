@@ -20,6 +20,8 @@ export const projects = mysqlTable("projects", {
   modesAllowlist: text("modes_allowlist"),
   automigrate: boolean("automigrate").notNull().default(false),
   aiProfile: text("ai_profile"),
+  reviewEnabled: boolean("review_enabled").notNull().default(true),
+  reviewApprovals: int("review_approvals").notNull().default(1),
   createdAt: datetime("created_at", { mode: "string", fsp: 3 }).notNull(),
   updatedAt: datetime("updated_at", { mode: "string", fsp: 3 }).notNull(),
 });
@@ -44,6 +46,8 @@ export interface Project {
   modesAllowlist?: string | null;
   automigrate: boolean;
   aiProfile: string | null;
+  reviewEnabled: boolean;
+  reviewApprovals: number;
   createdAt: string;
   updatedAt: string;
 }

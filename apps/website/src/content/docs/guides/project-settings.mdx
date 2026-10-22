@@ -22,6 +22,10 @@ Name, `git_repository` (`owner/repo`), `git_default_branch` (baseline fallback, 
 
 Which engines each build is captured on and which [modes](/guides/modes/) run. **Browsers**: a primary target plus up to two more (`browsers` via `PATCH`, primary first), chosen from the targets the runner has ready (unavailable ones are listed with the reason and refused on save); each target keeps its own baselines, and one approval covers a story and mode on all of them. **Mode allowlist**: mode names to run (`modesAllowlist`); empty runs every mode declared in your stories' parameters.
 
+## Review
+
+`reviewEnabled` (default `true`) and `reviewApprovals` (default `1`, 1 to 20), edited by project admins through `PATCH /api/v1/projects/:slug` and returned by `GET`. Review on means a build on a non-default branch of a project without `testing` waits as `pending` for a build-level verdict; review off accepts it when publishing ends and hides the verdict routes (they answer 404; nothing is deleted). `reviewApprovals` is how many reviewers must approve before such a build is approved. The default branch is never held. See [Review](/guides/review/#reviewing-without-testing).
+
 ## Label types
 
 Project-defined kinds (`pr`, `mr`, `jira`, `linear`, `figma`, `custom`) with `link_template` (`https://github.com/{repo}/pull/{value}`) and optional `color`. `persistent` and `branch` are seeded and read-only. Manage in **Settings → Labels** or via `GET/POST/PATCH/DELETE /api/v1/projects/:slug/label-types/:key`. See [Labels concept](/concepts/labels/) for linking and stable URLs.

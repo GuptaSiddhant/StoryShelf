@@ -4,6 +4,8 @@ export interface Comment {
   projectId: string;
   buildId: string;
   snapshotId: string | null;
+  /** Storybook story id of a story-anchored comment (ADR 0013, decision 2); null otherwise. */
+  storyId: string | null;
   userId: string | null;
   body: string;
   parentId: string | null;

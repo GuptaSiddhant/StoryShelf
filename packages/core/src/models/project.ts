@@ -43,6 +43,8 @@ export class ProjectModel {
       storybookMeta: input.storybookMeta ? JSON.stringify(input.storybookMeta) : null,
       ...(input.executePlay === undefined ? {} : { executePlay: input.executePlay }),
       ...(input.playTimeoutMs === undefined ? {} : { playTimeoutMs: input.playTimeoutMs }),
+      ...(input.reviewEnabled === undefined ? {} : { reviewEnabled: input.reviewEnabled }),
+      ...(input.reviewApprovals === undefined ? {} : { reviewApprovals: input.reviewApprovals }),
       createdAt: now,
       updatedAt: now,
     })) as unknown as Project;
@@ -122,4 +124,8 @@ export interface ProjectCreateInput {
   executePlay?: boolean;
   /** Per-story play timeout in milliseconds (column default applies when omitted). */
   playTimeoutMs?: number;
+  /** Review switch (column default true when omitted; ADR 0013, decision 1). */
+  reviewEnabled?: boolean;
+  /** Approvals a build needs with `testing` off (column default 1 when omitted). */
+  reviewApprovals?: number;
 }

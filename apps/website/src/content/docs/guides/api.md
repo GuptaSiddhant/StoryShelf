@@ -49,6 +49,7 @@ Unconfigured servers (no auth adapter) accept all requests.
 | Builds      | `/api/v1/projects/{slug}/builds`                                                          | Upload builds, list, retry, review                       |
 | Snapshots   | `/api/v1/projects/{slug}/builds/{id}/snapshots`                                           | Inspect and approve/reject individual screenshots        |
 | Comments    | `/api/v1/projects/{slug}/builds/{id}/comments`                                            | Review discussion threads                                |
+| Reviews     | `/api/v1/projects/{slug}/builds/{id}/reviews`                                             | Build-level verdicts (approver and admin)                |
 | Label types | `/api/v1/projects/{slug}/label-types`                                                     | Project-defined build label schemas                      |
 | Members     | `/api/v1/projects/{slug}/members`                                                         | Project-scoped roles                                     |
 | Tokens      | `/api/v1/projects/{slug}/tokens`                                                          | CI access tokens                                         |

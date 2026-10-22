@@ -1,7 +1,7 @@
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
 import type { ShelfOptions } from "@storyshelf/core/config";
 import { createShelfLogger } from "@storyshelf/core/logger";
-import { NotificationChannelModel } from "@storyshelf/core/models";
+import { NotificationChannelModel, ProjectModel } from "@storyshelf/core/models";
 import {
   createTestBuild,
   createTestProject,
@@ -37,7 +37,7 @@ function recordingMessageProvider(sent: unknown[]): NotifierProvider {
   };
 }
 
-async function world(options: { testing?: boolean } = {}) {
+async function world(options: { testing?: boolean; review?: boolean } = {}) {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
   const git = makeFakeStateNotifier();
@@ -52,6 +52,7 @@ async function world(options: { testing?: boolean } = {}) {
   } as unknown as ShelfOptions;
   const runtime = resolveRuntime(shelf);
   const project = await createTestProject(db, db.tables);
+  await new ProjectModel(db).update(project.id, { reviewEnabled: options.review ?? true });
   const build = await createTestBuild(db, db.tables, project.id);
   const channels = new NotificationChannelModel(db, undefined, SECRET);
   const git1 = await channels.create({
@@ -61,6 +62,12 @@ async function world(options: { testing?: boolean } = {}) {
     secret: "token",
   });
   return { db, shelf, runtime, project, build, channels, git, git1, sent };
+}
+
+function contexts(calls: { target: { kind: string; context?: string } }[]): string[] {
+  return calls.flatMap((call) =>
+    call.target.kind === "status" && call.target.context !== undefined ? [call.target.context] : [],
+  );
 }
 
 describe("setupBuildState", () => {
@@ -93,12 +100,22 @@ describe("setupBuildState", () => {
     expect(await jobs.get().poll()).toBeNull();
   });
 
-  it("shows only the Storybook status without testing", async () => {
-    const w = await world({ testing: false });
+  it("shows only the Storybook status without testing and review", async () => {
+    const w = await world({ testing: false, review: false });
     await setupBuildState(w.shelf, w.runtime, null).publisher.request(w.build.id);
-    expect(
-      w.git.calls.flatMap((call) => (call.target.kind === "status" ? [call.target.context] : [])),
-    ).toEqual(["storyshelf/storybook"]);
+    expect(contexts(w.git.calls)).toEqual(["storyshelf/storybook"]);
+  });
+
+  it("shows the review gate and the Storybook status without testing, with review on", async () => {
+    const w = await world({ testing: false, review: true });
+    await setupBuildState(w.shelf, w.runtime, null).publisher.request(w.build.id);
+    expect(contexts(w.git.calls)).toEqual(["storyshelf/review", "storyshelf/storybook"]);
+  });
+
+  it("keeps testing as the only gate with testing on, whatever the review switch says", async () => {
+    const w = await world({ testing: true, review: true });
+    await setupBuildState(w.shelf, w.runtime, null).publisher.request(w.build.id);
+    expect(contexts(w.git.calls)).toEqual(["storyshelf/testing", "storyshelf/storybook"]);
   });
 
   it("raises sys:notify-failed to the site-wide channels when a delivery is given up", async () => {

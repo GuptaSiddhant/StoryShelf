@@ -54,6 +54,7 @@ async function upsertContentRef(hash: string): Promise<void> {
     // ignore — content_refs may not exist on old DB
   }
 }
+import { registerBuildReviews } from "./build-reviews.ts";
 import { registerComments } from "./comments.ts";
 import { flashHx } from "./flash.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
@@ -248,6 +249,7 @@ export function registerBuilds(app: ShelfRouter): void {
 
   registerSnapshots(app);
   registerComments(app);
+  registerBuildReviews(app);
   registerAttempts(app);
 }
 

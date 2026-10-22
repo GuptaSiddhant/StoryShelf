@@ -44,11 +44,15 @@ export class CommentModel {
     if (!project) {
       throw new Error(`Project not found: ${projectId}`);
     }
+    if (input.snapshotId !== undefined && input.storyId !== undefined) {
+      throw new Error("A comment anchors to a build, a story or a snapshot, not several");
+    }
     return (await this.db.insert(this.tables.comments, {
       id: ulid(),
       projectId,
       buildId,
-      snapshotId: input.snapshotId,
+      snapshotId: input.snapshotId ?? null,
+      storyId: input.storyId ?? null,
       userId,
       body: input.body,
       parentId: input.parentId,
@@ -69,6 +73,9 @@ export class CommentModel {
 /** Input for creating a review comment. */
 export interface CommentCreateInput {
   body: string;
+  /** Anchor to a snapshot (builds with snapshots). */
   snapshotId?: string;
+  /** Anchor to a story of the build's catalog; not together with `snapshotId` (ADR 0013, decision 2). */
+  storyId?: string;
   parentId?: string;
 }

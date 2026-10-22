@@ -9,7 +9,7 @@ import { ProjectModel } from "@storyshelf/core/models";
 import { SnapshotModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
 import type { Build, Snapshot } from "@storyshelf/core/schema";
-import { type ProjectRole, BUILD_STATUSES } from "@storyshelf/core/types";
+import { type BuildStatus, type ProjectRole, BUILD_STATUSES } from "@storyshelf/core/types";
 import { HTTPException } from "hono/http-exception";
 import { Readable, Transform } from "node:stream";
 import type { ReadableStream as NodeWebStream } from "node:stream/web";
@@ -158,30 +158,40 @@ function rollupStatus(snapshots: Snapshot[]): "reviewing" | "rejected" | "approv
 
 /** Recompute a build's counts and roll its status up from its snapshots. */
 export async function refreshBuild(buildId: string): Promise<void> {
-  const { db, config } = getStore();
+  const { db } = getStore();
   await new BuildModel(db).updateCounts(buildId);
   const snapshots = await new SnapshotModel(db).listByBuild(buildId);
   const status = rollupStatus(snapshots);
+  if (!(await new BuildModel(db).get(buildId))) return;
+  await new BuildModel(db).setStatus(buildId, status);
+  await announceBuildStatus(buildId, status, { snapshotCount: snapshots.length });
+}
+
+/**
+ * Tell the world a build reached `status`: its git channels, the `build:<status>` webhook and the
+ * project's notification channels. Every route that moves a build to a decided status ends here.
+ */
+export async function announceBuildStatus(
+  buildId: string,
+  status: BuildStatus,
+  extra: { snapshotCount?: number } = {},
+): Promise<void> {
+  const { db, config } = getStore();
   const build = await new BuildModel(db).get(buildId);
   if (!build) return;
-  await new BuildModel(db).setStatus(buildId, status);
   await requestBuildState(buildId);
+  const payload = { buildId, status, ...extra };
   await emitWebhookEvent(
     db,
     { webhooks: getStore().db.tables.webhooks },
     build.projectId,
     `build:${status}`,
-    { buildId, status, snapshotCount: snapshots.length },
+    payload,
     credentialKeys(config),
   );
   const project = await new ProjectModel(db).get(build.projectId);
   if (!project) return;
-  await notifyProject(
-    project,
-    `build:${status}`,
-    { buildId, status, snapshotCount: snapshots.length },
-    `/builds/${buildId}`,
-  );
+  await notifyProject(project, `build:${status}`, payload, `/builds/${buildId}`);
 }
 
 /**

@@ -1,5 +1,6 @@
 /** Ask for a build's state to be shown on its project's git channels (ADR 0014, decision 5). */
 import { createBuildStatePublisher } from "@storyshelf/core/capture";
+import { buildStateFlags } from "./build-state-flags.ts";
 import { credentialKeys } from "./credential-keys.ts";
 import { getStore, type Store } from "./store.ts";
 
@@ -23,7 +24,7 @@ function inlinePublisher(store: Store): ReturnType<typeof createBuildStatePublis
       notifiers: store.notifiers,
       secret: credentialKeys(store.config),
       config: store.config,
-      flags: () => ({ testing: store.testing, review: false }),
+      flags: (project) => buildStateFlags(store.testing, project),
       logger: store.logger,
     },
   });

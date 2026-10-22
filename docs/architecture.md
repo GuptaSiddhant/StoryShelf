@@ -40,6 +40,8 @@ projects (
   pixel_threshold     real NOT NULL DEFAULT 0.1,    -- per-pixel color distance (0-1)
   max_diff_ratio      real NOT NULL DEFAULT 0.01,   -- max allowed diff ratio (0-1)
   public_branch_regex text,                    -- branches whose builds are publicly viewable (ADR 0011)
+  review_enabled      boolean NOT NULL DEFAULT true,   -- review on: non-default builds wait for a verdict (ADR 0013, decision 1)
+  review_approvals    integer NOT NULL DEFAULT 1,      -- approvals a build needs with `testing` off (ADR 0013, decision 3)
   created_at          text NOT NULL,
   updated_at          text NOT NULL
 );
@@ -110,7 +112,7 @@ baselines (
   UNIQUE(project_id, story_id, viewport_name, browser, branch)
 );
 
--- Review comments (threaded, on a build or a specific snapshot)
+-- Review comments (threaded; anchored to the build, a story or a snapshot, exactly one of the three)
 comments (
   id                  text PRIMARY KEY,
   project_id          text NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -121,8 +123,20 @@ comments (
   parent_id           text REFERENCES comments(id) ON DELETE CASCADE,   -- NULL = top-level, else reply
   resolved            boolean NOT NULL DEFAULT false,                   -- feedback addressed
   created_at          text NOT NULL,
-  updated_at          text NOT NULL
+  updated_at          text NOT NULL,
+  story_id            text                                              -- Storybook story id of a story comment (ADR 0013, decision 2)
 );
+
+-- Build-level verdicts (ADR 0013, decision 3): a reviewer's newest row is their verdict
+build_reviews (
+  id          text PRIMARY KEY,                           -- ULID
+  build_id    text NOT NULL REFERENCES builds(id) ON DELETE CASCADE,
+  user_id     text REFERENCES users(id) ON DELETE CASCADE, -- NULL = no user (auth off, bearer token): one anonymous reviewer
+  verdict     text NOT NULL,                              -- approved|rejected
+  body        text,
+  created_at  text NOT NULL                               -- strictly increasing within a build, so "newest" never ties
+);
+-- build_reviews_build_id_idx (build_id)
 
 -- Label types: project-defined kinds of build labels (with external link templates).
 -- `persistent` is a built-in, non-removable type: builds bearing it are exempt from purge.
@@ -671,7 +685,11 @@ handles HTTP.
 
 ### Review Comments
 
-Reviewers and developers can leave **threaded comments** on any snapshot (or on the build as a whole), and mark threads **resolved** once addressed. A comment on an unresolved snapshot keeps it in `changed` until the author pushes a fix and it is re-approved — this is the "request changes" flow. Comments persist on the build until the build is purged.
+Reviewers and developers can leave **threaded comments** on any snapshot, on a story of the build's catalog (`story_id`), or on the build as a whole (an anchor is exactly one of the three), and mark threads **resolved** once addressed. A comment on an unresolved snapshot keeps it in `changed` until the author pushes a fix and it is re-approved — this is the "request changes" flow. Comments persist on the build until the build is purged.
+
+### Build-level review
+
+With `testing` off (ADR 0013, decision 3) the verdicts in `build_reviews` decide a `pending` build. `deriveReviewStatus` (`core/src/models/build-review-status.ts`, pure) takes `testing`, the review switch, the required approvals and a build's reviews: `null` when they do not decide (`testing` on, or review off), `rejected` when any reviewer's latest verdict (`latestVerdicts`: newest `created_at`, then id; a missing user is one anonymous reviewer) is `rejected`, `approved` when at least `max(1, review_approvals)` latest verdicts approve, else `pending`. `BuildReviewModel.add` keeps `created_at` strictly increasing within a build. The routes `GET|POST /api/v1/projects/:slug/builds/:buildId/reviews` (`app/src/routers/build-reviews*.ts`, class `review`; read is `viewer`+, write is approver and admin) answer 404 when the project has review off; `giveVerdict` stores the row, applies the derived status to a build that is `pending`, `approved` or `rejected` (a `failed` build answers 409; with `testing` on the verdict is a sign-off that moves nothing), and ends in `announceBuildStatus` (git state, `build:<status>` webhook, notifications) for `approved`/`rejected` or `requestBuildState` otherwise. A verdict belongs to its build: a new push is a new build and needs its own approvals. The `review` class gate (a middleware that answers 404 for every `review` route of a project with review off) is a later change; today the verdict routes check the switch themselves.
 
 ### PR Status Checks & Merge Gate
 
@@ -680,7 +698,7 @@ A git channel (a `notification_channels` row whose provider declares `delivery: 
 | Status               | Shown when                                                                | State                                                                                                                                                  |
 | -------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `<prefix>/testing`   | `testing` is on                                                           | `pending` while captured or while review is open, `success` when all `new`/`changed` snapshots are approved, `failure` when rejected or capture failed |
-| `<prefix>/review`    | `testing` is off and review is on (not posted yet: no review flag exists) | build-level verdict                                                                                                                                    |
+| `<prefix>/review`    | `testing` is off and the project has review on (`projects.review_enabled`) | `pending` until the build is decided, `success` once approved by verdicts, `failure` when rejected or failed (see Build-level review)               |
 | `<prefix>/storybook` | every build with a commit                                                 | `success` linking the published Storybook, `failure` for a failed build that never published, else `pending`; informational                            |
 
 The point of the `testing` status is to **block the merge**: the repo owner marks it as a _required check_ in GitHub branch protection (or a required pipeline/approval rule in GitLab), so a PR cannot merge until StoryShelf reports `success`. This is the v1 primitive.
@@ -765,7 +783,7 @@ Beyond diff review, StoryShelf publishes the uploaded Storybook build as a brows
 
 - Each build's `storybook/{buildId}/` statics are served as the browsable Storybook.
 - **Publishing does not depend on `testing`** (ADR 0006, decision 10; `core/src/capture/publish/`). A zip up to `maxInlineUnzipSize` (default 50 MB, counted while the upload streams) is extracted inline in the upload request; a larger one becomes a `publish` job on the database queue (`capture_jobs`), run by a consumer that every instance with a database starts at `lifecycle.setup()` and drains at `teardown()`. The file-by-file route (`/dedup`, `/content`, `/manifest`) needs no extraction and completes publishing when the manifest is stored. On a serverless host (`AWS_LAMBDA_FUNCTION_NAME`, `VERCEL`, `NETLIFY`) no consumer runs and an over-limit zip is refused with `413` pointing to the file-by-file route. Extraction is capped (`maxZipEntries` default 50 000, `maxUnzippedBytes` default 2 GiB, stream-counted) and refuses absolute and `..` paths.
-- **Acceptance when publishing ends** (`publishVerdict`, the single owner of the rule): with no capture to run, a published build on the project's default branch becomes `approved`, a failed publish makes it `failed`, and a non-default build stays `pending` (the review-off acceptance arrives with the per-project review setting). No approval event or webhook fires, and a build that left `pending` is never touched again. With a capture to run, publishing leaves the status to capture. `afterPublish` hooks (`PublishCompleter`) run after every publish for later features such as the catalog.
+- **Acceptance when publishing ends** (`publishVerdict`, the single owner of the rule): with no capture to run, a published build on the project's default branch becomes `approved`, a failed publish makes it `failed`, and a non-default build becomes `approved` when the project has review off (`projects.review_enabled = false`) and stays `pending` for a build-level verdict otherwise. No approval event or webhook fires, and a build that left `pending` is never touched again. With a capture to run, publishing leaves the status to capture. `afterPublish` hooks (`PublishCompleter`) run after every publish for later features such as the catalog.
 - **`testing` gates the app** (ADR 0006, decisions 1, 3 and 8). `Store.testing` is `options.testing !== undefined`; `requireTesting` (`app/src/middleware/require-testing.ts`, mounted after `setupGate` and before the CSRF and rate-limit guards) takes the class of the last classified route Hono matched (`classOfRoute`) and answers 404 for `testing` routes when it is off (JSON under `/api/`, text elsewhere). Navigation (`projectNavItems`, settings tabs, the build table's Review button) hides what is off; the System page shows a notice with `countHiddenSnapshots`; `runBootTasks` logs the mode (`logHostingOnlyMode`); the create-build response carries `testing`, which `storyshelf upload` reports. `resolveShelfOptions` requires `runner` or `queue` with `testing` and refuses `testing.runner` on a database whose metadata says `supportsTesting: false` (D1); `assertServerless` (core) refuses `testing.runner` on AWS Lambda and warns on Vercel and Netlify, unless `STORYSHELF_ALLOW_SERVERLESS=1`. A remote-queue-only instance (`queue` without `runner`) is exempt from both checks.
 - **The catalog** (`core/src/capture/catalog/`; ADR 0006, decision 9): the first `afterPublish` hook (`createCatalogHook`) reads the published `index.json` (`stories.json` on older Storybooks; test entries left out), writes the `build_components` rows and then `catalog.json` (the marker that cataloguing finished), whatever the build's verdict and with `testing` on or off. `createCatalogLoader` serves a build's catalog from `catalog.json` through an in-process LRU keyed by build id and catalogues a build without one lazily from its persisted statics; a build with no readable index has no catalog and its pages say so. Retention removes the rows with the build and the file with the build's prefix.
 - **Library, component and build pages read the catalog** in both modes; `testing` (`testingEnabled()` in `app/src/store.ts`: `Store.testing`, true when `options.testing` is set) layers snapshot data onto them. The library shows the latest build of the branch whatever its status.
@@ -876,8 +894,10 @@ POST   /api/v1/projects/:projectId/builds/:buildId/reject-all
 
 # Comments
 GET    /api/v1/projects/:projectId/builds/:buildId/comments
-POST   /api/v1/projects/:projectId/builds/:buildId/comments         # { body, snapshotId?, parentId? }
+POST   /api/v1/projects/:projectId/builds/:buildId/comments         # { body, snapshotId? | storyId?, parentId? }
 POST   /api/v1/projects/:projectId/builds/:buildId/comments/:commentId/resolve
+GET    /api/v1/projects/:projectId/builds/:buildId/reviews          # verdicts and where the build stands (404 with review off)
+POST   /api/v1/projects/:projectId/builds/:buildId/reviews          # { verdict: approved|rejected, body? } (approver, admin)
 
 # Labels
 GET    /api/v1/projects/:projectId/label-types                      # list label types

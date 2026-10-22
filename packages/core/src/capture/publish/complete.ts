@@ -81,6 +81,7 @@ async function applyVerdict(
     published: outcome.ok,
     captureWillRun: options.captureWillRun,
     defaultBranch: build.gitBranch === project.gitDefaultBranch,
+    reviewEnabled: project.reviewEnabled !== false,
     status: build.status,
   });
   if (!outcome.ok) {

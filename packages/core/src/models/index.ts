@@ -49,6 +49,12 @@ export {
   type InsightTables,
 } from "./insight.ts";
 export { BuildModel, isPublicBuild, type BuildCreateInput, type BuildListFilter } from "./build.ts";
+export { BuildReviewModel, type BuildReviewTables } from "./build-review.ts";
+export {
+  deriveReviewStatus,
+  latestVerdicts,
+  type ReviewStatusInput,
+} from "./build-review-status.ts";
 export { CommentModel, type CommentCreateInput } from "./comment.ts";
 export {
   componentHistory,

@@ -11,6 +11,8 @@ export interface PublishFacts {
   captureWillRun: boolean;
   /** Whether the build is on the project's default branch. */
   defaultBranch: boolean;
+  /** The project's review switch (`projects.review_enabled`, ADR 0013, decision 1). */
+  reviewEnabled: boolean;
   /** The build's status right now. */
   status: string;
 }
@@ -22,9 +24,13 @@ export interface PublishFacts {
  * - Not `pending` any more (already accepted, failed or reviewed): `unchanged`, so a repeated
  *   publish (job redelivery after a lost lease) changes nothing.
  * - Publish failed: `failed`.
- * - Published on the default branch: `approved`.
- * - Published on another branch: `unchanged`, the build waits as `pending` for a verdict. The
- *   review-off auto-accept comes with the per-project review setting.
+ * - Published on the default branch: `approved`, whatever the review switch says.
+ * - Published on another branch with review off: `approved`, nobody will sign it off.
+ * - Published on another branch with review on: `unchanged`, the build waits as `pending` for a
+ *   build-level verdict (ADR 0013, decision 3).
+ *
+ * Accepting here is not an approval: no event, webhook or notification (`build:created` announced
+ * the upload), so nothing is asked of a reviewer and nothing is reported as one.
  */
 export function publishVerdict(facts: PublishFacts): "approved" | "failed" | "unchanged" {
   if (facts.captureWillRun || facts.status !== "pending") {
@@ -33,5 +39,5 @@ export function publishVerdict(facts: PublishFacts): "approved" | "failed" | "un
   if (!facts.published) {
     return "failed";
   }
-  return facts.defaultBranch ? "approved" : "unchanged";
+  return facts.defaultBranch || !facts.reviewEnabled ? "approved" : "unchanged";
 }
