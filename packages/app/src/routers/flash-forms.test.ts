@@ -61,6 +61,16 @@ describe("form success toasts", () => {
     expect(flashOf(response)?.message).toBe("Label type added");
   });
 
+  it("flashes after editing a label type", async () => {
+    const app = await setup();
+    await post(app, "/projects/docs/settings/labels", { key: "ticket", labelName: "Ticket" });
+    const response = await post(app, "/projects/docs/settings/labels/ticket", {
+      labelName: "Ticket",
+      linkTemplate: "https://t.example.com/{value}",
+    });
+    expect(flashOf(response)?.message).toBe("Label type saved");
+  });
+
   it("tells the user a created token is shown only once", async () => {
     const app = await setup();
     const response = await post(app, "/projects/docs/settings/tokens", { tokenName: "ci" });

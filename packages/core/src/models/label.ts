@@ -49,6 +49,7 @@ export class LabelModel {
           projectId,
           key,
           name: SEEDED_NAMES[key] ?? key,
+          linkTemplate: SEEDED_LINK_TEMPLATES[key],
           createdAt: now,
         });
       }),
@@ -194,4 +195,10 @@ const SEEDED_NAMES: Record<string, string> = {
   linear: "Linear issue",
   figma: "Figma file",
   custom: "Custom",
+};
+
+/** Default link templates; jira, linear and figma are org-specific, so they stay unset. */
+const SEEDED_LINK_TEMPLATES: Record<string, string | undefined> = {
+  pr: "https://github.com/{repo}/pull/{value}",
+  mr: "https://gitlab.com/{repo}/-/merge_requests/{value}",
 };
