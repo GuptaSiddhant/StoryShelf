@@ -1,4 +1,5 @@
-import type { PollableCaptureQueue } from "@storyshelf/core/adapter/capture-queue";
+import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import { createDatabaseCaptureQueue } from "@storyshelf/core/capture";
 import { BuildModel, CaptureAttemptModel } from "@storyshelf/core/models";
 import {
   createTestBuild,
@@ -9,16 +10,30 @@ import {
 import { pino } from "pino";
 import { describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "../index.tsx";
+import { stubRunner } from "../test-runner.ts";
 
-function queueWith(cancel: (id: string) => Promise<boolean>): PollableCaptureQueue {
+vi.mock("../job-queue.ts", async (original) => {
+  const real = await original<typeof import("../job-queue.ts")>();
   return {
-    metadata: { name: "mock", version: "0.0.0", kind: "mock", category: "capture-queue" },
-    enqueue: vi.fn(async () => {}),
-    status: vi.fn(async () => null),
-    active: vi.fn(async () => []),
-    recent: vi.fn(async () => []),
-    cancel,
-  } as unknown as PollableCaptureQueue;
+    ...real,
+    // Enqueue and cancel as usual, but hand no job out: no consumer races the assertions.
+    createJobQueue: (...args: Parameters<typeof real.createJobQueue>) => {
+      const queue = real.createJobQueue(...args);
+      return {
+        ...queue,
+        get: () => ({
+          ...queue.get(),
+          poll: async () => await new Promise<null>((resolve) => setTimeout(resolve, 100, null)),
+        }),
+      };
+    },
+  };
+});
+
+/** Status of the build's capture jobs on the database queue. */
+async function jobStatuses(db: DatabaseAdapter, buildId: string): Promise<string[]> {
+  const rows = await db.list(db.tables.captureJobs);
+  return rows.filter((row) => row["buildId"] === buildId).map((row) => String(row["status"]));
 }
 
 async function seed(status: string, testing = true) {
@@ -27,26 +42,29 @@ async function seed(status: string, testing = true) {
   const project = await createTestProject(db, db.tables, { name: "app" });
   const created = await createTestBuild(db, db.tables, project.id);
   await new BuildModel(db).setStatus(created.id, status as never);
-  const cancel = vi.fn(async () => true);
   const app = createShelfApp({
     database: db,
     storage,
     logger: pino({ level: "silent" }),
-    ...(testing ? { testing: { queue: queueWith(cancel) } } : {}),
+    ...(testing ? { testing: { runner: stubRunner() } } : {}),
   });
   const url = `/api/v1/projects/app/builds/${created.id}/cancel`;
-  return { app, db, cancel, build: created, url };
+  await createDatabaseCaptureQueue(db, { kinds: ["capture"] }).enqueueJob({
+    kind: "capture",
+    buildId: created.id,
+  });
+  return { app, db, build: created, url };
 }
 
 describe("POST /builds/:buildId/cancel", () => {
   it("cancels the build's jobs, closes its attempts and fails the build", async () => {
-    const { app, db, cancel, build, url } = await seed("capturing");
+    const { app, db, build, url } = await seed("capturing");
     const attempts = new CaptureAttemptModel(db);
     const attempt = await attempts.startAttempt(build.projectId, build.id);
     const response = await app.request(url, { method: "POST" });
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ id: build.id, status: "failed" });
-    expect(cancel).toHaveBeenCalledWith(build.id);
+    expect(await jobStatuses(db, build.id)).toEqual(["cancelled"]);
     expect((await new BuildModel(db).get(build.id))?.status).toBe("failed");
     expect((await attempts.listByBuild(build.id)).find((a) => a.id === attempt.id)).toMatchObject({
       status: "cancelled",
@@ -61,10 +79,10 @@ describe("POST /builds/:buildId/cancel", () => {
   it.each(["reviewing", "approved", "rejected", "failed"])(
     "answers 409 for a %s build, and leaves it and its jobs alone",
     async (status) => {
-      const { app, db, cancel, build, url } = await seed(status);
+      const { app, db, build, url } = await seed(status);
       const response = await app.request(url, { method: "POST" });
       expect(response.status).toBe(409);
-      expect(cancel).not.toHaveBeenCalled();
+      expect(await jobStatuses(db, build.id)).toEqual(["queued"]);
       expect((await new BuildModel(db).get(build.id))?.status).toBe(status);
     },
   );

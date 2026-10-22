@@ -1,8 +1,8 @@
 import type { ShelfConfig } from "@storyshelf/core/config";
 /**
  * Notifications need a public origin (ADR 0014, decision 11): every message carries a link and
- * every git status targets one, so while the resolver (ADR 0007, decision 6) finds no origin
- * nothing is sent. Pausing is not a failure: no channel is marked as errored, and the System page
+ * every git status targets one, so while the resolver (ADR 0007, decision 6) finds no confirmed
+ * origin (a detected one counts only once an admin confirmed it) nothing is sent. Pausing is not a failure: no channel is marked as errored, and the System page
  * and the notification settings say what to set.
  */
 import type { Logger } from "@storyshelf/core/logger";

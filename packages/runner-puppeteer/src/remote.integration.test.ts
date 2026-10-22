@@ -81,7 +81,7 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("remote capture over CDP
     const result = await runner.render({
       buildId: "remote-cdp",
       storybookDir: join(FIXTURE_DIR, "storybook-static"),
-      storybookUrl: `${served?.url}/iframe.html`,
+      storybookUrl: `${served?.url}/`,
       stories: STORIES,
       viewports: [{ name: "desktop", width: 1280, height: 720 }],
     });

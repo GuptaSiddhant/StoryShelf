@@ -38,6 +38,14 @@ export function resolveBrowsers(project: {
   return browsers;
 }
 
+/**
+ * The primary target of a resolved target list: its first entry. The single owner of "primary":
+ * axe runs only here (ADR 0004, decision 6), so one story is not checked once per target.
+ */
+export function primaryTargetOf(targets: readonly CaptureTarget[]): CaptureTarget | undefined {
+  return targets[0];
+}
+
 /** Throw when more than {@link MAX_BROWSERS} targets are requested. */
 export function assertBrowserCount(browsers: readonly string[]): void {
   if (browsers.length > MAX_BROWSERS) {

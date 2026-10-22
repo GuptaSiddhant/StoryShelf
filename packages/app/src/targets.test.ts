@@ -1,4 +1,5 @@
 import type { CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
+import { NO_SECRET_REASON } from "@storyshelf/core/capture";
 import { describe, expect, it } from "vitest";
 import { runWithStore, type Store } from "./store.ts";
 import { assertTargetsSelectable, runnerTargets, targetLabel } from "./targets.ts";
@@ -33,7 +34,7 @@ describe("runnerTargets", () => {
     const store = storeOf({ runner, config: { secret: "s" }, publicOrigin: origin as never });
     expect((await runnerTargets(store))?.[0]?.status).toBe("ready");
     expect((await runnerTargets(storeOf({ runner })))?.[0]?.status).toEqual({
-      unavailable: "no secret",
+      unavailable: NO_SECRET_REASON,
     });
   });
 });

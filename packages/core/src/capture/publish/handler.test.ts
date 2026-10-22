@@ -65,6 +65,12 @@ async function setup(options: { files?: Record<string, string>; maxEntries?: num
 }
 
 describe("createPublishHandler", () => {
+  it("records the published content in content_refs", async () => {
+    const { db, run } = await setup();
+    await run();
+    expect((await db.list(db.tables.contentRefs)).length).toBe(2);
+  });
+
   it("accepts only jobs that name a build", async () => {
     const { handler } = await setup();
     expect(handler.accepts?.({ buildId: "b1" } as ConsumerJob)).toBe(true);

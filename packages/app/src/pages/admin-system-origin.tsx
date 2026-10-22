@@ -17,7 +17,7 @@ import { csrfField } from "../ui/csrf-field.tsx";
 
 /** What the System page knows about the public origin. */
 export interface PublicOriginView {
-  /** What background jobs use now; `null` when nothing resolves. */
+  /** What background jobs use now (configured, platform or confirmed); `null` when nothing is confirmed. */
   resolved: ResolvedPublicOrigin | null;
   /** The origin an admin's browser reported; `null` when none did. */
   stored: StoredPublicOrigin | null;
@@ -28,7 +28,7 @@ export interface PublicOriginView {
 const SOURCE_LABELS = {
   config: "configured (PUBLIC_BASE_URL)",
   platform: "detected from the hosting platform",
-  admin: "detected from your browser",
+  admin: "confirmed by an admin",
 } as const;
 
 /** Where absolute links in emails, commit statuses and signed Storybook URLs point (ADR 0007). */
@@ -43,10 +43,15 @@ export function PublicOriginCard(props: {
       <SectionTitle>Public origin</SectionTitle>
       <Meta>
         The address links in emails, commit statuses and signed Storybook URLs use. It comes from{" "}
-        <code>PUBLIC_BASE_URL</code>, then the hosting platform, then the address an admin used to
-        open this page.
+        <code>PUBLIC_BASE_URL</code>, then the hosting platform, then an address an admin confirmed
+        here. An address detected from a browser is used for none of these until it is confirmed;
+        sign-in (OAuth redirects) may use the address of the request itself.
       </Meta>
-      {resolved === null ? <NothingResolved learns={learns} /> : <Resolved resolved={resolved} />}
+      {resolved === null ? (
+        <NothingResolved learns={learns} stored={stored} />
+      ) : (
+        <Resolved resolved={resolved} />
+      )}
       {reports ? <div data-report-origin="/admin/public-origin/report" /> : null}
       {learns && stored !== null ? <StoredForm stored={stored} /> : null}
       {learns && stored === null ? <EnterForm /> : null}
@@ -56,13 +61,22 @@ export function PublicOriginCard(props: {
 
 function NothingResolved(props: {
   learns: boolean;
+  stored: StoredPublicOrigin | null;
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
+  if (props.stored !== null && !props.stored.confirmed) {
+    return (
+      <Alert tone="warning" title="Public origin detected, not confirmed">
+        <code>{props.stored.origin}</code> was detected from your browser. Confirm it to enable
+        notifications and signed Storybook URLs: until then no commit status or email is sent, and
+        browsers that reach the Storybook by URL stay unavailable.
+      </Alert>
+    );
+  }
   return (
     <Alert tone="warning" title="No public origin is known">
-      Links in commit statuses and emails are left out, and browsers that reach the Storybook by URL
-      stay unavailable.{" "}
+      Notifications are paused, and browsers that reach the Storybook by URL stay unavailable.{" "}
       {props.learns
-        ? "Reload this page: it reports the address you opened it with."
+        ? "Reload this page: it reports the address you opened it with, for you to confirm."
         : "Set PUBLIC_BASE_URL, or turn authentication on so an admin's browser can report it."}
     </Alert>
   );
@@ -75,10 +89,7 @@ function Resolved(props: {
   return (
     <HStack>
       <code>{resolved.url}</code>
-      <Badge tone={resolved.confirmed ? "success" : "info"}>{SOURCE_LABELS[resolved.source]}</Badge>
-      {resolved.source === "admin" && !resolved.confirmed ? (
-        <Badge tone="warning">unconfirmed</Badge>
-      ) : null}
+      <Badge tone="success">{SOURCE_LABELS[resolved.source]}</Badge>
     </HStack>
   );
 }

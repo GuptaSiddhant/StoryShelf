@@ -27,6 +27,7 @@ import { captureAcrossBrowsers } from "./matrix.ts";
 import { parseModesAllowlist } from "./modes.ts";
 import { persistCapture, type PipelineTables } from "./pipeline.ts";
 import type { CaptureProgress } from "./progress.ts";
+import type { ExtractionLimits } from "./publish/limits.ts";
 import { removeJobScratch } from "./scratch.ts";
 import { fanOutCapture } from "./shards/fan-out.ts";
 import { resolveViewports } from "./sizing.ts";
@@ -50,6 +51,8 @@ export interface CaptureJobOptions {
   storage: StorageAdapter;
   runner: CaptureRunner;
   scratchDir: string;
+  /** Entry and size caps of the zip extraction (`maxZipEntries`, `maxUnzippedBytes`); built-in defaults when unset. */
+  limits?: ExtractionLimits | undefined;
   viewports?: Viewport[];
   logger?: Logger;
   /** Server secret for decrypting webhook secrets at send time. */
@@ -191,6 +194,8 @@ async function runCapturePhases(
             options.scratchDir,
             project.id,
             build.id,
+            undefined,
+            options.limits,
           );
         }),
     );
@@ -209,7 +214,13 @@ async function runCapturePhases(
       "capture.persist-statics",
       async () =>
         await withSpan("capture.persist-statics", async () => {
-          await persistStorybookStatics(options.storage, storybookDir, project.id, build.id);
+          await persistStorybookStatics(
+            options.storage,
+            storybookDir,
+            project.id,
+            build.id,
+            options.db,
+          );
         }),
     );
     logger?.info(

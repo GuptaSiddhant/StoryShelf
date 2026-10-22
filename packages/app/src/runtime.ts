@@ -27,9 +27,6 @@ function addOptionalSnapshots(snap: Record<string, AdapterMetadata>, options: Sh
   if (options.testing?.runner) {
     snap["captureRunner"] = options.testing.runner.metadata;
   }
-  if (options.testing?.queue) {
-    snap["captureQueue"] = options.testing.queue.metadata;
-  }
 }
 
 /**

@@ -1,6 +1,5 @@
 import type { Logger } from "pino";
 import { z } from "zod";
-import type { PollableCaptureQueue } from "./adapters/capture-queue.ts";
 import type { CaptureRunner } from "./adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "./adapters/database.ts";
 import type { DesignProvider } from "./adapters/design.ts";
@@ -300,19 +299,10 @@ export function validateUiConfig(config: Record<string, unknown>): UIConfig {
   return result.data;
 }
 
-/** Testing options: what renders, how jobs are queued, how many run at once, and how screenshots are compared. */
+/** Testing options: what renders, how many run at once, and how screenshots are compared. */
 export interface ShelfTestingOptions {
-  /**
-   * Pure renderer. Required unless `queue` is set: with a user-supplied queue a remote consumer
-   * may render instead, so this process does not.
-   */
-  runner?: CaptureRunner;
-  /**
-   * Replaces the database queue for `capture` jobs (ADR 0006, decision 6). With `runner` it is
-   * consumed by this instance like the database queue; without one it is enqueue-only and
-   * something else consumes it. Publish jobs stay on the database queue.
-   */
-  queue?: PollableCaptureQueue;
+  /** Pure renderer. Required: `testing` without a `runner` throws. */
+  runner: CaptureRunner;
   /** Jobs this instance runs at once; auto-sized from CPU and memory when unset. */
   concurrency?: number;
   /**

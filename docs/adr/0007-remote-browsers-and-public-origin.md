@@ -153,8 +153,10 @@ endpoint URL), and renaming a target starts fresh baselines for it, as switching
 many assets by relative path; a token on a single file URL would not reach them:
 
 ```
-<publicOrigin>/_s/<token>/iframe.html
+<publicOrigin>/_s/<token>/
 ```
+
+The URL core hands a runner is this directory root; the runner opens `iframe.html` under it.
 
 The app strips the `/_s/<token>` prefix, checks the token, and serves the build's static files
 through the same file handler and access rule as the published Storybook routes
@@ -168,7 +170,7 @@ page, no API, no other build).
 
 - **Key.** Derived from `config.secret` with a fixed context string (`storyshelf/storybook-url/v1`),
   so a token can never be confused with a session or any other signature. Without a `secret`, every
-  `reach: "url"` target is `unavailable: "no secret"`. During a rotation a token is also accepted if
+  `reach: "url"` target is `unavailable: "no secret: ..."`. During a rotation a token is also accepted if
   it verifies against `previousSecret`.
 - **Expiry.** A token is minted when a render pass starts, with a lifetime derived from that pass:
   its render budget (`renderBudgetMs`, which grows with the number of captures) plus a grace of
@@ -200,8 +202,9 @@ commit-status links) asks one resolver, which tries in order:
    a working fallback but the wrong link when a custom domain fronts the app.
 3. **The origin an authenticated admin actually used.** The System page reports the browser's
    `location.origin` back to the app (a same-origin, CSRF-protected POST from the page's existing
-   script layer), the app stores it, and the page shows it as "detected from your browser" for the
-   admin to confirm or replace. The browser's view is used, not the server's: the app does no proxy
+   script layer), the app stores it as **unconfirmed**, and the page shows it as "Public origin
+   detected, not confirmed" for the admin to confirm or replace. An unconfirmed origin is not
+   resolved: no background link, notification or signed URL uses it until an admin confirms it. The browser's view is used, not the server's: the app does no proxy
    normalization, so behind a TLS-terminating proxy `c.req.url` is the internal `http://host:port`.
    Background jobs, which run inside an app instance, read the stored value from the database. The
    value lives in a small `site_settings` key-value table (DDL in the three dialects and a
@@ -210,8 +213,8 @@ commit-status links) asks one resolver, which tries in order:
    from configuration or the platform.
 
 **Nothing resolved does not stop the app.** Targets that need a URL (`reach: "url"`) are
-`unavailable: "no public origin"` until one resolves, so a first deploy starts, an admin opens the
-System page, and the targets become ready. Without a resolved origin, notification links that need
+`unavailable: "no public origin: ..."` until a confirmed one resolves, so a first deploy starts, an
+admin opens the System page and confirms the address, and the targets become ready. Without a resolved origin, notification links that need
 one are omitted.
 
 The `Host` / `X-Forwarded-Host` of an arbitrary request is never used: a background job has none,
@@ -412,8 +415,8 @@ interface RenderRequest {
 
 For a `reach: "url"` target, core mints the token, resolves the public origin (decision 6) and puts
 `storybookUrl` on the render request and on the `extractParameters` input; the runner navigates there
-instead of to its loopback server. While no public origin resolves, or no `secret` is set, such a
-target is `unavailable`: a settings save that names it is refused and a build of a project that
+instead of to its loopback server. While no confirmed public origin resolves, or no `secret` is
+set, such a target is `unavailable` (the reason says what to set): a settings save that names it is refused and a build of a project that
 already does fails at once with that reason, so builds never fail one by one with an unexplained
 error.
 
@@ -515,8 +518,9 @@ a public origin exist, and core now mints the URL (see "Signed URLs" below). Cho
 - **A failed connect is `transient` or not.** A service that is down (refused, timed out, no
   capacity) fails the job at once but leaves the target offered; refused credentials and a version
   mismatch mark it `unavailable` like a failed local launch.
-- **`storybookUrl` is the build's Storybook root**, with or without a trailing `/iframe.html`; the
-  runner reduces either to the directory `iframe.html` is served under (`storybookBase`).
+- **`storybookUrl` is the build's Storybook root**, `<origin>/_s/<token>/` only (see the last of
+  these notes); `storybookBase` reduces it to the directory `iframe.html` is served under and
+  refuses every other form.
 - **Spike results (a bare `playwright run-server`, 1.63).** No authentication: the `--path` is the only
   gate and a wrong path is refused at the handshake with `400`. `--max-clients` queues a connection over
   the cap instead of refusing it, so a full farm shows up as a connect timeout. A version mismatch is
@@ -556,14 +560,25 @@ a public origin exist, and core now mints the URL (see "Signed URLs" below). Cho
 - **Which settings saves are checked.** A save refuses only targets the project does not already
   have, so an unrelated settings save never fails because an engine it already names went away; the
   build of such a project still fails at once (`assertSupportedBrowsers`).
-- **A stored, unconfirmed origin is used.** The origin an admin's browser reported resolves at once
-  (marked "unconfirmed" on the System page) so a first deploy learns its URL without a second step;
-  confirming it only records that an admin looked. The first report wins, and a later visit through
-  another domain never replaces it. A report must carry the browser's own `Origin` header, equal to
-  the reported origin.
-- **Interactive routes keep a last resort.** The OAuth redirect URI and the OIDC helper document
-  fall back to the request's own origin when nothing resolves, because they are answered to a
-  browser that is present; background links never do.
+- **A detected origin must be confirmed before it is used (owner decision, #267).** The origin an
+  admin's browser reported is stored unconfirmed; `resolve()` and `url()` do not return it, so no
+  background link, notification or signed URL uses it until an admin confirms (or replaces) it on
+  the System page, which says "confirm to enable notifications and signed URLs". The cost is one
+  click on a first deploy; the gain is that a visit through a stray domain can never plant links.
+  The first report wins, and a later visit through another domain never replaces it. A report must
+  carry the browser's own `Origin` header, equal to the reported origin. `publicBaseUrl` and
+  platform origins count as confirmed.
+- **Authentication is the exception (owner decision, #267).** The OAuth redirect URI and the OIDC
+  helper document are answered to a browser that is present, so they use
+  `PublicOriginResolver.authOrigin(requestOrigin)`: the confirmed origin when there is one, else the
+  request's own origin. It is a distinct accessor on purpose; nothing that outlives the request may
+  call it, and background links never fall back to a request.
+- **The Storybook URL is the directory root (owner decision, #273).** Core mints
+  `<origin>/_s/<token>/` and nothing else; the runner opens `iframe.html` under it. `storybookBase`
+  accepts only that form (a trailing slash, no `iframe.html`, query or fragment) and the runners
+  refuse any other before connecting, so a different page is never opened silently. When no signed
+  URL can be made (no confirmed origin or no secret) the target is unavailable and testing holds
+  with the reason, rather than rendering part of the matrix.
 - **Platform variables.** `detectPublicBaseUrl` reads Heroku, Railway, Vercel, Netlify (with
   `NETLIFY=true`), Render, Fly.io, Azure App Service and Container Apps, and DigitalOcean (`APP_URL`
   with `DIGITALOCEAN_APP_ID`); the table is pinned in `utils/public-origin.test.ts`.
@@ -580,5 +595,5 @@ a public origin exist, and core now mints the URL (see "Signed URLs" below). Cho
   is treated as `reach: "url"`, the safe default.
 - ~~Whether a bare `playwright run-server` has built-in authentication or a concurrency cap.~~ Settled
   (see the spike results above): no authentication, and a cap that queues.
-- Whether GitHub and GitLab treat `target_url` as optional when no public origin is known
-  (unverified).
+- ~~Whether GitHub and GitLab treat `target_url` as optional when no public origin is known.~~ Moot
+  (#267): with no confirmed origin no status is sent at all (ADR 0014, decision 11).

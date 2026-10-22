@@ -167,7 +167,7 @@ describe("bindAdapterLoggers", () => {
       {
         database: fakeAdapter("postgres", setLoggerDb),
         storage: fakeAdapter("local"),
-        captureQueue: fakeAdapter("sqs", setLoggerQueue),
+        captureRunner: fakeAdapter("sqs", setLoggerQueue),
       } as never,
       parent,
     );

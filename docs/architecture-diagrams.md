@@ -181,7 +181,7 @@ flowchart LR
 
     subgraph Wiring["Wiring\npackages/app/src/index.tsx:74"]
         mw2["wireMiddleware\nrequestId / requestLogging\nrateLimit / csrf\nstoreScope(AsyncLocalStorage)\nauthGate"]
-        qsetup["setupJobs\npackages/app/src/jobs-setup.ts\ndatabase queue | testing.queue"]
+        qsetup["setupJobs\npackages/app/src/jobs-setup.ts\ndatabase queue"]
     end
 
     subgraph Routes2["registerAllRoutes"]

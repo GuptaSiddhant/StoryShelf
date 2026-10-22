@@ -49,10 +49,10 @@ async function publishOnce(
   context: { logger: Logger; touch: () => void },
   projectId: string,
 ): Promise<void> {
-  const { completer, storage, scratchDir, limits } = options;
+  const { completer, storage, scratchDir, limits, db } = options;
   try {
     await publishStoredZip(
-      { storage, scratchDir, limits, logger: context.logger, touch: context.touch },
+      { storage, scratchDir, limits, db, logger: context.logger, touch: context.touch },
       { projectId, buildId: job.buildId },
     );
   } catch (error) {

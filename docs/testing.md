@@ -35,15 +35,15 @@ Every adapter package must satisfy this matrix. New adapters ship with all
 rows; existing adapters backfill on touch. The `adapter-layout` skill enforces
 the file placement (colocated `<module>.test.ts`, move cases with the code).
 
-| Requirement | Storage (`storage-*`) | DB (`db-*`) | Runner / git / auth / notify |
-|---|---|---|---|
-| `metadata` | `kind` + `category` asserted once per factory | same | same |
-| `lifecycle` all-or-nothing | `setup` creates root (idempotent x2), `health.ok` true then false after `rm -rf`, `teardown` x2 no-throw | `migrate` twice + `ping` ok, `close` x2 no-throw | same shape; runners assert browser launch/close |
-| Happy-path operations | `write/read/exists/delete/list` round-trip + recursive `list` + missing prefix `[]` | CRUD per table + unique-constraint + foreign-key violation | render/post/comment round-trip via fake transport |
-| Not-found / error mapping | `read`/`readStream` missing → throw; `writeStream` failure deletes partial | missing row → `undefined`, not throw | HTTP 4xx mapped to typed error, 5xx retried per `httpJson` |
-| Safety | path-traversal (`../escape`) rejected on `read/write/list` | SQL injection via values rejected (params, never concat) | webhook HMAC verified before mutation |
-| Streams / codec where applicable | `writeStream/readStream` byte-identical + partial cleanup on failure | N/A (or bulk-import performance smoke) | runner screenshot bytes equal fixture hash |
-| Live (`*.live.test.ts`, `LIVE_CLOUD=1` gated) | real bucket round-trip with `live/<run-id>/` prefix | real migrate + CRUD, teardown drops test rows | real API against throwaway repo/SHA |
+| Requirement                                   | Storage (`storage-*`)                                                                                    | DB (`db-*`)                                                | Runner / git / auth / notify                               |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------- |
+| `metadata`                                    | `kind` + `category` asserted once per factory                                                            | same                                                       | same                                                       |
+| `lifecycle` all-or-nothing                    | `setup` creates root (idempotent x2), `health.ok` true then false after `rm -rf`, `teardown` x2 no-throw | `migrate` twice + `ping` ok, `close` x2 no-throw           | same shape; runners assert browser launch/close            |
+| Happy-path operations                         | `write/read/exists/delete/list` round-trip + recursive `list` + missing prefix `[]`                      | CRUD per table + unique-constraint + foreign-key violation | render/post/comment round-trip via fake transport          |
+| Not-found / error mapping                     | `read`/`readStream` missing → throw; `writeStream` failure deletes partial                               | missing row → `undefined`, not throw                       | HTTP 4xx mapped to typed error, 5xx retried per `httpJson` |
+| Safety                                        | path-traversal (`../escape`) rejected on `read/write/list`                                               | SQL injection via values rejected (params, never concat)   | webhook HMAC verified before mutation                      |
+| Streams / codec where applicable              | `writeStream/readStream` byte-identical + partial cleanup on failure                                     | N/A (or bulk-import performance smoke)                     | runner screenshot bytes equal fixture hash                 |
+| Live (`*.live.test.ts`, `LIVE_CLOUD=1` gated) | real bucket round-trip with `live/<run-id>/` prefix                                                      | real migrate + CRUD, teardown drops test rows              | real API against throwaway repo/SHA                        |
 
 Rules:
 
@@ -51,7 +51,7 @@ Rules:
   temp dirs, or `:memory:` DBs. No network in `nub run test`.
 - Prove conformance with the published suites: `storageContractSuite` /
   `databaseContractSuite` from `@storyshelf/core/test-helpers` (one line in
-  the package's own test file). `queueContractSuite` covers the database queue and any custom `testing.queue`; runner/git suites follow in later phases).
+  the package's own test file). `queueContractSuite` covers the database queue; runner/git suites follow in later phases).
 - Core validates untrusted input at the boundary: storage path segments
   (`paths.ts`), screenshot bytes (`capture/guards.ts`: PNG magic + 25 MiB cap),
   list limits (`clampListLimit`, max 1000).
@@ -106,17 +106,17 @@ contract pinned by `terraform-*.test.ts` — renames break CI.
 
 ### Output → env map
 
-| Target | Terraform output | Env / secret |
-|---|---|---|
-| AWS | `s3_bucket` | `S3_BUCKET` (+ `AWS_REGION`) |
-| AWS | `db_endpoint` | `DATABASE_URL` (`?sslmode=require`) |
-| AWS | `user_pool_id` / `app_client_id` | `COGNITO_*` / `OIDC_*` (phase 4) |
-| Azure | `storage_connection_string` | `AZURE_STORAGE_CONNECTION` |
-| Azure | (container, pre-provisioned) | `LIVE_AZURE_CONTAINER` |
-| Azure | `database_url` | `DATABASE_URL` (phase 4) |
-| GCP | `gcs_bucket` | `LIVE_GCS_BUCKET` |
-| GCP | (project) | `GCP_PROJECT_ID` |
-| GCP | (service-account key JSON) | `GCP_SERVICE_ACCOUNT_JSON` |
+| Target | Terraform output                 | Env / secret                        |
+| ------ | -------------------------------- | ----------------------------------- |
+| AWS    | `s3_bucket`                      | `S3_BUCKET` (+ `AWS_REGION`)        |
+| AWS    | `db_endpoint`                    | `DATABASE_URL` (`?sslmode=require`) |
+| AWS    | `user_pool_id` / `app_client_id` | `COGNITO_*` / `OIDC_*` (phase 4)    |
+| Azure  | `storage_connection_string`      | `AZURE_STORAGE_CONNECTION`          |
+| Azure  | (container, pre-provisioned)     | `LIVE_AZURE_CONTAINER`              |
+| Azure  | `database_url`                   | `DATABASE_URL` (phase 4)            |
+| GCP    | `gcs_bucket`                     | `LIVE_GCS_BUCKET`                   |
+| GCP    | (project)                        | `GCP_PROJECT_ID`                    |
+| GCP    | (service-account key JSON)       | `GCP_SERVICE_ACCOUNT_JSON`          |
 
 AWS creds come from the standard SDK chain (`AWS_ACCESS_KEY_ID` /
 `AWS_SECRET_ACCESS_KEY` or an IAM role). GCP creds come from ADC
@@ -126,7 +126,7 @@ in CI).
 ### Manual runbook (follow these steps later)
 
 1. **Provision** (per target, one-time): `storyshelf server init --target
-   <aws|azure|gcp>`, then under the generated `terraform/`:
+<aws|azure|gcp>`, then under the generated `terraform/`:
    ```sh
    terraform init
    terraform plan -var "project=shelf-manual-<name>" -out=tfplan  # review!
@@ -147,7 +147,7 @@ in CI).
 4. **Teardown:** suites delete their own keys/messages (unique
    `live/<run-id>/<uuid>` prefixes, per-run build ids), but the
    infrastructure is yours — `terraform destroy -var
-   "project=shelf-manual-<name>" -auto-approve` when done.
+"project=shelf-manual-<name>" -auto-approve` when done.
 5. **Costs:** live suites are a handful of API calls; the spend is idle
    infrastructure (RDS, Cloud SQL, Postgres Flexible Server). Destroy promptly.
 
@@ -157,13 +157,13 @@ No terraform scaffold covers these — resources are long-lived and shared,
 isolation is per-run. Matrix legs: `db`, `auth`, `git` (nightly +
 manual dispatch, `--force` so results never come from cache).
 
-| Suite | Resource to provision (one-time, manual) | Env |
-|---|---|---|
-| Turso | Turso database (`turso db create shelf-live-test`) | `TURSO_DATABASE_URL` (`libsql://…`), `TURSO_AUTH_TOKEN` |
-| Postgres | Any wire-compatible DB (Neon/Supabase free tier is enough; use a direct connection, not the pooler) | `DATABASE_URL` (`?sslmode=require` for managed) |
-| OAuth | OIDC app with a redirect URL (Auth0 free tenant; Keycloak/Entra/Okta/Cognito work too) — discovery-only, no interactive login | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_REDIRECT_URL` |
-| GitHub | Test repo + PAT with `repo:status`; reserve a throwaway SHA (statuses are immutable) | `LIVE_GH_TOKEN`, `LIVE_GH_OWNER`, `LIVE_GH_REPO`, `LIVE_GH_SHA` |
-| GitLab | Test project + token with `api` scope; reserve a throwaway SHA | `LIVE_GL_TOKEN`, `LIVE_GL_OWNER`, `LIVE_GL_REPO`, `LIVE_GL_SHA`, optional `LIVE_GL_HOST` |
+| Suite    | Resource to provision (one-time, manual)                                                                                      | Env                                                                                      |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Turso    | Turso database (`turso db create shelf-live-test`)                                                                            | `TURSO_DATABASE_URL` (`libsql://…`), `TURSO_AUTH_TOKEN`                                  |
+| Postgres | Any wire-compatible DB (Neon/Supabase free tier is enough; use a direct connection, not the pooler)                           | `DATABASE_URL` (`?sslmode=require` for managed)                                          |
+| OAuth    | OIDC app with a redirect URL (Auth0 free tenant; Keycloak/Entra/Okta/Cognito work too) — discovery-only, no interactive login | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_REDIRECT_URL`               |
+| GitHub   | Test repo + PAT with `repo:status`; reserve a throwaway SHA (statuses are immutable)                                          | `LIVE_GH_TOKEN`, `LIVE_GH_OWNER`, `LIVE_GH_REPO`, `LIVE_GH_SHA`                          |
+| GitLab   | Test project + token with `api` scope; reserve a throwaway SHA                                                                | `LIVE_GL_TOKEN`, `LIVE_GL_OWNER`, `LIVE_GL_REPO`, `LIVE_GL_SHA`, optional `LIVE_GL_HOST` |
 
 Isolation: unique row ids/slugs (DBs, removed afterwards), unique status contexts (`storyshelf/live-<run-id>`).
 Suites gate on their own env (`skipIf`), so a leg exercises exactly the

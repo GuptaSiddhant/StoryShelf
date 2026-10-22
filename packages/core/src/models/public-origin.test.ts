@@ -33,7 +33,6 @@ describe("createPublicOriginResolver", () => {
     expect(await resolver.resolve()).toEqual({
       url: "https://shelf.example.com/storyshelf",
       source: "config",
-      confirmed: true,
     });
   });
 
@@ -45,12 +44,43 @@ describe("createPublicOriginResolver", () => {
       source: "platform",
     });
     const admin = setup();
-    await admin.resolver.report("https://admin.example.com");
+    await admin.resolver.set("https://admin.example.com");
     expect(await admin.resolver.resolve()).toEqual({
       url: "https://admin.example.com",
       source: "admin",
+    });
+  });
+
+  it("does not resolve a reported origin until an admin confirms it", async () => {
+    const { resolver } = setup();
+    await resolver.report("https://detected.example.com");
+    expect(await resolver.stored()).toEqual({
+      origin: "https://detected.example.com",
       confirmed: false,
     });
+    expect(await resolver.resolve()).toBeNull();
+    expect(await resolver.url()).toBeUndefined();
+    await resolver.set("https://detected.example.com");
+    expect(await resolver.url()).toBe("https://detected.example.com");
+  });
+
+  it("answers authentication with the request's own origin until one is confirmed", async () => {
+    const { resolver } = setup();
+    expect(await resolver.authOrigin("https://request.example.com")).toBe(
+      "https://request.example.com",
+    );
+    await resolver.report("https://detected.example.com");
+    expect(await resolver.authOrigin("https://request.example.com")).toBe(
+      "https://request.example.com",
+    );
+    await resolver.set("https://confirmed.example.com");
+    expect(await resolver.authOrigin("https://request.example.com")).toBe(
+      "https://confirmed.example.com",
+    );
+    const configured = setup({ publicBaseUrl: "https://shelf.example.com" });
+    expect(await configured.resolver.authOrigin("https://request.example.com")).toBe(
+      "https://shelf.example.com",
+    );
   });
 
   it("keeps the first report and lets an explicit set replace it", async () => {

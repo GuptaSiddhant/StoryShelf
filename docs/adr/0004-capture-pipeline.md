@@ -162,11 +162,18 @@ Review) apply on top of this.
 ### 6. Accessibility checks
 
 With `runA11y` (on by default, `projects.run_a11y`; a project admin turns it off in Settings > Tests or the project API) the runner runs [axe-core](https://github.com/dequelabs/axe-core) in the page after
-the story settles and before the screenshot, once per story, mode and viewport. Results are
+the story settles and before the screenshot, once per story, mode and viewport, on the primary target only (see below). Results are
 annotations: they are stored on the snapshot (`snapshots.a11y_violations`, a JSON array of the
 annotation strings, null when none) and shown in review, but never block the build or change its
 status.
 
+- **Primary target only.** With several targets (ADR 0007) axe runs on the project's primary one,
+  the first entry of its `browsers` list (`primaryTargetOf`, `capture/browsers.ts`; `matrix.ts`
+  sets `RenderRequest.runA11y` from it, also inside a shard). The results are engine-independent
+  for practical purposes and each extra target cost about 150 ms per story, mode and viewport. The
+  findings sit on the snapshot of that target, whose `browser` names it; the review page, the
+  filmstrip and the component card show the name, and the page shows the findings from whichever
+  sibling of the story holds them.
 - **Ownership.** `@storyshelf/core` owns `axe-core` (exact pin) and the shared pieces under
   `capture/a11y/`, re-exported from `@storyshelf/core/capture`: a lazy, cached loader of
   `axe.min.js`, the `parameters.a11y` to run-plan resolver, the two in-page functions and the pure
@@ -184,8 +191,10 @@ status.
   default (measured in Chromium); a story that widens `element`/`context` to the page turns them on
   and can switch them off through `config.rules`. The story's
   `parameters.a11y` is read from the preview (`disable: true` or `test: "off"` skip it; `config`,
-  `options` and `element`/`context` apply; `test: "todo" | "error"` still only annotate). Only the
-  JSON-serialisable subset is readable; `config.rules[].enabled: false` is mirrored into the run
+  `options` and `element`/`context` apply; `test: "todo" | "error"` still only annotate). Function
+  values are not readable from a page, so `inPageReadA11yParameters` drops them (and a rule item
+  or object that held nothing else), runs axe with what remains and reports how many it dropped,
+  which the runner logs once at debug level; `config.rules[].enabled: false` is mirrored into the run
   options so it also holds under a tag-based `runOnly`.
 - **Annotation format.** One string per violation, worst impact first:
   `<rule> (<impact>): <help> [<selector>] <n> node(s)`, at most 10, then `…and N more`. The runner

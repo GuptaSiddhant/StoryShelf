@@ -178,6 +178,7 @@ async function renderShard(
     project.id,
     build.id,
     shard.id,
+    options.limits,
   );
   progress?.();
   try {

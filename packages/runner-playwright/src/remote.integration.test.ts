@@ -158,7 +158,7 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")(
         try {
           const result = await runner.render({
             ...input,
-            storybookUrl: `${served.url}/iframe.html`,
+            storybookUrl: `${served.url}/`,
           });
           expect(result.failures).toEqual([]);
           expect(result.captures).toHaveLength(1);

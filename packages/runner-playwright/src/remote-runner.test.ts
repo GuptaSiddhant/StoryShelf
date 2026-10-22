@@ -197,7 +197,7 @@ describe("a remote target", () => {
     expect(fake.state.connects).toEqual([]);
 
     const result = await runner.render(
-      input({ storybookUrl: "https://app.example/_s/tok/build/b/iframe.html" }),
+      input({ storybookUrl: "https://app.example/_s/tok/build/b/" }),
     );
     expect(result.captures).toHaveLength(2);
     expect(fake.state.connects[0]).toMatchObject({ kind: "chromium-cdp" });
@@ -206,6 +206,14 @@ describe("a remote target", () => {
     );
     // The URL is the way in; the host's loopback server was never bound for it.
     expect(fake.state.gotos.some((url) => url.includes("127.0.0.1"))).toBe(false);
+  });
+
+  it("refuses a Storybook URL that is not the directory root, before any connection", async () => {
+    const runner = createPlaywrightCaptureRunner({ browsers: [farm()] });
+    await expect(
+      runner.render(input({ storybookUrl: "https://app.example/_s/tok/build/b/iframe.html" })),
+    ).rejects.toThrow(/directory root/u);
+    expect(fake.state.connects).toEqual([]);
   });
 
   it("reads parameters on a remote target as well", async () => {

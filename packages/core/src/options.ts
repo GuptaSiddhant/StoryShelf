@@ -26,12 +26,10 @@ export function resolveShelfOptions(options: ShelfOptions): ShelfOptions {
 }
 
 /**
- * A `testing` instance that renders here needs a database a long-running server can keep. An
- * instance that only hands jobs to a remote `testing.queue` renders nowhere in this process, so
- * it is left alone (the one deployment shape the earlier `capture` option supported on Workers).
+ * A `testing` instance renders here, so it needs a database a long-running server can keep.
  */
 function assertTestingBackable(options: ShelfOptions): void {
-  if (options.testing?.runner === undefined) {
+  if (options.testing === undefined) {
     return;
   }
   if (options.database.metadata.supportsTesting === false) {
@@ -45,10 +43,8 @@ function assertTestingBackable(options: ShelfOptions): void {
 }
 
 function assertTestingProcess(testing: ShelfOptions["testing"]): void {
-  if (testing !== undefined && testing.runner === undefined && testing.queue === undefined) {
-    throw new Error(
-      "testing requires testing.runner (or testing.queue to replace the database queue)",
-    );
+  if (testing !== undefined && testing.runner === undefined) {
+    throw new Error("testing requires testing.runner");
   }
   if (testing?.workerEntry !== undefined && testing.runner === undefined) {
     throw new Error("testing.workerEntry requires testing.runner (it is the in-process fallback)");

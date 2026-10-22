@@ -3,7 +3,7 @@ import { CaptureLogModel } from "@storyshelf/core/models";
 import type { Build, Project } from "@storyshelf/core/schema";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
 import { stubRunner } from "../test-runner.ts";
 
@@ -116,29 +116,16 @@ describe("capture attempts API", () => {
 });
 
 describe("retry re-queues capture", () => {
-  it("resets to pending and enqueues the build", async () => {
+  it("resets to pending and queues a capture job for the build", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
     await db.insert(db.tables.projects, project);
     await db.insert(db.tables.builds, { ...build, status: "failed" });
-    const enqueue = vi.fn(async () => {});
-    const queue = {
-      metadata: {
-        name: "mock",
-        version: "0.0.0",
-        kind: "mock",
-        category: "capture-queue" as const,
-      },
-      enqueue,
-      status: vi.fn(async () => null),
-      active: vi.fn(async () => []),
-      recent: vi.fn(async () => []),
-    } as unknown as import("@storyshelf/core/adapter/capture-queue").PollableCaptureQueue;
     const app = createShelfApp({
       database: db,
       storage,
       logger: silentLogger,
-      testing: { queue },
+      testing: { runner: stubRunner() },
     });
 
     const response = await app.request("/api/v1/projects/test-project/builds/b1/retry", {
@@ -148,6 +135,7 @@ describe("retry re-queues capture", () => {
     expect(response.status).toBe(202);
     const body = (await response.json()) as Build;
     expect(body.status).toBe("pending");
-    expect(enqueue).toHaveBeenCalledWith({ buildId: "b1", reqId: expect.any(String) });
+    const jobs = await db.list(db.tables.captureJobs);
+    expect(jobs).toContainEqual(expect.objectContaining({ kind: "capture", buildId: "b1" }));
   });
 });

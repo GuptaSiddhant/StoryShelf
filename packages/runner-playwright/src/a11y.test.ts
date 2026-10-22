@@ -20,7 +20,11 @@ function fakePage(...results: unknown[]) {
 
 describe("checkA11y", () => {
   it("reads parameters, injects axe, runs it and maps the violations", async () => {
-    const { page, evaluate } = fakePage({ options: { runOnly: ["image-alt"] } }, undefined, [SLIM]);
+    const { page, evaluate } = fakePage(
+      { params: { options: { runOnly: ["image-alt"] } }, dropped: 0 },
+      undefined,
+      [SLIM],
+    );
     await expect(checkA11y(page)).resolves.toEqual([
       "image-alt (critical): Images must have alternative text [img] 2 nodes",
     ]);
@@ -42,11 +46,19 @@ describe("checkA11y", () => {
   it.each([{ disable: true }, { test: "off" }])(
     "skips the story for %o without injecting axe",
     async (params) => {
-      const { page, evaluate } = fakePage(params);
+      const { page, evaluate } = fakePage({ params, dropped: 0 });
       await expect(checkA11y(page)).resolves.toEqual([]);
       expect(evaluate).toHaveBeenCalledTimes(1);
     },
   );
+
+  it("logs one debug line when function values were dropped", async () => {
+    const { page } = fakePage({ params: {}, dropped: 2 }, undefined, []);
+    const debug = vi.fn();
+    await checkA11y(page, { debug } as never);
+    expect(debug).toHaveBeenCalledTimes(1);
+    expect(debug.mock.calls[0]?.[0]).toEqual({ dropped: 2 });
+  });
 
   it("reports one visible annotation when injection fails", async () => {
     const { page } = fakePage(undefined, new Error("Execution context was destroyed"));

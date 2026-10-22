@@ -5,6 +5,7 @@ import {
   assertSupportedBrowsers,
   MAX_BROWSERS,
   parseBrowsers,
+  primaryTargetOf,
   refusalFor,
   resolveBrowsers,
 } from "./browsers.ts";
@@ -100,5 +101,12 @@ describe("assertSupportedBrowsers", () => {
     expect(() => assertSupportedBrowsers(["chromium", "firefox", "webkit"], offered)).toThrow(
       /firefox is not offered.*; webkit is not offered/u,
     );
+  });
+});
+
+describe("primaryTargetOf", () => {
+  it("is the first target, and nothing for an empty list", () => {
+    expect(primaryTargetOf(["firefox", "chromium"])).toBe("firefox");
+    expect(primaryTargetOf([])).toBeUndefined();
   });
 });

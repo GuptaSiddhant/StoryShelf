@@ -226,6 +226,25 @@ describe("executeCaptureJob", () => {
     expect(await scratchExists(project.id, build.id)).toBe(false);
   });
 
+  it("records the persisted content in content_refs, so retention knows who uses it", async () => {
+    const { db, buildId, options } = await setupBrowsers({});
+    await executeCaptureJob({ buildId }, options);
+    const refs = await db.list(db.tables.contentRefs);
+    expect(refs.length).toBeGreaterThan(0);
+    expect(refs.every((ref) => ref["refCount"] === 1)).toBe(true);
+  });
+
+  it("enforces the configured zip caps while extracting for capture", async () => {
+    const { db, buildId, options } = await setupBrowsers({});
+    await expect(
+      executeCaptureJob(
+        { buildId },
+        { ...options, limits: { maxEntries: 0, maxBytes: 1_048_576 } },
+      ),
+    ).rejects.toThrow(/entries/u);
+    expect((await new BuildModel(db, tables(db)).get(buildId))?.status).toBe("failed");
+  });
+
   it("reports progress while it persists, apart from the attempt log", async () => {
     const { db, buildId, options } = await setupBrowsers({});
     const progress = vi.fn();
@@ -507,6 +526,20 @@ describe("executeCaptureJob", () => {
         expect.arrayContaining(["chromium", "firefox"]),
       );
       expect(rows).toHaveLength(2);
+    });
+
+    it("runs axe on the primary target only", async () => {
+      const { buildId, render, options } = await setupBrowsers({
+        browsers: '["firefox","chromium"]',
+      });
+      await executeCaptureJob({ buildId }, options);
+      const calls = render.mock.calls.map(
+        (call) => call[0] as { target: string; runA11y: boolean },
+      );
+      expect(calls.map((c) => [c.target, c.runA11y])).toEqual([
+        ["firefox", true],
+        ["chromium", false],
+      ]);
     });
 
     it("fails the build for a browser the runner does not support", async () => {

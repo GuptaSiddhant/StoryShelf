@@ -52,7 +52,7 @@ ssoKeycloakPreset("https://idp.example.com/realms/shelf", {
 
 StoryShelf is an OIDC **relying party**, not a provider:
 
-- `GET /.well-known/openid-configuration` — RP metadata (`issuer`, `code` flow, scopes, per-provider `redirect_uris`, provider list). Set `PUBLIC_BASE_URL` so the issuer is stable.
+- `GET /.well-known/openid-configuration` — RP metadata (`issuer`, `code` flow, scopes, per-provider `redirect_uris`, provider list). Set `PUBLIC_BASE_URL` so the issuer is stable: without a confirmed [public origin](/guides/config/#public-origin) it names the address of the request it answers.
 - `GET /.well-known/change-password` — redirects to `/profile`.
 
 For SAML, see [SAML](/guides/auth/saml/); for generic config and secrets, see [Configuration](/guides/auth/configuration/).

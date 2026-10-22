@@ -29,15 +29,14 @@ function ssoProviders(auth: Auth, origin: string): SsoProviderLink[] {
 }
 
 /**
- * The deployment's public origin (ADR 0007, decision 6). Only while none resolves does this
- * interactive, request-bound document fall back to the address the request came in on.
+ * The origin of this interactive, request-bound document (ADR 0007, decision 6): the confirmed
+ * public origin, else the address the request came in on (the one place besides OAuth redirect
+ * URIs where authentication may use it).
  */
 async function requestOrigin(c: Context): Promise<string> {
-  return (
-    (await getStore().publicOrigin?.url()) ??
-    getStore().config.publicBaseUrl ??
-    new URL(c.req.url).origin
-  );
+  const { publicOrigin, config } = getStore();
+  const own = new URL(c.req.url).origin;
+  return publicOrigin ? await publicOrigin.authOrigin(own) : (config.publicBaseUrl ?? own);
 }
 
 /** Register public relying-party helper documents (no auth required). */

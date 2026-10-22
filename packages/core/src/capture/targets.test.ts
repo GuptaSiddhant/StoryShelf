@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RunnerTarget } from "../adapters/capture-runner.ts";
-import { offeredTargets } from "./targets.ts";
+import { NO_ORIGIN_REASON, NO_SECRET_REASON, offeredTargets } from "./targets.ts";
 
 const runner = (targets?: RunnerTarget[]) => ({
   metadata: {
@@ -41,10 +41,10 @@ describe("offeredTargets", () => {
         publicOrigin: "https://x.example.com",
         hasSecret: false,
       }),
-    ).toEqual([local, { ...remote, status: { unavailable: "no secret" } }]);
+    ).toEqual([local, { ...remote, status: { unavailable: NO_SECRET_REASON } }]);
     expect(
       offeredTargets(runner([local, remote]), { publicOrigin: undefined, hasSecret: true }),
-    ).toEqual([local, { ...remote, status: { unavailable: "no public origin" } }]);
+    ).toEqual([local, { ...remote, status: { unavailable: NO_ORIGIN_REASON } }]);
   });
 
   it("keeps an unavailable target's own reason", () => {

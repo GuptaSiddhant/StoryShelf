@@ -8,7 +8,7 @@ import { createShelfApp } from "../index.tsx";
 const silentLogger = pino({ level: "silent" });
 const BASE_URL = "http://localhost:3000";
 
-async function testApp() {
+async function testApp(config: { publicBaseUrl?: string } = {}) {
   const db = createSqliteDatabase(":memory:");
   await db.lifecycle?.setup({ config: {}, logger: silentLogger });
   const shelf = createShelfAuth({
@@ -41,7 +41,13 @@ async function testApp() {
     },
   });
   const { storage } = makeStorage();
-  return createShelfApp({ database: db, storage, auth: shelf.adapter, logger: silentLogger });
+  return createShelfApp({
+    database: db,
+    storage,
+    auth: shelf.adapter,
+    logger: silentLogger,
+    config,
+  });
 }
 
 describe("well-known relying-party documents", () => {
@@ -66,6 +72,15 @@ describe("well-known relying-party documents", () => {
       { id: "keycloak", label: "Keycloak" },
       { id: "acme-saml", label: "Acme" },
     ]);
+  });
+
+  it("names the confirmed public origin as the issuer when there is one", async () => {
+    const response = await (
+      await testApp({ publicBaseUrl: "https://shelf.example.com" })
+    ).request("/.well-known/openid-configuration");
+    const body = (await response.json()) as { issuer: string; redirect_uris: string[] };
+    expect(body.issuer).toBe("https://shelf.example.com");
+    expect(body.redirect_uris[0]).toBe("https://shelf.example.com/api/auth/callback/keycloak");
   });
 
   it("redirects change-password to the profile page", async () => {
