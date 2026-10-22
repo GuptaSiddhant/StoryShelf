@@ -1,7 +1,7 @@
 /** Enqueue, cancel and the cross-instance views (`status`/`active`/`recent`) of the database queue. */
 import type { CaptureJob, QueueEntry } from "../../adapters/capture-queue.ts";
 import { attemptRowId, isTerminalJob } from "../../models/capture-job.ts";
-import type { CaptureJobRow } from "../../schema/capture-job.ts";
+import type { CaptureJobKind, CaptureJobRow } from "../../schema/capture-job.ts";
 import { ulid } from "../../utils/ulid.ts";
 import { isoAt } from "./clock.ts";
 import { encodePayload, toQueueEntry } from "./codec.ts";
@@ -17,7 +17,7 @@ export async function enqueueJob(rt: QueueRuntime, job: QueueJobInput): Promise<
       kind: job.kind,
       buildId: job.buildId ?? null,
       shardId: job.shard ?? null,
-      maxAttempts: rt.maxAttempts,
+      maxAttempts: job.maxAttempts ?? rt.maxAttempts,
       payload: encodePayload(job),
     },
     now,
@@ -27,6 +27,15 @@ export async function enqueueJob(rt: QueueRuntime, job: QueueJobInput): Promise<
   return id;
 }
 
+/**
+ * The kinds the queue's views (`status`, `active`, `recent`, `cancel`) show: every polled kind but
+ * `notify` (unless it is the only one), whose many short delivery jobs would bury a build's capture and publish jobs.
+ */
+function viewKinds(rt: QueueRuntime): readonly CaptureJobKind[] {
+  const shown = rt.kinds.filter((kind) => kind !== "notify");
+  return shown.length > 0 ? shown : rt.kinds;
+}
+
 /** `CaptureQueue.enqueue`: a capture job for a build or one of its shards. */
 export async function enqueueCapture(rt: QueueRuntime, job: CaptureJob): Promise<void> {
   await enqueueJob(rt, { ...job, kind: "capture" });
@@ -34,18 +43,18 @@ export async function enqueueCapture(rt: QueueRuntime, job: CaptureJob): Promise
 
 /** The build's own job most recently queued, as a queue entry. */
 export async function statusOf(rt: QueueRuntime, buildId: string): Promise<QueueEntry | null> {
-  const row = await rt.model.latestForBuild(buildId, rt.kinds);
+  const row = await rt.model.latestForBuild(buildId, viewKinds(rt));
   return row === null ? null : toQueueEntry(row);
 }
 
 /** Queued and running jobs of this queue's kinds on every instance, oldest first. */
 export async function activeEntries(rt: QueueRuntime): Promise<QueueEntry[]> {
-  return (await rt.model.listActive(rt.kinds)).map((row) => toQueueEntry(row));
+  return (await rt.model.listActive(viewKinds(rt))).map((row) => toQueueEntry(row));
 }
 
 /** The newest jobs of this queue's kinds, newest first. */
 export async function recentEntries(rt: QueueRuntime, limit: number): Promise<QueueEntry[]> {
-  return (await rt.model.listRecent(rt.kinds, limit)).map((row) => toQueueEntry(row));
+  return (await rt.model.listRecent(viewKinds(rt), limit)).map((row) => toQueueEntry(row));
 }
 
 /**
@@ -71,7 +80,7 @@ async function targetsOf(rt: QueueRuntime, id: string): Promise<CaptureJobRow[]>
   if (row?.entry === "job") {
     return [row];
   }
-  return (await rt.model.listForBuild(id)).filter((job) => rt.kinds.includes(job.kind));
+  return (await rt.model.listForBuild(id)).filter((job) => viewKinds(rt).includes(job.kind));
 }
 
 async function cancelOne(rt: QueueRuntime, row: CaptureJobRow): Promise<void> {

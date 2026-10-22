@@ -4,7 +4,11 @@ import type { DesignProvider } from "@storyshelf/core/adapter/design";
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import type { Ai } from "@storyshelf/core/ai";
-import { createCatalogLoader, type CatalogLoader } from "@storyshelf/core/capture";
+import {
+  createCatalogLoader,
+  type BuildStatePublisher,
+  type CatalogLoader,
+} from "@storyshelf/core/capture";
 import type { NotificationsConfig, ShelfConfig, UIConfig } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 import type { AuthUser } from "@storyshelf/core/types";
@@ -30,6 +34,8 @@ export interface Store {
   capturesHere?: boolean;
   /** Publishing: completion and the `publish` job queue (absent in hand-built stores). */
   publish?: PublishService;
+  /** Shows a build's state on its git channels (absent in hand-built stores: delivered inline). */
+  buildState?: BuildStatePublisher;
   /** Explicit `testing.concurrency`; unset means sized from the hardware. */
   captureConcurrency?: number;
   /** Design providers (Figma, …); empty when none is wired. */

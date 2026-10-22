@@ -1,6 +1,17 @@
 export { emitNotifications, emitSystemNotification } from "./events.ts";
-export { emitBuildState } from "./state.ts";
-export type { BuildStateOptions } from "./state.ts";
+export { statusesForBuild } from "./build-state.ts";
+export type {
+  BuildStateBuild,
+  BuildStateFlags,
+  BuildStateInput,
+  BuildStateSet,
+  DesiredComment,
+  DesiredStatus,
+  PublishingState,
+  StatusName,
+} from "./build-state.ts";
+export { buildCommentMarkdown } from "./build-comment.ts";
+export { channelPrefix, DEFAULT_STATUS_PREFIX, writeBuildState } from "./state.ts";
 export { formatNotification, formatSystemNotification } from "./format.ts";
 export { isStateProvider } from "./provider.ts";
 export type {
@@ -28,4 +39,3 @@ export type {
   SystemEventName,
   SystemNotification,
 } from "./types.ts";
-export { buildCommentMarkdown, DEFAULT_STATUS_PREFIX, statusContext } from "./state.ts";

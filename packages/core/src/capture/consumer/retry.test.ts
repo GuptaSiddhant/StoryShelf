@@ -18,6 +18,7 @@ describe("retry policy", () => {
     expect([0, 1, 2, 3].map((n) => backoffDelayMs(n))).toEqual([1000, 2000, 4000, 8000]);
     expect(backoffDelayMs(20)).toBe(MAX_BACKOFF_MS);
     expect(backoffDelayMs(1, 10)).toBe(20);
+    expect(backoffDelayMs(20, 10_000, 300_000)).toBe(300_000);
   });
 
   it("counts deliveries for queues without a limit of their own", () => {

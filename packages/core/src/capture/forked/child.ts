@@ -12,6 +12,9 @@
  * ```
  */
 import { createShelfLogger, type Logger } from "../../logger.ts";
+import { createNotifyEnqueuer } from "../build-state/notify-job.ts";
+import { createBuildStatePublisher } from "../build-state/publisher.ts";
+import type { BuildStatePublisher } from "../build-state/types.ts";
 import { createCaptureHandler, type CaptureHandlerOptions } from "../consumer/capture-handler.ts";
 import { applyImageSettings, ensureImageEngine } from "../consumer/startup.ts";
 import type { CaptureConsumerOptions, ConsumerJob, KindHandler } from "../consumer/types.ts";
@@ -104,6 +107,9 @@ function buildHandler(
     runner: options.runner,
     scratchDir: options.scratchDir,
     notifiers: options.notifiers,
+    config: options.config,
+    // The parent's consumer runs `notify` jobs, so the child hands state deliveries to the queue.
+    buildState: options.buildState ?? notifyJobsPublisher(options, queue, logger),
     design: options.design,
     secret: options.secret,
     viewports: options.viewports,
@@ -113,6 +119,26 @@ function buildHandler(
       await queue.enqueue(job);
     },
     logger,
+  });
+}
+
+/** Publisher that queues one `notify` job per git channel on the database queue. */
+function notifyJobsPublisher(
+  options: CaptureChildOptions,
+  queue: ReturnType<typeof createDatabaseCaptureQueue>,
+  logger: Logger,
+): BuildStatePublisher {
+  return createBuildStatePublisher({
+    deps: {
+      db: options.db,
+      storage: options.storage,
+      notifiers: options.notifiers ?? [],
+      secret: options.secret,
+      config: options.config ?? {},
+      flags: () => ({ testing: true, review: false }),
+      logger,
+    },
+    enqueue: createNotifyEnqueuer({ db: options.db }, queue),
   });
 }
 

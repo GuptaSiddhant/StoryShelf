@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { makeFakeStateNotifier } from "../../test-helpers/fake-notifier.ts";
-import { buildCommentMarkdown, emitBuildState, statusContext } from "./state.ts";
+import type { BuildStateSet } from "./build-state.ts";
+import { channelPrefix, writeBuildState } from "./state.ts";
 import type { NotificationChannel } from "./types.ts";
 
 function channel(overrides: Partial<NotificationChannel> = {}): NotificationChannel {
@@ -16,85 +17,75 @@ function channel(overrides: Partial<NotificationChannel> = {}): NotificationChan
   };
 }
 
-const base = { sha: "abc", url: "https://shelf/b/1", status: "testing" } as const;
-
-describe("statusContext", () => {
-  it("defaults the prefix to storyshelf and uses the configured one", () => {
-    expect(statusContext(channel(), "testing")).toBe("storyshelf/testing");
-    expect(statusContext(channel({ config: { prefix: "storyshelf-docs" } }), "review")).toBe(
-      "storyshelf-docs/review",
-    );
-    expect(statusContext(channel({ config: { prefix: "" } }), "testing")).toBe(
-      "storyshelf/testing",
-    );
-  });
-});
-
-describe("buildCommentMarkdown", () => {
-  it("links the build under the status name for every state", () => {
-    expect(buildCommentMarkdown("pending", "u", "s/testing")).toContain("pending for `s/testing`");
-    expect(buildCommentMarkdown("success", "u", "s/testing")).toContain("passed for `s/testing`");
-    expect(buildCommentMarkdown("failure", "u", "s/testing")).toContain("detected for `s/testing`");
-    expect(buildCommentMarkdown("failure", "https://shelf/b/1", "c")).toContain(
-      "(https://shelf/b/1)",
-    );
-  });
-});
-
-describe("emitBuildState", () => {
-  it("writes status then comment to each enabled state channel with its token", async () => {
-    const fake = makeFakeStateNotifier();
-    await emitBuildState({
-      ...base,
+const states: BuildStateSet = {
+  statuses: [
+    {
+      name: "testing",
+      context: "storyshelf/testing",
       state: "pending",
-      notifiers: [fake.provider],
-      channels: [channel(), channel({ id: "c2", config: { prefix: "alt" } })],
-    });
-    const statuses = fake.calls.filter((call) => call.target.kind === "status");
-    expect(statuses.map((call) => call.target)).toEqual(
-      expect.arrayContaining([
-        { kind: "status", sha: "abc", context: "storyshelf/testing" },
-        { kind: "status", sha: "abc", context: "alt/testing" },
-      ]),
-    );
-    expect(fake.calls.filter((call) => call.target.kind === "comment")).toHaveLength(2);
-    expect(fake.secrets).toEqual(["token", "token"]);
-  });
-
-  it("ignores disabled channels, message providers and unwired kinds", async () => {
-    const fake = makeFakeStateNotifier();
-    await emitBuildState({
-      ...base,
+      description: "Capturing",
+      url: "https://shelf/b/1",
+    },
+    {
+      name: "storybook",
+      context: "storyshelf/storybook",
       state: "success",
-      notifiers: [fake.provider],
-      channels: [
-        channel({ enabled: false }),
-        channel({ id: "c2", provider: "slack-webhook" }),
-        channel({ id: "c3", provider: "unwired" }),
-      ],
+      description: "Storybook published",
+      url: "https://shelf/sb/1",
+    },
+  ],
+  comment: { url: "https://shelf/b/1", markdown: "body", state: "pending" },
+};
+
+describe("channelPrefix", () => {
+  it("defaults the prefix to storyshelf and uses the configured one", () => {
+    expect(channelPrefix(channel())).toBe("storyshelf");
+    expect(channelPrefix(channel({ config: { prefix: "storyshelf-docs" } }))).toBe(
+      "storyshelf-docs",
+    );
+    expect(channelPrefix(channel({ config: { prefix: "" } }))).toBe("storyshelf");
+  });
+});
+
+describe("writeBuildState", () => {
+  it("writes every status verbatim, then the comment, with the channel token", async () => {
+    const fake = makeFakeStateNotifier();
+    await writeBuildState(fake.provider, channel(), { sha: "abc", states });
+    expect(fake.calls.map((call) => call.target)).toEqual([
+      { kind: "status", sha: "abc", context: "storyshelf/testing", description: "Capturing" },
+      {
+        kind: "status",
+        sha: "abc",
+        context: "storyshelf/storybook",
+        description: "Storybook published",
+      },
+      { kind: "comment", sha: "abc", markdown: "body" },
+    ]);
+    expect(fake.calls.map((call) => call.url)).toEqual([
+      "https://shelf/b/1",
+      "https://shelf/sb/1",
+      "https://shelf/b/1",
+    ]);
+    expect(fake.secrets).toEqual(["token"]);
+  });
+
+  it("skips the comment when the states carry none", async () => {
+    const fake = makeFakeStateNotifier();
+    await writeBuildState(fake.provider, channel(), {
+      sha: "abc",
+      states: { ...states, comment: null },
     });
-    expect(fake.calls).toHaveLength(0);
+    expect(fake.calls.every((call) => call.target.kind === "status")).toBe(true);
   });
 
-  it("reports each channel's outcome, with the failure sanitized, and never throws", async () => {
+  it("throws when the host refuses a status, so the caller can retry", async () => {
     const failing = makeFakeStateNotifier("fake-git", "HTTP 401: Bad credentials");
-    const onOutcome = vi.fn();
-    const warn = vi.fn();
     await expect(
-      emitBuildState({
-        ...base,
-        state: "failure",
-        notifiers: [failing.provider],
-        channels: [channel()],
-        onOutcome,
-        logger: { warn } as never,
-      }),
-    ).resolves.toBeUndefined();
-    expect(onOutcome).toHaveBeenCalledWith({ channelId: "c1", error: "HTTP 401: Bad credentials" });
-    expect(warn).toHaveBeenCalled();
+      writeBuildState(failing.provider, channel(), { sha: "abc", states }),
+    ).rejects.toThrow("HTTP 401");
   });
 
-  it("reports success without an error and survives a comment failure", async () => {
+  it("survives a comment failure", async () => {
     const fake = makeFakeStateNotifier();
     const original = fake.provider.create;
     fake.provider.create = (opts) => {
@@ -109,15 +100,13 @@ describe("emitBuildState", () => {
         },
       };
     };
-    const onOutcome = vi.fn();
-    await emitBuildState({
-      ...base,
-      state: "success",
-      notifiers: [fake.provider],
-      channels: [channel()],
-      onOutcome,
+    const warn = vi.fn();
+    await writeBuildState(fake.provider, channel(), {
+      sha: "abc",
+      states,
+      logger: { warn } as never,
     });
-    expect(onOutcome).toHaveBeenCalledWith({ channelId: "c1" });
-    expect(fake.calls).toHaveLength(1);
+    expect(fake.calls).toHaveLength(2);
+    expect(warn).toHaveBeenCalled();
   });
 });

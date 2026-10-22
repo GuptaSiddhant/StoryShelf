@@ -14,7 +14,7 @@ import { HTTPException } from "hono/http-exception";
 import { Readable, Transform } from "node:stream";
 import type { ReadableStream as NodeWebStream } from "node:stream/web";
 import { credentialKeys } from "../credential-keys.ts";
-import { postReviewStatus } from "../git-status.ts";
+import { requestBuildState } from "../git-status.ts";
 import { notifyProject } from "../notify.ts";
 import { getStore } from "../store.ts";
 import { assertBaselineCurrent } from "./baseline-guard.ts";
@@ -74,6 +74,7 @@ export async function createBuildRecord(
     },
     `/builds/${build.id}`,
   );
+  await requestBuildState(build.id);
   return build;
 }
 
@@ -164,6 +165,7 @@ export async function refreshBuild(buildId: string): Promise<void> {
   const build = await new BuildModel(db).get(buildId);
   if (!build) return;
   await new BuildModel(db).setStatus(buildId, status);
+  await requestBuildState(buildId);
   await emitWebhookEvent(
     db,
     { webhooks: getStore().db.tables.webhooks },
@@ -174,7 +176,6 @@ export async function refreshBuild(buildId: string): Promise<void> {
   );
   const project = await new ProjectModel(db).get(build.projectId);
   if (!project) return;
-  await postReviewStatus(project, build, build.status, status);
   await notifyProject(
     project,
     `build:${status}`,

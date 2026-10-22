@@ -1,8 +1,7 @@
 import type { Build, Project } from "@storyshelf/core/schema";
 import { makeDatabase, makeFakeStateNotifier, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
-import { describe, expect, it } from "vitest";
-import { checkForTransition } from "../git-status.ts";
+import { describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "../index.tsx";
 import { stubRunner } from "../test-runner.ts";
 
@@ -110,50 +109,49 @@ async function setup(storyCount = 2) {
   return { post, statuses };
 }
 
+/** The states shown on `<prefix>/testing`, once delivery caught up with `count` of them. */
+async function testingStates(statuses: () => StatusCall[], count: number): Promise<string[]> {
+  await vi.waitFor(() => {
+    expect(statuses().filter((call) => call.context === "storyshelf/testing")).toHaveLength(count);
+  });
+  return statuses()
+    .filter((call) => call.context === "storyshelf/testing")
+    .map((call) => call.status);
+}
+
 describe("git status after a human review", () => {
-  it("posts success once every snapshot is approved, not before", async () => {
+  it("shows success once every snapshot is approved, pending while review is open", async () => {
     const { post, statuses } = await setup();
 
     await post("snapshots/s0/approve");
-    expect(statuses()).toEqual([]);
+    expect(await testingStates(statuses, 1)).toEqual(["pending"]);
 
     await post("snapshots/s1/approve");
-    expect(statuses()).toEqual([{ context: "storyshelf/testing", gitSha: SHA, status: "success" }]);
+    expect(await testingStates(statuses, 2)).toEqual(["pending", "success"]);
+    expect(statuses().every((call) => call.gitSha === SHA)).toBe(true);
   });
 
-  it("posts failure when a snapshot is rejected and the review completes", async () => {
+  it("shows failure when a snapshot is rejected and the review completes", async () => {
     const { post, statuses } = await setup();
     await post("snapshots/s0/approve");
     await post("snapshots/s1/reject");
-    expect(statuses().map((call) => call.status)).toEqual(["failure"]);
+    expect(await testingStates(statuses, 2)).toEqual(["pending", "failure"]);
   });
 
-  it("posts success for approve-all and a shared story/mode approval", async () => {
+  it("shows success for approve-all and a shared story/mode approval", async () => {
     const all = await setup();
     await all.post("approve-all");
-    expect(all.statuses().map((call) => call.status)).toEqual(["success"]);
+    expect(await testingStates(all.statuses, 1)).toEqual(["success"]);
 
     const grouped = await setup(1);
     await grouped.post("stories/story-0/modes/desktop/approve");
-    expect(grouped.statuses().map((call) => call.status)).toEqual(["success"]);
+    expect(await testingStates(grouped.statuses, 1)).toEqual(["success"]);
   });
 
-  it("does not re-post when the outcome did not change", async () => {
+  it("shows the Storybook status beside the review status", async () => {
     const { post, statuses } = await setup(1);
     await post("snapshots/s0/approve");
-    await post("snapshots/s0/approve").catch(() => null);
-    expect(statuses()).toHaveLength(1);
-  });
-});
-
-describe("checkForTransition", () => {
-  it("maps terminal outcomes and re-opened reviews, ignoring no-ops", () => {
-    expect(checkForTransition("reviewing", "approved")).toBe("success");
-    expect(checkForTransition("reviewing", "rejected")).toBe("failure");
-    expect(checkForTransition("approved", "reviewing")).toBe("pending");
-    expect(checkForTransition("rejected", "approved")).toBe("success");
-    expect(checkForTransition("reviewing", "reviewing")).toBeNull();
-    expect(checkForTransition("approved", "approved")).toBeNull();
-    expect(checkForTransition("capturing", "reviewing")).toBeNull();
+    await testingStates(statuses, 1);
+    expect(statuses().map((call) => call.context)).toContain("storyshelf/storybook");
   });
 });

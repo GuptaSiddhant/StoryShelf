@@ -53,7 +53,18 @@ function wire(testing?: ShelfOptions["testing"], config: { scratchDir?: string }
   const { storage } = makeStorage();
   const options = { database: db, storage, testing } as unknown as ShelfOptions;
   const jobs = createJobQueue(options, testing?.queue ? [] : ["capture"], testing?.retries ?? 2);
-  return { db, jobs, wiring: setupCapture(options, config, [], logger, jobs), options };
+  return {
+    db,
+    jobs,
+    wiring: setupCapture(
+      options,
+      config,
+      { notifiers: [], buildState: { request: async () => {} } },
+      logger,
+      jobs,
+    ),
+    options,
+  };
 }
 
 const runContext = (): JobRunContext => ({ logger: {} as never, touch: () => {} });

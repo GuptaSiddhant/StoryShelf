@@ -36,6 +36,8 @@ export interface KindHandler {
   run(job: ConsumerJob, context: JobRunContext): Promise<void>;
   /** Whether the job is well-formed; a job that is not is failed without retries. */
   accepts?(job: ConsumerJob): boolean;
+  /** Retry delay of this kind: `baseMs * 2^n` capped at `maxMs`; defaults to the consumer's. */
+  backoff?: { baseMs: number; maxMs: number };
   /** Stop a running job (lease lost or cancelled); must tolerate a job that already ended. */
   cancel?(job: ConsumerJob): Promise<void>;
 }

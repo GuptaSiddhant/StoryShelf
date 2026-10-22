@@ -88,4 +88,5 @@ export type SystemEventName =
   | "sys:auth-failed"
   | "sys:capture-failed"
   | "sys:purge-completed"
+  | "sys:notify-failed"
   | "sys:ai-budget";

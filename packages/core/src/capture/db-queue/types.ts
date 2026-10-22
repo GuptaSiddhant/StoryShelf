@@ -53,6 +53,8 @@ export interface QueueJobInput {
   traceparent?: string;
   /** Kind-specific fields (channel id, zip key, …), stored as JSON. */
   data?: Record<string, unknown>;
+  /** Attempts allowed in total for this job; defaults to the queue's (`retries` + 1). */
+  maxAttempts?: number;
 }
 
 /** A job claimed from the database queue. */

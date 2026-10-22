@@ -1,6 +1,15 @@
+import { isServerlessHost } from "@storyshelf/core/config";
 import type { Project } from "@storyshelf/core/schema";
 import type { FC } from "hono/jsx";
-import { Button, Card, Field, FormActions, SectionTitle, SelectField } from "../ui/components.tsx";
+import {
+  Alert,
+  Button,
+  Card,
+  Field,
+  FormActions,
+  SectionTitle,
+  SelectField,
+} from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 import type { NotificationsFormState, SettingsNotifyProvider } from "./settings-notifications.tsx";
 
@@ -29,7 +38,7 @@ const GitChannelFields: FC<{ errors?: Record<string, string> }> = ({ errors }) =
       label="Status prefix"
       name="prefix"
       placeholder="storyshelf"
-      hint="Statuses are named <prefix>/testing. Give each project in a shared repository its own prefix."
+      hint="Statuses are named <prefix>/testing and <prefix>/storybook. Give each project in a shared repository its own prefix."
       error={errors?.["prefix"]}
     />
     <Field
@@ -52,6 +61,13 @@ export const CreateGitChannelCard: FC<{
 }> = ({ project, providers, formState }) => (
   <Card>
     <SectionTitle level={3}>Add a git channel</SectionTitle>
+    {isServerlessHost() ? (
+      <Alert tone="info" title="Statuses are delivered inline">
+        This host has no job consumer, so a build's state is written in the request that changes it,
+        without retries. A failure shows on the channel and the next change writes the current state
+        again.
+      </Alert>
+    ) : null}
     <form
       method="post"
       action={`/projects/${project.slug}/settings/notifications`}

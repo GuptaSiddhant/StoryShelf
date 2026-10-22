@@ -3,7 +3,7 @@ title: Hosting only
 description: Run StoryShelf without the testing option to publish and share Storybooks with no capture, compare or baselines.
 ---
 
-`createShelfApp({ database, storage })` is a complete deployment. Without the `testing` option StoryShelf **hosts Storybooks only**: it takes uploads, publishes them, and serves the library, component and build pages. Nothing renders, diffs or posts a testing status. Add `testing: { runner, ... }` and the same instance also captures, compares and keeps baselines.
+`createShelfApp({ database, storage })` is a complete deployment. Without the `testing` option StoryShelf **hosts Storybooks only**: it takes uploads, publishes them, and serves the library, component and build pages. Nothing renders, diffs or posts a testing status; a git channel still shows the informational `<prefix>/storybook` status when a build is published. Add `testing: { runner, ... }` and the same instance also captures, compares and keeps baselines.
 
 ```ts
 createShelfApp({ database, storage }); // hosting only

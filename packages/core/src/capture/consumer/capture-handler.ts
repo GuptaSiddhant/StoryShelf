@@ -4,8 +4,11 @@ import type { DatabaseAdapter } from "../../adapters/database.ts";
 import type { DesignProvider } from "../../adapters/design.ts";
 import type { NotifierProvider } from "../../adapters/notifier/provider.ts";
 import type { StorageAdapter } from "../../adapters/storage.ts";
+import type { ShelfConfig } from "../../config.ts";
 import type { Logger } from "../../logger.ts";
 import type { SecretInput } from "../../utils/encrypt.ts";
+import { createBuildStatePublisher } from "../build-state/publisher.ts";
+import type { BuildStatePublisher } from "../build-state/types.ts";
 import { createDispatchJob, type CaptureDispatchJob, type DispatchDeps } from "../dispatch.ts";
 import type { CaptureJobOptions, ShardJob } from "../orchestrator.ts";
 import { DEFAULT_MAX_RETRIES, retriesOf } from "./retry.ts";
@@ -25,6 +28,13 @@ export interface CaptureHandlerOptions {
   enqueue: (job: ShardJob) => Promise<void>;
   /** Notifier providers; `state` channels (git hosts) get the build statuses. */
   notifiers?: NotifierProvider[];
+  /**
+   * Shows a build's state on its git channels at every transition. Default: deliver inline through
+   * `notifiers` (a capture always has `testing` on); the app passes its queue-backed publisher.
+   */
+  buildState?: BuildStatePublisher;
+  /** Links in statuses are absolute from `publicBaseUrl`; published Storybooks use `publishedBaseDomain`. */
+  config?: Pick<ShelfConfig, "publicBaseUrl" | "publishedBaseDomain">;
   /** Design providers validating declared design links during capture. */
   design?: DesignProvider[];
   /** Server secret for webhook decryption. */
@@ -116,14 +126,27 @@ export function captureDispatchDeps(
       builds: t.builds,
       buildLabels: t.buildLabels,
       snapshots: t.snapshots,
-      notificationChannels: t.notificationChannels,
       captureAttempts: t.captureAttempts,
       captureLogs: t.captureLogs,
     },
     jobOptions,
-    notifiers: options.notifiers ?? [],
-    secret: options.secret,
+    buildState: options.buildState ?? inlineBuildState(options),
     logger: options.logger,
     maxRetries,
   };
+}
+
+/** Inline delivery of captured builds' states through the handler's own adapters. */
+function inlineBuildState(options: CaptureHandlerOptions): BuildStatePublisher {
+  return createBuildStatePublisher({
+    deps: {
+      db: options.db,
+      storage: options.storage,
+      notifiers: options.notifiers ?? [],
+      secret: options.secret,
+      config: options.config ?? {},
+      flags: () => ({ testing: true, review: false }),
+      logger: options.logger,
+    },
+  });
 }

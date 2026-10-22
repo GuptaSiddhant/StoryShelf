@@ -1,56 +1,30 @@
-/** Mirror review outcomes to the git channels' commit status (the merge gate). */
-import type { NotifierState } from "@storyshelf/core/adapter/notifier";
-import { postStatusesForBuild } from "@storyshelf/core/capture";
-import type { Build, Project } from "@storyshelf/core/schema";
+/** Ask for a build's state to be shown on its project's git channels (ADR 0014, decision 5). */
+import { createBuildStatePublisher } from "@storyshelf/core/capture";
 import { credentialKeys } from "./credential-keys.ts";
-import { getStore } from "./store.ts";
-
-const CHECK_FOR: Record<string, NotifierState | undefined> = {
-  approved: "success",
-  rejected: "failure",
-  reviewing: "pending",
-};
-
-/** Terminal outcomes decide the gate; `reviewing` only matters when it re-opens one. */
-function isTerminal(status: string): boolean {
-  return status === "approved" || status === "rejected";
-}
-
-/** The check state to post for a build moving `previous` → `next`, or null when nothing changes. */
-export function checkForTransition(previous: string, next: string): NotifierState | null {
-  if (previous === next) return null;
-  if (isTerminal(next) || (next === "reviewing" && isTerminal(previous))) {
-    return CHECK_FOR[next] ?? null;
-  }
-  return null;
-}
+import { getStore, type Store } from "./store.ts";
 
 /**
- * Post the `<prefix>/testing` status after a human review changes a build's
- * outcome. The capture consumer only posts `pending` and the capture-time result;
- * a `reviewing` build would otherwise stay pending on the PR after approval.
- * Provider errors never fail the review action.
+ * Show the build's current state (commit statuses and the pull-request comment) on every git
+ * channel of its project. Called on every transition a request causes: build creation, a review
+ * outcome, a retry. Delivery reads the build when it runs, so the call needs no state of its own;
+ * it never rejects, so a git host cannot fail the action that triggered it.
  */
-export async function postReviewStatus(
-  project: Project,
-  build: Pick<Build, "id" | "gitSha">,
-  previous: string,
-  next: string,
-): Promise<void> {
-  const status = checkForTransition(previous, next);
-  if (!status) return;
-  const { db, notifiers, config, logger } = getStore();
-  await postStatusesForBuild({
-    db,
-    tables: { notificationChannels: db.tables.notificationChannels },
-    project,
-    sha: build.gitSha,
-    status,
-    url: `/projects/${project.slug}/builds/${build.id}`,
-    notifiers,
-    secret: credentialKeys(config),
-    logger,
-  }).catch((error: unknown) => {
-    logger.warn({ err: error, buildId: build.id }, "failed to post review status");
+export async function requestBuildState(buildId: string): Promise<void> {
+  const store = getStore();
+  await (store.buildState ?? inlinePublisher(store)).request(buildId);
+}
+
+/** Hand-built stores have no wiring: deliver inline through the store's own adapters. */
+function inlinePublisher(store: Store): ReturnType<typeof createBuildStatePublisher> {
+  return createBuildStatePublisher({
+    deps: {
+      db: store.db,
+      storage: store.storage,
+      notifiers: store.notifiers,
+      secret: credentialKeys(store.config),
+      config: store.config,
+      flags: () => ({ testing: store.testing, review: false }),
+      logger: store.logger,
+    },
   });
 }

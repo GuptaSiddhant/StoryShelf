@@ -23,8 +23,12 @@ export interface RetryConfig {
 }
 
 /** Delay before retry number `attempts` (0 = the first retry): `base * 2^attempts`, capped. */
-export function backoffDelayMs(attempts: number, baseMs: number = DEFAULT_BACKOFF_MS): number {
-  return Math.min(MAX_BACKOFF_MS, baseMs * 2 ** attempts);
+export function backoffDelayMs(
+  attempts: number,
+  baseMs: number = DEFAULT_BACKOFF_MS,
+  maxMs: number = MAX_BACKOFF_MS,
+): number {
+  return Math.min(maxMs, baseMs * 2 ** attempts);
 }
 
 /**

@@ -13,6 +13,7 @@ import {
   extractionLimitsOf,
   resolvePublishLimits,
   type AfterPublishHook,
+  type BuildStatePublisher,
   type CatalogLoader,
   type KindHandler,
   type PublishCompleter,
@@ -45,22 +46,30 @@ export type PublishService = Pick<
 /**
  * Wire publishing for `options` (the instrumented options; `config` is the resolved config).
  * `captureWillRun` is whether uploads get a capture (`enqueueCapture` exists): capture owns the
- * build status then, and publishing leaves it alone. `jobs` is the shared queue; a host that
- * polls no `publish` jobs (serverless) has none of the job side.
+ * build status then, and publishing leaves it alone. `delivery.jobs` is the shared queue; a host
+ * that polls no `publish` jobs (serverless) has none of the job side. When publishing ends,
+ * `delivery.buildState` shows the build's state on its git channels (the `storybook` status).
  */
 export function setupPublishing(
   options: ShelfOptions,
   config: ShelfConfig,
   logger: Logger,
   captureWillRun: boolean,
-  jobs: JobQueue,
+  delivery: { jobs: JobQueue; buildState: BuildStatePublisher },
 ): PublishWiring {
+  const { jobs } = delivery;
   const catalog = createCatalogLoader({
     db: options.database,
     storage: options.storage,
     logger: logger.child({ component: "catalog" }),
   });
-  const afterPublish: AfterPublishHook[] = [createCatalogHook(catalog)];
+  // The Storybook status shows the end of publishing, a transition no build status change marks.
+  const afterPublish: AfterPublishHook[] = [
+    createCatalogHook(catalog),
+    async ({ build }) => {
+      await delivery.buildState.request(build.id);
+    },
+  ];
   const completer = createPublishCompleter({
     db: options.database,
     captureWillRun,

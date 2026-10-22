@@ -168,6 +168,32 @@ describe("retries", () => {
     await started;
   });
 
+  it("uses the backoff of the job's own kind when its handler states one", async () => {
+    const r = rig({
+      kinds: ["notify"],
+      handlers: {
+        notify: {
+          backoff: { baseMs: 10_000, maxMs: 15_000 },
+          run: async () => {
+            throw new Error("boom");
+          },
+        },
+      },
+    });
+    const consumer = r.consume();
+    const started = consumer.start();
+    const id = await r.queue.enqueueJob({ kind: "notify", buildId: "b1" });
+    await r.clock.advance(100);
+    const first = await stateOf(r, id);
+    expect(Date.parse(first?.visibleAt ?? "") - Date.parse(first?.updatedAt ?? "")).toBe(10_000);
+    await r.clock.advance(12_000);
+    const second = await stateOf(r, id);
+    // 20 s doubled, held at the handler's cap.
+    expect(Date.parse(second?.visibleAt ?? "") - Date.parse(second?.updatedAt ?? "")).toBe(15_000);
+    await consumer.stop();
+    await started;
+  });
+
   it("applies the final-attempt rule: the last attempt is nacked without requeue", async () => {
     const r = rig({
       retries: 1,

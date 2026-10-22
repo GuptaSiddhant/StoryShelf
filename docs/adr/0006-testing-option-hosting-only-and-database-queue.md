@@ -4,7 +4,8 @@
 
 Accepted. Amended with the `capture_jobs` table, the claim algorithm and the poll and cancel
 details (decisions 4 and 11), recorded while implementing the database queue (#212), and with the
-cutover details (decisions 4 and 5), recorded while moving the app onto it (#217).
+cutover details (decisions 4 and 5), recorded while moving the app onto it (#217), and with the
+`notify` job kind (decision 4), recorded while implementing it (#222).
 
 Supersedes (archived): ADR 0034.
 
@@ -201,6 +202,12 @@ third-party `DatabaseAdapter` implementations, which is accepted.
   `visible_at` order that stops at the first row: an idle queue reads no rows, a busy one reads one.
   A queue that polls several kinds at once (`publish` and `notify` on a hosting-only instance) scans
   the visible rows of those kinds and sorts them; idle, that is still no rows.
+- **`notify` jobs** (ADR 0014, decision 7) differ from the other kinds in three ways. A job states
+  its own `maxAttempts` at enqueue (five, instead of `testing.retries` + 1) and its handler its own
+  retry delay (10 s doubling to five minutes, instead of 1 s to 30 s). They run on a second queue
+  instance polled by a consumer of their own, so a capture holding every slot cannot starve a
+  status; the instance that enqueues wakes that consumer at once. The queue views (`status`,
+  `active`, `recent`, `cancel` by build) list every polled kind but `notify`.
 - **Leases follow progress**, throttled, never on a timer, so a hung capture loses its lease.
 - **Enqueue** inserts the row and wakes the local consumer directly, so a single instance dispatches
   immediately; other instances find the job on their next poll. An index on status and visibility

@@ -244,6 +244,7 @@ function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
     captureQueue,
     capturesHere,
     publish,
+    buildState,
     design,
     notifiers,
   } = wiring;
@@ -261,6 +262,7 @@ function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
       captureQueue,
       capturesHere,
       publish,
+      buildState,
       captureConcurrency: options.testing?.concurrency,
       design,
       notifiers,
