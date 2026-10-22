@@ -22,6 +22,7 @@ export const comments = sqliteTable(
     resolved: integer("resolved", { mode: "boolean" }).notNull().default(false),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
+    storyId: text("story_id"),
   },
   (t) => [index("comments_build_id_idx").on(t.buildId)],
 );
@@ -38,4 +39,5 @@ export interface Comment {
   resolved: boolean;
   createdAt: string;
   updatedAt: string;
+  storyId: string | null;
 }

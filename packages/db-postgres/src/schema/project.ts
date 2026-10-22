@@ -20,6 +20,8 @@ export const projects = pgTable("projects", {
   modesAllowlist: text("modes_allowlist"),
   automigrate: boolean("automigrate").notNull().default(false),
   aiProfile: text("ai_profile"),
+  reviewEnabled: boolean("review_enabled").notNull().default(true),
+  reviewApprovals: integer("review_approvals").notNull().default(1),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).notNull(),
 });
@@ -44,6 +46,8 @@ export interface Project {
   modesAllowlist?: string | null;
   automigrate: boolean;
   aiProfile: string | null;
+  reviewEnabled: boolean;
+  reviewApprovals: number;
   createdAt: string;
   updatedAt: string;
 }

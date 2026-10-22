@@ -68,6 +68,8 @@ const projects = defineTable("projects", {
   modesAllowlist: "modes_allowlist",
   automigrate: "automigrate",
   aiProfile: "ai_profile",
+  reviewEnabled: "review_enabled",
+  reviewApprovals: "review_approvals",
   createdAt: "created_at",
   updatedAt: "updated_at",
 });
@@ -212,6 +214,15 @@ const buildComponents = defineTable("build_components", {
   createdAt: "created_at",
 });
 
+const buildReviews = defineTable("build_reviews", {
+  id: "id",
+  buildId: "build_id",
+  userId: "user_id",
+  verdict: "verdict",
+  body: "body",
+  createdAt: "created_at",
+});
+
 const siteSettings = defineTable("site_settings", {
   id: "id",
   value: "value",
@@ -291,6 +302,7 @@ const comments = defineTable("comments", {
   resolved: "resolved",
   createdAt: "created_at",
   updatedAt: "updated_at",
+  storyId: "story_id",
 });
 
 const labelTypes = defineTable("label_types", {
@@ -473,6 +485,7 @@ export const fakeSchema: Tables = {
   captureShards,
   captureJobs,
   buildComponents,
+  buildReviews,
   siteSettings,
   snapshots,
   baselines,

@@ -48,6 +48,16 @@ describe("ProjectModel", () => {
     expect(project.executePlay).not.toBe(true);
   });
 
+  it("persists the review settings given at creation and leaves them to the defaults otherwise", async () => {
+    const { db } = makeDatabase();
+    const model = new ProjectModel(db, { projects: db.tables.projects });
+    const set = await model.create({ name: "Review", reviewEnabled: false, reviewApprovals: 2 });
+    expect(set).toMatchObject({ reviewEnabled: false, reviewApprovals: 2 });
+    const plain = await model.create({ name: "Plain review" });
+    expect(plain.reviewEnabled).toBeUndefined();
+    expect(plain.reviewApprovals).toBeUndefined();
+  });
+
   it("gets a project by id", async () => {
     const { db } = makeDatabase();
     const model = new ProjectModel(db, { projects: db.tables.projects });

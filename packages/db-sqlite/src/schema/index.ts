@@ -10,6 +10,7 @@
 import type { AnySQLiteTable } from "drizzle-orm/sqlite-core";
 import { baselines as baselinesTable } from "./baseline.ts";
 import { buildComponents as buildComponentsTable } from "./build-component.ts";
+import { buildReviews as buildReviewsTable } from "./build-review.ts";
 import { builds as buildsTable } from "./build.ts";
 import {
   captureAttempts as captureAttemptsTable,
@@ -53,6 +54,7 @@ export { builds } from "./build.ts";
 export { captureAttempts, captureLogs } from "./capture-attempt.ts";
 export { captureJobs } from "./capture-job.ts";
 export { buildComponents } from "./build-component.ts";
+export { buildReviews } from "./build-review.ts";
 export { siteSettings } from "./site-setting.ts";
 export { captureShards } from "./capture-shard.ts";
 export { baselines } from "./baseline.ts";
@@ -120,6 +122,7 @@ export const schema: {
   captureShards: AnySQLiteTable;
   captureJobs: AnySQLiteTable;
   buildComponents: AnySQLiteTable;
+  buildReviews: AnySQLiteTable;
   siteSettings: AnySQLiteTable;
   snapshots: AnySQLiteTable;
   baselines: AnySQLiteTable;
@@ -152,6 +155,7 @@ export const schema: {
   captureShards: captureShardsTable,
   captureJobs: captureJobsTable,
   buildComponents: buildComponentsTable,
+  buildReviews: buildReviewsTable,
   siteSettings: siteSettingsTable,
   snapshots: snapshotsTable,
   baselines: baselinesTable,

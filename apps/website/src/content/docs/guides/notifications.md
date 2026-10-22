@@ -30,7 +30,7 @@ curl -X POST $SHELF/api/v1/projects/my-app/notification-channels \
 
 ## Git channels (commit statuses)
 
-A git channel (`github`, `gitlab` from [`@storyshelf/notify-git`](/packages/notify-git/)) belongs to a project and shows the build's state on your repository: commit statuses named `<prefix>/testing` and `<prefix>/storybook`, and one pull-request comment per build. It takes the repository as config and the token as its secret:
+A git channel (`github`, `gitlab` from [`@storyshelf/notify-git`](/packages/notify-git/)) belongs to a project and shows the build's state on your repository: commit statuses named `<prefix>/testing` (or `<prefix>/review` without `testing`) and `<prefix>/storybook`, and one pull-request comment per build. It takes the repository as config and the token as its secret:
 
 ```sh
 curl -X POST $SHELF/api/v1/projects/my-app/notification-channels \

@@ -1,13 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
 import { BuildModel } from "../../models/build.ts";
+import { ProjectModel } from "../../models/project.ts";
 import { createTestBuild, createTestProject } from "../../test-helpers/create-project.ts";
 import { makeDatabase } from "../../test-helpers/fake-adapters.ts";
 import { stubLogger } from "../consumer/test-fixtures.ts";
 import { createPublishCompleter, type AfterPublishHook } from "./complete.ts";
 
-async function setup(options: { captureWillRun?: boolean; branch?: string } = {}) {
+async function setup(
+  options: { captureWillRun?: boolean; branch?: string; reviewEnabled?: boolean } = {},
+) {
   const { db } = makeDatabase();
   const project = await createTestProject(db, db.tables);
+  if (options.reviewEnabled !== undefined) {
+    await new ProjectModel(db).update(project.id, { reviewEnabled: options.reviewEnabled });
+  }
   const build = await createTestBuild(db, db.tables, project.id, {
     gitBranch: options.branch ?? project.gitDefaultBranch,
   });
@@ -50,6 +56,29 @@ describe("createPublishCompleter", () => {
 
   it("leaves a non-default branch pending", async () => {
     const { build, completer, statusOf } = await setup({ branch: "feature/x" });
+    await completer.complete(build.id, { ok: true });
+    expect(await statusOf()).toBe("pending");
+  });
+
+  it("accepts a non-default branch when review is off, once, with the hooks still running", async () => {
+    const { build, completer, hooks, statusOf } = await setup({
+      branch: "feature/x",
+      reviewEnabled: false,
+    });
+    const hook = vi.fn(async () => {});
+    hooks.push(hook);
+    await completer.complete(build.id, { ok: true });
+    expect(await statusOf()).toBe("approved");
+    expect(hook).toHaveBeenCalledOnce();
+    await completer.complete(build.id, { ok: true });
+    expect(await statusOf()).toBe("approved");
+  });
+
+  it("holds a non-default branch when review is explicitly on", async () => {
+    const { build, completer, statusOf } = await setup({
+      branch: "feature/x",
+      reviewEnabled: true,
+    });
     await completer.complete(build.id, { ok: true });
     expect(await statusOf()).toBe("pending");
   });

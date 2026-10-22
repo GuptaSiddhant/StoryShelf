@@ -38,6 +38,30 @@ Threaded review comments live on a build or a single snapshot, with **resolve**:
 
 Comments persist until the build is purged (see [Retention](/concepts/retention/)). The UI’s diff overlay (baseline | current | diff) is the heat map — red = changed pixels, thresholds from `pixel_threshold` / `max_diff_ratio` or per-story `diffThreshold`.
 
+## Reviewing without testing
+
+A project on a [hosting-only](/concepts/hosting-only/) instance, or any project whose builds carry no snapshots, is reviewed at the build level. Review is a per-project switch (`reviewEnabled`, on by default; see [Project settings](/guides/project-settings/#review)):
+
+| `testing` | review | A build                                                                                                                                       |
+| --------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| off       | off    | Accepted when publishing finishes. No verdicts, no review status.                                                                             |
+| off       | on     | Default branch: accepted when publishing finishes. Other branches: `pending` until verdicts decide it, `<prefix>/review` status.             |
+| on        | off    | Snapshot approval alone decides; the verdict routes answer 404.                                                                               |
+| on        | on     | Snapshot approval decides; a build-level verdict is available as a sign-off and does not gate.                                                |
+
+**Verdicts.** Approvers and admins (the roles that approve snapshots) give a build a verdict, `approved` or `rejected`, with an optional note:
+
+- `POST /api/v1/projects/:slug/builds/:id/reviews { verdict, body? }`
+- `GET /api/v1/projects/:slug/builds/:id/reviews` (any viewer): each reviewer's latest verdict, the approvals against the requirement, and the full history.
+
+A reviewer's newest verdict counts, so rewriting one is another `POST`. With `testing` off the build is `approved` once the project's required approvals (`reviewApprovals`, default 1) are present among the reviewers' latest verdicts and none of those is `rejected`; it is `rejected` when any is, and `pending` otherwise (for example when a rejecting reviewer rewrites to an approval and too few approvals remain). Each reviewer counts once. Verdicts belong to the build: a new push is a new build and needs its own approval, and unresolved comments never block a verdict. A failed build answers 409. Verdicts written with a bearer token carry no user and count as a single reviewer, so a project that requires more than one approval needs approvals from signed-in users.
+
+A verdict that approves or rejects the build fires the usual `build:approved` / `build:rejected` webhook and notifications. Accepting a build automatically (default branch, or any branch with review off) fires none.
+
+**Statuses.** The build's git channels show `<prefix>/review` (`pending`, then `success` or `failure` from the verdict) next to the informational `<prefix>/storybook`; see [Merge gate setup](/guides/merge-gate/).
+
+Comments by `developer` and above can anchor to the build, to a snapshot, or to a story of the build's catalog (`storyId` in the comment body; an anchor is exactly one of the three).
+
 ## Retry & merge gate
 
 - **Flaky capture:** **Retry** on the build page re-enqueues the same build ID (`POST …/builds/:id/retry`) — see [Interaction testing](/guides/interaction-testing/) for `flakyTest` handling.

@@ -21,6 +21,10 @@ export interface Project {
   automigrate?: boolean;
   /** AI profile gate: null = AI off for this project; otherwise a profile name. */
   aiProfile?: string | null;
+  /** Review is on for this project (ADR 0013, decision 1); the column defaults to true. */
+  reviewEnabled?: boolean;
+  /** Approvals a build needs when `testing` is off (ADR 0013, decision 3); default 1. */
+  reviewApprovals?: number;
   createdAt: string;
   updatedAt: string;
 }

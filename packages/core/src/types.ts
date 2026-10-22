@@ -66,6 +66,12 @@ export interface AuthUser {
   providerId?: string;
 }
 
+/** Build-level review verdicts (ADR 0013, decision 3). */
+export const REVIEW_VERDICTS = ["approved", "rejected"] as const;
+
+/** A reviewer's verdict on a build. */
+export type ReviewVerdict = (typeof REVIEW_VERDICTS)[number];
+
 /** All per-project membership roles. */
 export const PROJECT_ROLES = ["admin", "approver", "developer", "viewer"] as const;
 

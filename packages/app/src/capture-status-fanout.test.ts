@@ -190,6 +190,29 @@ async function uploadBuild(
   return build;
 }
 
+/** A hosting-only instance (no `testing`) with one project and one git channel. */
+async function hostingOnly() {
+  const { db } = makeDatabase();
+  const { storage } = makeStorage();
+  const git = makeFakeStateNotifier("github-a");
+  const app = createShelfApp({
+    database: db,
+    storage,
+    config: { scratchDir, secret: "test-secret", publicBaseUrl: BASE },
+    notifications: { notifiers: [git.provider] },
+    logger: pino({ level: "silent" }),
+  });
+  const project = (await (
+    await app.request("/api/v1/projects", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Hosting only" }),
+    })
+  ).json()) as { id: string; slug: string };
+  await addGitChannel(app, project.slug, { provider: "github-a", secret: "token-a" });
+  return { app, git, project };
+}
+
 describe("git channel status fan-out", () => {
   it("posts pending and success statuses to every configured git channel", async () => {
     const { db } = makeDatabase();
@@ -287,33 +310,34 @@ describe("git channel status fan-out", () => {
     expect(statusCalls(gitB)).toEqual([]);
   });
 
-  it("shows a build that was never captured: only the Storybook status, once it is published", async () => {
-    const { db } = makeDatabase();
-    const { storage } = makeStorage();
-    const git = makeFakeStateNotifier("github-a");
-    const app = createShelfApp({
-      database: db,
-      storage,
-      config: { scratchDir, secret: "test-secret", publicBaseUrl: BASE },
-      notifications: { notifiers: [git.provider] },
-      logger: pino({ level: "silent" }),
-    });
-    const project = (await (
-      await app.request("/api/v1/projects", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: "Hosting only" }),
-      })
-    ).json()) as { id: string; slug: string };
-    await addGitChannel(app, project.slug, { provider: "github-a", secret: "token-a" });
+  it("shows a build that was never captured: review and Storybook statuses, once it is published", async () => {
+    const { app, git, project } = await hostingOnly();
 
     const build = await uploadBuild(app, project.slug);
 
-    const states = await finalStates(git, { "storyshelf/storybook": "success" });
+    // The default branch is accepted when publishing ends, so the review gate is green at once.
+    const states = await finalStates(git, {
+      "storyshelf/review": "success",
+      "storyshelf/storybook": "success",
+    });
     expect(states["storyshelf/storybook"]).toMatchObject({
       sha: SHA,
       url: `${BASE}/projects/${project.slug}/storybook/build/${build.id}/`,
     });
+  });
+
+  it("shows only the Storybook status when the project has review off", async () => {
+    const { app, git, project } = await hostingOnly();
+    const off = await app.request(`/api/v1/projects/${project.slug}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ reviewEnabled: false }),
+    });
+    expect(off.status).toBe(200);
+
+    await uploadBuild(app, project.slug);
+
+    await finalStates(git, { "storyshelf/storybook": "success" });
   });
 
   it("on a host with no consumer, delivers inline and shows a refused status as the channel's last error", async () => {

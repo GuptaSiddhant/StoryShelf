@@ -3,7 +3,7 @@ title: Hosting only
 description: Run StoryShelf without the testing option to publish and share Storybooks with no capture, compare or baselines.
 ---
 
-`createShelfApp({ database, storage })` is a complete deployment. Without the `testing` option StoryShelf **hosts Storybooks only**: it takes uploads, publishes them, and serves the library, component and build pages. Nothing renders, diffs or posts a testing status; a git channel still shows the informational `<prefix>/storybook` status when a build is published. Add `testing: { runner, ... }` and the same instance also captures, compares and keeps baselines.
+`createShelfApp({ database, storage })` is a complete deployment. Without the `testing` option StoryShelf **hosts Storybooks only**: it takes uploads, publishes them, and serves the library, component and build pages. Nothing renders, diffs or posts a testing status; a git channel still shows the `<prefix>/review` gate (review on) and the informational `<prefix>/storybook` status when a build is published. Add `testing: { runner, ... }` and the same instance also captures, compares and keeps baselines.
 
 ```ts
 createShelfApp({ database, storage }); // hosting only
@@ -33,7 +33,7 @@ Existing snapshots are **hidden, not deleted**: they reappear when `testing` is 
 
 ## Which builds are accepted
 
-A published build on the project's default branch becomes `approved` when publishing finishes; a build on any other branch stays `pending`. With `testing` on, capture sets the status. See [Published Storybook](/concepts/publishing/).
+A published build on the project's default branch becomes `approved` when publishing finishes, and so does a build on any other branch when the project has review off. With review on (the default) a build on another branch stays `pending` until an approver or admin gives it a build-level verdict; see [Review](/guides/review/#reviewing-without-testing). With `testing` on, capture sets the status. See [Published Storybook](/concepts/publishing/).
 
 ## Serverless platforms
 

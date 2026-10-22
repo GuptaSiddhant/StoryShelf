@@ -96,4 +96,23 @@ describe("CommentModel", () => {
     const resolvedComment = await model.resolve(comment.id);
     expect(resolvedComment.resolved).toBe(true);
   });
+
+  it("anchors to a build, a story or a snapshot, never two", async () => {
+    const db = await makeDbWithProject();
+    const model = new CommentModel(db);
+    const onBuild = await model.create(mockProject.id, "b1", "u", { body: "x" });
+    const onStory = await model.create(mockProject.id, "b1", "u", { body: "x", storyId: "a--b" });
+    const onSnapshot = await model.create(mockProject.id, "b1", "u", {
+      body: "x",
+      snapshotId: "s1",
+    });
+    expect([onBuild, onStory, onSnapshot].map((c) => [c.snapshotId, c.storyId])).toEqual([
+      [null, null],
+      [null, "a--b"],
+      ["s1", null],
+    ]);
+    await expect(
+      model.create(mockProject.id, "b1", "u", { body: "x", storyId: "a--b", snapshotId: "s1" }),
+    ).rejects.toThrow("not several");
+  });
 });

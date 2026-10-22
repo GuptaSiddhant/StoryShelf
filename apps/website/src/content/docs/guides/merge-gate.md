@@ -7,11 +7,21 @@ StoryShelf posts a **commit status** on the commit it captured, through a **git 
 
 ## How the gate works
 
-| Build state                            | `<prefix>/testing` |
+| Build state (`testing` on)             | `<prefix>/testing` |
 | -------------------------------------- | ------------------ |
 | Capture started, or review still open  | `pending`          |
 | All `new`/`changed` snapshots approved | `success`          |
 | Changes rejected, or capture failed    | `failure`          |
+
+Without `testing` (a [hosting-only](/concepts/hosting-only/) project) the gate is **`<prefix>/review`**, fed by the build-level verdicts of [Review](/guides/review/#reviewing-without-testing):
+
+| Build state (`testing` off, review on)                                 | `<prefix>/review` |
+| ---------------------------------------------------------------------- | ----------------- |
+| Waiting for a verdict (default-branch builds are accepted on publish)  | `pending`         |
+| Approved: the required approvals are present, no latest rejection      | `success`         |
+| A reviewer's latest verdict is a rejection, or the build failed        | `failure`         |
+
+With `testing` on, `<prefix>/testing` stays the only gate and review never adds a second required check. A project with review off posts neither `<prefix>/testing` (without `testing`) nor `<prefix>/review`: it has no gate.
 
 The gating status is named **`<prefix>/testing`**, where `<prefix>` is the git channel's prefix (default `storyshelf`, so `storyshelf/testing`), and links to the build review page. Its description says whether review is still open. StoryShelf also posts `<prefix>/storybook` (the published Storybook, informational), which you should not require. Statuses follow the build's current state and are delivered durably with retries; see [Delivery](/packages/notify-git/#delivery). The name has no project slug: a repository that holds several projects gives each channel its own prefix (see [Several projects in one repo](#several-projects-in-one-repo)). Only approvers and admins can accept snapshots, so who can green-light a merge is a matter of [roles](/concepts/roles/).
 

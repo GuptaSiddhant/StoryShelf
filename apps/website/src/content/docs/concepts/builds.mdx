@@ -38,6 +38,8 @@ Default-branch builds auto-approve and write baselines; feature-branch builds la
 
 Without `testing` nothing is captured: a published default-branch build becomes `approved` when publishing ends and is labelled **Published** on its page, which shows component and story counts from the [catalog](/concepts/publishing/#the-catalog-and-the-pages-it-feeds) instead of snapshot counts.
 
+A build on another branch is accepted the same way when the project has **review off** (`reviewEnabled: false`). With review on (the default) it stays `pending` until reviewers decide it with a **build-level verdict** (`POST /api/v1/projects/:slug/builds/:id/reviews`, approver and admin): `approved` once the project's required approvals (`reviewApprovals`, default 1) are present and no reviewer's latest verdict is `rejected`, `rejected` when any is. A verdict is rewritable and belongs to its build, so a new push needs a new approval. With `testing` on the snapshot rollup decides and a verdict is only a sign-off. See [Review](/guides/review/#reviewing-without-testing).
+
 **Snapshots** track the diff result:
 
 | Status                  | Meaning                                                                |

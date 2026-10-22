@@ -1,7 +1,12 @@
 import { z } from "@hono/zod-openapi";
 import { BROWSER_NAMES, TARGET_NAME_PATTERN } from "@storyshelf/core/adapter/capture-runner";
 import { WebhookModel } from "@storyshelf/core/models";
-import { BUILD_STATUSES, PROJECT_ROLES, SNAPSHOT_STATUSES } from "@storyshelf/core/types";
+import {
+  BUILD_STATUSES,
+  PROJECT_ROLES,
+  REVIEW_VERDICTS,
+  SNAPSHOT_STATUSES,
+} from "@storyshelf/core/types";
 
 /** A capture target: an engine (`chromium`) or a remote one, `<engine>@<name>` (ADR 0007). */
 const captureTargetSchema = z
@@ -13,6 +18,8 @@ const captureTargetSchema = z
     ),
     "Expected an engine (chromium, firefox, webkit, chrome) or <engine>@<name>",
   );
+
+const reviewApprovalsSchema = z.number().int().min(1).max(20);
 
 const storybookMetaSchema = z.record(z.string(), z.unknown()).nullable().optional();
 
@@ -38,6 +45,10 @@ export const projectSchema = z
     modesAllowlist: z.string().nullable().optional(),
     /** AI profile gate: null/absent = AI off for this project. */
     aiProfile: z.string().nullable().optional(),
+    /** Review is on for this project (ADR 0013, decision 1). */
+    reviewEnabled: z.boolean().optional(),
+    /** Approvals a build needs when `testing` is off. */
+    reviewApprovals: z.number().optional(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -52,6 +63,8 @@ export const projectCreateSchema = z
     storybookMeta: storybookMetaSchema,
     executePlay: z.boolean().optional(),
     playTimeoutMs: z.number().int().min(1000).max(30_000).optional(),
+    reviewEnabled: z.boolean().optional(),
+    reviewApprovals: reviewApprovalsSchema.optional(),
   })
   .openapi("ProjectCreateInput");
 
@@ -75,6 +88,10 @@ export const projectUpdateSchema = z
     modesAllowlist: z.array(z.string().min(1)).max(50).nullable().optional(),
     /** Site admins only: a configured AI profile name, or null to turn AI off. */
     aiProfile: z.string().min(1).nullable().optional(),
+    /** Turn review (comments and build-level verdicts) on or off for the project. */
+    reviewEnabled: z.boolean().optional(),
+    /** Approvals a build needs before it is accepted when `testing` is off. */
+    reviewApprovals: reviewApprovalsSchema.optional(),
   })
   .openapi("ProjectUpdateInput");
 
@@ -175,6 +192,8 @@ export const commentSchema = z
     projectId: z.string(),
     buildId: z.string(),
     snapshotId: z.string().nullable(),
+    /** Storybook story id of a story-anchored comment. */
+    storyId: z.string().nullable().optional(),
     userId: z.string().nullable(),
     body: z.string(),
     parentId: z.string().nullable(),
@@ -188,10 +207,49 @@ export const commentSchema = z
 export const commentCreateSchema = z
   .object({
     body: z.string().min(1),
+    /** Anchor to a snapshot; not together with `storyId`. */
     snapshotId: z.string().optional(),
+    /** Anchor to a story of the build; not together with `snapshotId`. */
+    storyId: z.string().min(1).optional(),
     parentId: z.string().optional(),
   })
   .openapi("CommentCreateInput");
+
+/** OpenAPI schema for a build-level review verdict. */
+export const buildReviewSchema = z
+  .object({
+    id: z.string(),
+    buildId: z.string(),
+    userId: z.string().nullable(),
+    verdict: z.enum(REVIEW_VERDICTS),
+    body: z.string().nullable(),
+    createdAt: z.string(),
+  })
+  .openapi("BuildReview");
+
+/** OpenAPI schema for giving a build a verdict. */
+export const buildReviewCreateSchema = z
+  .object({
+    verdict: z.enum(REVIEW_VERDICTS),
+    body: z.string().max(4000).optional(),
+  })
+  .openapi("BuildReviewInput");
+
+/** OpenAPI schema for a build's review state: the verdicts and what they make of the build. */
+export const buildReviewStateSchema = z
+  .object({
+    /** Build status now. */
+    status: z.enum(BUILD_STATUSES),
+    /** Approvals the project requires. */
+    approvalsRequired: z.number(),
+    /** Approvals among the reviewers' latest verdicts. */
+    approvals: z.number(),
+    /** Every reviewer's latest verdict. */
+    latest: buildReviewSchema.array(),
+    /** Every verdict given, oldest first. */
+    history: buildReviewSchema.array(),
+  })
+  .openapi("BuildReviewState");
 
 /** OpenAPI schema for a project label type. */
 export const labelTypeSchema = z

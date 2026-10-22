@@ -1,9 +1,15 @@
-import type { BuildComponent, CaptureJobRow, CaptureShard } from "@storyshelf/core/schema";
+import type {
+  BuildComponent,
+  BuildReview,
+  CaptureJobRow,
+  CaptureShard,
+} from "@storyshelf/core/schema";
 import { expect, expectTypeOf, it } from "vitest";
 import { DDL, IDENTITY_STATEMENTS } from "./ddl.ts";
 import { baselines } from "./schema/baseline.ts";
 import type { Baseline } from "./schema/baseline.ts";
 import { buildComponents } from "./schema/build-component.ts";
+import { buildReviews } from "./schema/build-review.ts";
 import { builds } from "./schema/build.ts";
 import type { Build } from "./schema/build.ts";
 import { captureAttempts, captureLogs } from "./schema/capture-attempt.ts";
@@ -50,6 +56,7 @@ it("row interfaces match drizzle inference exactly", () => {
   expectTypeOf<CaptureShard>().toEqualTypeOf<typeof captureShards.$inferSelect>();
   expectTypeOf<CaptureJobRow>().toEqualTypeOf<typeof captureJobs.$inferSelect>();
   expectTypeOf<BuildComponent>().toEqualTypeOf<typeof buildComponents.$inferSelect>();
+  expectTypeOf<BuildReview>().toEqualTypeOf<typeof buildReviews.$inferSelect>();
   expectTypeOf<Snapshot>().toEqualTypeOf<typeof snapshots.$inferSelect>();
   expectTypeOf<Baseline>().toEqualTypeOf<typeof baselines.$inferSelect>();
   expectTypeOf<Comment>().toEqualTypeOf<typeof comments.$inferSelect>();
@@ -82,6 +89,7 @@ const DDL_TABLES = [
   "capture_shards",
   "capture_jobs",
   "build_components",
+  "build_reviews",
   "site_settings",
   "snapshots",
   "baselines",
@@ -121,6 +129,7 @@ const DDL_INDEXES = [
   "snapshots_build_id_idx",
   "baselines_project_story_idx",
   "comments_build_id_idx",
+  "build_reviews_build_id_idx",
   "label_types_project_key_idx",
   "build_labels_build_type_value_idx",
   "project_links_downstream_package_idx",

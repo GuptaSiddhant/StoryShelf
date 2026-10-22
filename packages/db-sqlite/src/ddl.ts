@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS projects (
   modes_allowlist TEXT,
   automigrate INTEGER NOT NULL DEFAULT 0,
   ai_profile TEXT,
+  review_enabled INTEGER NOT NULL DEFAULT 1,
+  review_approvals INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -195,9 +197,19 @@ CREATE TABLE IF NOT EXISTS comments (
   parent_id TEXT,
   resolved INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  updated_at TEXT NOT NULL,
+  story_id TEXT
 );
 CREATE INDEX IF NOT EXISTS comments_build_id_idx ON comments (build_id);
+CREATE TABLE IF NOT EXISTS build_reviews (
+  id TEXT PRIMARY KEY,
+  build_id TEXT NOT NULL REFERENCES builds(id) ON DELETE CASCADE,
+  user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+  verdict TEXT NOT NULL,
+  body TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS build_reviews_build_id_idx ON build_reviews (build_id);
 CREATE TABLE IF NOT EXISTS label_types (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,

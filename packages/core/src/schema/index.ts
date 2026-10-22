@@ -22,6 +22,8 @@ export type {
   CaptureJobRow,
   CaptureJobStatus,
 } from "./capture-job.ts";
+/** Build-level review verdict row (`build_reviews`). */
+export type { BuildReview } from "./build-review.ts";
 /** Component row of a published build (`build_components`). */
 export type { BuildComponent } from "./build-component.ts";
 export type { SiteSetting } from "./site-setting.ts";

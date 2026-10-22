@@ -38,7 +38,8 @@ Extraction also refuses entries with absolute paths or paths that leave the targ
 With `testing` off, publishing is the whole life of a build and ends by setting its status:
 
 - **Default branch:** published, the build becomes `approved`, so the project's Storybook link always resolves. Publishing that fails (for example a zip over a cap) makes it `failed`.
-- **Other branches:** published, the build stays `pending`. A later release adds the project setting that accepts these builds without a review; until then they wait for a build-level verdict.
+- **Other branches, review off:** published, the build becomes `approved` too: nobody is going to sign it off. This is the project's `reviewEnabled` setting (see [Project settings](/guides/project-settings/#review)).
+- **Other branches, review on (the default):** published, the build stays `pending`, and the project's Storybook link keeps resolving the previous accepted build. It becomes `approved` or `rejected` through build-level verdicts (see [Review](/guides/review/#reviewing-without-testing)). The build's own page and published Storybook answer for anyone who may view the project meanwhile.
 
 No approval event or webhook fires for this automatic acceptance; `build:created` already announced the upload. Repeating a publish (a job redelivered after a lost lease) never changes a build that has left `pending`. With `testing` on, publishing leaves the status alone and capture sets it.
 
