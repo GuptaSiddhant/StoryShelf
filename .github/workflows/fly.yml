@@ -71,21 +71,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Setup Nub
-        uses: nubjs/setup-nub@v0
-
-      - name: Setup pnpm
-        # Fixtures are independent pnpm installs, not nub workspaces.
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
+      - name: Setup workspace
+        uses: ./.github/actions/setup-workspace
 
       - name: Build the workspace CLI
-        run: nub ci && nubx turbo build --filter=storyshelf
+        run: nubx turbo build --filter=storyshelf
 
       - name: Build fixture Storybook
-        working-directory: fixtures/storybook-9
-        run: pnpm install --frozen-lockfile && pnpm run build-storybook
+        uses: ./.github/actions/build-fixture
+        with:
+          fixture: storybook-9
 
       - name: Seed demo project
         env:
