@@ -76,7 +76,7 @@ export function matrixInputOf(
     browsers: parts.browsers,
     affectedPaths: parts.affectedPaths,
     renderTimeoutMs: options.renderTimeoutMs,
-    storybookUrl: storybookUrlSource(options, target.build),
+    storybookUrl: storybookUrlSource(options, target),
     logger: parts.logger ?? options.logger,
     recordLog: parts.recordLog,
     progress: parts.progress,

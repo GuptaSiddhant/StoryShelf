@@ -65,19 +65,20 @@ published Storybook (ADR 0007 Remote Browsers and Public Origin). The token is a
 Storybook loads `iframe.html` and then many assets by relative path:
 
 ```
-<publicOrigin>/s/<token>/projects/<slug>/storybook/build/<buildId>/iframe.html
+<publicOrigin>/_s/<token>/iframe.html
 ```
 
-- The app strips `/s/<token>`, verifies the token and serves the build's static files through the same
-  file-serving branch as `/projects/:slug/storybook/build/:buildId/*`, as if `canViewBuild` had passed.
-  It never serves the wrapper page that route returns for an empty path.
+- The app strips `/_s/<token>`, verifies the token and serves the build's static files through the same
+  file handler and access rule as `/projects/:slug/storybook/build/:buildId/*`, with the token as the
+  grant. It never serves the wrapper page that route returns for an empty path.
 - The token is `base64url(projectId, buildId, expiresAt) + "." + HMAC-SHA256(key, same)`, verified
   statelessly. It grants read-only access to one build's static files and nothing else: no wrapper
   page, no API, no other build.
 - The key is derived from `config.secret` with the fixed context string `storyshelf/storybook-url/v1`,
   so a token cannot be confused with a session or any other signature. During a rotation the token is
   also accepted if it verifies against `previousSecret`.
-- Expiry is per job, default 2 hours (`testing.storybookUrlTtl`).
+- Expiry is derived from the render budget of the pass (2 to 24 hours) and can be set per project
+  (`projects.storybook_url_ttl_seconds`; ADR 0007, decision 5).
 - The token is redacted from logs, attempt records and runner error messages.
 - Subdomain published origins are not used for signed URLs, for the proxy reason above.
 - Absolute links in the app (signed URLs, email links, status targets) are built from the public-origin

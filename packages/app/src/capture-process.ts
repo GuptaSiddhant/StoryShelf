@@ -3,7 +3,6 @@ import {
   canForkCaptureChild,
   CAPTURE_RETRIES_ENV,
   CAPTURE_SHARD_SIZE_ENV,
-  CAPTURE_STORYBOOK_URL_TTL_ENV,
   createForkedCaptureHandler,
   decideCaptureProcess,
   forkCaptureChild,
@@ -57,8 +56,6 @@ export interface ForkedHandlerDeps {
   workerEntry: string;
   /** Captures per shard for big builds, handed to the child (`testing.shardSize`). */
   shardSize?: number;
-  /** `testing.storybookUrlTtl` (seconds), handed to the child, which mints signed Storybook URLs. */
-  storybookUrlTtl?: number;
   /** `testing.images.engine`, handed to the child so it diffs with the same codec. */
   imageEngine?: string;
   /** `testing.compare.threads`, handed to the child's diff pool. */
@@ -74,17 +71,11 @@ export interface ForkedHandlerDeps {
 
 /** Settings the parent hands to a forked child through its environment. */
 export function childEnvOf(
-  deps: Pick<
-    ForkedHandlerDeps,
-    "shardSize" | "storybookUrlTtl" | "imageEngine" | "diffThreads" | "retries"
-  >,
+  deps: Pick<ForkedHandlerDeps, "shardSize" | "imageEngine" | "diffThreads" | "retries">,
 ): Record<string, string> {
   const env: Record<string, string> = { [CAPTURE_RETRIES_ENV]: String(deps.retries) };
   if (deps.shardSize !== undefined) {
     env[CAPTURE_SHARD_SIZE_ENV] = String(deps.shardSize);
-  }
-  if (deps.storybookUrlTtl !== undefined) {
-    env[CAPTURE_STORYBOOK_URL_TTL_ENV] = String(deps.storybookUrlTtl);
   }
   if (deps.imageEngine !== undefined) {
     env[IMAGE_ENGINE_ENV] = deps.imageEngine;

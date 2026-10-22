@@ -8,13 +8,13 @@ describe("requestLogging", () => {
     const info = vi.fn();
     const app = new Hono();
     app.use("*", requestLogging({ info } as never));
-    app.get("/s/:token/*", (c) => c.text("ok"));
+    app.get("/_s/:token/*", (c) => c.text("ok"));
     const token = signStorybookToken({ secret: "k", projectId: "p1", buildId: "b1" });
 
-    await app.request(`/s/${token}/iframe.html`);
+    await app.request(`/_s/${token}/iframe.html`);
 
     const logged = JSON.stringify(info.mock.calls);
-    expect(logged).toContain("/s/[redacted]/iframe.html");
+    expect(logged).toContain("/_s/[redacted]/iframe.html");
     expect(logged).not.toContain(token);
   });
 });

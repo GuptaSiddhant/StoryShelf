@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS projects (
   ai_profile TEXT,
   review_enabled TINYINT(1) NOT NULL DEFAULT true,
   review_approvals INT NOT NULL DEFAULT 1,
+  storybook_url_ttl_seconds INT,
   created_at DATETIME(3) NOT NULL,
   updated_at DATETIME(3) NOT NULL
 );

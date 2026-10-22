@@ -7,6 +7,7 @@ import {
   REVIEW_VERDICTS,
   SNAPSHOT_STATUSES,
 } from "@storyshelf/core/types";
+import { MAX_STORYBOOK_URL_TTL, MIN_STORYBOOK_URL_TTL } from "@storyshelf/core/utils";
 
 /** A capture target: an engine (`chromium`) or a remote one, `<engine>@<name>` (ADR 0007). */
 const captureTargetSchema = z
@@ -20,6 +21,13 @@ const captureTargetSchema = z
   );
 
 const reviewApprovalsSchema = z.number().int().min(1).max(20);
+
+/** Seconds a signed Storybook URL stays valid (ADR 0007, decision 5). */
+const storybookUrlTtlSchema = z
+  .number()
+  .int()
+  .min(MIN_STORYBOOK_URL_TTL)
+  .max(MAX_STORYBOOK_URL_TTL);
 
 const storybookMetaSchema = z.record(z.string(), z.unknown()).nullable().optional();
 
@@ -49,6 +57,8 @@ export const projectSchema = z
     reviewEnabled: z.boolean().optional(),
     /** Approvals a build needs when `testing` is off. */
     reviewApprovals: z.number().optional(),
+    /** Seconds the signed Storybook URLs of a render stay valid; null derives it from the stories. */
+    storybookUrlTtlSeconds: z.number().nullable().optional(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -92,6 +102,8 @@ export const projectUpdateSchema = z
     reviewEnabled: z.boolean().optional(),
     /** Approvals a build needs before it is accepted when `testing` is off. */
     reviewApprovals: reviewApprovalsSchema.optional(),
+    /** Seconds (60 to 86400) the signed Storybook URLs of a render stay valid; null derives it from the stories. */
+    storybookUrlTtlSeconds: storybookUrlTtlSchema.nullable().optional(),
   })
   .openapi("ProjectUpdateInput");
 

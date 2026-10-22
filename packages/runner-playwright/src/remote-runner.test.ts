@@ -197,12 +197,12 @@ describe("a remote target", () => {
     expect(fake.state.connects).toEqual([]);
 
     const result = await runner.render(
-      input({ storybookUrl: "https://app.example/s/tok/build/b/iframe.html" }),
+      input({ storybookUrl: "https://app.example/_s/tok/build/b/iframe.html" }),
     );
     expect(result.captures).toHaveLength(2);
     expect(fake.state.connects[0]).toMatchObject({ kind: "chromium-cdp" });
     expect(fake.state.gotos[0]).toMatch(
-      /^https:\/\/app\.example\/s\/tok\/build\/b\/iframe\.html\?/u,
+      /^https:\/\/app\.example\/_s\/tok\/build\/b\/iframe\.html\?/u,
     );
     // The URL is the way in; the host's loopback server was never bound for it.
     expect(fake.state.gotos.some((url) => url.includes("127.0.0.1"))).toBe(false);

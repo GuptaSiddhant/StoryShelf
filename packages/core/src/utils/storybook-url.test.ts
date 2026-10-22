@@ -3,12 +3,12 @@ import { storybookBase } from "./storybook-url.ts";
 
 describe("storybookBase", () => {
   it.each([
-    ["https://app.example/s/tok/projects/p/storybook/build/b/iframe.html"],
-    ["https://app.example/s/tok/projects/p/storybook/build/b/"],
-    ["https://app.example/s/tok/projects/p/storybook/build/b"],
-    ["https://app.example/s/tok/projects/p/storybook/build/b/iframe.html?id=x#frag"],
+    ["https://app.example/_s/tok/projects/p/storybook/build/b/iframe.html"],
+    ["https://app.example/_s/tok/projects/p/storybook/build/b/"],
+    ["https://app.example/_s/tok/projects/p/storybook/build/b"],
+    ["https://app.example/_s/tok/projects/p/storybook/build/b/iframe.html?id=x#frag"],
   ])("reduces %s to the build's root", (url) => {
-    expect(storybookBase(url)).toBe("https://app.example/s/tok/projects/p/storybook/build/b");
+    expect(storybookBase(url)).toBe("https://app.example/_s/tok/projects/p/storybook/build/b");
   });
 
   it("keeps a port and a bare origin", () => {

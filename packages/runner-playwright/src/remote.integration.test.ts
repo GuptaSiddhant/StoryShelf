@@ -328,7 +328,7 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")(
       await rm(tmp, { recursive: true, force: true });
     });
 
-    it("renders a Storybook the browser can only reach through /s/<token>/", async () => {
+    it("renders a Storybook the browser can only reach through /_s/<token>/", async () => {
       const shelf = app as NonNullable<typeof app>;
       const created = await shelf.request("/api/v1/projects", {
         method: "POST",
@@ -339,7 +339,7 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")(
       const patched = await shelf.request(`/api/v1/projects/${project.slug}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ browsers: ["chromium@cdp"] }),
+        body: JSON.stringify({ browsers: ["chromium@cdp"], storybookUrlTtlSeconds: 3600 }),
       });
       expect(patched.status).toBe(200);
       const uploaded = await uploadBuild(shelf, project.slug, staticDir, {

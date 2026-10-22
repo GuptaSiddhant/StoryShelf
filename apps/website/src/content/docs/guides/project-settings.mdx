@@ -20,7 +20,7 @@ Name, `git_repository` (`owner/repo`), `git_default_branch` (baseline fallback, 
 
 ## Capture
 
-Which engines each build is captured on and which [modes](/guides/modes/) run. **Browsers**: a primary target plus up to two more (`browsers` via `PATCH`, primary first), chosen from the targets the runner has ready (unavailable ones are listed with the reason and refused on save); each target keeps its own baselines, and one approval covers a story and mode on all of them. **Mode allowlist**: mode names to run (`modesAllowlist`); empty runs every mode declared in your stories' parameters.
+Which engines each build is captured on and which [modes](/guides/modes/) run. **Browsers**: a primary target plus up to two more (`browsers` via `PATCH`, primary first), chosen from the targets the runner has ready (unavailable ones are listed with the reason and refused on save); each target keeps its own baselines, and one approval covers a story and mode on all of them. **Mode allowlist**: mode names to run (`modesAllowlist`); empty runs every mode declared in your stories' parameters. **Signed Storybook URL lifetime** (`storybookUrlTtlSeconds`, whole seconds from 60 to 86400, project admins): how long the URL given to a remote browser that cannot route back to the server stays valid ([Remote browsers](/guides/remote-browsers/#signed-storybook-urls)); empty derives it from the build's size, between 2 and 24 hours.
 
 ## Review
 

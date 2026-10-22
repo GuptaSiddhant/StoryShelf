@@ -38,6 +38,7 @@ async function setup() {
       browser?: string;
       browsers?: string | null;
       modesAllowlist?: string | null;
+      storybookUrlTtlSeconds?: number | null;
     };
   return { app, save, project };
 }
@@ -96,5 +97,32 @@ describe("capture settings tab", () => {
     expect(badMode.status).toBe(400);
     expect(await badMode.text()).toContain("Invalid mode name");
     expect((await project()).browsers ?? null).toBeNull();
+  });
+
+  it("saves the signed URL lifetime, shows it, and clears it when emptied", async () => {
+    const { app, save, project } = await setup();
+    expect((await project()).storybookUrlTtlSeconds ?? null).toBeNull();
+    expect([204, 302]).toContain(
+      (await save({ browser: "chromium", storybookUrlTtlSeconds: "5400" })).status,
+    );
+    expect((await project()).storybookUrlTtlSeconds).toBe(5400);
+    const html = await (await app.request("/projects/capture-project/settings/capture")).text();
+    expect(html).toContain('name="storybookUrlTtlSeconds"');
+    expect(html).toContain('value="5400"');
+    await save({ browser: "chromium", storybookUrlTtlSeconds: "" });
+    expect((await project()).storybookUrlTtlSeconds ?? null).toBeNull();
+  });
+
+  it("rejects a signed URL lifetime outside 60 to 86400 seconds or not whole", async () => {
+    const { save, project } = await setup();
+    const responses = await Promise.all(
+      ["59", "86401", "90.5", "soon"].map(
+        async (bad) => await save({ browser: "chromium", storybookUrlTtlSeconds: bad }),
+      ),
+    );
+    expect(responses.map((response) => response.status)).toEqual([400, 400, 400, 400]);
+    const bodies = await Promise.all(responses.map(async (response) => await response.text()));
+    expect(bodies.every((body) => body.includes("60 to 86400"))).toBe(true);
+    expect((await project()).storybookUrlTtlSeconds ?? null).toBeNull();
   });
 });

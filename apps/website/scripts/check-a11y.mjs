@@ -61,6 +61,18 @@ async function audit(browser, base, mode, path) {
   await page.addStyleTag({
     content: "*,*::before,*::after{transition:none!important;animation:none!important}",
   });
+  // Code blocks become keyboard-focusable (tabindex) from a client script after load. Wait for it
+  // before auditing, so an overflowing block is only reported when it really never gets focusable.
+  await page
+    .waitForFunction(
+      () =>
+        [...document.querySelectorAll("pre")].every(
+          (block) => block.scrollWidth <= block.clientWidth || block.hasAttribute("tabindex"),
+        ),
+      undefined,
+      { timeout: 5000 },
+    )
+    .catch(() => {});
   await page.evaluate(axeSource);
   const { violations } = await page.evaluate(() =>
     globalThis.axe.run(document, { runOnly: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"] }),

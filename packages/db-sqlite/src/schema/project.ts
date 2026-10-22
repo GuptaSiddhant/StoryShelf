@@ -22,6 +22,7 @@ export const projects = sqliteTable("projects", {
   aiProfile: text("ai_profile"),
   reviewEnabled: integer("review_enabled", { mode: "boolean" }).notNull().default(true),
   reviewApprovals: integer("review_approvals").notNull().default(1),
+  storybookUrlTtlSeconds: integer("storybook_url_ttl_seconds"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
@@ -48,6 +49,7 @@ export interface Project {
   aiProfile: string | null;
   reviewEnabled: boolean;
   reviewApprovals: number;
+  storybookUrlTtlSeconds: number | null;
   createdAt: string;
   updatedAt: string;
 }
