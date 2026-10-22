@@ -26,17 +26,28 @@ sha_for() { printf '%s:%s' "$1" "$(sha256sum "$STATIC/index.json" | cut -c1-64)"
 MAIN_SHA="$(sha_for main)"
 FEATURE_SHA="$(sha_for feature/new-button)"
 
-# Seeded = both builds exist on the server and neither failed.
-if BUILDS="$(curl -fsS "${AUTH[@]}" "$STORYSHELF_URL/api/v1/projects/$SLUG/builds" 2>/dev/null)"; then
-  if jq -e --arg a "$MAIN_SHA" --arg b "$FEATURE_SHA" \
-    '[.[] | select(.status != "failed") | .gitSha] | (index($a) != null) and (index($b) != null)' \
-    <<<"$BUILDS" >/dev/null; then
-    echo "Demo project is up to date; nothing to do."
-    exit 0
-  fi
-  echo "Demo project is stale; recreating it."
-  curl -fsS "${AUTH[@]}" -X DELETE "$STORYSHELF_URL/api/v1/projects/$SLUG" -o /dev/null
-fi
+# Seeded = both builds exist on the server and neither failed. Only a 404 means "not seeded
+# yet"; any other failure (auth, 5xx, unreachable) stops here instead of guessing.
+BUILDS_FILE="$(mktemp)"
+CODE="$(curl -sS -o "$BUILDS_FILE" -w '%{http_code}' "${AUTH[@]}" \
+  "$STORYSHELF_URL/api/v1/projects/$SLUG/builds" || true)"
+case "$CODE" in
+  200)
+    if jq -e --arg a "$MAIN_SHA" --arg b "$FEATURE_SHA" \
+      '[.[] | select(.status != "failed") | .gitSha] | (index($a) != null) and (index($b) != null)' \
+      "$BUILDS_FILE" >/dev/null; then
+      echo "Demo project is up to date; nothing to do."
+      exit 0
+    fi
+    echo "Demo project is stale; recreating it."
+    curl -fsS "${AUTH[@]}" -X DELETE "$STORYSHELF_URL/api/v1/projects/$SLUG" -o /dev/null
+    ;;
+  404) ;;
+  *)
+    echo "::error::GET $STORYSHELF_URL/api/v1/projects/$SLUG/builds answered '$CODE': $(head -c 300 "$BUILDS_FILE")"
+    exit 1
+    ;;
+esac
 
 # Create the project with fixed metadata. Uploads use the admin token itself: a project token
 # minted through it has no owner, which makes it a viewer that cannot upload.

@@ -152,3 +152,24 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.heavy == 'true' }}
     uses: ./.github/workflows/fly-dry-run.yml
+
+  # The one check to require in branch protection: `capture` and `fly` are skipped for
+  # docs-only PRs, and a skipped reusable-workflow job creates no child checks, so requiring
+  # those by name would wait forever. This passes when every job passed or was skipped.
+  ci:
+    name: ci
+    if: ${{ always() }}
+    needs: [changes, verify, capture, fly]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check results
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "job results: $RESULTS"
+          for result in $RESULTS; do
+            case "$result" in
+              success|skipped) ;;
+              *) echo "::error::a CI job finished as '$result'"; exit 1 ;;
+            esac
+          done
