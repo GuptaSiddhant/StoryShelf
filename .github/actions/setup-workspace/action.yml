@@ -1,5 +1,5 @@
 name: Setup workspace
-description: Install nub and pnpm, then the monorepo dependencies. Run after checkout.
+description: Install nub and pnpm, the monorepo dependencies, and restore the turbo task cache. Run after checkout.
 
 runs:
   using: composite
@@ -16,3 +16,14 @@ runs:
     - name: Install dependencies
       shell: bash
       run: nub ci
+
+    # Turbo's local task cache (.turbo/cache), restored from the newest cache `main` saved.
+    # Pull requests only restore; the `verify` job on `main` saves it (save-turbo-cache), so
+    # open PRs never fill the repository's cache quota with entries nobody else can read.
+    - name: Restore turbo cache
+      uses: actions/cache/restore@v4
+      with:
+        path: .turbo/cache
+        key: turbo-${{ runner.os }}-${{ github.sha }}
+        restore-keys: |
+          turbo-${{ runner.os }}-

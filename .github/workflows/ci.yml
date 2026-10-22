@@ -86,7 +86,8 @@ jobs:
 
       - name: Verify (build + lint + test)
         # The website has its own job (below), so it runs in parallel and only when it changed.
-        run: nubx turbo verify --force --filter='!website'
+        # Tasks hit the turbo cache restored by setup-workspace; their inputs are declared in turbo.json.
+        run: nubx turbo verify --filter='!website'
 
       - name: App smoke test (boot once, curl health/API/HTML/htmx)
         if: ${{ !cancelled() }}
@@ -103,6 +104,11 @@ jobs:
           SMOKE_NODE_MAJOR: "24"
         run: nubx vitest run src/smoke.integration.test.ts
 
+      # Last, and only here: this job builds every workspace package, so its cache serves
+      # the capture, Fly and seed jobs too.
+      - name: Save turbo cache
+        uses: ./.github/actions/save-turbo-cache
+
   website:
     name: website
     needs: changes
@@ -117,7 +123,7 @@ jobs:
 
       - name: Verify (build + lint + link check)
         # `website#verify` builds the docs site and runs its link check (dist/ stays for a11y).
-        run: nubx turbo verify --force --filter=website
+        run: nubx turbo verify --filter=website
 
       - name: Check website accessibility (axe, light/dark/mobile)
         working-directory: apps/website

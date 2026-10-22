@@ -1,9 +1,14 @@
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseStorybookIndex, parseStorybookIndexText } from "./parse.ts";
 
-const FIXTURES = resolve(import.meta.dirname, "../../../../../fixtures");
+/**
+ * The `index.json` each fixture Storybook (`fixtures/storybook-<version>`) emits, copied in so the
+ * test is hermetic. To refresh one: `pnpm run build-storybook` in the fixture, then copy
+ * `storybook-static/index.json` to `__fixtures__/storybook-<version>.index.json`.
+ */
+const SAMPLES = resolve(import.meta.dirname, "__fixtures__");
 
 describe("parseStorybookIndex", () => {
   it("reads v5 entries: stories and docs, tags, normalized import paths", () => {
@@ -96,8 +101,8 @@ describe("parseStorybookIndexText", () => {
 
 describe("the fixture Storybooks (8, 9, 10)", () => {
   for (const version of ["8", "9", "10"]) {
-    const file = resolve(FIXTURES, `storybook-${version}`, "storybook-static", "index.json");
-    it.skipIf(!existsSync(file))(`catalogues storybook-${version}'s index.json`, () => {
+    it(`catalogues storybook-${version}'s index.json`, () => {
+      const file = resolve(SAMPLES, `storybook-${version}.index.json`);
       const entries = parseStorybookIndexText(readFileSync(file, "utf8"));
       expect(entries).not.toBeNull();
       expect(entries?.length).toBeGreaterThan(0);
