@@ -45,6 +45,8 @@ export const projectSchema = z
     storybookMeta: z.string().nullable().optional(),
     executePlay: z.boolean(),
     playTimeoutMs: z.number(),
+    /** Axe accessibility checks run during capture (default on; results never block a build). */
+    runA11y: z.boolean().optional(),
     // Stored rows predate enum validation, so the response stays a plain string.
     browser: z.string().optional(),
     /** JSON array of capture targets, primary first, primary first; null = just `browser`. */
@@ -73,6 +75,8 @@ export const projectCreateSchema = z
     storybookMeta: storybookMetaSchema,
     executePlay: z.boolean().optional(),
     playTimeoutMs: z.number().int().min(1000).max(30_000).optional(),
+    /** Axe accessibility checks during capture; on when omitted. */
+    runA11y: z.boolean().optional(),
     reviewEnabled: z.boolean().optional(),
     reviewApprovals: reviewApprovalsSchema.optional(),
   })
@@ -90,6 +94,8 @@ export const projectUpdateSchema = z
     storybookMeta: storybookMetaSchema,
     executePlay: z.boolean().optional(),
     playTimeoutMs: z.number().int().min(1000).max(30_000).optional(),
+    /** Turn axe accessibility checks during capture on or off (admins). */
+    runA11y: z.boolean().optional(),
     /** Single capture target; clears `browsers`. */
     browser: captureTargetSchema.optional(),
     /** Capture targets, primary first (max 3); null returns to single `browser`. */
@@ -157,6 +163,8 @@ export const snapshotSchema = z
     reviewedBy: z.string().nullable(),
     reviewedAt: z.string().nullable(),
     inherited: z.boolean(),
+    /** JSON array of the axe violations found on this capture (non-blocking); null when none. */
+    a11yViolations: z.string().nullable().optional(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })

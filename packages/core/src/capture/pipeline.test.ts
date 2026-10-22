@@ -322,6 +322,26 @@ describe("persistCapture", () => {
     expect(rows.find((row) => row.storyName === "b")?.designUrl).toBeNull();
   });
 
+  it("stores a capture's axe violations on its snapshot without changing the build status", async () => {
+    const violations = ["image-alt (critical): Images must have alternative text [img] 1 node(s)"];
+    const { ctx } = await makeContext({
+      captures: [
+        { ...captureFor(storyOf("a"), png(4, 4, [0, 255, 0])), a11y: violations },
+        captureFor(storyOf("b"), png(4, 4, [0, 255, 0])),
+      ],
+    });
+
+    await persistCapture(ctx, new Set(), new Set(), new Set(["a"]));
+
+    const rows = await ctx.db.list(ctx.db.tables.snapshots);
+    expect(rows.find((row) => row.storyName === "a")?.a11yViolations).toBe(
+      JSON.stringify(violations),
+    );
+    expect(rows.find((row) => row.storyName === "b")?.a11yViolations).toBeNull();
+    const builds = await ctx.db.list(ctx.db.tables.builds);
+    expect(builds[0]?.status).not.toBe("failed");
+  });
+
   it("persists the captured stories and fails the build when a story failed to render", async () => {
     const { ctx } = await makeContext({
       captures: [captureFor(storyOf("b"), png(4, 4, [0, 255, 0]))],

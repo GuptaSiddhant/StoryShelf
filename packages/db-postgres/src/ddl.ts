@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS projects (
   storybook_meta TEXT,
   execute_play BOOLEAN NOT NULL DEFAULT false,
   play_timeout_ms INTEGER NOT NULL DEFAULT 10000,
-  run_a11y BOOLEAN NOT NULL DEFAULT false,
+  run_a11y BOOLEAN NOT NULL DEFAULT true,
   browser TEXT NOT NULL DEFAULT 'chromium',
   viewports TEXT,
   browsers TEXT,
@@ -168,6 +168,7 @@ CREATE TABLE IF NOT EXISTS snapshots (
   mode TEXT,
   browser TEXT NOT NULL DEFAULT 'chromium',
   duration_ms INTEGER,
+  a11y_violations TEXT,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );

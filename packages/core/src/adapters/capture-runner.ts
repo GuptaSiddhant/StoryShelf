@@ -89,6 +89,8 @@ export interface RenderedSnapshot {
    * snapshot and read back as the per-story cost a shard plan orders its work by (ADR 0031).
    */
   durationMs?: number;
+  /** Axe violation texts found on this capture (empty or absent: none, or not checked). */
+  a11y?: string[];
   /**
    * Set by the orchestrator when it already wrote the screenshot to storage
    * (via `onCapture`); `screenshot` is then empty and must not be written again.

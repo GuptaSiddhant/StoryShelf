@@ -57,3 +57,15 @@ export const RuleOverride: Story = {
   parameters: { a11y: { config: { rules: [{ id: "image-alt", enabled: false }] } } },
   render: () => <MissingAltMarkup />,
 };
+
+// Known best-practice violation: heading-order (h1 followed by h4). The default run set includes
+// axe's `best-practice` rules; the page-level ones (region, landmark-one-main) stay silent for an
+// isolated story because only the story root is scanned.
+export const BestPractice: Story = {
+  render: () => (
+    <div>
+      <h1>Title</h1>
+      <h4>Skipped heading levels</h4>
+    </div>
+  ),
+};

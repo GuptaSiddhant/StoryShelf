@@ -50,12 +50,12 @@ Review is the place where people comment on a build and sign it off. It works wh
 
 Review is a per-project switch (`reviewEnabled`, on by default) edited by project admins in **Settings → General → Review** or with `PATCH /api/v1/projects/:slug`; see [Project settings](/guides/project-settings/#review). With review on, a project has these four combinations:
 
-| `testing` | review | A build                                                                                                                                       |
-| --------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| off       | off    | Accepted when publishing finishes. No comments, no verdicts, no review status.                                                                |
-| off       | on     | Default branch: accepted when publishing finishes. Other branches: `pending` until verdicts decide it, `<prefix>/review` status.             |
-| on        | off    | Snapshot approval alone decides; comments and verdict routes answer 404.                                                                      |
-| on        | on     | Snapshot approval decides, plus comments, the changeset and a build-level sign-off that does not gate.                                        |
+| `testing` | review | A build                                                                                                                          |
+| --------- | ------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| off       | off    | Accepted when publishing finishes. No comments, no verdicts, no review status.                                                   |
+| off       | on     | Default branch: accepted when publishing finishes. Other branches: `pending` until verdicts decide it, `<prefix>/review` status. |
+| on        | off    | Snapshot approval alone decides; comments and verdict routes answer 404.                                                         |
+| on        | on     | Snapshot approval decides, plus comments, the changeset and a build-level sign-off that does not gate.                           |
 
 The default branch is never held, so the project's Storybook link always resolves. A pending build is not the project's latest accepted build: the Storybook link keeps serving the previous accepted build until this one is approved, while the build's own page and its published Storybook (`/projects/:slug/storybook/build/:id/`, or the `/_/:id` short link) open for anyone who may view the project, whatever the build's status.
 
@@ -76,6 +76,10 @@ A build's page is the review workspace for a project without `testing`, and with
 - **Review card.** The build's standing (`waiting for review`, `approved`, `rejected`), the approvals so far against the requirement, each reviewer's latest verdict with their note, and, for approvers and admins, **Approve build** and **Reject build** with an optional note. With `testing` the card says the verdict is a sign-off only.
 - **Changes in this build.** The components the build added, removed or changed against its baseline, each with a link to the published story and to its component page (see [the changeset](#the-changeset)).
 - **Comments.** Build comments and story comments with their anchor, resolve actions, and a form to add a build comment (`developer` and above).
+
+### Accessibility results
+
+With `testing` on and the project's accessibility checks on (`runA11y`, the default), the axe findings of each capture are stored on its snapshot (`a11yViolations`, a JSON array of one line per violation: rule id, impact, help, a short selector, node count). The snapshot review page lists them in a warning note above the comparison, the filmstrip entry shows `a11y N`, and the component page lists them on each snapshot card. They are information for the reviewer: a violation never changes a snapshot's or a build's status and never blocks a merge. See [the runners](/packages/runner-playwright/#accessibility-checks-axe) for what is scanned.
 
 ### Verdicts
 
@@ -106,11 +110,11 @@ The build's git channels show `<prefix>/review` (`pending`, then `success` or `f
 
 Review raises three [webhook](/guides/webhooks/) and [notification](/guides/notifications/) topics:
 
-| Event              | When                                                                                          |
-| ------------------ | --------------------------------------------------------------------------------------------- |
+| Event              | When                                                                                                      |
+| ------------------ | --------------------------------------------------------------------------------------------------------- |
 | `review:requested` | A published build waits for a verdict (review on, `testing` off). On by default for approvers and admins. |
-| `review:comment`   | A build or story comment is posted. Snapshot comments keep `comment:created`.                |
-| `review:verdict`   | A reviewer approves or rejects a build.                                                       |
+| `review:comment`   | A build or story comment is posted. Snapshot comments keep `comment:created`.                             |
+| `review:verdict`   | A reviewer approves or rejects a build.                                                                   |
 
 ### Builds nobody finishes
 

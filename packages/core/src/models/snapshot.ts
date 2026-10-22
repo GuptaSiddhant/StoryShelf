@@ -58,6 +58,7 @@ export class SnapshotModel {
       mode: input.mode ?? null,
       browser: input.browser ?? DEFAULT_BROWSER,
       durationMs: input.durationMs ?? null,
+      a11yViolations: input.a11yViolations ?? null,
       status: "pending",
       createdAt: now,
       updatedAt: now,
@@ -188,4 +189,6 @@ export interface SnapshotCreateInput {
   browser?: string;
   /** Milliseconds the renderer spent on this capture, when it reported any. */
   durationMs?: number | null;
+  /** JSON array of axe violation texts found on this capture; null when none. */
+  a11yViolations?: string | null;
 }

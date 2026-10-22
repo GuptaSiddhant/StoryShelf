@@ -64,7 +64,7 @@ Each capture run records a `captureAttempts` row (attempt `1`, `2` on retry) and
 A render no longer goes quiet between "partitioned" and "stories rendered". For each browser engine the attempt log records, in order:
 
 - `affected capture partitioned`: how many stories render and how many inherit a baseline.
-- The runner's own `info`, `warn` and `error` lines: `capture sizing` (detected CPUs and memory, pages at once, timeout), `browser recycled`, `a11y violations found` (one line per story with the axe rule ids; non-blocking) and `render failed for story`. Debug lines stay in the server log only.
+- The runner's own `info`, `warn` and `error` lines: `capture sizing` (detected CPUs and memory, pages at once, timeout), `browser recycled`, `a11y violations found` (one line per story with the axe rule ids; non-blocking, the texts are also kept on the snapshot and shown in review) and `render failed for story`. Debug lines stay in the server log only.
 - `captured N/M screenshots` after every 10 screenshots (it counts story and viewport pairs, so a story with several viewports or modes counts several times).
 - `render pass finished` with the captured, failed and expected counts.
 

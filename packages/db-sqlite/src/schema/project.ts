@@ -13,7 +13,7 @@ export const projects = sqliteTable("projects", {
   storybookMeta: text("storybook_meta").$type<string | null | undefined>().default(null),
   executePlay: integer("execute_play", { mode: "boolean" }).notNull().default(false),
   playTimeoutMs: integer("play_timeout_ms").notNull().default(10_000),
-  runA11y: integer("run_a11y", { mode: "boolean" }).notNull().default(false),
+  runA11y: integer("run_a11y", { mode: "boolean" }).notNull().default(true),
   browser: text("browser").notNull().default("chromium"),
   viewports: text("viewports"),
   browsers: text("browsers"),

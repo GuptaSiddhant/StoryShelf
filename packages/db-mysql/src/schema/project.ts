@@ -13,7 +13,7 @@ export const projects = mysqlTable("projects", {
   storybookMeta: text("storybook_meta").$type<string | null | undefined>().default(null),
   executePlay: boolean("execute_play").notNull().default(false),
   playTimeoutMs: int("play_timeout_ms").notNull().default(10_000),
-  runA11y: boolean("run_a11y").notNull().default(false),
+  runA11y: boolean("run_a11y").notNull().default(true),
   browser: text("browser").notNull().default("chromium"),
   viewports: text("viewports"),
   browsers: text("browsers"),

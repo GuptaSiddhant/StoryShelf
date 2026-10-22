@@ -37,6 +37,8 @@ export interface Snapshot {
   browser?: string;
   /** Milliseconds the renderer spent on this capture; null when it reported none or nothing rendered. */
   durationMs: number | null;
+  /** JSON array of the axe violations found on this capture (never blocking); null when none or not checked. */
+  a11yViolations?: string | null;
   createdAt: string;
   updatedAt: string;
 }
