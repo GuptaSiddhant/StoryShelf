@@ -10,6 +10,7 @@ import {
   headerTitle,
   reviewHeader,
 } from "../ui/styles/review-layout.ts";
+import { a11ySummaryOf } from "./a11y-violations.tsx";
 import { reviewProgress } from "./build-diff-model.ts";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
@@ -67,7 +68,14 @@ function BulkActions({
   );
 }
 
-function HeaderTitle({ build }: { build: Build }): HtmlEscapedString | Promise<HtmlEscapedString> {
+function HeaderTitle({
+  build,
+  snapshots,
+}: {
+  build: Build;
+  snapshots: Snapshot[];
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const a11y = a11ySummaryOf(snapshots);
   return (
     <>
       <h1 class={headerTitle}>
@@ -83,6 +91,11 @@ function HeaderTitle({ build }: { build: Build }): HtmlEscapedString | Promise<H
         {build.authorName ? <Avatar name={build.authorName} size="sm" /> : null}
         {build.authorName ? <span>{build.authorName}</span> : null}
         <span>{build.message ?? "No message"}</span>
+        {a11y.findings > 0 ? (
+          <Badge tone="warning" icon>
+            a11y {a11y.findings} (does not block)
+          </Badge>
+        ) : null}
       </p>
     </>
   );
@@ -112,7 +125,7 @@ export function DiffHeader(props: DiffHeaderProps): HtmlEscapedString | Promise<
   return (
     <header class={reviewHeader}>
       <div class={headerMain}>
-        <HeaderTitle build={build} />
+        <HeaderTitle build={build} snapshots={snapshots} />
       </div>
       <div class={headerSide}>
         <HeaderProgress snapshots={snapshots} />

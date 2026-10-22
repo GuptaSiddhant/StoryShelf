@@ -9,6 +9,7 @@ export const getBuildInsight: ToolDef = {
   description:
     "Get the latest cached AI triage of a build: verdict (likely-intended, needs-review, likely-regression), summary and per-snapshot notes. Advisory only. Read-only: it never triggers generation (an approver does that in the UI).",
   readOnly: true,
+  routeClass: "testing",
   input: { project, buildId: z.string().describe("Build id (ULID)") },
   run: async (client, args) => await client.get(`${buildPath(client, args)}/insights/latest`),
 };
@@ -19,6 +20,7 @@ export const getProjectHealth: ToolDef = {
   description:
     "Get the latest cached AI project-health digest (verdict, 0-100 score, trends) for a project. Read-only.",
   readOnly: true,
+  routeClass: "testing",
   input: { project, window: z.string().optional().describe("Window, e.g. 30d") },
   run: async (client, args) =>
     await client.get(`/projects/${projectSlug(client, args["project"])}/insights/health`, {

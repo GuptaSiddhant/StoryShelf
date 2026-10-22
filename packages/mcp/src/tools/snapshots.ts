@@ -22,6 +22,7 @@ export const listSnapshots: ToolDef = {
   description:
     "List the story snapshots of a build with diff metrics (pixels, ratio, pass/fail) and review status. By default only changed/new/pending/rejected snapshots are returned; set includeUnchanged for all. Approving is intentionally not available: a human approves in the StoryShelf UI.",
   readOnly: true,
+  routeClass: "testing",
   input: {
     project: z.string().optional().describe("Project slug (defaults to STORYSHELF_SLUG)"),
     buildId: z.string().describe("Build id (ULID)"),

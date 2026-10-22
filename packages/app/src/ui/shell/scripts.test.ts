@@ -1,5 +1,6 @@
+import { JSDOM } from "jsdom";
 import { Script } from "node:vm";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { bootScript } from "./boot-script.ts";
 import { clientScript } from "./client-script.ts";
 
@@ -93,5 +94,93 @@ describe("shell scripts", () => {
 
   it("builds toasts with textContent, never innerHTML", () => {
     expect(clientScript()).not.toContain("innerHTML");
+  });
+});
+
+const ok = (base: string) => Promise.resolve({ ok: true, json: () => Promise.resolve({ base }) });
+const tick = async () => await new Promise((resolve) => setTimeout(resolve, 0));
+
+describe("signed preview frame", () => {
+  const PAGE = `<div data-preview-embed data-preview-path="/iframe.html?id=a" data-preview-refresh-url="/tok" data-preview-refresh-seconds="2400">
+    <button data-preview-load>Load</button><div data-preview-idle></div>
+    <template data-preview-template><iframe src="/_s/old/iframe.html?id=a"></iframe></template></div>`;
+  type Timer = { fn: () => void; ms: number; kind: "interval" | "timeout"; cleared: boolean };
+
+  function boot(fetchImpl: (url: string) => Promise<unknown>) {
+    const dom = new JSDOM(`<body>${PAGE}</body>`, { runScripts: "outside-only" });
+    const { window } = dom;
+    const timers: Timer[] = [];
+    const add = (kind: Timer["kind"]) => (fn: () => void, ms: number) => {
+      timers.push({ fn, ms, kind, cleared: false });
+      return timers.length;
+    };
+    Object.assign(window, {
+      fetch: vi.fn(fetchImpl),
+      setInterval: add("interval"),
+      setTimeout: add("timeout"),
+      clearInterval: (id: number) => {
+        const timer = timers[id - 1];
+        if (timer) timer.cleared = true;
+      },
+    });
+    Object.assign(window, {
+      __storyshelfShell: {
+        readCookie: () => null,
+        writeCookie: () => {},
+        applyTheme: () => {},
+        applySidebar: () => {},
+      },
+    });
+    window.eval(clientScript());
+    const host = window.document.querySelector("[data-preview-embed]") as HTMLElement;
+    const frame = () => host.querySelector("iframe");
+    const click = () => window.document.querySelector<HTMLElement>("[data-preview-load]")?.click();
+    return { window, host, frame, click, timers };
+  }
+
+  it("mounts the frame under a freshly fetched root, not the one rendered with the page", async () => {
+    const { frame, click } = boot(() => ok("/_s/new"));
+    click();
+    await tick();
+    expect(frame()?.getAttribute("src")).toBe("/_s/new/iframe.html?id=a");
+  });
+
+  it("keeps the rendered root when the fresh one cannot be fetched", async () => {
+    const { frame, click } = boot(() => Promise.reject(new Error("offline")));
+    click();
+    await tick();
+    expect(frame()?.getAttribute("src")).toBe("/_s/old/iframe.html?id=a");
+  });
+
+  it("stops renewing once its host left the document", async () => {
+    const { host, click, timers } = boot(() => ok("/_s/new"));
+    click();
+    await tick();
+    const interval = timers.find((timer) => timer.kind === "interval");
+    expect(interval?.ms).toBe(2_400_000);
+    host.remove();
+    interval?.fn();
+    expect(interval?.cleared).toBe(true);
+  });
+
+  it("retries a failed renewal a minute later, a bounded number of times", async () => {
+    let calls = 0;
+    const { click, timers } = boot(() => {
+      calls += 1;
+      return calls === 1 ? ok("/_s/new") : Promise.reject(new Error("down"));
+    });
+    click();
+    await tick();
+    timers.find((timer) => timer.kind === "interval")?.fn();
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      // oxlint-disable-next-line no-await-in-loop -- each retry is scheduled by the previous failure
+      await tick();
+      timers.findLast((timer) => timer.kind === "timeout")?.fn();
+    }
+    await tick();
+    const retries = timers.filter((timer) => timer.kind === "timeout");
+    expect(retries.every((timer) => timer.ms === 60_000)).toBe(true);
+    expect(retries.length).toBeGreaterThan(0);
+    expect(retries.length).toBeLessThanOrEqual(3);
   });
 });

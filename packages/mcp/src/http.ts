@@ -1,6 +1,7 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { Readable } from "node:stream";
+import { probeCapabilities, type InstanceCapabilities } from "./capabilities.ts";
 import { createApiClient } from "./client.ts";
 import { createStoryShelfMcpServer } from "./server.ts";
 
@@ -23,13 +24,17 @@ export type McpHttpHandler = (request: Request) => Promise<Response>;
  * project scoping and roles apply per caller and no token is stored here.
  */
 export function createMcpHttpHandler(options: McpHttpOptions): McpHttpHandler {
+  const capabilities = cachedCapabilities(options);
   return async (request) => {
     const rejected = rejectRequest(request, options);
     if (rejected) return rejected;
     const token = bearerToken(request);
-    const server = createStoryShelfMcpServer(
-      createApiClient({ url: options.url, token, ...(options.slug ? { slug: options.slug } : {}) }),
-    );
+    const client = createApiClient({
+      url: options.url,
+      token,
+      ...(options.slug ? { slug: options.slug } : {}),
+    });
+    const server = createStoryShelfMcpServer(client, await capabilities());
     const transport = new WebStandardStreamableHTTPServerTransport({
       enableJsonResponse: true,
     });
@@ -39,6 +44,33 @@ export function createMcpHttpHandler(options: McpHttpOptions): McpHttpHandler {
     } finally {
       await server.close();
     }
+  };
+}
+
+/** How long the instance's capabilities are reused (they only change when it restarts). */
+const CAPABILITIES_TTL_MS = 60_000;
+
+/** The instance's capabilities, probed without credentials (liveness is open) at most once a minute. */
+function cachedCapabilities(options: McpHttpOptions): () => Promise<InstanceCapabilities> {
+  let cached: { at: number; value: InstanceCapabilities } | undefined;
+  let inflight: Promise<InstanceCapabilities> | undefined;
+  return async () => {
+    if (cached && Date.now() - cached.at < CAPABILITIES_TTL_MS) {
+      return cached.value;
+    }
+    // Concurrent requests share one probe; the settled value replaces the promise, a failure clears it.
+    inflight ??= probeCapabilities(createApiClient({ url: options.url, token: "" })).then(
+      (value) => {
+        cached = { at: Date.now(), value };
+        inflight = undefined;
+        return value;
+      },
+      (error: unknown) => {
+        inflight = undefined;
+        throw error;
+      },
+    );
+    return await inflight;
   };
 }
 

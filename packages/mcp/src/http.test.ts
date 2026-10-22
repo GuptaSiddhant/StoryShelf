@@ -53,9 +53,51 @@ describe("createMcpHttpHandler", () => {
   });
 });
 
+function toolsList(): Request {
+  return new Request("http://mcp.test/mcp", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      accept: "application/json, text/event-stream",
+      authorization: "Bearer t",
+    },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list" }),
+  });
+}
+
+describe("createMcpHttpHandler capabilities", () => {
+  it("probes the instance once and advertises no testing tool when it has none", async () => {
+    const upstream = vi.fn(async (..._args: unknown[]) =>
+      Response.json({ status: "ok", testing: false }),
+    );
+    vi.stubGlobal("fetch", upstream);
+    const handler = createMcpHttpHandler({ url: "https://s.example" });
+    const first = await (await handler(toolsList())).text();
+    await handler(toolsList());
+    expect(first).toContain("list_builds");
+    expect(first).not.toContain("list_snapshots");
+    expect(upstream).toHaveBeenCalledTimes(1);
+    expect(String(upstream.mock.calls[0]?.[0])).toBe("https://s.example/api/v1/health");
+  });
+});
+
+describe("createMcpHttpHandler concurrent probes", () => {
+  it("shares one capability probe between simultaneous requests", async () => {
+    const upstream = vi.fn(async (..._args: unknown[]) =>
+      Response.json({ status: "ok", testing: true }),
+    );
+    vi.stubGlobal("fetch", upstream);
+    const handler = createMcpHttpHandler({ url: "https://s.example" });
+    await Promise.all([handler(toolsList()), handler(toolsList()), handler(toolsList())]);
+    expect(upstream).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("serveHttp", () => {
   it("forwards the caller's token upstream on a tool call", async () => {
-    const upstream = vi.fn().mockResolvedValue(Response.json([{ id: "b1", status: "approved" }]));
+    const upstream = vi.fn(async (..._args: unknown[]) =>
+      Response.json([{ id: "b1", status: "approved" }]),
+    );
     const realFetch = globalThis.fetch;
     vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) =>
       (input instanceof Request ? input.url : input.toString()).startsWith("https://s.example")
@@ -72,7 +114,9 @@ describe("serveHttp", () => {
     );
     const result = await client.callTool({ name: "list_builds", arguments: {} });
     expect(JSON.stringify(result)).toContain("b1");
-    const [url, init] = upstream.mock.calls[0] as [string, RequestInit];
+    const [url, init] = upstream.mock.calls.find(([called]) =>
+      String(called).includes("/builds"),
+    ) as [string, RequestInit];
     expect(url).toBe("https://s.example/api/v1/projects/web/builds");
     expect((init.headers as Record<string, string>)["authorization"]).toBe("Bearer caller-token");
     await client.close();

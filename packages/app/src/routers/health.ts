@@ -10,7 +10,7 @@
 import type { AdapterSetupResult, AdapterSetupSources } from "@storyshelf/core/adapter/setup";
 import type { ShelfRouter } from "../app-types.ts";
 import { loadCredentialProbe } from "../credentials.ts";
-import { getStore } from "../store.ts";
+import { getStore, testingEnabled } from "../store.ts";
 import { collectHealthReport, type AdapterState } from "./health-report.ts";
 import { requireSiteAdmin } from "./helpers.ts";
 
@@ -27,6 +27,8 @@ export interface LivenessBody {
   status: "ok";
   uptimeSecs: number;
   version: string;
+  /** Whether this instance has the `testing` option (capture, compare, baselines; ADR 0006). */
+  testing: boolean;
 }
 
 /** Per-adapter readiness entry (error text sanitized — no secrets). */
@@ -52,6 +54,7 @@ export function registerHealth(app: ShelfRouter, deps: HealthDeps): void {
       status: "ok",
       uptimeSecs: Math.floor((Date.now() - deps.bootTimeMs) / 1000),
       version: deps.version,
+      testing: testingEnabled(),
     };
     c.header("Cache-Control", "no-store");
     return c.json(body);

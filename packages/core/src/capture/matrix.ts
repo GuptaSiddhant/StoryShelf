@@ -23,10 +23,11 @@ import { assertScreenshotBuffer } from "./guards.ts";
 import { renderIsolating, type IsolationNote, type PassOutcome } from "./isolate.ts";
 import type { PipelineTables } from "./pipeline.ts";
 import type { CaptureProgress } from "./progress.ts";
-import { renderBudgetMs, renderWithTimeout, type RenderRequest } from "./render.ts";
+import type { RenderRequest } from "./render.ts";
 import type { EngineWork } from "./shard-plan.ts";
 import type { StorybookUrlSource } from "./storybook-urls.ts";
 import { resolveStoryViewports } from "./storybook.ts";
+import { renderInSlices } from "./token-chunks.ts";
 
 /** Inputs shared by every engine's pass. */
 export interface MatrixInput {
@@ -296,16 +297,14 @@ async function renderPass(
   const expected = toRender.flatMap((story) =>
     resolveStoryViewports(story, input.viewports),
   ).length;
-  const budgetMs = renderBudgetMs(expected, input.renderTimeoutMs);
-  const storybookUrl = await input.storybookUrl?.(browser, { budgetMs });
-  const rendered = await renderWithTimeout(
-    input.runner,
-    {
-      ...renderRequest(input, browser, toRender, spooled, { mirror, expected }),
-      ...(storybookUrl === undefined ? {} : { storybookUrl }),
-    },
-    budgetMs,
-  );
+  const rendered = await renderInSlices({
+    runner: input.runner,
+    request: renderRequest(input, browser, toRender, spooled, { mirror, expected }),
+    browser,
+    storybookUrl: input.storybookUrl,
+    captureCount: (story) => resolveStoryViewports(story, input.viewports).length,
+    renderTimeoutMs: input.renderTimeoutMs,
+  });
   mirror.log("info", "render pass finished", {
     browser,
     captured: spooled.length + rendered.captures.length,
@@ -383,14 +382,14 @@ async function spoolCapture(
 
 const EMPTY_SCREENSHOT = Buffer.alloc(0);
 
-/** Attach the render pass's environment to each capture (rows are already private copies). */
+/** Attach the render pass's environment to captures that carry none (a slice may have set its own). */
 function withEnvironment(
   captures: RenderedSnapshot[],
   environment: RenderedSnapshot["environment"],
 ): RenderedSnapshot[] {
   if (environment) {
     for (const capture of captures) {
-      capture.environment = environment;
+      capture.environment ??= environment;
     }
   }
   return captures;

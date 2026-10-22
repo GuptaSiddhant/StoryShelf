@@ -27,6 +27,8 @@ It is a thin client over the [REST API](/guides/api/): it uses your existing tok
   </Card>
 </CardGrid>
 
+Tools that read snapshots, capture logs or AI insights (`list_snapshots`, `get_capture_logs`, `get_build_insight`, `get_project_health`) call routes that only exist with `testing`, so the server advertises them only when the StoryShelf instance has it. It asks the open `GET /api/v1/health` (its `testing` field) when it starts; over HTTP the answer is reused for a minute. An instance that does not answer counts as having `testing`.
+
 | Tool                                              | Purpose                                                                                              |
 | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | `list_projects`, `get_project`                    | Projects (listing needs a site-admin token) and one project's settings                               |

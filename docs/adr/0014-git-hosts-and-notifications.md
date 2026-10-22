@@ -232,8 +232,10 @@ detected origin", and one `warn` line is logged at boot and the first time a not
 skipped. A request dropped while paused is not replayed, with one exception: when an admin confirms
 the first origin on the System page, the state of every recent build still `pending`,
 `capturing`, `comparing` or `reviewing` is requested again (`requestOpenBuildStates`). A host that
-gets its origin through configuration (`PUBLIC_BASE_URL`, needs a restart) delivers from the next
-state change on. A `notify` job that finds the origin gone when it runs is acknowledged and writes
+gets its origin through configuration (`PUBLIC_BASE_URL`, needs a restart) replays at boot instead:
+once adapters are ready, with notifiers wired and an origin resolved, `runBootTasks` requests the
+state of open builds (newest 25 per project) once with the same `requestOpenBuildStates`. Only git
+state is replayed; chat, email and alerts resume with the next state change. A `notify` job that finds the origin gone when it runs is acknowledged and writes
 nothing.
 
 ### 13. GitHub check runs sit beside commit statuses (merge gate v2)

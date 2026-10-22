@@ -53,6 +53,24 @@ const build = {
   updatedAt: T1,
 } as Build;
 
+/** A log sink and the promise of the boot replay's log line. */
+function bootReplayWatch(): {
+  promise: Promise<boolean>;
+  logSink: { write: (line: string) => void };
+} {
+  const { promise, resolve } = Promise.withResolvers<boolean>();
+  return {
+    promise,
+    logSink: {
+      write: (line) => {
+        if (line.includes("re-requested the git state of open builds")) {
+          resolve(true);
+        }
+      },
+    },
+  };
+}
+
 async function setup(storyCount = 2) {
   const { db } = makeDatabase();
   const { storage, objects } = makeStorage();
@@ -79,14 +97,18 @@ async function setup(storyCount = 2) {
       });
     }),
   );
+  // The boot replay (ADR 0014, decision 11) asks for the state of this open build once adapters
+  // are ready; let it finish before the channel exists, so it adds no status to the ones counted.
+  const { promise: bootReplay, logSink } = bootReplayWatch();
   const app = createShelfApp({
     testing: { runner: stubRunner() },
     database: db,
     storage,
     config: { secret: "test-secret", publicBaseUrl: "https://shelf.example.com" },
     notifications: { notifiers: [git.provider] },
-    logger: pino({ level: "silent" }),
+    logger: pino({ level: "info" }, logSink),
   });
+  await bootReplay;
   const created = await app.request("/api/v1/projects/gate/notification-channels", {
     method: "POST",
     headers: { "content-type": "application/json" },

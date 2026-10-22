@@ -57,6 +57,7 @@ import {
   registerSystemChannels,
 } from "./routers/notification-channels.ts";
 import { registerNotificationSubscriptions } from "./routers/notification-subscriptions.ts";
+import { registerPreviewToken } from "./routers/preview-token.ts";
 import { registerProfile } from "./routers/profile.ts";
 import { registerProjects } from "./routers/projects.ts";
 import { registerReviewForms } from "./routers/review-forms.ts";
@@ -93,7 +94,7 @@ function instrumentedOptions(options: ShelfOptions): ShelfOptions {
 function wireQueues(scoped: ShelfOptions, runtime: ServerRuntime, cell: LifecycleCell): JobsWiring {
   const jobs = setupJobs(scoped, runtime);
   cell.consumer = jobs.consumer;
-  runBootTasks(cell, scoped, runtime);
+  runBootTasks(cell, scoped, runtime, jobs.buildState);
   return jobs;
 }
 
@@ -349,6 +350,7 @@ function registerPageRoutes(app: ShelfRouter, options: ShelfOptions, health: Hea
   registerAssets(app);
   registerStorybook(app);
   registerSignedStorybook(app);
+  registerPreviewToken(app);
   registerAdminPages(app, health, options.auth);
   registerPublicOriginRoutes(app);
   registerUiPages(app);

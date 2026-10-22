@@ -70,6 +70,7 @@ export const getCaptureLogs: ToolDef = {
   description:
     "Get the capture attempts of a build and the log lines of one attempt (latest by default). Use it to debug failed or flaky captures.",
   readOnly: true,
+  routeClass: "testing",
   input: {
     project,
     buildId,

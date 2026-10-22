@@ -38,6 +38,9 @@ const filteredList = css`
     [data-status]:not([data-status="new"]):not([data-status="changed"]):not([aria-current="true"]) {
     display: none;
   }
+  &[data-filter="a11y"] [data-snapshot-link]:not([data-a11y]):not([aria-current="true"]) {
+    display: none;
+  }
   &[data-filter="done"]
     [data-status]:not([data-status="approved"]):not([data-status="rejected"]):not(
       [aria-current="true"]
@@ -77,6 +80,7 @@ function FilmItem(props: {
       data-snapshot-link
       data-snapshot-id={snap.id}
       data-status={isOpenGroup(group) ? "changed" : snap.status}
+      data-a11y={a11yCount > 0 ? "" : undefined}
       aria-current={active ? "true" : undefined}
       hx-get={url}
       hx-target="body"
@@ -107,6 +111,9 @@ export function DiffNav(props: DiffNavProps): HtmlEscapedString | Promise<HtmlEs
   const groups = groupSnapshots(snapshots);
   const progress = reviewProgress(snapshots);
   const filter = progress.pending > 0 ? "review" : "all";
+  const withA11y = groups.filter(
+    (group) => a11yViolationsOf(a11yCarrierOf(group.representative, group.members)).length > 0,
+  ).length;
   return (
     <aside class={filmstrip} aria-label="Snapshots">
       <div class={filmstripHead}>
@@ -121,6 +128,7 @@ export function DiffNav(props: DiffNavProps): HtmlEscapedString | Promise<HtmlEs
             },
             { label: `All ${groups.length}`, value: "all", active: filter === "all" },
             { label: `Done ${progress.done}`, value: "done" },
+            ...(withA11y > 0 ? [{ label: `A11y ${withA11y}`, value: "a11y" }] : []),
           ]}
         />
       </div>
