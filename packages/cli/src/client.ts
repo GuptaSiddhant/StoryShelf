@@ -18,6 +18,24 @@ export function createClient(baseUrl: string, token?: string): Client {
   };
 }
 
+/** A non-2xx answer from the server; `status` is the HTTP status. */
+export class RequestError extends Error {
+  override readonly name = "RequestError";
+  readonly status: number;
+
+  constructor(status: number, body: string) {
+    super(`Request failed (${status}): ${body}`);
+    this.status = status;
+  }
+}
+
+/** One stored file of a file-by-file upload. */
+export interface ManifestFile {
+  rel: string;
+  hash: string;
+  size: number;
+}
+
 /** Metadata posted to create a build before streaming its bundle. */
 export interface BuildCreateInput {
   gitSha: string;
@@ -68,6 +86,16 @@ interface Client {
     builds: {
       createJson: (slug: string, json: BuildCreateInput) => Promise<BuildCreated>;
       uploadZip: (uploadUrl: string, body: NodeJS.ReadableStream) => Promise<unknown>;
+      /** File-by-file upload, step 1: which of these content hashes the server lacks. */
+      dedup: (slug: string, buildId: string, hashes: string[]) => Promise<string[]>;
+      /** File-by-file upload, step 2: store files by content hash. */
+      uploadContent: (
+        slug: string,
+        buildId: string,
+        files: { hash: string; data: Buffer }[],
+      ) => Promise<unknown>;
+      /** File-by-file upload, step 3: store the path-to-hash manifest (completes publishing). */
+      postManifest: (slug: string, buildId: string, files: ManifestFile[]) => Promise<unknown>;
       postAffected: (slug: string, buildId: string, json: AffectedInput) => Promise<unknown>;
       postUsage: (slug: string, buildId: string, usage: PackageUsageInput[]) => Promise<unknown>;
       retry: (slug: string, buildId: string) => Promise<unknown>;
@@ -96,7 +124,7 @@ function buildRequestHeaders(
 async function fetchJson(url: string, options: RequestInit): Promise<unknown> {
   const res = await fetch(url, options);
   if (!res.ok) {
-    throw new Error(`Request failed (${res.status}): ${await res.text()}`);
+    throw new RequestError(res.status, await res.text());
   }
   return res.json() as unknown;
 }
@@ -115,12 +143,55 @@ function createTokensApi(
   };
 }
 
+/** The three calls of a file-by-file upload. */
+function createFileUploadApi(
+  baseUrl: string,
+  requestHeaders: (contentType?: string) => Record<string, string>,
+): Pick<Client["projects"]["builds"], "dedup" | "uploadContent" | "postManifest"> {
+  return {
+    dedup: async (slug: string, buildId: string, hashes: string[]) => {
+      const answer = (await fetchJson(
+        `${baseUrl}/api/v1/projects/${slug}/builds/${buildId}/dedup`,
+        {
+          method: "POST",
+          headers: requestHeaders("application/json"),
+          body: JSON.stringify({ hashes }),
+        },
+      )) as { needed: string[] };
+      return answer.needed;
+    },
+    uploadContent: async (
+      slug: string,
+      buildId: string,
+      files: { hash: string; data: Buffer }[],
+    ) => {
+      const form = new FormData();
+      for (const file of files) {
+        form.set(file.hash, new File([new Uint8Array(file.data)], file.hash));
+      }
+      // No content-type header: fetch adds the multipart boundary itself.
+      return await fetchJson(`${baseUrl}/api/v1/projects/${slug}/builds/${buildId}/content`, {
+        method: "POST",
+        headers: requestHeaders(),
+        body: form,
+      });
+    },
+    postManifest: async (slug: string, buildId: string, files: ManifestFile[]) =>
+      await fetchJson(`${baseUrl}/api/v1/projects/${slug}/builds/${buildId}/manifest`, {
+        method: "POST",
+        headers: requestHeaders("application/json"),
+        body: JSON.stringify({ files }),
+      }),
+  };
+}
+
 function createBuildsApi(
   baseUrl: string,
   authHeaders: Record<string, string>,
   requestHeaders: (contentType?: string) => Record<string, string>,
 ): Client["projects"]["builds"] {
   return {
+    ...createFileUploadApi(baseUrl, requestHeaders),
     createJson: async (slug: string, json: BuildCreateInput) =>
       (await fetchJson(`${baseUrl}/api/v1/projects/${slug}/builds`, {
         method: "POST",
@@ -136,7 +207,7 @@ function createBuildsApi(
       } as RequestInit;
       const res = await fetch(`${baseUrl}${uploadUrl}`, init);
       if (!res.ok) {
-        throw new Error(`Request failed (${res.status}): ${await res.text()}`);
+        throw new RequestError(res.status, await res.text());
       }
       return res.json() as unknown;
     },

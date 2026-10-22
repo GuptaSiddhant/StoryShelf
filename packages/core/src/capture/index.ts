@@ -155,6 +155,7 @@ export {
 } from "./storybook.ts";
 export { createDispatchJob, type CaptureDispatchJob, type DispatchDeps } from "./dispatch.ts";
 export { extractStorybookToScratch, persistStorybookStatics } from "./statics.ts";
+export * from "./publish/index.ts";
 export {
   getScreenshotPlan,
   resolveViewports as resolveCaptureViewports,

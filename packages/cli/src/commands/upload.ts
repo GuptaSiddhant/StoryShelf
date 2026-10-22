@@ -13,6 +13,7 @@ import * as picomatch from "picomatch";
 import { createClient, type BuildCreated } from "../client.ts";
 import { loadStorybookConfig, type StorybookConfig } from "../config.ts";
 import { createSpinner, printLine, spinnerFrames } from "../output.ts";
+import { isOverInlineLimit, uploadFileByFile } from "./file-by-file.ts";
 import { collectPackageUsage } from "./package-usage.ts";
 import { assertBuildOutput, ensureBuildDir } from "./storybook-build.ts";
 
@@ -279,11 +280,7 @@ async function buildAndPost(
   });
   await reportAffectedCapture(client, created, cwd, collected);
   await reportPackageUsage(client, created, cwd, collected);
-  // Try content-hash dedup: walk buildDir, hash files, check needed, batch upload or fallback to zip
-  const useDedup = await tryDedupUpload(client, created, cwd, collected.buildDir);
-  if (!useDedup) {
-    await putZipStream(client, created, cwd, collected.buildDir);
-  }
+  await uploadBuild(client, created, cwd, collected);
   printLine(`Build created: ${created.build.id}`);
 }
 
@@ -358,15 +355,29 @@ function describeAffected(result: AffectedResult, baselineSha: string): string {
   return `Affected capture: rendering ${count} ${count === 1 ? "story" : "stories"} (baseline ${short})`;
 }
 
-// oxlint-disable eslint(no-unused-vars, require-await, max-statements) -- stub for dedup, will be wired
-async function tryDedupUpload(
-  _client: ReturnType<typeof createClient>,
-  _created: BuildCreated,
-  _cwd: string,
-  _buildDir: string,
-): Promise<boolean> {
-  // Use collected url/token via closure from buildAndPost caller
-  return false;
+/**
+ * Send the build: as a zip, or, when the server refuses a zip over its inline publish limit (a
+ * serverless host with no job consumer), file by file.
+ */
+async function uploadBuild(
+  client: ReturnType<typeof createClient>,
+  created: BuildCreated,
+  cwd: string,
+  collected: ResolvedUploadOptions,
+): Promise<void> {
+  try {
+    await putZipStream(client, created, cwd, collected.buildDir);
+  } catch (error) {
+    if (!isOverInlineLimit(error)) {
+      throw error;
+    }
+    printLine("Zip is over the server's inline publish limit; uploading file by file instead");
+    await uploadFileByFile(
+      client,
+      { slug: collected.slug, buildId: created.build.id, cwd, buildDir: collected.buildDir },
+      printLine,
+    );
+  }
 }
 
 /** PUT the streamed zip, then report the created build id. */
@@ -381,7 +392,7 @@ async function putZipStream(
     await client.projects.builds.uploadZip(created.uploadUrl, zipBuildDirStream(cwd, buildDir));
     spinner.stop("Upload complete");
   } catch (error) {
-    spinner.stop("Upload failed");
+    spinner.stop(isOverInlineLimit(error) ? "Zip refused as too large" : "Upload failed");
     throw error;
   }
 }

@@ -9,6 +9,7 @@ import type { NotificationsConfig, ShelfConfig, UIConfig } from "@storyshelf/cor
 import type { Logger } from "@storyshelf/core/logger";
 import type { AuthUser } from "@storyshelf/core/types";
 import { AsyncLocalStorage } from "node:async_hooks";
+import type { PublishService } from "./publish-setup.ts";
 
 /** Request-scoped dependencies and session state. */
 export interface Store {
@@ -23,6 +24,8 @@ export interface Store {
   sessionId: string;
   enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
   captureQueue?: CaptureQueue | null;
+  /** Publishing: completion and the `publish` job queue (absent in hand-built stores). */
+  publish?: PublishService;
   /** Explicit `testing.concurrency`; unset means sized from the hardware. */
   captureConcurrency?: number;
   gitHosts: GitHostProvider[];

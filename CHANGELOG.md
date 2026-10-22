@@ -5,6 +5,22 @@ All notable changes to StoryShelf. Versions follow the fixed-version scheme from
 
 ## Unreleased
 
+**Added: publishing independent of capture (ADR 0006, decision 10; #213).** An instance without `testing` now
+publishes Storybooks of any size. A zip up to `maxInlineUnzipSize` (now defaulting to 50 MB, counted while the
+upload streams instead of read from `Content-Length`) is extracted inline; a larger zip becomes a `publish` job
+on the database queue, run by a consumer that every instance with a database starts at `lifecycle.setup()` and
+drains at `teardown()` (capture keeps its own queue). The file-by-file route (`/dedup`, `/content`, `/manifest`)
+completes publishing when the manifest is stored. On serverless hosts (`AWS_LAMBDA_FUNCTION_NAME`, `VERCEL`,
+`NETLIFY`) no consumer runs, and an over-limit zip is refused with `413` pointing to the file-by-file route;
+`storyshelf upload` now falls back to that route by itself (the old `tryDedupUpload` stub is gone).
+Extraction is capped by the new `maxZipEntries` (default 50 000) and `maxUnzippedBytes` (default 2 GiB), counted
+while streaming, and refuses absolute and `..` paths; `maxInlineUnzipSize: 0` sends every zip to a job. When
+publishing ends with no capture to run, a published build on the project's default branch becomes `approved`, a
+failed publish makes it `failed`, and other branches stay `pending`; no approval event or webhook fires. With
+`testing` on, capture still sets the status. `config.scratchDir` now always defaults to
+`<os.tmpdir()>/storyshelf`. `PublishCompleter` runs `afterPublish` hooks for the catalog. The one-time boot task
+that would re-process builds already `pending` is dropped (no data migrations): such builds stay as they are.
+
 **Added: `createDatabaseCaptureQueue` (`@storyshelf/core/capture`), a database queue on the new `capture_jobs` table (ADR 0006); additive, not wired in yet (adapters gain `tables.captureJobs`; `LeaseRenewal` gains `"cancelled"`; queues may add `cancel`/`inspect`).**
 
 **Added: `createCaptureConsumer` (`@storyshelf/core/capture`), the consumer loop for any pollable queue (handler per job kind, slots before polling, retries with backoff, lease by progress, cancel, drain on stop; optional metrics hooks). `runCaptureChild` moves into core and `@storyshelf/worker` re-exports it. Retention purge also drops finished `capture_jobs` rows and a removed build's job rows. Not wired into the app yet.**

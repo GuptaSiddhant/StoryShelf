@@ -2,12 +2,6 @@ import { z } from "@hono/zod-openapi";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import { emitWebhookEvent } from "@storyshelf/core/adapter/webhook-events";
-import {
-  extractStorybookToScratch,
-  persistStorybookStatics,
-  removeJobScratch,
-} from "@storyshelf/core/capture";
-import type { Logger } from "@storyshelf/core/logger";
 import { BaselineModel } from "@storyshelf/core/models";
 import { BuildModel } from "@storyshelf/core/models";
 import { LabelModel } from "@storyshelf/core/models";
@@ -84,7 +78,8 @@ export async function createBuildRecord(
 }
 
 /**
- * Stream a raw request body into storage with a byte cap.
+ * Stream a raw request body into storage with a byte cap, counting the bytes as they pass (a
+ * chunked upload has no `Content-Length`). Resolves to the bytes stored.
  * Throws 400 for a missing body, 413 once `maxBytes` is exceeded.
  */
 export async function storeUploadStream(
@@ -92,7 +87,7 @@ export async function storeUploadStream(
   path: string,
   body: ReadableStream<Uint8Array> | null,
   maxBytes: number,
-): Promise<void> {
+): Promise<number> {
   if (!body) {
     throw new HTTPException(400, { message: "Missing request body" });
   }
@@ -114,43 +109,12 @@ export async function storeUploadStream(
   try {
     const nodeBody = Readable.fromWeb(body as unknown as NodeWebStream);
     await storage.writeStream(path, nodeBody.pipe(limiter));
+    return seen;
   } catch (error) {
     if (seen > maxBytes) {
       throw new HTTPException(413, { message: "Upload exceeds size limit" });
     }
     throw error;
-  }
-}
-
-/**
- * Best-effort inline statics extraction for small uploads (see
- * `maxInlineUnzipSize`). Never throws: failures are logged and the capture
- * job backfills the same keys idempotently.
- */
-export async function persistInlineStatics(
-  storage: StorageAdapter,
-  scratchDir: string | undefined,
-  maxInlineBytes: number | undefined,
-  contentLength: string | undefined,
-  projectId: string,
-  buildId: string,
-  logger: Logger,
-): Promise<void> {
-  if (!scratchDir || !maxInlineBytes) {
-    return;
-  }
-  const size = parseContentLength(contentLength);
-  if (size === undefined || size > maxInlineBytes) {
-    return;
-  }
-  try {
-    const extractedDir = await extractStorybookToScratch(storage, scratchDir, projectId, buildId);
-    await persistStorybookStatics(storage, extractedDir, projectId, buildId);
-    logger.info({ buildId, size }, "upload statics persisted inline");
-  } catch (error) {
-    logger.error({ err: error, buildId }, "inline statics persist failed; capture will backfill");
-  } finally {
-    await removeJobScratch(scratchDir, projectId, buildId, logger);
   }
 }
 
@@ -338,12 +302,3 @@ async function attachLabels(
   }
 }
 /* oxlint-enable eslint/no-await-in-loop */
-
-/** Parse a Content-Length header value into bytes, or undefined when unknown. */
-function parseContentLength(value: string | undefined): number | undefined {
-  if (!value) {
-    return undefined;
-  }
-  const parsed = Math.trunc(Number(value));
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
-}

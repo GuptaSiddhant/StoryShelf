@@ -1,14 +1,15 @@
 import type { CaptureJob, CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
 import type { CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
 import { SCRATCH_DIRNAME } from "@storyshelf/core/capture";
+import { BuildModel, CaptureJobModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
-import { storybookDir } from "@storyshelf/core/utils";
+import { storybookDir, storybookZipPath } from "@storyshelf/core/utils";
 import AdmZip from "adm-zip";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pino } from "pino";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "../index.tsx";
 
 const silentLogger = pino({ level: "silent" });
@@ -68,8 +69,8 @@ async function uploadZip(
   app: ReturnType<typeof createShelfApp>,
   slug: string,
   zip: Buffer,
-  contentLength: string | undefined,
-): Promise<{ buildId: string; status: number }> {
+  contentLength?: string,
+): Promise<{ buildId: string; status: number; body: string }> {
   const created = await app.request(`/api/v1/projects/${slug}/builds`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -89,6 +90,40 @@ async function uploadZip(
     headers,
     body: new Uint8Array(zip),
   });
+  return { buildId: build.id, status: upload.status, body: await upload.text() };
+}
+
+/** Upload with a streamed body and no Content-Length, as a chunked upload arrives. */
+async function uploadChunked(
+  app: ReturnType<typeof createShelfApp>,
+  slug: string,
+  zip: Buffer,
+): Promise<{ buildId: string; status: number }> {
+  const created = await app.request(`/api/v1/projects/${slug}/builds`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ gitSha: "sha-1", gitBranch: "main" }),
+  });
+  const { build, uploadUrl } = (await created.json()) as {
+    build: { id: string };
+    uploadUrl: string;
+  };
+  const half = Math.ceil(zip.length / 2);
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(new Uint8Array(zip.subarray(0, half)));
+      controller.enqueue(new Uint8Array(zip.subarray(half)));
+      controller.close();
+    },
+  });
+  const upload = await app.request(
+    new Request(`http://localhost${uploadUrl}`, {
+      method: "PUT",
+      headers: { "content-type": "application/zip" },
+      body,
+      duplex: "half",
+    } as RequestInit),
+  );
   return { buildId: build.id, status: upload.status };
 }
 
@@ -112,6 +147,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await rm(scratchDir, { recursive: true, force: true });
 });
 
@@ -133,6 +169,8 @@ describe("upload inline statics", () => {
     expect(status).toBe(202);
     expect(jobs.map((job) => job.buildId)).toContain(buildId);
     expect(await storage.exists(`${storybookDir(projectId, buildId)}/iframe.html`)).toBe(true);
+    // Capture will run, so publishing leaves the status to it (no auto-accept).
+    expect((await new BuildModel(db).get(buildId))?.status).toBe("pending");
     // The extracted scratch copy is removed once the statics are persisted.
     const left = await readdir(join(scratchDir, SCRATCH_DIRNAME, projectId, buildId)).catch(
       () => null,
@@ -159,7 +197,7 @@ describe("upload inline statics", () => {
     expect(await storage.exists(`${storybookDir(projectId, buildId)}/iframe.html`)).toBe(false);
   });
 
-  it("skips inline extraction when no limit is configured", async () => {
+  it("extracts inline by default (50 MB) without any configuration", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
     const app = createShelfApp({
@@ -172,7 +210,92 @@ describe("upload inline statics", () => {
     const zip = storybookZip();
     const { buildId, status } = await uploadZip(app, slug, zip, String(zip.length));
     expect(status).toBe(202);
+    expect(await storage.exists(`${storybookDir(projectId, buildId)}/iframe.html`)).toBe(true);
+  });
+
+  it("counts the streamed bytes: a chunked upload without Content-Length is still extracted inline", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const app = createShelfApp({
+      database: db,
+      storage,
+      logger: silentLogger,
+      config: { scratchDir },
+    });
+    const { slug, id: projectId } = await setupProject(app);
+    const { buildId, status } = await uploadChunked(app, slug, storybookZip());
+    expect(status).toBe(202);
+    expect(await storage.exists(`${storybookDir(projectId, buildId)}/iframe.html`)).toBe(true);
+  });
+
+  it("sends a chunked upload over the inline limit to a publish job", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const app = createShelfApp({
+      database: db,
+      storage,
+      logger: silentLogger,
+      config: { scratchDir, maxInlineUnzipSize: 10 },
+    });
+    const { slug, id: projectId } = await setupProject(app);
+    const { buildId, status } = await uploadChunked(app, slug, storybookZip());
+    expect(status).toBe(202);
     expect(await storage.exists(`${storybookDir(projectId, buildId)}/iframe.html`)).toBe(false);
+    const jobs = await new CaptureJobModel(db).listForBuild(buildId);
+    expect(jobs.map((job) => job.kind)).toEqual(["publish"]);
+  });
+
+  it("refuses an over-limit zip with 413 and the file-by-file pointer on a serverless host", async () => {
+    vi.stubEnv("VERCEL", "1");
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const app = createShelfApp({
+      database: db,
+      storage,
+      logger: silentLogger,
+      config: { scratchDir, maxInlineUnzipSize: 10 },
+    });
+    const { slug, id: projectId } = await setupProject(app);
+    const zip = storybookZip();
+    const { buildId, status, body } = await uploadZip(app, slug, zip, String(zip.length));
+    expect(status).toBe(413);
+    expect(body).toContain("/dedup");
+    expect(body).toContain("/manifest");
+    expect(await storage.exists(storybookZipPath(projectId, buildId))).toBe(false);
+    expect(await new CaptureJobModel(db).listForBuild(buildId)).toEqual([]);
+  });
+
+  it("still extracts a small zip inline on a serverless host", async () => {
+    vi.stubEnv("AWS_LAMBDA_FUNCTION_NAME", "fn");
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const app = createShelfApp({
+      database: db,
+      storage,
+      logger: silentLogger,
+      config: { scratchDir },
+    });
+    const { slug, id: projectId } = await setupProject(app);
+    const zip = storybookZip();
+    const { buildId, status } = await uploadZip(app, slug, zip, String(zip.length));
+    expect(status).toBe(202);
+    expect(await storage.exists(`${storybookDir(projectId, buildId)}/iframe.html`)).toBe(true);
+  });
+
+  it("fails a hosting-only build whose zip breaks a cap, and publishes nothing", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const app = createShelfApp({
+      database: db,
+      storage,
+      logger: silentLogger,
+      config: { scratchDir, maxZipEntries: 1 },
+    });
+    const { slug, id: projectId } = await setupProject(app);
+    const { buildId, status } = await uploadZip(app, slug, storybookZip());
+    expect(status).toBe(202);
+    expect((await new BuildModel(db).get(buildId))?.status).toBe("failed");
+    expect(await storage.exists(`${storybookDir(projectId, buildId)}/manifest.json`)).toBe(false);
   });
 
   it("defaults the scratch dir for inline extraction when none is configured", async () => {
@@ -208,5 +331,7 @@ describe("upload inline statics", () => {
     expect(status).toBe(202);
     expect(jobs.map((job) => job.buildId)).toContain(buildId);
     expect(await storage.exists(`${storybookDir(projectId, buildId)}/iframe.html`)).toBe(false);
+    // Capture will backfill, so a failed inline publish leaves the status to it.
+    expect((await new BuildModel(db).get(buildId))?.status).toBe("pending");
   });
 });

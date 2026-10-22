@@ -9,6 +9,7 @@ import type { NotificationsConfig, ShelfConfig, UIConfig } from "@storyshelf/cor
 import type { Logger } from "@storyshelf/core/logger";
 import type { AuthUser } from "@storyshelf/core/types";
 import type { Context, Next } from "hono";
+import type { PublishService } from "../publish-setup.ts";
 import { runWithStore } from "../store.ts";
 import { sessionIdFrom } from "./csrf.ts";
 
@@ -22,6 +23,7 @@ export interface StoreScopeDeps {
   authEnabled: boolean;
   enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
   captureQueue: CaptureQueue | null;
+  publish?: PublishService;
   captureConcurrency?: number;
   gitHosts: GitHostProvider[];
   design: DesignProvider[];
@@ -49,6 +51,7 @@ export function storeScope(deps: StoreScopeDeps) {
         sessionId: sessionIdFrom(c),
         enqueueCapture: deps.enqueueCapture,
         captureQueue: deps.captureQueue,
+        publish: deps.publish,
         captureConcurrency: deps.captureConcurrency,
         gitHosts: deps.gitHosts,
         design: deps.design,

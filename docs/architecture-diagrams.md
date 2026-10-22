@@ -590,7 +590,7 @@ flowchart TB
     class Purge,Publish purge;
 ```
 
-Upload path: CLI uploads `storybook.zip` → storage; orchestrator extracts to `scratchDir` (temp), then `persistStorybookStatics` copies to `storage/{projectId}/builds/{buildId}/storybook/` for serving (`packages/core/src/capture/orchestrator.ts:57`). `maxInlineUnzipSize` controls inline extraction at upload.
+Upload path: CLI uploads `storybook.zip` → storage; orchestrator extracts to `scratchDir` (temp), then `persistStorybookStatics` copies to `storage/{projectId}/builds/{buildId}/storybook/` for serving (`packages/core/src/capture/orchestrator.ts:57`). Publishing is independent of capture: a zip up to `maxInlineUnzipSize` (default 50 MB) is extracted inline at upload, a larger one by a `publish` job on the database queue, and extraction is capped by `maxZipEntries` and `maxUnzippedBytes` (`packages/core/src/capture/publish/`).
 
 ---
 

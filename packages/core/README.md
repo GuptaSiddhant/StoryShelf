@@ -63,12 +63,14 @@ Assembles the router from the provided adapters. `ShelfOptions`:
 interface ShelfConfig {
   secret?: string; // session signing secret
   publishedBaseDomain?: string; // for published storybook URLs
-  scratchDir?: string; // capture working directory (default: <os.tmpdir()>/storyshelf)
+  scratchDir?: string; // working directory for publishing and capture (default: <os.tmpdir()>/storyshelf)
   purgeTtlDays?: number; // purge builds older than N days
   branchTtlDays?: number | null; // branch baseline TTL, days; null disables GC (default 30)
   branchGcIntervalMs?: number; // branch GC interval, ms; daily via interval clock (default 86_400_000)
   maxUploadBytes?: number; // single-zip upload cap (default 1 GiB)
-  maxInlineUnzipSize?: number; // inline statics extraction cap; unset = capture-only
+  maxInlineUnzipSize?: number; // largest zip extracted inline at upload (default 50 MB; 0 = always a publish job)
+  maxZipEntries?: number; // most entries a zip may hold (default 50 000)
+  maxUnzippedBytes?: number; // most uncompressed bytes a zip may expand to (default 2 GiB)
   viewports?: Viewport[]; // capture viewports
 }
 ```

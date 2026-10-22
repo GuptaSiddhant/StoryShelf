@@ -1,4 +1,4 @@
-/** Resolves `ShelfOptions` once at boot: validates `testing.compare` and fills the capture scratch default. */
+/** Resolves `ShelfOptions` once at boot: validates `testing.compare` and fills the scratch default. */
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { notificationsConfigSchema, type ShelfOptions } from "./config.ts";
@@ -11,16 +11,14 @@ export const DEFAULT_SCRATCH_DIR: string = join(tmpdir(), "storyshelf");
  *
  * - `testing.compare.threads` must be a non-negative integer.
  * - `notifications.config` must match its schema (it used to live in `ShelfConfig`, which validated it).
- * - `config.scratchDir` defaults to {@link DEFAULT_SCRATCH_DIR} once something needs it (a runner,
- *   or inline statics extraction); hosting-only deployments stay untouched.
+ * - `config.scratchDir` defaults to {@link DEFAULT_SCRATCH_DIR}: publishing extracts zips there,
+ *   with or without `testing`.
  */
 export function resolveShelfOptions(options: ShelfOptions): ShelfOptions {
   assertThreads(options.testing?.compare?.threads);
   assertTestingProcess(options.testing);
   assertNotificationsConfig(options.notifications?.config);
-  const needsScratch =
-    options.testing?.runner !== undefined || (options.config?.maxInlineUnzipSize ?? 0) > 0;
-  if (!needsScratch || options.config?.scratchDir !== undefined) {
+  if (options.config?.scratchDir !== undefined) {
     return options;
   }
   return { ...options, config: { ...options.config, scratchDir: DEFAULT_SCRATCH_DIR } };

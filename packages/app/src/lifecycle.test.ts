@@ -173,3 +173,67 @@ describe("teardown and background boot tasks", () => {
     expect(order).toContain("db");
   });
 });
+
+function fakeConsumer() {
+  const stopped = Promise.withResolvers<null>();
+  let running = false;
+  return {
+    start: vi.fn(async () => {
+      running = true;
+      await stopped.promise;
+      running = false;
+    }),
+    stop: vi.fn(async () => {
+      stopped.resolve(null);
+      await Promise.resolve();
+    }),
+    isRunning: () => running,
+  };
+}
+
+function lifecycleOf(consumer: ReturnType<typeof fakeConsumer> | null) {
+  const { db } = makeDatabase();
+  const { storage } = makeStorage();
+  const options = { database: db, storage } as unknown as ShelfOptions;
+  const runtime = {
+    config: { branchTtlDays: null },
+    logger: silentLogger,
+  } as unknown as ServerRuntime;
+  const cell: LifecycleCell = {
+    ready: Promise.resolve({ ok: true, failures: [] }),
+    settled: null,
+    publishConsumer: consumer,
+  };
+  const app = {} as ShelfRouter;
+  attachLifecycle(app, options, runtime, cell);
+  return (app as unknown as { lifecycle: { setup(): Promise<void>; teardown(): Promise<void> } })
+    .lifecycle;
+}
+
+describe("publish consumer lifecycle", () => {
+  it("starts after setup, once, and drains on teardown", async () => {
+    const consumer = fakeConsumer();
+    const lifecycle = lifecycleOf(consumer);
+    expect(consumer.start).not.toHaveBeenCalled();
+    await lifecycle.setup();
+    await lifecycle.setup();
+    expect(consumer.start).toHaveBeenCalledOnce();
+    await lifecycle.teardown();
+    expect(consumer.stop).toHaveBeenCalledOnce();
+    expect(consumer.isRunning()).toBe(false);
+  });
+
+  it("works without a consumer (serverless hosts)", async () => {
+    const lifecycle = lifecycleOf(null);
+    await lifecycle.setup();
+    await expect(lifecycle.teardown()).resolves.toBeUndefined();
+  });
+
+  it("logs a consumer that fails to start instead of failing setup", async () => {
+    const consumer = fakeConsumer();
+    consumer.start.mockRejectedValueOnce(new Error("engine"));
+    const lifecycle = lifecycleOf(consumer);
+    await expect(lifecycle.setup()).resolves.toBeUndefined();
+    await expect(lifecycle.teardown()).resolves.toBeUndefined();
+  });
+});

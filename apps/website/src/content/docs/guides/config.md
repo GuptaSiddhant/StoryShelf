@@ -80,9 +80,15 @@ Each upload resolves `packagePath` (`relative(cwd, dirname(.storybook))`) and is
 ## Server config vs client config
 
 - **Client file** (`.storybook/storyshelf.json`): `slug`, `url`, `buildDir`, `buildCommand`, `buildScriptName`, `skip`, `affectedOnly`, `untraced` — per-Storybook, committed, non-secret.
-- **Server `ShelfConfig` / DB `projects`** (`core/src/config.ts:48`, `core/src/schema.ts:5`): `secret` (see [rotating it](/guides/deployment/secret-rotation/)), `previousSecret`, `migrateCredentialsOnBoot`, `scratchDir` (default `<os.tmpdir()>/storyshelf`), `purgeTtlDays`, `branchTtlDays`, `branchGcIntervalMs`, `maxUploadBytes`, `maxInlineUnzipSize`, `viewports`, `browser` (per-project capture engine: `chromium`/`firefox`/`webkit`/`chrome`), `pixel_threshold`, `storybook_meta` (`framework/addons/storiesGlobs/packagePath` auto-detected at `create`).
+- **Server `ShelfConfig` / DB `projects`** (`core/src/config.ts:48`, `core/src/schema.ts:5`): `secret` (see [rotating it](/guides/deployment/secret-rotation/)), `previousSecret`, `migrateCredentialsOnBoot`, `scratchDir` (default `<os.tmpdir()>/storyshelf`), `purgeTtlDays`, `branchTtlDays`, `branchGcIntervalMs`, `maxUploadBytes`, `maxInlineUnzipSize`, `maxZipEntries`, `maxUnzippedBytes`, `viewports`, `browser` (per-project capture engine: `chromium`/`firefox`/`webkit`/`chrome`), `pixel_threshold`, `storybook_meta` (`framework/addons/storiesGlobs/packagePath` auto-detected at `create`).
 
-Uploads at or under `maxInlineUnzipSize` bytes are extracted inline so the published Storybook preview is live on response; larger uploads wait for capture. Leave it unset (the default) to always wait for capture — required on diskless hosts.
+Publishing a Storybook zip is bounded by three options (see [Published Storybook](/concepts/publishing/)):
+
+- `maxInlineUnzipSize` (default 50 MB): zips up to this many bytes are extracted inline in the upload request, so the Storybook is live when the upload returns. Larger zips are published by a background `publish` job on any instance with a database; on a serverless host they are refused with `413`, pointing to the file-by-file upload route (`/dedup`, `/content`, `/manifest`). `0` sends every zip to a job. The size is counted while streaming, not from `Content-Length`.
+- `maxZipEntries` (default 50 000): the most entries a zip may hold.
+- `maxUnzippedBytes` (default 2 GiB): the most uncompressed bytes a zip may expand to, counted while extracting.
+
+A zip over a cap, or with an absolute or `..` path, fails the publish. `scratchDir` now always defaults to `<os.tmpdir()>/storyshelf`, since publishing extracts zips there with or without `testing`.
 
 ### Capture performance tuning
 

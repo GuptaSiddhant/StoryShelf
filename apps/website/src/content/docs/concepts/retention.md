@@ -56,7 +56,7 @@ createShelfApp({
 });
 ```
 
-Uploads ≤ `maxInlineUnzipSize` are extracted inline so the published Storybook is live immediately; larger ones wait for capture (required `null` on diskless hosts).
+Uploads ≤ `maxInlineUnzipSize` (default 50 MB) are extracted inline so the published Storybook is live immediately; larger ones are published by a background `publish` job (see [Published Storybook](/concepts/publishing/)).
 
 ## Related
 

@@ -14,9 +14,23 @@ import {
   buildListQuery,
   buildForProject,
   createBuildRecord,
-  persistInlineStatics,
   storeUploadStream,
 } from "./builds.handlers.ts";
+import { discardZip, planUpload, publishUpload } from "./publish-upload.ts";
+
+/** Decide how the stored zip is published; a zip this host cannot publish is removed and refused. */
+async function planOrDiscard(
+  zipBytes: number,
+  projectId: string,
+  buildId: string,
+): Promise<"inline" | "job"> {
+  try {
+    return planUpload(zipBytes);
+  } catch (error) {
+    await discardZip(projectId, buildId);
+    throw error;
+  }
+}
 
 async function upsertContentRef(hash: string): Promise<void> {
   try {
@@ -108,26 +122,16 @@ export function registerBuilds(app: ShelfRouter): void {
     const project = await resolveAuthorizedProject(c, slug, ...DEVELOPER_ROLES);
     const build = await buildForProject(project.id, buildId);
     const maxBytes = getStore().config.maxUploadBytes ?? DEFAULT_MAX_UPLOAD_BYTES;
-    await storeUploadStream(
+    const zipBytes = await storeUploadStream(
       getStore().storage,
       storybookZipPath(project.id, build.id),
       c.req.raw.body,
       maxBytes,
     );
-
+    const route = await planOrDiscard(zipBytes, project.id, build.id);
     const reqId = c.get("requestId");
     await getStore().enqueueCapture?.(build.id, reqId);
-    const { storage, config, logger } = getStore();
-    await persistInlineStatics(
-      storage,
-      config.scratchDir,
-      config.maxInlineUnzipSize,
-      c.req.header("content-length"),
-      project.id,
-      build.id,
-      logger,
-    );
-    return c.json(build, 202);
+    return c.json(await publishUpload(route, build, reqId), 202);
   });
 
   app.openapi(dedupRoute, async (c) => {
@@ -206,6 +210,8 @@ export function registerBuilds(app: ShelfRouter): void {
         // ignore — content_refs may not exist
       }
     }
+    // The files are stored content-addressed: nothing to extract, so publishing is complete.
+    await getStore().publish?.completer.complete(build.id, { ok: true });
     const reqId = c.get("requestId");
     await getStore().enqueueCapture?.(build.id, reqId);
     return c.json({ ok: true });
@@ -282,7 +288,8 @@ const createBuildRoute = createRoute({
           schema: buildCreatedSchema,
         },
       },
-      description: "Build created. PUT the Storybook zip to uploadUrl to queue capture.",
+      description:
+        "Build created. PUT the Storybook zip to uploadUrl to publish it (and queue capture when testing is on).",
     },
     ...badRequest,
     ...forbiddenResponse,
@@ -308,7 +315,8 @@ const uploadZipRoute = createRoute({
   responses: {
     202: {
       content: { "application/json": { schema: buildSchema } },
-      description: "Zip stored and capture queued",
+      description:
+        "Zip stored. A zip up to maxInlineUnzipSize (default 50 MB) is extracted inline in this request; a larger one is published by a background job. With testing off, the build becomes approved when publishing finishes on the project's default branch (failed if it cannot be published) and stays pending on other branches; with testing on, capture sets the status.",
     },
     413: {
       content: {
@@ -316,7 +324,8 @@ const uploadZipRoute = createRoute({
           schema: z.object({ message: z.string() }).openapi("Error"),
         },
       },
-      description: "Upload exceeds the configured size limit",
+      description:
+        "Upload exceeds the configured size limit, or the zip is over the inline limit and this host (serverless) runs no publish consumer: upload file by file instead (POST /dedup, PUT /content, POST /manifest)",
     },
     ...badRequest,
     ...forbiddenResponse,
@@ -330,6 +339,8 @@ const dedupRoute = createRoute({
   method: "post",
   tags: ["Builds"],
   summary: "Check which files need uploading",
+  description:
+    "File-by-file upload, step 1 (dedup, content, manifest): needs no zip extraction and works on any host, serverless included. Send the content hashes; the response lists those the server does not hold yet.",
   path: "/api/v1/projects/{slug}/builds/{buildId}/dedup",
   request: {
     params: z.object({ slug: z.string(), buildId: z.string() }),
@@ -348,6 +359,8 @@ const contentUploadRoute = createRoute({
   method: "post",
   tags: ["Builds"],
   summary: "Upload build content",
+  description:
+    "File-by-file upload, step 2: store the missing files content-addressed (multipart, or one file with an X-Content-Hash header).",
   path: "/api/v1/projects/{slug}/builds/{buildId}/content",
   request: {
     params: z.object({ slug: z.string(), buildId: z.string() }),
@@ -367,6 +380,8 @@ const manifestRoute = createRoute({
   method: "post",
   tags: ["Builds"],
   summary: "Store the build manifest",
+  description:
+    "File-by-file upload, step 3: store the path-to-hash manifest. This completes publishing. With testing off the build becomes approved when it is on the project's default branch and stays pending on other branches; with testing on, a capture is queued and sets the status.",
   path: "/api/v1/projects/{slug}/builds/{buildId}/manifest",
   request: {
     params: z.object({ slug: z.string(), buildId: z.string() }),

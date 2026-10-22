@@ -13,6 +13,35 @@ Beyond diff review, StoryShelf **publishes** the uploaded Storybook build as a b
   caption="The library lists every story from a branch's latest build; Preview opens the published Storybook."
 />
 
+## How a build gets published
+
+Publishing needs no capture: an instance without the `testing` option hosts Storybooks of any size. How the upload is published depends on the route:
+
+- **Small zip, inline.** A zip up to `maxInlineUnzipSize` (default 50 MB) is extracted in the upload request, so the Storybook is live when the `PUT` returns. The size is counted while the upload streams, never from `Content-Length`, so a chunked upload counts too.
+- **Larger zip, `publish` job.** A bigger zip is stored and a `publish` job is put on the database queue. Every instance with a database runs a consumer for `publish` jobs, so any of them extracts it in the background, with the queue's lease, retry and redelivery. A zip that breaks an extraction cap (below) is failed at once, without retries.
+- **File by file, no extraction.** `POST /dedup`, `POST /content`, `POST /manifest` store the files content-addressed and publish when the manifest is stored. The CLI falls back to this route by itself when the server refuses a zip with `413`. It is the way to publish on a serverless host.
+
+On a **serverless** host (`AWS_LAMBDA_FUNCTION_NAME`, `VERCEL` or `NETLIFY` is set) no consumer runs, so a zip over the inline limit is refused with `413` and a message pointing to the file-by-file route. Small zips still extract inline there.
+
+### Limits
+
+| Option               | Default | Effect                                                                                |
+| -------------------- | ------- | ------------------------------------------------------------------------------------- |
+| `maxInlineUnzipSize` | 50 MB   | Largest zip extracted inline; `0` sends every zip to a `publish` job.                 |
+| `maxZipEntries`      | 50 000  | Most entries a zip may hold; more fails the publish.                                  |
+| `maxUnzippedBytes`   | 2 GiB   | Most uncompressed bytes a zip may expand to, counted while extracting; more fails it. |
+
+Extraction also refuses entries with absolute paths or paths that leave the target directory (`..`). The compressed size is no bound on its own, which is why the entry and byte caps exist. See [Configuration](/guides/config/).
+
+### When the build is accepted
+
+With `testing` off, publishing is the whole life of a build and ends by setting its status:
+
+- **Default branch:** published, the build becomes `approved`, so the project's Storybook link always resolves. Publishing that fails (for example a zip over a cap) makes it `failed`.
+- **Other branches:** published, the build stays `pending`. A later release adds the project setting that accepts these builds without a review; until then they wait for a build-level verdict.
+
+No approval event or webhook fires for this automatic acceptance; `build:created` already announced the upload. Repeating a publish (a job redelivered after a lost lease) never changes a build that has left `pending`. With `testing` on, publishing leaves the status alone and capture sets it.
+
 ## URL structure
 
 All three are the same published artifact — the **latest published build** for the project (most recent build whose branch is public). They are resolvers that 302 to a canonical build-scoped path that serves assets:
