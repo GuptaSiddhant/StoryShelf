@@ -58,6 +58,8 @@ export interface ProjectSettingsData {
   notifyProviders: SettingsNotifyProvider[];
   mySubscription: SettingsMySubscription | null;
   isAdmin: boolean;
+  /** Notifiers are wired but no public origin resolves (ADR 0014, decision 11). */
+  notificationsPaused?: boolean | undefined;
   /** AI availability and the profile choices (omitted ⇒ AI off). */
   ai?: SettingsAiData;
   /** What the capture runner offers (ADR 0007); omitted when it publishes no list. */
@@ -169,6 +171,7 @@ function renderActiveTab(data: ProjectSettingsData, formState?: SettingsFormStat
       data.mySubscription,
       data.isAdmin,
       formState,
+      data.notificationsPaused,
     );
   if (activeTab === "members")
     return renderSettingsMembers(

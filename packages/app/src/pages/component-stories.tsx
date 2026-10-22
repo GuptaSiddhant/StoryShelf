@@ -83,16 +83,16 @@ function PreviewCard(props: { data: ComponentPageData; story: CatalogEntry }): R
   return (
     <Card id="preview">
       <SectionTitle>{story.name}</SectionTitle>
-      {data.previewable ? (
-        <PreviewEmbed
-          src={`${storybookBase(data)}/iframe.html?id=${encodeURIComponent(story.id)}&viewMode=story`}
-          title={`${story.title} / ${story.name}`}
-        />
-      ) : (
+      {data.previewBase === null ? (
         <Meta>
           This build needs a sign-in to view, so it cannot run in a frame here. Open it in Storybook
           instead.
         </Meta>
+      ) : (
+        <PreviewEmbed
+          src={`${data.previewBase}/iframe.html?id=${encodeURIComponent(story.id)}&viewMode=story`}
+          title={`${story.title} / ${story.name}`}
+        />
       )}
     </Card>
   );

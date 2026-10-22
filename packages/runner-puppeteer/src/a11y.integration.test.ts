@@ -25,6 +25,7 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("axe in the Puppeteer ru
       "components-accessibility--clean",
       "components-accessibility--disabled-a11y",
       "components-accessibility--rule-override",
+      "components-accessibility--best-practice",
       "components-button--primary",
     ];
     const rendered = await createPuppeteerCaptureRunner({
@@ -45,6 +46,8 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("axe in the Puppeteer ru
     );
     expect(annotation("components-accessibility--missing-alt")).toContain("button-name");
     expect(annotation("components-accessibility--low-contrast")).toContain("color-contrast");
+    // The default run set includes best-practice rules.
+    expect(annotation("components-accessibility--best-practice")).toContain("heading-order");
     expect(annotation("components-accessibility--clean")).toBe("");
     expect(annotation("components-accessibility--disabled-a11y")).toBe("");
     expect(annotation("components-button--primary")).toBe("");

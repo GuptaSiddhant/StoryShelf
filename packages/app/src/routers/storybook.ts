@@ -1,38 +1,16 @@
-import { readPublishedFile } from "@storyshelf/core/capture";
 import { BuildModel } from "@storyshelf/core/models";
 import { LabelModel } from "@storyshelf/core/models";
 import { ProjectModel } from "@storyshelf/core/models";
 import type { Build } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
-import { isSafeSegment, mimeFor, storybookDir } from "@storyshelf/core/utils";
+import { storybookDir } from "@storyshelf/core/utils";
 import { posix } from "node:path";
 import type { ShelfRouter } from "../app-types.ts";
 import { renderStorybookPage, renderStorybookPreparingPage } from "../pages/storybook.tsx";
 import { getStore } from "../store.ts";
-import { currentProjectRole, notFound } from "./helpers.ts";
-import { isAnonymouslyViewable, previewCorsHeaders } from "./preview-access.ts";
-const VIEW_ROLES: ReadonlySet<string> = new Set(["viewer", "developer", "approver", "admin"]);
-
-function contentTypeFor(path: string): string {
-  return mimeFor(path);
-}
-
-/**
- * Decide whether the current request may view `build`'s published Storybook.
- *
- * Public builds (ADR 0011), and every build of an instance without sign-in, are viewable without
- * auth; every other build requires a logged-in session with at least `viewer` membership.
- */
-async function canViewBuild(
-  build: Pick<Build, "public" | "gitBranch">,
-  project: Project,
-): Promise<boolean> {
-  if (isAnonymouslyViewable(build, project)) {
-    return true;
-  }
-  const role = await currentProjectRole(project.id);
-  return Boolean(role && VIEW_ROLES.has(role));
-}
+import { notFound } from "./helpers.ts";
+import { publishedAccess } from "./published-access.ts";
+import { publishedRelativePath, servePublishedFile } from "./published-files.ts";
 
 /** Check whether a build's extracted statics are available for serving. */
 async function staticsReady(projectId: string, buildId: string): Promise<boolean> {
@@ -45,14 +23,6 @@ async function staticsReady(projectId: string, buildId: string): Promise<boolean
   return await getStore().storage.exists(
     posix.join(storybookDir(projectId, buildId), "iframe.html"),
   );
-}
-
-async function readWithManifestFallback(
-  projectId: string,
-  buildId: string,
-  rel: string,
-): Promise<Buffer | null> {
-  return await readPublishedFile(getStore().storage, projectId, buildId, rel);
 }
 
 /** Register the published Storybook resolver and static-asset routes. */
@@ -71,7 +41,7 @@ export function registerStorybook(app: ShelfRouter): void {
     if (!build) {
       notFound("No approved build on the default branch yet");
     }
-    if (!(await canViewBuild(build, project))) {
+    if (!(await publishedAccess(build, project))) {
       return c.redirect("/auth/login", 302);
     }
     return c.redirect(`/projects/${slug}/storybook/build/${build.id}/`, 302);
@@ -94,7 +64,7 @@ export function registerStorybook(app: ShelfRouter): void {
       notFound("No build carries that label");
     }
     const build = await new BuildModel(getStore().db).get(buildId);
-    if (!build || !(await canViewBuild(build, project))) {
+    if (!build || !(await publishedAccess(build, project))) {
       return c.redirect("/auth/login", 302);
     }
     return c.redirect(`/projects/${slug}/storybook/build/${buildId}/`, 302);
@@ -120,14 +90,8 @@ export function registerStorybook(app: ShelfRouter): void {
   app.get("/_/:id/*", async (c) => {
     const id = c.req.param("id");
     const isUlid26 = id.length === 26 && /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/u.test(id);
-    const base = `/_/${id}/`;
-    if (!c.req.path.startsWith(base)) return c.notFound();
-    let rest: string;
-    try {
-      rest = decodeURIComponent(c.req.path.slice(base.length));
-    } catch {
-      return c.notFound();
-    }
+    const rest = publishedRelativePath(c.req.path, `/_/${id}/`);
+    if (rest === null) return c.notFound();
     let project: Project | null = null;
     let build: Build | null = null;
     if (isUlid26) {
@@ -141,41 +105,23 @@ export function registerStorybook(app: ShelfRouter): void {
       build = await new BuildModel(getStore().db).latestApprovedDefault(project);
       if (!build) return c.notFound();
     }
-    if (!(await canViewBuild(build, project))) return c.redirect("/auth/login", 302);
-    if (rest === "") {
-      if (!(await staticsReady(project.id, build.id))) {
-        return c.html(renderStorybookPreparingPage(project, build, project.slug), 200);
-      }
-      const buffer = await readWithManifestFallback(project.id, build.id, "index.html");
-      if (!buffer) {
-        return c.redirect(
-          isUlid26 ? `/projects/${project.slug}/builds/${build.id}` : `/projects/${project.slug}`,
-          302,
-        );
-      }
-      const cacheControl = isUlid26 ? "public, max-age=31536000, immutable" : "public, max-age=60";
-      return c.body(new Uint8Array(buffer), 200, {
-        "content-type": "text/html; charset=utf-8",
-        "cache-control": cacheControl,
-      });
+    const access = await publishedAccess(build, project);
+    if (!access) return c.redirect("/auth/login", 302);
+    if (rest === "" && !(await staticsReady(project.id, build.id))) {
+      return c.html(renderStorybookPreparingPage(project, build, project.slug), 200);
     }
-    const segments = rest.split("/");
-    if (segments.some((segment) => !isSafeSegment(segment))) return c.notFound();
-    const buffer = await readWithManifestFallback(project.id, build.id, rest);
-    if (!buffer) {
-      if (rest === "index.html") {
-        return c.redirect(
-          isUlid26 ? `/projects/${project.slug}/builds/${build.id}` : `/projects/${project.slug}`,
-          302,
-        );
-      }
-      return c.notFound();
-    }
-    const cacheControl = isUlid26 ? "public, max-age=31536000, immutable" : "public, max-age=3600";
-    return c.body(new Uint8Array(buffer), 200, {
-      "content-type": contentTypeFor(rest),
-      "cache-control": cacheControl,
+    const fallback = isUlid26
+      ? `/projects/${project.slug}/builds/${build.id}`
+      : `/projects/${project.slug}`;
+    const served = await servePublishedFile(c, {
+      projectId: project.id,
+      buildId: build.id,
+      rel: rest === "" ? "index.html" : rest,
+      access,
+      cacheControl: shortLinkCache(isUlid26, rest === ""),
     });
+    if (served) return served;
+    return rest === "" || rest === "index.html" ? c.redirect(fallback, 302) : c.notFound();
   });
 
   // Canonical build route: serves the static Storybook and the landing page.
@@ -184,14 +130,8 @@ export function registerStorybook(app: ShelfRouter): void {
     const buildId = c.req.param("buildId");
     // Hono's bare `/*` wildcard is not exposed through `param()`, so derive the
     // remainder from the raw request path (un-encoded) and decode it ourselves.
-    const base = `/projects/${slug}/storybook/build/${buildId}/`;
-    if (!c.req.path.startsWith(base)) {
-      return c.notFound();
-    }
-    let rest: string;
-    try {
-      rest = decodeURIComponent(c.req.path.slice(base.length));
-    } catch {
+    const rest = publishedRelativePath(c.req.path, `/projects/${slug}/storybook/build/${buildId}/`);
+    if (rest === null) {
       return c.notFound();
     }
     const project = await new ProjectModel(getStore().db).getBySlug(slug);
@@ -202,7 +142,8 @@ export function registerStorybook(app: ShelfRouter): void {
     if (!build || build.projectId !== project.id) {
       notFound("Build not found");
     }
-    if (!(await canViewBuild(build, project))) {
+    const access = await publishedAccess(build, project);
+    if (!access) {
       return c.redirect("/auth/login", 302);
     }
 
@@ -215,16 +156,22 @@ export function registerStorybook(app: ShelfRouter): void {
       return c.html(renderStorybookPage(project, build, slug, { storyId, viewMode }), 200);
     }
 
-    const segments = rest.split("/");
-    if (segments.some((segment) => !isSafeSegment(segment))) {
-      return c.notFound();
-    }
-    const buffer = await readWithManifestFallback(project.id, build.id, rest);
-    if (!buffer) return c.notFound();
-    return c.body(new Uint8Array(buffer), 200, {
-      "content-type": contentTypeFor(rest),
-      "cache-control": "public, max-age=31536000, immutable",
-      ...previewCorsHeaders(build, project),
-    });
+    return (
+      (await servePublishedFile(c, {
+        projectId: project.id,
+        buildId: build.id,
+        rel: rest,
+        access,
+        cacheControl: "public, max-age=31536000, immutable",
+      })) ?? c.notFound()
+    );
   });
+}
+
+/** Cache policy of the short link: a ULID names one build forever; a slug follows the latest. */
+function shortLinkCache(isUlid26: boolean, isRoot: boolean): string {
+  if (isUlid26) {
+    return "public, max-age=31536000, immutable";
+  }
+  return isRoot ? "public, max-age=60" : "public, max-age=3600";
 }

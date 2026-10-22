@@ -7,6 +7,7 @@ import {
   REVIEW_VERDICTS,
   SNAPSHOT_STATUSES,
 } from "@storyshelf/core/types";
+import { MAX_STORYBOOK_URL_TTL, MIN_STORYBOOK_URL_TTL } from "@storyshelf/core/utils";
 
 /** A capture target: an engine (`chromium`) or a remote one, `<engine>@<name>` (ADR 0007). */
 const captureTargetSchema = z
@@ -20,6 +21,13 @@ const captureTargetSchema = z
   );
 
 const reviewApprovalsSchema = z.number().int().min(1).max(20);
+
+/** Seconds a signed Storybook URL stays valid (ADR 0007, decision 5). */
+const storybookUrlTtlSchema = z
+  .number()
+  .int()
+  .min(MIN_STORYBOOK_URL_TTL)
+  .max(MAX_STORYBOOK_URL_TTL);
 
 const storybookMetaSchema = z.record(z.string(), z.unknown()).nullable().optional();
 
@@ -37,6 +45,8 @@ export const projectSchema = z
     storybookMeta: z.string().nullable().optional(),
     executePlay: z.boolean(),
     playTimeoutMs: z.number(),
+    /** Axe accessibility checks run during capture (default on; results never block a build). */
+    runA11y: z.boolean().optional(),
     // Stored rows predate enum validation, so the response stays a plain string.
     browser: z.string().optional(),
     /** JSON array of capture targets, primary first, primary first; null = just `browser`. */
@@ -49,6 +59,8 @@ export const projectSchema = z
     reviewEnabled: z.boolean().optional(),
     /** Approvals a build needs when `testing` is off. */
     reviewApprovals: z.number().optional(),
+    /** Seconds the signed Storybook URLs of a render stay valid; null derives it from the stories. */
+    storybookUrlTtlSeconds: z.number().nullable().optional(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -63,6 +75,8 @@ export const projectCreateSchema = z
     storybookMeta: storybookMetaSchema,
     executePlay: z.boolean().optional(),
     playTimeoutMs: z.number().int().min(1000).max(30_000).optional(),
+    /** Axe accessibility checks during capture; on when omitted. */
+    runA11y: z.boolean().optional(),
     reviewEnabled: z.boolean().optional(),
     reviewApprovals: reviewApprovalsSchema.optional(),
   })
@@ -80,6 +94,8 @@ export const projectUpdateSchema = z
     storybookMeta: storybookMetaSchema,
     executePlay: z.boolean().optional(),
     playTimeoutMs: z.number().int().min(1000).max(30_000).optional(),
+    /** Turn axe accessibility checks during capture on or off (admins). */
+    runA11y: z.boolean().optional(),
     /** Single capture target; clears `browsers`. */
     browser: captureTargetSchema.optional(),
     /** Capture targets, primary first (max 3); null returns to single `browser`. */
@@ -92,6 +108,8 @@ export const projectUpdateSchema = z
     reviewEnabled: z.boolean().optional(),
     /** Approvals a build needs before it is accepted when `testing` is off. */
     reviewApprovals: reviewApprovalsSchema.optional(),
+    /** Seconds (60 to 86400) the signed Storybook URLs of a render stay valid; null derives it from the stories. */
+    storybookUrlTtlSeconds: storybookUrlTtlSchema.nullable().optional(),
   })
   .openapi("ProjectUpdateInput");
 
@@ -145,6 +163,8 @@ export const snapshotSchema = z
     reviewedBy: z.string().nullable(),
     reviewedAt: z.string().nullable(),
     inherited: z.boolean(),
+    /** JSON array of the axe violations found on this capture (non-blocking); null when none. */
+    a11yViolations: z.string().nullable().optional(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })

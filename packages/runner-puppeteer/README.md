@@ -24,7 +24,7 @@ const capture = createPuppeteerCaptureRunner();
 
 ## Remote browsers
 
-`@storyshelf/runner-puppeteer/remote` exports `cdp({ name, endpoint, headers, sessions })`: a Chrome DevTools Protocol endpoint (Browserless, Cloudflare Browser Rendering, a Chrome with remote debugging) for the `browsers` list, offering `chromium@<name>`. The runner calls `puppeteer.connect`; its fingerprint is measured in the browser, `sessions` caps the pages per target, and connection failures are retried with backoff. A remote Puppeteer browser cannot route back to the host, so every remote target is given a signed Storybook URL by the server (`<public origin>/s/<token>/`, minted per render pass, `testing.storybookUrlTtl`) and stays unavailable until a `secret` and a public origin exist. See the website's "Remote browsers" guide.
+`@storyshelf/runner-puppeteer/remote` exports `cdp({ name, endpoint, headers, sessions })`: a Chrome DevTools Protocol endpoint (Browserless, Cloudflare Browser Rendering, a Chrome with remote debugging) for the `browsers` list, offering `chromium@<name>`. The runner calls `puppeteer.connect`; its fingerprint is measured in the browser, `sessions` caps the pages per target, and connection failures are retried with backoff. A remote Puppeteer browser cannot route back to the host, so every remote target is given a signed Storybook URL by the server (`<public origin>/_s/<token>/`, minted per render pass and valid for its render budget, or for the project's signed URL lifetime) and stays unavailable until a `secret` and a public origin exist. See the website's "Remote browsers" guide.
 
 ## Concurrency and memory
 

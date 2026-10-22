@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createBuildStatePublisher } from "./publisher.ts";
+import { createBuildStatePublisher, PAUSED_MESSAGE } from "./publisher.ts";
 import { statusLog, world } from "./test-world.ts";
 
 describe("createBuildStatePublisher", () => {
@@ -64,5 +64,31 @@ describe("createBuildStatePublisher", () => {
     const broken = { ...w.deps, db: {} as never, logger: { warn } as never };
     await expect(createBuildStatePublisher({ deps: broken }).request("b")).resolves.toBe(undefined);
     expect(warn).toHaveBeenCalled();
+  });
+
+  it("neither queues nor delivers inline while no public origin is resolved, and logs once", async () => {
+    const w = await world();
+    const warn = vi.fn();
+    let origin: string | undefined;
+    const deps = {
+      ...w.deps,
+      publicOrigin: async () => await Promise.resolve(origin),
+      logger: { ...w.deps.logger, warn } as unknown as typeof w.deps.logger,
+    };
+    const enqueue = vi.fn(async (_job: { channelId: string; buildId: string }) => {});
+    const publisher = createBuildStatePublisher({ deps, enqueue });
+    await w.channels.recordOutcome(w.channelId, "old error");
+    await publisher.request(w.build.id);
+    await publisher.request(w.build.id);
+    expect(enqueue).not.toHaveBeenCalled();
+    expect(w.git.calls).toHaveLength(0);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]?.[1]).toBe(PAUSED_MESSAGE);
+    // The channel is not marked as errored by the pause.
+    expect((await w.channels.get(w.channelId))?.lastError).toBe("old error");
+
+    origin = "https://shelf.example.com";
+    await publisher.request(w.build.id);
+    expect(enqueue).toHaveBeenCalledTimes(1);
   });
 });

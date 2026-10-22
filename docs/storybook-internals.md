@@ -342,7 +342,7 @@ and an adapter `screenshotSelector` per view mode.
 
 - **a11y**: shipped (ADR 0004 §6). The runners inject `axe-core` (owned by `@storyshelf/core`, loaded
   lazily) with `page.evaluate`, read the current story's `parameters.a11y` from
-  `__STORYBOOK_PREVIEW__.currentRender.story`, and scan `#storybook-root`; `addon-a11y` itself is not
+  `__STORYBOOK_PREVIEW__.currentRender.story`, and scan `#storybook-root` (WCAG A/AA plus `best-practice` tags); `addon-a11y` itself is not
   needed in the Storybook. Only JSON-serialisable parameters survive the read.
 - **interactions panel**: sidebar/test-status indicators in the manager are driven by
   `STORY_RENDER_PHASE_CHANGED`; the same protocol could one day drive a StoryShelf build-review

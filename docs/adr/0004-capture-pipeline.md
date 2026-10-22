@@ -161,9 +161,11 @@ Review) apply on top of this.
 
 ### 6. Accessibility checks
 
-With `runA11y` the runner runs [axe-core](https://github.com/dequelabs/axe-core) in the page after
+With `runA11y` (on by default, `projects.run_a11y`; a project admin turns it off in Settings > Tests or the project API) the runner runs [axe-core](https://github.com/dequelabs/axe-core) in the page after
 the story settles and before the screenshot, once per story, mode and viewport. Results are
-annotations and never block the build.
+annotations: they are stored on the snapshot (`snapshots.a11y_violations`, a JSON array of the
+annotation strings, null when none) and shown in review, but never block the build or change its
+status.
 
 - **Ownership.** `@storyshelf/core` owns `axe-core` (exact pin) and the shared pieces under
   `capture/a11y/`, re-exported from `@storyshelf/core/capture`: a lazy, cached loader of
@@ -175,7 +177,12 @@ annotations and never block the build.
   path. The in-page functions are each one self-contained function (only their source is
   serialised) and return slim fields only (rule id, impact, help, first target, node count), never
   raw axe node html.
-- **What is scanned.** `#storybook-root` with the WCAG 2.0/2.1/2.2 A and AA tags. The story's
+- **What is scanned.** `#storybook-root` with the WCAG 2.0/2.1/2.2 A and AA tags plus axe's
+  `best-practice` tag (`options.runOnly` replaces the set). The page-level best-practice rules
+  (`region`, `landmark-one-main`, `page-has-heading-one`) only run when the whole document is in
+  scope, so the default root scan does not flag every isolated story and no rule is disabled by
+  default (measured in Chromium); a story that widens `element`/`context` to the page turns them on
+  and can switch them off through `config.rules`. The story's
   `parameters.a11y` is read from the preview (`disable: true` or `test: "off"` skip it; `config`,
   `options` and `element`/`context` apply; `test: "todo" | "error"` still only annotate). Only the
   JSON-serialisable subset is readable; `config.rules[].enabled: false` is mirrored into the run
@@ -183,7 +190,9 @@ annotations and never block the build.
 - **Annotation format.** One string per violation, worst impact first:
   `<rule> (<impact>): <help> [<selector>] <n> node(s)`, at most 10, then `…and N more`. The runner
   joins them as `a11y: a; b; …` in a render failure, so core's `startsWith("a11y:")` classification
-  and story-id sets are unchanged.
+  and story-id sets are unchanged. The runner also attaches the strings to the `RenderedSnapshot`
+  (`a11y`), the pipeline stores them as JSON on that capture's snapshot row, and the review page,
+  filmstrip and component page read them from there (`pages/a11y-violations.tsx`).
 - **No fallback.** There is no hand-rolled scan. If axe cannot be loaded or run, the result is one
   visible, non-blocking annotation `a11y: axe unavailable: <reason>` plus a warning log, never a
   silent pass.

@@ -13,7 +13,7 @@ export const projects = mysqlTable("projects", {
   storybookMeta: text("storybook_meta").$type<string | null | undefined>().default(null),
   executePlay: boolean("execute_play").notNull().default(false),
   playTimeoutMs: int("play_timeout_ms").notNull().default(10_000),
-  runA11y: boolean("run_a11y").notNull().default(false),
+  runA11y: boolean("run_a11y").notNull().default(true),
   browser: text("browser").notNull().default("chromium"),
   viewports: text("viewports"),
   browsers: text("browsers"),
@@ -22,6 +22,7 @@ export const projects = mysqlTable("projects", {
   aiProfile: text("ai_profile"),
   reviewEnabled: boolean("review_enabled").notNull().default(true),
   reviewApprovals: int("review_approvals").notNull().default(1),
+  storybookUrlTtlSeconds: int("storybook_url_ttl_seconds"),
   createdAt: datetime("created_at", { mode: "string", fsp: 3 }).notNull(),
   updatedAt: datetime("updated_at", { mode: "string", fsp: 3 }).notNull(),
 });
@@ -48,6 +49,7 @@ export interface Project {
   aiProfile: string | null;
   reviewEnabled: boolean;
   reviewApprovals: number;
+  storybookUrlTtlSeconds: number | null;
   createdAt: string;
   updatedAt: string;
 }

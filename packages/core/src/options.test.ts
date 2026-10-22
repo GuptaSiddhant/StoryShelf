@@ -95,9 +95,9 @@ function shardSized(shardSize: number, extra = {}): () => void {
   };
 }
 
-function ttl(storybookUrlTtl: number): () => void {
+function rateLimited(storybookUrlRateLimit: number): () => void {
   return () => {
-    resolveShelfOptions({ ...base, testing: { runner, storybookUrlTtl } });
+    resolveShelfOptions({ ...base, testing: { runner, storybookUrlRateLimit } });
   };
 }
 
@@ -130,12 +130,11 @@ describe("resolveShelfOptions testing process options", () => {
     );
   });
 
-  it("validates storybookUrlTtl as seconds within bounds", () => {
-    expect(ttl(7200)).not.toThrow();
-    expect(ttl(60)).not.toThrow();
-    expect(ttl(59)).toThrow(/storybookUrlTtl/u);
-    expect(ttl(86_401)).toThrow(/storybookUrlTtl/u);
-    expect(ttl(100.5)).toThrow(/storybookUrlTtl/u);
+  it("validates storybookUrlRateLimit as a positive whole number", () => {
+    expect(rateLimited(6000)).not.toThrow();
+    expect(rateLimited(1)).not.toThrow();
+    expect(rateLimited(0)).toThrow(/storybookUrlRateLimit/u);
+    expect(rateLimited(2.5)).toThrow(/storybookUrlRateLimit/u);
   });
 
   it("validates concurrency as a positive integer", () => {

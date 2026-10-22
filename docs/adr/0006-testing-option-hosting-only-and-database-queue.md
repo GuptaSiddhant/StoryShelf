@@ -63,7 +63,7 @@ interface TestingOptions {
   concurrency?: number; // jobs this instance runs at once
   shardSize?: number; // ADR 0005
   retries?: number; // default 2 (decision 11)
-  storybookUrlTtl?: number; // signed Storybook URLs (ADR 0007); default 2 hours
+  storybookUrlRateLimit?: number; // requests a minute per IP on the signed Storybook URL route (ADR 0007); default 6000
   queue?: PollableCaptureQueue; // replaces the database queue (decision 6)
   workerEntry?: string; // forked capture (decision 5)
   mode?: "auto" | "in-process" | "fork";

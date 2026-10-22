@@ -1,5 +1,6 @@
 import type { Auth } from "@storyshelf/core/auth";
 import type { AuthUser } from "@storyshelf/core/types";
+import { STORYBOOK_TOKEN_PREFIX } from "@storyshelf/core/utils";
 import type { Context, Next } from "hono";
 import { getStore } from "../store.ts";
 
@@ -21,7 +22,7 @@ export async function resolveRequestUser(
  * Gate the server-rendered UI behind auth (ADR 0008): unauthenticated HTML
  * requests redirect to login. API/auth routes answer 401/403 themselves, and
  * published-Storybook routes enforce their own auth (public builds are
- * viewable without a session, ADR 0011), and `/s/<token>` is answered by its signed token
+ * viewable without a session, ADR 0011), and `/_s/<token>` is answered by its signed token
  * alone (ADR 0007).
  */
 export function authGate() {
@@ -35,7 +36,7 @@ export function authGate() {
       path.startsWith("/api/") ||
       path.startsWith("/auth/") ||
       path.startsWith("/assets/") ||
-      path.startsWith("/s/") ||
+      path.startsWith(STORYBOOK_TOKEN_PREFIX) ||
       path.startsWith("/.well-known/") ||
       (path.startsWith("/projects/") && path.includes("/storybook")) ||
       /^\/projects\/[^/]+\/?$/u.test(path)

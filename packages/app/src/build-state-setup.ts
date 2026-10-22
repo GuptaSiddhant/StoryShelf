@@ -89,6 +89,7 @@ async function alertAdmins(
       logger: runtime.logger,
       notifiers: runtime.notifiers,
       notificationsConfig: options.notifications?.config,
+      publicOrigin: runtime.publicOrigin,
     },
     "sys:notify-failed",
     {

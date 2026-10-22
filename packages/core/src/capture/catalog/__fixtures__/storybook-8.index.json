@@ -41,6 +41,14 @@
       "importPath": "./src/Accessibility.stories.tsx",
       "tags": ["dev", "test"]
     },
+    "components-accessibility--best-practice": {
+      "type": "story",
+      "id": "components-accessibility--best-practice",
+      "name": "Best Practice",
+      "title": "Components/Accessibility",
+      "importPath": "./src/Accessibility.stories.tsx",
+      "tags": ["dev", "test"]
+    },
     "components-button--primary": {
       "type": "story",
       "id": "components-button--primary",

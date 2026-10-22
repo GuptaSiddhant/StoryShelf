@@ -159,6 +159,7 @@ function buildStateFor(
       notifiers,
       secret: SECRET,
       config: {},
+      publicOrigin: async () => await Promise.resolve("https://shelf.example.com"),
       flags: () => ({ testing: true, review: false }),
       logger: createShelfLogger({ level: "silent" }),
     },

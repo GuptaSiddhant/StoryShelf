@@ -57,7 +57,7 @@ function storeFor(db: ReturnType<typeof makeDatabase>["db"], notifiers: Notifier
   return {
     db,
     storage,
-    config: { secret: SECRET },
+    config: { secret: SECRET, publicBaseUrl: "https://shelf.example.com" },
     ui: {},
     logger: pino({ level: "silent" }),
     user: null,
@@ -267,7 +267,7 @@ describe("notifyProject", () => {
     });
   });
 
-  it("links to the resolved public origin, and leaves the link out when none is known", async () => {
+  it("links to the resolved public origin", async () => {
     const { db } = makeDatabase();
     await seedProject(db);
     await new NotificationChannelModel(db, undefined, SECRET).create({
@@ -280,10 +280,45 @@ describe("notifyProject", () => {
     expect(await deliver({ ...storeFor(db, []), publicOrigin: detected as never })).toContain(
       "https://detected.example.com/projects/test-project/builds/b1",
     );
-    const none = { url: async () => await Promise.resolve("") };
-    expect(await deliver({ ...storeFor(db, []), publicOrigin: none as never })).not.toContain(
-      "/projects/test-project/builds/b1",
-    );
+  });
+
+  it("is paused while no public origin resolves: nothing is sent, the channel is not errored, one log line", async () => {
+    const { db } = makeDatabase();
+    await seedProject(db);
+    const channel = await new NotificationChannelModel(db, undefined, SECRET).create({
+      projectId: "p1",
+      provider: "log",
+      config: {},
+      events: ["build:created"],
+    });
+    const lines: string[] = [];
+    const logger = pino({ level: "warn" }, { write: (line: string) => lines.push(line) });
+    let origin: string | undefined;
+    const resolver = { url: async () => await Promise.resolve(origin) } as never;
+    const sent: unknown[] = [];
+    const store = {
+      ...storeFor(db, [recordingProvider("log", sent)]),
+      logger,
+      config: { secret: SECRET },
+      publicOrigin: resolver,
+    };
+    await runWithStore(store, async () => {
+      await notifyProject({ id: "p1", slug: "test-project" }, "build:created", {}, "/builds/b1");
+      await notifyProject({ id: "p1", slug: "test-project" }, "build:created", {}, "/builds/b1");
+      await notifySystem("sys:purge-completed", { removedBuilds: 3 });
+    });
+    expect(sent).toHaveLength(0);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain("Notifications are paused until a public URL is set");
+    expect(
+      (await new NotificationChannelModel(db, undefined, SECRET).get(channel.id))?.lastError,
+    ).toBeNull();
+
+    origin = "https://shelf.example.com";
+    await runWithStore(store, async () => {
+      await notifyProject({ id: "p1", slug: "test-project" }, "build:created", {}, "/builds/b1");
+    });
+    expect(sent).toHaveLength(1);
   });
 
   it("is a no-op without wired notifiers", async () => {

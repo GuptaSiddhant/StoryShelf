@@ -42,6 +42,7 @@ export class ProjectModel {
       gitDefaultBranch: input.gitDefaultBranch ?? "main",
       storybookMeta: input.storybookMeta ? JSON.stringify(input.storybookMeta) : null,
       ...(input.executePlay === undefined ? {} : { executePlay: input.executePlay }),
+      ...(input.runA11y === undefined ? {} : { runA11y: input.runA11y }),
       ...(input.playTimeoutMs === undefined ? {} : { playTimeoutMs: input.playTimeoutMs }),
       ...(input.reviewEnabled === undefined ? {} : { reviewEnabled: input.reviewEnabled }),
       ...(input.reviewApprovals === undefined ? {} : { reviewApprovals: input.reviewApprovals }),
@@ -122,6 +123,8 @@ export interface ProjectCreateInput {
   storybookMeta?: unknown;
   /** Run Storybook `play` functions during capture (opt-in; default false). */
   executePlay?: boolean;
+  /** Run axe accessibility checks during capture (column default true when omitted). */
+  runA11y?: boolean;
   /** Per-story play timeout in milliseconds (column default applies when omitted). */
   playTimeoutMs?: number;
   /** Review switch (column default true when omitted; ADR 0013, decision 1). */

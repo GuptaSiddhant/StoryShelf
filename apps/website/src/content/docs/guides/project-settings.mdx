@@ -20,14 +20,21 @@ Name, `git_repository` (`owner/repo`), `git_default_branch` (baseline fallback, 
 
 ## Capture
 
-Which engines each build is captured on and which [modes](/guides/modes/) run. **Browsers**: a primary target plus up to two more (`browsers` via `PATCH`, primary first), chosen from the targets the runner has ready (unavailable ones are listed with the reason and refused on save); each target keeps its own baselines, and one approval covers a story and mode on all of them. **Mode allowlist**: mode names to run (`modesAllowlist`); empty runs every mode declared in your stories' parameters.
+Which engines each build is captured on and which [modes](/guides/modes/) run. **Browsers**: a primary target plus up to two more (`browsers` via `PATCH`, primary first), chosen from the targets the runner has ready (unavailable ones are listed with the reason and refused on save); each target keeps its own baselines, and one approval covers a story and mode on all of them. **Mode allowlist**: mode names to run (`modesAllowlist`); empty runs every mode declared in your stories' parameters. **Signed Storybook URL lifetime** (`storybookUrlTtlSeconds`, whole seconds from 60 to 86400, project admins): how long the URL given to a remote browser that cannot route back to the server stays valid ([Remote browsers](/guides/remote-browsers/#signed-storybook-urls)); empty derives it from the build's size, between 2 and 24 hours.
+
+## Tests
+
+With `testing` on, **Settings → Tests** (project admins; `executePlay`, `playTimeoutMs` and `runA11y` on `PATCH /api/v1/projects/:slug`, also accepted on create):
+
+- **Interaction tests** (`executePlay`, default off): run each story's `play` function before the screenshot; a failing `play` blocks the build. See [Interaction testing](/guides/interaction-testing/).
+- **Accessibility checks (axe)** (`runA11y`, default **on**): every captured story is scanned with axe-core (WCAG A/AA and best-practice rules, honouring `parameters.a11y`). Violations are shown with the snapshot in [review](/guides/review/#accessibility-results) and on the component page and never block a build. Turn it off to skip the scan and its cost (about 150 ms per story and viewport). Projects created before this setting existed keep the value their database holds.
 
 ## Review
 
 Under **General → Review**, or `reviewEnabled` and `reviewApprovals` on `PATCH /api/v1/projects/:slug` (project admins):
 
 - **Review builds before they are accepted** (`reviewEnabled`, default on). With review on, a build on a non-default branch of a project without `testing` waits as `pending` for a build-level verdict, and comments, story comments, the changeset and the verdict controls are available. With review off the build is accepted when publishing ends and the review routes answer 404 for the project (nothing is deleted; turning review on again shows it all). Saving the form or the API call that turns review off also accepts the project's `pending` builds that no capture worked on, in one pass, and raises no approval event.
-- **Approvals required** (`reviewApprovals`, default 1, 1 to 20): how many reviewers must approve a build before it is approved when `testing` is off. A rejection always rejects.
+- **Approvals required** (`reviewApprovals`, default 1, 1 to 20): how many reviewers must approve a build before it is approved when `testing` is off. A rejection always rejects. On an instance without authentication, verdicts count as one anonymous reviewer, so a value above 1 cannot be met there (see [Review](/guides/review/#verdicts)).
 
 The default branch is never held. The review form is reachable while review is off, so a project can always turn it back on. See [Review](/guides/review/#review-without-screenshots).
 

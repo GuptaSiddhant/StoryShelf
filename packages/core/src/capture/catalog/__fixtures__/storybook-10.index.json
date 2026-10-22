@@ -51,6 +51,16 @@
       "tags": ["dev", "test", "manifest"],
       "exportName": "RuleOverride"
     },
+    "components-accessibility--best-practice": {
+      "type": "story",
+      "subtype": "story",
+      "id": "components-accessibility--best-practice",
+      "name": "Best Practice",
+      "title": "Components/Accessibility",
+      "importPath": "./src/Accessibility.stories.tsx",
+      "tags": ["dev", "test", "manifest"],
+      "exportName": "BestPractice"
+    },
     "components-button--primary": {
       "type": "story",
       "subtype": "story",

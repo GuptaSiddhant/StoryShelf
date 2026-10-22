@@ -23,6 +23,7 @@ import type { AuthUser } from "@storyshelf/core/types";
 import type { SecretInput } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import { credentialKeys } from "../credential-keys.ts";
+import { notificationsPaused } from "../notifications-pause.ts";
 import {
   renderProjectSettingsPage,
   type SettingsFormState,
@@ -342,6 +343,7 @@ export async function renderSettingsPage(
       notifyProviders: data.notifyProviders,
       mySubscription: data.mySubscription,
       isAdmin: data.isAdmin,
+      notificationsPaused: data.notifyProviders.length > 0 && (await notificationsPaused()),
       ai: aiSettingsData(c),
       targets: await runnerTargets(),
     },

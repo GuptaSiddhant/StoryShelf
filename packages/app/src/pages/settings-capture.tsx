@@ -1,12 +1,14 @@
 import { isCaptureTarget, type RunnerTarget } from "@storyshelf/core/adapter/capture-runner";
 import { MAX_BROWSERS, parseBrowsers, parseModesAllowlist } from "@storyshelf/core/capture";
 import type { Project } from "@storyshelf/core/schema";
+import { MAX_STORYBOOK_URL_TTL, MIN_STORYBOOK_URL_TTL } from "@storyshelf/core/utils";
 import type { HtmlEscapedString } from "hono/utils/html";
 import {
   Alert,
   Button,
   Card,
   CheckField,
+  Field,
   FormActions,
   Meta,
   SectionTitle,
@@ -53,6 +55,44 @@ function BrowserFields(props: {
   );
 }
 
+/** One mode name per line; empty runs every declared mode. */
+function AllowlistField(props: {
+  allowlist: string[];
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
+  return (
+    <TextareaField
+      label="Mode allowlist"
+      name="modesAllowlist"
+      rows={4}
+      value={props.allowlist.join("\n")}
+      placeholder="dark&#10;mobile"
+      hint="One mode name per line. Empty runs every mode declared in your stories' parameters."
+    />
+  );
+}
+
+/** The project's override of the signed Storybook URL lifetime (ADR 0007, decision 5). */
+function UrlLifetimeField(props: {
+  project: Project;
+  disabled: boolean;
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const { project, disabled } = props;
+  return (
+    <Field
+      label="Signed Storybook URL lifetime (seconds)"
+      name="storybookUrlTtlSeconds"
+      type="number"
+      step="1"
+      min={String(MIN_STORYBOOK_URL_TTL)}
+      max={String(MAX_STORYBOOK_URL_TTL)}
+      value={project.storybookUrlTtlSeconds ? String(project.storybookUrlTtlSeconds) : ""}
+      placeholder="Derived from the stories"
+      disabled={disabled}
+      hint={`How long the URL given to a remote browser that cannot reach this server stays valid (${MIN_STORYBOOK_URL_TTL} to ${MAX_STORYBOOK_URL_TTL}). Empty derives it from the build's size: at least 2 hours, at most 24.`}
+    />
+  );
+}
+
 /** Capture settings tab: engines to capture on and the mode allowlist. */
 export function renderSettingsCapture(
   project: Project,
@@ -83,14 +123,8 @@ export function renderSettingsCapture(
         <form method="post" action={action} hx-post={action} hx-target="body" hx-swap="outerHTML">
           {csrfField()}
           <BrowserFields primary={primary} extras={extras} disabled={!isAdmin} targets={targets} />
-          <TextareaField
-            label="Mode allowlist"
-            name="modesAllowlist"
-            rows={4}
-            value={allowlist.join("\n")}
-            placeholder="dark&#10;mobile"
-            hint="One mode name per line. Empty runs every mode declared in your stories' parameters."
-          />
+          <AllowlistField allowlist={allowlist} />
+          <UrlLifetimeField project={project} disabled={!isAdmin} />
           {isAdmin ? (
             <FormActions>
               <Button variant="primary" type="submit" icon="check">

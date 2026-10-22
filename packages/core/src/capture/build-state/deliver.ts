@@ -3,20 +3,17 @@
  * ({@link statusesForBuild}), write it. Reading at delivery time is what makes a retried, delayed
  * or reordered request harmless (ADR 0014, decision 7).
  */
-import {
-  channelPrefix,
-  statusesForBuild,
-  writeBuildState,
-  type PublishingState,
-} from "../../adapters/notifier/index.ts";
+import { channelPrefix, statusesForBuild, writeBuildState } from "../../adapters/notifier/index.ts";
 import { isStateProvider } from "../../adapters/notifier/provider.ts";
+import { latestVerdicts } from "../../models/build-review-status.ts";
+import { BuildReviewModel } from "../../models/build-review.ts";
 import { BuildModel } from "../../models/build.ts";
 import { NotificationChannelModel } from "../../models/notification-channel.ts";
 import { ProjectModel } from "../../models/project.ts";
 import type { Build } from "../../schema/build.ts";
 import type { Project } from "../../schema/project.ts";
 import { createUrlBuilder } from "../../urls.ts";
-import { storybookDir } from "../../utils/paths.ts";
+import { publishingOf } from "../publish/published.ts";
 import type { BuildStateDeps, SkipReason, StateTarget } from "./types.ts";
 
 /**
@@ -28,14 +25,16 @@ export async function deliverBuildState(
   ids: { buildId: string; channelId: string },
 ): Promise<"delivered" | SkipReason> {
   const loaded = await loadBuild(deps, ids.buildId);
-  if (loaded === null) {
-    return "no-build";
+  // The origin can disappear between queueing and running (a cleared setting): nothing is shown.
+  const origin = loaded === null ? undefined : await deps.publicOrigin();
+  if (loaded === null || !origin) {
+    return loaded === null ? "no-build" : "no-origin";
   }
   const target = await loadTarget(deps, ids.channelId, loaded.project.id);
   if (typeof target === "string") {
     return target;
   }
-  await writeTo(deps, loaded, target);
+  await writeTo(deps, loaded, { target, origin });
   return "delivered";
 }
 
@@ -49,21 +48,22 @@ export async function loadBuild(
   return build && project ? { build, project } : null;
 }
 
-/** Write `target`'s view of the build; throws on a refused status. */
+/** Write `target`'s view of the build, linking to `origin`; throws on a refused status. */
 export async function writeTo(
   deps: BuildStateDeps,
   loaded: { build: Build; project: Project },
-  target: StateTarget,
+  where: { target: StateTarget; origin: string },
 ): Promise<void> {
   const { build, project } = loaded;
-  const origin = deps.publicOrigin ? await deps.publicOrigin() : deps.config.publicBaseUrl;
+  const { target, origin } = where;
   const states = statusesForBuild({
     build,
     projectSlug: project.slug,
     prefix: channelPrefix(target.channel),
-    urls: origin ? createUrlBuilder(origin, deps.config.publishedBaseDomain) : null,
+    urls: createUrlBuilder(origin, deps.config.publishedBaseDomain),
     flags: deps.flags(project),
-    publishing: await publishingOf(deps, build),
+    publishing: await publishingOf(deps.storage, build),
+    approvals: await approvalsOf(deps, build, project),
   });
   if (states.statuses.length === 0) {
     deps.logger.info({ buildId: build.id }, "no commit to show a state on");
@@ -129,16 +129,19 @@ function channelModel(deps: BuildStateDeps): NotificationChannelModel {
   );
 }
 
-/**
- * Whether the build's Storybook is published: its manifest is written last, so its presence means
- * done. A `failed` build without one failed to publish (or never uploaded); any other build waits.
- */
-async function publishingOf(deps: BuildStateDeps, build: Build): Promise<PublishingState> {
-  const published =
-    deps.storage !== undefined &&
-    (await deps.storage.exists(`${storybookDir(build.projectId, build.id)}/manifest.json`));
-  if (published) {
-    return "success";
+/** Approval progress for `<prefix>/review`; only read when that status is the gate. */
+async function approvalsOf(
+  deps: BuildStateDeps,
+  build: Build,
+  project: Project,
+): Promise<{ given: number; required: number } | undefined> {
+  const flags = deps.flags(project);
+  if (flags.testing || !flags.review) {
+    return undefined;
   }
-  return build.status === "failed" ? "failure" : "pending";
+  const reviews = latestVerdicts(await new BuildReviewModel(deps.db).listByBuild(build.id));
+  return {
+    given: reviews.filter((review) => review.verdict === "approved").length,
+    required: Math.max(1, project.reviewApprovals ?? 1),
+  };
 }

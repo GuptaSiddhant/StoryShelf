@@ -15,15 +15,15 @@ import { createShelfLogger, type Logger } from "../../logger.ts";
 import { createNotifyEnqueuer } from "../build-state/notify-job.ts";
 import { createBuildStatePublisher } from "../build-state/publisher.ts";
 import type { BuildStatePublisher } from "../build-state/types.ts";
-import { createCaptureHandler, type CaptureHandlerOptions } from "../consumer/capture-handler.ts";
+import {
+  createCaptureHandler,
+  originOf,
+  type CaptureHandlerOptions,
+} from "../consumer/capture-handler.ts";
 import { applyImageSettings, ensureImageEngine } from "../consumer/startup.ts";
 import type { CaptureConsumerOptions, ConsumerJob, KindHandler } from "../consumer/types.ts";
 import { createDatabaseCaptureQueue, DEFAULT_RETRIES } from "../db-queue/index.ts";
-import {
-  CAPTURE_RETRIES_ENV,
-  CAPTURE_SHARD_SIZE_ENV,
-  CAPTURE_STORYBOOK_URL_TTL_ENV,
-} from "./fork.ts";
+import { CAPTURE_RETRIES_ENV, CAPTURE_SHARD_SIZE_ENV } from "./fork.ts";
 import { isParentMessage, type ChildMessage } from "./protocol.ts";
 
 /** Handler options minus the shard hand-out, which the child wires to the database queue. */
@@ -118,7 +118,6 @@ function buildHandler(
     secret: options.secret,
     viewports: options.viewports,
     shardSize: options.shardSize ?? positiveInt(env[CAPTURE_SHARD_SIZE_ENV]),
-    storybookUrlTtl: options.storybookUrlTtl ?? positiveInt(env[CAPTURE_STORYBOOK_URL_TTL_ENV]),
     maxRetries,
     enqueue: async (job) => {
       await queue.enqueue(job);
@@ -140,6 +139,7 @@ function notifyJobsPublisher(
       notifiers: options.notifiers ?? [],
       secret: options.secret,
       config: options.config ?? {},
+      publicOrigin: originOf(options),
       flags: () => ({ testing: true, review: false }),
       logger,
     },

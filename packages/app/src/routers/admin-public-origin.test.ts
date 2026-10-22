@@ -1,6 +1,13 @@
 import { createShelfLogger } from "@storyshelf/core/logger";
-import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
-import { describe, expect, it } from "vitest";
+import { NotificationChannelModel } from "@storyshelf/core/models";
+import {
+  createTestBuild,
+  createTestProject,
+  makeDatabase,
+  makeFakeStateNotifier,
+  makeStorage,
+} from "@storyshelf/core/test-helpers";
+import { describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "../index.tsx";
 import { stubAuth } from "../stub-auth.ts";
 
@@ -10,6 +17,7 @@ const ORIGIN = "https://shelf.example.com";
 async function seedApp(options: {
   config?: Record<string, unknown>;
   role?: "admin" | "member" | null;
+  notifiers?: NonNullable<Parameters<typeof createShelfApp>[0]["notifications"]>["notifiers"];
 }) {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
@@ -19,6 +27,7 @@ async function seedApp(options: {
     storage,
     logger: silent,
     config: { secret: "origin-test-secret", ...options.config },
+    ...(options.notifiers ? { notifications: { notifiers: options.notifiers } } : {}),
     ...(role ? { auth: stubAuth({ id: "u1", email: "a@b.c", name: "A", role }) } : {}),
   });
   await app.lifecycle.setup();
@@ -150,5 +159,57 @@ describe("public origin on the System page", () => {
     expect(html).not.toContain("data-report-origin");
     const token = await csrfFrom(app);
     expect((await report(app, token, { origin: ORIGIN })).status).toBe(204);
+  });
+});
+
+describe("notifications without a public origin", () => {
+  const paused = "Notifications are paused until a public URL is set";
+
+  it("warns on the System page while notifiers are wired and no origin resolves", async () => {
+    const git = makeFakeStateNotifier();
+    const app = await seedApp({ notifiers: [git.provider] });
+    expect(await (await app.request("/admin")).text()).toContain(paused);
+  });
+
+  it("stays quiet with an origin, or with no notifier wired", async () => {
+    const git = makeFakeStateNotifier();
+    const withOrigin = await seedApp({
+      notifiers: [git.provider],
+      config: { publicBaseUrl: ORIGIN },
+    });
+    expect(await (await withOrigin.request("/admin")).text()).not.toContain(paused);
+    const noNotifiers = await seedApp({});
+    expect(await (await noNotifiers.request("/admin")).text()).not.toContain(paused);
+  });
+
+  it("asks again for the state of open builds once an admin confirms an origin", async () => {
+    const git = makeFakeStateNotifier();
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const app = createShelfApp({
+      database: db,
+      storage,
+      logger: silent,
+      config: { secret: "origin-test-secret" },
+      auth: stubAuth({ id: "u1", email: "a@b.c", name: "A", role: "admin" }),
+      notifications: { notifiers: [git.provider] },
+    });
+    await app.lifecycle.setup();
+    const project = await createTestProject(db, db.tables);
+    const build = await createTestBuild(db, db.tables, project.id);
+    await new NotificationChannelModel(db, undefined, "origin-test-secret").create({
+      projectId: project.id,
+      provider: "fake-git",
+      config: {},
+      secret: "token",
+    });
+    const { requestBuildState } = await import("../git-status.ts");
+    expect(requestBuildState).toBeTypeOf("function");
+    const token = await csrfFrom(app);
+    await form(app, "/admin/public-origin", token, ORIGIN);
+    await vi.waitFor(() => {
+      expect(git.calls.length).toBeGreaterThan(0);
+    });
+    expect(git.calls[0]?.url).toBe(`${ORIGIN}/projects/${project.slug}/builds/${build.id}`);
   });
 });

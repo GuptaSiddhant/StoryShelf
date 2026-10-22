@@ -2,6 +2,7 @@
  * Build-level verdicts (ADR 0013, decision 3): giving one and reading where a build stands. The
  * routes are classed `review`, so `requireReview` answers 404 for a project with review off.
  */
+import { publishingOf } from "@storyshelf/core/capture";
 import {
   BuildModel,
   BuildReviewModel,
@@ -53,9 +54,7 @@ export async function giveVerdict(
   userId: string | null,
   input: { verdict: ReviewVerdict; body?: string | undefined },
 ): Promise<BuildReview> {
-  if (build.status === "failed") {
-    throw new HTTPException(409, { message: "The build failed; there is nothing to review" });
-  }
+  await assertReviewable(project, build, userId);
   const review = await new BuildReviewModel(getStore().db).add(
     build.id,
     userId,
@@ -76,13 +75,40 @@ export async function giveVerdict(
     },
     build.id,
   );
-  // Only a decision is news; a build sent back to `pending` just shows its new state on the host.
-  if (status === null || status === "pending") {
+  // Every move is news: `approved` and `rejected` as ever, and `pending` when a rewritten verdict
+  // sends the build back; a verdict that moves nothing only refreshes the git channels.
+  if (status === null) {
     await requestBuildState(build.id);
   } else {
     await announceBuildStatus(build.id, status);
   }
   return review;
+}
+
+/**
+ * A verdict needs a build that is not `failed`, whose publishing has ended (a publish that later
+ * failed would otherwise leave an approved build without statics), and, when it has no user (an
+ * instance without authentication), a project that needs one approval: the anonymous reviewer is
+ * one person, however many verdicts they give.
+ */
+async function assertReviewable(
+  project: Project,
+  build: Build,
+  userId: string | null,
+): Promise<void> {
+  if (build.status === "failed") {
+    throw new HTTPException(409, { message: "The build failed; there is nothing to review" });
+  }
+  if ((await publishingOf(getStore().storage, build)) !== "success") {
+    throw new HTTPException(409, {
+      message: "The build is still publishing; give a verdict once its Storybook is published",
+    });
+  }
+  if (userId === null && approvalsRequired(project) > 1) {
+    throw new HTTPException(409, {
+      message: `Verdicts without authentication count as one reviewer, but this project needs ${String(approvalsRequired(project))} approvals; enable authentication to review`,
+    });
+  }
 }
 
 /** Move the build to the status its verdicts give it; the new status, or null when it did not move. */

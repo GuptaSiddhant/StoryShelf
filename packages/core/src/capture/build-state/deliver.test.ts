@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { BuildReviewModel } from "../../models/build-review.ts";
 import { storybookDir } from "../../utils/paths.ts";
 import { deliverBuildState, stateTargets } from "./deliver.ts";
 import { statusLog, world } from "./test-world.ts";
@@ -19,7 +20,7 @@ describe("deliverBuildState", () => {
     expect(w.git.secrets).toEqual(["ghp_token"]);
   });
 
-  it("links with the resolved public origin, which wins over the configured base URL", async () => {
+  it("links with the resolved public origin", async () => {
     const w = await world();
     const deps = {
       ...w.deps,
@@ -31,21 +32,16 @@ describe("deliverBuildState", () => {
     );
   });
 
-  it("omits every link and the comment while no public origin is known", async () => {
+  it("writes nothing while no public origin is resolved", async () => {
     const w = await world();
-    const deps = {
-      ...w.deps,
-      config: {},
-      // An empty origin counts as none.
-      publicOrigin: async () => await Promise.resolve(""),
-    };
-    await deliverBuildState(deps, { buildId: w.build.id, channelId: w.channelId });
-    expect(statusLog(w.git)).toEqual([
-      ["storyshelf/testing", "pending"],
-      ["storyshelf/storybook", "pending"],
-    ]);
-    expect(w.git.calls.map((call) => call.url)).toEqual([undefined, undefined]);
-    expect(w.git.calls.some((call) => call.target.kind === "comment")).toBe(false);
+    const results = await Promise.all(
+      [undefined, ""].map(async (origin) => {
+        const deps = { ...w.deps, publicOrigin: async () => await Promise.resolve(origin) };
+        return await deliverBuildState(deps, { buildId: w.build.id, channelId: w.channelId });
+      }),
+    );
+    expect(results).toEqual(["no-origin", "no-origin"]);
+    expect(w.git.calls).toEqual([]);
   });
 
   it("reads the build as it is now", async () => {
@@ -81,6 +77,36 @@ describe("deliverBuildState", () => {
       { buildId: w.build.id, channelId: w.channelId },
     );
     expect(statusLog(w.git)).toEqual([["storyshelf/storybook", "pending"]]);
+  });
+
+  it("shows approval progress on the review status", async () => {
+    const w = await world();
+    await w.db.update(w.db.tables.projects, w.project.id, { reviewApprovals: 2 });
+    await new BuildReviewModel(w.db).add(w.build.id, "u1", "approved");
+    await new BuildReviewModel(w.db).add(w.build.id, "u2", "approved");
+    await new BuildReviewModel(w.db).add(w.build.id, "u2", "rejected");
+    await deliverBuildState(
+      { ...w.deps, flags: () => ({ testing: false, review: true }) },
+      { buildId: w.build.id, channelId: w.channelId },
+    );
+    expect(w.git.calls[0]).toMatchObject({
+      state: "pending",
+      target: { description: "Waiting for approvals: 1 of 2" },
+    });
+  });
+
+  it("closes the review status after the switch-off pass accepted the build", async () => {
+    const w = await world();
+    await w.builds.setStatus(w.build.id, "approved");
+    await deliverBuildState(
+      { ...w.deps, flags: () => ({ testing: false, review: false }) },
+      { buildId: w.build.id, channelId: w.channelId },
+    );
+    expect(statusLog(w.git)).toEqual([
+      ["storyshelf/review", "success"],
+      ["storyshelf/storybook", "pending"],
+    ]);
+    expect(w.git.calls[0]?.target).toMatchObject({ description: "Review is off" });
   });
 
   it("writes nothing for a local identity", async () => {

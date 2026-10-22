@@ -50,12 +50,12 @@ Review is the place where people comment on a build and sign it off. It works wh
 
 Review is a per-project switch (`reviewEnabled`, on by default) edited by project admins in **Settings → General → Review** or with `PATCH /api/v1/projects/:slug`; see [Project settings](/guides/project-settings/#review). With review on, a project has these four combinations:
 
-| `testing` | review | A build                                                                                                                                       |
-| --------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| off       | off    | Accepted when publishing finishes. No comments, no verdicts, no review status.                                                                |
-| off       | on     | Default branch: accepted when publishing finishes. Other branches: `pending` until verdicts decide it, `<prefix>/review` status.             |
-| on        | off    | Snapshot approval alone decides; comments and verdict routes answer 404.                                                                      |
-| on        | on     | Snapshot approval decides, plus comments, the changeset and a build-level sign-off that does not gate.                                        |
+| `testing` | review | A build                                                                                                                          |
+| --------- | ------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| off       | off    | Accepted when publishing finishes. No comments, no verdicts, no review status.                                                   |
+| off       | on     | Default branch: accepted when publishing finishes. Other branches: `pending` until verdicts decide it, `<prefix>/review` status. |
+| on        | off    | Snapshot approval alone decides; comments and verdict routes answer 404.                                                         |
+| on        | on     | Snapshot approval decides, plus comments, the changeset and a build-level sign-off that does not gate.                           |
 
 The default branch is never held, so the project's Storybook link always resolves. A pending build is not the project's latest accepted build: the Storybook link keeps serving the previous accepted build until this one is approved, while the build's own page and its published Storybook (`/projects/:slug/storybook/build/:id/`, or the `/_/:id` short link) open for anyone who may view the project, whatever the build's status.
 
@@ -77,6 +77,10 @@ A build's page is the review workspace for a project without `testing`, and with
 - **Changes in this build.** The components the build added, removed or changed against its baseline, each with a link to the published story and to its component page (see [the changeset](#the-changeset)).
 - **Comments.** Build comments and story comments with their anchor, resolve actions, and a form to add a build comment (`developer` and above).
 
+### Accessibility results
+
+With `testing` on and the project's accessibility checks on (`runA11y`, the default), the axe findings of each capture are stored on its snapshot (`a11yViolations`, a JSON array of one line per violation: rule id, impact, help, a short selector, node count). The snapshot review page lists them in a warning note above the comparison, the filmstrip entry shows `a11y N`, and the component page lists them on each snapshot card. They are information for the reviewer: a violation never changes a snapshot's or a build's status and never blocks a merge. See [the runners](/packages/runner-playwright/#accessibility-checks-axe) for what is scanned.
+
 ### Verdicts
 
 Approvers and admins give a build a verdict, `approved` or `rejected`, with an optional note:
@@ -84,9 +88,11 @@ Approvers and admins give a build a verdict, `approved` or `rejected`, with an o
 - `POST /api/v1/projects/:slug/builds/:id/reviews { verdict, body? }`
 - `GET /api/v1/projects/:slug/builds/:id/reviews` (any viewer): each reviewer's latest verdict, the approvals against the requirement, and the full history.
 
-A reviewer's newest verdict counts, so rewriting one is another `POST`. With `testing` off the build is `approved` once the project's required approvals (`reviewApprovals`, default 1) are present among the reviewers' latest verdicts and none of those is `rejected`; it is `rejected` when any is, and `pending` otherwise (for example when a rejecting reviewer rewrites to an approval and too few approvals remain). Each reviewer counts once. A failed build answers 409. Verdicts written with a bearer token carry no user and count as a single reviewer, so a project that requires more than one approval needs approvals from signed-in users.
+A reviewer's newest verdict counts, so rewriting one is another `POST`. With `testing` off the build is `approved` once the project's required approvals (`reviewApprovals`, default 1) are present among the reviewers' latest verdicts and none of those is `rejected`; it is `rejected` when any is, and `pending` otherwise (for example when a rejecting reviewer rewrites to an approval and too few approvals remain). Each reviewer counts once. A failed build answers 409, and so does a build whose publishing has not ended: a verdict is accepted once the build's Storybook is published (the build page and the API say "still publishing" until then), and a build whose publish failed is `failed` and not reviewable.
 
-A verdict that approves or rejects the build fires the usual `build:approved` / `build:rejected` webhook and notifications, and every verdict fires `review:verdict`. Accepting a build automatically (default branch, or any branch with review off) fires no approval event.
+**Who gave the verdict.** A verdict is attributed to a user. In the UI that is the signed-in user; with the API it is the user who owns the token, so a CI token created by a reviewer approves as that reviewer. A caller that is no user, such as the bootstrap admin token or a token without an owner, gets 403 when authentication is on. Only an instance with **no authentication configured at all** records a verdict without a user, as one anonymous reviewer; that only works while the project requires **one** approval (`reviewApprovals` of 1). With a higher requirement the anonymous verdict is refused with 409, because one anonymous reviewer could never supply a second approval: enable authentication to review such a project.
+
+A verdict that approves or rejects the build, or that sends it back to `pending` (a rejecting reviewer rewrites to an approval and too few approvals remain), fires the matching `build:approved` / `build:rejected` / `build:pending` webhook and notifications, and every verdict fires `review:verdict`. Accepting a build automatically (default branch, or any branch with review off) fires no approval event.
 
 ### The changeset
 
@@ -100,17 +106,17 @@ On a [component page](#component-pages), the **Stories** tab shows the comments 
 
 ### Statuses
 
-The build's git channels show `<prefix>/review` (`pending`, then `success` or `failure` from the verdict) when `testing` is off and review is on, next to the informational `<prefix>/storybook` that links the published Storybook. With `testing` on, `<prefix>/testing` stays the only gating status; review never adds a second required check. See [Merge gate setup](/guides/merge-gate/).
+The build's git channels show `<prefix>/review` (`pending`, then `success` or `failure` from the verdict) when `testing` is off and review is on. While the build waits for several approvals the description shows the progress (`Waiting for approvals: 1 of 2`). When review is turned off, accepted builds show a final `success` (`Review is off`), so a pull request is not left with a `pending` review status. These statuses sit next to the informational `<prefix>/storybook` that links the published Storybook. With `testing` on, `<prefix>/testing` stays the only gating status; review never adds a second required check. See [Merge gate setup](/guides/merge-gate/).
 
 ### Events
 
 Review raises three [webhook](/guides/webhooks/) and [notification](/guides/notifications/) topics:
 
-| Event              | When                                                                                          |
-| ------------------ | --------------------------------------------------------------------------------------------- |
+| Event              | When                                                                                                      |
+| ------------------ | --------------------------------------------------------------------------------------------------------- |
 | `review:requested` | A published build waits for a verdict (review on, `testing` off). On by default for approvers and admins. |
-| `review:comment`   | A build or story comment is posted. Snapshot comments keep `comment:created`.                |
-| `review:verdict`   | A reviewer approves or rejects a build.                                                       |
+| `review:comment`   | A build or story comment is posted. Snapshot comments keep `comment:created`.                             |
+| `review:verdict`   | A reviewer approves or rejects a build.                                                                   |
 
 ### Builds nobody finishes
 

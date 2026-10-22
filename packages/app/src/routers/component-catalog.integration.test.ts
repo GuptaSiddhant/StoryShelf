@@ -6,12 +6,13 @@ import {
   makeDatabase,
   makeStorage,
 } from "@storyshelf/core/test-helpers";
-import { storybookDir } from "@storyshelf/core/utils";
+import { storybookDir, verifyStorybookToken } from "@storyshelf/core/utils";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
 import { stubAuth } from "../stub-auth.ts";
 import { stubRunner } from "../test-runner.ts";
+import { PREVIEW_TOKEN_TTL } from "./preview-base.ts";
 
 type Entries = Record<string, [title: string, name: string, file: string, type?: string]>;
 
@@ -30,7 +31,9 @@ function indexOf(entries: Entries): unknown {
 const BUTTON = "./src/Button.stories.tsx";
 
 /** Three builds of `main`: b1 has Button (2 stories) and Old; b2 adds a story, renames one, moves Card. */
-async function seed(options: { testing?: boolean; auth?: boolean; publicBuilds?: boolean } = {}) {
+async function seed(
+  options: { testing?: boolean; auth?: boolean; publicBuilds?: boolean; secret?: string } = {},
+) {
   const { db } = makeDatabase();
   const { storage, objects } = makeStorage();
   const project = await createTestProject(db, db.tables, { name: "app" });
@@ -77,6 +80,7 @@ async function seed(options: { testing?: boolean; auth?: boolean; publicBuilds?:
     database: db,
     storage,
     logger: pino({ level: "silent" }),
+    ...(options.secret ? { config: { secret: options.secret } } : {}),
     ...(options.testing ? { testing: { runner: stubRunner() } } : {}),
     ...(options.auth
       ? { auth: stubAuth({ id: "u1", email: "a@example.com", name: "Ada", role: "admin" }) }
@@ -179,6 +183,32 @@ describe("component page without testing", () => {
     expect(html).not.toContain("<iframe");
     expect(html).not.toContain("data-preview-load");
     expect(html).toContain("Open");
+  });
+
+  it("frames a private build under sign-in through a short-lived signed URL when testing is on", async () => {
+    const secret = "preview-secret-preview-secret";
+    const { app, project, b2 } = await seed({ auth: true, testing: true, secret });
+    const html = await page(app, "src/Button.stories.tsx");
+    const token = /<iframe[^>]*src="\/_s\/([^/]+)\/iframe\.html\?id=button--primary/u.exec(
+      html,
+    )?.[1];
+    expect(token).toBeDefined();
+    const verified = verifyStorybookToken(token, secret);
+    expect(verified).toMatchObject({
+      ok: true,
+      claims: { projectId: project.id, buildId: b2.id },
+    });
+    const left = verified.ok ? verified.claims.expiresAt - Date.now() / 1000 : 0;
+    expect(left).toBeLessThanOrEqual(PREVIEW_TOKEN_TTL);
+    expect(html).not.toContain("needs a sign-in");
+  });
+
+  it("offers no frame for a private build when there is no testing to serve a signed URL", async () => {
+    const { app } = await seed({
+      auth: true,
+      secret: "preview-secret-preview-secret",
+    });
+    expect(await page(app, "src/Button.stories.tsx")).toContain("needs a sign-in");
   });
 
   it("offers the frame for a public build under sign-in", async () => {

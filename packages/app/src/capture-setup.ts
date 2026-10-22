@@ -90,7 +90,7 @@ export function setupCapture(
   const dispatch = captureDispatchDeps(handlerOptions, retries);
   const failed = async (job: ConsumerJob, error: string): Promise<void> => {
     await failCrashedCapture(dispatch, job, error);
-    await notifyCaptureFailed(options, config, logger, job.buildId);
+    await notifyCaptureFailed(options, config, logger, job.buildId, delivery.publicOrigin);
   };
   jobs.exhausted.capture = failed;
   const inProcess = createCaptureHandler(handlerOptions);
@@ -101,7 +101,7 @@ export function setupCapture(
     queue,
     enqueueCapture,
     handler: alerting(handler, retries, async (buildId) => {
-      await notifyCaptureFailed(options, config, logger, buildId);
+      await notifyCaptureFailed(options, config, logger, buildId, delivery.publicOrigin);
     }),
   };
 }
@@ -124,7 +124,6 @@ function captureHandlerOptions(
     secret: credentialKeys(config),
     design: options.design,
     shardSize: options.testing?.shardSize,
-    storybookUrlTtl: options.testing?.storybookUrlTtl,
     notifiers: delivery.notifiers,
     buildState: delivery.buildState,
     publicOrigin: delivery.publicOrigin,
@@ -147,7 +146,6 @@ function forkedHandler(
   return createForkedHandler({
     workerEntry: testing?.workerEntry ?? "",
     shardSize: testing?.shardSize,
-    storybookUrlTtl: testing?.storybookUrlTtl,
     imageEngine: testing?.images?.engine,
     diffThreads: testing?.compare?.threads,
     ...parts,

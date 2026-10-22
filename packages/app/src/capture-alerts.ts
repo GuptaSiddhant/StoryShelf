@@ -26,6 +26,7 @@ export async function notifyCaptureFailed(
   config: ShelfConfig,
   logger: Logger,
   buildId: string,
+  publicOrigin?: () => Promise<string | undefined>,
 ): Promise<void> {
   const build = await new BuildModel(options.database).get(buildId);
   if (build?.status !== "failed" || alreadyAlerted(build)) {
@@ -39,6 +40,7 @@ export async function notifyCaptureFailed(
       logger,
       notifiers: options.notifications?.notifiers ?? [],
       notificationsConfig: options.notifications?.config,
+      publicOrigin: publicOrigin ? { url: publicOrigin } : undefined,
     },
     "sys:capture-failed",
     { buildId, projectId: build.projectId, gitBranch: build.gitBranch },

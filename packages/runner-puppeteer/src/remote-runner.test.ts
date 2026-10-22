@@ -66,7 +66,7 @@ const STORIES: StoryEntry[] = [
   { id: "a--two", title: "A", name: "Two", type: "story" },
 ];
 const VIEWPORTS = [{ name: "desktop", width: 1280, height: 720 }];
-const URL_BASE = "https://app.example/s/tok/projects/p/storybook/build/b";
+const URL_BASE = "https://app.example/_s/tok/projects/p/storybook/build/b";
 
 let storybookDir = "";
 let tmp = "";

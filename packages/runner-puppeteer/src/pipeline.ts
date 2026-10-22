@@ -265,6 +265,7 @@ async function pushCapture(
     viewportName: viewport.name,
     viewport,
     screenshot: result.screenshot,
+    ...(result.a11yViolations.length > 0 ? { a11y: result.a11yViolations } : {}),
   };
   // Streaming: hand it over and drop the buffer rather than holding every screenshot.
   if (input.onCapture) await input.onCapture(snapshot);

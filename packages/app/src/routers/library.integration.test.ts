@@ -54,7 +54,10 @@ function mockBuild(overrides: Partial<Build> = {}): Build {
   };
 }
 
-async function seededLibraryApp(index: unknown): Promise<ReturnType<typeof createShelfApp>> {
+async function seededLibraryApp(
+  index: unknown,
+  snapshotExtra: Record<string, unknown> = {},
+): Promise<ReturnType<typeof createShelfApp>> {
   const { db } = makeDatabase();
   const { storage, objects } = makeStorage();
   await db.insert(db.tables.projects, mockProject());
@@ -69,6 +72,7 @@ async function seededLibraryApp(index: unknown): Promise<ReturnType<typeof creat
     screenshotPath: "p1/builds/b1/screenshots/components-button--primary/desktop.png",
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
+    ...snapshotExtra,
   });
   if (index !== null) {
     objects.set(`${storybookDir("p1", "b1")}/index.json`, Buffer.from(JSON.stringify(index)));
@@ -180,6 +184,20 @@ describe("library routes", () => {
     const body = await response.text();
     expect(body).not.toContain("viewMode=docs");
     expect(body).toContain("Preview");
+  });
+
+  it("lists a snapshot's axe violations on its card, and nothing for a clean one", async () => {
+    const text = "image-alt (critical): Images must have alternative text [img] 1 node(s)";
+    const flagged = await seededLibraryApp(indexWithoutDocs, {
+      a11yViolations: JSON.stringify([text]),
+    });
+    const body = await (await flagged.request("/projects/test-project/library")).text();
+    expect(body).toContain("a11y 1");
+    expect(body).toContain("image-alt (critical)");
+    const clean = await seededLibraryApp(indexWithoutDocs);
+    expect(await (await clean.request("/projects/test-project/library")).text()).not.toContain(
+      "a11y 1",
+    );
   });
 
   it("omits the Docs link when the build statics are missing", async () => {

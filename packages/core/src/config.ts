@@ -334,12 +334,12 @@ export interface ShelfTestingOptions {
    */
   shardSize?: number;
   /**
-   * Lifetime in seconds of the signed Storybook URL given to a remote browser that cannot reach
-   * this host (ADR 0007, decision 5). Default 7200 (2 hours); whole seconds from 60 to 86400. A
-   * token is minted for every render pass, so it only has to outlast one. Needs `runner`, a
-   * `secret` and a public origin.
+   * Requests per minute one client IP may make to the signed Storybook URL route, `/_s/<token>/*`
+   * (ADR 0007, decision 5). Default 6000, enough for a render fetching thousands of assets from one
+   * farm IP; a larger farm behind one address raises it. Over the limit the route answers `429`
+   * before it looks at the token, so the answer says nothing about a token's validity.
    */
-  storybookUrlTtl?: number;
+  storybookUrlRateLimit?: number;
   /**
    * Where captures run. `auto` (default) forks when `workerEntry` is set and the host can afford
    * a second process; `in-process` never forks; `fork` forks regardless of the host and fails at

@@ -70,6 +70,7 @@ const projects = defineTable("projects", {
   aiProfile: "ai_profile",
   reviewEnabled: "review_enabled",
   reviewApprovals: "review_approvals",
+  storybookUrlTtlSeconds: "storybook_url_ttl_seconds",
   createdAt: "created_at",
   updatedAt: "updated_at",
 });
@@ -245,6 +246,7 @@ const captureLogs = defineTable("capture_logs", {
 
 const snapshots = defineTable("snapshots", {
   durationMs: "duration_ms",
+  a11yViolations: "a11y_violations",
   id: "id",
   projectId: "project_id",
   buildId: "build_id",

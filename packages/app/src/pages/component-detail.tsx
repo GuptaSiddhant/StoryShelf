@@ -81,8 +81,12 @@ export interface ComponentPageData {
   captured: CapturedComponent | null;
   /** Story id the Stories tab previews (the first story when unset or unknown). */
   story: string | undefined;
-  /** Whether the frame can load: the build is open to anyone who reaches the app. */
-  previewable: boolean;
+  /**
+   * Root the preview frame loads the Storybook from: the build's own URL when it is open to anyone
+   * who reaches the app, a signed `/_s/<token>` URL for a private build (needs `testing` and a
+   * `secret`), or null when no frame can load.
+   */
+  previewBase: string | null;
   design: DesignItem[];
   usage: LinkedUsageItem[];
   /** Story comments of the shown build; null when the project has review off. */

@@ -49,13 +49,13 @@ describe("createHttpMiddleware", () => {
     telemetry = installTestTelemetry();
     const app = new Hono();
     app.use("*", createHttpMiddleware());
-    app.get("/s/:token/*", (c) => c.text("ok"));
+    app.get("/_s/:token/*", (c) => c.text("ok"));
     const token = `${"a".repeat(30)}.${"B".repeat(43)}`;
 
-    await app.request(`http://shelf.test/s/${token}/iframe.html`);
+    await app.request(`http://shelf.test/_s/${token}/iframe.html`);
 
     const [span] = telemetry.exporter.getFinishedSpans();
-    expect(span?.attributes["url.full"]).toBe("http://shelf.test/s/[redacted]/iframe.html");
+    expect(span?.attributes["url.full"]).toBe("http://shelf.test/_s/[redacted]/iframe.html");
     expect(JSON.stringify(span?.attributes)).not.toContain(token);
   });
 });

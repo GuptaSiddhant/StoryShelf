@@ -88,7 +88,8 @@ function depsOf(parts: {
     storage: parts.storage,
     notifiers: [parts.provider],
     secret: SECRET,
-    config: { publicBaseUrl: "https://shelf.example.com" },
+    config: {},
+    publicOrigin: async () => await Promise.resolve("https://shelf.example.com"),
     flags: () => ({ testing: true, review: false }),
     logger: createShelfLogger({ level: "silent" }),
   };

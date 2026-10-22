@@ -8,6 +8,9 @@ describe("resolveA11yRun", () => {
     expect(plan.context).toBe(A11Y_ROOT_SELECTOR);
     expect(plan.config).toEqual({});
     expect(plan.options["runOnly"]).toMatchObject({ type: "tag" });
+    expect((plan.options["runOnly"] as { values: string[] }).values).toEqual(
+      expect.arrayContaining(["wcag2aa", "best-practice"]),
+    );
   });
 
   it("skips disabled stories and test: off", () => {

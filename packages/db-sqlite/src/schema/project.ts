@@ -13,7 +13,7 @@ export const projects = sqliteTable("projects", {
   storybookMeta: text("storybook_meta").$type<string | null | undefined>().default(null),
   executePlay: integer("execute_play", { mode: "boolean" }).notNull().default(false),
   playTimeoutMs: integer("play_timeout_ms").notNull().default(10_000),
-  runA11y: integer("run_a11y", { mode: "boolean" }).notNull().default(false),
+  runA11y: integer("run_a11y", { mode: "boolean" }).notNull().default(true),
   browser: text("browser").notNull().default("chromium"),
   viewports: text("viewports"),
   browsers: text("browsers"),
@@ -22,6 +22,7 @@ export const projects = sqliteTable("projects", {
   aiProfile: text("ai_profile"),
   reviewEnabled: integer("review_enabled", { mode: "boolean" }).notNull().default(true),
   reviewApprovals: integer("review_approvals").notNull().default(1),
+  storybookUrlTtlSeconds: integer("storybook_url_ttl_seconds"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
@@ -48,6 +49,7 @@ export interface Project {
   aiProfile: string | null;
   reviewEnabled: boolean;
   reviewApprovals: number;
+  storybookUrlTtlSeconds: number | null;
   createdAt: string;
   updatedAt: string;
 }

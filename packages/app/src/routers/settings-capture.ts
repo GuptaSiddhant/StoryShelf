@@ -2,6 +2,7 @@ import { isCaptureTarget, type CaptureTarget } from "@storyshelf/core/adapter/ca
 import { resolveBrowsers } from "@storyshelf/core/capture";
 import { ProjectModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
+import { MAX_STORYBOOK_URL_TTL, MIN_STORYBOOK_URL_TTL } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
@@ -12,7 +13,7 @@ import { flash } from "./flash.ts";
 import { hxRedirect } from "./htmx.ts";
 import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
 
-/** Capture settings: browsers (primary + extras) and the mode allowlist. */
+/** Capture settings: browsers (primary + extras), the mode allowlist and the signed URL lifetime. */
 export function registerCaptureSettings(app: ShelfRouter): void {
   app.get("/projects/:slug/settings/capture", async (c) =>
     c.html(await renderSettingsPage(c, "capture")),
@@ -49,6 +50,23 @@ function readAllowlist(form: FormData): string[] | null {
   return lines.length > 0 ? lines : null;
 }
 
+/** Seconds of the signed Storybook URL lifetime; empty derives it from the stories (null). */
+function readUrlTtl(form: FormData): number | null {
+  const raw = asString(form.get("storybookUrlTtlSeconds"));
+  if (!raw) return null;
+  const seconds = Number(raw);
+  if (
+    !Number.isInteger(seconds) ||
+    seconds < MIN_STORYBOOK_URL_TTL ||
+    seconds > MAX_STORYBOOK_URL_TTL
+  ) {
+    throw new HTTPException(400, {
+      message: `The signed URL lifetime is a whole number of seconds from ${MIN_STORYBOOK_URL_TTL} to ${MAX_STORYBOOK_URL_TTL}`,
+    });
+  }
+  return seconds;
+}
+
 async function reject(c: Context, message: string): Promise<Response> {
   return c.html((await renderSettingsPage(c, "capture", { globalError: message })) ?? "", 400);
 }
@@ -62,6 +80,7 @@ async function saveCapture(
     browsers: browsers.length > 1 ? browsers : null,
     browser: browsers[0],
     modesAllowlist: readAllowlist(form),
+    storybookUrlTtlSeconds: readUrlTtl(form),
   });
   await new ProjectModel(getStore().db).update(project.id, patch);
 }

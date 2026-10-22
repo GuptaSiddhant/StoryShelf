@@ -103,6 +103,18 @@ describe("inPageRunAxe (as serialized, real axe in jsdom)", () => {
     expect(off).toEqual([]);
   });
 
+  it("runs best-practice rules by default and not the page-level ones for the story root", async () => {
+    const html =
+      '<div id="storybook-root"><h1>Title</h1><h4>Skipped levels</h4><p>Text outside any landmark</p></div>';
+    const ids = (await run(html)).map((x) => x.id);
+    expect(ids).toContain("heading-order");
+    // `region`, `landmark-one-main` and `page-has-heading-one` need the whole page in scope.
+    expect(ids).not.toContain("region");
+    expect(ids).not.toContain("landmark-one-main");
+    // An explicit runOnly replaces the default set, best-practice rules included.
+    expect(await run(html, { options: { runOnly: ["image-alt"] } })).toEqual([]);
+  });
+
   it("returns nothing when the context element is missing", async () => {
     expect(await run("<p>no root</p>")).toEqual([]);
   });

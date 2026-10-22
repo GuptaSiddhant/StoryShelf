@@ -11,7 +11,7 @@ import {
 } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
 
-/** Interaction-tests settings tab: play execution toggle and timeout. */
+/** Tests settings tab: play execution toggle and timeout, accessibility checks toggle. */
 export function renderSettingsTests(
   project: Project,
   isAdmin: boolean,
@@ -21,7 +21,7 @@ export function renderSettingsTests(
     <div class="grid max-w-form">
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
       <Card>
-        <SectionTitle>Interaction tests</SectionTitle>
+        <SectionTitle>Interaction and accessibility tests</SectionTitle>
         <Meta>
           When enabled, Storybook <code>play</code> functions run before each screenshot. Failures
           block the build unless the story is marked
@@ -29,6 +29,11 @@ export function renderSettingsTests(
           <code>parameters: &#123; flakyTest: true &#125;</code> (supports both{" "}
           <code>chromatic</code> and <code>storyshelf</code> keys, story-level, case-insensitive).
           Use <code>disableSnapshot</code> to skip a story entirely.
+        </Meta>
+        <Meta>
+          Accessibility checks run axe on every captured story. Violations appear with the snapshot
+          in review and never block a build; a story opts out with{" "}
+          <code>parameters: &#123; a11y: &#123; disable: true &#125; &#125;</code>.
         </Meta>
         <form
           method="post"
@@ -45,6 +50,14 @@ export function renderSettingsTests(
             checked={project.executePlay ? true : undefined}
             disabled={!isAdmin}
             hint="When enabled, failing play blocks the build (failed). Flaky stories show warnings but status stays successful."
+          />
+          <CheckField
+            label="Accessibility checks (axe)"
+            name="runA11y"
+            value="true"
+            checked={project.runA11y === false ? undefined : true}
+            disabled={!isAdmin}
+            hint="On by default. Each story is scanned with axe-core (WCAG A/AA and best-practice rules). Violations are shown on the snapshot in review and never block the build."
           />
           <Field
             label="Play timeout (ms)"
