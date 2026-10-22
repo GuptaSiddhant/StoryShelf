@@ -145,6 +145,29 @@ afterEach(async () => {
   await rm(scratchDir, { recursive: true, force: true });
 });
 
+/** Seconds of lifetime on the signed URL a `reach: "url"` target is given for a project with `patch`. */
+async function signedUrlLifetime(patch: Record<string, unknown>): Promise<number> {
+  const { buildId, render, options } = await setupBrowsers({
+    browsers: '["chromium@cdp"]',
+    ...patch,
+  });
+  (options.runner.metadata as { targets?: RunnerTarget[] }).targets = [
+    { target: "chromium@cdp", reach: "url", status: "ready" },
+  ];
+  await executeCaptureJob(
+    { buildId },
+    {
+      ...options,
+      secret: "s3cret-s3cret-s3cret",
+      publicOrigin: async () => await Promise.resolve("https://shelf.example.com"),
+    },
+  );
+  const call = render.mock.calls[0] as [{ storybookUrl?: string }] | undefined;
+  const token = /\/_s\/([^/]+)\//u.exec(call?.[0].storybookUrl ?? "")?.[1] ?? "";
+  const result = verifyStorybookToken(token, "s3cret-s3cret-s3cret");
+  return result.ok ? Math.round(result.claims.expiresAt - Date.now() / 1000) : -1;
+}
+
 async function setupBrowsers(projectPatch: Record<string, unknown>): Promise<{
   db: DatabaseAdapter;
   buildId: string;
@@ -580,18 +603,25 @@ describe("executeCaptureJob", () => {
       const urls = render.mock.calls.map(
         (call) => (call[0] as { storybookUrl?: string }).storybookUrl,
       );
-      expect(urls[0]).toMatch(/^https:\/\/shelf\.example\.com\/s\/[\w-]+\.[\w-]+\/$/u);
+      expect(urls[0]).toMatch(/^https:\/\/shelf\.example\.com\/_s\/[\w-]+\.[\w-]+\/$/u);
       expect(urls[1]).toBeUndefined();
       expect(
         (extract.mock.calls[0] as unknown as [{ storybookUrl?: string }])[0].storybookUrl,
-      ).toMatch(/\/s\//u);
+      ).toMatch(/\/_s\//u);
       const project = await db.list(db.tables.projects);
-      const token = /\/s\/([^/]+)\//u.exec(urls[0] ?? "")?.[1] ?? "";
-      expect(verifyStorybookToken(token, ["s3cret-s3cret-s3cret"])).toMatchObject({
+      const token = /\/_s\/([^/]+)\//u.exec(urls[0] ?? "")?.[1] ?? "";
+      expect(verifyStorybookToken(token, "s3cret-s3cret-s3cret")).toMatchObject({
         ok: true,
         claims: { projectId: project[0]?.id, buildId },
       });
       expect(lines.join("")).not.toContain(token);
+    });
+
+    it("sizes the signed URL's lifetime from the stories, or from the project's override", async () => {
+      // A small build derives the 2 hour floor; the project's value wins exactly.
+      expect(await signedUrlLifetime({})).toBeGreaterThan(7190);
+      expect(await signedUrlLifetime({ storybookUrlTtlSeconds: 600 })).toBeLessThanOrEqual(600);
+      expect(await signedUrlLifetime({ storybookUrlTtlSeconds: 600 })).toBeGreaterThan(590);
     });
 
     it("scrubs a signed URL a runner quotes in its failure", async () => {

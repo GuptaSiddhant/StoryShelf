@@ -58,11 +58,6 @@ export interface CaptureJobOptions {
   design?: DesignProvider[];
   /** The resolved public origin (ADR 0007, decision 6); targets that need a URL wait for it. */
   publicOrigin?: (() => Promise<string | undefined>) | undefined;
-  /**
-   * Lifetime in seconds of the signed Storybook URL a `reach: "url"` target is given (ADR 0007,
-   * decision 5; default 2 hours, `testing.storybookUrlTtl`). Minted afresh for every render pass.
-   */
-  storybookUrlTtl?: number | undefined;
   /** Render budget override (tests use a short fuse). */
   renderTimeoutMs?: number | undefined;
   /**
@@ -241,7 +236,7 @@ async function runCapturePhases(
         hasSecret: options.secret !== undefined,
       }),
     );
-    const storybookUrl = storybookUrlSource(options, build);
+    const storybookUrl = storybookUrlSource(options, { build, project });
     const enriched = await enrichStories({
       runner: options.runner,
       buildId: build.id,

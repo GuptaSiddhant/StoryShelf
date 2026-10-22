@@ -35,13 +35,13 @@ describe("renderWithTimeout", () => {
             {
               story: { id: "a" },
               viewportName: "desktop",
-              error: `goto https://x.test/s/${token}/iframe.html failed`,
+              error: `goto https://x.test/_s/${token}/iframe.html failed`,
             },
           ],
         }),
       cancel: async () => {},
     };
     const result = await renderWithTimeout(runner as never, {} as RenderRequest, 1000);
-    expect(result.failures[0]?.error).toBe("goto https://x.test/s/[redacted]/iframe.html failed");
+    expect(result.failures[0]?.error).toBe("goto https://x.test/_s/[redacted]/iframe.html failed");
   });
 });

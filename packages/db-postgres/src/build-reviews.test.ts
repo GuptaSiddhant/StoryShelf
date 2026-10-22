@@ -55,6 +55,15 @@ it("stores the review switch and the required approvals", async () => {
   expect(await projects.get("p1")).toMatchObject({ reviewEnabled: false, reviewApprovals: 3 });
 });
 
+it("keeps the signed Storybook URL lifetime null until a project sets one", async () => {
+  const projects = new ProjectModel(await seeded());
+  expect((await projects.get("p1"))?.storybookUrlTtlSeconds ?? null).toBeNull();
+  await projects.update("p1", { storybookUrlTtlSeconds: 14_400 });
+  expect((await projects.get("p1"))?.storybookUrlTtlSeconds).toBe(14_400);
+  await projects.update("p1", { storybookUrlTtlSeconds: null });
+  expect((await projects.get("p1"))?.storybookUrlTtlSeconds ?? null).toBeNull();
+});
+
 it("round-trips a story-anchored comment", async () => {
   const comments = new CommentModel(await seeded());
   const story = await comments.create("p1", "b1", "u1", { body: "hi", storyId: "a--x" });

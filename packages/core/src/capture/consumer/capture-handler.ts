@@ -48,8 +48,6 @@ export interface CaptureHandlerOptions {
   viewports?: CaptureJobOptions["viewports"];
   /** Captures per shard; unset keeps every build in one job. */
   shardSize?: number;
-  /** Lifetime in seconds of signed Storybook URLs (`testing.storybookUrlTtl`; default 2 hours). */
-  storybookUrlTtl?: number;
   /** Retries assumed for jobs that do not state `maxAttempts` (default 2). */
   maxRetries?: number;
 }
@@ -126,7 +124,6 @@ export function captureDispatchDeps(
     secret: options.secret,
     design: options.design,
     publicOrigin,
-    storybookUrlTtl: options.storybookUrlTtl,
     shardSize: options.shardSize,
     enqueue: options.enqueue,
   };

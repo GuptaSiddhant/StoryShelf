@@ -35,13 +35,19 @@ describe("the self-hosted farm guide", () => {
     expect(await readFile(GUIDE, "utf8")).toContain(`list of ${FONT_PROBE_FAMILIES.length} common`);
   });
 
-  it("states the signed Storybook URL's lifetime bounds the code enforces", async () => {
-    const { DEFAULT_STORYBOOK_URL_TTL, MAX_STORYBOOK_URL_TTL, MIN_STORYBOOK_URL_TTL } =
-      await import("@storyshelf/core/utils");
+  it("states the signed Storybook URL's path and lifetime bounds the code enforces", async () => {
+    const {
+      DEFAULT_STORYBOOK_URL_TTL,
+      MAX_STORYBOOK_URL_TTL,
+      MIN_STORYBOOK_URL_TTL,
+      STORYBOOK_TOKEN_PREFIX,
+    } = await import("@storyshelf/core/utils");
     const guide = await readFile(GUIDE, "utf8");
     expect(guide).toContain("## How the browser reaches the Storybook");
     expect(guide).toContain("### Signed Storybook URLs");
-    expect(guide).toContain(`${DEFAULT_STORYBOOK_URL_TTL / 3600} hours by default`);
+    expect(guide).toContain(`at least ${DEFAULT_STORYBOOK_URL_TTL / 3600} hours`);
+    expect(guide).toContain(`at most ${MAX_STORYBOOK_URL_TTL / 3600} hours`);
+    expect(guide).toContain(`${STORYBOOK_TOKEN_PREFIX}<token>/`);
     expect(guide).toContain(`from ${MIN_STORYBOOK_URL_TTL} to ${MAX_STORYBOOK_URL_TTL}`);
     expect(guide).toContain(`${MAX_STORYBOOK_URL_TTL / 3600} hours is refused`);
   });

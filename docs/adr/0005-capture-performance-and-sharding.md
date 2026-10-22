@@ -68,7 +68,7 @@ defaults to the OS temp directory.
 
 All capture configuration lives under `ShelfOptions.testing` (ADR 0006, Testing Option,
 Hosting-Only Mode and the Database Queue): `runner`, `compare`, `images`, `concurrency`,
-`shardSize`, `retries`, `storybookUrlTtl`, `queue`, `workerEntry` and `mode`. Absent, the
+`shardSize`, `retries`, `storybookUrlRateLimit`, `queue`, `workerEntry` and `mode`. Absent, the
 deployment hosts Storybooks only and the tuning fields are unreachable rather than ignored.
 `scratchDir` stays in `config`, because publishing uses it too.
 

@@ -59,9 +59,9 @@ With [`testing`](/concepts/capture/) the same pages gain what a capture adds: th
 
 ### Component preview
 
-The Stories tab previews a story **only when you ask**: the page shows a *Load preview* button, and the frame is created on click, so opening a page never runs a published Storybook. The frame is sandboxed with `allow-scripts` only, with no `allow-same-origin`, so the Storybook runs on an opaque origin and cannot read the app's cookies or storage. Every story and docs entry also has an *Open* link to the full Storybook.
+The Stories tab previews a story **only when you ask**: the page shows a _Load preview_ button, and the frame is created on click, so opening a page never runs a published Storybook. The frame is sandboxed with `allow-scripts` only, with no `allow-same-origin`, so the Storybook runs on an opaque origin and cannot read the app's cookies or storage. Every story and docs entry also has an _Open_ link to the full Storybook.
 
-Because the frame has an opaque origin, its module scripts are cross-origin requests that carry no cookies. For that reason the published files of a build answer `Access-Control-Allow-Origin: *` when the build is **viewable without credentials**: it is public (see below), or the instance has no sign-in at all. A **private build on an instance with sign-in** cannot be previewed in a frame; its page says so and offers the *Open* link, which uses your session. Storybook 8, 9 and 10 render under this sandbox.
+Because the frame has an opaque origin, its module scripts are cross-origin requests that carry no cookies. For that reason the published files of a build answer `Access-Control-Allow-Origin: *` (never with credentials) when the build is **viewable without credentials**: it is public (see below), or the instance has no sign-in at all; so do files served through a [signed Storybook URL](/guides/remote-browsers/#signed-storybook-urls). A **private build on an instance with sign-in** is framed through a signed URL minted for you when the page renders (valid for one hour, so a frame loaded much later may need a page reload) when the instance has `testing` and a `secret`; otherwise its page says it cannot be framed and offers the _Open_ link, which uses your session. Storybook 8, 9 and 10 render under this sandbox.
 
 ## URL structure
 

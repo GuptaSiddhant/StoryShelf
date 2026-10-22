@@ -9,6 +9,7 @@ import { assertServerless, resolveShelfOptions } from "@storyshelf/core/config";
 import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import { configureImages } from "@storyshelf/core/diff";
 import type { Logger } from "@storyshelf/core/logger";
+import { STORYBOOK_TOKEN_PREFIX } from "@storyshelf/core/utils";
 /**
  * StoryShelf app: compose database, storage, capture, auth, and notifier
  * adapters into a complete self-hosted visual-testing Hono app.
@@ -189,7 +190,7 @@ function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
   app.use("*", setupGate(getReady));
   // Routes classified `testing` answer 404 without `options.testing` (ADR 0006, decision 8).
   app.use("*", requireTesting(wiring.options.testing !== undefined));
-  mountGuards(app, config);
+  mountGuards(app, config, wiring.options);
   mountStoreScope(app, wiring);
   app.use("*", authGate());
   // Routes classified `review` answer 404 for a project with review off (ADR 0013, decision 10).
@@ -230,10 +231,20 @@ const RATE_LIMITS: readonly { paths: string[]; max: number; bucket?: string }[] 
   },
 ];
 
+/** Requests per minute per client IP on the signed Storybook URL route (`testing.storybookUrlRateLimit`). */
+const DEFAULT_STORYBOOK_URL_RATE_LIMIT = 6000;
+
 /** Mount rate limits and CSRF guards (abuse floors, not strict protection). */
-function mountGuards(app: ShelfRouter, config: ShelfConfig): void {
+function mountGuards(app: ShelfRouter, config: ShelfConfig, options: ShelfOptions): void {
   const rateLimit = createRateLimiter();
-  for (const { paths, max, bucket } of RATE_LIMITS) {
+  // A render fetches thousands of assets from one farm IP, so this floor is generous; it counts
+  // before the token is looked at and answers 429 alike for any token.
+  const signedUrls = {
+    paths: [`${STORYBOOK_TOKEN_PREFIX}*`],
+    max: options.testing?.storybookUrlRateLimit ?? DEFAULT_STORYBOOK_URL_RATE_LIMIT,
+    bucket: "signed-storybook",
+  };
+  for (const { paths, max, bucket } of [...RATE_LIMITS, signedUrls]) {
     const keyGenerator = bucket ? rateLimitKey(bucket) : undefined;
     for (const path of paths) {
       app.use(path, rateLimit({ windowMs: MINUTE, max, keyGenerator }));

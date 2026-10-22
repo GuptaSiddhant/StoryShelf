@@ -30,7 +30,7 @@ import {
   returnPathOf,
 } from "./design.handlers.ts";
 import { linkedUsageFor } from "./links.handlers.ts";
-import { isAnonymouslyViewable } from "./preview-access.ts";
+import { previewBaseOf } from "./preview-base.ts";
 import { loadComponentReview } from "./review-section.handlers.ts";
 
 async function buildsOf(snapshots: readonly Snapshot[]): Promise<Build[]> {
@@ -142,7 +142,7 @@ export async function loadComponentPage(
     catalog: view,
     captured: loaded?.captured ?? null,
     story,
-    previewable: isAnonymouslyViewable(view.build, project),
+    previewBase: await previewBaseOf(project, view.build),
     publishedBaseDomain: getStore().config.publishedBaseDomain,
     review: await loadComponentReview(project, view.build),
     ...tabData,

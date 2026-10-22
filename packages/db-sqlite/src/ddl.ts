@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS projects (
   ai_profile TEXT,
   review_enabled INTEGER NOT NULL DEFAULT 1,
   review_approvals INTEGER NOT NULL DEFAULT 1,
+  storybook_url_ttl_seconds INTEGER,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );

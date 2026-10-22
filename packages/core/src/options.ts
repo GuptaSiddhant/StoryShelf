@@ -2,7 +2,6 @@
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { notificationsConfigSchema, type ShelfOptions } from "./config.ts";
-import { assertStorybookUrlTtl } from "./utils/storybook-token.ts";
 
 /** Where capture scratch lives when `config.scratchDir` is not set. */
 export const DEFAULT_SCRATCH_DIR: string = join(tmpdir(), "storyshelf");
@@ -61,12 +60,19 @@ function assertTestingProcess(testing: ShelfOptions["testing"]): void {
   assertTestingNumbers(testing);
 }
 
-/** Numeric `testing` options: concurrency, retries and the Storybook URL lifetime. */
+/** Numeric `testing` options: concurrency, retries and the Storybook URL rate limit. */
 function assertTestingNumbers(testing: ShelfOptions["testing"]): void {
   assertConcurrency(testing?.concurrency);
   assertRetries(testing?.retries);
-  if (testing?.storybookUrlTtl !== undefined) {
-    assertStorybookUrlTtl(testing.storybookUrlTtl);
+  assertStorybookUrlRateLimit(testing?.storybookUrlRateLimit);
+}
+
+/** A whole number of requests per minute; `0` would refuse every render. */
+function assertStorybookUrlRateLimit(limit: number | undefined): void {
+  if (limit !== undefined && (!Number.isInteger(limit) || limit < 1)) {
+    throw new Error(
+      `testing.storybookUrlRateLimit must be a positive whole number of requests per minute, got ${String(limit)}`,
+    );
   }
 }
 

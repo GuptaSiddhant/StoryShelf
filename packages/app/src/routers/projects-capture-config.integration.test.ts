@@ -28,7 +28,12 @@ async function setup() {
   return { patch };
 }
 
-type Stored = { browser?: string; browsers?: string | null; modesAllowlist?: string | null };
+type Stored = {
+  browser?: string;
+  browsers?: string | null;
+  modesAllowlist?: string | null;
+  storybookUrlTtlSeconds?: number | null;
+};
 
 describe("PATCH /projects/:slug capture config", () => {
   it("stores the browser list as JSON and keeps `browser` equal to the primary", async () => {
@@ -73,5 +78,23 @@ describe("PATCH /projects/:slug capture config", () => {
 
     const cleared = (await (await patch({ modesAllowlist: null })).json()) as Stored;
     expect(cleared.modesAllowlist).toBeNull();
+  });
+});
+
+describe("PATCH /projects/:slug signed URL lifetime", () => {
+  it("stores the project's lifetime and clears it with null", async () => {
+    const { patch } = await setup();
+    const set = (await (await patch({ storybookUrlTtlSeconds: 14_400 })).json()) as Stored;
+    expect(set.storybookUrlTtlSeconds).toBe(14_400);
+    const cleared = (await (await patch({ storybookUrlTtlSeconds: null })).json()) as Stored;
+    expect(cleared.storybookUrlTtlSeconds).toBeNull();
+  });
+
+  it("rejects a lifetime outside 60 to 86400 whole seconds", async () => {
+    const { patch } = await setup();
+    const responses = await Promise.all(
+      [59, 86_401, 90.5, "7200"].map(async (bad) => await patch({ storybookUrlTtlSeconds: bad })),
+    );
+    expect(responses.map((response) => response.status)).toEqual([400, 400, 400, 400]);
   });
 });

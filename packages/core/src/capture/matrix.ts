@@ -295,14 +295,15 @@ async function renderPass(
   const expected = toRender.flatMap((story) =>
     resolveStoryViewports(story, input.viewports),
   ).length;
-  const storybookUrl = await input.storybookUrl?.(browser);
+  const budgetMs = renderBudgetMs(expected, input.renderTimeoutMs);
+  const storybookUrl = await input.storybookUrl?.(browser, { budgetMs });
   const rendered = await renderWithTimeout(
     input.runner,
     {
       ...renderRequest(input, browser, toRender, spooled, { mirror, expected }),
       ...(storybookUrl === undefined ? {} : { storybookUrl }),
     },
-    renderBudgetMs(expected, input.renderTimeoutMs),
+    budgetMs,
   );
   mirror.log("info", "render pass finished", {
     browser,

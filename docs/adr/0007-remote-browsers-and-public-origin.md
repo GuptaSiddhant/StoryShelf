@@ -153,13 +153,14 @@ endpoint URL), and renaming a target starts fresh baselines for it, as switching
 many assets by relative path; a token on a single file URL would not reach them:
 
 ```
-<publicOrigin>/s/<token>/projects/<slug>/storybook/build/<buildId>/iframe.html
+<publicOrigin>/_s/<token>/iframe.html
 ```
 
-The app strips the `/s/<token>` prefix, checks the token, and serves the build's static files
-through the same file-serving branch as the build Storybook route (`app/src/routers/storybook.ts`,
-`/projects/:slug/storybook/build/:buildId/*`) as if `canViewBuild` had passed. It never serves the
-project and build wrapper page that route returns for an empty path.
+The app strips the `/_s/<token>` prefix, checks the token, and serves the build's static files
+through the same file handler and access rule as the published Storybook routes
+(`app/src/routers/published-files.ts`, `published-access.ts`), with the token as the grant. It never
+serves the wrapper page those routes return for an empty path. (The path form first drafted here,
+`/s/<token>/projects/<slug>/storybook/build/<buildId>/...`, was dropped: see the notes.)
 
 **Token.** `base64url(projectId, buildId, expiresAt) + "." + HMAC-SHA256(key, same)`. It is verified
 statelessly and grants read-only access to one build's static files and nothing else (no wrapper
@@ -169,10 +170,11 @@ page, no API, no other build).
   so a token can never be confused with a session or any other signature. Without a `secret`, every
   `reach: "url"` target is `unavailable: "no secret"`. During a rotation a token is also accepted if
   it verifies against `previousSecret`.
-- **Expiry.** A per-job token with a default lifetime of 2 hours (`testing.storybookUrlTtl`, ADR
-  0006). The render budget is per render call and crash isolation can make dozens of passes, so a
-  lifetime tied to one budget would expire mid-render and show up as story failures; a fixed,
-  generous bound is simpler and still short.
+- **Expiry.** A token is minted when a render pass starts, with a lifetime derived from that pass:
+  its render budget (`renderBudgetMs`, which grows with the number of captures) plus a grace of
+  5 minutes, never below 2 hours and never above 24 hours. A project can override it
+  (`projects.storybook_url_ttl_seconds`, 60 to 86400, admin only). There is no instance-wide option
+  (the earlier `testing.storybookUrlTtl` is gone).
 - **Where it applies.** The render request and the `extractParameters` input both carry
   `storybookUrl`.
 - **Hygiene.** The token is redacted from logs, attempt records, and the error messages the runner
@@ -521,25 +523,35 @@ a public origin exist, and core now mints the URL (see "Signed URLs" below). Cho
   refused with `428` and a message naming both versions (major and minor). `exposeNetwork:
 "<loopback>"` works against it, so a self-hosted server is a `reach: "loopback"` target.
 
-- **Signed URLs (#228).** The URL core hands a runner is the directory root
-  `<publicOrigin>/s/<token>/`, not the `.../projects/<slug>/storybook/build/<buildId>/iframe.html`
-  shape sketched in decision 5: the token already names the project and the build, so a slug in the
-  path is one more thing to check against it and nothing to gain. `GET /s/<token>/<file>` is its own
-  route (`app/src/routers/signed-storybook.ts`), not a branch of the build route, and shares only
-  `readPublishedFile` with it. Token payload `<projectId>:<buildId>:<expiresAtSeconds>`; the
+- **Signed URLs (#228, #275).** The URL core hands a runner is the directory root
+  `<publicOrigin>/_s/<token>/`, not the `.../projects/<slug>/storybook/build/<buildId>/iframe.html`
+  shape first sketched in decision 5: the token already names the project and the build, so a slug in
+  the path is one more thing to check against it and nothing to gain (the owner confirmed the short
+  form in #275). The prefix is `/_s/` (`STORYBOOK_TOKEN_PREFIX`), not `/s/`, and cannot collide with
+  the `/_/:id` short link. `GET /_s/<token>/<file>` is its own route
+  (`app/src/routers/signed-storybook.ts`) that verifies the token and then serves through the same
+  handler and policy as the published Storybook routes (`publishedAccess`, `servePublishedFile`);
+  the token module owns the prefix, key derivation, signing and verification, and the auth gate,
+  route table and `redactSecrets` read the prefix from it. Token payload `<projectId>:<buildId>:<expiresAtSeconds>`; the
   signature is checked in constant time before the payload is read; a token claiming more than 24 h
-  (`MAX_STORYBOOK_URL_TTL`) is refused even when signed. `testing.storybookUrlTtl` is in seconds
-  (60 to 86400, default 7200) and reaches a forked child through an environment variable. The route
-  is classified `testing`: a hosting-only instance does not serve it. `previousSecret` verifies a
+  (`MAX_STORYBOOK_URL_TTL`) is refused even when signed. The route is classified `testing`: a
+  hosting-only instance does not serve it (ADR 0006 is silent; kept conservative). `previousSecret` verifies a
   token and never signs one. A token is minted when a render pass starts (and for the parameter
-  pre-pass), never at enqueue time, so queued shards and retries are not handed a stale one. A render
-  pass whose budget outlasts the lifetime (more than about 480 captures at the 15 s allowance, with
-  the default two hours) fails its later pages with `404`s: raise `storybookUrlTtl`. Refusals are all
-  one `404` with `Cache-Control: private, no-store`; the reason is in the debug log only. The token
+  pre-pass), never at enqueue time, so queued shards and retries are not handed a stale one. The
+  lifetime is derived from the render budget of the pass (decision 5, expiry), so a pass cannot
+  outlive its token below the 24 hour ceiling; a pass whose budget exceeds 24 hours (about 5700
+  captures at the 15 s allowance) is the one case left, and a project cannot lift the ceiling.
+  Refusals are all one `404` with `Cache-Control: private, no-store`; the reason is in the debug log
+  only. The token
   is scrubbed from the request log, the OTEL `url.full` attribute, attempt logs, failure text and the
   pino `err` serializer by `redactSecrets`. Not covered: the provider's own recordings (documented),
-  and a runner that logs the URL itself. Rate limiting is not applied: a render makes thousands of
-  asset requests, and a refused token costs one HMAC and no database read.
+  and a runner that logs the URL itself. The route has a generous per-IP rate limit
+  (`testing.storybookUrlRateLimit`, default 6000 requests a minute) counted before the token is
+  looked at, so the `429` it answers says nothing about a token; a farm behind one address that
+  needs more raises it. Served files answer `Access-Control-Allow-Origin: *` (never credentials),
+  like the files of a public build (#255): a sandboxed preview frame has an opaque origin and loads
+  module scripts only with it. A private build under sign-in is framed in the component page through
+  a one-hour signed URL minted for a viewer (needs `testing` and a `secret`).
 
 - **Which settings saves are checked.** A save refuses only targets the project does not already
   have, so an unrelated settings save never fails because an engine it already names went away; the
@@ -561,7 +573,7 @@ a public origin exist, and core now mints the URL (see "Signed URLs" below). Cho
 - ~~Whether Storybook 8, 9 and 10 static builds load every asset by relative path, so the path-prefix
   token reaches them all.~~ Settled (#228): the gated test `remote capture over a signed Storybook URL`
   (`runner-playwright/src/remote.integration.test.ts`) captures a build of each fixture (8, 9, 10)
-  through a CDP browser that can only open `<origin>/s/<token>/iframe.html`, so every asset loaded by
+  through a CDP browser that can only open `<origin>/_s/<token>/iframe.html`, so every asset loaded by
   relative path under the token prefix.
 - Which providers honour `exposeNetwork` beyond Azure and a self-hosted Playwright server. A self-hosted
   `run-server` does (tested); Azure is taken from its documentation; a provider not shown to support it

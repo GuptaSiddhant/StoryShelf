@@ -259,6 +259,33 @@ describe("storybook routes", () => {
     expect(await response.text()).toBe("<html>storybook</html>");
   });
 
+  it("short link files follow the same CORS rule as the canonical route", async () => {
+    const ulid = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+    const setup = async (auth: boolean) => {
+      const { db } = makeDatabase();
+      const { storage, objects } = makeStorage();
+      await db.insert(db.tables.projects, mockProject());
+      await db.insert(
+        db.tables.builds,
+        mockBuild({ id: ulid, public: false, gitBranch: "feature/x" }),
+      );
+      objects.set(`${storybookDir("p1", ulid)}/iframe.js`, Buffer.from("x"));
+      const user = { id: "u1", email: "a@example.com", name: "Ada", role: "admin" as const };
+      return createShelfApp({
+        database: db,
+        storage,
+        logger: silentLogger,
+        ...(auth ? { auth: stubAuth(user) } : {}),
+      });
+    };
+    const open = await (await setup(false)).request(`/_/${ulid}/iframe.js`);
+    expect(open.status).toBe(200);
+    expect(open.headers.get("access-control-allow-origin")).toBe("*");
+    const signedIn = await (await setup(true)).request(`/_/${ulid}/iframe.js`);
+    expect(signedIn.status).toBe(200);
+    expect(signedIn.headers.get("access-control-allow-origin")).toBeNull();
+  });
+
   it("short link redirects without trailing slash to canonical", async () => {
     const ulid = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
     const { db } = makeDatabase();

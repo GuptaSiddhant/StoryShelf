@@ -70,6 +70,7 @@ const projects = defineTable("projects", {
   aiProfile: "ai_profile",
   reviewEnabled: "review_enabled",
   reviewApprovals: "review_approvals",
+  storybookUrlTtlSeconds: "storybook_url_ttl_seconds",
   createdAt: "created_at",
   updatedAt: "updated_at",
 });

@@ -25,6 +25,11 @@ export interface Project {
   reviewEnabled?: boolean;
   /** Approvals a build needs when `testing` is off (ADR 0013, decision 3); default 1. */
   reviewApprovals?: number;
+  /**
+   * Lifetime in seconds of the signed Storybook URLs of this project's renders (ADR 0007,
+   * decision 5); null derives it from the build's stories.
+   */
+  storybookUrlTtlSeconds?: number | null;
   createdAt: string;
   updatedAt: string;
 }
