@@ -10,6 +10,7 @@ import {
   validateBootAssembly,
 } from "@storyshelf/core/adapter/setup";
 import type { AdapterSetupResult } from "@storyshelf/core/adapter/setup";
+import type { CaptureConsumer } from "@storyshelf/core/capture";
 import type { ShelfOptions } from "@storyshelf/core/config";
 import { shutdownDiffPool, verifyImageEngine } from "@storyshelf/core/diff";
 import type { Logger } from "@storyshelf/core/logger";
@@ -28,6 +29,10 @@ export interface LifecycleCell {
   background?: Promise<unknown>[];
   /** Override of {@link BACKGROUND_DRAIN_MS} (tests). */
   drainMs?: number;
+  /** Consumer of `publish` jobs (null on hosts that run none); started by `setup()`, drained by `teardown()`. */
+  publishConsumer?: CaptureConsumer | null;
+  /** The running consumer session, settled once it was stopped and drained. */
+  publishRun?: Promise<void>;
 }
 
 /** Longest teardown waits for background boot tasks before closing adapters anyway. */
@@ -36,6 +41,23 @@ const BACKGROUND_DRAIN_MS = 5000;
 /** Register a boot task so `teardown()` does not close adapters underneath it. */
 export function trackBackground(cell: LifecycleCell, task: Promise<unknown>): void {
   (cell.background ??= []).push(task);
+}
+
+/** Start the `publish` consumer once adapters are set up; a no-op when none exists or it runs. */
+function startPublishConsumer(cell: LifecycleCell, logger: Logger): void {
+  const consumer = cell.publishConsumer;
+  if (!consumer || consumer.isRunning()) {
+    return;
+  }
+  cell.publishRun = consumer.start().catch((error: unknown) => {
+    logger.error({ err: error }, "publish consumer stopped");
+  });
+}
+
+/** Stop polling and wait for the publish jobs in flight to finish. */
+async function stopPublishConsumer(cell: LifecycleCell): Promise<void> {
+  await cell.publishConsumer?.stop();
+  await cell.publishRun;
 }
 
 /** Wait for tracked boot tasks, bounded so a hung task can never block shutdown. */
@@ -241,9 +263,11 @@ function createLifecycle(
       if (!result.ok) {
         throw new AdapterLifecycleError("setup", result.failures);
       }
+      startPublishConsumer(cell, logger);
     },
     teardown: async () => {
       timer?.stop();
+      await stopPublishConsumer(cell);
       await drainBackground(cell);
       await settleInsightJobs();
       await options.ai?.teardown();

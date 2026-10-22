@@ -1,13 +1,16 @@
 import { createHash } from "node:crypto";
-import { createWriteStream } from "node:fs";
 import { mkdir, readdir, readFile, rm } from "node:fs/promises";
-import { dirname, join, relative, resolve, sep } from "node:path";
-import { pipeline } from "node:stream/promises";
-import { Parse, type Entry } from "unzipper";
+import { join, relative, resolve } from "node:path";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { mapLimit } from "../utils/map-limit.ts";
 import { storybookDir, storybookZipPath } from "../utils/paths.ts";
+import { extractZipStream } from "./publish/extract.ts";
+import {
+  DEFAULT_MAX_UNZIPPED_BYTES,
+  DEFAULT_MAX_ZIP_ENTRIES,
+  type ExtractionLimits,
+} from "./publish/limits.ts";
 import { jobScratchDir, shardScratchDir } from "./scratch.ts";
 
 /**
@@ -16,6 +19,11 @@ import { jobScratchDir, shardScratchDir } from "./scratch.ts";
  * capture orchestrator and by the upload path for opt-in inline extraction
  * (`maxInlineUnzipSize`); both write identical keys, so either may run first.
  */
+
+const DEFAULT_EXTRACTION_LIMITS: ExtractionLimits = {
+  maxEntries: DEFAULT_MAX_ZIP_ENTRIES,
+  maxBytes: DEFAULT_MAX_UNZIPPED_BYTES,
+};
 
 /**
  * Extract a build's stored zip into a dedicated scratch directory. The caller removes it when
@@ -26,7 +34,9 @@ import { jobScratchDir, shardScratchDir } from "./scratch.ts";
  * @param projectId - Owning project id.
  * @param buildId - Build whose zip to extract.
  * @param shardId - Shard extracting it; gives the shard a directory of its own.
+ * @param limits - Entry and uncompressed-byte caps (safe defaults when omitted).
  * @returns The extracted Storybook directory.
+ * @throws {ZipLimitError} When the archive breaks a cap or escapes the target directory.
  */
 export async function extractStorybookToScratch(
   storage: StorageAdapter,
@@ -34,6 +44,7 @@ export async function extractStorybookToScratch(
   projectId: string,
   buildId: string,
   shardId?: string,
+  limits: ExtractionLimits = DEFAULT_EXTRACTION_LIMITS,
 ): Promise<string> {
   const base = shardId
     ? shardScratchDir(scratchDir, projectId, buildId, shardId)
@@ -41,12 +52,7 @@ export async function extractStorybookToScratch(
   const targetDir = join(base, "storybook");
   const root = await prepareTargetDir(targetDir);
   const source = await storage.readStream(storybookZipPath(projectId, buildId));
-  const writes: Promise<void>[] = [];
-  const parseError = await runParser(root, source, writes);
-  if (parseError) {
-    throw parseError;
-  }
-  await awaitWrites(writes);
+  await extractZipStream(source, root, limits);
   return targetDir;
 }
 
@@ -55,17 +61,6 @@ async function prepareTargetDir(targetDir: string): Promise<string> {
   await rm(targetDir, { recursive: true, force: true });
   await mkdir(targetDir, { recursive: true });
   return resolve(targetDir);
-}
-
-/** Await streamed zip writes, throwing the first write failure. */
-async function awaitWrites(writes: Promise<void>[]): Promise<void> {
-  const outcomes = await Promise.allSettled(writes);
-  const writeError = outcomes.find(
-    (outcome): outcome is PromiseRejectedResult => outcome.status === "rejected",
-  );
-  if (writeError) {
-    throw writeError.reason;
-  }
 }
 
 /**
@@ -134,66 +129,6 @@ async function upsertContentRef(db: DatabaseAdapter, hash: string): Promise<void
   } catch {
     // content_refs table may not exist yet (old DB) — ignore
   }
-}
-
-function blockedTarget(root: string, entryName: string): boolean {
-  const candidate = resolve(join(root, entryName));
-  return candidate !== root && !candidate.startsWith(root + sep);
-}
-
-/** Pipe one zip entry to disk, tracking the write for later aggregation. */
-function handleEntry(
-  root: string,
-  entry: Entry,
-  writes: Promise<void>[],
-  fail: (error: unknown) => void,
-): void {
-  if (blockedTarget(root, entry.path)) {
-    entry.autodrain();
-    fail(new Error(`Blocked path traversal in uploaded Storybook: ${entry.path}`));
-    return;
-  }
-  if (entry.type === "Directory") {
-    entry.autodrain();
-    return;
-  }
-  writeEntry(root, entry, writes);
-}
-
-/** Stream one zip entry to disk, tracking the write for later aggregation. */
-function writeEntry(root: string, entry: Entry, writes: Promise<void>[]): void {
-  const target = join(root, entry.path);
-  const done = (async (): Promise<void> => {
-    await mkdir(dirname(target), { recursive: true });
-    await pipeline(entry, createWriteStream(target));
-  })();
-  writes.push(done);
-  done.catch(() => {}); // Intentionally empty — aggregated via allSettled by the caller
-}
-
-/** Run the unzipper parser, resolving with the first parse error (or null). */
-// oxlint-disable-next-line typescript/promise-function-async -- executor-style promise wrapper around events
-function runParser(
-  root: string,
-  source: import("node:stream").Readable,
-  writes: Promise<void>[],
-): Promise<unknown> {
-  return new Promise((settle) => {
-    const parser = Parse();
-    const fail = (error: unknown): void => {
-      source.destroy();
-      settle(error);
-    };
-    parser.on("entry", (entry: Entry) => {
-      handleEntry(root, entry, writes, fail);
-    });
-    parser.on("error", fail);
-    parser.on("close", () => {
-      settle(null);
-    });
-    source.on("error", fail);
-    source.pipe(parser);
-  });
 }
 
 async function walkFiles(dir: string): Promise<string[]> {

@@ -9,8 +9,8 @@ const runner = { metadata: { kind: "r" } } as unknown as CaptureRunner;
 const base = { database: {}, storage: {} } as unknown as ShelfOptions;
 
 describe("resolveShelfOptions", () => {
-  it("leaves a hosting-only deployment untouched", () => {
-    expect(resolveShelfOptions(base)).toBe(base);
+  it("defaults scratchDir for a hosting-only deployment: publishing extracts zips there", () => {
+    expect(resolveShelfOptions(base).config?.scratchDir).toBe(DEFAULT_SCRATCH_DIR);
   });
 
   it("defaults scratchDir when a runner needs it", () => {
@@ -19,14 +19,16 @@ describe("resolveShelfOptions", () => {
     expect(resolved.config?.scratchDir).toBe(DEFAULT_SCRATCH_DIR);
   });
 
-  it("does not default scratchDir for a queue-only deployment", () => {
+  it("defaults scratchDir for a queue-only deployment too", () => {
     const queue = { metadata: { kind: "q" } } as never;
-    expect(resolveShelfOptions({ ...base, testing: { queue } }).config).toBeUndefined();
+    expect(resolveShelfOptions({ ...base, testing: { queue } }).config?.scratchDir).toBe(
+      DEFAULT_SCRATCH_DIR,
+    );
   });
 
-  it("defaults scratchDir for inline statics extraction too", () => {
+  it("keeps the other config keys when defaulting scratchDir", () => {
     const resolved = resolveShelfOptions({ ...base, config: { maxInlineUnzipSize: 10 } });
-    expect(resolved.config?.scratchDir).toBe(DEFAULT_SCRATCH_DIR);
+    expect(resolved.config).toEqual({ maxInlineUnzipSize: 10, scratchDir: DEFAULT_SCRATCH_DIR });
   });
 
   it("keeps an explicit scratchDir and the rest of the config", () => {

@@ -3,9 +3,11 @@ import type { ShelfOptions } from "@storyshelf/core/config";
 import { sanitizeErrorText } from "@storyshelf/core/utils";
 import type { Context, Next } from "hono";
 import type { QueueWiring } from "../capture-setup.ts";
+import type { PublishService } from "../publish-setup.ts";
 import type { ServerRuntime } from "../runtime.ts";
 
 export interface MiddlewareWiring extends ServerRuntime, QueueWiring {
+  publish: PublishService;
   options: ShelfOptions;
   getReady: () => Promise<AdapterSetupResult>;
 }

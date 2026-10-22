@@ -20,7 +20,7 @@ import {
 import { requestId } from "hono/request-id";
 import type { ShelfApp, ShelfContext, ShelfRouter } from "./app-types.ts";
 import { runBootTasks } from "./boot-tasks.ts";
-import { setupCaptureQueue } from "./capture-setup.ts";
+import { setupCaptureQueue, type QueueWiring } from "./capture-setup.ts";
 import { attachLifecycle, type LifecycleCell } from "./lifecycle.ts";
 import {
   authGate,
@@ -33,6 +33,7 @@ import {
 } from "./middleware/index.ts";
 import { serverTiming } from "./middleware/server-timing.ts";
 import { setupGate, type MiddlewareWiring } from "./middleware/setup-gate.ts";
+import { setupPublishing, type PublishService } from "./publish-setup.ts";
 import { registerAdminPages } from "./routers/admin-pages.ts";
 import { registerAdmin } from "./routers/admin.ts";
 import { registerAssets } from "./routers/assets.ts";
@@ -60,7 +61,7 @@ import { registerTokens } from "./routers/tokens.ts";
 import { registerUiPages } from "./routers/ui.ts";
 import { registerWebhooks } from "./routers/webhooks.ts";
 import { registerWellKnown } from "./routers/well-known.ts";
-import { resolveRuntime } from "./runtime.ts";
+import { resolveRuntime, type ServerRuntime } from "./runtime.ts";
 
 /**
  * Fail fast on third-party adapters that cannot satisfy their slot.
@@ -82,6 +83,29 @@ function instrumentedOptions(options: ShelfOptions): ShelfOptions {
   };
 }
 
+/** Wire the capture queue and publishing, and run the boot tasks that need them. */
+function wireQueues(
+  scoped: ShelfOptions,
+  runtime: ServerRuntime,
+  cell: LifecycleCell,
+): QueueWiring & { publish: PublishService } {
+  const { queue, enqueueCapture, recoverStuck } = setupCaptureQueue(
+    scoped,
+    runtime.config,
+    runtime.gitHosts,
+    runtime.logger,
+  );
+  const publishing = setupPublishing(
+    scoped,
+    runtime.config,
+    runtime.logger,
+    enqueueCapture !== undefined,
+  );
+  cell.publishConsumer = publishing.consumer;
+  runBootTasks(cell, scoped, runtime, recoverStuck);
+  return { queue, enqueueCapture, publish: publishing };
+}
+
 /** Attach lifecycle, queue, middleware, routes, and docs to the app. */
 function assembleApp(app: ShelfApp, options: ShelfOptions, scoped: ShelfOptions): void {
   const runtime = resolveRuntime(options);
@@ -90,17 +114,10 @@ function assembleApp(app: ShelfApp, options: ShelfOptions, scoped: ShelfOptions)
   if (runtime.config.serverTiming === true) {
     app.use("*", serverTiming(true));
   }
-  const { queue, enqueueCapture, recoverStuck } = setupCaptureQueue(
-    scoped,
-    runtime.config,
-    runtime.gitHosts,
-    runtime.logger,
-  );
-  runBootTasks(cell, scoped, runtime, recoverStuck);
+  const queues = wireQueues(scoped, runtime, cell);
   wireMiddleware(app, {
     ...runtime,
-    queue,
-    enqueueCapture,
+    ...queues,
     options: scoped,
     getReady: async () => await cell.ready,
   });
@@ -225,6 +242,7 @@ function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
     authEnabled,
     enqueueCapture,
     queue,
+    publish,
     gitHosts,
     design,
     notifiers,
@@ -240,6 +258,7 @@ function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
       authEnabled,
       enqueueCapture,
       captureQueue: queue,
+      publish,
       captureConcurrency: options.testing?.concurrency,
       gitHosts,
       design,

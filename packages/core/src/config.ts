@@ -122,7 +122,7 @@ export interface ShelfConfig {
   publicBaseUrl?: string;
   /**
    * Working directory for capture and inline statics extraction. Defaults to
-   * `<os.tmpdir()>/storyshelf` once a capture runner (or `maxInlineUnzipSize`) needs it.
+   * `<os.tmpdir()>/storyshelf`; publishing and capture extract there.
    */
   scratchDir?: string;
   purgeTtlDays?: number;
@@ -137,10 +137,19 @@ export interface ShelfConfig {
    */
   serverTiming?: boolean;
   /**
-   * Max zip size (bytes) eligible for inline statics extraction at upload.
-   * Unset (or 0) disables inline extraction — statics land via capture.
+   * Largest zip (bytes) extracted inline in the upload request; a larger zip is published by a
+   * `publish` job (or refused with 413 on a host that runs no consumer). The count is taken
+   * while the upload streams, never from `Content-Length`. Default 50 MB; `0` sends every zip to
+   * a `publish` job.
    */
   maxInlineUnzipSize?: number;
+  /** Most entries an uploaded Storybook zip may hold (default 50 000); more fails the publish. */
+  maxZipEntries?: number;
+  /**
+   * Most uncompressed bytes an uploaded Storybook zip may expand to (default 2 GiB), counted while
+   * extracting; more fails the publish. The compressed size is no bound on its own.
+   */
+  maxUnzippedBytes?: number;
   viewports?: ShelfViewport[];
   adapters?: Record<string, AdapterSnapshot>;
 }
@@ -223,7 +232,9 @@ export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
     branchGcIntervalMs: z.number().int().positive().optional(),
     maxUploadBytes: z.number().int().positive().optional(),
     serverTiming: z.boolean().optional(),
-    maxInlineUnzipSize: z.number().int().positive().optional(),
+    maxInlineUnzipSize: z.number().int().min(0).optional(),
+    maxZipEntries: z.number().int().positive().optional(),
+    maxUnzippedBytes: z.number().int().positive().optional(),
     viewports: z.array(viewportSchema).min(1, "at least one viewport required").optional(),
     adapters: z.record(z.string(), adapterSnapshotSchema).optional(),
   })
