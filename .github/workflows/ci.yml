@@ -1,7 +1,8 @@
 name: CI
 
 # `verify` runs build/lint/test, smoke and docs checks; `capture` is a matrix of
-# real-browser capture tests, one leg per Storybook fixture (8, 9, 10).
+# real-browser capture tests, one leg per Storybook fixture (8, 9, 10); `fly` is the
+# deploy dry run: it builds the Fly image, boots it and runs the demo seed against it.
 #
 # Node: the whole job runs on the version `setup-nub` resolves from
 # package.json#devEngines.runtime (24.x, the minimum supported Node) — there is
@@ -198,3 +199,71 @@ jobs:
           # puppeteer-core ships no browser; GitHub's ubuntu runners include Chrome.
           PUPPETEER_EXECUTABLE_PATH: /usr/bin/google-chrome
         run: nub run test:integration
+
+  fly:
+    name: fly (image + demo seed dry run)
+    runs-on: ubuntu-latest
+    env:
+      STORYSHELF_URL: http://127.0.0.1:3000
+      STORYSHELF_ADMIN_TOKEN: ci-admin-token
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Nub
+        uses: nubjs/setup-nub@v0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install dependencies
+        run: nub ci
+
+      - name: Build the workspace CLI
+        run: nubx turbo build --filter=storyshelf
+
+      - name: Build fixture Storybook
+        working-directory: fixtures/storybook-8
+        run: pnpm install --frozen-lockfile && pnpm run build-storybook
+
+      # Same Dockerfile and build context as fly.yml's `flyctl deploy`, minus the push.
+      - name: Build the Fly image
+        run: docker build -f apps/fly-app/Dockerfile -t storyshelf-fly .
+
+      - name: Boot the image
+        run: |
+          docker run -d --name storyshelf -p 3000:3000 \
+            -e STORYSHELF_ADMIN_TOKEN="$STORYSHELF_ADMIN_TOKEN" storyshelf-fly
+          for i in $(seq 1 30); do
+            curl -fsS "$STORYSHELF_URL/api/v1/health" && exit 0
+            sleep 2
+          done
+          echo "::error::the Fly image did not become healthy"
+          exit 1
+
+      - name: Seed the demo
+        run: apps/fly-app/seed.sh
+
+      - name: Demo captures through the pipeline
+        run: |
+          for i in $(seq 1 90); do
+            status="$(curl -fsS -H "Authorization: Bearer $STORYSHELF_ADMIN_TOKEN" \
+              "$STORYSHELF_URL/api/v1/projects/demo-design-system/builds" | jq -r '[.[].status] | join(" ")')"
+            echo "build statuses: $status"
+            case "$status" in
+              *failed*) echo "::error::a demo build failed"; exit 1 ;;
+              *pending*|*capturing*|*comparing*|"") sleep 5 ;;
+              *) exit 0 ;;
+            esac
+          done
+          echo "::error::demo builds did not settle in time"
+          exit 1
+
+      - name: Re-seed is a no-op
+        run: apps/fly-app/seed.sh | tee reseed.log && grep -q "up to date" reseed.log
+
+      - name: Container logs
+        if: ${{ failure() }}
+        run: docker logs storyshelf
