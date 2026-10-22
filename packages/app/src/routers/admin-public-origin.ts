@@ -7,6 +7,7 @@ import { normalizeOrigin } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
+import { requestOpenBuildStatesNow } from "../git-status.ts";
 import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
 import { requireSiteAdmin } from "./helpers.ts";
@@ -39,7 +40,17 @@ async function handleReport(c: Context): Promise<Response> {
   }
   const reported = await reportedOrigin(c);
   const before = await publicOrigin.stored();
-  return c.json(await publicOrigin.report(reported, user?.id), before === null ? 201 : 200);
+  const wasResolved = (await publicOrigin.url()) !== undefined;
+  const stored = await publicOrigin.report(reported, user?.id);
+  resumeIfResolved(wasResolved);
+  return c.json(stored, before === null ? 201 : 200);
+}
+
+/** Notifications were paused and an origin now resolves: re-request the state of open builds. */
+function resumeIfResolved(wasResolved: boolean): void {
+  if (!wasResolved) {
+    requestOpenBuildStatesNow().catch(() => 0);
+  }
 }
 
 /** Store what an admin typed; the message says why not when it is no origin. */
@@ -47,7 +58,9 @@ async function storeTyped(c: Context): Promise<string> {
   const { publicOrigin, user } = getStore();
   const origin = (await c.req.formData()).get("origin");
   try {
+    const wasResolved = (await publicOrigin?.url()) !== undefined;
     await publicOrigin?.set(typeof origin === "string" ? origin : "", user?.id);
+    resumeIfResolved(wasResolved);
     return "Public origin saved";
   } catch (error) {
     return error instanceof Error ? error.message : "Invalid origin";

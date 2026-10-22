@@ -26,6 +26,7 @@ curl -X POST $SHELF/api/v1/projects/my-app/notification-channels \
 - `provider` — `slack-webhook` | `teams-workflow` | `email`, or a git provider (see below); it must be wired in `ShelfOptions.notifications.notifiers`, and unknown kinds are a 400.
 - `events` — allowlist or empty for all; `enabled` toggles delivery without deleting.
 - Secrets (webhook URLs, SMTP passwords) are stored AES-256-GCM encrypted with server `SECRET` and decrypted only in memory at send time.
+- **A public URL is required.** Every message links to the build or review page, so while the server resolves no [public origin](/guides/config/#public-origin) (`PUBLIC_BASE_URL`, the platform's address, or the origin an admin confirmed on **System**) no notification is sent at all, git statuses included. Channels are not marked as failing; **System**, the project's notification settings and your profile show "Notifications are paused until a public URL is set", and the server logs it at start-up. Webhooks carry ids and no links, so they are unaffected.
 - Display toggles: `style` (`compact`|`verbose`), `subjectPrefix`, `includeAuthor`, `includeMessage`, `includeCounts`. Brand (name, logo, links) comes from server `UIConfig` + `publicBaseUrl`.
 
 ## Git channels (commit statuses)

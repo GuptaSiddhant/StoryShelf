@@ -72,7 +72,11 @@ async function seed() {
 
 type Seeded = Awaited<ReturnType<typeof seed>>;
 
-function testApp(seeded: Seeded, auth: boolean): ReturnType<typeof createShelfApp> {
+function testApp(
+  seeded: Seeded,
+  auth: boolean,
+  publicBaseUrl?: string,
+): ReturnType<typeof createShelfApp> {
   return createShelfApp({
     database: seeded.db,
     storage: seeded.storage,
@@ -85,7 +89,7 @@ function testApp(seeded: Seeded, auth: boolean): ReturnType<typeof createShelfAp
       ],
     },
     logger: pino({ level: "silent" }),
-    config: { secret },
+    config: { secret, ...(publicBaseUrl === undefined ? {} : { publicBaseUrl }) },
   });
 }
 
@@ -115,6 +119,18 @@ describe("notifications settings tab", () => {
     expect(html).toContain("Add a message channel");
     expect(html).toContain("Add a git channel");
     expect(html).not.toContain("settings/status");
+  });
+
+  it("says notifications are paused until a public URL is set, and only then", async () => {
+    const paused = "Notifications are paused until a public URL is set";
+    const without = testApp(await seed(), false);
+    expect(
+      await (await without.request("/projects/notify-project/settings/notifications")).text(),
+    ).toContain(paused);
+    const withOrigin = testApp(await seed(), false, "https://shelf.example.com");
+    expect(
+      await (await withOrigin.request("/projects/notify-project/settings/notifications")).text(),
+    ).not.toContain(paused);
   });
 
   it("creates an email channel from the form", async () => {

@@ -3,7 +3,6 @@ import { ProjectModel } from "@storyshelf/core/models";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { getStore } from "../store.ts";
 import {
-  Alert,
   Badge,
   Button,
   Card,
@@ -78,20 +77,11 @@ export function renderActiveQueue(slug: string, queueView: QueueView[]): Rendere
   );
 }
 
-/**
- * A `capturing` build the in-process queue no longer tracks was cut short by a
- * restart. Remote queues are invisible to the server, so nothing is flagged there.
- */
-export function isStuckCapture(status: string, tracked: boolean, inProcessQueue: boolean): boolean {
-  return inProcessQueue && status === "capturing" && !tracked;
-}
-
 /** Compute jobs page: live capture queue plus recent build history with retry. */
 export async function renderComputeJobsPage(
   slug: string,
   queueView: QueueView[],
   canRetry: boolean,
-  inProcessQueue = false,
 ): Promise<RenderedContent | null> {
   const projects = await new ProjectModel(getStore().db).list();
   const project = projects.find((item) => item.slug === slug);
@@ -101,9 +91,6 @@ export async function renderComputeJobsPage(
   const builds = await new BuildModel(getStore().db).list(project.id);
   const recentBuilds = builds.slice(0, 20);
   const queueByBuild = new Map(queueView.map((job) => [job.buildId, job]));
-  const stuck = (id: string, status: string): boolean =>
-    isStuckCapture(status, queueByBuild.has(id), inProcessQueue);
-  const stuckCount = recentBuilds.filter((build) => stuck(build.id, build.status)).length;
 
   return (
     <DocumentLayout
@@ -120,19 +107,11 @@ export async function renderComputeJobsPage(
         }
       />
 
-      {stuckCount > 0 ? (
-        <Alert tone="warning" title="Interrupted captures">
-          {stuckCount} build{stuckCount === 1 ? " was" : "s were"} still capturing when the server
-          restarted. On startup an interrupted build is requeued once; if it is interrupted again it
-          is marked failed so a crash loop cannot repeat captures. Retry a build to run it again.
-        </Alert>
-      ) : null}
-
       {renderActiveQueue(project.slug, queueView)}
 
       <Card>
         <SectionTitle>Recent builds</SectionTitle>
-        <Meta>Capture history for {project.name}. Failed and interrupted jobs can be retried.</Meta>
+        <Meta>Capture history for {project.name}. Failed jobs can be retried.</Meta>
         <Table>
           <table>
             <thead>
@@ -156,11 +135,7 @@ export async function renderComputeJobsPage(
                     </Meta>
                   </td>
                   <td>
-                    <Badge
-                      tone={stuck(build.id, build.status) ? "warning" : statusTone(build.status)}
-                    >
-                      {stuck(build.id, build.status) ? "interrupted" : build.status}
-                    </Badge>
+                    <Badge tone={statusTone(build.status)}>{build.status}</Badge>
                   </td>
                   <td>
                     <Meta as="span">
@@ -179,10 +154,7 @@ export async function renderComputeJobsPage(
                       >
                         View
                       </Button>
-                      {canRetry &&
-                      (build.status === "failed" ||
-                        build.status === "pending" ||
-                        stuck(build.id, build.status)) ? (
+                      {canRetry && (build.status === "failed" || build.status === "pending") ? (
                         <form
                           method="post"
                           action={`/api/v1/projects/${project.slug}/builds/${build.id}/retry`}

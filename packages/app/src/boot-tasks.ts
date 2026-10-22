@@ -4,6 +4,7 @@ import type { Logger } from "@storyshelf/core/logger";
 import { checkCredentialsAfterSetup } from "./credentials.ts";
 import { logHostingOnlyMode } from "./hidden-data.ts";
 import { startConsumer, trackBackground, type LifecycleCell } from "./lifecycle.ts";
+import { NOTIFICATIONS_PAUSED_TEXT } from "./notifications-pause.ts";
 import type { ServerRuntime } from "./runtime.ts";
 
 /**
@@ -20,6 +21,26 @@ export function runBootTasks(
   sweepScratchOnBoot(cell, runtime.config.scratchDir, runtime.logger);
   checkCredentialsAfterSetup(cell, scoped.database, runtime.config, runtime.logger);
   logHostingOnlyAfterSetup(cell, scoped, runtime.logger);
+  logPausedAfterSetup(cell, runtime);
+}
+
+/** With notifiers wired but no public origin resolved, say at boot that notifications are paused. */
+function logPausedAfterSetup(cell: LifecycleCell, runtime: ServerRuntime): void {
+  if (runtime.notifiers.length === 0) {
+    return;
+  }
+  trackBackground(
+    cell,
+    cell.ready
+      .then(async (setup) => {
+        if (setup.ok && (await runtime.publicOrigin.url()) === undefined) {
+          runtime.logger.warn({}, NOTIFICATIONS_PAUSED_TEXT);
+        }
+      })
+      .catch((error: unknown) => {
+        runtime.logger.warn({ err: error }, "could not check the public origin for notifications");
+      }),
+  );
 }
 
 /** Without `testing`, once adapters are ready, log the mode and any snapshots it hides. */

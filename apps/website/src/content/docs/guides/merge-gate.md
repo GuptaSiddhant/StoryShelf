@@ -27,6 +27,8 @@ With `testing` on, `<prefix>/testing` stays the only gate and review never adds 
 
 The gating status is named **`<prefix>/testing`**, where `<prefix>` is the git channel's prefix (default `storyshelf`, so `storyshelf/testing`), and links to the build review page. Its description says whether review is still open. StoryShelf also posts `<prefix>/storybook` (the published Storybook, informational), which you should not require. Statuses follow the build's current state and are delivered durably with retries; see [Delivery](/packages/notify-git/#delivery). The name has no project slug: a repository that holds several projects gives each channel its own prefix (see [Several projects in one repo](#several-projects-in-one-repo)). Only approvers and admins can accept snapshots, so who can green-light a merge is a matter of [roles](/concepts/roles/).
 
+> **A public URL is required.** Every status links to the build page, so nothing is posted, and the required check never appears, while the server has no [public origin](/guides/config/#public-origin). Set `PUBLIC_BASE_URL` (or confirm the detected origin on **System**); until then **System** and the project's notification settings show "Notifications are paused until a public URL is set" and no channel is marked as failing.
+
 ## 1. Connect the git provider
 
 Do this once per project. See the [CI guide](/guides/ci/#merge-gate) for the short version.

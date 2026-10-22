@@ -25,10 +25,16 @@ const playwright = vi.hoisted(() => {
   let extractResult: unknown;
   const launchOptions: unknown[] = [];
   let launchFailure: Error | null = null;
+  let gate: Promise<null> | null = null;
+  let held = 0;
   const makePage = () => ({
     goto: async (): Promise<void> => {
       if (closed) {
         throw new Error("Browser closed by cancel");
+      }
+      if (gate !== null) {
+        held += 1;
+        await gate;
       }
       if (!hangNextGoto) {
         return;
@@ -125,6 +131,17 @@ const playwright = vi.hoisted(() => {
       launchFailure = error;
     },
     stats,
+    /** Hold every `goto` until the returned function is called. */
+    holdGotos: (): (() => void) => {
+      const { promise, resolve } = Promise.withResolvers<null>();
+      gate = promise;
+      held = 0;
+      return () => {
+        gate = null;
+        resolve(null);
+      };
+    },
+    heldGotos: (): number => held,
     configureHang: (hang: boolean): void => {
       hangNextGoto = hang;
     },
@@ -192,6 +209,29 @@ describe("createPlaywrightCaptureRunner.render", () => {
     expect(result.failures[0]?.storyId).toBe("components-button--primary");
     const browser = playwright.lastBrowser();
     expect(browser?.closed).toBe(true);
+  }, 30_000);
+
+  it("lets a render in flight finish across a teardown, then closes its browser", async () => {
+    const runner = createPlaywrightCaptureRunner();
+    playwright.configureHang(false);
+    const release = playwright.holdGotos();
+    const rendering = runner.render({
+      buildId: "build-drain",
+      storybookDir,
+      stories: STORIES,
+      viewports: VIEWPORTS,
+    });
+    await vi.waitFor(() => {
+      expect(playwright.heldGotos()).toBeGreaterThan(0);
+    });
+    // The host's graceful drain: the runner is torn down while the capture is still running.
+    await runner.lifecycle?.teardown();
+    expect(playwright.lastBrowser()?.closed).toBe(false);
+    release();
+    const result = await rendering;
+    expect(result.failures).toHaveLength(0);
+    expect(result.captures).toHaveLength(1);
+    expect(playwright.lastBrowser()?.closed).toBe(true);
   }, 30_000);
 
   it("restarts the browser every N captures and logs the sizing", async () => {
@@ -652,6 +692,12 @@ describe("createPlaywrightCaptureRunner targets (ADR 0007)", () => {
       channel?: string;
       args: string[];
     }[];
+    // The host owns shutdown (a graceful drain must not have its browsers closed by a signal).
+    expect(chromium).toMatchObject({
+      handleSIGINT: false,
+      handleSIGTERM: false,
+      handleSIGHUP: false,
+    });
     expect(chrome?.channel).toBe("chrome");
     expect(chromium).not.toHaveProperty("channel");
     expect(chromium?.args).toContain("--disable-dev-shm-usage");

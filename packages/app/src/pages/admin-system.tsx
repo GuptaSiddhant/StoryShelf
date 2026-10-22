@@ -21,6 +21,7 @@ import { csrfField } from "../ui/csrf-field.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
 import { PublicOriginCard, type PublicOriginView } from "./admin-system-origin.tsx";
 import { CaptureTargetsCard } from "./admin-system-targets.tsx";
+import { NotificationsPausedNotice } from "./notifications-paused.tsx";
 
 /* eslint-disable promise-function-async -- Hono JSX components return HtmlEscapedString | Promise<HtmlEscapedString> */
 
@@ -45,6 +46,8 @@ export interface AdminSystemData {
   targets?: readonly RunnerTarget[] | undefined;
   /** The public origin and where it came from; omitted when the store has no resolver. */
   publicOrigin?: PublicOriginView | undefined;
+  /** Notifiers are wired but no public origin resolves, so nothing is sent (ADR 0014, decision 11). */
+  notificationsPaused?: boolean | undefined;
 }
 
 function healthTone(state: string): "success" | "info" | "danger" | "neutral" {
@@ -324,6 +327,7 @@ export function renderAdminSystemPage(data: AdminSystemData): RenderedContent {
           </HStack>
         }
       />
+      <NotificationsPausedNotice paused={data.notificationsPaused} />
       {data.testing === false ? (
         <HostingOnlyNotice hiddenSnapshots={data.hiddenSnapshots ?? 0} />
       ) : null}

@@ -13,5 +13,10 @@ export {
   type NotifyHandlerOptions,
   type NotifyJobQueue,
 } from "./notify-job.ts";
-export { createBuildStatePublisher, type BuildStatePublisherOptions } from "./publisher.ts";
+export {
+  createBuildStatePublisher,
+  PAUSED_MESSAGE,
+  type BuildStatePublisherOptions,
+} from "./publisher.ts";
+export { requestOpenBuildStates } from "./resume.ts";
 export type { BuildStateDeps, BuildStatePublisher, SkipReason, StateTarget } from "./types.ts";

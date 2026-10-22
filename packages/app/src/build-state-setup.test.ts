@@ -37,7 +37,7 @@ function recordingMessageProvider(sent: unknown[]): NotifierProvider {
   };
 }
 
-async function world(options: { testing?: boolean; review?: boolean } = {}) {
+async function world(options: { testing?: boolean; review?: boolean; noOrigin?: boolean } = {}) {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
   const git = makeFakeStateNotifier();
@@ -46,7 +46,10 @@ async function world(options: { testing?: boolean; review?: boolean } = {}) {
     database: db,
     storage,
     logger,
-    config: { secret: SECRET, publicBaseUrl: "https://shelf.example.com" },
+    config: {
+      secret: SECRET,
+      ...(options.noOrigin === true ? {} : { publicBaseUrl: "https://shelf.example.com" }),
+    },
     testing: options.testing === false ? undefined : { runner: {} },
     notifications: { notifiers: [git.provider, recordingMessageProvider(sent)] },
   } as unknown as ShelfOptions;
@@ -98,6 +101,16 @@ describe("setupBuildState", () => {
       data: { channelId: w.git1.id },
     });
     expect(await jobs.get().poll()).toBeNull();
+  });
+
+  it("is paused without a public origin: nothing is queued, delivered or marked as errored", async () => {
+    const w = await world({ noOrigin: true });
+    const jobs = createJobQueue(w.shelf, ["notify"], 4);
+    await setupBuildState(w.shelf, w.runtime, jobs).publisher.request(w.build.id);
+    await setupBuildState(w.shelf, w.runtime, null).publisher.request(w.build.id);
+    expect(w.git.calls).toHaveLength(0);
+    expect(await jobs.get().poll()).toBeNull();
+    expect((await w.channels.get(w.git1.id))?.lastError).toBeNull();
   });
 
   it("shows only the Storybook status without testing and review", async () => {

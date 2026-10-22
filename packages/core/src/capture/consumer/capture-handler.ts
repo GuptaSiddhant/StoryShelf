@@ -164,7 +164,9 @@ function inlineBuildState(
 }
 
 /** The host's origin resolver, else one built from the database and `config.publicBaseUrl`. */
-function originOf(options: CaptureHandlerOptions): () => Promise<string | undefined> {
+export function originOf(
+  options: Pick<CaptureHandlerOptions, "db" | "config" | "publicOrigin">,
+): () => Promise<string | undefined> {
   if (options.publicOrigin !== undefined) {
     return options.publicOrigin;
   }
