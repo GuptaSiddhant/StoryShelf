@@ -9,12 +9,11 @@ import type { ProjectRole } from "@storyshelf/core/types";
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
-import { getStore } from "../store.ts";
 import { giveVerdict } from "./build-reviews.handlers.ts";
 import { APPROVER_ROLES, DEVELOPER_ROLES, buildForProject } from "./builds.handlers.ts";
 import { createComment, resolveBuildComment } from "./comments.ts";
 import { flash } from "./flash.ts";
-import { resolveAuthorizedProject } from "./helpers.ts";
+import { resolveAuthorizedProject, resolveReviewer } from "./helpers.ts";
 import { hxRefresh } from "./htmx.ts";
 import { buildReviewCreateSchema, commentCreateSchema } from "./schemas.ts";
 
@@ -45,7 +44,7 @@ export function registerReviewForms(app: ShelfRouter): void {
     if (!input.success) {
       throw new HTTPException(400, { message: "Choose approve or reject" });
     }
-    await giveVerdict(project, build, getStore().user?.id ?? null, input.data);
+    await giveVerdict(project, build, await resolveReviewer(c), input.data);
     return done(c, build.id, "Verdict recorded");
   });
 }

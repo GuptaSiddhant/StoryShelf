@@ -92,11 +92,11 @@ transition and when publishing finishes. It is independent of the capture pipeli
 was never captured still posts its statuses. The transport never sees an event it must order; it
 sees "make the host show the current state of this build".
 
-| Context              | Posted when                       | Meaning                                                                                                                                                                   |
-| -------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `<prefix>/testing`   | `testing` is on                   | `pending` on creation, `success` when all new and changed snapshots are approved, `failure` when changes are rejected. Its description says whether review is still open. |
-| `<prefix>/review`    | `testing` is off and review is on | `pending` on creation, `success` or `failure` from the build-level verdict.                                                                                               |
-| `<prefix>/storybook` | every build with a commit SHA     | `success` when publishing finishes, targeting the published Storybook; `failure` if publishing fails. Informational, not a gate.                                          |
+| Context              | Posted when                       | Meaning                                                                                                                                                                                                                                  |
+| -------------------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<prefix>/testing`   | `testing` is on                   | `pending` on creation, `success` when all new and changed snapshots are approved, `failure` when changes are rejected. Its description says whether review is still open.                                                                |
+| `<prefix>/review`    | `testing` is off and review is on | `pending` on creation (with several approvals required the description shows `Waiting for approvals: 1 of 2`), `success` or `failure` from the build-level verdict. With review off an accepted build shows `success` (`Review is off`). |
+| `<prefix>/storybook` | every build with a commit SHA     | `success` when publishing finishes, targeting the published Storybook; `failure` if publishing fails. Informational, not a gate.                                                                                                         |
 
 The function (`statusesForBuild`, in the notifier module of core) is pure: it takes the build, the
 channel's prefix, absolute links from `publicBaseUrl` and the `testing` and review flags, and returns
@@ -110,9 +110,11 @@ the statuses and the pull-request comment. Its details:
 - A build without a commit SHA, or with a synthetic local identity, shows nothing.
 - Links are absolute when `publicBaseUrl` is set; without it they are relative paths, which a git
   host cannot follow.
-- `review` is part of the function and is posted only when `testing` is off and the review flag is
-  on. The flag has no source until the project review setting exists, so it is off and only
-  `testing` and `storybook` are posted.
+- `review` is part of the function and is posted when `testing` is off and the review flag is on
+  (the flag is the project's review switch). Its `pending` description shows approval progress when
+  several approvals are required (the delivery reads the build's reviews). With the flag off, an
+  accepted build shows a final `success` (`Review is off`), so a status left `pending` when review
+  was on is closed.
 
 Which statuses exist and what decides them is defined in ADR 0013 UI Review. The prefix is a field
 of the git channel's config, default `storyshelf`, with no project slug. A repository that holds

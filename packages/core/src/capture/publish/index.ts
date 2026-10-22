@@ -5,6 +5,7 @@
  */
 export { createPublishHandler, type PublishHandlerOptions } from "./handler.ts";
 export { publishVerdict, type PublishFacts } from "./accept.ts";
+export { publishingOf } from "./published.ts";
 export {
   createPublishCompleter,
   type AfterPublishContext,

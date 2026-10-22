@@ -1,6 +1,7 @@
-import { BuildModel, MemberModel, ProjectModel } from "@storyshelf/core/models";
+import { BuildModel, MemberModel, ProjectModel, TokenModel } from "@storyshelf/core/models";
 import { makeDatabase, makeFakeStateNotifier, makeStorage } from "@storyshelf/core/test-helpers";
 import type { ProjectRole } from "@storyshelf/core/types";
+import { sha256, storybookDir } from "@storyshelf/core/utils";
 import AdmZip from "adm-zip";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -67,7 +68,9 @@ function storybookZip(): Buffer {
   return zip.toBuffer();
 }
 
-async function boot(options: { testing?: boolean; project?: Record<string, unknown> } = {}) {
+async function boot(
+  options: { testing?: boolean; noAuth?: boolean; project?: Record<string, unknown> } = {},
+) {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
   const git = makeFakeStateNotifier("fake-host");
@@ -101,9 +104,14 @@ async function boot(options: { testing?: boolean; project?: Record<string, unkno
   const app = createShelfApp({
     database: db,
     storage,
-    auth,
+    ...(options.noAuth === true ? {} : { auth }),
     ...(options.testing === true ? { testing: { runner: stubRunner() } } : {}),
-    config: { secret: "s", scratchDir, publicBaseUrl: "https://shelf.example" },
+    config: {
+      secret: "s",
+      scratchDir,
+      publicBaseUrl: "https://shelf.example",
+      adminToken: "root-token",
+    },
     notifications: { notifiers: [git.provider] },
     logger: pino({ level: "silent" }),
   });
@@ -127,7 +135,13 @@ async function boot(options: { testing?: boolean; project?: Record<string, unkno
     git.calls.flatMap((call) =>
       call.target.kind === "status" && call.target.context === context ? [call.state] : [],
     );
-  return { app, db, as, statuses };
+  const descriptions = (context: string): string[] =>
+    git.calls.flatMap((call) =>
+      call.target.kind === "status" && call.target.context === context
+        ? [call.target.description ?? ""]
+        : [],
+    );
+  return { app, db, storage, as, statuses, descriptions };
 }
 
 type Booted = Awaited<ReturnType<typeof boot>>;
@@ -270,7 +284,8 @@ describe("hosting-only review", () => {
     await vi.waitFor(() => {
       expect(booted.statuses("storyshelf/storybook").at(-1)).toBe("success");
     });
-    expect(booted.statuses("storyshelf/review")).toEqual([]);
+    // Review was never on, so the one status is the closing success (no pending one to clear).
+    expect(booted.statuses("storyshelf/review")).toEqual(["success"]);
     await booted.app.lifecycle.teardown();
   });
 
@@ -297,6 +312,127 @@ describe("hosting-only review", () => {
   });
 });
 
+const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
+
+async function bearerVerdict(booted: Booted, id: string, token: string): Promise<Response> {
+  return await booted.app.request(`/api/v1/projects/gate/builds/${id}/reviews`, {
+    method: "POST",
+    headers: { ...bearer(token), "content-type": "application/json" },
+    body: JSON.stringify({ verdict: "approved" }),
+  });
+}
+
+describe("who gave the verdict", () => {
+  it("attributes a token's verdict to the user who owns the token", async () => {
+    const booted = await boot({ project: { reviewApprovals: 2 } });
+    const id = await publish(booted, "feature/x");
+    await new TokenModel(booted.db).create("p1", {
+      name: "alice-ci",
+      hash: sha256("alice-token"),
+      userId: "alice",
+    });
+    const given = await bearerVerdict(booted, id, "alice-token");
+    expect(given.status).toBe(201);
+    expect(await given.json()).toMatchObject({ userId: "alice" });
+    // The token's owner is one reviewer: the same user by session adds no second approval.
+    await booted.as("alice")(`/builds/${id}/reviews`, verdict("approved"));
+    expect(await statusOf(booted, id)).toBe("pending");
+    await booted.as("bob")(`/builds/${id}/reviews`, verdict("approved"));
+    expect(await statusOf(booted, id)).toBe("approved");
+    await booted.app.lifecycle.teardown();
+  });
+
+  it("refuses a verdict that cannot be traced to a user", async () => {
+    const booted = await boot();
+    const id = await publish(booted, "feature/x");
+    const adminToken = await bearerVerdict(booted, id, "root-token");
+    expect(adminToken.status).toBe(403);
+    expect(await adminToken.text()).toContain("needs a user");
+    await new TokenModel(booted.db).create("p1", {
+      name: "ownerless",
+      hash: sha256("ownerless-token"),
+      userId: null,
+    });
+    expect((await bearerVerdict(booted, id, "ownerless-token")).status).toBe(403);
+    expect((await bearerVerdict(booted, id, "unknown-token")).status).toBe(401);
+    expect(await statusOf(booted, id)).toBe("pending");
+    await booted.app.lifecycle.teardown();
+  });
+
+  it("records one anonymous reviewer only when the instance has no authentication", async () => {
+    const booted = await boot({ noAuth: true });
+    const id = await publish(booted, "feature/x");
+    const given = await booted.as("nobody")(`/builds/${id}/reviews`, verdict("approved"));
+    expect(given.status).toBe(201);
+    expect(await given.json()).toMatchObject({ userId: null });
+    expect(await statusOf(booted, id)).toBe("approved");
+    await booted.app.lifecycle.teardown();
+  });
+
+  it("answers 409 to an anonymous verdict when the project needs several approvals", async () => {
+    const booted = await boot({ noAuth: true, project: { reviewApprovals: 2 } });
+    const id = await publish(booted, "feature/x");
+    const refused = await booted.as("nobody")(`/builds/${id}/reviews`, verdict("approved"));
+    expect(refused.status).toBe(409);
+    expect(await refused.text()).toContain("needs 2 approvals");
+    expect(await statusOf(booted, id)).toBe("pending");
+    await booted.app.lifecycle.teardown();
+  });
+});
+
+describe("a verdict waits for publishing", () => {
+  it("answers 409 until the Storybook is published, then takes the verdict", async () => {
+    const booted = await boot();
+    const created = await booted.as("dev")("/builds", {
+      method: "POST",
+      body: JSON.stringify({ gitSha: SHA, gitBranch: "feature/x" }),
+    });
+    const { build } = (await created.json()) as { build: { id: string } };
+    const early = await booted.as("alice")(`/builds/${build.id}/reviews`, verdict("approved"));
+    expect(early.status).toBe(409);
+    expect(await early.text()).toContain("still publishing");
+    expect(await statusOf(booted, build.id)).toBe("pending");
+    expect((await new BuildModel(booted.db).get(build.id))?.status).toBe("pending");
+
+    await booted.storage.write(`${storybookDir("p1", build.id)}/manifest.json`, Buffer.from("{}"));
+    const late = await booted.as("alice")(`/builds/${build.id}/reviews`, verdict("approved"));
+    expect(late.status).toBe(201);
+    expect(await statusOf(booted, build.id)).toBe("approved");
+    await booted.app.lifecycle.teardown();
+  });
+});
+
+describe("review progress and switch-off on the git host", () => {
+  it("shows approval progress on <prefix>/review", async () => {
+    const booted = await boot({ project: { reviewApprovals: 2 } });
+    const id = await publish(booted, "feature/x");
+    await booted.as("alice")(`/builds/${id}/reviews`, verdict("approved"));
+    await vi.waitFor(() => {
+      expect(booted.descriptions("storyshelf/review").at(-1)).toBe("Waiting for approvals: 1 of 2");
+    });
+    await booted.app.lifecycle.teardown();
+  });
+
+  it("clears the pending review status when review is switched off", async () => {
+    const booted = await boot();
+    const id = await publish(booted, "feature/x");
+    await vi.waitFor(() => {
+      expect(booted.statuses("storyshelf/review").at(-1)).toBe("pending");
+    });
+    const off = await booted.as("admin")("", {
+      method: "PATCH",
+      body: JSON.stringify({ reviewEnabled: false }),
+    });
+    expect(off.status).toBe(200);
+    expect(await statusOf(booted, id)).toBe("approved");
+    await vi.waitFor(() => {
+      expect(booted.statuses("storyshelf/review").at(-1)).toBe("success");
+      expect(booted.descriptions("storyshelf/review").at(-1)).toBe("Review is off");
+    });
+    await booted.app.lifecycle.teardown();
+  });
+});
+
 describe("review with testing on", () => {
   it("stores the verdict as a sign-off and leaves the status to the snapshots", async () => {
     const booted = await boot({ testing: true });
@@ -305,6 +441,7 @@ describe("review with testing on", () => {
       body: JSON.stringify({ gitSha: SHA, gitBranch: "feature/z" }),
     });
     const { build } = (await created.json()) as { build: { id: string; status: string } };
+    await booted.storage.write(`${storybookDir("p1", build.id)}/manifest.json`, Buffer.from("{}"));
     const before = await statusOf(booted, build.id);
     const given = await booted.as("alice")(`/builds/${build.id}/reviews`, verdict("approved"));
     expect(given.status).toBe(201);
