@@ -43,10 +43,10 @@ export interface BuildStateInput {
   /** The channel's status-name prefix, without a trailing slash. */
   prefix: string;
   /**
-   * Absolute links (`createUrlBuilder(publicOrigin)`). `null` when no public origin is known: the
-   * statuses then carry no link and there is no pull-request comment, whose job is to link (ADR 0007).
+   * Absolute links (`createUrlBuilder(publicOrigin)`). A build's state is only ever shown once a
+   * public origin is resolved (ADR 0014, decision 11), so every status links and the comment exists.
    */
-  urls: Pick<UrlBuilder, "build" | "storybookBuild"> | null;
+  urls: Pick<UrlBuilder, "build" | "storybookBuild">;
   flags: BuildStateFlags;
   publishing: PublishingState;
   /**
@@ -63,8 +63,8 @@ export interface DesiredStatus {
   context: string;
   state: NotifierState;
   description: string;
-  /** What the status links to: the build page, or the published Storybook for `storybook`; absent without a public origin. */
-  url?: string | undefined;
+  /** What the status links to: the build page, or the published Storybook for `storybook`. */
+  url: string;
 }
 
 /** The pull-request comment to show. */
@@ -89,10 +89,10 @@ export function statusesForBuild(input: BuildStateInput): BuildStateSet {
   }
   const links = linksOf(input);
   const statuses = [
-    ...gateStatus(input, links?.build),
+    ...gateStatus(input, links.build),
     storybookStatus(input.publishing, input.prefix, links),
   ];
-  return { statuses, comment: links === null ? null : commentOf(input, statuses, links) };
+  return { statuses, comment: commentOf(input, statuses, links) };
 }
 
 function commentOf(
@@ -118,12 +118,9 @@ interface Links {
   storybook: string;
 }
 
-/** The links to show, or `null` without a public origin. */
-function linksOf(input: BuildStateInput): Links | null {
+/** The links to show. */
+function linksOf(input: BuildStateInput): Links {
   const { urls, projectSlug, build } = input;
-  if (urls === null) {
-    return null;
-  }
   return {
     build: urls.build(projectSlug, build.id),
     storybook: `${urls.storybookBuild(projectSlug, build.id).replace(/\/+$/u, "")}/`,
@@ -131,7 +128,7 @@ function linksOf(input: BuildStateInput): Links | null {
 }
 
 /** `testing` when it is on; `review` when only review is on; none for a hosting-only build. */
-function gateStatus(input: BuildStateInput, url: string | undefined): DesiredStatus[] {
+function gateStatus(input: BuildStateInput, url: string): DesiredStatus[] {
   const { flags, build, prefix } = input;
   if (flags.testing) {
     return [{ name: "testing", context: `${prefix}/testing`, url, ...testingOutcome(build) }];
@@ -155,7 +152,7 @@ function gateStatus(input: BuildStateInput, url: string | undefined): DesiredSta
  * the pull request. The function sees no history, so every accepted build of a project with review
  * off shows it, and a host that requires the status never waits for one that will not come.
  */
-function reviewClosed(input: BuildStateInput, url: string | undefined): DesiredStatus[] {
+function reviewClosed(input: BuildStateInput, url: string): DesiredStatus[] {
   if (input.build.status !== "approved") {
     return [];
   }
@@ -219,18 +216,14 @@ function reviewOutcome(build: BuildStateBuild, approvals: BuildStateInput["appro
 }
 
 /** Informational: never a gate, linking to the published Storybook once there is one. */
-function storybookStatus(
-  publishing: PublishingState,
-  prefix: string,
-  links: Links | null,
-): DesiredStatus {
+function storybookStatus(publishing: PublishingState, prefix: string, links: Links): DesiredStatus {
   const base = { name: "storybook", context: `${prefix}/storybook` } as const;
   if (publishing === "success") {
     return {
       ...base,
       state: "success",
       description: "Storybook published",
-      url: links?.storybook,
+      url: links.storybook,
     };
   }
   if (publishing === "failure") {
@@ -238,10 +231,10 @@ function storybookStatus(
       ...base,
       state: "failure",
       description: "Storybook could not be published",
-      url: links?.build,
+      url: links.build,
     };
   }
-  return { ...base, state: "pending", description: "Publishing Storybook", url: links?.build };
+  return { ...base, state: "pending", description: "Publishing Storybook", url: links.build };
 }
 
 /** `1 of 2 approvals` when the project needs several; a single approval just waits for a verdict. */

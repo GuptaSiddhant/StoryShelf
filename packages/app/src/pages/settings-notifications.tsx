@@ -16,6 +16,7 @@ import {
   VStack,
 } from "../ui/components.tsx";
 import { csrfField } from "../ui/csrf-field.tsx";
+import { NotificationsPausedNotice } from "./notifications-paused.tsx";
 import { CreateGitChannelCard } from "./settings-notifications-git.tsx";
 
 /** Notification topic catalog (mirrors the webhook event names). */
@@ -295,11 +296,13 @@ export function renderSettingsNotifications(
   mySubscription: SettingsMySubscription | null,
   isAdmin: boolean,
   formState?: NotificationsFormState,
+  paused?: boolean,
 ): unknown {
   const messageProviders = providers.filter((provider) => provider.delivery === "message");
   const gitProviders = providers.filter((provider) => provider.delivery === "state");
   return (
     <div class="grid max-w-form">
+      <NotificationsPausedNotice paused={paused} />
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
       <MyNotificationsCard project={project} mySubscription={mySubscription} />
       <ChannelsCard project={project} channels={channels} isAdmin={isAdmin} />

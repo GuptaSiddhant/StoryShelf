@@ -25,14 +25,16 @@ export async function deliverBuildState(
   ids: { buildId: string; channelId: string },
 ): Promise<"delivered" | SkipReason> {
   const loaded = await loadBuild(deps, ids.buildId);
-  if (loaded === null) {
-    return "no-build";
+  // The origin can disappear between queueing and running (a cleared setting): nothing is shown.
+  const origin = loaded === null ? undefined : await deps.publicOrigin();
+  if (loaded === null || !origin) {
+    return loaded === null ? "no-build" : "no-origin";
   }
   const target = await loadTarget(deps, ids.channelId, loaded.project.id);
   if (typeof target === "string") {
     return target;
   }
-  await writeTo(deps, loaded, target);
+  await writeTo(deps, loaded, { target, origin });
   return "delivered";
 }
 
@@ -46,19 +48,19 @@ export async function loadBuild(
   return build && project ? { build, project } : null;
 }
 
-/** Write `target`'s view of the build; throws on a refused status. */
+/** Write `target`'s view of the build, linking to `origin`; throws on a refused status. */
 export async function writeTo(
   deps: BuildStateDeps,
   loaded: { build: Build; project: Project },
-  target: StateTarget,
+  where: { target: StateTarget; origin: string },
 ): Promise<void> {
   const { build, project } = loaded;
-  const origin = deps.publicOrigin ? await deps.publicOrigin() : deps.config.publicBaseUrl;
+  const { target, origin } = where;
   const states = statusesForBuild({
     build,
     projectSlug: project.slug,
     prefix: channelPrefix(target.channel),
-    urls: origin ? createUrlBuilder(origin, deps.config.publishedBaseDomain) : null,
+    urls: createUrlBuilder(origin, deps.config.publishedBaseDomain),
     flags: deps.flags(project),
     publishing: await publishingOf(deps.storage, build),
     approvals: await approvalsOf(deps, build, project),

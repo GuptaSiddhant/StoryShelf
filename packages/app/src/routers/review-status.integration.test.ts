@@ -83,7 +83,7 @@ async function setup(storyCount = 2) {
     testing: { runner: stubRunner() },
     database: db,
     storage,
-    config: { secret: "test-secret" },
+    config: { secret: "test-secret", publicBaseUrl: "https://shelf.example.com" },
     notifications: { notifiers: [git.provider] },
     logger: pino({ level: "silent" }),
   });

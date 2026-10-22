@@ -15,6 +15,7 @@ import {
 import { csrfField } from "../ui/csrf-field.tsx";
 import { css } from "../ui/css.ts";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
+import { NotificationsPausedNotice } from "./notifications-paused.tsx";
 import { passkeyRegisterScript } from "./passkey-ceremony.ts";
 
 export interface ProfilePageState {
@@ -30,6 +31,8 @@ export interface ProfilePageState {
   memberships: Array<{ projectName: string; projectSlug: string; role: string; source: string }>;
   subscribedSlugs: string[];
   error?: string;
+  /** Notifiers are wired but no public origin resolves (ADR 0014, decision 11). */
+  notificationsPaused?: boolean | undefined;
   isLocal?: boolean;
   security?: {
     sessions: Array<{
@@ -366,6 +369,7 @@ export function renderProfilePage(state: ProfilePageState): RenderedContent {
           title="Notifications"
           description="Email alerts per project. Fine-tune topics in each project's settings."
         />
+        <NotificationsPausedNotice paused={state.notificationsPaused} />
         {memberships.length === 0 ? (
           <p class={profileMeta}>No project memberships.</p>
         ) : (

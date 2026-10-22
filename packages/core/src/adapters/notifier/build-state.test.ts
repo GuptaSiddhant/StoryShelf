@@ -171,10 +171,6 @@ describe("statusesForBuild: names and links", () => {
       "storyshelf-docs/storybook",
     ]);
   });
-
-  it("falls back to relative links without a base URL", () => {
-    expect(run({ base: "" }).statuses[0]?.url).toBe("/projects/web/builds/b1");
-  });
 });
 
 describe("statusesForBuild: nothing to show", () => {
@@ -209,21 +205,5 @@ describe("statusesForBuild: the comment", () => {
     const { comment } = run({ publishing: "pending", flags: { testing: false, review: false } });
     expect(comment?.markdown).not.toContain("Storybook:");
     expect(comment?.markdown).not.toContain("Snapshots:");
-  });
-});
-
-describe("statusesForBuild without a public origin", () => {
-  it("drops every link and the comment", () => {
-    const set = statusesForBuild({
-      build: build(),
-      projectSlug: "web",
-      prefix: "storyshelf",
-      urls: null,
-      flags: { testing: true, review: false },
-      publishing: "success",
-    });
-    expect(set.statuses.map((status) => status.url)).toEqual([undefined, undefined]);
-    expect(set.statuses.map((status) => status.state)).toEqual(["pending", "success"]);
-    expect(set.comment).toBeNull();
   });
 });

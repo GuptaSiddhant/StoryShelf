@@ -24,10 +24,16 @@ const puppeteer = vi.hoisted(() => {
   let extractResult: unknown;
   const launchOptions: unknown[] = [];
   let launchFailure: Error | null = null;
+  let gate: Promise<null> | null = null;
+  let held = 0;
   const makePage = () => ({
     goto: async (): Promise<void> => {
       if (closed) {
         throw new Error("Browser closed by cancel");
+      }
+      if (gate !== null) {
+        held += 1;
+        await gate;
       }
       if (!hangNextGoto) {
         return;
@@ -125,6 +131,17 @@ const puppeteer = vi.hoisted(() => {
     },
     stats,
     hangingPages: (): number => pendingGotos.length,
+    /** Hold every `goto` until the returned function is called. */
+    holdGotos: (): (() => void) => {
+      const { promise, resolve } = Promise.withResolvers<null>();
+      gate = promise;
+      held = 0;
+      return () => {
+        gate = null;
+        resolve(null);
+      };
+    },
+    heldGotos: (): number => held,
     configureHang: (hang: boolean): void => {
       hangNextGoto = hang;
     },
@@ -215,6 +232,29 @@ describe("createPuppeteerCaptureRunner.render", () => {
 
     expect(result.captures).toHaveLength(12);
     expect(peak).toBe(3);
+  }, 30_000);
+
+  it("lets a render in flight finish across a teardown, then closes its browser", async () => {
+    const runner = createPuppeteerCaptureRunner({ executablePath: "/usr/bin/chromium" });
+    puppeteer.configureHang(false);
+    const release = puppeteer.holdGotos();
+    const rendering = runner.render({
+      buildId: "build-drain",
+      storybookDir,
+      stories: STORIES,
+      viewports: VIEWPORTS,
+    });
+    await vi.waitFor(() => {
+      expect(puppeteer.heldGotos()).toBeGreaterThan(0);
+    });
+    // The host's graceful drain: the runner is torn down while the capture is still running.
+    await runner.lifecycle?.teardown();
+    expect(puppeteer.lastBrowser()?.closed).toBe(false);
+    release();
+    const result = await rendering;
+    expect(result.failures).toHaveLength(0);
+    expect(result.captures).toHaveLength(1);
+    expect(puppeteer.lastBrowser()?.closed).toBe(true);
   }, 30_000);
 
   it("restarts the browser every N captures and logs the sizing", async () => {
@@ -502,7 +542,7 @@ describe("createPuppeteerCaptureRunner targets (ADR 0007)", () => {
     );
   });
 
-  it("launches each target's own executable and shares the runner's flags", async () => {
+  it("launches each target's own executable, shares the runner's flags and leaves signals to the host", async () => {
     puppeteer.configureHang(false);
     const runner = createPuppeteerCaptureRunner({
       executablePath: "/usr/bin/chromium",
@@ -513,8 +553,22 @@ describe("createPuppeteerCaptureRunner targets (ADR 0007)", () => {
     await runner.render({ ...input(), target: "chrome" });
     await runner.render({ ...input(), target: "chromium" });
     expect(puppeteer.launchOptions.slice(before)).toEqual([
-      { headless: true, executablePath: "/usr/bin/google-chrome", args: ["--no-sandbox"] },
-      { headless: true, executablePath: "/usr/bin/chromium", args: ["--no-sandbox"] },
+      {
+        handleSIGINT: false,
+        handleSIGTERM: false,
+        handleSIGHUP: false,
+        headless: true,
+        executablePath: "/usr/bin/google-chrome",
+        args: ["--no-sandbox"],
+      },
+      {
+        handleSIGINT: false,
+        handleSIGTERM: false,
+        handleSIGHUP: false,
+        headless: true,
+        executablePath: "/usr/bin/chromium",
+        args: ["--no-sandbox"],
+      },
     ]);
   }, 30_000);
 

@@ -25,6 +25,7 @@ import {
 import type { NotificationSubscriptionRow } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";
 import { credentialKeys } from "./credential-keys.ts";
+import { clearPaused, notificationOrigin, warnPaused } from "./notifications-pause.ts";
 import { getStore } from "./store.ts";
 
 /** Explicit dependencies for background fan-out (no request scope). */
@@ -40,21 +41,26 @@ export interface NotifyDeps {
   publicOrigin?: Pick<PublicOriginResolver, "url"> | undefined;
 }
 
+/** Absolute review URL for a project page under the resolved public origin. */
+function reviewUrlFor(origin: string, slug: string, suffix: string): string {
+  return `${origin}/projects/${slug}${suffix}`;
+}
+
 /**
- * Absolute review URL for a project page, from the resolved public origin (ADR 0007, decision 6);
- * `undefined` while none is known, so notification links that need one are omitted.
+ * The origin notifications link to; `undefined` (after one log line per pause) while none is
+ * resolved, which pauses every notification (ADR 0014, decision 11).
  */
-async function reviewUrlForWith(
-  deps: Pick<NotifyDeps, "config" | "publicOrigin">,
-  slug: string,
-  suffix: string,
+async function originOrPause(
+  deps: Pick<NotifyDeps, "config" | "publicOrigin" | "logger">,
+  event: string,
 ): Promise<string | undefined> {
-  const origin = (await deps.publicOrigin?.url()) ?? deps.config.publicBaseUrl;
-  const base = origin?.replace(/\/+$/u, "");
-  if (!base) {
-    return undefined;
+  const origin = await notificationOrigin(deps);
+  if (origin === undefined) {
+    warnPaused(deps.logger, event);
+  } else {
+    clearPaused(deps.logger);
   }
-  return `${base}/projects/${slug}${suffix}`;
+  return origin;
 }
 
 /** Brand inputs from UI config plus the notification sender settings. */
@@ -216,9 +222,11 @@ export async function notifyProjectWith(
   if (deps.notifiers.length === 0) {
     return;
   }
-  const reviewUrl = reviewSuffix
-    ? await reviewUrlForWith(deps, project.slug, reviewSuffix)
-    : undefined;
+  const origin = await originOrPause(deps, event);
+  if (origin === undefined) {
+    return;
+  }
+  const reviewUrl = reviewSuffix ? reviewUrlFor(origin, project.slug, reviewSuffix) : undefined;
   const wired = new Set(deps.notifiers.map((candidate) => candidate.metadata.kind));
   const channels = await loadChannels(deps, project.id);
   const targets = await subscriberTargets(deps.db, project.id, event, wired);
@@ -253,7 +261,7 @@ export async function notifySystemWith(
   event: SystemEventName,
   data: Record<string, unknown>,
 ): Promise<void> {
-  if (deps.notifiers.length === 0) {
+  if (deps.notifiers.length === 0 || (await originOrPause(deps, event)) === undefined) {
     return;
   }
   await emitSystemNotification(

@@ -15,7 +15,11 @@ import { createShelfLogger, type Logger } from "../../logger.ts";
 import { createNotifyEnqueuer } from "../build-state/notify-job.ts";
 import { createBuildStatePublisher } from "../build-state/publisher.ts";
 import type { BuildStatePublisher } from "../build-state/types.ts";
-import { createCaptureHandler, type CaptureHandlerOptions } from "../consumer/capture-handler.ts";
+import {
+  createCaptureHandler,
+  originOf,
+  type CaptureHandlerOptions,
+} from "../consumer/capture-handler.ts";
 import { applyImageSettings, ensureImageEngine } from "../consumer/startup.ts";
 import type { CaptureConsumerOptions, ConsumerJob, KindHandler } from "../consumer/types.ts";
 import { createDatabaseCaptureQueue, DEFAULT_RETRIES } from "../db-queue/index.ts";
@@ -135,6 +139,7 @@ function notifyJobsPublisher(
       notifiers: options.notifiers ?? [],
       secret: options.secret,
       config: options.config ?? {},
+      publicOrigin: originOf(options),
       flags: () => ({ testing: true, review: false }),
       logger,
     },

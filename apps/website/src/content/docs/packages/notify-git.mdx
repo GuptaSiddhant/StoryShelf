@@ -82,6 +82,8 @@ The status name is `<prefix>/<status>`; the channel's `prefix` defaults to `stor
 
 ## Delivery
 
+State delivery needs a [public origin](/guides/config/#public-origin): every status and the comment link to the build. While none resolves nothing is queued or posted, and no channel shows an error. When an admin confirms an origin on **System**, the builds still pending or in review are shown again; with `PUBLIC_BASE_URL` set at start-up, delivery resumes with the next state change.
+
 State delivery is **durable and latest-wins**. Every build transition and the end of publishing queue one `notify` job per git channel on the [database queue](/concepts/hosting-only/), next to `capture` and `publish` jobs, with a consumer of its own so a status never waits behind a running capture.
 
 - A job names a channel and a build, not a status. When it runs it reads the build as it is _then_ and writes that, so a retried, delayed or reordered job can never post a stale status. A request for a channel and build that already has a job waiting is folded into it.

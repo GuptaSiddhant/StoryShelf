@@ -99,7 +99,7 @@ sees "make the host show the current state of this build".
 | `<prefix>/storybook` | every build with a commit SHA     | `success` when publishing finishes, targeting the published Storybook; `failure` if publishing fails. Informational, not a gate.                                                                                                         |
 
 The function (`statusesForBuild`, in the notifier module of core) is pure: it takes the build, the
-channel's prefix, absolute links from `publicBaseUrl` and the `testing` and review flags, and returns
+channel's prefix, absolute links from the resolved public origin and the `testing` and review flags, and returns
 the statuses and the pull-request comment. Its details:
 
 - `testing` is `pending` while the build is captured and while review is open (the description
@@ -108,8 +108,8 @@ the statuses and the pull-request comment. Its details:
   because it is written last), `failure` for a `failed` build that never published, and `pending`
   otherwise. Capture failing does not fail it: the Storybook is published independently (ADR 0006).
 - A build without a commit SHA, or with a synthetic local identity, shows nothing.
-- Links are absolute when `publicBaseUrl` is set; without it they are relative paths, which a git
-  host cannot follow.
+- Links are always absolute: the function takes a URL builder over the resolved public origin, and
+  no state is requested or delivered while none resolves (decision 11).
 - `review` is part of the function and is posted when `testing` is off and the review flag is on
   (the flag is the project's review switch). Its `pending` description shows approval progress when
   several approvals are required (the delivery reads the build's reviews). With the flag off, an
@@ -170,7 +170,8 @@ delivered inline in the request or publish path, through the shared HTTP helper'
 
 Message channels (chat, email) are sent inline with `Promise.allSettled`; a failure is logged and
 never fails the triggering action. Messages have no state to converge, so a durable outbox and
-retries are non-goals for them.
+retries are non-goals for them. While no public origin resolves they are not sent at all
+(decision 11).
 
 ### 9. Shared plumbing
 
@@ -208,6 +209,28 @@ on by default for a project's approvers and admins and switchable off per user (
   regardless.
 - `sys:auth-failed` fires on local-login credential failures only (`POST /auth/engine/login` 401s,
   never 429 or 5xx noise, never secrets); bursts are bounded by the `/auth/*` rate limit.
+
+### 12. Notifications need a public origin
+
+Owner decision (#265): every notification carries or targets an absolute link, so none is sent while
+the public origin resolver (ADR 0007, decision 6) finds no origin. The resolver's own semantics
+decide what "resolved" means: `publicBaseUrl`, the platform address, or the origin an admin's browser
+reported (stored; an unconfirmed report already counts). Covered: git statuses and the pull-request
+comment, and every message notification (project events, review events, site-wide `sys:*` alerts) to
+chat, email and log channels and per-user subscriptions. Not covered: signed webhooks, which carry
+ids and no links, and authentication mail (invites, password reset), which is not a notification
+channel.
+
+While paused nothing is queued and no inline delivery runs, no channel is marked as errored (the
+pause is not a delivery failure), the System page, the project notification settings and the profile
+page show "Notifications are paused until a public URL is set; set `PUBLIC_BASE_URL` or confirm the
+detected origin", and one `warn` line is logged at boot and the first time a notification is
+skipped. A request dropped while paused is not replayed, with one exception: when an admin confirms
+or reports the first origin on the System page, the state of every recent build still `pending`,
+`capturing`, `comparing` or `reviewing` is requested again (`requestOpenBuildStates`). A host that
+gets its origin through configuration (`PUBLIC_BASE_URL`, needs a restart) delivers from the next
+state change on. A `notify` job that finds the origin gone when it runs is acknowledged and writes
+nothing.
 
 ## Consequences
 

@@ -16,6 +16,17 @@ const CHROMIUM_ARGS = [
 ];
 
 /**
+ * Playwright closes its browsers on SIGINT/SIGTERM/SIGHUP by default, which fails a render that a
+ * graceful drain is still finishing (`TargetClosedError`). The host owns shutdown: it drains, then
+ * closes every browser through `teardown`.
+ */
+const HOST_OWNS_SIGNALS = {
+  handleSIGINT: false,
+  handleSIGTERM: false,
+  handleSIGHUP: false,
+} as const;
+
+/**
  * Launch `entry`'s engine. Playwright is loaded here, on first use, not at import: it costs
  * ~150 ms and tens of MB, which a server that only serves reviews or hosts Storybooks should not
  * pay at boot. A failure is a {@link TargetLaunchError}: the browser never started, so no story is
@@ -43,14 +54,15 @@ function launcherOf(
   playwright: typeof import("playwright-core"),
 ): (channel: string | undefined) => Promise<Browser> {
   if (engine === "firefox") {
-    return async () => await playwright.firefox.launch();
+    return async () => await playwright.firefox.launch(HOST_OWNS_SIGNALS);
   }
   if (engine === "webkit") {
-    return async () => await playwright.webkit.launch();
+    return async () => await playwright.webkit.launch(HOST_OWNS_SIGNALS);
   }
   // Containers ship a tiny /dev/shm; Chromium crashes (looks like OOM) unless it uses /tmp.
   return async (channel) =>
     await playwright.chromium.launch({
+      ...HOST_OWNS_SIGNALS,
       args: CHROMIUM_ARGS,
       ...(channel === undefined ? {} : { channel }),
     });

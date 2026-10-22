@@ -90,7 +90,7 @@ export function setupCapture(
   const dispatch = captureDispatchDeps(handlerOptions, retries);
   const failed = async (job: ConsumerJob, error: string): Promise<void> => {
     await failCrashedCapture(dispatch, job, error);
-    await notifyCaptureFailed(options, config, logger, job.buildId);
+    await notifyCaptureFailed(options, config, logger, job.buildId, delivery.publicOrigin);
   };
   jobs.exhausted.capture = failed;
   const inProcess = createCaptureHandler(handlerOptions);
@@ -101,7 +101,7 @@ export function setupCapture(
     queue,
     enqueueCapture,
     handler: alerting(handler, retries, async (buildId) => {
-      await notifyCaptureFailed(options, config, logger, buildId);
+      await notifyCaptureFailed(options, config, logger, buildId, delivery.publicOrigin);
     }),
   };
 }

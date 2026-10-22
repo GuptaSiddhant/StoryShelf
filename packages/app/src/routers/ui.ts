@@ -155,12 +155,7 @@ export function registerUiPages(app: ShelfRouter): void {
     if (c.req.query("partial") === "queue") {
       return c.html(renderActiveQueue(slug, queueView));
     }
-    const html = await renderComputeJobsPage(
-      slug,
-      queueView,
-      canRetry,
-      getStore().capturesHere === true,
-    );
+    const html = await renderComputeJobsPage(slug, queueView, canRetry);
     if (!html) {
       return c.notFound();
     }

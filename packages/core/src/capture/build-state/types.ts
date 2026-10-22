@@ -18,13 +18,13 @@ export interface BuildStateDeps {
   notifiers: readonly NotifierProvider[];
   /** Server secret that decrypts channel tokens. */
   secret: SecretInput;
-  /** Absolute links come from `publicBaseUrl`; the published-Storybook domain from `publishedBaseDomain`. */
-  config: Pick<ShelfConfig, "publicBaseUrl" | "publishedBaseDomain">;
+  /** The published-Storybook domain for Storybook links. */
+  config: Pick<ShelfConfig, "publishedBaseDomain">;
   /**
-   * The resolved public origin (ADR 0007, decision 6). Without it `config.publicBaseUrl` is used;
-   * with neither, statuses carry no link and no pull-request comment is written.
+   * The resolved public origin (ADR 0007, decision 6): the origin every link starts with. While it
+   * resolves to nothing, no state is requested or delivered (ADR 0014, decision 11).
    */
-  publicOrigin?: (() => Promise<string | undefined>) | undefined;
+  publicOrigin: () => Promise<string | undefined>;
   /** Which statuses a project's builds show: `testing` from the server options, review from the project. */
   flags: (project: Project) => BuildStateFlags;
   logger: Logger;
@@ -37,7 +37,7 @@ export interface StateTarget {
 }
 
 /** Why a delivery wrote nothing. */
-export type SkipReason = "no-build" | "no-channel" | "disabled" | "no-provider";
+export type SkipReason = "no-build" | "no-channel" | "disabled" | "no-provider" | "no-origin";
 
 /**
  * Asks for a build's current state to be shown on its project's git channels. Never rejects: the

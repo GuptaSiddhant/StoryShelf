@@ -20,7 +20,7 @@ describe("deliverBuildState", () => {
     expect(w.git.secrets).toEqual(["ghp_token"]);
   });
 
-  it("links with the resolved public origin, which wins over the configured base URL", async () => {
+  it("links with the resolved public origin", async () => {
     const w = await world();
     const deps = {
       ...w.deps,
@@ -32,21 +32,16 @@ describe("deliverBuildState", () => {
     );
   });
 
-  it("omits every link and the comment while no public origin is known", async () => {
+  it("writes nothing while no public origin is resolved", async () => {
     const w = await world();
-    const deps = {
-      ...w.deps,
-      config: {},
-      // An empty origin counts as none.
-      publicOrigin: async () => await Promise.resolve(""),
-    };
-    await deliverBuildState(deps, { buildId: w.build.id, channelId: w.channelId });
-    expect(statusLog(w.git)).toEqual([
-      ["storyshelf/testing", "pending"],
-      ["storyshelf/storybook", "pending"],
-    ]);
-    expect(w.git.calls.map((call) => call.url)).toEqual([undefined, undefined]);
-    expect(w.git.calls.some((call) => call.target.kind === "comment")).toBe(false);
+    const results = await Promise.all(
+      [undefined, ""].map(async (origin) => {
+        const deps = { ...w.deps, publicOrigin: async () => await Promise.resolve(origin) };
+        return await deliverBuildState(deps, { buildId: w.build.id, channelId: w.channelId });
+      }),
+    );
+    expect(results).toEqual(["no-origin", "no-origin"]);
+    expect(w.git.calls).toEqual([]);
   });
 
   it("reads the build as it is now", async () => {

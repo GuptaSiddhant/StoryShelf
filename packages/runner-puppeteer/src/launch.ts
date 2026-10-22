@@ -18,6 +18,17 @@ const DEFAULT_ARGS = [
 ];
 
 /**
+ * Puppeteer closes its browser on SIGINT/SIGTERM/SIGHUP by default, which fails a render that a
+ * graceful drain is still finishing. The host owns shutdown: it drains, then closes every browser
+ * through `teardown`.
+ */
+const HOST_OWNS_SIGNALS = {
+  handleSIGINT: false,
+  handleSIGTERM: false,
+  handleSIGHUP: false,
+} as const;
+
+/**
  * Launch `entry`'s browser. A failure is a {@link TargetLaunchError}: the browser never started, so
  * no story is at fault and the job fails at once instead of going through crash isolation.
  */
@@ -27,6 +38,7 @@ export async function launchLocal(
 ): Promise<Browser> {
   try {
     return await puppeteer.launch({
+      ...HOST_OWNS_SIGNALS,
       headless: true,
       executablePath: entry.executablePath,
       args: args ?? DEFAULT_ARGS,
