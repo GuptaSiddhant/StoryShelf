@@ -1,31 +1,80 @@
 ---
 /**
- * Two menus in one sidebar: the generated HTTP API reference gets its own (reached from the
- * header "HTTP API" link), and the docs menu only carries a single link to it. The generated
- * TypeScript API lives inside the docs menu, under each package.
+ * Three menus in one sidebar: the docs, the packages (each with its generated TypeScript API) and
+ * the generated HTTP API reference. The header links switch between them; on small screens the
+ * same links sit above the menu, because the header has no room for them.
  */
 import Default from "@astrojs/starlight/components/Sidebar.astro";
 
+import { sectionLinks, sectionOf } from "./sections";
+
 const route = Astro.locals.starlightRoute;
 const base = import.meta.env.BASE_URL.replace(/\/$/u, "");
-const onApi = Astro.url.pathname.startsWith(`${base}/api`);
-const isApiGroup = (e: (typeof route.sidebar)[number]) => e.type === "group" && e.label === "HTTP API";
-const link = (label: string, href: string) => ({
+const section = sectionOf(Astro.url.pathname, base);
+const links = sectionLinks(base);
+
+type Entry = (typeof route.sidebar)[number];
+const labelled = (label: string) => (e: Entry) => e.type === "group" && e.label === label;
+const isPackages = labelled("Packages");
+const isApi = labelled("HTTP API");
+
+const back = {
   type: "link" as const,
-  label,
-  href,
+  label: "← Back to docs",
+  href: `${base}/guides/getting-started/`,
   isCurrent: false,
   badge: undefined,
   attrs: {},
-});
+};
 
-const back = link("← Back to docs", `${base}/guides/getting-started/`);
+// The packages menu is the "Packages" group without its wrapper.
+const packages = route.sidebar.find(isPackages);
+const packageEntries = packages?.type === "group" ? packages.entries : [];
 
-if (onApi) {
-  route.sidebar = [back, ...route.sidebar.filter(isApiGroup)];
-} else {
-  route.sidebar = route.sidebar.map((e) => (isApiGroup(e) ? link("HTTP API", `${base}/api/`) : e));
-}
+if (section === "api") route.sidebar = [back, ...route.sidebar.filter(isApi)];
+else if (section === "packages") route.sidebar = [back, ...packageEntries];
+else route.sidebar = route.sidebar.filter((e) => !isPackages(e) && !isApi(e));
 ---
 
+<nav class="section-switch" aria-label="Sections">
+  {
+    links.map((l) => (
+      <a href={l.href} aria-current={l.section === section ? "page" : undefined}>
+        {l.label}
+      </a>
+    ))
+  }
+</nav>
 <Default {...Astro.props}><slot /></Default>
+
+<style>
+  .section-switch {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--sl-color-gray-6);
+  }
+  .section-switch a {
+    flex: 1;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.375rem;
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-sm);
+    font-weight: 500;
+    text-align: center;
+    text-decoration: none;
+  }
+  .section-switch a[aria-current="page"] {
+    border-color: var(--sl-color-accent);
+    background: var(--sl-color-accent-low);
+    color: var(--sl-color-white);
+  }
+  /* From the width where the header shows its own links. */
+  @media (min-width: 50rem) {
+    .section-switch {
+      display: none;
+    }
+  }
+</style>

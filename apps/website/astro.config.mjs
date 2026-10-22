@@ -23,11 +23,7 @@ const packageItem = (slug) => {
 };
 
 /** Packages grouped by the adapter slot they fill. */
-const packageGroup = (label, slugs) => ({
-  label,
-  collapsed: true,
-  items: slugs.map((slug) => packageItem(slug)),
-});
+const packageGroup = (label, slugs) => ({ label, items: slugs.map((slug) => packageItem(slug)) });
 
 export default defineConfig({
   site: SITE,
@@ -223,12 +219,13 @@ export default defineConfig({
             { label: "Changelog", slug: "changelog" },
           ],
         },
-        // Shown on /api/** only (see components/overrides/Sidebar.astro).
+        // Shown on /api/** only, like the packages menu below.
         ...openAPISidebarGroups,
+        // Its own menu, shown on /packages/** and /reference/** only (components/overrides/Sidebar.astro).
         {
           label: "Packages",
-          collapsed: true,
           items: [
+            { label: "Overview", slug: "packages" },
             packageGroup("Core", [
               "core",
               "app",
