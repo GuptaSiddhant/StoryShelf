@@ -38,14 +38,13 @@ if BUILDS="$(curl -fsS "${AUTH[@]}" "$STORYSHELF_URL/api/v1/projects/$SLUG/build
   curl -fsS "${AUTH[@]}" -X DELETE "$STORYSHELF_URL/api/v1/projects/$SLUG" -o /dev/null
 fi
 
-# Create the project with fixed metadata and a CI token scoped to it.
+# Create the project with fixed metadata. Uploads use the admin token itself: a project token
+# minted through it has no owner, which makes it a viewer that cannot upload.
 curl -fsS "${AUTH[@]}" -X POST "$STORYSHELF_URL/api/v1/projects" -o /dev/null \
   -d '{"name":"Demo Design System","gitRepository":"acme/design-system","gitDefaultBranch":"main"}'
-CI_TOKEN="$(curl -fsS "${AUTH[@]}" -X POST "$STORYSHELF_URL/api/v1/projects/$SLUG/tokens" \
-  -d '{"name":"demo-seed"}' | jq -er .token)"
 
 upload() { # <dir> <branch> <sha> <message>
-  (cd "$FIXTURE" && "${CLI[@]}" upload --url "$STORYSHELF_URL" --slug "$SLUG" --token "$CI_TOKEN" \
+  (cd "$FIXTURE" && "${CLI[@]}" upload --url "$STORYSHELF_URL" --slug "$SLUG" --token "$STORYSHELF_ADMIN_TOKEN" \
     --build-dir "$1" --branch "$2" --sha "$3" --message "$4" "${AUTHOR[@]}")
 }
 
