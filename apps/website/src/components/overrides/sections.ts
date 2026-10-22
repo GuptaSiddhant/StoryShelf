@@ -8,10 +8,13 @@ export const sectionLinks = (base: string): { section: Section; label: string; h
   { section: "api", label: "HTTP API", href: `${base}/api/` },
 ];
 
+/** Hand-written pages that sit in the HTTP API menu next to the generated reference. */
+const API_GUIDES = ["/guides/api", "/guides/webhooks"];
+
 /** Which menu a page belongs to, from its path. */
 export function sectionOf(pathname: string, base: string): Section {
   const path = pathname.slice(base.length);
-  if (path.startsWith("/api")) return "api";
+  if (path.startsWith("/api") || API_GUIDES.some((guide) => path.startsWith(guide))) return "api";
   if (path.startsWith("/packages") || path.startsWith("/reference")) return "packages";
   return "docs";
 }

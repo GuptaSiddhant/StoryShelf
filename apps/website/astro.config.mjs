@@ -110,92 +110,13 @@ export default defineConfig({
           items: [
             { label: "Getting started", slug: "guides/getting-started" },
             { label: "Live demo", slug: "guides/demo" },
+            { label: "Compare with Chromatic", slug: "guides/chromatic-comparison" },
+            { label: "Migrate from Chromatic", slug: "guides/chromatic-migration" },
+            { label: "Migrate from Lost Pixel", slug: "guides/lost-pixel-migration" },
           ],
         },
         {
-          label: "Guides",
-          items: [
-            {
-              label: "Review workflow",
-              collapsed: true,
-              items: [
-                { label: "CI setup", slug: "guides/ci" },
-                { label: "Reviewing changes", slug: "guides/review" },
-                { label: "Merge gate", slug: "guides/merge-gate" },
-                { label: "Interaction testing", slug: "guides/interaction-testing" },
-                { label: "Modes", slug: "guides/modes" },
-                { label: "Notifications", slug: "guides/notifications" },
-                { label: "Without git", slug: "guides/without-git" },
-              ],
-            },
-            {
-              label: "Projects & CLI",
-              collapsed: true,
-              items: [
-                { label: "Project settings", slug: "guides/project-settings" },
-                { label: "Baseline portability", slug: "guides/portability" },
-                { label: "Configuration", slug: "guides/config" },
-                { label: "Image engines", slug: "guides/image-engines" },
-                { label: "Remote browsers", slug: "guides/remote-browsers" },
-                { label: "CLI overview", slug: "guides/cli" },
-                { label: "CLI client", slug: "guides/cli/client" },
-                { label: "CLI server", slug: "guides/cli/server" },
-              ],
-            },
-            {
-              label: "Deployment",
-              collapsed: true,
-              items: [
-                { label: "Overview", slug: "guides/deployment" },
-                { label: "Docker Compose", slug: "guides/deployment/docker-compose" },
-                { label: "AWS", slug: "guides/deployment/aws" },
-                { label: "Azure", slug: "guides/deployment/azure" },
-                { label: "GCP", slug: "guides/deployment/gcp" },
-                { label: "Cloud assembly", slug: "guides/deployment/cloud" },
-                { label: "Observability", slug: "guides/observability" },
-                { label: "Secret rotation", slug: "guides/deployment/secret-rotation" },
-              ],
-            },
-            {
-              label: "Authentication",
-              collapsed: true,
-              items: [
-                { label: "Overview", slug: "guides/auth" },
-                { label: "Local accounts", slug: "guides/auth/local" },
-                { label: "Social login", slug: "guides/auth/social" },
-                { label: "OIDC", slug: "guides/auth/oidc" },
-                { label: "SAML", slug: "guides/auth/saml" },
-                { label: "Passkeys", slug: "guides/auth/passkeys" },
-                { label: "Configuration", slug: "guides/auth/configuration" },
-              ],
-            },
-            {
-              label: "Coming from other tools",
-              collapsed: true,
-              items: [
-                { label: "Comparison", slug: "guides/chromatic-comparison" },
-                { label: "Migration", slug: "guides/chromatic-migration" },
-                { label: "Lost Pixel migration", slug: "guides/lost-pixel-migration" },
-              ],
-            },
-          ],
-        },
-        {
-          label: "AI insights",
-          items: [
-            { label: "Overview", slug: "ai" },
-            { label: "Setup and providers", slug: "ai/setup" },
-            { label: "Build triage", slug: "ai/triage" },
-            { label: "Project health", slug: "ai/health" },
-            { label: "Privacy and safety", slug: "ai/privacy" },
-            { label: "Budget and usage", slug: "ai/budget" },
-            { label: "AI API", slug: "ai/api" },
-            { label: "MCP server", slug: "ai/mcp" },
-            { label: "Free AI for testing", slug: "ai/testing" },
-          ],
-        },
-        {
-          label: "Core concepts",
+          label: "Concepts",
           collapsed: true,
           items: [
             { label: "Projects", slug: "concepts/projects" },
@@ -207,19 +128,100 @@ export default defineConfig({
             { label: "Retention & purge", slug: "concepts/retention" },
             { label: "Published Storybook", slug: "concepts/publishing" },
             { label: "Hosting only", slug: "concepts/hosting-only" },
-            { label: "Roles & tokens", slug: "concepts/roles" },
-            { label: "Authentication model", slug: "concepts/auth" },
           ],
         },
         {
-          label: "Reference",
+          label: "Capture & CI",
+          collapsed: true,
           items: [
-            { label: "REST API", slug: "guides/api" },
-            { label: "Webhooks", slug: "guides/webhooks" },
+            { label: "CI setup", slug: "guides/ci" },
+            { label: "Without git", slug: "guides/without-git" },
+            { label: "Modes", slug: "guides/modes" },
+            { label: "Interaction testing", slug: "guides/interaction-testing" },
+            { label: "Image engines", slug: "guides/image-engines" },
+            { label: "Remote browsers", slug: "guides/remote-browsers" },
+          ],
+        },
+        {
+          label: "Review",
+          collapsed: true,
+          items: [
+            { label: "Reviewing changes", slug: "guides/review" },
+            { label: "Merge gate", slug: "guides/merge-gate" },
+            { label: "Notifications", slug: "guides/notifications" },
+            { label: "Project settings", slug: "guides/project-settings" },
+            { label: "Baseline portability", slug: "guides/portability" },
+          ],
+        },
+        {
+          label: "Deploy & operate",
+          collapsed: true,
+          items: [
+            { label: "Overview", slug: "guides/deployment" },
+            { label: "Docker Compose", slug: "guides/deployment/docker-compose" },
+            { label: "AWS", slug: "guides/deployment/aws" },
+            { label: "Azure", slug: "guides/deployment/azure" },
+            { label: "GCP", slug: "guides/deployment/gcp" },
+            { label: "Cloud assembly", slug: "guides/deployment/cloud" },
+            { label: "Server configuration", slug: "guides/config" },
+            { label: "Secret rotation", slug: "guides/deployment/secret-rotation" },
+            { label: "Observability", slug: "guides/observability" },
+          ],
+        },
+        {
+          label: "Access",
+          collapsed: true,
+          items: [
+            { label: "Authentication", slug: "guides/auth" },
+            { label: "Local accounts", slug: "guides/auth/local" },
+            { label: "Social login", slug: "guides/auth/social" },
+            { label: "OIDC", slug: "guides/auth/oidc" },
+            { label: "SAML", slug: "guides/auth/saml" },
+            { label: "Passkeys", slug: "guides/auth/passkeys" },
+            { label: "Auth configuration", slug: "guides/auth/configuration" },
+            { label: "Roles & tokens", slug: "concepts/roles" },
+            { label: "How auth works", slug: "concepts/auth" },
+          ],
+        },
+        {
+          label: "AI insights",
+          collapsed: true,
+          items: [
+            { label: "Overview", slug: "ai" },
+            { label: "Setup and providers", slug: "ai/setup" },
+            { label: "Free AI for testing", slug: "ai/testing" },
+            { label: "Build triage", slug: "ai/triage" },
+            { label: "Project health", slug: "ai/health" },
+            { label: "Privacy and safety", slug: "ai/privacy" },
+            { label: "Budget and usage", slug: "ai/budget" },
+            {
+              label: "Agents & API",
+              items: [
+                { label: "MCP server", slug: "ai/mcp" },
+                { label: "AI API", slug: "ai/api" },
+              ],
+            },
+          ],
+        },
+        {
+          label: "CLI & changelog",
+          collapsed: true,
+          items: [
+            { label: "CLI overview", slug: "guides/cli" },
+            { label: "CLI client", slug: "guides/cli/client" },
+            { label: "CLI server", slug: "guides/cli/server" },
             { label: "Changelog", slug: "changelog" },
           ],
         },
-        // Shown on /api/** only, like the packages menu below.
+        // The HTTP API menu: these two guides, then the generated reference below.
+        // Shown on /api/**, /guides/api and /guides/webhooks only (components/overrides/sections.ts).
+        {
+          label: "Using the API",
+          items: [
+            { label: "Overview", slug: "guides/api" },
+            { label: "Webhooks", slug: "guides/webhooks" },
+          ],
+        },
         ...openAPISidebarGroups,
         // Its own menu, shown on /packages/** and /reference/** only (components/overrides/Sidebar.astro).
         {

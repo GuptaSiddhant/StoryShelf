@@ -16,7 +16,7 @@ const links = sectionLinks(base);
 type Entry = (typeof route.sidebar)[number];
 const labelled = (label: string) => (e: Entry) => e.type === "group" && e.label === label;
 const isPackages = labelled("Packages");
-const isApi = labelled("HTTP API");
+const isApi = (e: Entry) => labelled("HTTP API")(e) || labelled("Using the API")(e);
 
 const back = {
   type: "link" as const,
