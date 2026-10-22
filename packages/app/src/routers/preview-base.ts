@@ -18,6 +18,17 @@ import { isAnonymouslyViewable, publishedAccess } from "./published-access.ts";
 /** Lifetime of the token in a page: long enough to open the frame, short enough to be harmless. */
 export const PREVIEW_TOKEN_TTL = 3600;
 
+/**
+ * How often a page asks for a fresh frame token (seconds): well inside {@link PREVIEW_TOKEN_TTL},
+ * so a frame on a page left open never holds an expired token. The token stays short-lived.
+ */
+export const PREVIEW_TOKEN_REFRESH = 2400;
+
+/** Whether a frame root is a signed `/_s/<token>` URL, the only kind that expires. */
+export function isSignedPreviewBase(base: string): boolean {
+  return base.startsWith(STORYBOOK_TOKEN_PREFIX);
+}
+
 /** The frame's root URL (no trailing slash), or null when this viewer cannot be given one. */
 export async function previewBaseOf(project: Project, build: Build): Promise<string | null> {
   const { config } = getStore();

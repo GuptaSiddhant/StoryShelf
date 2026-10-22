@@ -18,6 +18,16 @@ describe("requestOpenBuildStates", () => {
     expect(ids).toContain(reviewing.id);
   });
 
+  it("skips open builds that have no git commit to show state on", async () => {
+    const w = await world();
+    await w.builds.create(w.project.id, { gitSha: "", gitBranch: "main" });
+    await w.builds.create(w.project.id, { gitSha: "local-abc123def456", gitBranch: "main" });
+    const request = vi.fn(async (_id: string) => {});
+    const asked = await requestOpenBuildStates(w.deps, { request });
+    expect(asked).toBe(1);
+    expect(request.mock.calls.map(([id]) => id)).toEqual([w.build.id]);
+  });
+
   it("never rejects", async () => {
     const w = await world();
     const request = vi.fn(async () => {

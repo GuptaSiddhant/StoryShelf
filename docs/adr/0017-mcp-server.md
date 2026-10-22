@@ -41,6 +41,11 @@ the API already allows.
    insights (`list_snapshots`, `get_capture_logs`, `get_build_insight`, `get_project_health`) are class
    `testing` and absent on an instance without `testing`. Comment tools are class `review`: they work
    with or without `testing`, and answer as not found when the project's review setting is off.
+   A tool def carries `routeClass` (unset is `hosting`); the server learns whether the instance has
+   `testing` from the `testing` field of the open `GET /api/v1/health` (`probeCapabilities`, read at
+   start-up over stdio, at most once a minute over HTTP) and registers only the tools that fit
+   (`toolsFor`). An instance that does not answer counts as having `testing`: no tool is hidden on a
+   guess. A project with review off is not probed: its comment tools answer 404 per call.
 6. **Token-friendly output.** Responses are trimmed to review-relevant fields, `list_snapshots` hides
    unchanged and approved snapshots by default, logs are tailed, and errors map to short actionable
    messages with no upstream bodies.

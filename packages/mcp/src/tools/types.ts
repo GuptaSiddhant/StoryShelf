@@ -9,6 +9,11 @@ export interface ToolDef<Shape extends ZodRawShape = ZodRawShape> {
   description: string;
   /** False for tools that write (comments only in v1). */
   readOnly: boolean;
+  /**
+   * The class of the `/api/v1` routes the tool calls (ADR 0006, decision 8). A `testing` tool is
+   * advertised only by an instance that has the `testing` option; unset means `hosting`.
+   */
+  routeClass?: "hosting" | "testing" | "review";
   input: Shape;
   run(client: ApiClient, args: Record<string, unknown>): Promise<unknown>;
 }

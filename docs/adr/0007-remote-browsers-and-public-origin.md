@@ -543,8 +543,12 @@ a public origin exist, and core now mints the URL (see "Signed URLs" below). Cho
   token and never signs one. A token is minted when a render pass starts (and for the parameter
   pre-pass), never at enqueue time, so queued shards and retries are not handed a stale one. The
   lifetime is derived from the render budget of the pass (decision 5, expiry), so a pass cannot
-  outlive its token below the 24 hour ceiling; a pass whose budget exceeds 24 hours (about 5700
-  captures at the 15 s allowance) is the one case left, and a project cannot lift the ceiling.
+  outlive its token below the 24 hour ceiling. A pass whose budget would outlast its token (about
+  5700 captures at the 15 s allowance, or fewer under a project's shorter override) is rendered in
+  slices of stories (`renderInSlices`, `capture/token-chunks.ts`, at least 50 captures a slice),
+  each asking `storybookUrlSource` for a fresh token just before it starts, so the render never
+  dies at the ceiling; the cap per token stays 24 h and a project cannot lift it. A slice is one
+  runner `render` call, so a remote browser reconnects with the new URL per slice.
   Refusals are all one `404` with `Cache-Control: private, no-store`; the reason is in the debug log
   only. The token
   is scrubbed from the request log, the OTEL `url.full` attribute, attempt logs, failure text and the
@@ -555,7 +559,10 @@ a public origin exist, and core now mints the URL (see "Signed URLs" below). Cho
   needs more raises it. Served files answer `Access-Control-Allow-Origin: *` (never credentials),
   like the files of a public build (#255): a sandboxed preview frame has an opaque origin and loads
   module scripts only with it. A private build under sign-in is framed in the component page through
-  a one-hour signed URL minted for a viewer (needs `testing` and a `secret`).
+  a one-hour signed URL minted for a viewer (needs `testing` and a `secret`). The page's script asks
+  `GET /api/v1/projects/:slug/builds/:buildId/preview-token` (class `testing`, same access check, `no-store`)
+  every 40 minutes once the frame is loaded and re-points the frame to the new root, so a page
+  left open keeps working while the token stays short-lived.
 
 - **Which settings saves are checked.** A save refuses only targets the project does not already
   have, so an unrelated settings save never fails because an engine it already names went away; the

@@ -38,6 +38,7 @@ import {
   snapshotCardMeta,
   snapshotGrid,
 } from "../ui/styles/review.ts";
+import { a11ySummaryNote, a11ySummaryOf } from "./a11y-violations.tsx";
 import { snapshotVariant } from "./build-diff-model.ts";
 import { StaleBaselineNotice } from "./build-diff-stale.tsx";
 import { LinkedUsage, type LinkedUsageItem } from "./build-diff-usage.tsx";
@@ -106,6 +107,7 @@ export async function renderBuildDetailPage(
     list.push(snap);
     grouped.set(key, list);
   }
+  const a11y = a11ySummaryOf(snapshots);
   const inheritedCount = snapshots.filter((snap) => snap.inherited).length;
   const selective = build.affectedOnly && build.affectedImportPaths !== null;
 
@@ -230,6 +232,14 @@ export async function renderBuildDetailPage(
               </Card>
               <Card>
                 <Stat label="Approved / unchanged" value={build.approvedCount} tone="success" />
+              </Card>
+              <Card>
+                <Stat
+                  label="Accessibility findings"
+                  value={a11y.findings}
+                  tone={a11y.findings > 0 ? "warning" : "neutral"}
+                />
+                <Meta>{a11ySummaryNote(a11y)}</Meta>
               </Card>
             </>
           ) : null}

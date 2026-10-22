@@ -71,7 +71,8 @@ authentication at all records an anonymous verdict, one reviewer, which counts o
 project requires one approval (otherwise it is refused with 409). A verdict waits for publishing:
 until the build's Storybook is published (the manifest, the same probe as `<prefix>/storybook`) the
 route answers 409, and a build whose publish failed is `failed`, and one a user cancelled is `cancelled`, not reviewable
-(409, no verdict card). A verdict that
+(409, no verdict card). While publishing is unfinished the verdict card shows "Waiting for the
+Storybook to publish" in place of the form; the 409 stays the guard for every verdict. A verdict that
 sends the build back to `pending` raises `build:pending` like every other move.
 
 A verdict is rewritable. Verdicts belong to the build, as snapshot approvals do: a new push to the

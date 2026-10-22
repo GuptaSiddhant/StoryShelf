@@ -13,9 +13,9 @@ function fakeClient(overrides: Partial<ApiClient> = {}): ApiClient {
   };
 }
 
-async function connect(api: ApiClient): Promise<Client> {
+async function connect(api: ApiClient, testing = true): Promise<Client> {
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
-  await createStoryShelfMcpServer(api).connect(serverSide);
+  await createStoryShelfMcpServer(api, { testing }).connect(serverSide);
   const client = new Client({ name: "test", version: "0.0.0" });
   await client.connect(clientSide);
   return client;
@@ -45,6 +45,15 @@ describe("StoryShelf MCP server", () => {
       false,
     );
     expect(tools.find((tool) => tool.name === "get_build")?.annotations?.readOnlyHint).toBe(true);
+  });
+
+  it("advertises only hosting and review tools when the instance has no testing", async () => {
+    const { tools } = await (await connect(fakeClient(), false)).listTools();
+    const names = tools.map((tool) => tool.name);
+    expect(names).toContain("list_builds");
+    expect(names).toContain("add_comment");
+    expect(names).not.toContain("list_snapshots");
+    expect(names).not.toContain("get_build_insight");
   });
 
   it("hides unchanged snapshots by default and trims fields", async () => {
@@ -106,6 +115,18 @@ describe("StoryShelf MCP server", () => {
   it("offers the review-build prompt", async () => {
     const client = await connect(fakeClient());
     const prompt = await client.getPrompt({ name: "review-build", arguments: { buildId: "b1" } });
-    expect(JSON.stringify(prompt.messages)).toContain("b1");
+    const body = JSON.stringify(prompt.messages);
+    expect(body).toContain("b1");
+    expect(body).toContain("list_snapshots");
+  });
+
+  it("leaves the capture tools out of the review-build prompt when there is no testing", async () => {
+    const client = await connect(fakeClient(), false);
+    const prompt = await client.getPrompt({ name: "review-build", arguments: { buildId: "b1" } });
+    const body = JSON.stringify(prompt.messages);
+    expect(body).toContain("get_build");
+    for (const tool of ["list_snapshots", "get_build_insight", "get_capture_logs"]) {
+      expect(body).not.toContain(tool);
+    }
   });
 });

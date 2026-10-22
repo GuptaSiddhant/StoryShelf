@@ -3,6 +3,7 @@
  * were dropped (ADR 0014, decision 11), so once one is, the builds that can still change are asked
  * again; settled builds keep what they last showed until their next transition.
  */
+import { LOCAL_SHA_PREFIX } from "@storyshelf/affected";
 import { BuildModel } from "../../models/build.ts";
 import { ProjectModel } from "../../models/project.ts";
 import type { BuildStatus } from "../../types.ts";
@@ -43,5 +44,12 @@ async function openBuildIds(
   projectId: string,
 ): Promise<string[]> {
   const recent = await new BuildModel(deps.db).list(projectId, { limit: PER_PROJECT });
-  return recent.filter((build) => OPEN.has(build.status)).map((build) => build.id);
+  return recent
+    .filter((build) => OPEN.has(build.status) && hasGitCommit(build.gitSha))
+    .map((build) => build.id);
+}
+
+/** A build with no commit, or a local upload, has no git state to show (see `statusesForBuild`). */
+function hasGitCommit(gitSha: string): boolean {
+  return gitSha.length > 0 && !gitSha.startsWith(LOCAL_SHA_PREFIX);
 }
