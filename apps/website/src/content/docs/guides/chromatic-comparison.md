@@ -48,7 +48,7 @@ Billed snapshots = visual snapshots + accessibility snapshots. TurboSnap copies 
 | **Baseline lookup** | Traverses git ancestry to find ancestor builds; rebase/squash can break it | Key lookup on project/story/viewport/branch — no history walk, rebase- and squash-proof                                         |
 | **Storage**         | Chromatic cloud                                                            | Your S3-compatible or local filesystem                                                                                          |
 | **Database**        | Chromatic managed                                                          | Your SQLite/Turso/Postgres                                                                                                      |
-| **Queue**           | Chromatic managed                                                          | In-memory / Redis / SQS (your choice)                                                                                           |
+| **Queue**           | Chromatic managed                                                          | Your database (`capture_jobs`), no extra service                                                                                |
 | **Auth**            | Chromatic accounts / SAML                                                  | Local / social / SSO / passkeys / none                                                                                          |
 
 ## Feature parity

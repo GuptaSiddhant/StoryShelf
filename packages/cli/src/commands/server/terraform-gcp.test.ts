@@ -7,7 +7,6 @@ import {
   generateGcpIdentity,
   generateGcpMain,
   generateGcpOutputs,
-  generateGcpQueue,
   generateGcpReadme,
   generateGcpSecrets,
   generateGcpStorage,
@@ -15,7 +14,6 @@ import {
   generateGcpTfvarsExample,
   generateGcpVariables,
   generateGcpVersions,
-  generateGcpWorker,
   type GcpTerraformOptions,
 } from "./terraform-gcp.ts";
 
@@ -26,14 +24,7 @@ const options: GcpTerraformOptions = {
 };
 
 /** Frozen output contract parsed by CI — renames break live-cloud.yml. */
-const FROZEN_OUTPUT_KEYS = [
-  "database_url",
-  "gcs_bucket",
-  "identity_tenant_id",
-  "pubsub_subscription",
-  "pubsub_topic",
-  "run_url",
-];
+const FROZEN_OUTPUT_KEYS = ["database_url", "gcs_bucket", "identity_tenant_id", "run_url"];
 
 function outputNames(outputsTf: string): string[] {
   const names: string[] = [];
@@ -65,15 +56,17 @@ describe("GCP Terraform modules", () => {
   it("enables every API the stack touches", () => {
     const main = generateGcpMain();
     expect(main).toContain('resource "google_project_service" "apis"');
-    for (const api of ["run", "sqladmin", "pubsub", "storage", "secretmanager", "dns"]) {
+    for (const api of ["run", "sqladmin", "storage", "secretmanager", "dns"]) {
       expect(main).toContain(api);
     }
   });
 
   it("runs compute on Cloud Run, not GCE or Functions", () => {
-    const compute = `${generateGcpApp()}${generateGcpWorker()}`;
+    const compute = generateGcpApp();
     expect(compute).toContain('resource "google_cloud_run_v2_service" "app"');
-    expect(compute).toContain('resource "google_cloud_run_v2_service" "worker"');
+    // One service: it also consumes capture jobs from the database queue.
+    expect(compute).not.toContain('resource "google_cloud_run_v2_service" "worker"');
+    expect(compute).toContain("cpu_idle = false");
     expect(compute).toContain("INGRESS_TRAFFIC_ALL");
     expect(compute).not.toContain("compute_instance");
     expect(compute).not.toContain("cloudfunctions");
@@ -85,15 +78,6 @@ describe("GCP Terraform modules", () => {
     expect(storage).toContain("public_access_prevention");
     expect(storage).toContain("force_destroy");
     expect(storage).toContain("builds/");
-  });
-
-  it("provisions a Pub/Sub subscription with dead-lettering", () => {
-    const queue = generateGcpQueue();
-    expect(queue).toContain('resource "google_pubsub_topic" "capture"');
-    expect(queue).toContain('resource "google_pubsub_topic" "capture_dlq"');
-    expect(queue).toContain('resource "google_pubsub_subscription" "capture"');
-    expect(queue).toContain("dead_letter_policy");
-    expect(queue).toContain("max_delivery_attempts");
   });
 
   it("uses shared-core Cloud SQL Postgres", () => {
@@ -146,7 +130,6 @@ describe("GCP Terraform modules", () => {
       "terraform/compute.tf",
       "terraform/database.tf",
       "terraform/storage.tf",
-      "terraform/queue.tf",
       "terraform/identity.tf",
       "terraform/secrets.tf",
       "terraform/dns.tf",
@@ -156,6 +139,8 @@ describe("GCP Terraform modules", () => {
     ]) {
       expect(Object.keys(files)).toContain(path);
     }
+    expect(Object.keys(files)).not.toContain("terraform/queue.tf");
+    expect(Object.values(files).join("\n").toLowerCase()).not.toMatch(/pubsub|queue|worker/u);
     expect(files["terraform/README.md"]).toContain("terraform plan");
     expect(files["terraform/README.md"]).toContain("GCS_BUCKET");
     expect(files["terraform/README.md"]).toContain("terraform destroy");

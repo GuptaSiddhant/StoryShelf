@@ -1,6 +1,6 @@
 # @storyshelf/core
 
-The domain layer of StoryShelf: adapter interfaces, models, capture pipeline, diff engine, and retention logic — with no HTTP dependency, so workers import it without pulling a server. The Hono router lives in `@storyshelf/app`. Compose pluggable adapters into a complete self-hosted visual testing server.
+The domain layer of StoryShelf: adapter interfaces, models, capture pipeline, diff engine, and retention logic — with no HTTP dependency, so the capture consumer imports it without pulling a server. The Hono router lives in `@storyshelf/app`. Compose pluggable adapters into a complete self-hosted visual testing server.
 
 ## Install
 
@@ -129,15 +129,13 @@ See `docs/architecture.md` and the ADRs in `docs/adr/`.
 
 ## Deployment targets
 
-The core router is runtime-agnostic (Web `Request`/`Response`, `fetch`, `crypto`, `URL`). The Node-specific piece is the capture consumer and its optional forked child, which need a long-lived Node server (`testing`); serverless runtimes swap in a remote `CaptureQueue` (e.g. `@storyshelf/queue-sqs`) plus a separate worker. You assemble a server for any platform — `storyshelf server init` generates a scaffold with the adapters you choose:
+The core router is runtime-agnostic (Web `Request`/`Response`, `fetch`, `crypto`, `URL`). The Node-specific piece is the capture consumer and its optional forked child, which need a long-lived Node server: that is what the `testing` option turns on, and the database is the queue (ADR 0006). Without `testing` an instance only hosts Storybooks and runs on serverless platforms too. You assemble a server for any platform — `storyshelf server init` generates a scaffold with the adapters you choose:
 
-| Platform                                   | Database                              | Storage                          | Capture queue                   | Server entry               |
-| ------------------------------------------ | ------------------------------------- | -------------------------------- | ------------------------------- | -------------------------- |
-| **Vercel**                                 | `@storyshelf/db-sqlite/turso`         | `@storyshelf/storage-s3` (R2/S3) | Remote `CaptureQueue` + worker  | Hono + `@hono/vercel-edge` |
-| **Cloudflare Workers**                     | `@storyshelf/db-sqlite/turso`         | `@storyshelf/storage-s3` (R2)    | Workers Queues `CaptureQueue`   | Hono + Workers entry       |
-| **Azure Functions**                        | `@storyshelf/db-sqlite/turso`         | `@storyshelf/storage-s3` (Blob)  | Azure Queues `CaptureQueue`     | Hono + Azure handler       |
-| **AWS Lambda**                             | `@storyshelf/db-sqlite/turso`         | `@storyshelf/storage-s3`         | SQS `CaptureQueue`              | Hono + Lambda handler      |
-| **Deno Deploy**                            | `@storyshelf/db-sqlite/turso`         | `@storyshelf/storage-s3`         | Custom `CaptureQueue` (Deno KV) | Hono + Deno entry          |
-| **Bun / Node (VPS, Fly, Railway, Render)** | `db-sqlite` (+ `./bun-sqlite` on Bun) | `storage-local` / `storage-s3`   | Database queue (built in)       | `storyshelf-server serve`  |
+| Platform                                   | Database                              | Storage                          | `testing` (capture)       | Server entry               |
+| ------------------------------------------ | ------------------------------------- | -------------------------------- | ------------------------- | -------------------------- |
+| **Vercel, AWS Lambda, Azure Functions**    | `@storyshelf/db-sqlite/turso`         | `@storyshelf/storage-s3`         | No (hosting only)         | Hono + platform handler    |
+| **Cloudflare Workers**                     | `@storyshelf/db-sqlite/d1` or turso   | `@storyshelf/storage-s3` (R2)    | No (hosting only)         | Hono + Workers entry       |
+| **Bun / Node (VPS, Fly, Railway, Render)** | `db-sqlite` (+ `./bun-sqlite` on Bun) | `storage-local` / `storage-s3`   | Yes, database queue       | `storyshelf-server serve`  |
+| **Container platforms (ECS, Cloud Run, Container Apps, Kubernetes)** | `db-postgres` / `db-mysql` | `storage-s3` / `storage-gcs` / `storage-azure` | Yes, database queue | `storyshelf server init` scaffold |
 
 All clouds are equal — pick the adapters that match your infrastructure. See the **Deployment** guide for recipes including a minimal Turso + S3 example.

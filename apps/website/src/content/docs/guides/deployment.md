@@ -79,7 +79,7 @@ Capture drives Chromium, which dominates memory use. Each open page costs roughl
 
 | Setting                                                                                       | Default                                                       | What it controls                                                 |
 | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `testing.concurrency` (server) / `WORKER_CONCURRENCY` (remote worker)                         | auto: 2 builds on hosts with ≥ 2 CPUs and ≥ 3 GB, otherwise 1 | Builds captured at the same time (each launches its own browser) |
+| `testing.concurrency`                                                                         | auto: 2 builds on hosts with ≥ 2 CPUs and ≥ 3 GB, otherwise 1 | Builds captured at the same time (each launches its own browser) |
 | `createPlaywrightCaptureRunner({ concurrency })` / `STORYSHELF_CAPTURE_CONCURRENCY`           | auto (see below)                                              | Pages rendering at once within one build                         |
 | `createPlaywrightCaptureRunner({ navigationTimeoutMs })` / `STORYSHELF_NAVIGATION_TIMEOUT_MS` | auto: 30 s, 60 s under 2 CPUs, 90 s under 1 CPU               | Per-page navigation and action timeout                           |
 
@@ -113,11 +113,11 @@ If builds still run out of memory, lower the runner concurrency first, then add 
 
 ## Cloud reference stacks
 
-Enterprise Terraform stacks are available per cloud — each scaffolds an app + worker, database, storage, queue, auth, and optional DNS/TLS. See the dedicated pages for commands, env wiring, and stable output contracts:
+Enterprise Terraform stacks are available per cloud — each scaffolds one app (it also runs the captures from the database queue), database, storage, auth, and optional DNS/TLS. See the dedicated pages for commands, env wiring, and stable output contracts:
 
-- [AWS — ECS + S3 + SQS + Postgres + Cognito](./aws/) — `s3_bucket`, `queue_url`, `user_pool_id`
-- [Azure — Container Apps + Blob + Queues/Service Bus + Postgres + Entra](./azure/) — `storage_connection_string`, `entra_application_id`
-- [GCP — Cloud Run + GCS + Pub/Sub + Postgres + Identity Platform](./gcp/) — `run_url`, `gcs_bucket`, `pubsub_topic`
-- [Cloud assembly — all clouds equal](./cloud/) — swap each layer independently across Vercel, Cloudflare Workers, Lambda, Deno, and Bun, plus serverless hosting only and Postgres provider recipes
+- [AWS — ECS + S3 + Postgres + Cognito](./aws/) — `s3_bucket`, `db_endpoint`, `user_pool_id`
+- [Azure — Container Apps + Blob + Postgres + Entra](./azure/) — `storage_connection_string`, `entra_application_id`
+- [GCP — Cloud Run + GCS + Postgres + Identity Platform](./gcp/) — `run_url`, `gcs_bucket`, `database_url`
+- [Cloud assembly — all clouds equal](./cloud/) — swap each layer independently, with serverless hosting only on Vercel, Cloudflare Workers and Lambda, plus Postgres provider recipes
 
 For single-host Docker Compose or a bare `npm start` on Fly/Railway/Render/VPS, the [Docker Compose](./docker-compose/) page covers the compose file, subdomains, and auth. The cloud assembly page also includes minimal `Turso + S3` and `Postgres + S3` recipes that run on any `fetch`+`crypto` platform.

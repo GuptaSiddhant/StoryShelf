@@ -27,39 +27,37 @@ function materialize(options: AzureTerraformOptions): string {
 }
 
 describe.skipIf(!hasTerraform)("generated Azure terraform (gated on terraform binary)", () => {
-  let storageDir: string;
-  let busDir: string;
+  let fullDir: string;
+  let minimalDir: string;
 
   beforeAll(() => {
-    storageDir = materialize({
+    fullDir = materialize({
       project: "acme-shelf",
       location: "eastus",
-      queueBackend: "storage-queues",
       domainName: "shelf.example.com",
       entraTenantId: "00000000-0000-0000-0000-000000000000",
     });
-    busDir = materialize({
+    minimalDir = materialize({
       project: "acme-shelf",
       location: "eastus",
-      queueBackend: "service-bus",
     });
   });
 
   afterAll(() => {
-    rmSync(storageDir, { recursive: true, force: true });
-    rmSync(busDir, { recursive: true, force: true });
+    rmSync(fullDir, { recursive: true, force: true });
+    rmSync(minimalDir, { recursive: true, force: true });
   });
 
-  it("passes terraform fmt -check for both backends", () => {
-    for (const dir of [storageDir, busDir]) {
+  it("passes terraform fmt -check for the full and the minimal stack", () => {
+    for (const dir of [fullDir, minimalDir]) {
       expect(() =>
         execFileSync("terraform", ["fmt", "-check", "-recursive", "."], { cwd: dir }),
       ).not.toThrow();
     }
   });
 
-  it("initializes and validates both backend modules", () => {
-    for (const dir of [storageDir, busDir]) {
+  it("initializes and validates the full and the minimal stack", () => {
+    for (const dir of [fullDir, minimalDir]) {
       expect(() =>
         execFileSync("terraform", ["init", "-backend=false", "-input=false", "-no-color"], {
           cwd: dir,

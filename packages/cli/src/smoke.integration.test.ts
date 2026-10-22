@@ -116,7 +116,6 @@ describe.skipIf(!enabled)("scaffolded server project", () => {
       storage: "local",
       auth: "none",
       git: "none",
-      queue: "memory",
       docker: false,
     });
     await runServerInit({});

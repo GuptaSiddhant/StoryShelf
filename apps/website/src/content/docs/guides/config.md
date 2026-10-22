@@ -99,6 +99,7 @@ createShelfApp({ database, storage }); // hosting only
 createShelfApp({ database, storage, testing: { runner, compare: { threads: 2 }, concurrency: 2 } });
 ```
 
+- Enabling `testing` requires a long-running server (a container, VM, Fly Machine or Kubernetes pod); a serverless deployment can host Storybooks only, by leaving `testing` unset. See [Capture](/concepts/capture/#requires-a-long-running-server) and [Hosting only](/concepts/hosting-only/).
 - `testing` needs `runner`, or `queue` to hand jobs to a queue that something else consumes; `testing: {}` fails at boot.
 - `compare`, `images`, `concurrency`, `retries`, `shardSize`, `workerEntry`, `mode` and `queue` all live under `testing`; they are unreachable without it.
 - Captures queue on the database (`capture_jobs`), and every instance with `testing` consumes them. `testing.retries` (default `2`, so three attempts) is the one retry limit for failed attempts, lost leases and forked-child crashes; `testing.queue` replaces the database queue and must be a `PollableCaptureQueue`, consumed in this process when `runner` is set. See [Capture](/concepts/capture/#the-job-queue).

@@ -37,12 +37,6 @@ const app = createShelfApp({
 });
 ```
 
-Remote capture workers need the same list so declared links are validated while capturing:
-
-```ts
-createCaptureWorker({ queue, db, storage, runner, scratchDir, design: [createFigmaDesign()] });
-```
-
 Without a provider, StoryShelf extracts and shows no design links. See [Design links](/guides/design-links/) for how stories, mappings and the access token work.
 
 ## Let members connect their own account

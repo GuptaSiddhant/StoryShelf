@@ -59,7 +59,7 @@ Three tiers, pick the shallowest that fits:
    const logger = app.lifecycle.logger;
    ```
 
-3. **Remote worker process** — import `createShelfLogger` from `@storyshelf/core/logger` directly, never the router barrel (workers must not pull Hono).
+3. **A process that only consumes jobs or runs forked capture** — import `createShelfLogger` from `@storyshelf/core/logger` directly, never the router barrel (it must not pull Hono).
 
 ## Main APIs
 

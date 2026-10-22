@@ -2,7 +2,7 @@ import { access } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { detectPackageRunner, installCommand } from "../../config.ts";
 import { printError } from "../../output.ts";
-import { defaultSpawnProcess, type SpawnProcess } from "../worker/serve.ts";
+import { defaultSpawnProcess, type SpawnProcess } from "../server/serve.ts";
 
 export interface McpServeOptions {
   dir?: string;

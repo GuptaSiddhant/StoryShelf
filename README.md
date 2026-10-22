@@ -19,7 +19,7 @@ Self-hosted visual testing platform for Storybook. Run visual regression tests i
 - **Unlimited snapshots.** MIT-licensed; you pay for your own infrastructure, not per snapshot.
 - **Per-branch baselines** with fallback to the default branch, auto-approved on `main`.
 - **Published Storybook.** Share the latest build of each project at a stable URL.
-- **One `docker run` to self-host**, or Terraform stacks for AWS, Azure, and GCP. Bring your own database, storage, and queue.
+- **One `docker run` to self-host**, or Terraform stacks for AWS, Azure, and GCP. Bring your own database and storage; the database is also the capture queue.
 - **Server-side capture.** Upload your built Storybook; Playwright (Chromium, Firefox, WebKit) or Puppeteer renders it, including `play` functions.
 - **Review workflow.** Approve or reject, threaded comments, and GitHub/GitLab merge-gate status checks.
 - **Optional AI triage and project health.** Bring your own model: a verdict and per-snapshot notes on every build, plus a 30-day health digest. Advisory only, off by default. [Learn more](https://storyshelf.js.org/ai/).
@@ -50,8 +50,6 @@ packages/
   git-github/     @storyshelf/git-github    — GitHub commit status / merge gate / PR comments
   design-figma/   @storyshelf/design-figma  — Figma design links, metadata and rendered previews
   git-gitlab/     @storyshelf/git-gitlab    — GitLab commit statuses, MR comments, merge-gate helpers
-  queue-sqs/      @storyshelf/queue-sqs     — AWS SQS capture job queue
-  queue-redis/    @storyshelf/queue-redis   — Redis capture job queue (ioredis)
   cli/            storyshelf              — CLI client (server init, init, create, upload, purge, retry)
   runner-playwright/ @storyshelf/runner-playwright — Playwright capture runner
   runner-puppeteer/ @storyshelf/runner-puppeteer — Puppeteer capture runner

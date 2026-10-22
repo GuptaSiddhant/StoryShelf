@@ -5,7 +5,7 @@ description: Lightweight Puppeteer CaptureRunner — Chromium-only screenshots w
 
 import { PackageManagers } from "starlight-package-managers";
 
-`@storyshelf/runner-puppeteer` is a lightweight `CaptureRunner` that renders Storybook screenshots with Puppeteer (`puppeteer-core` + `chrome-headless-shell`). It produces Chromium-only captures at a smaller image size than the Playwright runner. Pair it with the `@storyshelf/worker` remote worker for a decomposed deploy or wire it directly into `createShelfApp`.
+`@storyshelf/runner-puppeteer` is a lightweight `CaptureRunner` that renders Storybook screenshots with Puppeteer (`puppeteer-core` + `chrome-headless-shell`). It produces Chromium-only captures at a smaller image size than the Playwright runner. Wire it into `createShelfApp` through the `testing` option.
 
 ## Install
 
@@ -31,7 +31,7 @@ const runner = createPuppeteerCaptureRunner({
 
 Pages render through a bounded pool sized from the detected CPU and memory (one page on 0.5–1 vCPU hosts). Tune it with `concurrency` / `STORYSHELF_CAPTURE_CONCURRENCY` and `navigationTimeoutMs` / `STORYSHELF_NAVIGATION_TIMEOUT_MS`; see [Sizing memory for capture](/guides/deployment/#sizing-memory-for-capture). The default launch args include low-memory flags; passing your own `args` replaces them.
 
-Hand the runner to the server or to a remote worker — both are runners-agnostic:
+Hand the runner to the server:
 
 ```ts
 import { createShelfApp } from "@storyshelf/app";
@@ -41,19 +41,6 @@ const app = createShelfApp({
   database,
   storage,
   testing: { runner: createPuppeteerCaptureRunner() },
-});
-```
-
-```ts
-import { createCaptureWorker } from "@storyshelf/worker";
-import { createPuppeteerCaptureRunner } from "@storyshelf/runner-puppeteer";
-
-const worker = createCaptureWorker({
-  queue,
-  db,
-  storage,
-  runner: createPuppeteerCaptureRunner(),
-  scratchDir: "/tmp/shelf",
 });
 ```
 
@@ -80,4 +67,4 @@ Both runners implement the same pure `CaptureRunner` contract. The orchestrator 
 
 ## When to use it
 
-Choose Puppeteer when image size or cold-start time dominates — single-browser deploys, Fly/Railway/Lambda workers, or CI images where you already ship a system Chromium. Choose Playwright when you need Firefox, WebKit, or Chrome channel selection per project.
+Choose Puppeteer when image size or cold-start time dominates — single-browser deploys, Fly/Railway deployments, or CI images where you already ship a system Chromium. Choose Playwright when you need Firefox, WebKit, or Chrome channel selection per project.

@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { generateTsconfig, SERVER_ENTRY, WORKER_ENTRY, writeScaffoldFile } from "./scaffold.ts";
+import { generateTsconfig, SERVER_ENTRY, writeScaffoldFile } from "./scaffold.ts";
 
 let dir = "";
 afterEach(() => {
@@ -14,7 +14,6 @@ afterEach(() => {
 describe("scaffold helpers", () => {
   it("keeps entries under src/", () => {
     expect(SERVER_ENTRY).toBe("src/index.ts");
-    expect(WORKER_ENTRY).toBe("src/worker.ts");
   });
 
   it("generates a strict, type-check-only tsconfig covering src", () => {

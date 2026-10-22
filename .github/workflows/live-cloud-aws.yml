@@ -1,7 +1,7 @@
 name: Live Cloud AWS
 
-# Phase 1 live tests: S3 + SQS against strictly real AWS (no fakes, no emulators).
-# Bucket/queue are pre-provisioned (manually or via `terraform apply` from
+# Phase 1 live tests: S3 against strictly real AWS (no fakes, no emulators).
+# The bucket is pre-provisioned (manually or via `terraform apply` from
 # `storyshelf server init --target aws`); this workflow only consumes
 # `terraform output -json` values as secrets and never creates infrastructure.
 # Full scaffold-apply/destroy in CI arrives with the E2E issue (needs a
@@ -11,7 +11,6 @@ name: Live Cloud AWS
 # - AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (or an assumed IAM role)
 # - AWS_REGION (e.g. us-east-1)
 # - LIVE_S3_BUCKET (terraform output: s3_bucket)
-# - LIVE_SQS_QUEUE_URL (terraform output: queue_url)
 on:
   workflow_dispatch:
   schedule:
@@ -51,9 +50,9 @@ jobs:
         env:
           CI: "true"
 
-  # Real S3 + SQS suites. Hermetic tests in the same packages also run
+  # Real S3 suites. Hermetic tests in the same packages also run
   # (they must stay green); live files skip without LIVE_CLOUD=1.
-  live-s3-sqs:
+  live-s3:
     runs-on: ubuntu-latest
     needs: [scaffold-validate]
     env:
@@ -62,7 +61,6 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       S3_BUCKET: ${{ secrets.LIVE_S3_BUCKET }}
-      QUEUE_URL: ${{ secrets.LIVE_SQS_QUEUE_URL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -76,13 +74,13 @@ jobs:
       - name: Fail fast on missing secrets
         run: |
           set -e
-          for v in AWS_REGION AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY S3_BUCKET QUEUE_URL; do
+          for v in AWS_REGION AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY S3_BUCKET; do
             if [ -z "${!v}" ]; then
               echo "::error::Missing required secret (or env): $v. See workflow header."
               exit 1
             fi
           done
 
-      - name: Run S3 + SQS suites (hermetic + live)
+      - name: Run S3 suites (hermetic + live)
         # --force: live results must never come from the turbo cache.
-        run: nubx turbo test --filter='@storyshelf/storage-s3' --filter='@storyshelf/queue-sqs' --force
+        run: nubx turbo test --filter='@storyshelf/storage-s3' --force

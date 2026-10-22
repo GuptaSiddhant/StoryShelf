@@ -4,9 +4,6 @@ import { dirname, join } from "node:path";
 /** Server entry in a scaffolded project (a `src/` dir leaves room for helper modules). */
 export const SERVER_ENTRY = "src/index.ts";
 
-/** Worker entry in a scaffolded project. */
-export const WORKER_ENTRY = "src/worker.ts";
-
 /** Dev dependencies every scaffolded project gets (editor + `tsc --noEmit`). */
 export const SCAFFOLD_DEV_DEPENDENCIES: Record<string, string> = {
   "@types/node": "^24.0.0",

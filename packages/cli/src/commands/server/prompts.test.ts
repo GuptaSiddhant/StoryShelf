@@ -2,11 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   ADVANCED_DATABASE_CHOICES,
   CURATED_DATABASE_CHOICES,
-  CURATED_QUEUE_CHOICES,
   CURATED_STORAGE_CHOICES,
   databaseChoices,
   localInfraPrompts,
-  queueChoices,
   storageChoices,
 } from "./prompts.ts";
 
@@ -26,14 +24,16 @@ describe("curated adapter choices", () => {
     expect(databaseChoices(true).map((c) => c.value)).toContain("d1");
   });
 
-  it("curates storage and queue shortlists with full matrix behind the toggle", () => {
+  it("curates the storage shortlist with full matrix behind the toggle", () => {
     expect(CURATED_STORAGE_CHOICES.map((c) => c.value)).toEqual(["local", "s3"]);
     expect(storageChoices(false)).toHaveLength(2);
     expect(storageChoices(true).map((c) => c.value)).toContain("azure");
+  });
 
-    expect(CURATED_QUEUE_CHOICES.map((c) => c.value)).toEqual(["memory", "redis"]);
-    expect(queueChoices(false)).toHaveLength(2);
-    expect(queueChoices(true).map((c) => c.value)).toContain("sqs");
+  it("asks no queue question: the database is the queue", () => {
+    for (const advanced of [false, true]) {
+      expect(localInfraPrompts(advanced).map((p) => p.name)).not.toContain("queue");
+    }
   });
 
   it("builds local infra prompts from the shortlist by default", () => {

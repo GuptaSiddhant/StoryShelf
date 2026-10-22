@@ -15,4 +15,4 @@ serve({ fetch: app.fetch, port: 3000 });
 
 ## How it fits in
 
-`app` owns everything HTTP: `routers/`, `pages/`, `ui/`, `middleware/`, the request `store`, and vendored assets. All domain logic — adapter interfaces, models, schema, capture pipeline, retention, diff — lives in `@storyshelf/core` and is imported here through its granular subpaths (never the core barrel, which is now domain-only). Queue and remote workers depend on core alone and pull zero HTTP modules.
+`app` owns everything HTTP: `routers/`, `pages/`, `ui/`, `middleware/`, the request `store`, and vendored assets. All domain logic — adapter interfaces, models, schema, capture pipeline, retention, diff — lives in `@storyshelf/core` and is imported here through its granular subpaths (never the core barrel, which is now domain-only). The capture consumer and the forked capture child live in core too, so they pull zero HTTP modules.

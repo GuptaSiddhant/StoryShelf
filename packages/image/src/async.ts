@@ -40,8 +40,8 @@ export function configureImages(settings: ImageSettings): void {
  * threads are unavailable. The buffers may be transferred to a worker, which detaches them in
  * the caller: do not read them afterwards.
  *
- * The pool is process-scoped, not owned by the capture worker, so the re-diff route benefits in
- * queue-only deployments where nothing ever renders.
+ * The pool is process-scoped, not owned by the capture consumer, so the re-diff route benefits
+ * even on an instance that never renders.
  */
 export async function diffImagesAsync(
   baseline: Buffer,

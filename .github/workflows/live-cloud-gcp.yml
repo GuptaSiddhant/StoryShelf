@@ -1,17 +1,15 @@
 name: Live Cloud GCP
 
-# Phase 3 live tests: GCS + Pub/Sub against strictly real GCP (no fakes,
-# no emulators). Bucket/topic/subscription are pre-provisioned (manually or
+# Phase 3 live tests: GCS against strictly real GCP (no fakes, no
+# emulators). The bucket is pre-provisioned (manually or
 # via `terraform apply` from `storyshelf server init --target gcp`); this
 # workflow only consumes `terraform output -json` values as secrets and
 # never creates infrastructure.
 #
 # Required repository secrets:
 # - GCP_PROJECT_ID (GCP project id)
-# - GCP_SERVICE_ACCOUNT_JSON (service-account key JSON with storage + pubsub roles)
+# - GCP_SERVICE_ACCOUNT_JSON (service-account key JSON with storage roles)
 # - LIVE_GCS_BUCKET (terraform output: gcs_bucket)
-# - LIVE_PUBSUB_TOPIC (terraform output: pubsub_topic)
-# - LIVE_PUBSUB_SUBSCRIPTION (terraform output: pubsub_subscription)
 on:
   workflow_dispatch:
   schedule:
@@ -51,7 +49,7 @@ jobs:
         env:
           CI: "true"
 
-  # Real GCS + Pub/Sub suites. Hermetic tests in the same packages also run
+  # Real GCS suites. Hermetic tests in the same packages also run
   # (they must stay green); live files skip without LIVE_CLOUD=1.
   live-gcp:
     runs-on: ubuntu-latest
@@ -60,8 +58,6 @@ jobs:
       LIVE_CLOUD: "1"
       GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
       LIVE_GCS_BUCKET: ${{ secrets.LIVE_GCS_BUCKET }}
-      LIVE_PUBSUB_TOPIC: ${{ secrets.LIVE_PUBSUB_TOPIC }}
-      LIVE_PUBSUB_SUBSCRIPTION: ${{ secrets.LIVE_PUBSUB_SUBSCRIPTION }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -81,7 +77,7 @@ jobs:
       - name: Fail fast on missing secrets
         run: |
           set -e
-          for v in GCP_PROJECT_ID LIVE_GCS_BUCKET LIVE_PUBSUB_TOPIC LIVE_PUBSUB_SUBSCRIPTION; do
+          for v in GCP_PROJECT_ID LIVE_GCS_BUCKET; do
             if [ -z "${!v}" ]; then
               echo "::error::Missing required secret (or env): $v. See workflow header."
               exit 1
@@ -92,6 +88,6 @@ jobs:
             exit 1
           fi
 
-      - name: Run GCS + Pub/Sub suites (hermetic + live)
+      - name: Run GCS suites (hermetic + live)
         # --force: live results must never come from the turbo cache.
-        run: nubx turbo test --filter='@storyshelf/storage-gcs' --filter='@storyshelf/queue-gcp' --force
+        run: nubx turbo test --filter='@storyshelf/storage-gcs' --force

@@ -6,7 +6,6 @@ import {
   generateAwsEndpoints,
   generateAwsIdentity,
   generateAwsOutputs,
-  generateAwsQueue,
   generateAwsReadme,
   generateAwsSecrets,
   generateAwsSecurity,
@@ -50,7 +49,7 @@ describe("AWS Terraform modules", () => {
     expect(variables).toContain('variable "vpc_id"');
     expect(variables).toContain('variable "domain_name"');
     expect(variables).toContain('variable "saml_metadata_url"');
-    // db_engine is baked at scaffold time, like storage and queue; a
+    // db_engine is baked at scaffold time, like storage; a
     // variable here would be dead config that terraform validate flags.
     expect(variables).not.toContain("db_engine");
   });
@@ -60,13 +59,6 @@ describe("AWS Terraform modules", () => {
     expect(storage).toContain('resource "aws_s3_bucket" "storybook"');
     expect(storage).toContain("block_public_acls");
     expect(storage).toContain("expire-transient-builds");
-  });
-
-  it("provisions an SQS queue with a DLQ redrive", () => {
-    const queue = generateAwsQueue();
-    expect(queue).toContain('resource "aws_sqs_queue" "capture"');
-    expect(queue).toContain('resource "aws_sqs_queue" "capture_dlq"');
-    expect(queue).toContain("deadLetterTargetArn");
   });
 
   it("uses RDS by default and DSQL on request", () => {
@@ -79,7 +71,7 @@ describe("AWS Terraform modules", () => {
   it("keeps data-plane traffic private and compute on Fargate", () => {
     const network = `${generateAwsVpc()}${generateAwsSecurity()}${generateAwsEndpoints()}`;
     expect(network).toContain('resource "aws_vpc_endpoint" "s3"');
-    expect(network).toContain('resource "aws_vpc_endpoint" "sqs"');
+    expect(network).not.toContain("sqs");
     const compute = generateAwsCompute();
     expect(compute).toContain('resource "aws_ecs_cluster" "main"');
     expect(compute).toContain('resource "aws_lb" "main"');
@@ -110,7 +102,6 @@ describe("AWS Terraform modules", () => {
     for (const name of [
       "alb_dns_name",
       "s3_bucket",
-      "queue_url",
       "db_endpoint",
       "user_pool_id",
       "app_client_id",
@@ -121,14 +112,7 @@ describe("AWS Terraform modules", () => {
   });
 
   it("emits a frozen output contract for both engines", () => {
-    const frozen = [
-      "alb_dns_name",
-      "app_client_id",
-      "db_endpoint",
-      "queue_url",
-      "s3_bucket",
-      "user_pool_id",
-    ];
+    const frozen = ["alb_dns_name", "app_client_id", "db_endpoint", "s3_bucket", "user_pool_id"];
     for (const engine of ["rds", "dsql"] as const) {
       expect(outputNames(generateAwsOutputs(engine))).toEqual(frozen);
     }
@@ -152,12 +136,13 @@ describe("AWS Terraform modules", () => {
 
   it("emits one file per module plus database and README", () => {
     const files = generateAwsTerraformFiles(options);
+    expect(Object.keys(files)).not.toContain("terraform/queue.tf");
+    expect(Object.values(files).join("\n").toLowerCase()).not.toMatch(/sqs|queue|worker/u);
     for (const path of [
       "terraform/versions.tf",
       "terraform/variables.tf",
       "terraform/network.tf",
       "terraform/storage.tf",
-      "terraform/queue.tf",
       "terraform/identity.tf",
       "terraform/compute.tf",
       "terraform/secrets.tf",

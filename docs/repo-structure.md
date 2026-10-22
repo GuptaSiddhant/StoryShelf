@@ -33,7 +33,7 @@ There is no `tsdown-entry` key. Each `package.json` `exports` map carries `{ sou
   option types (`ShelfOptions`/`ShelfConfig`/`UIConfig`/`BrandTheme` from core).
 - `@storyshelf/core` root barrel is domain-only (config/logger/types surface).
   Importing it must never pull Hono into bundles that do not serve it
-  (e.g. runners, workers) — enforced by keeping all HTTP modules in app.
+  (e.g. runners, the forked capture child) — enforced by keeping all HTTP modules in app.
 - Everything else lives under a subpath: adapter interfaces under
   `core/adapter/*`, runtime capture under `core/capture`, logging under
   `core/logger`, diff under `core/diff` (re-exported from the leaf `@storyshelf/image`), URLs under `core/urls`, storage paths

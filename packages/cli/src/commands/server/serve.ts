@@ -115,7 +115,7 @@ function waitForExit(child: ChildProcess, relay: SignalRelay): Promise<number> {
 }
 
 /** Spawn a child server, forwarding signals and resolving its exit code. */
-async function defaultSpawnProcess(
+export async function defaultSpawnProcess(
   command: string,
   args: readonly string[],
   options: SpawnOptions,
