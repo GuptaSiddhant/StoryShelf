@@ -48,6 +48,7 @@ function build(id: string, projectId: string): Build {
     changedCount: 0,
     approvedCount: 0,
     rejectedCount: 0,
+    inheritedCount: 0,
     affectedOnly: true,
     baselineSha: null,
     changedFiles: null,

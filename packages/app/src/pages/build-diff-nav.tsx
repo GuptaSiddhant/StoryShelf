@@ -14,7 +14,7 @@ import {
   filmstripList,
   statusDots,
 } from "../ui/styles/review-layout.ts";
-import { a11yCarrierOf, a11yViolationsOf } from "./a11y-violations.tsx";
+import { a11yCarrierOf, a11yFindingsOf } from "./a11y-violations.tsx";
 import {
   diffPercent,
   groupSnapshots,
@@ -68,7 +68,7 @@ function FilmItem(props: {
   const url = snapshotPageUrl(project, build, snap.id);
   const percent = diffPercent(snap);
   const carrier = a11yCarrierOf(snap, group.members);
-  const a11yCount = a11yViolationsOf(carrier).length;
+  const a11yCount = a11yFindingsOf(carrier).length;
   const tags = [
     group.modeKey === "desktop" ? "" : group.modeKey,
     group.members.length > 1 ? `${group.members.length} browsers` : "",
@@ -112,7 +112,7 @@ export function DiffNav(props: DiffNavProps): HtmlEscapedString | Promise<HtmlEs
   const progress = reviewProgress(snapshots);
   const filter = progress.pending > 0 ? "review" : "all";
   const withA11y = groups.filter(
-    (group) => a11yViolationsOf(a11yCarrierOf(group.representative, group.members)).length > 0,
+    (group) => a11yFindingsOf(a11yCarrierOf(group.representative, group.members)).length > 0,
   ).length;
   return (
     <aside class={filmstrip} aria-label="Snapshots">

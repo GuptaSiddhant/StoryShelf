@@ -56,7 +56,7 @@ A build on another branch is accepted the same way when the project has **review
 
 `storyId` is `components-button--primary` (unique), plus `storyName`, `storyTitle`, and `viewportName` (`desktop` default `1280×720`). `diffPixels` / `diffRatio` / `diffPath` are populated only when a baseline exists.
 
-With [affected capture](/concepts/affected-capture/), stories outside the change inherit their baseline without rendering: snapshots with `inherited: true` reuse the baseline screenshot and land `unchanged`. The build row records the computation (`affectedOnly`, `baselineSha`, `changedFiles`, `affectedImportPaths`; `null` paths mean a full render).
+With [affected capture](/concepts/affected-capture/), stories outside the change inherit their baseline without rendering: snapshots with `inherited: true` reuse the baseline screenshot and land `unchanged`. The build row counts them in `inheritedCount` (part of `snapshotCount`) and records the computation (`affectedOnly`, `baselineSha`, `changedFiles`, `affectedImportPaths`; `null` paths mean a full render).
 
 ## Attempts & logs
 

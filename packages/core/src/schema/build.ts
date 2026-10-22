@@ -16,6 +16,8 @@ export interface Build {
   changedCount: number;
   approvedCount: number;
   rejectedCount: number;
+  /** Snapshots inherited from the baseline without rendering (affected capture); a subset of `snapshotCount`. */
+  inheritedCount: number;
   /** Affected capture enabled for this build (default true). */
   affectedOnly: boolean;
   /** Ancestor commit the affected set was computed against, if any. */

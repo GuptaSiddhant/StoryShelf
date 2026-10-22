@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CaptureRunner } from "../adapters/capture-runner.ts";
+import { PER_CAPTURE_BUDGET_MS } from "../utils/storybook-token.ts";
 import { enrichStories } from "./enrich.ts";
-import { PER_CAPTURE_BUDGET_MS, RENDER_TIMEOUT_MS } from "./render.ts";
+import { RENDER_TIMEOUT_MS } from "./render.ts";
 
 function story(id: string) {
   return {

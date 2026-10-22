@@ -23,6 +23,18 @@ export const MAX_STORYBOOK_URL_TTL = 86_400;
 /** Slack added to a render budget when deriving a lifetime (queue wait, retries, clock skew). */
 export const STORYBOOK_URL_TTL_GRACE = 300;
 
+/** Extra time granted per capture of a render pass, in ms; sizes a pass's budget and its slices. */
+export const PER_CAPTURE_BUDGET_MS = 15_000;
+/** Smallest slice (captures), so a very short project override never renders a page per call. */
+export const MIN_CAPTURES_PER_SLICE = 50;
+/**
+ * Shortest lifetime a project may set as its override (seconds): one minimum slice's budget plus
+ * the grace, so a slice never outlives its token. Single owner of the rule; every parser of the
+ * override (project API, settings form, page hint) reads it through {@link storybookUrlTtlOverrideError}.
+ */
+export const MIN_STORYBOOK_URL_TTL_OVERRIDE =
+  Math.ceil((MIN_CAPTURES_PER_SLICE * PER_CAPTURE_BUDGET_MS) / 1000) + STORYBOOK_URL_TTL_GRACE;
+
 /** Domain separation: the signing key is derived from the secret with this context, nothing else uses it. */
 const KEY_CONTEXT = "storyshelf/storybook-url/v1";
 const TOKEN_SHAPE = new RegExp(`^${STORYBOOK_TOKEN_SOURCE}$`, "u");
@@ -113,6 +125,18 @@ export function storybookUrlTtl(input: {
   }
   const derived = Math.ceil(input.budgetMs / 1000) + STORYBOOK_URL_TTL_GRACE;
   return Math.min(MAX_STORYBOOK_URL_TTL, Math.max(DEFAULT_STORYBOOK_URL_TTL, derived));
+}
+
+/** The reason a project's lifetime override is refused, or `undefined` when it is acceptable. */
+export function storybookUrlTtlOverrideError(seconds: number): string | undefined {
+  if (
+    Number.isInteger(seconds) &&
+    seconds >= MIN_STORYBOOK_URL_TTL_OVERRIDE &&
+    seconds <= MAX_STORYBOOK_URL_TTL
+  ) {
+    return undefined;
+  }
+  return `The signed URL lifetime is a whole number of seconds from ${MIN_STORYBOOK_URL_TTL_OVERRIDE} (one slice of ${MIN_CAPTURES_PER_SLICE} captures plus the ${STORYBOOK_URL_TTL_GRACE} s grace) to ${MAX_STORYBOOK_URL_TTL}`;
 }
 
 /** Throws unless `seconds` is an integer within the allowed lifetime range. */

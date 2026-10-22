@@ -87,6 +87,8 @@ export const Hidden: Story = {
 
 ## How parameters are discovered
 
+For the background on the preview page this reads from, see [How Storybook works](/concepts/how-storybook-works/).
+
 Storybook 8's `index.json` (v5) omits `parameters`; StoryShelf prefers `stories.json` (which has them) then falls back to runtime `page.evaluate(() => __STORYBOOK_PREVIEW__.extract()[id].parameters)` for SB 8 without `buildStoriesJson`.
 
 You **do not** need to edit `.storybook/main.ts`. When `storyshelf upload` builds Storybook for you, it sets `STORYBOOK_BUILD_STORIES_JSON=true` automatically. If you build outside `upload` (`storybook build -o storybook-static` then `upload` without rebuild), the runtime fallback still covers it. For a persistent file, you may add:

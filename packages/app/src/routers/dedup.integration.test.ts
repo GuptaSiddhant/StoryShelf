@@ -44,6 +44,7 @@ describe("content-addressed dedup", () => {
       changedCount: 0,
       approvedCount: 0,
       rejectedCount: 0,
+      inheritedCount: 0,
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z",
     });
@@ -108,6 +109,7 @@ describe("content-addressed dedup", () => {
       changedCount: 0,
       approvedCount: 0,
       rejectedCount: 0,
+      inheritedCount: 0,
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z",
     });
@@ -149,6 +151,7 @@ describe("content-addressed dedup", () => {
       changedCount: 0,
       approvedCount: 0,
       rejectedCount: 0,
+      inheritedCount: 0,
       createdAt: "2026-01-02T00:00:00.000Z",
       updatedAt: "2026-01-02T00:00:00.000Z",
     });

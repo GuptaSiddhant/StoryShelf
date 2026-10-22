@@ -7,7 +7,7 @@ import {
   REVIEW_VERDICTS,
   SNAPSHOT_STATUSES,
 } from "@storyshelf/core/types";
-import { MAX_STORYBOOK_URL_TTL, MIN_STORYBOOK_URL_TTL } from "@storyshelf/core/utils";
+import { storybookUrlTtlOverrideError } from "@storyshelf/core/utils";
 
 /** A capture target: an engine (`chromium`) or a remote one, `<engine>@<name>` (ADR 0007). */
 const captureTargetSchema = z
@@ -26,8 +26,12 @@ const reviewApprovalsSchema = z.number().int().min(1).max(20);
 const storybookUrlTtlSchema = z
   .number()
   .int()
-  .min(MIN_STORYBOOK_URL_TTL)
-  .max(MAX_STORYBOOK_URL_TTL);
+  .superRefine((seconds, ctx) => {
+    const message = storybookUrlTtlOverrideError(seconds);
+    if (message !== undefined) {
+      ctx.addIssue({ code: "custom", message });
+    }
+  });
 
 const storybookMetaSchema = z.record(z.string(), z.unknown()).nullable().optional();
 
@@ -108,7 +112,7 @@ export const projectUpdateSchema = z
     reviewEnabled: z.boolean().optional(),
     /** Approvals a build needs before it is accepted when `testing` is off. */
     reviewApprovals: reviewApprovalsSchema.optional(),
-    /** Seconds (60 to 86400) the signed Storybook URLs of a render stay valid; null derives it from the stories. */
+    /** Seconds (at least one minimum slice plus grace, 1050, to 86400) the signed Storybook URLs of a render stay valid; null derives it from the stories. */
     storybookUrlTtlSeconds: storybookUrlTtlSchema.nullable().optional(),
   })
   .openapi("ProjectUpdateInput");
@@ -130,6 +134,7 @@ export const buildSchema = z
     changedCount: z.number(),
     approvedCount: z.number(),
     rejectedCount: z.number(),
+    inheritedCount: z.number(),
     affectedOnly: z.boolean(),
     baselineSha: z.string().nullable(),
     changedFiles: z.string().nullable(),

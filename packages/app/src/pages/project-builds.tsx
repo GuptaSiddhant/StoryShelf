@@ -1,16 +1,19 @@
-import { BuildModel, ProjectModel } from "@storyshelf/core/models";
+import { BuildModel, ProjectModel, averageInheritedRatio } from "@storyshelf/core/models";
 import type { Build, Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import { loadHealthPanel } from "../insights/health-panel.ts";
-import { getStore } from "../store.ts";
+import { getStore, testingEnabled } from "../store.ts";
 import {
   Badge,
   Button,
+  Card,
   EmptyState,
   HStack,
+  Meta,
   PageHeader,
   Segmented,
   SelectField,
+  Stat,
   VStack,
 } from "../ui/components.tsx";
 import { DocumentLayout, type RenderedContent } from "../ui/document.tsx";
@@ -99,6 +102,26 @@ function BuildsToolbar(props: {
   );
 }
 
+/**
+ * Affected-capture efficiency: the average share of a snapshot set that recent builds inherited
+ * from the baseline instead of rendering, from the counts stored on the builds (no snapshot reads).
+ */
+function InheritedRatioCard(props: { builds: Build[] }): ReturnType<typeof Card> | null {
+  const average = averageInheritedRatio(props.builds);
+  if (average === null) {
+    return null;
+  }
+  return (
+    <Card>
+      <Stat label="Inherited from baseline" value={`${Math.round(average.ratio * 100)}%`} />
+      <Meta>
+        Average over the last {average.builds} {average.builds === 1 ? "build" : "builds"}: the
+        share of snapshots reused without rendering.
+      </Meta>
+    </Card>
+  );
+}
+
 /** Project builds page: filterable build history for one project. */
 export async function renderProjectBuildsPage(
   slug: string,
@@ -136,6 +159,7 @@ export async function renderProjectBuildsPage(
       />
       <VStack>
         <HealthSlot project={project} data={health} />
+        {testingEnabled() ? <InheritedRatioCard builds={all} /> : null}
         <BuildsToolbar
           project={project}
           all={all}

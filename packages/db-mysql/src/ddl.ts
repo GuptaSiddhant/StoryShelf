@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS builds (
   changed_count INTEGER NOT NULL DEFAULT 0,
   approved_count INTEGER NOT NULL DEFAULT 0,
   rejected_count INTEGER NOT NULL DEFAULT 0,
+  inherited_count INTEGER NOT NULL DEFAULT 0,
   affected_only TINYINT(1) NOT NULL DEFAULT true,
   baseline_sha TEXT,
   changed_files TEXT,

@@ -5,7 +5,7 @@ description: How StoryShelf renders stories — orchestrator, pure CaptureRunner
 
 import Screenshot from "../../../components/Screenshot.astro";
 
-Capture is server-side. The CLI uploads a zipped static Storybook; the server extracts it, serves it locally, and screenshots the stories impacted by the change — unaffected stories are inherited from their baselines (see [Affected capture](/concepts/affected-capture/)).
+Capture is server-side. The CLI uploads a zipped static Storybook; the server extracts it, serves it locally, and screenshots the stories impacted by the change — unaffected stories are inherited from their baselines (see [Affected capture](/concepts/affected-capture/)). For the parts of a built Storybook the render relies on, see [How Storybook works](/concepts/how-storybook-works/).
 
 <Screenshot
   name="build-review"

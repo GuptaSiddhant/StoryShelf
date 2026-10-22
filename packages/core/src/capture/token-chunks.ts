@@ -6,14 +6,15 @@
  * token (the usual case, and every target without a signed URL) is one render call, as before.
  */
 import type { CaptureTarget, CaptureRunner, RenderResult } from "../adapters/capture-runner.ts";
-import { STORYBOOK_URL_TTL_GRACE } from "../utils/storybook-token.ts";
+import {
+  MIN_CAPTURES_PER_SLICE,
+  PER_CAPTURE_BUDGET_MS,
+  STORYBOOK_URL_TTL_GRACE,
+} from "../utils/storybook-token.ts";
 import type { StoryEntry } from "./adapter.ts";
-import { PER_CAPTURE_BUDGET_MS, renderBudgetMs, renderWithTimeout } from "./render.ts";
+import { renderBudgetMs, renderWithTimeout } from "./render.ts";
 import type { RenderRequest } from "./render.ts";
 import type { StorybookUrlSource } from "./storybook-urls.ts";
-
-/** Smallest slice (captures), so a very short project override never renders a page per call. */
-export const MIN_CAPTURES_PER_SLICE = 50;
 
 /** What cutting a pass into slices needs of its caller. */
 export interface SliceInput {

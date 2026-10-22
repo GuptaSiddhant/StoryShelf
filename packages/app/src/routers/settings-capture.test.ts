@@ -109,20 +109,21 @@ describe("capture settings tab", () => {
     const html = await (await app.request("/projects/capture-project/settings/capture")).text();
     expect(html).toContain('name="storybookUrlTtlSeconds"');
     expect(html).toContain('value="5400"');
+    expect(html).toContain('min="1050"');
     await save({ browser: "chromium", storybookUrlTtlSeconds: "" });
     expect((await project()).storybookUrlTtlSeconds ?? null).toBeNull();
   });
 
-  it("rejects a signed URL lifetime outside 60 to 86400 seconds or not whole", async () => {
+  it("rejects a signed URL lifetime below the slice floor, above 86400 seconds or not whole", async () => {
     const { save, project } = await setup();
     const responses = await Promise.all(
-      ["59", "86401", "90.5", "soon"].map(
+      ["59", "1049", "86401", "90.5", "soon"].map(
         async (bad) => await save({ browser: "chromium", storybookUrlTtlSeconds: bad }),
       ),
     );
-    expect(responses.map((response) => response.status)).toEqual([400, 400, 400, 400]);
+    expect(responses.map((response) => response.status)).toEqual([400, 400, 400, 400, 400]);
     const bodies = await Promise.all(responses.map(async (response) => await response.text()));
-    expect(bodies.every((body) => body.includes("60 to 86400"))).toBe(true);
+    expect(bodies.every((body) => body.includes("1050"))).toBe(true);
     expect((await project()).storybookUrlTtlSeconds ?? null).toBeNull();
   });
 });

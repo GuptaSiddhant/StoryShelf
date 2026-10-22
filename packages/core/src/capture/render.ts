@@ -7,12 +7,10 @@ import type {
   RenderedSnapshot,
 } from "../adapters/capture-runner.ts";
 import { redactSecrets } from "../utils/redact.ts";
+import { PER_CAPTURE_BUDGET_MS } from "../utils/storybook-token.ts";
 
 /** Default budget for one render call before the orchestrator cancels it. */
 export const RENDER_TIMEOUT_MS = 15 * 60_000;
-
-/** Extra time granted per capture, so slow single-page hosts are not cancelled mid-run. */
-export const PER_CAPTURE_BUDGET_MS = 15_000;
 
 /**
  * Budget for one render call: an explicit setting wins; otherwise the default

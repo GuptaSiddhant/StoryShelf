@@ -62,6 +62,7 @@ describe("Retention", () => {
       changedCount: 0,
       approvedCount: 0,
       rejectedCount: 0,
+      inheritedCount: 0,
       createdAt: oldDate,
       updatedAt: oldDate,
     });
@@ -76,6 +77,7 @@ describe("Retention", () => {
       changedCount: 0,
       approvedCount: 0,
       rejectedCount: 0,
+      inheritedCount: 0,
       createdAt: recentDate,
       updatedAt: recentDate,
     });
@@ -119,6 +121,7 @@ describe("Retention", () => {
         changedCount: 0,
         approvedCount: 0,
         rejectedCount: 0,
+        inheritedCount: 0,
         createdAt: old,
         updatedAt: old,
       });
@@ -149,6 +152,7 @@ describe("Retention", () => {
         changedCount: 0,
         approvedCount: 0,
         rejectedCount: 0,
+        inheritedCount: 0,
         createdAt: old,
         updatedAt: old,
       });
@@ -202,6 +206,7 @@ describe("Retention", () => {
       changedCount: 0,
       approvedCount: 0,
       rejectedCount: 0,
+      inheritedCount: 0,
       createdAt: oldDate,
       updatedAt: oldDate,
     });
@@ -216,6 +221,7 @@ describe("Retention", () => {
       changedCount: 0,
       approvedCount: 0,
       rejectedCount: 0,
+      inheritedCount: 0,
       createdAt: recentDate,
       updatedAt: recentDate,
     });
@@ -230,6 +236,7 @@ describe("Retention", () => {
       changedCount: 0,
       approvedCount: 0,
       rejectedCount: 0,
+      inheritedCount: 0,
       createdAt: oldDate,
       updatedAt: oldDate,
     });
@@ -282,6 +289,7 @@ describe("Retention", () => {
       changedCount: 0,
       approvedCount: 0,
       rejectedCount: 0,
+      inheritedCount: 0,
       createdAt: oldDate,
       updatedAt: oldDate,
     });
@@ -345,6 +353,7 @@ async function insertApprovedBuild(db: DatabaseAdapter, id: string, projectId: s
     changedCount: 0,
     approvedCount: 0,
     rejectedCount: 0,
+    inheritedCount: 0,
     createdAt: at,
     updatedAt: at,
   });
