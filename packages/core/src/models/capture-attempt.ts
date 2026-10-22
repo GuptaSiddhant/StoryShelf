@@ -5,6 +5,7 @@ import type { Logger } from "pino";
 import type { JobStatus } from "../adapters/capture-queue.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { CaptureAttempt, CaptureLogLevel } from "../schema/capture-attempt.ts";
+import { redactSecrets } from "../utils/redact.ts";
 import { ulid } from "../utils/ulid.ts";
 import { col } from "./columns.ts";
 
@@ -140,7 +141,7 @@ export async function emitAttemptLog(
     return;
   }
   try {
-    await record(level, message, fields);
+    await record(level, redactSecrets(message), fields);
   } catch (error) {
     logger?.warn({ err: error }, "attempt log write failed");
   }

@@ -3,6 +3,7 @@ import type { Logger } from "pino";
 import type { CaptureTarget, CaptureRunner } from "../adapters/capture-runner.ts";
 import type { StoryEntry, Viewport } from "./adapter.ts";
 import { filterModes, MAX_MODES_PER_STORY } from "./modes.ts";
+import type { StorybookUrlSource } from "./storybook-urls.ts";
 import { resolveStoryViewports } from "./storybook.ts";
 
 /** Inputs for {@link enrichStories}. */
@@ -14,6 +15,8 @@ export interface EnrichInput {
   target: CaptureTarget;
   allowlist: readonly string[] | null;
   logger: Logger | undefined;
+  /** Mints the signed URL for a `reach: "url"` target. */
+  storybookUrl?: StorybookUrlSource | undefined;
 }
 
 /**
@@ -53,11 +56,13 @@ async function extractSafely(
   const { runner } = input;
   if (!runner.extractParameters) return {};
   try {
+    const storybookUrl = await input.storybookUrl?.(input.target);
     return await runner.extractParameters({
       buildId: input.buildId,
       storybookDir: input.storybookDir,
       stories: input.stories,
       target: input.target,
+      ...(storybookUrl === undefined ? {} : { storybookUrl }),
       ...(input.logger ? { logger: input.logger } : {}),
     });
   } catch (error) {

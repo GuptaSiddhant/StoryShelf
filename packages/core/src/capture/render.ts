@@ -6,6 +6,7 @@ import type {
   RenderResult,
   RenderedSnapshot,
 } from "../adapters/capture-runner.ts";
+import { redactSecrets } from "../utils/redact.ts";
 
 /** Default budget for one render call before the orchestrator cancels it. */
 export const RENDER_TIMEOUT_MS = 15 * 60_000;
@@ -38,6 +39,8 @@ export interface RenderRequest {
   playTimeoutMs: number;
   runA11y: boolean;
   target: CaptureTarget;
+  /** The signed URL a `reach: "url"` target opens (never logged); absent for every other target. */
+  storybookUrl?: string | undefined;
   onCapture?: (capture: RenderedSnapshot) => Promise<void>;
 }
 
@@ -48,10 +51,8 @@ function capFailures(result: RenderResult): RenderResult {
     captures: result.captures,
     failures: result.failures.map((failure) => ({
       ...failure,
-      error:
-        failure.error.length > FAILURE_ERROR_MAX
-          ? failure.error.slice(0, FAILURE_ERROR_MAX)
-          : failure.error,
+      // A runner's error can quote the URL it failed to open, which carries a signed token.
+      error: redactSecrets(failure.error).slice(0, FAILURE_ERROR_MAX),
     })),
   };
 }

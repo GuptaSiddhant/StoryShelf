@@ -1,6 +1,7 @@
 import type { Logger } from "pino";
 import { emitAttemptLog, type AttemptLogRecorder } from "../models/capture-attempt.ts";
 import type { CaptureLogLevel } from "../schema/capture-attempt.ts";
+import { redactSecrets } from "../utils/redact.ts";
 
 /** Longest error text recorded on an attempt-log line. */
 const ERROR_TEXT_MAX = 500;
@@ -78,7 +79,7 @@ function parseArgs(first: unknown, second: unknown): [Record<string, unknown> | 
 function plainFields(fields: object): Record<string, unknown> {
   const copy: Record<string, unknown> = { ...fields };
   const err = copy["err"];
-  if (err instanceof Error) copy["err"] = err.message.slice(0, ERROR_TEXT_MAX);
+  if (err instanceof Error) copy["err"] = redactSecrets(err.message).slice(0, ERROR_TEXT_MAX);
   return copy;
 }
 

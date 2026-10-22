@@ -51,7 +51,7 @@ hosts, webhooks, OIDC). Span names never contain IDs or paths.
 `http.server.request.duration` — all low-cardinality by rule.
 
 **Logs:** stdout JSON unchanged, plus `trace_id`/`span_id` on every line
-inside a span, so logs join with traces in your backend.
+inside a span, so logs join with traces in your backend. A [signed Storybook URL](/guides/remote-browsers/#signed-storybook-urls) token in a request path is replaced by `[redacted]` in request logs and in the span's `url.full` attribute.
 
 ## Server-Timing response headers
 

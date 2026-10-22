@@ -2,6 +2,7 @@
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { notificationsConfigSchema, type ShelfOptions } from "./config.ts";
+import { assertStorybookUrlTtl } from "./utils/storybook-token.ts";
 
 /** Where capture scratch lives when `config.scratchDir` is not set. */
 export const DEFAULT_SCRATCH_DIR: string = join(tmpdir(), "storyshelf");
@@ -57,8 +58,16 @@ function assertTestingProcess(testing: ShelfOptions["testing"]): void {
     throw new Error('testing.mode "fork" requires testing.workerEntry');
   }
   assertShardSize(testing);
+  assertTestingNumbers(testing);
+}
+
+/** Numeric `testing` options: concurrency, retries and the Storybook URL lifetime. */
+function assertTestingNumbers(testing: ShelfOptions["testing"]): void {
   assertConcurrency(testing?.concurrency);
   assertRetries(testing?.retries);
+  if (testing?.storybookUrlTtl !== undefined) {
+    assertStorybookUrlTtl(testing.storybookUrlTtl);
+  }
 }
 
 /** Retries are counted after the first attempt: `0` runs a job once. */

@@ -21,7 +21,8 @@ export async function resolveRequestUser(
  * Gate the server-rendered UI behind auth (ADR 0008): unauthenticated HTML
  * requests redirect to login. API/auth routes answer 401/403 themselves, and
  * published-Storybook routes enforce their own auth (public builds are
- * viewable without a session, ADR 0011).
+ * viewable without a session, ADR 0011), and `/s/<token>` is answered by its signed token
+ * alone (ADR 0007).
  */
 export function authGate() {
   // oxlint-disable-next-line typescript/no-invalid-void-type -- Hono middleware may not return Response
@@ -34,6 +35,7 @@ export function authGate() {
       path.startsWith("/api/") ||
       path.startsWith("/auth/") ||
       path.startsWith("/assets/") ||
+      path.startsWith("/s/") ||
       path.startsWith("/.well-known/") ||
       (path.startsWith("/projects/") && path.includes("/storybook")) ||
       /^\/projects\/[^/]+\/?$/u.test(path)

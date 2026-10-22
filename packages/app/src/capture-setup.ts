@@ -124,6 +124,7 @@ function captureHandlerOptions(
     secret: credentialKeys(config),
     design: options.design,
     shardSize: options.testing?.shardSize,
+    storybookUrlTtl: options.testing?.storybookUrlTtl,
     notifiers: delivery.notifiers,
     buildState: delivery.buildState,
     publicOrigin: delivery.publicOrigin,
@@ -146,6 +147,7 @@ function forkedHandler(
   return createForkedHandler({
     workerEntry: testing?.workerEntry ?? "",
     shardSize: testing?.shardSize,
+    storybookUrlTtl: testing?.storybookUrlTtl,
     imageEngine: testing?.images?.engine,
     diffThreads: testing?.compare?.threads,
     ...parts,

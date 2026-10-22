@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { PER_CAPTURE_BUDGET_MS, RENDER_TIMEOUT_MS, renderBudgetMs } from "./render.ts";
+import { signStorybookToken } from "../utils/storybook-token.ts";
+import {
+  PER_CAPTURE_BUDGET_MS,
+  RENDER_TIMEOUT_MS,
+  renderBudgetMs,
+  renderWithTimeout,
+  type RenderRequest,
+} from "./render.ts";
 
 describe("renderBudgetMs", () => {
   it("keeps the default floor for small matrices", () => {
@@ -14,5 +21,27 @@ describe("renderBudgetMs", () => {
 
   it("honours an explicit budget even when it is shorter", () => {
     expect(renderBudgetMs(1000, 50)).toBe(50);
+  });
+});
+
+describe("renderWithTimeout", () => {
+  it("scrubs a signed Storybook URL from a failure's error text", async () => {
+    const token = signStorybookToken({ secret: "k", projectId: "p1", buildId: "b1" });
+    const runner = {
+      render: async () =>
+        await Promise.resolve({
+          captures: [],
+          failures: [
+            {
+              story: { id: "a" },
+              viewportName: "desktop",
+              error: `goto https://x.test/s/${token}/iframe.html failed`,
+            },
+          ],
+        }),
+      cancel: async () => {},
+    };
+    const result = await renderWithTimeout(runner as never, {} as RenderRequest, 1000);
+    expect(result.failures[0]?.error).toBe("goto https://x.test/s/[redacted]/iframe.html failed");
   });
 });

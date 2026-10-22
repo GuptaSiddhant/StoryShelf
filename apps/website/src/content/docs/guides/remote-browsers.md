@@ -78,7 +78,21 @@ The presets other than `playwrightServer` follow each vendor's published connect
 The Storybook is extracted on the host and served on `127.0.0.1`, which a remote browser cannot open on its own. There are two ways in (ADR 0007, decision 5):
 
 - **`exposeNetwork`** (Playwright's own protocol, on a self-hosted Playwright server and Azure Playwright Workspaces): the runner connects with `exposeNetwork: "<loopback>"`, and the remote browser's requests for `127.0.0.1` are routed back through the connection to the host, so the static server works unchanged and nothing new is exposed. Every asset crosses the WebSocket, so a remote render is slower per page than a local one.
-- **A Storybook URL** (CDP-only services, every Puppeteer remote target, and providers that cannot route back such as BrowserStack): the runner is given an absolute, signed URL to the build's published Storybook and navigates there. This needs a `secret` and a [public origin](/guides/config/#public-origin); until both exist such a target is `unavailable` ("no secret", "no public origin") on **System → Capture browsers**, and settings saves naming it are refused. The signed URL itself is not part of this release: until it ships, only `exposeNetwork` targets render, and a render that reaches a URL target without a URL fails at once saying so.
+- **A Storybook URL** (CDP-only services, every Puppeteer remote target, and providers that cannot route back such as BrowserStack): the runner is given an absolute, signed URL to the build's published Storybook and navigates there. This needs a `secret` and a [public origin](/guides/config/#public-origin); until both exist such a target is `unavailable` ("no secret", "no public origin") on **System → Capture browsers**, and settings saves naming it are refused. 
+
+### Signed Storybook URLs
+
+For a `reach: "url"` target the job mints a URL of the form `<public origin>/s/<token>/` for each render pass and for the parameter pre-pass; the runner opens `<url>iframe.html` and the assets beside it. `GET /s/<token>/<file>` serves static files of that one build and nothing else: no session is needed, the token is the only credential.
+
+- **What a token grants.** Read access to the files of one build of one project (`<projectId>:<buildId>:<expiry>`, signed with HMAC-SHA-256). Not the wrapper page, not a directory listing, not the API, not another build, not another route. A token for a build whose project does not match, or a build that was deleted, answers `404`.
+- **Key.** Derived from the server `secret` with a fixed context, so a token cannot be mistaken for a session or any other signature. During a rotation a token signed with `previousSecret` is also accepted; once `previousSecret` is removed, outstanding tokens stop working.
+- **Lifetime.** 2 hours by default; `testing.storybookUrlTtl` sets it in whole seconds, from 60 to 86400. A fresh token is minted whenever a render pass starts (a retried pass, a crash-isolation pass and a shard that waited in the queue each get their own), so the lifetime only has to outlast one pass. A token that claims more than 24 hours is refused even when it is correctly signed.
+- **Every refusal looks the same.** A malformed, tampered, expired or unknown token, a path outside the build and a missing file all answer an identical `404`; the reason is only in the server's debug log.
+- **Responses** carry `Cache-Control: private, no-store`, `Referrer-Policy: no-referrer`, `X-Robots-Tag: noindex, nofollow` and `X-Content-Type-Options: nosniff`.
+- **Without `testing`** the route answers `404` as if it did not exist; a hosting-only instance never mints or serves one.
+- **The token is kept out of logs.** The request log, the OpenTelemetry `url.full` attribute, attempt logs, failure text and error serializers replace `/s/<token>` with `/s/[redacted]`.
+
+**What the provider sees.** The remote service receives the URL, and a hosted service may record it (BrowserStack stores the URLs a session visits, for example). The token is the only secret in it and it expires, so keep the lifetime short, and treat a provider's session logs as holding a read link to that build for that long. Use a self-hosted farm with `exposeNetwork` when a Storybook must not leave your network at all.
 
 ## What is measured in the browser
 

@@ -24,6 +24,7 @@ import type { PipelineTables } from "./pipeline.ts";
 import type { CaptureProgress } from "./progress.ts";
 import { renderBudgetMs, renderWithTimeout, type RenderRequest } from "./render.ts";
 import type { EngineWork } from "./shard-plan.ts";
+import type { StorybookUrlSource } from "./storybook-urls.ts";
 import { resolveStoryViewports } from "./storybook.ts";
 
 /** Inputs shared by every engine's pass. */
@@ -51,6 +52,8 @@ export interface MatrixInput {
    * rendering a shard (sibling shards of one build render at once), the build id otherwise.
    */
   runId?: string | undefined;
+  /** Mints the signed URL for a `reach: "url"` target at the start of each pass. */
+  storybookUrl?: StorybookUrlSource | undefined;
 }
 
 /** Everything the passes produced, every row tagged with its engine. */
@@ -292,9 +295,13 @@ async function renderPass(
   const expected = toRender.flatMap((story) =>
     resolveStoryViewports(story, input.viewports),
   ).length;
+  const storybookUrl = await input.storybookUrl?.(browser);
   const rendered = await renderWithTimeout(
     input.runner,
-    renderRequest(input, browser, toRender, spooled, { mirror, expected }),
+    {
+      ...renderRequest(input, browser, toRender, spooled, { mirror, expected }),
+      ...(storybookUrl === undefined ? {} : { storybookUrl }),
+    },
     renderBudgetMs(expected, input.renderTimeoutMs),
   );
   mirror.log("info", "render pass finished", {

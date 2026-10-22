@@ -59,6 +59,7 @@ import { registerNotificationSubscriptions } from "./routers/notification-subscr
 import { registerProfile } from "./routers/profile.ts";
 import { registerProjects } from "./routers/projects.ts";
 import { registerReviewForms } from "./routers/review-forms.ts";
+import { registerSignedStorybook } from "./routers/signed-storybook.ts";
 import { registerStorybook } from "./routers/storybook.ts";
 import { registerTokens } from "./routers/tokens.ts";
 import { registerUiPages } from "./routers/ui.ts";
@@ -335,6 +336,7 @@ function registerPageRoutes(app: ShelfRouter, options: ShelfOptions, health: Hea
   registerAuthFlow(app, options);
   registerAssets(app);
   registerStorybook(app);
+  registerSignedStorybook(app);
   registerAdminPages(app, health, options.auth);
   registerPublicOriginRoutes(app);
   registerUiPages(app);
