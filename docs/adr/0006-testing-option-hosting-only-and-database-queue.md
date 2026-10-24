@@ -152,7 +152,7 @@ being recommended or metrics show no capture-caused restarts.
 ### 6. No queue adapters and no queue option; the interfaces stay
 
 There are no `queue-sqs`, `queue-redis`, `queue-azure` or `queue-gcp` packages; they are retired
-through `docs/deprecated.md` once the database queue passes the contract suite, multi-instance tests
+through `docs/deprecated.json` once the database queue passes the contract suite, multi-instance tests
 on Postgres/MySQL/Turso, and a same-host test on local SQLite. There is no `testing.queue`: the
 database queue is the only queue, and `testing` without `runner` throws. `CaptureQueue` and
 `PollableCaptureQueue` and the contract suite stay exported for the database queue and the forked

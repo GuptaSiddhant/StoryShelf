@@ -22,6 +22,7 @@
  *   nub ./scripts/jsr.mjs scope | members | whoami
  *   nub ./scripts/jsr.mjs yank <pkg>@<ver> --yes
  *   nub ./scripts/jsr.mjs unyank <pkg>@<ver> --yes
+ *   nub ./scripts/jsr.mjs deprecate <pkg> --yes
  *   nub ./scripts/jsr.mjs set-desc <pkg> --text "..." --yes
  *   nub ./scripts/jsr.mjs set-runtime <pkg> --node true --deno true [--browser false] [--workerd false] --yes
  *   nub ./scripts/jsr.mjs set-github <pkg> --owner <o> --repo <r> --yes
@@ -102,6 +103,7 @@ Commands (write, require --yes unless --dry-run):
     Create missing JSR packages + PATCH description/runtimeCompat/githubRepository drift.
   yank|unyank <pkg>@<ver> --yes     Yank or unyank a version
   archive|unarchive <pkg> --yes   Archive a package (blocks new versions, hides from search) or undo
+  deprecate <pkg> --yes             Archive a retired package (JSR has no deprecation API)
   set-desc <pkg> --text "..." --yes Set package description (max 250 chars)
   set-runtime <pkg> --node/--deno/--browser/--workerd/--bun true|false --yes
   set-github <pkg> --owner <o> --repo <r> --yes | set-github <pkg> --clear --yes
@@ -497,14 +499,25 @@ async function cmdSetDesc(positional, flags) {
   log(`updated @${SCOPE}/${jsr}: description`);
 }
 
-async function cmdArchive(positional, flags, archived) {
-  const jsr = requirePkg(positional);
-  requireYes(flags, archived ? "archive" : "unarchive");
+async function setArchived(jsr, archived) {
   await apiFetch(`/scopes/${SCOPE}/packages/${jsr}`, {
     method: "PATCH",
     json: { isArchived: archived },
   });
+}
+
+async function cmdArchive(positional, flags, archived) {
+  const jsr = requirePkg(positional);
+  requireYes(flags, archived ? "archive" : "unarchive");
+  await setArchived(jsr, archived);
   log(`${archived ? "archived" : "unarchived"} @${SCOPE}/${jsr}`);
+}
+
+async function cmdDeprecate(positional, flags) {
+  const jsr = requirePkg(positional);
+  requireYes(flags, "mark as deprecated");
+  await setArchived(jsr, true);
+  log(`deprecated @${SCOPE}/${jsr} by archiving it (JSR has no deprecation API)`);
 }
 
 function parseBoolFlag(value, name) {
@@ -572,6 +585,7 @@ function runCommand(parsed) {
   if (command === "unyank") return cmdYank(positional, flags, false);
   if (command === "archive") return cmdArchive(positional, flags, true);
   if (command === "unarchive") return cmdArchive(positional, flags, false);
+  if (command === "deprecate") return cmdDeprecate(positional, flags);
   if (command === "set-desc") return cmdSetDesc(positional, flags);
   if (command === "set-runtime") return cmdSetRuntime(positional, flags);
   if (command === "set-github") return cmdSetGithub(positional, flags);

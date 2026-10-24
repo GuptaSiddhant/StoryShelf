@@ -1,0 +1,120 @@
+{
+  "auditedAt": "2026-10-24",
+  "packages": [
+    {
+      "name": "@storyshelf/db-turso",
+      "since": "0.6.0",
+      "reason": "Turso moved into @storyshelf/db-sqlite as the /turso subpath with the same createTursoDatabase API.",
+      "newPackage": "@storyshelf/db-sqlite/turso",
+      "npm": {
+        "state": "pending"
+      },
+      "jsr": {
+        "state": "pending"
+      }
+    },
+    {
+      "name": "@storyshelf/auth-password",
+      "since": "0.5.2",
+      "reason": "The Better Auth engine replaces the bespoke password adapter; local password hashes are incompatible, so users must be re-invited.",
+      "newPackage": "@storyshelf/auth",
+      "npm": {
+        "state": "pending"
+      },
+      "jsr": {
+        "state": "pending"
+      }
+    },
+    {
+      "name": "@storyshelf/auth-oauth",
+      "since": "0.5.2",
+      "reason": "The Better Auth engine replaces the bespoke OAuth adapter; existing issuer URLs keep working through presets.",
+      "newPackage": "@storyshelf/auth",
+      "npm": {
+        "state": "pending"
+      },
+      "jsr": {
+        "state": "pending"
+      }
+    },
+    {
+      "name": "@storyshelf/git-github",
+      "since": "post-0.6.2 (#264)",
+      "reason": "Git hosts merged into the notifier family; register the github state notifier instead.",
+      "newPackage": "@storyshelf/notify-git",
+      "npm": {
+        "state": "pending"
+      },
+      "jsr": {
+        "state": "pending"
+      }
+    },
+    {
+      "name": "@storyshelf/git-gitlab",
+      "since": "post-0.6.2 (#264)",
+      "reason": "Git hosts merged into the notifier family; register the gitlab state notifier instead.",
+      "newPackage": "@storyshelf/notify-git",
+      "npm": {
+        "state": "pending"
+      },
+      "jsr": {
+        "state": "pending"
+      }
+    },
+    {
+      "name": "@storyshelf/queue-sqs",
+      "since": "post-0.6.2 (#262)",
+      "reason": "The database-backed capture queue is built in; remove the external queue transport and its service.",
+      "npm": {
+        "state": "pending"
+      },
+      "jsr": {
+        "state": "pending"
+      }
+    },
+    {
+      "name": "@storyshelf/queue-redis",
+      "since": "post-0.6.2 (#262)",
+      "reason": "The database-backed capture queue is built in; remove the external queue transport and its service.",
+      "npm": {
+        "state": "pending"
+      },
+      "jsr": {
+        "state": "pending"
+      }
+    },
+    {
+      "name": "@storyshelf/queue-azure",
+      "since": "post-0.6.2 (#262)",
+      "reason": "The database-backed capture queue is built in; remove the external queue transport and its service.",
+      "npm": {
+        "state": "pending"
+      },
+      "jsr": {
+        "state": "pending"
+      }
+    },
+    {
+      "name": "@storyshelf/queue-gcp",
+      "since": "post-0.6.2 (#262)",
+      "reason": "The database-backed capture queue is built in; remove the external queue transport and its service.",
+      "npm": {
+        "state": "pending"
+      },
+      "jsr": {
+        "state": "pending"
+      }
+    },
+    {
+      "name": "@storyshelf/worker",
+      "since": "post-0.6.2 (#262)",
+      "reason": "Capture and publish jobs run in the app's in-app consumer; remove the separate worker service.",
+      "npm": {
+        "state": "pending"
+      },
+      "jsr": {
+        "state": "pending"
+      }
+    }
+  ]
+}
