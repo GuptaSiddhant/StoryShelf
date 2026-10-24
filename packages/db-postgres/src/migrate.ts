@@ -17,6 +17,7 @@ const PLAY_TIMEOUT_MS_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS play_timeout_ms INTEGER NOT NULL DEFAULT 10000";
 const RUN_A11Y_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS run_a11y BOOLEAN NOT NULL DEFAULT true";
+const RUN_A11Y_DEFAULT_ALTER = "ALTER TABLE projects ALTER COLUMN run_a11y SET DEFAULT true";
 const PROJECT_BROWSER_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS browser TEXT NOT NULL DEFAULT 'chromium'";
 const PROJECT_VIEWPORTS_ALTER = "ALTER TABLE projects ADD COLUMN IF NOT EXISTS viewports TEXT";
@@ -169,9 +170,14 @@ export async function runMigrations(run: MigrationRunner): Promise<void> {
   await migrateNotificationColumns(run);
 }
 
+async function migrateRunA11yDefault(run: MigrationRunner): Promise<void> {
+  await execIgnore(run, RUN_A11Y_ALTER);
+  await execIgnore(run, RUN_A11Y_DEFAULT_ALTER);
+}
+
 async function migrateCoreColumns(run: MigrationRunner): Promise<void> {
   await execIgnore(run, STORYBOOK_META_ALTER);
-  await execIgnore(run, RUN_A11Y_ALTER);
+  await migrateRunA11yDefault(run);
   await execIgnore(run, PROJECT_BROWSER_ALTER);
   await execIgnore(run, PROJECT_VIEWPORTS_ALTER);
   await execIgnore(run, WEBHOOK_SECRET_ALTER);

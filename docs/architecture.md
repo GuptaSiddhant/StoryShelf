@@ -1230,7 +1230,7 @@ See `docs/website.md`. The public site (`apps/website/`, Astro Starlight) hosts 
    while inheriting the rest unchanged from their baselines (new stories always render).
    Any uncertainty (shallow clone, missing stats/history, global-file change) falls
    back to a full render, and `--full` opts out per run.
-2. **Git-provider merge gate (GitHub App / GitLab)** -- rich check runs, per-snapshot annotations, and auto-reject on review rejection. v1 has the primitive (required commit status); the full integration is ADR 0014.
+2. **Git-provider merge gate (GitHub App / GitLab)** -- required commit statuses, GitHub check runs and per-snapshot annotations are implemented (ADR 0014); auto-reject on review rejection remains deferred.
 3. **Remote browsers** -- render in a browser farm (ADR 0007). The runner `browsers` list, `CaptureTarget`, the public origin, remote connect (`./remote` presets), in-browser fingerprints, session limits and retries are in place; signed Storybook URLs (`/s/<token>/`), which `reach: "url"` targets use, are minted per render pass and served by the app.
 4. **`parameters.chromatic` equivalents** -- `modes` are implemented (named modes from `parameters.chromatic.modes` / `parameters.storyshelf.modes`, ADR 0004); an args matrix is not. Per-story `delay`, `disableSnapshot`, `flakyTest`, `autoCrop`/sizing are implemented; `waitForReady` covers the basic "wait for data" case.
 5. **Ladle / Histoire / custom pages** -- the `StorySourceAdapter` interface anticipates them.

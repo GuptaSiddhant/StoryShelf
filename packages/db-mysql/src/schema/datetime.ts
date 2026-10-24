@@ -37,10 +37,9 @@ export function toMySqlDateTime(iso: string): string {
   return new Date(time).toISOString().slice(0, 23).replace("T", " ");
 }
 
-export function fromMySqlDateTime(value: string): string {
-  const raw: unknown = value;
-  if (raw instanceof Date) {
-    return raw.toISOString();
+export function fromMySqlDateTime(value: string | Date): string {
+  if (value instanceof Date) {
+    return wallClockIso(value);
   }
   if (value.includes("T")) {
     return value;
@@ -51,4 +50,14 @@ export function fromMySqlDateTime(value: string): string {
   }
   const parsed = new Date(`${date}T${time}Z`);
   return Number.isNaN(parsed.getTime()) ? value : parsed.toISOString();
+}
+
+function wallClockIso(date: Date): string {
+  const day = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  const time = `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  return `${day}T${time}.${pad(date.getMilliseconds(), 3)}Z`;
+}
+
+function pad(value: number, width = 2): string {
+  return String(value).padStart(width, "0");
 }

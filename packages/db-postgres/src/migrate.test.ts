@@ -56,6 +56,23 @@ describe("runMigrations: pre-browser volume upgrade", () => {
   }, 60_000);
 });
 
+describe("runMigrations: run_a11y default", () => {
+  it("restores the default on an existing column", async () => {
+    const client = new PGlite();
+    const run = runnerFor(client);
+    await runMigrations(run);
+    await client.exec("ALTER TABLE projects ALTER COLUMN run_a11y SET DEFAULT false");
+
+    await runMigrations(run);
+
+    const columns = await client.query<{ column_default: string | null }>(
+      "SELECT column_default FROM information_schema.columns WHERE table_name = 'projects' AND column_name = 'run_a11y'",
+    );
+    expect(columns.rows).toEqual([{ column_default: "true" }]);
+    await client.close();
+  }, 60_000);
+});
+
 describe("runMigrations: builds and projects gain later columns", () => {
   it("adds inherited_count, test_results and run_tests to older tables, with defaults", async () => {
     const client = new PGlite();

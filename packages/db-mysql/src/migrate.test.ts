@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { DDL } from "./ddl.ts";
+import { FOREIGN_KEYS } from "./foreign-keys.ts";
 import { runMigrations } from "./migrate.ts";
 
 function recordingRunner(): { queries: string[]; run: (sql: string) => Promise<unknown[]> } {
@@ -37,6 +39,58 @@ describe("runMigrations: MySQL 8 compatibility", () => {
           sql.includes("`key` VARCHAR(255)"),
       ),
     ).toBe(true);
+    expect(
+      queries.some(
+        (sql) =>
+          sql.includes("CONSTRAINT fk_builds_project_id") &&
+          sql.includes("FOREIGN KEY (project_id) REFERENCES projects(id)"),
+      ),
+    ).toBe(true);
+    expect(queries.some((sql) => sql.includes("REFERENCES") && !sql.includes("CONSTRAINT"))).toBe(
+      false,
+    );
+    expect(queries).toContain(
+      "ALTER TABLE `builds` ADD CONSTRAINT fk_builds_project_id FOREIGN KEY (`project_id`) REFERENCES `projects`(`id`) ON DELETE CASCADE",
+    );
+  });
+
+  it("keeps DDL constraints and migrations in sync", () => {
+    const ddlKeys = [
+      ...DDL.matchAll(
+        /CONSTRAINT (?<name>\w+) FOREIGN KEY \((?<column>\w+)\) REFERENCES `?(?<parent>\w+)`?\((?<parentColumn>\w+)\)/gu,
+      ),
+    ].map((match) => {
+      const groups = match.groups ?? {};
+      return `${groups["name"]}:${groups["column"]}:${groups["parent"]}.${groups["parentColumn"]}`;
+    });
+    const migrationKeys = FOREIGN_KEYS.map(
+      (foreignKey) =>
+        `${foreignKey.name}:${foreignKey.column}:${foreignKey.parent}.${foreignKey.parentColumn}`,
+    );
+    expect(ddlKeys.toSorted()).toEqual(migrationKeys.toSorted());
+  });
+
+  it("skips foreign keys that already exist", async () => {
+    const queries: string[] = [];
+    const run = async (sql: string) => {
+      queries.push(sql);
+      return sql.includes("key_column_usage") ? [{ "1": 1 }] : [];
+    };
+    await runMigrations(run);
+    expect(queries.some((sql) => sql.includes("ADD CONSTRAINT"))).toBe(false);
+  });
+
+  it("keeps a non-unique builds_project_gitsha_idx", async () => {
+    const queries: string[] = [];
+    const run = async (sql: string) => {
+      queries.push(sql);
+      if (sql.includes("NON_UNIQUE")) {
+        return [{ non_unique: 1 }];
+      }
+      return sql.includes("index_name = 'builds_project_gitsha_idx'") ? [{ "1": 1 }] : [];
+    };
+    await runMigrations(run);
+    expect(queries.some((sql) => sql.includes("DROP INDEX builds_project_gitsha_idx"))).toBe(false);
   });
 
   it("adds later columns and makes comment.user_id nullable with MODIFY", async () => {

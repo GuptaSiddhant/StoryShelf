@@ -170,8 +170,8 @@ address and the targets become ready. Without an origin, notifications that need
 (ADR 0014, decision 11).
 
 The `Host` / `X-Forwarded-Host` of an arbitrary request is never used: a background job has none,
-and both can be forged to plant attacker-controlled links. Commit-status links use the same resolver
-and omit `target_url` when no origin is known.
+and both can be forged to plant attacker-controlled links. Commit-status links use the same resolver;
+without a confirmed origin no status is requested or delivered (ADR 0014, decision 11).
 
 ### 7. Local engines are declared and verified, and can be absent
 

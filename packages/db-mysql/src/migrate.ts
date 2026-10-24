@@ -7,6 +7,7 @@
  * duplicate-index error from a repeated DDL statement is ignored.
  */
 import { DDL } from "./ddl.ts";
+import { FOREIGN_KEYS, type ForeignKeyMigration } from "./foreign-keys.ts";
 
 /** Minimal row-query surface a migration runner needs. */
 export type MigrationRunner = (sql: string) => Promise<unknown[]>;
@@ -115,6 +116,7 @@ export async function runMigrations(run: MigrationRunner): Promise<void> {
   await ensureColumns(run);
   await migrateIndexes(run);
   await migrateLegacyColumns(run);
+  await ensureForeignKeys(run);
 }
 
 async function ensureColumns(run: MigrationRunner): Promise<void> {
@@ -131,7 +133,9 @@ async function migrateIndexes(run: MigrationRunner): Promise<void> {
     // oxlint-disable-next-line no-await-in-loop -- index creation follows the legacy drops
     await ensureIndex(run, index.table, index.name, index.sql);
   }
-  await dropIndexIfExists(run, "builds", "builds_project_gitsha_idx");
+  if (await indexIsUnique(run, "builds", "builds_project_gitsha_idx")) {
+    await dropIndexIfExists(run, "builds", "builds_project_gitsha_idx");
+  }
   await ensureIndex(
     run,
     "builds",
@@ -149,6 +153,54 @@ async function migrateIndexes(run: MigrationRunner): Promise<void> {
 async function migrateLegacyColumns(run: MigrationRunner): Promise<void> {
   await dropColumnIfExists(run, "webhooks", "secret");
   await migrateCommentsTable(run);
+}
+
+async function ensureForeignKeys(run: MigrationRunner): Promise<void> {
+  for (const foreignKey of FOREIGN_KEYS) {
+    // oxlint-disable-next-line no-await-in-loop -- each constraint needs its own check
+    await ensureForeignKey(run, foreignKey);
+  }
+}
+
+async function ensureForeignKey(
+  run: MigrationRunner,
+  foreignKey: ForeignKeyMigration,
+): Promise<void> {
+  if (await hasForeignKey(run, foreignKey)) {
+    return;
+  }
+  await deleteOrphans(run, foreignKey);
+  const table = quote(foreignKey.table);
+  const column = quote(foreignKey.column);
+  const parent = quote(foreignKey.parent);
+  const parentColumn = quote(foreignKey.parentColumn);
+  await run(
+    `ALTER TABLE ${table} ADD CONSTRAINT ${foreignKey.name} FOREIGN KEY (${column}) REFERENCES ${parent}(${parentColumn}) ON DELETE CASCADE`,
+  );
+}
+
+async function hasForeignKey(
+  run: MigrationRunner,
+  foreignKey: ForeignKeyMigration,
+): Promise<boolean> {
+  const rows = await run(
+    `SELECT 1 FROM information_schema.key_column_usage WHERE constraint_schema = DATABASE() AND table_name = '${foreignKey.table}' AND column_name = '${foreignKey.column}' AND referenced_table_name = '${foreignKey.parent}' AND referenced_column_name = '${foreignKey.parentColumn}' LIMIT 1`,
+  );
+  return rows.length > 0;
+}
+
+async function deleteOrphans(run: MigrationRunner, foreignKey: ForeignKeyMigration): Promise<void> {
+  const table = quote(foreignKey.table);
+  const column = quote(foreignKey.column);
+  const parent = quote(foreignKey.parent);
+  const parentColumn = quote(foreignKey.parentColumn);
+  await run(
+    `DELETE FROM ${table} WHERE ${column} IS NOT NULL AND NOT EXISTS (SELECT 1 FROM ${parent} WHERE ${parent}.${parentColumn} = ${table}.${column})`,
+  );
+}
+
+function quote(identifier: string): string {
+  return `\`${identifier}\``;
 }
 
 async function runDdl(run: MigrationRunner): Promise<void> {
@@ -212,6 +264,14 @@ async function hasIndex(run: MigrationRunner, table: string, name: string): Prom
   return rows.length > 0;
 }
 
+async function indexIsUnique(run: MigrationRunner, table: string, name: string): Promise<boolean> {
+  const rows = await run(
+    `SELECT NON_UNIQUE AS non_unique FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = '${table}' AND index_name = '${name}' LIMIT 1`,
+  );
+  const nonUnique = (rows[0] as { non_unique?: number | string } | undefined)?.non_unique;
+  return nonUnique !== undefined && Number(nonUnique) === 0;
+}
+
 async function dropIndexIfExists(run: MigrationRunner, table: string, name: string): Promise<void> {
   if (await hasIndex(run, table, name)) {
     await run(`ALTER TABLE ${table} DROP INDEX ${name}`);
@@ -230,7 +290,7 @@ async function dropColumnIfExists(
 
 async function migrateCommentsTable(run: MigrationRunner): Promise<void> {
   const rows = await run(
-    "SELECT is_nullable FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'comments' AND column_name = 'user_id' LIMIT 1",
+    "SELECT IS_NULLABLE AS is_nullable FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'comments' AND column_name = 'user_id' LIMIT 1",
   );
   const isNullable = (rows[0] as { is_nullable?: string } | undefined)?.is_nullable;
   if (isNullable !== "NO") {

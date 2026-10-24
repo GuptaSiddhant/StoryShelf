@@ -14,16 +14,23 @@ const root = join(import.meta.dirname, "..");
 const adrDir = join(root, "docs", "adr");
 const archiveDir = join(adrDir, "archive");
 const CURRENT_MAX = 18;
+const ARCHIVE_MAX = 36;
 const NEW_ADR_START = 37;
 const MAX_ADR_LINES = 320;
 const HISTORICAL = new Set(["CHANGELOG.md", "apps/website/src/content/docs/changelog.md"]);
 const TEXT_EXTENSIONS = /\.(?:md|mdx|ts|tsx|js|mjs|json|ya?ml)$/u;
 const ADR_MENTION = /\bADR (?<number>\d{4})\b/gu;
-const ADR_LINK = /(?:\.\/|docs\/)?adr\/(?<number>\d{4})-(?<name>[^)\s`]+)/gu;
+const ADR_LINK = /(?:\.\/|docs\/)?adr\/(?<archive>archive\/)?(?<number>\d{4})-(?<name>[^)\s`]+)/gu;
 
 const errors = [];
 const current = adrFiles(adrDir);
 const archived = adrFiles(archiveDir);
+const currentNumbers = new Set(numbersOf(current));
+const archivedNumbers = new Set(numbersOf(archived));
+
+function numbersOf(files) {
+  return files.map((file) => file.number).filter((number) => number !== undefined);
+}
 
 function adrFiles(dir) {
   return readdirSync(dir, { withFileTypes: true })
@@ -43,10 +50,34 @@ function trackedFiles() {
 }
 
 function checkCurrentAdrs() {
-  const numbers = current.map((file) => file.number).filter((n) => n !== undefined);
+  const numbers = [...currentNumbers];
   checkMissingNumbers(numbers);
   checkFrozenRange(numbers);
+  checkDuplicateNumbers("current", current);
   checkAdrSizes();
+}
+
+function checkArchivedAdrs() {
+  for (const number of archivedNumbers) {
+    if (number < 1 || number > ARCHIVE_MAX) {
+      errors.push(
+        `docs/adr/archive: ADR ${String(number).padStart(4, "0")} is outside the archived range 0001-${String(ARCHIVE_MAX).padStart(4, "0")}`,
+      );
+    }
+  }
+  checkDuplicateNumbers("archived", archived);
+}
+
+function checkDuplicateNumbers(label, files) {
+  const seen = new Set();
+  for (const number of numbersOf(files)) {
+    if (seen.has(number)) {
+      errors.push(
+        `docs/adr/${label === "archived" ? "archive/" : ""}: duplicate ADR ${String(number).padStart(4, "0")}`,
+      );
+    }
+    seen.add(number);
+  }
 }
 
 function checkMissingNumbers(numbers) {
@@ -59,9 +90,9 @@ function checkMissingNumbers(numbers) {
 
 function checkFrozenRange(numbers) {
   for (const number of numbers) {
-    if (number > CURRENT_MAX) {
+    if (number > CURRENT_MAX && number < NEW_ADR_START) {
       errors.push(
-        `docs/adr: current ADR ${String(number).padStart(4, "0")} exceeds the frozen range (new ADRs start at ${NEW_ADR_START})`,
+        `docs/adr: current ADR ${String(number).padStart(4, "0")} is in the archived range; archived ADRs stay in docs/adr/archive`,
       );
     }
   }
@@ -92,12 +123,11 @@ function checkReadmeTable() {
 }
 
 function checkReferences() {
-  const allNumbers = new Set([...current, ...archived].map((file) => file.number));
   for (const path of trackedFiles()) {
     if (shouldSkip(path)) {
       continue;
     }
-    checkFile(path, allNumbers);
+    checkFile(path);
   }
 }
 
@@ -110,35 +140,50 @@ function shouldSkip(path) {
   );
 }
 
-function checkFile(path, allNumbers) {
+function checkFile(path) {
   const lines = readFileSync(join(root, path), "utf8").split("\n");
   for (const [index, line] of lines.entries()) {
     const location = `${path}:${index + 1}`;
-    checkMentions(location, line, allNumbers);
+    checkMentions(location, line);
     checkLinks(location, line);
   }
 }
 
-function checkMentions(location, line, allNumbers) {
+function checkMentions(location, line) {
   for (const match of line.matchAll(ADR_MENTION)) {
     const number = Number(match.groups?.number);
-    const archivedRef = /\barchived\b|\bSupersedes\b/u.test(line);
+    const archivedRef = isArchivedMention(line, match.index);
     if (number > CURRENT_MAX && number < NEW_ADR_START && !archivedRef) {
       errors.push(
         `${location}: archived ADR ${match.groups?.number} must be written "archived ADR ${match.groups?.number}"`,
       );
+      continue;
     }
-    if (number >= NEW_ADR_START && !allNumbers.has(number)) {
-      errors.push(`${location}: ADR ${match.groups?.number} does not exist`);
+    const known = archivedRef ? archivedNumbers : currentNumbers;
+    if (!known.has(number)) {
+      errors.push(
+        `${location}: ${archivedRef ? "archived " : ""}ADR ${match.groups?.number} does not exist`,
+      );
     }
   }
+}
+
+function isArchivedMention(line, index) {
+  const prefix = line.slice(0, index);
+  return (
+    /\b(?:archived|Supersedes)\s+$/iu.test(prefix) ||
+    /\bSupersedes\s+\(archived\):[^.;]*$/iu.test(prefix)
+  );
 }
 
 function checkLinks(location, line) {
   for (const match of line.matchAll(ADR_LINK)) {
     const file = `${match.groups?.number}-${match.groups?.name}`;
-    if (!existsSync(join(adrDir, file)) && !existsSync(join(archiveDir, file))) {
-      errors.push(`${location}: missing ADR file docs/adr/${file}`);
+    const isArchive = Boolean(match.groups?.archive);
+    const dir = isArchive ? archiveDir : adrDir;
+    if (!existsSync(join(dir, file))) {
+      const prefix = isArchive ? "docs/adr/archive" : "docs/adr";
+      errors.push(`${location}: missing ADR file ${prefix}/${file}`);
     }
   }
 }
@@ -151,6 +196,7 @@ function reportErrors() {
 }
 
 checkCurrentAdrs();
+checkArchivedAdrs();
 checkReadmeTable();
 checkReferences();
 

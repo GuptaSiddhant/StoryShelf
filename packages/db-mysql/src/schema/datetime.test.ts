@@ -10,6 +10,11 @@ describe("MySQL datetime columns", () => {
     expect(fromMySqlDateTime("2026-10-24 10:34:17.691")).toBe("2026-10-24T10:34:17.691Z");
   });
 
+  it("preserves wall-clock components when the driver returns a Date", () => {
+    const local = new Date(2026, 9, 24, 10, 34, 17, 691);
+    expect(fromMySqlDateTime(local)).toBe("2026-10-24T10:34:17.691Z");
+  });
+
   it("leaves already-ISO and malformed values unchanged", () => {
     expect(fromMySqlDateTime("2026-10-24T10:34:17.691Z")).toBe("2026-10-24T10:34:17.691Z");
     expect(toMySqlDateTime("not-a-date")).toBe("not-a-date");

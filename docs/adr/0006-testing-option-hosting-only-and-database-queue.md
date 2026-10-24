@@ -237,8 +237,8 @@ off, applying decision 2 (`approved`, `pending` for review, or `failed`), postin
 `<prefix>/storybook`. With `testing` on, capture backfills statics and the pipeline decides status.
 
 **Upgrade:** with `testing` off, a boot task accepts pre-design `pending` builds that have a
-zip/manifest and no attempts, and fails the rest. With `testing` on, decision 4's sweep gives them
-job rows.
+zip/manifest and no attempts, and fails the rest. With `testing` on, a build with no job row is
+retried by hand; there is no migration sweep (decision 4).
 
 ### 11. Operating details
 

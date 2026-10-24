@@ -7,7 +7,7 @@ detail to `docs/architecture.md`.
 
 ## Numbering and references
 
-- **Current ADRs are 0001 to 0018.** Their numbers are permanent; do not renumber them.
+- **Current ADRs are 0001 to 0018 plus any new ADR from 0037.** Numbers 0001 to 0018 are permanent; do not renumber them.
 - **Archived ADRs are 0001 to 0036**, kept unchanged in [`archive/`](./archive/) under their original
   numbers and file names because code comments, issues and pull requests refer to them.
 - **New ADRs start at 0037.** Never reuse a number from either range.
