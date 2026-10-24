@@ -120,7 +120,7 @@ function consumersOf(
       ? [databaseConsumer(options, runtime, jobs, { capture, publishing })]
       : []),
     ...(buildState.handler !== null && notifyJobs !== null
-      ? [notifyConsumer(runtime, notifyJobs, buildState.handler)]
+      ? [notifyConsumer(options, runtime, notifyJobs, buildState.handler)]
       : []),
   ];
 }
@@ -172,6 +172,7 @@ const NOTIFY_CONCURRENCY = 4;
 
 /** The consumer of `notify` jobs, on its own queue so no capture or publish job can starve it. */
 function notifyConsumer(
+  options: ShelfOptions,
   runtime: ServerRuntime,
   queue: JobQueue,
   handler: KindHandler,
@@ -183,6 +184,9 @@ function notifyConsumer(
       config: { concurrency: NOTIFY_CONCURRENCY },
       metrics: jobMetrics(),
       logger: runtime.logger.child({ component: "notify-consumer" }),
+      ...(options.testing?.queueClock === undefined
+        ? {}
+        : { now: options.testing.queueClock.now, timers: options.testing.queueClock.timers }),
     }),
     [
       async () => {
