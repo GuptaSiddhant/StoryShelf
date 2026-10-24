@@ -6,6 +6,24 @@
 - **Constructor injection makes this possible.** Models take adapters in their constructor (ADR 0001), so unit tests pass in-memory SQLite (`:memory:`), a temp-dir storage, and fakes for capture/auth/status.
 - **Assert behavior, not lines.** The 100%-coverage target (AGENTS.md) applies to models, routers, adapters, and the diff engine. The browser-integration path is asserted behaviorally.
 
+## Determinism
+
+Timing and concurrency tests must assert causality, not wall-clock speed:
+
+- Hold work at a barrier (`createLatch`/`deferred` in `@storyshelf/core/test-helpers`) and assert the in-flight state; release it and assert the outcome. Do not `sleep(5)` to make a race "probably" happen.
+- Drive timers through the seam under test: an injected clock/timers, or a spy on `setTimeout`/`setInterval` that records the delay, then assert the branch that ran. Do not assert elapsed milliseconds. `vi.useFakeTimers()` currently conflicts with the Node 24 Temporal polyfill in this workspace (`Cannot redefine property: Now`), so use the injected/spied seam instead. Use the real clock only at an outer polling boundary (`vi.waitFor`) where the system itself is asynchronous.
+- Polling an external callback is fine; polling to create a window for a bug is not.
+- Never quarantine a timing test with `skip` to get green. If a test genuinely measures throughput, move it to a bench/nightly timing tier.
+
+The touched timing-sensitive files have a `test:flake` script in their package: they repeat at `--maxWorkers=1 --no-file-parallelism`, which the nightly `flake` job runs uncached. This is the canary for scheduler assumptions; it is not a PR gate.
+
+## CI selection tiers
+
+- **PR required gate:** `turbo verify --affected` includes changed packages and their dependents. Root/global files, package manifests, workflow/config changes, a missing diff, or the `ci:full` label force the full suite. Test tasks run at `TURBO_CONCURRENCY=1`: the Postgres/PGlite suite spawns many memory-heavy workers, and overlapping package suites have been OOM-killed on the runner.
+- **Push to `main`:** full, uncached `turbo verify --filter='!website' --force`.
+- **Nightly:** the same full uncached verify plus `turbo run test:flake`, every Storybook fixture, and the Fly dry run. It is the backstop for anything `--affected` could miss.
+- File-level `vitest --changed` is deliberately not a required gate: dynamic imports and cross-package resolution can miss a test. Use it only as an advisory experiment, with the nightly full run as the safety net.
+
 ## Layers
 
 ### 1. Unit (vitest, colocated `*.test.ts`, CI-always)
