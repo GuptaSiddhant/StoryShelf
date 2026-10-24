@@ -146,17 +146,24 @@ async function setupApprovedDefault() {
     name: "Test",
     gitRepository: "owner/repo",
   });
-  return { model, project };
+  return { model, project, db };
 }
 
 describe("BuildModel latestApprovedDefault", () => {
   it("returns the most recent approved build on the default branch", async () => {
-    const { model, project } = await setupApprovedDefault();
+    const { model, project, db } = await setupApprovedDefault();
     const older = await model.create(project.id, { gitSha: "a", gitBranch: "main" });
     await model.update(older.id, { status: "approved" });
-    await new Promise((resolve) => setTimeout(resolve, 5));
+    await db.update(db.tables.builds, older.id, {
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
     const newer = await model.create(project.id, { gitSha: "b", gitBranch: "main" });
     await model.update(newer.id, { status: "approved" });
+    await db.update(db.tables.builds, newer.id, {
+      createdAt: "2026-01-02T00:00:00.000Z",
+      updatedAt: "2026-01-02T00:00:00.000Z",
+    });
     expect((await model.latestApprovedDefault(project))?.id).toBe(newer.id);
   });
 

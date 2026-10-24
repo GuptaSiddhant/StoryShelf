@@ -4,6 +4,14 @@
  * In-memory fakes only — never shipped to production bundles, but published
  * so out-of-tree adapter implementations can run the same contract tests.
  */
+export {
+  createLatch,
+  createReleaseQueue,
+  deferred,
+  type Deferred,
+  type Latch,
+  type ReleaseQueue,
+} from "./deferred.ts";
 export { designContractSuite, type DesignContractSamples } from "./design-contract.ts";
 export { createTestBuild, createTestProject } from "./create-project.ts";
 export { databaseContractSuite, REQUIRED_TABLES } from "./database-contract.ts";

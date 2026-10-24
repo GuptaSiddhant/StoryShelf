@@ -1,19 +1,30 @@
 import { describe, expect, it } from "vitest";
+import { createLatch, deferred } from "../test-helpers/index.ts";
 import { createSessionGate, sessionGateFor } from "./session-gate.ts";
 
-async function peakOf(gate: { run<T>(fn: () => Promise<T>): Promise<T> }, runs: number) {
+async function peakOf(
+  gate: { run<T>(fn: () => Promise<T>): Promise<T>; size?: number },
+  runs: number,
+) {
   let active = 0;
   let peak = 0;
-  await Promise.all(
+  const latch = createLatch();
+  const full = deferred();
+  const limit = gate.size ?? runs;
+  const work = Promise.all(
     Array.from({ length: runs }, async () => {
       await gate.run(async () => {
         active += 1;
         peak = Math.max(peak, active);
-        await new Promise((resolve) => setTimeout(resolve, 2));
+        if (active === limit) full.resolve();
+        await latch.wait();
         active -= 1;
       });
     }),
   );
+  await full.promise;
+  latch.open();
+  await work;
   return peak;
 }
 

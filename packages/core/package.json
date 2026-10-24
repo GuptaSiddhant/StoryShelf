@@ -197,7 +197,8 @@
     "prepublishOnly": "nub run build",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:flake": "vitest run --repeats=20 --maxWorkers=1 --no-file-parallelism src/utils/map-limit.test.ts src/utils/session-gate.test.ts src/utils/page-limiter.test.ts src/utils/adaptive-concurrency.test.ts src/capture/rediff.test.ts src/models/build.test.ts src/models/design-credentials.test.ts"
   },
   "dependencies": {
     "@opentelemetry/api": "catalog:",

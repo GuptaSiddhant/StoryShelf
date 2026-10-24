@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createLatch, deferred } from "../test-helpers/index.ts";
 import { AdaptiveConcurrency, isTimeoutError } from "./adaptive-concurrency.ts";
 import { mapAdaptive } from "./map-adaptive.ts";
 
@@ -98,18 +99,24 @@ describe("mapAdaptive", () => {
     const ctl = controller({ initial: 3, max: 3 });
     let active = 0;
     let peak = 0;
-    const out = await mapAdaptive(
+    const latch = createLatch();
+    const full = deferred();
+    const out = mapAdaptive(
       Array.from({ length: 20 }, (_unused, index) => index),
       ctl,
       async (item) => {
         active += 1;
         peak = Math.max(peak, active);
-        await new Promise((resolve) => setTimeout(resolve, 2));
+        if (active === 3) full.resolve();
+        await latch.wait();
         active -= 1;
         return { value: item * 2 };
       },
     );
-    expect(out).toEqual(Array.from({ length: 20 }, (_unused, index) => index * 2));
+    await full.promise;
+    expect(active).toBe(3);
+    latch.open();
+    expect(await out).toEqual(Array.from({ length: 20 }, (_unused, index) => index * 2));
     expect(peak).toBe(3);
   });
 
@@ -117,17 +124,23 @@ describe("mapAdaptive", () => {
     const ctl = controller({ initial: 1, max: 4 });
     let active = 0;
     let peak = 0;
-    await mapAdaptive(
+    const latch = createLatch();
+    const started = deferred();
+    const work = mapAdaptive(
       Array.from({ length: 80 }, (_unused, index) => index),
       ctl,
       async () => {
         active += 1;
         peak = Math.max(peak, active);
-        await new Promise((resolve) => setTimeout(resolve, 1));
+        started.resolve();
+        await latch.wait();
         active -= 1;
         return { value: 0 };
       },
     );
+    await started.promise;
+    latch.open();
+    await work;
     expect(peak).toBeGreaterThan(1);
     expect(peak).toBeLessThanOrEqual(4);
   });

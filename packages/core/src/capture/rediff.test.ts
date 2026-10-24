@@ -2,6 +2,7 @@ import { PNG } from "pngjs";
 import { describe, expect, it } from "vitest";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
+import { createLatch, deferred } from "../test-helpers/index.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/index.ts";
 import { PERSIST_CONCURRENCY } from "./pipeline.ts";
 import { rediffBuild } from "./rediff.ts";
@@ -205,19 +206,24 @@ describe("rediffBuild", () => {
 
     let inFlight = 0;
     let peak = 0;
+    const latch = createLatch();
+    const full = deferred();
     const read = storage.read.bind(storage);
     storage.read = async (path) => {
       inFlight += 1;
       peak = Math.max(peak, inFlight);
-      await new Promise((resolve) => setTimeout(resolve, 5));
+      if (inFlight === PERSIST_CONCURRENCY) full.resolve();
+      await latch.wait();
       inFlight -= 1;
       return await read(path);
     };
 
-    const result = await rediffBuild({ db, storage }, project, build);
+    const result = rediffBuild({ db, storage }, project, build);
+    await full.promise;
+    expect(inFlight).toBe(PERSIST_CONCURRENCY);
+    latch.open();
 
-    expect(result.rediffed).toBe(count + 1);
-    expect(peak).toBeGreaterThan(1);
-    expect(peak).toBeLessThanOrEqual(PERSIST_CONCURRENCY);
+    expect(await result).toMatchObject({ rediffed: count + 1 });
+    expect(peak).toBe(PERSIST_CONCURRENCY);
   });
 });

@@ -1,18 +1,25 @@
 import { describe, expect, it } from "vitest";
+import { createLatch, deferred } from "../test-helpers/index.ts";
 import { chunk, mapLimit } from "./map-limit.ts";
 
 describe("mapLimit", () => {
   it("never exceeds the limit and preserves order", async () => {
     let active = 0;
     let peak = 0;
-    const out = await mapLimit([1, 2, 3, 4, 5, 6, 7], 3, async (n) => {
+    const latch = createLatch();
+    const full = deferred();
+    const out = mapLimit([1, 2, 3, 4, 5, 6, 7], 3, async (n) => {
       active += 1;
       peak = Math.max(peak, active);
-      await new Promise((resolve) => setTimeout(resolve, 5));
+      if (active === 3) full.resolve();
+      await latch.wait();
       active -= 1;
       return n * 2;
     });
-    expect(out).toEqual([2, 4, 6, 8, 10, 12, 14]);
+    await full.promise;
+    expect(active).toBe(3);
+    latch.open();
+    expect(await out).toEqual([2, 4, 6, 8, 10, 12, 14]);
     expect(peak).toBe(3);
   });
 
