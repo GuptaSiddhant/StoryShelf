@@ -347,6 +347,18 @@ export interface ShelfTestingOptions {
   compare?: ShelfCompareOptions;
   /** Image library selection; see {@link ShelfImagesOptions}. */
   images?: ShelfImagesOptions;
+  /**
+   * Clock and timers of the database job queue. Tests inject a manual clock so lease and poll
+   * transitions do not depend on wall time; production leaves it unset (`Date.now` and the global
+   * timers).
+   */
+  queueClock?: {
+    now: () => number;
+    timers: {
+      setTimeout(callback: () => void, ms: number): unknown;
+      clearTimeout(handle: unknown): void;
+    };
+  };
 }
 
 /** Notification options: who can deliver, over which transport, with what branding. */

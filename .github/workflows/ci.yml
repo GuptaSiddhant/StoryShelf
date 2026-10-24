@@ -14,6 +14,7 @@ name: CI
 # website or the fixtures this run does not use.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
   push:
     branches: ["main"]
   workflow_dispatch:
@@ -125,9 +126,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: bash scripts/smoke.sh
 
+      - name: Build packages for built-artifact smoke
+        # Docs-only PRs select no packages with `--affected`, so the verify step
+        # builds nothing; the smoke test needs every non-website `dist/`.
+        if: ${{ !cancelled() }}
+        run: nubx turbo run build --filter='!website'
+
       - name: Built-artifact smoke (CLI via .bin symlink, scaffolded server boots)
-        # The CLI and every package are built by the verify step. Scaffolds a
-        # server, type-checks it, boots it and checks it serves and shuts down.
+        # Scaffolds a server, type-checks it, boots it and checks it serves and shuts down.
         if: ${{ !cancelled() }}
         working-directory: packages/cli
         env:

@@ -12,6 +12,7 @@ import {
   createTestProject,
   makeDatabase,
   makeStorage,
+  type ManualClock,
 } from "@storyshelf/core/test-helpers";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "./index.tsx";
@@ -28,8 +29,16 @@ async function seed() {
   return { db, storage, build };
 }
 
-function instance(db: ReturnType<typeof makeDatabase>["db"], storage: never) {
-  return createShelfApp({ database: db, storage, logger, testing: { runner: stubRunner() } });
+function instance(db: ReturnType<typeof makeDatabase>["db"], storage: never, clock?: ManualClock) {
+  return createShelfApp({
+    database: db,
+    storage,
+    logger,
+    testing: {
+      runner: stubRunner(),
+      ...(clock === undefined ? {} : { queueClock: { now: clock.now, timers: clock.timers } }),
+    },
+  });
 }
 
 const until = async (check: () => Promise<boolean>, timeoutMs = 10_000): Promise<void> => {
@@ -84,8 +93,10 @@ describe("two instances on one database", () => {
     const claimed = await dying.poll();
     expect(claimed?.attempt).toBe(1);
 
-    const survivor = instance(db, storage as never);
+    const survivor = instance(db, storage as never, clock);
     await survivor.lifecycle.setup();
+    await until(async () => clock.pending > 0);
+    await clock.advance(20_000);
     const jobs = new CaptureJobModel(db);
     await until(async () => (await jobs.get(`${claimed?.jobId}:2`)) !== null);
     expect(await jobs.get(`${claimed?.jobId}:1`)).toMatchObject({ status: "expired" });
@@ -106,8 +117,10 @@ describe("two instances on one database", () => {
     await dying.enqueue({ buildId: build.id });
     expect(await dying.poll()).not.toBeNull();
 
-    const survivor = instance(db, storage as never);
+    const survivor = instance(db, storage as never, clock);
     await survivor.lifecycle.setup();
+    await until(async () => clock.pending > 0);
+    await clock.advance(20_000);
     await until(async () => (await new BuildModel(db).get(build.id))?.status === "failed");
     await survivor.lifecycle.teardown();
   });
