@@ -1,13 +1,45 @@
+import type { StateNotifierProvider } from "@storyshelf/core/adapter/notifier";
 import { createDatabaseCaptureQueue } from "@storyshelf/core/capture";
 import type { ShelfOptions } from "@storyshelf/core/config";
 import { createShelfLogger } from "@storyshelf/core/logger";
-import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
+import { NotificationChannelModel } from "@storyshelf/core/models";
+import {
+  createManualClock,
+  createTestBuild,
+  createTestProject,
+  deferred,
+  makeDatabase,
+  makeStorage,
+} from "@storyshelf/core/test-helpers";
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import { setupJobs } from "./jobs-setup.ts";
 import { resolveRuntime } from "./runtime.ts";
 import { stubRunner } from "./test-runner.ts";
 
 const logger = createShelfLogger({ level: "silent" });
+const SECRET = "test-server-secret-32-chars-long!!";
+
+function blockingStateProvider(gate: Promise<void>, entered: () => void): StateNotifierProvider {
+  const metadata = {
+    name: "Blocking Git",
+    version: "0.0.0",
+    kind: "slow-git",
+    category: "notifier",
+    delivery: "state",
+    schema: z.object({}).loose(),
+  } as const;
+  return {
+    metadata,
+    create: () => ({
+      metadata,
+      setState: async () => {
+        entered();
+        await gate;
+      },
+    }),
+  };
+}
 
 function wire(testing?: ShelfOptions["testing"], env: NodeJS.ProcessEnv = {}) {
   const { db } = makeDatabase();
@@ -78,5 +110,57 @@ describe("setupJobs", () => {
     });
     await wiring.consumer?.stop();
     await running;
+  });
+
+  it("runs the notify consumer's lease keeper on the injected queue clock", async () => {
+    const clock = createManualClock();
+    const delays: number[] = [];
+    const timers = {
+      setTimeout: (callback: () => void, ms: number) => {
+        delays.push(ms);
+        return clock.timers.setTimeout(callback, ms);
+      },
+      clearTimeout: (handle: unknown) => {
+        clock.timers.clearTimeout(handle);
+      },
+    };
+    const gate = deferred();
+    const entered = deferred();
+    const provider = blockingStateProvider(gate.promise, () => {
+      entered.resolve();
+    });
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const options = {
+      database: db,
+      storage,
+      logger,
+      config: { secret: SECRET, publicBaseUrl: "https://shelf.example.com" },
+      testing: { runner: stubRunner(), queueClock: { now: clock.now, timers } },
+      notifications: { notifiers: [provider] },
+    } as unknown as ShelfOptions;
+    const project = await createTestProject(db, db.tables);
+    const build = await createTestBuild(db, db.tables, project.id);
+    await new NotificationChannelModel(db, undefined, SECRET).create({
+      projectId: project.id,
+      provider: "slow-git",
+      config: {},
+      secret: "token",
+    });
+    const wiring = setupJobs(options, resolveRuntime(options));
+    await wiring.buildState.request(build.id);
+
+    const running = wiring.consumer?.start();
+    try {
+      await entered.promise;
+      // The handler is blocked in the git host; its keeper checks cancellation every 5 s and
+      // renews the 5 min lease every 30 s, on the notify queue's injected clock.
+      expect(delays).toContain(5_000);
+      expect(delays).toContain(30_000);
+    } finally {
+      gate.resolve();
+      await wiring.consumer?.stop();
+      await running;
+    }
   });
 });
