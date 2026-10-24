@@ -155,7 +155,7 @@ describe("setupJobs", () => {
       await entered.promise;
       // The handler is blocked in the git host; its keeper checks cancellation every 5 s and
       // renews the 5 min lease every 30 s, on the notify queue's injected clock.
-      expect(delays).toContain(5_000);
+      expect(delays).toContain(5000);
       expect(delays).toContain(30_000);
     } finally {
       gate.resolve();
