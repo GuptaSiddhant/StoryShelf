@@ -154,7 +154,7 @@ This distinction matters for:
 - **SQLite presets** (same package, subpaths): `@storyshelf/db-sqlite/turso` (libSQL serverless: Turso/Vercel/Lambda, optional `@libsql/client` peer), `./better-sqlite3` (native, optional `better-sqlite3` peer), `./bun-sqlite` (Bun-only), `./d1` (Cloudflare D1 binding, no peer). Same schema, same queries, different driver.
 - **Postgres presets** (same package, subpaths): `@storyshelf/db-postgres` (postgres.js default) + `./pg` (node-postgres pooler-safe), `./neon`, `./neon-http`, `./vercel`, `./pglite` (embedded WASM). Same schema, same queries, different driver.
 - **MySQL presets** (same package, subpaths): `@storyshelf/db-mysql` (mysql2 default, MySQL/MariaDB) + `./planetscale`, `./tidb` (serverless MySQL). Same schema, same queries, different driver.
-- Retired packages are logged in `docs/deprecated.md` (run `npm deprecate` per published version when retiring).
+- Retired packages are logged in `docs/deprecated.json`; run `nub run deprecate` after npm/JSR auth to deprecate every published version and update the JSON statuses.
 
 ## Storage options
 

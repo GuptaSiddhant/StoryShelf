@@ -53,6 +53,8 @@
     "cli": "nub run --filter storyshelf start",
     "docs": "nub run --filter website start",
     "docs:check": "node ./scripts/check-adr-refs.mjs",
+    "deprecate": "nub ./scripts/deprecate-packages.mjs",
+    "deprecate:dry": "nub ./scripts/deprecate-packages.mjs --dry-run",
     "jsr": "nub ./scripts/jsr.mjs",
     "serve": "nub run --filter dev-server serve",
     "fmt": "turbo fmt",
