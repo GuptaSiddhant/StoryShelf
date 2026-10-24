@@ -58,6 +58,20 @@ function checkCurrentAdrs() {
 }
 
 function checkArchivedAdrs() {
+  checkMissingArchivedNumbers();
+  checkArchivedRange();
+  checkDuplicateNumbers("archived", archived);
+}
+
+function checkMissingArchivedNumbers() {
+  for (let number = 1; number <= ARCHIVE_MAX; number += 1) {
+    if (!archivedNumbers.has(number)) {
+      errors.push(`docs/adr/archive: missing archived ADR ${String(number).padStart(4, "0")}`);
+    }
+  }
+}
+
+function checkArchivedRange() {
   for (const number of archivedNumbers) {
     if (number < 1 || number > ARCHIVE_MAX) {
       errors.push(
@@ -65,7 +79,6 @@ function checkArchivedAdrs() {
       );
     }
   }
-  checkDuplicateNumbers("archived", archived);
 }
 
 function checkDuplicateNumbers(label, files) {
