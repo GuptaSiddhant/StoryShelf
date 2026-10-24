@@ -1,0 +1,476 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: "en-US"
+early_access: false
+tone_instructions: "Be direct, highly technical, and strictly actionable. State the defect, failure mode, and concrete fix with file:line. No praise, filler, or generic advice. Flag uncertainty explicitly; never assert an unverified issue."
+
+reviews:
+  profile: "assertive"
+  request_changes_workflow: false
+  auto_approvals:
+    enabled: false
+    allow_author_approval: false
+  high_level_summary: true
+  high_level_summary_in_walkthrough: true
+  high_level_summary_instructions: |
+    Summarize only verifiable changes: affected packages, behavior, schema/migration impact, and test coverage. Do not claim a fix works unless the diff or tests prove it. List unresolved risks under "Risks".
+  review_status: true
+  review_details: true
+  collapse_walkthrough: false
+  changed_files_summary: true
+  sequence_diagrams: true
+  estimate_code_review_effort: true
+  assess_linked_issues: true
+  related_issues: true
+  related_prs: true
+  suggested_labels: true
+  auto_apply_labels: false
+  suggested_reviewers: true
+  auto_assign_reviewers: false
+  poem: false
+  in_progress_fortune: false
+  enable_prompt_for_ai_agents: true
+  abort_on_close: true
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+    ignore_title_keywords:
+      - "WIP"
+      - "DO NOT MERGE"
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+    simplify:
+      enabled: false
+    autofix:
+      enabled: false
+    fix_ci:
+      enabled: false
+  pre_merge_checks:
+    title:
+      mode: "error"
+      requirements: "Conventional Commits: type(scope): imperative summary. Allowed types: feat, fix, test, docs, refactor, perf, build, ci, chore, revert. Scope is the package or area when applicable."
+    description:
+      mode: "warning"
+    docstrings:
+      mode: "off"
+    issue_assessment:
+      mode: "warning"
+  tools:
+    oxc:
+      enabled: true
+    eslint:
+      enabled: false
+    biome:
+      enabled: false
+    actionlint:
+      enabled: true
+    hadolint:
+      enabled: true
+    yamllint:
+      enabled: true
+    gitleaks:
+      enabled: true
+    semgrep:
+      enabled: true
+    markdownlint:
+      enabled: false
+    ruff:
+      enabled: false
+  path_filters:
+    - "**/*"
+    - "!**/node_modules/**"
+    - "!**/dist/**"
+    - "!**/build/**"
+    - "!**/out/**"
+    - "!**/coverage/**"
+    - "!**/.turbo/**"
+    - "!**/.cache/**"
+    - "!**/.tmp/**"
+    - "!**/.astro/**"
+    - "!**/storybook-static/**"
+    - "!**/*.tsbuildinfo"
+    - "!**/*.map"
+    - "!**/*.min.js"
+    - "!**/*.log"
+    - "!**/__snapshots__/**"
+    - "!**/*.snap"
+    - "!nub.lock"
+    - "!**/pnpm-lock.yaml"
+    - "!**/package-lock.json"
+    - "!**/yarn.lock"
+    - "!**/npm-shrinkwrap.json"
+    - "!fixtures/**/pnpm-workspace.yaml"
+    - "!apps/website/public/build/**"
+    - "!**/LICENSE"
+  instructions: |
+    Enforce correctness before style. Review this TypeScript monorepo as production infrastructure.
+
+    - Require strict type safety: no `any`, no unsafe casts, no non-null assertions or `@ts-ignore` without a narrowly justified reason. Exported functions, public methods and adapter implementations need explicit return types. Model expected failures as typed errors/results instead of throwing untyped values.
+    - Require defensive programming: prove every nullable/optional value is checked before use, every async call is awaited or intentionally fire-and-forget with rejection handling, and every resource (DB connection, stream, timer, browser context, worker) is released in `finally`. Flag swallowed errors, empty catch blocks, unhandled promise rejections and missing route/error-boundary handling.
+    - Flag efficiency defects: O(N^2) loops, N+1 queries, unindexed lookups or full scans, repeated serialization, unbounded concurrency, unbounded list growth, and full-file/whole-body buffering where streaming is possible. State the input size that makes it a problem.
+    - Enforce DRY and SOLID: one reason to change per module, no copy-pasted logic across packages, and no parallel implementations of one rule. Prefer composition and the existing adapter interfaces over imports of concrete adapters. Reuse existing helpers (`httpJson`, the URL builder, token utilities, pagination and validation) instead of re-implementing them.
+    - Respect repository invariants: ULID IDs, ISO-8601 timestamps, constructor injection (never AsyncLocalStorage for models), `/api/v1` JSON routes, route-class gating, schema parity across SQLite/Postgres/MySQL, and the public-origin/signed-token rules. Read `AGENTS.md` and the relevant ADR before assuming an architecture.
+    - Security is blocking: no secrets, tokens or PII in logs, errors, span attributes or URLs; parameterized SQL only; validate and authorize every external input at the boundary; reject path traversal, SSRF and IDOR; use constant-time comparison for secrets.
+    - Do not report formatting, indentation, import ordering, quote style or line-length issues: oxlint/oxfmt own those. Do not propose comment-only or docstring-only churn; the repo is deliberately comment-light.
+    - Every behavioral change needs tests for empty input, boundary values, error paths, concurrency/state conflicts and the happy path. Missing tests, or tests that cover only the happy path, are blocking findings.
+
+  path_instructions:
+    - path: "packages/core/src/models/**"
+      instructions: |
+        Models own persistence and state transitions. Verify:
+        - Multi-write operations are transactional; a partial write cannot leave two tables inconsistent.
+        - Terminal states (`failed`, `cancelled`) cannot be overwritten except through the documented retry/reset path. `setStatus`/`update` must enforce this, and cancelled builds must be skipped by finalize/capture paths.
+        - Every status or verdict transition goes through the one existing owner and emits the matching event; flag hand-written duplicate transitions.
+        - Concurrent updates use conditional SQL or an explicit lock/compare-and-set. Flag read-modify-write races and TOCTOU windows.
+        - Missing rows return `undefined` consistently; do not throw for not-found unless the contract says so.
+        - IDs are ULIDs and timestamps are ISO-8601 strings.
+        Require tests for state-machine boundaries, duplicate/replayed transitions, concurrent writers, empty result sets and not-found behavior.
+
+    - path: "packages/core/src/schema/**"
+      instructions: |
+        Schema changes are cross-database changes. Verify:
+        - Every table/column/index change is mirrored in `packages/db-sqlite`, `packages/db-postgres` and `packages/db-mysql` Drizzle schemas, DDL and migration paths, including driver presets.
+        - Migrations are upgrade-safe from the previous released schema, idempotent where the adapter promises it, and have a rollback or backfill story for destructive changes.
+        - Indexes cover the predicates and ordering of real queries; flag missing indexes on foreign keys and high-cardinality filters, and redundant indexes.
+        - Nullability, defaults, FK actions, unique constraints, timestamp precision/timezone and JSON encoding are consistent across dialects.
+        - No schema change is accepted without a test that applies it to an existing populated database.
+
+    - path: "packages/core/src/capture/**"
+      instructions: |
+        Capture is asynchronous, leased and cancellable. Verify:
+        - Lease renewal, retry limits and redelivery are correct; a lost lease cannot leave a build stuck in `capturing`. Jobs must be idempotent under redelivery.
+        - Cancellation is terminal: cancelled attempts are retained, shards/jobs are cancelled together, and no late worker can move the build forward.
+        - No fixed sleeps for rendering; use the settle/channel signal with a configured timeout and a bounded fallback.
+        - Browser contexts, pages and temporary files are closed in `finally`; concurrency is bounded per target/service.
+        - A pass longer than a signed URL's lifetime is sliced and re-minted, never handed one expiring URL. Tokens never appear in logs, errors, spans or referrers.
+        - A11y findings remain informational and never change build status.
+        Require tests for lease expiry, retry exhaustion, cancellation races, duplicate delivery, partial shard failure and empty story sets.
+
+    - path: "packages/core/src/diff/**"
+      instructions: |
+        Verify pixel comparison correctness and resource safety:
+        - Thresholds and dimension handling match the documented semantics; size changes cannot be silently treated as identical.
+        - Buffers are bounds-checked before indexing; PNG input is validated (magic, dimensions, size cap) before decode.
+        - Overlay/thumbnail work releases buffers and worker leases, and worker errors reject the caller instead of hanging.
+        - No full-image copy per pixel; flag quadratic scans over large images.
+        Require fixture coverage for identical, differing, size-changed and malformed images.
+
+    - path: "packages/image/**"
+      instructions: |
+        Image processing runs on a worker pool. Verify:
+        - Worker tasks always settle (resolve or reject) and the pool is drained/terminated on teardown.
+        - Buffer transfer does not detach data still in use; no unbounded queue growth or concurrency.
+        - Optional `sharp` and default `pngjs` codecs produce equivalent output for supported inputs, and a missing native dependency fails with an actionable error, not a crash.
+        - Decode/encode paths enforce size caps and reject non-PNG bytes before allocation.
+        Require tests for worker failure, cancellation, malformed input, empty buffers and codec parity.
+
+    - path: "packages/core/src/adapters/**"
+      instructions: |
+        These are the public adapter contracts. Verify:
+        - No adapter-specific types, SDK values or driver errors leak into core; map to typed contract errors at the boundary.
+        - `setup`, `health` and `teardown` are idempotent and all-or-nothing; teardown twice must not throw.
+        - Untrusted input is validated at the boundary (paths, URLs, limits), and errors are distinguishable (not-found vs unavailable vs invalid).
+        - Contract tests use a fake transport, not a fake adapter, and exercise the published suite (`storageContractSuite`, `databaseContractSuite`, queue suite).
+        - A new optional capability is reflected in `metadata` rather than probed ad hoc at call sites.
+
+    - path: "packages/db-sqlite/**"
+      instructions: |
+        Database adapter review. Verify parameterized SQL only, no string interpolation of values or identifiers. Check:
+        - Schema/DDL/migration parity with Postgres and MySQL; presets (`turso`, `better-sqlite3`, `bun-sqlite`, `d1`) keep the same behavior or explicitly document a capability gap in `metadata`.
+        - Connection and statement lifecycle is idempotent; `close` twice is safe; WAL/foreign-key pragmas are set where required.
+        - Unique and FK violations map to typed errors; migrations run twice safely; no destructive migration without backfill.
+        - Indexes support the actual query predicates; flag N+1 loops and unbounded `SELECT`s.
+        Require upgrade tests against a populated pre-change database.
+
+    - path: "packages/db-postgres/**"
+      instructions: |
+        Database adapter review. Verify parameterized SQL only, no string interpolation. Check:
+        - Schema/DDL/migration parity with SQLite and MySQL, including enum/JSON/timestamp/boolean differences and preset drivers (`pg`, `neon`, `neon-http`, `vercel`, `pglite`).
+        - Pool/connection teardown is idempotent and does not leak on setup failure; transactions are used for multi-write operations.
+        - Constraint violations map to typed errors; migrations are upgrade-safe and idempotent.
+        - Indexes match query predicates and ordering; flag unindexed scans, N+1 queries and unbounded results.
+        Do not accept driver-specific types in core contracts.
+
+    - path: "packages/db-mysql/**"
+      instructions: |
+        Database adapter review. Verify parameterized SQL only. Check:
+        - MySQL/MariaDB-specific semantics are handled deliberately: identifier quoting, case sensitivity, `utf8mb4`, timestamp precision, JSON columns, `ON DUPLICATE KEY`, transaction isolation.
+        - Schema/DDL/migration parity with SQLite and Postgres and all presets (`planetscale`, `tidb`).
+        - Constraint errors map to typed errors; migrations are upgrade-safe and idempotent; teardown twice is safe.
+        - Indexes match real predicates/order; flag unindexed scans, N+1 queries and unbounded results.
+
+    - path: "packages/storage-*/**"
+      instructions: |
+        Storage adapters handle untrusted keys and large streams. Verify:
+        - Path traversal (`../`), absolute paths, NUL bytes and empty segments are rejected before any filesystem/object call.
+        - Large reads/writes stream; no whole-object buffering unless the contract bounds it. Partial writes are deleted on failure.
+        - Keys are joined/split by the shared key module, not re-implemented per operation; content-addressed reads verify integrity where promised.
+        - `setup` creates roots idempotently; `health` turns false after removal; `teardown` twice does not throw.
+        - Missing objects map to typed errors; list limits are clamped; credentials and signed URLs never enter logs.
+        Require path-traversal, missing-object, partial-write and contract-suite tests.
+
+    - path: "packages/runner-playwright/**"
+      instructions: |
+        Browser runner review. Verify:
+        - Every page/context/browser is closed in `finally`, including on navigation or render failure, timeout and cancellation.
+        - No fixed sleep for rendering; wait on Storybook's settle/channel event with a bounded timeout and fallback.
+        - Launch failures become `TargetLaunchError` (not a story crash); story errors are isolated to the snapshot.
+        - Screenshot bytes are validated (PNG magic, size cap) before storage; remote endpoints, headers, query values and tokens are scrubbed from errors/logs.
+        - Remote targets go through `retryConnect` and the process-wide session gate; target availability is reported through metadata, not guessed.
+        - The Playwright and Puppeteer implementations stay behaviorally identical for shared logic (`play`, `settle`, `a11y`).
+
+    - path: "packages/runner-puppeteer/**"
+      instructions: |
+        Browser runner review. Verify:
+        - Browser/page lifecycle is closed in `finally` on success, timeout, navigation failure and cancellation.
+        - `executablePath` is required and validated; launch failures are `TargetLaunchError`, not story failures.
+        - Rendering waits on the Storybook settle signal, never a fixed sleep; fallback delay is bounded.
+        - Screenshot bytes meet the PNG magic/size contract; remote endpoints, headers and tokens are scrubbed from errors.
+        - Shared `play`, `settle` and a11y logic stays identical to Playwright; flag drift.
+
+    - path: "packages/app/src/routes/**"
+      instructions: |
+        Route registration is load-bearing. Verify:
+        - Every route is classified `hosting`, `testing`, `review` or `both` in `api-routes.ts`/`page-routes.ts` using the exact Hono pattern; unclassified or stale entries fail the suite.
+        - `testing` routes answer 404 without a `testing` adapter and `review` routes answer 404 with review off; the gate is middleware, never an ad-hoc handler `if`.
+        - Auth, CSRF and class-gate middleware order is correct; `app.all(...)` handlers are classified too.
+        - OpenAPI output still marks every operation with the correct `x-storyshelf-class`.
+        A new route without a classification test and an OpenAPI class is blocking.
+
+    - path: "packages/app/src/routers/**"
+      instructions: |
+        HTTP handlers are a trust boundary. Verify:
+        - Every body/query/param is validated with the existing schema/validator; reject unknown or mass-assigned fields.
+        - Authn, role, project membership and object ownership are checked for every read and mutation; hidden resources return 404, not 403.
+        - Browser forms enforce CSRF; JSON endpoints reject wrong content types. State conflicts return 409, validation 400, auth 401/403.
+        - Absolute links use the confirmed public origin resolver; only auth may use the request origin, and only via `authOrigin`.
+        - Multi-write operations are transactional and use the model layer; no direct status writes outside `announceBuildStatus`/`requestBuildState`.
+        - Errors do not leak SQL, storage keys, tokens or internal paths.
+        Require tests for anonymous/member/admin matrices, cross-project access, invalid input and stale-state conflicts.
+
+    - path: "packages/app/src/middleware/**"
+      instructions: |
+        Verify middleware is the single gate for a route class:
+        - Authentication runs before authorization; class gates (`requireTesting`, `requireReview`) run after auth and read current state.
+        - A gated route returns an identical 404 for unauthorized and absent-resource cases; it must not reveal whether review/testing is enabled.
+        - CSRF applies to state-changing browser routes and is not bypassed by alternate methods, content types or nested mounts.
+        - No handler re-implements a check that belongs here.
+        Require a boot test that walks every route of the class.
+
+    - path: "packages/app/src/pages/**"
+      instructions: |
+        Server-rendered JSX + HTMX only. Verify:
+        - All user-controlled values are escaped by JSX; `dangerouslySetInnerHTML` requires a proven trusted source and sanitization.
+        - Iframes are sandboxed without `allow-same-origin` where previews are untrusted; no token or secret is placed in a URL that is logged or referred.
+        - Forms post to CSRF-protected page routes; no inline event handlers or client framework.
+        - Accessibility: labeled controls, keyboard reachability, focus management, semantic landmarks, ARIA only where native semantics fail, and contrast-safe theme tokens.
+        - A11y findings are displayed as information only and never drive a build status.
+        Flag large inline style blocks; use facade components and `HStack`/`VStack`.
+
+    - path: "packages/app/src/ui/**"
+      instructions: |
+        UI consistency is enforced by a ratchet. Verify:
+        - Pages use facade components (`Button`, `Tabs`, `Badge`, `Card`, `HStack`, `VStack`, etc.) and never raw `btn`/`tabs`/`card` classes, direct family imports or `style="..."`.
+        - Variants are labeled `css` templates composed by extension, not `cx`; static values only, brand values stay CSS variables.
+        - Actions in inline/table/card contexts use `size="sm"`; icons come from the cached sprite.
+        - Theme and aria behavior remain accessible; no full-width customer accent bar.
+        A change that adds a direct class/import/inline style fails `consistency.test.ts`; call it blocking.
+
+    - path: "packages/app/src/jobs-setup.ts"
+      instructions: |
+        Verify the single-queue/single-consumer wiring:
+        - One handler per job kind is registered, all kinds share the consumer, and startup happens only after adapters are ready.
+        - Teardown drains in-flight work and stops the forked child after the consumer.
+        - Retries come from `testing.retries`; lease renewal is active for the handler lifetime; an exhausted job fails its build.
+        - Cancellation cancels every job kind for the build; no in-memory queue, boot sweep or stall handler is reintroduced.
+
+    - path: "packages/core/src/capture/db-queue/**"
+      instructions: |
+        Verify queue correctness under concurrency:
+        - Claiming is atomic and conditional; two consumers cannot claim one job.
+        - Lease expiry and redelivery are bounded by the configured retries; `onExhausted` fails the associated build.
+        - The clock/timers are injected so tests can assert causality, not elapsed wall time.
+        - Enqueue is idempotent where promised; cancelled jobs are not resurrected.
+        Require multi-instance, lease-expiry, retry-exhaustion and duplicate-delivery tests.
+
+    - path: "packages/auth/**"
+      instructions: |
+        Auth is security-critical. Verify:
+        - Every protected action checks session validity, role and object ownership; no trust in client-supplied user/role/project IDs.
+        - OAuth/OIDC uses state, PKCE and nonce correctly; redirect URIs are allowlisted; the request origin is used only for auth.
+        - Cookies are `HttpOnly`, `Secure` where applicable and `SameSite`-appropriate; sessions are rotated on privilege change and revoked on logout.
+        - Secrets/tokens/passwords are hashed with the intended KDF, compared in constant time, never logged, and rate-limited against enumeration.
+        - Passkey/SSO challenges are single-use, expire, and bind to the session/user; replay and cross-user use are rejected.
+        Require tests for anonymous/member/admin, expired/revoked sessions, wrong-user tokens and replay.
+
+    - path: "packages/notify-*/**"
+      instructions: |
+        Notifications are durable side effects. Verify:
+        - Nothing is sent without a confirmed public origin; no relative-link fallback and no channel marked errored because the origin is unknown.
+        - Git state is derived from `statusesForBuild` and delivered by the publisher/job, never posted from a handler or capture call site.
+        - Outbound HTTP uses the shared `httpJson` timeout/retry/`Retry-After` behavior; 4xx vs 5xx and retryability are distinguished.
+        - Webhook HMAC/signature is verified before any mutation; delivery is idempotent with a stable key.
+        - Channel secrets, private keys, installation tokens and full webhook URLs never appear in logs, errors, API output or annotations.
+        - Cancelled/failed build semantics map to the provider's nearest state; annotations stay within host limits.
+
+    - path: "packages/cli/**"
+      instructions: |
+        CLI review. Verify:
+        - Arguments/config are validated; destructive actions require explicit flags (`--apply`, force/purge) and never happen by default.
+        - Archive ingestion is safe: zip-slip entries, absolute paths, entry-count and uncompressed-size caps, and symlinks are rejected or bounded.
+        - Large uploads stream; retries are idempotent; partial uploads are cleaned up.
+        - Exit codes and stderr are actionable; secrets/tokens never print, including in verbose/debug output.
+        - API responses are validated before use; a malformed server response produces a typed error, not a crash.
+
+    - path: "packages/mcp/**"
+      instructions: |
+        MCP is a constrained API client. Verify:
+        - Tools remain read/comment-only and never expose verdicts, approvals or destructive admin actions.
+        - Tools that call `testing` routes declare `routeClass: "testing"` and are hidden unless `/api/v1/health` reports `testing: true`.
+        - Every tool input is validated; errors are structured and do not leak upstream bodies, tokens or project data.
+        - The server is a thin client over `/api/v1`; no direct DB/storage access and no duplicated business rules.
+
+    - path: "packages/ai/**"
+      instructions: |
+        AI features consume untrusted content. Verify:
+        - Model/web/Storybook content is treated as data, not instructions; prompt-injection paths are called out.
+        - Secrets, tokens and unnecessary PII are excluded from prompts, logs and telemetry.
+        - Budgets, timeouts and max-token limits are enforced; provider failures degrade gracefully without blocking a build.
+        - Output is validated/parsed defensively; malformed model output never becomes a status, verdict or authorization decision.
+        - Telemetry records bounded attributes only (no prompts or user content).
+
+    - path: "packages/affected/**"
+      instructions: |
+        Dependency-graph logic must be correct for a monorepo. Verify:
+        - Paths are normalized and resolved within the workspace; traversal outside the repo and symlink escapes are rejected.
+        - Cycles, missing packages, workspace aliases and package exports are handled without infinite recursion.
+        - Changed files map to owning packages deterministically; a test-only change does not select unrelated packages.
+        Require tests for cycles, empty graphs, scoped packages, renamed files and Windows/POSIX separators.
+
+    - path: "packages/design-figma/**"
+      instructions: |
+        External design-provider integration. Verify:
+        - Credentials and tokens never enter logs, errors, URLs or rendered HTML; link validation does not leak private file access.
+        - Outbound calls use the shared HTTP helper with timeouts/retries; rate limits and 401/403/404 are handled distinctly.
+        - Remote images are size/type bounded before decode; no SSRF via user-supplied file/node URLs.
+        - Cached metadata has a clear invalidation rule; failures do not break the build review page.
+
+    - path: "packages/observability/**"
+      instructions: |
+        Telemetry must be safe and bounded. Verify:
+        - No secrets, tokens, prompts, user content or unbounded IDs in span names/attributes, metric labels or logs.
+        - Metric cardinality is bounded; user/project IDs are not used as label values.
+        - Shutdown flushes exporters with a bounded timeout; a telemetry failure cannot fail the request or swallow the original error.
+        - Logging is structured (`logger.info({ buildId }, "msg")`) and errors attach as `err` children.
+
+    - path: "packages/*/src/**"
+      instructions: |
+        Package-level checks for code not covered by a more specific rule:
+        - Respect the adapter module layout (`types`, `keys`, `client`, `lifecycle`, `operations`, `streams`, `errors`) and split files over ~150 lines or with 3+ concerns.
+        - The primary factory/class export appears before helpers; `index.ts` is a composition root, not a logic dump.
+        - Do not add a new public subpath to a package `exports` map without an explicit reason; keep internal modules internal.
+        - Runtime dependencies belong to exactly one package; import shared types through the owner (`@storyshelf/core/...`), not a duplicate dependency.
+        - New modules ship with a colocated `<module>.test.ts`; move cases with moved code.
+
+    - path: "**/*.test.ts"
+      instructions: |
+        Tests are part of the contract. Verify:
+        - The default suite is hermetic: no browser, network, real cloud or Storybook build. Fake the transport, not the adapter (`:memory:` DB, temp dir, injected fetch).
+        - Cases cover empty sets, `null`/`undefined`, boundary values, malformed input, error mapping, concurrent/duplicate operations and the happy path. Happy-path-only tests are blocking.
+        - Timing is deterministic: hold at a barrier or inject/spy the clock. Do not add `sleep` to create a race and do not assert elapsed milliseconds.
+        - `skip`/`todo` is not used to hide a flaky or failing test; a genuinely timing-sensitive case belongs in the `test:flake` tier.
+        - Gated integration tests keep `RUN_INTEGRATION`/`LIVE_CLOUD` guards and clean up their resources.
+        - A behavioral change without a test is a blocking finding.
+
+    - path: "**/*.integration.test.ts"
+      instructions: |
+        Integration tests may use a real browser/HTTP boundary. Verify:
+        - The suite is gated (`RUN_INTEGRATION=1` or `LIVE_CLOUD=1`) and skipped cleanly when the gate is absent.
+        - Resources (browser, server, temp dirs, DB rows, buckets) are cleaned up even on failure; unique run prefixes prevent cross-run collisions.
+        - Assertions prove causality (barrier/release), not sleeps or wall-clock timing.
+        - Live tests never print credentials and never mutate shared resources outside the run's isolated prefix.
+
+    - path: "apps/website/**"
+      instructions: |
+        The public docs site is Astro Starlight. Verify:
+        - Prose and commands match the current code and ADRs (no stale `npm`/`pnpm` instructions where `nub`/`nubx` is required).
+        - Links resolve; code samples use the published import surface and do not import internal subpaths.
+        - No secrets, tokens or private URLs in examples, generated assets or `openapi.json`.
+        - Accessibility and SEO metadata remain valid; do not hand-edit generated `openapi.json` or SRI hashes.
+
+    - path: "docs/**"
+      instructions: |
+        Documentation review. Verify:
+        - Claims match the implementation and the frozen ADRs; `docs/architecture.md` owns entities/interfaces and ADRs record decisions, not duplicated schemas.
+        - ADR numbering is respected: current ADRs are 0001-0018; new ADRs start at 0037; never edit `archive/`.
+        - ADRs stay within the 250-line target/320-line hard cap and references resolve.
+        - Commands use the real toolchain (`nub`, `nubx turbo`, `export PATH="$HOME/.nub/bin:$PATH"` where needed).
+        Do not flag prose style that oxfmt/markdown tooling owns.
+
+    - path: ".agents/skills/**"
+      instructions: |
+        Skills are executable guidance for agents. Verify:
+        - Instructions match the current code layout and commands; no stale paths or removed APIs.
+        - Examples are copy-paste correct and do not encourage bypassing the facade components, adapter layout or route-class gates.
+        - New guidance does not contradict `AGENTS.md` or an ADR; if it does, the ADR/AGENTS change must be in the same PR.
+
+    - path: ".github/workflows/**"
+      instructions: |
+        CI/CD security and correctness. Verify:
+        - `permissions` is least-privilege; write scopes exist only on jobs that need them.
+        - No `pull_request_target` with checkout/execution of untrusted PR code; no expression injection from PR titles/branches/bodies into `run:`.
+        - Third-party actions are pinned to a release tag or SHA; secrets are masked and never echoed.
+        - Required checks still run for the affected packages; `--force`/uncached runs are intentional and documented.
+        - Cache keys include every input that can change the output; a cache cannot mask a failing test.
+
+    - path: ".github/actions/**"
+      instructions: |
+        Composite actions are shared CI code. Verify:
+        - Inputs are quoted and validated; no untrusted PR metadata interpolated into shell commands.
+        - `set -euo pipefail` (or equivalent) is used; failures propagate instead of being swallowed by a pipeline.
+        - Caches are keyed by lockfile/toolchain and do not restore across incompatible OS/runtime versions.
+        - Secrets are passed explicitly and never written to disk or logs.
+
+    - path: "apps/fly-app/Dockerfile"
+      instructions: |
+        Container review. Verify:
+        - Multi-stage build excludes `node_modules`, `dist`, `.git`, `.tmp` and test fixtures from the runtime image.
+        - Base images are pinned and the runtime runs as a non-root user with a writable data directory only where needed.
+        - No secrets, tokens or build args containing credentials end up in layers; use runtime env/secret mounts.
+        - Layer order is cache-friendly (manifests before source); the healthcheck and exposed port match the app.
+        - The image still boots with local adapters and the demo seed, and the build does not depend on network access at runtime.
+
+    - path: "scripts/**"
+      instructions: |
+        Repository automation is production tooling. Verify:
+        - Destructive release/publish/purge operations default to dry-run or require an explicit flag; fail closed on a dirty tree, wrong branch or missing env.
+        - Secrets are never echoed; OIDC/trust flows do not fall back to long-lived tokens silently.
+        - File rewrites are atomic and scoped; no traversal outside the repo and no mutation of generated files that are gitignored.
+        - Exit codes are non-zero on failure and errors identify the failing step without dumping credentials.
+
+    - path: "fixtures/**"
+      instructions: |
+        Fixtures are independent pnpm installs, not workspace packages. Verify:
+        - They stay isolated from the nub workspace and do not gain workspace dependencies accidentally.
+        - Storybook versions remain pinned per fixture; generated `storybook-static`, `node_modules` and lockfile drift are not committed.
+        - Changes do not silently invalidate the default capture expectations used by the gated integration suite.
+        Do not nitpick fixture formatting or generated files.
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "AGENTS.md"
+      - "CLAUDE.md"
+      - "docs/architecture.md"
+      - "docs/testing.md"
+      - "docs/adr/*.md"
+      - ".agents/skills/**/SKILL.md"
+  web_search:
+    enabled: true
