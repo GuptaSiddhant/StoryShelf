@@ -55,7 +55,8 @@
     "lint": "oxlint --type-aware --type-check ./src",
     "test": "vitest run",
     "test:integration": "RUN_INTEGRATION=1 vitest run a11y.integration.test.ts settle.integration.test.ts remote.integration.test.ts",
-    "prepublishOnly": "nub run build"
+    "prepublishOnly": "nub run build",
+    "test:flake": "vitest run --repeats=20 --maxWorkers=1 --no-file-parallelism src/capture-runner.test.ts src/settle.test.ts src/screenshot.test.ts"
   },
   "dependencies": {
     "@storyshelf/core": "workspace:*",

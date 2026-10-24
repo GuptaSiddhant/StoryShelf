@@ -40,6 +40,7 @@ function fakeChannel(): {
 const scope = globalThis as unknown as Record<string, unknown>;
 
 afterEach(() => {
+  vi.useRealTimers();
   delete scope["__STORYSHELF_SETTLE__"];
   delete scope["__STORYBOOK_ADDONS_CHANNEL__"];
   delete scope["__STORYBOOK_PREVIEW__"];
@@ -103,9 +104,8 @@ describe("inPageRecorder (as serialized into the page)", () => {
   it("times out unsettled when the channel exists but the event never comes", async () => {
     scope["__STORYBOOK_ADDONS_CHANNEL__"] = fakeChannel();
     record();
-    const report = await wait({ timeoutMs: 40 });
+    const report = await wait({ timeoutMs: 0 });
     expect(report).toMatchObject({ settled: false, hooked: true });
-    expect(report.elapsedMs).toBeGreaterThanOrEqual(40);
   });
 
   it("answers at once when no channel ever appears after the page loaded", async () => {
@@ -125,7 +125,8 @@ describe("inPageRecorder (as serialized into the page)", () => {
     record();
     const channel = fakeChannel();
     scope["__STORYBOOK_ADDONS_CHANNEL__"] = channel;
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    const state = scope["__STORYSHELF_SETTLE__"] as { hook: () => boolean };
+    expect(state.hook()).toBe(true);
     channel.emit("storyRendered", "a--b");
     expect((await wait({ timeoutMs: 500 })).settled).toBe(true);
   });

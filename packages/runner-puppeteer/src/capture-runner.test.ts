@@ -3,6 +3,7 @@ import {
   type StoryEntry,
   type Viewport,
 } from "@storyshelf/core/adapter/capture-runner";
+import { createLatch } from "@storyshelf/core/test-helpers";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -210,6 +211,7 @@ describe("createPuppeteerCaptureRunner.render", () => {
   it("caps concurrently open pages at the configured concurrency", async () => {
     let active = 0;
     let peak = 0;
+    const latch = createLatch();
     const adapter = {
       name: "fake",
       discover: async (): Promise<StoryEntry[]> => [],
@@ -217,21 +219,22 @@ describe("createPuppeteerCaptureRunner.render", () => {
       waitForReady: async (): Promise<void> => {
         active += 1;
         peak = Math.max(peak, active);
-        await new Promise((resolve) => {
-          setTimeout(resolve, 5);
-        });
+        await latch.wait();
         active -= 1;
       },
     };
     const stories = Array.from({ length: 12 }, (_, i) => ({ ...STORIES[0]!, id: `s-${i}` }));
     puppeteer.configureHang(false);
-    const result = await createPuppeteerCaptureRunner({ concurrency: 3 }).render({
+    const rendering = createPuppeteerCaptureRunner({ concurrency: 3 }).render({
       buildId: "build-1",
       storybookDir,
       stories,
       viewports: VIEWPORTS,
       adapter,
     });
+    await vi.waitFor(() => expect(active).toBe(3));
+    latch.open();
+    const result = await rendering;
 
     expect(result.captures).toHaveLength(12);
     expect(peak).toBe(3);
