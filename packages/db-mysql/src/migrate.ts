@@ -1,189 +1,240 @@
 /**
- * Shared Postgres migrations for every `db-postgres` preset.
+ * Shared MySQL migrations for every `db-mysql` preset.
  *
- * The DDL plus idempotent follow-up ALTERs run through a minimal row-query
- * runner so all drivers (`postgres.js`, `node-postgres`, Neon, …) share one
- * migration path instead of drifting per preset.
+ * MySQL 8 has no `ADD COLUMN IF NOT EXISTS`, no `CREATE INDEX IF NOT EXISTS`
+ * and no `ALTER COLUMN ... DROP NOT NULL`. The DDL is split into statements,
+ * missing columns/indexes are found in `information_schema`, and only a
+ * duplicate-index error from a repeated DDL statement is ignored.
  */
 import { DDL } from "./ddl.ts";
 
 /** Minimal row-query surface a migration runner needs. */
 export type MigrationRunner = (sql: string) => Promise<unknown[]>;
 
-const STORYBOOK_META_ALTER = "ALTER TABLE projects ADD COLUMN IF NOT EXISTS storybook_meta TEXT";
-const EXECUTE_PLAY_ALTER =
-  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS execute_play BOOLEAN NOT NULL DEFAULT false";
-const PLAY_TIMEOUT_MS_ALTER =
-  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS play_timeout_ms INTEGER NOT NULL DEFAULT 10000";
-const RUN_A11Y_ALTER =
-  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS run_a11y BOOLEAN NOT NULL DEFAULT false";
-const PROJECT_BROWSER_ALTER =
-  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS browser TEXT NOT NULL DEFAULT 'chromium'";
-const PROJECT_VIEWPORTS_ALTER = "ALTER TABLE projects ADD COLUMN IF NOT EXISTS viewports TEXT";
-const PROJECT_AUTOMIGRATE_ALTER =
-  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS automigrate BOOLEAN NOT NULL DEFAULT false";
-const PROJECT_AI_PROFILE_ALTER = "ALTER TABLE projects ADD COLUMN IF NOT EXISTS ai_profile TEXT";
-const SNAPSHOT_INFRA_HASH_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS infra_hash TEXT";
-const SNAPSHOT_INHERITED_ALTER =
-  "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS inherited BOOLEAN NOT NULL DEFAULT false";
-const SNAPSHOT_BASELINE_ID_ALTER =
-  "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS baseline_id TEXT";
-const SNAPSHOT_BASELINE_VERSION_ALTER =
-  "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS baseline_version TEXT";
-const SNAPSHOT_ENV_CHANGE_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS env_change TEXT";
-const SNAPSHOT_DESIGN_URL_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS design_url TEXT";
-const DESIGN_LINKS_UNIQUE_INDEX =
-  "CREATE UNIQUE INDEX design_links_project_import_path_idx ON design_links (project_id, import_path)";
-/** Pre-adapter Figma tables (replaced by design_nodes / design_credentials; no data is carried over). */
-const LEGACY_DESIGN_DROPS = [
-  "DROP TABLE IF EXISTS figma_nodes",
-  "DROP TABLE IF EXISTS design_tokens",
+interface ColumnMigration {
+  table: string;
+  column: string;
+  definition: string;
+}
+
+const COLUMN_MIGRATIONS: ColumnMigration[] = [
+  { table: "projects", column: "storybook_meta", definition: "TEXT" },
+  {
+    table: "projects",
+    column: "execute_play",
+    definition: "TINYINT(1) NOT NULL DEFAULT 0",
+  },
+  {
+    table: "projects",
+    column: "play_timeout_ms",
+    definition: "INTEGER NOT NULL DEFAULT 10000",
+  },
+  { table: "projects", column: "run_a11y", definition: "TINYINT(1) NOT NULL DEFAULT 1" },
+  {
+    table: "projects",
+    column: "browser",
+    definition: "VARCHAR(64) NOT NULL DEFAULT 'chromium'",
+  },
+  { table: "projects", column: "viewports", definition: "TEXT" },
+  { table: "projects", column: "browsers", definition: "TEXT" },
+  { table: "projects", column: "modes_allowlist", definition: "TEXT" },
+  { table: "projects", column: "automigrate", definition: "TINYINT(1) NOT NULL DEFAULT 0" },
+  { table: "projects", column: "ai_profile", definition: "TEXT" },
+  {
+    table: "projects",
+    column: "review_enabled",
+    definition: "TINYINT(1) NOT NULL DEFAULT 1",
+  },
+  { table: "projects", column: "review_approvals", definition: "INT NOT NULL DEFAULT 1" },
+  { table: "projects", column: "storybook_url_ttl_seconds", definition: "INT" },
+  { table: "projects", column: "run_tests", definition: "TINYINT(1) NOT NULL DEFAULT 0" },
+  { table: "snapshots", column: "infra_hash", definition: "TEXT" },
+  {
+    table: "snapshots",
+    column: "inherited",
+    definition: "TINYINT(1) NOT NULL DEFAULT 0",
+  },
+  { table: "snapshots", column: "baseline_id", definition: "VARCHAR(64)" },
+  { table: "snapshots", column: "baseline_version", definition: "TEXT" },
+  { table: "snapshots", column: "design_url", definition: "TEXT" },
+  { table: "snapshots", column: "env_change", definition: "TEXT" },
+  { table: "snapshots", column: "mode", definition: "VARCHAR(64)" },
+  {
+    table: "snapshots",
+    column: "browser",
+    definition: "VARCHAR(64) NOT NULL DEFAULT 'chromium'",
+  },
+  { table: "snapshots", column: "duration_ms", definition: "INT" },
+  { table: "snapshots", column: "a11y_violations", definition: "TEXT" },
+  { table: "baselines", column: "infra_hash", definition: "TEXT" },
+  { table: "baselines", column: "fingerprint", definition: "TEXT" },
+  { table: "baselines", column: "mode", definition: "VARCHAR(64)" },
+  {
+    table: "baselines",
+    column: "browser",
+    definition: "VARCHAR(64) NOT NULL DEFAULT 'chromium'",
+  },
+  {
+    table: "builds",
+    column: "affected_only",
+    definition: "TINYINT(1) NOT NULL DEFAULT 1",
+  },
+  { table: "builds", column: "baseline_sha", definition: "TEXT" },
+  { table: "builds", column: "changed_files", definition: "TEXT" },
+  { table: "builds", column: "affected_import_paths", definition: "TEXT" },
+  { table: "builds", column: "inherited_count", definition: "INTEGER NOT NULL DEFAULT 0" },
+  { table: "builds", column: "test_results", definition: "TEXT" },
+  { table: "webhooks", column: "secret_encrypted", definition: "TEXT NOT NULL" },
+  { table: "tokens", column: "user_id", definition: "VARCHAR(64) NULL" },
+  {
+    table: "project_members",
+    column: "source",
+    definition: "VARCHAR(32) NOT NULL DEFAULT 'manual'",
+  },
+  { table: "comments", column: "story_id", definition: "TEXT" },
+  { table: "notification_channels", column: "last_error", definition: "TEXT" },
+  { table: "notification_channels", column: "last_error_at", definition: "DATETIME(3)" },
 ];
-const BASELINE_FINGERPRINT_ALTER =
-  "ALTER TABLE baselines ADD COLUMN IF NOT EXISTS fingerprint TEXT";
-const BASELINE_INFRA_HASH_ALTER = "ALTER TABLE baselines ADD COLUMN IF NOT EXISTS infra_hash TEXT";
-const BUILD_AFFECTED_ONLY_ALTER =
-  "ALTER TABLE builds ADD COLUMN IF NOT EXISTS affected_only BOOLEAN NOT NULL DEFAULT true";
-const BUILD_BASELINE_SHA_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS baseline_sha TEXT";
-const BUILD_CHANGED_FILES_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS changed_files TEXT";
-const BUILD_AFFECTED_PATHS_ALTER =
-  "ALTER TABLE builds ADD COLUMN IF NOT EXISTS affected_import_paths TEXT";
-const BUILD_INHERITED_COUNT_ALTER =
-  "ALTER TABLE builds ADD COLUMN IF NOT EXISTS inherited_count INTEGER NOT NULL DEFAULT 0";
-const BUILD_TEST_RESULTS_ALTER = "ALTER TABLE builds ADD COLUMN IF NOT EXISTS test_results TEXT";
-const RUN_TESTS_ALTER =
-  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS run_tests BOOLEAN NOT NULL DEFAULT false";
-const WEBHOOK_SECRET_ALTER =
-  "ALTER TABLE webhooks ADD COLUMN IF NOT EXISTS secret_encrypted TEXT NOT NULL DEFAULT ''";
-const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN IF EXISTS secret";
-const TOKEN_USER_ALTER =
-  "ALTER TABLE tokens ADD COLUMN IF NOT EXISTS user_id TEXT REFERENCES users(id) ON DELETE CASCADE";
-const MEMBER_SOURCE_ALTER =
-  "ALTER TABLE project_members ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'manual'";
-/**
- * Re-runs share `(project_id, git_sha)` by design (ULID build ids), so the
- * lookup index must not be unique. Existing databases created it UNIQUE —
- * drop (MySQL syntax, no IF EXISTS) and recreate it plain.
- */
-const BUILDS_GITSHA_DEDUP = "DROP INDEX builds_project_gitsha_idx ON builds";
-const BUILDS_GITSHA_INDEX =
-  "CREATE INDEX builds_project_gitsha_idx ON builds (project_id, git_sha)";
 
-const PROJECT_BROWSERS_ALTER = "ALTER TABLE projects ADD COLUMN IF NOT EXISTS browsers TEXT";
-const PROJECT_MODES_ALLOWLIST_ALTER =
-  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS modes_allowlist TEXT";
-const SNAPSHOT_MODE_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS mode TEXT";
-const SNAPSHOT_BROWSER_ALTER =
-  "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS browser TEXT NOT NULL DEFAULT 'chromium'";
-const BASELINE_MODE_ALTER = "ALTER TABLE baselines ADD COLUMN IF NOT EXISTS mode TEXT";
-const BASELINE_BROWSER_ALTER =
-  "ALTER TABLE baselines ADD COLUMN IF NOT EXISTS browser TEXT NOT NULL DEFAULT 'chromium'";
-/** Swap the viewport-only unique indexes for the browser-aware ones (rows default to chromium). */
-const IDENTITY_STATEMENTS = [
-  "DROP INDEX snapshots_build_story_viewport_idx ON snapshots",
-  "DROP INDEX baselines_project_story_viewport_branch_idx ON baselines",
-  "CREATE UNIQUE INDEX snapshots_build_story_mode_browser_idx ON snapshots (build_id, story_id, viewport_name, browser)",
-  "CREATE UNIQUE INDEX baselines_project_story_mode_browser_branch_idx ON baselines (project_id, story_id, viewport_name, browser, branch)",
+const IDENTITY_INDEXES = [
+  {
+    table: "snapshots",
+    name: "snapshots_build_story_mode_browser_idx",
+    sql: "CREATE UNIQUE INDEX snapshots_build_story_mode_browser_idx ON snapshots (build_id, story_id, viewport_name, browser)",
+  },
+  {
+    table: "baselines",
+    name: "baselines_project_story_mode_browser_branch_idx",
+    sql: "CREATE UNIQUE INDEX baselines_project_story_mode_browser_branch_idx ON baselines (project_id, story_id, viewport_name, browser, branch)",
+  },
 ];
-
-async function migrateSnapshotColumns(run: MigrationRunner): Promise<void> {
-  await execIgnore(run, SNAPSHOT_INFRA_HASH_ALTER);
-  await execIgnore(run, SNAPSHOT_INHERITED_ALTER);
-  await execIgnore(run, SNAPSHOT_BASELINE_ID_ALTER);
-  await execIgnore(run, SNAPSHOT_BASELINE_VERSION_ALTER);
-  await execIgnore(run, SNAPSHOT_DESIGN_URL_ALTER);
-  await execIgnore(run, SNAPSHOT_ENV_CHANGE_ALTER);
-  await migrateCaptureIdentityColumns(run);
-}
-
-async function migrateCaptureIdentityColumns(run: MigrationRunner): Promise<void> {
-  await execIgnore(run, SNAPSHOT_MODE_ALTER);
-  await execIgnore(run, SNAPSHOT_BROWSER_ALTER);
-  await execIgnore(run, BASELINE_MODE_ALTER);
-  await execIgnore(run, BASELINE_BROWSER_ALTER);
-  await execIgnore(run, PROJECT_BROWSERS_ALTER);
-  await execIgnore(run, PROJECT_MODES_ALLOWLIST_ALTER);
-  await execIgnore(run, DESIGN_LINKS_UNIQUE_INDEX);
-  await Promise.all(
-    LEGACY_DESIGN_DROPS.map(async (statement) => {
-      await execIgnore(run, statement);
-    }),
-  );
-}
-
-async function migrateBaselineColumns(run: MigrationRunner): Promise<void> {
-  await execIgnore(run, BASELINE_INFRA_HASH_ALTER);
-  await execIgnore(run, BASELINE_FINGERPRINT_ALTER);
-}
-
-async function migrateProjectExtras(run: MigrationRunner): Promise<void> {
-  await execIgnore(run, EXECUTE_PLAY_ALTER);
-  await execIgnore(run, PLAY_TIMEOUT_MS_ALTER);
-  await execIgnore(run, PROJECT_AUTOMIGRATE_ALTER);
-  await execIgnore(run, PROJECT_AI_PROFILE_ALTER);
-  await migrateSnapshotColumns(run);
-  await migrateBaselineColumns(run);
-  await migrateBuildColumns(run);
-  await execIgnore(run, RUN_TESTS_ALTER);
-}
-
-async function migrateBuildColumns(run: MigrationRunner): Promise<void> {
-  await execIgnore(run, BUILD_AFFECTED_ONLY_ALTER);
-  await execIgnore(run, BUILD_BASELINE_SHA_ALTER);
-  await execIgnore(run, BUILD_CHANGED_FILES_ALTER);
-  await execIgnore(run, BUILD_AFFECTED_PATHS_ALTER);
-  await execIgnore(run, BUILD_INHERITED_COUNT_ALTER);
-  await execIgnore(run, BUILD_TEST_RESULTS_ALTER);
-}
 
 /** Run the full migration set through any row-query runner. */
 export async function runMigrations(run: MigrationRunner): Promise<void> {
-  await run(DDL);
-  await migrateCoreColumns(run);
-  await migrateProjectExtras(run);
-  await applyIdentityStatements(run);
-  await migrateCommentsTable(run);
+  await runDdl(run);
+  await ensureColumns(run);
+  await migrateIndexes(run);
+  await migrateLegacyColumns(run);
 }
 
-async function migrateCoreColumns(run: MigrationRunner): Promise<void> {
-  await execIgnore(run, STORYBOOK_META_ALTER);
-  await execIgnore(run, RUN_A11Y_ALTER);
-  await execIgnore(run, PROJECT_BROWSER_ALTER);
-  await execIgnore(run, PROJECT_VIEWPORTS_ALTER);
-  await execIgnore(run, WEBHOOK_SECRET_ALTER);
-  await execIgnore(run, WEBHOOK_SECRET_DROP);
-  await execIgnore(run, TOKEN_USER_ALTER);
-  await execIgnore(run, MEMBER_SOURCE_ALTER);
-  await execIgnore(run, BUILDS_GITSHA_DEDUP);
-  await execIgnore(run, BUILDS_GITSHA_INDEX);
-}
-
-async function applyIdentityStatements(run: MigrationRunner): Promise<void> {
-  for (const statement of IDENTITY_STATEMENTS) {
-    // oxlint-disable-next-line no-await-in-loop -- ordered: drop old indexes, then create new
-    await execIgnore(run, statement);
+async function ensureColumns(run: MigrationRunner): Promise<void> {
+  for (const migration of COLUMN_MIGRATIONS) {
+    // oxlint-disable-next-line no-await-in-loop -- information_schema query then ALTER
+    await ensureColumn(run, migration);
   }
 }
 
-async function execIgnore(run: MigrationRunner, sql: string): Promise<void> {
-  try {
-    await run(sql);
-  } catch {
-    // idempotent — already migrated
+async function migrateIndexes(run: MigrationRunner): Promise<void> {
+  await dropIndexIfExists(run, "snapshots", "snapshots_build_story_viewport_idx");
+  await dropIndexIfExists(run, "baselines", "baselines_project_story_viewport_branch_idx");
+  for (const index of IDENTITY_INDEXES) {
+    // oxlint-disable-next-line no-await-in-loop -- index creation follows the legacy drops
+    await ensureIndex(run, index.table, index.name, index.sql);
+  }
+  await dropIndexIfExists(run, "builds", "builds_project_gitsha_idx");
+  await ensureIndex(
+    run,
+    "builds",
+    "builds_project_gitsha_idx",
+    "CREATE INDEX builds_project_gitsha_idx ON builds (project_id, git_sha)",
+  );
+  await ensureIndex(
+    run,
+    "design_links",
+    "design_links_project_import_path_idx",
+    "CREATE UNIQUE INDEX design_links_project_import_path_idx ON design_links (project_id, import_path)",
+  );
+}
+
+async function migrateLegacyColumns(run: MigrationRunner): Promise<void> {
+  await dropColumnIfExists(run, "webhooks", "secret");
+  await migrateCommentsTable(run);
+}
+
+async function runDdl(run: MigrationRunner): Promise<void> {
+  for (const statement of splitStatements(DDL)) {
+    try {
+      // oxlint-disable-next-line no-await-in-loop -- DDL order matters
+      await run(statement);
+    } catch (error) {
+      if (!isDuplicateIndexError(error)) {
+        throw error;
+      }
+    }
+  }
+}
+
+function splitStatements(ddl: string): string[] {
+  return ddl
+    .split(";")
+    .map((statement) => statement.trim())
+    .filter((statement) => statement.length > 0);
+}
+
+function isDuplicateIndexError(error: unknown): boolean {
+  const code = (error as { code?: string; errno?: number }).code;
+  const errno = (error as { errno?: number }).errno;
+  return code === "ER_DUP_KEYNAME" || errno === 1061;
+}
+
+async function ensureColumn(run: MigrationRunner, migration: ColumnMigration): Promise<void> {
+  if (await hasColumn(run, migration.table, migration.column)) {
+    return;
+  }
+  await run(
+    `ALTER TABLE ${migration.table} ADD COLUMN ${migration.column} ${migration.definition}`,
+  );
+}
+
+async function hasColumn(run: MigrationRunner, table: string, column: string): Promise<boolean> {
+  const rows = await run(
+    `SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = '${table}' AND column_name = '${column}' LIMIT 1`,
+  );
+  return rows.length > 0;
+}
+
+async function ensureIndex(
+  run: MigrationRunner,
+  table: string,
+  name: string,
+  sql: string,
+): Promise<void> {
+  if (await hasIndex(run, table, name)) {
+    return;
+  }
+  await run(sql);
+}
+
+async function hasIndex(run: MigrationRunner, table: string, name: string): Promise<boolean> {
+  const rows = await run(
+    `SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = '${table}' AND index_name = '${name}' LIMIT 1`,
+  );
+  return rows.length > 0;
+}
+
+async function dropIndexIfExists(run: MigrationRunner, table: string, name: string): Promise<void> {
+  if (await hasIndex(run, table, name)) {
+    await run(`ALTER TABLE ${table} DROP INDEX ${name}`);
+  }
+}
+
+async function dropColumnIfExists(
+  run: MigrationRunner,
+  table: string,
+  column: string,
+): Promise<void> {
+  if (await hasColumn(run, table, column)) {
+    await run(`ALTER TABLE ${table} DROP COLUMN ${column}`);
   }
 }
 
 async function migrateCommentsTable(run: MigrationRunner): Promise<void> {
-  try {
-    const rows = (await run(
-      "SELECT is_nullable FROM information_schema.columns WHERE table_name='comments' AND column_name='user_id'",
-    )) as { is_nullable: string }[];
-    const isNullable = rows[0]?.is_nullable;
-    if (isNullable === "YES" || isNullable === undefined) {
-      return;
-    }
-    await run("ALTER TABLE comments ALTER COLUMN user_id DROP NOT NULL");
-  } catch {
-    // already nullable or table missing — ignore
+  const rows = await run(
+    "SELECT is_nullable FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'comments' AND column_name = 'user_id' LIMIT 1",
+  );
+  const isNullable = (rows[0] as { is_nullable?: string } | undefined)?.is_nullable;
+  if (isNullable !== "NO") {
+    return;
   }
+  await run("ALTER TABLE comments MODIFY COLUMN user_id VARCHAR(64) NULL");
 }

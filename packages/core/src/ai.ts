@@ -1,5 +1,5 @@
 /**
- * AI singleton surface (not an adapter; see ADR 0026).
+ * AI singleton surface (not an adapter; see ADR 0016).
  *
  * Owned by core so `ShelfOptions.ai` needs no dependency edge into the
  * implementation package (`@storyshelf/ai` already depends on core). The

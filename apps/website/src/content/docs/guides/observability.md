@@ -80,4 +80,4 @@ history instead (`GET /api/v1/projects/:id/builds/:buildId/attempts/:attemptNo/l
 
 For the full reference (span/metric catalogs, sampling, Deno, troubleshooting),
 see `docs/observability.md` in the repository and
-[ADR 0022](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/0022-opentelemetry-observability.md).
+[ADR 0015](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/0015-observability-and-logging.md).

@@ -1,5 +1,5 @@
 import type { Project } from "@storyshelf/core/schema";
-/** Shared guards for the insights API (ADR 0026 §6 guard order). */
+/** Shared guards for the insights API (ADR 0016 §6 guard order). */
 import type { Context } from "hono";
 import { insightDepsFromStore, type InsightDeps } from "../insights/deps.ts";
 import { failWith } from "../insights/errors.ts";

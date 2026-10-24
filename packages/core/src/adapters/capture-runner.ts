@@ -86,7 +86,7 @@ export interface RenderedSnapshot {
   browser?: CaptureTarget;
   /**
    * Wall-clock milliseconds the renderer spent on this capture, when it measured it. Recorded per
-   * snapshot and read back as the per-story cost a shard plan orders its work by (ADR 0031).
+   * snapshot and read back as the per-story cost a shard plan orders its work by (ADR 0005).
    */
   durationMs?: number;
   /** Axe violation texts found on this capture (empty or absent: none, or not checked). */

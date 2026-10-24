@@ -1,3 +1,6 @@
+import type { Client } from "@libsql/client";
+import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import * as drizzleLibsqlCore from "drizzle-orm/libsql/driver-core";
 /**
  * Turso/libSQL preset for the SQLite database adapter.
  *
@@ -6,16 +9,19 @@
  * `wss://`, or embedded replica via `syncUrl`). Requires the optional
  * `@libsql/client` peer (`nub add @libsql/client`).
  */
-import { createClient } from "@libsql/client";
-import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
-import { drizzle } from "drizzle-orm/libsql";
+import { createRequire } from "node:module";
 import { DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
 import { createDrizzleAdapter } from "./drizzle-factory.ts";
 import { schema } from "./schema/index.ts";
 
 declare const __PKG_VERSION__: string | undefined;
 
-type LibsqlClient = ReturnType<typeof createClient>;
+type LibsqlClient = Client;
+type CreateClient = typeof import("@libsql/client").createClient;
+type Construct = (client: LibsqlClient, config: { schema: typeof schema }) => unknown;
+
+// `driver-core` exports `construct` at runtime but omits it from its typings.
+const construct = (drizzleLibsqlCore as unknown as { construct: Construct }).construct;
 
 /**
  * Options for creating a Turso-backed DatabaseAdapter.
@@ -42,7 +48,7 @@ export interface TursoDatabaseOptions {
  */
 export function createTursoDatabase(options: TursoDatabaseOptions): DatabaseAdapter {
   const { client, owned } = resolveClient(options);
-  const db = drizzle(client, { schema });
+  const db = construct(client, { schema });
 
   return createDrizzleAdapter(db, {
     metadata: {
@@ -90,7 +96,7 @@ function resolveClient(options: TursoDatabaseOptions): { client: LibsqlClient; o
     );
   }
   return {
-    client: createClient({
+    client: createNodeClient({
       url,
       authToken: options.authToken,
       syncUrl: options.syncUrl,
@@ -98,6 +104,21 @@ function resolveClient(options: TursoDatabaseOptions): { client: LibsqlClient; o
     }),
     owned: true,
   };
+}
+
+/**
+ * Load the default Node client only when a URL is used. Importing
+ * `@libsql/client` at module load pulls in its native addon, which makes a
+ * process that only injects a `sqlite3` client (tests, embedded replicas)
+ * crash on teardown under some Node versions.
+ */
+let nodeCreateClient: CreateClient | undefined;
+
+function createNodeClient(config: Parameters<CreateClient>[0]): Client {
+  nodeCreateClient ??= (
+    createRequire(import.meta.url)("@libsql/client") as { createClient: CreateClient }
+  ).createClient;
+  return nodeCreateClient(config);
 }
 
 const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN secret";

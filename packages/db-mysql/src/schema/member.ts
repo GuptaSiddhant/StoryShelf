@@ -1,5 +1,6 @@
 import type { ProjectRole } from "@storyshelf/core/types";
-import { mysqlTable, text, datetime, uniqueIndex } from "drizzle-orm/mysql-core";
+import { mysqlTable, text, uniqueIndex } from "drizzle-orm/mysql-core";
+import { datetime } from "./datetime.ts";
 import { projects } from "./project.ts";
 import { users } from "./user.ts";
 

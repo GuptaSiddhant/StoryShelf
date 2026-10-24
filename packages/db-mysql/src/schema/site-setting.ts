@@ -1,4 +1,5 @@
-import { datetime, mysqlTable, text } from "drizzle-orm/mysql-core";
+import { mysqlTable, text } from "drizzle-orm/mysql-core";
+import { datetime } from "./datetime.ts";
 
 /** Narrow `site_settings` table definition: key-value facts the app learns at runtime. */
 export const siteSettings = mysqlTable("site_settings", {

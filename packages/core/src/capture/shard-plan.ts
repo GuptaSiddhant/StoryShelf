@@ -1,4 +1,4 @@
-/** Splitting a build's render work into shards (ADR 0031 phase 5). Pure: no I/O, no clock. */
+/** Splitting a build's render work into shards (ADR 0005 phase 5). Pure: no I/O, no clock. */
 import type { CaptureTarget } from "../adapters/capture-runner.ts";
 import type { StoryEntry, Viewport } from "./adapter.ts";
 

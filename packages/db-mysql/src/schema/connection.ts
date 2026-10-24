@@ -1,4 +1,5 @@
-import { datetime, mysqlTable, text, uniqueIndex } from "drizzle-orm/mysql-core";
+import { mysqlTable, text, uniqueIndex } from "drizzle-orm/mysql-core";
+import { datetime } from "./datetime.ts";
 import { users } from "./user.ts";
 
 /**

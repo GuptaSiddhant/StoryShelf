@@ -1,7 +1,7 @@
 // oxlint-disable-next-line unicorn/no-abusive-eslint-disable
 /* oxlint-disable */
 /**
- * Generates the Storybook that `scripts/bench-shards.mjs` captures (ADR 0031).
+ * Generates the Storybook that `scripts/bench-shards.mjs` captures (ADR 0005).
  *
  *   node scripts/bench-fixture.mjs --out .tmp/bench-sb [--stories 600] [--heavy even|first] [--heavy-count 60]
  *                                  [--node-modules <dir>]

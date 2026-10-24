@@ -1,7 +1,7 @@
 // oxlint-disable-next-line unicorn/no-abusive-eslint-disable
 /* oxlint-disable */
 /**
- * Phase 0 benchmark for the pixel diff engine (ADR 0031).
+ * Phase 0 benchmark for the pixel diff engine (ADR 0005).
  *
  *   node scripts/bench-diff.mjs [--runs 15] [--dist]
  *

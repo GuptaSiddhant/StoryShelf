@@ -14,7 +14,7 @@ export type ModelSlot =
       model: LanguageModel;
       /** Max output tokens (defaults: triage ~1500, health ~4000). */
       maxTokens?: number;
-      /** Declared vision capability (see ADR 0026 §3 effective-vision rules). */
+      /** Declared vision capability (see ADR 0016 §3 effective-vision rules). */
       vision?: boolean;
       /** Per-call timeout in milliseconds. */
       timeoutMs?: number;
@@ -54,7 +54,7 @@ export interface CreateAiOptions<P extends string> {
   budget?: BudgetOptions;
   /** Force SDK telemetry registration on/off (default: on when `OTEL_EXPORTER_OTLP_ENDPOINT` is set). */
   otel?: boolean;
-  /** Evidence limit overrides (ADR 0026 §5 defaults otherwise). */
+  /** Evidence limit overrides (ADR 0016 §5 defaults otherwise). */
   limits?: Partial<EvidenceLimits>;
 }
 

@@ -47,7 +47,7 @@ flowchart TB
     class GH,Store,DB,Browser,SB external;
 ```
 
-**Reads as:** the CLI builds/zips Storybook and uploads it (`architecture.md:14`); the server renders asynchronously via Playwright (`architecture.md:17`) without cloning the repo; reviewers approve in the server-rendered UI; the server posts commit statuses back to the git host (ADR 0010). Storage and database are swappable adapters.
+**Reads as:** the CLI builds/zips Storybook and uploads it (`architecture.md:14`); the server renders asynchronously via Playwright (`architecture.md:17`) without cloning the repo; reviewers approve in the server-rendered UI; the server posts commit statuses back to the git host (ADR 0014). Storage and database are swappable adapters.
 
 ---
 
@@ -234,13 +234,13 @@ sequenceDiagram
     Handler-->>Client: JSON (/api/v1) or HTML (hono/jsx + HTMX) + HX-Redirect
 ```
 
-Conventions: IDs are ULIDs, timestamps ISO-8601 (`architecture.md:30`); `linkRoute()` for type-safe URLs; outbound HTTP via `httpJson`/`HttpError` (`core/utils`), never hand-rolled fetch (ADR 0019); structured logs `logger.info({ buildId }, "msg")` with `err` child (ADR 0014).
+Conventions: IDs are ULIDs, timestamps ISO-8601 (`architecture.md:30`); `linkRoute()` for type-safe URLs; outbound HTTP via `httpJson`/`HttpError` (`core/utils`), never hand-rolled fetch (ADR 0001); structured logs `logger.info({ buildId }, "msg")` with `err` child (ADR 0015).
 
 ---
 
 ## 5. Capture Pipeline — End-to-End Sequence
 
-Server-side render per ADR 0015 — the CLI never runs Playwright; the renderer is pure (`CaptureRunner.render → Buffer`, `packages/core/src/adapters/capture-runner.ts`).
+Server-side render per ADR 0004 — the CLI never runs Playwright; the renderer is pure (`CaptureRunner.render → Buffer`, `packages/core/src/adapters/capture-runner.ts`).
 
 ```mermaid
 sequenceDiagram
@@ -839,7 +839,7 @@ flowchart TB
         R1["users.role = admin (site-wide bypass)"]
         R2["project_members (project, user) → role<br/>admin | approver | developer | viewer"]
         R3["public builds: without auth (public_branch_regex OR builds.public)"]
-        R4["private builds: requires auth + viewer membership (ADR 0008, 0011)"]
+        R4["private builds: requires auth + viewer membership (ADR 0011)"]
     end
 
     NoAuth -. opt .-> RBAC
@@ -909,7 +909,7 @@ Uses same libs Playwright does internally (`architecture.md:424`); overlay store
 | 12  | Retention           | flowchart    | `core/retention/purge.ts:30`, ADR 0009                 |
 | 13  | Lifecycle/Health    | flowchart    | `app/lifecycle.ts:33`, `architecture.md:250`           |
 | 14  | Deployment          | flowchart ×3 | `architecture.md:732`, `docs/adr/*`                    |
-| 15  | Auth/RBAC           | flowchart    | `architecture.md:199`, ADR 0008                        |
+| 15  | Auth/RBAC           | flowchart    | `architecture.md:199`, ADR 0011                        |
 | 16  | Diff Engine         | flowchart    | `core/diff`, `architecture.md:405`                     |
 
 **When to update:**

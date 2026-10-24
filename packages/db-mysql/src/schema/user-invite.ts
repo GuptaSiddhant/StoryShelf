@@ -1,4 +1,5 @@
-import { mysqlTable, text, datetime } from "drizzle-orm/mysql-core";
+import { mysqlTable, text } from "drizzle-orm/mysql-core";
+import { datetime } from "./datetime.ts";
 import { users } from "./user.ts";
 
 /** Invite token for local accounts (one-time, hashed at rest). */

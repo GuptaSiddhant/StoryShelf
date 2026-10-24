@@ -1,5 +1,6 @@
 import type { BuildStatus } from "@storyshelf/core/types";
-import { boolean, index, int, mysqlTable, text, datetime } from "drizzle-orm/mysql-core";
+import { boolean, index, int, mysqlTable, text } from "drizzle-orm/mysql-core";
+import { datetime } from "./datetime.ts";
 import { projects } from "./project.ts";
 
 /** Narrow `builds` table definition. */

@@ -4,7 +4,7 @@ import type { Logger } from "../logger.ts";
 import { AiUsageModel } from "../models/ai-usage.ts";
 import { InsightModel } from "../models/insight.ts";
 
-/** Health digests older than this are deleted (ADR 0026 §5). */
+/** Health digests older than this are deleted (ADR 0016 §5). */
 export const HEALTH_RETENTION_DAYS = 90;
 
 /** Usage rows older than this are deleted (budgets only look at days/hours). */
