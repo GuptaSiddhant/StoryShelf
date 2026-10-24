@@ -52,6 +52,7 @@
     "core:dev": "nub run --filter @storyshelf/core dev",
     "cli": "nub run --filter storyshelf start",
     "docs": "nub run --filter website start",
+    "docs:check": "node ./scripts/check-adr-refs.mjs",
     "jsr": "nub ./scripts/jsr.mjs",
     "serve": "nub run --filter dev-server serve",
     "fmt": "turbo fmt",

@@ -1,6 +1,6 @@
 # @storyshelf/ai
 
-AI insights engine for StoryShelf (build triage and project health) on the Vercel AI SDK. See ADR 0026.
+AI insights engine for StoryShelf (build triage and project health) on the Vercel AI SDK. See ADR 0016.
 
 This package never sees API keys: you install a provider package yourself (`@ai-sdk/openai`, `@ai-sdk/anthropic`, Ollama, Bedrock, Vertex, …) and pass configured models in.
 

@@ -1,5 +1,6 @@
-import { datetime, index, mysqlTable, text } from "drizzle-orm/mysql-core";
+import { index, mysqlTable, text } from "drizzle-orm/mysql-core";
 import { builds } from "./build.ts";
+import { datetime } from "./datetime.ts";
 import { users } from "./user.ts";
 
 /** Narrow `build_reviews` table definition: one verdict of one reviewer on one build. */

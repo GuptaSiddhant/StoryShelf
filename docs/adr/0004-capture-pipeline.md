@@ -10,348 +10,202 @@ Supersedes (archived): ADR 0003, 0015, 0017, 0028
 
 ## Context
 
-The core feature a visual testing platform needs is automated screenshot capture: render each
-Storybook story in a controlled browser and take a pixel-perfect screenshot. Three architectures
-were possible:
+A visual testing platform must render every Storybook story in a controlled browser and take a
+deterministic screenshot. Three architectures were possible:
 
-1. **Client-side capture:** the CLI runs a browser in the user's CI and uploads PNGs. Rendering
-   determinism then depends on an arbitrary CI environment, and the CLI ships about 150 MB of
-   browser binaries.
-2. **Server clones the repository** and builds Storybook itself. This needs git credentials on the
-   server, a Docker socket, and a reconciliation loop for build jobs.
+1. **Client-side capture:** the CLI runs a browser in the user's CI and uploads PNGs. Determinism
+   then depends on an arbitrary CI environment, and the CLI ships browser binaries.
+2. **Server clones and builds the repository:** needs git credentials, a Docker socket and a
+   reconciliation loop on the server.
 3. **Server-side render:** the CLI builds Storybook, uploads the static build, and the server
    renders it in an environment it controls.
 
-The capture adapter also needs a boundary. A renderer that loads builds, writes snapshots and sets
-statuses couples every implementation to core's models and storage layout, so each new runner
-would re-implement orchestration.
-
-Teams also want StoryShelf to be the CI gate for interaction tests (Storybook `play` functions),
-to test theme and locale globals, and to cover more than one browser engine, with Chromatic's
-parameter conventions working unchanged.
+The renderer also needs a boundary. A runner that loads builds, writes snapshots and sets statuses
+couples every implementation to core's models and storage layout. Teams additionally want
+interaction tests (`play`), theme and locale globals, multiple browser engines, and Chromatic's
+parameter conventions to keep working.
 
 ## Decision
 
 ### 1. Server-side render
 
-The CLI builds Storybook (or reuses an existing build), zips the static output, and uploads it. The
-server renders the stories in its own pinned browser environment. The server never clones a
-repository and never runs user build scripts.
-
-Everything after upload is asynchronous. The upload returns `202 Accepted`, and a `capture` job on
-the database queue runs the capture with the configured concurrency (`testing.concurrency`; ADR
-0006, Testing Option, Hosting-Only Mode and the Database Queue). Capture runs only on instances
-with `testing` configured. Browsers are local or remote (ADR 0007, Remote Browsers and Public
-Origin).
-
-**Playwright** is the reference runner: multi-browser, deterministic rendering, Docker images
-available. A Puppeteer runner exists for a smaller Chromium-only image.
+The CLI builds Storybook, zips the static output and uploads it. The server renders the stories in
+its own pinned browser environment; it never clones a repository or runs user build scripts.
+Everything after upload is asynchronous: the upload returns `202`, and a `capture` job on the
+database queue runs with `testing.concurrency` (ADR 0006). Capture exists only on instances with
+`testing`; browsers are local or remote (ADR 0007). Playwright is the reference runner; Puppeteer
+is the smaller Chromium-only alternative.
 
 ### 2. `CaptureRunner` is a pure renderer
 
-A runner turns an already-extracted Storybook directory, a list of discovered stories and a list of
-viewports into screenshot buffers. It owns only rendering concerns: launching or connecting to the
-browser, serving the extracted directory, navigating, running `play` and accessibility checks, and
-screenshotting. It touches no database, storage or build state.
+A runner turns an extracted Storybook directory, discovered stories and viewports into screenshot
+buffers. It owns only rendering: launch/connect, serving the extracted directory, navigation,
+`play`, accessibility and screenshots. It touches no database, storage or build state.
 
-```ts
-interface CaptureRunner extends Adapter<{
-  readonly category: "capture-runner";
-  readonly targets: readonly {
-    target: CaptureTarget; // the first entry is the runner's default target
-    reach: "loopback" | "url";
-    status: "ready" | { unavailable: string };
-  }[];
-}> {
-  render(input: {
-    buildId: string;
-    runId?: string; // this call's cancel handle within the build (a shard id)
-    storybookDir: string; // always the extracted build on this host
-    storybookUrl?: string; // set by core for `reach: "url"` targets (ADR 0007)
-    target: CaptureTarget;
-    stories: StoryEntry[];
-    viewports: Viewport[];
-    executePlay?: boolean;
-    playTimeoutMs?: number;
-    runA11y?: boolean;
-    onCapture?: (capture: RenderedSnapshot) => Promise<void>; // streaming hand-off
-    logger?: Logger;
-  }): Promise<RenderResult>; // { captures, failures }
-
-  extractParameters?(input: {
-    buildId: string;
-    storybookDir: string;
-    storybookUrl?: string;
-    stories: StoryEntry[];
-    target?: CaptureTarget;
-    logger?: Logger;
-  }): Promise<Record<string, StoryParameters>>;
-
-  cancel(buildId: string, runId?: string): Promise<void>;
-}
-```
-
-- `RenderResult` carries per-story `failures`, so one failing story does not abort the run.
-- `onCapture` streams each screenshot to the caller as it is taken, so a large build never holds
-  every screenshot in memory.
-- `cancel` without a `runId` stops every render of the build; with one it stops that run only.
-- The runner factory takes no database, storage or logger. A logger is only ever a per-render
-  input.
+- `render` takes `target`, `stories`, `viewports`, optional `executePlay`, `runA11y`, a streaming
+  `onCapture` callback and the build's `storybookDir`/`storybookUrl`.
+- `RenderResult` carries per-story failures, so one failing story does not abort the run.
+- `onCapture` streams each screenshot so a large build never holds every image in memory.
+- `cancel(buildId, runId?)` stops the build's renders or one run (a shard).
+- `extractParameters` and `runTests` are optional capabilities; a runner without them only sees
+  index-declared parameters or cannot run Storybook tests.
+- The factory takes no database, storage or logger; a logger is a per-render input.
 
 ### 3. Core owns the capture orchestrator
 
-`executeCaptureJob` in core is the job runner. Given a build id and its dependencies (database,
-storage, runner, scratch directory, logger) it:
-
-1. loads the build and project and marks the build `capturing`;
-2. extracts the uploaded archive into the scratch directory, with path-traversal protection
-   (extraction and its security boundary live in core);
-3. discovers stories (`StorybookAdapter`) and resolves their parameters;
-4. builds the capture matrix (stories x viewports and modes x targets);
-5. delegates rendering to the runner;
-6. persists snapshots, diffs and baselines and finalizes the build, passing render failures so a
-   build whose story failed is still marked `failed` while its good captures persist.
-
-`createShelfApp` builds the orchestrator when `testing` is supplied. `config.scratchDir` is
-optional and defaults to the OS temp directory.
+`executeCaptureJob` loads the build and project, marks the build `capturing`, extracts the archive
+with path-traversal protection, discovers stories and parameters, builds the capture matrix,
+delegates rendering, then persists snapshots, diffs and baselines and finalizes the build. Render
+failures still persist good captures and fail the build. `createShelfApp` builds the orchestrator
+when `testing` is supplied; `config.scratchDir` defaults to the OS temp directory.
 
 ### 4. Story parameters, with Chromatic compatibility
 
-`StoryEntry.parameters` holds `disableSnapshot`, `delay`, `diffThreshold`, `pauseAnimationAtEnd`,
-`flakyTest` and `modes`. Each is read from both `parameters.chromatic` and `parameters.storyshelf`,
-merged as `{ ...chromatic, ...storyshelf }`, so existing Chromatic repositories work unchanged and
-the `storyshelf` key wins.
+`StoryEntry.parameters` carries `disableSnapshot`, `delay`, `diffThreshold`,
+`pauseAnimationAtEnd`, `flakyTest`, `modes` and `a11y`. Values are read from both
+`parameters.chromatic` and `parameters.storyshelf`, merged so `storyshelf` wins.
 
-- **Source.** `index.json` rarely carries parameters, so the optional
-  `CaptureRunner.extractParameters` loads the preview once per build, before the capture matrix is
-  built, and returns the fully resolved parameters (project, component and story levels stacked).
-  A runner without it (Puppeteer) only sees parameters present in the index.
-- **CLI.** When `storyshelf upload` runs the Storybook build, it sets
-  `STORYBOOK_BUILD_STORIES_JSON=true`, so no `.storybook/main.ts` edit is needed. A Storybook built
-  outside `upload` is covered by the runtime extraction.
-- **`disableSnapshot: true`** skips the story entirely: no capture, no `play`, not counted, never
-  `failed`. The orchestrator filters these before rendering.
-- **Per-story viewports.** `parameters.viewport` resolves against Storybook's built-in minimal
-  viewports and is captured in addition to the global viewport list (union, deduplicated by name).
+- `extractParameters` loads the preview once per build and returns resolved project, component and
+  story parameters. Without it, only parameters present in `index.json` are visible.
+- `storyshelf upload` sets `STORYBOOK_BUILD_STORIES_JSON=true`; no `.storybook/main.ts` edit is
+  needed. A build made outside `upload` uses runtime extraction.
+- `disableSnapshot: true` skips the story entirely: no capture, `play` or failure.
+- `parameters.viewport` is captured in addition to the project list (union, deduplicated by name).
 
 ### 5. Interaction tests through `play`, opt-in per project
 
 Projects carry `execute_play` (default off) and `play_timeout_ms` (default 10000, range 1000 to
-30000), set on the project's Tests settings tab by a project admin.
+30000), set in Settings > Tests.
 
-- **Off:** the runner ignores `play` and waits for the network to settle plus Storybook's own
-  render-finished signal (decision 9) before the screenshot.
-- **On:** the runner executes each story's `play` function before the screenshot. The screenshot
-  after `play` is the visual baseline.
-- **A `play` failure blocks the build** (`failed`). There is no reviewer waive in the review UI.
-- **Flaky stories do not block.** A story is flaky when it has the tag `flaky-test`
-  (case-insensitive) or `flakyTest: true` in its merged parameters. Flaky is whole-story, not
-  per-viewport. Flaky stories are still rendered; their failures keep the snapshot's test status
-  `failed` but do not fail the build, and the UI and commit statuses show them as warnings.
+- **Off:** the runner ignores `play` and waits for the network plus Storybook's render-finished
+  signal before the screenshot.
+- **On:** the runner executes `play` before the screenshot; the post-`play` frame is the baseline.
+- A `play` failure is a blocking failure: the build becomes `failed`; there is no reviewer waive.
+- A story tagged `flaky-test` (case-insensitive) or with `flakyTest: true` is flaky. Flaky stories
+  are rendered, but their failures keep the snapshot `failed` without failing the build; the UI
+  and commit statuses show warnings.
 
-Build status at finalize:
-
-```
-hasBlocking = blocking failures exist
-status = hasBlocking ? "failed" : (changedCount === 0 ? "approved" : "reviewing")
-```
-
-The per-branch acceptance rules of ADR 0009 (Baselines, Approval and Retention) and ADR 0013 (UI
-Review) apply on top of this.
+Finalize status: blocking failures ⇒ `failed`; otherwise no changes ⇒ `approved`; otherwise
+`reviewing`. ADR 0009 and ADR 0013 add the per-branch and review rules.
 
 ### 6. Accessibility checks
 
-With `runA11y` (on by default, `projects.run_a11y`; a project admin turns it off in Settings > Tests or the project API) the runner runs [axe-core](https://github.com/dequelabs/axe-core) in the page after
-the story settles and before the screenshot, once per story, mode and viewport, on the primary target only (see below). Results are
-annotations: they are stored on the snapshot (`snapshots.a11y_violations`, a JSON array of the
-annotation strings, null when none) and shown in review, but never block the build or change its
-status.
+With `runA11y` (on by default via `projects.run_a11y`, switched in Settings > Tests) the runner
+runs axe-core after the story settles and before the screenshot, once per story, mode and viewport,
+on the primary target only.
 
-- **Primary target only.** With several targets (ADR 0007) axe runs on the project's primary one,
-  the first entry of its `browsers` list (`primaryTargetOf`, `capture/browsers.ts`; `matrix.ts`
-  sets `RenderRequest.runA11y` from it, also inside a shard). The results are engine-independent
-  for practical purposes and each extra target cost about 150 ms per story, mode and viewport. The
-  findings sit on the snapshot of that target, whose `browser` names it; the review page, the
-  filmstrip and the component card show the name, and the page shows the findings from whichever
-  sibling of the story holds them.
-- **Ownership.** `@storyshelf/core` owns `axe-core` (exact pin) and the shared pieces under
-  `capture/a11y/`, re-exported from `@storyshelf/core/capture`: a lazy, cached loader of
-  `axe.min.js`, the `parameters.a11y` to run-plan resolver, the two in-page functions and the pure
-  result mapper. Runners keep only a thin `checkA11y(page)` and have no axe dependency.
-- **Injection.** The axe source is evaluated as a string (`page.evaluate`, a CDP
-  `Runtime.evaluate`), guarded by `typeof globalThis.axe`. Not `addScriptTag`: evaluation is not
-  bound by the page's CSP and works over a `connect`ed browser, since source travels instead of a
-  path. The in-page functions are each one self-contained function (only their source is
-  serialised) and return slim fields only (rule id, impact, help, first target, node count), never
-  raw axe node html.
-- **What is scanned.** `#storybook-root` with the WCAG 2.0/2.1/2.2 A and AA tags plus axe's
-  `best-practice` tag (`options.runOnly` replaces the set). The page-level best-practice rules
-  (`region`, `landmark-one-main`, `page-has-heading-one`) only run when the whole document is in
-  scope, so the default root scan does not flag every isolated story and no rule is disabled by
-  default (measured in Chromium); a story that widens `element`/`context` to the page turns them on
-  and can switch them off through `config.rules`. The story's
-  `parameters.a11y` is read from the preview (`disable: true` or `test: "off"` skip it; `config`,
-  `options` and `element`/`context` apply; `test: "todo" | "error"` still only annotate). Function
-  values are not readable from a page, so `inPageReadA11yParameters` drops them (and a rule item
-  or object that held nothing else), runs axe with what remains and reports how many it dropped,
-  which the runner logs once at debug level; `config.rules[].enabled: false` is mirrored into the run
-  options so it also holds under a tag-based `runOnly`.
-- **Annotation format.** One string per violation, worst impact first:
-  `<rule> (<impact>): <help> [<selector>] <n> node(s)`, at most 10, then `…and N more`. The runner
-  joins them as `a11y: a; b; …` in a render failure, so core's `startsWith("a11y:")` classification
-  and story-id sets are unchanged. The runner also attaches the strings to the `RenderedSnapshot`
-  (`a11y`), the pipeline stores them as JSON on that capture's snapshot row, and the review page,
-  filmstrip and component page read them from there (`pages/a11y-violations.tsx`). The build page
-  shows the total (`a11ySummaryOf`: findings and snapshots carrying them), the review header shows
-  `a11y N`, and the filmstrip has an `A11y` filter; all are information only and never a status.
-- **No fallback.** There is no hand-rolled scan. If axe cannot be loaded or run, the result is one
-  visible, non-blocking annotation `a11y: axe unavailable: <reason>` plus a warning log, never a
-  silent pass. The stored `axe unavailable: <reason>` entry is not a finding: the review UI leaves it
-  out of the build total, the header badge, the filter and the per-snapshot counts and shows it as a
-  separate neutral note ("axe did not run on N snapshots", with the reason on the snapshot), so a
-  failed run is visible without inflating the findings.
+- Results are annotations, stored on the snapshot and shown in review; they never block or change
+  a status. The snapshot's `browser` names the target that produced them.
+- Core owns `axe-core` (exact pin), the lazy loader, the run-plan resolver, the in-page functions
+  and the pure result mapper; runners keep only a thin `checkA11y(page)`.
+- The axe source is evaluated as a string (not injected by URL), so it works under a page CSP and
+  over a connected remote browser.
+- The default scan is `#storybook-root` with WCAG A/AA plus `best-practice`; story
+  `parameters.a11y` can disable, change or scope it. Function values are dropped before they cross
+  into the page and the count is logged.
+- A failed axe run is one non-blocking `axe unavailable: <reason>` note, not a finding; every
+  count and filter excludes it and review shows it separately.
+- There is no hand-rolled fallback: a failed run is visible, never a silent pass.
 
 ### 7. Modes are named and come from story parameters
 
-Modes follow Chromatic's model: `parameters.chromatic.modes` and `parameters.storyshelf.modes`, at
-project, component or story level, merged per mode name (`storyshelf` wins). A mode is
-`{ viewport?, disable?, ...globals }`.
+Modes follow Chromatic: `parameters.chromatic.modes` and `parameters.storyshelf.modes`, merged per
+name (`storyshelf` wins). A mode is `{ viewport?, disable?, ...globals }`.
 
-- **Identity is the name.** A mode's baseline key is the slug of its name (`modeSlug`), so changing
-  what a mode does keeps comparing against the same baseline. `globalTypes` is not scanned. The
-  slug is stored in `viewport_name`; a mode named like a viewport replaces it. `disable: true` drops
-  an inherited mode or a viewport of the same name. The applied globals (`mode`, JSON) are display
-  and capture metadata only.
-- **Globals reach Storybook through the `globals=` URL argument** (`a:b;c.d:e`, nested objects
-  flattened, `!true` and `!hex()` forms). `viewport` sizes the page and is not forwarded as a
-  global. Verified on Storybook 8, 9 and 10: declared globals apply and undeclared ones are ignored.
-- **Guards.** At most 8 captures per story (viewports, default viewport and modes) and at most 3
-  targets per project. Parameter-defined modes cannot be validated at configuration time, so the
-  cap is checked again after extraction and fails the build before rendering. The project's
-  `modesAllowlist` filters declared modes.
+- Identity is the name's slug (`modeSlug`), stored in `viewport_name`; changing what a mode does
+  keeps the same baseline. `globalTypes` is not scanned.
+- Globals reach Storybook through the `globals=` URL argument; `viewport` sizes the page and is not
+  forwarded. Verified on Storybook 8, 9 and 10.
+- Guards: at most 8 captures per story and 3 targets per project. Parameter-defined modes are
+  checked again after extraction and fail before rendering; `modesAllowlist` filters them.
 
 ### 8. Multi-browser capture over capture targets
 
-A project's `browsers` setting is a list of capture targets, primary first, falling back to the
-single `browser` column. A target is an engine name (`chromium`, `firefox`, `webkit`, `chrome`) or
-`<engine>@<name>` for a remote target (ADR 0007).
+A project's `browsers` is a target list, primary first, falling back to `browser`. A target is an
+engine (`chromium`, `firefox`, `webkit`, `chrome`) or `<engine>@<name>` for a remote target (ADR
+0007).
 
-- **One extraction, targets in sequence.** The orchestrator loops the targets over one extraction;
-  runners stay single-target per render call. Sequential keeps one browser's memory alive at a
-  time.
-- **Keyed per target.** Snapshots, baselines, diffs and storage paths are keyed by target
-  (`<mode>~<target>` for anything other than local `chromium`, which keeps the plain layout).
-  Rows with no `browser` mean local `chromium`. The target is part of the capture fingerprint (ADR
-  0005, Capture Performance and Sharding).
-- **New targets bootstrap, never copy.** A target with no baselines auto-accepts a story or mode's
-  first snapshot when the primary target's snapshot of it is clean; otherwise it goes to review as
-  `new`. Images are never copied across targets, since rendering differences would diff everything.
-- **Shared approval.** One decision covers a story and mode on every target
-  (`POST .../stories/:storyId/modes/:modeKey/approve|reject`). It is atomic on drift: if any
-  target's baseline moved, nothing is approved unless `force` is passed. `approve-all` skips a whole
-  group when one member drifted. Per-snapshot approve and reject remain as the escape hatch ("Only
-  <target>"). Review progress, the filmstrip and previous/next count story and mode groups, not
-  target rows.
-- A failure on any target fails the story, since failures are keyed per story.
+- One extraction, targets in sequence; runners stay single-target per render call.
+- Snapshots, baselines, diffs and storage are keyed by target (`<mode>~<target>` except local
+  `chromium`); the target is part of the capture fingerprint (ADR 0005).
+- A new target bootstraps from the primary target's clean snapshot; images are never copied across
+  targets, since rendering differences would diff everything.
+- One approval covers a story and mode across targets, atomic on drift unless `force` is passed;
+  per-snapshot approve/reject remains the escape hatch. A failure on any target fails the story.
 
 ### 9. Render-settled signalling
 
-The runner waits for Storybook's render-finished event instead of a clock. Storybook stays a black
-box: the only contract is `iframe.html` and the public `Channel.on` API of the preview's channel
-(`window.__STORYBOOK_ADDONS_CHANNEL__`, else `__STORYBOOK_PREVIEW__.channel`); no internal
+The runner waits for Storybook's render-finished event, not a clock. Storybook remains a black box:
+the contract is `iframe.html` and the public `Channel.on` API of the preview channel; no internal
 postMessage protocol and nothing is patched.
 
-- **Recorder before render.** A script registered before the page's own scripts (`addInitScript` /
-  `evaluateOnNewDocument`) hooks the channel as soon as iframe.html creates it and records
-  `storyRendered`, `storyFinished` (SB 8.5 and later), `storyThrewException`, `storyErrored`,
-  `storyMissing`, `storyRenderPhaseChanged`, `playFunctionThrewException` and
-  `unhandledErrorsWhilePlaying`. Events that fired before the capture asked are therefore not
-  missed. Storybook 9 and 10 emit `storyRendered` after the play function, also when it threw;
-  Storybook 8 emits `storyThrewException` instead; all three emit `storyFinished`.
-- **Settled** means any terminal event arrived. The screenshot then waits for `document.fonts.ready`
-  and two painted frames (capped at 250 ms), and then for `parameters.delay` when the story sets
-  one, counted from the signal. A story without `delay` no longer sleeps a fixed 500 ms.
-- **Fallback.** A page with no channel falls back at once, and a page whose channel never announces
-  the render falls back after the wait (5 s, or the play timeout when plays run, whichever is
-  longer) to the earlier behaviour: `delay ?? 500` ms after the selector appears. Custom adapters
-  that never call it work unchanged.
-- **Diagnostics.** A story that errors while rendering or playing is still photographed (the error
-  overlay is the snapshot, as before) and one warn line names the last render phase and Storybook's
-  message; a story that never signals logs the phase it was stuck in. This is logging only: no
-  schema, status or failure changes.
-- On the three fixtures every screenshot is byte-identical to the fixed-wait capture, and a build
-  renders about 30 % faster on a 15-story run.
+- A recorder registered before the page's scripts hooks the channel and records
+  `storyRendered`, `storyFinished`, error/missing events and play exceptions, so events that fired
+  before capture asked are not missed.
+- Settled means a terminal event arrived; the runner then waits for `document.fonts.ready` and two
+  painted frames (capped at 250 ms), then `parameters.delay` when set.
+- A page with no channel falls back at once; a channel that never announces falls back after the
+  wait (5 s, or the play timeout when plays run) to `delay ?? 500` ms.
+- Rendering/play errors are still photographed and logged with the last render phase. This is
+  diagnostics only: no schema, status or failure change.
+- On the fixtures, screenshots are byte-identical to fixed-wait capture and a 15-story build is
+  about 30 % faster.
 
 ### 10. Storybook 10 `.test()` entries as interaction tests
 
-Storybook 10's `story.test("name", fn)` produces index entries with `subtype: "test"`, the id
-`<story id>:<test name slug>` and `parent` naming the story. Capture leaves them out (`discover`).
-With `projects.run_tests` on (default off, because it changes what a build contains; Settings >
-Tests, `runTests` on the project API), the orchestrator runs them once per build:
+Storybook 10's `story.test("name", fn)` creates index entries with `subtype: "test"` and `parent`.
+`discover` leaves them out. With `projects.run_tests` on (default off, because it changes what a
+build contains), the orchestrator runs them once per build.
 
-- **Entry point.** Opening `iframe.html?id=<test id>&viewMode=story` renders the parent story and
-  runs the test body as that entry's play function, so no call into the store is needed: the runner
-  observes the same channel events as decision 9 and reads the verdict from them. A failing body
-  emits `playFunctionThrewException` (and phase `errored`); `storyFinished.status` stays `success`
-  for such a throw on Storybook 9 and 10, so it is not the signal.
-- **Runner contract.** `CaptureRunner.runTests?(input): TestOutcome[]` (optional, like
-  `extractParameters`): pass or fail per entry with the failure message, no screenshot. Playwright
-  and Puppeteer implement it on the project's primary target; a test that does not finish within
-  the play timeout fails with its last phase.
-- **Same lane as `play`.** A failing test is a blocking failure of its own id, exactly like a
-  throwing `play`: it fails the build (`failed`), a test of a `flaky-test` story does not, no
-  snapshot or baseline is written and no build status is added. The tests of a `skip` or
-  `disableSnapshot` story are skipped.
-- **Where the results live.** One nullable JSON column, `builds.test_results` (a `TestResult[]`:
-  id, title, name, parent id, status, error, duration), written once by the plan step of the capture
-  job (before sharding, so a sharded build needs no merge) and cleared when a later run of the
-  build has none. The build page shows a Tests card (failures first with their message, passes
-  behind a disclosure) and the API's `Build` carries the JSON. No table, no new status, no webhook
-  or notification topic; MCP and the CLI do not expose it.
-- Tests run for every build regardless of affected capture, and a Storybook before 10 has no test
-  entries, so the setting is a no-op there.
+- Opening `iframe.html?id=<test id>&viewMode=story` renders the parent and runs the test as its
+  play function, so the runner observes the same channel events as decision 9.
+- `CaptureRunner.runTests?(input)` returns pass/fail per entry with the failure message and no
+  screenshot, on the primary target. A test that exceeds the play timeout fails with its last
+  phase.
+- A failing test is a blocking failure of its own id, exactly like a throwing `play`; a flaky
+  story's test does not fail the build. `skip`/`disableSnapshot` stories skip their tests.
+- Results live in one nullable JSON column, `builds.test_results`, written once before sharding.
+  No table, status, webhook or notification topic; MCP and the CLI do not expose it.
+- Tests run for every build regardless of affected capture; Storybook before 10 has none.
 
 ## Consequences
 
 **Positive**
 
-- The server controls rendering determinism; the CLI stays a thin zip-and-upload client with no
-  browser dependency, and re-capturing an existing build needs no re-upload.
-- Runners follow the same purity standard as the other adapters (ADR 0001, Architecture and
-  Conventions): a new runner, local or remote, is a dependency swap, not a copy of orchestration.
-- One gate covers visual and interaction checks, so teams can drop a separate `storybook test` CI
-  step. Chromatic users migrate with no parameter changes.
+- The server controls rendering determinism; the CLI stays a thin zip-and-upload client, and a
+  build can be re-captured without re-uploading.
+- Runners follow the same purity standard as other adapters (ADR 0001); a new runner is a
+  dependency swap, not a copy of orchestration.
+- One gate covers visual and interaction checks; Chromatic users migrate without parameter changes.
 - Reviewers decide once per story and mode, with per-target tabs for inspection.
 
 **Negative**
 
-- The upload is the full static build (tens of MB). The server must serve the extracted statics
-  over HTTP during capture.
-- Rendering is the scaling bottleneck: every build re-renders the stories it captures. ADR 0005 and
-  ADR 0007 address throughput.
-- Flaky stories still cost capture time and storage, unlike `disableSnapshot`.
-- Puppeteer renders only Chromium and only sees index-declared modes.
+- The upload is the full static build; the server must serve extracted statics during capture.
+- Rendering is the scaling bottleneck; ADR 0005 and ADR 0007 address throughput.
+- Flaky stories still cost capture time and storage.
+- Puppeteer is Chromium-only and sees only index-declared parameters.
 - Baselines of a removed mode are not pruned.
 - Shared approval differs from Chromatic, which reviews browsers separately.
-- Settled signalling depends on Storybook's public channel event names; a Storybook that renames
-  them falls back to the fixed wait (slower, not wrong).
-- A build's `.test()` results are overwritten by every capture run of it, not kept per attempt.
+- Settled signalling depends on Storybook's public event names; a rename falls back to the fixed
+  wait (slower, not wrong).
+- A build's `.test()` results are overwritten by every capture run, not kept per attempt.
 
 ## Alternatives considered
 
-| Alternative                                                         | Why rejected                                                                              |
-| ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Client-side capture in the user's CI                                | Determinism depends on the CI environment; CLI ships browsers                             |
-| Server clones and builds the repository                             | Git credentials, Docker socket and a reconciliation loop on the server                    |
-| Puppeteer, BackstopJS or the Storybook test-runner as the reference | Chromium-only, full-page only, or needs a running Storybook server                        |
-| Runner that orchestrates (loads, persists, sets status)             | Every runner re-implements orchestration and couples to core's storage layout             |
-| Execute `play` unconditionally                                      | Breaks repositories whose `play` functions are dev-only demos                             |
-| Reviewer waive for failed `play`                                    | Flakiness belongs in code (`flaky-test`), not in a review click                           |
-| Custom flaky tag name, or per-viewport flaky                        | Unneeded complexity; tags are story-level                                                 |
-| Parameters from `index.json` only                                   | Storybook 8's index omits parameters, silently ignoring `disableSnapshot` and `flakyTest` |
-| Canonical query string as mode identity                             | Any value change creates a new baseline; diverges from Chromatic                          |
-| Copy chromium baselines to a new target                             | Font and anti-aliasing differences make every story diff                                  |
-| Render targets in parallel                                          | Memory multiplies per engine                                                              |
-| Call `play` through the story store for `.test()` entries           | The iframe URL of a test entry already runs it; store internals differ per version        |
-| A `build_tests` table or a build status for tests                   | A JSON column and the existing failure lane carry what the build page needs               |
-| Separate approval per target                                        | Review load scales with targets; token bumps become unreviewable                          |
+| Alternative                                                     | Why rejected                                                     |
+| --------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Client-side capture in the user's CI                            | Determinism depends on the CI environment; CLI ships browsers    |
+| Server clones and builds the repository                         | Git credentials, Docker socket and a reconciliation loop         |
+| Puppeteer, BackstopJS or the Storybook test-runner as reference | Chromium-only, full-page only, or needs a running server         |
+| Runner that orchestrates                                        | Every runner re-implements orchestration and couples to storage  |
+| Execute `play` unconditionally                                  | Breaks repositories whose `play` functions are dev-only demos    |
+| Reviewer waive for failed `play`                                | Flakiness belongs in code (`flaky-test`), not a review click     |
+| Custom flaky tag or per-viewport flaky                          | Unneeded complexity; tags are story-level                        |
+| Parameters from `index.json` only                               | Storybook 8 omits them, silently ignoring `disableSnapshot`      |
+| Canonical query string as mode identity                         | Any value change creates a new baseline                          |
+| Copy chromium baselines to a new target                         | Font and anti-aliasing differences diff everything               |
+| Render targets in parallel                                      | Memory multiplies per engine                                     |
+| Call `play` through the story store for `.test()`               | The iframe URL already runs it; store internals differ           |
+| A `build_tests` table or build status for tests                 | A JSON column and the existing failure lane suffice              |
+| Separate approval per target                                    | Review load scales with targets; token bumps become unreviewable |

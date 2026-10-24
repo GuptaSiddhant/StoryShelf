@@ -1,5 +1,6 @@
 import type { SiteRole } from "@storyshelf/core/types";
-import { mysqlTable, text, datetime } from "drizzle-orm/mysql-core";
+import { mysqlTable, text } from "drizzle-orm/mysql-core";
+import { datetime } from "./datetime.ts";
 
 /** Narrow `users` table definition. */
 export const users = mysqlTable("users", {

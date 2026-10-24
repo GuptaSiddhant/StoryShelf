@@ -3,7 +3,7 @@
 The legacy auth packages (`@storyshelf/auth-password`, `@storyshelf/auth-oauth`)
 are deleted. All installs use `@storyshelf/auth` (`createShelfAuth`),
 which owns OIDC/SAML/WebAuthn wire protocols via Better Auth while StoryShelf
-keeps users, memberships, invites, and UI. See ADR 0023.
+keeps users, memberships, invites, and UI. See ADR 0011.
 
 ## What breaks
 
@@ -23,18 +23,18 @@ keeps users, memberships, invites, and UI. See ADR 0023.
   mappings (highest rank wins, recorded as `sso:<group>`; manual grants
   survive). No `viewerGroups` equivalent — site roles are `admin`/`member`.
 - **`storyshelf server init` output changed** — `password` scaffolds email/pass
-  + `ensurePasswordAdmin` bootstrap; `oauth` on AWS scaffolds the `cognitoPreset`
-  social (new `COGNITO_DOMAIN` env); otherwise the `keycloakPreset` recipe.
+  - `ensurePasswordAdmin` bootstrap; `oauth` on AWS scaffolds the `cognitoPreset`
+    social (new `COGNITO_DOMAIN` env); otherwise the `keycloakPreset` recipe.
 
 ## Environment changes
 
-| Before | After |
-|---|---|
-| `AUTH_PASSWORD` (shared login, any length) | `AUTH_PASSWORD` (local admin bootstrap, **≥ 12 chars**) |
-| `AUTH_VIEWER_PASSWORD` | Removed (no viewer tier) |
-| — | `AUTH_EMAIL` (admin address, default `admin@example.com`) |
-| `SECRET` | `SECRET` (unchanged, still required with auth) |
-| `OIDC_ISSUER` / `OIDC_REDIRECT_URL` | Recipe-specific (e.g. `OIDC_ISSUER` = realm URL for `keycloakPreset`; `COGNITO_DOMAIN`/`COGNITO_REGION`/`COGNITO_USER_POOL_ID` for `cognitoPreset`) |
+| Before                                     | After                                                                                                                                               |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AUTH_PASSWORD` (shared login, any length) | `AUTH_PASSWORD` (local admin bootstrap, **≥ 12 chars**)                                                                                             |
+| `AUTH_VIEWER_PASSWORD`                     | Removed (no viewer tier)                                                                                                                            |
+| —                                          | `AUTH_EMAIL` (admin address, default `admin@example.com`)                                                                                           |
+| `SECRET`                                   | `SECRET` (unchanged, still required with auth)                                                                                                      |
+| `OIDC_ISSUER` / `OIDC_REDIRECT_URL`        | Recipe-specific (e.g. `OIDC_ISSUER` = realm URL for `keycloakPreset`; `COGNITO_DOMAIN`/`COGNITO_REGION`/`COGNITO_USER_POOL_ID` for `cognitoPreset`) |
 
 ## Database migration
 

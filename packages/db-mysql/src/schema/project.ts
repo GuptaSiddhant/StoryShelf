@@ -1,4 +1,5 @@
-import { boolean, double, int, mysqlTable, text, datetime } from "drizzle-orm/mysql-core";
+import { boolean, double, int, mysqlTable, text } from "drizzle-orm/mysql-core";
+import { datetime } from "./datetime.ts";
 
 /** Narrow `projects` table definition. */
 export const projects = mysqlTable("projects", {

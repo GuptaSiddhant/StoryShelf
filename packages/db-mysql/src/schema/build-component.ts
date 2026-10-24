@@ -1,5 +1,6 @@
-import { datetime, index, int, mysqlTable, text } from "drizzle-orm/mysql-core";
+import { index, int, mysqlTable, text } from "drizzle-orm/mysql-core";
 import { builds } from "./build.ts";
+import { datetime } from "./datetime.ts";
 import { projects } from "./project.ts";
 
 /** Narrow `build_components` table definition: one row per component of a published build. */

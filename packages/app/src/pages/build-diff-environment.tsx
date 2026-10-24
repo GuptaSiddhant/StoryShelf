@@ -8,7 +8,7 @@ import { environmentChangeOf, labelOf, summariseEnvironmentChanges } from "./env
 
 /**
  * Build-level note: some snapshots were captured in a different environment than their baseline.
- * The default branch migrates them without a diff; a feature branch still diffs them (ADR 0031).
+ * The default branch migrates them without a diff; a feature branch still diffs them (ADR 0005).
  */
 export function EnvironmentChangeNotice(props: {
   snapshots: readonly Snapshot[];

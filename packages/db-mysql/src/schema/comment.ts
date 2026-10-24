@@ -1,5 +1,6 @@
-import { boolean, index, mysqlTable, text, datetime } from "drizzle-orm/mysql-core";
+import { boolean, index, mysqlTable, text } from "drizzle-orm/mysql-core";
 import { builds } from "./build.ts";
+import { datetime } from "./datetime.ts";
 import { projects } from "./project.ts";
 import { snapshots } from "./snapshot.ts";
 import { users } from "./user.ts";

@@ -85,7 +85,7 @@ Convert a Lost Pixel ratio directly to `max_diff_ratio`. There is no absolute pi
 
 ## Scope
 
-StoryShelf is Storybook-only ([ADR 0005](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/0005-storybook-only-for-v1.md)). These Lost Pixel modes have **no native equivalent**:
+StoryShelf is Storybook-only ([ADR 0005](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/archive/0005-storybook-only-for-v1.md)). These Lost Pixel modes have **no native equivalent**:
 
 - `pageShots` (full-page URLs)
 - `ladleShots`

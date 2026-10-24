@@ -21,7 +21,7 @@ export function resetOtelRegistrationForTests(): void {
 
 /**
  * Run `fn` inside an internal span (intentional copy of the core/observability
- * helper: ADR 0022 §5 no-cycle rule — do not deduplicate).
+ * helper: ADR 0015 §5 no-cycle rule — do not deduplicate).
  */
 export async function withSpan<T>(
   name: string,

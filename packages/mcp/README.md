@@ -25,4 +25,4 @@ Read tools cover projects, builds, snapshots and AI insights. The write tools ar
 
 A project with [review](https://storyshelf.js.org/guides/review/#review-without-screenshots) off has no comments: these tools fail with 404 for it. Build verdicts (`POST …/reviews`) are deliberately not exposed.
 
-Docs: https://storyshelf.js.org/ai/mcp/ · Design: `docs/adr/0027-mcp-server.md`
+Docs: https://storyshelf.js.org/ai/mcp/ · Design: `docs/adr/0017-mcp-server.md`

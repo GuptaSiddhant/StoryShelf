@@ -1,4 +1,4 @@
-/** Bounded-cardinality OTEL instruments (task + outcome only; ADR 0026 §8). */
+/** Bounded-cardinality OTEL instruments (task + outcome only; ADR 0016 §8). */
 import { metrics, type Counter, type Histogram } from "@opentelemetry/api";
 
 interface Instruments {

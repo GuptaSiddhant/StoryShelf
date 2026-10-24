@@ -47,11 +47,11 @@ There is no `tsdown-entry` key. Each `package.json` `exports` map carries `{ sou
 - `@storyshelf/ai` exports only `createAi` and its option types; the `Ai` contract
   (`core/ai`) and the pure evidence/redaction/budget code (`core/insights`) live in
   core so `ShelfOptions.ai` needs no dependency on the implementation package.
-- `@storyshelf/mcp` is a thin `/api/v1` client (no core models/DB). Public surface: the `storyshelf-mcp` bin and the `@storyshelf/mcp/http` subpath (`createMcpHttpHandler`, `serveHttp`); tools stay internal (ADR 0027).
+- `@storyshelf/mcp` is a thin `/api/v1` client (no core models/DB). Public surface: the `storyshelf-mcp` bin and the `@storyshelf/mcp/http` subpath (`createMcpHttpHandler`, `serveHttp`); tools stay internal (ADR 0017).
 - `@storyshelf/observability` root barrel is runtime-agnostic (`@opentelemetry/api`
   only); the Node SDK lifecycle lives under `observability/node` and must never
   be imported under Deno. `core` never imports `observability` (no-cycle rule,
-  ADR 0022 §5) — cross-package span/propagation helpers are intentionally
+  ADR 0015 §5) — cross-package span/propagation helpers are intentionally
   duplicated, not shared.
 
 ## Schema layout (0.2.0 target, R2)
@@ -82,12 +82,12 @@ There is no `tsdown-entry` key. Each `package.json` `exports` map carries `{ sou
 
 ## Config ownership
 
-| File | Owns |
-|---|---|
-| `package.json` (root) | Workspaces list, `catalog` pins (dev tools: TS, tsdown, vitest, oxlint/oxfmt, pino, yaml) |
-| `nub.jsonc` | `source` condition, isolated linker, public hoists |
-| `turbo.json` | `build → ^build`; `lint/test/test:integration` need `^build`; `verify = build+lint+test` |
-| `config/tsconfig.base.json` | Strict TS, `hono/jsx`, `customConditions: ["source"]` |
-| `config/tsdown.ts` | `libConfig` / `cliConfig` |
-| `.oxlintrc.json` | Rule-based lint (no per-file path exemptions) |
-| `scripts/` | Release/publish tooling only (`release.mjs`, `jsr.mjs`, `public-packages.mjs`, `npm-trust-all.mjs`) |
+| File                        | Owns                                                                                                |
+| --------------------------- | --------------------------------------------------------------------------------------------------- |
+| `package.json` (root)       | Workspaces list, `catalog` pins (dev tools: TS, tsdown, vitest, oxlint/oxfmt, pino, yaml)           |
+| `nub.jsonc`                 | `source` condition, isolated linker, public hoists                                                  |
+| `turbo.json`                | `build → ^build`; `lint/test/test:integration` need `^build`; `verify = build+lint+test`            |
+| `config/tsconfig.base.json` | Strict TS, `hono/jsx`, `customConditions: ["source"]`                                               |
+| `config/tsdown.ts`          | `libConfig` / `cliConfig`                                                                           |
+| `.oxlintrc.json`            | Rule-based lint (no per-file path exemptions)                                                       |
+| `scripts/`                  | Release/publish tooling only (`release.mjs`, `jsr.mjs`, `public-packages.mjs`, `npm-trust-all.mjs`) |

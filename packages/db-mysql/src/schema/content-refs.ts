@@ -1,4 +1,5 @@
-import { int, mysqlTable, text, datetime } from "drizzle-orm/mysql-core";
+import { int, mysqlTable, text } from "drizzle-orm/mysql-core";
+import { datetime } from "./datetime.ts";
 
 /** Content-addressed storage refs for deduplicated Storybook assets. */
 export const contentRefs = mysqlTable("content_refs", {

@@ -1,11 +1,22 @@
 # Architecture Decision Records
 
 One ADR per concern, each stating the current decisions. `docs/architecture.md` remains the spec for
-entities and interfaces; ADRs record the decisions and the reasons.
+entities and interfaces; ADRs record the decisions and the reasons. Keep an ADR a decision record:
+target 250 lines, hard cap 320 (enforced by `nub run docs:check`). Move interface and implementation
+detail to `docs/architecture.md`.
 
-The earlier ADRs (0001 to 0036) are kept unchanged in [`archive/`](./archive/) under their original
-numbers and file names, because code comments, issues and pull requests refer to them. Each ADR below
-lists the archived ones it supersedes.
+## Numbering and references
+
+- **Current ADRs are 0001 to 0018 plus any new ADR from 0037.** Numbers 0001 to 0018 are permanent; do not renumber them.
+- **Archived ADRs are 0001 to 0036**, kept unchanged in [`archive/`](./archive/) under their original
+  numbers and file names because code comments, issues and pull requests refer to them.
+- **New ADRs start at 0037.** Never reuse a number from either range.
+- A bare `ADR NNNN` means a **current** ADR. Refer to an archived decision as
+  `archived ADR NNNN` (or link its file under `archive/`).
+- `nub run docs:check` validates numbering, references, links and the line cap. Do not edit files in
+  `archive/`.
+
+Each current ADR below lists the archived ones it supersedes.
 
 | ADR  | Title                                                    | Supersedes (archived)              |
 | ---- | -------------------------------------------------------- | ---------------------------------- |

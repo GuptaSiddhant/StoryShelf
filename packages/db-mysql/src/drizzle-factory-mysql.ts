@@ -89,6 +89,15 @@ async function updateOne<T extends Table>(
   }
 }
 
+/** mysql2 resolves `execute` to `[rows, fields]`; adapters expose just the rows. */
+async function allRows<T>(drizzle: DrizzleMySqlLike, query: SQL): Promise<T[]> {
+  const result: unknown = await drizzle.execute(query);
+  if (Array.isArray(result) && Array.isArray(result[0]) && result.length === 2) {
+    return result[0] as T[];
+  }
+  return result as T[];
+}
+
 /**
  * Build a {@link DatabaseAdapter} over any Postgres-compatible Drizzle
  * dialect. Mirrors `createDrizzleAdapter` with Postgres terminal shapes
@@ -134,7 +143,7 @@ export function createDrizzleMySqlAdapter(
       return rows as T["$inferSelect"][];
     },
     count: async (table: Table, where?: SQL): Promise<number> => await drizzle.$count(table, where),
-    all: async <T>(query: SQL): Promise<T[]> => await drizzle.execute<T[]>(query),
+    all: async <T>(query: SQL): Promise<T[]> => await allRows<T>(drizzle, query),
     transact: async <R>(fn: (tx: TxStore) => Promise<R>): Promise<R> =>
       await drizzle.transaction(async (tx) => await fn(buildTxStore(tx as DrizzleMySqlLike))),
   };

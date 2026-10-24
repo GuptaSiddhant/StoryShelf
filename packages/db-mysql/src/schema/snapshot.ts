@@ -1,15 +1,7 @@
 import type { SnapshotStatus } from "@storyshelf/core/types";
-import {
-  boolean,
-  double,
-  index,
-  int,
-  mysqlTable,
-  text,
-  datetime,
-  uniqueIndex,
-} from "drizzle-orm/mysql-core";
+import { boolean, double, index, int, mysqlTable, text, uniqueIndex } from "drizzle-orm/mysql-core";
 import { builds } from "./build.ts";
+import { datetime } from "./datetime.ts";
 import { projects } from "./project.ts";
 
 /** Narrow `snapshots` table definition. */

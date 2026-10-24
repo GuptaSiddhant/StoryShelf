@@ -1,4 +1,4 @@
-/** Whether a capture child is worth forking on this host (ADR 0031 phase 3 fallback rules). */
+/** Whether a capture child is worth forking on this host (ADR 0005 phase 3 fallback rules). */
 
 /** What the decision looks at. */
 export interface ForkHost {

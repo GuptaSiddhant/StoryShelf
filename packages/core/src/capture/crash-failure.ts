@@ -1,6 +1,6 @@
 /**
  * The terminal path for a capture job the forked parent gave up on because the child kept dying on
- * it (ADR 0031 phase 3). The child never got to record the failure, so the parent writes it: the
+ * it (ADR 0005 phase 3). The child never got to record the failure, so the parent writes it: the
  * build fails, or, for a shard, the shard row fails and the build is reduced like any other end.
  */
 import { BuildModel } from "../models/build.ts";

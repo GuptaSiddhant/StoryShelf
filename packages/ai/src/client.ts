@@ -51,7 +51,7 @@ export interface EffectiveSlot extends ResolvedSlot {
 }
 
 /**
- * Effective vision (ADR 0026 §3): a `vision` slot is assumed vision-capable
+ * Effective vision (ADR 0016 §3): a `vision` slot is assumed vision-capable
  * unless it declares `vision: false`; `vision: null` disables images; a base
  * slot only counts when it declares `vision: true`. The vision slot is used only
  * when images are actually sent; text-only calls use the task/default model.

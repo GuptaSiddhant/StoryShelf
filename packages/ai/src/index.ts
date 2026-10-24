@@ -1,5 +1,5 @@
 /**
- * `@storyshelf/ai`: the AI insights engine on the Vercel AI SDK (ADR 0026).
+ * `@storyshelf/ai`: the AI insights engine on the Vercel AI SDK (ADR 0016).
  *
  * Providers (`@ai-sdk/openai`, `@ai-sdk/anthropic`, Ollama, …) are installed by
  * the deployer and passed in as configured models; this package never sees keys.

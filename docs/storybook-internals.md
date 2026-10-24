@@ -291,7 +291,7 @@ render-finished signal rather than a clock:
   richer failure diagnostics than today's "play failed: <message>" — StoryShelf could record _where_
   in the interaction run a story failed.
 
-### 10.3 Drive stories like the manager (modes / args / globals) — modes shipped (ADR 0028)
+### 10.3 Drive stories like the manager (modes / args / globals) — modes shipped (ADR 0004)
 
 Chromatic-style **modes** are implemented, but through the URL rather than channel events:
 `iframe.html?...&globals=theme:dark;backgrounds.value:!hex(1E293B)` applies Storybook globals before

@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/ai",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "StoryShelf AI insights engine on the Vercel AI SDK: build triage and project health (providers are supplied by the deployer).",
   "keywords": [
     "ai",
