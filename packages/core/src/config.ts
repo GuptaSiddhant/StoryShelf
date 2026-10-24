@@ -389,7 +389,7 @@ export interface ShelfOptions {
    */
   testing?: ShelfTestingOptions;
   auth?: Auth;
-  /** AI insights surface (ADR 0026). Set ⇒ AI on site-wide; absent ⇒ off. */
+  /** AI insights surface (ADR 0016). Set ⇒ AI on site-wide; absent ⇒ off. */
   ai?: Ai;
   /** Design-tool providers (Figma, …) that resolve links, metadata and previews. */
   design?: DesignProvider[];

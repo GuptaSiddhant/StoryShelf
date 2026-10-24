@@ -1,5 +1,6 @@
-import { mysqlTable, text, datetime, uniqueIndex, index } from "drizzle-orm/mysql-core";
+import { mysqlTable, text, uniqueIndex, index } from "drizzle-orm/mysql-core";
 import { builds } from "./build.ts";
+import { datetime } from "./datetime.ts";
 import { projects } from "./project.ts";
 
 /** Narrow `project_links` table definition. */

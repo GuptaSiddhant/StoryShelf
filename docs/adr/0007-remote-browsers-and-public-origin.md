@@ -6,444 +6,227 @@ Accepted.
 
 Supersedes (archived): ADR 0033.
 
-Companion to ADR 0006 (Testing Option, Hosting-Only Mode and the Database Queue): there is one
-deployable and no separate worker, so remote browsers are how rendering scales, and every app
-instance runs the same configuration.
+Companion to ADR 0006: there is one deployable and no separate worker, so remote browsers are how
+rendering scales, and every app instance runs the same configuration.
 
 ## Context
 
-Capture is server-side (ADR 0004, Capture Pipeline): the runner extracts the uploaded Storybook,
-serves it from a static server on `127.0.0.1` (`runner-playwright/src/static-server.ts`) and drives a
-browser. A host that launches every browser locally pays for every browser, and can only render the
-engines it can install.
+Capture is server-side (ADR 0004): the runner extracts the uploaded Storybook, serves it from a
+loopback static server and drives a browser. A host that launches every browser locally pays for
+every browser and can only render the engines it can install.
 
-Hosted browser services offer the same engines (and more) on other machines: Azure App Testing's
-Playwright Workspaces, BrowserStack, LambdaTest, Browserless (hosted or self-hosted), Cloudflare
-Browser Rendering, AWS Bedrock AgentCore Browser, or a self-hosted `playwright run-server` on any
-cloud. They all expose a browser over a WebSocket, so a runner can drive one with the calls it
-already makes. Using them raises four problems:
+Hosted browser services offer the same engines on other machines: Azure App Testing, BrowserStack,
+LambdaTest, Browserless, Cloudflare Browser Rendering, AWS Bedrock AgentCore, or a self-hosted
+`playwright run-server`. They expose a browser over a WebSocket, so a runner can drive one with the
+calls it already makes. Four problems follow:
 
-1. **Connecting.** A runner has to be able to connect to a browser elsewhere, not only launch one.
-2. **Reachability.** The static server binds loopback only, so a remote browser cannot reach the
+1. **Connecting:** a runner must connect to a browser elsewhere, not only launch one.
+2. **Reachability:** the static server binds loopback, so a remote browser cannot reach the
    Storybook.
-3. **Fingerprint.** `detectCaptureEnvironment` (`core/src/utils/environment.ts`) reads `platform`
-   from `process.platform`/`process.arch` and `fontsHash` from `fc-list` on the machine running the
-   runner. For a remote browser both describe the wrong machine. Because a fingerprint mismatch is
-   accepted as an environment migration (ADR 0005, Capture Performance and Sharding), a fingerprint
-   that cannot see the remote machine would let a provider-side image change through without a diff
-   and, on the default branch, rewrite the baselines.
-4. **Local engines must be checked, not claimed.** A runner that advertises every engine name
-   whatever is installed fails mid-capture with a launch error for a project that picks a missing
-   engine, and crash isolation (`capture/isolate.ts`) then retries it as if a story had crashed. The
-   name `chrome` must also mean Chrome, not a fallback to bundled Chromium.
+3. **Fingerprint:** `detectCaptureEnvironment` reads `platform` and `fc-list` fonts from the runner
+   host. For a remote browser both describe the wrong machine, so a provider image change could pass
+   without a diff and rewrite default-branch baselines.
+4. **Local engines must be checked, not claimed:** advertising an engine that is not installed
+   fails mid-capture and crash isolation then treats it as a story crash. `chrome` must mean Chrome,
+   not bundled Chromium.
 
-Reaching the Storybook from providers that cannot tunnel needs an absolute URL to the published
-Storybook, which needs the deployment's public origin. Many platforms generate a deployment's URL,
-so an operator cannot always set `PUBLIC_BASE_URL` before the first deploy.
+Providers that cannot tunnel need an absolute URL to the published Storybook, which needs the
+deployment's public origin. Many platforms generate that URL, so an operator cannot always set
+`PUBLIC_BASE_URL` before the first deploy.
 
 ## Decision
 
 ### 1. A runner declares everything it can render in one `browsers` list
 
-`createPlaywrightCaptureRunner` and `createPuppeteerCaptureRunner` take `browsers`: a list of every
-**target** the runner offers, local and remote. An entry is one of:
+`createPlaywrightCaptureRunner` and `createPuppeteerCaptureRunner` take `browsers`: every target the
+runner offers, local and remote. An entry is:
 
-- a bare engine name, `"chromium"`: a local engine with the runner's defaults;
-- `local(engine, options)`: a local engine with options (Playwright's `channel`, Puppeteer's
+- a bare engine, `"chromium"`: a local engine with the runner's defaults;
+- `local(engine, options)`: a local engine with options (Playwright `channel`, Puppeteer
   `executablePath`);
-- a **remote preset**, one value standing for one remote service, which expands to one or more
-  targets (`playwrightServer(...)`, `azurePlaywright(...)`, `browserstack(...)`, `cdp(...)`, or the
-  generic `remote(...)`).
+- a **remote preset** (`playwrightServer`, `azurePlaywright`, `browserstack`, `cdp`, or generic
+  `remote`), which expands to one or more targets.
 
-The runner flattens the list into its targets. It is a list, not an object keyed by target, so that
-two entries producing the same target are visible to the runner and rejected (an object spread
-would overwrite one silently).
+The runner flattens the list and rejects duplicate targets, so two entries producing the same
+target are visible rather than silently overwritten.
 
-- **Default:** omitted, `browsers` is `["chromium"]`. Firefox and WebKit are offered only when an
-  operator who provisioned them lists them.
-- **Primary target:** the first target of the flattened list is the runner's default, what a
-  project with no `browsers` setting resolves to.
-- **Projects keep their stored targets.** Every project row stores a `browser` (default
-  `'chromium'`) and optionally `browsers`, so the runner's default applies to new projects only: a
-  project created through an instance starts with that runner's default target. A project that
-  names a target the runner does not offer fails its builds at once, with that reason
-  (`assertSupportedBrowsers` at capture time), and the System page lists such projects.
-- **No local engines:** a list with no bare or `local()` entries has none; the host needs no
-  installed browsers (decision 7).
-- **Remote mechanics:**
-  - Playwright: `browserType.connect(endpoint, { headers, exposeNetwork })` for services that speak
-    Playwright's own protocol (all three engines), or `chromium.connectOverCDP(endpoint, { headers })`
-    for Chrome-DevTools-only services (Chromium only).
-  - Puppeteer: `puppeteer.connect({ browserWSEndpoint, headers })`.
-  - Browser recycling (`recycleBrowserEvery`) opens a new remote session instead of relaunching.
-  - `connectOverCDP` is a fallback: it is significantly lower fidelity than `browserType.connect()`.
-    It stays as the Chromium-only route for services with no other protocol, and it is acceptable
-    because such a target is its own engine with its own baselines and fingerprint (decisions 2 and
-    3), so a fidelity difference is never compared against a local render.
-- **Presets are plain configuration, not packages.** Each is a function returning
-  `{ name, protocol, endpoint, headers, exposeNetwork?, sessions, engines }`. A provider-specific
-  package is justified only for something a connect endpoint cannot do (real devices and real
-  Safari, which go through WebDriver/Appium, ADR-worthy on their own).
-- **`engines` picks a subset** of what the service offers; without it a preset offers all of them.
-  A Chromium-only service cannot offer `firefox`, which fails when the runner is created.
-- **Credentials are operator-level only**: passed to the preset in the server's code, from the
-  environment or a secret manager, like every other adapter's credentials. Per-project credentials
-  (a project owner bringing their own provider account through user connections, ADR 0011,
-  Authentication and Access) are a later step.
+- **Default:** omitted, `browsers` is `["chromium"]`; Firefox and WebKit are offered only when
+  provisioned and listed.
+- **Primary target:** the first flattened target is the runner's default and what a project with no
+  `browsers` setting resolves to.
+- **Projects keep stored targets.** A project stores `browser` (default `'chromium'`) and optionally
+  `browsers`. A project naming a target the runner does not offer fails its builds at once
+  (`assertSupportedBrowsers`), and the System page lists it.
+- **No local engines:** a list with no bare or `local()` entries needs no installed browsers
+  (decision 7).
+- **Remote mechanics:** Playwright uses `browserType.connect(endpoint, { headers, exposeNetwork })`
+  for its own protocol, or `chromium.connectOverCDP` for Chromium-only services; Puppeteer uses
+  `puppeteer.connect`. `connectOverCDP` is lower fidelity but safe because the target has its own
+  baselines and fingerprint. Browser recycling opens a new session instead of relaunching.
+- **Presets are plain configuration, not packages:** a function returning
+  `{ name, protocol, endpoint, headers, exposeNetwork?, sessions, engines }`. A provider package is
+  justified only for something a connect endpoint cannot do (real devices, real Safari).
+- **`engines` picks a subset** of what a service offers; a Chromium-only service cannot offer
+  Firefox and fails at runner creation.
+- **Credentials are operator-level only**, like every adapter's; per-project provider accounts are a
+  later step (ADR 0011).
 
 ### 2. A remote browser's environment is measured inside the browser
 
-For a remote target the runner reports `CaptureEnvironment` from the browser it drove, never from
-the host running the runner:
+For a remote target the runner reports `CaptureEnvironment` from the browser it drove, never the
+host:
 
-- `browserVersion`: `browser.version()`, which works over a connection.
-- `platform`: the OS the preset requested, confirmed from the page (`navigator.userAgentData` /
-  `navigator.platform`); never `process.platform`.
-- `deviceScaleFactor`: `window.devicePixelRatio` from the page.
-- `fontsHash`: a digest computed in the page over a fixed probe list of font families
-  (`document.fonts.check`), or omitted. `fc-list` describes the host and is not used.
+- `browserVersion`: `browser.version()`.
+- `platform`: the preset's requested OS, confirmed from the page (`navigator.userAgentData` /
+  `navigator.platform`), never `process.platform`.
+- `deviceScaleFactor`: `window.devicePixelRatio`.
+- `fontsHash`: a digest computed in the page over a fixed font probe, never `fc-list`.
 
-A field the runner cannot determine is omitted, and the rule that an unknown fingerprint component
-is not a change (ADR 0005) keeps an omission from reading as a migration.
+A field the runner cannot determine is omitted; an unknown fingerprint component is not a change
+(ADR 0005), so omission cannot read as a migration.
 
 ### 3. Remote captures are their own engine, and a target's name is data
 
-A remote target is named `<engine>@<name>`, where `<name>` is the preset's `name` option or its
-fixed default (`browserstack`, `grid`, ...): `chromium@browserstack`. It gets its own baselines (the
-per-engine baselines of ADR 0004) and never compares against a local render of the same engine:
-different hosts, fonts and GPU paths would turn every comparison into noise or, worse, into
-migrations. Moving a project from local to remote is an explicit "new engine" bootstrap, as enabling
-a new local engine is.
+A remote target is `<engine>@<name>`, where `<name>` is the preset's `name` or fixed default
+(`chromium@browserstack`). It gets its own baselines and never compares against a local render:
+different hosts, fonts and GPU paths would turn comparison into noise or migrations. Moving local to
+remote is an explicit new-engine bootstrap.
 
-The name is stored: it is the value of `snapshots.browser` and part of every baseline key (the
-per-engine storage key `<mode>~<browser>` carries the full target). So it comes only from `name` or
-the preset's fixed default, never from anything that changes (the OS, a browser version, the
-endpoint URL), and renaming a target starts fresh baselines for it, as switching engines does.
+The name is stored in `snapshots.browser` and every baseline key, so it comes only from `name` or a
+fixed default, never from the OS, browser version or endpoint. Renaming starts fresh baselines.
 
-- Two entries of one preset (Windows and macOS on BrowserStack) need an explicit `name` on at least
-  one; a collision fails when the runner is created, naming both entries. Operators who may ever have
-  two should set `name` before the first build.
-- A `name` is limited to lowercase letters, digits and hyphens, starts with a letter or digit and is
-  at most 32 characters, because it becomes part of a storage key and a unique index; anything else
-  fails when the runner is created.
+- Two entries of one preset need an explicit `name` on at least one; a collision fails at runner
+  creation, naming both entries.
+- A `name` is lowercase letters, digits and hyphens, starts alphanumeric, at most 32 characters,
+  because it becomes part of a storage key and unique index.
 
 ### 4. Concurrency is counted in sessions, and session failures are retried
 
-- For a remote target, the page limiter uses a fixed cap from the preset (`sessions`, the plan's
-  parallel-session limit) instead of sizing pages from local CPU and memory
-  (`utils/page-limiter.ts`). One render call may hold several sessions; shards (ADR 0005) map onto
-  sessions naturally.
-- **The limit is per target and per process.** Remote targets share one limiter per target for the
-  whole process, and `sessions` bounds it, so concurrent shards do not multiply the cap.
-- Connection-level failures (a dropped WebSocket, "no capacity", a session that never starts) are
-  retried with backoff before the render pass sees them. Crash isolation (`capture/isolate.ts`) only
-  ever sees a browser that died while rendering, so a provider outage is not treated as a story
-  crash.
+- A remote target's page limiter uses the preset's fixed `sessions` cap instead of CPU/memory
+  sizing. One render call may hold several sessions; shards map onto sessions naturally.
+- **The limit is per target and per process**, so concurrent shards do not multiply the cap.
+- Connection-level failures (dropped WebSocket, no capacity, a session that never starts) are
+  retried with backoff before the render pass sees them. Crash isolation only sees a browser that
+  died while rendering, so a provider outage is not a story crash.
 
 ### 5. Reaching the Storybook: `exposeNetwork` first, signed URLs otherwise
 
-- **Playwright `connect` providers that support it** (Azure Playwright Workspaces, a self-hosted
-  Playwright server): pass `exposeNetwork: "<loopback>"`. The remote browser's requests for
-  `127.0.0.1` are routed back through the connection to the host, so the static server works
-  unchanged. Nothing new is exposed.
-- **Everyone else** (CDP-only services, Puppeteer, providers that only offer a tunnel): the runner is
-  given a **signed URL** to the build's published Storybook instead of the loopback server.
+- **Playwright `connect` providers that support it** (Azure, self-hosted Playwright server): pass
+  `exposeNetwork: "<loopback>"`; the remote browser's `127.0.0.1` requests route back through the
+  connection to the host, so the static server works unchanged.
+- **Everyone else** (CDP-only, Puppeteer, tunnel-only providers): the runner gets a **signed URL** to
+  the build's published Storybook.
 
-**Signed URL shape.** The token is a path prefix, because a Storybook loads `iframe.html` and then
-many assets by relative path; a token on a single file URL would not reach them:
+**Shape.** The token is a path prefix because a Storybook loads `iframe.html` and assets by relative
+path:
 
 ```
 <publicOrigin>/_s/<token>/
 ```
 
-The URL core hands a runner is this directory root; the runner opens `iframe.html` under it.
+The runner opens `iframe.html` under that root. The app strips `/_s/<token>`, checks the token and
+serves the build's static files through the same handler and access rule as published Storybook
+routes, with the token as the grant. It never serves the wrapper page for an empty path.
 
-The app strips the `/_s/<token>` prefix, checks the token, and serves the build's static files
-through the same file handler and access rule as the published Storybook routes
-(`app/src/routers/published-files.ts`, `published-access.ts`), with the token as the grant. It never
-serves the wrapper page those routes return for an empty path. (The path form first drafted here,
-`/s/<token>/projects/<slug>/storybook/build/<buildId>/...`, was dropped: see the notes.)
+**Token:** `base64url(projectId, buildId, expiresAt) + "." + HMAC-SHA256(key, same)`, verified
+statelessly; it grants read-only access to one build's static files and nothing else.
 
-**Token.** `base64url(projectId, buildId, expiresAt) + "." + HMAC-SHA256(key, same)`. It is verified
-statelessly and grants read-only access to one build's static files and nothing else (no wrapper
-page, no API, no other build).
+- **Key:** derived from `config.secret` with the fixed context `storyshelf/storybook-url/v1`, so it
+  cannot be confused with a session or another signature. Without a secret every `reach: "url"`
+  target is unavailable (`no secret`). During rotation `previousSecret` verifies but never signs.
+- **Expiry:** minted when a render pass starts, lifetime from that pass's render budget plus a
+  5-minute grace, floored at 2 hours and capped at 24 hours. A project may override
+  `storybook_url_ttl_seconds` (`storybookUrlTtlOverrideError`, floor 1050 s, ceiling 86400); there is
+  no instance option. A pass that would outlast its token is rendered in slices, each minting a
+  fresh URL.
+- **Where:** `render` and `extractParameters` inputs both carry `storybookUrl`.
+- **Hygiene:** the token is redacted from logs, attempt records, errors, span attributes and
+  `Referer`; refusals are one identical `404` with `Cache-Control: private, no-store`.
 
-- **Key.** Derived from `config.secret` with a fixed context string (`storyshelf/storybook-url/v1`),
-  so a token can never be confused with a session or any other signature. Without a `secret`, every
-  `reach: "url"` target is `unavailable: "no secret: ..."`. During a rotation a token is also accepted if
-  it verifies against `previousSecret`.
-- **Expiry.** A token is minted when a render pass starts, with a lifetime derived from that pass:
-  its render budget (`renderBudgetMs`, which grows with the number of captures) plus a grace of
-  5 minutes, never below 2 hours and never above 24 hours. A project can override it
-  (`projects.storybook_url_ttl_seconds`, `MIN_STORYBOOK_URL_TTL_OVERRIDE` (1050: one minimum slice of
-  `MIN_CAPTURES_PER_SLICE` captures at `PER_CAPTURE_BUDGET_MS` each plus the grace) to 86400, admin only;
-  `storybookUrlTtlOverrideError` is the single check behind the project API, the settings form and its
-  hint, so a slice always fits inside its token). There is no instance-wide option
-  (the earlier `testing.storybookUrlTtl` is gone).
-- **Where it applies.** The render request and the `extractParameters` input both carry
-  `storybookUrl`.
-- **Hygiene.** The token is redacted from logs, attempt records, and the error messages the runner
-  surfaces.
-
-Published Storybooks on `publishedBaseDomain` subdomains (ADR 0010, Projects, Published Storybook
-and Labels) are not used for signed URLs: the app builds those links (`core/src/urls.ts`) but does
-not serve those hosts itself, so whether a subdomain reaches this app depends on a proxy outside it.
+Published Storybooks on `publishedBaseDomain` subdomains are not used for signed URLs: the app
+builds those links but does not serve those hosts, so reachability depends on an external proxy.
 
 ### 6. The public origin is resolved from a chain, and learnt on first admin use
 
-Anything that needs an absolute URL in the background (signed Storybook URLs, email links,
-commit-status links) asks one resolver, which tries in order:
+Anything needing an absolute URL in the background (signed URLs, email links, commit-status links)
+asks one resolver, which tries in order:
 
 1. **Explicit configuration:** `config.publicBaseUrl`.
-2. **Platform environment variables**, mapped by a `detectPublicBaseUrl(env)` helper in core next to
-   `detectResources()`. Platforms that publish their own address include Heroku
-   (`HEROKU_APP_DEFAULT_DOMAIN_NAME`, with the `runtime-dyno-metadata` Labs feature), Railway
-   (`RAILWAY_PUBLIC_DOMAIN`, when the service has a domain), Vercel, Netlify, Render, Fly.io, Azure
-   App Service, Azure Container Apps and DigitalOcean App Platform; the exact variables are pinned in
-   the helper's tests. Cloud Run's URL is deterministic but not injected; AWS App Runner, Lambda
-   function URLs and Cloudflare Workers expose none. These give the platform's own domain, which is
-   a working fallback but the wrong link when a custom domain fronts the app.
+2. **Platform environment variables** via `detectPublicBaseUrl(env)`: Heroku, Railway, Vercel,
+   Netlify, Render, Fly.io, Azure App Service/Container Apps, DigitalOcean. These give the
+   platform's domain, a working fallback but the wrong link behind a custom domain. Cloud Run, App
+   Runner, Lambda function URLs and Workers expose none.
 3. **The origin an authenticated admin actually used.** The System page reports the browser's
-   `location.origin` back to the app (a same-origin, CSRF-protected POST from the page's existing
-   script layer), the app stores it as **unconfirmed**, and the page shows it as "Public origin
-   detected, not confirmed" for the admin to confirm or replace. An unconfirmed origin is not
-   resolved: no background link, notification or signed URL uses it until an admin confirms it. The browser's view is used, not the server's: the app does no proxy
-   normalization, so behind a TLS-terminating proxy `c.req.url` is the internal `http://host:port`.
-   Background jobs, which run inside an app instance, read the stored value from the database. The
-   value lives in a small `site_settings` key-value table (DDL in the three dialects and a
-   `siteSettings` key in `Tables`) and is written only through a site-admin, CSRF-protected route.
-   With authentication disabled there is no admin, so nothing is learnt and the origin must come
-   from configuration or the platform.
+   `location.origin` through a same-origin, CSRF-protected POST; the app stores it as
+   **unconfirmed** and the page asks the admin to confirm or replace it. An unconfirmed origin is
+   not resolved: no background link, notification or signed URL uses it. The browser's view is used
+   because behind a TLS proxy `c.req.url` is the internal address. The value lives in
+   `site_settings`, written only by a site-admin CSRF route. With auth disabled nothing is learnt;
+   the origin must come from configuration or the platform.
 
-**Nothing resolved does not stop the app.** Targets that need a URL (`reach: "url"`) are
-`unavailable: "no public origin: ..."` until a confirmed one resolves, so a first deploy starts, an
-admin opens the System page and confirms the address, and the targets become ready. Without a resolved origin, notification links that need
-one are omitted.
+**Nothing resolved does not stop the app.** `reach: "url"` targets are unavailable with
+`no public origin` until a confirmed one resolves, so a first deploy starts, an admin confirms the
+address and the targets become ready. Without an origin, notifications that need one are not sent
+(ADR 0014, decision 11).
 
 The `Host` / `X-Forwarded-Host` of an arbitrary request is never used: a background job has none,
-and both can be forged to plant attacker-controlled links in emails and commit statuses. Commit
-status links (ADR 0014, Git Hosts and Notifications) are built absolute through the same resolver,
-and `target_url` is omitted when no origin is known.
+and both can be forged to plant attacker-controlled links. Commit-status links use the same resolver
+and omit `target_url` when no origin is known.
 
 ### 7. Local engines are declared and verified, and can be absent
 
-Declaring an engine does not prove it is installed, so the runner checks. When it starts, each local
-target is verified without launching anything: Playwright asks the browser type for its
-`executablePath()` and checks that the file exists; Puppeteer checks its configured executable
-(`puppeteer-core` ships no browser, so a Puppeteer runner with no `executablePath` has its local
-targets `unavailable`). The result is part of the runner's metadata, per target, `ready` or
-`unavailable` with a reason, and is shown on the System page ("firefox: declared, not installed").
+Declaring an engine does not prove it is installed, so the runner checks at startup without
+launching: Playwright asks for `executablePath()` and checks the file exists; Puppeteer checks its
+configured executable (`puppeteer-core` ships none). The result is per-target metadata, `ready` or
+`unavailable` with a reason, shown on the System page.
 
-- A project setting that names an unavailable target is refused when it is saved, with the reason.
-- The existence check cannot see missing system libraries. A launch that fails anyway marks the
-  target unavailable with the launch error, and the job fails at once with that error instead of
-  being retried through crash isolation: a launch failure is not a story's fault.
-- `chrome` is real Chrome. In Playwright, a bare `"chrome"` or `local("chrome", { channel: "chrome" })`
-  launches with the `chrome` channel (it needs `playwright install chrome`); in Puppeteer it needs an
-  `executablePath`, and a bare `"chrome"` without one fails when the runner is created.
+- A project setting naming an unavailable target is refused at save with the reason.
+- The check cannot see missing system libraries. A launch that fails marks the target unavailable
+  and fails the job at once with that error, not through crash isolation.
+- `chrome` is real Chrome. Playwright uses the `chrome` channel (`playwright install chrome`);
+  Puppeteer needs an `executablePath`, and a bare `"chrome"` without one fails at runner creation.
 
-With no local entries the host needs no browsers at all (`playwright-core` only, no
-`playwright install`), which removes the browsers' memory and CPU, by far the largest part of a
-capture host's load. It does not make the host idle. What still runs locally:
+With no local entries the host needs no browsers (`playwright-core` only), removing the largest
+capture-host load. Still local: diffing (ADR 0008), parameter extraction on the primary target,
+unzip/static serving for `exposeNetwork`, and screenshot transfer.
 
-- **Diffing.** PNG decode, `pixelmatch` and overlay encode run in the diff worker pool on this host
-  (ADR 0008, Image Diff Engines).
-- **Parameter extraction.** `extractParameters` opens one page to read Storybook's resolved
-  parameters before rendering (`runner-playwright/src/capture-runner.ts`); with no local engines it
-  runs on the project's primary target (`browsers[0]`). Only the Playwright runner implements it.
-- **Extraction and serving.** Unzipping the build to scratch and, for `exposeNetwork` targets,
-  serving it to the remote browser over the connection.
-- **Screenshot transfer.** Every PNG comes back over the WebSocket and is written to storage.
-
-Legacy snapshot and baseline rows with no `browser` mean local `chromium`: that is what produced
-them.
+Legacy snapshot and baseline rows with no `browser` mean local `chromium`.
 
 ## API
 
-### Operator: declaring what a runner offers
-
-Playwright, local engines only (the common case):
+A runner declares targets once; presets are sugar over one generic constructor:
 
 ```ts
-import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
-
-createPlaywrightCaptureRunner({ browsers: ["chromium", "firefox", "webkit"] });
-// omitted → ["chromium"]
-```
-
-The binaries are provisioned separately; `playwright-core` never downloads them:
-
-```sh
-# once per machine or image, pinned to your playwright-core version
-npx -y playwright@<version> install --with-deps chromium firefox webkit
-```
-
-Mixing local and remote targets, with a preset per service:
-
-```ts
-import { createPlaywrightCaptureRunner, local } from "@storyshelf/runner-playwright";
-import {
-  azurePlaywright,
-  browserstack,
-  playwrightServer,
-} from "@storyshelf/runner-playwright/remote";
-
 const runner = createPlaywrightCaptureRunner({
   browsers: [
-    "chromium", // local; the first target is the default for projects with no setting
+    "chromium",
     local("chrome", { channel: "chrome" }),
     playwrightServer({
       name: "grid",
       endpoint: "ws://playwright:3000/",
-      exposeNetwork: "<loopback>", // reaches the 127.0.0.1 Storybook server; no signed URL needed
-      sessions: 8, // concurrency cap; replaces CPU/memory-based page sizing
-    }), // → chromium@grid, firefox@grid, webkit@grid
-    azurePlaywright({
-      endpoint: process.env.PLAYWRIGHT_SERVICE_URL!,
-      token: process.env.PLAYWRIGHT_SERVICE_ACCESS_TOKEN!,
-      os: "linux",
-      sessions: 20,
-    }), // → chromium@azure, firefox@azure, webkit@azure
+      exposeNetwork: "<loopback>",
+      sessions: 8,
+    }),
     browserstack({
-      username: process.env.BROWSERSTACK_USERNAME!,
-      accessKey: process.env.BROWSERSTACK_ACCESS_KEY!,
+      username,
+      accessKey,
       os: { name: "Windows", version: "11" },
       engines: ["chromium", "chrome"],
       sessions: 5,
-      // no exposeNetwork: this service needs a signed Storybook URL (decision 5)
-    }), // → chromium@browserstack, chrome@browserstack
-    browserstack({
-      name: "bs-mac", // a second entry of one preset needs its own name
-      username: process.env.BROWSERSTACK_USERNAME!,
-      accessKey: process.env.BROWSERSTACK_ACCESS_KEY!,
-      os: { name: "OS X", version: "Sonoma" },
-      engines: ["webkit"],
-    }), // → webkit@bs-mac
-  ],
-});
-
-createShelfApp({ database, storage, testing: { runner } });
-```
-
-Every preset is sugar over one generic constructor, so a provider without a preset needs no new
-release:
-
-```ts
-remote({
-  name: "mygrid",
-  engines: ["chromium", "firefox", "webkit"],
-  connect: (engine: BrowserName) => ({
-    protocol: "playwright", // or "cdp" (Chromium only)
-    endpoint: "wss://…",
-    headers: { authorization: "Bearer …" },
-    exposeNetwork: "<loopback>", // omit when the service cannot route back to us
-  }),
-  sessions: 4,
-  platform: "linux-x64", // reported in the fingerprint when the page cannot tell (decision 2)
-});
-```
-
-Puppeteer takes the same option with its own constraints: Chromium-family engines only, `local()`
-takes an `executablePath`, and remote entries are CDP only with no `exposeNetwork`, so every
-Puppeteer remote target needs a signed URL:
-
-```ts
-import { createPuppeteerCaptureRunner, local } from "@storyshelf/runner-puppeteer";
-import { cdp } from "@storyshelf/runner-puppeteer/remote";
-
-createPuppeteerCaptureRunner({
-  executablePath: "/usr/bin/chromium", // the executable bare entries launch
-  browsers: [
-    "chromium", // uses the runner's `executablePath`
-    local("chrome", { executablePath: "/usr/bin/google-chrome" }),
-    cdp({
-      name: "cloudflare",
-      endpoint: "wss://…",
-      headers: { authorization: `Bearer ${token}` },
-      sessions: 4,
     }),
-    // → chromium@cloudflare
   ],
-  args: ["--no-sandbox"], // local engines only; replaces the default low-memory flags
 });
 ```
 
-`local("firefox")` on the Puppeteer runner fails when the runner is created: this runner cannot
-drive it. Presets validate eagerly: a CDP-only preset offering `firefox`, an empty list, or two
-entries with one target throws at creation, not when the first build runs.
+A project's `browsers` is a list of capture targets (`BrowserName | <engine>@<name>`), capped at
+`MAX_BROWSERS` (3). Saving a target the runner does not offer or that is unavailable is rejected at
+save with the offered list. `snapshots.browser` and baseline keys are text, so no schema change is
+needed; `resolveBrowsers` returns targets, and `parseTarget` splits engine and name.
 
-There is deliberately one runner per server (see Alternatives).
-
-### Project: choosing targets
-
-The project's `browsers` setting is a list of **capture targets**:
-
-```ts
-type CaptureTarget = BrowserName | `${BrowserName}@${string}`;
-
-// Settings → Capture, or the project update API:
-//   { "browsers": ["chromium", "chromium@browserstack", "webkit@grid"] }
-```
-
-- The engine half is checked against `BROWSER_NAMES`, the name half against the runner's targets;
-  `MAX_BROWSERS` (3) counts targets.
-- Saving a target the runner does not offer, or that is `unavailable`, is rejected at save time with
-  the list of targets it does offer.
-- `snapshots.browser` and baseline keys are text, so a target needs no schema change; each target
-  gets its own baselines (decision 3).
-- `BrowserName` is the type of a rendering engine; everything that stores, compares or validates a
-  project's engines uses `CaptureTarget`, with no aliases. `resolveBrowsers` returns targets; code
-  that launches or connects splits a target into its engine and name with one helper
-  (`parseTarget`).
-
-### Contract between core and the runner
-
-```ts
-interface CaptureRunnerMetadata {
-  // the first entry is the default target
-  targets: readonly {
-    target: CaptureTarget;
-    reach: "loopback" | "url"; // how the browser reaches the Storybook (decision 5)
-    status: "ready" | { unavailable: string }; // decision 7
-  }[];
-}
-
-interface RenderRequest {
-  target: CaptureTarget;
-  storybookDir: string; // always: the extracted build on this host
-  storybookUrl?: string; // set by core for `reach: "url"` targets: a signed, absolute URL
-  // …other fields as in ADR 0004
-}
-```
-
-For a `reach: "url"` target, core mints the token, resolves the public origin (decision 6) and puts
-`storybookUrl` on the render request and on the `extractParameters` input; the runner navigates there
-instead of to its loopback server. While no confirmed public origin resolves, or no `secret` is
-set, such a target is `unavailable` (the reason says what to set): a settings save that names it is refused and a build of a project that
-already does fails at once with that reason, so builds never fail one by one with an unexplained
-error.
-
-### Scaling out
-
-There is no separate worker (ADR 0006): every app instance runs the same `testing` configuration, so
-every instance has the same `browsers` list and validates project settings against the runner it
-already holds. Rendering scales on the browser side, not by adding processes that need database
-access.
-
-- **Pools that differ are presets.** A Firefox and WebKit pool and a Chromium pool are two presets
-  with their own endpoints (`firefox@pool-b`, `chromium@pool-a`). Each target maps to its endpoint, so
-  no job routing is needed, and one job still renders all of a project's engines.
-- **`sessions` is per app instance.** When several instances share one provider plan, the operator
-  divides the provider's parallel-session limit among them. For a self-hosted farm the cap belongs at
-  the farm (Browserless's `CONCURRENT` and `QUEUED`, or a proxy in front of a Playwright server). A
-  shared limit across instances (session leases in the database) is not built; it is added only if
-  over-provisioning when the app scales turns out to be a real problem. A provider refusing a session
-  for capacity is retried with backoff (decision 4), so exceeding the limit costs time, not builds.
-- **A target an instance does not offer cannot reach a job,** because instances share one
-  configuration and a settings save for an unknown or unavailable target is refused (decision 7).
-- **Self-hosted farm.** The official Playwright image running `playwright run-server`, pinned to the
-  same version as `playwright-core`, or Browserless, with a token and a concurrency cap in front
-  (ADR 0006). A clear error at connect time names both versions when client and server differ.
+For a `reach: "url"` target, core mints the token, resolves the origin and puts `storybookUrl` on
+`render` and `extractParameters`; the runner navigates there instead of its loopback server. While
+no confirmed origin or secret exists, the target is unavailable: a settings save naming it is
+refused and a build of a project that already has it fails at once.
 
 ## Consequences
 
@@ -451,159 +234,51 @@ access.
 
 - Any connect-capable provider works through one code path and a preset; adding a provider is
   configuration, not a package.
-- With `exposeNetwork`, remote capture needs no new public surface at all.
-- Remote captures are never compared against local ones, and their fingerprint describes the
-  machine that rendered them, so provider image changes are diffed, not waved through.
-- The public origin is not a first-deploy chicken-and-egg problem, and email and commit-status links
-  get a correct absolute origin even without remote browsers.
+- With `exposeNetwork`, remote capture needs no new public surface.
+- Remote captures are never compared with local ones, and their fingerprint describes the rendering
+  machine, so provider image changes are diffed, not waved through.
+- The public origin is not a first-deploy chicken-and-egg problem; email and commit-status links get
+  a correct absolute origin even without remote browsers.
 
 **Negative**
 
-- **Breaking default.** The Playwright runner offers only Chromium unless told otherwise. A server
-  whose projects use Firefox or WebKit stops offering them until the operator lists them in
-  `browsers`; the System page and the save-time refusal make that visible, and the upgrade notes say
-  it.
-- Each screenshot crosses the internet: slower per page than a local browser, paid back only by
-  parallelism the operator does not have to host.
-- Provider browser builds move. The fingerprint catches it, but every move is a baseline migration on
-  the default branch; pinning the browser version in the preset is the operator's job.
+- **Breaking default:** the Playwright runner offers only Chromium unless told otherwise. Servers
+  using Firefox/WebKit stop offering them until the operator lists them; the System page and
+  save-time refusal make it visible, and upgrade notes say it.
+- Each screenshot crosses the internet: slower per page, paid back only by parallelism the operator
+  does not host.
+- Provider browser builds move. The fingerprint catches it, but every move is a default-branch
+  migration; pinning is the operator's job.
 - The signed-URL route is a new way to read a private Storybook from outside. It is narrow (one
-  build, static files, short expiry) and was written for review: the points to check are listed in
-  the implementation notes (#228).
+  build, static files, short expiry) but security-sensitive.
 - The customer's Storybook, possibly unreleased UI, is rendered by a third party. Remote capture is
   opt-in per project.
-- Playwright `connect` requires compatible client and server versions, which ties `playwright-core`
-  upgrades to each provider's supported range.
+- Playwright `connect` needs compatible client/server versions, tying `playwright-core` upgrades to
+  each provider's range.
 
 ## Alternatives considered
 
-- **One package per provider** (`runner-browserstack`, …). Rejected: every provider would re-solve
-  the same problems; the differences are an endpoint and its capabilities.
-- **A tunnel binary** (BrowserStack Local, Sauce Connect) as the only way in. Kept as a preset option,
-  not the default: it is an extra process per host, and signed URLs cover the same need without
-  third-party software.
-- **Public URL from the `Host` header.** Rejected: forgeable, and absent in background work.
-- **A `remotes` object plus `local` and `defaultTarget` options.** Rejected for the single `browsers`
-  list: operators also need to say which engines are available locally, the first entry already
-  defines the default, and a list lets the runner reject duplicates that an object spread would hide.
-- **Several runner types at once (`composeRunners`).** Rejected. The orchestrator renders one engine
-  at a time per job, so there is no parallelism between runner types to gain; the real reason to mix
-  (local plus several remote services) is already one runner with a `browsers` list; Puppeteer next
-  to Playwright saves nothing, since Playwright's headless Chromium is also chrome-headless-shell; and
-  rendering one engine with two runners lets browser version and fonts differ, which the fingerprint
-  reads as a migration.
-- **Per-engine worker pools.** Not needed: pools are presets with their own endpoints (see Scaling
-  out). Routing jobs to pools would need engine-level jobs, against the sharding rule that keeps a
-  story's engines in one shard so a newly enabled engine can bootstrap from its sibling (ADR 0005).
-- **WebdriverIO as the remote runner.** Deferred: the right tool for real devices and real Safari,
-  wrong as the default (sessions instead of pages, unpinned browser builds). A future ADR if device
-  coverage is needed.
-
-## Implementation notes
-
-Landed so far: the runner `browsers` list with bare engines and `local()`, `CaptureTarget`, the
-installed-engine check and the `chrome` fix (decisions 1, 3 and 7, #225), and the public-origin
-resolver with `site_settings` (decision 6, #227); remote connect, presets, in-browser
-fingerprints, session limits, retries and `exposeNetwork` (decisions 1 to 5, #226). Signed URLs
-(decision 5, #228): `RunnerTarget.reach` is `"url"` for a remote target that cannot route back,
-`offeredTargets` (`core/src/capture/targets.ts`) marks such targets `unavailable` until a `secret` and
-a public origin exist, and core now mints the URL (see "Signed URLs" below). Choices the text left open:
-
-- **Where the code is.** `defineRemote` and the `RemoteBrowser` shape live in core
-  (`adapters/remote-browser.ts`) so both runners validate alike; the presets are in the runners'
-  `./remote` subpaths (`remote`, `playwrightServer`, `azurePlaywright`, `browserstack`; `cdp` for
-  Puppeteer). `sessions` defaults to 1 and `playwrightServer` defaults `exposeNetwork` to
-  `"<loopback>"`. A `RemoteOptions` also takes `connectRetries` (3), `connectBackoffMs` (500) and
-  `connectTimeoutMs` (30 000).
-- **The fonts digest does not use `document.fonts.check`.** It answers `true` for a family that does
-  not exist, so it cannot tell installed fonts from missing ones. The probe measures text in a canvas
-  against the generic family it would fall back to, over a fixed list of 44 families, in a blank page.
-- **A failed connect is `transient` or not.** A service that is down (refused, timed out, no
-  capacity) fails the job at once but leaves the target offered; refused credentials and a version
-  mismatch mark it `unavailable` like a failed local launch.
-- **`storybookUrl` is the build's Storybook root**, `<origin>/_s/<token>/` only (see the last of
-  these notes); `storybookBase` reduces it to the directory `iframe.html` is served under and
-  refuses every other form.
-- **Spike results (a bare `playwright run-server`, 1.63).** No authentication: the `--path` is the only
-  gate and a wrong path is refused at the handshake with `400`. `--max-clients` queues a connection over
-  the cap instead of refusing it, so a full farm shows up as a connect timeout. A version mismatch is
-  refused with `428` and a message naming both versions (major and minor). `exposeNetwork:
-"<loopback>"` works against it, so a self-hosted server is a `reach: "loopback"` target.
-
-- **Signed URLs (#228, #275).** The URL core hands a runner is the directory root
-  `<publicOrigin>/_s/<token>/`, not the `.../projects/<slug>/storybook/build/<buildId>/iframe.html`
-  shape first sketched in decision 5: the token already names the project and the build, so a slug in
-  the path is one more thing to check against it and nothing to gain (the owner confirmed the short
-  form in #275). The prefix is `/_s/` (`STORYBOOK_TOKEN_PREFIX`), not `/s/`, and cannot collide with
-  the `/_/:id` short link. `GET /_s/<token>/<file>` is its own route
-  (`app/src/routers/signed-storybook.ts`) that verifies the token and then serves through the same
-  handler and policy as the published Storybook routes (`publishedAccess`, `servePublishedFile`);
-  the token module owns the prefix, key derivation, signing and verification, and the auth gate,
-  route table and `redactSecrets` read the prefix from it. Token payload `<projectId>:<buildId>:<expiresAtSeconds>`; the
-  signature is checked in constant time before the payload is read; a token claiming more than 24 h
-  (`MAX_STORYBOOK_URL_TTL`) is refused even when signed. The route is classified `testing`: a
-  hosting-only instance does not serve it (ADR 0006 is silent; kept conservative). `previousSecret` verifies a
-  token and never signs one. A token is minted when a render pass starts (and for the parameter
-  pre-pass), never at enqueue time, so queued shards and retries are not handed a stale one. The
-  lifetime is derived from the render budget of the pass (decision 5, expiry), so a pass cannot
-  outlive its token below the 24 hour ceiling. A pass whose budget would outlast its token (about
-  5700 captures at the 15 s allowance, or fewer under a project's shorter override) is rendered in
-  slices of stories (`renderInSlices`, `capture/token-chunks.ts`, at least 50 captures a slice),
-  each asking `storybookUrlSource` for a fresh token just before it starts, so the render never
-  dies at the ceiling; the cap per token stays 24 h and a project cannot lift it. A slice is one
-  runner `render` call, so a remote browser reconnects with the new URL per slice.
-  Refusals are all one `404` with `Cache-Control: private, no-store`; the reason is in the debug log
-  only. The token
-  is scrubbed from the request log, the OTEL `url.full` attribute, attempt logs, failure text and the
-  pino `err` serializer by `redactSecrets`. Not covered: the provider's own recordings (documented),
-  and a runner that logs the URL itself. The route has a generous per-IP rate limit
-  (`testing.storybookUrlRateLimit`, default 6000 requests a minute) counted before the token is
-  looked at, so the `429` it answers says nothing about a token; a farm behind one address that
-  needs more raises it. Served files answer `Access-Control-Allow-Origin: *` (never credentials),
-  like the files of a public build (#255): a sandboxed preview frame has an opaque origin and loads
-  module scripts only with it. A private build under sign-in is framed in the component page through
-  a one-hour signed URL minted for a viewer (needs `testing` and a `secret`). The page's script asks
-  `GET /api/v1/projects/:slug/builds/:buildId/preview-token` (class `testing`, same access check, `no-store`)
-  every 40 minutes once the frame is loaded and re-points the frame to the new root, so a page
-  left open keeps working while the token stays short-lived.
-
-- **Which settings saves are checked.** A save refuses only targets the project does not already
-  have, so an unrelated settings save never fails because an engine it already names went away; the
-  build of such a project still fails at once (`assertSupportedBrowsers`).
-- **A detected origin must be confirmed before it is used (owner decision, #267).** The origin an
-  admin's browser reported is stored unconfirmed; `resolve()` and `url()` do not return it, so no
-  background link, notification or signed URL uses it until an admin confirms (or replaces) it on
-  the System page, which says "confirm to enable notifications and signed URLs". The cost is one
-  click on a first deploy; the gain is that a visit through a stray domain can never plant links.
-  The first report wins, and a later visit through another domain never replaces it. A report must
-  carry the browser's own `Origin` header, equal to the reported origin. `publicBaseUrl` and
-  platform origins count as confirmed.
-- **Authentication is the exception (owner decision, #267).** The OAuth redirect URI and the OIDC
-  helper document are answered to a browser that is present, so they use
-  `PublicOriginResolver.authOrigin(requestOrigin)`: the confirmed origin when there is one, else the
-  request's own origin. It is a distinct accessor on purpose; nothing that outlives the request may
-  call it, and background links never fall back to a request.
-- **The Storybook URL is the directory root (owner decision, #273).** Core mints
-  `<origin>/_s/<token>/` and nothing else; the runner opens `iframe.html` under it. `storybookBase`
-  accepts only that form (a trailing slash, no `iframe.html`, query or fragment) and the runners
-  refuse any other before connecting, so a different page is never opened silently. When no signed
-  URL can be made (no confirmed origin or no secret) the target is unavailable and testing holds
-  with the reason, rather than rendering part of the matrix.
-- **Platform variables.** `detectPublicBaseUrl` reads Heroku, Railway, Vercel, Netlify (with
-  `NETLIFY=true`), Render, Fly.io, Azure App Service and Container Apps, and DigitalOcean (`APP_URL`
-  with `DIGITALOCEAN_APP_ID`); the table is pinned in `utils/public-origin.test.ts`.
+- **One package per provider.** Rejected: every provider re-solves the same problems; differences
+  are an endpoint and capabilities.
+- **A tunnel binary as the only way in.** Kept as a preset option, not the default: extra process
+  per host, while signed URLs cover the same need.
+- **Public URL from the `Host` header.** Rejected: forgeable and absent in background work.
+- **A `remotes` object plus `local`/`defaultTarget` options.** Rejected for one `browsers` list:
+  operators also declare local engines, the first entry defines the default, and a list exposes
+  duplicate targets.
+- **Several runner types at once.** Rejected: the orchestrator renders one engine at a time; mixing
+  local and remote is already one runner with a list; two runners for one engine would let browser
+  version/fonts differ, which the fingerprint reads as a migration.
+- **Per-engine worker pools.** Not needed: pools are presets with endpoints; routing jobs to pools
+  would break the rule that a story's engines stay in one shard (ADR 0005).
+- **WebdriverIO as the remote runner.** Deferred: right for real devices/Safari, wrong as the
+  default (sessions instead of pages, unpinned builds). A future ADR if device coverage is needed.
 
 ## Open questions
 
-- ~~Whether Storybook 8, 9 and 10 static builds load every asset by relative path, so the path-prefix
-  token reaches them all.~~ Settled (#228): the gated test `remote capture over a signed Storybook URL`
-  (`runner-playwright/src/remote.integration.test.ts`) captures a build of each fixture (8, 9, 10)
-  through a CDP browser that can only open `<origin>/_s/<token>/iframe.html`, so every asset loaded by
-  relative path under the token prefix.
-- Which providers honour `exposeNetwork` beyond Azure and a self-hosted Playwright server. A self-hosted
-  `run-server` does (tested); Azure is taken from its documentation; a provider not shown to support it
-  is treated as `reach: "url"`, the safe default.
-- ~~Whether a bare `playwright run-server` has built-in authentication or a concurrency cap.~~ Settled
-  (see the spike results above): no authentication, and a cap that queues.
-- ~~Whether GitHub and GitLab treat `target_url` as optional when no public origin is known.~~ Moot
-  (#267): with no confirmed origin no status is sent at all (ADR 0014, decision 11).
+- Which providers honour `exposeNetwork` beyond Azure and self-hosted Playwright. A provider not
+  shown to support it is treated as `reach: "url"`, the safe default.
+- Whether a bare `playwright run-server` has authentication/concurrency limits. Spike: no
+  authentication (`--path` is the only gate), and `--max-clients` queues rather than refuses.
+- Whether GitHub/GitLab treat `target_url` as optional with no origin. Moot: with no confirmed
+  origin no status is sent at all (ADR 0014, decision 11).

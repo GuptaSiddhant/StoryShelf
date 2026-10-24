@@ -14,7 +14,7 @@ export interface EvidenceLimits {
   maxSnapshots: number;
 }
 
-/** Default limits from ADR 0026 §5. */
+/** Default limits from ADR 0016 §5. */
 export const DEFAULT_EVIDENCE_LIMITS: EvidenceLimits = {
   maxImages: 3,
   imageMaxEdge: 512,

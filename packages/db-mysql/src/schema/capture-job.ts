@@ -4,7 +4,8 @@ import type {
   CaptureJobKind,
   CaptureJobStatus,
 } from "@storyshelf/core/schema";
-import { datetime, index, int, mysqlTable, text } from "drizzle-orm/mysql-core";
+import { index, int, mysqlTable, text } from "drizzle-orm/mysql-core";
+import { datetime } from "./datetime.ts";
 
 /**
  * Narrow `capture_jobs` table definition: the database queue's job rows and per-attempt claim rows.

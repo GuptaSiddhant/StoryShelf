@@ -39,16 +39,13 @@ workload identity or managed identity, preferred for enterprises), vendor API ke
 secrets, an internal LLM gateway, or a local server (Ollama). Consumer or seat-plan credentials (Claude
 subscription OAuth tokens, "Sign in with ChatGPT" tokens) are unsupported by design: they are issued for
 the vendors' own clients, are seat-metered, and would tie a shared server to one person's refresh token.
-Community providers that shell out to those CLIs are not documented or tested. Vendor terms are not
-verified here; confirm before publishing operator docs. Operator docs include a credentials page and a
-guide to free or low-cost access for testing (Google AI Studio, OpenRouter, a local Ollama), warning that
-free tiers may log or train on prompts and screenshots and so suit test data only.
+Community providers that shell out to those CLIs are not documented or tested. Operator docs warn that
+free tiers may log or train on prompts and screenshots, so they suit test data only.
 
 Rejected: TanStack AI (client-oriented, immature for server structured output), raw `httpJson` to
-provider REST (re-owns envelopes, schema repair and multimodal parts), and the SDK inside `core` (drags
-inference into runners and breaks the domain-only barrel). The SDK's internal fetch is the domain-SDK
-exception to the shared HTTP helper; timeout and retry ownership sit at this package's seam
-(`AbortSignal`, budget caps) and are mandatory test surface.
+provider REST (re-owns envelopes, schema repair and multimodal parts), and the SDK inside `core`. The
+SDK's internal fetch is the domain-SDK exception to the shared HTTP helper; timeout and retry
+ownership sit at this package's seam and are mandatory test surface.
 
 ### 2. `ShelfOptions.ai: Ai`: a singleton surface, not an adapter
 
@@ -146,10 +143,9 @@ Both scopes run over a shared pipeline with deterministic evidence limits (defau
   deterministic.
 - **Snapshot rows:** at most 50 changed snapshots by diff ratio; the rest are aggregated as counts.
 - **Redaction** (`core/insights/redact.ts`, fixture-tested) runs before truncation and does not count
-  toward the caps. Rules: values of keys matching `secret|token|password|api[_-]?key|authorization|
-cookie`; `Bearer` and `Basic` credentials; URLs with userinfo; JWTs; common key prefixes (`sk-`,
-  `ghp_`, `AKIA`, `xox`); long base64 or hex runs (32 characters or more). Unmatched content is not
-  assumed safe; evidence excludes environment dumps and request headers by construction.
+  toward the caps: secret-like keys, `Bearer`/`Basic` credentials, URLs with userinfo, JWTs, common key
+  prefixes (`sk-`, `ghp_`, `AKIA`, `xox`) and long base64/hex runs. Unmatched content is not assumed
+  safe; evidence excludes environment dumps and request headers by construction.
 - **Result envelope** (zod, in core): `{ verdict: "likely-intended" | "needs-review" |
 "likely-regression", summary, items: { snapshotKey, note, severity }[], confidence: "low" | "medium" |
 "high" }`; health adds `{ score, trends[] }`. It is stored as an opaque validated text column, never
@@ -271,16 +267,13 @@ Comment bodies are included only as truncated, redacted text.
 
 ### 11. UI and testing
 
-- **UI** (all through the `ui/components.tsx` facades, passing `consistency.test.ts`; panels need
-  `testing` and `ai`): an insight panel on the build review page (verdict, summary, per-snapshot notes, a
-  regenerate button for approver and admin, HTMX polling while running); a project settings AI tab
-  (read-only for non-site-admins, hidden when no AI is configured); a site-admin usage page at `/admin/ai`
-  (tokens by day and profile); and the 30-day health digest as a panel with a generate and refresh button
-  on the project Library and Builds pages, plus a `health` badge on the project card once a digest has
-  finished.
-- **Testing.** Hermetic tests use the AI SDK's mock language model (no network). Redaction, evidence
-  limits, effective vision, budget sums and dedupe are pure and unit-tested. There is no live-model or
-  Ollama integration test.
+- **UI** (through `ui/components.tsx` facades, passing `consistency.test.ts`; panels need `testing`
+  and `ai`): an insight panel on the build review page (verdict, summary, per-snapshot notes,
+  regenerate for approver/admin, HTMX polling); a project settings AI tab (read-only for
+  non-site-admins, hidden without AI); a site-admin usage page at `/admin/ai`; and the 30-day health
+  digest on Library/Builds with a project-card badge.
+- **Testing.** Hermetic tests use the AI SDK's mock model (no network). Redaction, evidence limits,
+  effective vision, budget sums and dedupe are pure and unit-tested; there is no live-model test.
 
 ## Alternatives considered
 
@@ -298,13 +291,11 @@ Comment bodies are included only as truncated, redacted text.
 
 ## Consequences
 
-- The smallest valid deployment is one line (`profiles: { default: { defaultModel } }`); every
-  refinement (vision model, second profile, caps) is additive. Misconfiguration fails at compile time
-  where types reach, at creation otherwise, and degrades with markers at runtime, never silently.
-- The self-hosted differentiator holds: a local default, data stays in the deployer's network, and agent
-  iteration carries no per-snapshot tax.
-- Later features (summaries, fix suggestions) add consumers and task keys only, with no contract, schema
-  or package change.
+- The smallest valid deployment is one line; every refinement (vision model, second profile, caps) is
+  additive. Misconfiguration fails at compile time where types reach, at creation otherwise, and
+  degrades with markers at runtime, never silently.
+- The self-hosted differentiator holds: a local default, data stays in the deployer's network, and
+  later features add consumers and task keys only, with no contract/schema/package change.
 - New runtime dependencies (`ai`, `@ai-sdk/otel`) to track for npm and JSR publishing. Peer-major
   alignment between the pinned `ai` core and user-installed `@ai-sdk/*` packages is documented; the
   startup check compares `specificationVersion`.

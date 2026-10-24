@@ -1,4 +1,4 @@
-/** Capture fingerprint: everything that changes pixels without a code change (ADR 0031 phase 4). */
+/** Capture fingerprint: everything that changes pixels without a code change (ADR 0005 phase 4). */
 import type { CaptureEnvironment } from "../adapters/capture-runner.ts";
 import { sha256 } from "../utils/hash.ts";
 import type { Viewport } from "./adapter.ts";

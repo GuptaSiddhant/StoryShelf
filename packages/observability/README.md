@@ -63,7 +63,7 @@ instead).
 
 Core (`@storyshelf/core`) uses `@opentelemetry/api` directly for pipeline
 spans (`capture.job`, phase spans, `http.client`) and never imports this
-package — that one-way boundary is load-bearing (see ADR 0022 §5).
+package — that one-way boundary is load-bearing (see ADR 0015 §5).
 
 ## License
 

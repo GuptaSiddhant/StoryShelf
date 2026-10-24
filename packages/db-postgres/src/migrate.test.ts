@@ -84,3 +84,61 @@ describe("runMigrations: builds and projects gain later columns", () => {
     await client.close();
   }, 60_000);
 });
+
+describe("runMigrations: review, a11y, comment and notification columns", () => {
+  it("back-fills every later column on older tables with the current defaults", async () => {
+    const client = new PGlite();
+    const run = runnerFor(client);
+    await runMigrations(run);
+    await client.exec(`
+      INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', now(), now());
+      INSERT INTO notification_channels (id, project_id, provider, config, created_at, updated_at)
+        VALUES ('n', 'p', 'slack', '{}', now(), now());
+      ALTER TABLE projects DROP COLUMN run_a11y;
+      ALTER TABLE projects DROP COLUMN review_enabled;
+      ALTER TABLE projects DROP COLUMN review_approvals;
+      ALTER TABLE projects DROP COLUMN storybook_url_ttl_seconds;
+      ALTER TABLE snapshots DROP COLUMN duration_ms;
+      ALTER TABLE snapshots DROP COLUMN a11y_violations;
+      ALTER TABLE comments DROP COLUMN story_id;
+      ALTER TABLE notification_channels DROP COLUMN last_error;
+      ALTER TABLE notification_channels DROP COLUMN last_error_at;
+    `);
+
+    await runMigrations(run);
+    await runMigrations(run); // idempotent
+
+    const project = await client.query<{
+      run_a11y: boolean;
+      review_enabled: boolean;
+      review_approvals: number;
+      storybook_url_ttl_seconds: number | null;
+    }>(
+      "SELECT run_a11y, review_enabled, review_approvals, storybook_url_ttl_seconds FROM projects WHERE id = 'p'",
+    );
+    expect(project.rows).toEqual([
+      {
+        run_a11y: true,
+        review_enabled: true,
+        review_approvals: 1,
+        storybook_url_ttl_seconds: null,
+      },
+    ]);
+
+    const columns = await client.query<{ table_name: string; column_name: string }>(`
+      SELECT table_name, column_name FROM information_schema.columns
+      WHERE (table_name = 'snapshots' AND column_name IN ('duration_ms', 'a11y_violations'))
+         OR (table_name = 'comments' AND column_name = 'story_id')
+         OR (table_name = 'notification_channels' AND column_name IN ('last_error', 'last_error_at'))
+      ORDER BY table_name, column_name
+    `);
+    expect(columns.rows.map((row) => `${row.table_name}.${row.column_name}`)).toEqual([
+      "comments.story_id",
+      "notification_channels.last_error",
+      "notification_channels.last_error_at",
+      "snapshots.a11y_violations",
+      "snapshots.duration_ms",
+    ]);
+    await client.close();
+  }, 60_000);
+});

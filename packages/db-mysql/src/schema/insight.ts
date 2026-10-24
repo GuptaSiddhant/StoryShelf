@@ -1,5 +1,6 @@
-import { boolean, datetime, int, mysqlTable, text } from "drizzle-orm/mysql-core";
+import { boolean, int, mysqlTable, text } from "drizzle-orm/mysql-core";
 import { builds } from "./build.ts";
+import { datetime } from "./datetime.ts";
 import { projects } from "./project.ts";
 
 /** Narrow `insights` table definition (build triage and project health results). */

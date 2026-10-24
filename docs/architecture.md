@@ -39,7 +39,7 @@ projects (
   git_default_branch  text NOT NULL DEFAULT 'main',
   pixel_threshold     real NOT NULL DEFAULT 0.1,    -- per-pixel color distance (0-1)
   max_diff_ratio      real NOT NULL DEFAULT 0.01,   -- max allowed diff ratio (0-1)
-  public_branch_regex text,                    -- branches whose builds are publicly viewable (ADR 0011)
+  public_branch_regex text,                    -- branches whose builds are publicly viewable (ADR 0010)
   run_a11y            boolean NOT NULL DEFAULT true,   -- axe accessibility checks during capture; results are shown in review and never block (ADR 0004, decision 6)
   run_tests           boolean NOT NULL DEFAULT false,  -- run Storybook 10 `.test()` entries as interaction tests during capture (ADR 0004, decision 10)
   review_enabled      boolean NOT NULL DEFAULT true,   -- review on: non-default builds wait for a verdict (ADR 0013, decision 1)
@@ -69,7 +69,7 @@ builds (
 );
 
 -- One row per story x mode (viewport) x browser per build. `viewport_name` is the mode key: a
--- project viewport's name, or the slug of a named mode (ADR 0028).
+-- project viewport's name, or the slug of a named mode (ADR 0004).
 snapshots (
   id                  text PRIMARY KEY,
   project_id          text NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -184,7 +184,7 @@ design_links (
 -- ("figma"). Encrypted under ShelfConfig.secret and rotated with the other credentials, never displayed.
 -- created_at = when the credential was set/replaced and drives the provider's max-age clock;
 -- status/checked_at record the last API outcome (unknown | ok | unauthorized | forbidden) and never move
--- created_at/updated_at. Members' own OAuth connections live in user_connections (ADR 0030).
+-- created_at/updated_at. Members' own OAuth connections live in user_connections (ADR 0011).
 design_credentials (
   id               text PRIMARY KEY,
   project_id       text NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -199,7 +199,7 @@ design_credentials (
 
 -- Design metadata + render cache keyed by (project, provider, viewer, file key, node id; node '' = whole
 -- file). viewer_id '' = fetched with the project credential; a user id = fetched with that user's own
--- access (such entries are served only to that user; see ADR 0030). state: ok | deleted | unauthorized |
+-- access (such entries are served only to that user; see ADR 0011). state: ok | deleted | unauthorized |
 -- forbidden. Refreshed on view when older than 15 min; outages keep the last good row.
 design_nodes (
   id             text PRIMARY KEY,
@@ -220,7 +220,7 @@ design_nodes (
   UNIQUE(project_id, provider, viewer_id, file_key, node_id)
 );
 
--- A user's own OAuth connection to an external service (service = adapter kind, e.g. figma; ADR 0030).
+-- A user's own OAuth connection to an external service (service = adapter kind, e.g. figma; ADR 0011).
 -- Tokens are encrypted; status: ok | expired (refresh failed - the user must reconnect).
 user_connections (
   id                      text PRIMARY KEY,
@@ -375,11 +375,11 @@ Project 1--* Webhook
 Project 1--* ProjectMember *--1 User   (project-scoped roles)
 ```
 
-- **Build to Snapshot:** one build contains many snapshots (one per story x mode x browser). Review groups them by story and mode: one approval covers every browser (ADR 0028).
+- **Build to Snapshot:** one build contains many snapshots (one per story x mode x browser). Review groups them by story and mode: one approval covers every browser (ADR 0004).
 - **Baseline (table):** a pointer `(project, story, mode, browser, branch)` → the accepted screenshot file. The **file** (`screenshot_path`) is canonical; builds are transient and can be purged without losing baselines.
 - **Accept:** copy the accepted snapshot's screenshot to the baseline path, upsert the `baselines` row for that branch.
 - **Reject:** mark the snapshot rejected, no baseline change.
-- **Access control:** a user's permissions on a project come from `project_members` (project-scoped role); `users.role = 'admin'` is a site-wide admin bypass (ADR 0008).
+- **Access control:** a user's permissions on a project come from `project_members` (project-scoped role); `users.role = 'admin'` is a site-wide admin bypass (ADR 0011).
 - **Label:** a typed value (`pr=123`, `jira=ABC-123`) attached to a build. Types are project-defined (`label_types`) and carry external link templates; the latest build for a `(key, value)` is resolved by query over `build_labels` joined to `builds`.
 
 ## Storage Layout
@@ -440,7 +440,7 @@ Two-tier, both ungated by init: `GET /api/v1/health` is open liveness (`{ status
 
 ### Capture Renderer (pure adapter)
 
-Capture adapters are **pure renderers** (ADR 0015). They render screenshots from an already-extracted Storybook directory and return PNG buffers; they never touch the database, storage, or build status. A `CaptureRunner` implementation renders and returns:
+Capture adapters are **pure renderers** (ADR 0004). They render screenshots from an already-extracted Storybook directory and return PNG buffers; they never touch the database, storage, or build status. A `CaptureRunner` implementation renders and returns:
 
 ```typescript
 interface RenderedSnapshot {
@@ -530,7 +530,7 @@ new holder settles the job), a cancel ends the job `cancelled`. `stop()` (SIGTER
 and waits for the jobs in flight; the runners launch browsers with `handleSIGINT`/`handleSIGTERM`/`handleSIGHUP` off, so the signal does not close a browser under a capture that is still draining (each render closes its own). Optional `metrics` hooks report each job's outcome and the
 queue's depth and oldest waiting job (a sample costs one read; off unless `queueSample` is given).
 
-**In the app** (`packages/app/src/jobs-setup.ts`). One lazily built database queue carries every job kind and one consumer runs them: the `capture` handler (`capture-setup.ts`: `createCaptureHandler`, wrapped to alert admins when a capture leaves its build failed), the `publish` handler (`publish-setup.ts`); `notify` jobs run on a second queue and consumer (see PR Status Checks & Merge Gate), kept apart so a status never waits behind a capture. The consumer starts when adapters are ready and `teardown()` drains it. `DatabaseCaptureQueueOptions.onExhausted` is the one hook the queue offers its host: a job whose final attempt lost its lease has no running handler to record the failure, so the host writes it (the crash path of the capture handler for `capture`, the publish completer for `publish`). A supplied `testing.queue` replaces the database queue for captures and, with a `runner`, gets its own consumer; without a `runner` it is enqueue-only.
+**In the app** (`packages/app/src/jobs-setup.ts`). One lazily built database queue carries every job kind and one consumer runs them: the `capture` handler (`capture-setup.ts`: `createCaptureHandler`, wrapped to alert admins when a capture leaves its build failed), the `publish` handler (`publish-setup.ts`); `notify` jobs run on a second queue and consumer (see PR Status Checks & Merge Gate), kept apart so a status never waits behind a capture. The consumer starts when adapters are ready and `teardown()` drains it. `DatabaseCaptureQueueOptions.onExhausted` is the one hook the queue offers its host: a job whose final attempt lost its lease has no running handler to record the failure, so the host writes it (the crash path of the capture handler for `capture`, the publish completer for `publish`). There is no `testing.queue`: `testing` requires a `runner` and the database queue is the only queue.
 
 **Forked capture** (`testing.workerEntry`, `core/src/capture/forked/`, opt-in, no new investment). The parent is the consumer: `createForkedCaptureHandler` is its `capture` handler, which pushes each leased job to a child over IPC (`{ type: "run", runId, job }`, and `cancel`) and waits for `progress`, `done` or `failed`. Progress renews the lease the consumer keeps; there are no `poll`, `enqueue`, `ack` or `nack` messages, and the concurrency slots live in the parent. The child (`runCaptureChild`) runs `createCaptureHandler` over the same database, storage and runner, and inserts shard jobs into the database queue itself. A child crash fails the run of the job it took down (charged against `testing.retries` like any attempt; runs that shared the crashed child are pushed again uncharged, one at a time); a child that makes no progress for a lease is killed; three crashes in five minutes, or a failed fork, hand everything to the in-process handler.
 
@@ -625,7 +625,7 @@ For a snapshot of `(story, mode, browser)` in a build on branch `B`:
    - On the **default branch**: auto-approve and write the baseline.
    - On a **feature branch**: mark `new` (needs review).
 
-A newly enabled browser has no baselines yet: its first snapshots are auto-accepted where the primary browser's snapshot of the same story and mode is clean, otherwise they are `new` (ADR 0028).
+A newly enabled browser has no baselines yet: its first snapshots are auto-accepted where the primary browser's snapshot of the same story and mode is clean, otherwise they are `new` (ADR 0004).
 
 Resolution is a pure key lookup — no git ancestry or build history is consulted, so rebases, force-pushes and squash merges cannot break it (covered by tests in `baseline.test.ts`).
 
@@ -745,7 +745,7 @@ interface DiffResult {
 }
 ```
 
-Uses `pixelmatch` for pixel comparison and a PNG codec for decode/encode: `pngjs` by default, or opt-in `sharp` (`testing.images.engine`, ADR 0032). The engine lives in `@storyshelf/image` (a leaf package), re-exported from `core/diff`.
+Uses `pixelmatch` for pixel comparison and a PNG codec for decode/encode: `pngjs` by default, or opt-in `sharp` (`testing.images.engine`, ADR 0008). The engine lives in `@storyshelf/image` (a leaf package), re-exported from `core/diff`.
 
 ### Diff Overlay
 
@@ -759,7 +759,7 @@ Thresholds are configurable per-project (`pixel_threshold`, `max_diff_ratio`) an
 
 ## AI Insights
 
-Optional, advisory-only AI (ADR 0026). `ShelfOptions.ai` (an `Ai` singleton like `Auth`, implemented by `@storyshelf/ai`) switches it on site-wide; `projects.ai_profile` (NULL = off) is the per-project gate, set by site admins. Evidence is assembled deterministically in `core/insights` (redacted, size-capped, ranked), sent through a named profile's model, and the answer is validated against a fixed envelope and rendered as plain text.
+Optional, advisory-only AI (ADR 0016). `ShelfOptions.ai` (an `Ai` singleton like `Auth`, implemented by `@storyshelf/ai`) switches it on site-wide; `projects.ai_profile` (NULL = off) is the per-project gate, set by site admins. Evidence is assembled deterministically in `core/insights` (redacted, size-capped, ranked), sent through a named profile's model, and the answer is validated against a fixed envelope and rendered as plain text.
 
 - **Tables:** `insights` (triage per build, health per project window; `pending → running → done | failed`, unique key dedupes concurrent runs), `ai_usage` (provider-reported tokens, survives build purge; budgets and hourly limits are counted from it), `ai_budget_alerts` (`day:threshold` primary key = once-per-day alert claim).
 - **API:** `/api/v1/projects/{slug}/builds/{buildId}/insights[/latest]` and `/api/v1/projects/{slug}/insights/health`; guard order `501 → 409 → role → 429`; `200` cached, `202` + poll.
@@ -805,7 +805,7 @@ Beyond diff review, StoryShelf publishes the uploaded Storybook build as a brows
 - **Library, component and build pages read the catalog** in both modes; `testing` (`testingEnabled()` in `app/src/store.ts`: `Store.testing`, true when `options.testing` is set) layers snapshot data onto them. The library shows the latest build of the branch whatever its status.
 - **Component preview** (`ui/preview-embed.tsx`): click-to-load, in an `<iframe sandbox="allow-scripts">` (no `allow-same-origin`) created from an inert `<template>` by the shell script, so opening a page never runs a published Storybook. A sandboxed frame has an opaque origin, so its module scripts are cross-origin requests without cookies: published files answer `Access-Control-Allow-Origin: *` exactly when the build is viewable without credentials (public build, or an instance without sign-in); a private build under sign-in is not embedded (the page offers the link out). Storybook 8, 9 and 10 render under this sandbox.
 - The **published** Storybook for a project is the most recent build whose branch is public. A build is public iff `builds.public = true` or `builds.git_branch` matches `projects.public_branch_regex` (e.g. `^main$`, `^release-`).
-- **Access control:** a public build is viewable **without auth**. Every other Storybook requires auth and at least `viewer` membership on the project (ADR 0008).
+- **Access control:** a public build is viewable **without auth**. Every other Storybook requires auth and at least `viewer` membership on the project (ADR 0011).
 - **Retention:** published builds follow the same purge rules as any other build. Because retention keeps the most recent build per branch, the latest public build on a branch survives purge; if it is purged, the published URL falls back to the next-most-recent public build (or 404 until a new build lands).
 
 ### URL structure
@@ -845,7 +845,7 @@ Subdomains serve the Storybook at the domain **root**, so no asset-path rewritin
 
 ## Design Sources
 
-Design links attach to a **component (story file)**, never to a single state or to a build label. A state's design button appears iff its file resolves a link; there is no project-default or label fallback on snapshots. The vendor specifics live behind the **`DesignProvider` adapter** (ADR 0029, `@storyshelf/core/adapter/design`); core owns everything else. Servers opt in with `design: [createFigmaDesign()]` (`@storyshelf/design-figma`); with no provider wired, no design links are extracted or shown.
+Design links attach to a **component (story file)**, never to a single state or to a build label. A state's design button appears iff its file resolves a link; there is no project-default or label fallback on snapshots. The vendor specifics live behind the **`DesignProvider` adapter** (ADR 0018, `@storyshelf/core/adapter/design`); core owns everything else. Servers opt in with `design: [createFigmaDesign()]` (`@storyshelf/design-figma`); with no provider wired, no design links are extracted or shown.
 
 - **Provider contract:** `parseUrl(raw) → DesignRef | null` (`{fileKey, nodeId, url}`), `create({credential}) → DesignClient` with `fetchMetas(fileKey, refs)` and `fetchRenders(fileKey, nodeIds)` (batched per file; API failures map to a `DesignState` per ref instead of throwing). Metadata (`credentialLabel`, `credentialHelp`, `urlHint`, `credentialMaxAgeDays`) drives the Design settings copy. The capture consumer in the app uses the same list, so declared links are validated during capture.
 - **Story parameters:** `parameters.storyshelf.figma` (plain URL string) wins over the Storybook `design` addon shape (`string | {url} | {type,url} | {type,url}[]`, first URL wins). `extractDesignUrl()` runs at discovery with the configured providers' parser and stores the result on `StoryEntry.designUrl` → `snapshots.design_url`, keeping `StoryParameters` capture-clean. Links no provider accepts are dropped and logged; capture never fails.
@@ -855,7 +855,7 @@ Design links attach to a **component (story file)**, never to a single state or 
 - **Render cache:** for node links the provider's render is downloaded at fetch time (signed vendor URLs expire, so they are never hot-linked) into storage at `{projectId}/design/{provider}/{fileKey}/{node}.png` and re-fetched only when the file `version` moves (`render_version`). `GET /api/v1/projects/:slug/design/renders/:renderId` (the internal `design_nodes` row id, not a provider node id) serves it to viewers; a request whose `?v=` matches the stored version is cached `immutable`. A render failure keeps the previous render and the metadata. A **deleted** node drops its render (row and stored PNG), so a design that no longer exists is never shown as reference; an auth failure (`unauthorized`/`forbidden`) keeps the last good name, version and render and only flips the state.
 - **Render lifecycle:** one PNG per linked node, overwritten in place when the file version moves, so storage is bounded by the number of distinct linked nodes. Renders are not evicted by build purge (they are not build artifacts); a link removed from settings (or a deleted project) leaves its PNG behind — small, bounded, and safe to delete by hand under `{projectId}/design/`.
 - **Surfaces:** the review page shows a reference pane under the diff stage (reference only — never diffed); library cards open a click popover with the cached render and `Open in <provider>`. Whole-file links have no render and stay deep links.
-- **Member connections (ADR 0030):** when the project has no credential and the operator configured OAuth for the provider (`createFigmaDesign({ oauth })`), signed-in members see a "Connect <provider>" prompt. Their tokens live in `user_connections`; entries fetched with them carry `design_nodes.viewer_id = user` and (with their renders under `.../user-<id>/...`) are served only to that user. The project credential always wins, and a member token is used only during that member's own visits.
+- **Member connections (ADR 0011):** when the project has no credential and the operator configured OAuth for the provider (`createFigmaDesign({ oauth })`), signed-in members see a "Connect <provider>" prompt. Their tokens live in `user_connections`; entries fetched with them carry `design_nodes.viewer_id = user` and (with their renders under `.../user-<id>/...`) are served only to that user. The project credential always wins, and a member token is used only during that member's own visits.
 - **Non-goals:** pixel-diffing against design renders, token mapping, build-level `figma` labels.
 
 ## Build Labels
@@ -982,7 +982,7 @@ GET    /admin                                             # site-admin System pa
 ```
 StoryShelf/
   packages/
-    core/                 # domain only — no HTTP (see ADR 0018)
+    core/                 # domain only — no HTTP (see ADR 0001)
       src/
         adapters/         # interfaces only (+ lifecycle runner, webhook sender)
         models/           # business logic (constructor-injected over DatabaseAdapter)
@@ -1001,7 +1001,7 @@ StoryShelf/
       package.json        # subpaths: adapter/*, capture, config, ddl, diff,
                           # logger, models, paths, retention, schema, types,
                           # urls, utils, test-helpers
-    app/                  # HTTP app over core (see ADR 0018)
+    app/                  # HTTP app over core (see ADR 0001)
       src/
         index.tsx         # createShelfApp entry point (ShelfApp/ShelfRouter)
         routers/          # API + UI routes (incl. health, OpenAPI)
@@ -1091,7 +1091,7 @@ StoryShelf/
         instrument-storage.ts # StorageAdapter wrapper (storage.* spans + metrics)
         metrics.ts        # memoized instruments (capture/db/storage)
         logs.ts           # pino mixin (trace_id/span_id correlation)
-      package.json        # single prod owner of all OTEL deps (see ADR 0022)
+      package.json        # single prod owner of all OTEL deps (see ADR 0015)
 ```
 
 ## Tech Stack
@@ -1112,7 +1112,7 @@ StoryShelf/
 | **Task runner**        | turbo                                                                                                                                                                                                                                                                                               | Monorepo build orchestration. Same as StoryBooker                                                                                             |
 | **Package manager**    | nub/nubx                                                                                                                                                                                                                                                                                            | Proven in StoryBooker. Monorepo-aware, works with turbo                                                                                       |
 | **CLI framework**      | commander.js                                                                                                                                                                                                                                                                                        | Lightweight, well-typed, no magic                                                                                                             |
-| **Auth**               | Better Auth engine (`@storyshelf/auth`, mounted at `/api/auth/*`): descriptor-driven login (password, social, SSO/SAML, passkey), invite-only local accounts, device/passkey management on `/profile`. Custom login text via `UIConfig.auth`; RP helpers under `/.well-known/`. No auth by default. | Enterprise teams plug in their IdP (Keycloak, Okta, Entra, SAML). CLI uses API tokens (separate from user auth). See ADR 0023.                |
+| **Auth**               | Better Auth engine (`@storyshelf/auth`, mounted at `/api/auth/*`): descriptor-driven login (password, social, SSO/SAML, passkey), invite-only local accounts, device/passkey management on `/profile`. Custom login text via `UIConfig.auth`; RP helpers under `/.well-known/`. No auth by default. | Enterprise teams plug in their IdP (Keycloak, Okta, Entra, SAML). CLI uses API tokens (separate from user auth). See ADR 0011.                |
 | **Schema validation**  | zod                                                                                                                                                                                                                                                                                                 | Runtime validation for API inputs. Drizzle uses it for schema                                                                                 |
 | **Date/time**          | Built-in `Date` + ISO strings                                                                                                                                                                                                                                                                       | No luxury date library needed                                                                                                                 |
 | **IDs**                | ULID                                                                                                                                                                                                                                                                                                | Sortable, collision-resistant, URL-safe                                                                                                       |
@@ -1139,7 +1139,7 @@ StoryShelf/
 
 ## Server UI
 
-StoryShelf ships a **fixed, server-rendered UI** — `hono/jsx` + HTMX + `hono/css`. No client framework, no UI build step, no pluggable-UI adapter. Custom interfaces are built against `/api/v1` (the same contract the CLI uses, so it cannot be a second-class citizen). See ADR 0012 and ADR 0025 (shell, review workspace, derived brand tokens).
+StoryShelf ships a **fixed, server-rendered UI** — `hono/jsx` + HTMX + `hono/css`. No client framework, no UI build step, no pluggable-UI adapter. Custom interfaces are built against `/api/v1` (the same contract the CLI uses, so it cannot be a second-class citizen). See ADR 0012 (shell, review workspace, derived brand tokens).
 
 - **Layout:** a full-height icon **sidebar** (brand, project/developer/admin navigation; footer with the account, theme and collapse controls; collapses to a rail, drawer on phones) plus a slim neutral **top bar** (project picker and the page's ancestor breadcrumbs). The customer accent appears only in small places (brand mark, active nav, primary actions, derived tints). The content area is image-first.
 - **Pages** live in `app/src/pages/*.tsx` and render directly from models (no API/UI contract duplication).
@@ -1230,9 +1230,9 @@ See `docs/website.md`. The public site (`apps/website/`, Astro Starlight) hosts 
    while inheriting the rest unchanged from their baselines (new stories always render).
    Any uncertainty (shallow clone, missing stats/history, global-file change) falls
    back to a full render, and `--full` opts out per run.
-2. **Git-provider merge gate (GitHub App / GitLab)** -- rich check runs, per-snapshot annotations, and auto-reject on review rejection. v1 has the primitive (required commit status); the full integration is ADR 0010.
+2. **Git-provider merge gate (GitHub App / GitLab)** -- rich check runs, per-snapshot annotations, and auto-reject on review rejection. v1 has the primitive (required commit status); the full integration is ADR 0014.
 3. **Remote browsers** -- render in a browser farm (ADR 0007). The runner `browsers` list, `CaptureTarget`, the public origin, remote connect (`./remote` presets), in-browser fingerprints, session limits and retries are in place; signed Storybook URLs (`/s/<token>/`), which `reach: "url"` targets use, are minted per render pass and served by the app.
-4. **`parameters.chromatic` equivalents** -- `modes` are implemented (named modes from `parameters.chromatic.modes` / `parameters.storyshelf.modes`, ADR 0028); an args matrix is not. Per-story `delay`, `disableSnapshot`, `flakyTest`, `autoCrop`/sizing are implemented; `waitForReady` covers the basic "wait for data" case.
+4. **`parameters.chromatic` equivalents** -- `modes` are implemented (named modes from `parameters.chromatic.modes` / `parameters.storyshelf.modes`, ADR 0004); an args matrix is not. Per-story `delay`, `disableSnapshot`, `flakyTest`, `autoCrop`/sizing are implemented; `waitForReady` covers the basic "wait for data" case.
 5. **Ladle / Histoire / custom pages** -- the `StorySourceAdapter` interface anticipates them.
 6. **Per-story viewport presets** -- a story's Storybook `defaultViewport` is captured **in addition to** the project's global list (union, deduped by name; issue #82), including inline `parameters.viewport.viewports`. Global defaults remain the project-level surface.
 7. **Linked projects / design-system propagation** -- automatically re-diffing dependent projects when a design-system project approves a change. Deferred: re-rendering a separate repo on its old `node_modules` produces no diff. The shipped alternative is provenance, not re-diffing: `project_links` (`PUT /api/v1/projects/:slug/links`) plus per-build `build_package_usage` power `GET …/snapshots/:id/usage`, which links a changed snapshot to the upstream component's published story. Tokens and automatic re-diff stay out of scope.

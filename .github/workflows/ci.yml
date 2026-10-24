@@ -84,6 +84,9 @@ jobs:
       - name: Setup workspace
         uses: ./.github/actions/setup-workspace
 
+      - name: Check ADR references and size
+        run: nub run docs:check
+
       - name: Verify (build + lint + test)
         # The website has its own job (below), so it runs in parallel and only when it changed.
         # Tasks hit the turbo cache restored by setup-workspace; their inputs are declared in turbo.json.

@@ -1,6 +1,7 @@
 import type { JobStatus } from "@storyshelf/core/adapter/capture-queue";
-import { index, int, mysqlTable, text, datetime, uniqueIndex } from "drizzle-orm/mysql-core";
+import { index, int, mysqlTable, text, uniqueIndex } from "drizzle-orm/mysql-core";
 import { builds } from "./build.ts";
+import { datetime } from "./datetime.ts";
 import { projects } from "./project.ts";
 
 /** Narrow `capture_attempts` table definition: one row per build capture run. */

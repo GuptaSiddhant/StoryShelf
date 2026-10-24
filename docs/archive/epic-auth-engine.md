@@ -36,6 +36,7 @@
 ## Wave 0 — foundation (E1+E2+E3 parallel-safe; E3 needs E2's table defs)
 
 ### E1 — ✅ DONE (`170bd573`) `feat(auth-engine): optional transact on DatabaseAdapter`
+
 Goal: atomic `consumeOne` everywhere; reusable primitive.
 Work: add `transact?<R>(fn: (tx: TxStore) => Promise<R>): Promise<R>` where
 `TxStore` = insert/update/get/remove/list/count subset; implement in
@@ -45,6 +46,7 @@ Files: `packages/core/src/db/*`, `packages/db-*/src/*`.
 Verify: per-package lint/tsc/test/build.
 
 ### E2 — ✅ DONE `feat(auth-engine): @storyshelf/auth scaffold + opaque bridge`
+
 Goal: Better Auth `DBAdapter` over core `DatabaseAdapter`, dialect-blind.
 Work: new package; model→table/field registry for auth tables;
 `Where[]`→drizzle conditions (eq/ne/gt/gte/lt/lte/in/like, AND/OR), sortBy,
@@ -54,6 +56,7 @@ Files: `packages/auth/*` (new).
 Verify: new package lint/tsc/test/build green; no other package touched.
 
 ### E3 — ✅ DONE `feat(auth-engine): auth tables DDL in driver pipelines`
+
 Goal: base tables exist on both drivers via existing migration story.
 Work: drizzle table defs in the new package; vendor base
 `user/session/account/verification` DDL into db-sqlite `ddl.ts` (+turso shared
@@ -64,6 +67,7 @@ Verify: db-sqlite + db-turso suites; strict checker passes against the tables.
 ## Wave 1 — engine + UI (E4→E5 sequential; E6 after E4)
 
 ### E4 — ✅ DONE `feat(auth-engine): createShelfAuth engine + AuthAdapter wrapper`
+
 Goal: working engine behind our interface.
 Work: factory (curated plugins, ULID ids, our cookie name, cookieCache off,
 `databaseHooks` mirror into `users`, session TTL parity); wrapper `check`
@@ -73,6 +77,7 @@ Files: `packages/auth/src/*`.
 Verify: package suite incl. sqlite-proxy + libsql round-trips.
 
 ### E5 — `feat(auth-engine): descriptor-driven single login UI`
+
 Goal: one login page adapts to configured methods, server-rendered.
 Work: mount `/api/auth/*` (documented Hono pattern); method descriptors →
 form/buttons/passkey-JS; `auth.api.*` in routes; Keycloak redirect test
@@ -81,6 +86,7 @@ Files: `packages/app/src/*`.
 Verify: app suite green (incl. new router tests).
 
 ### E6 — ✅ DONE `feat(auth-engine): password + OIDC presets, drop shared tier`
+
 Goal: old packages become recipes; breaking surface defined.
 Work: `auth-password` → email/pass config + invite front-end recipe (token
 table stays, accept calls admin create/set-password); `auth-oauth` presets →
@@ -91,6 +97,7 @@ Files: `packages/auth/src/presets/*`, `packages/auth-password/*`,
 Verify: affected suites; old packages' tests migrated or removed deliberately.
 
 #### E6 breaking surface (draft for E11)
+
 - Packages `@storyshelf/auth-password` and `@storyshelf/auth-oauth` are
   deleted. Consumers use `@storyshelf/auth` (`createShelfAuth`,
   presets, `issueInvite`/`acceptInvite`, `ensurePasswordAdmin`).
@@ -113,11 +120,13 @@ Verify: affected suites; old packages' tests migrated or removed deliberately.
 ## Wave 2 — methods + config modes (parallel after E4)
 
 ### E7 — ✅ DONE `feat(auth-engine): profile enrollment + session management`
+
 Passkey register/revoke, password change, device list, revoke-all; `/profile`
 wiring; "register a 2nd key" nudge. Files: `packages/app/src/*`,
 `packages/auth/src/*`.
 
 #### E7 breaking surface (draft for E11)
+
 - New `passkey` table in driver DDL (auto-migrates via `IF NOT EXISTS`);
   `@better-auth/passkey@1.7.6` pinned next to `better-auth@1.7.6`.
 - `/profile` on engine installs gains Devices (per-device revoke, sign out
@@ -131,12 +140,14 @@ wiring; "register a 2nd key" nudge. Files: `packages/app/src/*`,
   them off until E10 config-as-code.
 
 ### E8 — ✅ DONE `feat(auth-engine): passkey plugin + ceremony JS`
+
 Plugin enablement + vendored passkey-table DDL, page-local vanilla ceremony,
 RP-ID derivation (host/`publicBaseUrl`), TLS/secure-context docs +
 feature-detect hiding. Real-browser check rides the gated suite.
 Files: as E7 + `packages/db-sqlite/src/ddl.ts`.
 
 #### E8 breaking surface (draft for E11)
+
 - Login page gains a descriptor-driven "Sign in with a passkey" button
   (rendered when `passkeys` is enabled); ceremony is page-local vanilla JS
   (`passkey-ceremony.ts`), no client framework.
@@ -152,11 +163,13 @@ Files: as E7 + `packages/db-sqlite/src/ddl.ts`.
   register → sign out → passkey sign-in end to end.
 
 ### E9 — ✅ DONE `feat(auth-engine): SAML/SSO plugin + POST callbacks`
+
 Per-provider SSO recipes, callback-method routing (deferred SAML plan),
 ACS metadata docs, samlify-via-plugin (never hand-rolled XML).
 Files: `packages/app/src/routers/*`, `packages/auth/src/presets/*`.
 
 #### E9 breaking surface (draft for E11)
+
 - New `ssoProvider` table in driver DDL (auto-migrates via `IF NOT EXISTS`);
   `@better-auth/sso@1.7.6` pinned next to `better-auth@1.7.6`.
 - `createShelfAuth({ sso: { providers } })` wires the SSO plugin with
@@ -178,6 +191,7 @@ Files: `packages/app/src/routers/*`, `packages/auth/src/presets/*`.
   E6 recipes (revisited in E10 config-as-code).
 
 ### E10 — ✅ DONE `feat(auth-engine): config-as-code + custom-plugin contract`
+
 Code>DB>defaults precedence; shared zod schemas; `{env}` refs +
 `resolveSecrets` hook (Vault/AWS/GCP customer-owned); read-only UI badges;
 brand packs in code; plugin contract (UI descriptor kinds, `{sqlite,pg}` DDL
@@ -185,6 +199,7 @@ fragments, reserved-route collision guard). Files: `packages/core/src/config.ts`
 `packages/auth/src/*`, `packages/app/src/*`.
 
 #### E10 breaking surface (draft for E11)
+
 - `resolveAuthOptions()` (new `config.ts`): validates engine options with
   shared zod schemas and resolves `{env:NAME}` secret refs from
   `process.env` first, then the customer-owned `resolveSecrets` hook.
@@ -205,15 +220,17 @@ fragments, reserved-route collision guard). Files: `packages/core/src/config.ts`
 ## Wave 3 — release
 
 ### E11 — ✅ DONE `docs(auth-engine): migration + breaking-change release`
+
 Forced re-login comms, local-password resets, re-invites, dual-driver
 migration verification, ADR update (containment→wholesale), guides +
 preset/recipe docs, exact pins, JSR dry-run, remote-Turso check.
 Files: `docs/**`, `apps/website/src/content/docs/**`.
 
 #### E11 verification notes
+
 - Migration guide: `docs/migration-auth-engine.md` (breaks, env changes,
   code migration, dual-driver checklist, exact pins).
-- ADR 0023 records wholesale; ADR 0008 status points at it.
+- ADR 0011 records wholesale; the auth status endpoint is part of it.
 - Website: `guides/auth.md` rewritten for the engine, new
   `packages/auth.md` (old password/oauth pages deleted, sidebar
   updated), demo/deployment/cloud/roles pages patched; `astro build`
@@ -226,6 +243,7 @@ Files: `docs/**`, `apps/website/src/content/docs/**`.
   automatically; live remote verification is a manual release step.
 
 ### E12 — DEFERRED BY DEFAULT — `feat(auth-engine): TOTP ladder + custom role bundles`
+
 Only on demand. Kept out of the epic.
 
 ## Resumability
@@ -250,10 +268,10 @@ committed on this branch:
   secret, profile no-store, Secure clear-cookie, drift refresh, token-based
   `destroySession`) and LIKE-escaping follow-up.
 - S1 `refactor: rename auth-betterauth to auth`; S2 `refactor: slim core
-  slot, standalone Auth singleton` (`Auth` lives in `core/auth` — the
+slot, standalone Auth singleton` (`Auth` lives in `core/auth` — the
   prescribed core→auth edge cycles turbo, so the interface moved down and
   the engine implements + re-exports it); S3+S4 `refactor: collapse app
-  routing to single engine path` (legacy router deleted, `asEngineAuth`
+routing to single engine path` (legacy router deleted, `asEngineAuth`
   gone, profile engine-only, auth routes gated when disabled; async lazy
   loading declined — needs async `createShelfApp`).
 - `feat(auth-engine): IdP group sync for SSO providers` (per-recipe

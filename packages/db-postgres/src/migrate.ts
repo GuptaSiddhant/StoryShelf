@@ -16,13 +16,19 @@ const EXECUTE_PLAY_ALTER =
 const PLAY_TIMEOUT_MS_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS play_timeout_ms INTEGER NOT NULL DEFAULT 10000";
 const RUN_A11Y_ALTER =
-  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS run_a11y BOOLEAN NOT NULL DEFAULT false";
+  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS run_a11y BOOLEAN NOT NULL DEFAULT true";
 const PROJECT_BROWSER_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS browser TEXT NOT NULL DEFAULT 'chromium'";
 const PROJECT_VIEWPORTS_ALTER = "ALTER TABLE projects ADD COLUMN IF NOT EXISTS viewports TEXT";
 const PROJECT_AUTOMIGRATE_ALTER =
   "ALTER TABLE projects ADD COLUMN IF NOT EXISTS automigrate BOOLEAN NOT NULL DEFAULT false";
 const PROJECT_AI_PROFILE_ALTER = "ALTER TABLE projects ADD COLUMN IF NOT EXISTS ai_profile TEXT";
+const PROJECT_REVIEW_ENABLED_ALTER =
+  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS review_enabled BOOLEAN NOT NULL DEFAULT true";
+const PROJECT_REVIEW_APPROVALS_ALTER =
+  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS review_approvals INTEGER NOT NULL DEFAULT 1";
+const PROJECT_STORYBOOK_URL_TTL_ALTER =
+  "ALTER TABLE projects ADD COLUMN IF NOT EXISTS storybook_url_ttl_seconds INTEGER";
 const SNAPSHOT_INFRA_HASH_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS infra_hash TEXT";
 const SNAPSHOT_INHERITED_ALTER =
   "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS inherited BOOLEAN NOT NULL DEFAULT false";
@@ -32,6 +38,9 @@ const SNAPSHOT_BASELINE_VERSION_ALTER =
   "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS baseline_version TEXT";
 const SNAPSHOT_ENV_CHANGE_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS env_change TEXT";
 const SNAPSHOT_DESIGN_URL_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS design_url TEXT";
+const SNAPSHOT_DURATION_ALTER =
+  "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS duration_ms INTEGER";
+const SNAPSHOT_A11Y_ALTER = "ALTER TABLE snapshots ADD COLUMN IF NOT EXISTS a11y_violations TEXT";
 const DESIGN_LINKS_UNIQUE_INDEX =
   "CREATE UNIQUE INDEX IF NOT EXISTS design_links_project_import_path_idx ON design_links (project_id, import_path)";
 /** Pre-adapter Figma tables (replaced by design_nodes / design_credentials; no data is carried over). */
@@ -60,6 +69,11 @@ const TOKEN_USER_ALTER =
   "ALTER TABLE tokens ADD COLUMN IF NOT EXISTS user_id TEXT REFERENCES users(id) ON DELETE CASCADE";
 const MEMBER_SOURCE_ALTER =
   "ALTER TABLE project_members ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'manual'";
+const COMMENT_STORY_ID_ALTER = "ALTER TABLE comments ADD COLUMN IF NOT EXISTS story_id TEXT";
+const NOTIFICATION_LAST_ERROR_ALTER =
+  "ALTER TABLE notification_channels ADD COLUMN IF NOT EXISTS last_error TEXT";
+const NOTIFICATION_LAST_ERROR_AT_ALTER =
+  "ALTER TABLE notification_channels ADD COLUMN IF NOT EXISTS last_error_at TIMESTAMPTZ";
 /**
  * Re-runs share `(project_id, git_sha)` by design (ULID build ids), so the
  * lookup index must not be unique. Existing databases created it UNIQUE —
@@ -93,6 +107,8 @@ async function migrateSnapshotColumns(run: MigrationRunner): Promise<void> {
   await execIgnore(run, SNAPSHOT_BASELINE_VERSION_ALTER);
   await execIgnore(run, SNAPSHOT_DESIGN_URL_ALTER);
   await execIgnore(run, SNAPSHOT_ENV_CHANGE_ALTER);
+  await execIgnore(run, SNAPSHOT_DURATION_ALTER);
+  await execIgnore(run, SNAPSHOT_A11Y_ALTER);
   await migrateCaptureIdentityColumns(run);
 }
 
@@ -121,10 +137,17 @@ async function migrateProjectExtras(run: MigrationRunner): Promise<void> {
   await execIgnore(run, PLAY_TIMEOUT_MS_ALTER);
   await execIgnore(run, PROJECT_AUTOMIGRATE_ALTER);
   await execIgnore(run, PROJECT_AI_PROFILE_ALTER);
+  await migrateProjectReviewColumns(run);
   await migrateSnapshotColumns(run);
   await migrateBaselineColumns(run);
   await migrateBuildColumns(run);
   await execIgnore(run, RUN_TESTS_ALTER);
+}
+
+async function migrateProjectReviewColumns(run: MigrationRunner): Promise<void> {
+  await execIgnore(run, PROJECT_REVIEW_ENABLED_ALTER);
+  await execIgnore(run, PROJECT_REVIEW_APPROVALS_ALTER);
+  await execIgnore(run, PROJECT_STORYBOOK_URL_TTL_ALTER);
 }
 
 async function migrateBuildColumns(run: MigrationRunner): Promise<void> {
@@ -143,6 +166,7 @@ export async function runMigrations(run: MigrationRunner): Promise<void> {
   await migrateProjectExtras(run);
   await applyIdentityStatements(run);
   await migrateCommentsTable(run);
+  await migrateNotificationColumns(run);
 }
 
 async function migrateCoreColumns(run: MigrationRunner): Promise<void> {
@@ -173,7 +197,13 @@ async function execIgnore(run: MigrationRunner, sql: string): Promise<void> {
   }
 }
 
+async function migrateNotificationColumns(run: MigrationRunner): Promise<void> {
+  await execIgnore(run, NOTIFICATION_LAST_ERROR_ALTER);
+  await execIgnore(run, NOTIFICATION_LAST_ERROR_AT_ALTER);
+}
+
 async function migrateCommentsTable(run: MigrationRunner): Promise<void> {
+  await execIgnore(run, COMMENT_STORY_ID_ALTER);
   try {
     const rows = (await run(
       "SELECT is_nullable FROM information_schema.columns WHERE table_name='comments' AND column_name='user_id'",

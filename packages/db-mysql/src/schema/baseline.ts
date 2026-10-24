@@ -1,4 +1,5 @@
-import { index, mysqlTable, text, datetime, uniqueIndex } from "drizzle-orm/mysql-core";
+import { index, mysqlTable, text, uniqueIndex } from "drizzle-orm/mysql-core";
+import { datetime } from "./datetime.ts";
 import { projects } from "./project.ts";
 
 /** Narrow `baselines` table definition. */

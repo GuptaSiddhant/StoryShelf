@@ -37,7 +37,10 @@ function resolvePool(options: MysqlDatabaseOptions): {
   const connectionString = options.connectionString ?? options.url;
   if (connectionString) {
     // oxlint-disable-next-line typescript/no-unnecessary-type-assertion -- Pool vs PoolLike width
-    return { pool: mysql.createPool(connectionString) as unknown as PoolLike, owned: true };
+    return {
+      pool: mysql.createPool({ uri: connectionString, dateStrings: true }),
+      owned: true,
+    };
   }
   if (options.host) {
     return {
@@ -49,6 +52,7 @@ function resolvePool(options: MysqlDatabaseOptions): {
         password: options.password,
         database: options.database,
         ssl: options.ssl as never,
+        dateStrings: true,
         waitForConnections: true,
         connectionLimit: options.connectionLimit ?? 10,
       }) as unknown as PoolLike,
@@ -81,12 +85,13 @@ export function createMysqlDatabase(options: MysqlDatabaseOptions): DatabaseAdap
     migrate: async (): Promise<void> => {
       // oxlint-disable-next-line unicorn/consistent-function-scoping -- closes over pool from createMysqlDatabase
       const run = async (sql: string): Promise<unknown[]> => {
-        if (typeof pool.query === "function") {
-          await pool.query(sql);
-        } else if (pool.execute) {
-          await pool.execute(sql);
+        const result: unknown =
+          typeof pool.query === "function" ? await pool.query(sql) : await pool.execute?.(sql);
+        if (!Array.isArray(result)) {
+          return [];
         }
-        return [];
+        const rows: unknown = result[0];
+        return Array.isArray(rows) ? (rows as unknown[]) : [];
       };
       await runMigrations(run);
     },

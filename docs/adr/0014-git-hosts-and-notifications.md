@@ -67,8 +67,7 @@ that is already merged is captured like any other (there is no `isMerged` check)
   by `notify-chat`, and provider kinds are unique across packages).
 
 They are packages, not part of `@storyshelf/core`, because core carries none of the provider code or
-SDKs (single owner per third-party dependency, ADR 0001 Architecture and Conventions). Channels needing a
-different identity (WhatsApp with phone numbers and template approval) would be separate packages.
+SDKs (ADR 0001). Channels needing a different identity (WhatsApp) would be separate packages.
 
 ### 4. Storage
 
@@ -119,10 +118,9 @@ the statuses and the pull-request comment. Its details:
   accepted build shows a final `success` (`Review is off`), so a status left `pending` when review
   was on is closed.
 
-Which statuses exist and what decides them is defined in ADR 0013 UI Review. The prefix is a field
-of the git channel's config, default `storyshelf`, with no project slug. A repository that holds
-several projects sets a different prefix per channel (`storyshelf-web`, `storyshelf-docs`) so their
-statuses do not collide and each can be required on its own.
+ADR 0013 defines which statuses exist and what decides them. The prefix is a git-channel config
+field, default `storyshelf`, with no project slug; a repository with several projects sets a
+different prefix per channel so statuses do not collide and each can be required alone.
 
 ### 6. Pull-request comments
 
@@ -259,13 +257,11 @@ nothing posts from a call site.
   informational Storybook status failing). A run is found by head SHA and the stable `external_id`
   `storyshelf:<context>` and updated, never duplicated. The details URL is absolute (decision 12 already
   pauses delivery without a confirmed origin).
-- **Annotations:** one per `new` or `changed` snapshot, titled by story, viewport and browser,
-  anchored at the story file, with `raw_details` the snapshot's review URL (`UrlBuilder.snapshot`, the
-  diff page with `?snapshot=<id>`). `MAX_ANNOTATIONS` (200) caps the build state, GitHub takes 50
-  per request so they go out in batches of 50 through check-run updates, and the summary says `and N
-more changed snapshots` with the build link. A delivery skips the annotations the run already holds
-  (`output.annotations_count`), so a retry never doubles them; GitHub cannot remove annotations, so one
-  for a change approved later stays on the run.
+- **Annotations:** one per `new`/`changed` snapshot, anchored at the story file, with the snapshot's
+  review URL in `raw_details`. `MAX_ANNOTATIONS` (200) caps the build state; GitHub takes 50 per
+  request, so they go in batches, and the summary says `and N more changed snapshots` with the build
+  link. A retry skips annotations the run already holds; GitHub cannot remove one for a change
+  approved later.
 - **Branch protection** stays the owner's step, but `storyshelf protect` (CLI) prints the exact required
   check, validates the branch's rule through the host API and writes only with `--apply` (additive:
   it adds the missing check, or creates a rule on an unprotected branch; GitLab: the "pipelines must
@@ -286,10 +282,9 @@ more changed snapshots` with the build link. A delivery skips the annotations th
 
 - The gate depends on the repository owner configuring branch protection, a manual step
   (`storyshelf protect` validates and can write it, decision 13).
-- A PAT for status writes is a credential to manage and rotate (a GitHub App channel avoids it).
-- Status delivery is asynchronous: a status can lag the build change by a queue polling interval.
-- Hosting-only instances without a queue consumer get no durability for statuses.
-- Per-user chat DMs, phone-number channels and custom templates are not supported.
+- A PAT for status writes is a credential to manage and rotate (a GitHub App avoids it); delivery is
+  asynchronous, so a status can lag by a polling interval; hosting-only instances without a queue
+  consumer get no durability; per-user DMs, phone-number channels and custom templates are unsupported.
 
 ## Alternatives considered
 
@@ -304,7 +299,6 @@ more changed snapshots` with the build link. A delivery skips the annotations th
 
 ## Open questions
 
-- Auto-rejecting a pull request when a build is rejected (the check run already ends `failure`).
-- GitHub rulesets and GitLab external status checks are not read by `storyshelf protect`.
-- Polling cadence and cost of `notify` jobs on metered databases such as Turso.
-- Rate limits: GitHub secondary limits on bursts of statuses across many builds.
+- Auto-rejecting a PR when a build is rejected (the check run already ends `failure`); GitHub
+  rulesets/GitLab external status checks are not read by `storyshelf protect`; `notify` polling cost
+  on metered databases; GitHub secondary limits on status bursts.

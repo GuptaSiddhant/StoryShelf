@@ -1,4 +1,4 @@
-import { createClient } from "@libsql/client";
+import { createClient as createSqlite3Client } from "@libsql/client/sqlite3";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import type { Project } from "@storyshelf/core/schema";
@@ -17,17 +17,32 @@ async function initDb(db: DatabaseAdapter): Promise<void> {
   await db.lifecycle?.setup({ config: {}, logger: silentLogger });
 }
 
-function createTempTurso(): { dir: string; db: ReturnType<typeof createTursoDatabase> } {
+type TestClient = ReturnType<typeof createSqlite3Client>;
+
+/**
+ * Use the `sqlite3` transport for local-file tests: the default Node binding
+ * (`@libsql/client`) exits with SIGSEGV during process teardown on Node 24,
+ * which makes Vitest report an unhandled worker crash even when every
+ * assertion passed. The adapter contract is the same.
+ */
+function createTempTurso(): {
+  dir: string;
+  db: ReturnType<typeof createTursoDatabase>;
+  client: TestClient;
+} {
   const dir = mkdtempSync(join(tmpdir(), "storyshelf-turso-"));
-  const db = createTursoDatabase({ url: `file:${join(dir, "test.db")}` });
-  return { dir, db };
+  const client = createSqlite3Client({ url: `file:${join(dir, "test.db")}` });
+  const db = createTursoDatabase({ client });
+  return { dir, db, client };
 }
 
 async function cleanupTurso(
   dir: string,
   db: ReturnType<typeof createTursoDatabase>,
+  client: TestClient,
 ): Promise<void> {
   await db.lifecycle?.teardown();
+  client.close();
   rmSync(dir, { recursive: true, force: true });
 }
 
@@ -41,7 +56,7 @@ async function tableNames(db: DatabaseAdapter): Promise<Set<string>> {
 
 describe("createTursoDatabase", () => {
   it("migrates and inserts a project", async () => {
-    const { dir, db } = createTempTurso();
+    const { dir, db, client } = createTempTurso();
     await initDb(db);
 
     const now = new Date().toISOString();
@@ -60,11 +75,11 @@ describe("createTursoDatabase", () => {
     const listed = await db.list(schema.projects);
     expect(listed).toHaveLength(1);
 
-    await cleanupTurso(dir, db);
+    await cleanupTurso(dir, db, client);
   });
 
   it("updates and removes a project", async () => {
-    const { dir, db } = createTempTurso();
+    const { dir, db, client } = createTempTurso();
     await initDb(db);
 
     await db.insert(schema.projects, {
@@ -83,14 +98,14 @@ describe("createTursoDatabase", () => {
     const afterRemove = await db.get(schema.projects, "p1");
     expect(afterRemove).toBeNull();
 
-    await cleanupTurso(dir, db);
+    await cleanupTurso(dir, db, client);
   });
 
   it("back-fills a stale volume with every current projects column", async () => {
     const dir = mkdtempSync(join(tmpdir(), "storyshelf-turso-"));
     const url = `file:${join(dir, "test.db")}`;
     // Simulate the oldest deployed volume: only the pre-ADR-0017 columns exist.
-    const seed = createClient({ url });
+    const seed = createSqlite3Client({ url });
     await seed.execute(`
       CREATE TABLE projects (
         id TEXT PRIMARY KEY,
@@ -107,11 +122,12 @@ describe("createTursoDatabase", () => {
     `);
     seed.close();
 
-    const db = createTursoDatabase({ url });
+    const client = createSqlite3Client({ url });
+    const db = createTursoDatabase({ client });
     await initDb(db);
 
     const expected = Object.values(getTableColumns(schema.projects)).map((column) => column.name);
-    const inspector = createClient({ url });
+    const inspector = createSqlite3Client({ url });
     const info = await inspector.execute("PRAGMA table_info(projects)");
     inspector.close();
     const present = new Set(
@@ -137,11 +153,11 @@ describe("createTursoDatabase", () => {
     const listed = await db.list(schema.projects);
     expect(listed).toHaveLength(1);
 
-    await cleanupTurso(dir, db);
+    await cleanupTurso(dir, db, client);
   });
 
   it("commits transact writes and rolls back on throw", async () => {
-    const { dir, db } = createTempTurso();
+    const { dir, db, client } = createTempTurso();
     await initDb(db);
 
     const now = new Date().toISOString();
@@ -172,37 +188,40 @@ describe("createTursoDatabase", () => {
     ).rejects.toThrow("boom");
     expect(await db.get(schema.projects, "p2")).toBeNull();
 
-    await cleanupTurso(dir, db);
+    await cleanupTurso(dir, db, client);
   });
 
   it("creates auth tables on fresh and stale volumes", async () => {
     const expected = ["user", "session", "account", "verification"] as const;
 
-    const { dir: freshDir, db: fresh } = createTempTurso();
+    const { dir: freshDir, db: fresh, client: freshClient } = createTempTurso();
     await initDb(fresh);
     const freshTables = await tableNames(fresh);
     for (const table of expected) {
       expect(freshTables.has(table), `fresh ${table}`).toBe(true);
     }
-    await cleanupTurso(freshDir, fresh);
+    await cleanupTurso(freshDir, fresh, freshClient);
 
     const dir = mkdtempSync(join(tmpdir(), "storyshelf-turso-auth-"));
     try {
       const url = `file:${join(dir, "test.db")}`;
-      const seed = createTursoDatabase({ url });
+      const seedClient = createSqlite3Client({ url });
+      const seed = createTursoDatabase({ client: seedClient });
       await initDb(seed);
       await seed.lifecycle?.teardown();
-      const raw = createClient({ url });
+      seedClient.close();
+      const raw = createSqlite3Client({ url });
       await raw.executeMultiple("DROP TABLE session; DROP TABLE account;");
       raw.close();
 
-      const db = createTursoDatabase({ url });
+      const client = createSqlite3Client({ url });
+      const db = createTursoDatabase({ client });
       await initDb(db);
       const tables = await tableNames(db);
       for (const table of expected) {
         expect(tables.has(table), `stale ${table}`).toBe(true);
       }
-      await cleanupTurso(dir, db);
+      await cleanupTurso(dir, db, client);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -223,7 +242,7 @@ describe("createTursoDatabase", () => {
     const dir = mkdtempSync(join(tmpdir(), "storyshelf-turso-"));
     try {
       const url = `file:${join(dir, "test.db")}`;
-      const client = createClient({ url });
+      const client = createSqlite3Client({ url });
       const db = createTursoDatabase({ client });
       await initDb(db);
 

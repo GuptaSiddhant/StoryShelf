@@ -1,7 +1,7 @@
 // oxlint-disable-next-line unicorn/no-abusive-eslint-disable
 /* oxlint-disable */
 /**
- * Sharded-capture benchmark (ADR 0031 phase 5).
+ * Sharded-capture benchmark (ADR 0005 phase 5).
  *
  *   node scripts/bench-shards.mjs --storybook <built storybook dir> [--scenario <name>]...
  *                                 [--repeat 2] [--out results.json]
