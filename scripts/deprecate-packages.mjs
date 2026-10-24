@@ -16,6 +16,7 @@
  *   nub ./scripts/deprecate-packages.mjs
  *   nub ./scripts/deprecate-packages.mjs --npm-only
  *   nub ./scripts/deprecate-packages.mjs --jsr-only
+ *   nub ./scripts/deprecate-packages.mjs --otp 123456
  *   nub ./scripts/deprecate-packages.mjs --package @storyshelf/db-turso
  */
 import { spawnSync } from "node:child_process";
@@ -49,6 +50,7 @@ Options:
   --dry-run             Show what would change; never mutate a registry or file
   --npm-only            Skip JSR
   --jsr-only            Skip npm
+  --otp <code>          npm one-time password for 2FA
   --package <name>      Process one package (e.g. @storyshelf/db-turso)
   --file <path>         Read/write a different JSON file
   -h, --help            Show this help
@@ -68,6 +70,7 @@ function parseArgs(argv) {
     jsr: true,
     file: DEFAULT_FILE,
     package: null,
+    otp: null,
     help: false,
   };
   let index = 0;
@@ -79,7 +82,7 @@ function parseArgs(argv) {
       options.jsr = false;
     } else if (arg === "--jsr-only") {
       options.npm = false;
-    } else if (arg === "--file" || arg === "--package") {
+    } else if (arg === "--file" || arg === "--package" || arg === "--otp") {
       const value = argv[index + 1];
       if (!value) throw new Error(`${arg} expects a value.`);
       options[arg.slice(2)] = value;
@@ -248,7 +251,10 @@ async function deprecateNpm(entry, options, save) {
   const message = npmMessage(entry);
   if (pending.length > 0) {
     log(`npm ${entry.name}: deprecating ${pending.length}/${versions.length} version(s)`);
-    runLocal("nub", ["deprecate", entry.name, message], `nub deprecate ${entry.name}`);
+    const args = ["deprecate"];
+    if (options.otp) args.push("--otp", options.otp);
+    args.push(entry.name, message);
+    runLocal("nub", args, `nub deprecate ${entry.name}`);
     await confirmNpm(entry.name, versions);
   }
   entry.npm = {

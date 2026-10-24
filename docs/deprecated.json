@@ -10,7 +10,8 @@
         "state": "pending"
       },
       "jsr": {
-        "state": "pending"
+        "state": "archived",
+        "confirmedAt": "2026-10-24T21:34:55.968Z"
       }
     },
     {
@@ -22,7 +23,8 @@
         "state": "pending"
       },
       "jsr": {
-        "state": "pending"
+        "state": "archived",
+        "confirmedAt": "2026-10-24T21:35:03.870Z"
       }
     },
     {
@@ -34,7 +36,8 @@
         "state": "pending"
       },
       "jsr": {
-        "state": "pending"
+        "state": "archived",
+        "confirmedAt": "2026-10-24T21:35:05.201Z"
       }
     },
     {
@@ -46,7 +49,8 @@
         "state": "pending"
       },
       "jsr": {
-        "state": "pending"
+        "state": "archived",
+        "confirmedAt": "2026-10-24T21:35:06.350Z"
       }
     },
     {
@@ -58,7 +62,8 @@
         "state": "pending"
       },
       "jsr": {
-        "state": "pending"
+        "state": "archived",
+        "confirmedAt": "2026-10-24T21:35:08.359Z"
       }
     },
     {
@@ -69,7 +74,8 @@
         "state": "pending"
       },
       "jsr": {
-        "state": "pending"
+        "state": "archived",
+        "confirmedAt": "2026-10-24T21:35:09.586Z"
       }
     },
     {
@@ -80,7 +86,8 @@
         "state": "pending"
       },
       "jsr": {
-        "state": "pending"
+        "state": "archived",
+        "confirmedAt": "2026-10-24T21:35:10.905Z"
       }
     },
     {
@@ -91,7 +98,8 @@
         "state": "pending"
       },
       "jsr": {
-        "state": "pending"
+        "state": "archived",
+        "confirmedAt": "2026-10-24T21:35:12.272Z"
       }
     },
     {
@@ -102,7 +110,8 @@
         "state": "pending"
       },
       "jsr": {
-        "state": "pending"
+        "state": "archived",
+        "confirmedAt": "2026-10-24T21:35:13.693Z"
       }
     },
     {
@@ -113,7 +122,8 @@
         "state": "pending"
       },
       "jsr": {
-        "state": "pending"
+        "state": "archived",
+        "confirmedAt": "2026-10-24T21:35:17.816Z"
       }
     }
   ]
