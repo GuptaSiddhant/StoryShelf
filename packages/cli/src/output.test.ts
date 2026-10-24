@@ -5,6 +5,18 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** Record the spinner interval and let the test fire it by hand. */
+function installImmediateInterval(): (times: number) => void {
+  const callbacks: (() => void)[] = [];
+  vi.spyOn(globalThis, "setInterval").mockImplementation(((callback: () => void) => {
+    callbacks.push(callback);
+    return callbacks.length;
+  }) as typeof setInterval);
+  return (times) => {
+    for (let index = 0; index < times; index += 1) callbacks.at(-1)?.();
+  };
+}
+
 function collectStdout(): string[] {
   const writes: string[] = [];
   vi.spyOn(process.stdout, "write").mockImplementation((...args: unknown[]) => {
@@ -27,10 +39,9 @@ describe("spinnerFrames", () => {
 describe("createSpinner", () => {
   it("animates indeterminate frames while running and stops without a fake percentage", async () => {
     const writes = collectStdout();
+    const tick = installImmediateInterval();
     const spinner = createSpinner("Uploading...", spinnerFrames);
-    await new Promise((resolve) => {
-      setTimeout(resolve, 250);
-    });
+    tick(4);
     spinner.stop("Upload complete");
 
     const animations = writes.filter(
@@ -43,10 +54,9 @@ describe("createSpinner", () => {
 
   it("uses the shared frames by default", async () => {
     const writes = collectStdout();
+    const tick = installImmediateInterval();
     const spinner = createSpinner("Working");
-    await new Promise((resolve) => {
-      setTimeout(resolve, 120);
-    });
+    tick(2);
     spinner.stop();
 
     const animation = writes.find((chunk) => chunk.startsWith("\r") && chunk.includes("Working"));

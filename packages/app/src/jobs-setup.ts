@@ -152,6 +152,9 @@ function databaseConsumer(
       scratchDir: runtime.config.scratchDir ?? DEFAULT_SCRATCH_DIR,
       metrics: jobMetrics(),
       logger: runtime.logger.child({ component: "job-consumer" }),
+      ...(options.testing?.queueClock === undefined
+        ? {}
+        : { now: options.testing.queueClock.now, timers: options.testing.queueClock.timers }),
     }),
     [
       async () => {

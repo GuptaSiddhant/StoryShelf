@@ -1,8 +1,9 @@
 name: Nightly
 
-# Drift check (Storybook, pnpm, Playwright and the Fly base images move fast): captures
-# every supported Storybook fixture and dry-runs the Fly image. PRs only run storybook-9
-# (ci.yml). Also runnable on demand.
+# Full validation and drift check: the whole unit/integration suite (uncached), the
+# timing-sensitive suite repeated at one worker, every supported Storybook fixture, and the
+# Fly image dry run. PRs run affected packages plus storybook-9 (ci.yml); this is the
+# backstop for a change that slipped through selection. Also runnable on demand.
 on:
   schedule:
     - cron: "30 4 * * *"
@@ -16,6 +17,41 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup workspace
+        uses: ./.github/actions/setup-workspace
+
+      - name: Check ADR references and size
+        run: nub run docs:check
+
+      - name: Full verify (build + lint + test, uncached)
+        env:
+          TURBO_CONCURRENCY: "1"
+        run: nubx turbo verify --filter='!website' --force
+
+  flake:
+    name: flake
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup workspace
+        uses: ./.github/actions/setup-workspace
+
+      - name: Repeat timing-sensitive tests at one worker
+        env:
+          TURBO_CONCURRENCY: "1"
+        run: nubx turbo run test:flake --filter='!website' --force
+
   capture:
     name: capture
     uses: ./.github/workflows/capture.yml

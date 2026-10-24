@@ -3,6 +3,7 @@ import {
   type StoryEntry,
   type Viewport,
 } from "@storyshelf/core/adapter/capture-runner";
+import { createLatch } from "@storyshelf/core/test-helpers";
 import { maxPageConcurrency, recommendedPageConcurrency } from "@storyshelf/core/utils";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -390,6 +391,7 @@ describe("createPlaywrightCaptureRunner.render", () => {
   it("caps concurrently open pages at the configured concurrency", async () => {
     let active = 0;
     let peak = 0;
+    const latch = createLatch();
     const adapter = {
       name: "fake",
       discover: async (): Promise<StoryEntry[]> => [],
@@ -397,21 +399,22 @@ describe("createPlaywrightCaptureRunner.render", () => {
       waitForReady: async (): Promise<void> => {
         active += 1;
         peak = Math.max(peak, active);
-        await new Promise((resolve) => {
-          setTimeout(resolve, 5);
-        });
+        await latch.wait();
         active -= 1;
       },
     };
     const stories = Array.from({ length: 12 }, (_, i) => ({ ...STORIES[0]!, id: `s-${i}` }));
     playwright.configureHang(false);
-    const result = await createPlaywrightCaptureRunner({ concurrency: 3 }).render({
+    const rendering = createPlaywrightCaptureRunner({ concurrency: 3 }).render({
       buildId: "build-1",
       storybookDir,
       stories,
       viewports: VIEWPORTS,
       adapter,
     });
+    await vi.waitFor(() => expect(active).toBe(3));
+    latch.open();
+    const result = await rendering;
 
     expect(result.captures).toHaveLength(12);
     expect(peak).toBe(3);
@@ -420,6 +423,7 @@ describe("createPlaywrightCaptureRunner.render", () => {
   it("adapts page concurrency when none is configured, never above the ceiling", async () => {
     let active = 0;
     let peak = 0;
+    const latch = createLatch();
     const adapter = {
       name: "fake",
       discover: async (): Promise<StoryEntry[]> => [],
@@ -427,21 +431,22 @@ describe("createPlaywrightCaptureRunner.render", () => {
       waitForReady: async (): Promise<void> => {
         active += 1;
         peak = Math.max(peak, active);
-        await new Promise((resolve) => {
-          setTimeout(resolve, 2);
-        });
+        await latch.wait();
         active -= 1;
       },
     };
     const stories = Array.from({ length: 60 }, (_, i) => ({ ...STORIES[0]!, id: `s-${i}` }));
     playwright.configureHang(false);
-    const result = await createPlaywrightCaptureRunner({}).render({
+    const rendering = createPlaywrightCaptureRunner({}).render({
       buildId: "build-1",
       storybookDir,
       stories,
       viewports: VIEWPORTS,
       adapter,
     });
+    await vi.waitFor(() => expect(active).toBeGreaterThanOrEqual(1));
+    latch.open();
+    const result = await rendering;
 
     expect(result.captures).toHaveLength(60);
     expect(peak).toBeGreaterThanOrEqual(1);

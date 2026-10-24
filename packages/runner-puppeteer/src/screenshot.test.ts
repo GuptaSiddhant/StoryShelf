@@ -1,6 +1,6 @@
 import type { StoryEntry } from "@storyshelf/core/adapter/capture-runner";
 import { StorybookAdapter } from "@storyshelf/core/capture";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createRuntimeParamsState } from "./runtime-params.ts";
 import { captureScreenshot } from "./screenshot.ts";
 import { inPagePaint, inPageWaitSettled, type SettleReport } from "./settle.ts";
@@ -8,11 +8,22 @@ import type { CaptureContext } from "./types.ts";
 
 const viewport = { name: "desktop", width: 800, height: 600 };
 
-async function timed(run: () => Promise<unknown>): Promise<number> {
-  const started = performance.now();
-  await run();
-  return performance.now() - started;
+/** Record the fixed waits the pipeline asks for, running each callback on the next tick. */
+function recordWaits(): number[] {
+  const waits: number[] = [];
+  const real = globalThis.setTimeout;
+  vi.spyOn(globalThis, "setTimeout").mockImplementation(((
+    callback: TimerHandler,
+    timeout?: number,
+    ...args: unknown[]
+  ) => {
+    waits.push(timeout ?? 0);
+    return real(callback, 0, ...args);
+  }) as typeof setTimeout);
+  return waits;
 }
+
+afterEach(() => vi.restoreAllMocks());
 
 /** A page that answers the settle wait with `report` and records every fixed wait. */
 function harness(report: SettleReport | null, overrides: Partial<CaptureContext> = {}) {
@@ -58,29 +69,31 @@ const settled: SettleReport = { settled: true, hooked: true, phase: "completed",
 describe("waiting for the story to be ready", () => {
   it("does not sleep when Storybook says it finished and no delay is set", async () => {
     const { ctx, evaluated } = harness(settled);
-    expect(await timed(async () => await captureScreenshot(ctx, story(), viewport))).toBeLessThan(
-      300,
-    );
+    expect(await captureScreenshot(ctx, story(), viewport)).toMatchObject({
+      screenshot: Buffer.from([1]),
+    });
     expect(evaluated).toContain(inPagePaint);
   });
 
   it("still honours an explicit delay after the signal", async () => {
+    const waits = recordWaits();
     const { ctx } = harness(settled);
-    expect(
-      await timed(async () => await captureScreenshot(ctx, story(300), viewport)),
-    ).toBeGreaterThanOrEqual(290);
+    expect(await captureScreenshot(ctx, story(300), viewport)).toMatchObject({
+      screenshot: Buffer.from([1]),
+    });
+    expect(waits).toEqual([300]);
   });
 
   it("falls back to the fixed 500 ms wait when the page never signals", async () => {
+    const waits = recordWaits();
     const { ctx, logger } = harness({
       settled: false,
       hooked: true,
       phase: "rendering",
       elapsedMs: 5000,
     });
-    expect(
-      await timed(async () => await captureScreenshot(ctx, story(), viewport)),
-    ).toBeGreaterThanOrEqual(490);
+    await captureScreenshot(ctx, story(), viewport);
+    expect(waits).toEqual([500]);
     expect(logger.warn).toHaveBeenCalledWith(
       expect.objectContaining({ storyId: "a--b", phase: "rendering" }),
       expect.stringContaining("did not signal"),
@@ -88,23 +101,23 @@ describe("waiting for the story to be ready", () => {
   });
 
   it("falls back to the story's delay on a page without a channel, without a log line", async () => {
+    const waits = recordWaits();
     const { ctx, logger } = harness({
       settled: false,
       hooked: false,
       phase: null,
       elapsedMs: 0,
     });
-    const took = await timed(async () => await captureScreenshot(ctx, story(150), viewport));
-    expect(took).toBeGreaterThanOrEqual(140);
-    expect(took).toBeLessThan(450);
+    await captureScreenshot(ctx, story(150), viewport);
+    expect(waits).toEqual([150]);
     expect(logger.warn).not.toHaveBeenCalled();
   });
 
   it("falls back when the page cannot answer at all", async () => {
+    const waits = recordWaits();
     const { ctx } = harness(null);
-    expect(
-      await timed(async () => await captureScreenshot(ctx, story(), viewport)),
-    ).toBeGreaterThanOrEqual(490);
+    await captureScreenshot(ctx, story(), viewport);
+    expect(waits).toEqual([500]);
   });
 
   it("logs what Storybook said when the story errored, and still photographs it", async () => {

@@ -14,6 +14,7 @@ name: CI
 # website or the fixtures this run does not use.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
   push:
     branches: ["main"]
   workflow_dispatch:
@@ -34,6 +35,7 @@ jobs:
     outputs:
       website: ${{ steps.detect.outputs.website }}
       heavy: ${{ steps.detect.outputs.heavy }}
+      full: ${{ steps.detect.outputs.full }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -47,18 +49,24 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           BEFORE: ${{ github.event.before }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
           # Paths that cannot change the Fly image or the capture tests: the docs site, docs,
           # markdown, and the fixtures the PR run does not use.
           IGNORABLE: '^(apps/website/|docs/|fixtures/storybook-(8|10)/|\.github/ISSUE_TEMPLATE/)|\.md$'
+          # A change here can alter every package's build/test inputs, or the test selection
+          # itself, so the PR gate runs the full suite rather than trusting `--affected`.
+          FULL: '^(package\.json|nub\.lock|turbo\.json|nub\.jsonc|tsconfig\.json|config/|\.github/workflows/|\.github/actions/|scripts/|packages/[^/]+/(package\.json|turbo\.json|tsconfig\.json|tsdown\.config\.|vitest\.config\.))'
         run: |
           website=true
           heavy=true
+          full=true
           case "$EVENT" in
             pull_request)
               # HEAD is the PR merge commit: first parent is the base branch tip.
               git diff --name-only HEAD^1 HEAD > changed.txt || rm -f changed.txt
               ;;
             push)
+              # A push to main always validates the whole workspace.
               git fetch --no-tags --depth=1 origin "$BEFORE" 2>/dev/null \
                 && git diff --name-only "$BEFORE" HEAD > changed.txt || rm -f changed.txt
               ;;
@@ -68,10 +76,18 @@ jobs:
             echo "changed files:"; cat changed.txt
             if grep -qE '^apps/website/' changed.txt; then website=true; else website=false; fi
             if grep -vqE "$IGNORABLE" changed.txt; then heavy=true; else heavy=false; fi
+            if [ "$EVENT" = "pull_request" ]; then
+              if grep -qE "$FULL" changed.txt || printf '%s' "$LABELS" | grep -qE '(^|,)ci:full(,|$)'; then
+                full=true
+              else
+                full=false
+              fi
+            fi
           fi
           echo "website=$website" >> "$GITHUB_OUTPUT"
           echo "heavy=$heavy" >> "$GITHUB_OUTPUT"
-          echo "website=$website heavy=$heavy"
+          echo "full=$full" >> "$GITHUB_OUTPUT"
+          echo "website=$website heavy=$heavy full=$full"
 
   verify:
     name: verify
@@ -80,6 +96,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          # `--affected` needs the merge base, so the full history is required here.
+          fetch-depth: 0
 
       - name: Setup workspace
         uses: ./.github/actions/setup-workspace
@@ -89,16 +108,32 @@ jobs:
 
       - name: Verify (build + lint + test)
         # The website has its own job (below), so it runs in parallel and only when it changed.
-        # Tasks hit the turbo cache restored by setup-workspace; their inputs are declared in turbo.json.
-        run: nubx turbo verify --filter='!website'
+        # PRs run only affected packages (plus their dependents); global/risky changes, pushes
+        # to main and manual runs use the full workspace. One test task at a time keeps
+        # per-package vitest worker pools from oversubscribing a small runner.
+        env:
+          TURBO_CONCURRENCY: "1"
+          TURBO_SCM_BASE: origin/main
+          TURBO_SCM_HEAD: HEAD
+        run: |
+          if [ "${{ needs.changes.outputs.full }}" = "true" ]; then
+            nubx turbo verify --filter='!website' --force
+          else
+            nubx turbo verify --filter='!website' --affected
+          fi
 
       - name: App smoke test (boot once, curl health/API/HTML/htmx)
         if: ${{ !cancelled() }}
         run: bash scripts/smoke.sh
 
+      - name: Build packages for built-artifact smoke
+        # Docs-only PRs select no packages with `--affected`, so the verify step
+        # builds nothing; the smoke test needs every non-website `dist/`.
+        if: ${{ !cancelled() }}
+        run: nubx turbo run build --filter='!website'
+
       - name: Built-artifact smoke (CLI via .bin symlink, scaffolded server boots)
-        # The CLI and every package are built by the verify step. Scaffolds a
-        # server, type-checks it, boots it and checks it serves and shuts down.
+        # Scaffolds a server, type-checks it, boots it and checks it serves and shuts down.
         if: ${{ !cancelled() }}
         working-directory: packages/cli
         env:

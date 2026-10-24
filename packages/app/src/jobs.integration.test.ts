@@ -7,10 +7,12 @@ import { createDatabaseCaptureQueue } from "@storyshelf/core/capture";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { BuildModel, CaptureJobModel } from "@storyshelf/core/models";
 import {
+  createManualClock,
   createTestBuild,
   createTestProject,
   makeDatabase,
   makeStorage,
+  type ManualClock,
 } from "@storyshelf/core/test-helpers";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "./index.tsx";
@@ -27,8 +29,16 @@ async function seed() {
   return { db, storage, build };
 }
 
-function instance(db: ReturnType<typeof makeDatabase>["db"], storage: never) {
-  return createShelfApp({ database: db, storage, logger, testing: { runner: stubRunner() } });
+function instance(db: ReturnType<typeof makeDatabase>["db"], storage: never, clock?: ManualClock) {
+  return createShelfApp({
+    database: db,
+    storage,
+    logger,
+    testing: {
+      runner: stubRunner(),
+      ...(clock === undefined ? {} : { queueClock: { now: clock.now, timers: clock.timers } }),
+    },
+  });
 }
 
 const until = async (check: () => Promise<boolean>, timeoutMs = 10_000): Promise<void> => {
@@ -72,14 +82,21 @@ describe("two instances on one database", () => {
 
   it("another instance claims the job of a holder that died, after its lease expired", async () => {
     const { db, storage, build } = await seed();
-    const dying = createDatabaseCaptureQueue(db, { owner: "dead-instance", leaseMs: 5 });
+    const clock = createManualClock();
+    const dying = createDatabaseCaptureQueue(db, {
+      owner: "dead-instance",
+      leaseMs: 5,
+      now: clock.now,
+      timers: clock.timers,
+    });
     await dying.enqueue({ buildId: build.id });
     const claimed = await dying.poll();
     expect(claimed?.attempt).toBe(1);
-    await new Promise((resolve) => setTimeout(resolve, 30));
 
-    const survivor = instance(db, storage as never);
+    const survivor = instance(db, storage as never, clock);
     await survivor.lifecycle.setup();
+    await until(async () => clock.pending > 0);
+    await clock.advance(20_000);
     const jobs = new CaptureJobModel(db);
     await until(async () => (await jobs.get(`${claimed?.jobId}:2`)) !== null);
     expect(await jobs.get(`${claimed?.jobId}:1`)).toMatchObject({ status: "expired" });
@@ -89,17 +106,21 @@ describe("two instances on one database", () => {
 
   it("fails the build of a job whose last attempt lost its lease", async () => {
     const { db, storage, build } = await seed();
+    const clock = createManualClock();
     const dying = createDatabaseCaptureQueue(db, {
       owner: "dead-instance",
       leaseMs: 5,
       retries: 0,
+      now: clock.now,
+      timers: clock.timers,
     });
     await dying.enqueue({ buildId: build.id });
     expect(await dying.poll()).not.toBeNull();
-    await new Promise((resolve) => setTimeout(resolve, 30));
 
-    const survivor = instance(db, storage as never);
+    const survivor = instance(db, storage as never, clock);
     await survivor.lifecycle.setup();
+    await until(async () => clock.pending > 0);
+    await clock.advance(20_000);
     await until(async () => (await new BuildModel(db).get(build.id))?.status === "failed");
     await survivor.lifecycle.teardown();
   });

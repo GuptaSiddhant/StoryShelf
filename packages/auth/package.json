@@ -48,7 +48,8 @@
     "fmt": "oxfmt ./src",
     "lint": "oxlint --type-aware --type-check ./src",
     "test": "vitest run",
-    "prepublishOnly": "nub run build"
+    "prepublishOnly": "nub run build",
+    "test:flake": "vitest run --repeats=10 --maxWorkers=1 --no-file-parallelism src/engine.test.ts"
   },
   "dependencies": {
     "@better-auth/passkey": "1.7.6",

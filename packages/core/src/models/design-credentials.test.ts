@@ -9,12 +9,6 @@ function setup(): { model: DesignCredentialModel; db: ReturnType<typeof makeData
   return { db, model: new DesignCredentialModel(db, SECRET) };
 }
 
-const wait = async (): Promise<void> => {
-  await new Promise((resolve) => {
-    setTimeout(resolve, 5);
-  });
-};
-
 describe("DesignCredentialModel", () => {
   it("encrypts, rotates, tracks health and removes", async () => {
     const { model } = setup();
@@ -50,21 +44,22 @@ describe("DesignCredentialModel", () => {
   });
 
   it("keeps the rotation clock through status writes and restarts it on a new token", async () => {
-    const { model } = setup();
+    const { db, model } = setup();
     await model.set("p1", "fake", "tok_one");
     const first = await model.info("p1", "fake");
-    await wait();
+    if (!first) throw new Error("credential missing");
+    const old = "2020-01-01T00:00:00.000Z";
+    await db.update(db.tables.designCredentials, first.id, { createdAt: old, updatedAt: old });
     await model.recordStatus("p1", "fake", "ok");
     await model.recordStatus("p1", "fake", "forbidden");
     await model.recordStatus("p1", "fake", "ok");
     const after = await model.info("p1", "fake");
-    expect(after?.createdAt).toBe(first?.createdAt);
-    expect(after?.updatedAt).toBe(first?.updatedAt);
+    expect(after?.createdAt).toBe(old);
+    expect(after?.updatedAt).toBe(old);
     expect(after?.checkedAt).not.toBeNull();
-    await wait();
     await model.set("p1", "fake", "tok_two");
     const rotated = await model.info("p1", "fake");
-    expect((rotated?.createdAt ?? "") > (first?.createdAt ?? "")).toBe(true);
+    expect((rotated?.createdAt ?? "") > old).toBe(true);
   });
 
   it("converges a lost insert onto one rotated row, and rethrows other failures", async () => {

@@ -32,8 +32,8 @@ export interface JobQueue {
 }
 
 /**
- * Create the lazy queue polling `kinds`, with `retries` after a first failed attempt and the lease
- * of `testing.leaseSeconds`.
+ * Create the lazy queue polling `kinds`, with `retries` after a first failed attempt, the lease
+ * of `testing.leaseSeconds` and the clock of `testing.queueClock` (production: real time).
  */
 export function createJobQueue(
   options: ShelfOptions,
@@ -49,6 +49,9 @@ export function createJobQueue(
       ...(options.testing?.leaseSeconds === undefined
         ? {}
         : { leaseMs: Math.round(options.testing.leaseSeconds * 1000) }),
+      ...(options.testing?.queueClock === undefined
+        ? {}
+        : { now: options.testing.queueClock.now, timers: options.testing.queueClock.timers }),
       onExhausted: async (job, error) => {
         await exhausted[job.kind]?.(job, error);
       },

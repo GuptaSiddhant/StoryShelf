@@ -52,7 +52,8 @@
     "prepublishOnly": "nub run build",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "bench": "node --conditions=source bench/run.ts"
+    "bench": "node --conditions=source bench/run.ts",
+    "test:flake": "vitest run --repeats=10 --maxWorkers=1 --no-file-parallelism src/pool.test.ts"
   },
   "dependencies": {
     "pixelmatch": "^7.1.0",
