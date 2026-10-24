@@ -52,7 +52,8 @@
     "prepublishOnly": "nub run build",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:flake": "vitest run --repeats=10 --maxWorkers=1 --no-file-parallelism src/jobs.integration.test.ts src/capture-status-fanout.test.ts src/routers/design.integration.test.ts"
   },
   "dependencies": {
     "@hono/swagger-ui": "^0.6.1",

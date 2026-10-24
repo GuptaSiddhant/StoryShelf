@@ -1,6 +1,6 @@
 import { DesignCredentialModel, DesignModel, MemberModel } from "@storyshelf/core/models";
 import type { DesignNode } from "@storyshelf/core/schema";
-import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
+import { createLatch, makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { createFigmaDesign } from "@storyshelf/design-figma";
 import { pino } from "pino";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -503,6 +503,7 @@ describe("design hardening", () => {
     let inFlight = 0;
     let peak = 0;
     const calls: string[] = [];
+    const latch = createLatch();
     const real = globalThis.fetch;
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const url = input instanceof Request ? input.url : String(input);
@@ -510,13 +511,14 @@ describe("design hardening", () => {
       calls.push(url);
       inFlight += 1;
       peak = Math.max(peak, inFlight);
-      await new Promise((resolve) => {
-        setTimeout(resolve, 5);
-      });
+      await latch.wait();
       inFlight -= 1;
       return Response.json({ name: "Kit", version: "1", lastModified: "2025-12-01T00:00:00Z" });
     });
-    expect((await app.request("/projects/app/library")).status).toBe(200);
+    const response = app.request("/projects/app/library");
+    await vi.waitFor(() => expect(inFlight).toBe(3));
+    latch.open();
+    expect((await response).status).toBe(200);
     expect(calls.length).toBeLessThanOrEqual(10);
     expect(calls.length).toBeGreaterThan(0);
     expect(peak).toBeLessThanOrEqual(3);
