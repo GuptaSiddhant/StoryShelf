@@ -47,6 +47,7 @@ describe("createMcpHttpHandler", () => {
   });
 
   it("initializes with a token", async () => {
+    vi.stubGlobal("fetch", async () => Response.json({ status: "ok", testing: false }));
     const response = await handler(post({ authorization: "Bearer t" }));
     expect(response.status).toBe(200);
     expect(await response.text()).toContain("storyshelf");
