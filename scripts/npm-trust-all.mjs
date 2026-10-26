@@ -45,7 +45,11 @@ function isTrusted(name) {
     const output = npm(["trust", "list", name, "--json"]);
     return (output.match(CONFIG_OBJECT_RE) ?? []).some((raw) => {
       const config = JSON.parse(raw);
-      return config.repository === REPOSITORY && config.file === WORKFLOW;
+      return (
+        config.repository === REPOSITORY &&
+        config.file === WORKFLOW &&
+        (config.permissions ?? []).includes("createPackage")
+      );
     });
   } catch {
     return false;
@@ -63,6 +67,7 @@ function createTrust(name) {
       "--file",
       WORKFLOW,
       "--allow-publish",
+      "--allow-stage-publish",
       "--yes",
     ]);
   } catch (error) {
