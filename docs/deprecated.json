@@ -7,7 +7,16 @@
       "reason": "Turso moved into @storyshelf/db-sqlite as the /turso subpath with the same createTursoDatabase API.",
       "newPackage": "@storyshelf/db-sqlite/turso",
       "npm": {
-        "state": "pending"
+        "state": "deprecated",
+        "confirmedAt": "2026-10-26T10:13:24.612Z",
+        "versions": [
+          "0.1.0",
+          "0.1.2",
+          "0.1.3",
+          "0.3.1",
+          "0.3.2"
+        ],
+        "message": "Deprecated: Turso moved into @storyshelf/db-sqlite as the /turso subpath with the same createTursoDatabase API. Use @storyshelf/db-sqlite/turso instead. See docs/deprecated.json."
       },
       "jsr": {
         "state": "archived",
@@ -20,7 +29,16 @@
       "reason": "The Better Auth engine replaces the bespoke password adapter; local password hashes are incompatible, so users must be re-invited.",
       "newPackage": "@storyshelf/auth",
       "npm": {
-        "state": "pending"
+        "state": "deprecated",
+        "confirmedAt": "2026-10-26T10:27:27.933Z",
+        "versions": [
+          "0.1.0",
+          "0.1.2",
+          "0.1.3",
+          "0.3.1",
+          "0.3.2"
+        ],
+        "message": "Deprecated: The Better Auth engine replaces the bespoke password adapter; local password hashes are incompatible, so users must be re-invited. Use @storyshelf/auth instead. See docs/deprecated.json."
       },
       "jsr": {
         "state": "archived",
@@ -33,7 +51,16 @@
       "reason": "The Better Auth engine replaces the bespoke OAuth adapter; existing issuer URLs keep working through presets.",
       "newPackage": "@storyshelf/auth",
       "npm": {
-        "state": "pending"
+        "state": "deprecated",
+        "confirmedAt": "2026-10-26T10:34:48.786Z",
+        "versions": [
+          "0.1.0",
+          "0.1.2",
+          "0.1.3",
+          "0.3.1",
+          "0.3.2"
+        ],
+        "message": "Deprecated: The Better Auth engine replaces the bespoke OAuth adapter; existing issuer URLs keep working through presets. Use @storyshelf/auth instead. See docs/deprecated.json."
       },
       "jsr": {
         "state": "archived",
@@ -46,7 +73,22 @@
       "reason": "Git hosts merged into the notifier family; register the github state notifier instead.",
       "newPackage": "@storyshelf/notify-git",
       "npm": {
-        "state": "pending"
+        "state": "deprecated",
+        "confirmedAt": "2026-10-26T10:34:48.870Z",
+        "versions": [
+          "0.1.0",
+          "0.1.2",
+          "0.1.3",
+          "0.3.1",
+          "0.3.2",
+          "0.5.3",
+          "0.5.4",
+          "0.5.5",
+          "0.6.0",
+          "0.6.1",
+          "0.6.2"
+        ],
+        "message": "Deprecated: Git hosts merged into the notifier family; register the github state notifier instead. Use @storyshelf/notify-git instead. See docs/deprecated.json."
       },
       "jsr": {
         "state": "archived",
@@ -59,7 +101,22 @@
       "reason": "Git hosts merged into the notifier family; register the gitlab state notifier instead.",
       "newPackage": "@storyshelf/notify-git",
       "npm": {
-        "state": "pending"
+        "state": "deprecated",
+        "confirmedAt": "2026-10-26T10:34:48.989Z",
+        "versions": [
+          "0.1.0",
+          "0.1.2",
+          "0.1.3",
+          "0.3.1",
+          "0.3.2",
+          "0.5.3",
+          "0.5.4",
+          "0.5.5",
+          "0.6.0",
+          "0.6.1",
+          "0.6.2"
+        ],
+        "message": "Deprecated: Git hosts merged into the notifier family; register the gitlab state notifier instead. Use @storyshelf/notify-git instead. See docs/deprecated.json."
       },
       "jsr": {
         "state": "archived",
@@ -71,7 +128,22 @@
       "since": "post-0.6.2 (#262)",
       "reason": "The database-backed capture queue is built in; remove the external queue transport and its service.",
       "npm": {
-        "state": "pending"
+        "state": "deprecated",
+        "confirmedAt": "2026-10-26T10:34:49.108Z",
+        "versions": [
+          "0.1.0",
+          "0.1.2",
+          "0.1.3",
+          "0.3.1",
+          "0.3.2",
+          "0.5.3",
+          "0.5.4",
+          "0.5.5",
+          "0.6.0",
+          "0.6.1",
+          "0.6.2"
+        ],
+        "message": "Deprecated: The database-backed capture queue is built in; remove the external queue transport and its service. See docs/deprecated.json."
       },
       "jsr": {
         "state": "archived",
@@ -83,7 +155,17 @@
       "since": "post-0.6.2 (#262)",
       "reason": "The database-backed capture queue is built in; remove the external queue transport and its service.",
       "npm": {
-        "state": "pending"
+        "state": "deprecated",
+        "confirmedAt": "2026-10-26T10:34:49.209Z",
+        "versions": [
+          "0.5.3",
+          "0.5.4",
+          "0.5.5",
+          "0.6.0",
+          "0.6.1",
+          "0.6.2"
+        ],
+        "message": "Deprecated: The database-backed capture queue is built in; remove the external queue transport and its service. See docs/deprecated.json."
       },
       "jsr": {
         "state": "archived",
@@ -95,7 +177,18 @@
       "since": "post-0.6.2 (#262)",
       "reason": "The database-backed capture queue is built in; remove the external queue transport and its service.",
       "npm": {
-        "state": "pending"
+        "state": "deprecated",
+        "confirmedAt": "2026-10-26T10:34:49.237Z",
+        "versions": [
+          "0.0.0-stage",
+          "0.5.3",
+          "0.5.4",
+          "0.5.5",
+          "0.6.0",
+          "0.6.1",
+          "0.6.2"
+        ],
+        "message": "Deprecated: The database-backed capture queue is built in; remove the external queue transport and its service. See docs/deprecated.json."
       },
       "jsr": {
         "state": "archived",
@@ -107,7 +200,17 @@
       "since": "post-0.6.2 (#262)",
       "reason": "The database-backed capture queue is built in; remove the external queue transport and its service.",
       "npm": {
-        "state": "pending"
+        "state": "deprecated",
+        "confirmedAt": "2026-10-26T10:34:49.319Z",
+        "versions": [
+          "0.5.3",
+          "0.5.4",
+          "0.5.5",
+          "0.6.0",
+          "0.6.1",
+          "0.6.2"
+        ],
+        "message": "Deprecated: The database-backed capture queue is built in; remove the external queue transport and its service. See docs/deprecated.json."
       },
       "jsr": {
         "state": "archived",
@@ -119,7 +222,18 @@
       "since": "post-0.6.2 (#262)",
       "reason": "Capture and publish jobs run in the app's in-app consumer; remove the separate worker service.",
       "npm": {
-        "state": "pending"
+        "state": "deprecated",
+        "confirmedAt": "2026-10-26T10:34:49.347Z",
+        "versions": [
+          "0.0.0-stage",
+          "0.5.3",
+          "0.5.4",
+          "0.5.5",
+          "0.6.0",
+          "0.6.1",
+          "0.6.2"
+        ],
+        "message": "Deprecated: Capture and publish jobs run in the app's in-app consumer; remove the separate worker service. See docs/deprecated.json."
       },
       "jsr": {
         "state": "archived",
