@@ -1,10 +1,18 @@
-// oxlint-disable max-statements curly no-console no-inline-comments
+// oxlint-disable max-statements curly no-console no-inline-comments no-process-exit no-await-in-loop
 /**
  * Configure npm trusted publishing (GitHub Actions, release.yml) for every
  * public workspace package, idempotently.
  *
  * Needs a fresh npm 2FA code, e.g.:
  *   npm_config_otp=$(op item get <npm-item> --otp) node scripts/npm-trust-all.mjs
+ *
+ * Usage:
+ *   node scripts/npm-trust-all.mjs
+ *   node scripts/npm-trust-all.mjs --package @storyshelf/notify-git
+ *   node scripts/npm-trust-all.mjs --package @storyshelf/image --package @storyshelf/mcp
+ *
+ * With no `--package`, every public package is checked. Repeat the flag (or
+ * pass bare package names) to limit the run to one or more packages.
  *
  * The registry's trust endpoint can answer a bare 400 with no message, so the
  * exit code of `npm trust github` is not trusted: state is always re-read with
@@ -46,10 +54,21 @@ function isTrusted(name) {
 
 function createTrust(name) {
   try {
-    npm(["trust", "github", name, "--repo", REPOSITORY, "--file", WORKFLOW, "--allow-publish", "--yes"]);
+    npm([
+      "trust",
+      "github",
+      name,
+      "--repo",
+      REPOSITORY,
+      "--file",
+      WORKFLOW,
+      "--allow-publish",
+      "--yes",
+    ]);
   } catch (error) {
     // Re-checked below; the endpoint's status code is unreliable.
-    const reason = String(error.stderr ?? error.message).match(/npm error code (\w+)/u)?.[1];
+    const reason = String(error.stderr ?? error.message).match(/npm error code (?<code>\w+)/u)
+      ?.groups?.["code"];
     if (reason === "E429") {
       console.error("npm rate-limited the trust endpoint (E429). Wait 15+ minutes and rerun.");
       process.exit(2);
@@ -58,8 +77,58 @@ function createTrust(name) {
   }
 }
 
+function printHelp() {
+  console.log(`Usage: node scripts/npm-trust-all.mjs [--package <name> ...]
+
+With no --package, every public package is checked. Repeat --package (or pass
+bare package names) to limit the run to one or more packages.`);
+}
+
+function parseArgs(argv) {
+  const names = [];
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === "--help" || arg === "-h") {
+      printHelp();
+      process.exit(0);
+    }
+    if (arg === "--package") {
+      const value = argv[index + 1];
+      if (!value) throw new Error("--package expects a package name.");
+      names.push(value);
+      index += 1;
+    } else if (arg.startsWith("--package=")) {
+      names.push(arg.slice("--package=".length));
+    } else if (arg.startsWith("-")) {
+      throw new Error(`unknown option '${arg}'. Run with --help.`);
+    } else {
+      names.push(arg);
+    }
+  }
+  return [...new Set(names)];
+}
+
+function selectPackages(requested) {
+  const publicNames = getPublicPackageNames();
+  if (requested.length === 0) return publicNames;
+  const unknown = requested.filter((name) => !publicNames.includes(name));
+  if (unknown.length > 0) {
+    throw new Error(`not a public package: ${unknown.join(", ")}`);
+  }
+  return requested;
+}
+
+function packagesFromArgs() {
+  try {
+    return selectPackages(parseArgs(process.argv.slice(2)));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
+}
+
 const missing = [];
-for (const name of getPublicPackageNames()) {
+for (const name of packagesFromArgs()) {
   if (isTrusted(name)) {
     console.log(`✓ ${name} already trusted`);
     continue;
