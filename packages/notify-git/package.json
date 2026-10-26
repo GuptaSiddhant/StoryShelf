@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/notify-git",
-  "version": "0.6.2",
+  "version": "0.7.0",
   "description": "Git notification providers for StoryShelf: commit statuses and pull-request comments on GitHub and GitLab.",
   "keywords": [
     "ci",
