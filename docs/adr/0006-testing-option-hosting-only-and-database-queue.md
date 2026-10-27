@@ -123,7 +123,9 @@ implementations, which is accepted.
   `CaptureAttemptModel` keeps cancelled attempts, `finalizeBuild`/the orchestrator skip it, snapshot
   approval and build verdicts answer 409, and only retry (`resetStatus`) leaves it. Cancelled builds
   are purged like failed ones and never published/accepted. Jobs are cancelled and attempts closed
-  before the status write to keep the race window to one in-flight write.
+  before the status write. Status updates atomically require `status <> cancelled` in the database;
+  `resetStatus` deliberately bypasses the condition. Custom database adapters must implement
+  `updateWhere`, evaluating the condition in the update statement.
 - **Views/traces/retention:** `status`, `active` and `recent` read the table; `traceparent` and the
   request id travel in the job; finished rows are purged with retention. **Backends:** any adapter
   with a distinguishable unique-key insert. Postgres (all presets, including `neon-http`), MySQL and

@@ -38,6 +38,7 @@ function database(): Record<string, unknown> {
     tables,
     insert: async () => ({}),
     update: async () => ({}),
+    updateWhere: async () => ({}),
     get: async () => null,
     remove: async () => {},
     list: async () => [],

@@ -1,5 +1,5 @@
 /** Build records, status transitions, and publication helpers. */
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import type { Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { Logger } from "../logger.ts";
@@ -115,20 +115,24 @@ export class BuildModel {
     patch: Partial<Pick<Build, "status" | "public" | "message" | "authorEmail" | "authorName">>,
     options: { reset?: boolean } = {},
   ): Promise<Build> {
+    const values = { ...patch, updatedAt: new Date().toISOString() };
     if (patch.status !== undefined && patch.status !== "cancelled" && options.reset !== true) {
-      const current = await this.get(id);
-      if (current?.status === "cancelled") {
+      const current = (await this.db.updateWhere(
+        this.tables.builds,
+        id,
+        values,
+        ne(col(this.tables.builds, "status"), "cancelled"),
+      )) as unknown as Build | null;
+      if (!current) throw new Error("Build not found");
+      if (current.status === "cancelled") {
         this.logger?.debug(
           { buildId: id, refused: patch.status },
           "build is cancelled; status write refused",
         );
-        return current;
       }
+      return current;
     }
-    return (await this.db.update(this.tables.builds, id, {
-      ...patch,
-      updatedAt: new Date().toISOString(),
-    })) as unknown as Build;
+    return (await this.db.update(this.tables.builds, id, values)) as unknown as Build;
   }
 
   async setStatus(id: string, status: BuildStatus): Promise<Build> {

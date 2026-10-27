@@ -216,6 +216,32 @@ describe("BuildModel: a cancelled build is terminal", () => {
     expect((await model.get(id))?.status).toBe("cancelled");
   });
 
+  it("refuses a status write when cancellation wins before its atomic update", async () => {
+    const { db } = makeDatabase();
+    const model = new BuildModel(db, buildTables(db));
+    const build = await model.create("p1", { gitSha: "abc", gitBranch: "main" });
+    const updateWhere = db.updateWhere.bind(db);
+    let proceed!: () => void;
+    let entered!: () => void;
+    const paused = new Promise<void>((resolve) => {
+      proceed = resolve;
+    });
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    db.updateWhere = async (...args) => {
+      entered();
+      await paused;
+      return await updateWhere(...args);
+    };
+    const late = model.setStatus(build.id, "capturing");
+    await started;
+    await model.setStatus(build.id, "cancelled");
+    proceed();
+    expect((await late).status).toBe("cancelled");
+    expect((await model.get(build.id))?.status).toBe("cancelled");
+  });
+
   it("still lets other fields change, and a repeated cancel through", async () => {
     const { model, id } = await cancelled();
     expect((await model.update(id, { message: "note" })).message).toBe("note");

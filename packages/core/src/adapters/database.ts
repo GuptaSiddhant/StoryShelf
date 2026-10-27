@@ -134,6 +134,15 @@ export interface DatabaseAdapter extends Adapter<DatabaseAdapterMetadata> {
     id: string,
     values: Partial<T["$inferInsert"]>,
   ): Promise<T["$inferSelect"]>;
+  /** Atomically update a row only while `where` matches; return the current row, or null if absent.
+   * Custom adapters must implement the condition in the same database statement as the update.
+   */
+  updateWhere<T extends Table>(
+    table: T,
+    id: string,
+    values: Partial<T["$inferInsert"]>,
+    where: SQL,
+  ): Promise<T["$inferSelect"] | null>;
   /** Fetch a single row by id, or null if not found. */
   get<T extends Table>(table: T, id: string): Promise<T["$inferSelect"] | null>;
   /** Delete a row by id. */

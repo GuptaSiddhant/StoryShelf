@@ -15,7 +15,7 @@ import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import type { Project } from "@storyshelf/core/schema";
 import { databaseQueueMultiInstanceSuite } from "@storyshelf/core/test-helpers";
-import { sql } from "drizzle-orm";
+import { getTableColumns, ne, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createMysqlDatabase } from "./index.ts";
@@ -52,6 +52,32 @@ describe.skipIf(!LIVE)("mysql live (real MySQL, gated on LIVE_CLOUD=1)", () => {
   afterAll(async () => {
     await db?.remove(schema.projects, id).catch(() => {});
     await db?.lifecycle?.teardown();
+  });
+
+  it("conditionally updates without overwriting a locked row", async () => {
+    const rowId = `conditional-${randomUUID()}`;
+    const now = new Date().toISOString();
+    const adapter = liveDb();
+    await adapter.insert(schema.projects, {
+      id: rowId,
+      slug: rowId,
+      name: "before",
+      createdAt: now,
+      updatedAt: now,
+    });
+    try {
+      const condition = ne(getTableColumns(schema.projects)["name"]!, "locked");
+      expect(
+        (await adapter.updateWhere(schema.projects, rowId, { name: "locked" }, condition))?.[
+          "name"
+        ],
+      ).toBe("locked");
+      expect(
+        (await adapter.updateWhere(schema.projects, rowId, { name: "after" }, condition))?.["name"],
+      ).toBe("locked");
+    } finally {
+      await adapter.remove(schema.projects, rowId);
+    }
   });
 
   it.skipIf(process.env["MYSQL_SCHEMA_MUTATION_TEST"] !== "1")(
