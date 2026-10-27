@@ -29,7 +29,9 @@ const one = (name: string) =>
     name,
     engines: ["chromium"],
     sessions: 1,
-    connect: () => ({ protocol: "cdp", endpoint: "wss://x/" }),
+    protocol: "cdp",
+    reach: "url",
+    connect: { endpoint: "wss://x/" },
   });
 
 describe("flattenBrowsers", () => {
@@ -70,11 +72,9 @@ describe("flattenBrowsers", () => {
       name: "grid",
       engines: ["chromium", "firefox"],
       sessions: 2,
-      connect: () => ({
-        protocol: "playwright",
-        endpoint: "ws://farm/",
-        exposeNetwork: "<loopback>",
-      }),
+      protocol: "playwright",
+      reach: "loopback",
+      connect: { endpoint: "ws://farm/" },
     });
     const flat = flattenBrowsers(["chromium", grid]);
     expect(flat.declared).toEqual([
@@ -91,7 +91,9 @@ describe("flattenBrowsers", () => {
       name: "farm",
       engines: ["chromium"],
       sessions: 1,
-      connect: () => ({ protocol: "cdp", endpoint: "wss://x/" }),
+      protocol: "cdp",
+      reach: "url",
+      connect: { endpoint: "wss://x/" },
     });
     expect(flattenBrowsers([farm]).declared).toEqual([
       { target: "chromium@farm", reach: "url", status: "ready" },

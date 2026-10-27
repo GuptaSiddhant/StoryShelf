@@ -2,7 +2,7 @@
 
 /** Runs work under a fixed number of sessions. */
 export interface SessionGate {
-  /** Sessions the plan allows. */
+  /** Sessions the plan allows now (a scaling provider's cap can change between reads). */
   readonly size: number;
   /** Run `fn` once a session is free. */
   run<T>(fn: () => Promise<T>): Promise<T>;
@@ -15,30 +15,52 @@ const gates = new Map<string, SessionGate>();
  * concurrent shards share the cap instead of multiplying it. A later call with another `sessions`
  * keeps the first gate: the size is the runner's configuration and does not change under it.
  */
-export function sessionGateFor(target: string, sessions: number): SessionGate {
+export function sessionGateFor(
+  target: string,
+  sessions: number | (() => number),
+  onInvalid?: (value: unknown) => void,
+): SessionGate {
   let gate = gates.get(target);
   if (gate === undefined) {
-    gate = createSessionGate(sessions);
+    gate = createSessionGate(sessions, onInvalid);
     gates.set(target, gate);
   }
   return gate;
 }
 
-/** A gate of its own (not shared through {@link sessionGateFor}); `size` below 1 counts as 1. */
-export function createSessionGate(size: number): SessionGate {
-  const limit = Math.max(1, Math.floor(size));
+/**
+ * A gate of its own (not shared through {@link sessionGateFor}); `size` below 1 counts as 1. A
+ * function is read on every use, so a cap that grows lets waiting work in at the next release.
+ */
+export function createSessionGate(
+  size: number | (() => number),
+  onInvalid?: (value: unknown) => void,
+): SessionGate {
+  let last = 1;
+  let warned = false;
+  // A function returning garbage (NaN, a string) keeps the last good cap instead of blocking every page.
+  const limitNow = (): number => {
+    const raw: unknown = typeof size === "function" ? size() : size;
+    if (typeof raw === "number" && Number.isFinite(raw)) {
+      last = Math.max(1, Math.floor(raw));
+    } else if (!warned) {
+      warned = true;
+      onInvalid?.(raw);
+    }
+    return last;
+  };
   let active = 0;
   const waiting: (() => void)[] = [];
+  // A cap that grew lets in as many waiters as it now has room for, not one per release.
   const release = (): void => {
-    const next = waiting.shift();
-    if (next === undefined) {
-      active -= 1;
-    } else {
-      next();
+    active -= 1;
+    while (active < limitNow() && waiting.length > 0) {
+      active += 1;
+      waiting.shift()?.();
     }
   };
   const acquire = async (): Promise<void> => {
-    if (active < limit) {
+    if (active < limitNow()) {
       active += 1;
       return;
     }
@@ -47,7 +69,9 @@ export function createSessionGate(size: number): SessionGate {
     });
   };
   return {
-    size: limit,
+    get size() {
+      return limitNow();
+    },
     run: async (fn) => {
       await acquire();
       try {

@@ -207,7 +207,9 @@ describe("component page without testing", () => {
     const secret = "preview-secret-preview-secret";
     const { app, project, b2 } = await seed({ auth: true, testing: true, secret });
     const html = await page(app, "src/Button.stories.tsx");
-    expect(html).toContain(`data-preview-refresh-url="/api/v1/projects/app/builds/${b2.id}/preview-token"`);
+    expect(html).toContain(
+      `data-preview-refresh-url="/api/v1/projects/app/builds/${b2.id}/preview-token"`,
+    );
     expect(html).toContain("data-preview-refresh-seconds=");
     const response = await app.request(`/api/v1/projects/app/builds/${b2.id}/preview-token`);
     expect(response.status).toBe(200);
@@ -224,7 +226,9 @@ describe("component page without testing", () => {
   it("offers no refresh for a frame that needs no token", async () => {
     const { app, b2 } = await seed({ auth: true, publicBuilds: true });
     expect(await page(app, "src/Button.stories.tsx")).not.toContain("data-preview-refresh-url");
-    expect((await app.request(`/api/v1/projects/app/builds/${b2.id}/preview-token`)).status).toBe(404);
+    expect((await app.request(`/api/v1/projects/app/builds/${b2.id}/preview-token`)).status).toBe(
+      404,
+    );
   });
 
   it("offers no frame for a private build when there is no testing to serve a signed URL", async () => {

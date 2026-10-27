@@ -54,6 +54,8 @@ export interface MatrixInput {
    * rendering a shard (sibling shards of one build render at once), the build id otherwise.
    */
   runId?: string | undefined;
+  /** The shard's 1-based position in the plan, passed to the runner; absent outside a shard. */
+  shardIndex?: number | undefined;
   /** Mints the signed URL for a `reach: "url"` target at the start of each pass. */
   storybookUrl?: StorybookUrlSource | undefined;
 }
@@ -338,6 +340,7 @@ function renderRequest(
     },
     buildId: build.id,
     runId: input.runId ?? build.id,
+    ...(input.shardIndex === undefined ? {} : { shardIndex: input.shardIndex }),
     storybookDir: input.storybookDir,
     stories,
     viewports: input.viewports,

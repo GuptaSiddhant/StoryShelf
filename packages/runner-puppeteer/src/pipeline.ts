@@ -24,7 +24,7 @@ import {
   type SessionGate,
 } from "@storyshelf/core/utils";
 import type { Browser } from "puppeteer-core";
-import { messageOf, safeCloseBrowser, safeCloseServer } from "./browser.ts";
+import { finishing, messageOf, outcomeOf, safeCloseBrowser, safeCloseServer } from "./browser.ts";
 import { PagePool } from "./pages.ts";
 import { measureRemote } from "./remote-environment.ts";
 import { createRuntimeParamsState } from "./runtime-params.ts";
@@ -33,6 +33,7 @@ import { createStaticServer } from "./static-server.ts";
 import type {
   ActiveRun,
   CaptureContext,
+  LaunchContext,
   PuppeteerRenderInput,
   RunInput,
   TargetDriver,
@@ -54,27 +55,43 @@ export async function renderAll(
   const { input, name, remote } = planRun(rawInput, driver, defaultTarget);
   assertReachable(name, remote, input.storybookUrl);
   // Launch first: a target that will not start must fail before a static server is bound.
-  const browser = await driver.launch(name, input.logger);
+  const launch = async (): Promise<Browser> =>
+    await driver.launch(name, input.logger, launchContextOf(input, "render", active.abort?.signal));
+  const browser = await launch();
   const server = await serve(input, browser);
   input.logger?.info(describeSizing({ ...input, browser: engineOf(name) }), "capture sizing");
   // Measured while the browser is open: Puppeteer cannot read the version of a closed one.
-  const environment = remote
-    ? await measureRemote(browser, remote.remote, input.logger)
-    : await localEnvironment(browser);
-  const result = await runWithBrowser(
-    input,
-    active,
-    browser,
-    server,
-    async () => await driver.launch(name, input.logger),
-  );
+  const environment = await (
+    remote ? measureRemote(browser, remote.remote, input.logger) : localEnvironment(browser)
+  ).catch(async (error: unknown) => {
+    await Promise.all([safeCloseBrowser(browser, "failed", error), safeCloseServer(server)]);
+    throw error;
+  });
+  const result = await runWithBrowser(input, active, browser, server, launch);
   // Echo the target so persisted rows are attributable without the request.
   for (const row of [...result.captures, ...result.failures]) row.browser = name;
   return { ...result, environment };
 }
 
+/** What a remote service's `connect` is told about the run a browser is for. */
+export function launchContextOf(
+  input: { buildId: string; runId?: string | undefined; shardIndex?: number | undefined },
+  purpose: LaunchContext["purpose"],
+  signal?: AbortSignal,
+): LaunchContext {
+  return {
+    buildId: input.buildId,
+    runId: input.runId ?? input.buildId,
+    shardIndex: input.shardIndex,
+    purpose,
+    signal,
+  };
+}
+
 /** The input with its target resolved, and the session gate when the target is remote. */
-export function planRun<T extends { target?: CaptureTarget | undefined }>(
+export function planRun<
+  T extends { target?: CaptureTarget | undefined; logger?: PuppeteerRenderInput["logger"] },
+>(
   rawInput: T,
   driver: TargetDriver,
   defaultTarget: CaptureTarget,
@@ -85,7 +102,14 @@ export function planRun<T extends { target?: CaptureTarget | undefined }>(
 } {
   const name = rawInput.target ?? defaultTarget;
   const remote = driver.remote(name);
-  const gate = remote && sessionGateFor(name, remote.remote.sessions);
+  const gate =
+    remote &&
+    sessionGateFor(name, remote.remote.sessions, (value) => {
+      rawInput.logger?.warn(
+        { target: name, value: String(value) },
+        "sessions() returned an invalid value; keeping the last good one",
+      );
+    });
   return { input: { ...rawInput, target: name, gate }, name, remote };
 }
 
@@ -130,7 +154,7 @@ export async function serve(
     };
   }
   return await createStaticServer(input.storybookDir).catch(async (error: unknown) => {
-    await safeCloseBrowser(browser);
+    await safeCloseBrowser(browser, "failed", error);
     throw error;
   });
 }
@@ -152,15 +176,21 @@ async function runWithBrowser(
   const ctx = buildContext(browser, server.url, input);
   const captures: RenderedSnapshot[] = [];
   const failures: RenderResult["failures"] = [];
-  try {
-    await runAllCaptures(input, active, ctx, captures, failures, relaunch);
-    return { captures, failures };
-  } finally {
-    active.browser = null;
-    await ctx.pagePool?.dispose();
-    // ctx.browser is the latest one: recycling replaces the browser mid-run.
-    await Promise.all([safeCloseBrowser(ctx.browser), safeCloseServer(server)]);
-  }
+  return await finishing(
+    async () => {
+      await runAllCaptures(input, active, ctx, captures, failures, relaunch);
+      return { captures, failures };
+    },
+    async (failed, error) => {
+      active.browser = null;
+      await ctx.pagePool?.dispose();
+      // ctx.browser is the latest one: recycling replaces the browser mid-run.
+      await Promise.all([
+        safeCloseBrowser(ctx.browser, outcomeOf(active, failed), error),
+        safeCloseServer(server),
+      ]);
+    },
+  );
 }
 
 function buildContext(
@@ -244,6 +274,8 @@ async function recycleBrowser(
   if (active.cancelled) throw new Error("Capture cancelled");
   await ctx.pagePool?.dispose();
   await safeCloseBrowser(ctx.browser);
+  // A cancel that arrived while the old browser closed must not start a new one.
+  if (active.cancelled) throw new Error("Capture cancelled");
   ctx.browser = await relaunch();
   if (ctx.pagePool) ctx.pagePool = new PagePool(ctx.browser);
   active.browser = ctx.browser;

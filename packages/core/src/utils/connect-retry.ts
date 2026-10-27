@@ -6,6 +6,8 @@ export interface RetryConnectOptions {
   retries: number;
   /** Delay before the first retry in ms; doubles each time, with jitter, capped at 10 s. */
   backoffMs: number;
+  /** Whether an error is worth another attempt; defaults to {@link isRetryableConnectError}. */
+  retryable?: (error: unknown) => boolean;
   /** Called before each retry with the error, the retry's number (from 1) and its delay. */
   onRetry?: (error: unknown, retry: number, delayMs: number) => void;
   /** Injectable for tests. */
@@ -43,7 +45,7 @@ export async function retryConnect<T>(
       // oxlint-disable-next-line eslint/no-await-in-loop -- attempts are sequential by design
       return await connect();
     } catch (error) {
-      if (retry >= options.retries || !isRetryableConnectError(error)) {
+      if (retry >= options.retries || !(options.retryable ?? isRetryableConnectError)(error)) {
         throw error;
       }
       const delayMs = Math.min(MAX_DELAY_MS, options.backoffMs * 2 ** retry) * jitter();

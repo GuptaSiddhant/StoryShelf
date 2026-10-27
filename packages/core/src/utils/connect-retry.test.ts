@@ -99,4 +99,12 @@ describe("retryConnect", () => {
     );
     expect(attempts).toBe(2);
   });
+
+  it("takes its own rule for what is worth retrying", async () => {
+    const connect = vi.fn(async () => await Promise.reject(new Error("anything")));
+    await expect(
+      retryConnect(connect, { retries: 2, backoffMs: 1, sleep: noSleep, retryable: () => true }),
+    ).rejects.toThrow("anything");
+    expect(connect).toHaveBeenCalledTimes(3);
+  });
 });

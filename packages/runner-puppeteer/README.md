@@ -75,6 +75,8 @@ createPuppeteerCaptureRunner({
 });
 ```
 
+A service that must be woken or started first passes `connect` as a function (with `release`, `retry` and `timeouts`) instead of `endpoint`: it receives the run's `buildId`, `runId`, `shardIndex`, `purpose` and a cancel `signal` and returns `{ endpoint, headers, lease }`, and `release(lease, { outcome, error })` runs once when the render ends, fails or is cancelled. `RemoteConnectError` and `refCounted` come from the same `./remote` subpath; see "Scale to zero" in [Remote browsers](https://storyshelf.js.org/guides/remote-browsers/).
+
 A Puppeteer remote browser cannot route back to the host, so every remote target needs a signed Storybook URL (`reach: "url"`); it stays `unavailable` until a `secret` and a confirmed public origin exist, then the server hands the runner a short-lived signed URL (`<public origin>/_s/<token>/`) for every render pass, and the runner refuses to start one without it. See [Signed Storybook URLs](https://storyshelf.js.org/guides/remote-browsers/#signed-storybook-urls). The target's environment is measured inside the browser, `sessions` is the per-target page cap shared across the process, and connection failures are retried with backoff. Details in [Remote browsers](https://storyshelf.js.org/guides/remote-browsers/).
 
 ## Concurrency and memory

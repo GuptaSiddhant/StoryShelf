@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createLatch, deferred } from "../test-helpers/index.ts";
 import { createSessionGate, sessionGateFor } from "./session-gate.ts";
 
@@ -60,5 +60,57 @@ describe("session gates", () => {
     expect(first.size).toBe(2);
     expect(sessionGateFor("firefox@gate-test", 4)).not.toBe(first);
     expect(await peakOf(sessionGateFor("chromium@gate-test", 2), 10)).toBe(2);
+  });
+
+  it("reads a function size on every use, so a scaling provider can raise or lower the cap", async () => {
+    let cap = 1;
+    const gate = createSessionGate(() => cap);
+    expect(gate.size).toBe(1);
+    cap = 3;
+    expect(gate.size).toBe(3);
+    expect(await peakOf(gate, 10)).toBe(3);
+    cap = 1;
+    expect(await peakOf(gate, 6)).toBe(1);
+  });
+
+  it("keeps the last good cap when a function returns garbage, telling the caller once", async () => {
+    let value: unknown = 2;
+    const invalid = vi.fn();
+    const gate = createSessionGate(() => value as number, invalid);
+    expect(gate.size).toBe(2);
+    value = Number.NaN;
+    expect(gate.size).toBe(2);
+    value = "many";
+    expect(gate.size).toBe(2);
+    expect(invalid).toHaveBeenCalledTimes(1);
+    expect(await peakOf(gate, 8)).toBe(2);
+  });
+
+  it("counts a function returning below one as one", () => {
+    expect(createSessionGate(() => 0).size).toBe(1);
+  });
+
+  it("lets in every waiter a grown cap has room for on the next release, not one", async () => {
+    let cap = 1;
+    const gate = createSessionGate(() => cap);
+    const first = deferred();
+    const running = [gate.run(async () => await first.promise)];
+    const counter = { started: 0 };
+    const barrier = deferred();
+    for (let index = 0; index < 4; index += 1) {
+      running.push(
+        gate.run(async () => {
+          counter.started += 1;
+          await barrier.promise;
+        }),
+      );
+    }
+    cap = 4;
+    first.resolve();
+    await running[0];
+    await Promise.resolve();
+    expect(counter.started).toBe(4);
+    barrier.resolve();
+    await Promise.all(running);
   });
 });

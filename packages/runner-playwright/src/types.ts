@@ -19,6 +19,8 @@ export interface PlaywrightRenderInput {
   buildId: string;
   /** This call\'s cancel handle within the build (a shard id); defaults to the build id. */
   runId?: string | undefined;
+  /** The shard's 1-based position in the build's plan (handed to a remote service's `acquire`). */
+  shardIndex?: number | undefined;
   storybookDir: string;
   stories: StoryEntry[];
   viewports: Viewport[];
@@ -73,7 +75,22 @@ export type ExtractInput = Pick<
 >;
 
 /** Starts (or connects to) a browser for a target; a failure is a `TargetLaunchError`. */
-export type LaunchTarget = (target: CaptureTarget, logger?: Logger) => Promise<Browser>;
+export type LaunchTarget = (
+  target: CaptureTarget,
+  logger: Logger | undefined,
+  context: LaunchContext,
+) => Promise<Browser>;
+
+/** Which run a browser is for, so a remote service can route and lease per shard. */
+export interface LaunchContext {
+  buildId: string;
+  /** The shard's id; the build id when not sharded. */
+  runId: string;
+  shardIndex?: number | undefined;
+  purpose: "render" | "extract" | "tests";
+  /** Aborts a pending `connect` when the run is cancelled. */
+  signal?: AbortSignal | undefined;
+}
 
 /** What the pipeline needs of a target beyond starting it. */
 export interface TargetDriver {
@@ -126,4 +143,6 @@ export interface ExtractedEntry {
 export interface ActiveRun {
   cancelled: boolean;
   browser: Browser | null;
+  /** Aborted by `cancel`, so a `connect` still pending stops too. */
+  abort?: AbortController | undefined;
 }

@@ -1,10 +1,15 @@
-import { TargetLaunchError, type StoryEntry } from "@storyshelf/core/adapter/capture-runner";
+import {
+  RemoteConnectError,
+  TargetLaunchError,
+  type RemoteConnectContext,
+  type StoryEntry,
+} from "@storyshelf/core/adapter/capture-runner";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createPuppeteerCaptureRunner } from "./capture-runner.ts";
-import { cdp } from "./remote/cdp.ts";
+import { cdp, type CdpFixedOptions, type CdpLeasedOptions } from "./remote/cdp.ts";
 
 const fake = vi.hoisted(() => {
   const state = {
@@ -14,10 +19,12 @@ const fake = vi.hoisted(() => {
     probe: undefined as unknown,
     active: 0,
     peak: 0,
+    gate: null as Promise<void> | null,
   };
   const page = {
     goto: async (url: string): Promise<void> => {
       state.gotos.push(url);
+      await state.gate;
       state.active += 1;
       state.peak = Math.max(state.peak, state.active);
       await new Promise((resolve) => setTimeout(resolve, 5));
@@ -87,6 +94,7 @@ beforeEach(async () => {
     probe: { platform: "Linux x86_64", deviceScaleFactor: 1, fonts: ["Arial"] },
     active: 0,
     peak: 0,
+    gate: null,
   });
 });
 
@@ -94,7 +102,7 @@ afterEach(async () => {
   await rm(tmp, { recursive: true, force: true });
 });
 
-const farm = (overrides: Partial<Parameters<typeof cdp>[0]> = {}) =>
+const farm = (overrides: Partial<CdpFixedOptions> = {}) =>
   cdp({
     name: "farm",
     endpoint: "wss://farm.example/?token=sekret-key",
@@ -217,5 +225,142 @@ describe("a remote CDP target", () => {
     await runner.lifecycle?.setup({} as never);
     expect(fake.state.connects).toEqual([]);
     expect(runner.metadata.targets?.[0]?.status).toBe("ready");
+  });
+});
+
+/** Park every page navigation until `open()`, so a render stays in flight. */
+function holdRenders(): { open: () => void } {
+  const { promise, resolve } = Promise.withResolvers<null>();
+  fake.state.gate = promise.then(() => {});
+  return { open: () => resolve(null) };
+}
+
+const leased = (overrides: Partial<CdpLeasedOptions<{ id: string }>> = {}) => {
+  const seen: RemoteConnectContext[] = [];
+  const released: { lease: unknown; outcome: string; error?: unknown }[] = [];
+  let next = 0;
+  const options: CdpLeasedOptions<{ id: string }> = {
+    name: "pool",
+    sessions: 2,
+    retry: { attempts: 1, backoffMs: 1 },
+    connect: async (context) => {
+      seen.push(context);
+      next += 1;
+      const id = next;
+      await Promise.resolve();
+      return {
+        endpoint: `wss://pool-${id}.example/?key=sekret-${id}`,
+        lease: { id: `lease-${id}` },
+      };
+    },
+    release: (lease, info) => {
+      released.push({ lease, ...info });
+    },
+    ...overrides,
+  };
+  const service = cdp<{ id: string }>(options);
+  return { service, seen, released };
+};
+
+describe("a remote CDP target with a function connect and release", () => {
+  it("connects per shard with its identity and releases as finished", async () => {
+    const { service, seen, released } = leased();
+    const runner = createPuppeteerCaptureRunner({ browsers: [service] });
+    await Promise.all(
+      [1, 2].map(
+        async (shardIndex) =>
+          await runner.render(
+            input({ shardIndex, runId: `s${shardIndex}`, storybookUrl: URL_ROOT }),
+          ),
+      ),
+    );
+    expect(
+      seen.map((context) => context.shardIndex).toSorted((a, b) => (a ?? 0) - (b ?? 0)),
+    ).toEqual([1, 2]);
+    expect(seen.every((context) => context.purpose === "render" && context.buildId === "b1")).toBe(
+      true,
+    );
+    expect(fake.state.connects).toHaveLength(2);
+    expect(released.map((entry) => entry.outcome)).toEqual(["finished", "finished"]);
+  });
+
+  it("releases as failed when the handshake fails after connect returned", async () => {
+    const { service, released } = leased();
+    fake.state.failure = new Error("Unexpected server response: 401");
+    await expect(
+      createPuppeteerCaptureRunner({ browsers: [service] }).render(
+        input({ storybookUrl: URL_ROOT }),
+      ),
+    ).rejects.toBeInstanceOf(TargetLaunchError);
+    expect(released.map((entry) => entry.outcome)).toEqual(["failed"]);
+  });
+
+  it("releases as cancelled when the build is cancelled mid-render", async () => {
+    const { service, released } = leased();
+    const runner = createPuppeteerCaptureRunner({ browsers: [service] });
+    const hold = holdRenders();
+    const rendering = runner.render(input({ runId: "s1", storybookUrl: URL_ROOT }));
+    await vi.waitFor(() => {
+      expect(fake.state.gotos.length).toBeGreaterThan(0);
+    });
+    await runner.cancel("b1", "s1");
+    hold.open();
+    await rendering.catch(() => {});
+    expect(released.map((entry) => entry.outcome)).toEqual(["cancelled"]);
+  });
+
+  it("aborts a connect still pending on cancel, and does not retry it", async () => {
+    const aborted = vi.fn();
+    const started = vi.fn();
+    const { service } = leased({
+      retry: { attempts: 3, backoffMs: 1 },
+      connect: async ({ signal }: RemoteConnectContext) =>
+        await new Promise((_, reject) => {
+          started();
+          signal.addEventListener("abort", () => {
+            aborted();
+            reject(new Error("aborted"));
+          });
+        }),
+    });
+    const runner = createPuppeteerCaptureRunner({ browsers: [service] });
+    const rendering = runner.render(input({ runId: "s1", storybookUrl: URL_ROOT }));
+    await vi.waitFor(() => {
+      expect(started).toHaveBeenCalledTimes(1);
+    });
+    await runner.cancel("b1", "s1");
+    await expect(rendering).rejects.toBeInstanceOf(TargetLaunchError);
+    expect(aborted).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails the job without marking the target unavailable for a job-scoped permanent error", async () => {
+    const { service } = leased({
+      connect: () =>
+        Promise.reject(new RemoteConnectError("server gone", { transient: false, scope: "job" })),
+    });
+    const runner = createPuppeteerCaptureRunner({ browsers: [service] });
+    await expect(runner.render(input({ storybookUrl: URL_ROOT }))).rejects.toThrow(/server gone/u);
+    expect(runner.metadata.targets?.[0]?.status).toBe("ready");
+  });
+
+  it("releases leases still held when the runner shuts down", async () => {
+    const { service, released } = leased();
+    const runner = createPuppeteerCaptureRunner({ browsers: [service] });
+    const hold = holdRenders();
+    const rendering = runner.render(input({ runId: "s9", storybookUrl: URL_ROOT }));
+    await vi.waitFor(() => {
+      expect(fake.state.gotos.length).toBeGreaterThan(0);
+    });
+    await runner.lifecycle?.teardown();
+    hold.open();
+    await rendering.catch(() => {});
+    expect(released.map((entry) => entry.outcome)).toEqual(["cancelled"]);
+  });
+
+  it("is still a URL target: loopback reach is not an option for CDP", () => {
+    expect(leased().service.reach).toBe("url");
+    expect(() => cdp({ name: "x", endpoint: "wss://x/", engines: ["firefox"] as never })).toThrow(
+      /Chromium only|cannot drive/u,
+    );
   });
 });
