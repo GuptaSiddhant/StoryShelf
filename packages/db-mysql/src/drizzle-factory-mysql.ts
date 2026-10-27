@@ -8,7 +8,7 @@ import type { AdapterLifecycle } from "@storyshelf/core/adapter/metadata";
 import type { SQL } from "drizzle-orm";
 import type { SQLWrapper } from "drizzle-orm";
 import type { Table } from "drizzle-orm";
-import { eq, getTableColumns } from "drizzle-orm";
+import { and, eq, getTableColumns } from "drizzle-orm";
 import { applyListOptions, buildLifecycle } from "./drizzle-factory.ts";
 
 /** Chainable select surface of the MySQL Drizzle dialect (directly awaitable). */
@@ -51,6 +51,28 @@ function firstRow(rows: unknown[], what: string): unknown {
     throw new Error(`${what} returned no rows`);
   }
   return row;
+}
+
+async function updateWhereOne<T extends Table>(
+  drizzle: DrizzleMySqlLike,
+  table: T,
+  id: string,
+  values: Partial<T["$inferInsert"]>,
+  where: SQL,
+): Promise<T["$inferSelect"] | null> {
+  // MySQL has no UPDATE RETURNING. The condition is evaluated by the UPDATE;
+  // reading afterwards may observe a newer state, but cannot undo cancellation.
+  // oxlint-disable-next-line typescript/await-thenable -- MySQL updates are thenable via drizzle
+  await drizzle
+    .update(table)
+    .set(values)
+    .where(and(eq(idColumn(table), id), where) ?? where);
+  const current = (await drizzle
+    .select()
+    .from(table)
+    .where(eq(idColumn(table), id))
+    .limit(1)) as T["$inferSelect"][];
+  return current[0] ?? null;
 }
 
 async function insertOne<T extends Table>(
@@ -122,15 +144,14 @@ export function createDrizzleMySqlAdapter(
       id: string,
       values: Partial<T["$inferInsert"]>,
     ): Promise<T["$inferSelect"]> => await updateOne(drizzle, table, id, values),
-    get: async <T extends Table>(table: T, id: string): Promise<T["$inferSelect"] | null> => {
-      const where = eq(idColumn(table), id);
-      const rows = (await drizzle
-        .select()
-        .from(table)
-        .where(where)
-        .limit(1)) as T["$inferSelect"][];
-      return rows[0] ?? null;
-    },
+    updateWhere: async <T extends Table>(
+      table: T,
+      id: string,
+      values: Partial<T["$inferInsert"]>,
+      where: SQL,
+    ): Promise<T["$inferSelect"] | null> => await updateWhereOne(drizzle, table, id, values, where),
+    get: async <T extends Table>(table: T, id: string): Promise<T["$inferSelect"] | null> =>
+      await getOne(drizzle, table, id),
     remove: async (table: Table, id: string): Promise<void> => {
       const where = eq(idColumn(table), id);
       await drizzle.delete(table).where(where);

@@ -18,7 +18,16 @@ const metadataSchema = z.object({
   category: z.string().min(1),
 });
 
-const DATABASE_METHODS = ["insert", "update", "get", "remove", "list", "count", "all"];
+const DATABASE_METHODS = [
+  "insert",
+  "update",
+  "updateWhere",
+  "get",
+  "remove",
+  "list",
+  "count",
+  "all",
+];
 
 const STORAGE_METHODS = ["read", "write", "delete", "exists", "list", "writeStream", "readStream"];
 

@@ -58,6 +58,19 @@ class InstrumentedDatabase implements DatabaseAdapter {
     return await track("db.update", table, async () => await this.inner.update(table, id, values));
   }
 
+  async updateWhere<T extends Table>(
+    table: T,
+    id: string,
+    values: Partial<T["$inferInsert"]>,
+    where: SQL,
+  ): Promise<T["$inferSelect"] | null> {
+    return await track(
+      "db.updateWhere",
+      table,
+      async () => await this.inner.updateWhere(table, id, values, where),
+    );
+  }
+
   async get<T extends Table>(table: T, id: string): Promise<T["$inferSelect"] | null> {
     return await track("db.get", table, async () => await this.inner.get(table, id));
   }

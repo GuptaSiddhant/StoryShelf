@@ -26,6 +26,7 @@ function createFakeDb(): DatabaseAdapter & { setLoggerMock: (logger: Logger) => 
     setLogger: setLoggerMock,
     insert: async <T extends Table>() => ({ id: "row-1" }) as T["$inferSelect"],
     update: async <T extends Table>() => ({ id: "row-1" }) as T["$inferSelect"],
+    updateWhere: async <T extends Table>() => ({ id: "row-1" }) as T["$inferSelect"],
     get: async <T extends Table>() => ({ id: "row-1" }) as T["$inferSelect"],
     remove: async () => {},
     list: async <T extends Table>() => [{ id: "row-1" }] as T["$inferSelect"][],
@@ -52,6 +53,26 @@ describe("createInstrumentedDatabase", () => {
     const spans = telemetry.exporter.getFinishedSpans();
     expect(spans.map((span) => span.name)).toEqual(["db.insert", "db.count", "db.all"]);
     expect(spans[0]?.attributes["db.table"]).toBe("fake_things");
+  });
+
+  it("delegates conditional updates and records a span", async () => {
+    telemetry = installTestTelemetry();
+    const fake = createFakeDb();
+    const condition = {} as SQL;
+    const update = vi.fn(fake.updateWhere);
+    fake.updateWhere = update;
+    const db = createInstrumentedDatabase(fake);
+    expect(await db.updateWhere(fakeTable, "row-1", { count: 3 }, condition)).toEqual({
+      id: "row-1",
+    });
+    expect(update).toHaveBeenCalledWith(fakeTable, "row-1", { count: 3 }, condition);
+    update.mockResolvedValueOnce(null);
+    expect(await db.updateWhere(fakeTable, "missing", { count: 3 }, condition)).toBeNull();
+    expect(update).toHaveBeenLastCalledWith(fakeTable, "missing", { count: 3 }, condition);
+    expect(telemetry.exporter.getFinishedSpans().map((span) => span.name)).toEqual([
+      "db.updateWhere",
+      "db.updateWhere",
+    ]);
   });
 
   it("marks failing operations ERROR and rethrows", async () => {

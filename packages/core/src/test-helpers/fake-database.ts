@@ -131,6 +131,12 @@ export function makeDatabase(): { db: DatabaseAdapter } {
     tables: fakeSchema,
     insert: insertRow,
     update: updateRow,
+    updateWhere: async (table, id, values, where) => {
+      const current = rowsOf(table).get(id) as Record<string, unknown> | undefined;
+      if (!current) return null;
+      if (whereMatches(where, current, table)) return await updateRow(table, id, values);
+      return current as never;
+    },
     get: getRow,
     remove: async (table, id) => {
       rowsOf(table).delete(id);

@@ -17,6 +17,7 @@ function stubDatabase(): DatabaseAdapter {
     tables: stubTables(),
     insert: fail,
     update: fail,
+    updateWhere: fail,
     get: fail,
     remove: fail,
     list: fail,

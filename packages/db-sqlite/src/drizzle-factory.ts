@@ -11,7 +11,7 @@ import type {
   TxStore,
 } from "@storyshelf/core/adapter/database";
 import type { SQL, Table } from "drizzle-orm";
-import { eq, getTableColumns } from "drizzle-orm";
+import { and, eq, getTableColumns } from "drizzle-orm";
 import type { AnySQLiteTable, SQLiteColumn } from "drizzle-orm/sqlite-core";
 
 /**
@@ -95,6 +95,12 @@ export function createDrizzleAdapter(db: unknown, options: DrizzleAdapterOptions
       // the type stays deferred instead of resolving to `{}` under generics.
       values: { [K in keyof T["$inferInsert"]]?: T["$inferInsert"][K] },
     ): Promise<T["$inferSelect"]> => await updateOne(drizzle, table, id, values),
+    updateWhere: async <T extends AnySQLiteTable>(
+      table: T,
+      id: string,
+      values: { [K in keyof T["$inferInsert"]]?: T["$inferInsert"][K] },
+      where: SQL,
+    ): Promise<T["$inferSelect"] | null> => await updateWhereOne(drizzle, table, id, values, where),
     get: async <T extends AnySQLiteTable>(
       table: T,
       id: string,
@@ -112,6 +118,22 @@ export function createDrizzleAdapter(db: unknown, options: DrizzleAdapterOptions
     transact: async <R>(fn: (tx: TxStore) => Promise<R>): Promise<R> =>
       await drizzle.transaction(async (tx) => await fn(buildTxStore(tx as DrizzleLike))),
   };
+}
+
+async function updateWhereOne<T extends AnySQLiteTable>(
+  drizzle: DrizzleLike,
+  table: T,
+  id: string,
+  values: { [K in keyof T["$inferInsert"]]?: T["$inferInsert"][K] },
+  where: SQL,
+): Promise<T["$inferSelect"] | null> {
+  const updated = (await drizzle
+    .update(table)
+    .set(values)
+    .where(and(eq(idOf(table), id), where) ?? where)
+    .returning()
+    .get()) as T["$inferSelect"] | undefined;
+  return updated ?? (await getOne(drizzle, table, id));
 }
 
 async function insertOne<T extends Table>(

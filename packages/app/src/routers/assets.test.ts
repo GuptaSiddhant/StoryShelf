@@ -24,6 +24,7 @@ function stubDatabase(): DatabaseAdapter {
     tables: stubTables(),
     insert: dbFail,
     update: dbFail,
+    updateWhere: dbFail,
     get: dbFail,
     remove: dbFail,
     list: dbFail,

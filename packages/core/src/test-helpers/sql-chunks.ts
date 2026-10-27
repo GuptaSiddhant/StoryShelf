@@ -52,6 +52,9 @@ function matchChunk(chunks: SqlChunk[], row: Record<string, unknown>, table: Tab
   if (/is null/iu.test(text)) {
     return isNullMatches(chunks, row, table, false);
   }
+  if (text.includes(" <> ")) {
+    return !eqMatches(chunks, row, table);
+  }
   if (text.includes(" like ")) {
     return likeMatches(chunks, row, table);
   }
