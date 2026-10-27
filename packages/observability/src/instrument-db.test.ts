@@ -66,7 +66,11 @@ describe("createInstrumentedDatabase", () => {
       id: "row-1",
     });
     expect(update).toHaveBeenCalledWith(fakeTable, "row-1", { count: 3 }, condition);
+    update.mockResolvedValueOnce(null);
+    expect(await db.updateWhere(fakeTable, "missing", { count: 3 }, condition)).toBeNull();
+    expect(update).toHaveBeenLastCalledWith(fakeTable, "missing", { count: 3 }, condition);
     expect(telemetry.exporter.getFinishedSpans().map((span) => span.name)).toEqual([
+      "db.updateWhere",
       "db.updateWhere",
     ]);
   });
