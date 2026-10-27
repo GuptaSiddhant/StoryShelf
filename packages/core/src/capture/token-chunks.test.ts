@@ -60,14 +60,54 @@ describe("renderInSlices", () => {
     expect(mint).toHaveBeenCalledTimes(3);
   });
 
-  it("never cuts below the minimum slice", async () => {
-    const { run, seen } = setup(60, 120);
+  it("slices legacy short lifetimes below the usual minimum", async () => {
+    const { run, seen } = setup(600, 45);
     await run();
-    expect(seen.map((call) => call.stories)).toEqual([
-      MIN_CAPTURES_PER_SLICE,
-      MIN_CAPTURES_PER_SLICE,
-      20,
-    ]);
+    expect(seen.map((call) => call.stories)).toEqual([20, 20, 5]);
+  });
+
+  it("caps the default 15 minute timeout for the valid 1050 second floor", async () => {
+    const { run, mint } = setup(1050, 1);
+    await run();
+    expect(mint).toHaveBeenCalledWith("chromium", { budgetMs: 750_000 });
+  });
+
+  it("rejects a lifetime too short for a capture and grace", async () => {
+    const { run, mint } = setup(60, 1);
+    await expect(run()).rejects.toThrow(/increase or clear/u);
+    expect(mint).not.toHaveBeenCalled();
+  });
+
+  it("rejects a story too large to fit in one slice", async () => {
+    const source: StorybookUrlSource = vi.fn(() => Promise.resolve("url"));
+    source.ttlSeconds = () => 600;
+    await expect(
+      renderInSlices({
+        runner: { render: vi.fn(), cancel: vi.fn() } as unknown as CaptureRunner,
+        request: { stories: stories(1), buildId: "b" } as never,
+        browser: "chromium",
+        storybookUrl: source,
+        captureCount: () => 21,
+        renderTimeoutMs: undefined,
+      }),
+    ).rejects.toThrow(/slice limit/u);
+  });
+
+  it("caps an explicit render timeout to the token lifetime minus grace", async () => {
+    const source: StorybookUrlSource = vi.fn(() => Promise.resolve("url"));
+    source.ttlSeconds = () => 600;
+    await renderInSlices({
+      runner: {
+        render: vi.fn().mockResolvedValue({ captures: [], failures: [] }),
+        cancel: vi.fn(),
+      } as unknown as CaptureRunner,
+      request: { stories: stories(1), buildId: "b" } as never,
+      browser: "chromium",
+      storybookUrl: source,
+      captureCount: () => 1,
+      renderTimeoutMs: 900_000,
+    });
+    expect(source).toHaveBeenCalledWith("chromium", { budgetMs: 300_000 });
   });
 
   it("keeps each slice's environment with its own captures", async () => {
@@ -84,7 +124,7 @@ describe("renderInSlices", () => {
         environment: env("2"),
       });
     const source: StorybookUrlSource = vi.fn(() => Promise.resolve("https://x/_s/t/"));
-    source.ttlSeconds = () => 100;
+    source.ttlSeconds = () => 1050;
     const result = await renderInSlices({
       runner: { render, cancel: vi.fn() } as unknown as CaptureRunner,
       request: { stories: stories(MIN_CAPTURES_PER_SLICE + 1), buildId: "b" } as never,
