@@ -114,6 +114,19 @@ describe("upload over the inline limit", () => {
     ]);
   });
 
+  it("explains a rejected inline zip without bypassing extraction limits", async () => {
+    writeBuild({ "index.html": "<html>" });
+    const seen = stubServer({ zipStatus: 422, zipBody: "Zip holds more than 10 entries" });
+
+    await expect(runUpload(options())).rejects.toMatchObject({
+      status: 422,
+      message: expect.stringMatching(
+        /Zip holds more than 10 entries[\s\S]*maxZipEntries[\s\S]*build b1[\s\S]*\/builds\/b1\/zip/u,
+      ),
+    });
+    expect(seen.some((call) => call.path.endsWith("/dedup"))).toBe(false);
+  });
+
   it("does not fall back on other errors, nor on the plain size-limit 413", async () => {
     writeBuild({ "index.html": "<html>" });
     stubServer({
